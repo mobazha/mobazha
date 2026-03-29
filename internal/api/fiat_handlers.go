@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -299,6 +300,10 @@ func (g *Gateway) handlePUTFiatProviderConfig(w http.ResponseWriter, r *http.Req
 	}
 	if input.SecretKey == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "secretKey is required")
+		return
+	}
+	if (providerID == "stripe" || providerID == "paypal") && strings.TrimSpace(input.PublicKey) == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "publicKey is required")
 		return
 	}
 

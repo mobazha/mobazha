@@ -381,7 +381,7 @@ func TestProvider_ParseWebhook_PaymentSucceeded_PurchaseUnitsFallback(t *testing
 	assert.Equal(t, "CAP-XYZ", event.PaymentID)
 	assert.Equal(t, "fallback-order-id", event.OrderID)
 	assert.Equal(t, "MERCH-999", event.AccountID)
-	assert.Equal(t, "fiat:EUR", event.Coin)
+	assert.Equal(t, "fiat:paypal:EUR", event.Coin)
 	assert.Equal(t, int64(4999), event.Amount)
 	assert.Equal(t, "EUR", event.Currency)
 	assert.Equal(t, "paypal", event.PaymentMethod.Type)
@@ -450,7 +450,7 @@ func TestProvider_ParseWebhook_DisputeCreated_ExtractsDetails(t *testing.T) {
 	assert.Equal(t, "CAP-SELLER-001", event.PaymentID)
 	assert.Equal(t, "my-order-id-001", event.OrderID)
 	assert.Equal(t, "USD", event.Currency)
-	assert.Equal(t, "fiat:USD", event.Coin)
+	assert.Equal(t, "fiat:paypal:USD", event.Coin)
 	assert.Equal(t, int64(2999), event.Amount)
 }
 
@@ -578,7 +578,7 @@ func TestProvider_ParseWebhook_CaptureRefunded_ExtractsDetails(t *testing.T) {
 	assert.Equal(t, "REFUND-ABC", event.RefundID)
 	assert.Equal(t, "CAP-PARENT-001", event.PaymentID)
 	assert.Equal(t, "USD", event.Currency)
-	assert.Equal(t, "fiat:USD", event.Coin)
+	assert.Equal(t, "fiat:paypal:USD", event.Coin)
 	assert.Equal(t, int64(1550), event.Amount)
 }
 

@@ -59,13 +59,8 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	order.Open = true
 
 	now := time.Now()
-	if orderOpen.GetFiatProvider() != "" {
-		exp := now.Add(1 * time.Hour)
-		order.ExpiresAt = &exp
-	} else {
-		exp := now.Add(1 * time.Hour)
-		order.ExpiresAt = &exp
-	}
+	exp := now.Add(1 * time.Hour)
+	order.ExpiresAt = &exp
 
 	var validationError bool
 	// If the validation fails and we are the vendor, we send a DECLINE message back

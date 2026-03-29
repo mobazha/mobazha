@@ -454,7 +454,7 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 		return CtMockInfo, nil
 	}
 
-	if coinType.IsFiatPayment() || coinType.IsStripeChain() {
+	if coinType.IsFiatPayment() {
 		return CtStripeInfo, nil
 	}
 

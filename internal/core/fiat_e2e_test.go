@@ -91,10 +91,10 @@ func stripeWebhookPayload(eventType string, dataObject json.RawMessage) ([]byte,
 
 func registerStripeProvider(reg contracts.FiatProviderRegistry) {
 	p := stripe.NewProvider(stripe.Config{
-		SecretKey:     "sk_test_e2e",
+		SecretKey:      "sk_test_e2e",
 		PublishableKey: "pk_test_e2e",
-		WebhookSecret: "whsec_e2e",
-		Mode:          stripe.ModeDirect,
+		WebhookSecret:  "whsec_e2e",
+		Mode:           stripe.ModeDirect,
 	})
 	reg.Register(p)
 }
@@ -609,7 +609,10 @@ func TestE2E_Stripe_WebhookToBuyerRelay(t *testing.T) {
 	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
 
 	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
-		pd := buildFiatPaymentData(event)
+		pd, err := buildFiatPaymentData(event)
+		if err != nil {
+			return err
+		}
 		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
 		return nil
 	})
@@ -675,7 +678,10 @@ func TestE2E_PayPal_WebhookToBuyerRelay(t *testing.T) {
 	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
 
 	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
-		pd := buildFiatPaymentData(event)
+		pd, err := buildFiatPaymentData(event)
+		if err != nil {
+			return err
+		}
 		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
 		return nil
 	})
@@ -732,7 +738,10 @@ func TestE2E_Stripe_WebhookIdempotency_BuyerCalledOnce(t *testing.T) {
 	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
 
 	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
-		pd := buildFiatPaymentData(event)
+		pd, err := buildFiatPaymentData(event)
+		if err != nil {
+			return err
+		}
 		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
 		return nil
 	})

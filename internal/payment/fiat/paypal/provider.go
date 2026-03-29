@@ -427,7 +427,7 @@ func (p *Provider) extractDisputeDetails(raw json.RawMessage, we *contracts.Webh
 
 	if res.DisputeAmount.CurrencyCode != "" {
 		we.Currency = strings.ToUpper(res.DisputeAmount.CurrencyCode)
-		we.Coin = "fiat:" + we.Currency
+		we.Coin = "fiat:" + providerID + ":" + we.Currency
 	}
 	if v, err := parseAmount(res.DisputeAmount.Value, res.DisputeAmount.CurrencyCode); err == nil {
 		we.Amount = v
@@ -454,7 +454,7 @@ func (p *Provider) extractRefundDetails(raw json.RawMessage, we *contracts.Webho
 
 	if res.Amount.CurrencyCode != "" {
 		we.Currency = strings.ToUpper(res.Amount.CurrencyCode)
-		we.Coin = "fiat:" + we.Currency
+		we.Coin = "fiat:" + providerID + ":" + we.Currency
 	}
 	if v, err := parseAmount(res.Amount.Value, res.Amount.CurrencyCode); err == nil {
 		we.Amount = v
@@ -480,7 +480,7 @@ func (p *Provider) extractResourceDetails(raw json.RawMessage, we *contracts.Web
 		}
 		if pu.Amount.CurrencyCode != "" {
 			we.Currency = strings.ToUpper(pu.Amount.CurrencyCode)
-			we.Coin = "fiat:" + we.Currency
+			we.Coin = "fiat:" + providerID + ":" + we.Currency
 		}
 		if v, err := parseAmount(pu.Amount.Value, pu.Amount.CurrencyCode); err == nil {
 			we.Amount = v

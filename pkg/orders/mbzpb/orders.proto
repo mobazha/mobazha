@@ -20,7 +20,6 @@ message OrderOpen {
     string amount                       = 10; // Satoshis / cents (smallest unit)
     repeated string discountCodes       = 11;
     repeated AppliedDiscount appliedDiscounts = 12;
-    string fiatProvider                 = 22; // Fiat provider ID: "stripe" | "paypal" | "" (crypto)
 
     message AppliedDiscount {
         string discountID = 1;
@@ -253,7 +252,7 @@ message PaymentSent {
         MODERATED           = 2; // 2 of 3 escrow address
         RWA_ESCROW          = 3; // RWA 托管模式：通过 createOrderFromListing 锁定资金，需卖家确认
         RWA_INSTANT         = 4; // RWA 即时模式：通过 instantBuy 原子交换完成
-        FIAT                = 5; // 法币支付（Stripe / PayPal），通过 FiatProvider 处理
+        FIAT                = 5; // 法币支付（Stripe / PayPal），以 PaymentSent.Coin 的 canonical 形式处理
     }
 
     message PaymentMethod {

@@ -286,7 +286,7 @@ func TestProvider_ParseWebhook_PaymentSucceeded(t *testing.T) {
 	assert.Equal(t, "stripe", event.ProviderID)
 	assert.Equal(t, "pi_webhook", event.PaymentID)
 	assert.Equal(t, "order_wh", event.OrderID)
-	assert.Equal(t, "fiat:USD", event.Coin)
+	assert.Equal(t, "fiat:stripe:USD", event.Coin)
 	assert.Equal(t, int64(2999), event.Amount)
 	assert.Equal(t, "USD", event.Currency)
 }
@@ -463,7 +463,7 @@ func TestProvider_ParseWebhook_ChargeRefunded_ExtractsDetails(t *testing.T) {
 	assert.Equal(t, "re_first_123", event.RefundID)
 	assert.Equal(t, int64(1500), event.Amount)
 	assert.Equal(t, "EUR", event.Currency)
-	assert.Equal(t, "fiat:EUR", event.Coin)
+	assert.Equal(t, "fiat:stripe:EUR", event.Coin)
 }
 
 func TestMapDisputeStatus(t *testing.T) {

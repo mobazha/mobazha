@@ -158,9 +158,9 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 		}
 		we.PaymentID = pi.ID
 		we.OrderID = pi.Metadata["order_id"]
-		we.Coin = "fiat:" + strings.ToUpper(string(pi.Currency))
 		we.Amount = pi.Amount
 		we.Currency = strings.ToUpper(string(pi.Currency))
+		we.Coin = "fiat:" + providerID + ":" + we.Currency
 		we.PaymentMethod = extractPaymentMethod(pi)
 		if we.AccountID == "" && pi.TransferData != nil && pi.TransferData.Destination != nil {
 			we.AccountID = pi.TransferData.Destination.ID
@@ -174,9 +174,9 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 		}
 		we.PaymentID = pi.ID
 		we.OrderID = pi.Metadata["order_id"]
-		we.Coin = "fiat:" + strings.ToUpper(string(pi.Currency))
 		we.Amount = pi.Amount
 		we.Currency = strings.ToUpper(string(pi.Currency))
+		we.Coin = "fiat:" + providerID + ":" + we.Currency
 
 	case "charge.dispute.created":
 		we.Type = contracts.WebhookDisputeOpened
@@ -210,7 +210,7 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 			}
 			we.Amount = ch.AmountRefunded
 			we.Currency = strings.ToUpper(string(ch.Currency))
-			we.Coin = "fiat:" + we.Currency
+			we.Coin = "fiat:" + providerID + ":" + we.Currency
 			if ch.Refunds != nil && len(ch.Refunds.Data) > 0 {
 				we.RefundID = ch.Refunds.Data[0].ID
 			}
@@ -224,9 +224,9 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 		}
 		we.PaymentID = pi.ID
 		we.OrderID = pi.Metadata["order_id"]
-		we.Coin = "fiat:" + strings.ToUpper(string(pi.Currency))
 		we.Amount = pi.Amount
 		we.Currency = strings.ToUpper(string(pi.Currency))
+		we.Coin = "fiat:" + providerID + ":" + we.Currency
 
 	case "account.updated":
 		we.Type = contracts.WebhookAccountUpdated

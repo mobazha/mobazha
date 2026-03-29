@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -160,7 +161,10 @@ func (n *MobazhaNode) wireServiceSetters() {
 	}
 	if n.fiatPaymentService != nil && n.orderService != nil {
 		n.fiatPaymentService.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
-			pd := buildFiatPaymentData(event)
+			pd, err := buildFiatPaymentData(event)
+			if err != nil {
+				return err
+			}
 			if err := n.orderService.ProcessOrderPayment(ctx, pd); err != nil {
 				return err
 			}
@@ -172,23 +176,32 @@ func (n *MobazhaNode) wireServiceSetters() {
 
 // buildFiatPaymentData converts a fiat WebhookEvent into a PaymentData struct.
 // Extracted from the webhook handler closure to keep wiring logic thin.
-func buildFiatPaymentData(event *contracts.WebhookEvent) *models.PaymentData {
-	coin := iwallet.CoinType(event.Coin)
-	if coin == "" && event.Currency != "" {
-		if event.ProviderID != "" {
-			coin = iwallet.CoinType("fiat:" + event.ProviderID + ":" + event.Currency)
-		} else {
-			coin = iwallet.CoinType("fiat:" + event.Currency)
-		}
+func buildFiatPaymentData(event *contracts.WebhookEvent) (*models.PaymentData, error) {
+	providerID := strings.ToLower(strings.TrimSpace(event.ProviderID))
+	if providerID == "" {
+		return nil, fmt.Errorf("fiat webhook provider ID is empty")
 	}
+	currency := strings.ToUpper(strings.TrimSpace(event.Currency))
+	if currency == "" {
+		return nil, fmt.Errorf("fiat webhook currency is empty")
+	}
+	if strings.TrimSpace(event.OrderID) == "" {
+		return nil, fmt.Errorf("fiat webhook order ID is empty")
+	}
+	if strings.TrimSpace(event.PaymentID) == "" {
+		return nil, fmt.Errorf("fiat webhook payment ID is empty")
+	}
+
+	coin := iwallet.CoinType(fmt.Sprintf("fiat:%s:%s", providerID, currency))
+
 	return &models.PaymentData{
 		OrderID:       event.OrderID,
 		TransactionID: event.PaymentID,
 		Coin:          coin,
 		Amount:        uint64(event.Amount),
 		Method:        pb.PaymentSent_FIAT,
-		ProviderID:    event.ProviderID,
-	}
+		ProviderID:    providerID,
+	}, nil
 }
 
 // initMatrixChatService creates the mautrix-go backed Matrix chat service.

@@ -19,28 +19,28 @@ import (
 
 // mockFiatService implements contracts.FiatService for handler tests.
 type mockFiatService struct {
-	enabledResult  []contracts.ProviderInfo
-	enabledErr     error
-	createResult   *contracts.PaymentSession
-	createErr      error
-	captureResult  *contracts.PaymentResult
-	captureErr     error
-	getResult      *contracts.PaymentDetail
-	getErr         error
-	webhookErr     error
-	statusResult   *contracts.AccountStatus
-	statusErr      error
-	configResult   *contracts.ProviderConfigView
-	configErr      error
-	saveErr        error
+	enabledResult   []contracts.ProviderInfo
+	enabledErr      error
+	createResult    *contracts.PaymentSession
+	createErr       error
+	captureResult   *contracts.PaymentResult
+	captureErr      error
+	getResult       *contracts.PaymentDetail
+	getErr          error
+	webhookErr      error
+	statusResult    *contracts.AccountStatus
+	statusErr       error
+	configResult    *contracts.ProviderConfigView
+	configErr       error
+	saveErr         error
 	disconnectErr   error
 	verifyErr       error
 	refundResult    *contracts.RefundResult
 	refundErr       error
-	onboardResult  *contracts.OnboardingResult
-	onboardErr     error
+	onboardResult   *contracts.OnboardingResult
+	onboardErr      error
 	onboardCBResult *contracts.AccountStatus
-	onboardCBErr   error
+	onboardCBErr    error
 }
 
 func (m *mockFiatService) EnabledProviders(_ context.Context) ([]contracts.ProviderInfo, error) {
@@ -331,6 +331,21 @@ func TestHandlePUTFiatConfig_MissingSecretKey(t *testing.T) {
 	g := &Gateway{}
 	w := httptest.NewRecorder()
 	body := contracts.ProviderConfigInput{AccountID: "acct_new"}
+	r := newFiatHandlerRequest(t, "PUT", "/v1/fiat/stripe/config", body,
+		map[string]string{"providerID": "stripe"}, svc)
+
+	g.handlePUTFiatProviderConfig(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandlePUTFiatConfig_MissingPublicKey(t *testing.T) {
+	svc := &mockFiatService{}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	body := contracts.ProviderConfigInput{
+		AccountID: "acct_new",
+		SecretKey: "sk_new",
+	}
 	r := newFiatHandlerRequest(t, "PUT", "/v1/fiat/stripe/config", body,
 		map[string]string{"providerID": "stripe"}, svc)
 

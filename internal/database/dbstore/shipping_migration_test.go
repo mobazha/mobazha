@@ -119,47 +119,6 @@ func TestMigrateShipping_FromShippingProfiles(t *testing.T) {
 	assert.True(t, l1.IsDefault)
 }
 
-func TestMigrateShipping_FromLegacyShippingOptions(t *testing.T) {
-	db, store := setupMigrationDB(t)
-	ctx := context.Background()
-
-	options := []models.ShippingOption{
-		{
-			Name:     "Domestic Shipping",
-			Currency: "USD",
-			Regions:  []string{"US", "CA"},
-			Services: []*models.ShippingOption_Service{
-				{Name: "Standard", FirstFreight: "500", EstimatedDelivery: "5-7 days"},
-				{Name: "Express", FirstFreight: "1500", EstimatedDelivery: "1-2 days"},
-			},
-		},
-	}
-	optionsJSON, _ := json.Marshal(options)
-
-	seedPreferences(t, db, &models.UserPreferences{
-		ShippingOptions: optionsJSON,
-	})
-
-	require.NoError(t, core.MigrateShippingFromPreferences(db, store))
-
-	got, err := store.ListProfiles(ctx)
-	require.NoError(t, err)
-	assert.Len(t, got, 1)
-	assert.True(t, got[0].IsDefault)
-
-	groups, err := got[0].GetLocationGroups()
-	require.NoError(t, err)
-	assert.Len(t, groups, 1)
-	assert.Len(t, groups[0].Zones, 1)
-	assert.Equal(t, []string{"US", "CA"}, groups[0].Zones[0].Regions)
-	assert.Len(t, groups[0].Zones[0].Rates, 2)
-
-	locs, err := store.ListLocations(ctx)
-	require.NoError(t, err)
-	assert.Len(t, locs, 1)
-	assert.True(t, locs[0].IsDefault)
-}
-
 func TestMigrateShipping_Idempotent(t *testing.T) {
 	db, store := setupMigrationDB(t)
 	ctx := context.Background()

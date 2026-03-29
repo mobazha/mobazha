@@ -46,22 +46,16 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 		return fmt.Errorf("%w: invalid moderator ID", coreiface.ErrBadRequest)
 	}
 
-	shippingOptions, err := prefs.GetShippingOptions()
-	if err != nil {
-		return fmt.Errorf("%w: invalid shipping options", coreiface.ErrBadRequest)
-	}
-
 	shippingProfiles, err := prefs.GetShippingProfiles()
 	if err != nil {
 		return fmt.Errorf("%w: invalid shipping profiles", coreiface.ErrBadRequest)
 	}
 
-	if len(shippingOptions) == 0 && len(shippingProfiles) == 0 {
+	if len(shippingProfiles) == 0 {
 		currentPrefs, err := s.GetPreferences()
 		if err == nil {
-			currentShippingOptions, _ := currentPrefs.GetShippingOptions()
 			currentShippingProfiles, _ := currentPrefs.GetShippingProfiles()
-			if len(currentShippingOptions) > 0 || len(currentShippingProfiles) > 0 {
+			if len(currentShippingProfiles) > 0 {
 				physicalGoodsCount, err := s.countPhysicalGoods()
 				if err != nil {
 					maybeCloseDone(done)
@@ -69,7 +63,7 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 				}
 				if physicalGoodsCount > 0 {
 					maybeCloseDone(done)
-					return fmt.Errorf("%w: cannot remove all shipping options/profiles while %d physical goods exist. Please delete or convert those listings first", coreiface.ErrBadRequest, physicalGoodsCount)
+					return fmt.Errorf("%w: cannot remove all shipping profiles while %d physical goods exist. Please delete or convert those listings first", coreiface.ErrBadRequest, physicalGoodsCount)
 				}
 			}
 		}

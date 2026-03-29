@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 // MigrateShippingFromPreferences migrates shipping data from legacy
-// UserPreferences JSON blobs (ShippingProfiles, ShippingLocations, ShippingOptions)
+// UserPreferences JSON blobs (ShippingProfiles, ShippingLocations)
 // into the dedicated shipping_profiles / shipping_locations tables.
 //
 // Idempotent: skips if the new tables already contain profiles.
@@ -33,15 +32,6 @@ func MigrateShippingFromPreferences(db pkgdb.Database, store contracts.ShippingS
 	})
 	if err != nil {
 		return nil
-	}
-
-	if prefs.NeedsMigrationFromLegacy() {
-		if err := prefs.MigrateFromLegacyShippingOptions(
-			uuid.New().String(), "Default Shipping",
-			uuid.New().String(), "Default Location",
-		); err != nil {
-			return fmt.Errorf("legacy option conversion: %w", err)
-		}
 	}
 
 	profiles, err := prefs.GetShippingProfiles()

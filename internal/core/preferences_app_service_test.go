@@ -188,10 +188,10 @@ func TestPreferencesAppService_SavePreferences_RejectRemoveShippingWithPhysicalG
 
 	svc := newTestPreferencesAppService(t, PreferencesAppServiceConfig{DB: db})
 
-	shippingOpts, _ := json.Marshal([]models.ShippingOption{
-		{ID: 1, Name: "Standard"},
+	shippingProfiles, _ := json.Marshal([]*models.ShippingProfile{
+		{ProfileID: "prof-1", Name: "Default", IsDefault: true},
 	})
-	seedPreferences(t, db, &models.UserPreferences{ShippingOptions: shippingOpts})
+	seedPreferences(t, db, &models.UserPreferences{ShippingProfiles: shippingProfiles})
 
 	prefs := &models.UserPreferences{}
 	err = svc.SavePreferences(prefs, nil)

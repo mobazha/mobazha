@@ -10,20 +10,12 @@ message Listing {
     ID vendorID                             = 2;
     Metadata metadata                       = 3;
     Item item                               = 4;
-    reserved 5;
-    reserved "shippingOptions";
-    repeated Tax taxes                      = 6;
-    reserved 7;
-    reserved "coupons";
-    repeated string moderators              = 8;
-    reserved 9;
-    reserved "termsAndConditions";
-    reserved 10;
-    reserved "refundPolicy";
-    string status                           = 11; // "draft", "published", "private". Default is "published".
-    bool featured                           = 12;
-    ShippingProfile shippingProfile         = 13; // P2P/IPFS 发布时嵌入的配送档案快照
-    string shippingProfileId                = 14; // 内部引用的配送档案 ID，发布时由后端解析为快照
+    repeated Tax taxes                      = 5;
+    repeated string moderators              = 6;
+    string status                           = 7;  // "draft", "published", "private". Default is "published".
+    bool featured                           = 8;
+    ShippingProfile shippingProfile         = 9;  // P2P/IPFS 发布时嵌入的配送档案快照
+    string shippingProfileId                = 10; // 内部引用的配送档案 ID，发布时由后端解析为快照
 
     message Metadata {
         uint32 version                     = 1;
@@ -33,10 +25,10 @@ message Listing {
         repeated string acceptedCurrencies = 5; // RWA/Crypto 商品接受的支付币种
         string language                    = 6;
         uint32 escrowTimeoutHours          = 7;
-        Currency pricingCurrency           = 9;
-        RwaTradeMode rwaTradeMode          = 10; // RWA 交易模式
-        uint64 rwaEscrowTimeoutSeconds     = 11; // RWA 托管超时时间（秒），默认86400（24小时）
-        uint64 rwaListingId                = 12; // RWA 合约 Listing ID（延迟模式必填，用于 createOrderFromListing）
+        Currency pricingCurrency           = 8;
+        RwaTradeMode rwaTradeMode          = 9;  // RWA 交易模式
+        uint64 rwaEscrowTimeoutSeconds     = 10; // RWA 托管超时时间（秒），默认86400（24小时）
+        uint64 rwaListingId                = 11; // RWA 合约 Listing ID（延迟模式必填，用于 createOrderFromListing）
 
         enum ContractType {
             PHYSICAL_GOOD  = 0;

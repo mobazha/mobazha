@@ -36,6 +36,22 @@ func TestDefaultRegistryLookup(t *testing.T) {
 		t.Fatalf("unexpected decimals: %d", def.Decimals)
 	}
 
+	dai, err := r.Lookup("crypto:eip155:1:erc20:0x6B175474E89094C44Da98b954EedeAC495271d0F")
+	if err != nil {
+		t.Fatalf("lookup dai failed: %v", err)
+	}
+	if dai.Code != "DAI" {
+		t.Fatalf("unexpected DAI code: %s", dai.Code)
+	}
+
+	busd, err := r.Lookup("crypto:eip155:56:erc20:0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56")
+	if err != nil {
+		t.Fatalf("lookup busd failed: %v", err)
+	}
+	if busd.Code != "BUSD" {
+		t.Fatalf("unexpected BUSD code: %s", busd.Code)
+	}
+
 	_, err = r.Lookup("TRXUSDT")
 	if err == nil {
 		t.Fatal("expected lookup failure for non-canonical input")

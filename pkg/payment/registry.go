@@ -20,7 +20,7 @@ import (
 //	reg.Register(iwallet.ChainBSC, evmStrategy)
 //
 //	// Dispatch by coin type
-//	strategy, err := reg.ForCoin(iwallet.CtBNB) // resolves BNB → BSC chain → evmStrategy
+//	strategy, err := reg.ForCoin(iwallet.CoinType("crypto:eip155:56:native")) // resolves coin → BSC chain → evmStrategy
 type Registry struct {
 	mu         sync.RWMutex
 	strategies map[iwallet.ChainType]PaymentStrategy
@@ -56,7 +56,7 @@ func (r *Registry) ForChain(chain iwallet.ChainType) (PaymentStrategy, error) {
 // ForCoin resolves a CoinType to its ChainType and returns the corresponding strategy.
 // This is the primary lookup method used by dispatchers, since events carry coin types.
 //
-// Example: ForCoin(CtBNB) → CoinInfo.Chain == ChainBSC → ForChain(ChainBSC)
+// Example: ForCoin("crypto:eip155:56:native") → CoinInfo.Chain == ChainBSC → ForChain(ChainBSC)
 func (r *Registry) ForCoin(coin iwallet.CoinType) (PaymentStrategy, error) {
 	info, err := coin.CoinInfo()
 	if err != nil {

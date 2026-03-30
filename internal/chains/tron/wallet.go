@@ -35,7 +35,11 @@ func NewTronWallet(cfg *base.WalletConfig) (*TronWallet, error) {
 
 	w.DB = cfg.DB
 	w.Logger = cfg.Logger
-	w.CoinType = iwallet.CtTRON
+	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainTRON)
+	if err != nil {
+		return nil, err
+	}
+	w.CoinType = nativeCoin
 	w.Done = make(chan struct{})
 	w.PostInitFunc = w.postInit
 	w.NetConfig = cfg.NetConfig

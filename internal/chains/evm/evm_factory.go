@@ -20,7 +20,10 @@ func init() {
 // The returned ChainClient is actually *EthClient, so wallet code can type-assert
 // to access EVM-specific methods like GetRecommendedContractVersion().
 func (f *defaultEVMClientFactory) CreateClient(cfg pkgevm.EVMClientConfig) (iwallet.ChainClient, error) {
-	coinType := iwallet.CoinType(cfg.ChainType)
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(cfg.ChainType)
+	if err != nil {
+		return nil, err
+	}
 
 	var opts []EthClientOption
 	if cfg.EscrowAddress != "" {

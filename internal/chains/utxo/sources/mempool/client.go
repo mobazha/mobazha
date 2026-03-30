@@ -36,6 +36,7 @@ type Source struct {
 	wsURL      string
 	httpClient *http.Client
 	chain      iwallet.ChainType
+	coinType   iwallet.CoinType
 	testnet    bool
 	mu         sync.RWMutex
 	healthy    bool
@@ -117,6 +118,11 @@ func NewSource(chain iwallet.ChainType, testnet bool) *Source {
 
 	wsURL := getWebSocketURL(chain, testnet)
 
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(chain)
+	if err != nil {
+		log.Errorf("Mempool source chain %s has no canonical native coin type: %v", chain, err)
+	}
+
 	return &Source{
 		baseURL: baseURL,
 		wsURL:   wsURL,
@@ -124,6 +130,7 @@ func NewSource(chain iwallet.ChainType, testnet bool) *Source {
 			Timeout: 30 * time.Second,
 		},
 		chain:         chain,
+		coinType:      coinType,
 		testnet:       testnet,
 		healthy:       true,
 		wsShutdown:    make(chan struct{}),
@@ -313,7 +320,7 @@ func (s *Source) convertTransaction(tx *TransactionAPI) *iwallet.Transaction {
 			outpointID := makeOutpointID(tx.Txid, uint32(i))
 			result.To = append(result.To, iwallet.SpendInfo{
 				ID:      outpointID,
-				Address: iwallet.NewAddress(vout.ScriptpubkeyAddress, iwallet.CoinType(s.chain)),
+				Address: iwallet.NewAddress(vout.ScriptpubkeyAddress, s.coinType),
 				Amount:  iwallet.NewAmount(int64(vout.Value)),
 			})
 		}
@@ -327,7 +334,7 @@ func (s *Source) convertTransaction(tx *TransactionAPI) *iwallet.Transaction {
 			outpointID := makeOutpointID(vin.Txid, uint32(vin.Vout))
 			result.From = append(result.From, iwallet.SpendInfo{
 				ID:      outpointID,
-				Address: iwallet.NewAddress(vin.Prevout.ScriptpubkeyAddress, iwallet.CoinType(s.chain)),
+				Address: iwallet.NewAddress(vin.Prevout.ScriptpubkeyAddress, s.coinType),
 				Amount:  iwallet.NewAmount(int64(vin.Prevout.Value)),
 			})
 		}

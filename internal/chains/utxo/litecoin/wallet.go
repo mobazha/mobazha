@@ -62,7 +62,11 @@ func NewLitecoinWallet(cfg *base.WalletConfig) (*LitecoinWallet, error) {
 	// via SetChainClient() with a shared UTXOChainClient (Electrum/Mempool).
 	w.DB = cfg.DB
 	w.Logger = cfg.Logger
-	w.CoinType = iwallet.CtLitecoin
+	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainLitecoin)
+	if err != nil {
+		return nil, err
+	}
+	w.CoinType = nativeCoin
 	w.Done = make(chan struct{})
 	w.PostInitFunc = w.postInit
 	w.NetConfig = cfg.NetConfig
@@ -178,7 +182,7 @@ func (w *LitecoinWallet) CreateMultisigAddress(keys []btcec.PublicKey, chaincode
 	if err != nil {
 		return iwallet.Address{}, nil, err
 	}
-	return iwallet.NewAddress(addr.String(), iwallet.CtLitecoin), redeemScript, nil
+	return iwallet.NewAddress(addr.String(), w.CoinType), redeemScript, nil
 }
 
 // SignMultisigTransaction should use the provided key to create a signature for
@@ -303,7 +307,7 @@ func (w *LitecoinWallet) BuildAndSend(wtx iwallet.Tx, txn iwallet.Transaction, s
 		return w.DB.Update(func(dbtx database.Tx) error {
 			err := dbtx.Save(&database.UnconfirmedTransaction{
 				Timestamp: time.Now(),
-				Coin:      iwallet.CtLitecoin.String(),
+				Coin:      w.CoinType.String(),
 				TxBytes:   buf.Bytes(),
 				Txid:      tx.TxHash().String(),
 			})
@@ -359,7 +363,7 @@ func (w *LitecoinWallet) CreateMultisigWithTimeout(keys []btcec.PublicKey, chain
 	if err != nil {
 		return iwallet.Address{}, nil, err
 	}
-	return iwallet.NewAddress(addr.String(), iwallet.CtLitecoin), redeemScript, nil
+	return iwallet.NewAddress(addr.String(), w.CoinType), redeemScript, nil
 }
 
 // ReleaseFundsAfterTimeout will release funds from the escrow. The signature will
@@ -421,7 +425,7 @@ func (w *LitecoinWallet) ReleaseFundsAfterTimeout(wtx iwallet.Tx, txn iwallet.Tr
 		return w.DB.Update(func(dbtx database.Tx) error {
 			err := dbtx.Save(&database.UnconfirmedTransaction{
 				Timestamp: time.Now(),
-				Coin:      iwallet.CtLitecoin.String(),
+				Coin:      w.CoinType.String(),
 				TxBytes:   buf.Bytes(),
 				Txid:      tx.TxHash().String(),
 			})
@@ -600,7 +604,7 @@ func (w *LitecoinWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet.UT
 		return w.DB.Update(func(dbtx database.Tx) error {
 			err := dbtx.Save(&database.UnconfirmedTransaction{
 				Timestamp: time.Now(),
-				Coin:      iwallet.CtLitecoin.String(),
+				Coin:      w.CoinType.String(),
 				TxBytes:   buf.Bytes(),
 				Txid:      tx.TxHash().String(),
 			})

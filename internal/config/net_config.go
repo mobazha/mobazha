@@ -23,9 +23,9 @@ type NetConfig struct {
 	Data      map[string]string `json:"data,omitempty"`
 
 	// Matrix homeserver configuration (injected by hosting in SaaS mode)
-	MatrixInternalURL          string `json:"matrixInternalURL,omitempty"`
-	MatrixServerName           string `json:"matrixServerName,omitempty"`
-	MatrixRegistrationSecret   string `json:"matrixRegistrationSecret,omitempty"`
+	MatrixInternalURL        string `json:"matrixInternalURL,omitempty"`
+	MatrixServerName         string `json:"matrixServerName,omitempty"`
+	MatrixRegistrationSecret string `json:"matrixRegistrationSecret,omitempty"`
 
 	Testnet bool `json:"-"`
 }
@@ -70,8 +70,8 @@ func LoadNetConfig(endpoint string) (*NetConfig, error) {
 // GetExchangeRateProviders returns the configured exchange rate provider URLs.
 // Deprecated: The main exchange rate system now uses CoinGecko directly (EXR-1a)
 // and Hub-and-Spoke for standalone sites (EXR-1b). This method is only used by
-// the ZCash wallet adapter's legacy DefaultExchangeRateProvider.
-// TECHDEBT(TD-031): Migrate ZCash adapter to use the shared ExchangeRateProvider.
+// historical compatibility paths and can be removed once node configs stop
+// carrying ExchangeRateProviders.
 func (config *NetConfig) GetExchangeRateProviders() []string {
 	if len(config.ExchangeRateProviders) == 0 {
 		return []string{"https://info.mobazha.org/api/ticker"}

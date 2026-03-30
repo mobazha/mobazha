@@ -28,6 +28,27 @@ const (
 	categoryUnknown chainCategory = "unknown"
 )
 
+var (
+	testBTCNativeCoin   = mustNativeCoin(iwallet.ChainBitcoin)
+	testBCHNativeCoin   = mustNativeCoin(iwallet.ChainBitcoinCash)
+	testLTCNativeCoin   = mustNativeCoin(iwallet.ChainLitecoin)
+	testZECNativeCoin   = mustNativeCoin(iwallet.ChainZCash)
+	testETHNativeCoin   = mustNativeCoin(iwallet.ChainEthereum)
+	testBNBNativeCoin   = mustNativeCoin(iwallet.ChainBSC)
+	testMATICNativeCoin = mustNativeCoin(iwallet.ChainPolygon)
+	testBASENativeCoin  = mustNativeCoin(iwallet.ChainBase)
+	testCFXNativeCoin   = mustNativeCoin(iwallet.ChainConflux)
+	testSOLNativeCoin   = mustNativeCoin(iwallet.ChainSolana)
+)
+
+func mustNativeCoin(chain iwallet.ChainType) iwallet.CoinType {
+	coin, err := iwallet.RequireCanonicalNativeCoinType(chain)
+	if err != nil {
+		panic(err)
+	}
+	return coin
+}
+
 func classifyCoin(coin iwallet.CoinType) chainCategory {
 	coinInfo, err := coin.CoinInfo()
 	if err != nil {
@@ -52,20 +73,20 @@ func TestDispatchCancelablePayment_ChainCategorization(t *testing.T) {
 		expected chainCategory
 	}{
 		// UTXO chains
-		{"BTC→UTXO", iwallet.CtBitcoin, categoryUTXO},
-		{"BCH→UTXO", iwallet.CtBitcoinCash, categoryUTXO},
-		{"LTC→UTXO", iwallet.CtLitecoin, categoryUTXO},
-		{"ZEC→UTXO", iwallet.CtZCash, categoryUTXO},
+		{"BTC→UTXO", testBTCNativeCoin, categoryUTXO},
+		{"BCH→UTXO", testBCHNativeCoin, categoryUTXO},
+		{"LTC→UTXO", testLTCNativeCoin, categoryUTXO},
+		{"ZEC→UTXO", testZECNativeCoin, categoryUTXO},
 
 		// EVM chains
-		{"ETH→EVM", iwallet.CtEthereum, categoryEVM},
-		{"BNB→EVM", iwallet.CtBNB, categoryEVM},
-		{"MATIC→EVM", iwallet.CtPolygon, categoryEVM},
-		{"BASE→EVM", iwallet.CtBase, categoryEVM},
-		{"CFX→EVM", iwallet.CtConflux, categoryEVM},
+		{"ETH→EVM", testETHNativeCoin, categoryEVM},
+		{"BNB→EVM", testBNBNativeCoin, categoryEVM},
+		{"MATIC→EVM", testMATICNativeCoin, categoryEVM},
+		{"BASE→EVM", testBASENativeCoin, categoryEVM},
+		{"CFX→EVM", testCFXNativeCoin, categoryEVM},
 
 		// Solana
-		{"SOL→Solana", iwallet.CtSolana, categorySolana},
+		{"SOL→Solana", testSOLNativeCoin, categorySolana},
 
 		// Unknown
 		{"INVALID→Unknown", iwallet.CoinType("INVALID_COIN"), categoryUnknown},
@@ -86,9 +107,9 @@ func TestDispatchCancelablePayment_ChainCategorization(t *testing.T) {
 func TestDispatchCancelablePayment_AllSupportedCoins(t *testing.T) {
 	// All supported coins should have a known category
 	supportedCoins := []iwallet.CoinType{
-		iwallet.CtBitcoin, iwallet.CtBitcoinCash, iwallet.CtLitecoin, iwallet.CtZCash,
-		iwallet.CtEthereum, iwallet.CtBNB, iwallet.CtPolygon, iwallet.CtBase, iwallet.CtConflux,
-		iwallet.CtSolana,
+		testBTCNativeCoin, testBCHNativeCoin, testLTCNativeCoin, testZECNativeCoin,
+		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin, testCFXNativeCoin,
+		testSOLNativeCoin,
 	}
 
 	for _, coin := range supportedCoins {
@@ -112,10 +133,10 @@ func TestRegistryDispatch_UTXOChainsRegistered(t *testing.T) {
 		coin  iwallet.CoinType
 		chain iwallet.ChainType
 	}{
-		{iwallet.CtBitcoin, iwallet.ChainBitcoin},
-		{iwallet.CtBitcoinCash, iwallet.ChainBitcoinCash},
-		{iwallet.CtLitecoin, iwallet.ChainLitecoin},
-		{iwallet.CtZCash, iwallet.ChainZCash},
+		{testBTCNativeCoin, iwallet.ChainBitcoin},
+		{testBCHNativeCoin, iwallet.ChainBitcoinCash},
+		{testLTCNativeCoin, iwallet.ChainLitecoin},
+		{testZECNativeCoin, iwallet.ChainZCash},
 	}
 
 	for _, tc := range utxoChains {
@@ -135,8 +156,8 @@ func TestRegistryDispatch_EVMChainsRegistered(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	evmCoins := []iwallet.CoinType{
-		iwallet.CtEthereum, iwallet.CtBNB, iwallet.CtPolygon,
-		iwallet.CtBase, iwallet.CtConflux,
+		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin,
+		testBASENativeCoin, testCFXNativeCoin,
 	}
 
 	for _, coin := range evmCoins {
@@ -155,7 +176,7 @@ func TestRegistryDispatch_SolanaRegistered(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
-	strategy, err := n.paymentRegistry.ForCoin(iwallet.CtSolana)
+	strategy, err := n.paymentRegistry.ForCoin(testSOLNativeCoin)
 	if err != nil {
 		t.Fatalf("ForCoin(SOL): unexpected error: %v", err)
 	}
@@ -169,9 +190,9 @@ func TestRegistryDispatch_ChainCount(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	chains := n.paymentRegistry.Chains()
-	// Expected: UTXO (4) + EVM (5) + Solana (1) = 10
-	if len(chains) != 10 {
-		t.Errorf("registry has %d chains, want 10 (4 UTXO + 5 EVM + 1 Solana)", len(chains))
+	// Expected: UTXO (4) + EVM (5) + Solana (1) + TRON (1) = 11
+	if len(chains) != 11 {
+		t.Errorf("registry has %d chains, want 11 (4 UTXO + 5 EVM + 1 Solana + 1 TRON)", len(chains))
 	}
 }
 
@@ -181,9 +202,9 @@ func TestRegistryDispatch_AllSupportedCoinsInRegistry(t *testing.T) {
 
 	// Every supported coin should resolve to a registered strategy
 	supportedCoins := []iwallet.CoinType{
-		iwallet.CtBitcoin, iwallet.CtBitcoinCash, iwallet.CtLitecoin, iwallet.CtZCash,
-		iwallet.CtEthereum, iwallet.CtBNB, iwallet.CtPolygon, iwallet.CtBase, iwallet.CtConflux,
-		iwallet.CtSolana,
+		testBTCNativeCoin, testBCHNativeCoin, testLTCNativeCoin, testZECNativeCoin,
+		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin, testCFXNativeCoin,
+		testSOLNativeCoin,
 	}
 
 	for _, coin := range supportedCoins {
@@ -288,7 +309,7 @@ func TestDispatchCancelablePayment_NilRegistrySafety(t *testing.T) {
 	svc.dispatchCancelablePayment(&events.CancelablePaymentReady{
 		OrderID:       "test-nil-registry",
 		TransactionID: "test-tx",
-		Coin:          string(iwallet.CtBitcoin),
+		Coin:          string(testBTCNativeCoin),
 		Amount:        1000,
 	})
 }

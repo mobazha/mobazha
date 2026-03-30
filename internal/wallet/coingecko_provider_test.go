@@ -11,6 +11,15 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
+func containsString(values []string, target string) bool {
+	for _, v := range values {
+		if v == target {
+			return true
+		}
+	}
+	return false
+}
+
 func newTestCoinGeckoProvider(client *http.Client) *coinGeckoProvider {
 	return newCoinGeckoProvider(
 		"https://api.coingecko.com/api/v3",
@@ -172,59 +181,70 @@ func TestCoinGeckoProvider_StablecoinMapping(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// USDT should be available (mapped from "tether")
-	usdtRate, ok := rates["USDT"]
-	if !ok {
-		t.Fatal("USDT rate not found")
-	}
-
-	// 1 USD = 1/1.0 USDT. USDT divisibility=6 → 1 * 10^6 = 1000000
-	if usdtRate.Int64() != 1000000 {
-		t.Errorf("expected USDT rate 1000000, got %d", usdtRate.Int64())
-	}
-
-	// Chain-specific USDT variants should also work
-	for _, code := range []string{"ETHUSDT", "BSCUSDT", "BASEUSDT", "SOLUSDT"} {
-		if _, ok := rates[models.CurrencyCode(code)]; !ok {
+	for _, code := range []string{"ETHUSDT", "BSCUSDT", "BASEUSDT", "MATICUSDT", "SOLUSDT", "TRXUSDT"} {
+		rate, ok := rates[models.CurrencyCode(code)]
+		if !ok {
 			t.Errorf("%s rate not found", code)
+			continue
 		}
+		if rate.Int64() != 1000000 {
+			t.Errorf("%s expected rate 1000000, got %d", code, rate.Int64())
+		}
+	}
+
+	if _, ok := rates[models.CurrencyCode("USDT")]; ok {
+		t.Fatal("legacy USDT alias should not be present in catalog-driven rates")
 	}
 }
 
-func TestCoinGeckoProvider_ChainNativeAliases(t *testing.T) {
-	client, cleanup := setupMockCoinGecko(t)
-	defer cleanup()
-
-	p := newTestCoinGeckoProvider(client)
-	rates, err := p.fetchRates("USD")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestCoinGeckoProvider_CatalogDrivenMapping(t *testing.T) {
+	tetherCodes, ok := coinGeckoIDMap["tether"]
+	if !ok {
+		t.Fatal("tether mapping not found")
+	}
+	for _, code := range []string{"ETHUSDT", "BSCUSDT", "BASEUSDT", "MATICUSDT", "SOLUSDT", "TRXUSDT"} {
+		if !containsString(tetherCodes, code) {
+			t.Fatalf("expected tether mapping to include %s", code)
+		}
+	}
+	if containsString(tetherCodes, "USDT") {
+		t.Fatal("legacy USDT alias should not be present in tether mapping")
 	}
 
-	// BASE should have same price as ETH
-	baseRate, hasBase := rates["BASE"]
-	ethRate, hasETH := rates["ETH"]
-	if !hasBase {
-		t.Fatal("BASE rate not found")
+	usdCoinCodes, ok := coinGeckoIDMap["usd-coin"]
+	if !ok {
+		t.Fatal("usd-coin mapping not found")
 	}
-	if !hasETH {
-		t.Fatal("ETH rate not found")
+	for _, code := range []string{"ETHUSDC", "BSCUSDC", "BASEUSDC", "MATICUSDC", "SOLUSDC"} {
+		if !containsString(usdCoinCodes, code) {
+			t.Fatalf("expected usd-coin mapping to include %s", code)
+		}
 	}
-	if baseRate.Int64() != ethRate.Int64() {
-		t.Errorf("BASE rate (%d) should equal ETH rate (%d)", baseRate.Int64(), ethRate.Int64())
+	if containsString(usdCoinCodes, "USDC") {
+		t.Fatal("legacy USDC alias should not be present in usd-coin mapping")
 	}
 
-	// BSC should have same price as BNB
-	bscRate, hasBSC := rates["BSC"]
-	bnbRate, hasBNB := rates["BNB"]
-	if !hasBSC {
-		t.Fatal("BSC rate not found")
+	bitcoinCashCodes, ok := coinGeckoIDMap["bitcoin-cash"]
+	if !ok {
+		t.Fatal("bitcoin-cash mapping not found")
 	}
-	if !hasBNB {
-		t.Fatal("BNB rate not found")
+	if !containsString(bitcoinCashCodes, "BCH") {
+		t.Fatal("expected bitcoin-cash mapping to include BCH")
 	}
-	if bscRate.Int64() != bnbRate.Int64() {
-		t.Errorf("BSC rate (%d) should equal BNB rate (%d)", bscRate.Int64(), bnbRate.Int64())
+
+	zcashCodes, ok := coinGeckoIDMap["zcash"]
+	if !ok {
+		t.Fatal("zcash mapping not found")
+	}
+	if !containsString(zcashCodes, "ZEC") {
+		t.Fatal("expected zcash mapping to include ZEC")
+	}
+	confluxCodes, ok := coinGeckoIDMap["conflux-token"]
+	if !ok {
+		t.Fatal("conflux-token mapping not found")
+	}
+	if !containsString(confluxCodes, "CFX") {
+		t.Fatal("expected conflux-token mapping to include CFX")
 	}
 }
 

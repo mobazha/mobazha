@@ -16,10 +16,12 @@ import (
 type Namespace string
 
 const (
-	NamespaceEIP155 Namespace = "eip155"
-	NamespaceBIP122 Namespace = "bip122"
-	NamespaceTRON   Namespace = "tron"
-	NamespaceSolana Namespace = "solana"
+	NamespaceEIP155      Namespace = "eip155"
+	NamespaceBIP122      Namespace = "bip122"
+	NamespaceTRON        Namespace = "tron"
+	NamespaceSolana      Namespace = "solana"
+	NamespaceBitcoinCash Namespace = "bitcoincash"
+	NamespaceZCash       Namespace = "zcash"
 )
 
 type Standard string
@@ -156,7 +158,7 @@ func normalizeChainRef(ns Namespace, chainRef string) (string, error) {
 			return "", newError(ErrCodeInvalidChainRef, fmt.Sprintf("invalid bip122 chain_ref %q", chainRef))
 		}
 		return n, nil
-	case NamespaceTRON, NamespaceSolana:
+	case NamespaceTRON, NamespaceSolana, NamespaceBitcoinCash, NamespaceZCash:
 		return strings.ToLower(chainRef), nil
 	default:
 		return "", newError(ErrCodeInvalidNamespace, fmt.Sprintf("unsupported namespace %q", ns))
@@ -183,6 +185,11 @@ func validateStandardForNamespace(ns Namespace, standard Standard) error {
 	case NamespaceSolana:
 		if standard != StandardNative && standard != StandardSPL {
 			return newError(ErrCodeInvalidStandard, fmt.Sprintf("namespace %s only supports native/spl", ns))
+		}
+		return nil
+	case NamespaceBitcoinCash, NamespaceZCash:
+		if standard != StandardNative {
+			return newError(ErrCodeInvalidStandard, fmt.Sprintf("namespace %s only supports native", ns))
 		}
 		return nil
 	default:
@@ -221,7 +228,7 @@ func normalizeAssetRef(ns Namespace, standard Standard, assetRef string) (string
 		}
 		return pk.String(), nil
 
-	case NamespaceBIP122:
+	case NamespaceBIP122, NamespaceBitcoinCash, NamespaceZCash:
 		return "", newError(ErrCodeInvalidStandard, fmt.Sprintf("namespace %s does not support token asset_ref", ns))
 
 	default:

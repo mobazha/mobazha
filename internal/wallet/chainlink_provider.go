@@ -6,11 +6,13 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -47,8 +49,10 @@ const chainlinkABI = `[
 	}
 ]`
 
-// 价格源配置 - 使用Polygon网络的Chainlink预言机
-var priceFeeds = map[string]string{
+// 价格源配置 - 使用Polygon网络的Chainlink预言机。
+// Key is provider-agnostic pricing key; concrete currency codes are expanded
+// from assetid registry so we don't maintain chain-specific token arrays here.
+var chainlinkFeedByPricingKey = map[string]string{
 	"USDT":  "0x0A6513e40db6EB1b165753AD52E80663aeA50545",
 	"USDC":  "0xfE4A8cc5b5B2366C1B58Bea3858e81843581b2F7",
 	"SOL":   "0x10C8264C0935b3B9870013e057f330Ff3e9C56dC",
@@ -59,7 +63,44 @@ var priceFeeds = map[string]string{
 	"BCH":   "0x327d9822e9932996f55b39F557AEC838313da8b7",
 	"LTC":   "0xEB99F173cf7d9a6dC4D889C2Ad7103e8383b6Efa",
 	"ZEC":   "0xBC08c639e579a391C4228F20d0C29d0690092DF0",
-	"EXTERNAL_PAYMENT":   "0xBE6FB0AB6302B693368D0E9001fAF77ecc6571db",
+}
+
+var chainlinkFeeds = buildChainlinkFeeds()
+var chainlinkUSDPeggedCodes = buildChainlinkUSDPeggedCodes()
+
+func buildChainlinkFeeds() map[string]string {
+	result := make(map[string]string)
+	for _, def := range assetid.DefaultRegistry().List() {
+		code := strings.TrimSpace(strings.ToUpper(def.Code))
+		if code == "" {
+			continue
+		}
+		pricingKey := strings.TrimSpace(strings.ToUpper(def.Pricing.Key))
+		if pricingKey == "" {
+			continue
+		}
+		address, ok := chainlinkFeedByPricingKey[pricingKey]
+		if !ok {
+			continue
+		}
+		result[code] = address
+	}
+	return result
+}
+
+func buildChainlinkUSDPeggedCodes() map[string]struct{} {
+	result := make(map[string]struct{})
+	for _, def := range assetid.DefaultRegistry().List() {
+		if !strings.EqualFold(def.Pricing.PeggedTo, "USD") {
+			continue
+		}
+		code := strings.TrimSpace(strings.ToUpper(def.Code))
+		if code == "" {
+			continue
+		}
+		result[code] = struct{}{}
+	}
+	return result
 }
 
 // NewChainlinkProvider 创建新的Chainlink预言机provider
@@ -77,7 +118,7 @@ func NewChainlinkProvider(rpcURL string) (*ChainlinkProvider, error) {
 		rpcURL:     rpcURL,
 		client:     client,
 		httpClient: httpClient,
-		feeds:      priceFeeds,
+		feeds:      chainlinkFeeds,
 	}, nil
 }
 
@@ -201,13 +242,8 @@ func (c *ChainlinkProvider) getPriceFromChainlink(feedAddress string) (float64, 
 
 // isStablecoin 检查是否为稳定币
 func (c *ChainlinkProvider) isStablecoin(symbol string) bool {
-	stablecoins := []string{"USDT", "USDC"}
-	for _, stablecoin := range stablecoins {
-		if symbol == stablecoin {
-			return true
-		}
-	}
-	return false
+	_, ok := chainlinkUSDPeggedCodes[strings.ToUpper(strings.TrimSpace(symbol))]
+	return ok
 }
 
 // Close 关闭provider连接

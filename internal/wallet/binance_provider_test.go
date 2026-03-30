@@ -5,12 +5,84 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
+
+func TestBinanceProvider_CatalogDrivenSymbolMapping(t *testing.T) {
+	if got := binanceSymbolMap["BTC"]; got != "BTCUSDT" {
+		t.Fatalf("expected BTC -> BTCUSDT, got %q", got)
+	}
+	if got := binanceSymbolMap["BASEETH"]; got != "ETHUSDT" {
+		t.Fatalf("expected BASEETH -> ETHUSDT, got %q", got)
+	}
+	if got := binanceSymbolMap["CFX"]; got != "CFXUSDT" {
+		t.Fatalf("expected CFX -> CFXUSDT, got %q", got)
+	}
+
+	if _, exists := binanceSymbolMap["ETHUSDT"]; exists {
+		t.Fatal("stable token code ETHUSDT should not map to a Binance trading pair symbol directly")
+	}
+	if _, exists := binanceSymbolMap["BCH"]; exists {
+		t.Fatal("BCH should not be mapped when binance symbols are registry-driven")
+	}
+
+	if _, ok := usdPeggedCurrencyCodes["TRXUSDT"]; !ok {
+		t.Fatal("expected TRXUSDT in usd pegged codes")
+	}
+	if _, ok := usdPeggedCurrencyCodes["USDT"]; ok {
+		t.Fatal("legacy USDT symbol alias should not be present in usd pegged codes")
+	}
+}
+
+func TestBinanceProvider_RequestSymbolsDeduplicatedAndSorted(t *testing.T) {
+	var requestedSymbols []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw := r.URL.Query().Get("symbols")
+		if raw == "" {
+			t.Fatal("missing symbols query param")
+		}
+		if err := json.Unmarshal([]byte(raw), &requestedSymbols); err != nil {
+			t.Fatalf("decode symbols query param: %v", err)
+		}
+
+		tickers := []binanceTickerPrice{
+			{Symbol: "BTCUSDT", Price: "65000.00000000"},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(tickers)
+	}))
+	defer server.Close()
+
+	p := newBinanceProvider(server.URL, server.Client(), 30*time.Second)
+	if _, err := p.fetchRates(models.CurrencyCode("BTC")); err != nil {
+		t.Fatalf("fetchRates BTC failed: %v", err)
+	}
+
+	if len(requestedSymbols) == 0 {
+		t.Fatal("expected symbols query payload")
+	}
+
+	unique := make(map[string]struct{}, len(requestedSymbols))
+	for _, symbol := range requestedSymbols {
+		unique[symbol] = struct{}{}
+	}
+	if len(unique) != len(requestedSymbols) {
+		t.Fatal("expected request symbols to be deduplicated")
+	}
+
+	sorted := append([]string(nil), requestedSymbols...)
+	sort.Strings(sorted)
+	if !reflect.DeepEqual(sorted, requestedSymbols) {
+		t.Fatal("expected request symbols to be sorted")
+	}
+}
 
 func TestBinanceProvider_FetchRates_BTC(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -93,35 +165,6 @@ func TestBinanceProvider_FetchRates_ETH(t *testing.T) {
 	expected := new(big.Int).SetUint64(1000000000000000000)
 	if ethRate.String() != iwallet.NewAmount(expected).String() {
 		t.Errorf("ETH→ETH rate: want %s, got %s", expected, ethRate)
-	}
-}
-
-func TestBinanceProvider_ChainNativeAliases(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tickers := []binanceTickerPrice{
-			{Symbol: "BTCUSDT", Price: "65000.00"},
-			{Symbol: "ETHUSDT", Price: "3500.00"},
-			{Symbol: "BNBUSDT", Price: "600.00"},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(tickers)
-	}))
-	defer server.Close()
-
-	p := newBinanceProvider(server.URL, server.Client(), 30*time.Second)
-	rates, err := p.fetchRates(models.CurrencyCode("BTC"))
-	if err != nil {
-		t.Fatalf("fetchRates failed: %v", err)
-	}
-
-	// BASE should have ETH's price (via chainNativeAliases)
-	baseRate, ok := rates[models.CurrencyCode("BASE")]
-	if !ok {
-		t.Skip("BASE not in CurrencyDefinitions, skipping alias check")
-	}
-	ethRate := rates[models.CurrencyCode("ETH")]
-	if baseRate.String() != ethRate.String() {
-		t.Errorf("BASE rate (%s) should equal ETH rate (%s)", baseRate, ethRate)
 	}
 }
 

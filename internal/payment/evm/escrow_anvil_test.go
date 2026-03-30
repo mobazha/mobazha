@@ -238,7 +238,7 @@ func TestEscrowAnvil_Moderated_2of3_Release(t *testing.T) {
 
 	releaseAmount := uint64(1_000_000_000_000_000_000)
 	tos := []iwallet.SpendInfo{{
-		Address: iwallet.NewAddress(sellerAddr.Hex(), iwallet.CtEthereum),
+		Address: iwallet.NewAddress(sellerAddr.Hex(), iwallet.CoinType("crypto:eip155:1:native")),
 		Amount:  iwallet.NewAmount(releaseAmount),
 	}}
 
@@ -355,8 +355,8 @@ func TestEscrowAnvil_Dispute_BuyerModerator(t *testing.T) {
 	sellerPay := uint64(500_000_000_000_000_000)
 
 	tos := []iwallet.SpendInfo{
-		{Address: iwallet.NewAddress(buyerAddr.Hex(), iwallet.CtEthereum), Amount: iwallet.NewAmount(buyerRefund)},
-		{Address: iwallet.NewAddress(sellerAddr.Hex(), iwallet.CtEthereum), Amount: iwallet.NewAmount(sellerPay)},
+		{Address: iwallet.NewAddress(buyerAddr.Hex(), iwallet.CoinType("crypto:eip155:1:native")), Amount: iwallet.NewAmount(buyerRefund)},
+		{Address: iwallet.NewAddress(sellerAddr.Hex(), iwallet.CoinType("crypto:eip155:1:native")), Amount: iwallet.NewAmount(sellerPay)},
 	}
 
 	buyerSigs, err := SignEscrowRelease(tos, serializedScript, ecdsaToBtcec(t, buyerKey))
@@ -494,7 +494,7 @@ func TestEscrowAnvil_SellerModerator(t *testing.T) {
 	serializedScript, _ := ethWal.SerializeEthScript(rScript)
 	releaseAmount := uint64(1_000_000_000_000_000_000)
 	tos := []iwallet.SpendInfo{{
-		Address: iwallet.NewAddress(sellerAddr.Hex(), iwallet.CtEthereum),
+		Address: iwallet.NewAddress(sellerAddr.Hex(), iwallet.CoinType("crypto:eip155:1:native")),
 		Amount:  iwallet.NewAmount(releaseAmount),
 	}}
 

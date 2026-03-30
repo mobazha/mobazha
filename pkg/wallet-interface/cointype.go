@@ -3,8 +3,11 @@ package wallet_interface
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/pkg/assetid"
 )
 
 // ChainType 表示区块链网络类型
@@ -23,8 +26,6 @@ const (
 	ChainConflux     ChainType = "CFX"
 	ChainSolana      ChainType = "SOL"
 	ChainTRON        ChainType = "TRX"
-	ChainExternalPayment      ChainType = "EXTERNAL_PAYMENT"
-	ChainDash        ChainType = "DASH"
 
 	ChainStripe ChainType = "Stripe"
 )
@@ -35,8 +36,18 @@ func (chaintype ChainType) String() string {
 
 func GetAllSupportedChainTypes() []ChainType {
 	return []ChainType{
-		ChainBitcoin, ChainLitecoin,
-		ChainSolana, ChainTRON, ChainStripe, ChainEthereum, ChainBSC, ChainBase,
+		ChainBitcoin,
+		ChainBitcoinCash,
+		ChainLitecoin,
+		ChainZCash,
+		ChainEthereum,
+		ChainBSC,
+		ChainPolygon,
+		ChainBase,
+		ChainConflux,
+		ChainSolana,
+		ChainTRON,
+		ChainStripe,
 	}
 }
 
@@ -44,35 +55,8 @@ func GetAllSupportedChainTypes() []ChainType {
 type CoinType string
 
 const (
-	CtMock        CoinType = CoinType(ChainMock)
-	CtBitcoin     CoinType = CoinType(ChainBitcoin)
-	CtBitcoinCash CoinType = CoinType(ChainBitcoinCash)
-	CtLitecoin    CoinType = CoinType(ChainLitecoin)
-	CtZCash       CoinType = CoinType(ChainZCash)
-	CtEthereum    CoinType = CoinType(ChainEthereum)
-	CtBNB         CoinType = "BNB"
-	CtPolygon     CoinType = CoinType(ChainPolygon)
-	CtBase        CoinType = CoinType(ChainBase)
-	CtConflux     CoinType = CoinType(ChainConflux)
-	CtSolana      CoinType = CoinType(ChainSolana)
-	CtExternalPayment      CoinType = CoinType(ChainExternalPayment)
-	CtDash        CoinType = CoinType(ChainDash)
-
+	CtMock   CoinType = CoinType(ChainMock)
 	CtStripe CoinType = CoinType(ChainStripe)
-
-	CtBEP20USDT   CoinType = "BSCUSDT"
-	CtBEP20USDC   CoinType = "BSCUSDC"
-	CtBaseETH     CoinType = "BASEETH"
-	CtBaseUSDT    CoinType = "BASEUSDT"
-	CtBaseUSDC    CoinType = "BASEUSDC"
-	CtPolygonUSDT CoinType = "MATICUSDT"
-	CtPolygonUSDC CoinType = "MATICUSDC"
-	CtSPLUSDT     CoinType = "SOLUSDT"
-	CtSPLUSDC     CoinType = "SOLUSDC"
-	CtTRON        CoinType = CoinType(ChainTRON)
-	CtTRC20USDT   CoinType = "TRXUSDT"
-
-	CtMBZ CoinType = "MBZ"
 
 	// 测试用的 CoinType
 	CtTestCoin CoinType = "TESTCOIN"
@@ -92,24 +76,17 @@ func (ct CoinType) CoinInfo() (CoinInfo, error) {
 }
 
 // IsFiatPayment returns true if the CoinType represents a fiat payment
-// (e.g. "fiat:USD", "fiat:EUR"). Fiat payments are processed through
+// (e.g. "fiat:stripe:USD", "fiat:paypal:EUR"). Fiat payments are processed through
 // FiatPaymentAppService, not blockchain wallets.
 func (ct CoinType) IsFiatPayment() bool {
 	return strings.HasPrefix(strings.ToLower(string(ct)), "fiat:")
 }
 
 // FiatBaseCurrency extracts the ISO currency code from fiat coin strings.
-// "fiat:stripe:USD" → "USD", "fiat:USD" → "USD", "USD" → "USD".
+// "fiat:stripe:USD" → "USD", "fiat:paypal:EUR" → "EUR", "USD" → "USD".
 func (ct CoinType) FiatBaseCurrency() string {
 	parts := strings.Split(string(ct), ":")
 	return parts[len(parts)-1]
-}
-
-// Deprecated: use IsFiatPayment(). IsStripeChain was the legacy check for
-// Stripe-specific payment paths. New code should use IsFiatPayment() which
-// covers all fiat providers (Stripe, PayPal, etc.).
-func (ct CoinType) IsStripeChain() bool {
-	return strings.HasPrefix(strings.ToUpper(string(ct)), "STRIPE")
 }
 
 const NATIVE_SYMBOL = "NATIVE"
@@ -125,7 +102,7 @@ type CoinInfo struct {
 	Description     string    // 描述
 }
 
-// 常用代币定义
+// 常用测试币定义
 var (
 	CtMockInfo = CoinInfo{
 		Chain:       ChainMock,
@@ -143,232 +120,23 @@ var (
 		Decimals:    18,
 		Description: "Test Coin for Testing",
 	}
-
-	// 原生代币
-	CtBitcoinInfo = CoinInfo{
-		Chain:       ChainBitcoin,
-		Symbol:      "BTC",
-		IsNative:    true,
-		Decimals:    8,
-		Description: "Bitcoin",
-	}
-
-	CtBNBInfo = CoinInfo{
-		Chain:       ChainBSC,
-		Symbol:      "BNB",
-		IsNative:    true,
-		Decimals:    18,
-		Description: "Binance Coin",
-	}
-
-	CtBaseInfo = CoinInfo{
-		Chain:       ChainBase,
-		Symbol:      "ETH",
-		IsNative:    true,
-		Decimals:    18,
-		Description: "Ethereum on Base",
-	}
-
-	CtBitcoinCashInfo = CoinInfo{
-		Chain:       ChainBitcoinCash,
-		Symbol:      "BCH",
-		IsNative:    true,
-		Decimals:    8,
-		Description: "Bitcoin Cash",
-	}
-
-	CtLitecoinInfo = CoinInfo{
-		Chain:       ChainLitecoin,
-		Symbol:      "LTC",
-		IsNative:    true,
-		Decimals:    8,
-		Description: "Litecoin",
-	}
-
-	CtZCashInfo = CoinInfo{
-		Chain:       ChainZCash,
-		Symbol:      "ZEC",
-		IsNative:    true,
-		Decimals:    8,
-		Description: "Zcash",
-	}
-
-	CtEthereumInfo = CoinInfo{
-		Chain:       ChainEthereum,
-		Symbol:      "ETH",
-		IsNative:    true,
-		Decimals:    18,
-		Description: "Ethereum",
-	}
-
-	CtPolygonInfo = CoinInfo{
-		Chain:       ChainPolygon,
-		Symbol:      "MATIC",
-		IsNative:    true,
-		Decimals:    18,
-		Description: "Polygon",
-	}
-
-	CtConfluxInfo = CoinInfo{
-		Chain:       ChainConflux,
-		Symbol:      "CFX",
-		IsNative:    true,
-		Decimals:    18,
-		Description: "Conflux",
-	}
-
-	CtSolanaInfo = CoinInfo{
-		Chain:       ChainSolana,
-		Symbol:      "SOL",
-		IsNative:    true,
-		Decimals:    9,
-		Description: "Solana",
-	}
-
-	CtTRONInfo = CoinInfo{
-		Chain:       ChainTRON,
-		Symbol:      "TRX",
-		IsNative:    true,
-		Decimals:    6,
-		Description: "TRON",
-	}
-
-	CtStripeInfo = CoinInfo{
-		Chain:       ChainStripe,
-		Symbol:      "Stripe",
-		IsNative:    true,
-		Decimals:    0,
-		Description: "Stripe",
-	}
-
-	// ERC20代币
-	ERC20USDTInfo = CoinInfo{
-		Chain:           ChainEthereum,
-		Symbol:          "USDT",
-		IsNative:        false,
-		Contract:        "0xF36BFeE8fd7F1950c0129714Faf6d1e1F94a66AA",
-		TestnetContract: "0xF36BFeE8fd7F1950c0129714Faf6d1e1F94a66AA", // Goerli USDT
-		Decimals:        6,
-		Description:     "Tether USD",
-	}
-
-	ERC20USDCInfo = CoinInfo{
-		Chain:           ChainEthereum,
-		Symbol:          "USDC",
-		IsNative:        false,
-		Contract:        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-		TestnetContract: "0x79C950C7446B234a6Ad53B908fBF342b01c4d446", // Goerli USDC
-	}
-
-	// BEP20代币
-	BEP20USDTInfo = CoinInfo{
-		Chain:           ChainBSC,
-		Symbol:          "USDT",
-		IsNative:        false,
-		Contract:        "0x55d398326f99059ff775485246999027b3197955",
-		TestnetContract: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", // BSC Testnet USDT
-		Decimals:        18,
-		Description:     "Tether USD on BSC",
-	}
-
-	BEP20USDCInfo = CoinInfo{
-		Chain:           ChainBSC,
-		Symbol:          "USDC",
-		IsNative:        false,
-		Contract:        "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-		TestnetContract: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", // BSC Testnet USDT
-	}
-
-	// Base USDT
-	BaseUSDTInfo = CoinInfo{
-		Chain:       ChainBase,
-		Symbol:      "USDT",
-		IsNative:    false,
-		Contract:    "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
-		Decimals:    6,
-		Description: "Tether USD on Base",
-	}
-
-	// Base USDC
-	BaseUSDCInfo = CoinInfo{
-		Chain:       ChainBase,
-		Symbol:      "USDC",
-		IsNative:    false,
-		Contract:    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-		Decimals:    6,
-		Description: "USD Coin on Base",
-	}
-
-	// SPL代币
-	SPLUSDTInfo = CoinInfo{
-		Chain:           ChainSolana,
-		Symbol:          "USDT",
-		IsNative:        false,
-		Contract:        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-		TestnetContract: "68DyGgw3jp9wH1WhEN4NaBFNgzDbWYM8TFM8XeFZTKU4", // Solana Devnet USDT
-		Decimals:        6,
-		Description:     "Tether USD on Solana",
-	}
-
-	SPLUSDCInfo = CoinInfo{
-		Chain:           ChainSolana,
-		Symbol:          "USDC",
-		IsNative:        false,
-		Contract:        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-		TestnetContract: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Solana Devnet USDC
-	}
-
-	PolygonUSDTInfo = CoinInfo{
-		Chain:       ChainPolygon,
-		Symbol:      "USDT",
-		IsNative:    false,
-		Contract:    "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
-		Decimals:    6,
-		Description: "Tether USD on Polygon",
-	}
-
-	PolygonUSDCInfo = CoinInfo{
-		Chain:       ChainPolygon,
-		Symbol:      "USDC",
-		IsNative:    false,
-		Contract:    "0x3c499c542cEF5E3811e1192ce70d8cC03d5C3359",
-		Decimals:    6,
-		Description: "USD Coin on Polygon",
-	}
-
-	TRC20USDTInfo = CoinInfo{
-		Chain:           ChainTRON,
-		Symbol:          "USDT",
-		IsNative:        false,
-		Contract:        "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
-		TestnetContract: "",
-		Decimals:        6,
-		Description:     "Tether USD on TRON",
-	}
 )
-
-// 链配置
-var ChainConfigs = map[ChainType]struct {
-	BlockInterval time.Duration
-	Description   string
-}{
-	ChainMock:        {time.Second * 1, "Mock Chain (Testing)"},
-	ChainBitcoin:     {time.Minute * 10, "Bitcoin"},
-	ChainBitcoinCash: {time.Minute * 10, "Bitcoin Cash"},
-	ChainLitecoin:    {time.Second * 150, "Litecoin"},
-	ChainZCash:       {time.Second * 150, "Zcash"},
-	ChainEthereum:    {time.Second * 3, "Ethereum"},
-	ChainBSC:         {time.Second * 3, "Binance Smart Chain"},
-	ChainBase:        {time.Second * 3, "Base"},
-	ChainPolygon:     {time.Second * 2, "Polygon"},
-	ChainConflux:     {time.Second * 1, "Conflux"},
-	ChainSolana:      {time.Second * 1, "Solana"},
-	ChainTRON:        {time.Second * 3, "TRON"},
-}
 
 // NewCoinInfo 创建新的币种
 func NewCoinInfo(chain string, token string) (CoinInfo, error) {
-	return CoinInfoFromCoinType(CoinType(chain + token))
+	normalizedChain := strings.ToUpper(strings.TrimSpace(chain))
+	if normalizedChain == "" {
+		return CoinInfo{}, fmt.Errorf("chain is empty")
+	}
+	if strings.TrimSpace(token) != "" {
+		return CoinInfo{}, fmt.Errorf("legacy chain+token coin type is no longer supported; use canonical crypto:* asset id")
+	}
+
+	canonicalNative, err := RequireCanonicalNativeCoinType(ChainType(normalizedChain))
+	if err != nil {
+		return CoinInfo{}, fmt.Errorf("unsupported chain %q for canonical native asset lookup", normalizedChain)
+	}
+	return CoinInfoFromCoinType(canonicalNative)
 }
 
 func (ct CoinInfo) CoinType() CoinType {
@@ -398,10 +166,10 @@ func (ct CoinInfo) ContractAddress(testnet bool) string {
 
 // BlockInterval 返回链的出块间隔
 func (ct CoinInfo) BlockInterval() time.Duration {
-	if config, ok := ChainConfigs[ct.Chain]; ok {
-		return config.BlockInterval
+	if interval, ok := CanonicalBlockInterval(ct.Chain); ok {
+		return interval
 	}
-	return time.Minute // 默认值
+	return 0
 }
 
 func (ct CoinInfo) IsEthTypeChain() bool {
@@ -411,104 +179,60 @@ func (ct CoinInfo) IsEthTypeChain() bool {
 
 // NativeCoinType 返回该链的原生币种 CoinType，用于获取对应的钱包实例
 func (ct CoinInfo) NativeCoinType() CoinType {
-	switch ct.Chain {
-	case ChainBitcoin:
-		return CtBitcoin
-	case ChainBitcoinCash:
-		return CtBitcoinCash
-	case ChainLitecoin:
-		return CtLitecoin
-	case ChainZCash:
-		return CtZCash
-	case ChainEthereum:
-		return CtEthereum
-	case ChainBSC:
-		return CtBNB
-	case ChainPolygon:
-		return CtPolygon
-	case ChainBase:
-		return CtBase
-	case ChainConflux:
-		return CtConflux
-	case ChainSolana:
-		return CtSolana
-	case ChainTRON:
-		return CtTRON
-	default:
+	if canonicalNative, err := RequireCanonicalNativeCoinType(ct.Chain); err == nil {
+		return canonicalNative
+	}
+
+	// Non-crypto chains/test chains are intentionally non-canonical.
+	if ct.Chain == ChainStripe || ct.Chain == ChainMock {
 		return CoinType(ct.Chain)
 	}
+
+	// No silent fallback for unsupported crypto chains.
+	return ""
 }
 
-// CoinInfoFromCoinType 从字符串构造 CoinInfo
-// 格式为 "CHAIN" 或 "CHAINTOKEN"，例如 "BTC" 或 "ETHUSDT"
+// CoinInfoFromCoinType 从字符串构造 CoinInfo。
+// 仅支持 canonical payment coin（crypto:* / fiat:*）以及测试/Mock coin。
 func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
-	s := string(coinType)
+	s := strings.TrimSpace(string(coinType))
+	if s == "" {
+		return CoinInfo{}, fmt.Errorf("invalid coin type string: %s", s)
+	}
+	normalized := CoinType(s)
 
 	// 检查是否为测试币种
-	if s == string(CtTestCoin) {
+	if normalized == CtTestCoin {
 		return CtTestCoinInfo, nil
 	}
 
 	// MCK 是 CurrencyDefinitions 中 Mock 币种的代码，映射到 ChainMock 钱包
-	if s == "MCK" {
+	if normalized == CtMock {
 		return CtMockInfo, nil
 	}
 
-	if coinType.IsFiatPayment() {
-		return CtStripeInfo, nil
+	if normalized == CtStripe {
+		return CoinInfo{
+			Chain:       ChainStripe,
+			Symbol:      "Stripe",
+			IsNative:    true,
+			Decimals:    0,
+			Description: "Stripe",
+		}, nil
 	}
 
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(s)), "crypto:") {
-		return coinInfoFromCanonicalAssetID(coinType)
+	if normalized.IsFiatPayment() {
+		return CoinInfo{
+			Chain:       ChainStripe,
+			Symbol:      strings.ToUpper(normalized.FiatBaseCurrency()),
+			IsNative:    true,
+			Decimals:    0,
+			Description: "Fiat Payment",
+		}, nil
 	}
 
-	// 特殊处理：CoinType 和 ChainType 不一致的原生币
-	switch coinType {
-	case CtBaseETH:
-		// BASEETH 是 Base 链的原生 ETH
-		return CtBaseInfo, nil
-	case CtBNB:
-		// BNB 是 BSC 链的原生币（ChainBSC = "BSC"，但 CtBNB = "BNB"）
-		return CtBNBInfo, nil
-	}
-
-	// 检查是否为原生代币
-	for chain := range ChainConfigs {
-		if string(chain) == s {
-			// 找到对应的原生代币
-			for _, token := range []CoinInfo{
-				CtMockInfo, // Mock chain for testing
-				CtBitcoinInfo, CtBitcoinCashInfo, CtLitecoinInfo, CtZCashInfo,
-				CtEthereumInfo, CtBNBInfo, CtBaseInfo, CtPolygonInfo, CtConfluxInfo,
-				CtSolanaInfo, CtTRONInfo,
-			} {
-				if token.Chain == chain && token.IsNative {
-					return token, nil
-				}
-			}
-			return CoinInfo{}, fmt.Errorf("no native token found for chain %s", s)
-		}
-	}
-
-	// 检查是否为合约代币
-	for chain := range ChainConfigs {
-		if strings.HasPrefix(s, string(chain)) {
-			tokenSymbol := s[len(chain):]
-			// 查找对应的合约代币
-			for _, token := range []CoinInfo{
-				ERC20USDTInfo, ERC20USDCInfo,
-				BaseUSDTInfo, BaseUSDCInfo,
-				BEP20USDTInfo, BEP20USDCInfo,
-				PolygonUSDTInfo, PolygonUSDCInfo,
-				SPLUSDTInfo, SPLUSDCInfo,
-				TRC20USDTInfo,
-			} {
-				if token.Chain == chain && token.Symbol == tokenSymbol {
-					return token, nil
-				}
-			}
-			continue
-		}
+	if strings.HasPrefix(strings.ToLower(s), "crypto:") {
+		return coinInfoFromCanonicalAssetID(normalized)
 	}
 
 	return CoinInfo{}, fmt.Errorf("invalid coin type string: %s", s)
@@ -525,27 +249,29 @@ func IsSPLTokenCoinType(coinType CoinType) bool {
 }
 
 func GetAllSupportedCoinTypes() []CoinType {
-	return []CoinType{
-		CtBitcoin, CtLitecoin,
-		CtSolana, CtBNB, CtPolygon, CtBaseETH,
-		CtTRON, CtTRC20USDT,
-		CtBEP20USDT, CtBEP20USDC, CtBaseUSDT, CtBaseUSDC, CtPolygonUSDT, CtPolygonUSDC, CtSPLUSDT, CtSPLUSDC,
+	defs := assetid.DefaultRegistry().List()
+	coins := make([]CoinType, 0, len(defs))
+	for _, def := range defs {
+		coins = append(coins, CoinType(def.AssetID))
 	}
+	sort.Slice(coins, func(i, j int) bool { return coins[i] < coins[j] })
+	return coins
 }
 
 func GetAllSupportedCurrencyCodes() []string {
-	coinTypes := GetAllSupportedCoinTypes()
-	currencyCodes := make([]string, len(coinTypes))
-	for i, coinType := range coinTypes {
-		currencyCodes[i] = coinType.CurrencyCode()
+	defs := assetid.DefaultRegistry().List()
+	currencyCodes := make([]string, 0, len(defs))
+	for _, def := range defs {
+		currencyCodes = append(currencyCodes, strings.ToUpper(strings.TrimSpace(def.Code)))
 	}
+	sort.Strings(currencyCodes)
 	return currencyCodes
 }
 
 // IsUTXOChain returns true if the chain uses UTXO model (Bitcoin-like)
 // Note: ChainMock is included for testing purposes
 func (c ChainType) IsUTXOChain() bool {
-	utxoChains := []ChainType{ChainBitcoin, ChainLitecoin, ChainBitcoinCash, ChainZCash, ChainDash, ChainMock}
+	utxoChains := []ChainType{ChainBitcoin, ChainLitecoin, ChainBitcoinCash, ChainZCash, ChainMock}
 	return slices.Contains(utxoChains, c)
 }
 

@@ -10,6 +10,14 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
+var testETHNativeCoin = func() iwallet.CoinType {
+	coin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainEthereum)
+	if err != nil {
+		panic(err)
+	}
+	return coin
+}()
+
 // newTestEthKey creates a random secp256k1 key for testing.
 func newTestEthKey(t *testing.T) *btcec.PrivateKey {
 	t.Helper()
@@ -53,7 +61,7 @@ func TestBuildEscrowReleaseParams_SingleRecipient(t *testing.T) {
 	ethAddr := "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
 
 	tos := []iwallet.SpendInfo{{
-		Address: iwallet.NewAddress(ethAddr, iwallet.CtEthereum),
+		Address: iwallet.NewAddress(ethAddr, testETHNativeCoin),
 		Amount:  iwallet.NewAmount(uint64(1000000)),
 	}}
 
@@ -92,11 +100,11 @@ func TestBuildEscrowReleaseParams_MultipleRecipients(t *testing.T) {
 
 	tos := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress(addr1, iwallet.CtEthereum),
+			Address: iwallet.NewAddress(addr1, testETHNativeCoin),
 			Amount:  iwallet.NewAmount(uint64(800000)),
 		},
 		{
-			Address: iwallet.NewAddress(addr2, iwallet.CtEthereum),
+			Address: iwallet.NewAddress(addr2, testETHNativeCoin),
 			Amount:  iwallet.NewAmount(uint64(200000)),
 		},
 	}
@@ -125,7 +133,7 @@ func TestBuildEscrowReleaseParams_DeterministicMessage(t *testing.T) {
 	addr := "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
 
 	tos := []iwallet.SpendInfo{{
-		Address: iwallet.NewAddress(addr, iwallet.CtEthereum),
+		Address: iwallet.NewAddress(addr, testETHNativeCoin),
 		Amount:  iwallet.NewAmount(uint64(500000)),
 	}}
 
@@ -156,7 +164,7 @@ func TestSignEscrowRelease_ProducesValidSignature(t *testing.T) {
 	addr := "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
 
 	tos := []iwallet.SpendInfo{{
-		Address: iwallet.NewAddress(addr, iwallet.CtEthereum),
+		Address: iwallet.NewAddress(addr, testETHNativeCoin),
 		Amount:  iwallet.NewAmount(uint64(1000000)),
 	}}
 
@@ -201,7 +209,7 @@ func TestSignEscrowRelease_DifferentKeysProduceDifferentSigs(t *testing.T) {
 	addr := "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
 
 	tos := []iwallet.SpendInfo{{
-		Address: iwallet.NewAddress(addr, iwallet.CtEthereum),
+		Address: iwallet.NewAddress(addr, testETHNativeCoin),
 		Amount:  iwallet.NewAmount(uint64(1000000)),
 	}}
 
@@ -233,7 +241,7 @@ func TestSignEscrowRelease_ConsistentWithBuildParams(t *testing.T) {
 	addr := "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
 
 	tos := []iwallet.SpendInfo{{
-		Address: iwallet.NewAddress(addr, iwallet.CtEthereum),
+		Address: iwallet.NewAddress(addr, testETHNativeCoin),
 		Amount:  iwallet.NewAmount(uint64(1000000)),
 	}}
 
@@ -272,11 +280,11 @@ func TestSignEscrowRelease_MultipleRecipients(t *testing.T) {
 
 	tos := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress(addr1, iwallet.CtEthereum),
+			Address: iwallet.NewAddress(addr1, testETHNativeCoin),
 			Amount:  iwallet.NewAmount(uint64(700000)),
 		},
 		{
-			Address: iwallet.NewAddress(addr2, iwallet.CtEthereum),
+			Address: iwallet.NewAddress(addr2, testETHNativeCoin),
 			Amount:  iwallet.NewAmount(uint64(300000)),
 		},
 	}

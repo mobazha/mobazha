@@ -16,6 +16,44 @@ func TestReserveCurrencyIsUSD(t *testing.T) {
 	}
 }
 
+func TestNormalizeBaseForRateQuery(t *testing.T) {
+	tests := []struct {
+		name string
+		base models.CurrencyCode
+		want models.CurrencyCode
+	}{
+		{
+			name: "plain currency code",
+			base: models.CurrencyCode("BTC"),
+			want: models.CurrencyCode("BTC"),
+		},
+		{
+			name: "fiat coin type",
+			base: models.CurrencyCode("fiat:stripe:usd"),
+			want: models.CurrencyCode("USD"),
+		},
+		{
+			name: "canonical evm token",
+			base: models.CurrencyCode("crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955"),
+			want: models.CurrencyCode("BSCUSDT"),
+		},
+		{
+			name: "canonical tron token preserves raw case path",
+			base: models.CurrencyCode("crypto:tron:mainnet:trc20:TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"),
+			want: models.CurrencyCode("TRXUSDT"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeBaseForRateQuery(tt.base)
+			if got != tt.want {
+				t.Fatalf("normalizeBaseForRateQuery(%q) = %q, want %q", tt.base, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNewExchangeRateProvider(t *testing.T) {
 	cfg := config.GetGlobalExchangeRateConfig()
 	cfg.SetCoinGeckoEnabled(true)
@@ -61,7 +99,7 @@ func TestExchangeRateProviderGetUSDRate_Mock(t *testing.T) {
 		t.Fatalf("failed to create mock exchange rates: %v", err)
 	}
 
-	rate, err := erp.GetUSDRate(iwallet.CtBitcoin)
+	rate, err := erp.GetUSDRate(iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f:native"))
 	if err != nil {
 		t.Fatalf("failed to get BTC USD rate: %v", err)
 	}

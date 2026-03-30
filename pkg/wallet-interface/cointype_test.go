@@ -44,3 +44,61 @@ func TestCoinType_IsFiatPayment(t *testing.T) {
 		}
 	}
 }
+
+func TestCoinInfoFromCoinType_LegacyTokenCoinRejected(t *testing.T) {
+	if _, err := CoinInfoFromCoinType(CoinType("BSCUSDT")); err == nil {
+		t.Fatalf("expected legacy token coin to be rejected")
+	}
+	if _, err := CoinInfoFromCoinType(CoinType("BSCFAKE")); err == nil {
+		t.Fatalf("expected unknown chain+token coin to be rejected")
+	}
+}
+
+func TestCoinInfoFromCoinType_LegacyNativeCoinRejected(t *testing.T) {
+	if _, err := CoinInfoFromCoinType(CoinType("BTC")); err == nil {
+		t.Fatalf("expected legacy native coin code to be rejected")
+	}
+}
+
+func TestNewCoinInfo_CanonicalNativeByChain(t *testing.T) {
+	info, err := NewCoinInfo("ETH", "")
+	if err != nil {
+		t.Fatalf("NewCoinInfo(ETH, \"\"): %v", err)
+	}
+	if info.Chain != ChainEthereum {
+		t.Fatalf("chain = %s, want %s", info.Chain, ChainEthereum)
+	}
+	if !info.IsNative {
+		t.Fatalf("IsNative = false, want true")
+	}
+}
+
+func TestNewCoinInfo_LegacyTokenRejected(t *testing.T) {
+	if _, err := NewCoinInfo("BSC", "USDT"); err == nil {
+		t.Fatalf("expected legacy chain+token to be rejected")
+	}
+}
+
+func TestCoinInfoFromCoinType_FiatCoinInfo(t *testing.T) {
+	info, err := CoinInfoFromCoinType(CoinType("fiat:stripe:usd"))
+	if err != nil {
+		t.Fatalf("CoinInfoFromCoinType(fiat:stripe:usd): %v", err)
+	}
+	if info.Chain != ChainStripe {
+		t.Fatalf("chain = %s, want %s", info.Chain, ChainStripe)
+	}
+	if info.Symbol != "USD" {
+		t.Fatalf("symbol = %s, want USD", info.Symbol)
+	}
+	if !info.IsNative {
+		t.Fatalf("IsNative = false, want true")
+	}
+
+	stripeInfo, err := CoinInfoFromCoinType(CtStripe)
+	if err != nil {
+		t.Fatalf("CoinInfoFromCoinType(Stripe): %v", err)
+	}
+	if stripeInfo.Symbol != "Stripe" {
+		t.Fatalf("symbol = %s, want Stripe", stripeInfo.Symbol)
+	}
+}

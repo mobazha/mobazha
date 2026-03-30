@@ -46,6 +46,28 @@ func TestNormalizeSolanaSPL(t *testing.T) {
 	}
 }
 
+func TestNormalizeBitcoinCashNative(t *testing.T) {
+	got, err := Normalize("crypto:bitcoincash:MAINNET:native")
+	if err != nil {
+		t.Fatalf("Normalize failed: %v", err)
+	}
+	want := "crypto:bitcoincash:mainnet:native"
+	if got != want {
+		t.Fatalf("unexpected normalized value: got %s want %s", got, want)
+	}
+}
+
+func TestNormalizeZCashNative(t *testing.T) {
+	got, err := Normalize("crypto:zcash:MAINNET:native")
+	if err != nil {
+		t.Fatalf("Normalize failed: %v", err)
+	}
+	want := "crypto:zcash:mainnet:native"
+	if got != want {
+		t.Fatalf("unexpected normalized value: got %s want %s", got, want)
+	}
+}
+
 func TestNormalizeRejectsLegacyChainToken(t *testing.T) {
 	_, err := Normalize("TRXUSDT")
 	if err == nil {

@@ -5,10 +5,10 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
 	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm" // registers EVM factory via init()
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
 	"github.com/mobazha/mobazha3.0/internal/chains/solana"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
 	pkgsolana "github.com/mobazha/mobazha3.0/pkg/solana"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -47,7 +47,11 @@ func TestNewZCashWallet_NilChainClient(t *testing.T) {
 }
 
 func TestNewETHWallet_NilChainClient(t *testing.T) {
-	w, err := ethWal.NewETHWallet(iwallet.CoinType(iwallet.ChainEthereum), nil, &base.WalletConfig{
+	ethCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainEthereum)
+	if err != nil {
+		t.Fatalf("RequireCanonicalNativeCoinType(ETH) failed: %v", err)
+	}
+	w, err := ethWal.NewETHWallet(ethCoin, nil, &base.WalletConfig{
 		Testnet: true,
 	})
 	if err != nil {

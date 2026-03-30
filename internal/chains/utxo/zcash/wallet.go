@@ -49,14 +49,6 @@ const (
 	MainnetMagic mbwire.BitcoinNet = 0x6427e924
 	// TestnetMagic is testnet network constant
 	TestnetMagic mbwire.BitcoinNet = 0xbff91afa
-
-	divisibility           = 8
-	averageTransactionSize = 1000
-	maxFeePerByte          = 200
-	priorityTarget         = 10
-	normalTarget           = 8.5
-	economicTarget         = 7
-	superEconomicTarget    = 6
 )
 
 // Assert interfaces
@@ -87,8 +79,7 @@ func init() {
 // remaining functions for each interface.
 type ZCashWallet struct { // nolint
 	base.WalletBase
-	testnet     bool
-	feeProvider base.FeeProvider
+	testnet bool
 }
 
 // NewZCashWallet returns a new ZCashWallet.
@@ -103,17 +94,15 @@ func NewZCashWallet(cfg *base.WalletConfig) (*ZCashWallet, error) {
 	// ChainClient intentionally left nil — will be set by configureUTXOWallets()
 	// via SetChainClient() with a shared UTXOChainClient (Electrum/Mempool).
 
-	exchangeRateProvider := base.NewDefaultExchangeRateProvider(cfg.NetConfig.GetExchangeRateProviders()[0])
-
-	fp := base.NewExchangeRateFeeProvider(iwallet.CtZCash, divisibility, exchangeRateProvider, averageTransactionSize,
-		iwallet.NewAmount(maxFeePerByte), priorityTarget, normalTarget, economicTarget, superEconomicTarget)
-
 	w.DB = cfg.DB
 	w.Logger = cfg.Logger
-	w.CoinType = iwallet.CtZCash
+	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainZCash)
+	if err != nil {
+		return nil, err
+	}
+	w.CoinType = nativeCoin
 	w.Done = make(chan struct{})
 	w.PostInitFunc = w.postInit
-	w.feeProvider = fp
 	w.NetConfig = cfg.NetConfig
 	return w, nil
 }
@@ -164,11 +153,11 @@ func (w *ZCashWallet) EstimateEscrowFee(threshold int, nOuts int, level iwallet.
 		wire.VarIntSerializeSize(uint64(nOuts)) + 1 +
 		threshold*66 + txsizes.P2PKHOutputSize*nOuts + redeemScriptSize + 15
 
-	fpb, err := w.feeProvider.GetFee(level)
+	resp, err := w.ChainClient.EstimateFee(size)
 	if err != nil {
 		return iwallet.NewAmount(0), err
 	}
-	return fpb.Mul(iwallet.NewAmount(size)), nil
+	return resp[level].FeePerTx, nil
 }
 
 // GetFeePerByte returns the current fee per byte for the given fee level. There
@@ -176,7 +165,11 @@ func (w *ZCashWallet) EstimateEscrowFee(threshold int, nOuts int, level iwallet.
 //
 // The returned value should be in the coin's base unit (for example: satoshis).
 func (w *ZCashWallet) GetFeePerByte(feeLevel iwallet.FeeLevel) (iwallet.Amount, error) {
-	return w.feeProvider.GetFee(feeLevel)
+	resp, err := w.ChainClient.EstimateFee(1)
+	if err != nil {
+		return iwallet.NewAmount(0), err
+	}
+	return resp[feeLevel].FeePerTx, nil
 }
 
 // CreateMultisigAddress creates a new threshold multisig address using the
@@ -223,7 +216,7 @@ func (w *ZCashWallet) CreateMultisigAddress(keys []btcec.PublicKey, chaincode []
 	if err != nil {
 		return iwallet.Address{}, nil, err
 	}
-	return iwallet.NewAddress(addr.String(), iwallet.CtZCash), redeemScript, nil
+	return iwallet.NewAddress(addr.String(), w.CoinType), redeemScript, nil
 }
 
 // SignMultisigTransaction should use the provided key to create a signature for
@@ -350,7 +343,7 @@ func (w *ZCashWallet) BuildAndSend(wtx iwallet.Tx, txn iwallet.Transaction, sign
 		return w.DB.Update(func(dbtx database.Tx) error {
 			err := dbtx.Save(&database.UnconfirmedTransaction{
 				Timestamp: time.Now(),
-				Coin:      iwallet.CtZCash.String(),
+				Coin:      w.CoinType.String(),
 				TxBytes:   buf,
 				Txid:      tx.TxHash().String(),
 			})
@@ -816,7 +809,7 @@ func (w *ZCashWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet.UTXO,
 		return w.DB.Update(func(dbtx database.Tx) error {
 			err := dbtx.Save(&database.UnconfirmedTransaction{
 				Timestamp: time.Now(),
-				Coin:      iwallet.CtZCash.String(),
+				Coin:      w.CoinType.String(),
 				TxBytes:   txBytes,
 				Txid:      h.String(),
 			})

@@ -12,21 +12,39 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/martinboehm/btcutil/txscript"
-	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
+	"github.com/mobazha/mobazha3.0/internal/config"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/op/go-logging"
 )
 
+const (
+	testInvalidAddress = "abc"
+	testZECTestnetAddr = "tmJKrg3gS4sPS7gSJ4vT8dFeqkGtfnDW4gu"
+)
+
+var testZCashNativeCoin = func() iwallet.CoinType {
+	coin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainZCash)
+	if err != nil {
+		panic(err)
+	}
+	return coin
+}()
+
 func newTestWallet() (*ZCashWallet, error) {
 	w := &ZCashWallet{
-		testnet:     true,
-		feeProvider: base.NewHardCodedFeeProvider(iwallet.NewAmount(50), iwallet.NewAmount(40), iwallet.NewAmount(30), iwallet.NewAmount(20)),
+		testnet: true,
 	}
 
 	chainClient := base.NewMockChainClient()
+	chainClient.SetEstimateFee(map[iwallet.FeeLevel]iwallet.EstimateFeeRes{
+		iwallet.FlPriority:      {FeePerTx: iwallet.NewAmount(50)},
+		iwallet.FlNormal:        {FeePerTx: iwallet.NewAmount(40)},
+		iwallet.FlEconomic:      {FeePerTx: iwallet.NewAmount(30)},
+		iwallet.FLSuperEconomic: {FeePerTx: iwallet.NewAmount(20)},
+	})
 
 	db, err := sqlitedb.NewMemoryDB()
 	if err != nil {
@@ -39,7 +57,7 @@ func newTestWallet() (*ZCashWallet, error) {
 	w.ChainClient = chainClient
 	w.DB = db
 	w.Logger = logging.MustGetLogger("bchtest")
-	w.CoinType = iwallet.CtZCash
+	w.CoinType = testZCashNativeCoin
 	w.Done = make(chan struct{})
 	w.PostInitFunc = w.postInit
 	w.NetConfig = config.DefaultNetConfig()
@@ -65,11 +83,11 @@ func TestZCashWallet_ValidateAddress(t *testing.T) {
 		valid   bool
 	}{
 		{
-			address: iwallet.NewAddress("abc", iwallet.CtZCash),
+			address: iwallet.NewAddress(testInvalidAddress, testZCashNativeCoin),
 			valid:   false,
 		},
 		{
-			address: iwallet.NewAddress("tmJKrg3gS4sPS7gSJ4vT8dFeqkGtfnDW4gu", iwallet.CtZCash),
+			address: iwallet.NewAddress(testZECTestnetAddr, testZCashNativeCoin),
 			valid:   true,
 		},
 	}
@@ -112,7 +130,7 @@ func TestZCashWallet_IsDust(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, test := range tests {
-		isDust := w.IsDust(iwallet.NewAddress("tmJKrg3gS4sPS7gSJ4vT8dFeqkGtfnDW4gu", iwallet.CtZCash), test.amount)
+		isDust := w.IsDust(iwallet.NewAddress(testZECTestnetAddr, testZCashNativeCoin), test.amount)
 		if test.isDust != isDust {
 			t.Errorf("Test %d expected %t got %t", i, test.isDust, isDust)
 		}
@@ -228,7 +246,7 @@ func TestZCashWallet_Multisig1of2(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("tmJKrg3gS4sPS7gSJ4vT8dFeqkGtfnDW4gu", iwallet.CtZCash),
+				Address: iwallet.NewAddress(testZECTestnetAddr, testZCashNativeCoin),
 			},
 		},
 	}
@@ -258,7 +276,7 @@ func TestZCashWallet_Multisig1of2(t *testing.T) {
 
 	err = w.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtZCash).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testZCashNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -333,7 +351,7 @@ func TestZCashWallet_Multisig2of3(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("tmJKrg3gS4sPS7gSJ4vT8dFeqkGtfnDW4gu", iwallet.CtZCash),
+				Address: iwallet.NewAddress(testZECTestnetAddr, testZCashNativeCoin),
 			},
 		},
 	}
@@ -368,7 +386,7 @@ func TestZCashWallet_Multisig2of3(t *testing.T) {
 
 	err = w1.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtZCash).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testZCashNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {

@@ -35,10 +35,10 @@ type mockHostService struct {
 	evmClients map[iwallet.ChainType]iwallet.ChainClient
 }
 
-func (m *mockHostService) GetUTXOMonitor() utxo.UTXOMonitorService       { return nil }
-func (m *mockHostService) GetEVMRelayService() relay.EVMRelayService     { return nil }
-func (m *mockHostService) GetGlobalBlockedIDs() []peer.ID                { return nil }
-func (m *mockHostService) SetGlobalBlockedIDs(ids []peer.ID)             {}
+func (m *mockHostService) GetUTXOMonitor() utxo.UTXOMonitorService   { return nil }
+func (m *mockHostService) GetEVMRelayService() relay.EVMRelayService { return nil }
+func (m *mockHostService) GetGlobalBlockedIDs() []peer.ID            { return nil }
+func (m *mockHostService) SetGlobalBlockedIDs(ids []peer.ID)         {}
 func (m *mockHostService) GetEVMChainClient(chain iwallet.ChainType) iwallet.ChainClient {
 	if m.evmClients == nil {
 		return nil
@@ -50,12 +50,12 @@ func (m *mockHostService) GetEVMChainClient(chain iwallet.ChainType) iwallet.Cha
 	return client
 }
 func (m *mockHostService) GetSolanaChainClient() iwallet.ChainClient       { return nil }
-func (m *mockHostService) GetSolanaEscrowProgramID() string               { return "" }
+func (m *mockHostService) GetSolanaEscrowProgramID() string                { return "" }
 func (m *mockHostService) GetSolanaRelayService() relay.SolanaRelayService { return nil }
 func (m *mockHostService) GetDiscountAccessForPeer(_ peer.ID) (contracts.DiscountService, contracts.DiscountStore, error) {
 	return nil, nil, nil
 }
-func (m *mockHostService) GetBlobStore() contracts.BlobStore { return nil }
+func (m *mockHostService) GetBlobStore() contracts.BlobStore                      { return nil }
 func (m *mockHostService) GetNodeServiceByPeerID(_ peer.ID) contracts.NodeService { return nil }
 
 var _ coreiface.HostService = (*mockHostService)(nil)
@@ -287,14 +287,18 @@ func TestEVMWallet_BusinessRoundtrip_CreateEscrowAddress_NoClient(t *testing.T) 
 	w := newTestETHWallet(t, iwallet.ChainBSC)
 
 	// Create a valid EscrowInfo for EVM
+	bscCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBSC)
+	if err != nil {
+		t.Fatalf("RequireCanonicalNativeCoinType(BSC) failed: %v", err)
+	}
 	escrowInfo := iwallet.EscrowInfo{
-		CoinType:          iwallet.CoinType(iwallet.ChainBSC),
-		BuyerAddress:      "0x1111111111111111111111111111111111111111",
-		SellerAddress:     "0x2222222222222222222222222222222222222222",
-		ContractAddress:   "0x3333333333333333333333333333333333333333",
-		UniqueId:          [20]byte{1, 2, 3},
+		CoinType:           bscCoin,
+		BuyerAddress:       "0x1111111111111111111111111111111111111111",
+		SellerAddress:      "0x2222222222222222222222222222222222222222",
+		ContractAddress:    "0x3333333333333333333333333333333333333333",
+		UniqueId:           [20]byte{1, 2, 3},
 		RequiredSignatures: 2,
-		UnlockHours:       24,
+		UnlockHours:        24,
 	}
 
 	addr, err := w.CreateEscrowAddress(escrowInfo)
@@ -350,7 +354,11 @@ func TestEVMWallet_BusinessRoundtrip_SetChainClient_TypeManagedEscrow(t *testing
 
 func newTestETHWallet(t *testing.T, chain iwallet.ChainType) *ethWal.ETHWallet {
 	t.Helper()
-	w, err := ethWal.NewETHWallet(iwallet.CoinType(chain), nil, &base.WalletConfig{
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(chain)
+	if err != nil {
+		t.Fatalf("RequireCanonicalNativeCoinType(%s) failed: %v", chain, err)
+	}
+	w, err := ethWal.NewETHWallet(coinType, nil, &base.WalletConfig{
 		Testnet: true,
 	})
 	if err != nil {

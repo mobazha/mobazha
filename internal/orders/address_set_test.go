@@ -31,7 +31,7 @@ func TestAddressSet_NonEVM(t *testing.T) {
 }
 
 func TestAddressSet_EVM_CaseInsensitive(t *testing.T) {
-	s := newAddressSet(iwallet.CtBNB.String())
+	s := newAddressSet(iwallet.CoinType("crypto:eip155:56:native").String())
 
 	s.Add("0xAbCdEf1234567890AbCdEf1234567890AbCdEf12")
 	s.Add(" 0x111 ")

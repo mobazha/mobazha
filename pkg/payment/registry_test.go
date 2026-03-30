@@ -66,12 +66,12 @@ func TestRegistry_ForCoin_DelegatesToForChain(t *testing.T) {
 	r := payment.NewRegistry()
 	s := &mockStrategy{model: payment.PaymentModelClientSigned}
 
-	// BNB coin resolves to BSC chain
+	// BSC native canonical coin resolves to BSC chain
 	r.Register(iwallet.ChainBSC, s)
 
-	got, err := r.ForCoin(iwallet.CtBNB)
+	got, err := r.ForCoin(iwallet.CoinType("crypto:eip155:56:native"))
 	if err != nil {
-		t.Fatalf("ForCoin(BNB): unexpected error: %v", err)
+		t.Fatalf("ForCoin(BSC native): unexpected error: %v", err)
 	}
 	if got.Model() != payment.PaymentModelClientSigned {
 		t.Errorf("Model() = %s, want %s", got.Model(), payment.PaymentModelClientSigned)
@@ -84,8 +84,12 @@ func TestRegistry_ForCoin_TokensResolveToPlatformChain(t *testing.T) {
 
 	r.Register(iwallet.ChainBSC, bscStrategy)
 
-	// BEP20 tokens should resolve to BSC chain
-	for _, coin := range []iwallet.CoinType{iwallet.CtBNB, iwallet.CtBEP20USDT, iwallet.CtBEP20USDC} {
+	// Canonical BSC assets (native + ERC20) should resolve to BSC chain
+	for _, coin := range []iwallet.CoinType{
+		iwallet.CoinType("crypto:eip155:56:native"),
+		iwallet.CoinType("crypto:eip155:56:erc20:0x55d398326f99059ff775485246999027b3197955"),
+		iwallet.CoinType("crypto:eip155:56:erc20:0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"),
+	} {
 		got, err := r.ForCoin(coin)
 		if err != nil {
 			t.Errorf("ForCoin(%s): unexpected error: %v", coin, err)

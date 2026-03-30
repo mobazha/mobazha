@@ -7,37 +7,40 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // binanceSymbolMap maps our internal currency codes to Binance USDT trading pair symbols.
-// Only includes cryptos that Binance actively lists as XXX/USDT pairs.
-var binanceSymbolMap = map[string]string{
-	"BTC":   "BTCUSDT",
-	"ETH":   "ETHUSDT",
-	"BCH":   "BCHUSDT",
-	"LTC":   "LTCUSDT",
-	"ZEC":   "ZECUSDT",
-	"EXTERNAL_PAYMENT":   "EXTERNAL_PAYMENTUSDT",
-	"SOL":   "SOLUSDT",
-	"BNB":   "BNBUSDT",
-	"MATIC": "MATICUSDT",
-	"DASH":  "DASHUSDT",
-	"XRP":   "XRPUSDT",
-	"EOS":   "EOSUSDT",
-	"XLM":   "XLMUSDT",
-	"ADA":   "ADAUSDT",
-	"TRX":   "TRXUSDT",
-	"LINK":  "LINKUSDT",
-	"XTZ":   "XTZUSDT",
-	"NEO":   "NEOUSDT",
-	"ETC":   "ETCUSDT",
-	"CFX":   "CFXUSDT",
+// It is fully sourced from pkg/assetid Pricing.Sources(provider=binance).
+var binanceSymbolMap = buildBinanceSymbolMap()
+
+func buildBinanceSymbolMap() map[string]string {
+	result := make(map[string]string)
+	add := func(code, symbol string) {
+		normalizedCode := strings.TrimSpace(strings.ToUpper(code))
+		normalizedSymbol := strings.TrimSpace(strings.ToUpper(symbol))
+		if normalizedCode == "" || normalizedSymbol == "" {
+			return
+		}
+		result[normalizedCode] = normalizedSymbol
+	}
+
+	for _, def := range assetid.DefaultRegistry().List() {
+		symbol, ok := def.PriceIDForProvider("binance")
+		if !ok {
+			continue
+		}
+		add(def.Code, symbol)
+	}
+
+	return result
 }
 
 // binanceProvider implements the provider interface using the Binance public ticker API.
@@ -127,10 +130,16 @@ func (b *binanceProvider) refreshIfNeeded() error {
 }
 
 func (b *binanceProvider) fetchFromBinance() error {
-	var symbolList []string
+	symbolSet := make(map[string]struct{})
 	for _, sym := range binanceSymbolMap {
+		symbolSet[sym] = struct{}{}
+	}
+
+	symbolList := make([]string, 0, len(symbolSet))
+	for sym := range symbolSet {
 		symbolList = append(symbolList, sym)
 	}
+	sort.Strings(symbolList)
 
 	symbolsJSON, err := json.Marshal(symbolList)
 	if err != nil {
@@ -164,17 +173,17 @@ func (b *binanceProvider) fetchFromBinance() error {
 		return fmt.Errorf("decode Binance response: %w", err)
 	}
 
-	symbolToCode := make(map[string]string, len(binanceSymbolMap))
+	symbolToCodes := make(map[string][]string, len(binanceSymbolMap))
 	for code, sym := range binanceSymbolMap {
-		symbolToCode[sym] = code
+		symbolToCodes[sym] = append(symbolToCodes[sym], code)
 	}
 
 	prices := make(map[string]float64)
 	prices["USD"] = 1.0
 
 	for _, ticker := range tickers {
-		code, ok := symbolToCode[ticker.Symbol]
-		if !ok {
+		codes, ok := symbolToCodes[ticker.Symbol]
+		if !ok || len(codes) == 0 {
 			continue
 		}
 		price, _, err := new(big.Float).SetPrec(256).Parse(ticker.Price, 10)
@@ -182,31 +191,16 @@ func (b *binanceProvider) fetchFromBinance() error {
 			continue
 		}
 		priceF64, _ := price.Float64()
-		prices[code] = priceF64
-	}
-
-	// Stablecoins: Binance USDT pairs price assets in USDT ≈ USD.
-	// Assign $1.0 to stablecoins that share the USDT/USDC peg.
-	for _, codes := range coinGeckoIDMap {
-		if len(codes) <= 1 {
-			continue
-		}
-		baseCode := codes[0]
-		if basePrice, ok := prices[baseCode]; ok {
-			for _, alias := range codes[1:] {
-				if _, exists := prices[alias]; !exists {
-					prices[alias] = basePrice
-				}
-			}
+		for _, code := range codes {
+			prices[code] = priceF64
 		}
 	}
 
-	// Chain-native token aliases (BASE=ETH, BSC=BNB)
-	for alias, source := range chainNativeAliases {
-		if sp, ok := prices[source]; ok {
-			if _, exists := prices[alias]; !exists {
-				prices[alias] = sp
-			}
+	// Stablecoins: Binance quotes in USDT, so USD-pegged codes should be
+	// treated as $1 even when Binance has no direct ticker for that code.
+	for code := range usdPeggedCurrencyCodes {
+		if _, exists := prices[code]; !exists {
+			prices[code] = 1.0
 		}
 	}
 

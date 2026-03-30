@@ -30,7 +30,7 @@ func TestChainlinkProviderIntegration(t *testing.T) {
 	}
 
 	// 验证关键币种的汇率存在
-	requiredCurrencies := []string{"USD", "ETH", "USDT"}
+	requiredCurrencies := []string{"USD", "ETH", "ETHUSDT"}
 	for _, currency := range requiredCurrencies {
 		if _, exists := rates[models.CurrencyCode(currency)]; !exists {
 			t.Errorf("缺少 %s 的汇率数据", currency)
@@ -127,7 +127,7 @@ func TestChainlinkProviderPriceFeeds(t *testing.T) {
 	}{
 		{"BTC", "0xc907E116054Ad103354f2D350FD2514433D57F6f"},
 		{"ETH", "0xF9680D99D6C9589e2a93a78A04A279e509205945"},
-		{"USDT", "0x0A6513e40db6EB1b165753AD52E80663aeA50545"},
+		{"ETHUSDT", "0x0A6513e40db6EB1b165753AD52E80663aeA50545"},
 	}
 
 	for _, tc := range testCases {
@@ -157,8 +157,8 @@ func TestChainlinkProviderStablecoins(t *testing.T) {
 	}
 	defer provider.Close()
 
-	// 测试稳定币识别（USD 是法币非稳定币，不在 priceFeeds 中）
-	stablecoins := []string{"USDT", "USDC"}
+	// 测试稳定币识别（registry 中所有 PeggedTo=USD 的 code 都应识别）
+	stablecoins := []string{"ETHUSDT", "BSCUSDT", "SOLUSDC"}
 	for _, symbol := range stablecoins {
 		if !provider.isStablecoin(symbol) {
 			t.Errorf("%s 应该被识别为稳定币", symbol)
@@ -166,7 +166,7 @@ func TestChainlinkProviderStablecoins(t *testing.T) {
 	}
 
 	// 测试非稳定币识别
-	nonStablecoins := []string{"BTC", "ETH", "BNB", "SOL"}
+	nonStablecoins := []string{"BTC", "ETH", "BNB", "SOL", "BASEETH"}
 	for _, symbol := range nonStablecoins {
 		if provider.isStablecoin(symbol) {
 			t.Errorf("%s 不应该被识别为稳定币", symbol)

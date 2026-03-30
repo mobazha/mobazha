@@ -14,13 +14,27 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
+	"github.com/mobazha/mobazha3.0/internal/config"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/op/go-logging"
 )
+
+const (
+	testInvalidAddress = "abc"
+	testBTCMainnetAddr = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+	testBTCTestnetAddr = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx"
+)
+
+var testBitcoinNativeCoin = func() iwallet.CoinType {
+	coin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBitcoin)
+	if err != nil {
+		panic(err)
+	}
+	return coin
+}()
 
 func newTestWallet() (*BitcoinWallet, error) {
 	w := &BitcoinWallet{
@@ -46,7 +60,7 @@ func newTestWallet() (*BitcoinWallet, error) {
 	w.ChainClient = chainClient
 	w.DB = db
 	w.Logger = logging.MustGetLogger("bchtest")
-	w.CoinType = iwallet.CtBitcoin
+	w.CoinType = testBitcoinNativeCoin
 	w.Done = make(chan struct{})
 	w.PostInitFunc = w.postInit
 	w.NetConfig = config.DefaultNetConfig()
@@ -68,11 +82,11 @@ func newTestWallet() (*BitcoinWallet, error) {
 
 func TestBitcoinWallet_Params_NetworkSelection(t *testing.T) {
 	tests := []struct {
-		name        string
-		testnet     bool
-		regtest     bool
-		wantName    string
-		wantBech32  string
+		name       string
+		testnet    bool
+		regtest    bool
+		wantName   string
+		wantBech32 string
 	}{
 		{
 			name:       "mainnet",
@@ -155,7 +169,7 @@ func TestNewBitcoinWallet_PropagatesRegtest(t *testing.T) {
 func TestBitcoinWallet_CreateMultisigAddress_RegtestPrefix(t *testing.T) {
 	w := &BitcoinWallet{regtest: true}
 	w.Init()
-	w.CoinType = iwallet.CtBitcoin
+	w.CoinType = testBitcoinNativeCoin
 
 	key1Bytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
 	key2Bytes, _ := hex.DecodeString("c68ab7796c52952a062b4c875c758ae3831448240fb58c152cc58a224d6ad3b8")
@@ -177,11 +191,11 @@ func TestBitcoinWallet_ValidateAddress(t *testing.T) {
 		valid   bool
 	}{
 		{
-			address: iwallet.NewAddress("abc", iwallet.CtBitcoin),
+			address: iwallet.NewAddress(testInvalidAddress, testBitcoinNativeCoin),
 			valid:   false,
 		},
 		{
-			address: iwallet.NewAddress("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", iwallet.CtBitcoin),
+			address: iwallet.NewAddress(testBTCMainnetAddr, testBitcoinNativeCoin),
 			valid:   true,
 		},
 	}
@@ -283,7 +297,7 @@ func TestBitcoinWallet_IsDust(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, test := range tests {
-		isDust := w.IsDust(iwallet.NewAddress("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", iwallet.CtBitcoin), test.amount)
+		isDust := w.IsDust(iwallet.NewAddress(testBTCMainnetAddr, testBitcoinNativeCoin), test.amount)
 		if test.isDust != isDust {
 			t.Errorf("Test %d expected %t got %t", i, test.isDust, isDust)
 		}
@@ -339,7 +353,7 @@ func TestBitcoinWallet_Multisig1of2(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", iwallet.CtBitcoin),
+				Address: iwallet.NewAddress(testBTCMainnetAddr, testBitcoinNativeCoin),
 			},
 		},
 	}
@@ -370,7 +384,7 @@ func TestBitcoinWallet_Multisig1of2(t *testing.T) {
 	var txBytes []byte
 	err = w.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtBitcoin).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testBitcoinNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -473,7 +487,7 @@ func TestBitcoinWallet_Multisig2of3(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", iwallet.CtBitcoin),
+				Address: iwallet.NewAddress(testBTCMainnetAddr, testBitcoinNativeCoin),
 			},
 		},
 	}
@@ -509,7 +523,7 @@ func TestBitcoinWallet_Multisig2of3(t *testing.T) {
 	var txBytes []byte
 	err = w1.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtBitcoin).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testBitcoinNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -612,7 +626,7 @@ func TestBitcoinWallet_Multisig2of3Timlocked(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", iwallet.CtBitcoin),
+				Address: iwallet.NewAddress(testBTCMainnetAddr, testBitcoinNativeCoin),
 			},
 		},
 	}
@@ -648,7 +662,7 @@ func TestBitcoinWallet_Multisig2of3Timlocked(t *testing.T) {
 	var txBytes []byte
 	err = w1.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtBitcoin).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testBitcoinNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -747,7 +761,7 @@ func TestBitcoinWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", iwallet.CtBitcoin),
+				Address: iwallet.NewAddress(testBTCMainnetAddr, testBitcoinNativeCoin),
 			},
 		},
 	}
@@ -773,7 +787,7 @@ func TestBitcoinWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 	var txBytes []byte
 	err = w.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtBitcoin).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testBitcoinNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -857,16 +871,16 @@ func TestBitcoinWallet_SpendFromDerivedAddress(t *testing.T) {
 	}
 
 	// Create outputs: seller gets 900000, platform gets 50000, fee is 50000
-	sellerAddr := "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx"
+	sellerAddr := testBTCTestnetAddr
 	platformAddr := "tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7"
 
 	outputs := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress(sellerAddr, iwallet.CtBitcoin),
+			Address: iwallet.NewAddress(sellerAddr, testBitcoinNativeCoin),
 			Amount:  iwallet.NewAmount(900000),
 		},
 		{
-			Address: iwallet.NewAddress(platformAddr, iwallet.CtBitcoin),
+			Address: iwallet.NewAddress(platformAddr, testBitcoinNativeCoin),
 			Amount:  iwallet.NewAmount(50000),
 		},
 	}
@@ -948,7 +962,7 @@ func TestBitcoinWallet_SpendFromDerivedAddress_OutputsExceedInput(t *testing.T) 
 
 	outputs := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", iwallet.CtBitcoin),
+			Address: iwallet.NewAddress(testBTCTestnetAddr, testBitcoinNativeCoin),
 			Amount:  iwallet.NewAmount(2000000), // More than input
 		},
 	}
@@ -984,7 +998,7 @@ func TestBitcoinWallet_SpendFromDerivedAddress_ZeroFee(t *testing.T) {
 
 	outputs := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", iwallet.CtBitcoin),
+			Address: iwallet.NewAddress(testBTCTestnetAddr, testBitcoinNativeCoin),
 			Amount:  iwallet.NewAmount(1000000), // Equals input, zero fee
 		},
 	}
@@ -1025,7 +1039,7 @@ func TestBitcoinWallet_SpendFromDerivedAddress_ScriptVerification(t *testing.T) 
 
 	outputs := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", iwallet.CtBitcoin),
+			Address: iwallet.NewAddress(testBTCTestnetAddr, testBitcoinNativeCoin),
 			Amount:  iwallet.NewAmount(950000), // 50000 sat fee
 		},
 	}

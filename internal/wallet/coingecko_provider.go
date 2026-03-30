@@ -11,45 +11,74 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
+// usdPeggedCurrencyCodes lists currencies that should be treated as USD-pegged
+// by secondary providers (for example Binance USDT quotes).
+// Built from PricingMeta in assetid registry.
+var usdPeggedCurrencyCodes = buildUSDPeggedCurrencyCodes()
+
 // coinGeckoIDMap maps CoinGecko coin IDs to our internal currency codes.
-// Multiple internal codes can map to the same CoinGecko ID (chain-specific tokens).
-var coinGeckoIDMap = map[string][]string{
-	"bitcoin":           {"BTC"},
-	"ethereum":          {"ETH", "BASEETH"},
-	"bitcoin-cash":      {"BCH"},
-	"litecoin":          {"LTC"},
-	"zcash":             {"ZEC"},
-	"external_payment":            {"EXTERNAL_PAYMENT"},
-	"solana":            {"SOL"},
-	"binancecoin":       {"BNB"},
-	"matic-network":     {"MATIC"},
-	"tether":            {"USDT", "ETHUSDT", "BSCUSDT", "BASEUSDT", "MATICUSDT", "CFXUSDT", "SOLUSDT", "TRXUSDT"},
-	"usd-coin":          {"USDC", "ETHUSDC", "BSCUSDC", "BASEUSDC", "MATICUSDC", "CFXUSDC", "SOLUSDC"},
-	"dash":              {"DASH"},
-	"ripple":            {"XRP"},
-	"eos":               {"EOS"},
-	"stellar":           {"XLM"},
-	"cardano":           {"ADA"},
-	"tron":              {"TRX"},
-	"chainlink":         {"LINK"},
-	"tezos":             {"XTZ"},
-	"neo":               {"NEO"},
-	"ethereum-classic":  {"ETC"},
-	"conflux-token":     {"CFX"},
-	"bitcoin-cash-sv":   {"BSV"},
-	"leo-token":         {"LEO"},
-	"iota":              {"MIOTA"},
+// It is fully sourced from assetid registry metadata.
+var coinGeckoIDMap = buildCoinGeckoIDMap()
+
+func buildCoinGeckoIDMap() map[string][]string {
+	byID := make(map[string]map[string]struct{})
+
+	add := func(cgID, code string) {
+		id := strings.TrimSpace(strings.ToLower(cgID))
+		normalizedCode := strings.TrimSpace(strings.ToUpper(code))
+		if id == "" || normalizedCode == "" {
+			return
+		}
+		if _, ok := byID[id]; !ok {
+			byID[id] = make(map[string]struct{})
+		}
+		byID[id][normalizedCode] = struct{}{}
+	}
+
+	for _, def := range assetid.DefaultRegistry().List() {
+		priceID, ok := def.PriceIDForProvider("coingecko")
+		if !ok {
+			continue
+		}
+		add(priceID, def.Code)
+	}
+
+	result := make(map[string][]string, len(byID))
+	for cgID, set := range byID {
+		codes := make([]string, 0, len(set))
+		for code := range set {
+			codes = append(codes, code)
+		}
+		sort.Strings(codes)
+		result[cgID] = codes
+	}
+
+	return result
 }
 
-// Additional mappings for chain-native tokens that share a price with another coin.
-// These are applied after CoinGecko data is processed.
-var chainNativeAliases = map[string]string{
-	"BASE": "ETH",
-	"BSC":  "BNB",
+func buildUSDPeggedCurrencyCodes() map[string]struct{} {
+	result := make(map[string]struct{})
+	add := func(code string) {
+		normalizedCode := strings.TrimSpace(strings.ToUpper(code))
+		if normalizedCode == "" {
+			return
+		}
+		result[normalizedCode] = struct{}{}
+	}
+
+	for _, def := range assetid.DefaultRegistry().List() {
+		if !strings.EqualFold(def.Pricing.PeggedTo, "USD") {
+			continue
+		}
+		add(def.Code)
+	}
+
+	return result
 }
 
 // coinGeckoVsCurrencies are the fiat currencies to request from CoinGecko.
@@ -162,14 +191,6 @@ func (c *coinGeckoProvider) buildUSDPriceMap() map[string]float64 {
 
 		for _, code := range currCodes {
 			prices[code] = usdPrice
-		}
-	}
-
-	for alias, source := range chainNativeAliases {
-		if sourcePrice, ok := prices[source]; ok {
-			if _, exists := prices[alias]; !exists {
-				prices[alias] = sourcePrice
-			}
 		}
 	}
 

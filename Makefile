@@ -1,10 +1,17 @@
-.PHONY: build test clean ios_framework android_framework protos sample-config docker push_docker
+.PHONY: build test test-libolm clean ios_framework android_framework protos sample-config docker push_docker
+
+SYSTEM_GO := /usr/local/go/bin/go
+GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
+GO_TEST_TAGS ?= goolm
 
 build: ## 构建项目
-	bash ./scripts/with-libolm-env.sh go build -o mobazha
+	bash ./scripts/with-libolm-env.sh $(GO) build -o mobazha
 
 test: ## 运行测试
-	bash ./scripts/with-libolm-env.sh go test ./...
+	$(GO) test -tags '$(GO_TEST_TAGS)' ./...
+
+test-libolm: ## 使用 libolm(cgo) 运行测试
+	bash ./scripts/with-libolm-env.sh $(GO) test ./...
 
 clean: ## 清理构建文件
 	rm -f mobazha

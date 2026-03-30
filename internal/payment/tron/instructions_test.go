@@ -11,10 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const tronUSDTAssetID = iwallet.CoinType("crypto:tron:mainnet:trc20:TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t")
+
 func TestBuildEscrowReleaseParams_Success(t *testing.T) {
 	tos := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress("0x1234567890abcdef1234567890abcdef12345678", iwallet.CtTRC20USDT),
+			Address: iwallet.NewAddress("0x1234567890abcdef1234567890abcdef12345678", tronUSDTAssetID),
 			Amount:  iwallet.NewAmount(1000000),
 		},
 	}
@@ -35,7 +37,7 @@ func TestSignEscrowRelease_Success(t *testing.T) {
 
 	tos := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress("0x1234567890abcdef1234567890abcdef12345678", iwallet.CtTRC20USDT),
+			Address: iwallet.NewAddress("0x1234567890abcdef1234567890abcdef12345678", tronUSDTAssetID),
 			Amount:  iwallet.NewAmount(500000),
 		},
 	}
@@ -55,11 +57,11 @@ func TestSignEscrowRelease_TwoRecipients(t *testing.T) {
 
 	tos := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress("0x1111111111111111111111111111111111111111", iwallet.CtTRC20USDT),
+			Address: iwallet.NewAddress("0x1111111111111111111111111111111111111111", tronUSDTAssetID),
 			Amount:  iwallet.NewAmount(900000),
 		},
 		{
-			Address: iwallet.NewAddress("0x2222222222222222222222222222222222222222", iwallet.CtTRC20USDT),
+			Address: iwallet.NewAddress("0x2222222222222222222222222222222222222222", tronUSDTAssetID),
 			Amount:  iwallet.NewAmount(100000),
 		},
 	}
@@ -78,7 +80,7 @@ func TestSignEscrowRelease_DifferentKeys_DifferentSignatures(t *testing.T) {
 
 	tos := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress("0x1234567890abcdef1234567890abcdef12345678", iwallet.CtTRC20USDT),
+			Address: iwallet.NewAddress("0x1234567890abcdef1234567890abcdef12345678", tronUSDTAssetID),
 			Amount:  iwallet.NewAmount(500000),
 		},
 	}

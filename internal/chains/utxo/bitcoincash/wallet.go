@@ -51,7 +51,11 @@ func NewBitcoinCashWallet(cfg *base.WalletConfig) (*BitcoinCashWallet, error) {
 	// Previously used Blockbook or BCHD clients, both replaced at runtime.
 	w.DB = cfg.DB
 	w.Logger = cfg.Logger
-	w.CoinType = iwallet.CtBitcoinCash
+	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBitcoinCash)
+	if err != nil {
+		return nil, err
+	}
+	w.CoinType = nativeCoin
 	w.Done = make(chan struct{})
 	w.PostInitFunc = w.postInit
 	w.NetConfig = cfg.NetConfig
@@ -159,7 +163,7 @@ func (w *BitcoinCashWallet) CreateMultisigAddress(keys []btcec.PublicKey, chainc
 	if err != nil {
 		return iwallet.Address{}, nil, err
 	}
-	return iwallet.NewAddress(addr.String(), iwallet.CtBitcoinCash), redeemScript, nil
+	return iwallet.NewAddress(addr.String(), w.CoinType), redeemScript, nil
 }
 
 // SignMultisigTransaction should use the provided key to create a signature for
@@ -350,7 +354,7 @@ func (w *BitcoinCashWallet) BuildAndSend(wtx iwallet.Tx, txn iwallet.Transaction
 		return w.DB.Update(func(dbtx database.Tx) error {
 			err := dbtx.Save(&database.UnconfirmedTransaction{
 				Timestamp: time.Now(),
-				Coin:      iwallet.CtBitcoinCash.String(),
+				Coin:      w.CoinType.String(),
 				TxBytes:   buf.Bytes(),
 				Txid:      tx.TxHash().String(),
 			})
@@ -405,7 +409,7 @@ func (w *BitcoinCashWallet) CreateMultisigWithTimeout(keys []btcec.PublicKey, ch
 	if err != nil {
 		return iwallet.Address{}, nil, err
 	}
-	return iwallet.NewAddress(addr.String(), iwallet.CtBitcoinCash), redeemScript, nil
+	return iwallet.NewAddress(addr.String(), w.CoinType), redeemScript, nil
 }
 
 // ReleaseFundsAfterTimeout will release funds from the escrow. The signature will
@@ -474,7 +478,7 @@ func (w *BitcoinCashWallet) ReleaseFundsAfterTimeout(wtx iwallet.Tx, txn iwallet
 		return w.DB.Update(func(dbtx database.Tx) error {
 			err := dbtx.Save(&database.UnconfirmedTransaction{
 				Timestamp: time.Now(),
-				Coin:      iwallet.CtBitcoinCash.String(),
+				Coin:      w.CoinType.String(),
 				TxBytes:   buf.Bytes(),
 				Txid:      tx.TxHash().String(),
 			})
@@ -640,7 +644,7 @@ func (w *BitcoinCashWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet
 		return w.DB.Update(func(dbtx database.Tx) error {
 			err := dbtx.Save(&database.UnconfirmedTransaction{
 				Timestamp: time.Now(),
-				Coin:      iwallet.CtBitcoinCash.String(),
+				Coin:      w.CoinType.String(),
 				TxBytes:   buf.Bytes(),
 				Txid:      tx.TxHash().String(),
 			})

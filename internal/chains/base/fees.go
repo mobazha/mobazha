@@ -19,6 +19,12 @@ type FeeProvider interface {
 	GetFee(level iwallet.FeeLevel) (iwallet.Amount, error)
 }
 
+// ExchangeRateProvider converts a coin type to its USD rate (in cents).
+// It is used by ExchangeRateFeeProvider when fee targets are USD-based.
+type ExchangeRateProvider interface {
+	GetUSDRate(coinType iwallet.CoinType) (iwallet.Amount, error)
+}
+
 // HardCodedFeeProvider is a basic implementation of the FeeProvider interface
 // which returns hard coded fees from a map.
 type HardCodedFeeProvider struct {

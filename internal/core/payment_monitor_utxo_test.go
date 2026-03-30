@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/sources/electrum"
+	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -488,7 +488,7 @@ func TestCoinSwitchDetection(t *testing.T) {
 	require.NoError(t, err)
 
 	// Detect switch to LTC
-	newCoin := iwallet.CtLitecoin
+	newCoin := iwallet.CoinType("crypto:bip122:12a765e31ffd4059bada1e25190f6e98c99d9714d334efa41a195a7e7e04bfe2:native")
 	pendingInfo, _ := order.GetPendingPaymentInfo()
 	hasCoinSwitch := pendingInfo != nil && pendingInfo.Coin != "" && pendingInfo.Coin != string(newCoin)
 	assert.True(t, hasCoinSwitch, "Should detect coin switch from BTC to LTC")

@@ -7,16 +7,16 @@ import (
 	"path"
 
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoincash"
-	"github.com/mobazha/mobazha3.0/internal/chains/evm"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
-	"github.com/mobazha/mobazha3.0/internal/chains/solana"
-	tronWal "github.com/mobazha/mobazha3.0/internal/chains/tron"
-	"github.com/mobazha/mobazha3.0/internal/chains/fiat/stripe"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/zcash"
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
+	"github.com/mobazha/mobazha3.0/internal/chains/evm"
+	"github.com/mobazha/mobazha3.0/internal/chains/fiat/stripe"
+	"github.com/mobazha/mobazha3.0/internal/chains/solana"
+	tronWal "github.com/mobazha/mobazha3.0/internal/chains/tron"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoincash"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo/zcash"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/natefinch/lumberjack"
@@ -141,7 +141,11 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 			// Injected during MobazhaNode.Start() via startEVMChainClients():
 			//   - Standalone: creates own EthClient per chain via pkg/evm factory
 			//   - SaaS: gets shared EthClient from HostService
-			w, err := evm.NewETHWallet(iwallet.CoinType(chain), nil, &base.WalletConfig{
+			coinType, err := iwallet.RequireCanonicalNativeCoinType(chain)
+			if err != nil {
+				return nil, err
+			}
+			w, err := evm.NewETHWallet(coinType, nil, &base.WalletConfig{
 				Logger:    logger,
 				DB:        db,
 				Testnet:   cfg.UseTestnet,

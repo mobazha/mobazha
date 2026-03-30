@@ -16,6 +16,7 @@ import (
 type Source struct {
 	client    *Client
 	chain     iwallet.ChainType
+	coinType  iwallet.CoinType
 	mu        sync.RWMutex
 	healthy   bool
 	lastCheck time.Time
@@ -30,10 +31,16 @@ func NewSource(chain iwallet.ChainType, config *ClientConfig, testnet bool) *Sou
 	config.Chain = string(chain)
 	config.Testnet = testnet
 
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(chain)
+	if err != nil {
+		log.Errorf("Electrum source chain %s has no canonical native coin type: %v", chain, err)
+	}
+
 	return &Source{
-		client:  NewClient(config),
-		chain:   chain,
-		healthy: false,
+		client:   NewClient(config),
+		chain:    chain,
+		coinType: coinType,
+		healthy:  false,
 	}
 }
 
@@ -300,18 +307,7 @@ func makeOutpointID(txid string, vout uint32) []byte {
 
 // getCoinType returns the iwallet.CoinType for this source's chain
 func (s *Source) getCoinType() iwallet.CoinType {
-	switch s.chain {
-	case iwallet.ChainBitcoin:
-		return iwallet.CtBitcoin
-	case iwallet.ChainLitecoin:
-		return iwallet.CtLitecoin
-	case iwallet.ChainBitcoinCash:
-		return iwallet.CtBitcoinCash
-	case iwallet.ChainZCash:
-		return iwallet.CtZCash
-	default:
-		return iwallet.CtBitcoin
-	}
+	return s.coinType
 }
 
 // IsHealthy returns true if the source is healthy

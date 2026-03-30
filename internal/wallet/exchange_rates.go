@@ -96,18 +96,27 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 	return &e
 }
 
+func normalizeBaseForRateQuery(base models.CurrencyCode) models.CurrencyCode {
+	rawBase := strings.TrimSpace(string(base))
+	if rawBase == "" {
+		return models.CurrencyCode("")
+	}
+
+	if pricingCode, err := iwallet.CoinType(rawBase).PricingCurrencyCode(); err == nil {
+		return models.CurrencyCode(strings.ToUpper(strings.TrimSpace(pricingCode)))
+	}
+
+	return models.CurrencyCode(strings.ToUpper(rawBase))
+}
+
 // GetRate returns the rate for a given currency converting from the provided base currency.
 // Uses stale-while-revalidate: if providers fail, returns the last known rate from cache.
 func (e *ExchangeRateProvider) GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
-	base = models.CurrencyCode(strings.ToUpper(base.String()))
-
-	baseForQuery := base
-	if coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(base)); err == nil {
-		baseForQuery = models.CurrencyCode(coinInfo.Symbol)
-	}
+	baseForQuery := normalizeBaseForRateQuery(base)
+	to = models.CurrencyCode(strings.ToUpper(strings.TrimSpace(string(to))))
 
 	lastQueried := e.lastQueried[baseForQuery]
 	cachedRates, hasCached := e.cache[baseForQuery]
@@ -148,10 +157,7 @@ func (e *ExchangeRateProvider) GetAllRates(base models.CurrencyCode, breakCache 
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
-	baseForQuery := base
-	if coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(base)); err == nil {
-		baseForQuery = models.CurrencyCode(coinInfo.Symbol)
-	}
+	baseForQuery := normalizeBaseForRateQuery(base)
 
 	lastQueried := e.lastQueried[baseForQuery]
 	cachedRates, hasCached := e.cache[baseForQuery]

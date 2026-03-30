@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/op/go-logging"
 )
@@ -29,57 +30,6 @@ var (
 	CurrencyDefinitions = CurrencyDictionary{
 		// Testing
 		"MCK": {Name: "Mock", Code: CurrencyCode("MCK"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, BlockInterval: time.Minute * 10},
-
-		// Crypto
-		"BTC":       {Name: "Bitcoin", Code: CurrencyCode("BTC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 0, BlockInterval: time.Minute * 10},
-		"BCH":       {Name: "Bitcoin Cash", Code: CurrencyCode("BCH"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 145, BlockInterval: time.Minute * 10},
-		"LTC":       {Name: "Litecoin", Code: CurrencyCode("LTC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 2, BlockInterval: time.Second * 150},
-		"ZEC":       {Name: "Zcash", Code: CurrencyCode("ZEC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 133, BlockInterval: time.Second * 150},
-		"ETH":       {Name: "Ethereum", Code: CurrencyCode("ETH"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 12},
-		"ETHUSDT":   {Name: "Tether", Code: CurrencyCode("ETHUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 12},
-		"ETHUSDC":   {Name: "USD Coin", Code: CurrencyCode("ETHUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 12},
-		"EXTERNAL_PAYMENT":       {Name: "ExternalPayment", Code: CurrencyCode("EXTERNAL_PAYMENT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 12, Bip44Code: 128, BlockInterval: time.Minute * 2},
-		"DASH":      {Name: "Dash", Code: CurrencyCode("DASH"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 5, BlockInterval: time.Second * 150},
-		"XRP":       {Name: "Ripple", Code: CurrencyCode("XRP"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 144},
-		"BASE":      {Name: "Base", Code: CurrencyCode("BASE"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
-		"BASEETH":   {Name: "Ethereum", Code: CurrencyCode("BASEETH"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
-		"BASEUSDT":  {Name: "Tether", Code: CurrencyCode("BASEUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"BASEUSDC":  {Name: "USD Coin", Code: CurrencyCode("BASEUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"BSC":       {Name: "Binance Smart Chain", Code: CurrencyCode("BSC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
-		"BNB":       {Name: "Binance Coin", Code: CurrencyCode("BNB"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
-		"BSCUSDT":   {Name: "Tether", Code: CurrencyCode("BSCUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"BSCUSDC":   {Name: "USD Coin", Code: CurrencyCode("BSCUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"BSCMBZ":    {Name: "Mobazha Token", Code: CurrencyCode("BSCMBZ"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
-		"MATIC":     {Name: "Polygon", Code: CurrencyCode("MATIC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
-		"MATICUSDT": {Name: "Tether", Code: CurrencyCode("MATICUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"MATICUSDC": {Name: "USD Coin", Code: CurrencyCode("MATICUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"MATICMBZ":  {Name: "Mobazha Token", Code: CurrencyCode("MATICMBZ"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
-
-		"CFX":     {Name: "Conflux", Code: CurrencyCode("CFX"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
-		"CFXUSDT": {Name: "Tether", Code: CurrencyCode("CFXUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
-		"CFXUSDC": {Name: "USD Coin", Code: CurrencyCode("CFXUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
-		"CFXMBZ":  {Name: "Mobazha Token", Code: CurrencyCode("CFXMBZ"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
-
-		"SOL":     {Name: "Solana", Code: CurrencyCode("SOL"), CurrencyType: CurrencyTypeCrypto, Divisibility: 9, Bip44Code: 501, BlockInterval: time.Millisecond * 400},
-		"SOLUSDT": {Name: "Tether", Code: CurrencyCode("SOLUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Millisecond * 400},
-		"SOLUSDC": {Name: "USD Coin", Code: CurrencyCode("SOLUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Millisecond * 400},
-
-		"STRIPE": {Name: "Stripe", Code: CurrencyCode("STRIPE"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-
-		"USDT":  {Name: "Tether", Code: CurrencyCode("USDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"USDC":  {Name: "USD Coin", Code: CurrencyCode("USDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"EOS":   {Name: "EOS", Code: CurrencyCode("EOS"), CurrencyType: CurrencyTypeCrypto, Divisibility: 4, Bip44Code: 194},
-		"BSV":   {Name: "Bitcoin SV", Code: CurrencyCode("BSV"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 236},
-		"XLM":   {Name: "Stellar Lumens", Code: CurrencyCode("XLM"), CurrencyType: CurrencyTypeCrypto, Divisibility: 7, Bip44Code: 148},
-		"LEO":   {Name: "UNUS SED LEO", Code: CurrencyCode("LEO"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18},
-		"ADA":   {Name: "Cardano", Code: CurrencyCode("ADA"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 1815},
-		"TRX":   {Name: "Tron", Code: CurrencyCode("TRX"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 195},
-		"TRXUSDT": {Name: "Tether", Code: CurrencyCode("TRXUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"LINK":  {Name: "Chainlink", Code: CurrencyCode("LINK"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18},
-		"XTZ":   {Name: "Tezos", Code: CurrencyCode("XTZ"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 1729},
-		"NEO":   {Name: "NEO", Code: CurrencyCode("NEO"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 888},
-		"MIOTA": {Name: "IOTA", Code: CurrencyCode("MIOTA"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 4218},
-		"ETC":   {Name: "Ethereum Classic", Code: CurrencyCode("ETC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 61},
 
 		// Fiat
 		"AED": {Name: "UAE Dirham", Code: CurrencyCode("AED"), CurrencyType: CurrencyTypeFiat, Divisibility: 2},
@@ -241,6 +191,30 @@ var (
 		"ZWL": {Name: "Zimbabwe Dollar", Code: CurrencyCode("ZWL"), CurrencyType: CurrencyTypeFiat, Divisibility: 2},
 	}
 )
+
+func init() {
+	mergeCanonicalCryptoFromRegistry()
+}
+
+// mergeCanonicalCryptoFromRegistry makes assetid registry the source of truth for
+// crypto definitions while keeping existing fiat/test entries intact.
+func mergeCanonicalCryptoFromRegistry() {
+	for _, def := range assetid.DefaultRegistry().List() {
+		code := strings.ToUpper(strings.TrimSpace(def.Code))
+		if code == "" {
+			continue
+		}
+
+		CurrencyDefinitions[code] = &Currency{
+			Name:          def.DisplayName,
+			Code:          CurrencyCode(code),
+			Divisibility:  uint(def.Decimals),
+			CurrencyType:  CurrencyTypeCrypto,
+			Bip44Code:     def.Runtime.Bip44Code,
+			BlockInterval: def.Runtime.BlockInterval,
+		}
+	}
+}
 
 // CurrencyDictionary is a map that can be used to look up a currency
 // given its string code.

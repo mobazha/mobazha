@@ -3,16 +3,71 @@ package wallet_interface
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/assetid"
 )
 
 var canonicalAssetRegistry = assetid.DefaultRegistry()
+var canonicalNativeCoinByChain = buildCanonicalNativeCoinByChain()
+var canonicalBlockIntervalByChain = buildCanonicalBlockIntervalByChain()
 
 const (
 	btcMainnetGenesis = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
 	ltcMainnetGenesis = "12a765e31ffd4059bada1e25190f6e98c99d9714d334efa41a195a7e7e04bfe2"
 )
+
+func buildCanonicalNativeCoinByChain() map[ChainType]CoinType {
+	result := make(map[ChainType]CoinType)
+	for _, def := range canonicalAssetRegistry.List() {
+		parsed, err := assetid.Parse(def.AssetID)
+		if err != nil || !parsed.IsNative() {
+			continue
+		}
+		chain, err := chainTypeFromAssetID(parsed)
+		if err != nil {
+			continue
+		}
+		result[chain] = CoinType(def.AssetID)
+	}
+	return result
+}
+
+// CanonicalNativeCoinType returns the canonical native crypto:* coin type for a chain.
+// For chains that are not yet in assetid registry, bool will be false.
+func CanonicalNativeCoinType(chain ChainType) (CoinType, bool) {
+	coin, ok := canonicalNativeCoinByChain[chain]
+	return coin, ok
+}
+
+func RequireCanonicalNativeCoinType(chain ChainType) (CoinType, error) {
+	coin, ok := CanonicalNativeCoinType(chain)
+	if !ok {
+		return "", fmt.Errorf("no canonical native asset id configured for chain %s", chain)
+	}
+	return coin, nil
+}
+
+func CanonicalBlockInterval(chain ChainType) (time.Duration, bool) {
+	interval, ok := canonicalBlockIntervalByChain[chain]
+	return interval, ok
+}
+
+func buildCanonicalBlockIntervalByChain() map[ChainType]time.Duration {
+	result := make(map[ChainType]time.Duration)
+	for _, def := range canonicalAssetRegistry.List() {
+		parsed, err := assetid.Parse(def.AssetID)
+		if err != nil || !parsed.IsNative() || def.Runtime.BlockInterval <= 0 {
+			continue
+		}
+		chain, err := chainTypeFromAssetID(parsed)
+		if err != nil {
+			continue
+		}
+		result[chain] = def.Runtime.BlockInterval
+	}
+	return result
+}
 
 // IsCanonicalCryptoAssetID reports whether this coin type is a canonical
 // crypto asset id in the form of crypto:*.
@@ -27,7 +82,7 @@ func (ct CoinType) IsCanonicalCryptoAssetID() bool {
 // IsCanonicalPaymentCoin reports whether coin can be used in payment flows.
 // It accepts canonical fiat IDs, canonical crypto asset IDs, and test-only coins.
 func (ct CoinType) IsCanonicalPaymentCoin() bool {
-	if ct.IsFiatPayment() {
+	if ct.IsCanonicalFiatPaymentCoin() {
 		return true
 	}
 	if ct == CtMock || ct == CtTestCoin {
@@ -36,19 +91,40 @@ func (ct CoinType) IsCanonicalPaymentCoin() bool {
 	return ct.IsCanonicalCryptoAssetID()
 }
 
+// IsCanonicalFiatPaymentCoin reports whether coin matches fiat:{provider}:{currency}.
+func (ct CoinType) IsCanonicalFiatPaymentCoin() bool {
+	raw := strings.TrimSpace(string(ct))
+	parts := strings.Split(raw, ":")
+	if len(parts) != 3 {
+		return false
+	}
+	if !strings.EqualFold(parts[0], "fiat") {
+		return false
+	}
+	provider := strings.TrimSpace(parts[1])
+	currency := strings.TrimSpace(parts[2])
+	return provider != "" && currency != ""
+}
+
 // ValidateCanonicalPaymentCoin returns error when coin is not canonical for payment.
 func (ct CoinType) ValidateCanonicalPaymentCoin() error {
 	if ct.IsCanonicalPaymentCoin() {
 		return nil
 	}
-	return fmt.Errorf("coin must be canonical payment coin (crypto:* / fiat:*), got %q", ct)
+	return fmt.Errorf("coin must be canonical payment coin (crypto:* / fiat:{provider}:{currency}), got %q", ct)
 }
 
 // PricingCurrencyCode returns the pricing/exchange currency code used by
 // CurrencyDefinitions and exchange-rate lookup (e.g. BTC, BSCUSDT, USD).
 func (ct CoinType) PricingCurrencyCode() (string, error) {
 	if ct.IsFiatPayment() {
+		if !ct.IsCanonicalFiatPaymentCoin() {
+			return "", fmt.Errorf("fiat payment coin must use canonical format fiat:{provider}:{currency}, got %q", ct)
+		}
 		return strings.ToUpper(ct.FiatBaseCurrency()), nil
+	}
+	if ct == CtMock || ct == CtTestCoin {
+		return strings.ToUpper(strings.TrimSpace(string(ct))), nil
 	}
 
 	def, isCanonical, err := lookupCanonicalAssetDefinition(ct)
@@ -59,8 +135,7 @@ func (ct CoinType) PricingCurrencyCode() (string, error) {
 		return strings.ToUpper(def.Code), nil
 	}
 
-	// Legacy fallback while the codebase is still being migrated.
-	return strings.ToUpper(strings.TrimSpace(string(ct))), nil
+	return "", fmt.Errorf("coin must be canonical payment coin (crypto:* / fiat:{provider}:{currency}), got %q", ct)
 }
 
 func lookupCanonicalAssetDefinition(ct CoinType) (assetid.Definition, bool, error) {
@@ -134,6 +209,8 @@ func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
 			return ChainPolygon, nil
 		case "8453":
 			return ChainBase, nil
+		case "1030":
+			return ChainConflux, nil
 		default:
 			return "", fmt.Errorf("unsupported eip155 chain_ref %q", id.ChainRef)
 		}
@@ -147,6 +224,16 @@ func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
 			return "", fmt.Errorf("unsupported solana chain_ref %q", id.ChainRef)
 		}
 		return ChainSolana, nil
+	case assetid.NamespaceBitcoinCash:
+		if id.ChainRef != "mainnet" {
+			return "", fmt.Errorf("unsupported bitcoincash chain_ref %q", id.ChainRef)
+		}
+		return ChainBitcoinCash, nil
+	case assetid.NamespaceZCash:
+		if id.ChainRef != "mainnet" {
+			return "", fmt.Errorf("unsupported zcash chain_ref %q", id.ChainRef)
+		}
+		return ChainZCash, nil
 	default:
 		return "", fmt.Errorf("unsupported namespace %q", id.Namespace)
 	}

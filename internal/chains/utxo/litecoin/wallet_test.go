@@ -14,13 +14,26 @@ import (
 	"github.com/ltcsuite/ltcd/ltcutil"
 	"github.com/ltcsuite/ltcd/txscript"
 	"github.com/ltcsuite/ltcd/wire"
-	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
+	"github.com/mobazha/mobazha3.0/internal/config"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/op/go-logging"
 )
+
+const (
+	testInvalidAddress = "abc"
+	testLTCTestnetAddr = "tltc1q0wzfm6yz9gxght997y38mfvc9lj25hrj2lwdtq"
+)
+
+var testLitecoinNativeCoin = func() iwallet.CoinType {
+	coin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainLitecoin)
+	if err != nil {
+		panic(err)
+	}
+	return coin
+}()
 
 func newTestWallet() (*LitecoinWallet, error) {
 	w := &LitecoinWallet{
@@ -46,7 +59,7 @@ func newTestWallet() (*LitecoinWallet, error) {
 	w.ChainClient = chainClient
 	w.DB = db
 	w.Logger = logging.MustGetLogger("bchtest")
-	w.CoinType = iwallet.CtLitecoin
+	w.CoinType = testLitecoinNativeCoin
 	w.Done = make(chan struct{})
 	w.PostInitFunc = w.postInit
 	w.NetConfig = config.DefaultNetConfig()
@@ -72,11 +85,11 @@ func TestLitecoinWallet_ValidateAddress(t *testing.T) {
 		valid   bool
 	}{
 		{
-			address: iwallet.NewAddress("abc", iwallet.CtLitecoin),
+			address: iwallet.NewAddress(testInvalidAddress, testLitecoinNativeCoin),
 			valid:   false,
 		},
 		{
-			address: iwallet.NewAddress("tltc1q0wzfm6yz9gxght997y38mfvc9lj25hrj2lwdtq", iwallet.CtLitecoin),
+			address: iwallet.NewAddress(testLTCTestnetAddr, testLitecoinNativeCoin),
 			valid:   true,
 		},
 	}
@@ -178,7 +191,7 @@ func TestLitecoinWallet_IsDust(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, test := range tests {
-		isDust := w.IsDust(iwallet.NewAddress("tltc1q0wzfm6yz9gxght997y38mfvc9lj25hrj2lwdtq", iwallet.CtLitecoin), test.amount)
+		isDust := w.IsDust(iwallet.NewAddress(testLTCTestnetAddr, testLitecoinNativeCoin), test.amount)
 		if test.isDust != isDust {
 			t.Errorf("Test %d expected %t got %t", i, test.isDust, isDust)
 		}
@@ -234,7 +247,7 @@ func TestLitecoinWallet_Multisig1of2(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("tltc1q0wzfm6yz9gxght997y38mfvc9lj25hrj2lwdtq", iwallet.CtLitecoin),
+				Address: iwallet.NewAddress(testLTCTestnetAddr, testLitecoinNativeCoin),
 			},
 		},
 	}
@@ -265,7 +278,7 @@ func TestLitecoinWallet_Multisig1of2(t *testing.T) {
 	var txBytes []byte
 	err = w.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtLitecoin).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testLitecoinNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -366,7 +379,7 @@ func TestLitecoinWallet_Multisig2of3(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("tltc1q0wzfm6yz9gxght997y38mfvc9lj25hrj2lwdtq", iwallet.CtLitecoin),
+				Address: iwallet.NewAddress(testLTCTestnetAddr, testLitecoinNativeCoin),
 			},
 		},
 	}
@@ -402,7 +415,7 @@ func TestLitecoinWallet_Multisig2of3(t *testing.T) {
 	var txBytes []byte
 	err = w1.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtLitecoin).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testLitecoinNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -503,7 +516,7 @@ func TestLitecoinWallet_Multisig2of3Timlocked(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("tltc1q0wzfm6yz9gxght997y38mfvc9lj25hrj2lwdtq", iwallet.CtLitecoin),
+				Address: iwallet.NewAddress(testLTCTestnetAddr, testLitecoinNativeCoin),
 			},
 		},
 	}
@@ -539,7 +552,7 @@ func TestLitecoinWallet_Multisig2of3Timlocked(t *testing.T) {
 	var txBytes []byte
 	err = w1.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtLitecoin).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testLitecoinNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -636,7 +649,7 @@ func TestLitecoinWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 		To: []iwallet.SpendInfo{
 			{
 				Amount:  iwallet.NewAmount(900000),
-				Address: iwallet.NewAddress("tltc1q0wzfm6yz9gxght997y38mfvc9lj25hrj2lwdtq", iwallet.CtLitecoin),
+				Address: iwallet.NewAddress(testLTCTestnetAddr, testLitecoinNativeCoin),
 			},
 		},
 	}
@@ -662,7 +675,7 @@ func TestLitecoinWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 	var txBytes []byte
 	err = w.DB.View(func(tx database.Tx) error {
 		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", iwallet.CtLitecoin).Find(&txs).Error; err != nil {
+		if err := tx.Read().Where("coin=?", testLitecoinNativeCoin).Find(&txs).Error; err != nil {
 			return err
 		}
 		if len(txs) != 1 {
@@ -757,11 +770,11 @@ func TestLitecoinWallet_SpendFromDerivedAddress(t *testing.T) {
 
 	outputs := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress(sellerWitnessAddr.String(), iwallet.CtLitecoin),
+			Address: iwallet.NewAddress(sellerWitnessAddr.String(), testLitecoinNativeCoin),
 			Amount:  iwallet.NewAmount(900000),
 		},
 		{
-			Address: iwallet.NewAddress(platformWitnessAddr.String(), iwallet.CtLitecoin),
+			Address: iwallet.NewAddress(platformWitnessAddr.String(), testLitecoinNativeCoin),
 			Amount:  iwallet.NewAmount(50000),
 		},
 	}
@@ -825,7 +838,7 @@ func TestLitecoinWallet_SpendFromDerivedAddress_OutputsExceedInput(t *testing.T)
 
 	outputs := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress(destWitnessAddr.String(), iwallet.CtLitecoin),
+			Address: iwallet.NewAddress(destWitnessAddr.String(), testLitecoinNativeCoin),
 			Amount:  iwallet.NewAmount(2000000), // More than input
 		},
 	}
@@ -867,7 +880,7 @@ func TestLitecoinWallet_SpendFromDerivedAddress_ZeroFee(t *testing.T) {
 
 	outputs := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress(destWitnessAddr.String(), iwallet.CtLitecoin),
+			Address: iwallet.NewAddress(destWitnessAddr.String(), testLitecoinNativeCoin),
 			Amount:  iwallet.NewAmount(1000000), // Equals input, zero fee
 		},
 	}
@@ -914,7 +927,7 @@ func TestLitecoinWallet_SpendFromDerivedAddress_ScriptVerification(t *testing.T)
 
 	outputs := []iwallet.SpendInfo{
 		{
-			Address: iwallet.NewAddress(destWitnessAddr.String(), iwallet.CtLitecoin),
+			Address: iwallet.NewAddress(destWitnessAddr.String(), testLitecoinNativeCoin),
 			Amount:  iwallet.NewAmount(950000), // 50000 sat fee
 		},
 	}

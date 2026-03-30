@@ -12,6 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	tronUSDTAssetID = iwallet.CoinType("crypto:tron:mainnet:trc20:TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t")
+	bscNativeAsset  = iwallet.CoinType("crypto:eip155:56:native")
+)
+
 func TestTRONChainOps_AutoConfirm_WithCallback(t *testing.T) {
 	var called bool
 	ops := &adapters.TRONChainOps{
@@ -75,7 +80,7 @@ func TestTRONChainOps_BuildDisputeRelease_KeyProviderError(t *testing.T) {
 func TestTRONChainOps_VerifyDeposit_NilClient(t *testing.T) {
 	ops := &adapters.TRONChainOps{TronClient: nil}
 	err := ops.VerifyDeposit(context.Background(), payment.DepositVerifyParams{
-		CoinType: iwallet.CtTRC20USDT,
+		CoinType: tronUSDTAssetID,
 		Script:   "aabb",
 	})
 	assert.NoError(t, err)
@@ -84,7 +89,7 @@ func TestTRONChainOps_VerifyDeposit_NilClient(t *testing.T) {
 func TestTRONChainOps_VerifyDeposit_NonTRONCoin(t *testing.T) {
 	ops := &adapters.TRONChainOps{}
 	err := ops.VerifyDeposit(context.Background(), payment.DepositVerifyParams{
-		CoinType: iwallet.CtBNB,
+		CoinType: bscNativeAsset,
 	})
 	assert.NoError(t, err)
 }

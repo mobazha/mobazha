@@ -144,6 +144,28 @@ func TestMapCancelEvent_NonVendorSender(t *testing.T) {
 	}
 }
 
+func TestMessageTypeToEvent_PaymentSentAlwaysMapped(t *testing.T) {
+	vendorUnverified := &models.Order{MyRole: string(models.RoleVendor)}
+	if got := MessageTypeToEvent(npb.OrderMessage_PAYMENT_SENT, vendorUnverified, "QmBuyer"); got != coreorders.EventPaymentSent {
+		t.Fatalf("expected EventPaymentSent for unverified vendor payment, got %v", got)
+	}
+
+	vendorVerified := &models.Order{
+		MyRole: string(models.RoleVendor),
+		OrderPaymentState: models.OrderPaymentState{
+			PaymentVerificationStatus: models.PaymentVerificationStatusVerified,
+		},
+	}
+	if got := MessageTypeToEvent(npb.OrderMessage_PAYMENT_SENT, vendorVerified, "QmBuyer"); got != coreorders.EventPaymentSent {
+		t.Fatalf("expected EventPaymentSent for verified vendor payment, got %v", got)
+	}
+
+	buyerUnverified := &models.Order{MyRole: string(models.RoleBuyer)}
+	if got := MessageTypeToEvent(npb.OrderMessage_PAYMENT_SENT, buyerUnverified, "QmBuyer"); got != coreorders.EventPaymentSent {
+		t.Fatalf("expected EventPaymentSent for buyer payment, got %v", got)
+	}
+}
+
 // TestCoreTransitionTable_HappyPath verifies the canonical order flow through the FSM.
 func TestCoreTransitionTable_HappyPath(t *testing.T) {
 	steps := []struct {
@@ -152,7 +174,8 @@ func TestCoreTransitionTable_HappyPath(t *testing.T) {
 		event coreorders.OrderEvent
 		to    coreorders.OrderState
 	}{
-		{"buyer pays", coreorders.StateAwaitingPayment, coreorders.EventPaymentSent, coreorders.StatePending},
+		{"buyer submits payment", coreorders.StateAwaitingPayment, coreorders.EventPaymentSent, coreorders.StateAwaitingPaymentVerification},
+		{"payment verified", coreorders.StateAwaitingPaymentVerification, coreorders.EventPaymentVerified, coreorders.StatePending},
 		{"vendor confirms", coreorders.StatePending, coreorders.EventVendorConfirm, coreorders.StateAwaitingFulfillment},
 		{"vendor fulfills", coreorders.StateAwaitingFulfillment, coreorders.EventOrderFulfilled, coreorders.StateFulfilled},
 		{"buyer completes", coreorders.StateFulfilled, coreorders.EventBuyerComplete, coreorders.StateCompleted},
@@ -209,6 +232,7 @@ func TestCoreTransitionTable_InvalidTransitions(t *testing.T) {
 		{"event on completed", coreorders.StateCompleted, coreorders.EventPaymentSent},
 		{"event on canceled", coreorders.StateCanceled, coreorders.EventPaymentSent},
 		{"vendor confirm from awaiting payment", coreorders.StateAwaitingPayment, coreorders.EventVendorConfirm},
+		{"vendor confirm from awaiting verification", coreorders.StateAwaitingPaymentVerification, coreorders.EventVendorConfirm},
 	}
 
 	for _, tt := range tests {
@@ -225,10 +249,22 @@ func TestCoreTransitionTable_InvalidTransitions(t *testing.T) {
 func TestStateValidator_Interface(t *testing.T) {
 	bridge := &mockStateBridge{}
 
-	// Happy path: AWAITING_PAYMENT + PaymentSent → PENDING
+	// Happy path: AWAITING_PAYMENT + PaymentSent → AWAITING_PAYMENT_VERIFICATION
 	newState, valid := bridge.ValidateTransition(
 		int(coreorders.StateAwaitingPayment),
 		int(coreorders.EventPaymentSent),
+	)
+	if !valid {
+		t.Fatal("expected valid transition")
+	}
+	if coreorders.OrderState(newState) != coreorders.StateAwaitingPaymentVerification {
+		t.Errorf("expected StateAwaitingPaymentVerification, got %v", coreorders.OrderState(newState))
+	}
+
+	// Payment verification: AWAITING_PAYMENT_VERIFICATION + PaymentVerified → PENDING
+	newState, valid = bridge.ValidateTransition(
+		int(coreorders.StateAwaitingPaymentVerification),
+		int(coreorders.EventPaymentVerified),
 	)
 	if !valid {
 		t.Fatal("expected valid transition")

@@ -42,7 +42,7 @@ type OrderRepo interface {
 	FindSales(ctx context.Context, filter OrderFilter) ([]models.Order, int64, error)
 
 	// FindUnverifiedPaymentOrders returns vendor orders with a serialized
-	// PaymentSent but payment_verified = false and open = true.
+	// PaymentSent but payment_verification_status = pending (or unset) and open = true.
 	FindUnverifiedPaymentOrders(ctx context.Context) ([]models.Order, error)
 
 	// Save persists an order (insert or upsert).

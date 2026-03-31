@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	coreorders "github.com/mobazha/mobazha-core/orders"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -54,6 +55,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}
 
 	order.PaymentAddress = paymentSent.ToAddress
+	order.MarkPaymentVerificationPending()
 
 	err = order.PutMessage(message)
 	if models.IsDuplicateTransactionError(err) {
@@ -66,19 +68,32 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}
 
 	transactionKnown := false
-	for _, tx := range txs {
+	var knownTx *iwallet.Transaction
+	for i := range txs {
+		tx := &txs[i]
 		if tx.ID.String() == paymentSent.TransactionID {
 			logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s but already know about transaction", order.ID)
 			transactionKnown = true
+			knownTx = tx
 			break
 		}
 	}
 
 	if transactionKnown {
-		order.PaymentVerified = true
-		if order.PaidAt == nil {
-			now := time.Now()
-			order.PaidAt = &now
+		preVerifiedFiat := paymentSent.Method == pb.PaymentSent_FIAT || coinType.IsFiatPayment()
+		// For crypto, a transaction already persisted on this order with
+		// block height means local on-chain verification has already happened.
+		knownConfirmedCrypto := !preVerifiedFiat && isKnownTxConfirmed(knownTx)
+		if preVerifiedFiat || knownConfirmedCrypto {
+			order.MarkPaymentVerified()
+			// Keep FSM and verification gate semantically aligned:
+			// once payment is verified, order should leave
+			// AWAITING_PAYMENT_VERIFICATION immediately.
+			op.advanceToPendingAfterVerification(order)
+			if order.PaidAt == nil {
+				now := time.Now()
+				order.PaidAt = &now
+			}
 		}
 	}
 	// Sync verification (FetchAndVerify) is now handled by the orchestration
@@ -136,7 +151,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 		}
 
 	case models.RoleVendor:
-		if funded && order.PaymentVerified {
+		if funded && order.IsPaymentVerified() {
 			if err := op.sendRatingSignatures(dbtx, order, orderOpen); err != nil {
 				logger.LogInfoWithIDf(log, op.nodeID, "Error sending rating signatures: %s", err)
 			}
@@ -169,7 +184,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected and chain-verified: Order %s fully funded", order.ID)
 		}
 
-		if paymentSent.Method == pb.PaymentSent_CANCELABLE && order.PaymentVerified {
+		if paymentSent.Method == pb.PaymentSent_CANCELABLE && order.IsPaymentVerified() {
 			var amount uint64
 			if verifiedTx != nil {
 				amount = uint64(verifiedTx.Value.Int64())
@@ -185,7 +200,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE payment chain-verified, ready for auto-confirm: order %s (coin=%s)", order.ID, paymentSent.Coin)
 		}
 
-		if paymentSent.Method == pb.PaymentSent_RWA_INSTANT && order.PaymentVerified {
+		if paymentSent.Method == pb.PaymentSent_RWA_INSTANT && order.IsPaymentVerified() {
 			dbtx.RegisterCommitHook(func() {
 				op.bus.Emit(&events.RwaInstantBuyCompleted{
 					OrderID:       order.ID.String(),
@@ -196,7 +211,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			logger.LogInfoWithIDf(log, op.nodeID, "RWA instant buy chain-verified, ready for auto-confirm: order %s", order.ID)
 		}
 
-		if !order.PaymentVerified {
+		if !order.IsPaymentVerified() {
 			logger.LogInfoWithIDf(log, op.nodeID, "Order %s: PaymentSent received but not yet chain-verified, financial events deferred", order.ID)
 		}
 	}
@@ -219,11 +234,12 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 			return err
 		}
 	}
-	order.PaymentVerified = true
+	order.MarkPaymentVerified()
 	if order.PaidAt == nil {
 		now := time.Now()
 		order.PaidAt = &now
 	}
+	op.advanceToPendingAfterVerification(order)
 
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
@@ -236,4 +252,33 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 
 	op.emitPaymentSentEvents(dbtx, order, orderOpen, paymentSent, &tx)
 	return dbtx.Save(order)
+}
+
+func (op *OrderProcessor) advanceToPendingAfterVerification(order *models.Order) {
+	if op.stateValidator != nil {
+		currentState := coreorders.OrderState(order.State)
+		if newState, valid := op.stateValidator.ValidateTransition(
+			int(currentState), int(coreorders.EventPaymentVerified),
+		); valid {
+			order.SetFSMState(models.OrderState(newState))
+			return
+		}
+	}
+
+	switch order.State {
+	case models.OrderState_AWAITING_PAYMENT,
+		models.OrderState_AWAITING_PAYMENT_VERIFICATION,
+		models.OrderState_PROCESSING_ERROR:
+		order.SetFSMState(models.OrderState_PENDING)
+	}
+}
+
+func isKnownTxConfirmed(tx *iwallet.Transaction) bool {
+	if tx == nil {
+		return false
+	}
+	if tx.Height > 0 {
+		return true
+	}
+	return tx.BlockInfo != nil && tx.BlockInfo.Height > 0
 }

@@ -69,8 +69,8 @@ func (t *testTx) Update(key string, value interface{}, where map[string]interfac
 	return q.UpdateColumn(key, value).Error
 }
 
-func (t *testTx) Commit() error                              { panic("managed tx") }
-func (t *testTx) Rollback() error                            { panic("managed tx") }
+func (t *testTx) Commit() error   { panic("managed tx") }
+func (t *testTx) Rollback() error { panic("managed tx") }
 func (t *testTx) Delete(key string, value interface{}, where map[string]interface{}, model interface{}) error {
 	q := t.db.Where(key, value)
 	for k, v := range where {
@@ -78,40 +78,40 @@ func (t *testTx) Delete(key string, value interface{}, where map[string]interfac
 	}
 	return q.Delete(model).Error
 }
-func (t *testTx) DeleteAll(interface{}) error                 { return nil }
-func (t *testTx) Migrate(interface{}) error                   { return nil }
-func (t *testTx) RegisterCommitHook(func())                   {}
+func (t *testTx) DeleteAll(interface{}) error { return nil }
+func (t *testTx) Migrate(interface{}) error   { return nil }
+func (t *testTx) RegisterCommitHook(func())   {}
 
 // PublicData stubs — not used by OrderRepo
-func (t *testTx) GetProfile() (*models.Profile, error)                    { return nil, nil }
-func (t *testTx) SetProfile(*models.Profile) error                        { return nil }
-func (t *testTx) GetFollowers() (models.Followers, error)                  { return models.Followers{}, nil }
-func (t *testTx) SetFollowers(models.Followers) error                      { return nil }
-func (t *testTx) GetFollowing() (models.Following, error)                  { return models.Following{}, nil }
-func (t *testTx) SetFollowing(models.Following) error                      { return nil }
+func (t *testTx) GetProfile() (*models.Profile, error)    { return nil, nil }
+func (t *testTx) SetProfile(*models.Profile) error        { return nil }
+func (t *testTx) GetFollowers() (models.Followers, error) { return models.Followers{}, nil }
+func (t *testTx) SetFollowers(models.Followers) error     { return nil }
+func (t *testTx) GetFollowing() (models.Following, error) { return models.Following{}, nil }
+func (t *testTx) SetFollowing(models.Following) error     { return nil }
 
-func (t *testTx) GetListing(string) (*pb.SignedListing, error)           { return nil, nil }
-func (t *testTx) SetListing(*pb.SignedListing) error                     { return nil }
-func (t *testTx) GetEncryptedListing(string) ([]byte, error)             { return nil, nil }
-func (t *testTx) SetEncryptedListing(string, []byte) error               { return nil }
-func (t *testTx) DeleteListing(string) error                              { return nil }
-func (t *testTx) GetListingIndex() (models.ListingIndex, error)           { return nil, nil }
-func (t *testTx) SetListingIndex(models.ListingIndex) error               { return nil }
-func (t *testTx) GetRatingIndex() (models.RatingIndex, error)             { return nil, nil }
-func (t *testTx) SetRatingIndex(models.RatingIndex) error                 { return nil }
-func (t *testTx) SetRating(*pb.Rating) error                              { return nil }
-func (t *testTx) GetPostIndex() ([]models.PostData, error)                { return nil, nil }
-func (t *testTx) SetPostIndex([]models.PostData) error                    { return nil }
-func (t *testTx) AddPost(*postsPb.SignedPost) error                       { return nil }
-func (t *testTx) DeletePost(string) error                                  { return nil }
-func (t *testTx) PostExist(string) bool                                    { return false }
-func (t *testTx) GetPost(string) (*postsPb.SignedPost, error)             { return nil, nil }
-func (t *testTx) SetImage(models.Image) error                                    { return nil }
-func (t *testTx) GetImageByName(models.ImageSize, string) ([]byte, error)        { return nil, nil }
-func (t *testTx) GetMediaByCID(string) ([]byte, string, error)                   { return nil, "", nil }
-func (t *testTx) IndexMediaCID(string, string, string, string, string) error     { return nil }
-func (t *testTx) SetUploadedFile(models.UploadedFile) error                      { return nil }
-func (t *testTx) SetIntroVideo(models.IntroVideo) error                          { return nil }
+func (t *testTx) GetListing(string) (*pb.SignedListing, error)               { return nil, nil }
+func (t *testTx) SetListing(*pb.SignedListing) error                         { return nil }
+func (t *testTx) GetEncryptedListing(string) ([]byte, error)                 { return nil, nil }
+func (t *testTx) SetEncryptedListing(string, []byte) error                   { return nil }
+func (t *testTx) DeleteListing(string) error                                 { return nil }
+func (t *testTx) GetListingIndex() (models.ListingIndex, error)              { return nil, nil }
+func (t *testTx) SetListingIndex(models.ListingIndex) error                  { return nil }
+func (t *testTx) GetRatingIndex() (models.RatingIndex, error)                { return nil, nil }
+func (t *testTx) SetRatingIndex(models.RatingIndex) error                    { return nil }
+func (t *testTx) SetRating(*pb.Rating) error                                 { return nil }
+func (t *testTx) GetPostIndex() ([]models.PostData, error)                   { return nil, nil }
+func (t *testTx) SetPostIndex([]models.PostData) error                       { return nil }
+func (t *testTx) AddPost(*postsPb.SignedPost) error                          { return nil }
+func (t *testTx) DeletePost(string) error                                    { return nil }
+func (t *testTx) PostExist(string) bool                                      { return false }
+func (t *testTx) GetPost(string) (*postsPb.SignedPost, error)                { return nil, nil }
+func (t *testTx) SetImage(models.Image) error                                { return nil }
+func (t *testTx) GetImageByName(models.ImageSize, string) ([]byte, error)    { return nil, nil }
+func (t *testTx) GetMediaByCID(string) ([]byte, string, error)               { return nil, "", nil }
+func (t *testTx) IndexMediaCID(string, string, string, string, string) error { return nil }
+func (t *testTx) SetUploadedFile(models.UploadedFile) error                  { return nil }
+func (t *testTx) SetIntroVideo(models.IntroVideo) error                      { return nil }
 
 // ── Setup helpers ───────────────────────────────────────────────
 
@@ -302,7 +302,7 @@ func TestGormOrderRepo_FindUnverifiedPaymentOrders(t *testing.T) {
 		ID:                    "unverified-1",
 		MyRole:                "vendor",
 		Open:                  true,
-		OrderPaymentState:     models.OrderPaymentState{PaymentVerified: false},
+		OrderPaymentState:     models.OrderPaymentState{PaymentVerificationStatus: models.PaymentVerificationStatusPending},
 		SerializedPaymentSent: []byte("some-data"),
 	}
 	o1.SetFSMState(models.OrderState_AWAITING_FULFILLMENT)
@@ -313,7 +313,7 @@ func TestGormOrderRepo_FindUnverifiedPaymentOrders(t *testing.T) {
 		ID:                    "verified-1",
 		MyRole:                "vendor",
 		Open:                  true,
-		OrderPaymentState:     models.OrderPaymentState{PaymentVerified: true},
+		OrderPaymentState:     models.OrderPaymentState{PaymentVerificationStatus: models.PaymentVerificationStatusVerified},
 		SerializedPaymentSent: []byte("some-data"),
 	}
 	o2.SetFSMState(models.OrderState_AWAITING_FULFILLMENT)
@@ -324,7 +324,7 @@ func TestGormOrderRepo_FindUnverifiedPaymentOrders(t *testing.T) {
 		ID:                    "buyer-1",
 		MyRole:                "buyer",
 		Open:                  true,
-		OrderPaymentState:     models.OrderPaymentState{PaymentVerified: false},
+		OrderPaymentState:     models.OrderPaymentState{PaymentVerificationStatus: models.PaymentVerificationStatusPending},
 		SerializedPaymentSent: []byte("some-data"),
 	}
 	o3.SetFSMState(models.OrderState_PENDING)

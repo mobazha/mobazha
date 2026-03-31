@@ -122,6 +122,7 @@ func TestComputeProtection_NilForInapplicableStates(t *testing.T) {
 	for _, state := range []OrderState{
 		OrderState_PENDING,
 		OrderState_AWAITING_PAYMENT,
+		OrderState_AWAITING_PAYMENT_VERIFICATION,
 		OrderState_CANCELED,
 		OrderState_DECLINED,
 		OrderState_REFUNDED,

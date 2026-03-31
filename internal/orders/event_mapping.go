@@ -25,6 +25,9 @@ func MessageTypeToEvent(
 		return coreorders.EventUnknown
 
 	case npb.OrderMessage_PAYMENT_SENT:
+		// PAYMENT_SENT always means "payment submitted" and moves to
+		// AWAITING_PAYMENT_VERIFICATION. Promotion to PENDING happens on
+		// verification via EventPaymentVerified in RecordVerifiedPayment.
 		return coreorders.EventPaymentSent
 
 	case npb.OrderMessage_ORDER_CONFIRMATION:

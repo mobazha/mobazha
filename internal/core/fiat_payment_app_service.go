@@ -349,12 +349,30 @@ func (s *FiatPaymentAppService) autoRefundCanceledOrder(ctx context.Context, pro
 		event.OrderID, event.PaymentID)
 }
 
-func (s *FiatPaymentAppService) handlePaymentFailed(_ context.Context, event *contracts.WebhookEvent) error {
+func (s *FiatPaymentAppService) handlePaymentFailed(ctx context.Context, event *contracts.WebhookEvent) error {
 	logger.LogInfoWithIDf(log, s.nodeID,
 		"fiat payment failed: provider=%s payment=%s order=%s reason=%s",
 		event.ProviderID, event.PaymentID, event.OrderID, event.FailureReason)
-	// Design decision: do not auto-cancel — buyer may retry with a different payment method.
-	// Order timeout (S3-1) handles cleanup.
+
+	// Keep retry semantics: do not auto-cancel order on provider failure.
+	// If buyer already submitted PAYMENT_SENT and order is awaiting verification,
+	// persist a terminal verification-failed marker for UI clarity and explicit retry.
+	if s.orderRepo != nil {
+		order, err := s.findOrderForWebhook(ctx, event)
+		if err != nil {
+			return err
+		}
+		if order.State == models.OrderState_AWAITING_PAYMENT_VERIFICATION {
+			order.MarkPaymentVerificationFailed("provider_failed")
+			if err := s.orderRepo.Save(ctx, order); err != nil {
+				return fmt.Errorf("mark payment verification failed for order %s: %w", order.ID, err)
+			}
+			logger.LogInfoWithIDf(log, s.nodeID,
+				"order %s marked verification failed (provider_failed)", order.ID)
+		}
+	}
+
+	// Order timeout (S3-1) still handles stale cleanup for retried/abandoned orders.
 	return nil
 }
 
@@ -635,13 +653,14 @@ func (s *FiatPaymentAppService) deleteProviderConfig(providerID string) error {
 }
 
 // DisconnectProvider safely disconnects a fiat provider after verifying no active orders depend on it.
-// Orders in fulfillment/dispute states block disconnect. AWAITING_PAYMENT sessions are canceled.
+// Orders in verification/fulfillment/dispute states block disconnect. AWAITING_PAYMENT sessions are canceled.
 func (s *FiatPaymentAppService) DisconnectProvider(ctx context.Context, providerID string) error {
 	if s.orderRepo == nil {
 		return s.deleteProviderConfig(providerID)
 	}
 
 	blockingStates := []models.OrderState{
+		models.OrderState_AWAITING_PAYMENT_VERIFICATION,
 		models.OrderState_AWAITING_FULFILLMENT,
 		models.OrderState_PARTIALLY_FULFILLED,
 		models.OrderState_DISPUTED,
@@ -840,9 +859,10 @@ func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
 	}
 }
 
-// ReconcileFiatOrders checks AWAITING_PAYMENT orders with fiat metadata against
+// ReconcileFiatOrders checks AWAITING_PAYMENT / AWAITING_PAYMENT_VERIFICATION orders
+// with fiat metadata against
 // the payment provider. If the provider reports the payment as succeeded but the
-// order is still AWAITING_PAYMENT (missed webhook), it triggers the payment flow.
+// order has not reached verified states (missed webhook), it triggers the payment flow.
 // If the provider reports canceled/failed, it's a no-op (order timeout handles cancellation).
 func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 	if s.webhookHandler == nil {
@@ -852,8 +872,11 @@ func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 	var orders []models.Order
 	err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().
-			Where("state = ? AND open = ? AND fiat_metadata IS NOT NULL AND length(fiat_metadata) > 2",
-				int32(models.OrderState_AWAITING_PAYMENT), true).
+			Where("state IN ? AND open = ? AND fiat_metadata IS NOT NULL AND length(fiat_metadata) > 2",
+				[]models.OrderState{
+					models.OrderState_AWAITING_PAYMENT,
+					models.OrderState_AWAITING_PAYMENT_VERIFICATION,
+				}, true).
 			Find(&orders).Error
 	})
 	if err != nil {
@@ -864,7 +887,7 @@ func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 		return
 	}
 
-	logger.LogInfoWithIDf(log, s.nodeID, "fiat reconciliation: checking %d AWAITING_PAYMENT orders", len(orders))
+	logger.LogInfoWithIDf(log, s.nodeID, "fiat reconciliation: checking %d awaiting-payment fiat orders", len(orders))
 
 	for i := range orders {
 		order := &orders[i]
@@ -919,7 +942,7 @@ func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 }
 
 // StartReconciliationScheduler launches a background goroutine that periodically
-// checks AWAITING_PAYMENT fiat orders against the payment provider.
+// checks awaiting-payment fiat orders against the payment provider.
 func (s *FiatPaymentAppService) StartReconciliationScheduler(ctx context.Context, interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)

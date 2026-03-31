@@ -6,6 +6,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -39,5 +40,20 @@ func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Or
 
 	// Process the order message
 	_, err = op.processMessage(dbtx, order, orderMessage)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// If PAYMENT_SENT handling already marked payment as verified
+	// (fiat pre-verified, or crypto tx already confirmed in local tx set),
+	// promote to PENDING now so confirm/auto-confirm is not blocked by an
+	// intermediate stale AWAITING_PAYMENT_VERIFICATION state.
+	paymentSent := new(pb.PaymentSent)
+	if unmarshalErr := orderMessage.Message.UnmarshalTo(paymentSent); unmarshalErr == nil {
+		if order.IsPaymentVerified() {
+			op.advanceToPendingAfterVerification(order)
+		}
+	}
+
+	return nil
 }

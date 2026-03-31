@@ -18,20 +18,20 @@ import (
 
 // mockDiscountService implements contracts.DiscountService for handler tests.
 type mockDiscountService struct {
-	createDiscountFunc        func(ctx context.Context, d *models.Discount) error
-	getDiscountFunc           func(ctx context.Context, id string) (*models.Discount, error)
-	listDiscountsFunc         func(ctx context.Context, filter contracts.DiscountFilter) ([]models.Discount, int64, error)
-	updateDiscountFunc        func(ctx context.Context, d *models.Discount) error
-	deleteDiscountFunc        func(ctx context.Context, id string) error
-	addCodesFunc              func(ctx context.Context, discountID string, codes []models.DiscountCode) error
-	generateCodesFunc         func(ctx context.Context, discountID string, count int, prefix string) ([]models.DiscountCode, error)
-	listCodesFunc             func(ctx context.Context, discountID string) ([]models.DiscountCode, error)
-	deleteCodeFunc            func(ctx context.Context, codeID string) error
-	validateCodeFunc          func(ctx context.Context, code string, customerPeerID string) (*contracts.ValidateCodeResult, error)
-	getApplicableFunc         func(ctx context.Context, productIDs []string) ([]models.Discount, error)
-	recordRedemptionFunc      func(ctx context.Context, discountID string, codeID *string, orderID, customerPeerID, discountAmount, currency string) error
-	calculateDiscountsFunc    func(ctx context.Context, req contracts.CalculateDiscountsRequest) (*contracts.CalculateDiscountsResult, error)
-	listRedemptionsFunc       func(ctx context.Context, discountID string, page, pageSize int) ([]models.DiscountRedemption, int64, error)
+	createDiscountFunc     func(ctx context.Context, d *models.Discount) error
+	getDiscountFunc        func(ctx context.Context, id string) (*models.Discount, error)
+	listDiscountsFunc      func(ctx context.Context, filter contracts.DiscountFilter) ([]models.Discount, int64, error)
+	updateDiscountFunc     func(ctx context.Context, d *models.Discount) error
+	deleteDiscountFunc     func(ctx context.Context, id string) error
+	addCodesFunc           func(ctx context.Context, discountID string, codes []models.DiscountCode) error
+	generateCodesFunc      func(ctx context.Context, discountID string, count int, prefix string) ([]models.DiscountCode, error)
+	listCodesFunc          func(ctx context.Context, discountID string) ([]models.DiscountCode, error)
+	deleteCodeFunc         func(ctx context.Context, codeID string) error
+	validateCodeFunc       func(ctx context.Context, code string, customerPeerID string) (*contracts.ValidateCodeResult, error)
+	getApplicableFunc      func(ctx context.Context, productIDs []string) ([]models.Discount, error)
+	recordRedemptionFunc   func(ctx context.Context, discountID string, codeID *string, orderID, customerPeerID, discountAmount, currency string) error
+	calculateDiscountsFunc func(ctx context.Context, req contracts.CalculateDiscountsRequest) (*contracts.CalculateDiscountsResult, error)
+	listRedemptionsFunc    func(ctx context.Context, discountID string, page, pageSize int) ([]models.DiscountRedemption, int64, error)
 }
 
 func (m *mockDiscountService) CreateDiscount(ctx context.Context, d *models.Discount) error {
@@ -496,7 +496,7 @@ func TestDiscountHandlers_Validate(t *testing.T) {
 
 	t.Run("valid code", func(t *testing.T) {
 		body := []byte(`{"code":"SAVE10"}`)
-		resp, respBody := doReq(t, ts, http.MethodPost, "/v1/discounts/validate", body)
+		resp, respBody := doReq(t, ts, http.MethodPost, "/v1/discounts/test-peer/validate", body)
 		assertStatus(t, resp, http.StatusOK)
 
 		var envelope map[string]json.RawMessage
@@ -513,24 +513,24 @@ func TestDiscountHandlers_Validate(t *testing.T) {
 
 	t.Run("invalid code (expired)", func(t *testing.T) {
 		body := []byte(`{"code":"EXPIRED"}`)
-		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/validate", body)
+		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/test-peer/validate", body)
 		assertStatus(t, resp, http.StatusUnprocessableEntity)
 	})
 
 	t.Run("code not found", func(t *testing.T) {
 		body := []byte(`{"code":"BADCODE"}`)
-		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/validate", body)
+		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/test-peer/validate", body)
 		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("empty code", func(t *testing.T) {
 		body := []byte(`{"code":""}`)
-		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/validate", body)
+		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/test-peer/validate", body)
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/validate", []byte(`{bad`))
+		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/test-peer/validate", []byte(`{bad`))
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
@@ -637,7 +637,7 @@ func TestDiscountHandlers_Calculate(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		body := []byte(`{"subtotal":"5000","currency":"USD","discountCodes":["SAVE10"]}`)
-		resp, respBody := doReq(t, ts, http.MethodPost, "/v1/discounts/calculate", body)
+		resp, respBody := doReq(t, ts, http.MethodPost, "/v1/discounts/test-peer/calculate", body)
 		assertStatus(t, resp, http.StatusOK)
 
 		var envelope map[string]json.RawMessage
@@ -655,12 +655,12 @@ func TestDiscountHandlers_Calculate(t *testing.T) {
 
 	t.Run("missing subtotal", func(t *testing.T) {
 		body := []byte(`{"currency":"USD"}`)
-		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/calculate", body)
+		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/test-peer/calculate", body)
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("invalid body", func(t *testing.T) {
-		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/calculate", []byte(`{bad`))
+		resp, _ := doReq(t, ts, http.MethodPost, "/v1/discounts/test-peer/calculate", []byte(`{bad`))
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
@@ -696,8 +696,8 @@ func TestDiscountHandlers_NoProvider(t *testing.T) {
 		{http.MethodGet, "/v1/discounts/abc/codes", nil},
 		{http.MethodDelete, "/v1/discounts/abc/codes/c1", nil},
 		{http.MethodGet, "/v1/discounts/abc/redemptions", nil},
-		{http.MethodPost, "/v1/discounts/validate", []byte(`{"code":"X"}`)},
-		{http.MethodPost, "/v1/discounts/calculate", []byte(`{"subtotal":"100"}`)},
+		{http.MethodPost, "/v1/discounts/test-peer/validate", []byte(`{"code":"X"}`)},
+		{http.MethodPost, "/v1/discounts/test-peer/calculate", []byte(`{"subtotal":"100"}`)},
 	}
 
 	for _, ep := range routerEndpoints {

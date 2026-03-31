@@ -91,17 +91,17 @@ const (
 // OrderProtectionInfo is a derived (non-persisted) view of buyer-protection
 // status, computed at API response time from order state + timestamps + policy.
 type OrderProtectionInfo struct {
-	Stage              string     `json:"stage"`
-	DaysRemaining      int        `json:"daysRemaining"`
-	AutoCompleteAt     *time.Time `json:"autoCompleteAt,omitempty"`
-	Extendable         bool       `json:"extendable"`
-	Extended           bool       `json:"extended"`
-	AfterSaleWindowDays int       `json:"afterSaleWindowDays"`
+	Stage               string     `json:"stage"`
+	DaysRemaining       int        `json:"daysRemaining"`
+	AutoCompleteAt      *time.Time `json:"autoCompleteAt,omitempty"`
+	Extendable          bool       `json:"extendable"`
+	Extended            bool       `json:"extended"`
+	AfterSaleWindowDays int        `json:"afterSaleWindowDays"`
 }
 
 // ComputeProtection derives the buyer-protection status for the order.
 // Returns nil for states where protection is not applicable (PENDING,
-// AWAITING_PAYMENT, CANCELED, DECLINED, REFUNDED, etc.).
+// AWAITING_PAYMENT, AWAITING_PAYMENT_VERIFICATION, CANCELED, DECLINED, REFUNDED, etc.).
 func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 	policy := DefaultProtectionPolicy(o.ContractType())
 

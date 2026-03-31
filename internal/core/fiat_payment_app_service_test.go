@@ -616,6 +616,41 @@ func TestFiatService_HandleWebhook_PaymentFailed_NoAutoCancel(t *testing.T) {
 	assert.Empty(t, repo.savedOrders, "no Save call expected for PaymentFailed")
 }
 
+func TestFiatService_HandleWebhook_PaymentFailed_MarksVerificationFailedWhenAwaitingVerification(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:       "evt_pf_002",
+			Type:          contracts.WebhookPaymentFailed,
+			ProviderID:    "stripe",
+			PaymentID:     "pi_failed_002",
+			OrderID:       "order_pf_002",
+			FailureReason: "card_declined",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	repo := newMockOrderRepo()
+	repo.addOrder(&models.Order{
+		ID:                    "order_pf_002",
+		State:                 models.OrderState_AWAITING_PAYMENT_VERIFICATION,
+		SerializedPaymentSent: []byte{1},
+	})
+	svc.SetOrderRepo(repo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err)
+
+	require.Len(t, repo.savedOrders, 1, "verification failure should be persisted once")
+	saved := repo.savedOrders[0]
+	assert.Equal(t, models.OrderState_AWAITING_PAYMENT_VERIFICATION, saved.State,
+		"state should stay awaiting verification; only verification result changes")
+	assert.True(t, saved.IsPaymentVerificationFailed(), "payment verification should be failed")
+	assert.Equal(t, "provider_failed", saved.PaymentVerificationFailureReason)
+	assert.NotNil(t, saved.PaymentVerificationFailedAt)
+}
+
 func TestFiatService_HandleWebhook_RefundCreated_TransitionsToRefunded(t *testing.T) {
 	reg := newMockFiatRegistry()
 	reg.Register(&mockFiatProvider{
@@ -985,6 +1020,30 @@ func TestDisconnectProvider_ActiveOrders_ReturnsError(t *testing.T) {
 	assert.ErrorIs(t, err, contracts.ErrActiveOrdersExist)
 }
 
+func TestDisconnectProvider_AwaitingPaymentVerification_BlocksDisconnect(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe"}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID: "awaiting-verification-order",
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				PaymentTransactionID: "pi_verify_123",
+				FiatMetadata:         []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_verify_123"}`),
+			},
+		},
+	}, models.OrderState_AWAITING_PAYMENT_VERIFICATION)
+
+	svc.SetOrderRepo(newMockOrderRepo())
+
+	err := svc.DisconnectProvider(context.Background(), "stripe")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, contracts.ErrActiveOrdersExist)
+}
+
 func TestDisconnectProvider_AwaitingPayment_CancelsSession(t *testing.T) {
 	provider := &mockFiatProvider{id: "stripe"}
 	reg := newMockFiatRegistry()
@@ -1183,6 +1242,48 @@ func TestFiatService_ReconcileFiatOrders_SucceededPayment_TriggersHandler(t *tes
 	assert.Equal(t, "order_reconcile_001", handledEvent.OrderID)
 	assert.Equal(t, "pi_reconcile_001", handledEvent.PaymentID)
 	assert.Equal(t, int64(5000), handledEvent.Amount)
+	assert.Equal(t, contracts.WebhookPaymentSucceeded, handledEvent.Type)
+}
+
+func TestFiatService_ReconcileFiatOrders_AwaitingVerificationState_TriggersHandler(t *testing.T) {
+	provider := &mockFiatProvider{
+		id: "stripe",
+		getResult: &contracts.PaymentDetail{
+			PaymentID: "pi_verify_reconcile_001",
+			Status:    "succeeded",
+			Amount:    4200,
+			Currency:  "USD",
+			PaymentMethod: contracts.PaymentMethodInfo{
+				Type: "card", Brand: "mastercard", Last4: "4444",
+			},
+		},
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:   "order_reconcile_verify_001",
+		Open: true,
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_verify_reconcile_001"}`),
+			},
+		},
+	}, models.OrderState_AWAITING_PAYMENT_VERIFICATION)
+
+	var handledEvent *contracts.WebhookEvent
+	svc.SetWebhookHandler(func(_ context.Context, event *contracts.WebhookEvent) error {
+		handledEvent = event
+		return nil
+	})
+
+	svc.ReconcileFiatOrders(context.Background())
+
+	require.NotNil(t, handledEvent)
+	assert.Equal(t, "order_reconcile_verify_001", handledEvent.OrderID)
+	assert.Equal(t, "pi_verify_reconcile_001", handledEvent.PaymentID)
 	assert.Equal(t, contracts.WebhookPaymentSucceeded, handledEvent.Type)
 }
 

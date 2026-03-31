@@ -382,18 +382,27 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 		return nil, err
 	}
 
-	// Phase 3: Set state from FSM (authoritative).
-	// When the FSM computed a valid transition, use it as the source of truth.
-	// Also compare with the legacy DeriveState() for monitoring during the transition period.
+	// Phase 3: Set state from FSM (authoritative), then apply event-specific
+	// post-processing that depends on handler side effects (e.g. payment verification).
+	// Also compare with legacy DeriveState() for monitoring during the transition period.
 	if fsmResult.valid {
-		derivedState := order.DeriveState()
 		fsmState := models.OrderState(fsmResult.newState)
-		if fsmState != derivedState {
+		order.SetFSMState(fsmState)
+
+		// PAYMENT_SENT always transitions to AWAITING_PAYMENT_VERIFICATION in FSM.
+		// If handler logic already established payment as verified (e.g. known fiat
+		// tx or already-confirmed crypto tx), promote to PENDING immediately so all
+		// processing paths converge to the same state.
+		if message.MessageType == npb.OrderMessage_PAYMENT_SENT && order.IsPaymentVerified() {
+			op.advanceToPendingAfterVerification(order)
+		}
+
+		derivedState := order.DeriveState()
+		if order.State != derivedState {
 			logger.LogInfoWithIDf(log, op.nodeID,
 				"FSM vs DeriveState mismatch: order %s FSM=%s Derived=%s (using FSM)",
-				order.ID, fsmState, derivedState)
+				order.ID, order.State, derivedState)
 		}
-		order.SetFSMState(fsmState)
 	}
 	// If fsmResult is not valid (no validator, non-transition message, or unmapped event),
 	// BeforeSave() will fall back to DeriveState() as before.

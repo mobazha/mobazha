@@ -1449,8 +1449,9 @@ func TestOrder_CanConfirm(t *testing.T) {
 		canConfirm bool
 	}{
 		{
-			// Success - OrderOpen + PaymentSent must both exist for vendor to confirm
+			// Success - OrderOpen + PaymentSent + verified payment must all exist for vendor to confirm
 			setup: func(order *Order) error {
+				order.MarkPaymentVerified()
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				if err != nil {
 					return err
@@ -1469,6 +1470,20 @@ func TestOrder_CanConfirm(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleBuyer,
+			canConfirm: false,
+		},
+		{
+			// PaymentSent exists but not yet verified
+			setup: func(order *Order) error {
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
+				}))
+			},
+			ourRole:    RoleVendor,
 			canConfirm: false,
 		},
 		{
@@ -1591,6 +1606,47 @@ func TestOrder_CanConfirm(t *testing.T) {
 		canConfirm := order.CanConfirm()
 		if canConfirm != test.canConfirm {
 			t.Errorf("Test %d: Got incorrect result. Expected %t, got %t", i, test.canConfirm, canConfirm)
+		}
+	}
+}
+
+func TestOrder_DeriveState_UnverifiedPaymentSent(t *testing.T) {
+	makeOrder := func(role OrderRole) (*Order, error) {
+		order := &Order{}
+		order.SetRole(role)
+		if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{})); err != nil {
+			return nil, err
+		}
+		if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+			Method:        pb.PaymentSent_DIRECT,
+			ToAddress:     "addr1",
+			TransactionID: "tx1",
+			Amount:        "100",
+			Coin:          string(iwallet.CtMock),
+		})); err != nil {
+			return nil, err
+		}
+		if err := order.PutTransaction(iwallet.Transaction{
+			ID: iwallet.TransactionID("tx1"),
+			To: []iwallet.SpendInfo{
+				{
+					Address: iwallet.NewAddress("addr1", iwallet.CtMock),
+					Amount:  iwallet.NewAmount(100),
+				},
+			},
+		}); err != nil {
+			return nil, err
+		}
+		return order, nil
+	}
+
+	for _, role := range []OrderRole{RoleVendor, RoleBuyer} {
+		order, err := makeOrder(role)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := order.DeriveState(); got != OrderState_AWAITING_PAYMENT_VERIFICATION {
+			t.Fatalf("%s unverified payment should be AWAITING_PAYMENT_VERIFICATION, got %s", role, got)
 		}
 	}
 }

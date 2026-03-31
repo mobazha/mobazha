@@ -87,8 +87,8 @@ func (r *GormOrderRepo) FindUnverifiedPaymentOrders(_ context.Context) ([]models
 	var orders []models.Order
 	err := r.db.View(func(tx database.Tx) error {
 		return tx.Read().
-			Where("serialized_payment_sent IS NOT NULL AND payment_verified = ? AND open = ? AND my_role = ?",
-				false, true, string(models.RoleVendor)).
+			Where("serialized_payment_sent IS NOT NULL AND payment_verification_status IN ? AND open = ? AND my_role = ?",
+				[]string{"", string(models.PaymentVerificationStatusPending)}, true, string(models.RoleVendor)).
 			Find(&orders).Error
 	})
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {

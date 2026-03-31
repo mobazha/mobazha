@@ -189,15 +189,22 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	// Legacy P2P chat unread count removed; Matrix order-scoped unread is client/Matrix room metadata.
 	unreadChatMsgCount := int64(0)
 
+	type paymentStateResp struct {
+		VerificationStatus        string            `json:"verificationStatus"`
+		VerificationFailureReason string            `json:"verificationFailureReason,omitempty"`
+		VerificationFailedAt      *time.Time        `json:"verificationFailedAt,omitempty"`
+		FiatMetadata              map[string]string `json:"fiatMetadata,omitempty"`
+	}
+
 	type OrderRespApi struct {
-		Contract           *models.Order                `json:"contract,omitempty"`
-		State              string                       `json:"state,omitempty"`
-		Read               bool                         `json:"read,omitempty"`
-		UnreadChatMessages int64                        `json:"unreadChatMessages,omitempty"`
-		Funded             bool                         `json:"funded,omitempty"`
-		Completable        bool                         `json:"completable,omitempty"`
-		FiatMetadata       map[string]string            `json:"fiatMetadata,omitempty"`
-		Protection         *models.OrderProtectionInfo  `json:"protection,omitempty"`
+		Contract           *models.Order               `json:"contract,omitempty"`
+		State              string                      `json:"state,omitempty"`
+		Read               bool                        `json:"read,omitempty"`
+		UnreadChatMessages int64                       `json:"unreadChatMessages,omitempty"`
+		Funded             bool                        `json:"funded,omitempty"`
+		Completable        bool                        `json:"completable,omitempty"`
+		PaymentState       paymentStateResp            `json:"paymentState"`
+		Protection         *models.OrderProtectionInfo `json:"protection,omitempty"`
 	}
 
 	isFunded, _ := order.IsFunded()
@@ -212,8 +219,15 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		UnreadChatMessages: unreadChatMsgCount,
 		Funded:             isFunded,
 		Completable:        order.CanComplete(),
-		FiatMetadata:       fiatMeta,
-		Protection:         order.ComputeProtection(time.Now()),
+		PaymentState: paymentStateResp{
+			VerificationStatus: string(order.CurrentPaymentVerificationStatus()),
+			FiatMetadata:       fiatMeta,
+		},
+		Protection: order.ComputeProtection(time.Now()),
+	}
+	if order.IsPaymentVerificationFailed() {
+		ret.PaymentState.VerificationFailureReason = order.PaymentVerificationFailureReason
+		ret.PaymentState.VerificationFailedAt = order.PaymentVerificationFailedAt
 	}
 
 	sanitizedJSONResponse(w, ret)
@@ -264,24 +278,24 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 	}
 
 	type purchaseInfo struct {
-		OrderID            string                       `json:"orderID"`
-		Slug               string                       `json:"slug"`
-		Timestamp          time.Time                    `json:"timestamp"`
-		Title              string                       `json:"title"`
-		Thumbnail          string                       `json:"thumbnail"`
-		Total              models.CurrencyValue         `json:"total"`
-		VendorID           string                       `json:"vendorID"`
-		VendorName         string                       `json:"vendorName"`
-		VendorAvatar       string                       `json:"vendorAvatar"`
-		ShippingName       string                       `json:"shippingName"`
-		ShippingAddress    string                       `json:"shippingAddress"`
-		CoinType           string                       `json:"coinType"`
-		PaymentCoin        string                       `json:"paymentCoin"`
-		State              string                       `json:"state"`
-		Read               bool                         `json:"read"`
-		Moderated          bool                         `json:"moderated"`
-		UnreadChatMessages int                          `json:"unreadChatMessages"`
-		Protection         *models.OrderProtectionInfo  `json:"protection,omitempty"`
+		OrderID            string                      `json:"orderID"`
+		Slug               string                      `json:"slug"`
+		Timestamp          time.Time                   `json:"timestamp"`
+		Title              string                      `json:"title"`
+		Thumbnail          string                      `json:"thumbnail"`
+		Total              models.CurrencyValue        `json:"total"`
+		VendorID           string                      `json:"vendorID"`
+		VendorName         string                      `json:"vendorName"`
+		VendorAvatar       string                      `json:"vendorAvatar"`
+		ShippingName       string                      `json:"shippingName"`
+		ShippingAddress    string                      `json:"shippingAddress"`
+		CoinType           string                      `json:"coinType"`
+		PaymentCoin        string                      `json:"paymentCoin"`
+		State              string                      `json:"state"`
+		Read               bool                        `json:"read"`
+		Moderated          bool                        `json:"moderated"`
+		UnreadChatMessages int                         `json:"unreadChatMessages"`
+		Protection         *models.OrderProtectionInfo `json:"protection,omitempty"`
 	}
 
 	purchases := []purchaseInfo{}
@@ -394,24 +408,24 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 	}
 
 	type saleInfo struct {
-		OrderID            string                       `json:"orderID"`
-		Slug               string                       `json:"slug"`
-		Timestamp          time.Time                    `json:"timestamp"`
-		Title              string                       `json:"title"`
-		Thumbnail          string                       `json:"thumbnail"`
-		Total              models.CurrencyValue         `json:"total"`
-		BuyerID            string                       `json:"buyerID"`
-		BuyerName          string                       `json:"buyerName"`
-		BuyerAvatar        string                       `json:"buyerAvatar"`
-		ShippingName       string                       `json:"shippingName"`
-		ShippingAddress    string                       `json:"shippingAddress"`
-		CoinType           string                       `json:"coinType"`
-		PaymentCoin        string                       `json:"paymentCoin"`
-		State              string                       `json:"state"`
-		Read               bool                         `json:"read"`
-		Moderated          bool                         `json:"moderated"`
-		UnreadChatMessages int                          `json:"unreadChatMessages"`
-		Protection         *models.OrderProtectionInfo  `json:"protection,omitempty"`
+		OrderID            string                      `json:"orderID"`
+		Slug               string                      `json:"slug"`
+		Timestamp          time.Time                   `json:"timestamp"`
+		Title              string                      `json:"title"`
+		Thumbnail          string                      `json:"thumbnail"`
+		Total              models.CurrencyValue        `json:"total"`
+		BuyerID            string                      `json:"buyerID"`
+		BuyerName          string                      `json:"buyerName"`
+		BuyerAvatar        string                      `json:"buyerAvatar"`
+		ShippingName       string                      `json:"shippingName"`
+		ShippingAddress    string                      `json:"shippingAddress"`
+		CoinType           string                      `json:"coinType"`
+		PaymentCoin        string                      `json:"paymentCoin"`
+		State              string                      `json:"state"`
+		Read               bool                        `json:"read"`
+		Moderated          bool                        `json:"moderated"`
+		UnreadChatMessages int                         `json:"unreadChatMessages"`
+		Protection         *models.OrderProtectionInfo `json:"protection,omitempty"`
 	}
 
 	sales := []saleInfo{}

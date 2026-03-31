@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -141,10 +142,26 @@ type FiatPaymentState struct {
 	FiatMetadata []byte `gorm:"column:fiat_metadata"`
 }
 
+// PaymentVerificationStatus represents payment verification result.
+// Pending means submitted but not yet verified by chain/provider.
+// Verified means verification passed and order may proceed to PENDING.
+// Failed means verification reached a terminal failure and requires retry/manual handling.
+type PaymentVerificationStatus string
+
+const (
+	PaymentVerificationStatusPending  PaymentVerificationStatus = "pending"
+	PaymentVerificationStatusVerified PaymentVerificationStatus = "verified"
+	PaymentVerificationStatusFailed   PaymentVerificationStatus = "failed"
+)
+
 // OrderPaymentState groups payment verification state across payment methods.
-// PaymentVerified is the common gate used by both crypto and fiat flows.
+// PaymentVerificationStatus is the common gate used by both crypto and fiat flows.
 type OrderPaymentState struct {
-	PaymentVerified bool `gorm:"column:payment_verified"`
+	PaymentVerificationStatus PaymentVerificationStatus `gorm:"column:payment_verification_status;type:text;index"`
+
+	PaymentVerificationFailureReason string `gorm:"column:payment_verification_failure_reason"`
+
+	PaymentVerificationFailedAt *time.Time `gorm:"column:payment_verification_failed_at"`
 
 	FiatPaymentState `gorm:"embedded"`
 }
@@ -249,6 +266,12 @@ type Order struct {
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
+	o.PaymentVerificationStatus = normalizePaymentVerificationStatus(o.PaymentVerificationStatus)
+	if o.PaymentVerificationStatus != PaymentVerificationStatusFailed {
+		o.PaymentVerificationFailureReason = ""
+		o.PaymentVerificationFailedAt = nil
+	}
+
 	if !o.fsmStateSet {
 		o.State = o.DeriveState()
 	} else {
@@ -273,6 +296,59 @@ func (o *Order) SetFSMState(state OrderState) {
 	now := time.Now()
 	o.LastStateChangeAt = &now
 	o.TimeoutWarnedAt = nil
+}
+
+// CurrentPaymentVerificationStatus returns the normalized verification status.
+func (o *Order) CurrentPaymentVerificationStatus() PaymentVerificationStatus {
+	return normalizePaymentVerificationStatus(o.PaymentVerificationStatus)
+}
+
+// IsPaymentVerified returns true when payment verification is complete and successful.
+func (o *Order) IsPaymentVerified() bool {
+	return o.CurrentPaymentVerificationStatus() == PaymentVerificationStatusVerified
+}
+
+// IsPaymentVerificationPending returns true when payment is still awaiting verification.
+func (o *Order) IsPaymentVerificationPending() bool {
+	return o.CurrentPaymentVerificationStatus() == PaymentVerificationStatusPending
+}
+
+// IsPaymentVerificationFailed returns true when verification reached a terminal failure.
+func (o *Order) IsPaymentVerificationFailed() bool {
+	return o.CurrentPaymentVerificationStatus() == PaymentVerificationStatusFailed
+}
+
+// MarkPaymentVerificationPending marks payment as awaiting verification and clears failure metadata.
+func (o *Order) MarkPaymentVerificationPending() {
+	o.PaymentVerificationStatus = PaymentVerificationStatusPending
+	o.PaymentVerificationFailureReason = ""
+	o.PaymentVerificationFailedAt = nil
+}
+
+// MarkPaymentVerified marks payment as verified and clears failure metadata.
+func (o *Order) MarkPaymentVerified() {
+	o.PaymentVerificationStatus = PaymentVerificationStatusVerified
+	o.PaymentVerificationFailureReason = ""
+	o.PaymentVerificationFailedAt = nil
+}
+
+// MarkPaymentVerificationFailed marks payment verification as failed with reason.
+func (o *Order) MarkPaymentVerificationFailed(reason string) {
+	o.PaymentVerificationStatus = PaymentVerificationStatusFailed
+	o.PaymentVerificationFailureReason = strings.TrimSpace(reason)
+	now := time.Now()
+	o.PaymentVerificationFailedAt = &now
+}
+
+func normalizePaymentVerificationStatus(status PaymentVerificationStatus) PaymentVerificationStatus {
+	switch strings.ToLower(strings.TrimSpace(string(status))) {
+	case string(PaymentVerificationStatusVerified):
+		return PaymentVerificationStatusVerified
+	case string(PaymentVerificationStatusFailed):
+		return PaymentVerificationStatusFailed
+	default:
+		return PaymentVerificationStatusPending
+	}
 }
 
 // Role returns the role of the user for this order.
@@ -975,6 +1051,9 @@ func (o *Order) CanConfirm() bool {
 	if o.SerializedPaymentSent == nil {
 		return false
 	}
+	if !o.IsPaymentVerified() {
+		return false
+	}
 
 	// Cannot confirm if the order has progressed passed order open.
 	if o.SerializedOrderDecline != nil || o.SerializedOrderCancel != nil ||
@@ -1209,6 +1288,10 @@ func (o *Order) DeriveState() OrderState {
 	}
 	if cloneOrder.SerializedOrderCancel != nil {
 		return OrderState_CANCELED
+	}
+
+	if cloneOrder.SerializedPaymentSent != nil && !cloneOrder.IsPaymentVerified() {
+		return OrderState_AWAITING_PAYMENT_VERIFICATION
 	}
 
 	funded, _ := cloneOrder.IsFunded()

@@ -3,6 +3,7 @@ package chains
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 
@@ -18,16 +19,14 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/zcash"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/natefinch/lumberjack"
-	"github.com/op/go-logging"
 )
 
 var (
 	defaultLogFilename = "multiwallet.log"
 	ErrUnsuppertedCoin = errors.New("multiwallet does not contain an implementation for the given coin")
-	fileLogFormat      = logging.MustStringFormatter(`%{time:2006-01-02 T15:04:05.000} [%{level}] [%{module}] %{message}`)
-	stdoutLogFormat    = logging.MustStringFormatter(`%{color:reset}%{color}%{time:15:04:05} [%{level}] [%{module}] %{message}`)
 )
 
 // Compile-time check: *Multiwallet implements contracts.WalletOperator.
@@ -42,11 +41,7 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 		return nil, err
 	}
 
-	logger := logging.MustGetLogger("multiwallet")
-
-	backendStdout := logging.NewLogBackend(os.Stdout, fmt.Sprintf("[%s] ", cfg.NodeID), 0)
-	backendStdoutFormatter := logging.NewBackendFormatter(backendStdout, stdoutLogFormat)
-
+	writers := []io.Writer{os.Stdout}
 	if cfg.LogDir != "" {
 		rotator := &lumberjack.Logger{
 			Filename:   path.Join(cfg.LogDir, defaultLogFilename),
@@ -54,17 +49,10 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 			MaxBackups: 3,
 			MaxAge:     30, // Days
 		}
-
-		backendFile := logging.NewLogBackend(rotator, fmt.Sprintf("[%s] ", cfg.NodeID), 0)
-		backendFileFormatter := logging.NewBackendFormatter(backendFile, fileLogFormat)
-		leveledBackend := logging.MultiLogger(backendStdoutFormatter, backendFileFormatter)
-		leveledBackend.SetLevel(cfg.LogLevel, "")
-		logger.SetBackend(leveledBackend)
-	} else {
-		leveledBackend := logging.AddModuleLevel(backendStdoutFormatter)
-		leveledBackend.SetLevel(cfg.LogLevel, "")
-		logger.SetBackend(leveledBackend)
+		writers = append(writers, rotator)
 	}
+	logging.Configure(logging.Config{Level: cfg.LogLevel, Format: logging.FormatText, Writers: writers})
+	logger := logging.MustGetLogger("multiwallet").With("node_id", cfg.NodeID)
 
 	os.MkdirAll(cfg.DataDir, os.ModePerm)
 	db, err := sqlitedb.NewSqliteDB(cfg.DataDir)

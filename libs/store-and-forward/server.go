@@ -13,7 +13,6 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
-	logging "github.com/ipfs/go-log"
 	ctxio "github.com/jbenet/go-context/io"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -22,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	msgio "github.com/libp2p/go-msgio"
 	"github.com/mobazha/mobazha3.0/libs/store-and-forward/pb"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/multiformats/go-base32"
 )
 
@@ -31,7 +31,7 @@ const (
 	messageKeyPrefix      = "/snf/message/"
 )
 
-var log = logging.Logger("snf")
+var log = logging.MustGetLogger("snf")
 
 // Server is a store and forward server which can be used for asynchronous
 // communication between peers on the network.

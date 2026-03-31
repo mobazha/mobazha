@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
-	"github.com/op/go-logging"
 )
 
 var sinkLog = logging.MustGetLogger("WHSK")

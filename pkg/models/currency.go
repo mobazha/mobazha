@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/assetid"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/op/go-logging"
 )
 
 // DefaultCurrencyDivisibility is the Divisibility of the Currency if not

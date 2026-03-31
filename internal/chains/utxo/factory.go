@@ -6,9 +6,9 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/sources/electrum"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/sources/mempool"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/op/go-logging"
 )
 
 var factoryLog = logging.MustGetLogger("utxo-factory")

@@ -85,7 +85,7 @@ func TestChannelNotificationSink_Handle_MultiChannel(t *testing.T) {
 	}, "test-node")
 
 	meta := events.EventMeta{Name: "order.created", Category: "order"}
-	event := &events.NewOrder{OrderID: "QmTest123", BuyerHandle: "alice", Title: "Widget"}
+	event := &events.NewOrder{OrderID: "QmTest123", BuyerName: "alice", Title: "Widget"}
 
 	err := sink.Handle(context.Background(), meta, event)
 	if err != nil {

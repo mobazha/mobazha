@@ -44,13 +44,13 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 	madns "github.com/multiformats/go-multiaddr-dns"
-	"github.com/op/go-logging"
 	"github.com/tyler-smith/go-bip39"
 	"gorm.io/gorm"
 )
@@ -64,10 +64,8 @@ const (
 )
 
 var (
-	log             = logging.MustGetLogger("CORE")
-	stdoutLogFormat = logging.MustStringFormatter(`%{color:reset}%{color}%{time:15:04:05.000} [%{level}] [%{module}/%{shortfunc}] %{message}`)
-	fileLogFormat   = logging.MustStringFormatter(`%{time:15:04:05.000} [%{level}] [%{module}/%{shortfunc}] %{message}`)
-	ProtocolDHT     protocol.ID
+	log         = logging.MustGetLogger("CORE")
+	ProtocolDHT protocol.ID
 )
 
 // NewNode constructs and returns an MobazhaNode using the given cfg.

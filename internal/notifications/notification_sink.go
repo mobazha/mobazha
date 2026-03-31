@@ -10,14 +10,14 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("NOTF")
 
 type notificationPushMessage struct {
-	Type string                `json:"type"`
+	Type string               `json:"type"`
 	Data notificationPushData `json:"data"`
 }
 

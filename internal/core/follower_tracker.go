@@ -79,7 +79,7 @@ func (t *FollowerTracker) Start() {
 		return err
 	})
 	if err != nil && !os.IsNotExist(err) {
-		log.Error("Error loading followers: %s", err)
+		log.Errorf("Error loading followers: %v", err)
 	}
 
 	for _, follower := range followers {
@@ -144,19 +144,19 @@ func (t *FollowerTracker) ConnectedFollowers() []peer.ID {
 func (t *FollowerTracker) listenEvents() {
 	connectedSub, err := t.bus.Subscribe(&events.PeerConnected{})
 	if err != nil {
-		log.Error("Error subscribing to PeerConnected event: %s", err)
+		log.Errorf("Error subscribing to PeerConnected event: %v", err)
 	}
 	disonnectedSub, err := t.bus.Subscribe(&events.PeerDisconnected{})
 	if err != nil {
-		log.Error("Error subscribing to PeerDisconnected event: %s", err)
+		log.Errorf("Error subscribing to PeerDisconnected event: %v", err)
 	}
 	followerSub, err := t.bus.Subscribe(&events.Follow{})
 	if err != nil {
-		log.Error("Error subscribing to FollowNotification event: %s", err)
+		log.Errorf("Error subscribing to FollowNotification event: %v", err)
 	}
 	unfollowerSub, err := t.bus.Subscribe(&events.Unfollow{})
 	if err != nil {
-		log.Error("Error subscribing to UnfollowNotification event: %s", err)
+		log.Errorf("Error subscribing to UnfollowNotification event: %v", err)
 	}
 	ticker := time.NewTicker(TrackerInterval)
 	t.bus.Emit(&events.TrackerStarted{})

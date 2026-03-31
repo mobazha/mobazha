@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("utxo")
@@ -88,11 +88,11 @@ type Monitor struct {
 	sources             map[iwallet.ChainType][]PaymentSource
 	watching            map[string]*WatchedAddress
 	watchMu             sync.RWMutex
-	pollInterval         time.Duration
-	gracePeriod          time.Duration
-	subscribeAllSources  bool // If true, subscribe to all sources; if false, use first successful only
-	broadcastMaxRetries  int
-	broadcastBaseDelay   time.Duration
+	pollInterval        time.Duration
+	gracePeriod         time.Duration
+	subscribeAllSources bool // If true, subscribe to all sources; if false, use first successful only
+	broadcastMaxRetries int
+	broadcastBaseDelay  time.Duration
 	shutdown            chan struct{}
 	wg                  sync.WaitGroup
 	stopOnce            sync.Once // Ensures Stop() is only executed once
@@ -151,18 +151,18 @@ func NewMonitor(config *MonitorConfig) *Monitor {
 	}
 
 	return &Monitor{
-		sources:              make(map[iwallet.ChainType][]PaymentSource),
-		watching:             make(map[string]*WatchedAddress),
-		pollInterval:         config.PollInterval,
-		gracePeriod:          config.GracePeriod,
-		subscribeAllSources:  config.SubscribeAllSources,
-		broadcastMaxRetries:  config.BroadcastMaxRetries,
-		broadcastBaseDelay:   config.BroadcastBaseDelay,
-		shutdown:             make(chan struct{}),
-		subscribers:          make([]chan iwallet.Transaction, 0),
-		nodeCallbacks:        make(map[string]func(tx iwallet.Transaction, wa *WatchedAddress)),
-		seenTxs:              make(map[string]time.Time),
-		sourceHealthPrev:     make(map[string]bool),
+		sources:             make(map[iwallet.ChainType][]PaymentSource),
+		watching:            make(map[string]*WatchedAddress),
+		pollInterval:        config.PollInterval,
+		gracePeriod:         config.GracePeriod,
+		subscribeAllSources: config.SubscribeAllSources,
+		broadcastMaxRetries: config.BroadcastMaxRetries,
+		broadcastBaseDelay:  config.BroadcastBaseDelay,
+		shutdown:            make(chan struct{}),
+		subscribers:         make([]chan iwallet.Transaction, 0),
+		nodeCallbacks:       make(map[string]func(tx iwallet.Transaction, wa *WatchedAddress)),
+		seenTxs:             make(map[string]time.Time),
+		sourceHealthPrev:    make(map[string]bool),
 	}
 }
 

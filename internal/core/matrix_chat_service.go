@@ -52,7 +52,7 @@ type MautrixChatServiceConfig struct {
 	ServerName         string          // e.g. "matrix.mobazha.org"
 	DBPath             string          // path for crypto state DB (SQLite) in standalone mode
 	RegistrationSecret string          // Synapse shared secret for auto-registering Matrix users
-	Debug              bool            // enables debug-level logging for mautrix-go client
+	SDKLogLevel        string          // off|info|debug (defaults to off)
 
 	// CryptoStore overrides the default SQLite crypto store when non-nil.
 	// Accepts *dbutil.Database for shared PostgreSQL (SaaS multi-tenant).
@@ -107,6 +107,69 @@ type mautrixChatService struct {
 	directRoomCreateMu sync.Mutex
 
 	mu sync.RWMutex
+}
+
+type matrixSDKLogWriter struct {
+	userID string
+}
+
+func (w matrixSDKLogWriter) Write(p []byte) (int, error) {
+	return w.WriteLevel(zerolog.InfoLevel, p)
+}
+
+func (w matrixSDKLogWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
+	msg := strings.TrimSpace(string(p))
+	if msg == "" {
+		return len(p), nil
+	}
+	if w.userID != "" {
+		msg = fmt.Sprintf("matrix-sdk user=%s %s", w.userID, msg)
+	} else {
+		msg = "matrix-sdk " + msg
+	}
+
+	switch level {
+	case zerolog.TraceLevel, zerolog.DebugLevel:
+		log.Debug(msg)
+	case zerolog.InfoLevel:
+		log.Info(msg)
+	case zerolog.WarnLevel:
+		log.Warning(msg)
+	default:
+		log.Error(msg)
+	}
+	return len(p), nil
+}
+
+func normalizeMatrixSDKLogLevel(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "off":
+		return "off"
+	case "info":
+		return "info"
+	case "debug":
+		return "debug"
+	default:
+		log.Warningf("Unknown matrix sdk log level %q, fallback to off", raw)
+		return "off"
+	}
+}
+
+func (s *mautrixChatService) configureMautrixClientLogger() string {
+	level := normalizeMatrixSDKLogLevel(s.config.SDKLogLevel)
+	if level == "off" || s.client == nil {
+		return level
+	}
+
+	zerologLevel := zerolog.InfoLevel
+	if level == "debug" {
+		zerologLevel = zerolog.DebugLevel
+		s.client.SyncTraceLog = true
+	}
+
+	w := matrixSDKLogWriter{userID: s.matrixUserID.String()}
+	s.client.Log = zerolog.New(w).Level(zerologLevel).With().Timestamp().Logger()
+	return level
 }
 
 // NewMautrixChatService creates a new mautrix-backed Matrix chat service.
@@ -168,15 +231,11 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create mautrix client: %w", err)
 	}
-	logLevel := zerolog.InfoLevel
-	if s.config.Debug {
-		logLevel = zerolog.DebugLevel
-	}
-	client.Log = zerolog.New(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
-		w.NoColor = true
-		w.TimeFormat = "15:04:05"
-	})).With().Str("matrix", s.matrixUserID.Localpart()).Timestamp().Logger().Level(logLevel)
 	s.client = client
+	sdkLogLevel := s.configureMautrixClientLogger()
+	if sdkLogLevel != "off" {
+		log.Infof("Matrix SDK logs enabled: user=%s level=%s", s.matrixUserID, sdkLogLevel)
+	}
 
 	startFailed := true
 	defer func() {

@@ -26,6 +26,7 @@ type NetConfig struct {
 	MatrixInternalURL        string `json:"matrixInternalURL,omitempty"`
 	MatrixServerName         string `json:"matrixServerName,omitempty"`
 	MatrixRegistrationSecret string `json:"matrixRegistrationSecret,omitempty"`
+	MatrixSDKLogLevel        string `json:"matrixSDKLogLevel,omitempty"` // off|info|debug
 
 	Testnet bool `json:"-"`
 }

@@ -12,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mobazha/ethereum-watcher/rpc"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/op/go-logging"
 
 	contract "github.com/mobazha/mobazha3.0/internal/chains/evm/contract"
 )

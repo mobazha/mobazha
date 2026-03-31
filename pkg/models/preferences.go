@@ -476,7 +476,7 @@ func (prefs *UserPreferences) RemoveBlockedNode(peerID string) (bool, error) {
 		nodes = append(nodes, pid)
 	}
 	if !found {
-		log.Debugf("Skip, the node is not in blocked list, peer id: ", peerID)
+		log.Debugf("Skip, the node is not in blocked list, peer id: %s", peerID)
 		return false, nil
 	}
 

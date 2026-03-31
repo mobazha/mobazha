@@ -2,8 +2,8 @@ package evm
 
 import (
 	pkgevm "github.com/mobazha/mobazha3.0/pkg/evm"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/op/go-logging"
 )
 
 var factoryLog = logging.MustGetLogger("evm-factory")

@@ -9,11 +9,11 @@ import (
 	"time"
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
+	"github.com/mobazha/mobazha3.0/internal/config"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/op/go-logging"
 	"gorm.io/gorm"
 )
 
@@ -385,4 +385,3 @@ func (w *WalletBase) RemovePassphrase(pw []byte) error {
 func (w *WalletBase) Unlock(pw []byte, howLong time.Duration) error {
 	return w.Keychain.Unlock(pw, howLong)
 }
-

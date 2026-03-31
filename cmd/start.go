@@ -15,7 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/op/go-logging"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 )
 
 var log = logging.MustGetLogger("CMD")

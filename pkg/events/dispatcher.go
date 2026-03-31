@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/op/go-logging"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 )
 
 var dispatcherLog = logging.MustGetLogger("EVTD")
@@ -15,12 +15,12 @@ const defaultSinkBuffer = 256
 // Each sink has its own buffered channel and a configurable number of worker goroutines,
 // providing error isolation and backpressure.
 type Dispatcher struct {
-	bus     Bus
-	sinks  []EventSink
-	sub    Subscription
-	done   chan struct{}
-	once   sync.Once
-	wg     sync.WaitGroup
+	bus   Bus
+	sinks []EventSink
+	sub   Subscription
+	done  chan struct{}
+	once  sync.Once
+	wg    sync.WaitGroup
 
 	// per-sink worker channels
 	workers map[string]chan dispatchItem
@@ -35,8 +35,8 @@ type dispatchItem struct {
 func NewDispatcher(bus Bus, sinks ...EventSink) *Dispatcher {
 	return &Dispatcher{
 		bus:     bus,
-		sinks:  sinks,
-		done:   make(chan struct{}),
+		sinks:   sinks,
+		done:    make(chan struct{}),
 		workers: make(map[string]chan dispatchItem),
 	}
 }

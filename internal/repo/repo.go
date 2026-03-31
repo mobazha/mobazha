@@ -18,8 +18,8 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/internal/version"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/op/go-logging"
 	"github.com/tyler-smith/go-bip39"
 	"gorm.io/gorm"
 )

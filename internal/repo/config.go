@@ -13,11 +13,10 @@ import (
 	"strings"
 	"time"
 
-	ipfslogging "github.com/ipfs/go-log/writer"
 	"github.com/jessevdk/go-flags"
 	"github.com/mobazha/mobazha3.0/internal/version"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/natefinch/lumberjack"
-	"github.com/op/go-logging"
 )
 
 const (
@@ -29,9 +28,7 @@ const (
 var (
 	DefaultHomeDir = AppDataDir("mobazha", false)
 
-	fileLogFormat   = logging.MustStringFormatter(`%{time:2006-01-02 T15:04:05.000} [%{level}] [%{module}] %{message}`)
-	stdoutLogFormat = logging.MustStringFormatter(`%{color:reset}%{color}%{time:15:04:05} [%{level}] [%{module}] %{message}`)
-	LogLevelMap     = map[string]logging.Level{
+	LogLevelMap = map[string]logging.Level{
 		"debug":    logging.DEBUG,
 		"info":     logging.INFO,
 		"notice":   logging.NOTICE,
@@ -167,6 +164,7 @@ type Config struct {
 	MatrixInternalURL        string `no-flag:"true"`
 	MatrixServerName         string `no-flag:"true"`
 	MatrixRegistrationSecret string `no-flag:"true"`
+	MatrixSDKLogLevel        string `no-flag:"true"`
 
 	// MatrixCryptoStore allows hosting (SaaS) to inject a shared PostgreSQL
 	// *dbutil.Database for mautrix-go crypto state. When non-nil,
@@ -322,9 +320,12 @@ func LoadConfig(dataDir string) (*Config, error) {
 
 // SetupLogging sets up logging for this node
 func SetupLogging(logDir, logLevel string) {
-	backendStdout := logging.NewLogBackend(os.Stdout, "", 0)
-	backendStdoutFormatter := logging.NewBackendFormatter(backendStdout, stdoutLogFormat)
+	level, ok := LogLevelMap[strings.ToLower(logLevel)]
+	if !ok {
+		level = logging.INFO
+	}
 
+	writers := []io.Writer{os.Stdout}
 	if logDir != "" {
 		rotator := &lumberjack.Logger{
 			Filename:   path.Join(logDir, defaultLogFilename),
@@ -332,23 +333,14 @@ func SetupLogging(logDir, logLevel string) {
 			MaxBackups: 3,
 			MaxAge:     30, // Days
 		}
-
-		backendFile := logging.NewLogBackend(rotator, "", 0)
-		backendFileFormatter := logging.NewBackendFormatter(backendFile, fileLogFormat)
-		logging.SetBackend(backendStdoutFormatter, backendFileFormatter)
-
-		mirrorWriter := ipfslogging.NewMirrorWriter()
-		w2 := &lumberjack.Logger{
-			Filename:   path.Join(logDir, "ipfs.log"),
-			MaxSize:    10, // Megabytes
-			MaxBackups: 3,
-			MaxAge:     30, // Days
-		}
-		mirrorWriter.AddWriter(w2)
-	} else {
-		logging.SetBackend(backendStdoutFormatter)
+		writers = append(writers, rotator)
 	}
-	logging.SetLevel(LogLevelMap[strings.ToLower(logLevel)], "")
+
+	logging.Configure(logging.Config{
+		Level:   level,
+		Format:  logging.FormatText,
+		Writers: writers,
+	})
 }
 
 // createDefaultConfig copies the sample-bchd.conf content to the given destination path,

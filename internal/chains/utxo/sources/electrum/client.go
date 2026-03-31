@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/op/go-logging"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 )
 
 var log = logging.MustGetLogger("electrum")
@@ -22,8 +22,8 @@ var log = logging.MustGetLogger("electrum")
 type Client struct {
 	servers        []string
 	currentServer  int
-	conn   net.Conn
-	writer *bufio.Writer
+	conn           net.Conn
+	writer         *bufio.Writer
 	mu             sync.Mutex
 	idGen          RequestIDGenerator
 	pending        map[uint64]chan *Response

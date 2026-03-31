@@ -6,8 +6,8 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/op/go-logging"
 )
 
 var (
@@ -251,7 +251,6 @@ func NetConfig(data *config.NetConfig) Option {
 		return nil
 	}
 }
-
 
 // EscrowAddresses configures pre-resolved escrow contract addresses for chains.
 // When set, chain clients skip Registry RPC queries for contract address lookup.

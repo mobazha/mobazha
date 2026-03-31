@@ -36,7 +36,6 @@ require (
 	github.com/ipfs/go-datastore v0.8.2
 	github.com/ipfs/go-ds-leveldb v0.5.2
 	github.com/ipfs/go-ipld-format v0.6.2
-	github.com/ipfs/go-log v1.0.5
 	github.com/ipsn/go-libtor v1.0.380
 	github.com/jarcoal/httpmock v1.2.0
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
@@ -63,7 +62,6 @@ require (
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/natefinch/lumberjack v2.0.0+incompatible
-	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/stripe/stripe-go/v82 v82.0.0

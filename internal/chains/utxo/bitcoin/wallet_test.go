@@ -18,8 +18,8 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
 	"github.com/mobazha/mobazha3.0/internal/config"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/op/go-logging"
 )
 
 const (

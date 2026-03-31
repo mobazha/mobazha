@@ -12,7 +12,7 @@ import (
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/op/go-logging"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 )
 
 var log = logging.MustGetLogger("API")
@@ -228,7 +228,7 @@ func getListingService(r *http.Request) contracts.ListingService { return getNod
 func getProfileService(r *http.Request) contracts.ProfileService { return getNodeService(r).Profile() }
 func getSocialService(r *http.Request) contracts.SocialService   { return getNodeService(r).Social() }
 func getWalletService(r *http.Request) contracts.WalletService   { return getNodeService(r).Wallet() }
-func getMediaService(r *http.Request) contracts.MediaService { return getNodeService(r).Media() }
+func getMediaService(r *http.Request) contracts.MediaService     { return getNodeService(r).Media() }
 func getMatrixChatService(r *http.Request) contracts.MatrixChatService {
 	return getNodeService(r).MatrixChat()
 }

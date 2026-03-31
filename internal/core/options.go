@@ -222,16 +222,20 @@ func (n *MobazhaNode) initMatrixChatService() {
 		return
 	}
 
-	var homeserverURL, serverName, dbPath, registrationSecret string
+	var homeserverURL, serverName, dbPath, registrationSecret, matrixSDKLogLevel string
 
 	if n.sharedManager != nil && n.sharedManager.NetConfig != nil {
 		homeserverURL = n.sharedManager.NetConfig.MatrixInternalURL
 		serverName = n.sharedManager.NetConfig.MatrixServerName
 		registrationSecret = n.sharedManager.NetConfig.MatrixRegistrationSecret
+		matrixSDKLogLevel = n.sharedManager.NetConfig.MatrixSDKLogLevel
 	}
 
 	if registrationSecret == "" {
 		registrationSecret = os.Getenv("MATRIX_REGISTRATION_SECRET")
+	}
+	if matrixSDKLogLevel == "" {
+		matrixSDKLogLevel = "off"
 	}
 
 	if homeserverURL == "" {
@@ -254,16 +258,17 @@ func (n *MobazhaNode) initMatrixChatService() {
 		ServerName:         serverName,
 		DBPath:             dbPath,
 		RegistrationSecret: registrationSecret,
+		SDKLogLevel:        matrixSDKLogLevel,
 	}
 
 	if n.matrixCryptoStore != nil {
 		cfg.CryptoStore = n.matrixCryptoStore
 		cfg.CryptoDBAccountID = n.peerID.String()
-		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v, cryptoStore=shared-PG)",
-			homeserverURL, serverName, registrationSecret != "")
+		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v, sdkLog=%s, cryptoStore=shared-PG)",
+			homeserverURL, serverName, registrationSecret != "", matrixSDKLogLevel)
 	} else {
-		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v, cryptoStore=SQLite)",
-			homeserverURL, serverName, registrationSecret != "")
+		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v, sdkLog=%s, cryptoStore=SQLite)",
+			homeserverURL, serverName, registrationSecret != "", matrixSDKLogLevel)
 	}
 
 	svc, err := NewMautrixChatService(cfg)

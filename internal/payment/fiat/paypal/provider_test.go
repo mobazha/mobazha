@@ -670,7 +670,7 @@ func TestProvider_GetOnboardingURL_Success(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(partnerReferralResponse{
 			Links: []link{
-				{Href: "https://paypal.com/action/referral-123", Rel: "action_url"},
+				{Href: "https://paypal.com/action/referral-123?partnerId=PARTNER-ID-FROM-ACTION", Rel: "action_url"},
 			},
 		})
 	})
@@ -683,7 +683,42 @@ func TestProvider_GetOnboardingURL_Success(t *testing.T) {
 		ReturnURL: "https://example.com/return",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "https://paypal.com/action/referral-123", result.URL)
+	assert.Equal(t, "https://paypal.com/action/referral-123?partnerId=PARTNER-ID-FROM-ACTION", result.URL)
+	assert.Equal(t, "PARTNER-ID-FROM-ACTION", p.config.PartnerID)
+}
+
+func TestProvider_GetOnboardingURL_CapturesPartnerIDFromReferralDetails(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/customer/partner-referrals", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(partnerReferralResponse{
+			Links: []link{
+				{
+					Href: "https://api-m.sandbox.paypal.com/v1/customer/partner-referrals/ref-token-001",
+					Rel:  "self",
+				},
+				{
+					Href: "https://www.sandbox.paypal.com/merchantsignup/partner/onboardingentry?token=ref-token-001",
+					Rel:  "action_url",
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/v1/customer/partner-referrals/ref-token-001", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(partnerReferralDetailsResponse{
+			SubmitterPayerID: "PARTNER-FROM-REFERRAL",
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+
+	result, err := p.GetOnboardingURL(context.Background(), contracts.OnboardingParams{
+		SellerID: "seller-001",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://www.sandbox.paypal.com/merchantsignup/partner/onboardingentry?token=ref-token-001", result.URL)
+	assert.Equal(t, "PARTNER-FROM-REFERRAL", p.config.PartnerID)
 }
 
 func TestProvider_HandleOnboardingCallback_Success(t *testing.T) {
@@ -728,6 +763,57 @@ func TestProvider_HandleOnboardingCallback_Pending(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "pending", account.Status)
+}
+
+func TestProvider_HandleOnboardingCallback_ResolveMerchantByTrackingID(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/customer/partners/PARTNER-ID/merchant-integrations", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "seller-001", r.URL.Query().Get("tracking_id"))
+		json.NewEncoder(w).Encode(merchantTrackingResponse{
+			MerchantID: "MERCH-TRACK-001",
+			TrackingID: "seller-001",
+		})
+	})
+	mux.HandleFunc("/v1/customer/partners/PARTNER-ID/merchant-integrations/MERCH-TRACK-001", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(merchantIntegration{
+			MerchantID:            "MERCH-TRACK-001",
+			PaymentsReceivable:    true,
+			PrimaryEmailConfirmed: true,
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	p.config.PartnerID = "PARTNER-ID"
+	defer ts.Close()
+
+	account, err := p.HandleOnboardingCallback(context.Background(), contracts.CallbackParams{
+		TrackingID: "seller-001",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "MERCH-TRACK-001", account.AccountID)
+	assert.Equal(t, "active", account.Status)
+}
+
+func TestProvider_HandleOnboardingCallback_UsesAccountIDFallback(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/customer/partners/PARTNER-ID/merchant-integrations/MERCH-FROM-ACCOUNT", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(merchantIntegration{
+			MerchantID:            "MERCH-FROM-ACCOUNT",
+			PaymentsReceivable:    true,
+			PrimaryEmailConfirmed: true,
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	p.config.PartnerID = "PARTNER-ID"
+	defer ts.Close()
+
+	account, err := p.HandleOnboardingCallback(context.Background(), contracts.CallbackParams{
+		AccountID: "MERCH-FROM-ACCOUNT",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "MERCH-FROM-ACCOUNT", account.AccountID)
+	assert.Equal(t, "active", account.Status)
 }
 
 func TestProvider_HandleOnboardingCallback_MissingMerchantID(t *testing.T) {

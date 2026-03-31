@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -35,6 +36,8 @@ type FiatPaymentAppService struct {
 	testnet        bool
 	webhookHandler FiatWebhookHandler
 	orderRepo      contracts.OrderRepo
+	platformMu     sync.RWMutex
+	platformIDs    map[string]struct{}
 }
 
 func NewFiatPaymentAppService(
@@ -44,10 +47,11 @@ func NewFiatPaymentAppService(
 	testnet bool,
 ) *FiatPaymentAppService {
 	return &FiatPaymentAppService{
-		registry: registry,
-		db:       db,
-		nodeID:   nodeID,
-		testnet:  testnet,
+		registry:    registry,
+		db:          db,
+		nodeID:      nodeID,
+		testnet:     testnet,
+		platformIDs: make(map[string]struct{}),
 	}
 }
 
@@ -635,8 +639,10 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 	return nil
 }
 
-// deleteProviderConfig removes the fiat provider config, deactivates the receiving account,
-// and unregisters the provider from the registry. Called internally by DisconnectProvider.
+// deleteProviderConfig removes the fiat provider config and receiving account.
+// Standalone providers are unregistered from the registry; platform-injected providers stay
+// registered so SaaS onboarding can be started again after disconnect.
+// Called internally by DisconnectProvider.
 func (s *FiatPaymentAppService) deleteProviderConfig(providerID string) error {
 	err := s.db.Update(func(tx database.Tx) error {
 		if err := tx.Delete("provider_id", providerID, nil, &models.FiatProviderConfig{}); err != nil {
@@ -648,7 +654,9 @@ func (s *FiatPaymentAppService) deleteProviderConfig(providerID string) error {
 	if err != nil {
 		return err
 	}
-	s.registry.Unregister(providerID)
+	if !s.isPlatformProvider(providerID) {
+		s.registry.Unregister(providerID)
+	}
 	return nil
 }
 
@@ -796,6 +804,7 @@ func (s *FiatPaymentAppService) HandleOnboardingCallback(ctx context.Context, pr
 // RegisterPlatformProvider registers a provider using the platform's keys in Connected/Partner mode.
 // Called by the hosting layer after SaaS node creation to inject platform-level keys.
 func (s *FiatPaymentAppService) RegisterPlatformProvider(providerID, secretKey, publishableKey, webhookSecret string, opts *contracts.PlatformProviderOpts) {
+	s.markPlatformProvider(providerID)
 	s.registerProvider(providerID, secretKey, publishableKey, webhookSecret, true, opts)
 }
 
@@ -841,6 +850,22 @@ func (s *FiatPaymentAppService) registerProvider(providerID, secretKey, publisha
 	default:
 		logger.LogErrorWithIDf(log, s.nodeID, "unknown fiat provider %q, cannot register", providerID)
 	}
+}
+
+func (s *FiatPaymentAppService) markPlatformProvider(providerID string) {
+	if providerID == "" {
+		return
+	}
+	s.platformMu.Lock()
+	s.platformIDs[providerID] = struct{}{}
+	s.platformMu.Unlock()
+}
+
+func (s *FiatPaymentAppService) isPlatformProvider(providerID string) bool {
+	s.platformMu.RLock()
+	_, ok := s.platformIDs[providerID]
+	s.platformMu.RUnlock()
+	return ok
 }
 
 // LoadAndRegisterProviders scans existing FiatProviderConfig records and registers

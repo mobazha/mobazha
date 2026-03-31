@@ -277,11 +277,27 @@ type partnerReferralResponse struct {
 	Links []link `json:"links"`
 }
 
+type partnerReferralDetailsResponse struct {
+	SubmitterPayerID string `json:"submitter_payer_id"`
+	ReferralData     struct {
+		CustomerData struct {
+			ReferralUserPayerID struct {
+				Value string `json:"value"`
+			} `json:"referral_user_payer_id"`
+		} `json:"customer_data"`
+	} `json:"referral_data"`
+}
+
 type merchantIntegration struct {
 	MerchantID            string `json:"merchant_id"`
 	TrackingID            string `json:"tracking_id"`
 	PaymentsReceivable    bool   `json:"payments_receivable"`
 	PrimaryEmailConfirmed bool   `json:"primary_email_confirmed"`
+}
+
+type merchantTrackingResponse struct {
+	MerchantID string `json:"merchant_id"`
+	TrackingID string `json:"tracking_id"`
 }
 
 // --- Refund API types ---

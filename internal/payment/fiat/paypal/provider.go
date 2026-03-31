@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +15,9 @@ import (
 )
 
 const providerID = "paypal"
+
+var partnerPathRE = regexp.MustCompile(`/v1/customer/partners/([^/]+)`)
+var partnerReferralPathRE = regexp.MustCompile(`/v1/customer/partner-referrals/([^/?#]+)`)
 
 // Mode determines how the PayPal provider operates.
 type Mode string
@@ -334,17 +339,33 @@ func (p *Provider) GetOnboardingURL(ctx context.Context, params contracts.Onboar
 	if err := p.client.doJSON(ctx, "POST", "/v2/customer/partner-referrals", reqBody, &resp); err != nil {
 		return nil, fmt.Errorf("paypal: create partner referral: %w", err)
 	}
-
+	actionURL := ""
 	for _, l := range resp.Links {
 		if l.Rel == "action_url" {
-			return &contracts.OnboardingResult{URL: l.Href}, nil
+			actionURL = l.Href
+			break
 		}
 	}
-	return nil, fmt.Errorf("paypal: no action_url in partner referral response")
+	if actionURL == "" {
+		return nil, fmt.Errorf("paypal: no action_url in partner referral response")
+	}
+
+	p.tryCapturePartnerID(ctx, resp.Links, actionURL)
+	return &contracts.OnboardingResult{URL: actionURL}, nil
 }
 
 func (p *Provider) HandleOnboardingCallback(ctx context.Context, params contracts.CallbackParams) (*contracts.ProviderAccount, error) {
-	merchantID := params.MerchantIDPP
+	merchantID := strings.TrimSpace(params.MerchantIDPP)
+	if merchantID == "" {
+		merchantID = strings.TrimSpace(params.AccountID)
+	}
+	if merchantID == "" && strings.TrimSpace(params.TrackingID) != "" {
+		resolvedID, err := p.lookupMerchantIDByTrackingID(ctx, params.TrackingID)
+		if err != nil {
+			return nil, fmt.Errorf("paypal: resolve merchant id by tracking id: %w", err)
+		}
+		merchantID = resolvedID
+	}
 	if merchantID == "" {
 		return nil, fmt.Errorf("paypal: merchant_id_in_paypal is required")
 	}
@@ -365,6 +386,152 @@ func (p *Provider) HandleOnboardingCallback(ctx context.Context, params contract
 		AccountID:  merchantID,
 		Status:     status,
 	}, nil
+}
+
+func (p *Provider) lookupMerchantIDByTrackingID(ctx context.Context, trackingID string) (string, error) {
+	if p.config.PartnerID == "" {
+		return "", fmt.Errorf("partner id is required")
+	}
+	trimmed := strings.TrimSpace(trackingID)
+	if trimmed == "" {
+		return "", fmt.Errorf("tracking id is required")
+	}
+
+	path := fmt.Sprintf(
+		"/v1/customer/partners/%s/merchant-integrations?tracking_id=%s",
+		p.config.PartnerID,
+		url.QueryEscape(trimmed),
+	)
+	var resp merchantTrackingResponse
+	if err := p.client.doJSON(ctx, "GET", path, nil, &resp); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(resp.MerchantID) == "" {
+		return "", fmt.Errorf("merchant id not found for tracking id %q", trimmed)
+	}
+	return resp.MerchantID, nil
+}
+
+func (p *Provider) capturePartnerIDFromActionURL(actionURL string) {
+	if p.config.PartnerID != "" || strings.TrimSpace(actionURL) == "" {
+		return
+	}
+	parsed, err := url.Parse(actionURL)
+	if err != nil {
+		return
+	}
+	query := parsed.Query()
+	if pid := strings.TrimSpace(query.Get("partnerId")); pid != "" {
+		p.config.PartnerID = pid
+		return
+	}
+	if pid := strings.TrimSpace(query.Get("partner_id")); pid != "" {
+		p.config.PartnerID = pid
+	}
+}
+
+func (p *Provider) capturePartnerIDFromReferralLinks(links []link) {
+	if p.config.PartnerID != "" {
+		return
+	}
+	for _, l := range links {
+		href := strings.TrimSpace(l.Href)
+		if href == "" {
+			continue
+		}
+		match := partnerPathRE.FindStringSubmatch(href)
+		if len(match) == 2 {
+			candidate := strings.TrimSpace(match[1])
+			if candidate != "" {
+				p.config.PartnerID = candidate
+				return
+			}
+		}
+	}
+}
+
+func (p *Provider) tryCapturePartnerID(ctx context.Context, links []link, actionURL string) {
+	if p.config.PartnerID != "" {
+		return
+	}
+
+	p.capturePartnerIDFromReferralLinks(links)
+	if p.config.PartnerID != "" {
+		return
+	}
+
+	p.capturePartnerIDFromActionURL(actionURL)
+	if p.config.PartnerID != "" {
+		return
+	}
+
+	p.capturePartnerIDFromReferralDetails(ctx, links, actionURL)
+}
+
+func (p *Provider) capturePartnerIDFromReferralDetails(ctx context.Context, links []link, actionURL string) {
+	if p.config.PartnerID != "" {
+		return
+	}
+
+	referralID := extractPartnerReferralID(links, actionURL)
+	if referralID == "" {
+		return
+	}
+
+	path := "/v1/customer/partner-referrals/" + url.PathEscape(referralID)
+	var details partnerReferralDetailsResponse
+	if err := p.client.doJSON(ctx, "GET", path, nil, &details); err != nil {
+		return
+	}
+
+	if pid := strings.TrimSpace(details.SubmitterPayerID); pid != "" {
+		p.config.PartnerID = pid
+		return
+	}
+	if pid := strings.TrimSpace(details.ReferralData.CustomerData.ReferralUserPayerID.Value); pid != "" {
+		p.config.PartnerID = pid
+	}
+}
+
+func extractPartnerReferralID(links []link, actionURL string) string {
+	trimmed := strings.TrimSpace(actionURL)
+	if trimmed != "" {
+		parsed, err := url.Parse(trimmed)
+		if err == nil {
+			token := strings.TrimSpace(parsed.Query().Get("token"))
+			if token != "" {
+				return token
+			}
+		}
+	}
+
+	for _, l := range links {
+		if !strings.EqualFold(strings.TrimSpace(l.Rel), "self") {
+			continue
+		}
+		if id := extractPartnerReferralIDFromURL(l.Href); id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
+func extractPartnerReferralIDFromURL(href string) string {
+	trimmed := strings.TrimSpace(href)
+	if trimmed == "" {
+		return ""
+	}
+
+	match := partnerReferralPathRE.FindStringSubmatch(trimmed)
+	if len(match) != 2 {
+		return ""
+	}
+
+	unescaped, err := url.PathUnescape(match[1])
+	if err != nil {
+		return strings.TrimSpace(match[1])
+	}
+	return strings.TrimSpace(unescaped)
 }
 
 func (p *Provider) GetAccountStatus(ctx context.Context, accountID string) (*contracts.AccountStatus, error) {

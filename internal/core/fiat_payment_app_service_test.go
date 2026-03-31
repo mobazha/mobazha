@@ -315,6 +315,20 @@ func TestFiatService_deleteProviderConfig_UnregistersProvider(t *testing.T) {
 	assert.Empty(t, reg.Registered(), "provider should be unregistered after delete")
 }
 
+func TestFiatService_deleteProviderConfig_KeepPlatformProviderRegistered(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, _ := newFiatTestService(t, reg)
+
+	require.NoError(t, svc.SaveProviderConfig("paypal", contracts.ProviderConfigInput{
+		AccountID: "acct_del_pp", PublicKey: "client_id", SecretKey: "client_secret", WebhookSecret: "wh",
+	}))
+	svc.markPlatformProvider("paypal")
+
+	require.NoError(t, svc.deleteProviderConfig("paypal"))
+	_, err := reg.ForProvider("paypal")
+	require.NoError(t, err, "platform provider should stay registered after disconnect")
+}
+
 func TestFiatService_GetProviderConfig_Masked(t *testing.T) {
 	reg := newMockFiatRegistry()
 	svc, _ := newFiatTestService(t, reg)

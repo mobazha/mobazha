@@ -41,32 +41,56 @@ type toolRoute struct {
 }
 
 var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
-	"listings_list_mine":    func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/index"} },
-	"listings_get":          func(a map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/mine/" + sanitizePathParam(a["slug"])} },
+	"listings_list_mine": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/index"} },
+	"listings_get": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"GET", "/v1/listings/mine/" + sanitizePathParam(a["slug"])}
+	},
 	"listings_get_template": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/template"} },
 	"listings_create":       func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/listings"} },
 	"listings_update":       func(_ map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/listings"} },
-	"listings_delete":       func(a map[string]interface{}) toolRoute { return toolRoute{"DELETE", "/v1/listings/" + sanitizePathParam(a["slug"])} },
-	"orders_get_sales":      func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/sales"} },
-	"orders_get_detail":     func(a map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/orders/" + sanitizePathParam(a["orderId"])} },
-	"orders_confirm":        func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/confirm"} },
-	"orders_decline":         func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/cancel"} },
-	"orders_fulfill":        func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/fulfill"} },
-	"orders_refund":         func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/refund"} },
-	"orders_complete":       func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/complete"} },
-	"profile_get":           func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/profiles"} },
-	"profile_update":        func(_ map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/profiles"} },
-	"chat_get_conversations": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/chat/conversations"} },
-	"chat_get_messages":     func(a map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/chat/conversations/" + sanitizePathParam(a["peerID"]) + "/messages"} },
-	"chat_send_message":     func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/chat/messages"} },
-	"notifications_list":    func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/notifications"} },
-	"exchange_rates_get":    func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/exchange-rates"} },
-	"discounts_list":        func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/discounts"} },
-	"discounts_create":      func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/discounts"} },
-	"discounts_update":      func(a map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/discounts/" + sanitizePathParam(a["discountId"])} },
-	"discounts_delete":      func(a map[string]interface{}) toolRoute { return toolRoute{"DELETE", "/v1/discounts/" + sanitizePathParam(a["discountId"])} },
-	"collections_list":      func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/collections"} },
-	"collections_create":    func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/collections"} },
+	"listings_delete": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"DELETE", "/v1/listings/" + sanitizePathParam(a["slug"])}
+	},
+	"orders_get_sales": func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/sales"} },
+	"orders_get_detail": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"GET", "/v1/orders/" + sanitizePathParam(a["orderId"])}
+	},
+	"orders_confirm": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/confirm"}
+	},
+	"orders_decline": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/cancel"}
+	},
+	"orders_fulfill": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/fulfill"}
+	},
+	"orders_refund": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/refund"}
+	},
+	"orders_complete": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/complete"}
+	},
+	"profile_get":            func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/profiles"} },
+	"profile_update":         func(_ map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/profiles"} },
+	"chat_get_conversations": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/chat/rooms"} },
+	"chat_get_messages": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"GET", "/v1/chat/rooms/" + sanitizePathParam(a["roomID"]) + "/messages"}
+	},
+	"chat_send_message": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/chat/rooms/" + sanitizePathParam(a["roomID"]) + "/messages"}
+	},
+	"notifications_list": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/notifications"} },
+	"exchange_rates_get": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/exchange-rates"} },
+	"discounts_list":     func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/discounts"} },
+	"discounts_create":   func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/discounts"} },
+	"discounts_update": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"PUT", "/v1/discounts/" + sanitizePathParam(a["discountId"])}
+	},
+	"discounts_delete": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"DELETE", "/v1/discounts/" + sanitizePathParam(a["discountId"])}
+	},
+	"collections_list":   func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/collections"} },
+	"collections_create": func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/collections"} },
 }
 
 // sanitizePathParam prevents path traversal by stripping slashes, dots-sequences,
@@ -160,6 +184,17 @@ func buildRequestBody(toolName string, args map[string]interface{}) ([]byte, err
 			return json.Marshal(collection)
 		}
 		return json.Marshal(args)
+	case toolName == "chat_send_message":
+		payload := map[string]interface{}{}
+		if body, ok := args["body"]; ok {
+			payload["body"] = body
+			return json.Marshal(payload)
+		}
+		if msg, ok := args["message"]; ok {
+			payload["body"] = msg
+			return json.Marshal(payload)
+		}
+		return json.Marshal(args)
 	default:
 		return json.Marshal(args)
 	}
@@ -170,13 +205,20 @@ func appendQueryParams(baseURL, toolName string, args map[string]interface{}) st
 		"listings_list_mine": {"limit", "offset"},
 		"orders_get_sales":   {"limit", "offset"},
 		"notifications_list": {"limit", "offset"},
-		"chat_get_messages":  {"limit", "offsetId"},
+		"chat_get_messages":  {"limit", "before", "after", "since"},
 	}
 	keys, ok := paramKeys[toolName]
 	if !ok {
 		return baseURL
 	}
 	params := url.Values{}
+	if toolName == "chat_get_messages" {
+		if _, hasSince := args["since"]; !hasSince {
+			if offsetID, ok := args["offsetId"]; ok {
+				params.Set("since", fmt.Sprintf("%v", offsetID))
+			}
+		}
+	}
 	for _, k := range keys {
 		if v, exists := args[k]; exists {
 			params.Set(k, fmt.Sprintf("%v", v))

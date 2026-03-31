@@ -83,18 +83,18 @@ func SellerTools() []ToolDefinition {
 		},
 		{
 			Name:        "chat_get_conversations",
-			Description: "List recent chat conversations with buyers.",
+			Description: "List recent chat rooms.",
 			Parameters:  mustJSON(`{"type":"object","properties":{}}`),
 		},
 		{
 			Name:        "chat_get_messages",
-			Description: "Get messages from a specific chat conversation.",
-			Parameters:  mustJSON(`{"type":"object","properties":{"peerID":{"type":"string","description":"Buyer's peer ID"},"limit":{"type":"integer","description":"Max messages (default 20)"},"offsetId":{"type":"string","description":"Message ID for pagination"}},"required":["peerID"]}`),
+			Description: "Get messages from a specific chat room.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"roomID":{"type":"string","description":"Chat room ID"},"limit":{"type":"integer","description":"Max messages (default 20)"},"before":{"type":"string","description":"Pagination token for older messages"},"after":{"type":"string","description":"Pagination token for newer messages"},"since":{"type":"string","description":"Backward-compat alias for before"}},"required":["roomID"]}`),
 		},
 		{
 			Name:        "chat_send_message",
-			Description: "Send a message to a buyer.",
-			Parameters:  mustJSON(`{"type":"object","properties":{"peerID":{"type":"string","description":"Buyer's peer ID"},"message":{"type":"string","description":"Message text"},"subject":{"type":"string","description":"Message subject"}},"required":["peerID","message"]}`),
+			Description: "Send a message to a chat room.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"roomID":{"type":"string","description":"Chat room ID"},"body":{"type":"string","description":"Message text"},"message":{"type":"string","description":"Backward-compat alias of body"}},"required":["roomID"]}`),
 		},
 		{
 			Name:        "notifications_list",

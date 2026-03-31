@@ -133,17 +133,17 @@ func (c *apiClient) doJSON(ctx context.Context, method, path string, body, resul
 // --- PayPal v2 Orders API types ---
 
 type orderRequest struct {
-	Intent        string         `json:"intent"`
-	PurchaseUnits []purchaseUnit `json:"purchase_units"`
-	ApplicationContext *appContext `json:"application_context,omitempty"`
+	Intent             string         `json:"intent"`
+	PurchaseUnits      []purchaseUnit `json:"purchase_units"`
+	ApplicationContext *appContext    `json:"application_context,omitempty"`
 }
 
 type purchaseUnit struct {
-	ReferenceID string  `json:"reference_id,omitempty"`
-	Amount      amount  `json:"amount"`
-	Description string  `json:"description,omitempty"`
-	CustomID    string  `json:"custom_id,omitempty"`
-	Payee       *payee  `json:"payee,omitempty"`
+	ReferenceID string `json:"reference_id,omitempty"`
+	Amount      amount `json:"amount"`
+	Description string `json:"description,omitempty"`
+	CustomID    string `json:"custom_id,omitempty"`
+	Payee       *payee `json:"payee,omitempty"`
 }
 
 type amount struct {
@@ -162,11 +162,11 @@ type appContext struct {
 }
 
 type orderResponse struct {
-	ID            string         `json:"id"`
-	Status        string         `json:"status"`
-	PurchaseUnits []puResponse   `json:"purchase_units"`
-	Links         []link         `json:"links"`
-	CreateTime    string         `json:"create_time"`
+	ID            string       `json:"id"`
+	Status        string       `json:"status"`
+	PurchaseUnits []puResponse `json:"purchase_units"`
+	Links         []link       `json:"links"`
+	CreateTime    string       `json:"create_time"`
 }
 
 type puResponse struct {
@@ -224,9 +224,9 @@ type disputeResource struct {
 }
 
 type refundResource struct {
-	ID             string `json:"id"`
-	Status         string `json:"status"`
-	Amount         amount `json:"amount"`
+	ID                     string `json:"id"`
+	Status                 string `json:"status"`
+	Amount                 amount `json:"amount"`
 	SellerPayableBreakdown *struct {
 		TotalRefundedAmount amount `json:"total_refunded_amount"`
 	} `json:"seller_payable_breakdown,omitempty"`
@@ -236,15 +236,15 @@ type refundResource struct {
 // --- Partner Referral (PPCP onboarding) ---
 
 type partnerReferralRequest struct {
-	TrackingID           string              `json:"tracking_id"`
-	Operations           []referralOperation `json:"operations"`
-	Products             []string            `json:"products"`
-	LegalConsents        []legalConsent      `json:"legal_consents"`
-	PartnerConfigOverride *partnerConfig     `json:"partner_config_override,omitempty"`
+	TrackingID            string              `json:"tracking_id"`
+	Operations            []referralOperation `json:"operations"`
+	Products              []string            `json:"products"`
+	LegalConsents         []legalConsent      `json:"legal_consents"`
+	PartnerConfigOverride *partnerConfig      `json:"partner_config_override,omitempty"`
 }
 
 type referralOperation struct {
-	Operation                string              `json:"operation"`
+	Operation                string             `json:"operation"`
 	APIIntegrationPreference apiIntegrationPref `json:"api_integration_preference"`
 }
 
@@ -253,8 +253,15 @@ type apiIntegrationPref struct {
 }
 
 type restAPIIntegration struct {
-	IntegrationMethod string `json:"integration_method"`
-	IntegrationType   string `json:"integration_type"`
+	IntegrationMethod string                 `json:"integration_method"`
+	IntegrationType   string                 `json:"integration_type"`
+	ThirdPartyDetails *restThirdPartyDetails `json:"third_party_details,omitempty"`
+}
+
+type restThirdPartyDetails struct {
+	Features     []string `json:"features,omitempty"`
+	SignupMode   string   `json:"signup_mode,omitempty"`
+	Organization string   `json:"organization,omitempty"`
 }
 
 type legalConsent struct {

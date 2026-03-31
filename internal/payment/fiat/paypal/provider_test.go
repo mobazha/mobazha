@@ -655,6 +655,18 @@ func TestProvider_GetOnboardingURL_Success(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v2/customer/partner-referrals", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
+
+		var req partnerReferralRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		require.Len(t, req.Operations, 1)
+		rest := req.Operations[0].APIIntegrationPreference.RestAPIIntegration
+		assert.Equal(t, "PAYPAL", rest.IntegrationMethod)
+		assert.Equal(t, "THIRD_PARTY", rest.IntegrationType)
+		require.NotNil(t, rest.ThirdPartyDetails)
+		assert.ElementsMatch(t, []string{"PAYMENT", "REFUND"}, rest.ThirdPartyDetails.Features)
+		require.NotNil(t, req.PartnerConfigOverride)
+		assert.Equal(t, "https://example.com/return", req.PartnerConfigOverride.ReturnURL)
+
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(partnerReferralResponse{
 			Links: []link{

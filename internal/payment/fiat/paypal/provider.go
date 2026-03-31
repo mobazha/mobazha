@@ -311,6 +311,9 @@ func (p *Provider) GetOnboardingURL(ctx context.Context, params contracts.Onboar
 				RestAPIIntegration: restAPIIntegration{
 					IntegrationMethod: "PAYPAL",
 					IntegrationType:   "THIRD_PARTY",
+					ThirdPartyDetails: &restThirdPartyDetails{
+						Features: []string{"PAYMENT", "REFUND"},
+					},
 				},
 			},
 		}},

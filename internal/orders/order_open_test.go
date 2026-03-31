@@ -50,7 +50,7 @@ func TestOrderProcessor_processOrderOpenMessage(t *testing.T) {
 			expectedEvent: func(orderOpen *pb.OrderOpen) interface{} {
 				orderID, _ := utils.CalcOrderID(orderOpen)
 				return &events.NewOrder{
-					BuyerName: orderOpen.BuyerID.Name,
+					BuyerName:   orderOpen.BuyerID.Name,
 					BuyerID:     orderOpen.BuyerID.PeerID,
 					ListingType: orderOpen.Listings[0].Listing.Metadata.ContractType.String(),
 					OrderID:     orderID.B58String(),
@@ -192,11 +192,11 @@ func Test_convertCurrencyAmount(t *testing.T) {
 		expected         string
 	}{
 		{
-			// Exchange rate $407
+			// Exchange rate $400 (mock CoinGecko BCH/USD)
 			"100",
 			"USD",
 			"BCH",
-			"245579",
+			"250000",
 		},
 		{
 			// Same currency
@@ -206,23 +206,23 @@ func Test_convertCurrencyAmount(t *testing.T) {
 			"100000",
 		},
 		{
-			// Exchange rate 31.588915
+			// 1 BTC ~= 162.50016250 BCH under mock rates
 			"100000000",
 			"BTC",
 			"BCH",
-			"3158891949",
+			"16250016250",
 		},
 		{
 			"500000000",
 			"LTC",
 			"BCH",
-			"140816694",
+			"100000000",
 		},
 		{
 			"100",
 			"USD",
 			"MCK",
-			"3888024",
+			"3889537",
 		},
 	}
 
@@ -257,7 +257,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 		{
 			// Normal
 			transform:     func(order *pb.OrderOpen) error { return nil },
-			expectedTotal: iwallet.NewAmount("4992221"),
+			expectedTotal: iwallet.NewAmount("4994164"),
 		},
 		{
 			// Quantity 2
@@ -265,7 +265,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 				order.Items[0].Quantity = "2"
 				return nil
 			},
-			expectedTotal: iwallet.NewAmount("9152406"),
+			expectedTotal: iwallet.NewAmount("9155968"),
 		},
 		{
 			// Additional item shipping (Price="20" is same as factory default, so same as Quantity 2 test)
@@ -279,7 +279,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 				order.Items[0].ListingHash = hash.B58String()
 				return nil
 			},
-			expectedTotal: iwallet.NewAmount("9152406"),
+			expectedTotal: iwallet.NewAmount("9155968"),
 		},
 		{
 			// Multiple items
@@ -295,7 +295,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 				order.Items[1].ListingHash = hash.B58String()
 				return nil
 			},
-			expectedTotal: iwallet.NewAmount("9568425"),
+			expectedTotal: iwallet.NewAmount("9572149"),
 		},
 		{
 			// Market price listing
@@ -314,7 +314,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 				order.Items[0].ShippingOption = nil
 				return nil
 			},
-			expectedTotal: iwallet.NewAmount("3888024"),
+			expectedTotal: iwallet.NewAmount("3889537"),
 		},
 	}
 

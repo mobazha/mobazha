@@ -1270,4 +1270,11 @@ var MockCoinGeckoResponse = map[string]map[string]float64{
 		"cny": 0.868,
 		"gbp": 0.096,
 	},
+	"mockcoin": {
+		"usd": 25.72,
+		"eur": 23.74,
+		"jpy": 3760.0,
+		"cny": 185.9,
+		"gbp": 20.57,
+	},
 }

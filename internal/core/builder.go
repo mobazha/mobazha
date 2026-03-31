@@ -792,7 +792,21 @@ func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creation
 		} else {
 			// 其他钱包使用 bip44Key
 			if !wallet.WalletExists() {
-				def, err := models.CurrencyDefinitions.Lookup(chain.String())
+				canonicalNative := iwallet.CoinType("")
+				if chain == iwallet.ChainMock {
+					// ChainMock is test-only and intentionally outside canonical asset registry.
+					canonicalNative = iwallet.CtMock
+				} else {
+					canonicalNative, err = iwallet.RequireCanonicalNativeCoinType(chain)
+					if err != nil {
+						return err
+					}
+				}
+				pricingCode, err := canonicalNative.PricingCurrencyCode()
+				if err != nil {
+					return err
+				}
+				def, err := models.CurrencyDefinitions.Lookup(pricingCode)
 				if err != nil {
 					return err
 				}

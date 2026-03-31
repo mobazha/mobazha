@@ -16,6 +16,12 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
+const (
+	// testMockCurrencyCode is kept for internal mock-chain flows.
+	testMockCurrencyCode = "MCK"
+	testMockCurrencyUSD  = 25.72
+)
+
 // usdPeggedCurrencyCodes lists currencies that should be treated as USD-pegged
 // by secondary providers (for example Binance USDT quotes).
 // Built from PricingMeta in assetid registry.
@@ -47,6 +53,8 @@ func buildCoinGeckoIDMap() map[string][]string {
 		}
 		add(priceID, def.Code)
 	}
+	// Keep test currency MCK available in mock exchange-rate flows.
+	add("mockcoin", testMockCurrencyCode)
 
 	result := make(map[string][]string, len(byID))
 	for cgID, set := range byID {
@@ -210,6 +218,12 @@ func (c *coinGeckoProvider) buildUSDPriceMap() map[string]float64 {
 					prices[upperCode] = btcUSD / btcFiat
 				}
 			}
+		}
+	}
+
+	if _, exists := prices[testMockCurrencyCode]; !exists {
+		if _, defined := models.CurrencyDefinitions[testMockCurrencyCode]; defined {
+			prices[testMockCurrencyCode] = testMockCurrencyUSD
 		}
 	}
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/ipfs/go-cid"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -642,6 +643,35 @@ func (g *Gateway) handleGETMatrixChatPresence(w http.ResponseWriter, r *http.Req
 	responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "presence not yet implemented")
 }
 
+func parseMatrixAvatarCID(avatarRef string) (cid.Cid, error) {
+	ref := strings.TrimSpace(avatarRef)
+	if ref == "" {
+		return cid.Cid{}, errors.New("empty avatar reference")
+	}
+	if parsed, err := cid.Decode(ref); err == nil {
+		return parsed, nil
+	}
+
+	parts := strings.FieldsFunc(ref, func(r rune) bool {
+		switch r {
+		case '/', '?', '#', ':', '&':
+			return true
+		default:
+			return false
+		}
+	})
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		if parsed, err := cid.Decode(part); err == nil {
+			return parsed, nil
+		}
+	}
+
+	return cid.Cid{}, errors.New("invalid avatar reference")
+}
+
 func (g *Gateway) handlePOSTMatrixChatPresence(w http.ResponseWriter, r *http.Request) {
 	svc := getMatrixChatService(r)
 	if svc == nil {
@@ -650,18 +680,51 @@ func (g *Gateway) handlePOSTMatrixChatPresence(w http.ResponseWriter, r *http.Re
 	}
 	var req struct {
 		DisplayName string `json:"displayName"`
+		AvatarHash  string `json:"avatarHash,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid request body")
 		return
 	}
-	if req.DisplayName == "" {
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	req.AvatarHash = strings.TrimSpace(req.AvatarHash)
+	if req.DisplayName == "" && req.AvatarHash == "" {
 		responsePkg.NoContent(w)
 		return
 	}
-	if err := svc.SetDisplayName(r.Context(), req.DisplayName); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
-		return
+
+	if req.DisplayName != "" {
+		if err := svc.SetDisplayName(r.Context(), req.DisplayName); err != nil {
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+			return
+		}
+	}
+
+	if req.AvatarHash != "" {
+		avatarCID, err := parseMatrixAvatarCID(req.AvatarHash)
+		if err != nil {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid avatarHash")
+			return
+		}
+
+		mediaSvc := getMediaService(r)
+		if mediaSvc == nil {
+			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "media service not available")
+			return
+		}
+
+		reader, contentType, err := mediaSvc.GetMedia(r.Context(), avatarCID)
+		if err != nil {
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load avatar media")
+			return
+		}
+		if contentType == "" {
+			contentType = "image/jpeg"
+		}
+		if err := svc.SetAvatar(r.Context(), reader, contentType); err != nil {
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+			return
+		}
 	}
 	responsePkg.NoContent(w)
 }

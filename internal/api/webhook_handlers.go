@@ -48,7 +48,7 @@ func (g *Gateway) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := engine.CheckEndpointQuota(); err != nil {
-		response.Error(w, http.StatusConflict, response.CodeConflict, err.Error())
+		response.Error(w, http.StatusConflict, response.CodeConflict, "Maximum number of webhook endpoints reached")
 		return
 	}
 

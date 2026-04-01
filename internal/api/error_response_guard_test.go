@@ -10,16 +10,22 @@ import (
 	"testing"
 )
 
-// TestErrorResponseGuard_FiatHandlers ensures fiat handler files never pass
-// raw err.Error() into response.Error / responsePkg.Error calls that return
-// INTERNAL_ERROR or PROVIDER_ERROR codes. JSON decode BAD_REQUEST errors are
-// allowed because they only contain safe parsing details.
+// TestErrorResponseGuard ensures handler files never pass raw err.Error()
+// into response.Error / responsePkg.Error calls that return non-safe error
+// codes (INTERNAL_ERROR, PROVIDER_ERROR, CONFLICT, etc.).
 //
-// This guard prevents accidental exposure of third-party API error messages
-// (Stripe, PayPal) to end users.
-func TestErrorResponseGuard_FiatHandlers(t *testing.T) {
+// ManagedEscrow codes (CodeBadRequest, CodeValidation, CodeNotFound, CodeUnauthorized,
+// CodeNotImplemented, CodeConflict) are allowed because their messages are
+// either user-supplied validation details or well-defined sentinel strings.
+//
+// This guard prevents accidental exposure of internal error details, database
+// errors, or third-party API messages to end users.
+func TestErrorResponseGuard(t *testing.T) {
 	guardedFiles := []string{
 		"fiat_handlers.go",
+		"shipping_handlers.go",
+		"webhook_handlers.go",
+		"shared_router.go",
 	}
 
 	for _, filename := range guardedFiles {
@@ -56,6 +62,7 @@ func scanForRawErrorResponses(t *testing.T, filename string) []string {
 		"CodeNotFound",
 		"CodeUnauthorized",
 		"CodeNotImplemented",
+		"CodeConflict",
 	}
 
 	var violations []string

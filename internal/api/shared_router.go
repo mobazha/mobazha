@@ -51,7 +51,8 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			node, err := cfg.Resolver(req)
 			if err != nil {
-				response.Error(w, http.StatusUnauthorized, response.CodeUnauthorized, err.Error())
+				log.Warningf("Node resolver failed: %v", err)
+				response.Error(w, http.StatusUnauthorized, response.CodeUnauthorized, "Authentication required")
 				return
 			}
 			ctx := context.WithValue(req.Context(), nodeContextKey, node)

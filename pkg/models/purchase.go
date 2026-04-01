@@ -164,6 +164,9 @@ type PaymentData struct {
 
 	// 部分支付信息（用于多次支付场景）
 	RemainingAmount uint64 `json:"remainingAmount,omitempty,string"` // 剩余待支付金额
+
+	// 前端传入的区块高度（EVM/SOL AppKit 成功后已知，用于买家端乐观验证）
+	BlockHeight uint64 `json:"blockHeight,omitempty"`
 }
 
 // EnsureTransactionFields populates TransactionID and FromID on PaymentData
@@ -243,6 +246,7 @@ func (p *PaymentData) BuildTransaction() (iwallet.Transaction, error) {
 		},
 		Value:     iwallet.NewAmount(p.Amount),
 		Timestamp: p.Timestamp,
+		Height:    p.BlockHeight,
 	}
 	return tx, nil
 }

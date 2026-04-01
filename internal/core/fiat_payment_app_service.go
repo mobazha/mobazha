@@ -546,7 +546,7 @@ func (s *FiatPaymentAppService) getActiveAccount(providerID string) (*models.Rec
 func (s *FiatPaymentAppService) getActiveAccountLegacy() (*models.ReceivingAccount, error) {
 	var record models.ReceivingAccount
 	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("chain_type = ? AND is_active = ?", iwallet.ChainStripe, true).First(&record).Error
+		return tx.Read().Where("chain_type = ? AND is_active = ?", iwallet.ChainFiat, true).First(&record).Error
 	})
 	if err != nil {
 		return nil, err

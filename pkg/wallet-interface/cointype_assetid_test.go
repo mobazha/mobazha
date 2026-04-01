@@ -178,8 +178,8 @@ func TestRequireCanonicalNativeCoinType(t *testing.T) {
 		t.Fatalf("RequireCanonicalNativeCoinType(ETH)=%s, want crypto:eip155:1:native", eth)
 	}
 
-	if _, err := RequireCanonicalNativeCoinType(ChainStripe); err == nil {
-		t.Fatal("expected error for non-canonical chain Stripe")
+	if _, err := RequireCanonicalNativeCoinType(ChainFiat); err == nil {
+		t.Fatal("expected error for non-canonical chain Fiat")
 	}
 }
 
@@ -194,9 +194,9 @@ func TestCoinInfo_NativeCoinType_PrefersCanonical(t *testing.T) {
 		t.Fatalf("NativeCoinType()=%s, want crypto:eip155:1030:native", got)
 	}
 
-	unknown := CoinInfo{Chain: ChainStripe, IsNative: true}
-	if got := unknown.NativeCoinType(); got != CoinType(ChainStripe) {
-		t.Fatalf("NativeCoinType()=%s, want %s", got, ChainStripe)
+	unknown := CoinInfo{Chain: ChainFiat, IsNative: true}
+	if got := unknown.NativeCoinType(); got != CoinType(ChainFiat) {
+		t.Fatalf("NativeCoinType()=%s, want %s", got, ChainFiat)
 	}
 
 	unsupported := CoinInfo{Chain: ChainType("UNKNOWN"), IsNative: true}

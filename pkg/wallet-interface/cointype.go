@@ -27,7 +27,7 @@ const (
 	ChainSolana      ChainType = "SOL"
 	ChainTRON        ChainType = "TRX"
 
-	ChainStripe ChainType = "Stripe"
+	ChainFiat ChainType = "Fiat"
 )
 
 func (chaintype ChainType) String() string {
@@ -47,7 +47,7 @@ func GetAllSupportedChainTypes() []ChainType {
 		ChainConflux,
 		ChainSolana,
 		ChainTRON,
-		ChainStripe,
+		ChainFiat,
 	}
 }
 
@@ -56,7 +56,7 @@ type CoinType string
 
 const (
 	CtMock   CoinType = CoinType(ChainMock)
-	CtStripe CoinType = CoinType(ChainStripe)
+	CtFiat CoinType = CoinType(ChainFiat)
 
 	// 测试用的 CoinType
 	CtTestCoin CoinType = "TESTCOIN"
@@ -184,7 +184,7 @@ func (ct CoinInfo) NativeCoinType() CoinType {
 	}
 
 	// Non-crypto chains/test chains are intentionally non-canonical.
-	if ct.Chain == ChainStripe || ct.Chain == ChainMock {
+	if ct.Chain == ChainFiat || ct.Chain == ChainMock {
 		return CoinType(ct.Chain)
 	}
 
@@ -211,19 +211,19 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 		return CtMockInfo, nil
 	}
 
-	if normalized == CtStripe {
+	if normalized == CtFiat {
 		return CoinInfo{
-			Chain:       ChainStripe,
-			Symbol:      "Stripe",
+			Chain:       ChainFiat,
+			Symbol:      "Fiat",
 			IsNative:    true,
 			Decimals:    0,
-			Description: "Stripe",
+			Description: "Fiat",
 		}, nil
 	}
 
 	if normalized.IsFiatPayment() {
 		return CoinInfo{
-			Chain:       ChainStripe,
+			Chain:       ChainFiat,
 			Symbol:      strings.ToUpper(normalized.FiatBaseCurrency()),
 			IsNative:    true,
 			Decimals:    0,

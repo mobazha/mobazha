@@ -84,8 +84,8 @@ func TestCoinInfoFromCoinType_FiatCoinInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CoinInfoFromCoinType(fiat:stripe:usd): %v", err)
 	}
-	if info.Chain != ChainStripe {
-		t.Fatalf("chain = %s, want %s", info.Chain, ChainStripe)
+	if info.Chain != ChainFiat {
+		t.Fatalf("chain = %s, want %s", info.Chain, ChainFiat)
 	}
 	if info.Symbol != "USD" {
 		t.Fatalf("symbol = %s, want USD", info.Symbol)
@@ -94,11 +94,11 @@ func TestCoinInfoFromCoinType_FiatCoinInfo(t *testing.T) {
 		t.Fatalf("IsNative = false, want true")
 	}
 
-	stripeInfo, err := CoinInfoFromCoinType(CtStripe)
+	fiatInfo, err := CoinInfoFromCoinType(CtFiat)
 	if err != nil {
-		t.Fatalf("CoinInfoFromCoinType(Stripe): %v", err)
+		t.Fatalf("CoinInfoFromCoinType(Fiat): %v", err)
 	}
-	if stripeInfo.Symbol != "Stripe" {
-		t.Fatalf("symbol = %s, want Stripe", stripeInfo.Symbol)
+	if fiatInfo.Symbol != "Fiat" {
+		t.Fatalf("symbol = %s, want Fiat", fiatInfo.Symbol)
 	}
 }

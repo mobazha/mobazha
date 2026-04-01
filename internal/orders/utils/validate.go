@@ -154,7 +154,7 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 		return errors.New("payment amount not valid")
 	}
 
-	if wal.CoinCategory() == iwallet.CoinCategoryStripe {
+	if wal.CoinCategory() == iwallet.CoinCategoryFiat {
 		return validateFiatPayment(order, paymentSent)
 	}
 

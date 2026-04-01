@@ -348,13 +348,13 @@ func TestDispatchCancelablePayment_UnknownCoinSafety(t *testing.T) {
 	}
 }
 
-// ── Stripe: should NOT reach cancelable dispatch ────────────────────────
-// Stripe payments use webhook-based confirmation, not the cancelable payment
+// ── Fiat: should NOT reach cancelable dispatch ──────────────────────────
+// Fiat payments use webhook-based confirmation, not the cancelable payment
 // pipeline. This test documents this intentional design.
 
-func TestDispatchCancelablePayment_StripeIsNotDispatched(t *testing.T) {
-	cat := classifyCoin(iwallet.CtStripe)
+func TestDispatchCancelablePayment_FiatIsNotDispatched(t *testing.T) {
+	cat := classifyCoin(iwallet.CtFiat)
 	if cat != categoryUnknown {
-		t.Errorf("Stripe should be 'unknown' in cancelable dispatch (uses webhook flow), got %s", cat)
+		t.Errorf("Fiat should be 'unknown' in cancelable dispatch (uses webhook flow), got %s", cat)
 	}
 }

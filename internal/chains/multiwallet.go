@@ -11,7 +11,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
 	"github.com/mobazha/mobazha3.0/internal/chains/evm"
-	"github.com/mobazha/mobazha3.0/internal/chains/fiat/stripe"
+	"github.com/mobazha/mobazha3.0/internal/chains/fiat/shim"
 	"github.com/mobazha/mobazha3.0/internal/chains/solana"
 	tronWal "github.com/mobazha/mobazha3.0/internal/chains/tron"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
@@ -175,8 +175,8 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 				return nil, err
 			}
 			multiwallet[chain] = w
-		case iwallet.ChainStripe:
-			w, err := stripe.NewStripeWallet(&base.WalletConfig{
+		case iwallet.ChainFiat:
+			w, err := shim.NewFiatWalletShim(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
 				DB:        db,
@@ -236,7 +236,7 @@ func (w *Multiwallet) WalletForCurrencyCode(currencyCode string) (iwallet.Wallet
 
 	chainType := coinInfo.Chain
 	if coinType.IsFiatPayment() {
-		chainType = iwallet.ChainStripe
+		chainType = iwallet.ChainFiat
 	}
 
 	if wallet, ok := (*w)[chainType]; ok {

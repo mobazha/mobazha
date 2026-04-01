@@ -785,7 +785,7 @@ func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creation
 			if err := solWallet.InitializeWithKey(solPrivKey, creationDate); err != nil {
 				return err
 			}
-		} else if chain == iwallet.ChainStripe {
+		} else if chain == iwallet.ChainFiat {
 			// Do nothing
 		} else {
 			// 其他钱包使用 bip44Key

@@ -33,6 +33,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	_, err = parser.AddCommand("doctor",
+		"diagnose the Mobazha node environment",
+		"The doctor command checks system resources, network connectivity, DNS resolution, Docker status, and node health.",
+		&cmd.Doctor{})
+	if err != nil {
+		log.Fatal(err)
+	}
 	_, err = parser.AddCommand("devnet",
 		"start a local dev net",
 		"The devnet command spins up a local network of three nodes (buyer, vendor, moderator)"+

@@ -1,0 +1,78 @@
+#cloud-config
+# Mobazha Standalone Store — Cloud-Init for VPS Marketplace Images
+#
+# Pre-installs Docker, docker-compose, and Mobazha files.
+# On first boot, the user only needs to:
+#   1. SSH into the server
+#   2. Run: sudo mobazha-setup
+#   - OR -
+#   Run the token install: curl -sSL https://get.mobazha.org/standalone | sudo bash -s -- <token>
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - jq
+  - ca-certificates
+  - gnupg
+  - lsb-release
+
+runcmd:
+  # Install Docker
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable --now docker
+
+  # Install Docker Compose plugin
+  - apt-get install -qq -y docker-compose-plugin
+
+  # Download Mobazha files
+  - mkdir -p /opt/mobazha
+  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.yml -o /opt/mobazha/docker-compose.yml
+  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/.env.example -o /opt/mobazha/.env.example
+  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/install.sh -o /opt/mobazha/install.sh
+  - chmod +x /opt/mobazha/install.sh
+
+  # Create setup wrapper
+  - |
+    cat > /usr/local/bin/mobazha-setup <<'SCRIPT'
+    #!/bin/bash
+    echo "======================================"
+    echo "  Mobazha Standalone Store Setup"
+    echo "======================================"
+    echo ""
+    echo "Choose setup method:"
+    echo "  1) Interactive setup (guided prompts)"
+    echo "  2) Token setup (from Deploy Wizard)"
+    echo ""
+    read -rp "Choice [1]: " choice
+    choice="${choice:-1}"
+    case "$choice" in
+      1) cd /opt/mobazha && bash install.sh ;;
+      2)
+        read -rp "Deploy token: " token
+        cd /opt/mobazha && bash install.sh "$token"
+        ;;
+      *) echo "Invalid choice"; exit 1 ;;
+    esac
+    SCRIPT
+  - chmod +x /usr/local/bin/mobazha-setup
+
+  # Pre-pull the Docker image
+  - docker pull mobazha/standalone:stable || true
+
+  # Set MOTD
+  - |
+    cat > /etc/update-motd.d/99-mobazha <<'MOTD'
+    #!/bin/sh
+    echo ""
+    echo "  ╔══════════════════════════════════════════╗"
+    echo "  ║   Mobazha Standalone Store               ║"
+    echo "  ║                                          ║"
+    echo "  ║   Run 'mobazha-setup' to get started     ║"
+    echo "  ╚══════════════════════════════════════════╝"
+    echo ""
+    MOTD
+  - chmod +x /etc/update-motd.d/99-mobazha
+
+final_message: "Mobazha Standalone Store image ready. Run 'mobazha-setup' to configure."

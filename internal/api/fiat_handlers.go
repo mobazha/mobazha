@@ -80,7 +80,8 @@ func (g *Gateway) handleGETFiatProviders(w http.ResponseWriter, r *http.Request)
 
 	providers, err := svc.EnabledProviders(r.Context())
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to list fiat providers: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load payment providers")
 		return
 	}
 
@@ -221,7 +222,8 @@ func (g *Gateway) handleGETFiatPayment(w http.ResponseWriter, r *http.Request) {
 
 	detail, err := svc.GetPayment(r.Context(), providerID, paymentID)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get fiat payment %s/%s: %v", providerID, paymentID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to retrieve payment details")
 		return
 	}
 
@@ -293,7 +295,8 @@ func (g *Gateway) handleGETFiatProviderStatus(w http.ResponseWriter, r *http.Req
 			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Provider not found")
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get provider status %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to retrieve provider status")
 		return
 	}
 
@@ -319,7 +322,8 @@ func (g *Gateway) handleGETFiatProviderConfig(w http.ResponseWriter, r *http.Req
 			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Provider config not found")
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get provider config %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load provider configuration")
 		return
 	}
 
@@ -354,7 +358,10 @@ func (g *Gateway) handlePUTFiatProviderConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := svc.SaveProviderConfig(providerID, input); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to save provider config %s: %v", providerID, err)
+		responsePkg.ErrorWithDetail(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to save provider configuration",
+			sanitizeProviderError(err))
 		return
 	}
 
@@ -367,7 +374,8 @@ func (g *Gateway) handlePUTFiatProviderConfig(w http.ResponseWriter, r *http.Req
 
 	view, err := svc.GetProviderConfig(providerID)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to reload provider config %s after save: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Configuration saved but failed to reload")
 		return
 	}
 
@@ -439,10 +447,11 @@ func (g *Gateway) handleDELETEFiatProviderConfig(w http.ResponseWriter, r *http.
 
 	if err := svc.DisconnectProvider(r.Context(), providerID); err != nil {
 		if errors.Is(err, contracts.ErrActiveOrdersExist) {
-			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "Cannot disconnect provider with active orders")
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to disconnect provider %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to disconnect provider")
 		return
 	}
 

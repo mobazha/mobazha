@@ -1651,6 +1651,43 @@ func TestOrder_DeriveState_UnverifiedPaymentSent(t *testing.T) {
 	}
 }
 
+func TestOrder_DeriveState_VerifiedPaymentWithoutMatchedTransactions(t *testing.T) {
+	order := &Order{}
+	order.SetRole(RoleVendor)
+	order.MarkPaymentVerified()
+
+	if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{})); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+		Method:        pb.PaymentSent_DIRECT,
+		ToAddress:     "addr-unmatched",
+		TransactionID: "tx-verified",
+		Amount:        "100",
+		Coin:          string(iwallet.CtMock),
+	})); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a transaction that does not pay to PaymentSent.ToAddress. Legacy
+	// address-based aggregation alone would mark this as unfunded.
+	if err := order.PutTransaction(iwallet.Transaction{
+		ID: iwallet.TransactionID("tx-verified"),
+		To: []iwallet.SpendInfo{
+			{
+				Address: iwallet.NewAddress("another-address", iwallet.CtMock),
+				Amount:  iwallet.NewAmount(100),
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := order.DeriveState(); got != OrderState_PENDING {
+		t.Fatalf("verified payment should derive PENDING, got %s", got)
+	}
+}
+
 func TestOrder_CanComplete(t *testing.T) {
 	tests := []struct {
 		setup       func(order *Order) error
@@ -1888,6 +1925,32 @@ func TestOrder_IsFunded(t *testing.T) {
 				})
 			},
 			isFunded: false,
+		},
+		// Verified payment should be treated as funded even if tx outputs don't
+		// match legacy address aggregation.
+		{
+			setup: func(order *Order) error {
+				order.MarkPaymentVerified()
+				if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{})); err != nil {
+					return err
+				}
+				if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "expected-address",
+				})); err != nil {
+					return err
+				}
+				return order.PutTransaction(iwallet.Transaction{
+					ID: "verified-tx",
+					To: []iwallet.SpendInfo{
+						{
+							Address: iwallet.NewAddress("other-address", iwallet.CtMock),
+							Amount:  iwallet.NewAmount("1"),
+						},
+					},
+				})
+			},
+			isFunded: true,
 		},
 	}
 

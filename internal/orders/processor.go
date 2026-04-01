@@ -42,7 +42,7 @@ type DepositVerifyParams struct {
 	TxHash       string
 	Script       string
 	ContractAddr string
-	OrderAmount  string
+	PaymentAmount string
 }
 
 // StateValidator is the interface for validating order state transitions using mobazha-core.

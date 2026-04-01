@@ -114,8 +114,8 @@ func (o *TRONChainOps) VerifyDeposit(ctx context.Context, params payment.Deposit
 	}
 
 	amount := new(big.Int)
-	if params.OrderAmount != "" {
-		amount.SetString(params.OrderAmount, 10)
+	if params.PaymentAmount != "" {
+		amount.SetString(params.PaymentAmount, 10)
 	}
 
 	contractHex, err := tronchain.Base58ToHex(params.ContractAddr)
@@ -142,7 +142,7 @@ func (o *TRONChainOps) ValidatePaymentMessage(params payment.PaymentMessageParam
 		return nil
 	}
 
-	if err := utils.ValidatePaymentAmount(orderOpen.Amount, paymentSent.Amount); err != nil {
+	if err := validatePaymentAmountCrossCurrency(orderOpen, paymentSent); err != nil {
 		return err
 	}
 

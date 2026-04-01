@@ -126,8 +126,8 @@ func (o *EVMChainOps) VerifyDeposit(ctx context.Context, params payment.DepositV
 	}
 
 	amount := new(big.Int)
-	if params.OrderAmount != "" {
-		amount.SetString(params.OrderAmount, 10)
+	if params.PaymentAmount != "" {
+		amount.SetString(params.PaymentAmount, 10)
 	}
 
 	expectedAddr := common.HexToAddress(params.ContractAddr)
@@ -152,7 +152,7 @@ func (o *EVMChainOps) ValidatePaymentMessage(params payment.PaymentMessageParams
 		return nil
 	}
 
-	if err := utils.ValidatePaymentAmount(orderOpen.Amount, paymentSent.Amount); err != nil {
+	if err := validatePaymentAmountCrossCurrency(orderOpen, paymentSent); err != nil {
 		return err
 	}
 

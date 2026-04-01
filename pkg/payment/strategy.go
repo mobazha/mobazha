@@ -338,8 +338,10 @@ type DepositVerifyParams struct {
 	// ContractAddr is the escrow contract address.
 	ContractAddr string
 
-	// OrderAmount is the expected payment amount in minimal units (wei, lamports).
-	OrderAmount string
+	// PaymentAmount is the expected payment amount in the payment coin's
+	// minimal units (wei for ETH, lamports for SOL). This must be in the
+	// same currency as the on-chain deposit — NOT the pricing currency.
+	PaymentAmount string
 }
 
 // ── Payment Message Validation Params ───────────────────────────

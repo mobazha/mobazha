@@ -1161,7 +1161,7 @@ func (g *Gateway) handlePOSTExtendProtection(w http.ResponseWriter, r *http.Requ
 // PaymentTransactionInfo represents a transaction in the payment history
 type PaymentTransactionInfo struct {
 	TxID      string `json:"txid"`
-	Amount    uint64 `json:"amount"`
+	Amount    uint64 `json:"amount,string"`
 	Height    uint64 `json:"height"`
 	Timestamp string `json:"timestamp,omitempty"`
 }
@@ -1169,9 +1169,9 @@ type PaymentTransactionInfo struct {
 // PaymentRemainingResponse - Frontend generates PaymentURI/QRCode using paymentAddress + remainingAmount + coin
 type PaymentRemainingResponse struct {
 	OrderID           string                   `json:"orderID"`
-	ExpectedAmount    uint64                   `json:"expectedAmount"`
-	PaidAmount        uint64                   `json:"paidAmount"`
-	RemainingAmount   uint64                   `json:"remainingAmount"`
+	ExpectedAmount    uint64                   `json:"expectedAmount,string"`
+	PaidAmount        uint64                   `json:"paidAmount,string"`
+	RemainingAmount   uint64                   `json:"remainingAmount,string"`
 	Coin              string                   `json:"coin"`
 	PaymentAddress    string                   `json:"paymentAddress"`
 	Transactions      []PaymentTransactionInfo `json:"transactions,omitempty"`

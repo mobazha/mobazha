@@ -31,7 +31,7 @@ type UTXOPaymentInfoResponse struct {
 	PaymentMethod  pb.PaymentSent_Method `json:"paymentMethod"`  // CANCELABLE/MODERATED
 	PaymentAddress string                `json:"paymentAddress"` // 支付地址
 	PaymentURI     string                `json:"paymentURI"`     // BIP21 URI
-	Amount         uint64                `json:"amount"`         // 金额（satoshi）
+	Amount         uint64                `json:"amount,string"`  // 金额（satoshi）
 	Coin           string                `json:"coin"`           // 币种
 	ChainType      iwallet.ChainType     `json:"chainType"`      // 链类型
 	QRCodeData     string                `json:"qrCodeData"`     // 二维码数据
@@ -43,9 +43,9 @@ type UTXOPaymentInfoResponse struct {
 
 	// 币种切换检测相关字段
 	HasPartialPayment bool   `json:"hasPartialPayment,omitempty"` // 是否已有部分支付
-	PaidAmount        uint64 `json:"paidAmount,omitempty"`        // 已支付金额
-	PaidCoin          string `json:"paidCoin,omitempty"`          // 已支付的币种
-	PaidAddress       string `json:"paidAddress,omitempty"`       // 已支付的地址
+	PaidAmount        uint64 `json:"paidAmount,omitempty,string"`  // 已支付金额
+	PaidCoin          string `json:"paidCoin,omitempty"`           // 已支付的币种
+	PaidAddress       string `json:"paidAddress,omitempty"`        // 已支付的地址
 }
 
 // RWATokenPaymentInfoResponse RWA Token 支付响应

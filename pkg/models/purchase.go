@@ -114,7 +114,7 @@ type PaymentData struct {
 	PayerAddress     string                `json:"payerAddress"`
 	Moderator        string                `json:"moderator"`
 	ModeratorAddress string                `json:"moderatorAddress"`
-	Amount           uint64                `json:"amount"`
+	Amount           uint64                `json:"amount,string"`
 	/*
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])
@@ -158,12 +158,12 @@ type PaymentData struct {
 
 	// 币种切换检测相关字段
 	HasPartialPayment bool   `json:"hasPartialPayment,omitempty"` // 是否已有部分支付（用于币种切换时提示）
-	PaidAmount        uint64 `json:"paidAmount,omitempty"`        // 已支付金额
+	PaidAmount        uint64 `json:"paidAmount,omitempty,string"`  // 已支付金额
 	PaidCoin          string `json:"paidCoin,omitempty"`          // 已支付的币种
 	PaidAddress       string `json:"paidAddress,omitempty"`       // 已支付的地址
 
 	// 部分支付信息（用于多次支付场景）
-	RemainingAmount uint64 `json:"remainingAmount,omitempty"` // 剩余待支付金额
+	RemainingAmount uint64 `json:"remainingAmount,omitempty,string"` // 剩余待支付金额
 }
 
 // EnsureTransactionFields populates TransactionID and FromID on PaymentData

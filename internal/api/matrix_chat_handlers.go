@@ -16,6 +16,11 @@ import (
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
+func matrixChatError(w http.ResponseWriter, err error, operation string) {
+	log.Warningf("Matrix chat %s: %v", operation, err)
+	responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Chat operation failed")
+}
+
 func (g *Gateway) handleGETMatrixChatRooms(w http.ResponseWriter, r *http.Request) {
 	svc := getMatrixChatService(r)
 	if svc == nil {
@@ -24,7 +29,8 @@ func (g *Gateway) handleGETMatrixChatRooms(w http.ResponseWriter, r *http.Reques
 	}
 	rooms, err := svc.GetRooms(r.Context())
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get Matrix chat rooms: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load chat rooms")
 		return
 	}
 	responsePkg.Success(w, rooms)
@@ -39,7 +45,8 @@ func (g *Gateway) handleGETMatrixChatInvites(w http.ResponseWriter, r *http.Requ
 
 	rooms, err := svc.GetInvitedRooms(r.Context())
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get Matrix chat invites: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load chat invitations")
 		return
 	}
 	responsePkg.Success(w, rooms)
@@ -97,7 +104,7 @@ func (g *Gateway) handlePOSTMatrixChatRoom(w http.ResponseWriter, r *http.Reques
 		roomID, err = svc.CreateGroupRoom(r.Context(), req.Name, req.MemberIDs, req.Metadata)
 	}
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "create room")
 		return
 	}
 	responsePkg.Created(w, map[string]string{"roomId": roomID})
@@ -122,7 +129,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomJoin(w http.ResponseWriter, r *http.Re
 	}
 	roomID := mux.Vars(r)["roomID"]
 	if err := svc.JoinRoom(r.Context(), roomID); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "join room")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -136,7 +143,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomLeave(w http.ResponseWriter, r *http.R
 	}
 	roomID := mux.Vars(r)["roomID"]
 	if err := svc.LeaveRoom(r.Context(), roomID); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "leave room")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -181,7 +188,7 @@ func (g *Gateway) handleGETMatrixChatRoomMessages(w http.ResponseWriter, r *http
 
 	messages, nextToken, err := svc.GetMessages(r.Context(), roomID, limit, token, dir)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "get messages")
 		return
 	}
 	responsePkg.Success(w, map[string]interface{}{
@@ -211,7 +218,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomMessage(w http.ResponseWriter, r *http
 
 	eventID, err := svc.SendMessage(r.Context(), roomID, req.Body)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "send message")
 		return
 	}
 	responsePkg.Created(w, map[string]string{"eventId": eventID})
@@ -239,7 +246,7 @@ func (g *Gateway) handlePUTMatrixChatRoomMessage(w http.ResponseWriter, r *http.
 	}
 
 	if err := svc.EditMessage(r.Context(), roomID, eventID, req.Body); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "edit message")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -256,7 +263,7 @@ func (g *Gateway) handleDELETEMatrixChatRoomMessage(w http.ResponseWriter, r *ht
 	eventID := vars["eventID"]
 
 	if err := svc.RedactMessage(r.Context(), roomID, eventID); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "redact message")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -286,7 +293,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomReaction(w http.ResponseWriter, r *htt
 
 	reactionEventID, err := svc.SendReaction(r.Context(), roomID, eventID, req.Key)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "send reaction")
 		return
 	}
 	responsePkg.Created(w, map[string]string{"eventId": reactionEventID})
@@ -308,7 +315,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomTyping(w http.ResponseWriter, r *http.
 	}
 
 	if err := svc.SendTyping(r.Context(), roomID, req.Typing); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "send typing")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -334,7 +341,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomRead(w http.ResponseWriter, r *http.Re
 	}
 
 	if err := svc.MarkAsRead(r.Context(), roomID, req.EventID); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "mark as read")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -349,7 +356,7 @@ func (g *Gateway) handleGETMatrixChatRoomMembers(w http.ResponseWriter, r *http.
 	roomID := mux.Vars(r)["roomID"]
 	room, err := svc.GetRoom(r.Context(), roomID)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "get room members")
 		return
 	}
 	responsePkg.Success(w, room.Members)
@@ -375,7 +382,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomInvite(w http.ResponseWriter, r *http.
 	}
 
 	if err := svc.InviteToRoom(r.Context(), roomID, req.UserID); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "invite to room")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -401,7 +408,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomKick(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if err := svc.KickUser(r.Context(), roomID, req.UserID, req.Reason); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "kick user")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -416,7 +423,7 @@ func (g *Gateway) handleGETMatrixChatRoomSettings(w http.ResponseWriter, r *http
 	roomID := mux.Vars(r)["roomID"]
 	room, err := svc.GetRoom(r.Context(), roomID)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "get room settings")
 		return
 	}
 	responsePkg.Success(w, map[string]interface{}{
@@ -446,13 +453,13 @@ func (g *Gateway) handlePUTMatrixChatRoomSettings(w http.ResponseWriter, r *http
 	}
 	if req.Name != "" {
 		if err := svc.SetRoomName(r.Context(), roomID, req.Name); err != nil {
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+			matrixChatError(w, err, "set room name")
 			return
 		}
 	}
 	if req.Topic != nil {
 		if err := svc.SetRoomTopic(r.Context(), roomID, *req.Topic); err != nil {
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+			matrixChatError(w, err, "set room topic")
 			return
 		}
 	}
@@ -483,7 +490,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomAvatar(w http.ResponseWriter, r *http.
 		contentType = "application/octet-stream"
 	}
 	if err := svc.SetRoomAvatar(r.Context(), roomID, file, contentType); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "set room avatar")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -520,7 +527,7 @@ func (g *Gateway) handlePOSTMatrixChatMediaUpload(w http.ResponseWriter, r *http
 
 	eventID, err := svc.SendMedia(r.Context(), roomID, file, header.Filename, header.Size, contentType)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "upload media")
 		return
 	}
 	responsePkg.Created(w, map[string]string{"eventId": eventID})
@@ -547,7 +554,7 @@ func (g *Gateway) handleGETMatrixChatMediaDownload(w http.ResponseWriter, r *htt
 
 	reader, contentType, size, err := svc.DownloadMedia(r.Context(), serverName, mediaID)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "download media")
 		return
 	}
 	defer reader.Close()
@@ -601,7 +608,7 @@ func (g *Gateway) handlePOSTMatrixChatUserBlock(w http.ResponseWriter, r *http.R
 		return
 	}
 	if err := svc.BlockUser(r.Context(), userID); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "block user")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -619,7 +626,7 @@ func (g *Gateway) handleDELETEMatrixChatUserBlock(w http.ResponseWriter, r *http
 		return
 	}
 	if err := svc.UnblockUser(r.Context(), userID); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "unblock user")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -633,7 +640,7 @@ func (g *Gateway) handleGETMatrixChatBlockedUsers(w http.ResponseWriter, r *http
 	}
 	users, err := svc.GetBlockedUsers(r.Context())
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "get blocked users")
 		return
 	}
 	responsePkg.Success(w, users)
@@ -695,7 +702,7 @@ func (g *Gateway) handlePOSTMatrixChatPresence(w http.ResponseWriter, r *http.Re
 
 	if req.DisplayName != "" {
 		if err := svc.SetDisplayName(r.Context(), req.DisplayName); err != nil {
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+			matrixChatError(w, err, "set display name")
 			return
 		}
 	}
@@ -715,14 +722,14 @@ func (g *Gateway) handlePOSTMatrixChatPresence(w http.ResponseWriter, r *http.Re
 
 		reader, contentType, err := mediaSvc.GetMedia(r.Context(), avatarCID)
 		if err != nil {
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load avatar media")
+			matrixChatError(w, err, "load avatar media")
 			return
 		}
 		if contentType == "" {
 			contentType = "image/jpeg"
 		}
 		if err := svc.SetAvatar(r.Context(), reader, contentType); err != nil {
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+			matrixChatError(w, err, "set avatar")
 			return
 		}
 	}
@@ -737,7 +744,7 @@ func (g *Gateway) handleGETMatrixChatSettings(w http.ResponseWriter, r *http.Req
 	}
 	settings, err := svc.GetChatSettings(r.Context())
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "get chat settings")
 		return
 	}
 	responsePkg.Success(w, settings)
@@ -809,7 +816,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationRequest(w http.ResponseWriter,
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "start verification")
 		return
 	}
 	responsePkg.Created(w, map[string]string{"transactionId": txnID})
@@ -831,7 +838,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationAccept(w http.ResponseWriter, 
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "accept verification")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -853,7 +860,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationStartSAS(w http.ResponseWriter
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "start SAS")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -875,7 +882,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationConfirm(w http.ResponseWriter,
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "confirm SAS")
 		return
 	}
 	responsePkg.NoContent(w)
@@ -897,7 +904,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationCancel(w http.ResponseWriter, 
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		matrixChatError(w, err, "cancel verification")
 		return
 	}
 	responsePkg.NoContent(w)

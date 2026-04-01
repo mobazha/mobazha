@@ -81,7 +81,8 @@ func (g *Gateway) handleListDiscounts(w http.ResponseWriter, r *http.Request) {
 
 	discounts, total, err := svc.ListDiscounts(r.Context(), filter)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		log.Warningf("Failed to list discounts: %v", err)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Failed to load discounts")
 		return
 	}
 	response.List(w, discounts, response.Meta{
@@ -210,7 +211,8 @@ func (g *Gateway) handleListDiscountCodes(w http.ResponseWriter, r *http.Request
 	discountID := mux.Vars(r)["discountID"]
 	codes, err := svc.ListCodes(r.Context(), discountID)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		log.Warningf("Failed to list discount codes for %s: %v", discountID, err)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Failed to load discount codes")
 		return
 	}
 	response.Success(w, codes)
@@ -244,7 +246,8 @@ func (g *Gateway) handleListDiscountRedemptions(w http.ResponseWriter, r *http.R
 
 	redemptions, total, err := svc.ListRedemptions(r.Context(), discountID, page, pageSize)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		log.Warningf("Failed to list redemptions for %s: %v", discountID, err)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Failed to load redemption history")
 		return
 	}
 	response.List(w, redemptions, response.Meta{
@@ -310,7 +313,8 @@ func (g *Gateway) handleGetApplicableDiscounts(w http.ResponseWriter, r *http.Re
 
 	discounts, err := svc.GetApplicableDiscounts(r.Context(), productIDs)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		log.Warningf("Failed to get applicable discounts: %v", err)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Failed to load applicable discounts")
 		return
 	}
 
@@ -362,7 +366,8 @@ func (g *Gateway) handleCalculateDiscounts(w http.ResponseWriter, r *http.Reques
 
 	result, err := svc.CalculateDiscounts(r.Context(), req)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		log.Warningf("Failed to calculate discounts: %v", err)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Failed to calculate discounts")
 		return
 	}
 

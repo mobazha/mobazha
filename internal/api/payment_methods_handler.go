@@ -14,7 +14,8 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 	walletSvc := getWalletService(r)
 	accounts, err := walletSvc.GetReceivingAccounts()
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get receiving accounts: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load payment methods")
 		return
 	}
 

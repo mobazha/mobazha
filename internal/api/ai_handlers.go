@@ -142,7 +142,8 @@ func (g *Gateway) handlePOSTAITestConnection(w http.ResponseWriter, r *http.Requ
 
 	err := proxy.TestConnection(cfg)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		aiLog.Warningf("AI connection test failed: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "AI connection test failed")
 		return
 	}
 	responsePkg.Success(w, map[string]interface{}{"success": true})
@@ -187,8 +188,8 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 
 	result, err := proxy.Generate(cfg, req)
 	if err != nil {
-		aiLog.Errorf("AI generate failed: %s", err)
-		responsePkg.Error(w, http.StatusBadGateway, responsePkg.HttpStatusToCode(http.StatusBadGateway), err.Error())
+		aiLog.Warningf("AI generate failed: %v", err)
+		responsePkg.Error(w, http.StatusBadGateway, responsePkg.HttpStatusToCode(http.StatusBadGateway), "AI generation failed")
 		return
 	}
 

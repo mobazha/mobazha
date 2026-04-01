@@ -23,7 +23,8 @@ func (g *Gateway) handleGETWishlists(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := svc.GetWishlist()
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get wishlist: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load wishlist")
 		return
 	}
 	if items == nil {
@@ -71,7 +72,8 @@ func (g *Gateway) handlePOSTWishlist(w http.ResponseWriter, r *http.Request) {
 			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 			return
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to add to wishlist: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to add to wishlist")
 		return
 	}
 	responsePkg.Created(w, created)
@@ -93,7 +95,8 @@ func (g *Gateway) handleDELETEWishlist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := svc.RemoveFromWishlist(peerID, slug); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to remove from wishlist: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to remove from wishlist")
 		return
 	}
 	responsePkg.NoContent(w)

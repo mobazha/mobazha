@@ -26,6 +26,12 @@ func TestErrorResponseGuard(t *testing.T) {
 		"shipping_handlers.go",
 		"webhook_handlers.go",
 		"shared_router.go",
+		"discount_handlers.go",
+		"escrow_handler.go",
+		"ai_handlers.go",
+		"matrix_chat_handlers.go",
+		"payment_methods_handler.go",
+		"wishlist_handlers.go",
 	}
 
 	for _, filename := range guardedFiles {

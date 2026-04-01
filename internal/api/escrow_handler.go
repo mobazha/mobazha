@@ -96,18 +96,21 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 
 	order, err := orderSvc.GetOrder(params.OrderID)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get order %s for payment instructions: %v", params.OrderID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Order not found or unavailable")
 		return
 	}
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to parse order open message for %s: %v", params.OrderID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load order details")
 		return
 	}
 	if len(orderOpen.Listings) > 0 && orderOpen.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
 		coinInfo, err := params.CoinType.CoinInfo()
 		if err != nil {
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+			log.Warningf("Invalid coin type %s for RWA token payment: %v", params.CoinType, err)
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Unsupported coin type")
 			return
 		}
 		g.handleGetRWATokenPaymentInfo(w, r, orderSvc, params, coinInfo)
@@ -149,8 +152,8 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 			ci.ExchangeRates(),
 		)
 		if err != nil {
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
-				fmt.Sprintf("convert payment amount: %v", err))
+			log.Warningf("Failed to convert payment amount from %s to %s: %v", pricingCoin, paymentCoinCode, err)
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to convert payment amount")
 			return
 		}
 		params.Amount = converted.Uint64()
@@ -175,7 +178,8 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 				}
 			}
 		}
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to generate payment instructions for order %s: %v", params.OrderID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to generate payment instructions")
 		return
 	}
 
@@ -185,7 +189,8 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	case payment.PaymentModelClientSigned:
 		g.formatClientSignedPaymentResponse(w, result)
 	default:
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, fmt.Sprintf("unsupported payment model: %s", result.PaymentModel))
+		log.Warningf("Unsupported payment model %s for order %s", result.PaymentModel, params.OrderID)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Unsupported payment configuration")
 	}
 }
 
@@ -202,7 +207,8 @@ func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Re
 
 	orderInfo, err := orderSvc.GetOrderInfo(models.OrderID(params.OrderID), params.CoinType)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get RWA order info for %s: %v", params.OrderID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load order information")
 		return
 	}
 
@@ -223,13 +229,15 @@ func (g *Gateway) formatMonitoredPaymentResponse(w http.ResponseWriter, params m
 
 	coinInfo, err := params.CoinType.CoinInfo()
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Failed to get coin info for %s: %v", params.CoinType, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to process coin type")
 		return
 	}
 
 	scriptPubKey, err := hex.DecodeString(paymentData.Script)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, fmt.Sprintf("Failed to decode script: %v", err))
+		log.Warningf("Failed to decode payment script: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to process payment script")
 		return
 	}
 

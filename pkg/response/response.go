@@ -26,6 +26,8 @@ type Meta struct {
 type APIError struct {
 	Code    string       `json:"code"`
 	Message string       `json:"message"`
+	Detail  string       `json:"detail,omitempty"`
+	TraceID string       `json:"traceID,omitempty"`
 	Details []FieldError `json:"details,omitempty"`
 }
 
@@ -45,6 +47,8 @@ const (
 	CodeNotImplemented = "NOT_IMPLEMENTED"
 	CodeServiceUnavail  = "SERVICE_UNAVAILABLE"
 	CodePayloadTooLarge = "PAYLOAD_TOO_LARGE"
+	CodeProviderError   = "PROVIDER_ERROR"
+	CodeRateLimited     = "RATE_LIMITED"
 )
 
 // Success writes 200 + {"data": T}.
@@ -78,6 +82,22 @@ func Error(w http.ResponseWriter, status int, code, message string) {
 		Error: APIError{
 			Code:    code,
 			Message: message,
+		},
+	})
+}
+
+// ErrorWithDetail writes a structured error with a technical detail summary
+// and trace ID for diagnostics. The detail field should contain a sanitized
+// technical description (never include API keys, tokens, or secrets).
+// The traceID is automatically extracted from the X-Request-ID response header.
+func ErrorWithDetail(w http.ResponseWriter, status int, code, message, detail string) {
+	traceID := w.Header().Get("X-Request-ID")
+	writeJSON(w, status, ErrorEnvelope{
+		Error: APIError{
+			Code:    code,
+			Message: message,
+			Detail:  detail,
+			TraceID: traceID,
 		},
 	})
 }
@@ -127,7 +147,8 @@ func PanicRecovery(next http.Handler) http.Handler {
 				reqID := w.Header().Get("X-Request-ID")
 				fmt.Printf("[PANIC] request_id=%s method=%s path=%s err=%v\n%s\n",
 					reqID, r.Method, r.URL.Path, err, debug.Stack())
-				Error(w, http.StatusInternalServerError, CodeInternalError, "An unexpected error occurred")
+				ErrorWithDetail(w, http.StatusInternalServerError, CodeInternalError,
+				"An unexpected error occurred", fmt.Sprintf("panic: %v", err))
 			}
 		}()
 		next.ServeHTTP(w, r)

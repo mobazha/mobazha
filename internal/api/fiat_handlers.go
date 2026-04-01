@@ -15,6 +15,30 @@ import (
 
 const maxWebhookBodySize = 512 * 1024 // 512 KB
 
+// sanitizeProviderError strips API keys, tokens and URLs with credentials
+// from provider error messages to produce a safe detail string.
+func sanitizeProviderError(err error) string {
+	msg := err.Error()
+	for _, prefix := range []string{"sk_live_", "sk_test_", "rk_live_", "rk_test_", "pk_live_", "pk_test_"} {
+		searchFrom := 0
+		for searchFrom < len(msg) {
+			idx := strings.Index(msg[searchFrom:], prefix)
+			if idx < 0 {
+				break
+			}
+			idx += searchFrom
+			end := idx + len(prefix)
+			for end < len(msg) && msg[end] != ' ' && msg[end] != '"' && msg[end] != '\'' && msg[end] != ',' {
+				end++
+			}
+			replacement := prefix + "***"
+			msg = msg[:idx] + replacement + msg[end:]
+			searchFrom = idx + len(replacement)
+		}
+	}
+	return msg
+}
+
 func requestWebhookURL(r *http.Request, providerID string) string {
 	scheme := "https"
 	if r.TLS == nil {
@@ -104,7 +128,10 @@ func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) 
 
 	session, err := svc.CreatePayment(r.Context(), providerID, params)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Fiat payment creation failed for %s: %v", providerID, err)
+		responsePkg.ErrorWithDetail(w, http.StatusInternalServerError, responsePkg.CodeProviderError,
+			"Payment creation failed. Please try again.",
+			fmt.Sprintf("%s create payment: %v", providerID, sanitizeProviderError(err)))
 		return
 	}
 
@@ -127,7 +154,10 @@ func (g *Gateway) handlePOSTFiatCapture(w http.ResponseWriter, r *http.Request) 
 
 	result, err := svc.CapturePayment(r.Context(), providerID, sessionID)
 	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		log.Warningf("Fiat capture failed for %s/%s: %v", providerID, sessionID, err)
+		responsePkg.ErrorWithDetail(w, http.StatusInternalServerError, responsePkg.CodeProviderError,
+			"Payment capture failed. Please try again.",
+			fmt.Sprintf("%s capture: %v", providerID, sanitizeProviderError(err)))
 		return
 	}
 
@@ -360,7 +390,10 @@ func (g *Gateway) handlePOSTFiatSetupWebhook(w http.ResponseWriter, r *http.Requ
 	webhookURL := requestWebhookURL(r, providerID)
 	result, err := svc.SetupWebhook(r.Context(), providerID, webhookURL)
 	if err != nil {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Webhook setup failed: "+err.Error())
+		log.Warningf("Webhook setup failed for %s: %v", providerID, err)
+		responsePkg.ErrorWithDetail(w, http.StatusBadRequest, responsePkg.CodeProviderError,
+			"Webhook auto-configuration failed. Please set up the webhook manually.",
+			fmt.Sprintf("%s webhook setup: %v", providerID, sanitizeProviderError(err)))
 		return
 	}
 
@@ -381,7 +414,10 @@ func (g *Gateway) handlePOSTFiatProviderVerify(w http.ResponseWriter, r *http.Re
 	}
 
 	if err := svc.VerifyProviderConfig(providerID); err != nil {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Provider verification failed: "+err.Error())
+		log.Warningf("Provider verification failed for %s: %v", providerID, err)
+		responsePkg.ErrorWithDetail(w, http.StatusBadRequest, responsePkg.CodeProviderError,
+			"Provider verification failed. Please check your API keys.",
+			fmt.Sprintf("%s verification: %v", providerID, sanitizeProviderError(err)))
 		return
 	}
 

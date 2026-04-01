@@ -184,6 +184,72 @@ func TestHttpStatusToCode(t *testing.T) {
 	}
 }
 
+func TestErrorWithDetail(t *testing.T) {
+	w := httptest.NewRecorder()
+	w.Header().Set("X-Request-ID", "trace-abc-123")
+	ErrorWithDetail(w, http.StatusBadRequest, CodeProviderError,
+		"Webhook auto-configuration failed.",
+		"stripe: Invalid URL: must be publicly accessible")
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+
+	var env ErrorEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if env.Error.Code != CodeProviderError {
+		t.Errorf("expected PROVIDER_ERROR, got %q", env.Error.Code)
+	}
+	if env.Error.Message != "Webhook auto-configuration failed." {
+		t.Errorf("unexpected message: %q", env.Error.Message)
+	}
+	if env.Error.Detail != "stripe: Invalid URL: must be publicly accessible" {
+		t.Errorf("unexpected detail: %q", env.Error.Detail)
+	}
+	if env.Error.TraceID != "trace-abc-123" {
+		t.Errorf("expected traceID trace-abc-123, got %q", env.Error.TraceID)
+	}
+}
+
+func TestErrorWithDetail_NoRequestID(t *testing.T) {
+	w := httptest.NewRecorder()
+	ErrorWithDetail(w, http.StatusInternalServerError, CodeInternalError, "Something went wrong", "db timeout")
+
+	var env ErrorEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if env.Error.TraceID != "" {
+		t.Errorf("expected empty traceID, got %q", env.Error.TraceID)
+	}
+	if env.Error.Detail != "db timeout" {
+		t.Errorf("expected detail 'db timeout', got %q", env.Error.Detail)
+	}
+}
+
+func TestError_OmitsEmptyDetailAndTraceID(t *testing.T) {
+	w := httptest.NewRecorder()
+	Error(w, http.StatusNotFound, CodeNotFound, "resource not found")
+
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	var errObj map[string]interface{}
+	if err := json.Unmarshal(raw["error"], &errObj); err != nil {
+		t.Fatalf("decode error obj: %v", err)
+	}
+	if _, ok := errObj["detail"]; ok {
+		t.Error("expected 'detail' to be omitted for plain Error()")
+	}
+	if _, ok := errObj["traceID"]; ok {
+		t.Error("expected 'traceID' to be omitted for plain Error()")
+	}
+}
+
 func TestPanicRecovery(t *testing.T) {
 	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 )
 
@@ -78,5 +79,53 @@ func TestSanitizeJSON_PreservesSpecialChars(t *testing.T) {
 	}
 	if result["description"] != "vinyl records & turntable accessories" {
 		t.Errorf("description = %q, want %q", result["description"], "vinyl records & turntable accessories")
+	}
+}
+
+func TestSanitizeProviderError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			"no keys",
+			errors.New("connection refused"),
+			"connection refused",
+		},
+		{
+			"stripe live secret key",
+			errors.New(`Invalid API Key provided: sk_live_abc123def456 is not valid`),
+			`Invalid API Key provided: sk_live_*** is not valid`,
+		},
+		{
+			"stripe test key",
+			errors.New(`authentication failed with sk_test_longkeyvalue123`),
+			`authentication failed with sk_test_***`,
+		},
+		{
+			"stripe publishable key",
+			errors.New(`pk_live_pubkey456 is not a secret key`),
+			`pk_live_*** is not a secret key`,
+		},
+		{
+			"multiple keys",
+			errors.New(`sk_test_aaa, pk_test_bbb`),
+			`sk_test_***, pk_test_***`,
+		},
+		{
+			"restricted key",
+			errors.New(`rk_live_restricted123 denied`),
+			`rk_live_*** denied`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeProviderError(tt.err)
+			if got != tt.want {
+				t.Errorf("sanitizeProviderError(%q) = %q, want %q", tt.err, got, tt.want)
+			}
+		})
 	}
 }

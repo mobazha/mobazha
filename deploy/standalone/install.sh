@@ -20,6 +20,7 @@ set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/mobazha}"
 COMPOSE_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.yml"
+COMPOSE_OVERLAY_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.overlay.yml"
 SAAS_BASE_URL="${SAAS_BASE_URL:-https://app.mobazha.org}"
 
 RED='\033[0;31m'
@@ -37,6 +38,8 @@ ADMIN_PASSWORD=""
 SAAS_API_URL=""
 SAAS_PEER_ID=""
 CONNECTIVITY="nat"
+OVERLAY_TYPE=""
+OVERLAY_DOMAIN=""
 
 log()  { echo -e "${GREEN}[mobazha]${NC} $*"; }
 warn() { echo -e "${YELLOW}[mobazha]${NC} $*"; }
@@ -79,6 +82,8 @@ parse_config() {
     ADMIN_PASSWORD=$(echo "$json" | jq -r '.data.adminPassword // empty')
     CONNECTIVITY=$(echo "$json" | jq -r '.data.connectivity // "nat"')
     SAAS_PEER_ID=$(echo "$json" | jq -r '.data.saasPeerID // empty')
+    OVERLAY_TYPE=$(echo "$json" | jq -r '.data.overlayType // empty')
+    OVERLAY_DOMAIN=$(echo "$json" | jq -r '.data.overlayDomain // empty')
 
     if [ -z "$STANDALONE_API_KEY" ]; then
         err "Invalid config response: missing apiKey."
@@ -86,6 +91,9 @@ parse_config() {
     fi
 
     log "Configuration loaded: domain=${STORE_DOMAIN:-<ip-mode>}, connectivity=${CONNECTIVITY}"
+    if [ -n "$OVERLAY_TYPE" ]; then
+        log "Overlay network: type=${OVERLAY_TYPE}, domain=${OVERLAY_DOMAIN:-<auto-detect>}"
+    fi
 }
 
 report_progress() {
@@ -173,11 +181,27 @@ prompt_config() {
     echo "  public  — Store has a public IP/domain (direct HTTPS)"
     echo "  tunnel  — Behind NAT with Cloudflare Tunnel"
     echo "  nat     — Behind NAT, managed via SaaS P2P proxy"
+    echo "  overlay — Privacy network (Lokinet or Tor)"
     read -rp "Connectivity mode [nat]: " CONNECTIVITY
     CONNECTIVITY="${CONNECTIVITY:-nat}"
 
     if [ "$CONNECTIVITY" = "nat" ] || [ "$CONNECTIVITY" = "tunnel" ]; then
         read -rp "SaaS Default Node Peer ID (for remote management): " SAAS_PEER_ID
+        SAAS_PEER_ID="${SAAS_PEER_ID:-}"
+    fi
+
+    if [ "$CONNECTIVITY" = "overlay" ]; then
+        echo ""
+        echo "Overlay network type:"
+        echo "  lokinet — Lokinet SNApp (.loki domain)"
+        echo "  tor     — Tor hidden service (.onion domain)"
+        read -rp "Overlay type [lokinet]: " OVERLAY_TYPE
+        OVERLAY_TYPE="${OVERLAY_TYPE:-lokinet}"
+
+        read -rp "Overlay domain (leave empty to auto-detect): " OVERLAY_DOMAIN
+        OVERLAY_DOMAIN="${OVERLAY_DOMAIN:-}"
+
+        read -rp "SaaS Default Node Peer ID (for TMA buyer access): " SAAS_PEER_ID
         SAAS_PEER_ID="${SAAS_PEER_ID:-}"
     fi
 }
@@ -192,6 +216,8 @@ STANDALONE_API_KEY=${STANDALONE_API_KEY}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 SAAS_PEER_ID=${SAAS_PEER_ID:-}
 CONNECTIVITY=${CONNECTIVITY:-nat}
+OVERLAY_TYPE=${OVERLAY_TYPE:-}
+OVERLAY_DOMAIN=${OVERLAY_DOMAIN:-}
 TAG=stable
 EOF
     chmod 600 .env
@@ -211,27 +237,40 @@ setup_files() {
     curl -sSL "$COMPOSE_URL" -o docker-compose.yml
     log "Downloaded docker-compose.yml"
 
+    if [ -n "$OVERLAY_TYPE" ]; then
+        curl -sSL "$COMPOSE_OVERLAY_URL" -o docker-compose.overlay.yml
+        log "Downloaded docker-compose.overlay.yml (overlay: ${OVERLAY_TYPE})"
+    fi
+
     write_env
     log "Created .env configuration"
 }
 
 # --- Services ---
 
+compose_cmd() {
+    if [ -n "$OVERLAY_TYPE" ] && [ -f docker-compose.overlay.yml ]; then
+        docker compose -f docker-compose.yml -f docker-compose.overlay.yml --profile "$OVERLAY_TYPE" "$@"
+    else
+        docker compose "$@"
+    fi
+}
+
 start_services() {
     log "Pulling images..."
     report_progress "image_pulling" "in_progress"
-    docker compose pull
+    compose_cmd pull
     report_progress "image_pulled" "completed"
 
     log "Starting services..."
     report_progress "services_starting" "in_progress"
-    docker compose up -d
+    compose_cmd up -d
     report_progress "services_started" "completed"
 
     log "Waiting for health check..."
     report_progress "health_check" "in_progress"
     local retries=0
-    while ! docker compose ps --format json 2>/dev/null | grep -q '"healthy"'; do
+    while ! compose_cmd ps --format json 2>/dev/null | grep -q '"healthy"'; do
         retries=$((retries + 1))
         if [ $retries -gt 60 ]; then
             report_progress "health_check" "timeout"
@@ -253,7 +292,9 @@ print_summary() {
     echo -e "${BOLD}════════════════════════════════════════════════${NC}"
     echo ""
 
-    if [ -n "$STORE_DOMAIN" ]; then
+    if [ -n "$OVERLAY_DOMAIN" ]; then
+        echo -e "  Store URL:   ${BOLD}http://${OVERLAY_DOMAIN}${NC} (overlay: ${OVERLAY_TYPE})"
+    elif [ -n "$STORE_DOMAIN" ]; then
         echo -e "  Store URL:   ${BOLD}https://${STORE_DOMAIN}${NC}"
     else
         local ip
@@ -320,6 +361,12 @@ Examples:
   # Inspect config without installing
   sudo bash install.sh --dry-run a3f8c1d2e4...
 
+Connectivity modes:
+  public   — Public IP/domain, direct HTTPS via Caddy
+  tunnel   — Behind NAT, Cloudflare Tunnel
+  nat      — Behind NAT, SaaS LibP2P proxy
+  overlay  — Privacy network (Lokinet or Tor)
+
 Environment:
   INSTALL_DIR     Installation directory (default: /opt/mobazha)
   SAAS_BASE_URL   SaaS platform base URL (default: https://app.mobazha.org)
@@ -384,6 +431,8 @@ main() {
             echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
             echo "SAAS_PEER_ID=${SAAS_PEER_ID:-}"
             echo "CONNECTIVITY=${CONNECTIVITY:-nat}"
+            echo "OVERLAY_TYPE=${OVERLAY_TYPE:-}"
+            echo "OVERLAY_DOMAIN=${OVERLAY_DOMAIN:-}"
             echo "TAG=stable"
             echo "---"
             exit 0

@@ -1,0 +1,30 @@
+# Mobazha Standalone Store — Overlay Network Extension
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.overlay.yml up -d
+#
+# Adds Lokinet SNApp support for .loki domain access.
+# Set OVERLAY_TYPE=lokinet or OVERLAY_TYPE=tor in .env.
+
+services:
+  lokinet:
+    image: lokinet/lokinet:latest
+    container_name: mobazha-lokinet
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - lokinet-data:/var/lib/lokinet
+    network_mode: "host"
+    profiles:
+      - lokinet
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  store:
+    environment:
+      - OVERLAY_TYPE=${OVERLAY_TYPE:-}
+      - OVERLAY_DOMAIN=${OVERLAY_DOMAIN:-}
+
+volumes:
+  lokinet-data:

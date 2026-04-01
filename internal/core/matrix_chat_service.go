@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -809,6 +810,9 @@ func (s *mautrixChatService) Subscribe(ctx context.Context) (<-chan contracts.Ma
 func (s *mautrixChatService) broadcast(evt contracts.MatrixChatEvent) {
 	s.subsMu.Lock()
 	defer s.subsMu.Unlock()
+	if strings.HasPrefix(evt.Type, "chat.verification.") {
+		log.Infof("Broadcasting verification event: type=%s subscribers=%d", evt.Type, len(s.subs))
+	}
 	for _, ch := range s.subs {
 		select {
 		case ch <- evt:
@@ -867,8 +871,12 @@ func (s *mautrixChatService) registerEventHandlers() {
 
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
 		log.Debugf("EventMessage received: room=%s sender=%s eventID=%s", evt.RoomID, evt.Sender, evt.ID)
-		msg := s.eventToMessage(evt)
 		content := evt.Content.AsMessage()
+		if content != nil && content.MsgType == event.MsgVerificationRequest {
+			log.Infof("Verification request EventMessage detected (handled by VerificationHelper): room=%s sender=%s to=%s", evt.RoomID, evt.Sender, content.To)
+			return
+		}
+		msg := s.eventToMessage(evt)
 		if content != nil && content.RelatesTo != nil && content.RelatesTo.Type == event.RelReplace {
 			s.broadcast(contracts.MatrixChatEvent{
 				Type: "chat.message_edit",
@@ -1172,37 +1180,33 @@ func (s *mautrixChatService) registerUser(ctx context.Context) error {
 	}
 
 	if strings.Contains(string(body), "M_USER_IN_USE") {
-		log.Infof("Matrix user %s already exists, updating password", s.matrixUserID)
-		return s.updatePasswordViaRegister(ctx, httpClient, homeserverURL, secret)
+		log.Infof("Matrix user %s already exists, updating password via admin API", s.matrixUserID)
+		return s.updatePasswordViaAdmin(ctx, httpClient, homeserverURL, secret)
 	}
 
 	return fmt.Errorf("registration failed (HTTP %d): %s", resp.StatusCode, string(body))
 }
 
-// updatePasswordViaRegister updates an existing Synapse user's password by re-registering
-// with a fresh nonce. If the admin v1/register endpoint returns M_USER_IN_USE for a second
-// time, we accept it (password was likely correct already).
-func (s *mautrixChatService) updatePasswordViaRegister(ctx context.Context, httpClient *http.Client, homeserverURL, secret string) error {
-	nonce, err := synapseGetNonce(ctx, httpClient, homeserverURL)
+// updatePasswordViaAdmin updates an existing Synapse user's password using
+// the Synapse admin v2 users API. It first obtains an admin access token
+// (from /shared/matrix-admin-token or by registering a temporary admin),
+// then calls PUT /_synapse/admin/v2/users/{userId} to set the password.
+func (s *mautrixChatService) updatePasswordViaAdmin(ctx context.Context, httpClient *http.Client, homeserverURL, secret string) error {
+	adminToken, err := s.obtainAdminToken(ctx, httpClient, homeserverURL, secret)
 	if err != nil {
-		return err
+		return fmt.Errorf("obtain admin token: %w", err)
 	}
-	localpart := s.matrixUserID.Localpart()
-	mac := synapseRegistrationMAC(nonce, localpart, s.password, false, secret)
 
-	regBody, _ := json.Marshal(map[string]any{
-		"nonce":    nonce,
-		"username": localpart,
-		"password": s.password,
-		"admin":    false,
-		"mac":      mac,
-	})
+	putBody, _ := json.Marshal(map[string]any{"password": s.password})
+	escapedUserID := url.PathEscape(s.matrixUserID.String())
+	putURL := homeserverURL + "/_synapse/admin/v2/users/" + escapedUserID
 
-	req, err := http.NewRequestWithContext(ctx, "POST", homeserverURL+"/_synapse/admin/v1/register", strings.NewReader(string(regBody)))
+	req, err := http.NewRequestWithContext(ctx, "PUT", putURL, bytes.NewReader(putBody))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -1211,14 +1215,69 @@ func (s *mautrixChatService) updatePasswordViaRegister(ctx context.Context, http
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
+		log.Infof("Matrix user %s password updated via admin API", s.matrixUserID)
 		return nil
+	}
+	body, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("admin password update failed (HTTP %d): %s", resp.StatusCode, string(body))
+}
+
+// obtainAdminToken returns a Synapse admin access token. It first tries to
+// read /shared/matrix-admin-token (populated by init-synapse.sh in Docker).
+// If unavailable, it registers a temporary admin via the shared-secret
+// registration endpoint.
+func (s *mautrixChatService) obtainAdminToken(ctx context.Context, httpClient *http.Client, homeserverURL, secret string) (string, error) {
+	if data, err := os.ReadFile("/shared/matrix-admin-token"); err == nil {
+		token := strings.TrimSpace(string(data))
+		if token != "" {
+			return token, nil
+		}
 	}
 
-	body, _ := io.ReadAll(resp.Body)
-	if strings.Contains(string(body), "M_USER_IN_USE") {
-		return nil
+	nonce, err := synapseGetNonce(ctx, httpClient, homeserverURL)
+	if err != nil {
+		return "", fmt.Errorf("get nonce: %w", err)
 	}
-	return fmt.Errorf("password update failed (HTTP %d): %s", resp.StatusCode, string(body))
+
+	tmpUser := "mbz_admin_tmp"
+	tmpPass := fmt.Sprintf("tmp-%d-%s", time.Now().UnixNano(), secret[:8])
+	mac := synapseRegistrationMAC(nonce, tmpUser, tmpPass, true, secret)
+
+	regBody, _ := json.Marshal(map[string]any{
+		"nonce":    nonce,
+		"username": tmpUser,
+		"password": tmpPass,
+		"admin":    true,
+		"mac":      mac,
+	})
+
+	req, err := http.NewRequestWithContext(ctx, "POST", homeserverURL+"/_synapse/admin/v1/register", bytes.NewReader(regBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("temp admin register failed (HTTP %d): %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("parse temp admin response: %w", err)
+	}
+	if result.AccessToken == "" {
+		return "", fmt.Errorf("temp admin register returned empty token")
+	}
+	return result.AccessToken, nil
 }
 
 func synapseGetNonce(ctx context.Context, httpClient *http.Client, homeserverURL string) (string, error) {
@@ -1384,6 +1443,10 @@ var _ verificationhelper.RequiredCallbacks = (*verificationCallbacks)(nil)
 var _ verificationhelper.ShowSASCallbacks = (*verificationCallbacks)(nil)
 
 func (c *verificationCallbacks) VerificationRequested(_ context.Context, txnID id.VerificationTransactionID, from id.UserID, fromDevice id.DeviceID) {
+	c.svc.subsMu.Lock()
+	subCount := len(c.svc.subs)
+	c.svc.subsMu.Unlock()
+	log.Infof("VerificationRequested callback: txnID=%s from=%s device=%s subscribers=%d", txnID, from, fromDevice, subCount)
 	c.svc.broadcast(contracts.MatrixChatEvent{
 		Type: "chat.verification.request",
 		Data: map[string]string{
@@ -1406,6 +1469,7 @@ func (c *verificationCallbacks) VerificationReady(_ context.Context, txnID id.Ve
 }
 
 func (c *verificationCallbacks) VerificationCancelled(_ context.Context, txnID id.VerificationTransactionID, code event.VerificationCancelCode, reason string) {
+	log.Infof("VerificationCancelled callback: txnID=%s code=%s reason=%s", txnID, code, reason)
 	c.svc.broadcast(contracts.MatrixChatEvent{
 		Type: "chat.verification.cancelled",
 		Data: map[string]string{
@@ -1416,7 +1480,8 @@ func (c *verificationCallbacks) VerificationCancelled(_ context.Context, txnID i
 	})
 }
 
-func (c *verificationCallbacks) VerificationDone(_ context.Context, txnID id.VerificationTransactionID, _ event.VerificationMethod) {
+func (c *verificationCallbacks) VerificationDone(_ context.Context, txnID id.VerificationTransactionID, method event.VerificationMethod) {
+	log.Infof("VerificationDone callback: txnID=%s method=%s", txnID, method)
 	c.svc.broadcast(contracts.MatrixChatEvent{
 		Type: "chat.verification.done",
 		Data: map[string]string{
@@ -1426,6 +1491,7 @@ func (c *verificationCallbacks) VerificationDone(_ context.Context, txnID id.Ver
 }
 
 func (c *verificationCallbacks) ShowSAS(_ context.Context, txnID id.VerificationTransactionID, emojis []rune, emojiDescriptions []string, decimals []int) {
+	log.Infof("ShowSAS callback: txnID=%s emojiCount=%d", txnID, len(emojis))
 	emojiList := make([]map[string]interface{}, len(emojis))
 	for i, e := range emojis {
 		desc := ""

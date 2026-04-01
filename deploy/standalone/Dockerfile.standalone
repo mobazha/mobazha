@@ -3,8 +3,8 @@
 # Produces a single container with:
 #   - s6-overlay (PID 1, service supervision)
 #   - Caddy (reverse proxy, auto-TLS)
-#   - mobazha-node (seller node)
-#   - Frontend static assets (placeholder until S3.4)
+#   - mobazha-node (seller node, UPX-compressed)
+#   - Frontend static assets (Brotli pre-compressed)
 #
 # Build:
 #   docker buildx build -f deploy/standalone/Dockerfile.standalone \
@@ -14,34 +14,50 @@
 # For local builds with go.work dependencies, prepare a build context
 # containing mobazha3.0/, mobazha-core/, etherscan-api/ (see E2E Dockerfile).
 
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.26
+ARG NODE_VERSION=20
 ARG ALPINE_VERSION=3.20
 ARG S6_OVERLAY_VERSION=3.2.0.0
 ARG CADDY_VERSION=2.9
 
 # ============================================================
-# Stage 1: Go builder — compile mobazha-node
+# Stage 1: Go builder — compile mobazha-node + UPX compress
 # ============================================================
 FROM golang:${GO_VERSION}-bookworm AS go-builder
 
-RUN apt-get update -qq && apt-get install -qq -y gcc git >/dev/null 2>&1
+RUN apt-get update -qq && apt-get install -qq -y gcc git upx-ucl >/dev/null 2>&1
 
 WORKDIR /src/mobazha3.0
 
-# Cache dependencies first
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Copy source and build
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 go build -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/api.Version=$(git describe --tags --always 2>/dev/null || echo dev)" \
-    -o /out/mobazha .
+    CGO_ENABLED=1 go build -tags goolm \
+    -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/api.Version=$(git describe --tags --always 2>/dev/null || echo dev)" \
+    -o /out/mobazha . && \
+    upx --best --lzma /out/mobazha || true
 
 # ============================================================
-# Stage 2: Runtime — alpine + s6-overlay + Caddy + mobazha
+# Stage 2: Frontend builder — build + Brotli compress
+# ============================================================
+FROM node:${NODE_VERSION}-bookworm-slim AS fe-builder
+
+RUN apt-get update -qq && apt-get install -qq -y brotli >/dev/null 2>&1
+
+WORKDIR /src/frontend
+
+ARG FRONTEND_DIR=deploy/standalone/frontend-placeholder
+COPY ${FRONTEND_DIR}/ ./dist/
+
+RUN find ./dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' -o -name '*.json' -o -name '*.txt' -o -name '*.xml' -o -name '*.map' \) \
+    -exec brotli --best {} \;
+
+# ============================================================
+# Stage 3: Runtime — alpine + s6-overlay + Caddy + mobazha
 # ============================================================
 FROM alpine:${ALPINE_VERSION}
 
@@ -60,19 +76,19 @@ RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
 RUN apk add --no-cache \
     ca-certificates \
     curl \
+    jq \
     gettext \
     caddy~=${CADDY_VERSION}
 
-# Copy mobazha binary
+# Copy UPX-compressed mobazha binary
 COPY --from=go-builder /out/mobazha /usr/local/bin/mobazha
 
 # Copy Caddyfile template
 COPY deploy/standalone/Caddyfile.tmpl /etc/caddy/Caddyfile.tmpl
 COPY deploy/standalone/generate-caddyfile.sh /usr/local/bin/generate-caddyfile
 
-# Placeholder frontend (replaced by real build in S3.4)
-RUN mkdir -p /srv/www && \
-    echo '<!DOCTYPE html><html><body><h1>Mobazha Store</h1><p>Frontend not yet built (Phase S3)</p></body></html>' > /srv/www/index.html
+# Copy frontend assets (with .br pre-compressed siblings)
+COPY --from=fe-builder /src/frontend/dist/ /srv/www/
 
 # Copy s6-overlay service definitions
 COPY deploy/standalone/s6/ /etc/s6-overlay/

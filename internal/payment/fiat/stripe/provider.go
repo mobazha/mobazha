@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gostripe "github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/client"
 	"github.com/stripe/stripe-go/v82/webhook"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -480,8 +481,91 @@ func mapStripeStatus(s gostripe.PaymentIntentStatus) string {
 	}
 }
 
+// requiredWebhookEvents lists all Stripe event types the platform needs to receive.
+var requiredWebhookEvents = []string{
+	"payment_intent.succeeded",
+	"payment_intent.payment_failed",
+	"payment_intent.canceled",
+	"charge.refunded",
+	"charge.dispute.created",
+	"charge.dispute.closed",
+	"account.updated",
+}
+
+// SetupWebhook creates or updates a Stripe webhook endpoint for the given URL.
+// If a webhook with the same URL already exists, it updates the enabled events
+// and returns the existing endpoint (note: Stripe does not return the signing secret
+// for existing endpoints, so a new endpoint may need to be created).
+func (p *Provider) SetupWebhook(ctx context.Context, webhookURL string) (*contracts.WebhookSetupResult, error) {
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
+
+	existing, err := p.findExistingWebhook(api, webhookURL)
+	if err != nil {
+		return nil, fmt.Errorf("stripe: list webhook endpoints: %w", err)
+	}
+
+	if existing != nil {
+		updateParams := &gostripe.WebhookEndpointParams{
+			EnabledEvents: gostripe.StringSlice(requiredWebhookEvents),
+		}
+		if _, err := api.WebhookEndpoints.Update(existing.ID, updateParams); err != nil {
+			return nil, fmt.Errorf("stripe: update webhook endpoint: %w", err)
+		}
+		return &contracts.WebhookSetupResult{
+			WebhookID:     existing.ID,
+			WebhookSecret: existing.Secret,
+		}, nil
+	}
+
+	params := &gostripe.WebhookEndpointParams{
+		URL:           gostripe.String(webhookURL),
+		EnabledEvents: gostripe.StringSlice(requiredWebhookEvents),
+	}
+	endpoint, err := api.WebhookEndpoints.New(params)
+	if err != nil {
+		return nil, fmt.Errorf("stripe: create webhook endpoint: %w", err)
+	}
+
+	return &contracts.WebhookSetupResult{
+		WebhookID:     endpoint.ID,
+		WebhookSecret: endpoint.Secret,
+	}, nil
+}
+
+// CleanupWebhook removes the Stripe webhook endpoint matching the given URL.
+func (p *Provider) CleanupWebhook(ctx context.Context, webhookURL string) error {
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
+
+	existing, err := p.findExistingWebhook(api, webhookURL)
+	if err != nil {
+		return nil
+	}
+	if existing == nil {
+		return nil
+	}
+
+	if _, err := api.WebhookEndpoints.Del(existing.ID, nil); err != nil {
+		return fmt.Errorf("stripe: delete webhook endpoint %s: %w", existing.ID, err)
+	}
+	return nil
+}
+
+func (p *Provider) findExistingWebhook(api *client.API, webhookURL string) (*gostripe.WebhookEndpoint, error) {
+	params := &gostripe.WebhookEndpointListParams{}
+	params.Filters.AddFilter("limit", "", "100")
+	iter := api.WebhookEndpoints.List(params)
+	for iter.Next() {
+		ep := iter.WebhookEndpoint()
+		if ep.URL == webhookURL {
+			return ep, nil
+		}
+	}
+	return nil, iter.Err()
+}
+
 // Compile-time interface compliance checks.
 var (
 	_ contracts.FiatPaymentProvider    = (*Provider)(nil)
 	_ contracts.FiatOnboardingProvider = (*Provider)(nil)
+	_ contracts.FiatWebhookConfigurator = (*Provider)(nil)
 )

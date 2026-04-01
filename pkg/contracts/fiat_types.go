@@ -184,12 +184,13 @@ type ProviderInfo struct {
 
 // ProviderConfigView is the API response for provider config (secrets masked).
 type ProviderConfigView struct {
-	ProviderID    string `json:"providerID"`
-	AccountID     string `json:"accountID,omitempty"`
-	PublicKey     string `json:"publicKey,omitempty"`
-	SecretKey     string `json:"secretKey"`               // masked: "sk_l****ive"
-	WebhookSecret string `json:"webhookSecret,omitempty"` // masked: "****"
-	IsActive      bool   `json:"isActive"`
+	ProviderID             string `json:"providerID"`
+	AccountID              string `json:"accountID,omitempty"`
+	PublicKey              string `json:"publicKey,omitempty"`
+	SecretKey              string `json:"secretKey"`               // masked: "sk_l****ive"
+	WebhookSecret          string `json:"webhookSecret,omitempty"` // masked: "****"
+	IsActive               bool   `json:"isActive"`
+	WebhookAutoConfigured  bool   `json:"webhookAutoConfigured"`
 }
 
 // ProviderConfigInput is the API request body for saving provider config.

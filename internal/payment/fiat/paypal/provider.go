@@ -732,8 +732,109 @@ func mapPayPalStatus(s string) string {
 	}
 }
 
+// requiredWebhookEvents lists all PayPal event types the platform needs to receive.
+var requiredWebhookEvents = []string{
+	"CHECKOUT.ORDER.COMPLETED",
+	"PAYMENT.CAPTURE.COMPLETED",
+	"PAYMENT.CAPTURE.DENIED",
+	"CHECKOUT.ORDER.DECLINED",
+	"CUSTOMER.DISPUTE.CREATED",
+	"CUSTOMER.DISPUTE.RESOLVED",
+	"PAYMENT.SALE.REFUNDED",
+	"PAYMENT.CAPTURE.REFUNDED",
+	"MERCHANT.ONBOARDING.COMPLETED",
+}
+
+type webhookCreateRequest struct {
+	URL        string              `json:"url"`
+	EventTypes []webhookEventType  `json:"event_types"`
+}
+
+type webhookEventType struct {
+	Name string `json:"name"`
+}
+
+type webhookResponse struct {
+	ID         string             `json:"id"`
+	URL        string             `json:"url"`
+	EventTypes []webhookEventType `json:"event_types"`
+}
+
+type webhookListResponse struct {
+	Webhooks []webhookResponse `json:"webhooks"`
+}
+
+// SetupWebhook creates or updates a PayPal webhook endpoint for the given URL.
+// PayPal returns a webhook ID (used for signature verification) rather than a secret string.
+func (p *Provider) SetupWebhook(ctx context.Context, webhookURL string) (*contracts.WebhookSetupResult, error) {
+	existing, err := p.findExistingWebhook(ctx, webhookURL)
+	if err != nil {
+		return nil, fmt.Errorf("paypal: list webhooks: %w", err)
+	}
+
+	eventTypes := make([]webhookEventType, len(requiredWebhookEvents))
+	for i, e := range requiredWebhookEvents {
+		eventTypes[i] = webhookEventType{Name: e}
+	}
+
+	if existing != nil {
+		var updated webhookResponse
+		body := map[string]interface{}{
+			"op":    "replace",
+			"path":  "/event_types",
+			"value": eventTypes,
+		}
+		patches := []interface{}{body}
+		if err := p.client.doJSON(ctx, "PATCH", "/v1/notifications/webhooks/"+existing.ID, patches, &updated); err != nil {
+			return nil, fmt.Errorf("paypal: update webhook: %w", err)
+		}
+		return &contracts.WebhookSetupResult{
+			WebhookID:     updated.ID,
+			WebhookSecret: updated.ID,
+		}, nil
+	}
+
+	req := webhookCreateRequest{
+		URL:        webhookURL,
+		EventTypes: eventTypes,
+	}
+	var resp webhookResponse
+	if err := p.client.doJSON(ctx, "POST", "/v1/notifications/webhooks", req, &resp); err != nil {
+		return nil, fmt.Errorf("paypal: create webhook: %w", err)
+	}
+
+	return &contracts.WebhookSetupResult{
+		WebhookID:     resp.ID,
+		WebhookSecret: resp.ID,
+	}, nil
+}
+
+// CleanupWebhook removes the PayPal webhook endpoint matching the given URL.
+func (p *Provider) CleanupWebhook(ctx context.Context, webhookURL string) error {
+	existing, err := p.findExistingWebhook(ctx, webhookURL)
+	if err != nil || existing == nil {
+		return nil
+	}
+	_ = p.client.doJSON(ctx, "DELETE", "/v1/notifications/webhooks/"+existing.ID, nil, nil)
+	return nil
+}
+
+func (p *Provider) findExistingWebhook(ctx context.Context, webhookURL string) (*webhookResponse, error) {
+	var list webhookListResponse
+	if err := p.client.doJSON(ctx, "GET", "/v1/notifications/webhooks", nil, &list); err != nil {
+		return nil, err
+	}
+	for i := range list.Webhooks {
+		if list.Webhooks[i].URL == webhookURL {
+			return &list.Webhooks[i], nil
+		}
+	}
+	return nil, nil
+}
+
 // Compile-time interface compliance checks.
 var (
-	_ contracts.FiatPaymentProvider    = (*Provider)(nil)
-	_ contracts.FiatOnboardingProvider = (*Provider)(nil)
+	_ contracts.FiatPaymentProvider     = (*Provider)(nil)
+	_ contracts.FiatOnboardingProvider  = (*Provider)(nil)
+	_ contracts.FiatWebhookConfigurator = (*Provider)(nil)
 )

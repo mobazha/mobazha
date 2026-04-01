@@ -79,6 +79,10 @@ func (m *mockFiatService) SaveProviderConfig(_ string, _ contracts.ProviderConfi
 	return m.saveErr
 }
 
+func (m *mockFiatService) SetupWebhook(_ context.Context, _ string, _ string) (*contracts.WebhookSetupResult, error) {
+	return &contracts.WebhookSetupResult{}, nil
+}
+
 func (m *mockFiatService) DisconnectProvider(_ context.Context, _ string) error {
 	return m.disconnectErr
 }

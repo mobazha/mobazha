@@ -15,6 +15,22 @@ import (
 
 const maxWebhookBodySize = 512 * 1024 // 512 KB
 
+func requestWebhookURL(r *http.Request, providerID string) string {
+	scheme := "https"
+	if r.TLS == nil {
+		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+			scheme = proto
+		} else {
+			scheme = "http"
+		}
+	}
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		host = fwdHost
+	}
+	return fmt.Sprintf("%s://%s/v1/fiat/%s/webhooks", scheme, host, providerID)
+}
+
 // getFiatService extracts the FiatService from the request's NodeService
 // via the FiatPaymentProviderAccessor type assertion. Returns nil when
 // the node does not support fiat payments.
@@ -312,6 +328,13 @@ func (g *Gateway) handlePUTFiatProviderConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if input.WebhookSecret == "" {
+		webhookURL := requestWebhookURL(r, providerID)
+		if _, err := svc.SetupWebhook(r.Context(), providerID, webhookURL); err != nil {
+			log.Warningf("auto-webhook setup for %s: %v", providerID, err)
+		}
+	}
+
 	view, err := svc.GetProviderConfig(providerID)
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
@@ -319,6 +342,29 @@ func (g *Gateway) handlePUTFiatProviderConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	responsePkg.Success(w, view)
+}
+
+func (g *Gateway) handlePOSTFiatSetupWebhook(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getFiatService(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Fiat payments not available")
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	if providerID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
+		return
+	}
+
+	webhookURL := requestWebhookURL(r, providerID)
+	result, err := svc.SetupWebhook(r.Context(), providerID, webhookURL)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Webhook setup failed: "+err.Error())
+		return
+	}
+
+	responsePkg.Success(w, result)
 }
 
 func (g *Gateway) handlePOSTFiatProviderVerify(w http.ResponseWriter, r *http.Request) {

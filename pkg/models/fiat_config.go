@@ -15,6 +15,9 @@ type FiatProviderConfig struct {
 	SecretKey     string `gorm:"column:secret_key;type:text"`     // AES-256-GCM encrypted
 	WebhookSecret string `gorm:"column:webhook_secret;type:text"` // AES-256-GCM encrypted
 
+	WebhookID             string `gorm:"column:webhook_id;type:varchar(255)"`
+	WebhookAutoConfigured bool   `gorm:"column:webhook_auto_configured;default:false"`
+
 	IsActive  bool      `gorm:"column:is_active;default:false"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`

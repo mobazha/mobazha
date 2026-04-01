@@ -597,18 +597,22 @@ func (s *FiatPaymentAppService) GetProviderConfig(providerID string) (*contracts
 	}
 	cfg.MaskSecrets()
 	return &contracts.ProviderConfigView{
-		ProviderID:    cfg.ProviderID,
-		AccountID:     cfg.AccountID,
-		PublicKey:     cfg.PublicKey,
-		SecretKey:     cfg.SecretKey,
-		WebhookSecret: cfg.WebhookSecret,
-		IsActive:      cfg.IsActive,
+		ProviderID:            cfg.ProviderID,
+		AccountID:             cfg.AccountID,
+		PublicKey:             cfg.PublicKey,
+		SecretKey:             cfg.SecretKey,
+		WebhookSecret:         cfg.WebhookSecret,
+		IsActive:              cfg.IsActive,
+		WebhookAutoConfigured: cfg.WebhookAutoConfigured,
 	}, nil
 }
 
 // SaveProviderConfig stores/updates the fiat provider config, creates a ReceivingAccount,
 // and registers the provider in the registry (standalone mode).
 // Uses upsert semantics: updates existing config if (tenant_id, provider_id) already exists.
+// When webhookSecret is empty and the provider supports FiatWebhookConfigurator,
+// it attempts automated webhook creation. The webhookURL must be set by the caller
+// (handler knows the public-facing URL).
 func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input contracts.ProviderConfigInput) error {
 	chainType := FiatChainType(providerID)
 
@@ -621,16 +625,37 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 			WebhookSecret: input.WebhookSecret,
 			IsActive:      true,
 		}
+
+		// Partial-update: empty input fields keep existing values
+		var existing models.FiatProviderConfig
+		if tx.Read().Where("provider_id = ?", providerID).First(&existing).Error == nil {
+			if cfg.SecretKey == "" {
+				cfg.SecretKey = existing.SecretKey
+			}
+			if cfg.PublicKey == "" {
+				cfg.PublicKey = existing.PublicKey
+			}
+			if cfg.AccountID == "" {
+				cfg.AccountID = existing.AccountID
+			}
+			if cfg.WebhookSecret == "" {
+				cfg.WebhookSecret = existing.WebhookSecret
+			}
+		}
+
 		if err := database.SaveByBusinessKey(tx, cfg, "provider_id = ?", providerID); err != nil {
 			return err
 		}
 
-		ra := &models.ReceivingAccount{
-			ChainType: chainType,
-			Address:   input.AccountID,
-			IsActive:  true,
+		if cfg.AccountID != "" {
+			ra := &models.ReceivingAccount{
+				ChainType: chainType,
+				Address:   cfg.AccountID,
+				IsActive:  true,
+			}
+			return database.SaveByBusinessKey(tx, ra, "chain_type = ?", chainType)
 		}
-		return database.SaveByBusinessKey(tx, ra, "chain_type = ?", chainType)
+		return nil
 	}); err != nil {
 		return err
 	}
@@ -639,11 +664,85 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 	return nil
 }
 
+// SetupWebhook programmatically creates a webhook endpoint via the provider's API,
+// then updates the stored config with the auto-generated webhook secret.
+func (s *FiatPaymentAppService) SetupWebhook(ctx context.Context, providerID string, webhookURL string) (*contracts.WebhookSetupResult, error) {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	wc, ok := provider.(contracts.FiatWebhookConfigurator)
+	if !ok {
+		return nil, fmt.Errorf("provider %s does not support automated webhook setup", providerID)
+	}
+
+	result, err := wc.SetupWebhook(ctx, webhookURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.WebhookSecret != "" {
+		if dbErr := s.db.Update(func(tx database.Tx) error {
+			var cfg models.FiatProviderConfig
+			if err := tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error; err != nil {
+				return err
+			}
+			cfg.WebhookSecret = result.WebhookSecret
+			cfg.WebhookID = result.WebhookID
+			cfg.WebhookAutoConfigured = true
+			return database.SaveByBusinessKey(tx, &cfg, "provider_id = ?", providerID)
+		}); dbErr != nil {
+			logger.LogErrorWithIDf(log, s.nodeID, "auto-webhook: saved webhook but failed to update config: %v", dbErr)
+			return result, dbErr
+		}
+
+		s.registerProviderFromConfigReload(providerID)
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID, "auto-webhook: %s webhook created (id=%s)", providerID, result.WebhookID)
+	return result, nil
+}
+
+// registerProviderFromConfigReload reloads the config from DB and re-registers the provider.
+func (s *FiatPaymentAppService) registerProviderFromConfigReload(providerID string) {
+	var cfg models.FiatProviderConfig
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "reload provider config for %s: %v", providerID, err)
+		return
+	}
+	s.registerProviderFromConfig(providerID, cfg.SecretKey, cfg.PublicKey, cfg.WebhookSecret)
+}
+
 // deleteProviderConfig removes the fiat provider config and receiving account.
+// If the webhook was auto-configured, it attempts to clean up the remote webhook endpoint.
 // Standalone providers are unregistered from the registry; platform-injected providers stay
 // registered so SaaS onboarding can be started again after disconnect.
 // Called internally by DisconnectProvider.
-func (s *FiatPaymentAppService) deleteProviderConfig(providerID string) error {
+func (s *FiatPaymentAppService) deleteProviderConfig(ctx context.Context, providerID string) error {
+	var cfg models.FiatProviderConfig
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error
+	})
+
+	if cfg.WebhookAutoConfigured {
+		if provider, err := s.registry.ForProvider(providerID); err == nil {
+			if wc, ok := provider.(contracts.FiatWebhookConfigurator); ok {
+				webhookURL := s.buildWebhookURL(providerID)
+				if cleanupErr := wc.CleanupWebhook(ctx, webhookURL); cleanupErr != nil {
+					logger.LogWarningWithIDf(log, s.nodeID,
+						"cleanup webhook for %s during disconnect: %v", providerID, cleanupErr)
+				} else {
+					logger.LogInfoWithIDf(log, s.nodeID,
+						"cleaned up auto-configured webhook for %s", providerID)
+				}
+			}
+		}
+	}
+
 	err := s.db.Update(func(tx database.Tx) error {
 		if err := tx.Delete("provider_id", providerID, nil, &models.FiatProviderConfig{}); err != nil {
 			return err
@@ -660,11 +759,17 @@ func (s *FiatPaymentAppService) deleteProviderConfig(providerID string) error {
 	return nil
 }
 
+// buildWebhookURL constructs the webhook URL for a provider.
+// This is a best-effort reconstruction; the actual URL should be passed by the caller.
+func (s *FiatPaymentAppService) buildWebhookURL(providerID string) string {
+	return "/v1/fiat/" + providerID + "/webhooks"
+}
+
 // DisconnectProvider safely disconnects a fiat provider after verifying no active orders depend on it.
 // Orders in verification/fulfillment/dispute states block disconnect. AWAITING_PAYMENT sessions are canceled.
 func (s *FiatPaymentAppService) DisconnectProvider(ctx context.Context, providerID string) error {
 	if s.orderRepo == nil {
-		return s.deleteProviderConfig(providerID)
+		return s.deleteProviderConfig(ctx, providerID)
 	}
 
 	blockingStates := []models.OrderState{
@@ -728,7 +833,7 @@ func (s *FiatPaymentAppService) DisconnectProvider(ctx context.Context, provider
 		}
 	}
 
-	return s.deleteProviderConfig(providerID)
+	return s.deleteProviderConfig(ctx, providerID)
 }
 
 // VerifyProviderConfig tests the provider config by calling the provider's health check.

@@ -77,6 +77,33 @@ type FiatOnboardingProvider interface {
 	GetAccountStatus(ctx context.Context, accountID string) (*AccountStatus, error)
 }
 
+// FiatWebhookConfigurator is an optional extension for providers that support
+// programmatic webhook endpoint creation/deletion. This eliminates the need for
+// sellers to manually configure webhooks in provider dashboards.
+// Use type assertion to check availability:
+//
+//	if wc, ok := provider.(FiatWebhookConfigurator); ok { ... }
+type FiatWebhookConfigurator interface {
+	// SetupWebhook creates or updates a webhook endpoint with the provider,
+	// subscribing to all events the platform requires. Returns the webhook
+	// signing secret used for signature verification.
+	// The webhookURL is the public URL where the provider should send events
+	// (e.g. "https://example.com/v1/fiat/stripe/webhooks").
+	// Implementations must be idempotent: if a webhook for the same URL
+	// already exists, it should update the events list and return the existing secret.
+	SetupWebhook(ctx context.Context, webhookURL string) (*WebhookSetupResult, error)
+
+	// CleanupWebhook removes the webhook endpoint associated with the given URL.
+	// Implementations should be best-effort and not fail if the webhook doesn't exist.
+	CleanupWebhook(ctx context.Context, webhookURL string) error
+}
+
+// WebhookSetupResult holds the outcome of an automated webhook setup.
+type WebhookSetupResult struct {
+	WebhookID     string `json:"webhookID"`
+	WebhookSecret string `json:"webhookSecret"`
+}
+
 // FiatProviderRegistry manages registered FiatPaymentProvider instances.
 // Business-level filtering (e.g. which providers a seller has enabled) belongs
 // in FiatService, not here.
@@ -130,6 +157,11 @@ type FiatService interface {
 
 	// VerifyProviderConfig tests the stored config by calling the provider's health endpoint.
 	VerifyProviderConfig(providerID string) error
+
+	// SetupWebhook programmatically creates a webhook endpoint with the provider.
+	// Returns the setup result or an error if the provider doesn't support it or the call fails.
+	// The webhookURL is resolved by the caller (handler knows the public-facing URL).
+	SetupWebhook(ctx context.Context, providerID string, webhookURL string) (*WebhookSetupResult, error)
 
 	// GetProviderStatus returns connection status for a specific provider.
 	GetProviderStatus(ctx context.Context, providerID string) (*AccountStatus, error)

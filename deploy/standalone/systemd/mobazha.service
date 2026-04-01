@@ -1,0 +1,25 @@
+[Unit]
+Description=Mobazha Standalone Store Node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mobazha
+Group=mobazha
+ExecStart=/usr/local/bin/mobazha start -d /var/lib/mobazha
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+WorkingDirectory=/var/lib/mobazha
+
+EnvironmentFile=-/etc/mobazha/env
+
+ProtectSystem=strict
+ReadWritePaths=/var/lib/mobazha /var/log/mobazha
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -94,6 +94,9 @@ type mautrixChatService struct {
 
 	verifyHelper *verificationhelper.VerificationHelper
 
+	verificationReady  atomic.Bool
+	verificationReason atomic.Value
+
 	// unreadCounts tracks per-room notification counts from the sync loop.
 	// Updated on every /sync response; read by GetRooms.
 	unreadCounts   map[id.RoomID]int
@@ -153,6 +156,33 @@ func normalizeMatrixSDKLogLevel(raw string) string {
 		log.Warningf("Unknown matrix sdk log level %q, fallback to off", raw)
 		return "off"
 	}
+}
+
+func (s *mautrixChatService) setVerificationStatus(ready bool, reason string) {
+	s.verificationReady.Store(ready)
+	s.verificationReason.Store(strings.TrimSpace(reason))
+}
+
+func (s *mautrixChatService) verificationError(reason string) error {
+	if reason != "" {
+		return fmt.Errorf("%s: %w", reason, contracts.ErrVerificationUnavailable)
+	}
+	return contracts.ErrVerificationUnavailable
+}
+
+func (s *mautrixChatService) getVerificationStatus() (available bool, reason string) {
+	if s.verifyHelper != nil && s.verificationReady.Load() {
+		return true, ""
+	}
+	if raw := s.verificationReason.Load(); raw != nil {
+		if msg, ok := raw.(string); ok && strings.TrimSpace(msg) != "" {
+			return false, msg
+		}
+	}
+	if s.verifyHelper == nil {
+		return false, "verification helper not initialized"
+	}
+	return false, "cross-signing is not ready"
 }
 
 func (s *mautrixChatService) configureMautrixClientLogger() string {
@@ -329,15 +359,29 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	}
 	log.Infof("Matrix crypto initialized: user=%s device=%s store=%s ShareKeysMinTrust=CrossSignedTOFU", s.client.UserID, s.client.DeviceID, storeDesc)
 
+	verificationSupportErr := s.ensureCrossSigningSupport(ctx, mach)
+	if verificationSupportErr != nil {
+		log.Warningf("Matrix cross-signing unavailable for %s: %v", s.matrixUserID, verificationSupportErr)
+	}
+
 	vh := verificationhelper.NewVerificationHelper(
 		s.client, mach, nil, &verificationCallbacks{svc: s},
 		false, false, true,
 	)
-	if err := vh.Init(ctx); err != nil {
-		log.Warningf("Failed to init verification helper: %v (verification features unavailable)", err)
+	verificationHelperErr := vh.Init(ctx)
+	if verificationHelperErr != nil {
+		log.Warningf("Failed to init verification helper: %v (verification features unavailable)", verificationHelperErr)
 	} else {
 		s.verifyHelper = vh
 		s.client.Verification = vh
+	}
+	switch {
+	case verificationSupportErr != nil:
+		s.setVerificationStatus(false, verificationSupportErr.Error())
+	case verificationHelperErr != nil:
+		s.setVerificationStatus(false, verificationHelperErr.Error())
+	default:
+		s.setVerificationStatus(true, "")
 	}
 
 	s.registerEventHandlers()
@@ -650,6 +694,63 @@ func (s *mautrixChatService) persistMatrixCredentials() {
 	}
 }
 
+func (s *mautrixChatService) unlockCrossSigningFromSSSS(ctx context.Context, mach *mxcrypto.OlmMachine) error {
+	keyID, keyData, err := mach.SSSS.GetDefaultKeyData(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get default SSSS key: %w", err)
+	}
+	key, err := keyData.VerifyPassphrase(keyID, s.password)
+	if err != nil {
+		return fmt.Errorf("failed to unlock SSSS with node-derived passphrase: %w", err)
+	}
+	if err := mach.FetchCrossSigningKeysFromSSSS(ctx, key); err != nil {
+		return fmt.Errorf("failed to fetch cross-signing keys from SSSS: %w", err)
+	}
+	return nil
+}
+
+func (s *mautrixChatService) signOwnDeviceAndMaster(ctx context.Context, mach *mxcrypto.OlmMachine) error {
+	if err := mach.SignOwnDevice(ctx, mach.OwnIdentity()); err != nil {
+		if !errors.Is(err, mxcrypto.ErrSelfSigningKeyNotCached) {
+			return fmt.Errorf("failed to sign own device: %w", err)
+		}
+		if unlockErr := s.unlockCrossSigningFromSSSS(ctx, mach); unlockErr != nil {
+			return fmt.Errorf("failed to restore cross-signing private keys: %w", unlockErr)
+		}
+		if retryErr := mach.SignOwnDevice(ctx, mach.OwnIdentity()); retryErr != nil {
+			return fmt.Errorf("failed to sign own device after restore: %w", retryErr)
+		}
+	}
+	if err := mach.SignOwnMasterKey(ctx); err != nil {
+		return fmt.Errorf("failed to sign own master key: %w", err)
+	}
+	return nil
+}
+
+func (s *mautrixChatService) ensureCrossSigningSupport(ctx context.Context, mach *mxcrypto.OlmMachine) error {
+	if mach == nil {
+		return fmt.Errorf("olm machine is nil")
+	}
+
+	hasKeys, isVerified, err := mach.GetOwnVerificationStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to inspect cross-signing status: %w", err)
+	}
+	if !hasKeys {
+		if _, _, genErr := mach.GenerateAndUploadCrossSigningKeysWithPassword(ctx, s.password, s.password); genErr != nil {
+			return fmt.Errorf("failed to bootstrap cross-signing keys: %w", genErr)
+		}
+		if err := s.signOwnDeviceAndMaster(ctx, mach); err != nil {
+			return err
+		}
+		return nil
+	}
+	if isVerified {
+		return nil
+	}
+	return s.signOwnDeviceAndMaster(ctx, mach)
+}
+
 // IsReady returns true when the client is logged in and syncing.
 func (s *mautrixChatService) IsReady() bool {
 	return s.ready.Load()
@@ -662,15 +763,22 @@ func (s *mautrixChatService) GetStatus(ctx context.Context) contracts.MatrixChat
 	if !s.ready.Load() && !s.stopped.Load() {
 		_ = s.ensureReady(ctx)
 	}
+	verificationAvailable, verificationReason := s.getVerificationStatus()
 	if !s.ready.Load() || s.client == nil {
-		return contracts.MatrixChatStatus{Connected: false}
+		return contracts.MatrixChatStatus{
+			Connected:             false,
+			VerificationAvailable: verificationAvailable,
+			VerificationReason:    verificationReason,
+		}
 	}
 	return contracts.MatrixChatStatus{
-		Connected:   true,
-		UserID:      s.matrixUserID.String(),
-		DeviceID:    s.client.DeviceID.String(),
-		ServerName:  s.serverName,
-		SyncRunning: s.ready.Load(),
+		Connected:             true,
+		UserID:                s.matrixUserID.String(),
+		DeviceID:              s.client.DeviceID.String(),
+		ServerName:            s.serverName,
+		SyncRunning:           s.ready.Load(),
+		VerificationAvailable: verificationAvailable,
+		VerificationReason:    verificationReason,
 	}
 }
 
@@ -1343,8 +1451,8 @@ func (s *mautrixChatService) StartVerification(ctx context.Context, userID strin
 	if err := s.ensureReady(ctx); err != nil {
 		return "", err
 	}
-	if s.verifyHelper == nil {
-		return "", contracts.ErrVerificationUnavailable
+	if available, reason := s.getVerificationStatus(); !available {
+		return "", s.verificationError(reason)
 	}
 	txnID, err := s.verifyHelper.StartVerification(ctx, id.UserID(userID))
 	if err != nil {
@@ -1358,8 +1466,8 @@ func (s *mautrixChatService) AcceptVerification(ctx context.Context, txnID strin
 	if err := s.ensureReady(ctx); err != nil {
 		return err
 	}
-	if s.verifyHelper == nil {
-		return contracts.ErrVerificationUnavailable
+	if available, reason := s.getVerificationStatus(); !available {
+		return s.verificationError(reason)
 	}
 	s.touchActivity()
 	return s.verifyHelper.AcceptVerification(ctx, id.VerificationTransactionID(txnID))
@@ -1369,8 +1477,8 @@ func (s *mautrixChatService) StartSAS(ctx context.Context, txnID string) error {
 	if err := s.ensureReady(ctx); err != nil {
 		return err
 	}
-	if s.verifyHelper == nil {
-		return contracts.ErrVerificationUnavailable
+	if available, reason := s.getVerificationStatus(); !available {
+		return s.verificationError(reason)
 	}
 	s.touchActivity()
 	return s.verifyHelper.StartSAS(ctx, id.VerificationTransactionID(txnID))
@@ -1380,8 +1488,8 @@ func (s *mautrixChatService) ConfirmSAS(ctx context.Context, txnID string) error
 	if err := s.ensureReady(ctx); err != nil {
 		return err
 	}
-	if s.verifyHelper == nil {
-		return contracts.ErrVerificationUnavailable
+	if available, reason := s.getVerificationStatus(); !available {
+		return s.verificationError(reason)
 	}
 	s.touchActivity()
 	return s.verifyHelper.ConfirmSAS(ctx, id.VerificationTransactionID(txnID))
@@ -1391,8 +1499,8 @@ func (s *mautrixChatService) CancelVerification(ctx context.Context, txnID strin
 	if err := s.ensureReady(ctx); err != nil {
 		return err
 	}
-	if s.verifyHelper == nil {
-		return contracts.ErrVerificationUnavailable
+	if available, reason := s.getVerificationStatus(); !available {
+		return s.verificationError(reason)
 	}
 	s.touchActivity()
 	return s.verifyHelper.CancelVerification(ctx, id.VerificationTransactionID(txnID), event.VerificationCancelCodeUser, "user cancelled")

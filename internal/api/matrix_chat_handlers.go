@@ -772,8 +772,9 @@ func (g *Gateway) handleGETMatrixChatStatus(w http.ResponseWriter, r *http.Reque
 	svc := getMatrixChatService(r)
 	if svc == nil {
 		responsePkg.Success(w, map[string]interface{}{
-			"connected":   false,
-			"syncRunning": false,
+			"connected":             false,
+			"syncRunning":           false,
+			"verificationAvailable": false,
 		})
 		return
 	}

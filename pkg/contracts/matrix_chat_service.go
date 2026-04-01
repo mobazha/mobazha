@@ -212,9 +212,11 @@ type ChatSettings struct {
 
 // MatrixChatStatus represents the connection status.
 type MatrixChatStatus struct {
-	Connected   bool   `json:"connected"`
-	UserID      string `json:"userId,omitempty"`
-	DeviceID    string `json:"deviceId,omitempty"`
-	ServerName  string `json:"serverName,omitempty"`
-	SyncRunning bool   `json:"syncRunning"`
+	Connected             bool   `json:"connected"`
+	UserID                string `json:"userId,omitempty"`
+	DeviceID              string `json:"deviceId,omitempty"`
+	ServerName            string `json:"serverName,omitempty"`
+	SyncRunning           bool   `json:"syncRunning"`
+	VerificationAvailable bool   `json:"verificationAvailable"`
+	VerificationReason    string `json:"verificationReason,omitempty"`
 }

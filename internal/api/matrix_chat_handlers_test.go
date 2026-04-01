@@ -230,7 +230,12 @@ func (m *mockMatrixChatService) CancelVerification(_ context.Context, txnID stri
 }
 
 func (m *mockMatrixChatService) GetStatus(context.Context) contracts.MatrixChatStatus {
-	return contracts.MatrixChatStatus{Connected: true, SyncRunning: true, UserID: "@peer_abc:matrix.mobazha.org"}
+	return contracts.MatrixChatStatus{
+		Connected:             true,
+		SyncRunning:           true,
+		UserID:                "@peer_abc:matrix.mobazha.org",
+		VerificationAvailable: true,
+	}
 }
 
 // mockNodeWithMatrixChat wraps mockNode and overrides MatrixChat() to return a real mock.
@@ -311,6 +316,9 @@ func TestMatrixChat_GetStatus(t *testing.T) {
 	}
 	if data["syncRunning"] != true {
 		t.Errorf("expected syncRunning=true, got %v", data["syncRunning"])
+	}
+	if data["verificationAvailable"] != true {
+		t.Errorf("expected verificationAvailable=true, got %v", data["verificationAvailable"])
 	}
 }
 
@@ -1160,6 +1168,9 @@ func TestMatrixChat_GetStatus_ServiceUnavailable(t *testing.T) {
 	}
 	if resp.Data["connected"] != false {
 		t.Errorf("expected connected=false when service nil, got %v", resp.Data["connected"])
+	}
+	if resp.Data["verificationAvailable"] != false {
+		t.Errorf("expected verificationAvailable=false when service nil, got %v", resp.Data["verificationAvailable"])
 	}
 }
 

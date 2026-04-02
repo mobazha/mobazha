@@ -41,20 +41,9 @@ runcmd:
     echo "  Mobazha Standalone Store Setup"
     echo "======================================"
     echo ""
-    echo "Choose setup method:"
-    echo "  1) Interactive setup (guided prompts)"
-    echo "  2) Token setup (from Deploy Wizard)"
+    echo "Starting Mobazha installation..."
     echo ""
-    read -rp "Choice [1]: " choice
-    choice="${choice:-1}"
-    case "$choice" in
-      1) cd /opt/mobazha && bash install.sh ;;
-      2)
-        read -rp "Deploy token: " token
-        cd /opt/mobazha && bash install.sh "$token"
-        ;;
-      *) echo "Invalid choice"; exit 1 ;;
-    esac
+    cd /opt/mobazha && bash install.sh
     SCRIPT
   - chmod +x /usr/local/bin/mobazha-setup
 

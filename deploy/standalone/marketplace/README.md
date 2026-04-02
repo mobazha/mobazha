@@ -35,5 +35,5 @@ Upload the content of `cloud-init.yml` as a Linode StackScript.
 1. User creates a droplet/instance from the Mobazha marketplace image
 2. SSH into the server
 3. Run `mobazha-setup`
-4. Follow the prompts or paste a deploy token from the SaaS Deploy Wizard
+4. Follow the prompts to configure your store
 5. Store is live in ~2 minutes (Docker image is pre-pulled)

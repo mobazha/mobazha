@@ -156,8 +156,20 @@ func (p *Provider) CapturePayment(ctx context.Context, sessionID string) (*contr
 }
 
 func (p *Provider) GetPayment(ctx context.Context, paymentID string) (*contracts.PaymentDetail, error) {
+	detail, err := p.getPaymentByOrderID(ctx, paymentID)
+	if err != nil {
+		if captureDetail, captureErr := p.getPaymentByCaptureID(ctx, paymentID); captureErr == nil {
+			return captureDetail, nil
+		}
+		return nil, err
+	}
+	return detail, nil
+}
+
+// getPaymentByOrderID queries the PayPal Orders API (GET /v2/checkout/orders/{id}).
+func (p *Provider) getPaymentByOrderID(ctx context.Context, orderID string) (*contracts.PaymentDetail, error) {
 	var resp orderResponse
-	if err := p.client.doJSON(ctx, "GET", "/v2/checkout/orders/"+paymentID, nil, &resp); err != nil {
+	if err := p.client.doJSON(ctx, "GET", "/v2/checkout/orders/"+orderID, nil, &resp); err != nil {
 		return nil, fmt.Errorf("paypal: get order: %w", err)
 	}
 
@@ -197,6 +209,33 @@ func (p *Provider) GetPayment(ctx context.Context, paymentID string) (*contracts
 					detail.Amount = v
 				}
 			}
+		}
+	}
+
+	return detail, nil
+}
+
+// getPaymentByCaptureID queries the PayPal Captures API (GET /v2/payments/captures/{id}).
+// Used as fallback when the paymentID is a Capture ID rather than an Order ID —
+// this happens on the seller side where PaymentSent.TransactionID carries the Capture ID.
+func (p *Provider) getPaymentByCaptureID(ctx context.Context, captureID string) (*contracts.PaymentDetail, error) {
+	var resp captureDetail
+	if err := p.client.doJSON(ctx, "GET", "/v2/payments/captures/"+captureID, nil, &resp); err != nil {
+		return nil, fmt.Errorf("paypal: get capture: %w", err)
+	}
+
+	detail := &contracts.PaymentDetail{
+		PaymentID: resp.ID,
+		Status:    mapPayPalStatus(resp.Status),
+		PaymentMethod: contracts.PaymentMethodInfo{
+			Type:  "paypal",
+			Brand: "paypal",
+		},
+	}
+	if resp.Amount.Value != "" {
+		detail.Currency = resp.Amount.CurrencyCode
+		if v, err := parseAmount(resp.Amount.Value, resp.Amount.CurrencyCode); err == nil {
+			detail.Amount = v
 		}
 	}
 

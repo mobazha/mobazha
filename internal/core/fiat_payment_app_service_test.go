@@ -311,7 +311,7 @@ func TestFiatService_deleteProviderConfig_UnregistersProvider(t *testing.T) {
 	}))
 	assert.NotEmpty(t, reg.Registered())
 
-	require.NoError(t, svc.deleteProviderConfig("stripe"))
+	require.NoError(t, svc.deleteProviderConfig(context.Background(), "stripe"))
 	assert.Empty(t, reg.Registered(), "provider should be unregistered after delete")
 }
 
@@ -324,7 +324,7 @@ func TestFiatService_deleteProviderConfig_KeepPlatformProviderRegistered(t *test
 	}))
 	svc.markPlatformProvider("paypal")
 
-	require.NoError(t, svc.deleteProviderConfig("paypal"))
+	require.NoError(t, svc.deleteProviderConfig(context.Background(), "paypal"))
 	_, err := reg.ForProvider("paypal")
 	require.NoError(t, err, "platform provider should stay registered after disconnect")
 }
@@ -1259,7 +1259,7 @@ func TestFiatService_ReconcileFiatOrders_SucceededPayment_TriggersHandler(t *tes
 	assert.Equal(t, contracts.WebhookPaymentSucceeded, handledEvent.Type)
 }
 
-func TestFiatService_ReconcileFiatOrders_AwaitingVerificationState_TriggersHandler(t *testing.T) {
+func TestFiatService_ReconcileFiatOrders_AwaitingVerificationState_SkippedByReconciliation(t *testing.T) {
 	provider := &mockFiatProvider{
 		id: "stripe",
 		getResult: &contracts.PaymentDetail{
@@ -1295,10 +1295,7 @@ func TestFiatService_ReconcileFiatOrders_AwaitingVerificationState_TriggersHandl
 
 	svc.ReconcileFiatOrders(context.Background())
 
-	require.NotNil(t, handledEvent)
-	assert.Equal(t, "order_reconcile_verify_001", handledEvent.OrderID)
-	assert.Equal(t, "pi_verify_reconcile_001", handledEvent.PaymentID)
-	assert.Equal(t, contracts.WebhookPaymentSucceeded, handledEvent.Type)
+	assert.Nil(t, handledEvent, "AWAITING_PAYMENT_VERIFICATION orders should be handled by PaymentVerificationLoop, not reconciliation")
 }
 
 func TestFiatService_ReconcileFiatOrders_UsesResolvedPaymentID(t *testing.T) {

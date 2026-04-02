@@ -989,10 +989,10 @@ func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
 	}
 }
 
-// ReconcileFiatOrders checks AWAITING_PAYMENT / AWAITING_PAYMENT_VERIFICATION orders
-// with fiat metadata against
+// ReconcileFiatOrders checks AWAITING_PAYMENT orders with fiat metadata against
 // the payment provider. If the provider reports the payment as succeeded but the
 // order has not reached verified states (missed webhook), it triggers the payment flow.
+// Orders in AWAITING_PAYMENT_VERIFICATION are handled by PaymentVerificationLoop.
 // If the provider reports canceled/failed, it's a no-op (order timeout handles cancellation).
 func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 	if s.webhookHandler == nil {
@@ -1002,11 +1002,8 @@ func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 	var orders []models.Order
 	err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().
-			Where("state IN ? AND open = ? AND fiat_metadata IS NOT NULL AND length(fiat_metadata) > 2",
-				[]models.OrderState{
-					models.OrderState_AWAITING_PAYMENT,
-					models.OrderState_AWAITING_PAYMENT_VERIFICATION,
-				}, true).
+			Where("state = ? AND open = ? AND fiat_metadata IS NOT NULL AND length(fiat_metadata) > 2",
+				models.OrderState_AWAITING_PAYMENT, true).
 			Find(&orders).Error
 	})
 	if err != nil {

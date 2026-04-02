@@ -331,6 +331,33 @@ func TestProvider_GetPayment_CapturedOrder_UsesCaptureID(t *testing.T) {
 	assert.Equal(t, "USD", detail.Currency)
 }
 
+func TestProvider_GetPayment_CaptureIDFallback(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/checkout/orders/CAP-FALLBACK-001", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"name":"RESOURCE_NOT_FOUND"}`))
+	})
+	mux.HandleFunc("/v2/payments/captures/CAP-FALLBACK-001", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		json.NewEncoder(w).Encode(captureDetail{
+			ID:     "CAP-FALLBACK-001",
+			Status: "COMPLETED",
+			Amount: amount{CurrencyCode: "USD", Value: "29.99"},
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+
+	detail, err := p.GetPayment(context.Background(), "CAP-FALLBACK-001")
+	require.NoError(t, err)
+	assert.Equal(t, "CAP-FALLBACK-001", detail.PaymentID)
+	assert.Equal(t, "succeeded", detail.Status)
+	assert.Equal(t, int64(2999), detail.Amount)
+	assert.Equal(t, "USD", detail.Currency)
+	assert.Equal(t, "paypal", detail.PaymentMethod.Brand)
+}
+
 func TestProvider_ParseWebhook_PaymentSucceeded_ResourceLevel(t *testing.T) {
 	ts, p := newWebhookTestProvider(t)
 	defer ts.Close()

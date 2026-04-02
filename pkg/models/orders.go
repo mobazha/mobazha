@@ -642,6 +642,17 @@ func (o *Order) OrderCancelMessage() (*pb.OrderCancel, error) {
 	return orderCancel, nil
 }
 
+// SetSystemCancelReason creates an OrderCancel record for system-initiated cancellations
+// (e.g. payment timeout, stale order cleanup) where no P2P message is involved.
+func (o *Order) SetSystemCancelReason(reason string) {
+	cancelMsg := &pb.OrderCancel{
+		Reason:    reason,
+		Timestamp: timestamppb.Now(),
+	}
+	out := marshaler.Format(cancelMsg)
+	o.SerializedOrderCancel = []byte(out)
+}
+
 // OrderConfirmationMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) OrderConfirmationMessage() (*pb.OrderConfirmation, error) {
 	if len(o.SerializedOrderConfirmation) == 0 {

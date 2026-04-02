@@ -88,6 +88,7 @@ message OrderConfirmation {
 message OrderCancel {
     string transactionID                = 1; // Only cancelable orders.
     google.protobuf.Timestamp timestamp = 2;
+    string reason                       = 3; // e.g. "payment_timeout", "payment_verification_timeout"
 }
 
 message RatingSignatures {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -76,7 +77,7 @@ func (ra *ReceivingAccount) AcceptedCurrencies() []string {
 
 	var currencies []string
 	for _, token := range tokens {
-		if token == iwallet.NATIVE_SYMBOL {
+		if token == iwallet.NATIVE_SYMBOL || strings.EqualFold(token, string(ra.ChainType)) {
 			currencies = append(currencies, string(ra.ChainType))
 		} else {
 			currencies = append(currencies, string(ra.ChainType)+token)
@@ -154,6 +155,26 @@ func (ra *ReceivingAccount) UnmarshalJSON(b []byte) error {
 	ra.Status = raJSON.Status
 	ra.CreatedAt = raJSON.CreatedAt
 	ra.UpdatedAt = raJSON.UpdatedAt
+	return nil
+}
+
+// NormalizeActiveTokens replaces token entries that match the chain type
+// with the canonical NATIVE_SYMBOL, preventing duplicates like "BTCBTC".
+func (ra *ReceivingAccount) NormalizeActiveTokens() error {
+	tokens, err := ra.ActiveTokens()
+	if err != nil {
+		return err
+	}
+	normalized := false
+	for i, token := range tokens {
+		if strings.EqualFold(token, string(ra.ChainType)) && token != iwallet.NATIVE_SYMBOL {
+			tokens[i] = iwallet.NATIVE_SYMBOL
+			normalized = true
+		}
+	}
+	if normalized {
+		return ra.SetActiveTokens(tokens)
+	}
 	return nil
 }
 

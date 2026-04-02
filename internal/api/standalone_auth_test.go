@@ -44,8 +44,8 @@ func TestAuthMiddleware_RejectsNoAuth(t *testing.T) {
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", rr.Code)
 	}
-	if rr.Header().Get("WWW-Authenticate") == "" {
-		t.Error("expected WWW-Authenticate header")
+	if rr.Header().Get("WWW-Authenticate") != "" {
+		t.Error("API routes should not send WWW-Authenticate (triggers browser native dialog)")
 	}
 }
 

@@ -6,7 +6,8 @@ set -euo pipefail
 # This script:
 #   1. Builds the Vite SPA from the mobazha-unified monorepo
 #   2. Copies the dist/ output into this repo's build context
-#   3. Builds the multi-stage Docker image with the real frontend
+#   3. Detects mobazha-core path for multi-repo Docker build
+#   4. Builds the multi-stage Docker image with the real frontend
 #
 # Usage:
 #   ./deploy/standalone/build-standalone.sh [OPTIONS]
@@ -14,6 +15,7 @@ set -euo pipefail
 # Options:
 #   -t TAG         Docker image tag (default: mobazha/standalone:dev)
 #   -f FRONTEND    Path to mobazha-unified repo (default: auto-detect)
+#   -c CORE        Path to mobazha-core repo (default: auto-detect from go.work)
 #   -s             Skip frontend build (use existing dist in FRONTEND_DIR)
 #   -p             Push image after build
 #   --platform P   Docker buildx platform (e.g. linux/amd64,linux/arm64)
@@ -27,6 +29,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 IMAGE_TAG="mobazha/standalone:dev"
 FRONTEND_REPO=""
+CORE_REPO=""
 SKIP_FRONTEND=false
 PUSH=false
 PLATFORM=""
@@ -35,6 +38,7 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -t) IMAGE_TAG="$2"; shift 2 ;;
         -f) FRONTEND_REPO="$2"; shift 2 ;;
+        -c) CORE_REPO="$2"; shift 2 ;;
         -s) SKIP_FRONTEND=true; shift ;;
         -p) PUSH=true; shift ;;
         --platform) PLATFORM="$2"; shift 2 ;;
@@ -60,8 +64,37 @@ if [[ -z "$FRONTEND_REPO" ]]; then
     exit 1
 fi
 
+# Auto-detect mobazha-core repo location
+if [[ -z "$CORE_REPO" ]]; then
+    # Try go.work first (most reliable)
+    if [[ -f "$REPO_ROOT/go.work" ]]; then
+        CORE_PATH=$(grep 'replace github.com/mobazha/mobazha-core =>' "$REPO_ROOT/go.work" | sed 's/.*=> //' | xargs)
+        if [[ -n "$CORE_PATH" && -f "$CORE_PATH/go.mod" ]]; then
+            CORE_REPO="$(cd "$CORE_PATH" && pwd)"
+        fi
+    fi
+    # Fallback: common locations
+    if [[ -z "$CORE_REPO" ]]; then
+        for candidate in \
+            "$REPO_ROOT/../mobazha-core" \
+            "$HOME/dev/mobazha/core" \
+            "$HOME/go/src/github.com/mobazha/mobazha-core"; do
+            if [[ -f "$candidate/go.mod" ]]; then
+                CORE_REPO="$(cd "$candidate" && pwd)"
+                break
+            fi
+        done
+    fi
+fi
+
+if [[ -z "$CORE_REPO" ]]; then
+    echo "ERROR: Cannot find mobazha-core repo. Use -c to specify path." >&2
+    exit 1
+fi
+
 echo "==> Config"
 echo "    Backend repo:  $REPO_ROOT"
+echo "    Core repo:     $CORE_REPO"
 echo "    Frontend repo: $FRONTEND_REPO"
 echo "    Image tag:     $IMAGE_TAG"
 echo ""
@@ -111,6 +144,7 @@ echo "==> Building Docker image..."
 BUILD_ARGS=(
     -f "$SCRIPT_DIR/Dockerfile.standalone"
     --build-arg "FRONTEND_DIR=deploy/standalone/.frontend-dist"
+    --build-context "core=$CORE_REPO"
     -t "$IMAGE_TAG"
 )
 
@@ -126,6 +160,7 @@ DOCKER_BUILDKIT=1 docker build "${BUILD_ARGS[@]}" "$REPO_ROOT"
 
 echo ""
 echo "==> Done! Image: $IMAGE_TAG"
+echo "    Image size: $(docker image inspect "$IMAGE_TAG" --format='{{.Size}}' 2>/dev/null | awk '{printf "%.1f MB", $1/1024/1024}')"
 if [[ "$PUSH" == "false" ]]; then
     echo "    Use -p to push, or run:"
     echo "    docker push $IMAGE_TAG"

@@ -3,7 +3,7 @@ module github.com/mobazha/mobazha3.0
 go 1.25.0
 
 // Sentinel path: on dev machines, go.work overrides with actual local path.
-replace github.com/mobazha/mobazha-core => /Users/mingfeng/go/src/github.com/mobazha/mobazha-core
+replace github.com/mobazha/mobazha-core => /home/mingfeng/dev/mobazha/core
 
 require (
 	github.com/btcsuite/btcd v0.25.0

@@ -7,7 +7,7 @@ NODE_PORT="${NODE_PORT:-5102}"
 RETRIES=0
 MAX_RETRIES=60
 
-while ! wget -q -O /dev/null "http://localhost:${NODE_PORT}/healthz" 2>/dev/null; do
+while ! wget -q -O /dev/null "http://127.0.0.1:${NODE_PORT}/healthz" 2>/dev/null; do
     RETRIES=$((RETRIES + 1))
     if [ "$RETRIES" -gt "$MAX_RETRIES" ]; then
         echo "caddy: mobazha-node did not become healthy within ${MAX_RETRIES}s" >&2

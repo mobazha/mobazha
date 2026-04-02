@@ -26,25 +26,34 @@
 
 	# --- Node API: all /v1/* routes to local mobazha-node ---
 	handle /v1/* {
-		reverse_proxy localhost:{$NODE_PORT:5102}
-	}
-
-	# --- Admin routes: protected by BasicAuth on the node side ---
-	handle /admin/* {
-		reverse_proxy localhost:{$NODE_PORT:5102}
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
 	}
 
 	# --- Health check (unauthenticated) ---
 	handle /healthz {
-		reverse_proxy localhost:{$NODE_PORT:5102}
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
 	}
 
 	# --- WebSocket ---
 	handle /ws {
-		reverse_proxy localhost:{$NODE_PORT:5102}
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
 	}
 	handle /ws/* {
-		reverse_proxy localhost:{$NODE_PORT:5102}
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
+	}
+
+	# --- SSR: meta injection for crawlers + embed cards ---
+	handle /product/* {
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
+	}
+	handle /store/* {
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
+	}
+	handle /embed/* {
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
+	}
+	handle /api/oembed {
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
 	}
 
 	# --- Frontend SPA: serve static files, fallback to index.html ---

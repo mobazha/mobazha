@@ -107,7 +107,6 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 				}
 			}
 			if !ok {
-				w.Header().Set("WWW-Authenticate", `Basic realm="Mobazha"`)
 				ErrorResponse(w, http.StatusUnauthorized, "Authentication required")
 				return
 			}
@@ -115,7 +114,6 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 			providedHash := hex.EncodeToString(h[:])
 
 			if !g.auth.check(username, providedHash) {
-				w.Header().Set("WWW-Authenticate", `Basic realm="Mobazha"`)
 				ErrorResponse(w, http.StatusUnauthorized, "Invalid credentials")
 				return
 			}

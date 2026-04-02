@@ -1,0 +1,18 @@
+# Docker build context exclusions
+.git
+.github
+.cursor
+.vscode
+*.md
+LICENSE
+
+# Go workspace files (replace directives point to host paths)
+go.work
+go.work.sum
+
+# Build artifacts
+deploy/standalone/*.tar.gz
+
+# Test data
+testdata
+*_test.go

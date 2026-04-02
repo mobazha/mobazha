@@ -12,32 +12,45 @@
 # Manual build (with pre-built frontend):
 #   docker buildx build -f deploy/standalone/Dockerfile.standalone \
 #     --build-arg FRONTEND_DIR=deploy/standalone/.frontend-dist \
+#     --build-context core=/path/to/mobazha-core \
 #     -t mobazha/standalone:dev .
 #
-# Required build context: the mobazha3.0 repository root.
-# For local builds with go.work dependencies, prepare a build context
-# containing mobazha3.0/, mobazha-core/, etherscan-api/ (see E2E Dockerfile).
+# Required build contexts:
+#   - Default context: mobazha3.0 repository root
+#   - Named context "core": mobazha-core repository root (for go.mod replace)
 
 ARG GO_VERSION=1.26
 ARG NODE_VERSION=20
 ARG ALPINE_VERSION=3.20
 ARG S6_OVERLAY_VERSION=3.2.0.0
-ARG CADDY_VERSION=2.9
 
 # ============================================================
-# Stage 1: Go builder — compile mobazha-node + UPX compress
+# Stage 1: Go builder — compile mobazha-node on Alpine (musl)
 # ============================================================
-FROM golang:${GO_VERSION}-bookworm AS go-builder
+FROM golang:${GO_VERSION}-alpine AS go-builder
 
-RUN apt-get update -qq && apt-get install -qq -y gcc git upx-ucl >/dev/null 2>&1
+RUN apk add --no-cache gcc musl-dev git upx
 
+WORKDIR /src
+
+# Copy mobazha-core from named build context
+COPY --from=core . /src/core
+
+# Set up mobazha3.0
 WORKDIR /src/mobazha3.0
-
 COPY go.mod go.sum ./
+
+# Rewrite go.mod replace to point to the in-container path (for dependency caching layer)
+RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod
+
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
+# COPY . . overwrites go.mod with the original host path — must sed again + tidy
 COPY . .
+RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod && \
+    go mod tidy
+
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 go build -tags goolm \
@@ -46,11 +59,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     upx --best --lzma /out/mobazha || true
 
 # ============================================================
-# Stage 2: Frontend builder — build + Brotli compress
+# Stage 2: Frontend builder — Brotli compress pre-built SPA
 # ============================================================
-FROM node:${NODE_VERSION}-bookworm-slim AS fe-builder
+FROM node:${NODE_VERSION}-alpine AS fe-builder
 
-RUN apt-get update -qq && apt-get install -qq -y brotli >/dev/null 2>&1
+RUN apk add --no-cache brotli
 
 WORKDIR /src/frontend
 
@@ -66,15 +79,21 @@ RUN find ./dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -n
 FROM alpine:${ALPINE_VERSION}
 
 ARG S6_OVERLAY_VERSION
-ARG CADDY_VERSION
 ARG TARGETARCH
 
-# s6-overlay
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp/
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${TARGETARCH}.tar.xz /tmp/
-RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
-    tar -C / -Jxpf /tmp/s6-overlay-${TARGETARCH}.tar.xz && \
-    rm -f /tmp/s6-overlay-*.tar.xz
+# Map Docker TARGETARCH to s6-overlay release naming
+RUN set -ex; \
+    case "${TARGETARCH}" in \
+      amd64) S6_ARCH="x86_64" ;; \
+      arm64) S6_ARCH="aarch64" ;; \
+      arm)   S6_ARCH="arm" ;; \
+      *)     S6_ARCH="${TARGETARCH}" ;; \
+    esac; \
+    wget -q "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" -O /tmp/s6-noarch.tar.xz && \
+    wget -q "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" -O /tmp/s6-arch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-noarch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-arch.tar.xz && \
+    rm -f /tmp/s6-*.tar.xz
 
 # Runtime dependencies
 RUN apk add --no-cache \
@@ -82,9 +101,9 @@ RUN apk add --no-cache \
     curl \
     jq \
     gettext \
-    caddy~=${CADDY_VERSION}
+    caddy
 
-# Copy UPX-compressed mobazha binary
+# Copy UPX-compressed mobazha binary (musl-linked, Alpine-native)
 COPY --from=go-builder /out/mobazha /usr/local/bin/mobazha
 
 # Copy Caddyfile templates (native env var for startup, Go template for runtime)
@@ -105,7 +124,8 @@ VOLUME ["/data", "/data/caddy"]
 EXPOSE 80 443
 
 # Environment defaults
-ENV NODE_PORT=5102 \
+ENV S6_KEEP_ENV=1 \
+    NODE_PORT=5102 \
     STORE_DOMAIN="" \
     SAAS_API_URL="https://app.mobazha.org" \
     STANDALONE_API_KEY="" \

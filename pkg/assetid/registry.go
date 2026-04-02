@@ -201,9 +201,9 @@ func runtimeMeta(blockInterval time.Duration, bip44Code uint) RuntimeMeta {
 }
 
 var defaultDefinitions = []Definition{
-	{Code: "BTC", AssetID: "crypto:bip122:000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f:native", Pricing: pricingMeta("BTC", "bitcoin", PriceSource{Provider: "binance", ID: "BTCUSDT"}), DisplaySymbol: "BTC", DisplayName: "Bitcoin", Decimals: 8, Runtime: runtimeMeta(10*time.Minute, 0)},
+	{Code: "BTC", AssetID: "crypto:bip122:000000000019d6689c085ae165831e93:native", Pricing: pricingMeta("BTC", "bitcoin", PriceSource{Provider: "binance", ID: "BTCUSDT"}), DisplaySymbol: "BTC", DisplayName: "Bitcoin", Decimals: 8, Runtime: runtimeMeta(10*time.Minute, 0)},
 	{Code: "BCH", AssetID: "crypto:bitcoincash:mainnet:native", Pricing: pricingMeta("BCH", "bitcoin-cash"), DisplaySymbol: "BCH", DisplayName: "Bitcoin Cash", Decimals: 8, Runtime: runtimeMeta(10*time.Minute, 145)},
-	{Code: "LTC", AssetID: "crypto:bip122:12a765e31ffd4059bada1e25190f6e98c99d9714d334efa41a195a7e7e04bfe2:native", Pricing: pricingMeta("LTC", "litecoin", PriceSource{Provider: "binance", ID: "LTCUSDT"}), DisplaySymbol: "LTC", DisplayName: "Litecoin", Decimals: 8, Runtime: runtimeMeta(150*time.Second, 2)},
+	{Code: "LTC", AssetID: "crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native", Pricing: pricingMeta("LTC", "litecoin", PriceSource{Provider: "binance", ID: "LTCUSDT"}), DisplaySymbol: "LTC", DisplayName: "Litecoin", Decimals: 8, Runtime: runtimeMeta(150*time.Second, 2)},
 	{Code: "ZEC", AssetID: "crypto:zcash:mainnet:native", Pricing: pricingMeta("ZEC", "zcash"), DisplaySymbol: "ZEC", DisplayName: "Zcash", Decimals: 8, Runtime: runtimeMeta(150*time.Second, 133)},
 	{Code: "ETH", AssetID: "crypto:eip155:1:native", Pricing: pricingMeta("ETH", "ethereum", PriceSource{Provider: "binance", ID: "ETHUSDT"}), DisplaySymbol: "ETH", DisplayName: "Ethereum", Decimals: 18, Runtime: runtimeMeta(12*time.Second, 60)},
 	{Code: "ETHUSDT", AssetID: "crypto:eip155:1:erc20:0xF36BFeE8fd7F1950c0129714Faf6d1e1F94a66AA", Pricing: pricingMetaUSDPegged("USDT", "tether"), DisplaySymbol: "USDT", DisplayName: "Tether USD", Decimals: 6, Runtime: runtimeMeta(12*time.Second, 0)},

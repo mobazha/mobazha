@@ -148,7 +148,7 @@ func TestCanonicalNativeCoinType(t *testing.T) {
 		expected CoinType
 		ok       bool
 	}{
-		{chain: ChainBitcoin, expected: "crypto:bip122:000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f:native", ok: true},
+		{chain: ChainBitcoin, expected: "crypto:bip122:000000000019d6689c085ae165831e93:native", ok: true},
 		{chain: ChainEthereum, expected: "crypto:eip155:1:native", ok: true},
 		{chain: ChainBSC, expected: "crypto:eip155:56:native", ok: true},
 		{chain: ChainPolygon, expected: "crypto:eip155:137:native", ok: true},

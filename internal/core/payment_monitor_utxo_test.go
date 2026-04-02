@@ -488,7 +488,7 @@ func TestCoinSwitchDetection(t *testing.T) {
 	require.NoError(t, err)
 
 	// Detect switch to LTC
-	newCoin := iwallet.CoinType("crypto:bip122:12a765e31ffd4059bada1e25190f6e98c99d9714d334efa41a195a7e7e04bfe2:native")
+	newCoin := iwallet.CoinType("crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native")
 	pendingInfo, _ := order.GetPendingPaymentInfo()
 	hasCoinSwitch := pendingInfo != nil && pendingInfo.Coin != "" && pendingInfo.Coin != string(newCoin)
 	assert.True(t, hasCoinSwitch, "Should detect coin switch from BTC to LTC")

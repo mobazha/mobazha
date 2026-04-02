@@ -85,7 +85,22 @@ func IsCanonical(raw string) bool {
 	return strings.TrimSpace(raw) == normalized
 }
 
-var bip122ChainRefRE = regexp.MustCompile("^[0-9a-f]{64}$")
+var bip122ChainRefRE = regexp.MustCompile("^[0-9a-f]{32}$")
+
+var (
+	solanaChainRefs = map[string]struct{}{"mainnet": {}, "devnet": {}, "testnet": {}}
+	tronChainRefs   = map[string]struct{}{"mainnet": {}, "shasta": {}, "nile": {}}
+	bchChainRefs    = map[string]struct{}{"mainnet": {}, "testnet": {}}
+	zecChainRefs    = map[string]struct{}{"mainnet": {}, "testnet": {}}
+)
+
+func validateChainRefWhitelist(ns Namespace, chainRef string, allowed map[string]struct{}) (string, error) {
+	normalized := strings.ToLower(chainRef)
+	if _, ok := allowed[normalized]; !ok {
+		return "", newError(ErrCodeInvalidChainRef, fmt.Sprintf("unsupported %s chain_ref %q", ns, chainRef))
+	}
+	return normalized, nil
+}
 
 func Normalize(raw string) (string, error) {
 	input := strings.TrimSpace(raw)
@@ -158,8 +173,14 @@ func normalizeChainRef(ns Namespace, chainRef string) (string, error) {
 			return "", newError(ErrCodeInvalidChainRef, fmt.Sprintf("invalid bip122 chain_ref %q", chainRef))
 		}
 		return n, nil
-	case NamespaceTRON, NamespaceSolana, NamespaceBitcoinCash, NamespaceZCash:
-		return strings.ToLower(chainRef), nil
+	case NamespaceSolana:
+		return validateChainRefWhitelist(ns, chainRef, solanaChainRefs)
+	case NamespaceTRON:
+		return validateChainRefWhitelist(ns, chainRef, tronChainRefs)
+	case NamespaceBitcoinCash:
+		return validateChainRefWhitelist(ns, chainRef, bchChainRefs)
+	case NamespaceZCash:
+		return validateChainRefWhitelist(ns, chainRef, zecChainRefs)
 	default:
 		return "", newError(ErrCodeInvalidNamespace, fmt.Sprintf("unsupported namespace %q", ns))
 	}

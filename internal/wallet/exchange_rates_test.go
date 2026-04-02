@@ -99,7 +99,7 @@ func TestExchangeRateProviderGetUSDRate_Mock(t *testing.T) {
 		t.Fatalf("failed to create mock exchange rates: %v", err)
 	}
 
-	rate, err := erp.GetUSDRate(iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f:native"))
+	rate, err := erp.GetUSDRate(iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native"))
 	if err != nil {
 		t.Fatalf("failed to get BTC USD rate: %v", err)
 	}

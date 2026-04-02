@@ -241,6 +241,14 @@ func (c CurrencyDictionary) Lookup(code string) (*Currency, error) {
 		}
 	}
 
+	// Handle CAIP-2 crypto asset identifiers: "crypto:bip122:...:native"
+	if strings.HasPrefix(strings.ToLower(code), "crypto:") {
+		coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(code))
+		if err == nil && coinInfo.Symbol != "" {
+			code = coinInfo.Symbol
+		}
+	}
+
 	upcase := strings.ToUpper(code)
 	def, ok := c[upcase]
 	if !ok {

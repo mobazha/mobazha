@@ -223,7 +223,7 @@ func TestUTXOMonitor_WatchAddress(t *testing.T) {
 		OrderID:        "order_123",
 		ExpectedAmount: 100000,
 		CreatedAt:      time.Now(),
-		ExpiresAt:      time.Now().Add(24 * time.Hour),
+		ExpiresAt:      time.Now().Add(AddressMonitorDuration),
 	}
 
 	err := monitor.WatchAddress(wa)
@@ -249,7 +249,7 @@ func TestUTXOMonitor_PaymentDetection(t *testing.T) {
 		OrderID:        "order_456",
 		ExpectedAmount: 100000,
 		CreatedAt:      time.Now(),
-		ExpiresAt:      time.Now().Add(24 * time.Hour),
+		ExpiresAt:      time.Now().Add(AddressMonitorDuration),
 	}
 
 	err := monitor.WatchAddress(wa)

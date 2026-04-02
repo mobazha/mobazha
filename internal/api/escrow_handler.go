@@ -21,6 +21,15 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
+const (
+	// UTXOPaymentWindowDuration is the user-facing payment window for UTXO
+	// external wallet payments. Aligned with the 15-minute rate lock window
+	// (EXCHANGE_RATE_DESIGN.md §13) and industry standard (BitPay, BTCPay).
+	// The backend address monitor runs independently for 24h as a safety net
+	// (see payment_app_service_utxo.go AddressMonitorDuration).
+	UTXOPaymentWindowDuration = 15 * time.Minute
+)
+
 // ============================================================================
 // 响应结构定义
 // ============================================================================
@@ -258,7 +267,7 @@ func (g *Gateway) formatMonitoredPaymentResponse(w http.ResponseWriter, params m
 		Script:         paymentData.Script,
 		Moderator:      paymentData.Moderator,
 		UnlockHours:    paymentData.UnlockHours,
-		ExpiresAt:      time.Now().Add(24 * time.Hour),
+		ExpiresAt:      time.Now().Add(UTXOPaymentWindowDuration),
 	}
 	responsePkg.Success(w, response)
 }

@@ -48,6 +48,20 @@
 		reverse_proxy localhost:{{ .NodePort }}
 	}
 
+	# SSR: meta injection for crawlers + embed cards
+	handle /product/* {
+		reverse_proxy localhost:{{ .NodePort }}
+	}
+	handle /store/* {
+		reverse_proxy localhost:{{ .NodePort }}
+	}
+	handle /embed/* {
+		reverse_proxy localhost:{{ .NodePort }}
+	}
+	handle /api/oembed {
+		reverse_proxy localhost:{{ .NodePort }}
+	}
+
 	# Frontend SPA
 	handle {
 		root * /srv/www

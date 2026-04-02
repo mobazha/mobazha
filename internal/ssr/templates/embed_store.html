@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Name}} — Mobazha Store</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#fff;--text:#1a1a1a;--muted:#6b7280;--border:#e5e7eb;
+  --accent:#2563eb;--accent-text:#fff;--card-bg:#fff;
+}
+.dark{
+  --bg:#18181b;--text:#f4f4f5;--muted:#a1a1aa;--border:#3f3f46;
+  --accent:#3b82f6;--accent-text:#fff;--card-bg:#27272a;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.4}
+.card{display:block;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);max-width:480px;overflow:hidden;text-decoration:none;color:inherit}
+.card:hover{border-color:var(--accent)}
+.header{height:80px;background:var(--border);background-size:cover;background-position:center}
+.body{display:flex;gap:12px;padding:14px;align-items:center}
+.avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--border);margin-top:-28px;border:3px solid var(--card-bg)}
+.info{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.about{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.stats{font-size:12px;color:var(--muted);display:flex;gap:10px;margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);padding:0 14px 10px}
+.badge svg{width:14px;height:14px}
+</style>
+</head>
+<body{{if .Dark}} class="dark"{{end}}>
+<a class="card" href="{{.StoreURL}}" target="_blank" rel="noopener noreferrer">
+  <div class="header"{{if .HeaderURL}} style="background-image:url('{{.HeaderURL}}')"{{end}}></div>
+  <div class="body">
+    {{if .AvatarURL}}<img class="avatar" src="{{.AvatarURL}}" alt="{{.Name}}" loading="lazy">
+    {{else}}<div class="avatar"></div>{{end}}
+    <div class="info">
+      <div class="name">{{.Name}}</div>
+      {{if .About}}<div class="about">{{.About}}</div>{{end}}
+      <div class="stats">
+        {{if .ListingCount}}<span>{{.ListingCount}} products</span>{{end}}
+        {{if .RatingCount}}<span>★ {{.AvgRating}} ({{.RatingCount}})</span>{{end}}
+        {{if .Location}}<span>📍 {{.Location}}</span>{{end}}
+      </div>
+    </div>
+  </div>
+  <div class="badge">
+    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z"/></svg>
+    on Mobazha
+  </div>
+</a>
+<script>
+(function(){
+  var h=document.documentElement.scrollHeight;
+  window.parent.postMessage({type:'mobazha-embed-resize',height:h},'*');
+  new ResizeObserver(function(){
+    var nh=document.documentElement.scrollHeight;
+    if(nh!==h){h=nh;window.parent.postMessage({type:'mobazha-embed-resize',height:h},'*');}
+  }).observe(document.body);
+})();
+</script>
+</body>
+</html>

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/internal/ssr"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -132,6 +133,12 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	topMux.Handle("/ws", r)
 
 	topMux.HandleFunc("/healthz", g.handleHealthz)
+
+	// SSR: register meta injection + embed routes for standalone mode.
+	// Activated when SPA directory exists (container deployment).
+	if ssrHandler := ssr.NewFromEnv(config.LocalPeerID); ssrHandler != nil {
+		ssrHandler.RegisterRoutes(topMux)
+	}
 
 	g.handler = topMux
 	return g, nil

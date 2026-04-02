@@ -26,7 +26,7 @@ services:
       - ${INSTALL_DIR:-/opt/mobazha}:/hostconfig
     environment:
       - STORE_DOMAIN=${STORE_DOMAIN:-}
-      - SAAS_API_URL=${SAAS_API_URL:-https://store.mobazha.org}
+      - SAAS_API_URL=${SAAS_API_URL:-https://app.mobazha.org}
       - STANDALONE_API_KEY=${STANDALONE_API_KEY}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - SAAS_PEER_ID=${SAAS_PEER_ID:-}

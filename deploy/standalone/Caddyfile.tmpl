@@ -5,7 +5,7 @@
 #
 # Required env vars:
 #   STORE_DOMAIN       — Domain name (e.g. "my-store.com") or empty for IP mode
-#   SAAS_API_URL       — SaaS backend URL (e.g. "https://store.mobazha.org")
+#   SAAS_API_URL       — SaaS backend URL (e.g. "https://app.mobazha.org")
 #   STANDALONE_API_KEY — API key for authenticating with SaaS
 #   NODE_PORT          — Local mobazha-node port (default: 5102)
 #
@@ -19,7 +19,7 @@
 	# --- Buyer API proxy: strip /buyer-api prefix, forward to SaaS ---
 	handle /buyer-api/* {
 		uri strip_prefix /buyer-api
-		reverse_proxy {$SAAS_API_URL:https://store.mobazha.org} {
+		reverse_proxy {$SAAS_API_URL:https://app.mobazha.org} {
 			header_up X-Standalone-Store-Key {$STANDALONE_API_KEY}
 		}
 	}

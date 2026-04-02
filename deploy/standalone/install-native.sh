@@ -121,8 +121,8 @@ prompt_config() {
     echo ""
     ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 
-    read -rp "SaaS API URL [https://store.mobazha.org]: " SAAS_API_URL
-    SAAS_API_URL="${SAAS_API_URL:-https://store.mobazha.org}"
+    read -rp "SaaS API URL [https://app.mobazha.org]: " SAAS_API_URL
+    SAAS_API_URL="${SAAS_API_URL:-https://app.mobazha.org}"
 
     cat > "${CONF_DIR}/env" <<EOF
 STORE_DOMAIN=${STORE_DOMAIN}

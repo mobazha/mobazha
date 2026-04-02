@@ -103,7 +103,7 @@ EXPOSE 80 443
 # Environment defaults
 ENV NODE_PORT=5102 \
     STORE_DOMAIN="" \
-    SAAS_API_URL="https://store.mobazha.org" \
+    SAAS_API_URL="https://app.mobazha.org" \
     STANDALONE_API_KEY="" \
     ADMIN_PASSWORD="" \
     SAAS_PEER_ID="" \

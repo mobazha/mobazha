@@ -9,7 +9,7 @@ set -euo pipefail
 # Optional flags:
 #   --domain <domain>        Pre-configure a domain (enables auto-TLS via Let's Encrypt)
 #   --overlay <tor|lokinet>  Enable privacy overlay network
-#   --saas-url <url>         Override SaaS API URL (default: https://store.mobazha.org)
+#   --saas-url <url>         Override SaaS API URL (default: https://app.mobazha.org)
 #   --help                   Show this help message
 #
 # Tested on: Ubuntu 22.04+, Debian 12+
@@ -27,7 +27,7 @@ NC='\033[0m'
 
 STORE_DOMAIN=""
 STANDALONE_API_KEY=""
-SAAS_API_URL="${SAAS_API_URL:-https://store.mobazha.org}"
+SAAS_API_URL="${SAAS_API_URL:-https://app.mobazha.org}"
 CONNECTIVITY="public"
 OVERLAY_TYPE=""
 PUBLIC_IP=""
@@ -218,7 +218,7 @@ Examples:
 
 Environment:
   INSTALL_DIR     Installation directory (default: /opt/mobazha)
-  SAAS_API_URL    SaaS API URL (default: https://store.mobazha.org)
+  SAAS_API_URL    SaaS API URL (default: https://app.mobazha.org)
 HELP
 }
 

@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+#
+# mobazha-ctl — Standalone store management utility
+#
+# Usage:
+#   mobazha-ctl status              Show service status
+#   mobazha-ctl restart             Restart all services
+#   mobazha-ctl overlay status      Show overlay network status
+#   mobazha-ctl overlay enable tor  Enable Tor overlay
+#   mobazha-ctl overlay enable lokinet  Enable Lokinet overlay
+#   mobazha-ctl overlay disable     Disable overlay network
+#   mobazha-ctl logs [lines]        Show recent store logs
+#
+set -euo pipefail
+
+INSTALL_DIR="${MOBAZHA_DIR:-/opt/mobazha}"
+ENV_FILE="$INSTALL_DIR/.env"
+COMPOSE_BASE="$INSTALL_DIR/docker-compose.yml"
+COMPOSE_OVERLAY="$INSTALL_DIR/docker-compose.overlay.yml"
+OVERLAY_COMPOSE_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.overlay.yml"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
+error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+
+env_get() {
+  local key="$1"
+  if [ -f "$ENV_FILE" ]; then
+    grep -E "^${key}=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d "'\""
+  fi
+}
+
+env_set() {
+  local key="$1" value="$2"
+  if [ ! -f "$ENV_FILE" ]; then
+    error ".env file not found at $ENV_FILE"
+    exit 1
+  fi
+  if grep -qE "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+  else
+    echo "${key}=${value}" >> "$ENV_FILE"
+  fi
+}
+
+compose_cmd() {
+  local overlay_type
+  overlay_type=$(env_get "OVERLAY_TYPE")
+  local cmd="docker compose -f $COMPOSE_BASE"
+  if [ -n "$overlay_type" ] && [ -f "$COMPOSE_OVERLAY" ]; then
+    cmd="$cmd -f $COMPOSE_OVERLAY --profile $overlay_type"
+  fi
+  eval "$cmd" "$@"
+}
+
+ensure_overlay_compose() {
+  if [ ! -f "$COMPOSE_OVERLAY" ]; then
+    info "Downloading overlay compose file..."
+    curl -sSL "$OVERLAY_COMPOSE_URL" -o "$COMPOSE_OVERLAY"
+  fi
+}
+
+cmd_status() {
+  echo -e "${CYAN}=== Mobazha Store Status ===${NC}"
+  echo ""
+  echo "Install directory: $INSTALL_DIR"
+  echo "Connectivity:      $(env_get 'CONNECTIVITY')"
+  echo "Overlay type:      $(env_get 'OVERLAY_TYPE' || echo 'none')"
+  echo "Store domain:      $(env_get 'STORE_DOMAIN' || echo '(IP mode)')"
+  echo ""
+  compose_cmd ps
+}
+
+cmd_restart() {
+  info "Restarting Mobazha services..."
+  compose_cmd restart
+  info "Services restarted."
+}
+
+cmd_logs() {
+  local lines="${1:-50}"
+  compose_cmd logs --tail="$lines" store
+}
+
+cmd_overlay_status() {
+  local overlay_type
+  overlay_type=$(env_get "OVERLAY_TYPE")
+  local connectivity
+  connectivity=$(env_get "CONNECTIVITY")
+
+  echo -e "${CYAN}=== Overlay Network Status ===${NC}"
+  echo ""
+  if [ -n "$overlay_type" ] && [ "$overlay_type" != "" ]; then
+    echo -e "  Status:  ${GREEN}Enabled${NC}"
+    echo "  Type:    $overlay_type"
+    echo "  Mode:    $connectivity"
+  else
+    echo -e "  Status:  ${YELLOW}Disabled${NC}"
+    echo "  Mode:    ${connectivity:-public}"
+  fi
+  echo ""
+}
+
+cmd_overlay_enable() {
+  local type="${1:-}"
+  if [ "$type" != "tor" ] && [ "$type" != "lokinet" ]; then
+    error "Usage: mobazha-ctl overlay enable <tor|lokinet>"
+    exit 1
+  fi
+
+  local current
+  current=$(env_get "OVERLAY_TYPE")
+  if [ "$current" = "$type" ]; then
+    info "Overlay '$type' is already enabled."
+    return
+  fi
+
+  ensure_overlay_compose
+
+  info "Enabling $type overlay network..."
+  env_set "OVERLAY_TYPE" "$type"
+  env_set "CONNECTIVITY" "overlay"
+
+  if [ -n "$current" ] && [ "$current" != "$type" ] && [ "$current" != "" ]; then
+    info "Stopping previous overlay ($current)..."
+    docker stop "mobazha-$current" 2>/dev/null || true
+  fi
+
+  info "Restarting services with $type profile..."
+  compose_cmd up -d
+
+  info "Overlay '$type' enabled. Store is restarting."
+  echo ""
+  local suffix="loki"
+  [ "$type" = "tor" ] && suffix="onion"
+  echo -e "  Your store will be accessible via a ${CYAN}.${suffix}${NC} address."
+  echo "  Check logs with: mobazha-ctl logs"
+}
+
+cmd_overlay_disable() {
+  local current
+  current=$(env_get "OVERLAY_TYPE")
+  if [ -z "$current" ] || [ "$current" = "" ]; then
+    info "Overlay is already disabled."
+    return
+  fi
+
+  info "Disabling overlay network..."
+  env_set "OVERLAY_TYPE" ""
+  env_set "CONNECTIVITY" "public"
+
+  info "Stopping overlay container..."
+  docker stop "mobazha-$current" 2>/dev/null || true
+
+  info "Restarting store without overlay..."
+  docker compose -f "$COMPOSE_BASE" up -d
+
+  info "Overlay disabled. Store is running in direct mode."
+}
+
+cmd_help() {
+  echo "mobazha-ctl — Standalone store management"
+  echo ""
+  echo "Usage:"
+  echo "  mobazha-ctl status                Show service status"
+  echo "  mobazha-ctl restart               Restart all services"
+  echo "  mobazha-ctl overlay status        Show overlay network status"
+  echo "  mobazha-ctl overlay enable <tor|lokinet>"
+  echo "                                    Enable overlay network"
+  echo "  mobazha-ctl overlay disable       Disable overlay network"
+  echo "  mobazha-ctl logs [lines]          Show recent store logs"
+  echo "  mobazha-ctl help                  Show this help"
+}
+
+case "${1:-help}" in
+  status)
+    cmd_status
+    ;;
+  restart)
+    cmd_restart
+    ;;
+  logs)
+    cmd_logs "${2:-50}"
+    ;;
+  overlay)
+    case "${2:-status}" in
+      status)  cmd_overlay_status ;;
+      enable)  cmd_overlay_enable "${3:-}" ;;
+      disable) cmd_overlay_disable ;;
+      *)       error "Unknown overlay command: $2"; cmd_help; exit 1 ;;
+    esac
+    ;;
+  help|--help|-h)
+    cmd_help
+    ;;
+  *)
+    error "Unknown command: $1"
+    cmd_help
+    exit 1
+    ;;
+esac

@@ -12,6 +12,7 @@ import (
 
 type systemHealthResponse struct {
 	Status    string             `json:"status"`
+	Version   string             `json:"version"`
 	Uptime    int64              `json:"uptimeSeconds"`
 	Timestamp int64              `json:"timestamp"`
 	System    systemResourceInfo `json:"system"`
@@ -53,6 +54,7 @@ func (g *Gateway) handleGETSystemHealth(w http.ResponseWriter, r *http.Request) 
 
 	resp := systemHealthResponse{
 		Status:    "healthy",
+		Version:   Version,
 		Uptime:    int64(time.Since(nodeStartTime).Seconds()),
 		Timestamp: time.Now().Unix(),
 		System: systemResourceInfo{

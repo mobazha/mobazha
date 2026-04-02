@@ -22,6 +22,8 @@ services:
     volumes:
       - store-data:/data
       - caddy-data:/data/caddy
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${INSTALL_DIR:-/opt/mobazha}:/hostconfig
     environment:
       - STORE_DOMAIN=${STORE_DOMAIN:-}
       - SAAS_API_URL=${SAAS_API_URL:-https://store.mobazha.org}

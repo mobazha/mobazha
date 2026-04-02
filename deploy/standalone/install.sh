@@ -1,27 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Mobazha Standalone Store — One-Click Installer
+# Mobazha Standalone Store — Zero-Config Installer
 #
 # Usage:
-#   Interactive mode (manual prompts):
-#     curl -sSL https://get.mobazha.org/standalone | sudo bash
+#   curl -sSL https://get.mobazha.org/standalone | sudo bash
 #
-#   Token mode (pre-configured via SaaS Deploy Wizard, zero interaction):
-#     curl -sSL https://get.mobazha.org/i/<token> | sudo bash
-#     # or
-#     sudo bash install.sh <token>
-#
-#   Options:
-#     --dry-run    Print generated .env without installing
-#     --help       Show this help message
+# Optional flags:
+#   --domain <domain>        Pre-configure a domain (enables auto-TLS via Let's Encrypt)
+#   --overlay <tor|lokinet>  Enable privacy overlay network
+#   --saas-url <url>         Override SaaS API URL (default: https://store.mobazha.org)
+#   --help                   Show this help message
 #
 # Tested on: Ubuntu 22.04+, Debian 12+
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/mobazha}"
 COMPOSE_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.yml"
 COMPOSE_OVERLAY_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.overlay.yml"
-SAAS_BASE_URL="${SAAS_BASE_URL:-https://app.mobazha.org}"
+CTL_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/mobazha-ctl"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -29,87 +25,16 @@ YELLOW='\033[1;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-DEPLOY_TOKEN=""
-DRY_RUN=false
-
 STORE_DOMAIN=""
 STANDALONE_API_KEY=""
-ADMIN_PASSWORD=""
-SAAS_API_URL=""
-SAAS_PEER_ID=""
-CONNECTIVITY="nat"
+SAAS_API_URL="${SAAS_API_URL:-https://store.mobazha.org}"
+CONNECTIVITY="public"
 OVERLAY_TYPE=""
-OVERLAY_DOMAIN=""
+PUBLIC_IP=""
 
 log()  { echo -e "${GREEN}[mobazha]${NC} $*"; }
 warn() { echo -e "${YELLOW}[mobazha]${NC} $*"; }
 err()  { echo -e "${RED}[mobazha]${NC} $*" >&2; }
-
-# --- Token Detection ---
-
-detect_token() {
-    local arg="${1:-}"
-    if [[ "$arg" =~ ^[0-9a-f]{64}$ ]]; then
-        DEPLOY_TOKEN="$arg"
-        return 0
-    fi
-    return 1
-}
-
-# --- SaaS API Integration ---
-
-fetch_config() {
-    local token="$1"
-    local url="${SAAS_BASE_URL}/platform/v1/deploy/config/${token}"
-    local response
-
-    log "Fetching deployment configuration..."
-    if ! response=$(curl -sSf --connect-timeout 15 --max-time 30 "$url" 2>&1); then
-        err "Failed to fetch config from SaaS. The token may be expired or invalid."
-        err "Response: $response"
-        exit 1
-    fi
-
-    echo "$response"
-}
-
-parse_config() {
-    local json="$1"
-
-    STORE_DOMAIN=$(echo "$json" | jq -r '.data.domain // empty')
-    STANDALONE_API_KEY=$(echo "$json" | jq -r '.data.apiKey // empty')
-    SAAS_API_URL=$(echo "$json" | jq -r '.data.saasUrl // empty')
-    ADMIN_PASSWORD=$(echo "$json" | jq -r '.data.adminPassword // empty')
-    CONNECTIVITY=$(echo "$json" | jq -r '.data.connectivity // "nat"')
-    SAAS_PEER_ID=$(echo "$json" | jq -r '.data.saasPeerID // empty')
-    OVERLAY_TYPE=$(echo "$json" | jq -r '.data.overlayType // empty')
-    OVERLAY_DOMAIN=$(echo "$json" | jq -r '.data.overlayDomain // empty')
-
-    if [ -z "$STANDALONE_API_KEY" ]; then
-        err "Invalid config response: missing apiKey."
-        exit 1
-    fi
-
-    log "Configuration loaded: domain=${STORE_DOMAIN:-<ip-mode>}, connectivity=${CONNECTIVITY}"
-    if [ -n "$OVERLAY_TYPE" ]; then
-        log "Overlay network: type=${OVERLAY_TYPE}, domain=${OVERLAY_DOMAIN:-<auto-detect>}"
-    fi
-}
-
-report_progress() {
-    if [ -z "$DEPLOY_TOKEN" ]; then
-        return 0
-    fi
-
-    local stage="$1"
-    local status="$2"
-    local url="${SAAS_BASE_URL}/platform/v1/deploy/progress/${DEPLOY_TOKEN}"
-
-    curl -sS --connect-timeout 10 --max-time 15 -X POST "$url" \
-        -H 'Content-Type: application/json' \
-        -d "{\"stage\":\"${stage}\",\"status\":\"${status}\"}" \
-        >/dev/null 2>&1 || warn "Progress report failed for stage=$stage (non-fatal)"
-}
 
 # --- Prerequisites ---
 
@@ -117,13 +42,6 @@ check_root() {
     if [ "$(id -u)" -ne 0 ]; then
         err "This script must be run as root (or with sudo)."
         exit 1
-    fi
-}
-
-check_jq() {
-    if ! command -v jq &>/dev/null; then
-        log "Installing jq..."
-        apt-get update -qq && apt-get install -qq -y jq
     fi
 }
 
@@ -154,56 +72,11 @@ generate_api_key() {
     openssl rand -hex 32
 }
 
-# --- Interactive Configuration ---
-
-prompt_config() {
-    echo ""
-    echo -e "${BOLD}=== Mobazha Standalone Store Setup ===${NC}"
-    echo ""
-
-    read -rp "Domain name (leave empty for IP mode): " STORE_DOMAIN
-    STORE_DOMAIN="${STORE_DOMAIN:-}"
-
-    STANDALONE_API_KEY="$(generate_api_key)"
-    log "Generated API Key: $STANDALONE_API_KEY"
-    log "(Save this key — you'll need it when registering with the SaaS platform)"
-
-    echo ""
-    read -rsp "Admin password (leave empty to auto-generate): " ADMIN_PASSWORD
-    echo ""
-    ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
-
-    read -rp "SaaS API URL [https://store.mobazha.org]: " SAAS_API_URL
-    SAAS_API_URL="${SAAS_API_URL:-https://store.mobazha.org}"
-
-    echo ""
-    echo "Connectivity mode:"
-    echo "  public  — Store has a public IP/domain (direct HTTPS)"
-    echo "  tunnel  — Behind NAT with Cloudflare Tunnel"
-    echo "  nat     — Behind NAT, managed via SaaS P2P proxy"
-    echo "  overlay — Privacy network (Lokinet or Tor)"
-    read -rp "Connectivity mode [nat]: " CONNECTIVITY
-    CONNECTIVITY="${CONNECTIVITY:-nat}"
-
-    if [ "$CONNECTIVITY" = "nat" ] || [ "$CONNECTIVITY" = "tunnel" ]; then
-        read -rp "SaaS Default Node Peer ID (for remote management): " SAAS_PEER_ID
-        SAAS_PEER_ID="${SAAS_PEER_ID:-}"
-    fi
-
-    if [ "$CONNECTIVITY" = "overlay" ]; then
-        echo ""
-        echo "Overlay network type:"
-        echo "  lokinet — Lokinet SNApp (.loki domain)"
-        echo "  tor     — Tor hidden service (.onion domain)"
-        read -rp "Overlay type [lokinet]: " OVERLAY_TYPE
-        OVERLAY_TYPE="${OVERLAY_TYPE:-lokinet}"
-
-        read -rp "Overlay domain (leave empty to auto-detect): " OVERLAY_DOMAIN
-        OVERLAY_DOMAIN="${OVERLAY_DOMAIN:-}"
-
-        read -rp "SaaS Default Node Peer ID (for TMA buyer access): " SAAS_PEER_ID
-        SAAS_PEER_ID="${SAAS_PEER_ID:-}"
-    fi
+detect_public_ip() {
+    curl -4 -sf --connect-timeout 5 --max-time 10 https://ifconfig.me 2>/dev/null \
+        || curl -4 -sf --connect-timeout 5 --max-time 10 https://api.ipify.org 2>/dev/null \
+        || hostname -I 2>/dev/null | awk '{print $1}' \
+        || echo "unknown"
 }
 
 # --- File Setup ---
@@ -213,11 +86,11 @@ write_env() {
 STORE_DOMAIN=${STORE_DOMAIN}
 SAAS_API_URL=${SAAS_API_URL}
 STANDALONE_API_KEY=${STANDALONE_API_KEY}
-ADMIN_PASSWORD=${ADMIN_PASSWORD}
-SAAS_PEER_ID=${SAAS_PEER_ID:-}
-CONNECTIVITY=${CONNECTIVITY:-nat}
-OVERLAY_TYPE=${OVERLAY_TYPE:-}
-OVERLAY_DOMAIN=${OVERLAY_DOMAIN:-}
+ADMIN_PASSWORD=
+SAAS_PEER_ID=
+CONNECTIVITY=${CONNECTIVITY}
+OVERLAY_TYPE=${OVERLAY_TYPE}
+OVERLAY_DOMAIN=
 TAG=stable
 EOF
     chmod 600 .env
@@ -244,6 +117,10 @@ setup_files() {
 
     write_env
     log "Created .env configuration"
+
+    curl -sSL "$CTL_URL" -o /usr/local/bin/mobazha-ctl
+    chmod +x /usr/local/bin/mobazha-ctl
+    log "Installed mobazha-ctl to /usr/local/bin/"
 }
 
 # --- Services ---
@@ -258,69 +135,56 @@ compose_cmd() {
 
 start_services() {
     log "Pulling images..."
-    report_progress "image_pulling" "in_progress"
     compose_cmd pull
-    report_progress "image_pulled" "completed"
 
     log "Starting services..."
-    report_progress "services_starting" "in_progress"
     compose_cmd up -d
-    report_progress "services_started" "completed"
 
     log "Waiting for health check..."
-    report_progress "health_check" "in_progress"
     local retries=0
     while ! compose_cmd ps --format json 2>/dev/null | grep -q '"healthy"'; do
         retries=$((retries + 1))
         if [ $retries -gt 60 ]; then
-            report_progress "health_check" "timeout"
             warn "Health check timeout. Check logs with: docker compose logs -f"
             return
         fi
         sleep 2
     done
-    report_progress "health_check" "completed"
     log "Services are healthy!"
 }
 
 # --- Summary ---
 
 print_summary() {
+    local store_url
+
+    if [ -n "$STORE_DOMAIN" ]; then
+        store_url="https://${STORE_DOMAIN}"
+    else
+        store_url="https://${PUBLIC_IP}"
+    fi
+
     echo ""
     echo -e "${BOLD}════════════════════════════════════════════════${NC}"
     echo -e "${GREEN}  Mobazha Standalone Store is running!${NC}"
     echo -e "${BOLD}════════════════════════════════════════════════${NC}"
     echo ""
+    echo -e "  Store URL:   ${BOLD}${store_url}${NC}"
 
-    if [ -n "$OVERLAY_DOMAIN" ]; then
-        echo -e "  Store URL:   ${BOLD}http://${OVERLAY_DOMAIN}${NC} (overlay: ${OVERLAY_TYPE})"
-    elif [ -n "$STORE_DOMAIN" ]; then
-        echo -e "  Store URL:   ${BOLD}https://${STORE_DOMAIN}${NC}"
-    else
-        local ip
-        ip=$(curl -4 -sf https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
-        echo -e "  Store URL:   ${BOLD}https://${ip}${NC} (self-signed TLS)"
+    if [ -z "$STORE_DOMAIN" ]; then
+        echo ""
+        echo -e "  ${YELLOW}Your browser will show a security warning — this is${NC}"
+        echo -e "  ${YELLOW}normal for a new server without a domain name.${NC}"
+        echo -e "  ${YELLOW}Click \"Advanced\" → \"Proceed\" to access your store.${NC}"
     fi
 
-    echo -e "  Admin:       ${BOLD}https://${STORE_DOMAIN:-<your-ip>}/admin/${NC}"
-    echo -e "  Username:    ${BOLD}admin${NC}"
-    if [ -n "$ADMIN_PASSWORD" ]; then
-        echo -e "  Password:    ${BOLD}(as configured)${NC}"
-    else
-        echo -e "  Password:    ${BOLD}(check logs: docker compose logs store | grep password)${NC}"
-    fi
-    echo ""
-    echo -e "  API Key:     ${BOLD}${STANDALONE_API_KEY}${NC}"
     echo ""
     echo -e "  Install dir: ${BOLD}${INSTALL_DIR}${NC}"
-    echo -e "  Logs:        docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
-    echo -e "  Stop:        docker compose -f ${INSTALL_DIR}/docker-compose.yml down"
+    echo -e "  Manage:      ${BOLD}mobazha-ctl status${NC}"
+    echo -e "  Logs:        ${BOLD}mobazha-ctl logs${NC}"
+    echo -e "  Stop:        cd ${INSTALL_DIR} && docker compose down"
     echo ""
-    echo -e "  ${YELLOW}Next steps:${NC}"
-    echo -e "    1. Open the admin panel and change the default password"
-    echo -e "    2. Set up your store profile"
-    echo -e "    3. Register with the SaaS platform (to enable buyer features)"
-    echo -e "    4. Publish your first listing"
+    echo -e "  ${BOLD}Next: open ${store_url}/admin to set up your store.${NC}"
     echo ""
 }
 
@@ -328,70 +192,72 @@ print_summary() {
 
 show_help() {
     cat <<'HELP'
-Mobazha Standalone Store — One-Click Installer
+Mobazha Standalone Store — Zero-Config Installer
 
 Usage:
-  sudo bash install.sh [options] [token]
-
-Arguments:
-  token       64-char hex deploy token from the SaaS Deploy Wizard.
-              When provided, all configuration is fetched from the
-              SaaS API automatically (zero interaction).
+  curl -sSL https://get.mobazha.org/standalone | sudo bash
+  sudo bash install.sh [options]
 
 Options:
-  --dry-run   Print the generated .env file without installing.
-              Useful for inspecting configuration before committing.
-  --help      Show this help message and exit.
-
-Modes:
-  Interactive (no token):
-    Prompts for domain, connectivity, password, etc.
-
-  Token (with token):
-    Fetches pre-configured settings from SaaS Deploy Wizard.
-    No prompts. Ideal for automated / one-click deployment.
+  --domain <domain>        Pre-configure a domain name for auto-TLS.
+                           Without this, the store runs on IP with
+                           a self-signed certificate.
+  --overlay <tor|lokinet>  Enable a privacy overlay network.
+  --saas-url <url>         Override SaaS API URL.
+  --help                   Show this help message and exit.
 
 Examples:
-  # Interactive mode
-  sudo bash install.sh
+  # Zero-config (most common)
+  curl -sSL https://get.mobazha.org/standalone | sudo bash
 
-  # Token mode (from Deploy Wizard)
-  sudo bash install.sh a3f8c1d2e4...
+  # With a pre-configured domain
+  curl ... | sudo bash -s -- --domain shop.example.com
 
-  # Inspect config without installing
-  sudo bash install.sh --dry-run a3f8c1d2e4...
-
-Connectivity modes:
-  public   — Public IP/domain, direct HTTPS via Caddy
-  tunnel   — Behind NAT, Cloudflare Tunnel
-  nat      — Behind NAT, SaaS LibP2P proxy
-  overlay  — Privacy network (Lokinet or Tor)
+  # Privacy mode with Tor
+  curl ... | sudo bash -s -- --overlay tor
 
 Environment:
   INSTALL_DIR     Installation directory (default: /opt/mobazha)
-  SAAS_BASE_URL   SaaS platform base URL (default: https://app.mobazha.org)
+  SAAS_API_URL    SaaS API URL (default: https://store.mobazha.org)
 HELP
 }
 
 parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
-            --dry-run)
-                DRY_RUN=true
-                shift
+            --domain)
+                STORE_DOMAIN="${2:-}"
+                if [ -z "$STORE_DOMAIN" ]; then
+                    err "--domain requires a value."
+                    exit 1
+                fi
+                shift 2
+                ;;
+            --overlay)
+                OVERLAY_TYPE="${2:-}"
+                if [ -z "$OVERLAY_TYPE" ] || { [ "$OVERLAY_TYPE" != "tor" ] && [ "$OVERLAY_TYPE" != "lokinet" ]; }; then
+                    err "--overlay requires 'tor' or 'lokinet'."
+                    exit 1
+                fi
+                CONNECTIVITY="overlay"
+                shift 2
+                ;;
+            --saas-url)
+                SAAS_API_URL="${2:-}"
+                if [ -z "$SAAS_API_URL" ]; then
+                    err "--saas-url requires a value."
+                    exit 1
+                fi
+                shift 2
                 ;;
             --help|-h)
                 show_help
                 exit 0
                 ;;
             *)
-                if detect_token "$1"; then
-                    shift
-                else
-                    err "Unknown argument: $1"
-                    echo "Run 'install.sh --help' for usage."
-                    exit 1
-                fi
+                err "Unknown argument: $1"
+                echo "Run 'install.sh --help' for usage."
+                exit 1
                 ;;
         esac
     done
@@ -405,62 +271,18 @@ main() {
     log "Mobazha Standalone Store Installer"
     echo ""
 
-    if [ -n "$DEPLOY_TOKEN" ]; then
-        log "Token mode: configuration will be fetched from SaaS."
+    check_root
+    install_docker
+    install_docker_compose
 
-        if ! command -v jq &>/dev/null && [ "$DRY_RUN" = true ]; then
-            err "jq is required for token mode. Install it with: sudo apt-get install jq"
-            exit 1
-        fi
+    STANDALONE_API_KEY="$(generate_api_key)"
+    PUBLIC_IP="$(detect_public_ip)"
 
-        if [ "$DRY_RUN" != true ]; then
-            check_root
-            check_jq
-        fi
+    log "Detected public IP: ${PUBLIC_IP}"
 
-        local config_json
-        config_json=$(fetch_config "$DEPLOY_TOKEN")
-        parse_config "$config_json"
-
-        if [ "$DRY_RUN" = true ]; then
-            log "Dry-run mode — generated .env contents:"
-            echo "---"
-            echo "STORE_DOMAIN=${STORE_DOMAIN}"
-            echo "SAAS_API_URL=${SAAS_API_URL}"
-            echo "STANDALONE_API_KEY=${STANDALONE_API_KEY}"
-            echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
-            echo "SAAS_PEER_ID=${SAAS_PEER_ID:-}"
-            echo "CONNECTIVITY=${CONNECTIVITY:-nat}"
-            echo "OVERLAY_TYPE=${OVERLAY_TYPE:-}"
-            echo "OVERLAY_DOMAIN=${OVERLAY_DOMAIN:-}"
-            echo "TAG=stable"
-            echo "---"
-            exit 0
-        fi
-
-        report_progress "docker_installing" "in_progress"
-        install_docker
-        report_progress "docker_installed" "completed"
-
-        install_docker_compose
-        setup_files
-        start_services
-        report_progress "completed" "completed"
-        print_summary
-    else
-        if [ "$DRY_RUN" = true ]; then
-            err "--dry-run requires a deploy token."
-            exit 1
-        fi
-
-        check_root
-        install_docker
-        install_docker_compose
-        prompt_config
-        setup_files
-        start_services
-        print_summary
-    fi
+    setup_files
+    start_services
+    print_summary
 }
 
 main "$@"

@@ -83,8 +83,9 @@ RUN apk add --no-cache \
 # Copy UPX-compressed mobazha binary
 COPY --from=go-builder /out/mobazha /usr/local/bin/mobazha
 
-# Copy Caddyfile template
+# Copy Caddyfile templates (native env var for startup, Go template for runtime)
 COPY deploy/standalone/Caddyfile.tmpl /etc/caddy/Caddyfile.tmpl
+COPY deploy/standalone/Caddyfile.go.tmpl /etc/caddy/Caddyfile.go.tmpl
 COPY deploy/standalone/generate-caddyfile.sh /usr/local/bin/generate-caddyfile
 
 # Copy frontend assets (with .br pre-compressed siblings)

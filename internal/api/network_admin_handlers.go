@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	caddymgr "github.com/mobazha/mobazha3.0/internal/caddy"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -98,12 +99,33 @@ func (g *Gateway) handlePOSTSystemNetwork(w http.ResponseWriter, r *http.Request
 		_ = dockerContainerAction("mobazha-"+req.OverlayType, "start")
 	}
 
-	_ = dockerContainerAction("mobazha-store", "restart")
+	os.Setenv("CONNECTIVITY", newConnectivity)
+	os.Setenv("OVERLAY_TYPE", req.OverlayType)
+
+	if _, err := os.Stat(goTmplPath); err == nil {
+		mgr := caddymgr.NewCaddyManager(goTmplPath, caddyOut, envPath)
+		cfg := caddymgr.ProxyConfig{
+			Domain:        os.Getenv("STORE_DOMAIN"),
+			Connectivity:  newConnectivity,
+			OverlayType:   req.OverlayType,
+			OverlayDomain: os.Getenv("OVERLAY_DOMAIN"),
+			NodePort:      5102,
+			SaaSAPIURL:    os.Getenv("SAAS_API_URL"),
+			APIKey:        os.Getenv("STANDALONE_API_KEY"),
+		}
+		if err := mgr.Apply(cfg); err != nil {
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
+				"config saved but Caddy reload failed: "+err.Error())
+			return
+		}
+	} else {
+		_ = dockerContainerAction("mobazha-store", "restart")
+	}
 
 	response.Success(w, map[string]interface{}{
 		"connectivity": newConnectivity,
 		"overlayType":  req.OverlayType,
-		"message":      "Network configuration updated. Store is restarting.",
+		"message":      "Network configuration updated.",
 	})
 }
 

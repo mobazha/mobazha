@@ -4,10 +4,14 @@
 #   - s6-overlay (PID 1, service supervision)
 #   - Caddy (reverse proxy, auto-TLS)
 #   - mobazha-node (seller node, UPX-compressed)
-#   - Frontend static assets (Brotli pre-compressed)
+#   - Frontend SPA (Vite build, Brotli pre-compressed)
 #
-# Build:
+# Recommended: use the build script which handles frontend + Docker in one step:
+#   ./deploy/standalone/build-standalone.sh -t mobazha/standalone:dev
+#
+# Manual build (with pre-built frontend):
 #   docker buildx build -f deploy/standalone/Dockerfile.standalone \
+#     --build-arg FRONTEND_DIR=deploy/standalone/.frontend-dist \
 #     -t mobazha/standalone:dev .
 #
 # Required build context: the mobazha3.0 repository root.

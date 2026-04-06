@@ -333,7 +333,7 @@ func TestAutoMigrateDatabaseManagedEscrow(t *testing.T) {
 
 	// Verify core tables exist by trying to query them
 	tablesToCheck := []string{
-		"keys", "outgoing_messages", "incoming_messages", "chat_messages",
+		"keys", "outgoing_messages", "incoming_messages",
 		"orders", "user_preferences", "receiving_accounts",
 	}
 	for _, table := range tablesToCheck {

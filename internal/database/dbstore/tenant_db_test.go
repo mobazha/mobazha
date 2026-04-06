@@ -223,40 +223,37 @@ func TestTenantDB_Update(t *testing.T) {
 	db := newTestTenantDB(t, sharedDB, "tenant-C")
 
 	err := db.Update(func(tx database.Tx) error {
-		if err := tx.Migrate(&models.ChatMessage{}); err != nil {
+		if err := tx.Migrate(&models.NotificationRecord{}); err != nil {
 			return err
 		}
-		return tx.Save(&models.ChatMessage{
-			MessageID: "msg-1",
-			PeerID:    "peer-1",
-			OrderID:   "order-1",
-			Timestamp: time.Now(),
-			Read:      false,
-			Outgoing:  false,
-			Message:   "hello",
+		return tx.Save(&models.NotificationRecord{
+			ID:           "notif-1",
+			Timestamp:    time.Now(),
+			Read:         false,
+			Type:         "order",
+			Notification: []byte(`{"orderID":"ord-1"}`),
 		})
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Update read status
 	err = db.Update(func(tx database.Tx) error {
-		return tx.Update("read", true, map[string]interface{}{"peer_id = ?": "peer-1"}, &models.ChatMessage{})
+		return tx.Update("read", true, map[string]interface{}{"id = ?": "notif-1"}, &models.NotificationRecord{})
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var msg models.ChatMessage
+	var rec models.NotificationRecord
 	err = db.View(func(tx database.Tx) error {
-		return tx.Read().Where("message_id = ?", "msg-1").First(&msg).Error
+		return tx.Read().Where("id = ?", "notif-1").First(&rec).Error
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !msg.Read {
-		t.Error("message should be marked as read")
+	if !rec.Read {
+		t.Error("notification should be marked as read")
 	}
 }
 

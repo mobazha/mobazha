@@ -68,29 +68,29 @@ func TestDispatcher_AcceptFilter(t *testing.T) {
 			return meta.Category == "order"
 		},
 	}
-	chatOnly := &mockSink{
-		name: "chatOnly",
+	cartOnly := &mockSink{
+		name: "cartOnly",
 		accepted: func(meta EventMeta) bool {
-			return meta.Category == "chat"
+			return meta.Category == "cart"
 		},
 	}
 
-	d := NewDispatcher(bus, orderOnly, chatOnly)
+	d := NewDispatcher(bus, orderOnly, cartOnly)
 	if err := d.Start(); err != nil {
 		t.Fatal(err)
 	}
 	defer d.Stop()
 
 	bus.Emit(&NewOrder{})
-	bus.Emit(&ChatMessage{})
+	bus.Emit(&ShoppingCartUpdate{})
 
-	waitFor(t, func() bool { return orderOnly.eventCount() >= 1 && chatOnly.eventCount() >= 1 }, 2*time.Second)
+	waitFor(t, func() bool { return orderOnly.eventCount() >= 1 && cartOnly.eventCount() >= 1 }, 2*time.Second)
 
 	if orderOnly.eventCount() != 1 {
 		t.Errorf("orderOnly expected 1, got %d", orderOnly.eventCount())
 	}
-	if chatOnly.eventCount() != 1 {
-		t.Errorf("chatOnly expected 1, got %d", chatOnly.eventCount())
+	if cartOnly.eventCount() != 1 {
+		t.Errorf("cartOnly expected 1, got %d", cartOnly.eventCount())
 	}
 }
 

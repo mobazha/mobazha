@@ -41,11 +41,6 @@ func (n *MobazhaNode) IdentityInfo() contracts.IdentityService {
 // pointer field is nil, returning it directly yields a non-nil interface value
 // that passes `== nil` checks but panics on method calls.
 
-// Chat returns nil; the old P2P ChatService has been replaced by MatrixChat().
-// The accessor is kept for NodeService interface compatibility.
-func (n *MobazhaNode) Chat() contracts.ChatService {
-	return nil
-}
 func (n *MobazhaNode) Notification() contracts.NotificationService {
 	if n.notificationService == nil {
 		return nil

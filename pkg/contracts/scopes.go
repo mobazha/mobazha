@@ -31,7 +31,7 @@ const (
 	ScopeWalletSpend  Scope = "wallet:spend"
 	ScopeWalletManage Scope = "wallet:manage"
 
-	// Chat
+	// Chat (Matrix)
 	ScopeChatRead  Scope = "chat:read"
 	ScopeChatWrite Scope = "chat:write"
 

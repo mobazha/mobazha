@@ -22,7 +22,6 @@ const (
 	EventOrderRefunded        = "order.refunded"
 	EventDisputeOpened        = "dispute.opened"
 	EventDisputeClosed        = "dispute.closed"
-	EventChatMessage          = "chat.message"
 )
 
 // AllWebhookEventTypes returns all registered event names that webhooks can subscribe to.

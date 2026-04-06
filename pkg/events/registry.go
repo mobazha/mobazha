@@ -52,17 +52,6 @@ func init() {
 		{Category: "social", Name: "social.moderator_add", Persistent: true, Sample: new(ModeratorAdd)},
 		{Category: "social", Name: "social.moderator_remove", Persistent: true, Sample: new(ModeratorRemove)},
 
-		// ── Chat events (WebSocket only) ──
-		{Category: "chat", Name: "chat.message", Sample: new(ChatMessage)},
-		{Category: "chat", Name: "chat.read", Sample: new(ChatRead)},
-		{Category: "chat", Name: "chat.typing", Sample: new(ChatTyping)},
-		{Category: "chat", Name: "chat.channel", Sample: new(ChannelMessage)},
-
-		// ── Chat group events (WebSocket only) ──
-		{Category: "chatgroup", Name: "chatgroup.created", Sample: new(ChatGroupCreate)},
-		{Category: "chatgroup", Name: "chatgroup.updated", Sample: new(ChatGroupUpdate)},
-		{Category: "chatgroup", Name: "chatgroup.deleted", Sample: new(ChatGroupDelete)},
-
 		// ── Wallet events (WebSocket only) ──
 		{Category: "wallet", Name: "wallet.block_received", Sample: new(BlockReceived)},
 		{Category: "wallet", Name: "wallet.tx_received", Sample: new(TransactionReceived)},

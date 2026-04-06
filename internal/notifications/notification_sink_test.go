@@ -38,6 +38,10 @@ func (db *mockDB) Update(fn func(database.Tx) error) error {
 	return nil
 }
 
+func (db *mockDB) View(_ func(database.Tx) error) error {
+	return nil
+}
+
 type notifyCapture struct {
 	mu       sync.Mutex
 	captured []interface{}
@@ -113,17 +117,24 @@ func TestNotificationSink_PersistentNotification(t *testing.T) {
 	}
 	var wrapped map[string]interface{}
 	json.Unmarshal(raw, &wrapped)
-	if _, ok := wrapped["notification"]; !ok {
-		t.Error("expected WebSocket message to have 'notification' wrapper key")
+	if wrapped["type"] != "notification" {
+		t.Errorf("expected WebSocket message type 'notification', got %v", wrapped["type"])
+	}
+	data, ok := wrapped["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected 'data' to be a map")
+	}
+	if _, ok := data["notification"]; !ok {
+		t.Error("expected 'data' to contain 'notification' key")
 	}
 }
 
-func TestNotificationSink_WebSocketOnly_Chat(t *testing.T) {
+func TestNotificationSink_WebSocketOnly_Cart(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(nil, cap.notify)
 
-	meta := events.EventMeta{Category: "chat", Name: "chat.message"}
-	evt := &events.ChatMessage{PeerID: "peer-1", Message: "hello"}
+	meta := events.EventMeta{Category: "cart", Name: "cart.updated"}
+	evt := &events.ShoppingCartUpdate{ItemsCount: 3}
 
 	err := sink.Handle(context.Background(), meta, evt)
 	if err != nil {
@@ -142,8 +153,8 @@ func TestNotificationSink_WebSocketOnly_Chat(t *testing.T) {
 	}
 	var wrapped map[string]interface{}
 	json.Unmarshal(raw, &wrapped)
-	if _, ok := wrapped["chatMessage"]; !ok {
-		t.Errorf("expected 'chatMessage' wrapper, got keys: %v", wrapped)
+	if _, ok := wrapped["shoppingCart"]; !ok {
+		t.Errorf("expected 'shoppingCart' wrapper, got keys: %v", wrapped)
 	}
 }
 
@@ -199,32 +210,6 @@ func TestNotificationSink_WebSocketOnly_Publish(t *testing.T) {
 	}
 }
 
-func TestNotificationSink_WebSocketOnly_Cart(t *testing.T) {
-	cap := &notifyCapture{}
-	sink := NewNotificationSink(nil, cap.notify)
-
-	meta := events.EventMeta{Category: "cart", Name: "cart.updated"}
-	evt := &events.ShoppingCartUpdate{}
-
-	err := sink.Handle(context.Background(), meta, evt)
-	if err != nil {
-		t.Fatalf("Handle error: %v", err)
-	}
-
-	cap.mu.Lock()
-	defer cap.mu.Unlock()
-	if len(cap.captured) != 1 {
-		t.Fatalf("expected 1 push, got %d", len(cap.captured))
-	}
-
-	raw, _ := json.Marshal(cap.captured[0])
-	var wrapped map[string]interface{}
-	json.Unmarshal(raw, &wrapped)
-	if _, ok := wrapped["shoppingCart"]; !ok {
-		t.Errorf("expected 'shoppingCart' wrapper, got keys: %v", wrapped)
-	}
-}
-
 func TestNotificationSink_UnknownCategory_NoPush(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(nil, cap.notify)
@@ -251,9 +236,9 @@ func TestSetNotificationFields_Reflection(t *testing.T) {
 }
 
 func TestSetNotificationFields_NonNotificationEvent(t *testing.T) {
-	evt := &events.ChatMessage{PeerID: "peer-1"}
-	setNotificationFields(evt, "id-123", "chat")
-	// ChatMessage doesn't embed Notification — should be a no-op
+	evt := &events.ShoppingCartUpdate{ItemsCount: 1}
+	setNotificationFields(evt, "id-123", "cart")
+	// ShoppingCartUpdate doesn't embed Notification — should be a no-op
 }
 
 func TestSetNotificationFields_NilEvent(t *testing.T) {
@@ -270,8 +255,8 @@ func TestNotificationSink_Concurrency(t *testing.T) {
 
 func TestNotificationSink_NilNotifyFunc(t *testing.T) {
 	sink := NewNotificationSink(nil, nil)
-	meta := events.EventMeta{Category: "chat", Name: "chat.message"}
-	evt := &events.ChatMessage{}
+	meta := events.EventMeta{Category: "cart", Name: "cart.updated"}
+	evt := &events.ShoppingCartUpdate{}
 	if err := sink.Handle(context.Background(), meta, evt); err != nil {
 		t.Fatalf("Handle with nil notify should not error: %v", err)
 	}

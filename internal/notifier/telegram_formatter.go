@@ -58,15 +58,6 @@ func formatTelegramEvent(meta events.EventMeta, event interface{}) string {
 	case *events.DisputeClose:
 		fmt.Fprintf(&sb, "Order: `%s`\n", e.OrderID)
 
-	case *events.ChatMessage:
-		if e.Message != "" {
-			msg := e.Message
-			if len(msg) > 200 {
-				msg = msg[:200] + "..."
-			}
-			fmt.Fprintf(&sb, "Message: %s\n", escapeTelegramMarkdown(msg))
-		}
-
 	default:
 		fmt.Fprintf(&sb, "Event: `%s`\n", meta.Name)
 	}

@@ -22,21 +22,6 @@ import (
 
 type mockNode struct {
 	requestAddressFunc                      func(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
-	sendChatMessageFunc                     func(to peer.ID, message string, file *models.FileInChat, orderID models.OrderID, done chan<- struct{}) (string, error)
-	sendGroupChatMessageFunc                func(tos []peer.ID, message string, file *models.FileInChat, orderID models.OrderID, done chan<- struct{}) (string, error)
-	sendTypingMessageFunc                   func(to peer.ID, orderID models.OrderID) (string, error)
-	sendGroupTypingMessageFunc              func(tos []peer.ID, orderID models.OrderID) (string, error)
-	markChatMessagesAsReadFunc              func(peer peer.ID, orderID models.OrderID) error
-	getChatConversationsFunc                func() ([]models.ChatConversation, error)
-	getChatMessagesByPeerFunc               func(peer peer.ID, limit int, offsetID string) ([]models.ChatMessage, error)
-	getChatMessagesByOrderIDFunc            func(orderID models.OrderID, limit int, offsetID string) ([]models.ChatMessage, error)
-	getChatMessagesUnreadCountByOrderIDFunc func(orderID models.OrderID) (int64, error)
-	deleteChatMessageFunc                   func(messageID string) error
-	deleteChatConversationFunc              func(peerID peer.ID) error
-	deleteGroupChatMessagesFunc             func(orderID models.OrderID) error
-	SaveChatGroupFunc                       func(chatGroup *models.ChatGroup) (string, error)
-	getChatGroupFunc                        func(groupID string, orderID models.OrderID) (*models.ChatGroup, error)
-	deleteChatGroupFunc                     func(groupID string) error
 	getNotificationsFunc                    func(offsetID string, limit int, typeFilters []string) ([]models.NotificationRecord, int64, error)
 	markNotificationAsReadFunc              func(notifID string) error
 	markAllNotificationsAsReadFunc          func() error
@@ -165,7 +150,6 @@ type mockNode struct {
 
 // Service accessors — mockNode returns itself for each sub-interface.
 func (m *mockNode) IdentityInfo() contracts.IdentityService         { return m }
-func (m *mockNode) Chat() contracts.ChatService                     { return m }
 func (m *mockNode) Notification() contracts.NotificationService     { return m }
 func (m *mockNode) Order() contracts.OrderService                   { return m }
 func (m *mockNode) Listing() contracts.ListingService               { return m }
@@ -182,59 +166,6 @@ func (m *mockNode) Wishlist() contracts.WishlistService             { return nil
 func (m *mockNode) RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error) {
 	return m.requestAddressFunc(ctx, to, coinType)
 }
-func (m *mockNode) SendChatMessage(to peer.ID, message string, file *models.FileInChat, orderID models.OrderID, done chan<- struct{}) (string, error) {
-	return m.sendChatMessageFunc(to, message, file, orderID, done)
-}
-func (m *mockNode) SendGroupChatMessage(tos []peer.ID, message string, file *models.FileInChat, orderID models.OrderID, done chan<- struct{}) (string, error) {
-	return m.sendGroupChatMessageFunc(tos, message, file, orderID, done)
-}
-func (m *mockNode) SendTypingMessage(to peer.ID, orderID models.OrderID) (string, error) {
-	return m.sendTypingMessageFunc(to, orderID)
-}
-func (m *mockNode) SendGroupTypingMessage(tos []peer.ID, orderID models.OrderID) (string, error) {
-	return m.sendGroupTypingMessageFunc(tos, orderID)
-}
-func (m *mockNode) MarkChatMessagesAsRead(peer peer.ID, orderID models.OrderID) error {
-	return m.markChatMessagesAsReadFunc(peer, orderID)
-}
-func (m *mockNode) GetChatConversations() ([]models.ChatConversation, error) {
-	return m.getChatConversationsFunc()
-}
-func (m *mockNode) GetOrderConversations() ([]models.ChatConversation, error) {
-	return []models.ChatConversation{}, nil
-}
-func (m *mockNode) GetChatMessagesByPeer(peer peer.ID, limit int, offsetID string) ([]models.ChatMessage, error) {
-	return m.getChatMessagesByPeerFunc(peer, limit, offsetID)
-}
-func (m *mockNode) GetChatMessagesByOrderID(orderID models.OrderID, limit int, offsetID string) ([]models.ChatMessage, error) {
-	return m.getChatMessagesByOrderIDFunc(orderID, limit, offsetID)
-}
-func (m *mockNode) GetChatMessagesUnreadCountByOrderID(orderID models.OrderID) (int64, error) {
-	return m.getChatMessagesUnreadCountByOrderIDFunc(orderID)
-}
-func (m *mockNode) DeleteChatMessage(messageID string) error {
-	return m.deleteChatMessageFunc(messageID)
-}
-func (m *mockNode) DeleteChatConversation(peerID peer.ID) error {
-	return m.deleteChatConversationFunc(peerID)
-}
-func (m *mockNode) DeleteGroupChatMessages(orderID models.OrderID) error {
-	return m.deleteGroupChatMessagesFunc(orderID)
-}
-
-func (m *mockNode) SaveChatGroup(chatGroup *models.ChatGroup) (string, error) {
-	return m.SaveChatGroupFunc(chatGroup)
-}
-func (m *mockNode) GetChatGroup(groupID string, orderID models.OrderID) (*models.ChatGroup, error) {
-	return m.getChatGroupFunc(groupID, orderID)
-}
-func (m *mockNode) GetChatGroups() ([]*models.ChatGroup, error) {
-	return []*models.ChatGroup{}, nil
-}
-func (m *mockNode) DeleteChatGroup(groupID string) error {
-	return m.deleteChatGroupFunc(groupID)
-}
-
 func (m *mockNode) GetNotifications(offsetID string, limit int, typeFilters []string) ([]models.NotificationRecord, int64, error) {
 	return m.getNotificationsFunc(offsetID, limit, typeFilters)
 }

@@ -58,29 +58,6 @@ type IdentityService interface {
 	IsGlobalBanned(peerID peer.ID) bool
 }
 
-// ChatService handles messaging operations.
-type ChatService interface {
-	SendChatMessage(to peer.ID, message string, file *models.FileInChat, orderID models.OrderID, done chan<- struct{}) (string, error)
-	SendGroupChatMessage(tos []peer.ID, message string, file *models.FileInChat, orderID models.OrderID, done chan<- struct{}) (string, error)
-	SendTypingMessage(to peer.ID, orderID models.OrderID) (string, error)
-	SendGroupTypingMessage(tos []peer.ID, orderID models.OrderID) (string, error)
-	MarkChatMessagesAsRead(peer peer.ID, orderID models.OrderID) error
-	GetChatConversations() ([]models.ChatConversation, error)
-	GetOrderConversations() ([]models.ChatConversation, error)
-	GetChatMessagesByPeer(peer peer.ID, limit int, offsetID string) ([]models.ChatMessage, error)
-	GetChatMessagesByOrderID(orderID models.OrderID, limit int, offsetID string) ([]models.ChatMessage, error)
-	GetChatMessagesUnreadCountByOrderID(orderID models.OrderID) (int64, error)
-	DeleteChatMessage(messageID string) error
-	DeleteChatConversation(peerID peer.ID) error
-	DeleteGroupChatMessages(orderID models.OrderID) error
-
-	// Chat groups
-	SaveChatGroup(chatGroup *models.ChatGroup) (string, error)
-	GetChatGroup(groupID string, orderID models.OrderID) (*models.ChatGroup, error)
-	GetChatGroups() ([]*models.ChatGroup, error)
-	DeleteChatGroup(groupID string) error
-}
-
 // NotificationService handles user notifications.
 type NotificationService interface {
 	GetNotifications(offsetID string, limit int, typeFilters []string) ([]models.NotificationRecord, int64, error)
@@ -332,7 +309,7 @@ type AnalyticsProvider interface {
 // Both MobazhaNode (standalone) and TenantService (SaaS) implement this interface.
 //
 // Design: Service Accessor pattern — each domain is exposed via a typed accessor
-// method (e.g. Chat() ChatService) rather than flat embedding. This eliminates
+// method (e.g. Order() OrderService) rather than flat embedding. This eliminates
 // ~130 pass-through delegates on the implementor and ensures new domain methods
 // never require changes to NodeService or its implementors.
 //
@@ -340,7 +317,6 @@ type AnalyticsProvider interface {
 type NodeService interface {
 	// Domain service accessors
 	IdentityInfo() IdentityService
-	Chat() ChatService
 	Notification() NotificationService
 	Order() OrderService
 	Listing() ListingService

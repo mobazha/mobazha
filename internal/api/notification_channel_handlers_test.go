@@ -13,8 +13,8 @@ func TestExtractEventCategories(t *testing.T) {
 
 	expected := map[string]bool{
 		"order": true, "dispute": true, "social": true,
-		"chat": true, "wallet": true, "payment": true,
-		"publish": true, "cart": true, "chatgroup": true,
+		"wallet": true, "payment": true,
+		"publish": true, "cart": true,
 		"collection": true, "shipping": true, "internal": true,
 	}
 	for _, cat := range cats {

@@ -30,22 +30,6 @@ type shoppingCartWrapper struct {
 	ShoppingCart any `json:"shoppingCart"`
 }
 
-type channelMessageWrapper struct {
-	ChannelMessage any `json:"channelMessage"`
-}
-
-type chatMessageWrapper struct {
-	ChatMessage any `json:"chatMessage"`
-}
-
-type messageReadWrapper struct {
-	MessageRead any `json:"messageRead"`
-}
-
-type messageTypingWrapper struct {
-	MessageTyping any `json:"messageTyping"`
-}
-
 type walletWrapper struct {
 	Wallet any `json:"wallet"`
 }
@@ -56,18 +40,6 @@ type partialPaymentWrapper struct {
 
 type statusWrapper struct {
 	Status any `json:"status"`
-}
-
-type chatGroupCreateWrapper struct {
-	ChatGroupCreate any `json:"chatGroupCreate"`
-}
-
-type chatGroupUpdateWrapper struct {
-	ChatGroupUpdate any `json:"chatGroupUpdate"`
-}
-
-type chatGroupDeleteWrapper struct {
-	ChatGroupDelete any `json:"chatGroupDelete"`
 }
 
 // NotificationSink is an EventSink that replaces the old Notifier for-select loop.
@@ -202,10 +174,6 @@ func setNotificationFields(event interface{}, id, typ string) {
 // Returns nil for events that have no known WebSocket wrapper.
 func wrapForWebSocket(meta events.EventMeta, event interface{}) interface{} {
 	switch meta.Category {
-	case "chat":
-		return wrapChatEvent(event)
-	case "chatgroup":
-		return wrapChatGroupEvent(event)
 	case "wallet":
 		return wrapWalletEvent(event)
 	case "publish":
@@ -217,34 +185,6 @@ func wrapForWebSocket(meta events.EventMeta, event interface{}) interface{} {
 			return partialPaymentWrapper{event}
 		}
 		return nil
-	default:
-		return nil
-	}
-}
-
-func wrapChatEvent(event interface{}) interface{} {
-	switch event.(type) {
-	case *events.ChatMessage:
-		return chatMessageWrapper{event}
-	case *events.ChatRead:
-		return messageReadWrapper{event}
-	case *events.ChatTyping:
-		return messageTypingWrapper{event}
-	case *events.ChannelMessage:
-		return channelMessageWrapper{event}
-	default:
-		return nil
-	}
-}
-
-func wrapChatGroupEvent(event interface{}) interface{} {
-	switch event.(type) {
-	case *events.ChatGroupCreate:
-		return chatGroupCreateWrapper{event}
-	case *events.ChatGroupUpdate:
-		return chatGroupUpdateWrapper{event}
-	case *events.ChatGroupDelete:
-		return chatGroupDeleteWrapper{event}
 	default:
 		return nil
 	}

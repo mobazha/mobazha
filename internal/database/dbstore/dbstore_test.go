@@ -153,75 +153,72 @@ func TestDB_CRUD(t *testing.T) {
 	}
 
 	err = db.Update(func(tx database.Tx) error {
-		if err := tx.Migrate(&models.ChatMessage{}); err != nil {
+		if err := tx.Migrate(&models.NotificationRecord{}); err != nil {
 			return err
 		}
-		return tx.Save(&models.ChatMessage{
-			MessageID: "abc",
-			PeerID:    "qm123",
-			OrderID:   "test",
-			Timestamp: time.Time{},
-			Read:      false,
-			Outgoing:  false,
-			Message:   "hello",
-			Sequence:  0,
+		return tx.Save(&models.NotificationRecord{
+			ID:           "notif-abc",
+			Timestamp:    time.Time{},
+			Read:         false,
+			Type:         "order",
+			Notification: []byte(`{"msg":"hello"}`),
 		})
 	})
 	if err != nil {
 		t.Error(err)
 	}
 
-	var messages []models.ChatMessage
+	var records []models.NotificationRecord
 	err = db.View(func(tx database.Tx) error {
-		return tx.Read().Find(&messages).Error
+		return tx.Read().Find(&records).Error
 	})
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(messages) != 1 {
-		t.Error("Failed to save message to the database")
+	if len(records) != 1 {
+		t.Error("Failed to save record to the database")
 	}
 
 	err = db.Update(func(tx database.Tx) error {
-		return tx.Update("read", true, map[string]interface{}{"peer_id = ?": "qm123", "order_id = ?": "test"}, &models.ChatMessage{})
+		return tx.Update("read", true, map[string]interface{}{"id = ?": "notif-abc"}, &models.NotificationRecord{})
 	})
 	if err != nil {
 		t.Error(err)
 	}
 
-	var messages2 []models.ChatMessage
+	var records2 []models.NotificationRecord
 	err = db.View(func(tx database.Tx) error {
-		return tx.Read().Find(&messages2).Error
+		return tx.Read().Find(&records2).Error
 	})
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(messages2) != 1 {
-		t.Error("Failed to read message to the database")
+	if len(records2) != 1 {
+		t.Error("Failed to read record from the database")
 	}
 
-	if !messages2[0].Read {
+	if !records2[0].Read {
 		t.Error("Failed to update model to set read to true")
 	}
 
 	err = db.Update(func(tx database.Tx) error {
-		return tx.Delete("peer_id", "qm123", nil, &models.ChatMessage{})
+		return tx.Delete("id", "notif-abc", nil, &models.NotificationRecord{})
 	})
 	if err != nil {
 		t.Error(err)
 	}
 
-	var messages3 []models.ChatMessage
+	var records3 []models.NotificationRecord
 	err = db.View(func(tx database.Tx) error {
-		return tx.Read().Find(&messages3).Error
+		return tx.Read().Find(&records3).Error
 	})
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(messages3) != 0 {
+	if len(records3) != 0 {
 		t.Error("Failed to delete chat message from the database")
 	}
 }

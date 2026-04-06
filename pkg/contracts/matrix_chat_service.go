@@ -21,7 +21,7 @@ type MatrixDirectRoomTarget struct {
 // The frontend communicates only through REST API and WebSocket events; all Matrix
 // protocol interaction (including E2EE) is handled by the node.
 //
-// This interface coexists with the legacy ChatService (P2P).
+// The legacy P2P ChatService has been removed; this is now the sole chat interface.
 type MatrixChatService interface {
 	// Start initializes the Matrix client, logs in, and begins syncing.
 	Start(ctx context.Context) error

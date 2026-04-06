@@ -96,22 +96,6 @@ func formatEmailEvent(meta events.EventMeta, event interface{}, storeURL string)
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
 		actionURL = orderActionURL(storeURL, e.OrderID)
 
-	case *events.ChatMessage:
-		subject = "New Message"
-		if e.PeerID != "" {
-			rows = append(rows, emailRow{"From", truncateID(e.PeerID)})
-		}
-		if e.Message != "" {
-			msg := e.Message
-			if len(msg) > 300 {
-				msg = msg[:300] + "..."
-			}
-			rows = append(rows, emailRow{"Message", msg})
-		}
-		if storeURL != "" {
-			actionURL = storeURL + "/admin"
-		}
-
 	default:
 		subject = title
 		rows = append(rows, emailRow{"Event", meta.Name})

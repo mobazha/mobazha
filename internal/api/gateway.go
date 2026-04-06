@@ -226,7 +226,6 @@ func getNodeService(r *http.Request) contracts.NodeService {
 func getIdentityService(r *http.Request) contracts.IdentityService {
 	return getNodeService(r).IdentityInfo()
 }
-func getChatService(r *http.Request) contracts.ChatService { return getNodeService(r).Chat() }
 func getNotificationService(r *http.Request) contracts.NotificationService {
 	return getNodeService(r).Notification()
 }

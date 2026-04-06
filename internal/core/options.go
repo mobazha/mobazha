@@ -98,7 +98,6 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initPaymentVerificationService()
 	n.initOrderService()
 	n.wireServiceSetters()
-	n.initChatService()
 	n.initMatrixChatService()
 	n.initPreferencesService()
 	n.initMediaService()
@@ -377,10 +376,6 @@ func (n *MobazhaNode) initWishlistService() {
 		NodeID: n.nodeID,
 	})
 }
-
-// initChatService is a no-op placeholder. The old P2P ChatAppService was removed
-// in the Phase Chat migration; all chat is now handled by mautrixChatService.
-func (n *MobazhaNode) initChatService() {}
 
 // initOrderService creates the OrderAppService if the necessary
 // dependencies are available. Infrastructure-only nodes skip this.

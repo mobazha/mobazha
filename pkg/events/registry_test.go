@@ -86,7 +86,7 @@ func TestAllEventNames_Contains(t *testing.T) {
 	for _, n := range names {
 		nameSet[n] = true
 	}
-	for _, expected := range []string{"order.created", "dispute.opened", "chat.message", "wallet.update"} {
+	for _, expected := range []string{"order.created", "dispute.opened", "wallet.update"} {
 		if !nameSet[expected] {
 			t.Errorf("AllEventNames missing %s", expected)
 		}

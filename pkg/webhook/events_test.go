@@ -25,7 +25,6 @@ func TestClassifyEvent_AllTypes(t *testing.T) {
 		{"Refund", events.Refund{}, EventOrderRefunded},
 		{"DisputeOpen", events.DisputeOpen{}, EventDisputeOpened},
 		{"DisputeClose", events.DisputeClose{}, EventDisputeClosed},
-		{"ChatMessage", events.ChatMessage{}, EventChatMessage},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

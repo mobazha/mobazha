@@ -116,8 +116,8 @@ func TestChannelNotificationSink_Handle_FilteredOut(t *testing.T) {
 		newTestTGChannel("ch1", server.URL, "order.*"),
 	}, "test-node")
 
-	meta := events.EventMeta{Name: "chat.message", Category: "chat"}
-	event := &events.ChatMessage{Message: "hello"}
+	meta := events.EventMeta{Name: "cart.updated", Category: "cart"}
+	event := &events.ShoppingCartUpdate{ItemsCount: 1}
 
 	_ = sink.Handle(context.Background(), meta, event)
 

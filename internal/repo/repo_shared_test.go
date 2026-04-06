@@ -351,10 +351,6 @@ func TestSharedDBMigrateOnce_OnlyRunsOnce(t *testing.T) {
 	sharedDB := testSharedDB(t)
 
 	migrateCount := 0
-	// Override the once to track calls
-	origOnce := sharedDBMigrateOnce
-	sharedDBMigrateOnce = sync.Once{}
-	_ = origOnce
 
 	dirA := path.Join(os.TempDir(), "mobazha", "once-test-A")
 	dirB := path.Join(os.TempDir(), "mobazha", "once-test-B")

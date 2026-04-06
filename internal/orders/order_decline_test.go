@@ -14,6 +14,7 @@ import (
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -174,11 +175,11 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 		{
 			name: "duplicate but different",
 			setup: func(order *models.Order) error {
-				msg2 := *orderDecline
+				msg2 := proto.Clone(orderDecline).(*pb.OrderDecline)
 				msg2.Type = pb.OrderDecline_USER_DECLINE
 				return order.PutMessage(&npb.OrderMessage{
 					Signature:   []byte("abc"),
-					Message:     mustBuildAny(&msg2),
+					Message:     mustBuildAny(msg2),
 					MessageType: npb.OrderMessage_ORDER_DECLINE,
 				})
 			},

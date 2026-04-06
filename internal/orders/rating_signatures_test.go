@@ -150,11 +150,11 @@ func Test_processRatingSignaturesMessage(t *testing.T) {
 		{
 			// Duplicate but different.
 			setup: func(order *models.Order) error {
-				msg2 := *rsMsg
+				msg2 := proto.Clone(rsMsg).(*pb.RatingSignatures)
 				msg2.Sigs = nil
 				return order.PutMessage(&npb.OrderMessage{
 					Signature:   []byte("abc"),
-					Message:     mustBuildAny(&msg2),
+					Message:     mustBuildAny(msg2),
 					MessageType: npb.OrderMessage_RATING_SIGNATURES,
 				})
 			},

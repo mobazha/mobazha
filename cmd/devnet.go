@@ -116,6 +116,7 @@ func (x *DevNet) Execute(args []string) error {
 
 	// Set up a ticker to generate mock blocks once every minute.
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		for {

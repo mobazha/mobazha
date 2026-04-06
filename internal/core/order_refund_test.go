@@ -143,7 +143,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	addr1, err := wallet1.CurrentAddress()
+	addr1, err := wallet1.(*wallet.MockWallet).CurrentAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -633,7 +633,7 @@ func Test_buildRefundMessage(t *testing.T) {
 
 	net := wallet.NewMockWalletNetwork(1)
 	net.Start()
-	addr, err := net.Wallets()[0].NewAddress()
+	addr, err := net.Wallets()[0].CurrentAddress()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -445,11 +445,9 @@ func (w *MockWallet) IsTestnet() bool {
 	return true
 }
 
-// CurrentAddress is called when requesting this wallet's receiving
-// address. It is customary that the wallet return the first unused
-// address and only return a different address after funds have been
-// received on the address. This, however, is just a wallet implementation
-// detail.
+// CurrentAddress returns the first unused address, or generates a new one
+// if all addresses are used. This is a concrete method on MockWallet
+// (not part of the iwallet.Wallet interface) for test convenience.
 func (w *MockWallet) CurrentAddress() (iwallet.Address, error) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()

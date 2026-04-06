@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
@@ -224,7 +225,7 @@ func TestMobazhaNode_DeclineOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	addr0, err := wallet0.CurrentAddress()
+	addr0, err := wallet0.(*wallet.MockWallet).CurrentAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +235,7 @@ func TestMobazhaNode_DeclineOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	addr1, err := wallet1.CurrentAddress()
+	addr1, err := wallet1.(*wallet.MockWallet).CurrentAddress()
 	if err != nil {
 		t.Fatal(err)
 	}

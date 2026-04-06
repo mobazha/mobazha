@@ -212,15 +212,6 @@ func (w *WalletBase) CoinCategory() iwallet.CoinCategory {
 	return iwallet.CoinCategoryBitcoin
 }
 
-// CurrentAddress is called when requesting this wallet's receiving
-// address. It is customary that the wallet return the first unused
-// address and only return a different address after funds have been
-// received on the address. This, however, is just a wallet implementation
-// detail.
-func (w *WalletBase) CurrentAddress() (iwallet.Address, error) {
-	return w.Keychain.CurrentAddress(false)
-}
-
 // GetTransaction returns a transaction given it's ID.
 func (w *WalletBase) GetTransaction(id iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
 	var record database.TransactionRecord

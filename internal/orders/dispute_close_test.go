@@ -26,14 +26,9 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 	}
 	defer teardown()
 
-	wal, err := op.multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	vendorAddress, err := wal.CurrentAddress()
-	if err != nil {
-		t.Fatal(err)
-	}
+	vendorAddrBytes := make([]byte, 20)
+	rand.Read(vendorAddrBytes)
+	vendorAddress := iwallet.NewAddress(fmt.Sprintf("%x", vendorAddrBytes), iwallet.CtMock)
 
 	_, localPub, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
@@ -338,14 +333,9 @@ func TestValidateDisputeResolution_AddressCheck(t *testing.T) {
 	}
 	defer teardown()
 
-	wal, err := op.multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	vendorAddr, err := wal.CurrentAddress()
-	if err != nil {
-		t.Fatal(err)
-	}
+	vendorAddrBytes := make([]byte, 20)
+	rand.Read(vendorAddrBytes)
+	vendorAddr := iwallet.NewAddress(fmt.Sprintf("%x", vendorAddrBytes), iwallet.CtMock)
 
 	const (
 		buyerPayerAddr  = "buyer_payer_addr"

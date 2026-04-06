@@ -1825,7 +1825,7 @@ func TestOrderLifecycle_SellerDecline_AfterCancelablePayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	refundAddr, err := buyerWallet.CurrentAddress()
+	refundAddr, err := buyerWallet.(*wallet.MockWallet).CurrentAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1924,7 +1924,7 @@ func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	refundAddr, err := buyerWallet.CurrentAddress()
+	refundAddr, err := buyerWallet.(*wallet.MockWallet).CurrentAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1957,7 +1957,7 @@ func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	payoutAddr, err := sellerWallet.CurrentAddress()
+	payoutAddr, err := sellerWallet.(*wallet.MockWallet).CurrentAddress()
 	if err != nil {
 		t.Fatal(err)
 	}

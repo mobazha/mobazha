@@ -33,7 +33,7 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	addr2, err := wn.Wallets()[0].NewAddress()
+	addr2, err := wn.Wallets()[0].CurrentAddress()
 	if err != nil {
 		t.Fatal(err)
 	}

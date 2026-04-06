@@ -420,21 +420,6 @@ func (kc *Keychain) GetAddresses() ([]iwallet.Address, error) {
 	return addrs, nil
 }
 
-// CurrentAddress returns the first unused address.
-func (kc *Keychain) CurrentAddress(change bool) (iwallet.Address, error) {
-	if change && kc.externalOnly {
-		return iwallet.Address{}, errors.New("keychain is configured for external addresses only")
-	}
-	var record database.AddressRecord
-	err := kc.db.View(func(tx database.Tx) error {
-		return tx.Read().Order("key_index asc").Where("coin=?", kc.coinType.CurrencyCode()).Where("used=?", false).Where("change=?", change).First(&record).Error
-	})
-	if err != nil {
-		return iwallet.Address{}, err
-	}
-	return record.Address(), nil
-}
-
 func generateAccountPrivKeys(accountPrivKey *hd.ExtendedKey) (external, internal *hd.ExtendedKey, err error) {
 	// Change(0) = external
 	external, err = accountPrivKey.Derive(0)

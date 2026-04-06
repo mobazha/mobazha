@@ -92,13 +92,6 @@ type Wallet interface {
 	// IsTestnet returns whether the wallet is using testnet
 	IsTestnet() bool
 
-	// CurrentAddress is called when requesting this wallet's receiving
-	// address. It is customary that the wallet return the first unused
-	// address and only return a different address after funds have been
-	// received on the address. This, however, is just a wallet implementation
-	// detail.
-	CurrentAddress() (Address, error)
-
 	// ValidateAddress validates that the serialization of the address is correct
 	// for this coin and network. It returns an error if it isn't.
 	ValidateAddress(addr Address) error

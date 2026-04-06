@@ -63,10 +63,7 @@ func (tx *DBTx) Rollback() error {
 	return nil
 }
 
-// AddrFunc is a function to convert an HD key to an address.
-type AddrFunc func(key *hd.ExtendedKey) (iwallet.Address, error)
-
-// PostInitFunc is a function to convert an HD key to an address.
+// WalletPostInitFunc is called after the wallet is initialized.
 type WalletPostInitFunc func(masterKey *hd.ExtendedKey) error
 
 // WalletBase is a base class that wallets can extended by the individual

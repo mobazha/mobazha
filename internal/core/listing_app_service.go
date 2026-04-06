@@ -59,6 +59,7 @@ type ListingAppService struct {
 	onDeleteCleanup func(slug string)
 
 	coTenantPublicData contracts.CoTenantPublicDataFn
+	coTenantAllPeers   func() []peer.ID
 
 	shippingStore contracts.ShippingStore
 }
@@ -78,6 +79,7 @@ type ListingAppServiceConfig struct {
 	Publish PublishFunc
 
 	CoTenantPublicData contracts.CoTenantPublicDataFn
+	CoTenantAllPeers   func() []peer.ID
 
 	ShippingStore contracts.ShippingStore
 }
@@ -96,6 +98,7 @@ func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 		testnet:            cfg.Testnet,
 		publish:            cfg.Publish,
 		coTenantPublicData: cfg.CoTenantPublicData,
+		coTenantAllPeers:   cfg.CoTenantAllPeers,
 		shippingStore:        cfg.ShippingStore,
 	}
 }
@@ -104,6 +107,12 @@ func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 // shipping subsystem initializes after the listing service.
 func (s *ListingAppService) SetShippingStore(store contracts.ShippingStore) {
 	s.shippingStore = store
+}
+
+// SetCoTenantAllPeers allows late injection of a function that returns all
+// co-tenant peer IDs. Used by mocknet for CID-based listing lookup across nodes.
+func (s *ListingAppService) SetCoTenantAllPeers(fn func() []peer.ID) {
+	s.coTenantAllPeers = fn
 }
 
 func (s *ListingAppService) IsGlobalBanned(peerID peer.ID) bool {
@@ -364,6 +373,10 @@ func (s *ListingAppService) GetMyListings() (models.ListingIndex, error) {
 }
 
 func (s *ListingAppService) GetListings(_ context.Context, peerID peer.ID, reqCtx *request.Context, _ bool) (models.ListingIndex, error) {
+	if peerID == s.nodeID {
+		return s.GetMyListings()
+	}
+
 	if s.coTenantPublicData != nil {
 		if pd, err := s.coTenantPublicData(peerID); err == nil {
 			if index, err := pd.GetListingIndex(); err == nil {
@@ -465,6 +478,10 @@ func (s *ListingAppService) GetMyListingByCID(c cid.Cid) (*pb.SignedListing, err
 }
 
 func (s *ListingAppService) GetListingBySlug(_ context.Context, peerID peer.ID, slugStr string, reqCtx *request.Context, _ bool) (*pb.SignedListing, error) {
+	if peerID == s.nodeID {
+		return s.GetMyListingBySlug(slugStr)
+	}
+
 	if s.coTenantPublicData != nil {
 		if pd, err := s.coTenantPublicData(peerID); err == nil {
 			if sl, err := pd.GetListing(slugStr); err == nil {
@@ -485,7 +502,60 @@ func (s *ListingAppService) GetListingByCID(_ context.Context, c cid.Cid, reqCtx
 		return s.netDB.GetListingByCID(c.String(), reqCtx)
 	}
 
+	cidStr := c.String()
+
+	// Local DB lookup: find the listing by CID in our own index, then load by slug.
+	if slug, found := s.findSlugByCIDLocal(cidStr); found {
+		var sl *pb.SignedListing
+		err := s.db.View(func(tx database.Tx) error {
+			var e error
+			sl, e = tx.GetListing(slug)
+			return e
+		})
+		if err == nil {
+			return sl, nil
+		}
+	}
+
+	// Co-tenant search: iterate over all known peers to find the CID.
+	if s.coTenantPublicData != nil && s.coTenantAllPeers != nil {
+		for _, pid := range s.coTenantAllPeers() {
+			pd, err := s.coTenantPublicData(pid)
+			if err != nil {
+				continue
+			}
+			idx, err := pd.GetListingIndex()
+			if err != nil {
+				continue
+			}
+			for _, lm := range idx {
+				if lm.CID == cidStr {
+					return pd.GetListing(lm.Slug)
+				}
+			}
+		}
+	}
+
 	return nil, fmt.Errorf("listing data not available for CID %s", c)
+}
+
+// findSlugByCIDLocal looks up the local listing index for a matching CID.
+func (s *ListingAppService) findSlugByCIDLocal(cidStr string) (string, bool) {
+	var slug string
+	err := s.db.View(func(tx database.Tx) error {
+		idx, err := tx.GetListingIndex()
+		if err != nil {
+			return err
+		}
+		for _, lm := range idx {
+			if lm.CID == cidStr {
+				slug = lm.Slug
+				return nil
+			}
+		}
+		return fmt.Errorf("not found")
+	})
+	return slug, err == nil
 }
 
 // --- Private methods ---

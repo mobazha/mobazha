@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"io"
 	"net/http"
@@ -10,9 +11,12 @@ import (
 
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
+
+var validB64 = base64.StdEncoding.EncodeToString([]byte{0x89, 0x50, 0x4e, 0x47})
 
 func TestImageHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
@@ -77,7 +81,7 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/profiles/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/avatar/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getAvatarFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+				n.getProfileMediaFunc = func(ctx context.Context, pid peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 					return bytes.NewReader([]byte{0x00}), nil
 				}
 			},
@@ -91,7 +95,7 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/profiles/adfadsf/avatar/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getAvatarFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+				n.getProfileMediaFunc = func(ctx context.Context, pid peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 					return bytes.NewReader([]byte{0x00}), nil
 				}
 			},
@@ -105,7 +109,7 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/profiles/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/avatar/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getAvatarFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+				n.getProfileMediaFunc = func(ctx context.Context, pid peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 					return nil, coreiface.ErrNotFound
 				}
 			},
@@ -119,7 +123,7 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/profiles/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/avatar/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getAvatarFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+				n.getProfileMediaFunc = func(ctx context.Context, pid peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 					return nil, errors.New("internal")
 				}
 			},
@@ -133,7 +137,7 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/profiles/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/header/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getHeaderFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+				n.getProfileMediaFunc = func(ctx context.Context, pid peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 					return bytes.NewReader([]byte{0x00}), nil
 				}
 			},
@@ -147,7 +151,7 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/profiles/adfadsf/header/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getHeaderFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+				n.getProfileMediaFunc = func(ctx context.Context, pid peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 					return bytes.NewReader([]byte{0x00}), nil
 				}
 			},
@@ -161,7 +165,7 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/profiles/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/header/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getHeaderFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+				n.getProfileMediaFunc = func(ctx context.Context, pid peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 					return nil, coreiface.ErrNotFound
 				}
 			},
@@ -175,7 +179,7 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/profiles/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/header/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getHeaderFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+				n.getProfileMediaFunc = func(ctx context.Context, pid peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 					return nil, errors.New("internal")
 				}
 			},
@@ -189,16 +193,15 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/avatar",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
-				n.setAvatarImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-					if b64ImageData != "aa" {
-						return models.ImageHashes{}, errors.New("incorrect image")
-					}
-					return models.ImageHashes{
-						Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+				n.setProfileMediaFunc = func(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error) {
+					return &contracts.UploadResult{
+						Hashes: &models.ImageHashes{
+							Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+						},
 					}, nil
 				}
 			},
-			body:       []byte(`{"avatar": "aa"}`),
+			body:       []byte(`{"avatar": "` + validB64 + `"}`),
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
 				r := models.ImageHashes{
@@ -208,35 +211,25 @@ func TestImageHandlers(t *testing.T) {
 			},
 		},
 		{
-			name:   "Post avatar bad data",
-			path:   "/v1/media/avatar",
-			method: http.MethodPost,
-			setNodeMethods: func(n *mockNode) {
-				n.setAvatarImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-					return models.ImageHashes{
-						Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
-					}, nil
-				}
-			},
-			body:       []byte(``),
-			statusCode: http.StatusBadRequest,
+			name:               "Post avatar bad data",
+			path:               "/v1/media/avatar",
+			method:             http.MethodPost,
+			setNodeMethods:     func(n *mockNode) {},
+			body:               []byte(``),
+			statusCode:         http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
 				return []byte(wrapPhaseGError(http.StatusBadRequest, "EOF")), nil
 			},
 		},
 		{
-			name:   "Post avatar bad request",
-			path:   "/v1/media/avatar",
-			method: http.MethodPost,
-			setNodeMethods: func(n *mockNode) {
-				n.setAvatarImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-					return models.ImageHashes{}, coreiface.ErrBadRequest
-				}
-			},
-			body:       []byte(`{"avatar": "aa"}`),
-			statusCode: http.StatusBadRequest,
+			name:           "Post avatar invalid base64",
+			path:           "/v1/media/avatar",
+			method:         http.MethodPost,
+			setNodeMethods: func(n *mockNode) {},
+			body:           []byte(`{"avatar": "not-valid-b64!!!"}`),
+			statusCode:     http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "bad request")), nil
+				return nil, nil
 			},
 		},
 		{
@@ -244,11 +237,11 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/avatar",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
-				n.setAvatarImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-					return models.ImageHashes{}, coreiface.ErrInternalServer
+				n.setProfileMediaFunc = func(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error) {
+					return nil, coreiface.ErrInternalServer
 				}
 			},
-			body:       []byte(`{"avatar": "aa"}`),
+			body:       []byte(`{"avatar": "` + validB64 + `"}`),
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
 				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal server error")), nil
@@ -259,16 +252,15 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/header",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
-				n.setHeaderImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-					if b64ImageData != "aa" {
-						return models.ImageHashes{}, errors.New("incorrect image")
-					}
-					return models.ImageHashes{
-						Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+				n.setProfileMediaFunc = func(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error) {
+					return &contracts.UploadResult{
+						Hashes: &models.ImageHashes{
+							Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+						},
 					}, nil
 				}
 			},
-			body:       []byte(`{"header": "aa"}`),
+			body:       []byte(`{"header": "` + validB64 + `"}`),
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
 				r := models.ImageHashes{
@@ -278,35 +270,14 @@ func TestImageHandlers(t *testing.T) {
 			},
 		},
 		{
-			name:   "Post header bad data",
-			path:   "/v1/media/header",
-			method: http.MethodPost,
-			setNodeMethods: func(n *mockNode) {
-				n.setHeaderImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-					return models.ImageHashes{
-						Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
-					}, nil
-				}
-			},
-			body:       []byte(``),
-			statusCode: http.StatusBadRequest,
+			name:           "Post header bad data",
+			path:           "/v1/media/header",
+			method:         http.MethodPost,
+			setNodeMethods: func(n *mockNode) {},
+			body:           []byte(``),
+			statusCode:     http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
 				return []byte(wrapPhaseGError(http.StatusBadRequest, "EOF")), nil
-			},
-		},
-		{
-			name:   "Post header bad request",
-			path:   "/v1/media/header",
-			method: http.MethodPost,
-			setNodeMethods: func(n *mockNode) {
-				n.setHeaderImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-					return models.ImageHashes{}, coreiface.ErrBadRequest
-				}
-			},
-			body:       []byte(`{"header": "aa"}`),
-			statusCode: http.StatusBadRequest,
-			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "bad request")), nil
 			},
 		},
 		{
@@ -314,11 +285,11 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/header",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
-				n.setHeaderImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-					return models.ImageHashes{}, coreiface.ErrInternalServer
+				n.setProfileMediaFunc = func(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error) {
+					return nil, coreiface.ErrInternalServer
 				}
 			},
-			body:       []byte(`{"header": "aa"}`),
+			body:       []byte(`{"header": "` + validB64 + `"}`),
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
 				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal server error")), nil
@@ -329,19 +300,15 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/product-images",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
-				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
-					if b64ImageData != "aa" {
-						return models.ImageHashes{}, errors.New("incorrect image")
-					}
-					if filename != "image.jpg" {
-						return models.ImageHashes{}, errors.New("incorrect filename")
-					}
-					return models.ImageHashes{
-						Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+				n.uploadMediaFunc = func(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error) {
+					return &contracts.UploadResult{
+						Hashes: &models.ImageHashes{
+							Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+						},
 					}, nil
 				}
 			},
-			body:       []byte(`[{"image": "aa", "filename": "image.jpg"}]`),
+			body:       []byte(`[{"image": "` + validB64 + `", "filename": "image.jpg"}]`),
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
 				r := []models.ImageHashes{
@@ -353,35 +320,14 @@ func TestImageHandlers(t *testing.T) {
 			},
 		},
 		{
-			name:   "Post image bad data",
-			path:   "/v1/media/product-images",
-			method: http.MethodPost,
-			setNodeMethods: func(n *mockNode) {
-				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
-					return models.ImageHashes{
-						Small: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
-					}, nil
-				}
-			},
-			body:       []byte(``),
-			statusCode: http.StatusBadRequest,
+			name:           "Post image bad data",
+			path:           "/v1/media/product-images",
+			method:         http.MethodPost,
+			setNodeMethods: func(n *mockNode) {},
+			body:           []byte(``),
+			statusCode:     http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
 				return []byte(wrapPhaseGError(http.StatusBadRequest, "EOF")), nil
-			},
-		},
-		{
-			name:   "Post image bad request",
-			path:   "/v1/media/product-images",
-			method: http.MethodPost,
-			setNodeMethods: func(n *mockNode) {
-				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
-					return models.ImageHashes{}, coreiface.ErrBadRequest
-				}
-			},
-			body:       []byte(`[{"image": "aa", "filename": "image.jpg"}]`),
-			statusCode: http.StatusBadRequest,
-			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "bad request")), nil
 			},
 		},
 		{
@@ -389,11 +335,11 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/product-images",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
-				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
-					return models.ImageHashes{}, coreiface.ErrInternalServer
+				n.uploadMediaFunc = func(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error) {
+					return nil, coreiface.ErrInternalServer
 				}
 			},
-			body:       []byte(`[{"image": "aa", "filename": "image.jpg"}]`),
+			body:       []byte(`[{"image": "` + validB64 + `", "filename": "image.jpg"}]`),
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
 				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal server error")), nil

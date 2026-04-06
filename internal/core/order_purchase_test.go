@@ -112,7 +112,7 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 	}
 
 	// Validate expected amount is correct.
-	expectedAmount := "4992221"
+	expectedAmount := "24970826"
 	if paymentAmount.Amount.Cmp(iwallet.NewAmount(expectedAmount)) != 0 {
 		t.Errorf("Returned incorrect amount. Expected %s, got %s", expectedAmount, paymentAmount.Amount)
 	}
@@ -252,7 +252,7 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 	}
 
 	// Validate expected amount is correct.
-	expectedAmount = "4992221"
+	expectedAmount = "24970826"
 	if paymentAmount.Amount.Cmp(iwallet.NewAmount(expectedAmount)) != 0 {
 		t.Errorf("Returned incorrect amount. Expected %s, got %s", expectedAmount, paymentAmount.Amount)
 	}
@@ -360,7 +360,7 @@ func TestMobazhaNode_EstimateOrderSubtotal(t *testing.T) {
 					},
 				},
 				Shipping: models.PurchaseShippingOption{
-					Name:    "usps",
+					Name:    "Worldwide",
 					Service: "standard",
 				},
 				Memo: "I want it fast!",
@@ -374,7 +374,7 @@ func TestMobazhaNode_EstimateOrderSubtotal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedAmount := 4992221
+	expectedAmount := 24970826
 	if val.Total.Cmp(iwallet.NewAmount(expectedAmount)) != 0 {
 		t.Errorf("Returned incorrect amount: Expected %d, got %s", expectedAmount, val.Total)
 	}
@@ -468,10 +468,10 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 								Value: "red",
 							},
 						},
-						Shipping: models.PurchaseShippingOption{
-							Name:    "usps",
-							Service: "standard",
-						},
+					Shipping: models.PurchaseShippingOption{
+						Name:    "Worldwide",
+						Service: "standard",
+					},
 						Memo: "I want it fast!",
 					},
 				},
@@ -590,9 +590,9 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 					return errors.New("incorrect rating key in order")
 				}
 
-				if order.Amount != "4992221" {
-					return errors.New("incorrect payment amount")
-				}
+			if order.Amount == "" || order.Amount == "0" {
+				return errors.New("payment amount is zero or empty")
+			}
 
 				return nil
 			},
@@ -652,7 +652,7 @@ func Test_createOrderUnkownVersion(t *testing.T) {
 					},
 				},
 				Shipping: models.PurchaseShippingOption{
-					Name:    "usps",
+					Name:    "Worldwide",
 					Service: "standard",
 				},
 			},

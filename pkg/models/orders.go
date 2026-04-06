@@ -1382,16 +1382,19 @@ func (o *Order) IsDisputeAccepted() bool {
 }
 
 // IsFunded returns whether this order is fully funded or not.
-// Payment verification (e.g. fiat or provider-confirmed crypto) is a
-// stronger signal than local address-based aggregation, so verified
-// payments are always considered funded.
+//
+// For payments verified by a provider or on-chain confirmation, we still
+// run the local address-based amount check when possible. If no local
+// transactions match the payment/platform address (e.g. fiat payments or
+// address-format mismatches), we trust the verification status because
+// the provider already confirmed the full amount.
+//
+// If local transactions DO match the payment address but the total is
+// short, it is a genuine partial payment (e.g. UTXO QR scan where the
+// buyer manually reduced the amount) and we return false.
 func (o *Order) IsFunded() (bool, error) {
 	if o.SerializedPaymentSent == nil {
 		return false, nil
-	}
-
-	if o.IsPaymentVerified() {
-		return true, nil
 	}
 
 	paymentSent, err := o.PaymentSentMessage()
@@ -1404,6 +1407,7 @@ func (o *Order) IsFunded() (bool, error) {
 		paymentAddress  = paymentSent.ToAddress
 		platformAddr    = paymentSent.PlatformAddr
 		totalPaid       iwallet.Amount
+		hasMatchingTx   bool
 	)
 
 	txs, err := o.GetTransactions()
@@ -1412,12 +1416,31 @@ func (o *Order) IsFunded() (bool, error) {
 	}
 	for _, tx := range txs {
 		for _, to := range tx.To {
-			if to.Address.String() == paymentAddress || to.Address.String() == platformAddr {
+			addr := to.Address.String()
+			if addr == "" {
+				continue
+			}
+			if addr == paymentAddress || addr == platformAddr {
 				totalPaid = totalPaid.Add(to.Amount)
+				hasMatchingTx = true
 			}
 		}
 	}
-	return totalPaid.Cmp(requestedAmount) >= 0, nil
+
+	if totalPaid.Cmp(requestedAmount) >= 0 {
+		return true, nil
+	}
+
+	// Verified but no matching local transactions: trust the verification.
+	// This covers fiat payments and address-format mismatches where the
+	// provider already confirmed the full amount via FetchAndVerify.
+	// When matching transactions exist but the amount is short, it is a
+	// real partial payment (UTXO QR scan scenario) — do NOT trust blindly.
+	if o.IsPaymentVerified() && !hasMatchingTx {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // IsFulfilled returns whether a fulfillment message is saved for each item in the order.

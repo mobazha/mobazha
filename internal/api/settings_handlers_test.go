@@ -5,9 +5,7 @@ import (
 	"testing"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/version"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -28,23 +26,12 @@ func TestSettingsHandlers(t *testing.T) {
 				n.usingTestnetFunc = func() bool {
 					return true
 				}
-				n.usingTorFunc = func() bool {
-					return true
-				}
-			n.multiwalletFunc = func() contracts.WalletOperator {
-				m := chains.Multiwallet{
-					iwallet.ChainBitcoin: nil,
-				}
-				return &m
-			}
 			},
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
 				n := nodeConfig{
 					PeerID:  "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 					Testnet: true,
-					Tor:     true,
-					Wallets: []string{"BTC"},
 				}
 				return wrapDataInEnvelope(&n)
 			},

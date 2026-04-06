@@ -317,6 +317,34 @@ func validateProfile(profile *models.Profile) error {
 	if profile.Moderator && profile.ModeratorInfo == nil {
 		return errors.New("moderatorinfo must be included if moderator boolean is set")
 	}
+	if profile.ModeratorInfo != nil {
+		if len(profile.ModeratorInfo.Description) > AboutMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"moderatorinfo.description", strconv.Itoa(AboutMaxCharacters)}
+		}
+		if len(profile.ModeratorInfo.TermsAndConditions) > PolicyMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"moderatorinfo.termsandconditions", strconv.Itoa(PolicyMaxCharacters)}
+		}
+		if len(profile.ModeratorInfo.Languages) > MaxListItems {
+			return coreiface.ErrTooManyItems{"moderatorinfo.languages", strconv.Itoa(MaxListItems)}
+		}
+		for _, lang := range profile.ModeratorInfo.Languages {
+			if len(lang) > WordMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"moderatorinfo.language", strconv.Itoa(WordMaxCharacters)}
+			}
+		}
+		if profile.ModeratorInfo.Fee.FixedFee != nil && profile.ModeratorInfo.Fee.FixedFee.Currency != nil {
+			cur := profile.ModeratorInfo.Fee.FixedFee.Currency
+			if len(cur.Name) > WordMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"moderatorinfo.fee.fixedfee.currency.name", strconv.Itoa(WordMaxCharacters)}
+			}
+			if len(string(cur.Code)) > WordMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"moderatorinfo.fee.fixedfee.currency.code", strconv.Itoa(WordMaxCharacters)}
+			}
+			if len(string(cur.CurrencyType)) > WordMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"moderatorinfo.fee.fixedfee.currency.type", strconv.Itoa(WordMaxCharacters)}
+			}
+		}
+	}
 	if profile.AvatarHashes.Large != "" || profile.AvatarHashes.Medium != "" ||
 		profile.AvatarHashes.Small != "" || profile.AvatarHashes.Tiny != "" || profile.AvatarHashes.Original != "" {
 		_, err := cid.Decode(profile.AvatarHashes.Tiny)
@@ -363,8 +391,11 @@ func validateProfile(profile *models.Profile) error {
 			return errors.New("original image hashes must be properly formatted CID")
 		}
 	}
+	if profile.Stats != nil && (profile.Stats.AverageRating < 0 || profile.Stats.AverageRating > 5) {
+		return errors.New("average rating must be between 0 and 5")
+	}
 	if len(profile.StoreAndForwardServers) > MaxListItems {
-		return coreiface.ErrTooManyItems{"storeAndForwardServers"}
+		return coreiface.ErrTooManyItems{"storeAndForwardServers", strconv.Itoa(MaxListItems)}
 	}
 	for _, pid := range profile.StoreAndForwardServers {
 		_, err := peer.Decode(pid)

@@ -509,11 +509,6 @@ func (w *MockWallet) ValidateAddress(addr iwallet.Address) error {
 	return nil
 }
 
-// HasKey returns true if the wallet can spend from the given address.
-func (w *MockWallet) HasKey(addr iwallet.Address) (bool, error) {
-	_, ok := w.addrs[addr]
-	return ok, nil
-}
 
 func (w *MockWallet) newAddress() (iwallet.Address, error) {
 	b := make([]byte, 20)

@@ -14,8 +14,8 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/config"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/chains"
+	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -23,8 +23,11 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -439,6 +442,45 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		n.peerHost.Peerstore().AddAddrs(firstPeerInfo.ID, firstPeerInfo.Addrs, peerstore.PermanentAddrTTL)
 	}
 
+	// Wire coTenantPublicData so mocknet nodes can resolve each other's
+	// public data (profiles, ratings, listings, etc.). This replaces the
+	// IPFS content-exchange path that was retired in Phase Media.
+	peerToNode := make(map[peer.ID]*MobazhaNode, len(nodes))
+	for _, n := range nodes {
+		peerToNode[n.Identity()] = n
+	}
+	allPeerIDs := make([]peer.ID, 0, len(nodes))
+	for _, n := range nodes {
+		allPeerIDs = append(allPeerIDs, n.Identity())
+	}
+
+	for _, n := range nodes {
+		localPeerID := n.Identity()
+		n.SetCoTenantPublicData(func(targetPeer peer.ID) (pkgdb.PublicData, error) {
+			if targetPeer == localPeerID {
+				return nil, fmt.Errorf("co-tenant: self")
+			}
+			target, ok := peerToNode[targetPeer]
+			if !ok {
+				return nil, fmt.Errorf("co-tenant: unknown peer %s", targetPeer)
+			}
+			return &dbViewPublicData{db: target.repo.DB()}, nil
+		})
+
+		if n.listingService != nil {
+			localID := localPeerID
+			n.listingService.SetCoTenantAllPeers(func() []peer.ID {
+				others := make([]peer.ID, 0, len(allPeerIDs)-1)
+				for _, pid := range allPeerIDs {
+					if pid != localID {
+						others = append(others, pid)
+					}
+				}
+				return others
+			})
+		}
+	}
+
 	return &Mocknet{nodes, mn, wn}, nil
 }
 
@@ -509,5 +551,94 @@ func (mn *Mocknet) TearDown() error {
 			return err
 		}
 	}
+	return nil
+}
+
+// dbViewPublicData adapts a database.Database into a pkgdb.PublicData for
+// the mocknet's coTenantPublicData wiring. Read methods open a View tx;
+// write methods are stubs (coTenantPublicData callers only read).
+type dbViewPublicData struct{ db database.Database }
+
+var _ pkgdb.PublicData = (*dbViewPublicData)(nil)
+
+func (d *dbViewPublicData) GetProfile() (*models.Profile, error) {
+	var r *models.Profile
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetProfile(); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetFollowers() (models.Followers, error) {
+	var r models.Followers
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetFollowers(); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetFollowing() (models.Following, error) {
+	var r models.Following
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetFollowing(); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetListingIndex() (models.ListingIndex, error) {
+	var r models.ListingIndex
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetListingIndex(); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetListing(slug string) (*pb.SignedListing, error) {
+	var r *pb.SignedListing
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetListing(slug); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetEncryptedListing(slug string) ([]byte, error) {
+	var r []byte
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetEncryptedListing(slug); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetRatingIndex() (models.RatingIndex, error) {
+	var r models.RatingIndex
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetRatingIndex(); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetPostIndex() ([]models.PostData, error) {
+	var r []models.PostData
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetPostIndex(); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetPost(slug string) (*postsPb.SignedPost, error) {
+	var r *postsPb.SignedPost
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetPost(slug); return e })
+	return r, err
+}
+func (d *dbViewPublicData) PostExist(slug string) bool {
+	var exists bool
+	_ = d.db.View(func(tx database.Tx) error { exists = tx.PostExist(slug); return nil })
+	return exists
+}
+func (d *dbViewPublicData) GetImageByName(size models.ImageSize, name string) ([]byte, error) {
+	var r []byte
+	err := d.db.View(func(tx database.Tx) error { var e error; r, e = tx.GetImageByName(size, name); return e })
+	return r, err
+}
+func (d *dbViewPublicData) GetMediaByCID(cidHash string) ([]byte, string, error) {
+	var data []byte
+	var ct string
+	err := d.db.View(func(tx database.Tx) error { var e error; data, ct, e = tx.GetMediaByCID(cidHash); return e })
+	return data, ct, err
+}
+
+// Write stubs — coTenantPublicData callers only read.
+func (d *dbViewPublicData) SetProfile(*models.Profile) error            { return nil }
+func (d *dbViewPublicData) SetFollowers(models.Followers) error         { return nil }
+func (d *dbViewPublicData) SetFollowing(models.Following) error         { return nil }
+func (d *dbViewPublicData) SetListingIndex(models.ListingIndex) error   { return nil }
+func (d *dbViewPublicData) SetListing(*pb.SignedListing) error          { return nil }
+func (d *dbViewPublicData) SetEncryptedListing(string, []byte) error    { return nil }
+func (d *dbViewPublicData) DeleteListing(string) error                  { return nil }
+func (d *dbViewPublicData) SetRatingIndex(models.RatingIndex) error     { return nil }
+func (d *dbViewPublicData) SetRating(*pb.Rating) error                  { return nil }
+func (d *dbViewPublicData) SetPostIndex([]models.PostData) error        { return nil }
+func (d *dbViewPublicData) AddPost(*postsPb.SignedPost) error           { return nil }
+func (d *dbViewPublicData) DeletePost(string) error                     { return nil }
+func (d *dbViewPublicData) SetImage(models.Image) error                 { return nil }
+func (d *dbViewPublicData) SetUploadedFile(models.UploadedFile) error   { return nil }
+func (d *dbViewPublicData) SetIntroVideo(models.IntroVideo) error       { return nil }
+func (d *dbViewPublicData) IndexMediaCID(string, string, string, string, string) error {
 	return nil
 }

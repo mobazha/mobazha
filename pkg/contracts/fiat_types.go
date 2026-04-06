@@ -229,17 +229,17 @@ type RefundResult struct {
 	// RefundID is the provider-assigned refund identifier.
 	//   Stripe: re_xxx
 	//   PayPal: refund ID
-	RefundID string
+	RefundID string `json:"refundId"`
 
 	// Status indicates the refund state:
 	//   "succeeded" — refund completed
 	//   "pending"   — refund in progress (PayPal may be async)
 	//   "failed"    — refund failed
-	Status string
+	Status string `json:"status"`
 
 	// Amount is the actual refunded amount in smallest currency unit.
-	Amount int64
+	Amount int64 `json:"amount"`
 
 	// Currency is the ISO 4217 currency code.
-	Currency string
+	Currency string `json:"currency"`
 }

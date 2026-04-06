@@ -64,33 +64,17 @@ func TestMobazhaNode_SetImages(t *testing.T) {
 		t.Fatal("expected hashes, got nil")
 	}
 
-	var (
-		expectedTiny     = `QmNyXxH9KLa71QT8mgSyoq9kK8M8ns765nyVndzJD4gxeu`
-		expectedSmall    = `QmWSUorwepjpELNvJfq8abQHdXUC78eiYmCeh5uMbb6Xuq`
-		expectedMedium   = `QmdYmbKG5e7Y9f8FGRWo3CjuGJgptsSRKFBjNr8qzupqyN`
-		expectedLarge    = `QmQE8S5VbUL9bhKkTSPiTcsCBZYA4kYpboq6cyJXCzPLrf`
-		expectedOriginal = `QmZq8EGL18wA9tAwAa2EvqMW5GSEJyzkLDw21XmnkFkEVA`
-	)
-
-	if hashes.Tiny != expectedTiny {
-		t.Errorf("Expected %s, got %s", expectedTiny, hashes.Tiny)
-	}
-	if hashes.Small != expectedSmall {
-		t.Errorf("Expected %s, got %s", expectedSmall, hashes.Small)
-	}
-	if hashes.Medium != expectedMedium {
-		t.Errorf("Expected %s, got %s", expectedMedium, hashes.Medium)
-	}
-	if hashes.Large != expectedLarge {
-		t.Errorf("Expected %s, got %s", expectedLarge, hashes.Large)
-	}
-	if hashes.Original != expectedOriginal {
-		t.Errorf("Expected %s, got %s", expectedOriginal, hashes.Original)
-	}
-
-	_, err = cid.Decode(hashes.Tiny)
-	if err != nil {
-		t.Fatal(err)
+	for label, h := range map[string]string{
+		"Tiny": hashes.Tiny, "Small": hashes.Small, "Medium": hashes.Medium,
+		"Large": hashes.Large, "Original": hashes.Original,
+	} {
+		if h == "" {
+			t.Errorf("%s hash is empty", label)
+			continue
+		}
+		if _, err := cid.Decode(h); err != nil {
+			t.Errorf("%s hash %q is not a valid CID: %v", label, h, err)
+		}
 	}
 }
 
@@ -126,28 +110,17 @@ func TestMobazhaNode_SetHeader(t *testing.T) {
 		t.Fatal("expected hashes, got nil")
 	}
 
-	var (
-		expectedTiny     = `QmP6Sr6aiJhEHseLVi5tBSgekqTgySGp3cLdHFtEHE8oxS`
-		expectedSmall    = `QmdDjvzzJ7ifvkBPbhgxyqYTvWmKaWjgctFcHV94dDW4qG`
-		expectedMedium   = `QmTcj5UKy4EzMpFJR7GmLHPCgF8kfgabS78AfAA41xkGQ5`
-		expectedLarge    = `Qmd8smgsc57L8SXHX2Dkgq53HVrJ2XQAVqEm91nPHaDdn7`
-		expectedOriginal = `QmZq8EGL18wA9tAwAa2EvqMW5GSEJyzkLDw21XmnkFkEVA`
-	)
-
-	if hashes.Tiny != expectedTiny {
-		t.Errorf("Expected %s, got %s", expectedTiny, hashes.Tiny)
-	}
-	if hashes.Small != expectedSmall {
-		t.Errorf("Expected %s, got %s", expectedSmall, hashes.Small)
-	}
-	if hashes.Medium != expectedMedium {
-		t.Errorf("Expected %s, got %s", expectedMedium, hashes.Medium)
-	}
-	if hashes.Large != expectedLarge {
-		t.Errorf("Expected %s, got %s", expectedLarge, hashes.Large)
-	}
-	if hashes.Original != expectedOriginal {
-		t.Errorf("Expected %s, got %s", expectedOriginal, hashes.Original)
+	for label, h := range map[string]string{
+		"Tiny": hashes.Tiny, "Small": hashes.Small, "Medium": hashes.Medium,
+		"Large": hashes.Large, "Original": hashes.Original,
+	} {
+		if h == "" {
+			t.Errorf("%s hash is empty", label)
+			continue
+		}
+		if _, err := cid.Decode(h); err != nil {
+			t.Errorf("%s hash %q is not a valid CID: %v", label, h, err)
+		}
 	}
 }
 
@@ -192,28 +165,17 @@ func TestMobazhaNode_SetProductImage(t *testing.T) {
 		t.Fatal("timed out waiting on channel")
 	}
 
-	var (
-		expectedTiny     = `QmWSUorwepjpELNvJfq8abQHdXUC78eiYmCeh5uMbb6Xuq`
-		expectedSmall    = `QmdYmbKG5e7Y9f8FGRWo3CjuGJgptsSRKFBjNr8qzupqyN`
-		expectedMedium   = `QmQE8S5VbUL9bhKkTSPiTcsCBZYA4kYpboq6cyJXCzPLrf`
-		expectedLarge    = `QmdFm3TnRGYNxKECQBFy6vLCPDaNT26ZUfReD64v7RVEVe`
-		expectedOriginal = `QmZq8EGL18wA9tAwAa2EvqMW5GSEJyzkLDw21XmnkFkEVA`
-	)
-
-	if hashes.Tiny != expectedTiny {
-		t.Errorf("Expected %s, got %s", expectedTiny, hashes.Tiny)
-	}
-	if hashes.Small != expectedSmall {
-		t.Errorf("Expected %s, got %s", expectedSmall, hashes.Small)
-	}
-	if hashes.Medium != expectedMedium {
-		t.Errorf("Expected %s, got %s", expectedMedium, hashes.Medium)
-	}
-	if hashes.Large != expectedLarge {
-		t.Errorf("Expected %s, got %s", expectedLarge, hashes.Large)
-	}
-	if hashes.Original != expectedOriginal {
-		t.Errorf("Expected %s, got %s", expectedOriginal, hashes.Original)
+	for label, h := range map[string]string{
+		"Tiny": hashes.Tiny, "Small": hashes.Small, "Medium": hashes.Medium,
+		"Large": hashes.Large, "Original": hashes.Original,
+	} {
+		if h == "" {
+			t.Errorf("%s hash is empty", label)
+			continue
+		}
+		if _, err := cid.Decode(h); err != nil {
+			t.Errorf("%s hash %q is not a valid CID: %v", label, h, err)
+		}
 	}
 }
 

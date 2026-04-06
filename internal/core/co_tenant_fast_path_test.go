@@ -81,11 +81,17 @@ func coTenantMiss() contracts.CoTenantPublicDataFn {
 	}
 }
 
+// testLocalNodePeerID is a different peer ID from testVendorPeerID, used as the
+// local node identity so co-tenant lookups for testVendorPeerID don't
+// short-circuit to the local DB.
+const testLocalNodePeerID = "QmT5NvUtoM5nWFfrQdVrFtvGfKFmG7AHE8P34isapyhCxX"
+
 // --- ListingAppService tests ---
 
 func TestListingGetListings_CoTenantHit(t *testing.T) {
 	wantIndex := models.ListingIndex{{Slug: "test-product", Title: "Test"}}
 	svc := newTestListingAppService(t, ListingAppServiceConfig{
+		NodeID:             mustPeerID(t, testLocalNodePeerID),
 		CoTenantPublicData: coTenantHit(&mockPublicData{listingIndex: wantIndex}),
 	})
 
@@ -104,6 +110,7 @@ func TestListingGetListings_NilCoTenant_NoFastPath(t *testing.T) {
 
 func TestListingGetListings_CoTenantMissReturnsEmptyIndex(t *testing.T) {
 	svc := newTestListingAppService(t, ListingAppServiceConfig{
+		NodeID:             mustPeerID(t, testLocalNodePeerID),
 		CoTenantPublicData: coTenantHit(&mockPublicData{listingIndex: nil}),
 	})
 
@@ -116,6 +123,7 @@ func TestListingGetListings_CoTenantMissReturnsEmptyIndex(t *testing.T) {
 func TestListingGetListingBySlug_CoTenantHit(t *testing.T) {
 	sl := &pb.SignedListing{Listing: &pb.Listing{Slug: "cool-shirt"}}
 	svc := newTestListingAppService(t, ListingAppServiceConfig{
+		NodeID: mustPeerID(t, testLocalNodePeerID),
 		CoTenantPublicData: coTenantHit(&mockPublicData{
 			listings: map[string]*pb.SignedListing{"cool-shirt": sl},
 		}),

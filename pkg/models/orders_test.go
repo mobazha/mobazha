@@ -1927,7 +1927,7 @@ func TestOrder_IsFunded(t *testing.T) {
 			isFunded: false,
 		},
 		// Verified payment should be treated as funded even if tx outputs don't
-		// match legacy address aggregation.
+		// match legacy address aggregation (fiat / address-format mismatch).
 		{
 			setup: func(order *Order) error {
 				order.MarkPaymentVerified()
@@ -1951,6 +1951,33 @@ func TestOrder_IsFunded(t *testing.T) {
 				})
 			},
 			isFunded: true,
+		},
+		// UTXO partial payment: verified but tx matches payment address with
+		// insufficient amount (e.g. buyer scanned QR and manually reduced amount).
+		// Must NOT be treated as funded.
+		{
+			setup: func(order *Order) error {
+				order.MarkPaymentVerified()
+				if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{})); err != nil {
+					return err
+				}
+				if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "btc-address",
+				})); err != nil {
+					return err
+				}
+				return order.PutTransaction(iwallet.Transaction{
+					ID: "partial-tx",
+					To: []iwallet.SpendInfo{
+						{
+							Address: iwallet.NewAddress("btc-address", iwallet.CtMock),
+							Amount:  iwallet.NewAmount("500"),
+						},
+					},
+				})
+			},
+			isFunded: false,
 		},
 	}
 

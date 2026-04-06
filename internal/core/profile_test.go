@@ -88,34 +88,14 @@ func TestMobazhaNode_GetProfile(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	// Test fetching from cache
+	// Co-tenant fast path always returns live data (no local cache).
 	pro, err = mocknet.Nodes()[1].Profile().GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if pro.Name != name {
-		t.Errorf("Returned profile with incorrect name. Expected %s, got %s", name, pro.Name)
-	}
-
-	var record models.StoreAndForwardServers
-	err = mocknet.Nodes()[1].repo.DB().View(func(tx database.Tx) error {
-		return tx.Read().Where("peer_id=?", mocknet.Nodes()[0].Identity().String()).First(&record).Error
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	peerIDs, err := record.Servers()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(peerIDs) != 1 {
-		t.Errorf("Incorrect peerIDs returned. Expected 1 got %d", len(peerIDs))
-	}
-
-	if peerIDs[0].String() != snfServer {
-		t.Errorf("Incorrect snf server. Expected %s, got %s", snfServer, peerIDs[0])
+	if pro.Name != name2 {
+		t.Errorf("Returned profile with incorrect name. Expected %s, got %s", name2, pro.Name)
 	}
 }
 
@@ -235,6 +215,7 @@ func Test_updateSNFServers(t *testing.T) {
 
 	server := "adsf"
 	node.storeAndForwardServers = []string{server}
+	node.profileService.storeAndForwardServers = []string{server}
 
 	err = node.profileService.UpdateSNFServers()
 	if err != nil {
@@ -246,6 +227,9 @@ func Test_updateSNFServers(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if len(pro.StoreAndForwardServers) == 0 {
+		t.Fatal("Expected StoreAndForwardServers to be non-empty")
+	}
 	if pro.StoreAndForwardServers[0] != server {
 		t.Errorf("Expected server %s, got %s", server, pro.StoreAndForwardServers[0])
 	}

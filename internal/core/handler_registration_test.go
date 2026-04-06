@@ -31,13 +31,6 @@ func TestRegisterHandlers_CoversAllMessageTypes(t *testing.T) {
 	node := &MobazhaNode{networkFields: networkFields{networkService: spy}}
 	node.registerHandlers()
 
-	// Retired message types kept in proto for backward compatibility (reserved numbers).
-	// Phase 2g removed Channels handlers; the enum values remain to prevent reuse.
-	retiredTypes := map[pb.Message_MessageType]bool{
-		pb.Message_CHANNEL_REQUEST:  true,
-		pb.Message_CHANNEL_RESPONSE: true,
-	}
-
 	allTypes := pb.Message_MessageType_name
 	require.NotEmpty(t, allTypes, "protobuf enum map should not be empty")
 
@@ -45,9 +38,6 @@ func TestRegisterHandlers_CoversAllMessageTypes(t *testing.T) {
 	var missing []string
 	for num, name := range allTypes {
 		mt := pb.Message_MessageType(num)
-		if retiredTypes[mt] {
-			continue
-		}
 		activeCount++
 		if !spy.registered[mt] {
 			missing = append(missing, name)

@@ -96,14 +96,8 @@ func TestMobazhaNode_Ratings(t *testing.T) {
 		t.Errorf("Expected cid %s, got %s", id, ratings[0].Ratings[0])
 	}
 
-	rating2, err := mockNet.Nodes()[1].Social().GetRating(context.Background(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if rating2.Review != rating.Review {
-		t.Errorf("Expected review %s, got %s", rating.Review, rating2.Review)
-	}
+	// GetRating by CID is no longer available after IPFS retirement.
+	// The rating index (above) is the supported access pattern.
 }
 
 func newTestRating() (*pb.Rating, error) {

@@ -15,9 +15,9 @@ set -euo pipefail
 # Tested on: Ubuntu 22.04+, Debian 12+
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/mobazha}"
-COMPOSE_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.yml"
-COMPOSE_OVERLAY_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.overlay.yml"
-CTL_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/mobazha-ctl"
+COMPOSE_URL="https://get.mobazha.org/standalone/docker-compose.yml"
+COMPOSE_OVERLAY_URL="https://get.mobazha.org/standalone/docker-compose.overlay.yml"
+CTL_URL="https://get.mobazha.org/standalone/mobazha-ctl"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

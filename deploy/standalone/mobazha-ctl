@@ -17,7 +17,7 @@ INSTALL_DIR="${MOBAZHA_DIR:-/opt/mobazha}"
 ENV_FILE="$INSTALL_DIR/.env"
 COMPOSE_BASE="$INSTALL_DIR/docker-compose.yml"
 COMPOSE_OVERLAY="$INSTALL_DIR/docker-compose.overlay.yml"
-OVERLAY_COMPOSE_URL="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.overlay.yml"
+OVERLAY_COMPOSE_URL="https://get.mobazha.org/standalone/docker-compose.overlay.yml"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

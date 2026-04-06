@@ -25,11 +25,21 @@ func newTestSigner(t *testing.T) *contracts.KeyPairSigner {
 func TestOrderStateBridge_HappyPath(t *testing.T) {
 	bridge := NewOrderStateBridge()
 
-	// AWAITING_PAYMENT + PaymentSent → PENDING
+	// AWAITING_PAYMENT + PaymentSent → AWAITING_PAYMENT_VERIFICATION
 	newState, valid := bridge.ValidateTransition(
 		int(orders.StateAwaitingPayment), int(orders.EventPaymentSent))
 	if !valid {
 		t.Fatal("Expected valid transition AwaitingPayment + PaymentSent")
+	}
+	if newState != int(orders.StateAwaitingPaymentVerification) {
+		t.Errorf("Expected AwaitingPaymentVerification, got %d", newState)
+	}
+
+	// AWAITING_PAYMENT_VERIFICATION + PaymentVerified → PENDING
+	newState, valid = bridge.ValidateTransition(
+		int(orders.StateAwaitingPaymentVerification), int(orders.EventPaymentVerified))
+	if !valid {
+		t.Fatal("Expected valid transition AwaitingPaymentVerification + PaymentVerified")
 	}
 	if newState != int(orders.StatePending) {
 		t.Errorf("Expected Pending, got %d", newState)

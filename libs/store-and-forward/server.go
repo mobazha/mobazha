@@ -99,6 +99,13 @@ type streamSession struct {
 	authenticatedID peer.ID // The actual authenticated client ID (may differ in proxy mode)
 }
 
+func (svr *Server) isReplicationPeer(p peer.ID) bool {
+	svr.mtx.RLock()
+	_, ok := svr.replicationPeers[p]
+	svr.mtx.RUnlock()
+	return ok
+}
+
 func (svr *Server) streamHandler(s inet.Stream) {
 	defer s.Close()
 	contextReader := ctxio.NewReader(svr.ctx, s)
@@ -165,19 +172,19 @@ func (svr *Server) streamHandler(s inet.Stream) {
 		case pb.Message_STORE_MESSAGE:
 			err = svr.handleStoreMessage(writer, pmes, remotePeer)
 		case pb.Message_GET_MESSAGE:
-			if _, ok := svr.replicationPeers[remotePeer]; !ok {
+			if !svr.isReplicationPeer(remotePeer) {
 				err = writeStatusMessage(writer, pb.Message_UNAUTHORIZED)
 				break
 			}
 			err = svr.handleGetMessage(writer, pmes, remotePeer)
 		case pb.Message_REPLICATE:
-			if _, ok := svr.replicationPeers[remotePeer]; !ok {
+			if !svr.isReplicationPeer(remotePeer) {
 				err = writeStatusMessage(writer, pb.Message_UNAUTHORIZED)
 				break
 			}
 			err = svr.handleReplicateMessage(writer, pmes, remotePeer)
 		case pb.Message_MESSAGE:
-			if _, ok := svr.replicationPeers[remotePeer]; !ok {
+			if !svr.isReplicationPeer(remotePeer) {
 				err = writeStatusMessage(writer, pb.Message_UNAUTHORIZED)
 				break
 			}
@@ -642,9 +649,10 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 	for p, s := range svr.replicationPeers {
 		go func(p peer.ID, s inet.Stream) {
 			if s == nil {
-				s, err = svr.host.NewStream(inet.WithAllowLimitedConn(svr.ctx, "identify"), p, svr.serverProtocol)
-				if err != nil {
-					log.Errorf("Error replicating message to peer %s: %s", p, err)
+				var sErr error
+				s, sErr = svr.host.NewStream(inet.WithAllowLimitedConn(svr.ctx, "identify"), p, svr.serverProtocol)
+				if sErr != nil {
+					log.Errorf("Error replicating message to peer %s: %s", p, sErr)
 					return
 				}
 				svr.mtx.Lock()
@@ -654,7 +662,7 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 			}
 
 			writer := msgio.NewVarintWriter(s)
-			err = writeMsgWithTimeout(writer, &pb.Message{
+			if wErr := writeMsgWithTimeout(writer, &pb.Message{
 				Type: pb.Message_REPLICATE,
 				Payload: &pb.Message_Ids{
 					Ids: &pb.Message_IDs{
@@ -662,9 +670,8 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 						PeerID:    []byte(to),
 					},
 				},
-			})
-			if err != nil {
-				log.Errorf("Error writing REPLICATE message to peer %s: %s", p, err)
+			}); wErr != nil {
+				log.Errorf("Error writing REPLICATE message to peer %s: %s", p, wErr)
 			}
 		}(p, s)
 	}

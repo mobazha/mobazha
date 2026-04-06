@@ -1382,9 +1382,16 @@ func (o *Order) IsDisputeAccepted() bool {
 }
 
 // IsFunded returns whether this order is fully funded or not.
+// Payment verification (e.g. fiat or provider-confirmed crypto) is a
+// stronger signal than local address-based aggregation, so verified
+// payments are always considered funded.
 func (o *Order) IsFunded() (bool, error) {
 	if o.SerializedPaymentSent == nil {
 		return false, nil
+	}
+
+	if o.IsPaymentVerified() {
+		return true, nil
 	}
 
 	paymentSent, err := o.PaymentSentMessage()

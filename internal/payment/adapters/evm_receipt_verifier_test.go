@@ -112,15 +112,17 @@ func makeVerifier(fetcher iwallet.ChainClient) *EVMReceiptVerifier {
 
 // ── Tests: VerifyTransactionReceipt ─────────────────────────────────────
 
+const testETH = "crypto:eip155:1:native"
+
 func TestVerifyTransactionReceipt_Success(t *testing.T) {
 	v := makeVerifier(&mockReceiptFetcher{receipt: successReceipt()})
-	err := v.VerifyTransactionReceipt(context.Background(), "ETH", "0xabc123")
+	err := v.VerifyTransactionReceipt(context.Background(), testETH, "0xabc123")
 	require.NoError(t, err)
 }
 
 func TestVerifyTransactionReceipt_Reverted(t *testing.T) {
 	v := makeVerifier(&mockReceiptFetcher{receipt: revertedReceipt()})
-	err := v.VerifyTransactionReceipt(context.Background(), "ETH", "0xabc123")
+	err := v.VerifyTransactionReceipt(context.Background(), testETH, "0xabc123")
 	assert.ErrorIs(t, err, payment.ErrTransactionReverted)
 }
 
@@ -132,7 +134,7 @@ func TestVerifyTransactionReceipt_NonEVM(t *testing.T) {
 
 func TestVerifyTransactionReceipt_RPCError(t *testing.T) {
 	v := makeVerifier(&mockReceiptFetcher{receiptErr: errors.New("RPC timeout")})
-	err := v.VerifyTransactionReceipt(context.Background(), "ETH", "0xabc123")
+	err := v.VerifyTransactionReceipt(context.Background(), testETH, "0xabc123")
 	require.NoError(t, err, "RPC errors are best-effort — should return nil")
 }
 
@@ -140,7 +142,7 @@ func TestVerifyTransactionReceipt_RPCError(t *testing.T) {
 
 func TestWaitAndVerifyReceipt_Success(t *testing.T) {
 	v := makeVerifier(&delayedReceiptFetcher{receipt: successReceipt(), maxFails: 2})
-	err := v.WaitAndVerifyReceipt(context.Background(), "ETH", "0xabc123")
+	err := v.WaitAndVerifyReceipt(context.Background(), testETH, "0xabc123")
 	require.NoError(t, err)
 }
 
@@ -149,13 +151,13 @@ func TestWaitAndVerifyReceipt_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	err := v.WaitAndVerifyReceipt(ctx, "ETH", "0xabc123")
+	err := v.WaitAndVerifyReceipt(ctx, testETH, "0xabc123")
 	require.Error(t, err)
 }
 
 func TestWaitAndVerifyReceipt_Reverted(t *testing.T) {
 	v := makeVerifier(&mockReceiptFetcher{receipt: revertedReceipt()})
-	err := v.WaitAndVerifyReceipt(context.Background(), "ETH", "0xabc123")
+	err := v.WaitAndVerifyReceipt(context.Background(), testETH, "0xabc123")
 	assert.ErrorIs(t, err, payment.ErrTransactionReverted)
 }
 

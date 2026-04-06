@@ -58,7 +58,7 @@ func Test_Registration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = mn.AddPeer(sk, a)
+	clientHost, err := mn.AddPeer(sk, a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func Test_Registration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client, err := NewClient(context.Background(), sk, []peer.ID{}, mn.Hosts()[1])
+	client, err := NewClient(context.Background(), sk, []peer.ID{}, clientHost)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,10 @@ func Test_Registration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !client.servers[server.host.ID()] {
+	client.mtx.RLock()
+	registered := client.servers[server.host.ID()]
+	client.mtx.RUnlock()
+	if !registered {
 		t.Fatal("Registration failed")
 	}
 }
@@ -124,21 +127,22 @@ func Test_Messages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client1.registerSingle(mn.Hosts()[0].ID(), time.Hour)
+	serverID := server.host.ID()
+	client1.registerSingle(serverID, time.Hour)
 
 	client2, err := NewClient(context.Background(), sk2, []peer.ID{}, h2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client2.registerSingle(mn.Hosts()[0].ID(), time.Hour)
+	client2.registerSingle(serverID, time.Hour)
 
 	var (
 		sub    = client2.SubscribeMessages()
 		encMsg = []byte("encrypted message")
 	)
 
-	if err := client1.SendMessage(context.Background(), h2.ID(), mn.Hosts()[0].ID(), nil, encMsg, nil); err != nil {
+	if err := client1.SendMessage(context.Background(), h2.ID(), serverID, nil, encMsg, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -173,7 +177,7 @@ func Test_Messages(t *testing.T) {
 
 	// Make sure second message goes through.
 	encMsg = []byte("encrypted message2")
-	if err := client1.SendMessage(context.Background(), h2.ID(), mn.Hosts()[0].ID(), nil, encMsg, nil); err != nil {
+	if err := client1.SendMessage(context.Background(), h2.ID(), serverID, nil, encMsg, nil); err != nil {
 		t.Fatal(err)
 	}
 

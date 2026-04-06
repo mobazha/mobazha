@@ -91,18 +91,16 @@ func TestMessenger(t *testing.T) {
 		return nil
 	})
 
+	var ackErr error
 	ch2 := make(chan struct{})
 	service1.RegisterHandler(pb.Message_ACK, func(p peer.ID, msg *pb.Message) error {
-		err := db1.Update(func(tx database.Tx) error {
+		ackErr = db1.Update(func(tx database.Tx) error {
 			ack := new(pb.AckMessage)
 			if err := msg.Payload.UnmarshalTo(ack); err != nil {
 				return err
 			}
 			return messenger1.ProcessACK(tx, ack)
 		})
-		if err != nil {
-			t.Error(err)
-		}
 
 		ch2 <- struct{}{}
 		return nil
@@ -142,6 +140,9 @@ func TestMessenger(t *testing.T) {
 	case <-ch2:
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timed out")
+	}
+	if ackErr != nil {
+		t.Errorf("ACK handler error: %v", ackErr)
 	}
 
 	var messages2 []models.OutgoingMessage

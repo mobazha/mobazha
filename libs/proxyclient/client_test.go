@@ -8,9 +8,8 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-// FIXME: this test is using the internet and requires an open Tor browser to run. We need to
-// rewrite this test to be able to run locally.
 func TestNewHttpClient(t *testing.T) {
+	t.Skip("skipping: requires network access and a running Tor proxy on 127.0.0.1:9150")
 	// No proxy
 	client := NewHttpClient()
 

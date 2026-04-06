@@ -237,6 +237,8 @@ func (tx *dbTx) Rollback() error {
 // SetEventBus sets an event bus in the mock wallet. This is useful
 // for testing integration with the MobazhaNode.
 func (w *MockWallet) SetEventBus(bus events.Bus) {
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
 	w.bus = bus
 }
 

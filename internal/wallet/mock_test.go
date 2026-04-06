@@ -458,11 +458,12 @@ func TestMockWallet_1of2(t *testing.T) {
 
 func TestMockWalletNetwork(t *testing.T) {
 	network := NewMockWalletNetwork(3)
-	network.Start()
 
 	for _, wallet := range network.Wallets() {
 		wallet.SetEventBus(events.NewBus())
 	}
+
+	network.Start()
 
 	sub, err := network.Wallets()[0].bus.Subscribe(&events.TransactionReceived{})
 	if err != nil {
@@ -481,11 +482,14 @@ func TestMockWalletNetwork(t *testing.T) {
 
 	<-sub.Out()
 
-	if len(network.Wallets()[0].utxos) != 1 {
+	network.Wallets()[0].mtx.RLock()
+	utxoCount0 := len(network.Wallets()[0].utxos)
+	txCount0 := len(network.Wallets()[0].transactions)
+	network.Wallets()[0].mtx.RUnlock()
+	if utxoCount0 != 1 {
 		t.Error("Failed to record new utxo")
 	}
-
-	if len(network.Wallets()[0].transactions) != 1 {
+	if txCount0 != 1 {
 		t.Error("Failed to record new txn")
 	}
 
@@ -502,19 +506,25 @@ func TestMockWalletNetwork(t *testing.T) {
 		t.Errorf("Incorrect unconfirmed balance. Expected %d, got %v", 100000, confirmed)
 	}
 
-	if len(network.Wallets()[1].utxos) != 0 {
+	network.Wallets()[1].mtx.RLock()
+	utxoCount1 := len(network.Wallets()[1].utxos)
+	txCount1 := len(network.Wallets()[1].transactions)
+	network.Wallets()[1].mtx.RUnlock()
+	if utxoCount1 != 0 {
 		t.Error("Incorrectly recorded utxo")
 	}
-
-	if len(network.Wallets()[1].transactions) != 0 {
+	if txCount1 != 0 {
 		t.Error("Incorrectly recorded txn")
 	}
 
-	if len(network.Wallets()[2].utxos) != 0 {
+	network.Wallets()[2].mtx.RLock()
+	utxoCount2 := len(network.Wallets()[2].utxos)
+	txCount2 := len(network.Wallets()[2].transactions)
+	network.Wallets()[2].mtx.RUnlock()
+	if utxoCount2 != 0 {
 		t.Error("Incorrectly recorded utxo")
 	}
-
-	if len(network.Wallets()[2].transactions) != 0 {
+	if txCount2 != 0 {
 		t.Error("Incorrectly recorded txn")
 	}
 
@@ -566,11 +576,14 @@ func TestMockWalletNetwork(t *testing.T) {
 
 	<-sub2.Out()
 
-	if len(network.Wallets()[2].utxos) != 1 {
+	network.Wallets()[2].mtx.RLock()
+	utxoCount2After := len(network.Wallets()[2].utxos)
+	txCount2After := len(network.Wallets()[2].transactions)
+	network.Wallets()[2].mtx.RUnlock()
+	if utxoCount2After != 1 {
 		t.Error("Failed to record new utxo")
 	}
-
-	if len(network.Wallets()[2].transactions) != 1 {
+	if txCount2After != 1 {
 		t.Error("Failed to record new txn")
 	}
 
@@ -587,7 +600,10 @@ func TestMockWalletNetwork(t *testing.T) {
 		t.Errorf("Incorrect unconfirmed balance. Expected %d, got %v", 90000, unconfirmed)
 	}
 
-	if len(network.Wallets()[0].utxos) != 1 {
+	network.Wallets()[0].mtx.RLock()
+	utxoCount0After := len(network.Wallets()[0].utxos)
+	network.Wallets()[0].mtx.RUnlock()
+	if utxoCount0After != 1 {
 		t.Error("Failed to record new utxo")
 	}
 

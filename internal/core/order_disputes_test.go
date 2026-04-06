@@ -181,7 +181,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "abcd", done4); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -639,7 +639,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "abcd", done4); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {

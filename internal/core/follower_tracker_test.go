@@ -50,7 +50,10 @@ func TestFollowerTracker_ConnectDisconnect(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	if _, ok := ft.connected[p]; !ok {
+	ft.mtx.RLock()
+	_, connected := ft.connected[p]
+	ft.mtx.RUnlock()
+	if !connected {
 		t.Error("Peer is disconnected")
 	}
 
@@ -67,7 +70,10 @@ func TestFollowerTracker_ConnectDisconnect(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	if _, ok := ft.connected[p]; ok {
+	ft.mtx.RLock()
+	_, stillConnected := ft.connected[p]
+	ft.mtx.RUnlock()
+	if stillConnected {
 		t.Error("Peer is connected")
 	}
 
@@ -113,7 +119,10 @@ func TestFollowerTracker_ConnectToFollowers(t *testing.T) {
 
 	ft.tryConnectFollowers()
 
-	if len(ft.connected) != 4 {
-		t.Errorf("Incorrect number of connected followers. Expected %d, got %d", 4, len(ft.connected))
+	ft.mtx.RLock()
+	connectedCount := len(ft.connected)
+	ft.mtx.RUnlock()
+	if connectedCount != 4 {
+		t.Errorf("Incorrect number of connected followers. Expected %d, got %d", 4, connectedCount)
 	}
 }

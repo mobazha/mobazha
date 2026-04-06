@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,15 +25,30 @@ import (
 // capturingMessenger is a mock Messenger that records ReliablySendMessage calls.
 type capturingMessenger struct {
 	called   atomic.Int32
+	mu       sync.Mutex
 	lastPeer peer.ID
 	lastMsg  *netpb.Message
 }
 
 func (m *capturingMessenger) ReliablySendMessage(_ database.Tx, p peer.ID, msg *netpb.Message, _ chan<- struct{}) error {
 	m.called.Add(1)
+	m.mu.Lock()
 	m.lastPeer = p
 	m.lastMsg = msg
+	m.mu.Unlock()
 	return nil
+}
+
+func (m *capturingMessenger) getLastPeer() peer.ID {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastPeer
+}
+
+func (m *capturingMessenger) getLastMsg() *netpb.Message {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastMsg
 }
 func (m *capturingMessenger) ProcessACK(_ database.Tx, _ *netpb.AckMessage) error { return nil }
 func (m *capturingMessenger) SendACK(_ string, _ peer.ID)                         {}
@@ -644,8 +660,8 @@ func TestE2E_Stripe_WebhookToBuyerRelay(t *testing.T) {
 		return mockMsgr.called.Load() >= 1
 	}, 2*time.Second, 50*time.Millisecond, "messenger should send payment relay to buyer")
 
-	assert.Equal(t, buyerPeerID, mockMsgr.lastPeer)
-	assert.NotNil(t, mockMsgr.lastMsg)
+	assert.Equal(t, buyerPeerID, mockMsgr.getLastPeer())
+	assert.NotNil(t, mockMsgr.getLastMsg())
 }
 
 // TestE2E_PayPal_WebhookToBuyerRelay exercises the same chain for PayPal:
@@ -708,8 +724,8 @@ func TestE2E_PayPal_WebhookToBuyerRelay(t *testing.T) {
 		return mockMsgr.called.Load() >= 1
 	}, 2*time.Second, 50*time.Millisecond, "messenger should send PayPal payment relay to buyer")
 
-	assert.Equal(t, buyerPeerID, mockMsgr.lastPeer)
-	assert.NotNil(t, mockMsgr.lastMsg)
+	assert.Equal(t, buyerPeerID, mockMsgr.getLastPeer())
+	assert.NotNil(t, mockMsgr.getLastMsg())
 }
 
 // TestE2E_Stripe_WebhookIdempotency_BuyerCalledOnce verifies that duplicate

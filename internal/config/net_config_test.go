@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -37,15 +39,38 @@ func TestGenerateJson(t *testing.T) {
 }
 
 func TestLoadNetConfig(t *testing.T) {
-	netConfig, err := LoadNetConfig("https://mobazha.info/search/v1/config")
+	fixture := NetConfig{
+		BootstrapAddrs:         []string{"/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWTestPeerID"},
+		StoreAndForwardServers: []string{"12D3KooWTestPeerID"},
+		PlatformAddrs: map[iwallet.ChainType]string{
+			iwallet.ChainBitcoin: "bc1qtest",
+		},
+		Data: map[string]string{
+			"commission": "0.01",
+		},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&fixture)
+	}))
+	defer srv.Close()
+
+	netConfig, err := LoadNetConfig(srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(netConfig)
 
 	commission := netConfig.GetCommission()
-	t.Logf("commission is %f", commission)
+	if commission != 0.01 {
+		t.Errorf("expected commission 0.01, got %f", commission)
+	}
 
 	btcAddr := netConfig.GetPlatformAddr(iwallet.ChainBitcoin)
-	t.Logf("btcAddr is %s", btcAddr)
+	if btcAddr != "bc1qtest" {
+		t.Errorf("expected btcAddr bc1qtest, got %s", btcAddr)
+	}
+
+	if len(netConfig.BootstrapAddrs) != 1 {
+		t.Errorf("expected 1 bootstrap addr, got %d", len(netConfig.BootstrapAddrs))
+	}
 }

@@ -274,6 +274,7 @@ func ingestPaymentToWallets(t *testing.T, paymentData *models.PaymentData, nodes
 	if err != nil {
 		t.Fatalf("ingestPaymentToWallets: BuildTransaction: %v", err)
 	}
+	tx.Height = 1
 	for _, node := range nodes {
 		w, ok := node.Multiwallet().WalletForChain(iwallet.ChainMock)
 		if !ok {

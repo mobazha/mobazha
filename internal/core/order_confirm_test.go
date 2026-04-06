@@ -28,6 +28,8 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 		go node.orderProcessor.Start()
 	}
 
+	setupMockReceivingAccounts(t, network.Nodes())
+
 	orderSub0, err := network.Nodes()[0].eventBus.Subscribe(&events.NewOrder{})
 	if err != nil {
 		t.Fatal(err)
@@ -57,8 +59,7 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 	purchase := factory.NewPurchase()
 	purchase.Items[0].ListingHash = index[0].CID
 
-	// Address request direct order
-	orderID, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
+	orderID, _, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,21 +103,50 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 		t.Error("Node 1 failed to record order open ACK")
 	}
 
-	// Send payment (DIRECT method) - required before vendor can confirm
-	paymentData := &models.PaymentData{
-		OrderID:       orderID.String(),
-		TransactionID: "tx123456",
-		Method:        pb.PaymentSent_DIRECT,
-		Amount:        paymentAmount.Amount.Uint64(),
-		Coin:          iwallet.CtMock,
-		ToAddress:     "abcd",
+	fundingSub0, err := network.Nodes()[0].eventBus.Subscribe(&events.OrderFunded{})
+	if err != nil {
+		t.Fatal(err)
 	}
+	fundingSub1, err := network.Nodes()[1].eventBus.Subscribe(&events.OrderPaymentReceived{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ratingSigAck, err := network.Nodes()[0].eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paymentData, err := network.Nodes()[1].Wallet().GetUTXOPaymentInfo(
+		context.Background(), orderID.String(), "", iwallet.CtMock,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
+
 	if err := network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
 		t.Fatal(err)
 	}
 
-	// Wait for payment to be processed on both nodes
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-fundingSub0.Out():
+		fundingSub0.Close()
+	case <-time.After(time.Second * 10):
+		t.Fatal("Timeout waiting on channel")
+	}
+	select {
+	case <-fundingSub1.Out():
+		fundingSub1.Close()
+	case <-time.After(time.Second * 10):
+		t.Fatal("Timeout waiting on channel")
+	}
+	select {
+	case <-ratingSigAck.Out():
+		ratingSigAck.Close()
+	case <-time.After(time.Second * 10):
+		t.Fatal("Timeout waiting on channel")
+	}
 
 	confirmSub, err := network.Nodes()[1].eventBus.Subscribe(&events.OrderConfirmation{})
 	if err != nil {
@@ -129,7 +159,7 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "abcd", done4); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -269,7 +299,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 		Method:        pb.PaymentSent_CANCELABLE,
 		Amount:        paymentAmount.Amount.Uint64(),
 		Coin:          iwallet.CoinType(paymentAmount.Currency.String()),
-		ToAddress:     "abcd",
+		ToAddress:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
@@ -336,7 +366,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 	}
 
 	done5 := make(chan struct{})
-	if err := network.Nodes()[0].Order().ConfirmOrder(orderID2, "", "abcd", done5); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID2, "", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", done5); err != nil {
 		t.Fatal(err)
 	}
 	select {

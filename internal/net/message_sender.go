@@ -86,27 +86,28 @@ func (ms *messageSender) ctxPrepOrInvalidate(ctx context.Context) error {
 	ms.lk.Lock()
 	defer ms.lk.Unlock()
 
-	errCh := make(chan error)
+	combinedCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go func() {
-		errCh <- ms.prep()
+		select {
+		case <-ms.ns.ctx.Done():
+			cancel()
+		case <-combinedCtx.Done():
+		}
 	}()
 
-	select {
-	case err := <-errCh: // Prep finished. Check error.
-		if err != nil {
-			ms.invalidate()
-		}
+	if err := ms.prepWithCtx(combinedCtx); err != nil {
+		ms.invalidate()
 		return err
-	case <-ctx.Done(): // Context finished. Invalidate.
-		ms.invalidate()
-		return ErrContextDone
-	case <-ms.ns.ctx.Done(): // Network Service context finished. Invalidate.
-		ms.invalidate()
-		return ErrContextDone
 	}
+	return nil
 }
 
 func (ms *messageSender) prep() error {
+	return ms.prepWithCtx(ms.ns.ctx)
+}
+
+func (ms *messageSender) prepWithCtx(ctx context.Context) error {
 	if ms.invalid {
 		return fmt.Errorf("message sender has been invalidated")
 	}
@@ -114,8 +115,11 @@ func (ms *messageSender) prep() error {
 		return nil
 	}
 
-	nstr, err := ms.ns.host.NewStream(inet.WithUseTransient(ms.ns.ctx, "identify"), ms.p, ms.ns.protocolID)
+	nstr, err := ms.ns.host.NewStream(inet.WithAllowLimitedConn(ctx, "identify"), ms.p, ms.ns.protocolID)
 	if err != nil {
+		if ctx.Err() != nil {
+			return ErrContextDone
+		}
 		return err
 	}
 

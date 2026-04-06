@@ -70,7 +70,7 @@ func TestComposite_DispatchesToEVM(t *testing.T) {
 		&mockReceiptFetcher{receipt: revertedReceipt()},
 		&mockSolanaChecker{status: solanaSuccessStatus()},
 	)
-	err := v.VerifyTransactionReceipt(context.Background(), "ETH", "0xabc123")
+	err := v.VerifyTransactionReceipt(context.Background(), testETH, "0xabc123")
 	assert.ErrorIs(t, err, payment.ErrTransactionReverted)
 }
 
@@ -79,7 +79,7 @@ func TestComposite_DispatchesToSolana(t *testing.T) {
 		&mockReceiptFetcher{receipt: successReceipt()},
 		&mockSolanaChecker{status: solanaRevertedStatus()},
 	)
-	err := v.VerifyTransactionReceipt(context.Background(), "SOL", "5abc123")
+	err := v.VerifyTransactionReceipt(context.Background(), testSOL, "5abc123")
 	assert.ErrorIs(t, err, payment.ErrTransactionReverted)
 }
 
@@ -106,7 +106,7 @@ func TestComposite_WaitDispatchesToEVM(t *testing.T) {
 		&mockReceiptFetcher{receipt: &types.Receipt{Status: types.ReceiptStatusSuccessful}},
 		&mockSolanaChecker{status: solanaSuccessStatus()},
 	)
-	err := v.WaitAndVerifyReceipt(context.Background(), "ETH", "0xabc123")
+	err := v.WaitAndVerifyReceipt(context.Background(), testETH, "0xabc123")
 	require.NoError(t, err)
 }
 
@@ -115,6 +115,6 @@ func TestComposite_WaitDispatchesToSolana(t *testing.T) {
 		&mockReceiptFetcher{receipt: successReceipt()},
 		&delayedSolanaChecker{status: solanaSuccessStatus(), maxFails: 1},
 	)
-	err := v.WaitAndVerifyReceipt(context.Background(), "SOL", "5abc123")
+	err := v.WaitAndVerifyReceipt(context.Background(), testSOL, "5abc123")
 	require.NoError(t, err)
 }

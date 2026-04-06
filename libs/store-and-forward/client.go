@@ -146,7 +146,14 @@ func (cli *Client) GetMessagesAsync(ctx context.Context) (<-chan Message, error)
 		resp       = make(chan Message)
 		wg         sync.WaitGroup
 	)
+	cli.mtx.RLock()
+	serversCopy := make(map[peer.ID]bool, len(cli.servers))
 	for p, registered := range cli.servers {
+		serversCopy[p] = registered
+	}
+	cli.mtx.RUnlock()
+
+	for p, registered := range serversCopy {
 		if registered {
 			wg.Add(1)
 			go func(p peer.ID) {
@@ -317,8 +324,15 @@ func (cli *Client) SendMessage(ctx context.Context, to, server peer.ID, pubkey c
 // the servers will delete the message so the client must make sure it has it
 // fully committed first.
 func (cli *Client) AckMessage(ctx context.Context, messageID []byte) error {
-	var wg sync.WaitGroup
+	cli.mtx.RLock()
+	serversCopy := make(map[peer.ID]bool, len(cli.servers))
 	for p, registered := range cli.servers {
+		serversCopy[p] = registered
+	}
+	cli.mtx.RUnlock()
+
+	var wg sync.WaitGroup
+	for p, registered := range serversCopy {
 		if registered {
 			wg.Add(1)
 			go func(p peer.ID) {
@@ -429,7 +443,14 @@ func (cli *Client) streamHandler(s inet.Stream) {
 }
 
 func (cli *Client) registerWithServers(expiration time.Duration) {
+	cli.mtx.RLock()
+	initialServers := make([]peer.ID, 0, len(cli.servers))
 	for p := range cli.servers {
+		initialServers = append(initialServers, p)
+	}
+	cli.mtx.RUnlock()
+
+	for _, p := range initialServers {
 		cli.registerSingle(p, expiration)
 	}
 
@@ -455,7 +476,13 @@ func (cli *Client) registerWithServers(expiration time.Duration) {
 		for {
 			select {
 			case <-newRegistrationTicker.C:
+				cli.mtx.RLock()
+				reregServers := make([]peer.ID, 0, len(cli.servers))
 				for p := range cli.servers {
+					reregServers = append(reregServers, p)
+				}
+				cli.mtx.RUnlock()
+				for _, p := range reregServers {
 					go cli.registerSingle(p, expiration)
 				}
 			case <-boostrapTicker.C:

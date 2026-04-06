@@ -210,6 +210,7 @@ func (m *Messenger) ReliablySendMessage(tx database.Tx, peer peer.ID, message *p
 	}
 
 	if len(ser) > inet.MessageSizeMax {
+		m.wg.Done()
 		return errors.New("message exceeds max message size")
 	}
 
@@ -266,6 +267,7 @@ func (m *Messenger) SendACK(messageID string, peer peer.ID) {
 	payload := &anypb.Any{}
 	if err := payload.MarshalFrom(ack); err != nil {
 		log.Errorf("Error marshalling ack message: %s", err)
+		m.wg.Done()
 		return
 	}
 

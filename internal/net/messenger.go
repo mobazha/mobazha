@@ -61,6 +61,7 @@ type Messenger struct {
 	bootstrapDone  chan struct{}
 	mtx            sync.RWMutex
 	wg             sync.WaitGroup
+	stopMu         sync.RWMutex // guards wg.Add vs wg.Wait during shutdown
 
 	// fallbackSNFServers holds the configured SNF servers to use as fallback
 	// when the target peer's profile SNF servers can't be loaded.
@@ -169,8 +170,25 @@ func NewMessenger(cfg *MessengerConfig) (*Messenger, error) {
 // Stop shuts down the Messenger and blocks until all message
 // attempts are finished.
 func (m *Messenger) Stop() {
+	m.stopMu.Lock()
 	close(m.done)
+	m.stopMu.Unlock()
 	m.wg.Wait()
+}
+
+// trySendAdd increments the WaitGroup if the Messenger is not
+// shutting down. Returns false when Stop has been called; the
+// caller MUST call wg.Done when true is returned.
+func (m *Messenger) trySendAdd() bool {
+	m.stopMu.RLock()
+	defer m.stopMu.RUnlock()
+	select {
+	case <-m.done:
+		return false
+	default:
+		m.wg.Add(1)
+		return true
+	}
 }
 
 // markMessageProcessed marks a message as recently processed and returns true if it was already processed.
@@ -201,7 +219,9 @@ func (m *Messenger) ReliablySendMessage(tx database.Tx, peer peer.ID, message *p
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
 
-	m.wg.Add(1)
+	if !m.trySendAdd() {
+		return errors.New("messenger is shutting down")
+	}
 
 	ser, err := proto.Marshal(message)
 	if err != nil {
@@ -258,7 +278,9 @@ func (m *Messenger) ProcessACK(tx database.Tx, ack *pb.AckMessage) error {
 func (m *Messenger) SendACK(messageID string, peer peer.ID) {
 	log.Debugf("Sending ACK for message ID: %s", messageID)
 
-	m.wg.Add(1)
+	if !m.trySendAdd() {
+		return
+	}
 
 	ack := &pb.AckMessage{
 		AckedMessageID: messageID,
@@ -442,9 +464,9 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 // retryAllMessages loads all un-ACKed messages from the database and
 // tries to send them again using an exponential backoff.
 func (m *Messenger) retryAllMessages() {
-	// Increment the waitgroup to make sure we don't shutdown before
-	// this process finishes.
-	m.wg.Add(1)
+	if !m.trySendAdd() {
+		return
+	}
 	defer m.wg.Done()
 
 	var messages []models.OutgoingMessage
@@ -471,7 +493,9 @@ func (m *Messenger) retryAllMessages() {
 			continue
 		}
 		if shouldWeRetry(message.Timestamp, message.LastAttempt) {
-			m.wg.Add(1)
+			if !m.trySendAdd() {
+				return
+			}
 			go m.trySendMessage(pid, pmes, nil)
 
 			err = m.db.Update(func(tx database.Tx) error {

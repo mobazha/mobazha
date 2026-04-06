@@ -224,12 +224,13 @@ func TestMessenger_retryAllMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	messenger.retryAllMessages()
 	ch := make(chan struct{})
 	service2.RegisterHandler(pb.Message_PING, func(p peer.ID, msg *pb.Message) error {
 		ch <- struct{}{}
 		return nil
 	})
+
+	messenger.retryAllMessages()
 
 	select {
 	case <-ch:

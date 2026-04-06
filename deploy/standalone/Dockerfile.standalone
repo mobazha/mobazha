@@ -131,7 +131,8 @@ ENV S6_KEEP_ENV=1 \
     STANDALONE_API_KEY="" \
     ADMIN_PASSWORD="" \
     SAAS_PEER_ID="" \
-    CONNECTIVITY="nat"
+    CONNECTIVITY="nat" \
+    TESTNET=""
 
 # s6-overlay as PID 1
 ENTRYPOINT ["/init"]

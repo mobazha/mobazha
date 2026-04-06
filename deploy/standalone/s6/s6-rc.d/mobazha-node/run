@@ -5,6 +5,10 @@ NODE_PORT="${NODE_PORT:-5102}"
 
 ARGS="start -d /data --gatewayaddr=/ip4/127.0.0.1/tcp/${NODE_PORT}"
 
+if [ "$TESTNET" = "true" ] || [ "$TESTNET" = "1" ]; then
+  ARGS="$ARGS --testnet"
+fi
+
 if [ -n "$SAAS_PEER_ID" ]; then
   ARGS="$ARGS --httpproxytrustedpeer=$SAAS_PEER_ID"
 fi

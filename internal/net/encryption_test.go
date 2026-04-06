@@ -14,16 +14,16 @@ func TestEncryptCurve25519(t *testing.T) {
 	}
 
 	plaintext := "Hello World!!!"
-	ciphertext, err := Encrypt(pub, &pb.ChatMessage{Message: plaintext})
+	ciphertext, err := Encrypt(pub, &pb.AckMessage{AckedMessageID: plaintext})
 	if err != nil {
 		t.Fatal(err)
 	}
-	decrypted := new(pb.ChatMessage)
+	decrypted := new(pb.AckMessage)
 	err = Decrypt(priv, ciphertext, decrypted)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decrypted.Message != plaintext {
-		t.Errorf("Expected plaintext of %s, got %s", plaintext, decrypted.Message)
+	if decrypted.AckedMessageID != plaintext {
+		t.Errorf("Expected plaintext of %s, got %s", plaintext, decrypted.AckedMessageID)
 	}
 }

@@ -3,7 +3,6 @@ option go_package = "../mbzpb";
 package mbzpb;
 
 import "google/protobuf/any.proto";
-import "google/protobuf/timestamp.proto";
 
 message Message {
     MessageType messageType     = 1;
@@ -15,7 +14,6 @@ message Message {
         ACK                      = 0;
         PING                     = 1;
         PONG                     = 2;
-        CHAT                     = 3;
         FOLLOW                   = 4;
         UNFOLLOW                 = 5;
         STORE                    = 6;
@@ -23,50 +21,10 @@ message Message {
         DISPUTE                  = 8;
         ADDRESS_REQUEST          = 9;
         ADDRESS_RESPONSE         = 10;
-        CHANNEL_REQUEST          = 11;
-        CHANNEL_RESPONSE         = 12;
-        CHAT_GROUP               = 13;
     }
 }
 
-message ChatMessage {
-    string orderID                      = 1;
-    string message                      = 2;
-    FileInChat file                     = 3;
-    google.protobuf.Timestamp timestamp = 4;
-    Flag flag                           = 5;
-
-    // Only used when Flag is READ.
-    string readID                       = 6;
-
-    message FileInChat {
-        string type     = 1;
-        string hash     = 2;
-        string filename = 3;
-    }
-
-    enum Flag {
-        MESSAGE = 0;
-        TYPING  = 1;
-        READ    = 2;
-    }
-}
-
-message ChatGroupMessage {
-    string groupID                      = 1;
-    string orderID                      = 2;
-    string groupName                    = 3;
-    string owner                        = 4;
-    repeated string peers               = 5;
-    google.protobuf.Timestamp timestamp = 6;
-    Flag flag                           = 7;
-
-    enum Flag {
-        GROUP_CREATE            = 0;
-        GROUP_UPDATE            = 1;
-        GROUP_DELETE            = 2;
-    }
-}
+// ChatMessage, ChatGroupMessage removed: P2P chat migrated to Matrix.
 
 message StoreMessage {
     repeated bytes cids = 1;
@@ -123,15 +81,7 @@ message AddressResponseMessage {
     string coin    = 2;
 }
 
-message ChannelRequestMessage {
-    string topic = 1;
-}
-
-message ChannelResponseMessage {
-    string topic        = 1;
-    repeated bytes cids = 2;
-}
-
+// ChannelRequestMessage, ChannelResponseMessage removed: Channels feature retired.
 
 message Envelope {
     bytes senderPubkey = 1;

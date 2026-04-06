@@ -268,7 +268,7 @@ func TestMessenger_encryptDecrypt(t *testing.T) {
 	}
 
 	cipherText, err := messenger.prepEncryptedMessage(pid, &pb.Message{
-		MessageType: pb.Message_CHAT,
+		MessageType: pb.Message_FOLLOW,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -281,8 +281,8 @@ func TestMessenger_encryptDecrypt(t *testing.T) {
 		t.Errorf("Expected peer ID %s, got %s", pid, retPeer)
 	}
 
-	if pmes.MessageType != pb.Message_CHAT {
-		t.Errorf("Expected message type %s, got %s", pb.Message_CHAT, pmes.MessageType)
+	if pmes.MessageType != pb.Message_FOLLOW {
+		t.Errorf("Expected message type %s, got %s", pb.Message_FOLLOW, pmes.MessageType)
 	}
 }
 
@@ -329,7 +329,7 @@ func TestMessenger_DownloadMessages(t *testing.T) {
 
 	service1 := NewNetworkService("", h1, NewBanManager(nil, nil), true)
 	ch := make(chan struct{})
-	service1.RegisterHandler(pb.Message_CHAT, func(p peer.ID, msg *pb.Message) error {
+	service1.RegisterHandler(pb.Message_FOLLOW, func(p peer.ID, msg *pb.Message) error {
 		ch <- struct{}{}
 		return nil
 	})
@@ -403,7 +403,7 @@ func TestMessenger_DownloadMessages(t *testing.T) {
 			return err
 		}
 
-		return messenger2.ReliablySendMessage(tx, peer1ID, &pb.Message{MessageType: pb.Message_CHAT}, done)
+		return messenger2.ReliablySendMessage(tx, peer1ID, &pb.Message{MessageType: pb.Message_FOLLOW}, done)
 	})
 	if err != nil {
 		t.Fatal(err)

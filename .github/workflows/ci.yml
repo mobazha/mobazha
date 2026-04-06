@@ -26,13 +26,13 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           cache-dependency-path: node/go.sum
 
       - name: Create workspace
         run: |
           cat > go.work <<'EOF'
-          go 1.24.0
+          go 1.25.0
 
           use (
             ./node
@@ -40,6 +40,8 @@ jobs:
           )
           EOF
           sed -i 's/^          //' go.work
+
+          cd node && go mod edit -dropreplace=github.com/mobazha/mobazha-core
 
       - name: Vet
         run: go vet ./...
@@ -64,13 +66,13 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           cache-dependency-path: node/go.sum
 
       - name: Create workspace
         run: |
           cat > go.work <<'EOF'
-          go 1.24.0
+          go 1.25.0
 
           use (
             ./node
@@ -78,6 +80,8 @@ jobs:
           )
           EOF
           sed -i 's/^          //' go.work
+
+          cd node && go mod edit -dropreplace=github.com/mobazha/mobazha-core
 
       - name: Build
         run: go build -o /dev/null .

@@ -73,9 +73,8 @@ type Messenger struct {
 	recentlyProcessed   map[string]time.Time
 	recentlyProcessedMu sync.Mutex
 
-	// 防止 retryAllMessages / downloadMessages 重叠执行
-	retryRunning    atomic.Bool
-	downloadRunning atomic.Bool
+	retryRunning    atomic.Bool // prevents overlapping retryAllMessages
+	downloadRunning atomic.Bool // prevents overlapping downloadMessages
 }
 
 // MessengerConfig holds the data needed to construct a new Messenger.
@@ -160,8 +159,6 @@ func NewMessenger(cfg *MessengerConfig) (*Messenger, error) {
 		fallbackSNFServers: fallbackServers,
 		done:               make(chan struct{}),
 		bootstrapDone:      bootstrapDone,
-		mtx:                sync.RWMutex{},
-		wg:                 sync.WaitGroup{},
 		recentlyProcessed:  make(map[string]time.Time),
 	}
 	return m, nil
@@ -222,15 +219,19 @@ func (m *Messenger) ReliablySendMessage(tx database.Tx, peer peer.ID, message *p
 	if !m.trySendAdd() {
 		return errors.New("messenger is shutting down")
 	}
+	sent := false
+	defer func() {
+		if !sent {
+			m.wg.Done()
+		}
+	}()
 
 	ser, err := proto.Marshal(message)
 	if err != nil {
-		m.wg.Done()
 		return err
 	}
 
 	if len(ser) > inet.MessageSizeMax {
-		m.wg.Done()
 		return errors.New("message exceeds max message size")
 	}
 
@@ -246,11 +247,10 @@ func (m *Messenger) ReliablySendMessage(tx database.Tx, peer peer.ID, message *p
 		LastAttempt:       time.Now(),
 	})
 	if err != nil {
-		m.wg.Done()
 		return err
 	}
 
-	// Send the message on commit.
+	sent = true
 	tx.RegisterCommitHook(func() {
 		go m.trySendMessage(peer, message, done)
 	})
@@ -281,6 +281,12 @@ func (m *Messenger) SendACK(messageID string, peer peer.ID) {
 	if !m.trySendAdd() {
 		return
 	}
+	sent := false
+	defer func() {
+		if !sent {
+			m.wg.Done()
+		}
+	}()
 
 	ack := &pb.AckMessage{
 		AckedMessageID: messageID,
@@ -289,7 +295,6 @@ func (m *Messenger) SendACK(messageID string, peer peer.ID) {
 	payload := &anypb.Any{}
 	if err := payload.MarshalFrom(ack); err != nil {
 		log.Errorf("Error marshalling ack message: %s", err)
-		m.wg.Done()
 		return
 	}
 
@@ -301,6 +306,7 @@ func (m *Messenger) SendACK(messageID string, peer peer.ID) {
 		MessageType: pb.Message_ACK,
 		Payload:     payload,
 	}
+	sent = true
 	go m.trySendMessage(peer, msg, nil)
 }
 
@@ -329,7 +335,7 @@ func (m *Messenger) Start() {
 		case <-retryTicker.C:
 			go func() {
 				if !m.retryRunning.CompareAndSwap(false, true) {
-					return // 上一次尚未完成，跳过
+					return
 				}
 				defer m.retryRunning.Store(false)
 				m.retryAllMessages()
@@ -337,7 +343,7 @@ func (m *Messenger) Start() {
 		case <-requeryTicker.C:
 			go func() {
 				if !m.downloadRunning.CompareAndSwap(false, true) {
-					return // 上一次尚未完成，跳过
+					return
 				}
 				defer m.downloadRunning.Store(false)
 				m.downloadMessages()

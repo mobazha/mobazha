@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 
@@ -188,6 +189,11 @@ func (g *Gateway) handlePOSTFetchRatings(w http.ResponseWriter, r *http.Request)
 		Error    string `json:"error"`
 	}
 
+	inputOrder := make(map[string]int, len(ratingIDs))
+	for i, id := range ratingIDs {
+		inputOrder[id] = i
+	}
+
 	var (
 		ratings      = make([]ratingWithAsyncID, 0, len(ratingIDs))
 		responseChan = make(chan interface{}, 8)
@@ -238,6 +244,9 @@ func (g *Gateway) handlePOSTFetchRatings(w http.ResponseWriter, r *http.Request)
 				ratings = append(ratings, p)
 			}
 		}
+		sort.Slice(ratings, func(i, j int) bool {
+			return inputOrder[ratings[i].ID] < inputOrder[ratings[j].ID]
+		})
 		sanitizedJSONResponse(w, ratings)
 	} else {
 		asyncID := r.URL.Query().Get("asyncID")

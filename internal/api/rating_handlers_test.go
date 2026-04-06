@@ -252,15 +252,15 @@ func TestRatingHandlers(t *testing.T) {
 
 				ratings := []ratingWithAsyncID{
 					{
-						ID: "QmTvGbPiS1PaE7AAn4gEszNiYMgdrbMXwLkGnLKYSADs8K",
-						Rating: &pb.Rating{
-							Review: "123",
-						},
-					},
-					{
 						ID: "QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 						Rating: &pb.Rating{
 							Review: "abc",
+						},
+					},
+					{
+						ID: "QmTvGbPiS1PaE7AAn4gEszNiYMgdrbMXwLkGnLKYSADs8K",
+						Rating: &pb.Rating{
+							Review: "123",
 						},
 					},
 				}

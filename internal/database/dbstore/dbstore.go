@@ -31,10 +31,10 @@ var ErrReadOnly = errors.New("tx is read only")
 // It uses TenantDB + DBPublicData for unified storage.
 func NewSqliteDB(dataDir string) (database.Database, error) {
 	dbPath := path.Join(dataDir, common.DatabaseFileName)
-	dsn := dbPath
+	dsn := dbPath + "?_busy_timeout=5000"
 	if runtime.GOOS == "linux" {
 		if key := os.Getenv("MBZ_SQLCIPHER_KEY"); key != "" {
-			dsn = fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_page_size=4096", dbPath, url.QueryEscape(key))
+			dsn = fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_page_size=4096&_busy_timeout=5000", dbPath, url.QueryEscape(key))
 		}
 	}
 
@@ -45,6 +45,7 @@ func NewSqliteDB(dataDir string) (database.Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	db.Exec("PRAGMA journal_mode=WAL")
 	pd := NewDBPublicData(db, pkgdb.StandaloneTenantID)
 	return NewTenantDBWithPublicData(db, pkgdb.StandaloneTenantID, pd)
 }

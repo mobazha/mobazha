@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
@@ -286,8 +287,19 @@ func TestClientSubscribe(t *testing.T) {
 	}
 	defer client.Close()
 
-	// Use Satoshi's genesis address for testing
-	testAddress := "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+	// Generate a fresh random address to avoid "history too large" errors
+	// from high-traffic addresses like Satoshi's genesis address.
+	privKey, err := btcec.NewPrivateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+	pubKeyHash := btcutil.Hash160(privKey.PubKey().SerializeCompressed())
+	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, &chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("Failed to create address: %v", err)
+	}
+	testAddress := addr.EncodeAddress()
+
 	scriptHash, err := addressToScriptHash(testAddress, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Fatalf("Failed to convert address: %v", err)

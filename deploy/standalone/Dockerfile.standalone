@@ -7,13 +7,13 @@
 #   - Frontend SPA (Vite build, Brotli pre-compressed)
 #
 # Recommended: use the build script which handles frontend + Docker in one step:
-#   ./deploy/standalone/build-standalone.sh -t mobazha/standalone:dev
+#   ./deploy/standalone/build-standalone.sh -t ghcr.io/mobazha/standalone:dev
 #
 # Manual build (with pre-built frontend):
 #   docker buildx build -f deploy/standalone/Dockerfile.standalone \
 #     --build-arg FRONTEND_DIR=deploy/standalone/.frontend-dist \
 #     --build-context core=/path/to/mobazha-core \
-#     -t mobazha/standalone:dev .
+#     -t ghcr.io/mobazha/standalone:dev .
 #
 # Required build contexts:
 #   - Default context: mobazha3.0 repository root

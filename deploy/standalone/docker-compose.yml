@@ -7,11 +7,11 @@
 #
 # Services:
 #   store      — All-in-one container (s6-overlay: Caddy + mobazha-node)
-#   watchtower — Automatic image updates (pulls mobazha/standalone:stable)
+#   watchtower — Automatic image updates (pulls ghcr.io/mobazha/standalone:stable)
 
 services:
   store:
-    image: mobazha/standalone:${TAG:-stable}
+    image: ghcr.io/mobazha/standalone:${TAG:-stable}
     container_name: mobazha-store
     restart: unless-stopped
     ports:

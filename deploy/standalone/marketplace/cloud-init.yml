@@ -48,7 +48,7 @@ runcmd:
   - chmod +x /usr/local/bin/mobazha-setup
 
   # Pre-pull the Docker image
-  - docker pull mobazha/standalone:stable || true
+  - docker pull ghcr.io/mobazha/standalone:stable || true
 
   # Set MOTD
   - |

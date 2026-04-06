@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Load nvm if available (pnpm is managed via nvm on dev machines)
+if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+    source "$HOME/.nvm/nvm.sh"
+fi
+
 # build-standalone.sh — Build the standalone store Docker image
 #
 # This script:
@@ -13,7 +18,7 @@ set -euo pipefail
 #   ./deploy/standalone/build-standalone.sh [OPTIONS]
 #
 # Options:
-#   -t TAG         Docker image tag (default: mobazha/standalone:dev)
+#   -t TAG         Docker image tag (default: ghcr.io/mobazha/standalone:dev)
 #   -f FRONTEND    Path to mobazha-unified repo (default: auto-detect)
 #   -c CORE        Path to mobazha-core repo (default: auto-detect from go.work)
 #   -s             Skip frontend build (use existing dist in FRONTEND_DIR)
@@ -27,7 +32,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-IMAGE_TAG="mobazha/standalone:dev"
+IMAGE_TAG="ghcr.io/mobazha/standalone:dev"
 FRONTEND_REPO=""
 CORE_REPO=""
 SKIP_FRONTEND=false

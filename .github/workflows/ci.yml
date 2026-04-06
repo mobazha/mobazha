@@ -41,7 +41,7 @@ jobs:
           EOF
           sed -i 's/^          //' go.work
 
-          cd node && go mod edit -dropreplace=github.com/mobazha/mobazha-core
+          cd node && go mod edit -replace=github.com/mobazha/mobazha-core=../core
 
       - name: Vet
         run: go vet ./...
@@ -81,7 +81,7 @@ jobs:
           EOF
           sed -i 's/^          //' go.work
 
-          cd node && go mod edit -dropreplace=github.com/mobazha/mobazha-core
+          cd node && go mod edit -replace=github.com/mobazha/mobazha-core=../core
 
       - name: Build
         run: go build -o /dev/null .

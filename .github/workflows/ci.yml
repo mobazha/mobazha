@@ -44,11 +44,11 @@ jobs:
           cd node && go mod edit -replace=github.com/mobazha/mobazha-core=../core
 
       - name: Vet
-        run: go vet ./...
+        run: go vet -tags goolm ./...
         working-directory: node
 
       - name: Test
-        run: go test -race -count=1 -timeout 10m ./...
+        run: go test -tags goolm -race -count=1 -timeout 10m ./...
         working-directory: node
 
   build:
@@ -84,5 +84,5 @@ jobs:
           cd node && go mod edit -replace=github.com/mobazha/mobazha-core=../core
 
       - name: Build
-        run: go build -o /dev/null .
+        run: go build -tags goolm -o /dev/null .
         working-directory: node

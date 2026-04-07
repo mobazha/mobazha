@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime/pprof"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -360,6 +361,20 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		localPeerID = defaultNode.IdentityInfo().Identity().String()
 	}
 
+	casdoorCert := cfg.CasdoorCertificate
+	ownerUserID := cfg.OwnerUserID
+	if !cfg.SaaSMode && cfg.DataDir != "" {
+		persistedCert, persistedOwner := api.LoadPersistedPlatformConfig(cfg.DataDir)
+		if casdoorCert == "" && persistedCert != "" {
+			casdoorCert = persistedCert
+			log.Infof("Loaded Casdoor certificate from data directory")
+		}
+		if ownerUserID == "" && persistedOwner != "" {
+			ownerUserID = persistedOwner
+			log.Infof("Loaded owner user ID from data directory: %s", persistedOwner)
+		}
+	}
+
 	gwConfig := &api.GatewayConfig{
 		Listener:           manet.NetListener(gwLis),
 		AllowAllOrigins:    cfg.APIAllowAllOrigins,
@@ -373,9 +388,9 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		AllowedIPs:         allowedIPs,
 		HashFile:           api.HashFilePath(cfg.DataDir),
 		PlainFile:          api.PlainFilePath(cfg.DataDir),
-		CasdoorCertificate: cfg.CasdoorCertificate,
+		CasdoorCertificate: casdoorCert,
 		LocalPeerID:        localPeerID,
-		OwnerUserID:        cfg.OwnerUserID,
+		OwnerUserID:        ownerUserID,
 		SaaSAPIURL:         cfg.SaaSAPIURL,
 		StandaloneAPIKey:   cfg.StandaloneAPIKey,
 	}
@@ -385,7 +400,53 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		return nil, err
 	}
 
+	// Auto-fetch Casdoor certificate on standalone startup when not yet available.
+	// This enables buyer login immediately after deployment without manual admin action.
+	if !cfg.SaaSMode && cfg.SaaSAPIURL != "" && casdoorCert == "" && cfg.DataDir != "" {
+		go im.autoFetchCasdoorCert(cfg.SaaSAPIURL, cfg.DataDir, localPeerID, ownerUserID)
+	}
+
 	return im.httpGateway, nil
+}
+
+// autoFetchCasdoorCert fetches the Casdoor signing certificate from the SaaS
+// platform and enables JWT authentication on the gateway. Uses exponential
+// backoff (5s → 10s → 20s → 40s → 60s cap, up to 5 retries).
+func (im *SharedManager) autoFetchCasdoorCert(saasURL, dataDir, localPeerID, ownerUserID string) {
+	const maxRetries = 5
+	backoff := 5 * time.Second
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		certPEM, err := obnet.FetchCasdoorCertificate(context.Background(), saasURL)
+		if err != nil {
+			log.Warningf("Auto-fetch Casdoor certificate attempt %d/%d failed: %v", attempt, maxRetries, err)
+			if attempt < maxRetries {
+				time.Sleep(backoff)
+				backoff *= 2
+				if backoff > 60*time.Second {
+					backoff = 60 * time.Second
+				}
+			}
+			continue
+		}
+
+		if err := os.WriteFile(api.CertFilePath(dataDir), []byte(certPEM), 0600); err != nil {
+			log.Errorf("Failed to persist auto-fetched Casdoor certificate: %v", err)
+			return
+		}
+
+		if im.httpGateway != nil {
+			if err := im.httpGateway.EnableJWTAuth(certPEM, localPeerID, ownerUserID); err != nil {
+				log.Errorf("Failed to enable JWT auth with auto-fetched certificate: %v", err)
+				return
+			}
+		}
+
+		log.Infof("Auto-fetched Casdoor certificate from %s — buyer login enabled", saasURL)
+		return
+	}
+
+	log.Warningf("Failed to auto-fetch Casdoor certificate after %d attempts (buyers cannot log in until admin connects platform manually)", maxRetries)
 }
 
 func (im *SharedManager) Start() {

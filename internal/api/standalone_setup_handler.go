@@ -17,6 +17,7 @@ type setupStatusResponse struct {
 	SetupComplete    bool           `json:"setupComplete"`
 	CompletedSteps   completedSteps `json:"completedSteps"`
 	CasdoorAvailable bool           `json:"casdoorAvailable"`
+	OwnerUserID      string         `json:"ownerUserId,omitempty"`
 }
 
 type completedSteps struct {
@@ -92,9 +93,15 @@ func (g *Gateway) handleGETSetup(w http.ResponseWriter, r *http.Request) {
 
 	setupComplete := passwordDone && profileDone
 
+	var ownerUID string
+	if jv := g.getJWTValidator(); jv != nil {
+		ownerUID = jv.OwnerUserID()
+	}
+
 	response.Success(w, setupStatusResponse{
 		SetupComplete:    setupComplete,
-		CasdoorAvailable: g.jwtValidator != nil,
+		CasdoorAvailable: g.getJWTValidator() != nil,
+		OwnerUserID:      ownerUID,
 		CompletedSteps: completedSteps{
 			Password:    passwordDone,
 			Profile:     profileDone,

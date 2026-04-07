@@ -13,4 +13,8 @@ if [ -n "$SAAS_PEER_ID" ]; then
   ARGS="$ARGS --httpproxytrustedpeer=$SAAS_PEER_ID"
 fi
 
+if [ -n "$SAAS_API_URL" ]; then
+  ARGS="$ARGS --saasapiurl=$SAAS_API_URL"
+fi
+
 exec /usr/local/bin/mobazha $ARGS

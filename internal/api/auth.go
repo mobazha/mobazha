@@ -86,14 +86,16 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		if g.tryJWTAuth(r) {
+		jv := g.getJWTValidator()
+
+		if g.tryJWTAuthWith(jv, r) {
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		// If a Bearer token was present but JWT auth failed, reject immediately
 		// instead of falling through to Basic Auth or unauthenticated access.
-		if g.jwtValidator != nil {
+		if jv != nil {
 			authHeader := r.Header.Get("Authorization")
 			if strings.HasPrefix(authHeader, "Bearer ") {
 				ErrorResponse(w, http.StatusUnauthorized, "Invalid or expired token")
@@ -119,7 +121,7 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 				ErrorResponse(w, http.StatusUnauthorized, "Invalid credentials")
 				return
 			}
-		} else if g.jwtValidator != nil {
+		} else if jv != nil {
 			// JWT validator configured but no Basic Auth: require authentication.
 			ErrorResponse(w, http.StatusUnauthorized, "Authentication required")
 			return
@@ -129,10 +131,12 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// tryJWTAuth attempts JWT Bearer token authentication. Returns true if the
-// request carries a valid JWT from an authorized admin user.
-func (g *Gateway) tryJWTAuth(r *http.Request) bool {
-	if g.jwtValidator == nil {
+// tryJWTAuthWith attempts JWT Bearer token authentication using the provided
+// validator snapshot. Returns true if the request carries a valid JWT from
+// an authorized admin user. The caller must obtain jv via getJWTValidator()
+// to avoid racing with EnableJWTAuth.
+func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) bool {
+	if jv == nil {
 		return false
 	}
 
@@ -142,12 +146,12 @@ func (g *Gateway) tryJWTAuth(r *http.Request) bool {
 	}
 	tokenStr := authHeader[7:]
 
-	claims, err := g.jwtValidator.ValidateToken(tokenStr)
+	claims, err := jv.ValidateToken(tokenStr)
 	if err != nil {
 		return false
 	}
 
-	return g.jwtValidator.IsAdmin(claims)
+	return jv.IsAdmin(claims)
 }
 
 // parseBasicToken decodes a base64-encoded "user:pass" string.

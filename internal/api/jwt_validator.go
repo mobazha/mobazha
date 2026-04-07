@@ -136,6 +136,14 @@ func (v *JWTValidator) IsAdmin(claims *JWTClaims) bool {
 	return jwtPeer != "" && jwtPeer == v.localPeer
 }
 
+// OwnerUserID returns the currently configured owner user ID.
+// Thread-safe for concurrent reads.
+func (v *JWTValidator) OwnerUserID() string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.ownerUserID
+}
+
 // UpdateOwnerUserID sets or updates the owner user ID for admin authorization.
 // Thread-safe for runtime updates (e.g., after OAuth binding).
 func (v *JWTValidator) UpdateOwnerUserID(id string) {

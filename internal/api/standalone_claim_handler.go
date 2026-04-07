@@ -31,7 +31,8 @@ type claimStoreRequest struct {
 // This endpoint is NOT behind the standard auth() middleware because the
 // caller is not yet the store owner — they're trying to become one.
 func (g *Gateway) handlePOSTClaimStore(w http.ResponseWriter, r *http.Request) {
-	if g.jwtValidator == nil {
+	jv := g.getJWTValidator()
+	if jv == nil {
 		response.Error(w, http.StatusServiceUnavailable, response.CodeInternalError,
 			"JWT validation not configured on this node")
 		return
@@ -51,7 +52,7 @@ func (g *Gateway) handlePOSTClaimStore(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenStr := authHeader[7:]
 
-	claims, err := g.jwtValidator.ValidateToken(tokenStr)
+	claims, err := jv.ValidateToken(tokenStr)
 	if err != nil {
 		response.Error(w, http.StatusUnauthorized, response.CodeUnauthorized,
 			"Invalid or expired token")
@@ -108,7 +109,7 @@ func (g *Gateway) handlePOSTClaimStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g.jwtValidator.UpdateOwnerUserID(claims.Id)
+	jv.UpdateOwnerUserID(claims.Id)
 
 	response.Success(w, map[string]interface{}{
 		"success": true,

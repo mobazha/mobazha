@@ -15,8 +15,15 @@ if [ -n "$ADMIN_PASSWORD" ] && [ ! -f /data/admin_password_hash ]; then
     echo "init-data: Admin password set from environment"
 fi
 
-# Run database migrations (mobazha-node handles this at startup via embed.FS)
-
-# Wait for node to be ready to accept the healthcheck is handled by caddy dependency
+# Inject runtime config into frontend SPA.
+# The Vite build uses compile-time env vars, but SAAS_API_URL is only known
+# at container startup. This script generates a JS file that the SPA reads
+# before initializing, allowing runtime override of the SaaS URL.
+RUNTIME_JS="/srv/www/runtime-config.js"
+SAAS_URL="${SAAS_API_URL:-}"
+cat > "$RUNTIME_JS" <<JSEOF
+window.__RUNTIME_CONFIG__={saasUrl:"${SAAS_URL}"};
+JSEOF
+echo "init-data: Runtime config written (saasUrl=${SAAS_URL:-(empty)})"
 
 echo "=== init-data: Complete ==="

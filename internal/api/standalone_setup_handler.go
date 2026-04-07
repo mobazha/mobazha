@@ -14,8 +14,9 @@ import (
 )
 
 type setupStatusResponse struct {
-	SetupComplete  bool           `json:"setupComplete"`
-	CompletedSteps completedSteps `json:"completedSteps"`
+	SetupComplete    bool           `json:"setupComplete"`
+	CompletedSteps   completedSteps `json:"completedSteps"`
+	CasdoorAvailable bool           `json:"casdoorAvailable"`
 }
 
 type completedSteps struct {
@@ -92,7 +93,8 @@ func (g *Gateway) handleGETSetup(w http.ResponseWriter, r *http.Request) {
 	setupComplete := passwordDone && profileDone
 
 	response.Success(w, setupStatusResponse{
-		SetupComplete: setupComplete,
+		SetupComplete:    setupComplete,
+		CasdoorAvailable: g.jwtValidator != nil,
 		CompletedSteps: completedSteps{
 			Password:    passwordDone,
 			Profile:     profileDone,

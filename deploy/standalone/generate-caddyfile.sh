@@ -30,8 +30,11 @@ elif [ -n "$STORE_DOMAIN" ]; then
     echo "Caddyfile: domain mode ($STORE_DOMAIN)"
     cp "$TEMPLATE" "$OUTPUT"
 else
-    echo "Caddyfile: IP mode (:443 with auto self-signed TLS)"
-    cp "$TEMPLATE" "$OUTPUT"
+    echo "Caddyfile: IP mode (HTTP :80, auto_https off)"
+    {
+        printf "{\n\tauto_https off\n}\n\n"
+        sed 's/{$STORE_DOMAIN::443}/:80/' "$TEMPLATE"
+    } > "$OUTPUT"
 fi
 
 echo "Caddyfile deployed at $OUTPUT"

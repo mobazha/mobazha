@@ -10,6 +10,7 @@ set -euo pipefail
 #   --domain <domain>        Pre-configure a domain (enables auto-TLS via Let's Encrypt)
 #   --overlay <tor|lokinet>  Enable privacy overlay network
 #   --saas-url <url>         Override SaaS API URL (default: https://app.mobazha.org)
+#   --testnet                Use cryptocurrency testnets (no real money)
 #   --help                   Show this help message
 #
 # Tested on: Ubuntu 22.04+, Debian 12+
@@ -31,6 +32,7 @@ SAAS_API_URL="${SAAS_API_URL:-https://app.mobazha.org}"
 CONNECTIVITY="public"
 OVERLAY_TYPE=""
 PUBLIC_IP=""
+TESTNET=""
 
 log()  { echo -e "${GREEN}[mobazha]${NC} $*"; }
 warn() { echo -e "${YELLOW}[mobazha]${NC} $*"; }
@@ -92,6 +94,7 @@ CONNECTIVITY=${CONNECTIVITY}
 OVERLAY_TYPE=${OVERLAY_TYPE}
 OVERLAY_DOMAIN=
 TAG=stable
+TESTNET=${TESTNET}
 EOF
     chmod 600 .env
 }
@@ -161,7 +164,7 @@ print_summary() {
     if [ -n "$STORE_DOMAIN" ]; then
         store_url="https://${STORE_DOMAIN}"
     else
-        store_url="https://${PUBLIC_IP}"
+        store_url="http://${PUBLIC_IP}"
     fi
 
     echo ""
@@ -173,9 +176,8 @@ print_summary() {
 
     if [ -z "$STORE_DOMAIN" ]; then
         echo ""
-        echo -e "  ${YELLOW}Your browser will show a security warning — this is${NC}"
-        echo -e "  ${YELLOW}normal for a new server without a domain name.${NC}"
-        echo -e "  ${YELLOW}Click \"Advanced\" → \"Proceed\" to access your store.${NC}"
+        echo -e "  ${YELLOW}No domain configured — running on HTTP.${NC}"
+        echo -e "  ${YELLOW}Add a domain with: mobazha-ctl set-domain <your-domain>${NC}"
     fi
 
     echo ""
@@ -200,10 +202,10 @@ Usage:
 
 Options:
   --domain <domain>        Pre-configure a domain name for auto-TLS.
-                           Without this, the store runs on IP with
-                           a self-signed certificate.
+                           Without this, the store runs on IP with HTTP.
   --overlay <tor|lokinet>  Enable a privacy overlay network.
   --saas-url <url>         Override SaaS API URL.
+  --testnet                Use cryptocurrency testnets (no real money).
   --help                   Show this help message and exit.
 
 Examples:
@@ -249,6 +251,10 @@ parse_args() {
                     exit 1
                 fi
                 shift 2
+                ;;
+            --testnet)
+                TESTNET="true"
+                shift
                 ;;
             --help|-h)
                 show_help

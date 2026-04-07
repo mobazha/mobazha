@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
 // AuthCookieName is the name for the authentication cookie
@@ -236,10 +238,7 @@ func (g *Gateway) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-	})
+	response.Success(w, map[string]bool{"success": true})
 }
 
 func (g *Gateway) CORSAllowAllOriginsMiddleware(next http.Handler) http.Handler {

@@ -21,6 +21,7 @@
 	handle /buyer-api/* {
 		uri strip_prefix /buyer-api
 		reverse_proxy {{ .SaaSAPIURL }} {
+			header_up Host {http.reverse_proxy.upstream.hostport}
 			header_up X-Standalone-Store-Key {{ .APIKey }}
 		}
 	}

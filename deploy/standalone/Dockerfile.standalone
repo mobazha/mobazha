@@ -21,7 +21,7 @@
 
 ARG GO_VERSION=1.26
 ARG NODE_VERSION=20
-ARG ALPINE_VERSION=3.20
+ARG ALPINE_VERSION=3.23
 ARG S6_OVERLAY_VERSION=3.2.0.0
 
 # ============================================================

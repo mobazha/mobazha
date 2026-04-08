@@ -20,6 +20,7 @@
 	handle /buyer-api/* {
 		uri strip_prefix /buyer-api
 		reverse_proxy {$SAAS_API_URL:https://app.mobazha.org} {
+			header_up Host {http.reverse_proxy.upstream.hostport}
 			header_up X-Standalone-Store-Key {$STANDALONE_API_KEY}
 		}
 	}

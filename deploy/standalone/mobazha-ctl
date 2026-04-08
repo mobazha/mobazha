@@ -3,7 +3,8 @@
 # mobazha-ctl — Standalone store management utility
 #
 # Usage:
-#   mobazha-ctl status              Show service status
+#   mobazha-ctl status              Show service status + auto-update info
+#   mobazha-ctl update              Trigger an immediate update check
 #   mobazha-ctl restart             Restart all services
 #   mobazha-ctl overlay status      Show overlay network status
 #   mobazha-ctl overlay enable tor  Enable Tor overlay
@@ -74,7 +75,30 @@ cmd_status() {
   echo "Overlay type:      $(env_get 'OVERLAY_TYPE' || echo 'none')"
   echo "Store domain:      $(env_get 'STORE_DOMAIN' || echo '(IP mode)')"
   echo ""
+
+  if systemctl is-active --quiet mobazha-update.timer 2>/dev/null; then
+    local next_run
+    next_run=$(systemctl show mobazha-update.timer --property=NextElapseUSecRealtime --value 2>/dev/null | head -1)
+    echo -e "Auto-update:       ${GREEN}active${NC} (next: ${next_run:-unknown})"
+  else
+    echo -e "Auto-update:       ${YELLOW}inactive${NC}"
+  fi
+  echo ""
   compose_cmd ps
+}
+
+cmd_update() {
+  info "Checking for updates..."
+  if systemctl is-active --quiet mobazha-update.timer 2>/dev/null; then
+    systemctl start mobazha-update.service
+    info "Update check triggered via systemd."
+  else
+    cd "$INSTALL_DIR"
+    compose_cmd pull --quiet
+    compose_cmd up -d --remove-orphans
+    docker image prune -f --filter "until=168h" > /dev/null 2>&1
+    info "Update check completed."
+  fi
 }
 
 cmd_restart() {
@@ -168,7 +192,8 @@ cmd_help() {
   echo "mobazha-ctl — Standalone store management"
   echo ""
   echo "Usage:"
-  echo "  mobazha-ctl status                Show service status"
+  echo "  mobazha-ctl status                Show service status + auto-update info"
+  echo "  mobazha-ctl update                Trigger an immediate update check"
   echo "  mobazha-ctl restart               Restart all services"
   echo "  mobazha-ctl overlay status        Show overlay network status"
   echo "  mobazha-ctl overlay enable <tor|lokinet>"
@@ -181,6 +206,9 @@ cmd_help() {
 case "${1:-help}" in
   status)
     cmd_status
+    ;;
+  update)
+    cmd_update
     ;;
   restart)
     cmd_restart

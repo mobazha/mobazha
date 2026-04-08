@@ -5,9 +5,9 @@
 #   2. Edit .env with your configuration
 #   3. docker compose up -d
 #
-# Services:
-#   store      — All-in-one container (s6-overlay: Caddy + mobazha-node)
-#   watchtower — Automatic image updates (pulls ghcr.io/mobazha/standalone:stable)
+# Auto-updates: systemd timer (mobazha-update.timer) checks hourly for new images.
+#   View status: systemctl status mobazha-update.timer
+#   Trigger now: systemctl start mobazha-update.service
 
 services:
   store:
@@ -22,7 +22,6 @@ services:
     volumes:
       - store-data:/data
       - caddy-data:/data/caddy
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${INSTALL_DIR:-/opt/mobazha}:/hostconfig
     environment:
       - STORE_DOMAIN=${STORE_DOMAIN:-}
@@ -32,27 +31,12 @@ services:
       - SAAS_PEER_ID=${SAAS_PEER_ID:-}
       - CONNECTIVITY=${CONNECTIVITY:-nat}
       - TESTNET=${TESTNET:-}
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:5102/healthz"]
       interval: 15s
       timeout: 5s
       start_period: 30s
       retries: 3
-
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: mobazha-watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=3600
-      - WATCHTOWER_LABEL_ENABLE=true
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
 
 volumes:
   store-data:

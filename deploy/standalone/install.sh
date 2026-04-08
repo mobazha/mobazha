@@ -126,6 +126,42 @@ setup_files() {
     log "Installed mobazha-ctl to /usr/local/bin/"
 }
 
+setup_auto_update() {
+    log "Setting up automatic updates (systemd timer)..."
+
+    cat > /etc/systemd/system/mobazha-update.service <<UNIT
+[Unit]
+Description=Mobazha Store Auto-Update
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=${INSTALL_DIR}
+ExecStart=/usr/bin/docker compose pull --quiet
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStartPost=/usr/bin/docker image prune -f --filter "until=168h"
+UNIT
+
+    cat > /etc/systemd/system/mobazha-update.timer <<UNIT
+[Unit]
+Description=Check for Mobazha Store updates hourly
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+    systemctl daemon-reload
+    systemctl enable --now mobazha-update.timer
+
+    log "Auto-update timer enabled (hourly)."
+}
+
 # --- Services ---
 
 compose_cmd() {
@@ -181,10 +217,11 @@ print_summary() {
     fi
 
     echo ""
-    echo -e "  Install dir: ${BOLD}${INSTALL_DIR}${NC}"
-    echo -e "  Manage:      ${BOLD}mobazha-ctl status${NC}"
-    echo -e "  Logs:        ${BOLD}mobazha-ctl logs${NC}"
-    echo -e "  Stop:        cd ${INSTALL_DIR} && docker compose down"
+    echo -e "  Install dir:  ${BOLD}${INSTALL_DIR}${NC}"
+    echo -e "  Auto-update:  ${BOLD}systemctl status mobazha-update.timer${NC}"
+    echo -e "  Manage:       ${BOLD}mobazha-ctl status${NC}"
+    echo -e "  Logs:         ${BOLD}mobazha-ctl logs${NC}"
+    echo -e "  Stop:         cd ${INSTALL_DIR} && docker compose down"
     echo ""
     echo -e "  ${BOLD}Next: open ${store_url}/admin to set up your store.${NC}"
     echo ""
@@ -287,6 +324,7 @@ main() {
     log "Detected public IP: ${PUBLIC_IP}"
 
     setup_files
+    setup_auto_update
     start_services
     print_summary
 }

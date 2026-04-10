@@ -16,6 +16,8 @@ type aiConfigProvider interface {
 	AIMultiConfig() aipkg.MultiConfig
 	SaveAIMultiConfig(aipkg.MultiConfig) error
 	AIProxy() *aipkg.Proxy
+	AIRateLimiter() *aipkg.DailyRateLimiter
+	PlatformAIConfig() *aipkg.Config
 }
 
 func getAIProvider(r *http.Request) aiConfigProvider {
@@ -168,6 +170,17 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if cfg.IsPlatform {
+		nodeID := getIdentityService(r).GetNodeID()
+		if rl := p.AIRateLimiter(); rl != nil {
+			if ok, _ := rl.Allow(nodeID, cfg.DailyLimit); !ok {
+				responsePkg.Error(w, http.StatusTooManyRequests, "RATE_LIMITED",
+					"Daily AI limit reached. Configure your own API key in Settings > Integrations for unlimited usage.")
+				return
+			}
+		}
+	}
+
 	var req aipkg.GenerateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		aiLog.Errorf("Invalid AI generate request body: %s", err)
@@ -193,5 +206,48 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if cfg.IsPlatform {
+		if rl := p.AIRateLimiter(); rl != nil {
+			rl.Increment(getIdentityService(r).GetNodeID())
+		}
+	}
+
 	responsePkg.Success(w, result)
+}
+
+func (g *Gateway) handleGETAIStatus(w http.ResponseWriter, r *http.Request) {
+	p := getAIProvider(r)
+	if p == nil {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI not available in this mode")
+		return
+	}
+
+	mc := p.AIMultiConfig()
+	userCfg := mc.ActiveConfig()
+	byokConfigured := userCfg.IsValid()
+
+	var source string
+	var dailyLimit, dailyUsed int
+
+	switch {
+	case byokConfigured:
+		source = "byok"
+	case p.PlatformAIConfig() != nil && p.PlatformAIConfig().IsValid():
+		source = "platform"
+		pCfg := p.PlatformAIConfig()
+		dailyLimit = pCfg.DailyLimit
+		if rl := p.AIRateLimiter(); rl != nil {
+			dailyUsed = rl.Usage(getIdentityService(r).GetNodeID())
+		}
+	default:
+		source = "none"
+	}
+
+	responsePkg.Success(w, map[string]interface{}{
+		"available":       source != "none",
+		"source":          source,
+		"daily_limit":     dailyLimit,
+		"daily_used":      dailyUsed,
+		"byok_configured": byokConfigured,
+	})
 }

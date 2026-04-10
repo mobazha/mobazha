@@ -69,8 +69,10 @@ type MobazhaNode struct {
 	// SaaS co-tenant fast path (nil in standalone mode)
 	coTenantPublicData contracts.CoTenantPublicDataFn
 
-	// AI proxy
-	aiProxy *aipkg.Proxy
+	// AI proxy and platform fallback
+	aiProxy         *aipkg.Proxy
+	platformAIConfig *aipkg.Config
+	aiRateLimiter    *aipkg.DailyRateLimiter
 
 	// Stripe account
 	stripeAccountID string
@@ -570,10 +572,27 @@ func (n *MobazhaNode) AIProxy() *aipkg.Proxy {
 }
 
 // AIConfig returns the flat Config for the currently active provider.
-// Used by Generate/TestConnection handlers and proxy layer.
+// Priority: user BYOK (if valid) → platform config (if valid) → empty config.
 func (n *MobazhaNode) AIConfig() aipkg.Config {
 	mc := n.AIMultiConfig()
-	return mc.ActiveConfig()
+	userCfg := mc.ActiveConfig()
+	if userCfg.IsValid() {
+		return userCfg
+	}
+	if n.platformAIConfig != nil && n.platformAIConfig.IsValid() {
+		return *n.platformAIConfig
+	}
+	return userCfg
+}
+
+// AIRateLimiter returns the per-tenant daily rate limiter (may be nil).
+func (n *MobazhaNode) AIRateLimiter() *aipkg.DailyRateLimiter {
+	return n.aiRateLimiter
+}
+
+// PlatformAIConfig returns the platform-provided AI config (may be nil).
+func (n *MobazhaNode) PlatformAIConfig() *aipkg.Config {
+	return n.platformAIConfig
 }
 
 // AIMultiConfig reads the full multi-provider config from the database.

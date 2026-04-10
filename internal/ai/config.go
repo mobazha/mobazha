@@ -12,6 +12,13 @@ type Config struct {
 	Model    string `json:"model"`
 	BaseURL  string `json:"base_url"`
 	Enabled  bool   `json:"enabled"`
+
+	// IsPlatform marks this config as platform-provided (not user BYOK).
+	// Platform configs are subject to per-tenant daily rate limits.
+	IsPlatform bool `json:"-"`
+	// DailyLimit is the per-tenant daily call limit for platform configs.
+	// Zero means unlimited. Only meaningful when IsPlatform is true.
+	DailyLimit int `json:"-"`
 }
 
 // fallbackProviders is the hardcoded minimum set used when remote config

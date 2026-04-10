@@ -171,6 +171,14 @@ type Config struct {
 	// mautrixChatService uses this instead of a per-tenant SQLite file.
 	// Tenant isolation is via CryptoHelper.DBAccountID = peerID.
 	MatrixCryptoStore interface{} `no-flag:"true"`
+
+	// Platform AI Gateway — injected by hosting to provide zero-config AI.
+	// When the tenant hasn't configured BYOK, AIConfig() falls back to this.
+	PlatformAIProvider   string `no-flag:"true"`
+	PlatformAIAPIKey     string `no-flag:"true"`
+	PlatformAIModel      string `no-flag:"true"`
+	PlatformAIBaseURL    string `no-flag:"true"`
+	PlatformAIDailyLimit int    `no-flag:"true"` // per-tenant daily call limit (0 = unlimited)
 }
 
 // LoadConfig initializes and parses the config using a config file and command

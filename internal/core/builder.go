@@ -583,6 +583,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
 	initEventDispatcher(obNode, notifyWsFn)
+	initPlatformAIConfig(obNode, cfg)
 
 	// Create messenger with appropriate SNF client
 	messengerCfg := &obnet.MessengerConfig{
@@ -1205,6 +1206,7 @@ func newLightweightNode(
 	initFiatSubsystem(obNode)
 	initShippingSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
+	initPlatformAIConfig(obNode, cfg)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
 	messengerCfg := &obnet.MessengerConfig{
@@ -1399,4 +1401,26 @@ func initEventDispatcher(obNode *MobazhaNode, notifyWsFn func(any) error) {
 	logger.LogInfoWithIDf(log, obNode.nodeID, "Event dispatcher initialized with %d sinks", len(sinks))
 
 	obNode.aiProxy = aipkg.NewProxy(nil)
+	obNode.aiRateLimiter = aipkg.NewDailyRateLimiter()
+}
+
+// initPlatformAIConfig sets up the platform-provided AI fallback config
+// from repo.Config fields injected by hosting (SaaS) or standalone admin.
+func initPlatformAIConfig(obNode *MobazhaNode, cfg *repo.Config) {
+	if cfg.PlatformAIProvider == "" || cfg.PlatformAIAPIKey == "" {
+		return
+	}
+	pCfg := &aipkg.Config{
+		Provider:   cfg.PlatformAIProvider,
+		APIKey:     cfg.PlatformAIAPIKey,
+		Model:      cfg.PlatformAIModel,
+		BaseURL:    cfg.PlatformAIBaseURL,
+		Enabled:    true,
+		IsPlatform: true,
+		DailyLimit: cfg.PlatformAIDailyLimit,
+	}
+	if pCfg.IsValid() {
+		obNode.platformAIConfig = pCfg
+		logger.LogInfoWithIDf(log, obNode.nodeID, "Platform AI configured (provider=%s, limit=%d/day)", pCfg.Provider, pCfg.DailyLimit)
+	}
 }

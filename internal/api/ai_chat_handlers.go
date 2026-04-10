@@ -106,6 +106,17 @@ func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if cfg.IsPlatform {
+		nodeID := getIdentityService(r).GetNodeID()
+		if rl := p.AIRateLimiter(); rl != nil {
+			if ok, _ := rl.Allow(nodeID, cfg.DailyLimit); !ok {
+				responsePkg.Error(w, http.StatusTooManyRequests, "RATE_LIMITED",
+					"Daily AI limit reached. Configure your own API key in Settings > Integrations for unlimited usage.")
+				return
+			}
+		}
+	}
+
 	store := p.ChatStore()
 	streamKey := "ai-chat-" + p.ProfileName()
 	if _, loaded := activeAIStreams.LoadOrStore(streamKey, true); loaded {
@@ -200,6 +211,12 @@ func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 			Error: err.Error(),
 		})
 		return
+	}
+
+	if cfg.IsPlatform {
+		if rl := p.AIRateLimiter(); rl != nil {
+			rl.Increment(getIdentityService(r).GetNodeID())
+		}
 	}
 
 	session.Messages = append(session.Messages, newMsgs...)

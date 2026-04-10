@@ -359,3 +359,47 @@ func TestMultiConfig_MarshalRoundtrip(t *testing.T) {
 		t.Error("anthropic api_key mismatch after roundtrip")
 	}
 }
+
+func TestConfig_IsPlatform_NotSerialized(t *testing.T) {
+	cfg := Config{
+		Provider:   "openai",
+		APIKey:     "sk-test",
+		Enabled:    true,
+		IsPlatform: true,
+		DailyLimit: 50,
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var unmarshaled Config
+	if err := json.Unmarshal(data, &unmarshaled); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if unmarshaled.IsPlatform {
+		t.Error("IsPlatform should not be serialized (json:\"-\")")
+	}
+	if unmarshaled.DailyLimit != 0 {
+		t.Error("DailyLimit should not be serialized (json:\"-\")")
+	}
+}
+
+func TestConfig_IsValid_PlatformConfig(t *testing.T) {
+	cfg := Config{
+		Provider:   "deepseek",
+		APIKey:     "sk-platform-key",
+		Enabled:    true,
+		IsPlatform: true,
+		DailyLimit: 50,
+	}
+
+	if !cfg.IsValid() {
+		t.Error("platform config with valid fields should be valid")
+	}
+	if cfg.EffectiveBaseURL() != "https://api.deepseek.com/v1" {
+		t.Errorf("unexpected base URL: %s", cfg.EffectiveBaseURL())
+	}
+}

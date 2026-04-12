@@ -8,6 +8,7 @@
 #   SAAS_API_URL       — SaaS backend URL (e.g. "https://app.mobazha.org")
 #   STANDALONE_API_KEY — API key for authenticating with SaaS
 #   NODE_PORT          — Local mobazha-node port (default: 5102)
+#   NEXTJS_PORT        — Local Next.js server port (default: 3000)
 #
 # Modes:
 #   Domain mode (STORE_DOMAIN set):     Caddy obtains TLS automatically via ACME
@@ -43,24 +44,16 @@
 		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
 	}
 
-	# --- SSR: meta injection for crawlers + embed cards ---
-	handle /product/* {
-		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
-	}
-	handle /store/* {
-		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
-	}
-	handle /embed/* {
-		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
-	}
-	handle /api/oembed {
-		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
+	# --- Next.js static assets (immutable, aggressive cache) ---
+	handle /_next/static/* {
+		root * /app/frontend/.next
+		uri strip_prefix /_next
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
 	}
 
-	# --- Frontend SPA: serve static files, fallback to index.html ---
+	# --- All other requests: Next.js SSR server ---
 	handle {
-		root * /srv/www
-		try_files {path} /index.html
-		file_server
+		reverse_proxy 127.0.0.1:{$NEXTJS_PORT:3000}
 	}
 }

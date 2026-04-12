@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+echo "nextjs: Waiting for mobazha-node to be healthy..."
+
+NODE_PORT="${NODE_PORT:-5102}"
+RETRIES=0
+MAX_RETRIES=60
+
+while ! wget -q -O /dev/null "http://127.0.0.1:${NODE_PORT}/healthz" 2>/dev/null; do
+    RETRIES=$((RETRIES + 1))
+    if [ "$RETRIES" -gt "$MAX_RETRIES" ]; then
+        echo "nextjs: mobazha-node did not become healthy within ${MAX_RETRIES}s" >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+echo "nextjs: mobazha-node is healthy, starting Next.js SSR server..."
+
+NEXTJS_PORT="${NEXTJS_PORT:-3000}"
+
+export HOSTNAME="0.0.0.0"
+export PORT="$NEXTJS_PORT"
+export INTERNAL_API_URL="http://127.0.0.1:${NODE_PORT}"
+
+exec node /app/frontend/server.js

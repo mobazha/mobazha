@@ -15,11 +15,11 @@ if [ -n "$ADMIN_PASSWORD" ] && [ ! -f /data/admin_password_hash ]; then
     echo "init-data: Admin password set from environment"
 fi
 
-# Inject runtime config into frontend SPA.
-# The Vite build uses compile-time env vars, but SAAS_API_URL is only known
-# at container startup. This script generates a JS file that the SPA reads
-# before initializing, allowing runtime override of the SaaS URL.
-RUNTIME_JS="/srv/www/runtime-config.js"
+# Inject runtime config into Next.js public directory.
+# NEXT_PUBLIC_* env vars are baked at build time, but SAAS_API_URL is only
+# known at container startup. This generates a JS file that the frontend reads
+# via window.__RUNTIME_CONFIG__ before initializing.
+RUNTIME_JS="/app/frontend/public/runtime-config.js"
 SAAS_URL="${SAAS_API_URL:-}"
 cat > "$RUNTIME_JS" <<JSEOF
 window.__RUNTIME_CONFIG__={saasUrl:"${SAAS_URL}"};

@@ -4,28 +4,37 @@
 #   - s6-overlay (PID 1, service supervision)
 #   - Caddy (reverse proxy, auto-TLS)
 #   - mobazha-node (seller node, UPX-compressed)
-#   - Frontend SPA (Vite build, Brotli pre-compressed)
+#   - Next.js SSR server (standalone output)
 #
-# Recommended: use the build script which handles frontend + Docker in one step:
-#   ./deploy/standalone/build-standalone.sh -t ghcr.io/mobazha/standalone:dev
+# Two build modes:
 #
-# Manual build (with pre-built frontend):
-#   docker buildx build -f deploy/standalone/Dockerfile.standalone \
-#     --build-arg FRONTEND_DIR=deploy/standalone/.frontend-dist \
-#     --build-context core=/path/to/mobazha-core \
-#     -t ghcr.io/mobazha/standalone:dev .
+#   A) Pre-built node binary (fast, CI-recommended):
+#      docker buildx build -f deploy/standalone/Dockerfile.standalone \
+#        --build-arg NODE_IMAGE=ghcr.io/mobazha/standalone-node:v1.0 \
+#        --build-arg FRONTEND_DIR=deploy/standalone/.frontend-dist \
+#        -t ghcr.io/mobazha/standalone:dev .
 #
-# Required build contexts:
-#   - Default context: mobazha3.0 repository root
-#   - Named context "core": mobazha-core repository root (for go.mod replace)
+#   B) Build from source (default, for local dev):
+#      docker buildx build -f deploy/standalone/Dockerfile.standalone \
+#        --build-arg FRONTEND_DIR=deploy/standalone/.frontend-dist \
+#        --build-context core=/path/to/mobazha-core \
+#        -t ghcr.io/mobazha/standalone:dev .
+#
+# Frontend directory layout (.frontend-dist/):
+#   standalone/   — Next.js standalone server output
+#   static/       — .next/static/ assets (JS/CSS chunks)
+#   public/       — public/ assets (icons, manifest, etc.)
 
 ARG GO_VERSION=1.26
-ARG NODE_VERSION=20
 ARG ALPINE_VERSION=3.23
 ARG S6_OVERLAY_VERSION=3.2.0.0
+ARG NODE_IMAGE=""
 
 # ============================================================
 # Stage 1: Go builder — compile mobazha-node on Alpine (musl)
+#
+# When NODE_IMAGE is set, Docker's lazy evaluation skips this stage
+# entirely because nothing in the final image chain references it.
 # ============================================================
 FROM golang:${GO_VERSION}-alpine AS go-builder
 
@@ -33,20 +42,16 @@ RUN apk add --no-cache gcc musl-dev git upx
 
 WORKDIR /src
 
-# Copy mobazha-core from named build context
 COPY --from=core . /src/core
 
-# Set up mobazha3.0
 WORKDIR /src/mobazha3.0
 COPY go.mod go.sum ./
 
-# Rewrite go.mod replace to point to the in-container path (for dependency caching layer)
 RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# COPY . . overwrites go.mod with the original host path — must sed again + tidy
 COPY . .
 RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod && \
     go mod tidy
@@ -55,33 +60,38 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 go build -tags goolm \
     -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/api.Version=$(git describe --tags --always 2>/dev/null || echo dev)" \
-    -o /out/mobazha . && \
-    upx --best --lzma /out/mobazha || true
+    -o /usr/local/bin/mobazha . && \
+    upx --best --lzma /usr/local/bin/mobazha || true
 
 # ============================================================
-# Stage 2: Frontend builder — Brotli compress pre-built SPA
+# Stage: node-binary — alias to either go-builder or pre-built image
+#
+# When NODE_IMAGE is empty:  resolves to go-builder (build from source)
+# When NODE_IMAGE is set:    resolves to the pre-built image (skip compile)
+# Both provide the binary at /usr/local/bin/mobazha.
 # ============================================================
-FROM node:${NODE_VERSION}-alpine AS fe-builder
+FROM ${NODE_IMAGE:-go-builder} AS node-binary
 
-RUN apk add --no-cache brotli
+# ============================================================
+# Stage 2: Frontend assembler — organize pre-built Next.js output
+# ============================================================
+FROM alpine:${ALPINE_VERSION} AS fe-assembler
 
-WORKDIR /src/frontend
+WORKDIR /app
 
 ARG FRONTEND_DIR=deploy/standalone/frontend-placeholder
-COPY ${FRONTEND_DIR}/ ./dist/
-
-RUN find ./dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' -o -name '*.json' -o -name '*.txt' -o -name '*.xml' -o -name '*.map' \) \
-    -exec brotli --best {} \;
+COPY ${FRONTEND_DIR}/standalone/ ./
+COPY ${FRONTEND_DIR}/static/ ./.next/static/
+COPY ${FRONTEND_DIR}/public/ ./public/
 
 # ============================================================
-# Stage 3: Runtime — alpine + s6-overlay + Caddy + mobazha
+# Stage 3: Runtime — alpine + s6 + Caddy + Node.js + mobazha
 # ============================================================
 FROM alpine:${ALPINE_VERSION}
 
 ARG S6_OVERLAY_VERSION
 ARG TARGETARCH
 
-# Map Docker TARGETARCH to s6-overlay release naming
 RUN set -ex; \
     case "${TARGETARCH}" in \
       amd64) S6_ARCH="x86_64" ;; \
@@ -95,37 +105,31 @@ RUN set -ex; \
     tar -C / -Jxpf /tmp/s6-arch.tar.xz && \
     rm -f /tmp/s6-*.tar.xz
 
-# Runtime dependencies
 RUN apk add --no-cache \
     ca-certificates \
     curl \
     jq \
     gettext \
-    caddy
+    caddy \
+    nodejs
 
-# Copy UPX-compressed mobazha binary (musl-linked, Alpine-native)
-COPY --from=go-builder /out/mobazha /usr/local/bin/mobazha
+COPY --from=node-binary /usr/local/bin/mobazha /usr/local/bin/mobazha
 
-# Copy Caddyfile templates (native env var for startup, Go template for runtime)
 COPY deploy/standalone/Caddyfile.tmpl /etc/caddy/Caddyfile.tmpl
 COPY deploy/standalone/Caddyfile.go.tmpl /etc/caddy/Caddyfile.go.tmpl
 COPY deploy/standalone/generate-caddyfile.sh /usr/local/bin/generate-caddyfile
 
-# Copy frontend assets (with .br pre-compressed siblings)
-COPY --from=fe-builder /src/frontend/dist/ /srv/www/
+COPY --from=fe-assembler /app/ /app/frontend/
 
-# Copy s6-overlay service definitions
 COPY deploy/standalone/s6/ /etc/s6-overlay/
 
-# Volumes
 VOLUME ["/data", "/data/caddy"]
 
-# Ports: HTTP (80) for ACME challenge, HTTPS (443), node API (5102 internal only)
 EXPOSE 80 443
 
-# Environment defaults
 ENV S6_KEEP_ENV=1 \
     NODE_PORT=5102 \
+    NEXTJS_PORT=3000 \
     STORE_DOMAIN="" \
     SAAS_API_URL="https://app.mobazha.org" \
     STANDALONE_API_KEY="" \
@@ -134,7 +138,6 @@ ENV S6_KEEP_ENV=1 \
     CONNECTIVITY="nat" \
     TESTNET=""
 
-# s6-overlay as PID 1
 ENTRYPOINT ["/init"]
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \

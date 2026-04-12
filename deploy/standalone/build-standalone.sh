@@ -9,8 +9,8 @@ fi
 # build-standalone.sh — Build the standalone store Docker image
 #
 # This script:
-#   1. Builds the Vite SPA from the mobazha-unified monorepo
-#   2. Copies the dist/ output into this repo's build context
+#   1. Builds the Next.js app (standalone output) from the mobazha-unified monorepo
+#   2. Copies the standalone output into this repo's build context
 #   3. Detects mobazha-core path for multi-repo Docker build
 #   4. Builds the multi-stage Docker image with the real frontend
 #
@@ -21,6 +21,7 @@ fi
 #   -t TAG         Docker image tag (default: ghcr.io/mobazha/standalone:dev)
 #   -f FRONTEND    Path to mobazha-unified repo (default: auto-detect)
 #   -c CORE        Path to mobazha-core repo (default: auto-detect from go.work)
+#   -n NODE_IMAGE  Pre-built node image (skip Go compilation, e.g. ghcr.io/mobazha/standalone-node:v1.0)
 #   -s             Skip frontend build (use existing dist in FRONTEND_DIR)
 #   -p             Push image after build
 #   --platform P   Docker buildx platform (e.g. linux/amd64,linux/arm64)
@@ -35,6 +36,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 IMAGE_TAG="ghcr.io/mobazha/standalone:dev"
 FRONTEND_REPO=""
 CORE_REPO=""
+NODE_IMAGE=""
 SKIP_FRONTEND=false
 PUSH=false
 PLATFORM=""
@@ -44,6 +46,7 @@ while [[ $# -gt 0 ]]; do
         -t) IMAGE_TAG="$2"; shift 2 ;;
         -f) FRONTEND_REPO="$2"; shift 2 ;;
         -c) CORE_REPO="$2"; shift 2 ;;
+        -n) NODE_IMAGE="$2"; shift 2 ;;
         -s) SKIP_FRONTEND=true; shift ;;
         -p) PUSH=true; shift ;;
         --platform) PLATFORM="$2"; shift 2 ;;
@@ -92,14 +95,18 @@ if [[ -z "$CORE_REPO" ]]; then
     fi
 fi
 
-if [[ -z "$CORE_REPO" ]]; then
-    echo "ERROR: Cannot find mobazha-core repo. Use -c to specify path." >&2
+if [[ -z "$NODE_IMAGE" && -z "$CORE_REPO" ]]; then
+    echo "ERROR: Cannot find mobazha-core repo. Use -c to specify path, or -n to use a pre-built node image." >&2
     exit 1
 fi
 
 echo "==> Config"
 echo "    Backend repo:  $REPO_ROOT"
-echo "    Core repo:     $CORE_REPO"
+if [[ -n "$NODE_IMAGE" ]]; then
+    echo "    Node image:    $NODE_IMAGE (pre-built, skipping Go compilation)"
+else
+    echo "    Core repo:     $CORE_REPO"
+fi
 echo "    Frontend repo: $FRONTEND_REPO"
 echo "    Image tag:     $IMAGE_TAG"
 echo ""
@@ -107,7 +114,7 @@ echo ""
 DIST_DIR="$REPO_ROOT/deploy/standalone/.frontend-dist"
 
 if [[ "$SKIP_FRONTEND" == "false" ]]; then
-    echo "==> Building frontend SPA (standalone mode)..."
+    echo "==> Building Next.js frontend (standalone mode)..."
 
     ENV_FILE="$SCRIPT_DIR/env.standalone.production"
     if [[ ! -f "$ENV_FILE" ]]; then
@@ -115,26 +122,40 @@ if [[ "$SKIP_FRONTEND" == "false" ]]; then
         exit 1
     fi
 
-    # Copy env file to apps/web/.env.production.local for Vite to pick up
     cp "$ENV_FILE" "$FRONTEND_REPO/apps/web/.env.production.local"
 
     (
         cd "$FRONTEND_REPO"
         echo "    Installing dependencies..."
         pnpm install --frozen-lockfile 2>&1 | tail -1
-        echo "    Running vite build..."
-        pnpm --filter @mobazha/web build 2>&1 | tail -5
+        echo "    Running next build..."
+        pnpm --filter @mobazha/web build:next 2>&1 | tail -10
     )
 
-    # Clean up the injected env file
     rm -f "$FRONTEND_REPO/apps/web/.env.production.local"
 
-    # Copy dist to build context
+    WEB_DIR="$FRONTEND_REPO/apps/web"
+
     rm -rf "$DIST_DIR"
-    cp -r "$FRONTEND_REPO/apps/web/dist" "$DIST_DIR"
+    mkdir -p "$DIST_DIR"
+
+    # Next.js standalone output: self-contained server + minimal node_modules
+    cp -r "$WEB_DIR/.next/standalone/." "$DIST_DIR/standalone/"
+
+    # Static assets: must be alongside standalone server under .next/static/
+    if [[ -d "$WEB_DIR/.next/static" ]]; then
+        mkdir -p "$DIST_DIR/static"
+        cp -r "$WEB_DIR/.next/static/." "$DIST_DIR/static/"
+    fi
+
+    # Public assets: icons, manifest, etc.
+    if [[ -d "$WEB_DIR/public" ]]; then
+        mkdir -p "$DIST_DIR/public"
+        cp -r "$WEB_DIR/public/." "$DIST_DIR/public/"
+    fi
 
     FILE_COUNT=$(find "$DIST_DIR" -type f | wc -l)
-    echo "    Frontend built: $FILE_COUNT files in .frontend-dist/"
+    echo "    Next.js standalone built: $FILE_COUNT files in .frontend-dist/"
 else
     echo "==> Skipping frontend build (-s flag)"
     if [[ ! -d "$DIST_DIR" ]]; then
@@ -149,9 +170,14 @@ echo "==> Building Docker image..."
 BUILD_ARGS=(
     -f "$SCRIPT_DIR/Dockerfile.standalone"
     --build-arg "FRONTEND_DIR=deploy/standalone/.frontend-dist"
-    --build-context "core=$CORE_REPO"
     -t "$IMAGE_TAG"
 )
+
+if [[ -n "$NODE_IMAGE" ]]; then
+    BUILD_ARGS+=(--build-arg "NODE_IMAGE=$NODE_IMAGE")
+else
+    BUILD_ARGS+=(--build-context "core=$CORE_REPO")
+fi
 
 if [[ -n "$PLATFORM" ]]; then
     BUILD_ARGS+=(--platform "$PLATFORM")

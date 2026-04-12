@@ -1,12 +1,12 @@
 #!/bin/sh
 set -e
 
-echo "caddy: Waiting for mobazha-node to be healthy..."
-
 NODE_PORT="${NODE_PORT:-5102}"
-RETRIES=0
+NEXTJS_PORT="${NEXTJS_PORT:-3000}"
 MAX_RETRIES=60
 
+echo "caddy: Waiting for mobazha-node to be healthy..."
+RETRIES=0
 while ! wget -q -O /dev/null "http://127.0.0.1:${NODE_PORT}/healthz" 2>/dev/null; do
     RETRIES=$((RETRIES + 1))
     if [ "$RETRIES" -gt "$MAX_RETRIES" ]; then
@@ -15,7 +15,18 @@ while ! wget -q -O /dev/null "http://127.0.0.1:${NODE_PORT}/healthz" 2>/dev/null
     fi
     sleep 1
 done
+echo "caddy: mobazha-node is healthy."
 
-echo "caddy: mobazha-node is healthy, starting Caddy..."
+echo "caddy: Waiting for Next.js server to be ready..."
+RETRIES=0
+while ! wget -q -O /dev/null "http://127.0.0.1:${NEXTJS_PORT}/" 2>/dev/null; do
+    RETRIES=$((RETRIES + 1))
+    if [ "$RETRIES" -gt "$MAX_RETRIES" ]; then
+        echo "caddy: Next.js did not become ready within ${MAX_RETRIES}s" >&2
+        exit 1
+    fi
+    sleep 1
+done
+echo "caddy: Next.js is ready, starting Caddy..."
 
 exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile

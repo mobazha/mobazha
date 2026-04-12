@@ -16,13 +16,14 @@ type ReverseProxyManager interface {
 }
 
 type ProxyConfig struct {
-	Domain       string
-	Connectivity string // "public", "overlay", "nat"
-	OverlayType  string // "tor", "lokinet", ""
+	Domain        string
+	Connectivity  string // "public", "overlay", "nat"
+	OverlayType   string // "tor", "lokinet", ""
 	OverlayDomain string
-	NodePort     int
-	SaaSAPIURL   string
-	APIKey       string
+	NodePort      int
+	NextJSPort    int
+	SaaSAPIURL    string
+	APIKey        string
 }
 
 type CaddyManager struct {
@@ -45,6 +46,9 @@ func NewCaddyManager(tmplPath, outputPath, envFilePath string) *CaddyManager {
 func (m *CaddyManager) Apply(cfg ProxyConfig) error {
 	if cfg.NodePort == 0 {
 		cfg.NodePort = 5102
+	}
+	if cfg.NextJSPort == 0 {
+		cfg.NextJSPort = 3000
 	}
 	if cfg.SaaSAPIURL == "" {
 		cfg.SaaSAPIURL = "https://app.mobazha.org"

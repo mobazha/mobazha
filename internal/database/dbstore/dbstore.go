@@ -13,7 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/common"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
-	"gorm.io/driver/sqlite"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -38,7 +38,7 @@ func NewSqliteDB(dataDir string) (database.Database, error) {
 		}
 	}
 
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(sqlitedialect.Open(dsn), &gorm.Config{
 		Logger:            silentLogger,
 		AllowGlobalUpdate: true,
 	})
@@ -56,7 +56,7 @@ var memDBCounter uint64
 func NewMemoryDB(dataDir string) (database.Database, error) {
 	n := atomic.AddUint64(&memDBCounter, 1)
 	dsn := fmt.Sprintf("file:memdb_%d?mode=memory&cache=shared", n)
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(sqlitedialect.Open(dsn), &gorm.Config{
 		Logger:            silentLogger,
 		AllowGlobalUpdate: true,
 	})

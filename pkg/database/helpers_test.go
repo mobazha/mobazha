@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gorm.io/driver/sqlite"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"gorm.io/gorm"
 )
 
@@ -24,7 +24,7 @@ func (m *mockReadSaver) Save(i interface{}) error { return m.db.Save(i).Error }
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlitedialect.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

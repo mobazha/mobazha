@@ -7,10 +7,10 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -298,7 +298,7 @@ func TestGormCollectionStore_CountCollectionProducts(t *testing.T) {
 func newMultiTenantStores(t *testing.T) (storeA, storeB *database.GormCollectionStore) {
 	t.Helper()
 	dsn := fmt.Sprintf("file:memdb_%s?mode=memory&cache=shared", t.Name())
-	sharedDB, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+	sharedDB, err := gorm.Open(sqlitedialect.Open(dsn), &gorm.Config{
 		AllowGlobalUpdate: true,
 	})
 	require.NoError(t, err)

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
@@ -25,7 +25,7 @@ func testSharedDB(t *testing.T) *gorm.DB {
 
 	dbPath := path.Join(tmpDir, "shared.db")
 	dsn := dbPath + "?_busy_timeout=5000"
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(sqlitedialect.Open(dsn), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
 	})
 	if err != nil {

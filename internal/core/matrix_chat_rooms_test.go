@@ -7,10 +7,10 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -309,7 +309,7 @@ type matrixCredentialsTestDB struct {
 func newMatrixCredentialsTestDB(t *testing.T, records []models.MatrixCredentials) database.Database {
 	t.Helper()
 
-	gdb, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	gdb, err := gorm.Open(sqlitedialect.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

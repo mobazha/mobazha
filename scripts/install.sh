@@ -2,12 +2,16 @@
 set -euo pipefail
 
 # Mobazha native binary installer
-# Usage: curl -fsSL https://get.mobazha.org/install.sh | bash
-#   or:  curl -fsSL https://get.mobazha.org/install.sh | bash -s -- --version v0.1.0
+# Usage: curl -sSL https://get.mobazha.org/install | bash
+#   or:  curl -sSL https://get.mobazha.org/install | bash -s -- --version v0.1.0
+#
+# Binaries are published to the public mobazha.org repo on GitHub as
+# releases with tag prefix "native-".
 
-REPO="mobazha/mobazha3.0"
+REPO="mobazha/mobazha.org"
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="mobazha"
+TAG_PREFIX="native-"
 
 VERSION=""
 while [[ $# -gt 0 ]]; do
@@ -39,10 +43,18 @@ detect_platform() {
 }
 
 get_latest_version() {
-    curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+    # Find the latest release with "native-" tag prefix
+    local tag
+    tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases" \
         | grep '"tag_name"' \
+        | grep "\"${TAG_PREFIX}" \
         | head -1 \
-        | sed -E 's/.*"([^"]+)".*/\1/'
+        | sed -E 's/.*"([^"]+)".*/\1/')"
+    if [ -z "$tag" ]; then
+        echo "Error: no native releases found in ${REPO}" >&2
+        exit 1
+    fi
+    echo "$tag"
 }
 
 main() {
@@ -54,6 +66,8 @@ main() {
     if [ -z "$VERSION" ]; then
         echo "🔍 Fetching latest release..."
         VERSION="$(get_latest_version)"
+    elif [[ "$VERSION" != ${TAG_PREFIX}* ]]; then
+        VERSION="${TAG_PREFIX}${VERSION}"
     fi
     echo "   Version:  $VERSION"
 

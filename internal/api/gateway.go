@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/ssr"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
@@ -138,6 +139,11 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	// Activated when SPA directory exists (container deployment).
 	if ssrHandler := ssr.NewFromEnv(config.LocalPeerID); ssrHandler != nil {
 		ssrHandler.RegisterRoutes(topMux)
+	} else if frontend.HasContent() {
+		// Native binary mode: serve the go:embed SPA as catch-all.
+		feHandler := frontend.NewHandler(frontend.ServerConfig{})
+		topMux.Handle("/", feHandler)
+		log.Info("Serving embedded Web UI on /")
 	}
 
 	g.handler = topMux

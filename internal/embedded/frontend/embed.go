@@ -1,6 +1,9 @@
 package frontend
 
-import "embed"
+import (
+	"embed"
+	"io/fs"
+)
 
 // DistFS holds the Vite SPA build output.
 // In production, run the build script and copy the output to dist/ before compiling:
@@ -13,3 +16,15 @@ import "embed"
 //
 //go:embed all:dist
 var DistFS embed.FS
+
+// HasContent reports whether the embedded dist/ directory contains a
+// real SPA build (i.e. an index.html file), as opposed to just a
+// .gitkeep placeholder.
+func HasContent() bool {
+	sub, err := fs.Sub(DistFS, "dist")
+	if err != nil {
+		return false
+	}
+	_, err = sub.Open("index.html")
+	return err == nil
+}

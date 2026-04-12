@@ -12,6 +12,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/mobazha/mobazha3.0/internal/core"
+	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -109,7 +110,6 @@ func printReadyBanner(cfg *repo.Config) {
 		gwAddr = "/ip4/127.0.0.1/tcp/4002"
 	}
 
-	// Parse multiaddr → host:port for display.
 	host, port := "127.0.0.1", "4002"
 	parts := strings.Split(gwAddr, "/")
 	for i, p := range parts {
@@ -136,11 +136,19 @@ func printReadyBanner(cfg *repo.Config) {
 	fmt.Println()
 	green.Println("✅ Mobazha node is ready!")
 	fmt.Println()
-	cyan.Printf("   API endpoint:  %s\n", apiURL)
-	cyan.Printf("   API docs:      %s/v1/listings/index\n", apiURL)
-	fmt.Println()
-	fmt.Println("   This is the API server. To manage your store, connect a")
-	fmt.Println("   frontend client or use the Docker image for the full Web UI.")
+
+	if frontend.HasContent() {
+		cyan.Printf("   Web UI:        %s\n", apiURL)
+		cyan.Printf("   API endpoint:  %s/v1/\n", apiURL)
+		fmt.Println()
+		fmt.Println("   Open the Web UI in your browser to manage your store.")
+	} else {
+		cyan.Printf("   API endpoint:  %s\n", apiURL)
+		fmt.Println()
+		fmt.Println("   This binary does not include the Web UI.")
+		fmt.Println("   Use the Docker image for the full experience:")
+		fmt.Println("   https://mobazha.org/self-host")
+	}
 	fmt.Println()
 	fmt.Println("   Press Ctrl+C to stop the node.")
 	fmt.Println()

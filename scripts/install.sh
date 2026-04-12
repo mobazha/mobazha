@@ -11,7 +11,7 @@ set -euo pipefail
 # releases with tag prefix "native-".
 
 REPO="mobazha/mobazha.org"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="${HOME}/.local/bin"
 BINARY_NAME="mobazha"
 TAG_PREFIX="native-"
 DATA_DIR="${HOME}/.mobazha"
@@ -109,6 +109,7 @@ do_install() {
 
     chmod +x "${tmpdir}/${BINARY_NAME}"
 
+    mkdir -p "$INSTALL_DIR"
     if [ -w "$INSTALL_DIR" ]; then
         mv "${tmpdir}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
     else
@@ -118,15 +119,36 @@ do_install() {
 
     echo ""
     echo "✅ Mobazha ${VERSION} installed to ${INSTALL_DIR}/${BINARY_NAME}"
+
+    # Check if INSTALL_DIR is in PATH; if not, advise the user.
+    if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
+        echo ""
+        echo "⚠️  ${INSTALL_DIR} is not in your PATH."
+        local shell_rc=""
+        case "$(basename "${SHELL:-/bin/bash}")" in
+            zsh)  shell_rc="~/.zshrc" ;;
+            bash) shell_rc="~/.bashrc" ;;
+            fish) shell_rc="~/.config/fish/config.fish" ;;
+            *)    shell_rc="your shell profile" ;;
+        esac
+        echo "   Add it by running:"
+        echo ""
+        echo "     echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ${shell_rc}"
+        echo "     source ${shell_rc}"
+    fi
+
     echo ""
     echo "Quick start:"
-    echo "  ${BINARY_NAME} init      # Initialize data directory"
-    echo "  ${BINARY_NAME} start     # Start the node"
-    echo "  ${BINARY_NAME} doctor    # Check system health"
-    echo "  ${BINARY_NAME} backup    # Back up data"
+    echo "  ${BINARY_NAME} start             # Start the node (foreground)"
+    echo "  ${BINARY_NAME} service install   # Run as background service"
     echo ""
     echo "After starting, open your browser:"
     echo "  http://localhost:4002"
+    echo ""
+    echo "Other commands:"
+    echo "  ${BINARY_NAME} service status    # Check service status"
+    echo "  ${BINARY_NAME} doctor            # Check system health"
+    echo "  ${BINARY_NAME} backup            # Back up data"
     echo ""
     echo "To uninstall later:"
     echo "  curl -sSL https://get.mobazha.org/install | bash -s -- --uninstall"
@@ -156,13 +178,18 @@ do_uninstall() {
         fi
     fi
 
-    # Remove binary
-    local binary="${INSTALL_DIR}/${BINARY_NAME}"
-    if [ -f "$binary" ]; then
-        echo "   Removing ${binary}..."
-        do_remove "$binary"
-    else
-        echo "   Binary not found at ${binary}, skipping."
+    # Remove binary (check both new and legacy install dirs)
+    local found=false
+    for dir in "$INSTALL_DIR" "/usr/local/bin"; do
+        local binary="${dir}/${BINARY_NAME}"
+        if [ -f "$binary" ]; then
+            echo "   Removing ${binary}..."
+            do_remove "$binary"
+            found=true
+        fi
+    done
+    if ! $found; then
+        echo "   Binary not found, skipping."
     fi
 
     # Purge data if requested
@@ -199,7 +226,7 @@ UNINSTALL:
 
 OPTIONS:
   --version <tag>   Install a specific version (e.g. v0.1.0)
-  --dir <path>      Install directory (default: /usr/local/bin)
+  --dir <path>      Install directory (default: ~/.local/bin)
   --uninstall       Remove Mobazha binary and system service
   --purge           Also remove data directory (use with --uninstall)
   --help            Show this help message

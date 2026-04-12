@@ -57,6 +57,32 @@ func main() {
 		log.Fatal(err)
 	}
 
+	serviceCmd, err := parser.AddCommand("service",
+		"manage the background service",
+		"Install, uninstall, or check the status of the Mobazha background service (systemd on Linux, launchd on macOS).",
+		&struct{}{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := serviceCmd.AddCommand("install",
+		"install and start the background service",
+		"Register Mobazha as a system service that starts automatically on boot.",
+		&cmd.ServiceInstall{}); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := serviceCmd.AddCommand("uninstall",
+		"stop and remove the background service",
+		"Stop the Mobazha service and remove it from system startup.",
+		&cmd.ServiceUninstall{}); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := serviceCmd.AddCommand("status",
+		"check the service status",
+		"Show the current status of the Mobazha background service.",
+		&cmd.ServiceStatus{}); err != nil {
+		log.Fatal(err)
+	}
+
 	if _, err := parser.Parse(); err != nil {
 		os.Exit(1)
 	}

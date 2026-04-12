@@ -648,6 +648,12 @@ func CheckAndMigrateRepo(dataDir string) error {
 		if err := migrateRepoToNodesStructure(dataDir); err != nil {
 			return fmt.Errorf("migration failed: %v", err)
 		}
+		// Write updated version at root so migration won't re-trigger.
+		// (The old version file was moved into nodes/default/ by the migration.)
+		versionStr := strconv.Itoa(DefaultRepoVersion)
+		if err := os.WriteFile(path.Join(dataDir, versionFileName), []byte(versionStr), os.ModePerm); err != nil {
+			return fmt.Errorf("failed to write root version after migration: %v", err)
+		}
 	}
 
 	return nil

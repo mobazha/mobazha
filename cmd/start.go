@@ -35,6 +35,15 @@ func (x *Start) Execute(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	if !repo.IsRepoInitialized(cfg.DataDir) {
+		log.Info("Data directory not initialized, running first-time setup...")
+		if err := autoInit(cfg); err != nil {
+			return fmt.Errorf("auto-init failed: %w", err)
+		}
+		log.Info("Initialization complete.")
+	}
+
 	printSplashScreen()
 	n, err := core.NewNode(context.Background(), cfg, repo.DefaultNodeID)
 	if err != nil {
@@ -156,6 +165,7 @@ func printReadyBanner(cfg *repo.Config) {
 	}
 	fmt.Println()
 	fmt.Println("   Press Ctrl+C to stop the node.")
+	fmt.Println("   To run in the background: mobazha service install")
 	fmt.Println()
 }
 
@@ -188,4 +198,19 @@ func printSplashScreen() {
 	white.DisableColor()
 	fmt.Println("")
 	fmt.Printf("\nmobazha-go v%s\n", version.String())
+}
+
+// autoInit creates the data directory and writes the root-level version file
+// so that NewNode can proceed without the legacy migration prompt.
+// NewNode itself creates the actual repo at dataDir/nodes/default/.
+func autoInit(cfg *repo.Config) error {
+	if err := os.MkdirAll(cfg.DataDir, 0755); err != nil {
+		return err
+	}
+	versionStr := fmt.Sprintf("%d", repo.DefaultRepoVersion)
+	return os.WriteFile(
+		cfg.DataDir+"/version",
+		[]byte(versionStr),
+		0644,
+	)
 }

@@ -1,0 +1,369 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"text/template"
+
+	"github.com/mobazha/mobazha3.0/internal/repo"
+)
+
+// Service manages the Mobazha background service.
+type Service struct {
+	DataDir string `short:"d" long:"datadir" description:"Data directory"`
+	Testnet bool   `short:"t" long:"testnet" description:"Use the test network"`
+}
+
+// ServiceInstall installs the system service.
+type ServiceInstall struct {
+	Service
+}
+
+// ServiceUninstall removes the system service.
+type ServiceUninstall struct {
+	Service
+}
+
+// ServiceStatus checks the service status.
+type ServiceStatus struct {
+	Service
+}
+
+func (s *Service) dataDir() string {
+	if s.DataDir != "" {
+		return s.DataDir
+	}
+	d := repo.DefaultHomeDir
+	if s.Testnet {
+		d += "-testnet"
+	}
+	return d
+}
+
+func (s *Service) binaryPath() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(exe)
+}
+
+// Execute installs the Mobazha system service.
+func (x *ServiceInstall) Execute(args []string) error {
+	switch runtime.GOOS {
+	case "linux":
+		return x.installSystemd()
+	case "darwin":
+		return x.installLaunchd()
+	default:
+		return fmt.Errorf("service management is not supported on %s", runtime.GOOS)
+	}
+}
+
+// Execute removes the Mobazha system service.
+func (x *ServiceUninstall) Execute(args []string) error {
+	switch runtime.GOOS {
+	case "linux":
+		return x.uninstallSystemd()
+	case "darwin":
+		return x.uninstallLaunchd()
+	default:
+		return fmt.Errorf("service management is not supported on %s", runtime.GOOS)
+	}
+}
+
+// Execute checks the service status.
+func (x *ServiceStatus) Execute(args []string) error {
+	switch runtime.GOOS {
+	case "linux":
+		return x.statusSystemd()
+	case "darwin":
+		return x.statusLaunchd()
+	default:
+		return fmt.Errorf("service management is not supported on %s", runtime.GOOS)
+	}
+}
+
+// --- Linux systemd ---
+
+const systemdUnitTmpl = `[Unit]
+Description=Mobazha Node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart={{.Binary}} start{{if .DataDir}} -d {{.DataDir}}{{end}}{{if .Testnet}} -t{{end}}
+Restart=on-failure
+RestartSec=5
+User={{.User}}
+WorkingDirectory={{.Home}}
+
+[Install]
+WantedBy=multi-user.target
+`
+
+func (x *ServiceInstall) installSystemd() error {
+	bin, err := x.binaryPath()
+	if err != nil {
+		return fmt.Errorf("cannot resolve binary path: %w", err)
+	}
+
+	u, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	data := struct {
+		Binary  string
+		DataDir string
+		Testnet bool
+		User    string
+		Home    string
+	}{
+		Binary:  bin,
+		DataDir: x.dataDir(),
+		Testnet: x.Testnet,
+		User:    u.Username,
+		Home:    u.HomeDir,
+	}
+
+	// Use user-level systemd (no sudo) if available; fall back to system-level.
+	userMode := canUserSystemd()
+
+	var unitPath string
+	if userMode {
+		configDir := os.Getenv("XDG_CONFIG_HOME")
+		if configDir == "" {
+			configDir = filepath.Join(u.HomeDir, ".config")
+		}
+		unitDir := filepath.Join(configDir, "systemd", "user")
+		if err := os.MkdirAll(unitDir, 0755); err != nil {
+			return err
+		}
+		unitPath = filepath.Join(unitDir, "mobazha.service")
+	} else {
+		unitPath = "/etc/systemd/system/mobazha.service"
+	}
+
+	tmpl, err := template.New("unit").Parse(systemdUnitTmpl)
+	if err != nil {
+		return err
+	}
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return err
+	}
+
+	if userMode {
+		if err := os.WriteFile(unitPath, []byte(buf.String()), 0644); err != nil {
+			return err
+		}
+		run("systemctl", "--user", "daemon-reload")
+		run("systemctl", "--user", "enable", "mobazha")
+		run("systemctl", "--user", "start", "mobazha")
+		// Enable lingering so the service survives logout.
+		run("loginctl", "enable-linger", u.Username)
+	} else {
+		if err := sudoWriteFile(unitPath, []byte(buf.String())); err != nil {
+			return err
+		}
+		run("sudo", "systemctl", "daemon-reload")
+		run("sudo", "systemctl", "enable", "mobazha")
+		run("sudo", "systemctl", "start", "mobazha")
+	}
+
+	fmt.Println()
+	fmt.Println("✅ Mobazha service installed and started.")
+	fmt.Println()
+	if userMode {
+		fmt.Println("   Check status:  systemctl --user status mobazha")
+		fmt.Println("   View logs:     journalctl --user -u mobazha -f")
+		fmt.Println("   Stop:          systemctl --user stop mobazha")
+		fmt.Println("   Uninstall:     mobazha service uninstall")
+	} else {
+		fmt.Println("   Check status:  sudo systemctl status mobazha")
+		fmt.Println("   View logs:     sudo journalctl -u mobazha -f")
+		fmt.Println("   Stop:          sudo systemctl stop mobazha")
+		fmt.Println("   Uninstall:     mobazha service uninstall")
+	}
+	return nil
+}
+
+func (x *ServiceUninstall) uninstallSystemd() error {
+	userMode := canUserSystemd()
+	if userMode {
+		run("systemctl", "--user", "stop", "mobazha")
+		run("systemctl", "--user", "disable", "mobazha")
+		u, _ := user.Current()
+		configDir := os.Getenv("XDG_CONFIG_HOME")
+		if configDir == "" {
+			configDir = filepath.Join(u.HomeDir, ".config")
+		}
+		os.Remove(filepath.Join(configDir, "systemd", "user", "mobazha.service"))
+		run("systemctl", "--user", "daemon-reload")
+	} else {
+		run("sudo", "systemctl", "stop", "mobazha")
+		run("sudo", "systemctl", "disable", "mobazha")
+		os.Remove("/etc/systemd/system/mobazha.service")
+		run("sudo", "systemctl", "daemon-reload")
+	}
+	fmt.Println("✅ Mobazha service removed.")
+	return nil
+}
+
+func (x *ServiceStatus) statusSystemd() error {
+	if canUserSystemd() {
+		return runPassthrough("systemctl", "--user", "status", "mobazha")
+	}
+	return runPassthrough("systemctl", "status", "mobazha")
+}
+
+func canUserSystemd() bool {
+	uid := os.Getuid()
+	if uid == 0 {
+		return false
+	}
+	busAddr := fmt.Sprintf("/run/user/%d/bus", uid)
+	_, err := os.Stat(busAddr)
+	return err == nil
+}
+
+// --- macOS launchd ---
+
+const launchdPlistTmpl = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>org.mobazha.node</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>{{.Binary}}</string>
+		<string>start</string>
+{{- if .DataDir}}
+		<string>-d</string>
+		<string>{{.DataDir}}</string>
+{{- end}}
+{{- if .Testnet}}
+		<string>-t</string>
+{{- end}}
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>{{.LogDir}}/mobazha.log</string>
+	<key>StandardErrorPath</key>
+	<string>{{.LogDir}}/mobazha.log</string>
+</dict>
+</plist>
+`
+
+func (x *ServiceInstall) installLaunchd() error {
+	bin, err := x.binaryPath()
+	if err != nil {
+		return fmt.Errorf("cannot resolve binary path: %w", err)
+	}
+
+	u, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	logDir := filepath.Join(u.HomeDir, "Library", "Logs", "Mobazha")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return err
+	}
+
+	plistDir := filepath.Join(u.HomeDir, "Library", "LaunchAgents")
+	if err := os.MkdirAll(plistDir, 0755); err != nil {
+		return err
+	}
+	plistPath := filepath.Join(plistDir, "org.mobazha.node.plist")
+
+	data := struct {
+		Binary  string
+		DataDir string
+		Testnet bool
+		LogDir  string
+	}{
+		Binary:  bin,
+		DataDir: x.dataDir(),
+		Testnet: x.Testnet,
+		LogDir:  logDir,
+	}
+
+	tmpl, err := template.New("plist").Parse(launchdPlistTmpl)
+	if err != nil {
+		return err
+	}
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(plistPath, []byte(buf.String()), 0644); err != nil {
+		return err
+	}
+
+	run("launchctl", "unload", plistPath)
+	run("launchctl", "load", plistPath)
+
+	fmt.Println()
+	fmt.Println("✅ Mobazha service installed and started.")
+	fmt.Println("   The node will start automatically on login.")
+	fmt.Println()
+	fmt.Println("   Check status:  launchctl list | grep mobazha")
+	fmt.Println("   View logs:     tail -f ~/Library/Logs/Mobazha/mobazha.log")
+	fmt.Println("   Stop:          launchctl unload " + plistPath)
+	fmt.Println("   Uninstall:     mobazha service uninstall")
+	return nil
+}
+
+func (x *ServiceUninstall) uninstallLaunchd() error {
+	u, err := user.Current()
+	if err != nil {
+		return err
+	}
+	plistPath := filepath.Join(u.HomeDir, "Library", "LaunchAgents", "org.mobazha.node.plist")
+	run("launchctl", "unload", plistPath)
+	os.Remove(plistPath)
+	fmt.Println("✅ Mobazha service removed.")
+	return nil
+}
+
+func (x *ServiceStatus) statusLaunchd() error {
+	return runPassthrough("launchctl", "list", "org.mobazha.node")
+}
+
+// --- helpers ---
+
+func run(name string, args ...string) {
+	c := exec.Command(name, args...)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	_ = c.Run()
+}
+
+func runPassthrough(name string, args ...string) error {
+	c := exec.Command(name, args...)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	c.Stdin = os.Stdin
+	return c.Run()
+}
+
+func sudoWriteFile(path string, data []byte) error {
+	c := exec.Command("sudo", "tee", path)
+	c.Stdin = strings.NewReader(string(data))
+	c.Stdout = nil
+	c.Stderr = os.Stderr
+	return c.Run()
+}

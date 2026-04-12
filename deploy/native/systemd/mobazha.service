@@ -1,0 +1,30 @@
+[Unit]
+Description=Mobazha Decentralized Marketplace Node
+Documentation=https://github.com/mobazha/mobazha3.0
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mobazha
+Group=mobazha
+ExecStart=/usr/local/bin/mobazha start
+WorkingDirectory=/var/lib/mobazha
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65535
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mobazha
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mobazha
+
+[Install]
+WantedBy=multi-user.target

@@ -95,7 +95,7 @@ do_install() {
     trap 'rm -rf "${tmpdir:-}"' EXIT
 
     echo "⬇️  Downloading ${BINARY_NAME}-${platform}..."
-    curl -fsSL -o "${tmpdir}/${BINARY_NAME}" "$url"
+    curl -fL# -o "${tmpdir}/${BINARY_NAME}" "$url"
 
     echo "🔐 Verifying checksum..."
     if curl -fsSL -o "${tmpdir}/checksums-sha256.txt" "$checksum_url" 2>/dev/null; then

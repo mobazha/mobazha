@@ -11,12 +11,12 @@ func InitFeatureManager() {
 	fm.RegisterToggle(FeatureNoBuildinWallet, true)
 
 	allToggles := fm.GetAllToggles()
-	log.Println("功能开关初始化完成，当前所有功能开关状态：")
+	log.Println("Feature flags initialized, current state:")
 	for feature, enabled := range allToggles {
 		log.Printf("  - %s: %v", feature, enabled)
 	}
 
-	log.Println("功能开关管理器初始化完成")
+	log.Println("Feature manager initialized")
 }
 
 // 在包初始化时自动初始化 FeatureManager

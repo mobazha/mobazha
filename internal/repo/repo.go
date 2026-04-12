@@ -36,10 +36,6 @@ const (
 	defaultMispaymentBuffer = 1.0
 
 	DefaultNodeID = "default"
-
-	// Directory names
-	IPFSDirName         = "ipfs"
-	MobazhaFilesDirName = "mobazha-files"
 )
 
 var (
@@ -283,28 +279,28 @@ func SaveKeysToDB(tx database.Tx, escrowKey *btcec.PrivateKey, bip44Key *hdkeych
 		Name:  "escrow",
 		Value: escrowKey.Serialize(),
 	}); err != nil {
-		return fmt.Errorf("保存托管密钥失败: %v", err)
+		return fmt.Errorf("failed to save escrow key: %v", err)
 	}
 
 	if err := tx.Save(&models.Key{
 		Name:  "ratings",
 		Value: ratingKey.Serialize(),
 	}); err != nil {
-		return fmt.Errorf("保存评分密钥失败: %v", err)
+		return fmt.Errorf("failed to save rating key: %v", err)
 	}
 
 	if err := tx.Save(&models.Key{
 		Name:  "bip44",
 		Value: []byte(bip44Key.String()),
 	}); err != nil {
-		return fmt.Errorf("保存BIP44密钥失败: %v", err)
+		return fmt.Errorf("failed to save BIP44 key: %v", err)
 	}
 
 	if err := tx.Save(&models.Key{
 		Name:  "solana",
 		Value: []byte(*solKey),
 	}); err != nil {
-		return fmt.Errorf("保存SOL密钥失败: %v", err)
+		return fmt.Errorf("failed to save SOL key: %v", err)
 	}
 
 	return nil
@@ -314,19 +310,19 @@ func GetKeysFromDB(tx database.Tx) (dbEscrowKey, dbBip44Key, dbSolKey, dbRatingK
 	var escrowKey, ratingKey, bip44Key, solKey models.Key
 	err = func() error {
 		if err := tx.Read().Where("name = ?", "escrow").First(&escrowKey).Error; err != nil {
-			return fmt.Errorf("获取托管密钥失败: %v", err)
+			return fmt.Errorf("failed to get escrow key: %v", err)
 		}
 
 		if err := tx.Read().Where("name = ?", "ratings").First(&ratingKey).Error; err != nil {
-			return fmt.Errorf("获取评分密钥失败: %v", err)
+			return fmt.Errorf("failed to get rating key: %v", err)
 		}
 
 		if err := tx.Read().Where("name = ?", "bip44").First(&bip44Key).Error; err != nil {
-			return fmt.Errorf("获取BIP44密钥失败: %v", err)
+			return fmt.Errorf("failed to get BIP44 key: %v", err)
 		}
 
 		if err := tx.Read().Where("name = ?", "solana").First(&solKey).Error; err != nil {
-			return fmt.Errorf("获取SOL密钥失败: %v", err)
+			return fmt.Errorf("failed to get SOL key: %v", err)
 		}
 
 		return nil
@@ -531,7 +527,7 @@ func autoMigrateDatabase(db database.Database) error {
 		// 先迁移其他表
 		for _, m := range dbModels {
 			if err := tx.Migrate(m); err != nil {
-				return fmt.Errorf("迁移表 %s 失败: %v", reflect.TypeOf(m).String(), err)
+				return fmt.Errorf("failed to migrate table %s: %v", reflect.TypeOf(m).String(), err)
 			}
 		}
 
@@ -541,7 +537,7 @@ func autoMigrateDatabase(db database.Database) error {
 		if err := tx.Read().Table("receiving_accounts").Count(&count).Error; err != nil {
 			// 表不存在，直接创建
 			if err := tx.Migrate(&models.ReceivingAccount{}); err != nil {
-				return fmt.Errorf("迁移表 ReceivingAccount 失败: %v", err)
+				return fmt.Errorf("failed to migrate ReceivingAccount: %v", err)
 			}
 		} else {
 			// 检查表结构是否匹配
@@ -555,7 +551,7 @@ func autoMigrateDatabase(db database.Database) error {
 			}
 			var columns []TableInfo
 			if err := tx.Read().Raw("PRAGMA table_info(receiving_accounts)").Scan(&columns).Error; err != nil {
-				return fmt.Errorf("获取表结构失败: %v", err)
+				return fmt.Errorf("failed to get table info: %v", err)
 			}
 
 			// 检查是否需要迁移
@@ -573,12 +569,12 @@ func autoMigrateDatabase(db database.Database) error {
 			if needsMigration {
 				// 删除旧表
 				if err := tx.Read().Exec("DROP TABLE receiving_accounts").Error; err != nil {
-					return fmt.Errorf("删除旧表失败: %v", err)
+					return fmt.Errorf("failed to drop old receiving_accounts: %v", err)
 				}
 
 				// 创建新表
 				if err := tx.Migrate(&models.ReceivingAccount{}); err != nil {
-					return fmt.Errorf("创建新表失败: %v", err)
+					return fmt.Errorf("failed to create receiving_accounts: %v", err)
 				}
 			}
 		}
@@ -666,10 +662,7 @@ func migrateRepoToNodesStructure(rootPath string) error {
 		return fmt.Errorf("failed to create nodes directory structure: %v", err)
 	}
 
-	const oldMobazhaFilesDirName = "openbazaar-files"
 	itemsToMove := []string{
-		IPFSDirName,
-		oldMobazhaFilesDirName,
 		common.PublicDirName,
 		common.DatabaseFileName,
 		common.MultiwalletFileName,
@@ -679,9 +672,6 @@ func migrateRepoToNodesStructure(rootPath string) error {
 	for _, item := range itemsToMove {
 		srcPath := path.Join(rootPath, item)
 		dstPath := path.Join(defaultNodePath, item)
-		if item == oldMobazhaFilesDirName {
-			dstPath = path.Join(defaultNodePath, MobazhaFilesDirName)
-		}
 
 		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
 			continue

@@ -67,7 +67,7 @@ func (m *FeatureManager) Enable(name Feature) error {
 		toggle.enabled = true
 		return nil
 	}
-	return fmt.Errorf("功能开关 %s 不存在", name)
+	return fmt.Errorf("feature flag %s does not exist", name)
 }
 
 // IsEnabled 检查功能是否启用

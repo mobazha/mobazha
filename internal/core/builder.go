@@ -352,11 +352,11 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	err = obRepo.DB().View(func(tx database.Tx) error {
 		if err := tx.Read().First(&prefs).Error; err != nil {
-			return fmt.Errorf("获取用户偏好失败: %v", err)
+			return fmt.Errorf("failed to get user preferences: %v", err)
 		}
 		dbEscrowKey, dbBip44Key, dbSolKey, dbRatingKey, err = repo.GetKeysFromDB(tx)
 		if err != nil {
-			logger.LogInfoWithID(log, nodeID, "数据库中缺少密钥，需要更新")
+			logger.LogInfoWithID(log, nodeID, "Keys missing from DB, update required")
 			needDBUpdate = true
 			return nil
 		}
@@ -367,29 +367,29 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	if needDBUpdate {
-		logger.LogInfoWithID(log, nodeID, "更新数据库中的密钥")
+		logger.LogInfoWithID(log, nodeID, "Updating keys in DB")
 		err = obRepo.DB().Update(func(tx database.Tx) error {
 			var dbMnemonic models.Key
 			err = tx.Read().Where("name = ?", "mnemonic").First(&dbMnemonic).Error
 			if err != nil {
-				return fmt.Errorf("获取助记词失败: %v", err)
+				return fmt.Errorf("failed to get mnemonic: %v", err)
 			}
 
 			// 从助记词生成种子
 			hdSeed := bip39.NewSeed(string(dbMnemonic.Value), "")
 			escrowKey, ratingKey, bip44Key, solKey, err := repo.CreateHDKeys(hdSeed)
 			if err != nil {
-				return fmt.Errorf("生成密钥失败: %v", err)
+				return fmt.Errorf("failed to generate HD keys: %v", err)
 			}
 
 			// 保存新生成的密钥
 			if err := repo.SaveKeysToDB(tx, escrowKey, bip44Key, solKey, ratingKey); err != nil {
-				return fmt.Errorf("保存密钥失败: %v", err)
+				return fmt.Errorf("failed to save keys: %v", err)
 			}
 
 			dbEscrowKey, dbBip44Key, dbSolKey, dbRatingKey, err = repo.GetKeysFromDB(tx)
 			if err != nil {
-				return fmt.Errorf("获取密钥失败: %v", err)
+				return fmt.Errorf("failed to get keys: %v", err)
 			}
 			return nil
 		})

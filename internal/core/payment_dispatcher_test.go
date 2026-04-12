@@ -37,8 +37,7 @@ var (
 	testBNBNativeCoin   = mustNativeCoin(iwallet.ChainBSC)
 	testMATICNativeCoin = mustNativeCoin(iwallet.ChainPolygon)
 	testBASENativeCoin  = mustNativeCoin(iwallet.ChainBase)
-	testCFXNativeCoin   = mustNativeCoin(iwallet.ChainConflux)
-	testSOLNativeCoin   = mustNativeCoin(iwallet.ChainSolana)
+	testSOLNativeCoin = mustNativeCoin(iwallet.ChainSolana)
 )
 
 func mustNativeCoin(chain iwallet.ChainType) iwallet.CoinType {
@@ -83,8 +82,6 @@ func TestDispatchCancelablePayment_ChainCategorization(t *testing.T) {
 		{"BNB→EVM", testBNBNativeCoin, categoryEVM},
 		{"MATIC→EVM", testMATICNativeCoin, categoryEVM},
 		{"BASE→EVM", testBASENativeCoin, categoryEVM},
-		{"CFX→EVM", testCFXNativeCoin, categoryEVM},
-
 		// Solana
 		{"SOL→Solana", testSOLNativeCoin, categorySolana},
 
@@ -108,7 +105,7 @@ func TestDispatchCancelablePayment_AllSupportedCoins(t *testing.T) {
 	// All supported coins should have a known category
 	supportedCoins := []iwallet.CoinType{
 		testBTCNativeCoin, testBCHNativeCoin, testLTCNativeCoin, testZECNativeCoin,
-		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin, testCFXNativeCoin,
+		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin,
 		testSOLNativeCoin,
 	}
 
@@ -157,7 +154,7 @@ func TestRegistryDispatch_EVMChainsRegistered(t *testing.T) {
 
 	evmCoins := []iwallet.CoinType{
 		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin,
-		testBASENativeCoin, testCFXNativeCoin,
+		testBASENativeCoin,
 	}
 
 	for _, coin := range evmCoins {
@@ -190,9 +187,9 @@ func TestRegistryDispatch_ChainCount(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	chains := n.paymentRegistry.Chains()
-	// Expected: UTXO (4) + EVM (5) + Solana (1) + TRON (1) = 11
-	if len(chains) != 11 {
-		t.Errorf("registry has %d chains, want 11 (4 UTXO + 5 EVM + 1 Solana + 1 TRON)", len(chains))
+	// Expected: UTXO (4) + EVM (4) + Solana (1) + TRON (1) = 10
+	if len(chains) != 10 {
+		t.Errorf("registry has %d chains, want 10 (4 UTXO + 4 EVM + 1 Solana + 1 TRON)", len(chains))
 	}
 }
 
@@ -203,7 +200,7 @@ func TestRegistryDispatch_AllSupportedCoinsInRegistry(t *testing.T) {
 	// Every supported coin should resolve to a registered strategy
 	supportedCoins := []iwallet.CoinType{
 		testBTCNativeCoin, testBCHNativeCoin, testLTCNativeCoin, testZECNativeCoin,
-		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin, testCFXNativeCoin,
+		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin,
 		testSOLNativeCoin,
 	}
 

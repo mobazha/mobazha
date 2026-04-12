@@ -1223,7 +1223,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	chains := n.paymentRegistry.Chains()
 	expectedChains := []iwallet.ChainType{
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash, iwallet.ChainLitecoin, iwallet.ChainZCash,
-		iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon, iwallet.ChainBase, iwallet.ChainConflux,
+		iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon, iwallet.ChainBase,
 		iwallet.ChainSolana, iwallet.ChainMock,
 	}
 	chainSet := make(map[iwallet.ChainType]bool)
@@ -1281,7 +1281,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	// ── Verify EVM chains use PaymentModelClientSigned ──────────
 	testEvmChains := []iwallet.ChainType{
 		iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon,
-		iwallet.ChainBase, iwallet.ChainConflux,
+		iwallet.ChainBase,
 	}
 	for _, chain := range testEvmChains {
 		evmStrategy, err := n.paymentRegistry.ForChain(chain)
@@ -1294,7 +1294,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 				chain, evmStrategy.Model(), payment.PaymentModelClientSigned)
 		}
 	}
-	t.Log("✓ EVM chains (BSC/ETH/MATIC/BASE/CFX) use PaymentModelClientSigned")
+	t.Log("✓ EVM chains (BSC/ETH/MATIC/BASE) use PaymentModelClientSigned")
 
 	// ── Verify Solana uses PaymentModelClientSigned ──────────────
 	solStrategy, err := n.paymentRegistry.ForChain(iwallet.ChainSolana)
@@ -1328,7 +1328,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	// ── Summary: Model semantics table ──────────────────────────
 	t.Log("Model semantics verified:")
 	t.Log("  UTXO (BTC/BCH/LTC/ZEC/Mock): Monitored — backend auto-confirms, instructions=nil")
-	t.Log("  EVM (BSC/ETH/MATIC/BASE/CFX): ClientSigned — frontend signs, instructions!=nil")
+	t.Log("  EVM (BSC/ETH/MATIC/BASE): ClientSigned — frontend signs, instructions!=nil")
 	t.Log("  Solana (SOL): ClientSigned — frontend signs, instructions!=nil")
 }
 
@@ -2026,7 +2026,6 @@ func TestOrderLifecycle_ClientSigned_InstructionMatrix(t *testing.T) {
 		{iwallet.ChainEthereum, payment.PaymentModelClientSigned, true},
 		{iwallet.ChainPolygon, payment.PaymentModelClientSigned, true},
 		{iwallet.ChainBase, payment.PaymentModelClientSigned, true},
-		{iwallet.ChainConflux, payment.PaymentModelClientSigned, true},
 		{iwallet.ChainSolana, payment.PaymentModelClientSigned, true},
 	}
 

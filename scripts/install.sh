@@ -91,9 +91,8 @@ do_install() {
     local url="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}-${platform}"
     local checksum_url="https://github.com/${REPO}/releases/download/${VERSION}/checksums-sha256.txt"
 
-    local tmpdir
     tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' EXIT
+    trap 'rm -rf "${tmpdir:-}"' EXIT
 
     echo "⬇️  Downloading ${BINARY_NAME}-${platform}..."
     curl -fsSL -o "${tmpdir}/${BINARY_NAME}" "$url"

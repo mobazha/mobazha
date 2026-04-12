@@ -91,7 +91,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		}
 		netConfig, err := mcfg.LoadNetConfig(endpoint)
 		if err != nil {
-			log.Infof("Failed to load net config: %s", err)
+			log.Infof("Failed to load net config from %s: %s, using defaults", endpoint, err)
 		}
 
 		if aiJSON := netConfig.GetAIProviders(); aiJSON != "" {

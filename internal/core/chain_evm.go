@@ -10,12 +10,12 @@ import (
 )
 
 // evmChains lists the EVM chains that need shared client injection.
+// CFX (Conflux) is excluded for now — low usage and noisy RPC errors.
 var evmChains = []iwallet.ChainType{
 	iwallet.ChainBSC,
 	iwallet.ChainEthereum,
 	iwallet.ChainPolygon,
 	iwallet.ChainBase,
-	iwallet.ChainConflux,
 }
 
 // extractEVMConfigs converts multiwallet ChainAPIs to evm.EVMClientConfig slice.

@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -14,6 +15,11 @@ type ServerConfig struct {
 	// falling back to the embedded DistFS. This allows operators to
 	// replace the frontend without rebuilding the binary.
 	OverrideDir string
+
+	// SaaSURL is the SaaS platform URL for standalone buyer OAuth.
+	// When set, the handler serves a dynamic /runtime-config.js that
+	// switches the frontend to standalone mode.
+	SaaSURL string
 }
 
 // NewHandler returns an http.Handler that serves the SPA frontend.
@@ -28,15 +34,22 @@ func NewHandler(cfg ServerConfig) http.Handler {
 	return &spaHandler{
 		embedded:    embeddedSub,
 		overrideDir: cfg.OverrideDir,
+		saasURL:     cfg.SaaSURL,
 	}
 }
 
 type spaHandler struct {
 	embedded    fs.FS
 	overrideDir string
+	saasURL     string
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/runtime-config.js" {
+		h.serveRuntimeConfig(w)
+		return
+	}
+
 	urlPath := strings.TrimPrefix(r.URL.Path, "/")
 	if urlPath == "" {
 		urlPath = "index.html"
@@ -111,6 +124,20 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeFileFS(w, r, h.embedded, "index.html")
+}
+
+// serveRuntimeConfig returns a JS snippet that tells the SPA it is
+// running in standalone mode (native binary or Docker without build-time env).
+func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/javascript")
+	w.Header().Set("Cache-Control", "no-cache")
+
+	saasURL := h.saasURL
+	if saasURL == "" {
+		saasURL = "https://app.mobazha.org"
+	}
+
+	fmt.Fprintf(w, `window.__RUNTIME_CONFIG__={saasUrl:"%s",authMode:"standalone"};`, saasURL)
 }
 
 func sniffContentType(name string) string {

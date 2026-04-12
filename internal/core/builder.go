@@ -60,7 +60,7 @@ const (
 	maxRecordAge = time.Hour * 24 * 7
 
 	// netConfigEndpoint is the endpoint to get the node configuration.
-	netConfigEndpoint = "https://mobazha.info/search/v1/config"
+	netConfigEndpoint = "https://app.mobazha.org/search/v1/config"
 )
 
 var (

@@ -38,31 +38,31 @@ var (
 	}
 
 	DefaultMainnetBootstrapAddrs = []string{
-		"/ip4/23.94.43.104/tcp/4001/p2p/12D3KooWD1GpGf11qVtcDhat8q8rB2du9nohFEFu2DgciUYWY2BC",
-		"/ip4/192.227.231.231/tcp/4001/p2p/12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
-		"/ip4/43.157.46.194/tcp/4001/p2p/12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
-		"/ip4/43.153.84.212/tcp/4001/p2p/12D3KooWC37TxYV9UGrcxwi3kmupGaDNC5YTo1BDL7TrWQHPfh5S",
+		// "/ip4/23.94.43.104/tcp/4001/p2p/12D3KooWD1GpGf11qVtcDhat8q8rB2du9nohFEFu2DgciUYWY2BC",
+		// "/ip4/192.227.231.231/tcp/4001/p2p/12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
+		// "/ip4/43.157.46.194/tcp/4001/p2p/12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
+		// "/ip4/43.153.84.212/tcp/4001/p2p/12D3KooWC37TxYV9UGrcxwi3kmupGaDNC5YTo1BDL7TrWQHPfh5S",
 	}
 
 	DefaultTestnetBootstrapAddrs = []string{
-		"/ip4/23.94.43.104/tcp/4011/p2p/12D3KooWGkqSo8BZh9GMWpgBnFayG99KuAP3k8fNSC6Nc7RwX76y",
-		"/ip4/192.227.231.231/tcp/4011/p2p/12D3KooWAJcabjdM2AQBYn6bNpKPHkoRb6DcutS8z59ZmxyAYZtw",
-		"/ip4/43.157.46.194/tcp/4011/p2p/12D3KooWAREpvFoVdj1G97tHp287okV8srZt8Jmokn1gReNg2nEr",
-		"/ip4/43.153.84.212/tcp/4011/p2p/12D3KooWAmT26qKkGRoWQjLHFbgiRC8wpFLhrGYgSK5a3MCh6ah5",
+		// "/ip4/23.94.43.104/tcp/4011/p2p/12D3KooWGkqSo8BZh9GMWpgBnFayG99KuAP3k8fNSC6Nc7RwX76y",
+		// "/ip4/192.227.231.231/tcp/4011/p2p/12D3KooWAJcabjdM2AQBYn6bNpKPHkoRb6DcutS8z59ZmxyAYZtw",
+		// "/ip4/43.157.46.194/tcp/4011/p2p/12D3KooWAREpvFoVdj1G97tHp287okV8srZt8Jmokn1gReNg2nEr",
+		// "/ip4/43.153.84.212/tcp/4011/p2p/12D3KooWAmT26qKkGRoWQjLHFbgiRC8wpFLhrGYgSK5a3MCh6ah5",
 	}
 
 	DefaultMainnetSNFServers = []string{
-		"12D3KooWD1GpGf11qVtcDhat8q8rB2du9nohFEFu2DgciUYWY2BC",
-		"12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
-		"12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
-		"12D3KooWC37TxYV9UGrcxwi3kmupGaDNC5YTo1BDL7TrWQHPfh5S",
+		// "12D3KooWD1GpGf11qVtcDhat8q8rB2du9nohFEFu2DgciUYWY2BC",
+		// "12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
+		// "12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
+		// "12D3KooWC37TxYV9UGrcxwi3kmupGaDNC5YTo1BDL7TrWQHPfh5S",
 	}
 
 	DefaultTestnetSNFServers = []string{
-		"12D3KooWGkqSo8BZh9GMWpgBnFayG99KuAP3k8fNSC6Nc7RwX76y",
-		"12D3KooWAJcabjdM2AQBYn6bNpKPHkoRb6DcutS8z59ZmxyAYZtw",
-		"12D3KooWAREpvFoVdj1G97tHp287okV8srZt8Jmokn1gReNg2nEr",
-		"12D3KooWAmT26qKkGRoWQjLHFbgiRC8wpFLhrGYgSK5a3MCh6ah5",
+		// "12D3KooWGkqSo8BZh9GMWpgBnFayG99KuAP3k8fNSC6Nc7RwX76y",
+		// "12D3KooWAJcabjdM2AQBYn6bNpKPHkoRb6DcutS8z59ZmxyAYZtw",
+		// "12D3KooWAREpvFoVdj1G97tHp287okV8srZt8Jmokn1gReNg2nEr",
+		// "12D3KooWAmT26qKkGRoWQjLHFbgiRC8wpFLhrGYgSK5a3MCh6ah5",
 	}
 )
 

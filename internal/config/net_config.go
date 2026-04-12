@@ -75,7 +75,7 @@ func LoadNetConfig(endpoint string) (*NetConfig, error) {
 // carrying ExchangeRateProviders.
 func (config *NetConfig) GetExchangeRateProviders() []string {
 	if len(config.ExchangeRateProviders) == 0 {
-		return []string{"https://info.mobazha.org/api/ticker"}
+		return []string{"https://app.mobazha.org/api/ticker"}
 	}
 	return config.ExchangeRateProviders
 }
@@ -87,7 +87,7 @@ func (config *NetConfig) GetNetDBEndpoint() string {
 	if len(val) > 0 {
 		return val
 	}
-	return "https://info.mobazha.org/search/v1/netdb"
+	return "https://app.mobazha.org/search/v1/netdb"
 }
 
 // GetAIProviders returns the remote AI provider presets JSON string from
@@ -154,7 +154,7 @@ func (config *NetConfig) GetVerifiedModEndpoint() string {
 	if len(val) > 0 {
 		return val
 	}
-	return "https://info.mobazha.org/search/v1/moderators/verified"
+	return "https://app.mobazha.org/search/v1/moderators/verified"
 }
 
 // GetMaxImportZipSize returns the maximum size for batch import ZIP files in bytes.

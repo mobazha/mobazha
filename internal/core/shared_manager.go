@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/api"
 	mcfg "github.com/mobazha/mobazha3.0/internal/config"
+	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -349,9 +350,13 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 			return nil, fmt.Errorf("initializing standalone auth: %w", err)
 		}
 		if generatedPassword != "" {
-			log.Warningf("══════════════════════════════════════════")
-			log.Warningf("  Admin password (change after login): %s", generatedPassword)
-			log.Warningf("══════════════════════════════════════════")
+			if frontend.HasContent() {
+				log.Infof("Admin credentials generated — set your password in the Web UI setup wizard.")
+			} else {
+				log.Warningf("══════════════════════════════════════════")
+				log.Warningf("  Admin password (change after login): %s", generatedPassword)
+				log.Warningf("══════════════════════════════════════════")
+			}
 		}
 	}
 

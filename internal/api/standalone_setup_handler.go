@@ -186,6 +186,15 @@ func (g *Gateway) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// IsSetupComplete reports whether the setup_complete flag file exists in dataDir.
+func IsSetupComplete(dataDir string) bool {
+	if dataDir == "" {
+		return true
+	}
+	_, err := os.Stat(SetupCompleteFilePath(dataDir))
+	return err == nil
+}
+
 // CheckSetupWarning logs a warning if standalone setup has not been completed.
 // Call this from the startup sequence after a delay.
 func CheckSetupWarning(dataDir string) {
@@ -197,4 +206,3 @@ func CheckSetupWarning(dataDir string) {
 		log.Warning("⚠️  Standalone setup not completed. Visit the admin panel to set your password and configure the store.")
 	}
 }
-

@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/mobazha/mobazha3.0/internal/api"
 	"github.com/mobazha/mobazha3.0/internal/core"
 	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
 	"github.com/mobazha/mobazha3.0/internal/repo"
@@ -141,7 +142,11 @@ func printReadyBanner(cfg *repo.Config) {
 		cyan.Printf("   Web UI:        %s\n", apiURL)
 		cyan.Printf("   API endpoint:  %s/v1/\n", apiURL)
 		fmt.Println()
-		fmt.Println("   Open the Web UI in your browser to manage your store.")
+		if cfg.DataDir != "" && !api.IsSetupComplete(cfg.DataDir) {
+			fmt.Println("   Open the Web UI in your browser to set up your store.")
+		} else {
+			fmt.Println("   Open the Web UI in your browser to manage your store.")
+		}
 	} else {
 		cyan.Printf("   API endpoint:  %s\n", apiURL)
 		fmt.Println()

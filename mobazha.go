@@ -40,6 +40,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	_, err = parser.AddCommand("backup",
+		"back up the Mobazha data directory",
+		"The backup command creates a compressed archive of the data directory for safekeeping.",
+		&cmd.Backup{})
+	if err != nil {
+		log.Fatal(err)
+	}
 	_, err = parser.AddCommand("devnet",
 		"start a local dev net",
 		"The devnet command spins up a local network of three nodes (buyer, vendor, moderator)"+

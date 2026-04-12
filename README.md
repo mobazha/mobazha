@@ -57,14 +57,14 @@ make build
 
 ### 运行
 
-1. 初始化节点：
 ```bash
-./mobazha init
+./mobazha start    # First run auto-initializes; opens Web UI at http://localhost:4002
 ```
 
-2. 启动节点：
+后台运行：
 ```bash
-./mobazha start
+mobazha service install   # Install as system service (systemd/launchd)
+mobazha service status    # Check service status
 ```
 
 ## 开发

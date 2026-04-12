@@ -99,9 +99,22 @@ do_install() {
 
     echo "🔐 Verifying checksum..."
     if curl -fsSL -o "${tmpdir}/checksums-sha256.txt" "$checksum_url" 2>/dev/null; then
-        if ! (cd "$tmpdir" && grep "${BINARY_NAME}-${platform}" checksums-sha256.txt | sed "s/${BINARY_NAME}-${platform}/${BINARY_NAME}/" | sha256sum -c --quiet 2>/dev/null); then
-            echo "❌ Checksum verification failed! Aborting."
-            exit 1
+        local expected actual
+        expected="$(grep "${BINARY_NAME}-${platform}" "${tmpdir}/checksums-sha256.txt" | awk '{print $1}')"
+        if [ -z "$expected" ]; then
+            echo "⚠️  No checksum entry for ${BINARY_NAME}-${platform}, skipping."
+        else
+            if command -v sha256sum &>/dev/null; then
+                actual="$(sha256sum "${tmpdir}/${BINARY_NAME}" | awk '{print $1}')"
+            else
+                actual="$(shasum -a 256 "${tmpdir}/${BINARY_NAME}" | awk '{print $1}')"
+            fi
+            if [ "$expected" != "$actual" ]; then
+                echo "❌ Checksum verification failed! Aborting."
+                echo "   Expected: $expected"
+                echo "   Actual:   $actual"
+                exit 1
+            fi
         fi
     else
         echo "⚠️  Checksum file not available, skipping verification."

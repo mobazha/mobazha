@@ -246,7 +246,26 @@ func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []
 		return nil, err
 	}
 
-	if isNew {
+	needKeys := isNew
+	if !isNew {
+		var identityKey models.Key
+		if dbErr := db.View(func(tx database.Tx) error {
+			return tx.Read().Where("name = ?", "identity").First(&identityKey).Error
+		}); dbErr != nil {
+			needKeys = true
+			keys, err = generateNodeKeys(mnemonicSeed, externalIdentityKey)
+			if err != nil {
+				return nil, err
+			}
+			_, torPriv, genErr := ed25519.GenerateKey(rand.Reader)
+			if genErr != nil {
+				return nil, genErr
+			}
+			torKey = &models.Key{Name: "tor", Value: torPriv.Seed()}
+		}
+	}
+
+	if needKeys {
 		err = db.Update(func(tx database.Tx) error {
 			if err := saveNodeKeys(tx, keys); err != nil {
 				return err

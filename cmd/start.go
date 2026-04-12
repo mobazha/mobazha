@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path"
 	"sort"
 	"strings"
 	"syscall"
@@ -200,16 +201,25 @@ func printSplashScreen() {
 	fmt.Printf("\nmobazha-go v%s\n", version.String())
 }
 
-// autoInit creates the data directory and writes the root-level version file
-// so that NewNode can proceed without the legacy migration prompt.
-// NewNode itself creates the actual repo at dataDir/nodes/default/.
+// autoInit performs a complete first-time repository initialization:
+// creates the root data directory with version file, then initializes
+// the default node repo (keys, DB, preferences) so that NewNode can
+// find a fully-formed repository on startup.
 func autoInit(cfg *repo.Config) error {
 	if err := os.MkdirAll(cfg.DataDir, 0755); err != nil {
 		return err
 	}
+
+	nodeRepoPath := path.Join(cfg.DataDir, "nodes", repo.DefaultNodeID)
+	r, err := repo.NewRepo(repo.DefaultNodeID, nodeRepoPath, cfg.Testnet)
+	if err != nil {
+		return fmt.Errorf("repo init failed: %w", err)
+	}
+	r.Close()
+
 	versionStr := fmt.Sprintf("%d", repo.DefaultRepoVersion)
 	return os.WriteFile(
-		cfg.DataDir+"/version",
+		path.Join(cfg.DataDir, "version"),
 		[]byte(versionStr),
 		0644,
 	)

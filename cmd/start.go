@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"syscall"
 
 	"github.com/fatih/color"
@@ -40,6 +41,7 @@ func (x *Start) Execute(args []string) error {
 	log.Infof("PeerID: %s", n.Identity())
 	n.Start()
 	printSwarmAddrs(n.PeerHost())
+	printReadyBanner(cfg)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -99,6 +101,49 @@ func printSwarmAddrs(h host.Host) {
 	for _, addr := range lisAddrs {
 		log.Infof("Swarm listening on %s\n", addr)
 	}
+}
+
+func printReadyBanner(cfg *repo.Config) {
+	gwAddr := cfg.GatewayAddr
+	if gwAddr == "" {
+		gwAddr = "/ip4/127.0.0.1/tcp/4002"
+	}
+
+	// Parse multiaddr → host:port for display.
+	host, port := "127.0.0.1", "4002"
+	parts := strings.Split(gwAddr, "/")
+	for i, p := range parts {
+		switch p {
+		case "ip4", "ip6":
+			if i+1 < len(parts) {
+				host = parts[i+1]
+			}
+		case "tcp", "udp":
+			if i+1 < len(parts) {
+				port = parts[i+1]
+			}
+		}
+	}
+	if host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+
+	apiURL := fmt.Sprintf("http://%s:%s", host, port)
+
+	green := color.New(color.FgGreen, color.Bold)
+	cyan := color.New(color.FgCyan)
+
+	fmt.Println()
+	green.Println("✅ Mobazha node is ready!")
+	fmt.Println()
+	cyan.Printf("   API endpoint:  %s\n", apiURL)
+	cyan.Printf("   API docs:      %s/v1/listings/index\n", apiURL)
+	fmt.Println()
+	fmt.Println("   This is the API server. To manage your store, connect a")
+	fmt.Println("   frontend client or use the Docker image for the full Web UI.")
+	fmt.Println()
+	fmt.Println("   Press Ctrl+C to stop the node.")
+	fmt.Println()
 }
 
 func printSplashScreen() {

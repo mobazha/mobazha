@@ -18,7 +18,9 @@ SPA_DIST="${1:-$(cd "$REPO_ROOT/../.." && pwd)/dev/openbazaar/mobazha-unified/ap
 
 if [ ! -d "$SPA_DIST" ]; then
     echo "ERROR: SPA dist directory not found: $SPA_DIST"
-    echo "Run 'pnpm --filter @mobazha/web build' first."
+    echo "Run standalone embed build first, e.g.:"
+    echo "  NEXT_PUBLIC_ENV_MODE=standalone NEXT_PUBLIC_SAAS_URL=https://app.mobazha.org pnpm --filter @mobazha/web build"
+    echo "(Do not set NEXT_PUBLIC_AUTH_MODE=basic with standalone — it overrides auth.mode.)"
     exit 1
 fi
 

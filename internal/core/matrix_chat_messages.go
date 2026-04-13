@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -16,7 +17,19 @@ import (
 
 const maxMediaUploadSize = 50 << 20 // 50 MiB
 
-var errMediaTooLarge = errors.New("media exceeds maximum upload size of 50 MiB")
+var (
+	errMediaTooLarge = errors.New("media exceeds maximum upload size of 50 MiB")
+
+	roomKeyRequestTracker     = make(map[string]time.Time)
+	roomKeyRequestTrackerLock sync.Mutex
+	roomKeyRequestCooldown    = 5 * time.Minute
+)
+
+type undecryptableSession struct {
+	senderKey id.SenderKey
+	sender    id.UserID
+	sessionID id.SessionID
+}
 
 // SendMessage sends a text message to a room. Returns the event ID.
 func (s *mautrixChatService) SendMessage(ctx context.Context, roomID, content string) (string, error) {
@@ -132,6 +145,7 @@ func (s *mautrixChatService) GetMessages(ctx context.Context, roomID string, lim
 	}
 
 	messages := make([]contracts.MatrixMessage, 0, len(resp.Chunk))
+	var missingSessions []undecryptableSession
 	log.Infof("GetMessages: room=%s user=%s device=%s events=%d crypto=%v", roomID, s.client.UserID, s.client.DeviceID, len(resp.Chunk), s.client.Crypto != nil)
 	for _, evt := range resp.Chunk {
 		if evt.Type == event.EventEncrypted && s.client.Crypto != nil {
@@ -153,6 +167,11 @@ func (s *mautrixChatService) GetMessages(ctx context.Context, roomID string, lim
 			decrypted, err := s.client.Crypto.Decrypt(ctx, evt)
 			if err != nil {
 				log.Warningf("GetMessages: decrypt event %s failed: %v (sessionID=%s)", evt.ID, err, enc.SessionID)
+				missingSessions = append(missingSessions, undecryptableSession{
+					senderKey: id.SenderKey(enc.SenderKey),
+					sender:    evt.Sender,
+					sessionID: enc.SessionID,
+				})
 				messages = append(messages, contracts.MatrixMessage{
 					EventID:   evt.ID.String(),
 					RoomID:    evt.RoomID.String(),
@@ -174,7 +193,78 @@ func (s *mautrixChatService) GetMessages(ctx context.Context, roomID string, lim
 		messages = append(messages, msg)
 	}
 
+	if len(missingSessions) > 0 && s.cryptoHelper != nil {
+		go s.requestMissingRoomKeys(ctx, id.RoomID(roomID), missingSessions)
+	}
+
 	return messages, resp.End, nil
+}
+
+// requestMissingRoomKeys sends m.room_key_request to-device messages for
+// sessions that could not be decrypted. Requests are deduplicated per
+// (roomID, sessionID) with a cooldown to avoid spamming the sender.
+func (s *mautrixChatService) requestMissingRoomKeys(parentCtx context.Context, roomID id.RoomID, missing []undecryptableSession) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("requestMissingRoomKeys: PANIC recovered: %v", r)
+		}
+	}()
+	log.Infof("requestMissingRoomKeys: goroutine started for room %s with %d sessions", roomID, len(missing))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	mach := s.cryptoHelper.Machine()
+	if mach == nil {
+		log.Errorf("requestMissingRoomKeys: OlmMachine is nil, aborting")
+		return
+	}
+	seen := make(map[id.SessionID]bool)
+
+	for _, m := range missing {
+		if seen[m.sessionID] {
+			continue
+		}
+		seen[m.sessionID] = true
+
+		trackKey := string(roomID) + "/" + string(m.sessionID)
+		roomKeyRequestTrackerLock.Lock()
+		if last, ok := roomKeyRequestTracker[trackKey]; ok && time.Since(last) < roomKeyRequestCooldown {
+			roomKeyRequestTrackerLock.Unlock()
+			continue
+		}
+		roomKeyRequestTracker[trackKey] = time.Now()
+		roomKeyRequestTrackerLock.Unlock()
+
+		devices, err := mach.CryptoStore.GetDevices(ctx, m.sender)
+		if err != nil || len(devices) == 0 {
+			if err != nil {
+				log.Warningf("requestMissingRoomKeys: GetDevices for %s failed: %v", m.sender, err)
+			}
+			_, err = mach.FetchKeys(ctx, []id.UserID{m.sender}, true)
+			if err != nil {
+				log.Warningf("requestMissingRoomKeys: FetchKeys for %s failed: %v", m.sender, err)
+				continue
+			}
+			devices, _ = mach.CryptoStore.GetDevices(ctx, m.sender)
+		}
+
+		targets := map[id.UserID][]id.DeviceID{m.sender: {}}
+		for devID := range devices {
+			targets[m.sender] = append(targets[m.sender], devID)
+		}
+		if len(targets[m.sender]) == 0 {
+			targets[m.sender] = []id.DeviceID{"*"}
+		}
+
+		err = mach.SendRoomKeyRequest(ctx, roomID, m.senderKey, m.sessionID, "", targets)
+		if err != nil {
+			log.Warningf("requestMissingRoomKeys: SendRoomKeyRequest for session %s in room %s failed: %v", m.sessionID, roomID, err)
+		} else {
+			log.Infof("requestMissingRoomKeys: requested key for session %s in room %s from %s (%d devices)",
+				m.sessionID, roomID, m.sender, len(targets[m.sender]))
+		}
+	}
 }
 
 // EditMessage edits a previously sent message.

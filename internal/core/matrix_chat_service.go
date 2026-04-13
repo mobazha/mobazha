@@ -351,12 +351,18 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 
 	mach := s.cryptoHelper.Machine()
 	mach.ShareKeysMinTrust = id.TrustStateCrossSignedTOFU
-	mach.AllowKeyShare = func(_ context.Context, device *id.Device, _ event.RequestedKeyInfo) *mxcrypto.KeyShareRejection {
+	mach.AllowKeyShare = func(ctx context.Context, device *id.Device, info event.RequestedKeyInfo) *mxcrypto.KeyShareRejection {
 		if device.UserID == s.client.UserID {
 			return nil
 		}
 		if device.Trust == id.TrustStateCrossSignedVerified || device.Trust == id.TrustStateCrossSignedTOFU {
 			return nil
+		}
+		if !mach.DisableSharedGroupSessionTracking {
+			shared, err := mach.CryptoStore.IsOutboundGroupSessionShared(ctx, device.UserID, device.IdentityKey, info.SessionID)
+			if err == nil && shared {
+				return nil
+			}
 		}
 		return &mxcrypto.KeyShareRejectNoResponse
 	}

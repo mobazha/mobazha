@@ -3,6 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'cmd/mobazha-tray/assets/**'
+      - '.cursor/**'
   pull_request:
     branches: [main]
 

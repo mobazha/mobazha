@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"syscall"
@@ -28,6 +30,7 @@ var log = logging.MustGetLogger("CMD")
 // command are the same as the Mobazha node config options.
 type Start struct {
 	repo.Config
+	OpenBrowser bool `long:"open" description:"Automatically open the Web UI in the default browser after startup"`
 }
 
 // Execute starts the Mobazha node.
@@ -54,6 +57,10 @@ func (x *Start) Execute(args []string) error {
 	n.Start()
 	printSwarmAddrs(n.PeerHost())
 	printReadyBanner(cfg)
+
+	if x.OpenBrowser && frontend.HasContent() {
+		openBrowser(gatewayURL(cfg))
+	}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -116,30 +123,7 @@ func printSwarmAddrs(h host.Host) {
 }
 
 func printReadyBanner(cfg *repo.Config) {
-	gwAddr := cfg.GatewayAddr
-	if gwAddr == "" {
-		gwAddr = "/ip4/127.0.0.1/tcp/4002"
-	}
-
-	host, port := "127.0.0.1", "4002"
-	parts := strings.Split(gwAddr, "/")
-	for i, p := range parts {
-		switch p {
-		case "ip4", "ip6":
-			if i+1 < len(parts) {
-				host = parts[i+1]
-			}
-		case "tcp", "udp":
-			if i+1 < len(parts) {
-				port = parts[i+1]
-			}
-		}
-	}
-	if host == "0.0.0.0" {
-		host = "127.0.0.1"
-	}
-
-	apiURL := fmt.Sprintf("http://%s:%s", host, port)
+	apiURL := gatewayURL(cfg)
 
 	green := color.New(color.FgGreen, color.Bold)
 	cyan := color.New(color.FgCyan)
@@ -199,6 +183,46 @@ func printSplashScreen() {
 	white.DisableColor()
 	fmt.Println("")
 	fmt.Printf("\nmobazha-go v%s\n", version.String())
+}
+
+func gatewayURL(cfg *repo.Config) string {
+	gwAddr := cfg.GatewayAddr
+	if gwAddr == "" {
+		gwAddr = "/ip4/127.0.0.1/tcp/4002"
+	}
+	host, port := "127.0.0.1", "4002"
+	parts := strings.Split(gwAddr, "/")
+	for i, p := range parts {
+		switch p {
+		case "ip4", "ip6":
+			if i+1 < len(parts) {
+				host = parts[i+1]
+			}
+		case "tcp", "udp":
+			if i+1 < len(parts) {
+				port = parts[i+1]
+			}
+		}
+	}
+	if host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	return fmt.Sprintf("http://%s:%s", host, port)
+}
+
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		log.Warningf("Failed to open browser: %s", err)
+	}
 }
 
 // autoInit performs a complete first-time repository initialization:

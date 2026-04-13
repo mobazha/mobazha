@@ -22,6 +22,7 @@ require (
 	github.com/gcash/bchd v0.19.0
 	github.com/gcash/bchutil v0.0.0-20210113190856-6ea28dff4000
 	github.com/gcash/bchwallet v0.10.0
+	github.com/glebarez/go-sqlite v1.21.2
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-resty/resty/v2 v2.15.3
 	github.com/gogo/protobuf v1.3.2
@@ -82,6 +83,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
+	fyne.io/systray v1.12.0 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/DataDog/zstd v1.5.6-0.20230824185856-869dae002e5e // indirect
 	github.com/Groestlcoin/go-groestl-hash v0.1.0 // indirect
@@ -119,11 +121,11 @@ require (
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/gcash/bchlog v0.0.0-20180913005452-b4f036f92fa6 // indirect
-	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20250607225305-033d6d78b36a // indirect

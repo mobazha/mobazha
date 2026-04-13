@@ -61,13 +61,11 @@ func LoadNetConfig(endpoint string) (*NetConfig, error) {
 	if err != nil {
 		return DefaultNetConfig(), err
 	}
-	config := envelope.Data
+	config := &envelope.Data
 	if config.Data == nil {
 		config.Data = make(map[string]string)
 	}
-	config.dataMutex = sync.RWMutex{}
-	config.platformAddrMutex = sync.RWMutex{}
-	return &config, nil
+	return config, nil
 }
 
 // GetExchangeRateProviders returns the configured exchange rate provider URLs.

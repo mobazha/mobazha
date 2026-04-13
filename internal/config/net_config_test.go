@@ -39,7 +39,7 @@ func TestGenerateJson(t *testing.T) {
 }
 
 func TestLoadNetConfig(t *testing.T) {
-	fixture := NetConfig{
+	fixture := &NetConfig{
 		BootstrapAddrs:         []string{"/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWTestPeerID"},
 		StoreAndForwardServers: []string{"12D3KooWTestPeerID"},
 		PlatformAddrs: map[iwallet.ChainType]string{

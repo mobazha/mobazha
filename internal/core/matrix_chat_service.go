@@ -314,11 +314,15 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	if s.usesSharedCryptoStore() {
 		cryptoStoreArg = s.config.CryptoStore
 	} else {
-		dbDSN := s.config.DBPath
-		if dbDSN == "" {
-			dbDSN = "mautrix_crypto.db"
+		dbPath := s.config.DBPath
+		if dbPath == "" {
+			dbPath = "mautrix_crypto.db"
 		}
-		cryptoStoreArg = dbDSN
+		cryptoDB, dbErr := openMatrixCryptoDB(dbPath)
+		if dbErr != nil {
+			return fmt.Errorf("failed to open matrix crypto DB: %w", dbErr)
+		}
+		cryptoStoreArg = cryptoDB
 	}
 
 	cryptoHelper, err := cryptohelper.NewCryptoHelper(s.client, s.pickleKey, cryptoStoreArg)
@@ -490,23 +494,18 @@ func (s *mautrixChatService) idleStop() {
 // resetCryptoDB backs up then removes the crypto store DB and reinitializes the
 // crypto helper. Backup allows forensic recovery of old E2EE keys if needed.
 func (s *mautrixChatService) resetCryptoDB(ctx context.Context, cryptoStoreArg interface{}) error {
-	switch v := cryptoStoreArg.(type) {
-	case string:
-		return s.resetCryptoDBSQLite(ctx, v)
-	default:
+	if s.usesSharedCryptoStore() {
 		return s.resetCryptoDBSharedPG(ctx, cryptoStoreArg)
 	}
+	return s.resetCryptoDBSQLite(ctx)
 }
 
 // resetCryptoDBSQLite backs up and deletes the local SQLite crypto database,
 // then recreates it fresh. Used in standalone mode.
-func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context, dbDSN string) error {
-	dbPath := dbDSN
-	if strings.HasPrefix(dbPath, "file:") {
-		dbPath = strings.TrimPrefix(dbPath, "file:")
-	}
-	if idx := strings.Index(dbPath, "?"); idx >= 0 {
-		dbPath = dbPath[:idx]
+func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context) error {
+	dbPath := s.config.DBPath
+	if dbPath == "" {
+		dbPath = "mautrix_crypto.db"
 	}
 
 	backupDir := dbPath + ".backup." + time.Now().Format("20060102-150405")
@@ -532,7 +531,12 @@ func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context, dbDSN stri
 	s.client.StateStore = nil
 	s.client.Store = nil
 
-	cryptoHelper, err := cryptohelper.NewCryptoHelper(s.client, s.pickleKey, dbDSN)
+	cryptoDB, dbErr := openMatrixCryptoDB(dbPath)
+	if dbErr != nil {
+		return fmt.Errorf("failed to reopen matrix crypto DB: %w", dbErr)
+	}
+
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(s.client, s.pickleKey, cryptoDB)
 	if err != nil {
 		return fmt.Errorf("failed to recreate crypto helper: %w", err)
 	}

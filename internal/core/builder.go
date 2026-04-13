@@ -669,12 +669,27 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	}
 
+	obNode.applyOptions(nil)
+	obNode.registerHandlers()
+	obNode.listenNetworkEvents()
+
 	// Start heartbeat sender for standalone stores registered with SaaS.
-	if !cfg.SaaSMode && cfg.SaaSAPIURL != "" && cfg.StandaloneAPIKey != "" {
+	// Runs after applyOptions which may auto-register and obtain an API key.
+	hbSaaSURL := cfg.SaaSAPIURL
+	hbAPIKey := cfg.StandaloneAPIKey
+	if sharedManager != nil {
+		if hbSaaSURL == "" {
+			hbSaaSURL = sharedManager.saasAPIURL
+		}
+		if hbAPIKey == "" {
+			hbAPIKey = sharedManager.standaloneAPIKey
+		}
+	}
+	if !cfg.SaaSMode && hbSaaSURL != "" && hbAPIKey != "" {
 		hbCfg := obnet.StoreHeartbeatConfig{
-			SaaSURL: cfg.SaaSAPIURL,
+			SaaSURL: hbSaaSURL,
 			PeerID:  nodeID,
-			APIKey:  cfg.StandaloneAPIKey,
+			APIKey:  hbAPIKey,
 			Version: nodeVersion.String(),
 		}
 		if cfg.StandaloneConnectivity == "public" || cfg.StandaloneConnectivity == "tunnel" {
@@ -686,10 +701,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		heartbeat.Start(ctx)
 		logger.LogInfoWithID(log, nodeID, "Store heartbeat sender started")
 	}
-
-	obNode.applyOptions(nil)
-	obNode.registerHandlers()
-	obNode.listenNetworkEvents()
 
 	return obNode, nil
 }

@@ -6,7 +6,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -141,10 +143,6 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			return addrs
 		}()
 
-		if !cfg.SaaSMode && cfg.SaaSAPIURL != "" {
-			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(cfg.SaaSAPIURL)
-		}
-
 		// Hosting injects Matrix config via repo.Config; override remote NetConfig values.
 		if cfg.MatrixInternalURL != "" {
 			netConfig.MatrixInternalURL = cfg.MatrixInternalURL
@@ -178,6 +176,24 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		}
 		erp := wallet.NewExchangeRateProvider(nil)
 
+		saasURL := cfg.SaaSAPIURL
+		apiKey := cfg.StandaloneAPIKey
+
+		// Standalone nodes default to the public SaaS URL so Matrix
+		// provisioning, heartbeat, and exchange rates work out of the box.
+		if !cfg.SaaSMode && saasURL == "" {
+			saasURL = "https://app.mobazha.org"
+		}
+
+		// Load persisted API key from disk if not provided via CLI.
+		if !cfg.SaaSMode && apiKey == "" && cfg.DataDir != "" {
+			apiKey = loadPersistedAPIKey(cfg.DataDir)
+		}
+
+		if !cfg.SaaSMode && saasURL != "" {
+			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(saasURL)
+		}
+
 		SharedManagerInstance = &SharedManager{
 			ExchangeRateProvider: erp,
 			SNFServers:           snfServers,
@@ -185,8 +201,8 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			clients:              make(map[string]contracts.NodeService),
 			testnet:              cfg.Testnet,
 			saasMode:             cfg.SaaSMode,
-			saasAPIURL:           cfg.SaaSAPIURL,
-			standaloneAPIKey:     cfg.StandaloneAPIKey,
+			saasAPIURL:           saasURL,
+			standaloneAPIKey:     apiKey,
 			ctx:                  ctx,
 		}
 	})
@@ -478,4 +494,25 @@ func (im *SharedManager) Stop() {
 		return
 	}
 	im.httpGateway.Close()
+}
+
+const standaloneAPIKeyFile = "saas_api_key"
+
+// loadPersistedAPIKey reads a previously saved SaaS API key from disk.
+func loadPersistedAPIKey(dataDir string) string {
+	keyPath := filepath.Join(dataDir, standaloneAPIKeyFile)
+	data, err := os.ReadFile(keyPath)
+	if err != nil {
+		return ""
+	}
+	if key := strings.TrimSpace(string(data)); key != "" {
+		log.Infof("Loaded SaaS API key from %s", keyPath)
+		return key
+	}
+	return ""
+}
+
+// PersistAPIKey saves the API key to the data directory for future startups.
+func PersistAPIKey(dataDir, apiKey string) error {
+	return os.WriteFile(filepath.Join(dataDir, standaloneAPIKeyFile), []byte(apiKey), 0600)
 }

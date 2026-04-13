@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/storage"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -298,6 +300,7 @@ func (n *MobazhaNode) initMatrixChatService() {
 
 // tryStandaloneMatrixProvision checks local disk for a previous provision result,
 // or calls the SaaS proxy API to provision a Matrix user for this standalone node.
+// If no API key is available yet, it auto-registers with SaaS first.
 // Returns (homeserverURL, serverName) on success, or ("", "") if not available.
 func (n *MobazhaNode) tryStandaloneMatrixProvision(currentURL, currentName string) (string, string) {
 	if n.repo == nil {
@@ -312,8 +315,28 @@ func (n *MobazhaNode) tryStandaloneMatrixProvision(currentURL, currentName strin
 	}
 
 	sm := n.sharedManager
-	if sm == nil || sm.saasAPIURL == "" || sm.standaloneAPIKey == "" {
+	if sm == nil || sm.saasAPIURL == "" {
 		return currentURL, currentName
+	}
+
+	// Auto-register with SaaS to obtain an API key if we don't have one yet.
+	if sm.standaloneAPIKey == "" {
+		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: auto-registering with SaaS to get API key...")
+		ctx, cancel := context.WithTimeout(n.nodeCtx, 30*time.Second)
+		defer cancel()
+
+		apiKey, regErr := obnet.RegisterWithSaaS(ctx, sm.saasAPIURL, n.peerID.String(), "", "nat")
+		if regErr != nil {
+			logger.LogWarningWithIDf(log, n.nodeID, "SaaS auto-registration failed: %v", regErr)
+			return currentURL, currentName
+		}
+
+		sm.standaloneAPIKey = apiKey
+		if persistErr := PersistAPIKey(dataDir, apiKey); persistErr != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "Failed to persist SaaS API key: %v", persistErr)
+		} else {
+			logger.LogInfoWithIDf(log, n.nodeID, "SaaS API key obtained and persisted")
+		}
 	}
 
 	logger.LogInfoWithID(log, n.nodeID, "Matrix chat: requesting provision from SaaS...")

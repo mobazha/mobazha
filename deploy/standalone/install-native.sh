@@ -114,22 +114,14 @@ prompt_config() {
     read -rp "Domain name (leave empty for IP mode): " STORE_DOMAIN
     STORE_DOMAIN="${STORE_DOMAIN:-}"
 
-    STANDALONE_API_KEY="$(openssl rand -hex 32)"
-    log "Generated API Key: $STANDALONE_API_KEY"
-
     read -rsp "Admin password (leave empty to auto-generate): " ADMIN_PASSWORD
     echo ""
     ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 
-    read -rp "SaaS API URL [https://app.mobazha.org]: " SAAS_API_URL
-    SAAS_API_URL="${SAAS_API_URL:-https://app.mobazha.org}"
-
     cat > "${CONF_DIR}/env" <<EOF
+# Reference configuration — the binary auto-registers with SaaS on first boot.
 STORE_DOMAIN=${STORE_DOMAIN}
-SAAS_API_URL=${SAAS_API_URL}
-STANDALONE_API_KEY=${STANDALONE_API_KEY}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
-CONNECTIVITY=public
 EOF
     chmod 600 "${CONF_DIR}/env"
     log "Configuration written to ${CONF_DIR}/env"
@@ -211,7 +203,6 @@ print_summary() {
     echo -e "  Data dir:    ${BOLD}${INSTALL_DIR}${NC}"
     echo -e "  Config:      ${BOLD}${CONF_DIR}/env${NC}"
     echo -e "  Logs:        journalctl -u mobazha -f"
-    echo -e "  API Key:     ${BOLD}${STANDALONE_API_KEY}${NC}"
     echo ""
     echo -e "  Manage:"
     echo -e "    systemctl status mobazha    # check status"

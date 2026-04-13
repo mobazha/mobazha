@@ -95,3 +95,20 @@ func TestSPAHandler_NoOverride_EmptyDist_Returns404(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
+
+func TestSPAHandler_RuntimeConfig_StandaloneAuthMode(t *testing.T) {
+	h := NewHandler(ServerConfig{SaaSURL: "https://app.mobazha.org"})
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/runtime-config.js")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	js := string(body)
+
+	assert.Equal(t, "application/javascript", resp.Header.Get("Content-Type"))
+	assert.Contains(t, js, `authMode:"standalone"`)
+	assert.Contains(t, js, `saasUrl:"https://app.mobazha.org"`)
+}

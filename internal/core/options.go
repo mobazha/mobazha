@@ -208,6 +208,10 @@ func buildFiatPaymentData(event *contracts.WebhookEvent) (*models.PaymentData, e
 // or lazily on first use (SaaS mode). Matrix config (homeserver URL, server name)
 // is provided via SharedManager in SaaS mode or repo config in standalone mode.
 //
+// For standalone nodes without a registration secret, the function attempts to
+// provision a Matrix user via the SaaS proxy API. If provisioning succeeds (or the
+// node was previously provisioned), the service is created in login-only mode.
+//
 // When matrixCryptoStore is set (SaaS multi-tenant), the mautrixChatService
 // uses a shared PostgreSQL *dbutil.Database instead of per-tenant SQLite.
 // Tenant isolation is via CryptoHelper.DBAccountID = peerID.
@@ -233,14 +237,19 @@ func (n *MobazhaNode) initMatrixChatService() {
 	if registrationSecret == "" {
 		registrationSecret = os.Getenv("MATRIX_REGISTRATION_SECRET")
 	}
-	if registrationSecret == "" {
-		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: skipped (no registration secret — set MATRIX_REGISTRATION_SECRET to enable)")
+
+	if registrationSecret == "" && n.sharedManager != nil && !n.sharedManager.saasMode {
+		homeserverURL, serverName = n.tryStandaloneMatrixProvision(homeserverURL, serverName)
+	}
+
+	if registrationSecret == "" && homeserverURL == "" {
+		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: skipped (no registration secret and not provisioned)")
 		return
 	}
+
 	if matrixSDKLogLevel == "" {
 		matrixSDKLogLevel = "off"
 	}
-
 	if homeserverURL == "" {
 		homeserverURL = "https://matrix.mobazha.org"
 	}
@@ -270,8 +279,12 @@ func (n *MobazhaNode) initMatrixChatService() {
 		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v, sdkLog=%s, cryptoStore=shared-PG)",
 			homeserverURL, serverName, registrationSecret != "", matrixSDKLogLevel)
 	} else {
-		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v, sdkLog=%s, cryptoStore=SQLite)",
-			homeserverURL, serverName, registrationSecret != "", matrixSDKLogLevel)
+		mode := "full"
+		if registrationSecret == "" {
+			mode = "login-only"
+		}
+		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, mode=%s, sdkLog=%s, cryptoStore=SQLite)",
+			homeserverURL, serverName, mode, matrixSDKLogLevel)
 	}
 
 	svc, err := NewMautrixChatService(cfg)
@@ -281,6 +294,48 @@ func (n *MobazhaNode) initMatrixChatService() {
 	}
 	n.matrixChatService = svc
 	logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: service created (userID=%s)", svc.matrixUserID)
+}
+
+// tryStandaloneMatrixProvision checks local disk for a previous provision result,
+// or calls the SaaS proxy API to provision a Matrix user for this standalone node.
+// Returns (homeserverURL, serverName) on success, or ("", "") if not available.
+func (n *MobazhaNode) tryStandaloneMatrixProvision(currentURL, currentName string) (string, string) {
+	if n.repo == nil {
+		return "", ""
+	}
+	dataDir := n.repo.DataDir()
+
+	state, err := loadMatrixProvisionState(dataDir)
+	if err == nil && state.Provisioned && state.HomeserverURL != "" {
+		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: using previously provisioned config")
+		return state.HomeserverURL, state.ServerName
+	}
+
+	sm := n.sharedManager
+	if sm == nil || sm.saasAPIURL == "" || sm.standaloneAPIKey == "" {
+		return currentURL, currentName
+	}
+
+	logger.LogInfoWithID(log, n.nodeID, "Matrix chat: requesting provision from SaaS...")
+
+	result, err := requestMatrixProvision(sm.saasAPIURL, sm.standaloneAPIKey, n.peerID.String(), n.privKey)
+	if err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "Matrix provision failed: %v (chat unavailable until next restart)", err)
+		return "", ""
+	}
+
+	if saveErr := saveMatrixProvisionState(dataDir, &matrixProvisionState{
+		HomeserverURL: result.HomeserverURL,
+		ServerName:    result.ServerName,
+		Provisioned:   true,
+	}); saveErr != nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "Failed to persist Matrix provision state: %v", saveErr)
+	}
+
+	logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: provisioned via SaaS (homeserver=%s, server=%s)",
+		result.HomeserverURL, result.ServerName)
+
+	return result.HomeserverURL, result.ServerName
 }
 
 // initPreferencesService creates the PreferencesAppService.

@@ -28,7 +28,6 @@ _testmain.go
 *.iml
 .gx/
 dist
-!internal/embedded/frontend/dist/.gitkeep
 
 # Compiled binaries
 /mobazha

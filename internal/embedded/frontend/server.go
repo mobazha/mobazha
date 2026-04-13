@@ -72,10 +72,12 @@ func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if f, err := h.embedded.Open(urlPath); err == nil {
-		f.Close()
-		http.ServeFileFS(w, r, h.embedded, urlPath)
-		return
+	if h.embedded != nil {
+		if f, err := h.embedded.Open(urlPath); err == nil {
+			f.Close()
+			http.ServeFileFS(w, r, h.embedded, urlPath)
+			return
+		}
 	}
 
 	h.serveIndex(w, r)
@@ -102,13 +104,15 @@ func (h *spaHandler) tryServeBrotli(w http.ResponseWriter, r *http.Request, urlP
 		}
 	}
 
-	if f, err := h.embedded.Open(brPath); err == nil {
-		f.Close()
-		w.Header().Set("Content-Encoding", "br")
-		w.Header().Set("Content-Type", sniffContentType(urlPath))
-		setCacheHeaders(w, urlPath)
-		http.ServeFileFS(w, r, h.embedded, brPath)
-		return true
+	if h.embedded != nil {
+		if f, err := h.embedded.Open(brPath); err == nil {
+			f.Close()
+			w.Header().Set("Content-Encoding", "br")
+			w.Header().Set("Content-Type", sniffContentType(urlPath))
+			setCacheHeaders(w, urlPath)
+			http.ServeFileFS(w, r, h.embedded, brPath)
+			return true
+		}
 	}
 
 	return false
@@ -123,7 +127,11 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.ServeFileFS(w, r, h.embedded, "index.html")
+	if h.embedded != nil {
+		http.ServeFileFS(w, r, h.embedded, "index.html")
+		return
+	}
+	http.NotFound(w, r)
 }
 
 // serveRuntimeConfig returns a JS snippet that tells the SPA it is

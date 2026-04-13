@@ -43,10 +43,6 @@ jobs:
 
           cd node && go mod edit -replace=github.com/mobazha/mobazha-core=../core
 
-      - name: Ensure embedded frontend stub
-        run: mkdir -p internal/embedded/frontend/dist && touch internal/embedded/frontend/dist/.gitkeep
-        working-directory: node
-
       - name: Vet
         run: go vet -tags goolm ./...
         working-directory: node
@@ -86,10 +82,6 @@ jobs:
           sed -i 's/^          //' go.work
 
           cd node && go mod edit -replace=github.com/mobazha/mobazha-core=../core
-
-      - name: Ensure embedded frontend stub
-        run: mkdir -p internal/embedded/frontend/dist && touch internal/embedded/frontend/dist/.gitkeep
-        working-directory: node
 
       - name: Build
         run: go build -tags goolm -o /dev/null .

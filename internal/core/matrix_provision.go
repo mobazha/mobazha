@@ -34,11 +34,11 @@ func loadMatrixProvisionState(dataDir string) (*matrixProvisionState, error) {
 	if err != nil {
 		return nil, err
 	}
-	var state matrixProvisionState
-	if err := json.Unmarshal(data, &state); err != nil {
+	state := new(matrixProvisionState)
+	if err := json.Unmarshal(data, state); err != nil {
 		return nil, err
 	}
-	return &state, nil
+	return state, nil
 }
 
 func saveMatrixProvisionState(dataDir string, state *matrixProvisionState) error {

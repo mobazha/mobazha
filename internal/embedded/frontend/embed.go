@@ -1,30 +1,13 @@
+//go:build !embed_frontend
+
 package frontend
 
-import (
-	"embed"
-	"io/fs"
-)
+import "embed"
 
-// DistFS holds the Vite SPA build output.
-// In production, run the build script and copy the output to dist/ before compiling:
-//
-//	pnpm --filter @mobazha/web build
-//	cp -r apps/web/dist/* internal/embedded/frontend/dist/
-//
-// When dist/ only contains .gitkeep, the binary serves an empty SPA
-// and the external override directory (if configured) takes precedence.
-//
-//go:embed all:dist
+// DistFS is an empty filesystem when building without the embed_frontend tag.
+// Hosting (SaaS) and standalone Docker use external Next.js; only the native
+// binary optionally embeds the SPA via the embed_frontend build tag.
 var DistFS embed.FS
 
-// HasContent reports whether the embedded dist/ directory contains a
-// real SPA build (i.e. an index.html file), as opposed to just a
-// .gitkeep placeholder.
-func HasContent() bool {
-	sub, err := fs.Sub(DistFS, "dist")
-	if err != nil {
-		return false
-	}
-	_, err = sub.Open("index.html")
-	return err == nil
-}
+// HasContent always returns false in the default (non-embedded) build.
+func HasContent() bool { return false }

@@ -55,13 +55,17 @@ func DefaultNetConfig() *NetConfig {
 
 func LoadNetConfig(endpoint string) (*NetConfig, error) {
 	var envelope struct {
-		Data NetConfig `json:"data"`
+		Data *NetConfig `json:"data"`
 	}
 	_, err := resty.New().R().ForceContentType("application/json").SetResult(&envelope).Get(endpoint)
 	if err != nil {
 		return DefaultNetConfig(), err
 	}
-	config := &envelope.Data
+	if envelope.Data == nil {
+		// API returned null or omitted "data"; behave like an empty unmarshaled object.
+		envelope.Data = &NetConfig{}
+	}
+	config := envelope.Data
 	if config.Data == nil {
 		config.Data = make(map[string]string)
 	}

@@ -54,17 +54,19 @@ func DefaultNetConfig() *NetConfig {
 }
 
 func LoadNetConfig(endpoint string) (*NetConfig, error) {
-	var config NetConfig
-	_, err := resty.New().R().ForceContentType("application/json").SetResult(&config).Get(endpoint)
+	var envelope struct {
+		Data NetConfig `json:"data"`
+	}
+	_, err := resty.New().R().ForceContentType("application/json").SetResult(&envelope).Get(endpoint)
 	if err != nil {
 		return DefaultNetConfig(), err
 	}
+	config := envelope.Data
 	if config.Data == nil {
 		config.Data = make(map[string]string)
 	}
 	config.dataMutex = sync.RWMutex{}
 	config.platformAddrMutex = sync.RWMutex{}
-
 	return &config, nil
 }
 

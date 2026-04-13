@@ -51,7 +51,8 @@ func TestLoadNetConfig(t *testing.T) {
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&fixture)
+		envelope := map[string]interface{}{"data": fixture}
+		json.NewEncoder(w).Encode(envelope)
 	}))
 	defer srv.Close()
 
@@ -60,17 +61,16 @@ func TestLoadNetConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commission := netConfig.GetCommission()
-	if commission != 0.01 {
-		t.Errorf("expected commission 0.01, got %f", commission)
+	if netConfig.GetCommission() != 0.01 {
+		t.Errorf("expected commission 0.01, got %f", netConfig.GetCommission())
 	}
-
-	btcAddr := netConfig.GetPlatformAddr(iwallet.ChainBitcoin)
-	if btcAddr != "bc1qtest" {
+	if btcAddr := netConfig.GetPlatformAddr(iwallet.ChainBitcoin); btcAddr != "bc1qtest" {
 		t.Errorf("expected btcAddr bc1qtest, got %s", btcAddr)
 	}
-
 	if len(netConfig.BootstrapAddrs) != 1 {
 		t.Errorf("expected 1 bootstrap addr, got %d", len(netConfig.BootstrapAddrs))
+	}
+	if len(netConfig.StoreAndForwardServers) != 1 {
+		t.Errorf("expected 1 snf server, got %d", len(netConfig.StoreAndForwardServers))
 	}
 }

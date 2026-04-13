@@ -233,6 +233,10 @@ func (n *MobazhaNode) initMatrixChatService() {
 	if registrationSecret == "" {
 		registrationSecret = os.Getenv("MATRIX_REGISTRATION_SECRET")
 	}
+	if registrationSecret == "" {
+		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: skipped (no registration secret — set MATRIX_REGISTRATION_SECRET to enable)")
+		return
+	}
 	if matrixSDKLogLevel == "" {
 		matrixSDKLogLevel = "off"
 	}

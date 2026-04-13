@@ -26,6 +26,14 @@
 		}
 	}
 
+	# --- Platform API proxy: forward all /platform/* to SaaS ---
+	handle /platform/* {
+		reverse_proxy {$SAAS_API_URL:https://app.mobazha.org} {
+			header_up Host {http.reverse_proxy.upstream.hostport}
+			header_up X-Standalone-Store-Key {$STANDALONE_API_KEY}
+		}
+	}
+
 	# --- Node API: all /v1/* routes to local mobazha-node ---
 	handle /v1/* {
 		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}

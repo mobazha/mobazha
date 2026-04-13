@@ -29,9 +29,9 @@ import (
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -86,20 +86,20 @@ type ListingAppServiceConfig struct {
 
 func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 	return &ListingAppService{
-		db:                   cfg.DB,
-		signer:               cfg.Signer,
-		contentStore:         cfg.ContentStore,
-		netDB:                cfg.NetDB,
-		banManager:           cfg.BanManager,
-		keys:                 cfg.Keys,
-		featureManager:       cfg.FeatureManager,
-		localListingCrypto:   cfg.LocalListingCrypto,
-		nodeID:               cfg.NodeID,
+		db:                 cfg.DB,
+		signer:             cfg.Signer,
+		contentStore:       cfg.ContentStore,
+		netDB:              cfg.NetDB,
+		banManager:         cfg.BanManager,
+		keys:               cfg.Keys,
+		featureManager:     cfg.FeatureManager,
+		localListingCrypto: cfg.LocalListingCrypto,
+		nodeID:             cfg.NodeID,
 		testnet:            cfg.Testnet,
 		publish:            cfg.Publish,
 		coTenantPublicData: cfg.CoTenantPublicData,
 		coTenantAllPeers:   cfg.CoTenantAllPeers,
-		shippingStore:        cfg.ShippingStore,
+		shippingStore:      cfg.ShippingStore,
 	}
 }
 
@@ -158,17 +158,23 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 	// Resolve shipping profile BEFORE the main transaction to avoid deadlock.
 	// GormShippingStore opens its own db.View() internally; calling it inside
 	// s.db.Update() would re-enter the same database.Database and deadlock.
+	isDraft := listing.Status == models.ListingStatusDraft
 	var resolvedProfileID string
 	var resolvedProfileVersion int
 	if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
 		entity, resolveErr := s.resolveShippingProfile(listing)
 		if resolveErr != nil {
-			maybeCloseDone(done)
-			return resolveErr
+			if !isDraft {
+				maybeCloseDone(done)
+				return resolveErr
+			}
+			// Drafts: shipping profile resolution failure is non-fatal;
+			// keep whatever inline profile was submitted (or nil).
+		} else {
+			listing.ShippingProfile = models.ConvertShippingEntityToProto(entity)
+			resolvedProfileID = entity.ID
+			resolvedProfileVersion = entity.Version
 		}
-		listing.ShippingProfile = models.ConvertShippingEntityToProto(entity)
-		resolvedProfileID = entity.ID
-		resolvedProfileVersion = entity.Version
 	}
 
 	err := s.db.Update(func(tx database.Tx) error {
@@ -751,11 +757,17 @@ func (s *ListingAppService) saveListingToDB(dbtx database.Tx, listing *pb.Listin
 		return cid.Cid{}, err
 	}
 
-	if err := s.ValidateListing(sl); err != nil {
-		if errors.Is(err, coreiface.ErrInternalServer) {
-			return cid.Cid{}, err
+	if listing.Status == models.ListingStatusDraft {
+		if err := s.validateListingDraft(sl); err != nil {
+			return cid.Cid{}, fmt.Errorf("%w: %s", coreiface.ErrBadRequest, err)
 		}
-		return cid.Cid{}, fmt.Errorf("%w: %s", coreiface.ErrBadRequest, err)
+	} else {
+		if err := s.ValidateListing(sl); err != nil {
+			if errors.Is(err, coreiface.ErrInternalServer) {
+				return cid.Cid{}, err
+			}
+			return cid.Cid{}, fmt.Errorf("%w: %s", coreiface.ErrBadRequest, err)
+		}
 	}
 
 	m := protojson.MarshalOptions{
@@ -1212,6 +1224,37 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 	return nil
 }
 
+// validateListingDraft applies minimal validation for draft listings:
+// structural checks only (slug, title, metadata existence), skipping
+// business-required fields like images, price, and shipping profile.
+func (s *ListingAppService) validateListingDraft(sl *pb.SignedListing) error {
+	if sl.Listing.Slug == "" {
+		return coreiface.ErrMissingField("slug")
+	}
+	if len(sl.Listing.Slug) > SentenceMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"slug", strconv.Itoa(SentenceMaxCharacters)}
+	}
+	if strings.Contains(sl.Listing.Slug, " ") {
+		return errors.New("slugs cannot contain spaces")
+	}
+	if strings.Contains(sl.Listing.Slug, "/") {
+		return errors.New("slugs cannot contain file separators")
+	}
+	if sl.Listing.Item == nil {
+		return coreiface.ErrMissingField("item")
+	}
+	if sl.Listing.Item.Title == "" {
+		return coreiface.ErrMissingField("item.title")
+	}
+	if sl.Listing.Metadata == nil {
+		return coreiface.ErrMissingField("metadata")
+	}
+	if sl.Listing.VendorID == nil {
+		return coreiface.ErrMissingField("vendorID")
+	}
+	return nil
+}
+
 func (s *ListingAppService) deserializeAndValidateListing(listingBytes []byte, c cid.Cid) (*pb.SignedListing, error) {
 	signedListing := new(pb.SignedListing)
 	if err := (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(listingBytes, signedListing); err != nil {
@@ -1311,5 +1354,3 @@ func validateShippingZone(zone *pb.ShippingZone) error {
 	}
 	return nil
 }
-
-

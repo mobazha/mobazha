@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -134,6 +136,23 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	topMux.Handle("/ws", r)
 
 	topMux.HandleFunc("/healthz", g.handleHealthz)
+
+	// Standalone mode: reverse-proxy /platform/* to the SaaS backend so
+	// that frontend calls to HOSTING_API (store-links, bots, domains, etc.)
+	// reach the platform instead of falling through to the SPA catch-all.
+	if config.SaaSAPIURL != "" {
+		if saasTarget, err := url.Parse(config.SaaSAPIURL); err == nil {
+			proxy := httputil.NewSingleHostReverseProxy(saasTarget)
+			topMux.Handle("/platform/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				r.Host = saasTarget.Host
+				if config.StandaloneAPIKey != "" {
+					r.Header.Set("X-Standalone-Store-Key", config.StandaloneAPIKey)
+				}
+				proxy.ServeHTTP(w, r)
+			}))
+			log.Infof("Platform API proxy enabled: /platform/* → %s", config.SaaSAPIURL)
+		}
+	}
 
 	// SSR: register meta injection + embed routes for standalone mode.
 	// Activated when SPA directory exists (container deployment).

@@ -10,12 +10,21 @@ import (
 var Version = "dev"
 
 type healthResponse struct {
-	Status string `json:"status"`
+	Status               string `json:"status"`
+	UnreadNotifications  int    `json:"unreadNotifications"`
 }
 
 func (g *Gateway) handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	resp := healthResponse{Status: "ok"}
+
+	if defaultNode := g.nodeManager.GetDefaultNode(); defaultNode != nil {
+		if unread, err := defaultNode.Notification().GetNotificationsUnreadCount(); err == nil {
+			resp.UnreadNotifications = unread
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(healthResponse{Status: "ok"})
+	json.NewEncoder(w).Encode(resp)
 }
 
 type versionResponse struct {

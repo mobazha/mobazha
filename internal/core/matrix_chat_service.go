@@ -335,11 +335,13 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	s.cryptoHelper = cryptoHelper
 
 	if err := s.cryptoHelper.Init(ctx); err != nil {
-		if strings.Contains(err.Error(), "mismatching device ID") {
-			log.Warningf("Crypto store device ID mismatch (device=%s, account=%s), resetting crypto state: %v",
+		resettable := strings.Contains(err.Error(), "mismatching device ID") ||
+			strings.Contains(err.Error(), "not marked as shared")
+		if resettable {
+			log.Warningf("Crypto store state mismatch (device=%s, account=%s), resetting crypto state: %v",
 				stableDeviceID, s.config.CryptoDBAccountID, err)
 			if resetErr := s.resetCryptoDB(ctx, cryptoStoreArg); resetErr != nil {
-				return fmt.Errorf("failed to reset crypto DB after device mismatch: %w (original: %v)", resetErr, err)
+				return fmt.Errorf("failed to reset crypto DB after state mismatch: %w (original: %v)", resetErr, err)
 			}
 		} else {
 			return fmt.Errorf("failed to init crypto helper: %w", err)
@@ -574,6 +576,25 @@ func (s *mautrixChatService) resetCryptoDBSharedPG(ctx context.Context, cryptoSt
 		log.Warningf("Cannot clear shared PG crypto state: unexpected store type %T, will attempt clean reinit", cryptoStoreArg)
 	}
 
+	if s.client.DeviceID != "" {
+		s.deleteDeviceViaAdmin(ctx, s.client.DeviceID)
+	}
+
+	stableDeviceID := id.DeviceID("MBZ_" + s.config.PeerID.String())
+	_, err := s.client.Login(ctx, &mautrix.ReqLogin{
+		Type: mautrix.AuthTypePassword,
+		Identifier: mautrix.UserIdentifier{
+			Type: mautrix.IdentifierTypeUser,
+			User: s.matrixUserID.String(),
+		},
+		Password:         s.password,
+		DeviceID:         stableDeviceID,
+		StoreCredentials: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to re-login after device deletion: %w", err)
+	}
+
 	s.client.StateStore = nil
 	s.client.Store = nil
 
@@ -591,6 +612,49 @@ func (s *mautrixChatService) resetCryptoDBSharedPG(ctx context.Context, cryptoSt
 	s.client.Crypto = s.cryptoHelper
 	log.Infof("Crypto DB reset successful (shared PG, account=%s), new device keys established", s.config.CryptoDBAccountID)
 	return nil
+}
+
+// deleteDeviceViaAdmin removes a device from the Matrix server using the
+// Synapse Admin API, bypassing the interactive user-authentication flow
+// required by the standard client-server DELETE endpoint.
+func (s *mautrixChatService) deleteDeviceViaAdmin(ctx context.Context, deviceID id.DeviceID) {
+	homeserverURL := s.config.HomeserverURL
+	secret := s.config.RegistrationSecret
+	if homeserverURL == "" || secret == "" {
+		log.Warningf("Cannot delete device %s via admin: missing homeserver URL or registration secret", deviceID)
+		return
+	}
+
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	adminToken, err := s.obtainAdminToken(ctx, httpClient, homeserverURL, secret)
+	if err != nil {
+		log.Warningf("Cannot delete device %s via admin: %v", deviceID, err)
+		return
+	}
+
+	escapedUserID := url.PathEscape(s.matrixUserID.String())
+	delURL := homeserverURL + "/_synapse/admin/v2/users/" + escapedUserID + "/devices/" + url.PathEscape(string(deviceID))
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", delURL, nil)
+	if err != nil {
+		log.Warningf("Cannot build admin delete-device request: %v", err)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		log.Warningf("Admin delete-device HTTP error for %s: %v", deviceID, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+		log.Infof("Deleted device %s from Matrix server via admin API", deviceID)
+	} else {
+		body, _ := io.ReadAll(resp.Body)
+		log.Warningf("Admin delete-device returned HTTP %d for %s: %s", resp.StatusCode, deviceID, string(body))
+	}
 }
 
 func copyFile(src, dst string) error {

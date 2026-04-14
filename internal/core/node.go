@@ -193,6 +193,7 @@ type appServices struct {
 	shippingService            *ShippingAppService
 	analyticsService           *AnalyticsAppService
 	paymentVerificationService *PaymentVerificationService
+	netDBSyncService           *NetDBSyncService
 }
 
 // IsDefaultNode returns whether this node is the default node.
@@ -308,6 +309,11 @@ func (n *MobazhaNode) Start() {
 				}
 			}
 		}
+
+		if n.netDBSyncService != nil {
+			n.netDBSyncService.Start()
+			go n.netDBSyncService.Reconcile()
+		}
 	}
 
 	// Add log to verify connection reuse
@@ -392,6 +398,9 @@ func (n *MobazhaNode) Stop(force bool) error {
 		if err := n.matrixChatService.Stop(); err != nil {
 			log.Errorf("Matrix chat service stop error: %v", err)
 		}
+	}
+	if n.netDBSyncService != nil {
+		n.netDBSyncService.Stop()
 	}
 
 	if n.repo != nil {
@@ -633,12 +642,8 @@ func (n *MobazhaNode) SaveStoreConfig(cfg json.RawMessage) error {
 	if err := n.saveSetting(models.SettingsKeyStoreConfig, string(cfg)); err != nil {
 		return err
 	}
-	if n.netDB != nil {
-		go func() {
-			if err := n.netDB.SetOwnStoreMetadata("storefront", cfg); err != nil {
-				log.Debugf("pushStorefrontToNetDB: %v", err)
-			}
-		}()
+	if n.eventBus != nil {
+		n.eventBus.Emit(&events.StorefrontChanged{Config: cfg})
 	}
 	return nil
 }

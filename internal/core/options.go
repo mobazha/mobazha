@@ -110,6 +110,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initFollowService()
 	n.initPostsService()
 	n.initAnalyticsService()
+	n.initNetDBSyncService()
 }
 
 // initPaymentVerificationService creates the PaymentVerificationService.
@@ -399,6 +400,7 @@ func (n *MobazhaNode) initMediaService() {
 		NodeID:       n.nodeID,
 		Publish:      n.Publish,
 		PublishFile:  n.PublishFile,
+		EventBus:     n.eventBus,
 	})
 }
 
@@ -605,6 +607,7 @@ func (n *MobazhaNode) initProfileService() {
 	n.profileService = NewProfileAppService(ProfileAppServiceConfig{
 		DB:                     n.db,
 		Publish:                n.Publish,
+		EventBus:               n.eventBus,
 		NetDB:                  n.netDB,
 		NodeID:                 n.nodeID,
 		PeerID:                 n.peerID,
@@ -683,6 +686,7 @@ func (n *MobazhaNode) initListingService() {
 		Signer:             n.signer,
 		ContentStore:       n.contentStore,
 		NetDB:              n.netDB,
+		EventBus:           n.eventBus,
 		BanManager:         n.banManager,
 		Keys:               n.keyProvider,
 		FeatureManager:     n.featureManager,
@@ -718,5 +722,21 @@ func (n *MobazhaNode) initAnalyticsService() {
 		DB:       n.db,
 		NodeID:   n.nodeID,
 		Shutdown: n.shutdown,
+	})
+}
+
+func (n *MobazhaNode) initNetDBSyncService() {
+	if n.netDB == nil || n.eventBus == nil {
+		return
+	}
+	n.netDBSyncService = NewNetDBSyncService(NetDBSyncServiceConfig{
+		NetDB:             n.netDB,
+		DB:                n.db,
+		EventBus:          n.eventBus,
+		NodeID:            n.nodeID,
+		ListingService:    n.listingService,
+		RatingsService:    n.ratingsService,
+		CollectionService: n.collectionService,
+		DiscountService:   n.discountService,
 	})
 }

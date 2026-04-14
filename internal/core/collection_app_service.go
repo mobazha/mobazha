@@ -2,14 +2,11 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -24,15 +21,13 @@ const (
 type CollectionAppService struct {
 	store    contracts.CollectionStore
 	bus      events.Bus
-	netDB    *netdb.NetDB
 	tenantID string
 }
 
-func NewCollectionAppService(store contracts.CollectionStore, bus events.Bus, ndb *netdb.NetDB, tenantID string) *CollectionAppService {
+func NewCollectionAppService(store contracts.CollectionStore, bus events.Bus, tenantID string) *CollectionAppService {
 	return &CollectionAppService{
 		store:    store,
 		bus:      bus,
-		netDB:    ndb,
 		tenantID: tenantID,
 	}
 }
@@ -212,25 +207,8 @@ func normalizePageParams(page, pageSize int) (int, int) {
 	return page, pageSize
 }
 
-// pushCollectionsToNetDB asynchronously pushes the full collections snapshot
-// to the search service for offline fallback (cross-store routing).
 func (s *CollectionAppService) pushCollectionsToNetDB() {
-	if s.netDB == nil {
-		return
+	if s.bus != nil {
+		s.bus.Emit(&events.CollectionsChanged{})
 	}
-	go func() {
-		collections, _, err := s.store.ListCollections(context.Background(), 1, maxCollectionsPerTenant, false)
-		if err != nil {
-			logger.LogDebugWithIDf(log, s.tenantID, "pushCollectionsToNetDB: list failed: %v", err)
-			return
-		}
-		data, err := json.Marshal(collections)
-		if err != nil {
-			logger.LogDebugWithIDf(log, s.tenantID, "pushCollectionsToNetDB: marshal failed: %v", err)
-			return
-		}
-		if err := s.netDB.SetOwnStoreMetadata("collections", data); err != nil {
-			logger.LogDebugWithIDf(log, s.tenantID, "pushCollectionsToNetDB: push failed: %v", err)
-		}
-	}()
 }

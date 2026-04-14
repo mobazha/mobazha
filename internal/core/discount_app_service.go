@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -13,9 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
@@ -29,20 +27,17 @@ const (
 type DiscountAppService struct {
 	store           contracts.DiscountStore
 	collectionStore contracts.CollectionStore
+	eventBus        events.Bus
 	tenantID        string
-	netDB           *netdb.NetDB
 }
 
-func NewDiscountAppService(store contracts.DiscountStore, collectionStore contracts.CollectionStore, tenantID string) *DiscountAppService {
+func NewDiscountAppService(store contracts.DiscountStore, collectionStore contracts.CollectionStore, bus events.Bus, tenantID string) *DiscountAppService {
 	return &DiscountAppService{
 		store:           store,
 		collectionStore: collectionStore,
+		eventBus:        bus,
 		tenantID:        tenantID,
 	}
-}
-
-func (s *DiscountAppService) SetNetDB(n *netdb.NetDB) {
-	s.netDB = n
 }
 
 // Store returns the underlying DiscountStore for engine wiring (e.g., hosting
@@ -367,29 +362,7 @@ func randomAlphanumeric(n int) string {
 }
 
 func (s *DiscountAppService) pushDiscountsToNetDB() {
-	if s.netDB == nil {
-		return
+	if s.eventBus != nil {
+		s.eventBus.Emit(&events.DiscountsChanged{})
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		activeStatus := models.DiscountStatusActive
-		discounts, _, err := s.store.ListDiscounts(ctx, contracts.DiscountFilter{
-			Page:     1,
-			PageSize: maxDiscountsPerTenant,
-			Status:   &activeStatus,
-		})
-		if err != nil {
-			logger.LogDebugWithIDf(log, s.tenantID, "pushDiscountsToNetDB: list failed: %v", err)
-			return
-		}
-		data, err := json.Marshal(discounts)
-		if err != nil {
-			logger.LogDebugWithIDf(log, s.tenantID, "pushDiscountsToNetDB: marshal failed: %v", err)
-			return
-		}
-		if err := s.netDB.SetOwnStoreMetadata("discounts", data); err != nil {
-			log.Warningf("[%s] pushDiscountsToNetDB: push failed: %v", s.tenantID, err)
-		}
-	}()
 }

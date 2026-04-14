@@ -658,7 +658,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		if len(trustedPeers) > 0 {
 			localAddr := cfg.HTTPProxyLocalAddr
 			if localAddr == "" {
-				localAddr = "http://127.0.0.1:5102"
+				localAddr = gatewayLocalAddr(cfg)
 			}
 			proxyProto := protocol.ID(obnet.ProtocolHTTPProxyMainnet)
 			if cfg.Testnet {
@@ -1308,7 +1308,7 @@ func initCollectionSubsystem(obNode *MobazhaNode) {
 		return
 	}
 	store := database.NewGormCollectionStore(obNode.db)
-	obNode.collectionService = NewCollectionAppService(store, obNode.eventBus, obNode.netDB, obNode.nodeID)
+	obNode.collectionService = NewCollectionAppService(store, obNode.eventBus, obNode.nodeID)
 
 	if obNode.discountService != nil {
 		obNode.discountService.collectionStore = store
@@ -1348,10 +1348,7 @@ func initDiscountSubsystem(obNode *MobazhaNode) {
 		return
 	}
 	store := database.NewGormDiscountStore(obNode.db)
-	obNode.discountService = NewDiscountAppService(store, nil, obNode.nodeID)
-	if obNode.netDB != nil {
-		obNode.discountService.SetNetDB(obNode.netDB)
-	}
+	obNode.discountService = NewDiscountAppService(store, nil, obNode.eventBus, obNode.nodeID)
 	logger.LogInfoWithID(log, obNode.nodeID, "Discount subsystem initialized")
 }
 
@@ -1434,4 +1431,31 @@ func initPlatformAIConfig(obNode *MobazhaNode, cfg *repo.Config) {
 		obNode.platformAIConfig = pCfg
 		logger.LogInfoWithIDf(log, obNode.nodeID, "Platform AI configured (provider=%s, limit=%d/day)", pCfg.Provider, pCfg.DailyLimit)
 	}
+}
+
+// gatewayLocalAddr derives the local HTTP API address from cfg.GatewayAddr.
+// Used by the LibP2P HTTP proxy to forward incoming streams to the local API.
+func gatewayLocalAddr(cfg *repo.Config) string {
+	gwAddr := cfg.GatewayAddr
+	if gwAddr == "" {
+		gwAddr = "/ip4/127.0.0.1/tcp/4002"
+	}
+	host, port := "127.0.0.1", "4002"
+	parts := strings.Split(gwAddr, "/")
+	for i, p := range parts {
+		switch p {
+		case "ip4", "ip6":
+			if i+1 < len(parts) {
+				host = parts[i+1]
+			}
+		case "tcp":
+			if i+1 < len(parts) {
+				port = parts[i+1]
+			}
+		}
+	}
+	if host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }

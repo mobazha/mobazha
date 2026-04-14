@@ -86,6 +86,18 @@ func init() {
 		// ── Internal domain events (non-persistent, no WebSocket push) ──
 		{Category: "internal", Name: "internal.order_auto_confirm", Sample: new(OrderAutoConfirmRequest)},
 		{Category: "internal", Name: "internal.utxo_payment_detected", Sample: new(UTXOPaymentDetected)},
+
+		// ── NetDB sync events (internal, drive centralized search-service push) ──
+		{Category: "netdb", Name: "netdb.profile_changed", Sample: new(ProfileChanged)},
+		{Category: "netdb", Name: "netdb.listing_changed", Sample: new(ListingChanged)},
+		{Category: "netdb", Name: "netdb.listing_deleted", Sample: new(ListingDeleted)},
+		{Category: "netdb", Name: "netdb.listings_reindexed", Sample: new(ListingsReindexed)},
+		{Category: "netdb", Name: "netdb.following_changed", Sample: new(FollowingChanged)},
+		{Category: "netdb", Name: "netdb.followers_changed", Sample: new(FollowersChanged)},
+		{Category: "netdb", Name: "netdb.collections_changed", Sample: new(CollectionsChanged)},
+		{Category: "netdb", Name: "netdb.discounts_changed", Sample: new(DiscountsChanged)},
+		{Category: "netdb", Name: "netdb.storefront_changed", Sample: new(StorefrontChanged)},
+		{Category: "netdb", Name: "netdb.ratings_changed", Sample: new(RatingsChanged)},
 	}
 
 	typeIndex = make(map[reflect.Type]*EventMeta, len(registry)*2)

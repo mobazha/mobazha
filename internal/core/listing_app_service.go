@@ -25,12 +25,12 @@ import (
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha-core/identity"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/logger"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
@@ -48,6 +48,7 @@ type ListingAppService struct {
 	signer             corecontracts.Signer
 	contentStore       contracts.ContentStore
 	netDB              *netdb.NetDB
+	eventBus           events.Bus
 	banManager         *mbznet.BanManager
 	keys               contracts.KeyProvider
 	featureManager     *pkgconfig.FeatureManager
@@ -69,6 +70,7 @@ type ListingAppServiceConfig struct {
 	Signer             corecontracts.Signer
 	ContentStore       contracts.ContentStore
 	NetDB              *netdb.NetDB
+	EventBus           events.Bus
 	BanManager         *mbznet.BanManager
 	Keys               contracts.KeyProvider
 	FeatureManager     *pkgconfig.FeatureManager
@@ -90,6 +92,7 @@ func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 		signer:             cfg.Signer,
 		contentStore:       cfg.ContentStore,
 		netDB:              cfg.NetDB,
+		eventBus:           cfg.EventBus,
 		banManager:         cfg.BanManager,
 		keys:               cfg.Keys,
 		featureManager:     cfg.FeatureManager,
@@ -242,21 +245,9 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 		return nil
 	}
 
-	go func() {
-		if s.netDB != nil {
-			if sl, err := s.GetMyListingBySlug(listing.Slug); err == nil {
-				if err := s.netDB.SetOwnListing(sl); err != nil {
-					logger.LogDebugWithIDf(log, s.nodeID.String(), "SetOwnListing, error: %s", err)
-				}
-			}
-
-			if listingIndex, err := s.GetMyListings(); err == nil {
-				if err = s.netDB.SetOwnListingIndex(listingIndex); err != nil {
-					logger.LogDebugWithIDf(log, s.nodeID.String(), "SetOwnListingIndex, error: %s", err)
-				}
-			}
-		}
-	}()
+	if s.eventBus != nil {
+		s.eventBus.Emit(&events.ListingChanged{Slug: listing.Slug})
+	}
 
 	s.publish(done)
 	return nil
@@ -294,23 +285,9 @@ func (s *ListingAppService) UpdateAllListings(updateFunc func(l *pb.Listing) (bo
 		return nil
 	}
 
-	go func() {
-		if s.netDB != nil {
-			if listingIndex, err := s.GetMyListings(); err == nil {
-				s.netDB.SetOwnListingIndex(listingIndex)
-
-				for _, lmd := range listingIndex {
-					if sl, err := s.GetMyListingBySlug(lmd.Slug); err == nil {
-						s.netDB.SetOwnListing(sl)
-					}
-				}
-			}
-
-			if profile, err := getProfileWithStats(s.db); err == nil {
-				s.netDB.SetOwnProfile(profile)
-			}
-		}
-	}()
+	if s.eventBus != nil {
+		s.eventBus.Emit(&events.ListingsReindexed{})
+	}
 
 	s.publish(done)
 	return nil
@@ -351,11 +328,9 @@ func (s *ListingAppService) DeleteListing(slugStr string, done chan<- struct{}) 
 		s.onDeleteCleanup(slugStr)
 	}
 
-	go func() {
-		if listing != nil && s.netDB != nil {
-			s.netDB.DeleteOwnListing(listing.Cid)
-		}
-	}()
+	if listing != nil && s.eventBus != nil {
+		s.eventBus.Emit(&events.ListingDeleted{Cid: listing.Cid})
+	}
 
 	s.publish(done)
 	return nil

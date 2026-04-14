@@ -191,6 +191,19 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(cfg.SaaSAPIURL)
 		}
 
+		// Auto-configure HTTP proxy trusted peers from NetConfig so that
+		// native binary nodes accept LibP2P API proxy requests from SaaS
+		// without requiring a manual --httpproxytrustedpeer CLI flag.
+		if !cfg.SaaSMode && len(cfg.HTTPProxyTrustedPeers) == 0 {
+			if pid, ok := netConfig.GetConfig("saasDefaultPeerID"); ok && pid != "" {
+				cfg.HTTPProxyTrustedPeers = []string{pid}
+				log.Infof("Auto-configured HTTP proxy trusted peer from NetConfig: %s", pid)
+			} else if len(netConfig.StoreAndForwardServers) > 0 {
+				cfg.HTTPProxyTrustedPeers = netConfig.StoreAndForwardServers
+				log.Infof("Auto-configured HTTP proxy trusted peers from SNF servers: %v", netConfig.StoreAndForwardServers)
+			}
+		}
+
 		SharedManagerInstance = &SharedManager{
 			ExchangeRateProvider: erp,
 			SNFServers:           snfServers,

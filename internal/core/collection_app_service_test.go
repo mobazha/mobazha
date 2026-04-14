@@ -183,7 +183,7 @@ func (b *mockEventBus) Emit(evt interface{}) { b.emitted = append(b.emitted, evt
 func TestCollectionAppService_Create_Valid(t *testing.T) {
 	store := newMockCollectionStore()
 	bus := &mockEventBus{}
-	svc := NewCollectionAppService(store, bus, nil, "tenant1")
+	svc := NewCollectionAppService(store, bus, "tenant1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "Summer Sale"}
@@ -193,12 +193,12 @@ func TestCollectionAppService_Create_Valid(t *testing.T) {
 	assert.Equal(t, "tenant1", c.TenantID)
 	assert.Equal(t, models.CollectionTypeManual, c.Type)
 	assert.Equal(t, models.CollectionSortManual, c.SortOrder)
-	assert.Len(t, bus.emitted, 1)
+	assert.Len(t, bus.emitted, 2) // CollectionCreated + CollectionsChanged
 }
 
 func TestCollectionAppService_Create_TitleRequired(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 
 	err := svc.CreateCollection(context.Background(), &models.Collection{})
 	assert.ErrorIs(t, err, database.ErrCollectionTitleRequired)
@@ -206,7 +206,7 @@ func TestCollectionAppService_Create_TitleRequired(t *testing.T) {
 
 func TestCollectionAppService_Create_PreservesExplicitType(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "Auto", Type: models.CollectionTypeAuto, SortOrder: models.CollectionSortCreatedDesc}
@@ -218,7 +218,7 @@ func TestCollectionAppService_Create_PreservesExplicitType(t *testing.T) {
 
 func TestCollectionAppService_Create_TenantQuota(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	for i := 0; i < maxCollectionsPerTenant; i++ {
@@ -233,7 +233,7 @@ func TestCollectionAppService_Create_TenantQuota(t *testing.T) {
 func TestCollectionAppService_Update_Valid(t *testing.T) {
 	store := newMockCollectionStore()
 	bus := &mockEventBus{}
-	svc := NewCollectionAppService(store, bus, nil, "t1")
+	svc := NewCollectionAppService(store, bus, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "Original"}
@@ -241,12 +241,12 @@ func TestCollectionAppService_Update_Valid(t *testing.T) {
 
 	c.Title = "Updated"
 	require.NoError(t, svc.UpdateCollection(ctx, c))
-	assert.Len(t, bus.emitted, 2) // create + update
+	assert.Len(t, bus.emitted, 4) // (CollectionCreated + CollectionsChanged) + (CollectionUpdated + CollectionsChanged)
 }
 
 func TestCollectionAppService_Update_TitleRequired(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "X"}
@@ -260,20 +260,20 @@ func TestCollectionAppService_Update_TitleRequired(t *testing.T) {
 func TestCollectionAppService_Delete(t *testing.T) {
 	store := newMockCollectionStore()
 	bus := &mockEventBus{}
-	svc := NewCollectionAppService(store, bus, nil, "t1")
+	svc := NewCollectionAppService(store, bus, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "To Delete"}
 	require.NoError(t, svc.CreateCollection(ctx, c))
 
 	require.NoError(t, svc.DeleteCollection(ctx, c.ID))
-	assert.Len(t, bus.emitted, 2) // create + delete
+	assert.Len(t, bus.emitted, 4) // (CollectionCreated + CollectionsChanged) + (CollectionDeleted + CollectionsChanged)
 }
 
 func TestCollectionAppService_AddProducts_Valid(t *testing.T) {
 	store := newMockCollectionStore()
 	bus := &mockEventBus{}
-	svc := NewCollectionAppService(store, bus, nil, "t1")
+	svc := NewCollectionAppService(store, bus, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "C1"}
@@ -281,12 +281,12 @@ func TestCollectionAppService_AddProducts_Valid(t *testing.T) {
 
 	require.NoError(t, svc.AddProducts(ctx, c.ID, []string{"slug-a", "slug-b"}))
 	assert.Len(t, store.products[c.ID], 2)
-	assert.Len(t, bus.emitted, 2) // create + products_changed
+	assert.Len(t, bus.emitted, 4) // (CollectionCreated + CollectionsChanged) + (CollectionProductsChanged + CollectionsChanged)
 }
 
 func TestCollectionAppService_AddProducts_EmptySlugs(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 
 	err := svc.AddProducts(context.Background(), "col1", nil)
 	assert.ErrorIs(t, err, database.ErrCollectionProductRequired)
@@ -294,7 +294,7 @@ func TestCollectionAppService_AddProducts_EmptySlugs(t *testing.T) {
 
 func TestCollectionAppService_AddProducts_ExceedsLimit(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "Full"}
@@ -311,7 +311,7 @@ func TestCollectionAppService_AddProducts_ExceedsLimit(t *testing.T) {
 func TestCollectionAppService_RemoveProduct(t *testing.T) {
 	store := newMockCollectionStore()
 	bus := &mockEventBus{}
-	svc := NewCollectionAppService(store, bus, nil, "t1")
+	svc := NewCollectionAppService(store, bus, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "C"}
@@ -325,7 +325,7 @@ func TestCollectionAppService_RemoveProduct(t *testing.T) {
 
 func TestCollectionAppService_ReorderProducts(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "C"}
@@ -343,7 +343,7 @@ func TestCollectionAppService_ReorderProducts(t *testing.T) {
 func TestCollectionAppService_RemoveProductFromAllCollections(t *testing.T) {
 	store := newMockCollectionStore()
 	bus := &mockEventBus{}
-	svc := NewCollectionAppService(store, bus, nil, "t1")
+	svc := NewCollectionAppService(store, bus, "t1")
 	ctx := context.Background()
 
 	c1 := &models.Collection{Title: "C1"}
@@ -363,14 +363,15 @@ func TestCollectionAppService_RemoveProductFromAllCollections(t *testing.T) {
 	assert.Equal(t, "only-c2", store.products[c2.ID][0].ListingSlug)
 
 	assert.Greater(t, len(bus.emitted), eventsBefore)
-	lastEvt := bus.emitted[len(bus.emitted)-1].(events.CollectionProductsChanged)
-	assert.Equal(t, events.CollectionProductActionBulkRemove, lastEvt.Action)
-	assert.Equal(t, []string{"shared"}, lastEvt.Slugs)
+	// The second-to-last event is CollectionProductsChanged; the last is CollectionsChanged (NetDB sync)
+	productsEvt := bus.emitted[len(bus.emitted)-2].(events.CollectionProductsChanged)
+	assert.Equal(t, events.CollectionProductActionBulkRemove, productsEvt.Action)
+	assert.Equal(t, []string{"shared"}, productsEvt.Slugs)
 }
 
 func TestCollectionAppService_ReorderProducts_EmptySlugs(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 
 	err := svc.ReorderProducts(context.Background(), "col1", nil)
 	assert.ErrorIs(t, err, database.ErrCollectionProductRequired)
@@ -378,7 +379,7 @@ func TestCollectionAppService_ReorderProducts_EmptySlugs(t *testing.T) {
 
 func TestCollectionAppService_ListCollections_Pagination(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	for i := 0; i < 5; i++ {
@@ -394,7 +395,7 @@ func TestCollectionAppService_ListCollections_Pagination(t *testing.T) {
 
 func TestCollectionAppService_ListCollections_NormalizesParams(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "C"}
@@ -411,7 +412,7 @@ func TestCollectionAppService_ListCollections_NormalizesParams(t *testing.T) {
 
 func TestCollectionAppService_NilBus(t *testing.T) {
 	store := newMockCollectionStore()
-	svc := NewCollectionAppService(store, nil, nil, "t1")
+	svc := NewCollectionAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	c := &models.Collection{Title: "No Bus"}

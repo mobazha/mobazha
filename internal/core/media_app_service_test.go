@@ -8,6 +8,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,21 +80,27 @@ func TestMediaAppService_SetProfileMedia_Avatar(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	publishCalled := false
+	bus := events.NewBus()
+	sub, err := bus.Subscribe([]interface{}{&events.ProfileChanged{}})
+	require.NoError(t, err)
+	defer sub.Close()
+
 	svc := newTestMediaAppService(t, MediaAppServiceConfig{
-		DB: db,
-		Publish: func(done chan<- struct{}) {
-			publishCalled = true
-			if done != nil {
-				close(done)
-			}
-		},
+		DB:       db,
+		EventBus: bus,
 	})
 
 	imgBytes := decodeB64(t, jpgImageB64)
 	result, err := svc.SetProfileMedia(context.Background(), contracts.SlotAvatar, imgBytes)
 	require.NoError(t, err)
-	assert.True(t, publishCalled, "publish should be called after setting avatar")
+
+	select {
+	case evt := <-sub.Out():
+		_, ok := evt.(*events.ProfileChanged)
+		assert.True(t, ok, "expected ProfileChanged event")
+	default:
+		t.Fatal("ProfileChanged event not emitted after setting avatar")
+	}
 	assert.NotNil(t, result.Hashes)
 	assert.NotEmpty(t, result.Hashes.Original)
 	assert.NotEmpty(t, result.Hashes.Tiny)
@@ -112,21 +119,27 @@ func TestMediaAppService_SetProfileMedia_Header(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	publishCalled := false
+	bus := events.NewBus()
+	sub, err := bus.Subscribe([]interface{}{&events.ProfileChanged{}})
+	require.NoError(t, err)
+	defer sub.Close()
+
 	svc := newTestMediaAppService(t, MediaAppServiceConfig{
-		DB: db,
-		Publish: func(done chan<- struct{}) {
-			publishCalled = true
-			if done != nil {
-				close(done)
-			}
-		},
+		DB:       db,
+		EventBus: bus,
 	})
 
 	imgBytes := decodeB64(t, jpgImageB64)
 	result, err := svc.SetProfileMedia(context.Background(), contracts.SlotHeader, imgBytes)
 	require.NoError(t, err)
-	assert.True(t, publishCalled, "publish should be called after setting header")
+
+	select {
+	case evt := <-sub.Out():
+		_, ok := evt.(*events.ProfileChanged)
+		assert.True(t, ok, "expected ProfileChanged event")
+	default:
+		t.Fatal("ProfileChanged event not emitted after setting header")
+	}
 	assert.NotNil(t, result.Hashes)
 	assert.NotEmpty(t, result.Hashes.Original)
 }

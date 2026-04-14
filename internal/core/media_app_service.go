@@ -17,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
@@ -37,7 +38,8 @@ type MediaAppService struct {
 	nodeID       string
 
 	publish     PublishFunc
-	publishFile     PublishFileFunc
+	publishFile PublishFileFunc
+	eventBus    events.Bus
 }
 
 type MediaAppServiceConfig struct {
@@ -47,17 +49,19 @@ type MediaAppServiceConfig struct {
 	NodeID       string
 
 	Publish     PublishFunc
-	PublishFile     PublishFileFunc
+	PublishFile PublishFileFunc
+	EventBus    events.Bus
 }
 
 func NewMediaAppService(cfg MediaAppServiceConfig) *MediaAppService {
 	return &MediaAppService{
-		db:              cfg.DB,
-		contentStore:    cfg.ContentStore,
-		blobStore:       cfg.BlobStore,
-		nodeID:          cfg.NodeID,
-		publish:     cfg.Publish,
-		publishFile:     cfg.PublishFile,
+		db:           cfg.DB,
+		contentStore: cfg.ContentStore,
+		blobStore:    cfg.BlobStore,
+		nodeID:       cfg.NodeID,
+		publish:      cfg.Publish,
+		publishFile:  cfg.PublishFile,
+		eventBus:     cfg.EventBus,
 	}
 }
 
@@ -261,8 +265,13 @@ func (s *MediaAppService) SetProfileMedia(ctx context.Context, slot contracts.Pr
 		return nil, err
 	}
 
-	if profileUpdated && s.publish != nil {
-		s.publish(nil)
+	if profileUpdated {
+		if s.publish != nil {
+			s.publish(nil)
+		}
+		if s.eventBus != nil {
+			s.eventBus.Emit(&events.ProfileChanged{})
+		}
 	}
 
 	return &contracts.UploadResult{

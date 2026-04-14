@@ -311,29 +311,15 @@ func (s *FollowAppService) HandleUnFollowMessage(from peer.ID, message *pb.Messa
 }
 
 func (s *FollowAppService) syncFollowingToNetDB() {
-	go func() {
-		if s.netDB != nil {
-			if following, err := s.GetMyFollowing(); err == nil {
-				s.netDB.SetOwnFollowing(following)
-			}
-			if profile, err := getProfileWithStats(s.db); err == nil {
-				s.netDB.SetOwnProfile(profile)
-			}
-		}
-	}()
+	if s.eventBus != nil {
+		s.eventBus.Emit(&events.FollowingChanged{})
+	}
 }
 
 func (s *FollowAppService) syncFollowersToNetDB() {
-	go func() {
-		if s.netDB != nil {
-			if followers, err := s.GetMyFollowers(); err == nil {
-				s.netDB.SetOwnFollowers(followers)
-			}
-			if profile, err := getProfileWithStats(s.db); err == nil {
-				s.netDB.SetOwnProfile(profile)
-			}
-		}
-	}()
+	if s.eventBus != nil {
+		s.eventBus.Emit(&events.FollowersChanged{})
+	}
 }
 
 func (s *FollowAppService) isDuplicate(message *pb.Message) bool {

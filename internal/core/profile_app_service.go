@@ -11,21 +11,22 @@ import (
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 )
 
 type ProfileAppService struct {
-	db      database.Database
-	publish PublishFunc
-	netDB   *netdb.NetDB
-	nodeID  string
-	peerID  peer.ID
+	db       database.Database
+	publish  PublishFunc
+	eventBus events.Bus
+	netDB    *netdb.NetDB
+	nodeID   string
+	peerID   peer.ID
 
 	escrowPubKeyHex        string
 	ethPubKeyHex           string
@@ -37,11 +38,12 @@ type ProfileAppService struct {
 }
 
 type ProfileAppServiceConfig struct {
-	DB      database.Database
-	Publish PublishFunc
-	NetDB   *netdb.NetDB
-	NodeID  string
-	PeerID  peer.ID
+	DB       database.Database
+	Publish  PublishFunc
+	EventBus events.Bus
+	NetDB    *netdb.NetDB
+	NodeID   string
+	PeerID   peer.ID
 
 	EscrowPubKeyHex        string
 	ETHPubKeyHex           string
@@ -56,6 +58,7 @@ func NewProfileAppService(cfg ProfileAppServiceConfig) *ProfileAppService {
 	return &ProfileAppService{
 		db:                     cfg.DB,
 		publish:                cfg.Publish,
+		eventBus:               cfg.EventBus,
 		netDB:                  cfg.NetDB,
 		nodeID:                 cfg.NodeID,
 		peerID:                 cfg.PeerID,
@@ -92,13 +95,9 @@ func (s *ProfileAppService) SetProfile(profile *models.Profile, done chan<- stru
 		return err
 	}
 
-	go func() {
-		if s.netDB != nil {
-			if err = s.netDB.SetOwnProfile(profile); err != nil {
-				logger.LogDebugWithIDf(log, s.nodeID, "Failed to set profile to netdb, err: %s", err)
-			}
-		}
-	}()
+	if s.eventBus != nil {
+		s.eventBus.Emit(&events.ProfileChanged{})
+	}
 
 	if s.publish != nil {
 		s.publish(done)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -277,7 +278,7 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 
 	stableDeviceID := id.DeviceID("MBZ_" + s.config.PeerID.String())
 
-	_, err = s.client.Login(ctx, &mautrix.ReqLogin{
+	loginReq := &mautrix.ReqLogin{
 		Type: mautrix.AuthTypePassword,
 		Identifier: mautrix.UserIdentifier{
 			Type: mautrix.IdentifierTypeUser,
@@ -286,23 +287,15 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 		Password:         s.password,
 		DeviceID:         stableDeviceID,
 		StoreCredentials: true,
-	})
+	}
+	err = s.loginWithRetry(ctx, loginReq)
 	if err != nil {
 		if s.config.RegistrationSecret != "" && isForbiddenOrNotFound(err) {
 			log.Infof("Matrix user %s does not exist, auto-registering...", s.matrixUserID)
 			if regErr := s.registerUser(ctx); regErr != nil {
 				return fmt.Errorf("matrix auto-register failed: %w (original login error: %v)", regErr, err)
 			}
-			_, err = s.client.Login(ctx, &mautrix.ReqLogin{
-				Type: mautrix.AuthTypePassword,
-				Identifier: mautrix.UserIdentifier{
-					Type: mautrix.IdentifierTypeUser,
-					User: s.matrixUserID.String(),
-				},
-				Password:         s.password,
-				DeviceID:         stableDeviceID,
-				StoreCredentials: true,
-			})
+			err = s.loginWithRetry(ctx, loginReq)
 		}
 		if err != nil {
 			return fmt.Errorf("matrix login failed: %w", err)
@@ -350,11 +343,23 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	s.client.Crypto = s.cryptoHelper
 
 	mach := s.cryptoHelper.Machine()
-	mach.ShareKeysMinTrust = id.TrustStateCrossSignedTOFU
+
+	// Trust by Architecture: Mobazha controls all device creation (single device
+	// per user, server-managed). Cross-signing/SSSS failures must never block
+	// key distribution. External Matrix users (federation) keep stricter checks.
+	mach.ShareKeysMinTrust = id.TrustStateUnset
 	mach.AllowKeyShare = func(ctx context.Context, device *id.Device, info event.RequestedKeyInfo) *mxcrypto.KeyShareRejection {
+		if device.Trust == id.TrustStateBlacklisted {
+			return &mxcrypto.KeyShareRejectBlacklisted
+		}
 		if device.UserID == s.client.UserID {
 			return nil
 		}
+		// Mobazha users: unconditionally trust (single server-managed device)
+		if isMobazhaUser(string(device.UserID)) {
+			return nil
+		}
+		// External Matrix users: require cross-signed trust or prior sharing
 		if device.Trust == id.TrustStateCrossSignedVerified || device.Trust == id.TrustStateCrossSignedTOFU {
 			return nil
 		}
@@ -370,11 +375,15 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	if s.usesSharedCryptoStore() {
 		storeDesc = fmt.Sprintf("shared-PG(account=%s)", s.config.CryptoDBAccountID)
 	}
-	log.Infof("Matrix crypto initialized: user=%s device=%s store=%s ShareKeysMinTrust=CrossSignedTOFU", s.client.UserID, s.client.DeviceID, storeDesc)
+	log.Infof("Matrix crypto initialized: user=%s device=%s store=%s ShareKeysMinTrust=Unset(TrustByArch)", s.client.UserID, s.client.DeviceID, storeDesc)
 
+	s.importKeyBackup(ctx)
+
+	// Best-effort: cross-signing benefits external federation peers but is not
+	// required for Mobazha-internal messaging (Trust by Architecture).
 	verificationSupportErr := s.ensureCrossSigningSupport(ctx, mach)
 	if verificationSupportErr != nil {
-		log.Warningf("Matrix cross-signing unavailable for %s: %v", s.matrixUserID, verificationSupportErr)
+		log.Warningf("Matrix cross-signing unavailable for %s (non-critical): %v", s.matrixUserID, verificationSupportErr)
 	}
 
 	vh := verificationhelper.NewVerificationHelper(
@@ -492,6 +501,12 @@ func (s *mautrixChatService) idleStop() {
 	}
 	s.firstSyncCh = nil
 
+	if s.cryptoHelper != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		s.exportKeyBackup(ctx)
+		cancel()
+	}
+
 	log.Infof("Matrix chat service idle-paused for %s", s.matrixUserID)
 	s.broadcast(contracts.MatrixChatEvent{
 		Type: "chat.disconnected",
@@ -536,6 +551,26 @@ func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context) error {
 		_ = os.Remove(dbPath + suffix)
 	}
 
+	// Use a fresh device ID to avoid "keys on server" conflict with the old device.
+	// The orphaned old device is harmless — peers discover the new device via /keys/query.
+	loginDeviceID := id.DeviceID(fmt.Sprintf("MBZ_%s_%d",
+		s.config.PeerID.String(), time.Now().Unix()))
+	log.Infof("Crypto reset: using fresh device ID %s", loginDeviceID)
+
+	loginErr := s.loginWithRetry(ctx, &mautrix.ReqLogin{
+		Type: mautrix.AuthTypePassword,
+		Identifier: mautrix.UserIdentifier{
+			Type: mautrix.IdentifierTypeUser,
+			User: s.matrixUserID.String(),
+		},
+		Password:         s.password,
+		DeviceID:         loginDeviceID,
+		StoreCredentials: true,
+	})
+	if loginErr != nil {
+		return fmt.Errorf("failed to re-login after crypto DB reset: %w", loginErr)
+	}
+
 	s.client.StateStore = nil
 	s.client.Store = nil
 
@@ -553,7 +588,7 @@ func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context) error {
 		return fmt.Errorf("failed to init fresh crypto helper: %w", err)
 	}
 	s.client.Crypto = s.cryptoHelper
-	log.Infof("Crypto DB reset successful (SQLite), new device keys established")
+	log.Infof("Crypto DB reset successful (SQLite, device=%s), new device keys established", loginDeviceID)
 	return nil
 }
 
@@ -587,7 +622,7 @@ func (s *mautrixChatService) resetCryptoDBSharedPG(ctx context.Context, cryptoSt
 	}
 
 	stableDeviceID := id.DeviceID("MBZ_" + s.config.PeerID.String())
-	_, err := s.client.Login(ctx, &mautrix.ReqLogin{
+	err := s.loginWithRetry(ctx, &mautrix.ReqLogin{
 		Type: mautrix.AuthTypePassword,
 		Identifier: mautrix.UserIdentifier{
 			Type: mautrix.IdentifierTypeUser,
@@ -623,19 +658,19 @@ func (s *mautrixChatService) resetCryptoDBSharedPG(ctx context.Context, cryptoSt
 // deleteDeviceViaAdmin removes a device from the Matrix server using the
 // Synapse Admin API, bypassing the interactive user-authentication flow
 // required by the standard client-server DELETE endpoint.
-func (s *mautrixChatService) deleteDeviceViaAdmin(ctx context.Context, deviceID id.DeviceID) {
+func (s *mautrixChatService) deleteDeviceViaAdmin(ctx context.Context, deviceID id.DeviceID) bool {
 	homeserverURL := s.config.HomeserverURL
 	secret := s.config.RegistrationSecret
 	if homeserverURL == "" || secret == "" {
 		log.Warningf("Cannot delete device %s via admin: missing homeserver URL or registration secret", deviceID)
-		return
+		return false
 	}
 
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	adminToken, err := s.obtainAdminToken(ctx, httpClient, homeserverURL, secret)
 	if err != nil {
 		log.Warningf("Cannot delete device %s via admin: %v", deviceID, err)
-		return
+		return false
 	}
 
 	escapedUserID := url.PathEscape(s.matrixUserID.String())
@@ -644,23 +679,66 @@ func (s *mautrixChatService) deleteDeviceViaAdmin(ctx context.Context, deviceID 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", delURL, nil)
 	if err != nil {
 		log.Warningf("Cannot build admin delete-device request: %v", err)
-		return
+		return false
 	}
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Warningf("Admin delete-device HTTP error for %s: %v", deviceID, err)
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
 		log.Infof("Deleted device %s from Matrix server via admin API", deviceID)
-	} else {
-		body, _ := io.ReadAll(resp.Body)
-		log.Warningf("Admin delete-device returned HTTP %d for %s: %s", resp.StatusCode, deviceID, string(body))
+		return true
 	}
+	body, _ := io.ReadAll(resp.Body)
+	log.Warningf("Admin delete-device returned HTTP %d for %s: %s", resp.StatusCode, deviceID, string(body))
+	return false
+}
+
+// loginWithRetry wraps client.Login with 429 rate-limit backoff.
+// It respects Synapse's retry_after_ms when available, otherwise uses 15s default.
+func (s *mautrixChatService) loginWithRetry(ctx context.Context, req *mautrix.ReqLogin) error {
+	const maxAttempts = 5
+	var err error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			delay := 15 * time.Second
+			if retryMs, ok := extractRetryAfterMs(err); ok && retryMs > 0 {
+				delay = time.Duration(retryMs+500) * time.Millisecond
+			}
+			log.Infof("Matrix login rate limited, retrying in %s (attempt %d/%d)", delay, attempt+1, maxAttempts)
+			time.Sleep(delay)
+		}
+		_, err = s.client.Login(ctx, req)
+		if err == nil {
+			return nil
+		}
+		var respErr mautrix.RespError
+		if !errors.As(err, &respErr) || respErr.ErrCode != "M_LIMIT_EXCEEDED" {
+			return err
+		}
+	}
+	return err
+}
+
+func extractRetryAfterMs(err error) (int, bool) {
+	var respErr mautrix.RespError
+	if !errors.As(err, &respErr) {
+		return 0, false
+	}
+	if v, ok := respErr.ExtraData["retry_after_ms"]; ok {
+		switch n := v.(type) {
+		case float64:
+			return int(n), true
+		case int:
+			return n, true
+		}
+	}
+	return 0, false
 }
 
 func copyFile(src, dst string) error {
@@ -730,9 +808,14 @@ func (s *mautrixChatService) Stop() error {
 		s.syncCancel()
 	}
 
-	if s.cryptoHelper != nil && s.ownsCryptoStore() {
-		if err := s.cryptoHelper.Close(); err != nil {
-			log.Errorf("Failed to close crypto helper: %v", err)
+	if s.cryptoHelper != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		s.exportKeyBackup(ctx)
+		cancel()
+		if s.ownsCryptoStore() {
+			if err := s.cryptoHelper.Close(); err != nil {
+				log.Errorf("Failed to close crypto helper: %v", err)
+			}
 		}
 	}
 
@@ -802,6 +885,19 @@ func (s *mautrixChatService) signOwnDeviceAndMaster(ctx context.Context, mach *m
 	return nil
 }
 
+func (s *mautrixChatService) bootstrapCrossSigning(ctx context.Context, mach *mxcrypto.OlmMachine) error {
+	if _, _, genErr := mach.GenerateAndUploadCrossSigningKeysWithPassword(ctx, s.password, s.password); genErr != nil {
+		return fmt.Errorf("failed to bootstrap cross-signing keys: %w", genErr)
+	}
+	if err := s.signOwnDeviceAndMaster(ctx, mach); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ensureCrossSigningSupport is best-effort: cross-signing improves trust for
+// external Matrix federation users but is NOT required for Mobazha-internal
+// messaging (Trust by Architecture). Failures are logged, never fatal.
 func (s *mautrixChatService) ensureCrossSigningSupport(ctx context.Context, mach *mxcrypto.OlmMachine) error {
 	if mach == nil {
 		return fmt.Errorf("olm machine is nil")
@@ -812,18 +908,20 @@ func (s *mautrixChatService) ensureCrossSigningSupport(ctx context.Context, mach
 		return fmt.Errorf("failed to inspect cross-signing status: %w", err)
 	}
 	if !hasKeys {
-		if _, _, genErr := mach.GenerateAndUploadCrossSigningKeysWithPassword(ctx, s.password, s.password); genErr != nil {
-			return fmt.Errorf("failed to bootstrap cross-signing keys: %w", genErr)
-		}
-		if err := s.signOwnDeviceAndMaster(ctx, mach); err != nil {
-			return err
-		}
-		return nil
+		return s.bootstrapCrossSigning(ctx, mach)
 	}
 	if isVerified {
 		return nil
 	}
-	return s.signOwnDeviceAndMaster(ctx, mach)
+	err = s.signOwnDeviceAndMaster(ctx, mach)
+	if err == nil {
+		return nil
+	}
+	// SSSS data may be missing or corrupted (e.g. lost m.secret_storage.default_key).
+	// Re-bootstrap so external federation peers can verify us via CrossSignedTOFU.
+	// This is best-effort: Mobazha-internal peers trust unconditionally.
+	log.Warningf("Cross-signing restoration failed for %s (%v), re-bootstrapping keys", s.matrixUserID, err)
+	return s.bootstrapCrossSigning(ctx, mach)
 }
 
 // IsReady returns true when the client is logged in and syncing.
@@ -945,6 +1043,13 @@ func (s *mautrixChatService) registerEventHandlers() {
 
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
 		log.Debugf("EventMessage received: room=%s sender=%s eventID=%s", evt.RoomID, evt.Sender, evt.ID)
+
+		// Skip sync echo of self-sent messages — frontend already displayed them
+		// when the HTTP send call returned.
+		if evt.Sender == s.client.UserID {
+			return
+		}
+
 		content := evt.Content.AsMessage()
 		if content != nil && content.MsgType == event.MsgVerificationRequest {
 			log.Infof("Verification request EventMessage detected (handled by VerificationHelper): room=%s sender=%s to=%s", evt.RoomID, evt.Sender, content.To)
@@ -966,6 +1071,23 @@ func (s *mautrixChatService) registerEventHandlers() {
 			Type: "chat.message",
 			Data: msg,
 		})
+	})
+
+	syncer.OnEventType(event.EventEncrypted, func(ctx context.Context, evt *event.Event) {
+		// Fires when the crypto helper failed to decrypt an incoming event.
+		log.Warningf("Undecryptable event: room=%s sender=%s eventID=%s", evt.RoomID, evt.Sender, evt.ID)
+		s.broadcast(contracts.MatrixChatEvent{
+			Type: "chat.message",
+			Data: contracts.MatrixMessage{
+				EventID:   evt.ID.String(),
+				RoomID:    evt.RoomID.String(),
+				Sender:    evt.Sender.String(),
+				Content:   "Unable to decrypt this message",
+				MsgType:   "m.bad.encrypted",
+				Timestamp: time.UnixMilli(evt.Timestamp),
+			},
+		})
+		go s.retryDecryptAfterKeyRequest(ctx, evt)
 	})
 
 	syncer.OnEventType(event.EventReaction, func(ctx context.Context, evt *event.Event) {
@@ -1644,6 +1766,185 @@ func (s *mautrixChatService) CancelVerification(ctx context.Context, txnID strin
 	}
 	s.touchActivity()
 	return s.verifyHelper.CancelVerification(ctx, id.VerificationTransactionID(txnID), event.VerificationCancelCodeUser, "user cancelled")
+}
+
+// ---------------------------------------------------------------------------
+// Tier 3: Active key request + retry on decryption failure
+// ---------------------------------------------------------------------------
+
+const keyRequestRetryTimeout = 10 * time.Second
+
+// retryDecryptAfterKeyRequest is launched as a goroutine when an EventEncrypted
+// event fires (crypto helper failed to decrypt). It parses the encrypted
+// payload, requests the missing Megolm session from the sender, waits up to
+// keyRequestRetryTimeout for the key to arrive, and if successful, re-decrypts
+// the event and broadcasts the corrected message to replace the placeholder.
+func (s *mautrixChatService) retryDecryptAfterKeyRequest(parentCtx context.Context, evt *event.Event) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("retryDecryptAfterKeyRequest: PANIC recovered: %v", r)
+		}
+	}()
+
+	if s.cryptoHelper == nil {
+		return
+	}
+	mach := s.cryptoHelper.Machine()
+	if mach == nil {
+		return
+	}
+
+	enc := evt.Content.AsEncrypted()
+	if enc == nil {
+		// Content not yet parsed — try parsing raw.
+		if err := evt.Content.ParseRaw(evt.Type); err != nil {
+			log.Warningf("retryDecrypt: cannot parse encrypted content for %s: %v", evt.ID, err)
+			return
+		}
+		enc = evt.Content.AsEncrypted()
+	}
+	if enc == nil || enc.SessionID == "" {
+		return
+	}
+
+	trackKey := string(evt.RoomID) + "/" + string(enc.SessionID)
+	roomKeyRequestTrackerLock.Lock()
+	if last, ok := roomKeyRequestTracker[trackKey]; ok && time.Since(last) < roomKeyRequestCooldown {
+		roomKeyRequestTrackerLock.Unlock()
+		return
+	}
+	roomKeyRequestTracker[trackKey] = time.Now()
+	roomKeyRequestTrackerLock.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), keyRequestRetryTimeout+5*time.Second)
+	defer cancel()
+
+	devices, err := mach.CryptoStore.GetDevices(ctx, evt.Sender)
+	if err != nil || len(devices) == 0 {
+		if err != nil {
+			log.Warningf("retryDecrypt: GetDevices for %s failed: %v", evt.Sender, err)
+		}
+		_, _ = mach.FetchKeys(ctx, []id.UserID{evt.Sender}, true)
+		devices, _ = mach.CryptoStore.GetDevices(ctx, evt.Sender)
+	}
+
+	targets := map[id.UserID][]id.DeviceID{evt.Sender: {}}
+	for devID := range devices {
+		targets[evt.Sender] = append(targets[evt.Sender], devID)
+	}
+	if len(targets[evt.Sender]) == 0 {
+		targets[evt.Sender] = []id.DeviceID{"*"}
+	}
+
+	if err := mach.SendRoomKeyRequest(ctx, evt.RoomID, enc.SenderKey, enc.SessionID, "", targets); err != nil {
+		log.Warningf("retryDecrypt: SendRoomKeyRequest failed for session %s: %v", enc.SessionID, err)
+		return
+	}
+	log.Infof("retryDecrypt: requested key for session %s in room %s, waiting %v", enc.SessionID, evt.RoomID, keyRequestRetryTimeout)
+
+	if !mach.WaitForSession(ctx, evt.RoomID, enc.SenderKey, enc.SessionID, keyRequestRetryTimeout) {
+		log.Infof("retryDecrypt: key for session %s did not arrive within timeout", enc.SessionID)
+		return
+	}
+
+	decrypted, err := s.client.Crypto.Decrypt(ctx, evt)
+	if err != nil {
+		log.Warningf("retryDecrypt: re-decrypt still failed for %s: %v", evt.ID, err)
+		return
+	}
+	if decrypted.Type != event.EventMessage {
+		return
+	}
+
+	msg := s.eventToMessage(decrypted)
+	log.Infof("retryDecrypt: successfully decrypted %s after key request", evt.ID)
+	s.broadcast(contracts.MatrixChatEvent{
+		Type: "chat.message.decrypted",
+		Data: msg,
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Tier 2: Megolm session key backup (local encrypted file)
+// ---------------------------------------------------------------------------
+
+const keyBackupFilename = "megolm_keys.export"
+
+// keyBackupPath returns the path for the Megolm key backup file. For standalone
+// mode it's next to the crypto DB; for shared-PG (SaaS) it returns empty
+// (key backup is only meaningful for standalone nodes with local crypto stores).
+func (s *mautrixChatService) keyBackupPath() string {
+	if s.usesSharedCryptoStore() {
+		return ""
+	}
+	dbPath := s.config.DBPath
+	if dbPath == "" {
+		dbPath = "mautrix_crypto.db"
+	}
+	return filepath.Join(filepath.Dir(dbPath), keyBackupFilename)
+}
+
+// keyBackupPassphrase derives a stable passphrase for key export/import from
+// the pickle key (which itself is derived from the user's private key).
+func (s *mautrixChatService) keyBackupPassphrase() string {
+	h := sha256.New()
+	h.Write(s.pickleKey)
+	h.Write([]byte("megolm-key-backup"))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// exportKeyBackup exports all inbound Megolm sessions to an encrypted file.
+func (s *mautrixChatService) exportKeyBackup(ctx context.Context) {
+	path := s.keyBackupPath()
+	if path == "" {
+		return
+	}
+	mach := s.cryptoHelper.Machine()
+	if mach == nil {
+		return
+	}
+
+	sessions := mach.CryptoStore.GetAllGroupSessions(ctx)
+	data, err := mxcrypto.ExportKeysIter(s.keyBackupPassphrase(), sessions)
+	if err != nil {
+		if !errors.Is(err, mxcrypto.ErrNoSessionsForExport) {
+			log.Warningf("exportKeyBackup: failed for %s: %v", s.matrixUserID, err)
+		}
+		return
+	}
+
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		log.Warningf("exportKeyBackup: write failed for %s: %v", path, err)
+		return
+	}
+	log.Infof("exportKeyBackup: exported Megolm keys to %s for %s", path, s.matrixUserID)
+}
+
+// importKeyBackup imports Megolm sessions from a previously exported backup.
+func (s *mautrixChatService) importKeyBackup(ctx context.Context) {
+	path := s.keyBackupPath()
+	if path == "" {
+		return
+	}
+	mach := s.cryptoHelper.Machine()
+	if mach == nil {
+		return
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Warningf("importKeyBackup: read failed for %s: %v", path, err)
+		}
+		return
+	}
+
+	imported, total, err := mach.ImportKeys(ctx, s.keyBackupPassphrase(), data)
+	if err != nil {
+		log.Warningf("importKeyBackup: import failed for %s: %v", s.matrixUserID, err)
+		return
+	}
+	log.Infof("importKeyBackup: imported %d/%d Megolm sessions for %s", imported, total, s.matrixUserID)
 }
 
 // Ensure mautrixChatService implements contracts.MatrixChatService.

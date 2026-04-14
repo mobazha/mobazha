@@ -98,7 +98,7 @@ func (g *Gateway) handleGETStorefrontConfigPublic(w http.ResponseWriter, r *http
 		return
 	}
 	if cfg == nil {
-		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "No storefront config found")
+		responsePkg.Success(w, nil)
 		return
 	}
 

@@ -357,18 +357,24 @@ func (ndb *NetDB) GetListingIndex(peerID string, ctx *request.Context) (models.L
 
 	requestPath := fmt.Sprintf("/listing-indexes/%s", peerID)
 
-	// 创建带签名的请求
 	req, err := ndb.newSignedRequest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
 	var envelope dataEnvelope[ListingIndex]
-	_, err = req.
+	resp, err := req.
 		SetResult(&envelope).
 		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
+	}
+	if resp.IsError() {
+		return models.ListingIndex{}, nil
+	}
+
+	if len(envelope.Data.SerializedIndex) == 0 {
+		return models.ListingIndex{}, nil
 	}
 
 	listingIndex := models.ListingIndex{}
@@ -411,18 +417,24 @@ func (ndb *NetDB) GetRatingIndex(peerID string, ctx *request.Context) (models.Ra
 
 	requestPath := fmt.Sprintf("/rating-indexes/%s", peerID)
 
-	// 创建带签名的请求
 	req, err := ndb.newSignedRequest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
 	var envelope dataEnvelope[RatingIndex]
-	_, err = req.
+	resp, err := req.
 		SetResult(&envelope).
 		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
+	}
+	if resp.IsError() {
+		return models.RatingIndex{}, nil
+	}
+
+	if len(envelope.Data.SerializedIndex) == 0 {
+		return models.RatingIndex{}, nil
 	}
 
 	ratingIndex := models.RatingIndex{}

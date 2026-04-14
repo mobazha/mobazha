@@ -176,22 +176,19 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		}
 		erp := wallet.NewExchangeRateProvider(nil)
 
-		saasURL := cfg.SaaSAPIURL
-		apiKey := cfg.StandaloneAPIKey
-
 		// Standalone nodes default to the public SaaS URL so Matrix
 		// provisioning, heartbeat, and exchange rates work out of the box.
-		if !cfg.SaaSMode && saasURL == "" {
-			saasURL = "https://app.mobazha.org"
+		if !cfg.SaaSMode && cfg.SaaSAPIURL == "" {
+			cfg.SaaSAPIURL = "https://app.mobazha.org"
 		}
 
 		// Load persisted API key from disk if not provided via CLI.
-		if !cfg.SaaSMode && apiKey == "" && cfg.DataDir != "" {
-			apiKey = loadPersistedAPIKey(cfg.DataDir)
+		if !cfg.SaaSMode && cfg.StandaloneAPIKey == "" && cfg.DataDir != "" {
+			cfg.StandaloneAPIKey = loadPersistedAPIKey(cfg.DataDir)
 		}
 
-		if !cfg.SaaSMode && saasURL != "" {
-			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(saasURL)
+		if !cfg.SaaSMode && cfg.SaaSAPIURL != "" {
+			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(cfg.SaaSAPIURL)
 		}
 
 		SharedManagerInstance = &SharedManager{
@@ -201,8 +198,8 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			clients:              make(map[string]contracts.NodeService),
 			testnet:              cfg.Testnet,
 			saasMode:             cfg.SaaSMode,
-			saasAPIURL:           saasURL,
-			standaloneAPIKey:     apiKey,
+			saasAPIURL:           cfg.SaaSAPIURL,
+			standaloneAPIKey:     cfg.StandaloneAPIKey,
 			ctx:                  ctx,
 		}
 	})

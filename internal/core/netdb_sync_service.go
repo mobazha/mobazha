@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -12,6 +13,8 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/encoding/protojson"
 )
+
+const reconcileInterval = 10 * time.Minute
 
 const netdbDirtyPrefix = "netdb_dirty_"
 
@@ -73,7 +76,10 @@ func NewNetDBSyncService(cfg NetDBSyncServiceConfig) *NetDBSyncService {
 }
 
 // Start subscribes to all NetDB-related domain events and dispatches
-// them to the appropriate handler in a background goroutine.
+// them to the appropriate handler in a background goroutine. It also
+// starts a periodic reconciliation timer that retries any dirty flags
+// left by failed pushes, ensuring data eventually reaches the search
+// service even when the initial push (and startup Reconcile) both fail.
 func (s *NetDBSyncService) Start() {
 	if s.netDB == nil || s.eventBus == nil {
 		return
@@ -101,6 +107,8 @@ func (s *NetDBSyncService) Start() {
 
 	go func() {
 		defer sub.Close()
+		ticker := time.NewTicker(reconcileInterval)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
@@ -110,6 +118,8 @@ func (s *NetDBSyncService) Start() {
 					return
 				}
 				s.dispatch(evt)
+			case <-ticker.C:
+				s.Reconcile()
 			}
 		}
 	}()

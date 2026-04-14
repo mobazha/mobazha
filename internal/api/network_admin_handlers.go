@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,10 +24,11 @@ const (
 )
 
 type networkConfigResponse struct {
-	Connectivity string `json:"connectivity"`
-	OverlayType  string `json:"overlayType"`
+	Connectivity  string `json:"connectivity"`
+	OverlayType   string `json:"overlayType"`
 	OverlayDomain string `json:"overlayDomain,omitempty"`
 	DockerManaged bool   `json:"dockerManaged"`
+	GatewayPort   int    `json:"gatewayPort"`
 }
 
 type networkConfigRequest struct {
@@ -36,7 +38,21 @@ type networkConfigRequest struct {
 func (g *Gateway) handleGETSystemNetwork(w http.ResponseWriter, r *http.Request) {
 	connectivity := os.Getenv("CONNECTIVITY")
 	if connectivity == "" {
+		connectivity = g.config.StandaloneConnectivity
+	}
+	if connectivity == "" {
 		connectivity = "public"
+	}
+
+	port := repo.DefaultGatewayPortNum
+	if g.listener != nil {
+		if addr := g.listener.Addr(); addr != nil {
+			if _, p, err := net.SplitHostPort(addr.String()); err == nil {
+				if n, err := strconv.Atoi(p); err == nil {
+					port = n
+				}
+			}
+		}
 	}
 
 	resp := networkConfigResponse{
@@ -44,6 +60,7 @@ func (g *Gateway) handleGETSystemNetwork(w http.ResponseWriter, r *http.Request)
 		OverlayType:   os.Getenv("OVERLAY_TYPE"),
 		OverlayDomain: os.Getenv("OVERLAY_DOMAIN"),
 		DockerManaged: dockerSocketAvailable(),
+		GatewayPort:   port,
 	}
 
 	response.Success(w, resp)

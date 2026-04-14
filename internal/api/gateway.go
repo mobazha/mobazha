@@ -56,6 +56,14 @@ type GatewayConfig struct {
 	SaaSAPIURL string
 	// StandaloneAPIKey is the API key for authenticating with the SaaS platform.
 	StandaloneAPIKey string
+	// StandaloneConnectivity is the configured network mode for standalone
+	// nodes (from CLI --standaloneconnectivity). Used as fallback when the
+	// CONNECTIVITY env var is not set (native binary mode).
+	StandaloneConnectivity string
+	// DataDir is the node's data directory (e.g. ~/.mobazha).
+	// Used by native binary mode to persist domain config when Docker
+	// hostconfig is unavailable.
+	DataDir string
 }
 
 // Gateway represents an HTTP API gateway

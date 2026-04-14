@@ -333,10 +333,16 @@ func (n *MobazhaNode) tryStandaloneMatrixProvision(currentURL, currentName strin
 		}
 
 		sm.standaloneAPIKey = apiKey
-		if persistErr := PersistAPIKey(dataDir, apiKey); persistErr != nil {
+		// Persist to the top-level app data dir (where loadPersistedAPIKey reads),
+		// not the per-node dir, so the key survives restart.
+		persistDir := sm.appDataDir
+		if persistDir == "" {
+			persistDir = dataDir
+		}
+		if persistErr := PersistAPIKey(persistDir, apiKey); persistErr != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Failed to persist SaaS API key: %v", persistErr)
 		} else {
-			logger.LogInfoWithIDf(log, n.nodeID, "SaaS API key obtained and persisted")
+			logger.LogInfoWithIDf(log, n.nodeID, "SaaS API key obtained and persisted to %s", persistDir)
 		}
 	}
 

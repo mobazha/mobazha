@@ -148,6 +148,17 @@ func (g *Gateway) handlePOSTConnectPlatform(w http.ResponseWriter, r *http.Reque
 	jv.UpdateOwnerUserID(claims.Id)
 	log.Infof("Platform connected: ownerUserID=%s bound to standalone store", claims.Id)
 
+	// Claim store on SaaS side so TenantMiddleware can resolve peerID
+	// from the store_registry. Non-fatal — the local binding is complete
+	// regardless of whether SaaS-side claim succeeds.
+	if g.config.SaaSAPIURL != "" && g.config.StandaloneAPIKey != "" && g.config.LocalPeerID != "" {
+		if err := g.callSaaSClaim(r.Context(), g.config.LocalPeerID, claims.Id); err != nil {
+			log.Warningf("SaaS store claim failed (non-fatal): %v", err)
+		} else {
+			log.Infof("SaaS store claimed: peerID=%s ownerUserID=%s", g.config.LocalPeerID, claims.Id)
+		}
+	}
+
 	response.Success(w, connectPlatformResponse{
 		CasdoorAvailable: true,
 		OwnerUserID:      claims.Id,

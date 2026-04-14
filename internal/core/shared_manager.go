@@ -56,6 +56,11 @@ type SharedManager struct {
 	// standaloneAPIKey is the API key for SaaS platform authentication
 	standaloneAPIKey string
 
+	// appDataDir is the top-level application data directory (cfg.DataDir).
+	// Platform connection files (saas_api_key, owner_user_id, casdoor_certificate)
+	// are persisted here so they are available at startup before any node is initialized.
+	appDataDir string
+
 	// ctx is the context for the manager
 	ctx context.Context
 
@@ -213,6 +218,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			saasMode:             cfg.SaaSMode,
 			saasAPIURL:           cfg.SaaSAPIURL,
 			standaloneAPIKey:     cfg.StandaloneAPIKey,
+			appDataDir:           cfg.DataDir,
 			ctx:                  ctx,
 		}
 	})

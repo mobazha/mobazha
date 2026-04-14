@@ -8,6 +8,8 @@ import (
 	"os"
 	"text/template"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/internal/repo"
 )
 
 type ReverseProxyManager interface {
@@ -45,7 +47,7 @@ func NewCaddyManager(tmplPath, outputPath, envFilePath string) *CaddyManager {
 
 func (m *CaddyManager) Apply(cfg ProxyConfig) error {
 	if cfg.NodePort == 0 {
-		cfg.NodePort = 5102
+		cfg.NodePort = repo.DefaultGatewayPortNum
 	}
 	if cfg.NextJSPort == 0 {
 		cfg.NextJSPort = 3000

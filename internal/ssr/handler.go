@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 )
 
@@ -44,7 +45,7 @@ func NewFromEnv(localPeerID string) *SSRHandler {
 		return nil
 	}
 
-	port, _ := strconv.Atoi(envOr("NODE_PORT", "5102"))
+	port, _ := strconv.Atoi(envOr("NODE_PORT", repo.DefaultGatewayPort))
 	domain := os.Getenv("STORE_DOMAIN")
 
 	h, err := New(Config{

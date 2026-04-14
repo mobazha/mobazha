@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/internal/repo"
 )
 
 type Status string
@@ -52,7 +54,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		NodePort: 5102,
+		NodePort: repo.DefaultGatewayPortNum,
 		SaaSURL:  "https://app.mobazha.org",
 	}
 }
@@ -200,7 +202,7 @@ func (r *Runner) CheckNodeAPI() CheckResult {
 	cr := CheckResult{Name: "Node API"}
 	port := r.cfg.NodePort
 	if port == 0 {
-		port = 5102
+		port = repo.DefaultGatewayPortNum
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/healthz", port))

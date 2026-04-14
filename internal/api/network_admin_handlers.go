@@ -13,6 +13,7 @@ import (
 	"time"
 
 	caddymgr "github.com/mobazha/mobazha3.0/internal/caddy"
+	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -109,7 +110,7 @@ func (g *Gateway) handlePOSTSystemNetwork(w http.ResponseWriter, r *http.Request
 			Connectivity:  newConnectivity,
 			OverlayType:   req.OverlayType,
 			OverlayDomain: os.Getenv("OVERLAY_DOMAIN"),
-			NodePort:      5102,
+			NodePort:      repo.DefaultGatewayPortNum,
 			SaaSAPIURL:    os.Getenv("SAAS_API_URL"),
 			APIKey:        os.Getenv("STANDALONE_API_KEY"),
 		}

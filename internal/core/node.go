@@ -233,7 +233,7 @@ func (n *MobazhaNode) Start() {
 	go n.bootstrapDHT()
 
 	// Default node always starts the SharedManager (HTTP gateway) regardless of mode,
-	// because hosting proxies /v1/* requests to the internal API on port 5102.
+	// because hosting proxies /v1/* requests to the internal API (default port: 5102).
 	if n.IsDefaultNode() {
 		go n.SharedManager().Start()
 	}

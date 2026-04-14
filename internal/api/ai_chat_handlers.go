@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+	"github.com/mobazha/mobazha3.0/internal/repo"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -41,7 +42,7 @@ func getLocalAPIURL(r *http.Request) string {
 	}
 	host := r.Host
 	if host == "" {
-		host = "127.0.0.1:4002"
+		host = "127.0.0.1:" + repo.DefaultGatewayPort
 	}
 	return fmt.Sprintf("%s://%s", scheme, host)
 }

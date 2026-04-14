@@ -343,7 +343,7 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 	// Resolve gateway listen address: CLI override > default.
 	gatewayAddr := cfg.GatewayAddr
 	if gatewayAddr == "" {
-		gatewayAddr = "/ip4/127.0.0.1/tcp/4002"
+		gatewayAddr = repo.DefaultGatewayMultiaddr
 	}
 
 	gatewayMaddr, err := ma.NewMultiaddr(gatewayAddr)

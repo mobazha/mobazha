@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	caddymgr "github.com/mobazha/mobazha3.0/internal/caddy"
+	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -80,7 +81,7 @@ func (g *Gateway) handlePOSTSystemDomain(w http.ResponseWriter, r *http.Request)
 	if _, err := os.Stat(goTmplPath); err == nil {
 		mgr := caddymgr.NewCaddyManager(goTmplPath, caddyOut, envPath)
 
-		nodePort := 5102
+		nodePort := repo.DefaultGatewayPortNum
 		connectivity := os.Getenv("CONNECTIVITY")
 		if connectivity == "" {
 			connectivity = "public"

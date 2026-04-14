@@ -23,6 +23,17 @@ const (
 	defaultConfigFilename = "mobazha.conf"
 	defaultLogDirname     = "logs"
 	defaultLogFilename    = "mobazha.log"
+
+	// DefaultGatewayPort is the standard port for the node HTTP API across all
+	// deployment modes (SaaS hosting, standalone Docker, native binary).
+	DefaultGatewayPort = "5102"
+
+	// DefaultGatewayPortNum is the numeric form of DefaultGatewayPort.
+	DefaultGatewayPortNum = 5102
+
+	// DefaultGatewayMultiaddr is the multiaddr form of the default gateway
+	// listen address, used when cfg.GatewayAddr is empty.
+	DefaultGatewayMultiaddr = "/ip4/127.0.0.1/tcp/" + DefaultGatewayPort
 )
 
 var (
@@ -129,8 +140,8 @@ type Config struct {
 	// the SaaS default node's peer ID. Only used in standalone (non-SaaS) mode.
 	HTTPProxyTrustedPeers []string `long:"httpproxytrustedpeer" description:"Peer IDs trusted to proxy HTTP requests via libp2p"`
 
-	// HTTPProxyLocalAddr is the local API address that the libp2p HTTP proxy
-	// handler forwards requests to. Defaults to "http://127.0.0.1:5102".
+	// HTTPProxyLocalAddr overrides the local API address for the libp2p HTTP
+	// proxy. When empty (default), derived from GatewayAddr (typically :5102).
 	HTTPProxyLocalAddr string `long:"httpproxylocaladdr" description:"Local API address for libp2p HTTP proxy forwarding"`
 
 	// SaaSAPIURL is the SaaS platform URL for standalone stores to register

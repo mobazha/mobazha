@@ -188,9 +188,9 @@ func printSplashScreen() {
 func gatewayURL(cfg *repo.Config) string {
 	gwAddr := cfg.GatewayAddr
 	if gwAddr == "" {
-		gwAddr = "/ip4/127.0.0.1/tcp/4002"
+		gwAddr = repo.DefaultGatewayMultiaddr
 	}
-	host, port := "127.0.0.1", "4002"
+	host, port := "127.0.0.1", repo.DefaultGatewayPort
 	parts := strings.Split(gwAddr, "/")
 	for i, p := range parts {
 		switch p {

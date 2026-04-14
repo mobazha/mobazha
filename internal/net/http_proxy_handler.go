@@ -29,7 +29,7 @@ const (
 //  2. Local AuthenticationMiddleware validates JWT on write operations
 type HTTPProxyHandler struct {
 	trustedPeers map[peer.ID]bool
-	localAPIAddr string // e.g. "http://127.0.0.1:5102"
+	localAPIAddr string // derived from GatewayAddr, e.g. "http://127.0.0.1:5102"
 	client       *http.Client
 }
 

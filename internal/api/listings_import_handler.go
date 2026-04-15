@@ -17,6 +17,7 @@ import (
 
 	"github.com/h2non/filetype"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/xuri/excelize/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -1152,8 +1153,21 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 	listingSvc := getListingService(r)
 	mediaSvc := getMediaService(r)
 
+	// Resolve default shipping profile for PHYSICAL_GOOD listings that lack one
+	var defaultShippingPB *pb.ShippingProfile
+	if shippingSvc, ok := getShippingService(r); ok {
+		if profiles, err := shippingSvc.ListProfiles(r.Context()); err == nil {
+			for _, p := range profiles {
+				if p.IsDefault {
+					defaultShippingPB = models.ConvertShippingEntityToProto(p)
+					break
+				}
+			}
+		}
+	}
+
 	// Process import
-	result, err := g.processListingsImportJSON(listingSvc, mediaSvc, payload.Listings, images, videos)
+	result, err := g.processListingsImportJSON(listingSvc, mediaSvc, payload.Listings, images, videos, defaultShippingPB)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1162,8 +1176,9 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 	sanitizedJSONResponse(w, result)
 }
 
-// processListingsImportJSON processes the JSON data and creates/updates listings
-func (g *Gateway) processListingsImportJSON(listingSvc contracts.ListingService, mediaSvc contracts.MediaService, listings []JSONListingInput, images, videos map[string][]byte) (*ImportResult, error) {
+// processListingsImportJSON processes the JSON data and creates/updates listings.
+// defaultShippingPB is auto-injected into PHYSICAL_GOOD listings that have no ShippingProfile.
+func (g *Gateway) processListingsImportJSON(listingSvc contracts.ListingService, mediaSvc contracts.MediaService, listings []JSONListingInput, images, videos map[string][]byte, defaultShippingPB *pb.ShippingProfile) (*ImportResult, error) {
 	result := &ImportResult{
 		CreatedItems: []ImportedItem{},
 		UpdatedItems: []ImportedItem{},
@@ -1228,6 +1243,21 @@ func (g *Gateway) processListingsImportJSON(listingSvc contracts.ListingService,
 			})
 			result.Failed++
 			continue
+		}
+
+		// Auto-inject default shipping profile for physical goods
+		if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD && listing.ShippingProfile == nil {
+			if defaultShippingPB != nil {
+				listing.ShippingProfile = defaultShippingPB
+			} else {
+				result.Errors = append(result.Errors, ImportError{
+					Row:   rowNum,
+					Title: listing.Item.Title,
+					Error: "physical good requires a shipping profile; create a default shipping profile first",
+				})
+				result.Failed++
+				continue
+			}
 		}
 
 		// Check if listing exists (by title)

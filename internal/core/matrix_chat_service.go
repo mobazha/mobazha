@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -547,6 +548,8 @@ func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context) error {
 		log.Infof("Crypto DB backed up to %s before reset", backupDir)
 	}
 
+	pruneOldCryptoBackups(dbPath, 3)
+
 	for _, suffix := range []string{"", "-wal", "-shm"} {
 		_ = os.Remove(dbPath + suffix)
 	}
@@ -756,6 +759,42 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Sync()
+}
+
+// pruneOldCryptoBackups removes old crypto DB backup directories, keeping only
+// the most recent `keep` backups. Backup dirs match the pattern
+// "<dbPath>.backup.YYYYMMDD-HHMMSS". Also removes legacy .bak files.
+func pruneOldCryptoBackups(dbPath string, keep int) {
+	dir := filepath.Dir(dbPath)
+	base := filepath.Base(dbPath) + ".backup."
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+
+	var backups []string
+	for _, e := range entries {
+		if e.IsDir() && strings.HasPrefix(e.Name(), base) {
+			backups = append(backups, filepath.Join(dir, e.Name()))
+		}
+	}
+
+	sort.Strings(backups)
+
+	if len(backups) > keep {
+		for _, old := range backups[:len(backups)-keep] {
+			if err := os.RemoveAll(old); err != nil {
+				log.Warningf("Failed to remove old crypto backup %s: %v", old, err)
+			} else {
+				log.Infof("Pruned old crypto backup: %s", old)
+			}
+		}
+	}
+
+	for _, suffix := range []string{".bak", "-shm.bak", "-wal.bak"} {
+		_ = os.Remove(dbPath + suffix)
+	}
 }
 
 // idleWatcher periodically checks if the service has been idle longer than

@@ -1198,7 +1198,6 @@ func (s *mautrixChatService) registerEventHandlers() {
 
 	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
 		content := evt.Content.AsMember()
-		log.Infof("StateMember: room=%s sender=%s stateKey=%s membership=%s", evt.RoomID, evt.Sender, evt.GetStateKey(), content.Membership)
 		if content.Membership == event.MembershipInvite && evt.GetStateKey() == s.client.UserID.String() {
 			s.handleInvite(ctx, evt)
 		}

@@ -109,6 +109,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		if err != nil {
 			log.Infof("Failed to load net config from %s: %s, using defaults", endpoint, err)
 		}
+		netConfig.Testnet = cfg.Testnet
 
 		if aiJSON := netConfig.GetAIProviders(); aiJSON != "" {
 			if err := ai.LoadRemoteProviders(aiJSON); err != nil {

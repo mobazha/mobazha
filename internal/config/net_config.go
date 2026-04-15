@@ -84,12 +84,16 @@ func (config *NetConfig) GetExchangeRateProviders() []string {
 	return config.ExchangeRateProviders
 }
 
-// GetNetDBEndpoint The endpoint to use for the network database, which is used
-// to backup and query profile and listing data here.
+// GetNetDBEndpoint returns the endpoint for search index sync (NetDB).
+// Testnet nodes return empty by default to prevent accidental data leakage
+// to the production search index. Use --netdbendpoint to override explicitly.
 func (config *NetConfig) GetNetDBEndpoint() string {
 	val, _ := config.GetConfig("netDBEndpoint")
 	if len(val) > 0 {
 		return val
+	}
+	if config.Testnet {
+		return ""
 	}
 	return "https://app.mobazha.org/search/v1/netdb"
 }

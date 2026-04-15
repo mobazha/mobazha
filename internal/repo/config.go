@@ -112,6 +112,7 @@ type Config struct {
 	SNFServerPeers         []string `long:"snfpeer" description:"A list of other store-and-forward servers to replicate snf data to. This is only used when the snf server is enabled."`
 	Tor                    bool     `long:"tor" description:"Proxy all incoming and outgoing connections over the Tor network exclusively."`
 	DualStack              bool     `long:"dualstack" description:"Listen for incoming connections via Tor in addition to via the clearnet. This mode is not private."`
+	SocksProxy             string   `long:"socksproxy" description:"SOCKS5 proxy for outbound HTTP (e.g. 127.0.0.1:9050 for Tor, 127.0.0.1:1080 for Lokinet)"`
 	DHTClientOnly          bool     `long:"dhtclientonly" description:"Disable participating in serving data in the DHT. This should be used if your node is undialable."`
 	NetConfigEndpoint      string   `long:"netconfigendpoint" description:"Override the default net config endpoint with the provided value"`
 	NetDBEndpoint          string   `long:"netdbendpoint" description:"Override the default NetDB endpoint for search index sync"`
@@ -302,6 +303,9 @@ func LoadConfig(dataDir string) (*Config, error) {
 
 	if cfg.Tor && cfg.DualStack {
 		return nil, errors.New("tor and dualstack options cannot be used together")
+	}
+	if cfg.Tor && cfg.SocksProxy != "" {
+		return nil, errors.New("--tor and --socksproxy cannot be used together; --tor runs an embedded Tor client, --socksproxy uses an external SOCKS5 proxy")
 	}
 
 	// Ensure LogLevel has a valid default. When LoadConfig is called from a

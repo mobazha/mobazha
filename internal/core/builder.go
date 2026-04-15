@@ -52,6 +52,7 @@ import (
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/tyler-smith/go-bip39"
+	"golang.org/x/net/proxy"
 	"gorm.io/gorm"
 )
 
@@ -145,6 +146,18 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			proxyclient.SetProxy(dialer)
 			madns.DefaultResolver = oniontransport.NewTorResover(obnet.TorDNSResover)
 		}
+	}
+
+	// ── External SOCKS5 proxy (--socksproxy / --privacy-mode) ────────
+	// When an external proxy is configured and embedded Tor is NOT active,
+	// route all outbound HTTP through the SOCKS5 dialer.
+	if cfg.SocksProxy != "" && !cfg.Tor {
+		socksDialer, dialErr := proxy.SOCKS5("tcp", cfg.SocksProxy, nil, proxy.Direct)
+		if dialErr != nil {
+			return nil, fmt.Errorf("SOCKS5 proxy %s: %w", cfg.SocksProxy, dialErr)
+		}
+		proxyclient.SetProxy(socksDialer)
+		logger.LogInfoWithIDf(log, nodeID, "Outbound HTTP routed through SOCKS5 proxy %s", cfg.SocksProxy)
 	}
 
 	// ── SaaS / lightweight node path ──────────────────────────────────

@@ -17,7 +17,12 @@ type Profile struct {
 	Nsfw      bool `json:"nsfw"`
 	Vendor    bool `json:"vendor"`
 	Moderator bool `json:"moderator"`
-	Private   bool `json:"private"`
+
+	// Visibility controls store discoverability:
+	//   "public"   – appears in marketplace search and recommendations
+	//   "unlisted" – hidden from search, accessible via direct link
+	//   "private"  – requires authorization to access
+	Visibility StoreVisibility `json:"visibility"`
 
 	StorePaused bool `json:"storePaused"`
 
@@ -93,6 +98,25 @@ type ImageHashes struct {
 	Large    string `json:"large"`
 	Original string `json:"original"`
 	Filename string `json:"filename"`
+}
+
+// StoreVisibility controls how a store can be discovered.
+type StoreVisibility string
+
+const (
+	VisibilityPublic   StoreVisibility = "public"
+	VisibilityUnlisted StoreVisibility = "unlisted"
+	VisibilityPrivate  StoreVisibility = "private"
+)
+
+// IsPrivate returns true if the store requires authorization to access.
+func (v StoreVisibility) IsPrivate() bool {
+	return v == VisibilityPrivate
+}
+
+// IsSearchable returns true if the store should appear in search results.
+func (v StoreVisibility) IsSearchable() bool {
+	return v == VisibilityPublic
 }
 
 // ImageSize is a string representation of the image size.

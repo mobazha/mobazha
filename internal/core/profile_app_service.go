@@ -273,6 +273,14 @@ func (s *ProfileAppService) UpdateSNFServers() error {
 // validateProfile checks each field to make sure they're formatted properly and/or
 // within the desired limits.
 func validateProfile(profile *models.Profile) error {
+	switch profile.Visibility {
+	case models.VisibilityPublic, models.VisibilityUnlisted, models.VisibilityPrivate:
+	case "":
+		profile.Visibility = models.VisibilityPublic
+	default:
+		return fmt.Errorf("%w: visibility must be one of: public, unlisted, private", coreiface.ErrBadRequest)
+	}
+
 	if len(profile.Name) == 0 {
 		return coreiface.ErrMissingField("name")
 	}

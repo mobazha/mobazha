@@ -114,3 +114,75 @@ func TestProfileAppService_UpdateSNFServers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, servers, got.StoreAndForwardServers)
 }
+
+func TestValidateProfile_Visibility(t *testing.T) {
+	tests := []struct {
+		name       string
+		visibility models.StoreVisibility
+		wantVis    models.StoreVisibility
+		wantErr    bool
+	}{
+		{"public", models.VisibilityPublic, models.VisibilityPublic, false},
+		{"unlisted", models.VisibilityUnlisted, models.VisibilityUnlisted, false},
+		{"private", models.VisibilityPrivate, models.VisibilityPrivate, false},
+		{"empty defaults to public", "", models.VisibilityPublic, false},
+		{"invalid rejected", "hidden", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &models.Profile{
+				Name:            "Test",
+				Visibility:      tt.visibility,
+				EscrowPublicKey: testEscrowPubKeyHex,
+			}
+			err := validateProfile(p)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantVis, p.Visibility)
+		})
+	}
+}
+
+func TestStoreVisibility_Helpers(t *testing.T) {
+	tests := []struct {
+		vis          models.StoreVisibility
+		isPrivate    bool
+		isSearchable bool
+	}{
+		{models.VisibilityPublic, false, true},
+		{models.VisibilityUnlisted, false, false},
+		{models.VisibilityPrivate, true, false},
+		{"", false, false},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.vis), func(t *testing.T) {
+			assert.Equal(t, tt.isPrivate, tt.vis.IsPrivate())
+			assert.Equal(t, tt.isSearchable, tt.vis.IsSearchable())
+		})
+	}
+}
+
+func TestProfileAppService_SetProfile_VisibilityPersisted(t *testing.T) {
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{})
+
+	err := svc.SetProfile(&models.Profile{Name: "Test", Visibility: models.VisibilityUnlisted}, nil)
+	require.NoError(t, err)
+
+	got, err := svc.GetMyProfile()
+	require.NoError(t, err)
+	assert.Equal(t, models.VisibilityUnlisted, got.Visibility)
+}
+
+func TestProfileAppService_SetProfile_EmptyVisibilityDefaultsPublic(t *testing.T) {
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{})
+
+	err := svc.SetProfile(&models.Profile{Name: "Test"}, nil)
+	require.NoError(t, err)
+
+	got, err := svc.GetMyProfile()
+	require.NoError(t, err)
+	assert.Equal(t, models.VisibilityPublic, got.Visibility)
+}

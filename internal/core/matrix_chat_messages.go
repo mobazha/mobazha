@@ -219,6 +219,8 @@ func (s *mautrixChatService) requestMissingRoomKeys(parentCtx context.Context, r
 		log.Errorf("requestMissingRoomKeys: OlmMachine is nil, aborting")
 		return
 	}
+
+	targets := s.collectRoomKeyRequestTargets(ctx, mach, roomID)
 	seen := make(map[id.SessionID]bool)
 
 	for _, m := range missing {
@@ -236,33 +238,17 @@ func (s *mautrixChatService) requestMissingRoomKeys(parentCtx context.Context, r
 		roomKeyRequestTracker[trackKey] = time.Now()
 		roomKeyRequestTrackerLock.Unlock()
 
-		devices, err := mach.CryptoStore.GetDevices(ctx, m.sender)
-		if err != nil || len(devices) == 0 {
-			if err != nil {
-				log.Warningf("requestMissingRoomKeys: GetDevices for %s failed: %v", m.sender, err)
-			}
-			_, err = mach.FetchKeys(ctx, []id.UserID{m.sender}, true)
-			if err != nil {
-				log.Warningf("requestMissingRoomKeys: FetchKeys for %s failed: %v", m.sender, err)
-				continue
-			}
-			devices, _ = mach.CryptoStore.GetDevices(ctx, m.sender)
+		reqTargets := targets
+		if len(reqTargets) == 0 {
+			reqTargets = map[id.UserID][]id.DeviceID{m.sender: {"*"}}
 		}
 
-		targets := map[id.UserID][]id.DeviceID{m.sender: {}}
-		for devID := range devices {
-			targets[m.sender] = append(targets[m.sender], devID)
-		}
-		if len(targets[m.sender]) == 0 {
-			targets[m.sender] = []id.DeviceID{"*"}
-		}
-
-		err = mach.SendRoomKeyRequest(ctx, roomID, m.senderKey, m.sessionID, "", targets)
+		err := mach.SendRoomKeyRequest(ctx, roomID, m.senderKey, m.sessionID, "", reqTargets)
 		if err != nil {
 			log.Warningf("requestMissingRoomKeys: SendRoomKeyRequest for session %s in room %s failed: %v", m.sessionID, roomID, err)
 		} else {
-			log.Infof("requestMissingRoomKeys: requested key for session %s in room %s from %s (%d devices)",
-				m.sessionID, roomID, m.sender, len(targets[m.sender]))
+			log.Infof("requestMissingRoomKeys: requested key for session %s in room %s from %d users",
+				m.sessionID, roomID, len(reqTargets))
 		}
 	}
 }

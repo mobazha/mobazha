@@ -1819,28 +1819,16 @@ func (s *mautrixChatService) retryDecryptAfterKeyRequest(parentCtx context.Conte
 	ctx, cancel := context.WithTimeout(context.Background(), keyRequestRetryTimeout+5*time.Second)
 	defer cancel()
 
-	devices, err := mach.CryptoStore.GetDevices(ctx, evt.Sender)
-	if err != nil || len(devices) == 0 {
-		if err != nil {
-			log.Warningf("retryDecrypt: GetDevices for %s failed: %v", evt.Sender, err)
-		}
-		_, _ = mach.FetchKeys(ctx, []id.UserID{evt.Sender}, true)
-		devices, _ = mach.CryptoStore.GetDevices(ctx, evt.Sender)
-	}
-
-	targets := map[id.UserID][]id.DeviceID{evt.Sender: {}}
-	for devID := range devices {
-		targets[evt.Sender] = append(targets[evt.Sender], devID)
-	}
-	if len(targets[evt.Sender]) == 0 {
-		targets[evt.Sender] = []id.DeviceID{"*"}
+	targets := s.collectRoomKeyRequestTargets(ctx, mach, evt.RoomID)
+	if len(targets) == 0 {
+		targets = map[id.UserID][]id.DeviceID{evt.Sender: {"*"}}
 	}
 
 	if err := mach.SendRoomKeyRequest(ctx, evt.RoomID, enc.SenderKey, enc.SessionID, "", targets); err != nil {
 		log.Warningf("retryDecrypt: SendRoomKeyRequest failed for session %s: %v", enc.SessionID, err)
 		return
 	}
-	log.Infof("retryDecrypt: requested key for session %s in room %s, waiting %v", enc.SessionID, evt.RoomID, keyRequestRetryTimeout)
+	log.Infof("retryDecrypt: requested key for session %s in room %s from %d users, waiting %v", enc.SessionID, evt.RoomID, len(targets), keyRequestRetryTimeout)
 
 	if !mach.WaitForSession(ctx, evt.RoomID, enc.SenderKey, enc.SessionID, keyRequestRetryTimeout) {
 		log.Infof("retryDecrypt: key for session %s did not arrive within timeout", enc.SessionID)
@@ -1862,6 +1850,44 @@ func (s *mautrixChatService) retryDecryptAfterKeyRequest(parentCtx context.Conte
 		Type: "chat.message.decrypted",
 		Data: msg,
 	})
+}
+
+// collectRoomKeyRequestTargets queries all joined members of a room and
+// fetches their device keys, returning a target map suitable for
+// SendRoomKeyRequest. This ensures key requests reach ALL room participants
+// (not just the message sender), which is critical for recovering self-sent
+// message keys after a crypto reset — the other party holds a copy of the
+// inbound session for our old outbound Megolm session.
+func (s *mautrixChatService) collectRoomKeyRequestTargets(ctx context.Context, mach *mxcrypto.OlmMachine, roomID id.RoomID) map[id.UserID][]id.DeviceID {
+	members, err := s.client.JoinedMembers(ctx, roomID)
+	if err != nil {
+		log.Warningf("collectKeyTargets: JoinedMembers(%s) failed: %v", roomID, err)
+		return nil
+	}
+
+	userIDs := make([]id.UserID, 0, len(members.Joined))
+	for uid := range members.Joined {
+		userIDs = append(userIDs, uid)
+	}
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	_, _ = mach.FetchKeys(ctx, userIDs, false)
+
+	targets := make(map[id.UserID][]id.DeviceID, len(userIDs))
+	for _, uid := range userIDs {
+		devices, _ := mach.CryptoStore.GetDevices(ctx, uid)
+		devIDs := make([]id.DeviceID, 0, len(devices))
+		for devID := range devices {
+			devIDs = append(devIDs, devID)
+		}
+		if len(devIDs) == 0 {
+			devIDs = []id.DeviceID{"*"}
+		}
+		targets[uid] = devIDs
+	}
+	return targets
 }
 
 // ---------------------------------------------------------------------------

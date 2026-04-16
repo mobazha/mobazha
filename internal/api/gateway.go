@@ -8,6 +8,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
@@ -79,7 +80,8 @@ type Gateway struct {
 	shutdown       chan struct{}
 	closeOnce      sync.Once
 	mu             sync.RWMutex
-	featureManager *pkgconfig.FeatureManager
+	featureManager     *pkgconfig.FeatureManager
+	guestOrderLimiter  *rateLimiter
 }
 
 // NewGateway instantiates a new gateway.
@@ -92,7 +94,8 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			shutdown:       make(chan struct{}),
 			hubs:           make(map[string]*hub),
 			hubsMtx:        sync.RWMutex{},
-			featureManager: pkgconfig.GetGlobalFeatureManager(),
+			featureManager:    pkgconfig.GetGlobalFeatureManager(),
+			guestOrderLimiter: newRateLimiter(10, time.Hour),
 		}
 		topMux = http.NewServeMux()
 	)
@@ -249,6 +252,7 @@ func (g *Gateway) Serve() error {
 	if g.listener == nil {
 		return nil
 	}
+	g.guestOrderLimiter.startCleanup(g.shutdown)
 	log.Infof("Gateway/API server listening on %s\n", g.listener.Addr())
 	var err error
 	if g.config.UseSSL {

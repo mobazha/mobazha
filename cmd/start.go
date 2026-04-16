@@ -150,7 +150,7 @@ func printReadyBanner(cfg *repo.Config) {
 	}
 	fmt.Println()
 	fmt.Println("   Press Ctrl+C to stop the node.")
-	fmt.Println("   To run in the background: mobazha service install")
+	fmt.Println("   To run as a background service: mobazha service install")
 	fmt.Println()
 }
 

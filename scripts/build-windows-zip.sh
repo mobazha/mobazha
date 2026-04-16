@@ -78,7 +78,7 @@ Option 2: Command line
 
      .\mobazha.exe start
 
-   Your store will be available at http://localhost:4002
+   Your store will be available at http://localhost:5102
 
 Commands
 --------

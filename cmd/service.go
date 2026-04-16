@@ -53,6 +53,25 @@ func (s *Service) binaryPath() (string, error) {
 	return filepath.EvalSymlinks(exe)
 }
 
+// launcherBinaryPath returns the path to mobazha-launcher if it exists
+// alongside the current binary. The launcher provides crash recovery,
+// auto-update, and health monitoring on top of the bare node.
+func (s *Service) launcherBinaryPath() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	resolved, err := filepath.EvalSymlinks(exe)
+	if err != nil {
+		return ""
+	}
+	launcher := filepath.Join(filepath.Dir(resolved), "mobazha-launcher")
+	if _, err := os.Stat(launcher); err == nil {
+		return launcher
+	}
+	return ""
+}
+
 // Execute installs the Mobazha system service.
 func (x *ServiceInstall) Execute(args []string) error {
 	switch runtime.GOOS {
@@ -98,9 +117,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart={{.Binary}} start{{if .DataDir}} -d {{.DataDir}}{{end}}{{if .Testnet}} -t{{end}}
+ExecStart={{.ExecStart}}
 Restart=on-failure
-RestartSec=5
+RestartSec={{.RestartSec}}
 User={{.User}}
 WorkingDirectory={{.Home}}
 
@@ -119,21 +138,40 @@ func (x *ServiceInstall) installSystemd() error {
 		return err
 	}
 
-	data := struct {
-		Binary  string
-		DataDir string
-		Testnet bool
-		User    string
-		Home    string
-	}{
-		Binary:  bin,
-		DataDir: x.dataDir(),
-		Testnet: x.Testnet,
-		User:    u.Username,
-		Home:    u.HomeDir,
+	launcherBin := x.launcherBinaryPath()
+	var execStart string
+	var restartSec int
+	useLauncher := launcherBin != ""
+
+	if useLauncher {
+		execStart = launcherBin
+		if x.DataDir != "" {
+			execStart += " --node-data-dir " + x.DataDir
+		}
+		if x.Testnet {
+			execStart += " --testnet"
+		}
+		restartSec = 30
+	} else {
+		execStart = bin + " start -d " + x.dataDir()
+		if x.Testnet {
+			execStart += " -t"
+		}
+		restartSec = 5
 	}
 
-	// Use user-level systemd (no sudo) if available; fall back to system-level.
+	data := struct {
+		ExecStart  string
+		RestartSec int
+		User       string
+		Home       string
+	}{
+		ExecStart:  execStart,
+		RestartSec: restartSec,
+		User:       u.Username,
+		Home:       u.HomeDir,
+	}
+
 	userMode := canUserSystemd()
 
 	var unitPath string
@@ -166,8 +204,7 @@ func (x *ServiceInstall) installSystemd() error {
 		}
 		run("systemctl", "--user", "daemon-reload")
 		run("systemctl", "--user", "enable", "mobazha")
-		run("systemctl", "--user", "start", "mobazha")
-		// Enable lingering so the service survives logout.
+		run("systemctl", "--user", "restart", "mobazha")
 		run("loginctl", "enable-linger", u.Username)
 	} else {
 		if err := sudoWriteFile(unitPath, []byte(buf.String())); err != nil {
@@ -175,11 +212,16 @@ func (x *ServiceInstall) installSystemd() error {
 		}
 		run("sudo", "systemctl", "daemon-reload")
 		run("sudo", "systemctl", "enable", "mobazha")
-		run("sudo", "systemctl", "start", "mobazha")
+		run("sudo", "systemctl", "restart", "mobazha")
 	}
 
 	fmt.Println()
-	fmt.Println("✅ Mobazha service installed and started.")
+	if useLauncher {
+		fmt.Println("✅ Mobazha service installed and started (with auto-update).")
+	} else {
+		fmt.Println("✅ Mobazha service installed and started.")
+		fmt.Println("   ℹ️  Install mobazha-launcher alongside mobazha for auto-update.")
+	}
 	fmt.Println()
 	if userMode {
 		fmt.Println("   Check status:  systemctl --user status mobazha")
@@ -244,14 +286,8 @@ const launchdPlistTmpl = `<?xml version="1.0" encoding="UTF-8"?>
 	<string>org.mobazha.node</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>{{.Binary}}</string>
-		<string>start</string>
-{{- if .DataDir}}
-		<string>-d</string>
-		<string>{{.DataDir}}</string>
-{{- end}}
-{{- if .Testnet}}
-		<string>-t</string>
+{{- range .Args}}
+		<string>{{.}}</string>
 {{- end}}
 	</array>
 	<key>RunAtLoad</key>
@@ -282,6 +318,25 @@ func (x *ServiceInstall) installLaunchd() error {
 		return err
 	}
 
+	launcherBin := x.launcherBinaryPath()
+	useLauncher := launcherBin != ""
+	var args []string
+
+	if useLauncher {
+		args = append(args, launcherBin)
+		if x.DataDir != "" {
+			args = append(args, "--node-data-dir", x.DataDir)
+		}
+		if x.Testnet {
+			args = append(args, "--testnet")
+		}
+	} else {
+		args = append(args, bin, "start", "-d", x.dataDir())
+		if x.Testnet {
+			args = append(args, "-t")
+		}
+	}
+
 	plistDir := filepath.Join(u.HomeDir, "Library", "LaunchAgents")
 	if err := os.MkdirAll(plistDir, 0755); err != nil {
 		return err
@@ -289,15 +344,11 @@ func (x *ServiceInstall) installLaunchd() error {
 	plistPath := filepath.Join(plistDir, "org.mobazha.node.plist")
 
 	data := struct {
-		Binary  string
-		DataDir string
-		Testnet bool
-		LogDir  string
+		Args   []string
+		LogDir string
 	}{
-		Binary:  bin,
-		DataDir: x.dataDir(),
-		Testnet: x.Testnet,
-		LogDir:  logDir,
+		Args:   args,
+		LogDir: logDir,
 	}
 
 	tmpl, err := template.New("plist").Parse(launchdPlistTmpl)
@@ -317,7 +368,12 @@ func (x *ServiceInstall) installLaunchd() error {
 	run("launchctl", "load", plistPath)
 
 	fmt.Println()
-	fmt.Println("✅ Mobazha service installed and started.")
+	if useLauncher {
+		fmt.Println("✅ Mobazha service installed and started (with auto-update).")
+	} else {
+		fmt.Println("✅ Mobazha service installed and started.")
+		fmt.Println("   ℹ️  Install mobazha-launcher alongside mobazha for auto-update.")
+	}
 	fmt.Println("   The node will start automatically on login.")
 	fmt.Println()
 	fmt.Println("   Check status:  launchctl list | grep mobazha")

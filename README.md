@@ -58,7 +58,7 @@ make build
 ### 运行
 
 ```bash
-./mobazha start    # First run auto-initializes; opens Web UI at http://localhost:4002
+./mobazha start    # First run auto-initializes; opens Web UI at http://localhost:5102
 ```
 
 后台运行：

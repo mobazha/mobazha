@@ -109,6 +109,29 @@ func (o *GuestOrder) IsTerminal() bool {
 	return o.State == GuestOrderCompleted || o.State == GuestOrderExpired
 }
 
+// validTransitions defines the allowed state transitions for a Guest Order.
+var validTransitions = map[GuestOrderState][]GuestOrderState{
+	GuestOrderAwaitingPayment: {GuestOrderPaymentDetected, GuestOrderExpired},
+	GuestOrderPaymentDetected: {GuestOrderFunded, GuestOrderExpired},
+	GuestOrderFunded:          {GuestOrderFulfilled},
+	GuestOrderFulfilled:       {GuestOrderCompleted},
+	// GuestOrderCompleted and GuestOrderExpired are terminal — no outgoing transitions.
+}
+
+// ValidTransition checks whether a transition from the current state to the target is allowed.
+func ValidTransition(from, to GuestOrderState) bool {
+	allowed, ok := validTransitions[from]
+	if !ok {
+		return false
+	}
+	for _, s := range allowed {
+		if s == to {
+			return true
+		}
+	}
+	return false
+}
+
 // GuestOrderItem represents a single line item within a Guest Order.
 type GuestOrderItem struct {
 	TenantMixin

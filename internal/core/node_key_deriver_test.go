@@ -176,6 +176,37 @@ func TestZeroBytes(t *testing.T) {
 	}
 }
 
+// TestNodeKeyDeriver_ExactAddressVectors validates derived addresses against known vectors
+// for the fixed test seed. These are locked in as regression guards — if they change,
+// existing Guest Orders would lose access to payment addresses.
+func TestNodeKeyDeriver_ExactAddressVectors(t *testing.T) {
+	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+
+	// BTC index=0: derive and lock the exact bech32 address
+	btcAddr, err := deriver.DeriveAddress(iwallet.ChainBitcoin, 0)
+	if err != nil {
+		t.Fatalf("BTC derive: %v", err)
+	}
+	// ETH index=0: derive and lock the exact checksummed address
+	ethAddr, err := deriver.DeriveAddress(iwallet.ChainEthereum, 0)
+	if err != nil {
+		t.Fatalf("ETH derive: %v", err)
+	}
+
+	// Locked vectors from the fixed test seed (000102…1e1f).
+	// If these change, HD derivation has regressed — existing Guest Orders
+	// would lose access to their payment addresses.
+	const wantBTC = "bc1qpkvdvv2rhulsdrgf3jdwuq5w6r6q9r232jtk7g"
+	const wantETH = "0x919538116b4F25f1CE01429fd9Ed7964556bf565"
+
+	if btcAddr != wantBTC {
+		t.Errorf("BTC[0] = %s, want %s", btcAddr, wantBTC)
+	}
+	if ethAddr != wantETH {
+		t.Errorf("ETH[0] = %s, want %s", ethAddr, wantETH)
+	}
+}
+
 func TestNodeKeyDeriver_Deterministic(t *testing.T) {
 	deriver1 := NewNodeKeyDeriver(testMasterKey(t), false)
 	deriver2 := NewNodeKeyDeriver(testMasterKey(t), false)

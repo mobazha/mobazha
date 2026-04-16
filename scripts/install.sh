@@ -122,38 +122,38 @@ do_install() {
 
     chmod +x "${tmpdir}/${BINARY_NAME}"
 
-    # On macOS, also download the desktop tray binary (system tray icon + auto-open browser)
-    local tray_available=false
-    if [[ "$platform" == darwin-* ]]; then
-        local tray_name="${BINARY_NAME}-tray-${platform}"
-        local tray_url="https://github.com/${REPO}/releases/download/${VERSION}/${tray_name}"
-        echo "⬇️  Downloading desktop tray (${tray_name})..."
-        if curl -fL# -o "${tmpdir}/${BINARY_NAME}-tray" "$tray_url" 2>/dev/null; then
-            chmod +x "${tmpdir}/${BINARY_NAME}-tray"
-            tray_available=true
-        else
-            echo "⚠️  Tray binary not available for this version, skipping."
-        fi
+    # Download the launcher binary (supervisor + crash recovery + auto-update)
+    # macOS: desktop launcher (systray), built locally and uploaded separately
+    # Linux: headless launcher (no GUI, use with systemd)
+    local launcher_available=false
+    local launcher_name="${BINARY_NAME}-launcher-${platform}"
+    local launcher_url="https://github.com/${REPO}/releases/download/${VERSION}/${launcher_name}"
+    echo "⬇️  Downloading launcher (${launcher_name})..."
+    if curl -fL# -o "${tmpdir}/${BINARY_NAME}-launcher" "$launcher_url" 2>/dev/null; then
+        chmod +x "${tmpdir}/${BINARY_NAME}-launcher"
+        launcher_available=true
+    else
+        echo "⚠️  Launcher binary not available for this version, skipping."
     fi
 
     mkdir -p "$INSTALL_DIR"
     if [ -w "$INSTALL_DIR" ]; then
         mv "${tmpdir}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
-        if $tray_available; then
-            mv "${tmpdir}/${BINARY_NAME}-tray" "${INSTALL_DIR}/${BINARY_NAME}-tray"
+        if $launcher_available; then
+            mv "${tmpdir}/${BINARY_NAME}-launcher" "${INSTALL_DIR}/${BINARY_NAME}-launcher"
         fi
     else
         echo "📦 Installing to ${INSTALL_DIR} (requires sudo)..."
         sudo mv "${tmpdir}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
-        if $tray_available; then
-            sudo mv "${tmpdir}/${BINARY_NAME}-tray" "${INSTALL_DIR}/${BINARY_NAME}-tray"
+        if $launcher_available; then
+            sudo mv "${tmpdir}/${BINARY_NAME}-launcher" "${INSTALL_DIR}/${BINARY_NAME}-launcher"
         fi
     fi
 
     echo ""
     echo "✅ Mobazha ${VERSION} installed to ${INSTALL_DIR}/${BINARY_NAME}"
-    if $tray_available; then
-        echo "   Desktop tray also installed: ${INSTALL_DIR}/${BINARY_NAME}-tray"
+    if $launcher_available; then
+        echo "   Launcher also installed: ${INSTALL_DIR}/${BINARY_NAME}-launcher"
     fi
 
     # Check if INSTALL_DIR is in PATH; if not, advise the user.
@@ -174,11 +174,11 @@ do_install() {
     fi
 
     echo ""
-    if $tray_available; then
-        echo "Quick start (Desktop — recommended for macOS):"
-        echo "  ${BINARY_NAME}-tray              # Launch tray icon, auto-opens browser"
+    if $launcher_available; then
+        echo "Quick start (recommended):"
+        echo "  ${BINARY_NAME}-launcher           # Launch with supervisor (crash recovery + auto-update)"
         echo ""
-        echo "Or use the CLI:"
+        echo "Or use the CLI directly:"
     else
         echo "Quick start:"
     fi
@@ -224,7 +224,7 @@ do_uninstall() {
     # Remove binaries (check both new and legacy install dirs)
     local found=false
     for dir in "$INSTALL_DIR" "/usr/local/bin"; do
-        for name in "${BINARY_NAME}" "${BINARY_NAME}-tray"; do
+        for name in "${BINARY_NAME}" "${BINARY_NAME}-launcher" "${BINARY_NAME}-tray"; do
             local binary="${dir}/${name}"
             if [ -f "$binary" ]; then
                 echo "   Removing ${binary}..."

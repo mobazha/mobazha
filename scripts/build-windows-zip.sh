@@ -7,13 +7,13 @@ set -euo pipefail
 #   ./scripts/build-windows-zip.sh [--version v0.1.0]
 #
 # The zip contains:
-#   mobazha.exe       — CLI binary (CGO_ENABLED=0, cross-compiled)
-#   mobazha-tray.exe  — System tray launcher (CGO_ENABLED=1, native compile on Windows)
-#   README.txt        — Quick start instructions
+#   mobazha.exe           — CLI binary (CGO_ENABLED=0, cross-compiled)
+#   mobazha-launcher.exe  — Desktop launcher with supervisor (CGO_ENABLED=1, native compile on Windows)
+#   README.txt            — Quick start instructions
 #
-# On non-Windows hosts, only the CLI binary is included (tray requires
-# native Windows compilation). The CI workflow builds the tray binary
-# on a windows-latest runner and merges them.
+# On non-Windows hosts, only the CLI binary is included (launcher desktop mode
+# requires native Windows compilation). The CI workflow builds the launcher
+# binary on a windows-latest runner and merges them.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -48,15 +48,16 @@ else
         "${PROJECT_ROOT}"
 fi
 
-# --- Tray binary (only on Windows) ---
+# --- Launcher binary (only on Windows, requires CGO for systray) ---
 if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]] || [[ "${GOOS:-}" == "windows" ]]; then
-    echo "==> Building tray binary (native Windows)..."
+    echo "==> Building launcher binary (native Windows, desktop mode)..."
     CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build \
-        -ldflags="-s -w -H windowsgui" \
-        -o "${STAGE_DIR}/mobazha-tray.exe" \
-        "${PROJECT_ROOT}/cmd/mobazha-tray"
+        -tags "desktop" \
+        -ldflags="-s -w -H windowsgui -X github.com/mobazha/mobazha3.0/internal/supervisor.Version=${VERSION}" \
+        -o "${STAGE_DIR}/mobazha-launcher.exe" \
+        "${PROJECT_ROOT}/cmd/mobazha-launcher"
 else
-    echo "==> Skipping tray binary (not on Windows; CI will build this natively)"
+    echo "==> Skipping launcher binary (not on Windows; CI will build this natively)"
 fi
 
 # --- README ---
@@ -67,9 +68,10 @@ Mobazha Standalone Store
 Quick Start
 -----------
 
-Option 1: Double-click mobazha-tray.exe
-   The system tray icon appears, the node starts automatically, and your
-   browser opens to the setup wizard.
+Option 1: Double-click mobazha-launcher.exe
+   The launcher manages the node lifecycle with auto-updates and crash
+   recovery. The system tray icon appears, and your browser opens to the
+   setup wizard.
 
 Option 2: Command line
    Open PowerShell or Command Prompt, navigate to this folder, then:

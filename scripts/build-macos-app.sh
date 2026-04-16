@@ -7,7 +7,7 @@ set -euo pipefail
 #   ./scripts/build-macos-app.sh [--arch arm64|amd64] [--version v0.1.0]
 #
 # Prerequisites:
-#   - macOS (cannot cross-compile the tray binary)
+#   - macOS (cannot cross-compile the launcher desktop binary)
 #   - Go toolchain
 #   - The main `mobazha` binary already built for the target arch
 #
@@ -60,7 +60,7 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
     <key>CFBundleShortVersionString</key>
     <string>${VERSION}</string>
     <key>CFBundleExecutable</key>
-    <string>mobazha-tray</string>
+    <string>mobazha-launcher</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
@@ -77,12 +77,13 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# --- Build tray binary (requires CGO for systray) ---
-echo "==> Building mobazha-tray..."
+# --- Build launcher binary (requires CGO for systray desktop mode) ---
+echo "==> Building mobazha-launcher (desktop)..."
 CGO_ENABLED=1 GOARCH="${GOARCH}" go build \
-    -ldflags="-s -w" \
-    -o "${APP_DIR}/Contents/MacOS/mobazha-tray" \
-    "${PROJECT_ROOT}/cmd/mobazha-tray"
+    -tags "desktop" \
+    -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/supervisor.Version=${VERSION}" \
+    -o "${APP_DIR}/Contents/MacOS/mobazha-launcher" \
+    "${PROJECT_ROOT}/cmd/mobazha-launcher"
 
 # --- Copy or build the main CLI binary ---
 MAIN_BINARY="${DIST_DIR}/mobazha-darwin-${ARCH_LABEL}"
@@ -100,10 +101,10 @@ else
 fi
 
 chmod +x "${APP_DIR}/Contents/MacOS/mobazha"
-chmod +x "${APP_DIR}/Contents/MacOS/mobazha-tray"
+chmod +x "${APP_DIR}/Contents/MacOS/mobazha-launcher"
 
 # --- Icon ---
-cp "${PROJECT_ROOT}/cmd/mobazha-tray/assets/Mobazha.icns" "${APP_DIR}/Contents/Resources/AppIcon.icns"
+cp "${PROJECT_ROOT}/cmd/mobazha-launcher/assets/Mobazha.icns" "${APP_DIR}/Contents/Resources/AppIcon.icns"
 
 echo "==> Mobazha.app created at ${APP_DIR}"
 

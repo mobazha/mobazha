@@ -320,10 +320,42 @@ func (x *ServiceStop) stopSystemd() error {
 }
 
 func (x *ServiceStatus) statusSystemd() error {
+	var args []string
 	if canUserSystemd() {
-		return runPassthrough("systemctl", "--user", "status", "mobazha")
+		args = []string{"systemctl", "--user", "is-active", "mobazha"}
+	} else {
+		args = []string{"systemctl", "is-active", "mobazha"}
 	}
-	return runPassthrough("systemctl", "status", "mobazha")
+
+	out, err := exec.Command(args[0], args[1:]...).Output()
+	state := strings.TrimSpace(string(out))
+
+	if err != nil || state != "active" {
+		fmt.Println("⏹  Mobazha service is stopped.")
+		fmt.Println("   To start:     mobazha service start")
+		return nil
+	}
+
+	var pidArgs []string
+	if canUserSystemd() {
+		pidArgs = []string{"systemctl", "--user", "show", "-p", "MainPID", "--value", "mobazha"}
+	} else {
+		pidArgs = []string{"systemctl", "show", "-p", "MainPID", "--value", "mobazha"}
+	}
+	pidOut, _ := exec.Command(pidArgs[0], pidArgs[1:]...).Output()
+	pid := strings.TrimSpace(string(pidOut))
+
+	if pid != "" && pid != "0" {
+		fmt.Printf("✅ Mobazha is running (PID %s)\n", pid)
+	} else {
+		fmt.Println("✅ Mobazha is running.")
+	}
+	if canUserSystemd() {
+		fmt.Println("   Logs: journalctl --user -u mobazha -f")
+	} else {
+		fmt.Println("   Logs: sudo journalctl -u mobazha -f")
+	}
+	return nil
 }
 
 func canUserSystemd() bool {
@@ -491,7 +523,50 @@ func (x *ServiceStop) stopLaunchd() error {
 }
 
 func (x *ServiceStatus) statusLaunchd() error {
-	return runPassthrough("launchctl", "list", "org.mobazha.node")
+	u, err := user.Current()
+	if err != nil {
+		return err
+	}
+	plistPath := filepath.Join(u.HomeDir, "Library", "LaunchAgents", "org.mobazha.node.plist")
+	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+		fmt.Println("Mobazha service is not installed.")
+		fmt.Println("   To install: mobazha service install")
+		return nil
+	}
+
+	out, err := exec.Command("launchctl", "list", "org.mobazha.node").Output()
+	if err != nil {
+		fmt.Println("⏹  Mobazha service is stopped.")
+		fmt.Println("   To start:     mobazha service start")
+		fmt.Println("   To uninstall: mobazha service uninstall")
+		return nil
+	}
+
+	pid := parseLaunchdField(string(out), "PID")
+	if pid != "" && pid != "0" {
+		fmt.Printf("✅ Mobazha is running (PID %s)\n", pid)
+	} else {
+		fmt.Println("⏹  Mobazha service is loaded but not running.")
+	}
+	logDir := filepath.Join(u.HomeDir, "Library", "Logs", "Mobazha")
+	fmt.Printf("   Logs: %s/mobazha.log\n", logDir)
+	return nil
+}
+
+func parseLaunchdField(output, key string) string {
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "\""+key+"\"") {
+			parts := strings.SplitN(trimmed, "=", 2)
+			if len(parts) == 2 {
+				val := strings.TrimSpace(parts[1])
+				val = strings.TrimSuffix(val, ";")
+				val = strings.TrimSpace(val)
+				return val
+			}
+		}
+	}
+	return ""
 }
 
 // --- helpers ---

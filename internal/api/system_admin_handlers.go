@@ -1,21 +1,25 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"runtime"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/supervisor"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
 type systemHealthResponse struct {
-	Status    string             `json:"status"`
-	Version   string             `json:"version"`
-	Uptime    int64              `json:"uptimeSeconds"`
-	Timestamp int64              `json:"timestamp"`
-	System    systemResourceInfo `json:"system"`
-	Node      nodeHealthInfo     `json:"node"`
+	Status         string             `json:"status"`
+	Version        string             `json:"version"`
+	Uptime         int64              `json:"uptimeSeconds"`
+	Timestamp      int64              `json:"timestamp"`
+	DeploymentMode string             `json:"deploymentMode"`
+	System         systemResourceInfo `json:"system"`
+	Node           nodeHealthInfo     `json:"node"`
+	Update         *updateInfoResponse `json:"update,omitempty"`
 }
 
 type systemResourceInfo struct {
@@ -36,6 +40,18 @@ type nodeHealthInfo struct {
 	DataDir string `json:"dataDir"`
 }
 
+type updateInfoResponse struct {
+	LauncherVersion   string `json:"launcherVersion,omitempty"`
+	AutoUpdateEnabled bool   `json:"autoUpdateEnabled"`
+	UpdateStatus      string `json:"updateStatus"`
+	LatestVersion     string `json:"latestVersion,omitempty"`
+	LatestReleaseURL  string `json:"latestReleaseURL,omitempty"`
+	ReleaseNotes      string `json:"releaseNotes,omitempty"`
+	DownloadProgress  int    `json:"downloadProgress"`
+	LastCheckTime     string `json:"lastCheckTime,omitempty"`
+	LastError         string `json:"lastError,omitempty"`
+}
+
 var nodeStartTime = time.Now()
 
 func (g *Gateway) handleGETSystemHealth(w http.ResponseWriter, r *http.Request) {
@@ -52,10 +68,11 @@ func (g *Gateway) handleGETSystemHealth(w http.ResponseWriter, r *http.Request) 
 	diskTotal, diskFree, diskPct := getDiskUsage(dataDir)
 
 	resp := systemHealthResponse{
-		Status:    "healthy",
-		Version:   Version,
-		Uptime:    int64(time.Since(nodeStartTime).Seconds()),
-		Timestamp: time.Now().Unix(),
+		Status:         "healthy",
+		Version:        Version,
+		Uptime:         int64(time.Since(nodeStartTime).Seconds()),
+		Timestamp:      time.Now().Unix(),
+		DeploymentMode: detectDeploymentMode(),
 		System: systemResourceInfo{
 			GoVersion:    runtime.Version(),
 			OS:           runtime.GOOS,
@@ -73,6 +90,8 @@ func (g *Gateway) handleGETSystemHealth(w http.ResponseWriter, r *http.Request) 
 			DataDir: dataDir,
 		},
 	}
+
+	resp.Update = readUpdateInfo(dataDir)
 
 	response.Success(w, resp)
 }
@@ -118,6 +137,135 @@ func readLastLines(path string, maxLines int) ([]string, error) {
 		lines = lines[len(lines)-maxLines:]
 	}
 	return lines, nil
+}
+
+// detectDeploymentMode returns "docker", "native", or "saas".
+func detectDeploymentMode() string {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return "docker"
+	}
+	if os.Getenv("DOCKER_CONTAINER") == "true" {
+		return "docker"
+	}
+	return "native"
+}
+
+// readUpdateInfo reads the update-status.json written by the Launcher.
+func readUpdateInfo(dataDir string) *updateInfoResponse {
+	status, err := supervisor.ReadStatusFile(dataDir)
+	if err != nil {
+		return nil
+	}
+	return &updateInfoResponse{
+		LauncherVersion:   status.LauncherVersion,
+		AutoUpdateEnabled: status.AutoUpdateEnabled,
+		UpdateStatus:      status.UpdateStatus,
+		LatestVersion:     status.LatestVersion,
+		LatestReleaseURL:  status.LatestReleaseURL,
+		ReleaseNotes:      status.ReleaseNotes,
+		DownloadProgress:  status.DownloadProgress,
+		LastCheckTime:     status.LastCheckTime,
+		LastError:         status.LastError,
+	}
+}
+
+// handlePOSTUpdateTrigger writes an update-trigger.json for the Launcher to pick up.
+func (g *Gateway) handlePOSTUpdateTrigger(w http.ResponseWriter, r *http.Request) {
+	dataDir := g.setupDataDir()
+	if dataDir == "" {
+		response.Error(w, http.StatusServiceUnavailable, response.CodeServiceUnavail,
+			"Not available in this deployment mode")
+		return
+	}
+
+	var req struct {
+		Action string `json:"action"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Action != "check" && req.Action != "apply" {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
+			"action must be 'check' or 'apply'")
+		return
+	}
+
+	if err := supervisor.WriteTrigger(dataDir, req.Action); err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
+			"failed to write trigger file")
+		return
+	}
+
+	response.NoContent(w)
+}
+
+type updateConfigResponse struct {
+	AutoUpdateEnabled bool   `json:"autoUpdateEnabled"`
+	CheckIntervalMin  int    `json:"checkIntervalMinutes"`
+	UpdateChannel     string `json:"updateChannel"`
+}
+
+// handleGETUpdateConfig reads the launcher-config.json.
+func (g *Gateway) handleGETUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	dataDir := g.setupDataDir()
+	if dataDir == "" {
+		response.Error(w, http.StatusServiceUnavailable, response.CodeServiceUnavail,
+			"Not available in this deployment mode")
+		return
+	}
+
+	cfg := supervisor.NewConfigManager(dataDir)
+	c := cfg.Get()
+	response.Success(w, updateConfigResponse{
+		AutoUpdateEnabled: c.AutoUpdateEnabled,
+		CheckIntervalMin:  c.CheckIntervalMin,
+		UpdateChannel:     c.UpdateChannel,
+	})
+}
+
+// handlePUTUpdateConfig writes the launcher-config.json.
+func (g *Gateway) handlePUTUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	dataDir := g.setupDataDir()
+	if dataDir == "" {
+		response.Error(w, http.StatusServiceUnavailable, response.CodeServiceUnavail,
+			"Not available in this deployment mode")
+		return
+	}
+
+	var req updateConfigResponse
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "invalid request body")
+		return
+	}
+
+	if req.CheckIntervalMin <= 0 {
+		req.CheckIntervalMin = 360
+	}
+	if req.UpdateChannel == "" {
+		req.UpdateChannel = "stable"
+	}
+
+	cfg := supervisor.LauncherConfig{
+		AutoUpdateEnabled: req.AutoUpdateEnabled,
+		CheckIntervalMin:  req.CheckIntervalMin,
+		UpdateChannel:     req.UpdateChannel,
+	}
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "marshal config")
+		return
+	}
+
+	configPath := dataDir + "/launcher-config.json"
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "write config")
+		return
+	}
+
+	response.Success(w, req)
 }
 
 func splitNonEmpty(s string) []string {

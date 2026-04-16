@@ -772,6 +772,8 @@ func (n *MobazhaNode) initGuestOrderService() {
 		EventBus:      n.eventBus,
 		NodeID:        n.nodeID,
 		Shutdown:      n.shutdown,
+		Listings:      n.listingService,
+		ExchangeRates: n.exchangeRates,
 	})
 
 	// Monitor is created with nil chain checkers initially.

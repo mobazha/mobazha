@@ -26,17 +26,16 @@ type GuestOrderItemRequest struct {
 
 // GuestOrderResponse is returned after order creation.
 type GuestOrderResponse struct {
-	OrderToken     string                  `json:"orderToken"`
-	PaymentAddress string                  `json:"paymentAddress"`
-	PaymentAmount  string                  `json:"paymentAmount"`
-	PaymentCoin    string                  `json:"paymentCoin"`
-	ReferenceKey   string                  `json:"referenceKey,omitempty"`
-	ExpiresAt      time.Time               `json:"expiresAt"`
-	Items          []models.GuestOrderItem `json:"items"`
-	Subtotal       uint64                  `json:"subtotal"`
-	ShippingCost   uint64                  `json:"shippingCost"`
-	TotalPrice     uint64                  `json:"totalPrice"`
-	PriceCurrency  string                  `json:"priceCurrency"`
+	OrderToken        string                  `json:"orderToken"`
+	PaymentAddress    string                  `json:"paymentAddress"`
+	PaymentAmount     string                  `json:"paymentAmount"`
+	PaymentCoin       string                  `json:"paymentCoin"`
+	ReferenceKey      string                  `json:"referenceKey,omitempty"`
+	ExpiresAt         time.Time               `json:"expiresAt"`
+	Items             []models.GuestOrderItem `json:"items"`
+	Subtotal          uint64                  `json:"subtotal"`
+	PriceCurrency     string                  `json:"priceCurrency"`
+	PriceDivisibility uint32                  `json:"priceDivisibility"`
 }
 
 // GuestOrderStatusResponse is the public status for a guest order.

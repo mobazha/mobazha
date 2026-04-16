@@ -17,6 +17,7 @@ import (
 
 	"github.com/h2non/filetype"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/xuri/excelize/v2"
@@ -81,13 +82,15 @@ var columnsZH = map[string]int{
 
 // ImportResult represents the result of a batch import operation
 type ImportResult struct {
-	Total        int            `json:"total"`
-	Created      int            `json:"created"`
-	Updated      int            `json:"updated"`
-	Failed       int            `json:"failed"`
-	CreatedItems []ImportedItem `json:"createdItems"`
-	UpdatedItems []ImportedItem `json:"updatedItems"`
-	Errors       []ImportError  `json:"errors"`
+	Total           int            `json:"total"`
+	Created         int            `json:"created"`
+	Updated         int            `json:"updated"`
+	Failed          int            `json:"failed"`
+	CreatedItems    []ImportedItem `json:"createdItems"`
+	UpdatedItems    []ImportedItem `json:"updatedItems"`
+	Errors          []ImportError  `json:"errors"`
+	ProfileImported bool           `json:"profileImported,omitempty"`
+	ProfileError    string         `json:"profileError,omitempty"`
 }
 
 // ImportedItem represents a successfully imported item
@@ -248,6 +251,31 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+var profileImageExts = map[string]bool{
+	".jpg": true, ".jpeg": true, ".png": true, ".webp": true, ".gif": true,
+}
+
+// isProfileImage returns true if the file is a root-level avatar.* or header.* image
+// (not inside images/ or videos/ subdirectories).
+func isProfileImage(normalizedName, basename string) (slot string, ok bool) {
+	if strings.Contains(normalizedName, "/images/") || strings.HasPrefix(normalizedName, "images/") ||
+		strings.Contains(normalizedName, "/videos/") || strings.HasPrefix(normalizedName, "videos/") {
+		return "", false
+	}
+	ext := strings.ToLower(filepath.Ext(basename))
+	if !profileImageExts[ext] {
+		return "", false
+	}
+	nameNoExt := strings.TrimSuffix(strings.ToLower(basename), ext)
+	switch nameNoExt {
+	case "avatar":
+		return "avatar", true
+	case "header":
+		return "header", true
+	}
+	return "", false
+}
+
 // handlePOSTListingsImport handles the batch import of listings from a ZIP file.
 // It auto-detects the data format inside the ZIP:
 //   - If a .json file is found → JSON import (supports shippingProfiles + collections)
@@ -289,6 +317,7 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 
 	var excelFile *zip.File
 	var jsonFile *zip.File
+	var avatarData, headerData []byte
 	images := make(map[string][]byte)
 	videos := make(map[string][]byte)
 
@@ -299,6 +328,17 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 
 		normalizedName := strings.TrimPrefix(strings.ToLower(f.Name), "./")
 		filename := filepath.Base(f.Name)
+
+		if slot, ok := isProfileImage(normalizedName, filename); ok {
+			if data, err := readZipFile(f); err == nil {
+				if slot == "avatar" {
+					avatarData = data
+				} else {
+					headerData = data
+				}
+			}
+			continue
+		}
 
 		switch {
 		case strings.HasSuffix(normalizedName, ".json"):
@@ -320,7 +360,7 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 
 	// JSON format takes priority over Excel
 	if jsonFile != nil {
-		g.importFromJSON(w, r, jsonFile, images, videos)
+		g.importFromJSON(w, r, jsonFile, images, videos, avatarData, headerData)
 		return
 	}
 
@@ -1078,8 +1118,24 @@ type JSONImportCollection struct {
 	Products    []string `json:"products"` // listing slugs
 }
 
+// JSONImportProfile contains only the writable fields of a store profile.
+// Read-only fields (peerID, publicKey, stats, avatarHashes, headerHashes)
+// are intentionally excluded.
+type JSONImportProfile struct {
+	Name             string                    `json:"name"`
+	Location         string                    `json:"location,omitempty"`
+	About            string                    `json:"about,omitempty"`
+	ShortDescription string                    `json:"shortDescription,omitempty"`
+	Nsfw             bool                      `json:"nsfw,omitempty"`
+	Vendor           *bool                     `json:"vendor,omitempty"`
+	Moderator        bool                      `json:"moderator,omitempty"`
+	Colors           *models.ProfileColors     `json:"colors,omitempty"`
+	ContactInfo      *models.ProfileContactInfo `json:"contactInfo,omitempty"`
+}
+
 // JSONImportPayload represents the root JSON structure
 type JSONImportPayload struct {
+	Profile          *JSONImportProfile          `json:"profile,omitempty"`
 	Listings         []JSONListingInput          `json:"listings"`
 	ShippingProfiles []JSONImportShippingProfile `json:"shippingProfiles,omitempty"`
 	Collections      []JSONImportCollection      `json:"collections,omitempty"`
@@ -1123,6 +1179,7 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 	}
 
 	var jsonFile *zip.File
+	var avatarData, headerData []byte
 	images := make(map[string][]byte)
 	videos := make(map[string][]byte)
 
@@ -1133,6 +1190,17 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 
 		normalizedName := strings.TrimPrefix(strings.ToLower(f.Name), "./")
 		filename := filepath.Base(f.Name)
+
+		if slot, ok := isProfileImage(normalizedName, filename); ok {
+			if data, err := readZipFile(f); err == nil {
+				if slot == "avatar" {
+					avatarData = data
+				} else {
+					headerData = data
+				}
+			}
+			continue
+		}
 
 		switch {
 		case strings.HasSuffix(normalizedName, "listings.json") || strings.HasSuffix(normalizedName, ".json"):
@@ -1155,12 +1223,12 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	g.importFromJSON(w, r, jsonFile, images, videos)
+	g.importFromJSON(w, r, jsonFile, images, videos, avatarData, headerData)
 }
 
 // importFromJSON is the shared JSON import logic used by both the auto-detect
 // endpoint (/v1/listings/import) and the dedicated JSON endpoint (/v1/listings/import/json).
-func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZipEntry *zip.File, images, videos map[string][]byte) {
+func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZipEntry *zip.File, images, videos map[string][]byte, avatarData, headerData []byte) {
 	jsonData, err := readZipFile(jsonZipEntry)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading JSON file: %s", err.Error()))
@@ -1175,6 +1243,71 @@ func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZip
 
 	listingSvc := getListingService(r)
 	mediaSvc := getMediaService(r)
+
+	// Phase 0: Import profile (avatar, header, profile data).
+	// Failures are non-fatal — they get recorded in the result but do not
+	// block the subsequent listings import.
+	var profileImported bool
+	var profileError string
+
+	if avatarData != nil {
+		if _, err := mediaSvc.SetProfileMedia(r.Context(), contracts.SlotAvatar, avatarData); err != nil {
+			profileError = fmt.Sprintf("avatar upload failed: %s", err.Error())
+		}
+	}
+	if headerData != nil {
+		if _, err := mediaSvc.SetProfileMedia(r.Context(), contracts.SlotHeader, headerData); err != nil {
+			if profileError != "" {
+				profileError += "; "
+			}
+			profileError += fmt.Sprintf("header upload failed: %s", err.Error())
+		}
+	}
+	if payload.Profile != nil && payload.Profile.Name != "" {
+		prof := getProfileService(r)
+		profile := models.Profile{
+			Name:             payload.Profile.Name,
+			Location:         payload.Profile.Location,
+			About:            payload.Profile.About,
+			ShortDescription: payload.Profile.ShortDescription,
+			Nsfw:             payload.Profile.Nsfw,
+			Moderator:        payload.Profile.Moderator,
+		}
+		if payload.Profile.Vendor != nil {
+			profile.Vendor = *payload.Profile.Vendor
+		} else {
+			profile.Vendor = true
+		}
+		if payload.Profile.Colors != nil {
+			profile.Colors = *payload.Profile.Colors
+		}
+		if payload.Profile.ContactInfo != nil {
+			profile.ContactInfo = payload.Profile.ContactInfo
+		}
+
+		_, existErr := prof.GetMyProfile()
+		if errors.Is(existErr, coreiface.ErrNotFound) {
+			if err := prof.SetProfile(&profile, nil); err != nil {
+				if profileError != "" {
+					profileError += "; "
+				}
+				profileError += fmt.Sprintf("profile create failed: %s", err.Error())
+			} else {
+				profileImported = true
+			}
+		} else if existErr == nil {
+			if err := prof.SetProfile(&profile, nil); err != nil {
+				if profileError != "" {
+					profileError += "; "
+				}
+				profileError += fmt.Sprintf("profile update failed: %s", err.Error())
+			} else {
+				profileImported = true
+			}
+		}
+	} else if avatarData != nil || headerData != nil {
+		profileImported = profileError == ""
+	}
 
 	// Phase 1: Create shipping profiles and build key→ID mapping
 	profileKeyToID := make(map[string]string)
@@ -1233,6 +1366,9 @@ func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZip
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	result.ProfileImported = profileImported
+	result.ProfileError = profileError
 
 	// Phase 3: Create collections
 	if collSvc, ok := getCollectionService(r); ok && len(payload.Collections) > 0 {

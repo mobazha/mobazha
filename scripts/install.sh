@@ -234,6 +234,7 @@ do_install() {
             echo "Commands:"
             echo "  mobazha service status    Check service status"
             echo "  mobazha service stop      Stop the node"
+            echo "  mobazha service start     Start the node"
             echo "  mobazha doctor            System health check"
             echo "  mobazha backup            Back up data"
             echo ""

@@ -29,6 +29,16 @@ type ServiceUninstall struct {
 	Service
 }
 
+// ServiceStart starts the service (must be installed first).
+type ServiceStart struct {
+	Service
+}
+
+// ServiceStop stops the running service.
+type ServiceStop struct {
+	Service
+}
+
 // ServiceStatus checks the service status.
 type ServiceStatus struct {
 	Service
@@ -91,6 +101,30 @@ func (x *ServiceUninstall) Execute(args []string) error {
 		return x.uninstallSystemd()
 	case "darwin":
 		return x.uninstallLaunchd()
+	default:
+		return fmt.Errorf("service management is not supported on %s", runtime.GOOS)
+	}
+}
+
+// Execute starts the Mobazha service.
+func (x *ServiceStart) Execute(args []string) error {
+	switch runtime.GOOS {
+	case "linux":
+		return x.startSystemd()
+	case "darwin":
+		return x.startLaunchd()
+	default:
+		return fmt.Errorf("service management is not supported on %s", runtime.GOOS)
+	}
+}
+
+// Execute stops the Mobazha service.
+func (x *ServiceStop) Execute(args []string) error {
+	switch runtime.GOOS {
+	case "linux":
+		return x.stopSystemd()
+	case "darwin":
+		return x.stopLaunchd()
 	default:
 		return fmt.Errorf("service management is not supported on %s", runtime.GOOS)
 	}
@@ -223,17 +257,14 @@ func (x *ServiceInstall) installSystemd() error {
 		fmt.Println("   ℹ️  Install mobazha-launcher alongside mobazha for auto-update.")
 	}
 	fmt.Println()
+	fmt.Println("   Check status:  mobazha service status")
 	if userMode {
-		fmt.Println("   Check status:  systemctl --user status mobazha")
 		fmt.Println("   View logs:     journalctl --user -u mobazha -f")
-		fmt.Println("   Stop:          systemctl --user stop mobazha")
-		fmt.Println("   Uninstall:     mobazha service uninstall")
 	} else {
-		fmt.Println("   Check status:  sudo systemctl status mobazha")
 		fmt.Println("   View logs:     sudo journalctl -u mobazha -f")
-		fmt.Println("   Stop:          sudo systemctl stop mobazha")
-		fmt.Println("   Uninstall:     mobazha service uninstall")
 	}
+	fmt.Println("   Stop:          mobazha service stop")
+	fmt.Println("   Uninstall:     mobazha service uninstall")
 	return nil
 }
 
@@ -256,6 +287,35 @@ func (x *ServiceUninstall) uninstallSystemd() error {
 		run("sudo", "systemctl", "daemon-reload")
 	}
 	fmt.Println("✅ Mobazha service removed.")
+	return nil
+}
+
+func (x *ServiceStart) startSystemd() error {
+	userMode := canUserSystemd()
+	if userMode {
+		if err := runPassthrough("systemctl", "--user", "start", "mobazha"); err != nil {
+			return fmt.Errorf("failed to start service — is it installed? Run: mobazha service install")
+		}
+	} else {
+		if err := runPassthrough("sudo", "systemctl", "start", "mobazha"); err != nil {
+			return fmt.Errorf("failed to start service — is it installed? Run: mobazha service install")
+		}
+	}
+	fmt.Println("✅ Mobazha service started.")
+	return nil
+}
+
+func (x *ServiceStop) stopSystemd() error {
+	if canUserSystemd() {
+		if err := runPassthrough("systemctl", "--user", "stop", "mobazha"); err != nil {
+			return err
+		}
+	} else {
+		if err := runPassthrough("sudo", "systemctl", "stop", "mobazha"); err != nil {
+			return err
+		}
+	}
+	fmt.Println("✅ Mobazha service stopped.")
 	return nil
 }
 
@@ -290,6 +350,11 @@ const launchdPlistTmpl = `<?xml version="1.0" encoding="UTF-8"?>
 		<string>{{.}}</string>
 {{- end}}
 	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>MOBAZHA_LAUNCHER_BG</key>
+		<string>1</string>
+	</dict>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>KeepAlive</key>
@@ -376,9 +441,9 @@ func (x *ServiceInstall) installLaunchd() error {
 	}
 	fmt.Println("   The node will start automatically on login.")
 	fmt.Println()
-	fmt.Println("   Check status:  launchctl list | grep mobazha")
+	fmt.Println("   Check status:  mobazha service status")
 	fmt.Println("   View logs:     tail -f ~/Library/Logs/Mobazha/mobazha.log")
-	fmt.Println("   Stop:          launchctl unload " + plistPath)
+	fmt.Println("   Stop:          mobazha service stop")
 	fmt.Println("   Uninstall:     mobazha service uninstall")
 	return nil
 }
@@ -392,6 +457,36 @@ func (x *ServiceUninstall) uninstallLaunchd() error {
 	run("launchctl", "unload", plistPath)
 	os.Remove(plistPath)
 	fmt.Println("✅ Mobazha service removed.")
+	return nil
+}
+
+func (x *ServiceStart) startLaunchd() error {
+	u, err := user.Current()
+	if err != nil {
+		return err
+	}
+	plistPath := filepath.Join(u.HomeDir, "Library", "LaunchAgents", "org.mobazha.node.plist")
+	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+		return fmt.Errorf("service is not installed — run: mobazha service install")
+	}
+	run("launchctl", "load", plistPath)
+	fmt.Println("✅ Mobazha service started.")
+	return nil
+}
+
+func (x *ServiceStop) stopLaunchd() error {
+	u, err := user.Current()
+	if err != nil {
+		return err
+	}
+	plistPath := filepath.Join(u.HomeDir, "Library", "LaunchAgents", "org.mobazha.node.plist")
+	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+		fmt.Println("Mobazha service is not installed.")
+		return nil
+	}
+	run("launchctl", "unload", plistPath)
+	fmt.Println("✅ Mobazha service stopped.")
+	fmt.Println("   To start again: mobazha service start")
 	return nil
 }
 

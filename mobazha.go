@@ -70,6 +70,18 @@ func main() {
 		&cmd.ServiceInstall{}); err != nil {
 		log.Fatal(err)
 	}
+	if _, err := serviceCmd.AddCommand("start",
+		"start the background service",
+		"Start a previously stopped Mobazha service.",
+		&cmd.ServiceStart{}); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := serviceCmd.AddCommand("stop",
+		"stop the background service",
+		"Stop the Mobazha background service. Use 'mobazha service install' to start it again.",
+		&cmd.ServiceStop{}); err != nil {
+		log.Fatal(err)
+	}
 	if _, err := serviceCmd.AddCommand("uninstall",
 		"stop and remove the background service",
 		"Stop the Mobazha service and remove it from system startup.",

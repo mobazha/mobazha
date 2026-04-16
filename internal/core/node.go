@@ -200,6 +200,7 @@ type appServices struct {
 	directPaymentService       *DirectPaymentService
 	autoSweepService           *AutoSweepService
 	guestPaymentMonitor        *GuestPaymentMonitor
+	unifiedOrderView           *UnifiedOrderView
 }
 
 // IsDefaultNode returns whether this node is the default node.

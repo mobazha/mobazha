@@ -781,4 +781,6 @@ func (n *MobazhaNode) initGuestOrderService() {
 	// once chain clients are fully initialized.
 	n.guestPaymentMonitor = NewGuestPaymentMonitor(n.db, n.guestOrderService, nil, nil)
 	n.guestOrderService.SetPaymentWatcher(n.guestPaymentMonitor)
+
+	n.unifiedOrderView = NewUnifiedOrderView(n.orderService, n.guestOrderService)
 }

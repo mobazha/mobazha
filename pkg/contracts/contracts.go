@@ -320,6 +320,9 @@ type GuestOrderService interface {
 	CleanupExpiredOrders(ctx context.Context)
 	AutoCompleteOrders(ctx context.Context)
 	StartCleanupLoop()
+
+	GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error)
+	SaveGuestCheckoutConfig(ctx context.Context, cfg *models.GuestCheckoutConfig) error
 }
 
 // NodeService is the top-level aggregate interface that combines all domain services.

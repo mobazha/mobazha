@@ -20,6 +20,10 @@ type ServerConfig struct {
 	// When set, the handler serves a dynamic /runtime-config.js that
 	// switches the frontend to standalone mode.
 	SaaSURL string
+
+	// GuestCheckoutEnabled tells the frontend whether guest (anonymous)
+	// checkout is available on this node.
+	GuestCheckoutEnabled bool
 }
 
 // NewHandler returns an http.Handler that serves the SPA frontend.
@@ -32,16 +36,18 @@ func NewHandler(cfg ServerConfig) http.Handler {
 	embeddedSub, _ := fs.Sub(DistFS, "dist")
 
 	return &spaHandler{
-		embedded:    embeddedSub,
-		overrideDir: cfg.OverrideDir,
-		saasURL:     cfg.SaaSURL,
+		embedded:             embeddedSub,
+		overrideDir:          cfg.OverrideDir,
+		saasURL:              cfg.SaaSURL,
+		guestCheckoutEnabled: cfg.GuestCheckoutEnabled,
 	}
 }
 
 type spaHandler struct {
-	embedded    fs.FS
-	overrideDir string
-	saasURL     string
+	embedded             fs.FS
+	overrideDir          string
+	saasURL              string
+	guestCheckoutEnabled bool
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +151,12 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter) {
 		saasURL = "https://app.mobazha.org"
 	}
 
-	fmt.Fprintf(w, `window.__RUNTIME_CONFIG__={saasUrl:"%s",authMode:"standalone"};`, saasURL)
+	guestCheckout := "false"
+	if h.guestCheckoutEnabled {
+		guestCheckout = "true"
+	}
+
+	fmt.Fprintf(w, `window.__RUNTIME_CONFIG__={saasUrl:"%s",authMode:"standalone",guestCheckoutEnabled:%s};`, saasURL, guestCheckout)
 }
 
 func sniffContentType(name string) string {

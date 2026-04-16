@@ -81,6 +81,14 @@ func (n *MobazhaNode) GuestOrder() contracts.GuestOrderService {
 	return n.guestOrderService
 }
 
+// UnifiedOrders returns the unified order view combining standard and guest orders.
+func (n *MobazhaNode) UnifiedOrders() contracts.UnifiedOrderViewService {
+	if n.unifiedOrderView == nil {
+		return nil
+	}
+	return n.unifiedOrderView
+}
+
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService {
 	if n.shoppingCartService == nil {
 		return nil

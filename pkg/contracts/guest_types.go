@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"context"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -59,4 +60,60 @@ type GuestOrderFilter struct {
 	State    *models.GuestOrderState
 	Page     int
 	PageSize int
+}
+
+// --- UnifiedOrderView types ---
+
+// OrderSummary is a normalized summary suitable for the seller's unified order list.
+type OrderSummary struct {
+	ID             string       `json:"id"`
+	Type           string       `json:"type"`
+	State          string       `json:"state"`
+	BuyerName      string       `json:"buyerName"`
+	Items          []ItemBrief  `json:"items"`
+	Total          PriceSummary `json:"total"`
+	PaymentCoin    string       `json:"paymentCoin"`
+	TrackingNumber string       `json:"trackingNumber,omitempty"`
+	SweepStatus    string       `json:"sweepStatus,omitempty"`
+	CreatedAt      time.Time    `json:"createdAt"`
+	UpdatedAt      time.Time    `json:"updatedAt"`
+}
+
+// ItemBrief is a minimal item summary for the unified list.
+type ItemBrief struct {
+	Title    string `json:"title"`
+	Quantity int    `json:"quantity"`
+}
+
+// PriceSummary carries a price with currency metadata.
+type PriceSummary struct {
+	Amount       string `json:"amount"`
+	CurrencyCode string `json:"currencyCode"`
+	Divisibility uint32 `json:"divisibility"`
+}
+
+// OrderListFilter controls the unified order list query.
+type OrderListFilter struct {
+	View     string `json:"view"` // "all" | "standard" | "guest"
+	State    string `json:"state,omitempty"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"pageSize"`
+}
+
+// OrderListMeta carries pagination metadata for the unified list.
+type OrderListMeta struct {
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"pageSize"`
+}
+
+// UnifiedOrderViewService provides a merged view of standard + guest orders.
+type UnifiedOrderViewService interface {
+	ListOrders(ctx context.Context, filter OrderListFilter) ([]OrderSummary, *OrderListMeta, error)
+}
+
+// UnifiedOrderViewProvider is satisfied by NodeService implementations
+// that expose the unified order view.
+type UnifiedOrderViewProvider interface {
+	UnifiedOrders() UnifiedOrderViewService
 }

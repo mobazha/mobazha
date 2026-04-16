@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
@@ -165,6 +166,49 @@ func (g *Gateway) handleCompleteGuestOrder(w http.ResponseWriter, r *http.Reques
 	}
 
 	response.NoContent(w)
+}
+
+// handleGETGuestCheckoutSettings returns the guest checkout configuration.
+// GET /v1/settings/guest-checkout
+func (g *Gateway) handleGETGuestCheckoutSettings(w http.ResponseWriter, r *http.Request) {
+	svc := getGuestOrderService(r)
+	if svc == nil {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
+			"Guest Checkout is not available")
+		return
+	}
+
+	cfg, err := svc.GetGuestCheckoutConfig(r.Context())
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+
+	response.Success(w, cfg)
+}
+
+// handlePUTGuestCheckoutSettings updates the guest checkout configuration.
+// PUT /v1/settings/guest-checkout
+func (g *Gateway) handlePUTGuestCheckoutSettings(w http.ResponseWriter, r *http.Request) {
+	svc := getGuestOrderService(r)
+	if svc == nil {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
+			"Guest Checkout is not available")
+		return
+	}
+
+	var req models.GuestCheckoutConfig
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := svc.SaveGuestCheckoutConfig(r.Context(), &req); err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+
+	response.Success(w, req)
 }
 
 func parseIntQuery(r *http.Request, key string, defaultVal int) int {

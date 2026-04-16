@@ -17,7 +17,6 @@ import (
 
 	"github.com/h2non/filetype"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/xuri/excelize/v2"
@@ -1122,14 +1121,15 @@ type JSONImportCollection struct {
 // Read-only fields (peerID, publicKey, stats, avatarHashes, headerHashes)
 // are intentionally excluded.
 type JSONImportProfile struct {
-	Name             string                    `json:"name"`
-	Location         string                    `json:"location,omitempty"`
-	About            string                    `json:"about,omitempty"`
-	ShortDescription string                    `json:"shortDescription,omitempty"`
-	Nsfw             bool                      `json:"nsfw,omitempty"`
-	Vendor           *bool                     `json:"vendor,omitempty"`
-	Moderator        bool                      `json:"moderator,omitempty"`
-	Colors           *models.ProfileColors     `json:"colors,omitempty"`
+	Name             string                     `json:"name"`
+	Location         string                     `json:"location,omitempty"`
+	About            string                     `json:"about,omitempty"`
+	ShortDescription string                     `json:"shortDescription,omitempty"`
+	Nsfw             bool                       `json:"nsfw,omitempty"`
+	Vendor           *bool                      `json:"vendor,omitempty"`
+	Moderator        bool                       `json:"moderator,omitempty"`
+	ModeratorInfo    *models.ModeratorInfo      `json:"moderatorInfo,omitempty"`
+	Colors           *models.ProfileColors      `json:"colors,omitempty"`
 	ContactInfo      *models.ProfileContactInfo `json:"contactInfo,omitempty"`
 }
 
@@ -1250,19 +1250,8 @@ func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZip
 	var profileImported bool
 	var profileError string
 
-	if avatarData != nil {
-		if _, err := mediaSvc.SetProfileMedia(r.Context(), contracts.SlotAvatar, avatarData); err != nil {
-			profileError = fmt.Sprintf("avatar upload failed: %s", err.Error())
-		}
-	}
-	if headerData != nil {
-		if _, err := mediaSvc.SetProfileMedia(r.Context(), contracts.SlotHeader, headerData); err != nil {
-			if profileError != "" {
-				profileError += "; "
-			}
-			profileError += fmt.Sprintf("header upload failed: %s", err.Error())
-		}
-	}
+	// Step 1: Ensure profile exists before uploading media, because
+	// SetProfileMedia associates hashes with an existing profile record.
 	if payload.Profile != nil && payload.Profile.Name != "" {
 		prof := getProfileService(r)
 		profile := models.Profile{
@@ -1272,6 +1261,10 @@ func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZip
 			ShortDescription: payload.Profile.ShortDescription,
 			Nsfw:             payload.Profile.Nsfw,
 			Moderator:        payload.Profile.Moderator,
+			ModeratorInfo:    payload.Profile.ModeratorInfo,
+		}
+		if profile.Moderator && profile.ModeratorInfo == nil {
+			profile.Moderator = false
 		}
 		if payload.Profile.Vendor != nil {
 			profile.Vendor = *payload.Profile.Vendor
@@ -1285,28 +1278,33 @@ func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZip
 			profile.ContactInfo = payload.Profile.ContactInfo
 		}
 
-		_, existErr := prof.GetMyProfile()
-		if errors.Is(existErr, coreiface.ErrNotFound) {
-			if err := prof.SetProfile(&profile, nil); err != nil {
-				if profileError != "" {
-					profileError += "; "
-				}
-				profileError += fmt.Sprintf("profile create failed: %s", err.Error())
-			} else {
-				profileImported = true
-			}
-		} else if existErr == nil {
-			if err := prof.SetProfile(&profile, nil); err != nil {
-				if profileError != "" {
-					profileError += "; "
-				}
-				profileError += fmt.Sprintf("profile update failed: %s", err.Error())
-			} else {
-				profileImported = true
-			}
+		if err := prof.SetProfile(&profile, nil); err != nil {
+			profileError = fmt.Sprintf("profile set failed: %s", err.Error())
+		} else {
+			profileImported = true
 		}
-	} else if avatarData != nil || headerData != nil {
-		profileImported = profileError == ""
+	}
+
+	// Step 2: Upload avatar/header after profile exists so hashes get associated.
+	if avatarData != nil {
+		if _, err := mediaSvc.SetProfileMedia(r.Context(), contracts.SlotAvatar, avatarData); err != nil {
+			if profileError != "" {
+				profileError += "; "
+			}
+			profileError += fmt.Sprintf("avatar upload failed: %s", err.Error())
+		} else {
+			profileImported = true
+		}
+	}
+	if headerData != nil {
+		if _, err := mediaSvc.SetProfileMedia(r.Context(), contracts.SlotHeader, headerData); err != nil {
+			if profileError != "" {
+				profileError += "; "
+			}
+			profileError += fmt.Sprintf("header upload failed: %s", err.Error())
+		} else {
+			profileImported = true
+		}
 	}
 
 	// Phase 1: Create shipping profiles and build key→ID mapping

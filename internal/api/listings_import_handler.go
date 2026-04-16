@@ -248,22 +248,21 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// handlePOSTListingsImport handles the batch import of listings from a ZIP file
+// handlePOSTListingsImport handles the batch import of listings from a ZIP file.
+// It auto-detects the data format inside the ZIP:
+//   - If a .json file is found → JSON import (supports shippingProfiles + collections)
+//   - If a .xlsx file is found → Excel import
 func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Request) {
-	// Get size limits from config
 	maxZipSize := g.nodeManager.GetMaxImportZipSize()
 	maxVideoSize := g.nodeManager.GetMaxImportVideoSize()
 
-	// Limit request body size
 	r.Body = http.MaxBytesReader(w, r.Body, maxZipSize)
 
-	// Parse multipart form
 	if err := r.ParseMultipartForm(maxZipSize); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("file too large or invalid: %s", err.Error()))
 		return
 	}
 
-	// Get the uploaded file
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading file: %s", err.Error()))
@@ -271,33 +270,29 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 	}
 	defer file.Close()
 
-	// Check file extension
 	if !strings.HasSuffix(strings.ToLower(header.Filename), ".zip") {
 		ErrorResponse(w, http.StatusBadRequest, "file must be a ZIP archive")
 		return
 	}
 
-	// Read file into memory
 	zipData, err := io.ReadAll(file)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading file: %s", err.Error()))
 		return
 	}
 
-	// Open ZIP archive
 	zipReader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ZIP file: %s", err.Error()))
 		return
 	}
 
-	// Extract files from ZIP
 	var excelFile *zip.File
+	var jsonFile *zip.File
 	images := make(map[string][]byte)
 	videos := make(map[string][]byte)
 
 	for _, f := range zipReader.File {
-		// Skip directories and macOS metadata
 		if f.FileInfo().IsDir() || strings.HasPrefix(f.Name, "__MACOSX") {
 			continue
 		}
@@ -306,6 +301,10 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 		filename := filepath.Base(f.Name)
 
 		switch {
+		case strings.HasSuffix(normalizedName, ".json"):
+			if jsonFile == nil {
+				jsonFile = f
+			}
 		case strings.HasSuffix(normalizedName, ".xlsx"):
 			excelFile = f
 		case strings.HasPrefix(normalizedName, "images/") || strings.Contains(normalizedName, "/images/"):
@@ -319,19 +318,24 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	if excelFile == nil {
-		ErrorResponse(w, http.StatusBadRequest, "no Excel file found in ZIP archive")
+	// JSON format takes priority over Excel
+	if jsonFile != nil {
+		g.importFromJSON(w, r, jsonFile, images, videos)
 		return
 	}
 
-	// Read Excel file
+	if excelFile == nil {
+		ErrorResponse(w, http.StatusBadRequest, "no Excel (.xlsx) or JSON (.json) file found in ZIP archive")
+		return
+	}
+
+	// Excel format processing
 	excelData, err := readZipFile(excelFile)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading Excel file: %s", err.Error()))
 		return
 	}
 
-	// Parse Excel
 	xlsx, err := excelize.OpenReader(bytes.NewReader(excelData))
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error parsing Excel file: %s", err.Error()))
@@ -339,7 +343,6 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 	}
 	defer xlsx.Close()
 
-	// Detect language from sheet names
 	lang := "en"
 	sheets := xlsx.GetSheetList()
 	for _, sheet := range sheets {
@@ -352,7 +355,6 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 	listingSvc := getListingService(r)
 	mediaSvc := getMediaService(r)
 
-	// Process import
 	result, err := g.processListingsImport(listingSvc, mediaSvc, xlsx, lang, images, videos)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -1083,22 +1085,19 @@ type JSONImportPayload struct {
 	Collections      []JSONImportCollection      `json:"collections,omitempty"`
 }
 
-// handlePOSTListingsImportJSON handles the batch import of listings from a ZIP file with JSON data
+// handlePOSTListingsImportJSON handles the batch import of listings from a ZIP file with JSON data.
+// This is a dedicated JSON endpoint kept for backward compatibility (import.sh uses it).
 func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Request) {
-	// Get size limits from config
 	maxZipSize := g.nodeManager.GetMaxImportZipSize()
 	maxVideoSize := g.nodeManager.GetMaxImportVideoSize()
 
-	// Limit request body size
 	r.Body = http.MaxBytesReader(w, r.Body, maxZipSize)
 
-	// Parse multipart form
 	if err := r.ParseMultipartForm(maxZipSize); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("file too large or invalid: %s", err.Error()))
 		return
 	}
 
-	// Get the uploaded file
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading file: %s", err.Error()))
@@ -1106,33 +1105,28 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 	}
 	defer file.Close()
 
-	// Check file extension
 	if !strings.HasSuffix(strings.ToLower(header.Filename), ".zip") {
 		ErrorResponse(w, http.StatusBadRequest, "file must be a ZIP archive")
 		return
 	}
 
-	// Read file into memory
 	zipData, err := io.ReadAll(file)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading file: %s", err.Error()))
 		return
 	}
 
-	// Open ZIP archive
 	zipReader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ZIP file: %s", err.Error()))
 		return
 	}
 
-	// Extract files from ZIP
 	var jsonFile *zip.File
 	images := make(map[string][]byte)
 	videos := make(map[string][]byte)
 
 	for _, f := range zipReader.File {
-		// Skip directories and macOS metadata
 		if f.FileInfo().IsDir() || strings.HasPrefix(f.Name, "__MACOSX") {
 			continue
 		}
@@ -1142,7 +1136,7 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 
 		switch {
 		case strings.HasSuffix(normalizedName, "listings.json") || strings.HasSuffix(normalizedName, ".json"):
-			if jsonFile == nil { // Take the first JSON file found
+			if jsonFile == nil {
 				jsonFile = f
 			}
 		case strings.HasPrefix(normalizedName, "images/") || strings.Contains(normalizedName, "/images/"):
@@ -1161,14 +1155,18 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Read JSON file
-	jsonData, err := readZipFile(jsonFile)
+	g.importFromJSON(w, r, jsonFile, images, videos)
+}
+
+// importFromJSON is the shared JSON import logic used by both the auto-detect
+// endpoint (/v1/listings/import) and the dedicated JSON endpoint (/v1/listings/import/json).
+func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZipEntry *zip.File, images, videos map[string][]byte) {
+	jsonData, err := readZipFile(jsonZipEntry)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading JSON file: %s", err.Error()))
 		return
 	}
 
-	// Parse JSON
 	var payload JSONImportPayload
 	if err := json.Unmarshal(jsonData, &payload); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error parsing JSON file: %s", err.Error()))
@@ -1178,10 +1176,9 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 	listingSvc := getListingService(r)
 	mediaSvc := getMediaService(r)
 
-	// --- Phase 1: Create shipping profiles from payload & build key→ID map ---
-	profileKeyToID := make(map[string]string) // user-defined key → real profile ID
+	// Phase 1: Create shipping profiles and build key→ID mapping
+	profileKeyToID := make(map[string]string)
 	if shippingSvc, ok := getShippingService(r); ok {
-		// Create new profiles from payload
 		for _, sp := range payload.ShippingProfiles {
 			profile := models.ShippingProfileEntity{
 				Name:      sp.Name,
@@ -1199,9 +1196,6 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 			}
 		}
 
-		// Also build a name→ID index from ALL existing profiles so that
-		// subsequent batches (without shippingProfiles in payload) can
-		// resolve key references against previously created profiles.
 		if existingProfiles, err := shippingSvc.ListProfiles(r.Context()); err == nil {
 			for _, p := range existingProfiles {
 				if _, exists := profileKeyToID[p.Name]; !exists {
@@ -1211,7 +1205,6 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// Replace key references in listings with real profile IDs
 	for i := range payload.Listings {
 		ref := payload.Listings[i].ShippingProfileID
 		if ref == "" {
@@ -1222,7 +1215,6 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// Resolve default shipping profile for PHYSICAL_GOOD listings that lack one
 	var defaultShippingPB *pb.ShippingProfile
 	if shippingSvc, ok := getShippingService(r); ok {
 		if profiles, err := shippingSvc.ListProfiles(r.Context()); err == nil {
@@ -1235,14 +1227,14 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// --- Phase 2: Import listings ---
+	// Phase 2: Import listings
 	result, err := g.processListingsImportJSON(listingSvc, mediaSvc, payload.Listings, images, videos, defaultShippingPB)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// --- Phase 3: Create collections from payload ---
+	// Phase 3: Create collections
 	if collSvc, ok := getCollectionService(r); ok && len(payload.Collections) > 0 {
 		for _, ic := range payload.Collections {
 			coll := &models.Collection{

@@ -111,6 +111,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initPostsService()
 	n.initAnalyticsService()
 	n.initNetDBSyncService()
+	n.initGuestOrderService()
 }
 
 // initPaymentVerificationService creates the PaymentVerificationService.
@@ -745,4 +746,37 @@ func (n *MobazhaNode) initNetDBSyncService() {
 		CollectionService: n.collectionService,
 		DiscountService:   n.discountService,
 	})
+}
+
+// initGuestOrderService creates the Guest Checkout subsystem:
+// DirectPaymentService → AutoSweepService → GuestOrderAppService.
+// Requires: db, eventBus, bip44MasterKey (from cryptoFields).
+func (n *MobazhaNode) initGuestOrderService() {
+	if n.infrastructureOnly {
+		return
+	}
+	if n.db == nil || n.eventBus == nil {
+		return
+	}
+	if n.bip44Key == nil {
+		return
+	}
+
+	keyDeriver := NewNodeKeyDeriver(n.bip44Key, n.testnet)
+	n.directPaymentService = NewDirectPaymentService(n.db, keyDeriver)
+	n.autoSweepService = NewAutoSweepService(n.db, keyDeriver, n.eventBus)
+	n.guestOrderService = NewGuestOrderAppService(GuestOrderAppServiceConfig{
+		DB:            n.db,
+		DirectPayment: n.directPaymentService,
+		SweepService:  n.autoSweepService,
+		EventBus:      n.eventBus,
+		NodeID:        n.nodeID,
+		Shutdown:      n.shutdown,
+	})
+
+	// Monitor is created with nil chain checkers initially.
+	// Concrete adapters are injected later via SetCheckers
+	// once chain clients are fully initialized.
+	n.guestPaymentMonitor = NewGuestPaymentMonitor(n.db, n.guestOrderService, nil, nil)
+	n.guestOrderService.SetPaymentWatcher(n.guestPaymentMonitor)
 }

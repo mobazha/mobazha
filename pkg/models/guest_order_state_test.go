@@ -122,6 +122,7 @@ func TestValidTransition_FullMatrix(t *testing.T) {
 		{GuestOrderPaymentDetected, GuestOrderFunded}:          true,
 		{GuestOrderPaymentDetected, GuestOrderExpired}:         true,
 		{GuestOrderFunded, GuestOrderFulfilled}:                true,
+		{GuestOrderFunded, GuestOrderCompleted}:                true,
 		{GuestOrderFulfilled, GuestOrderCompleted}:             true,
 	}
 

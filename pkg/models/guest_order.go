@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -34,6 +35,27 @@ func (s GuestOrderState) String() string {
 		return "EXPIRED"
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", int(s))
+	}
+}
+
+// ParseGuestOrderState converts a string (e.g. "FUNDED" or "funded") to a GuestOrderState.
+// Returns -1 if the string is not recognized.
+func ParseGuestOrderState(s string) (GuestOrderState, bool) {
+	switch strings.ToUpper(s) {
+	case "AWAITING_PAYMENT":
+		return GuestOrderAwaitingPayment, true
+	case "PAYMENT_DETECTED":
+		return GuestOrderPaymentDetected, true
+	case "FUNDED":
+		return GuestOrderFunded, true
+	case "FULFILLED":
+		return GuestOrderFulfilled, true
+	case "COMPLETED":
+		return GuestOrderCompleted, true
+	case "EXPIRED":
+		return GuestOrderExpired, true
+	default:
+		return -1, false
 	}
 }
 
@@ -113,7 +135,7 @@ func (o *GuestOrder) IsTerminal() bool {
 var validTransitions = map[GuestOrderState][]GuestOrderState{
 	GuestOrderAwaitingPayment: {GuestOrderPaymentDetected, GuestOrderExpired},
 	GuestOrderPaymentDetected: {GuestOrderFunded, GuestOrderExpired},
-	GuestOrderFunded:          {GuestOrderFulfilled},
+	GuestOrderFunded:          {GuestOrderFulfilled, GuestOrderCompleted},
 	GuestOrderFulfilled:       {GuestOrderCompleted},
 	// GuestOrderCompleted and GuestOrderExpired are terminal — no outgoing transitions.
 }

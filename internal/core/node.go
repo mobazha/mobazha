@@ -8,6 +8,7 @@ import (
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/gagliardetto/solana-go"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -112,6 +113,7 @@ type cryptoFields struct {
 	ratingMasterKey *btcec.PrivateKey
 	tronMasterKey   *btcec.PrivateKey
 	keyProvider     contracts.KeyProvider
+	bip44Key        *hdkeychain.ExtendedKey
 }
 
 // networkFields groups P2P networking components.
@@ -194,6 +196,10 @@ type appServices struct {
 	analyticsService           *AnalyticsAppService
 	paymentVerificationService *PaymentVerificationService
 	netDBSyncService           *NetDBSyncService
+	guestOrderService          *GuestOrderAppService
+	directPaymentService       *DirectPaymentService
+	autoSweepService           *AutoSweepService
+	guestPaymentMonitor        *GuestPaymentMonitor
 }
 
 // IsDefaultNode returns whether this node is the default node.

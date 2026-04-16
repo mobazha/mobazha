@@ -74,6 +74,13 @@ func (n *MobazhaNode) Preferences() contracts.PreferencesService {
 	}
 	return n.preferencesService
 }
+func (n *MobazhaNode) GuestOrder() contracts.GuestOrderService {
+	if n.guestOrderService == nil {
+		return nil
+	}
+	return n.guestOrderService
+}
+
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService {
 	if n.shoppingCartService == nil {
 		return nil

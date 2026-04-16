@@ -1128,6 +1128,7 @@ type JSONImportProfile struct {
 	Nsfw             bool                       `json:"nsfw,omitempty"`
 	Vendor           *bool                      `json:"vendor,omitempty"`
 	Moderator        bool                       `json:"moderator,omitempty"`
+	Visibility       models.StoreVisibility     `json:"visibility,omitempty"`
 	ModeratorInfo    *models.ModeratorInfo      `json:"moderatorInfo,omitempty"`
 	Colors           *models.ProfileColors      `json:"colors,omitempty"`
 	ContactInfo      *models.ProfileContactInfo `json:"contactInfo,omitempty"`
@@ -1261,6 +1262,7 @@ func (g *Gateway) importFromJSON(w http.ResponseWriter, r *http.Request, jsonZip
 			ShortDescription: payload.Profile.ShortDescription,
 			Nsfw:             payload.Profile.Nsfw,
 			Moderator:        payload.Profile.Moderator,
+			Visibility:       payload.Profile.Visibility,
 			ModeratorInfo:    payload.Profile.ModeratorInfo,
 		}
 		if profile.Moderator && profile.ModeratorInfo == nil {

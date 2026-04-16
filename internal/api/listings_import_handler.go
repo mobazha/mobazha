@@ -1017,6 +1017,8 @@ func (g *Gateway) convertPriceToInt(priceStr string, divisibility int) (string, 
 
 // JSONListingInput represents a single listing in JSON import format
 type JSONListingInput struct {
+	Slug               string             `json:"slug"`
+	ShippingProfileID  string             `json:"shippingProfileId"`
 	Title              string             `json:"title"`
 	ContractType       string             `json:"contractType"`
 	Price              string             `json:"price"`
@@ -1053,9 +1055,32 @@ type JSONVariantInput struct {
 	ProductID  string            `json:"productID"`
 }
 
+// JSONImportShippingProfile is a shipping profile to create during import.
+// The "key" field is a local reference that listings use in shippingProfileId
+// to link to this profile (replaced with the real ID after creation).
+type JSONImportShippingProfile struct {
+	Key             string              `json:"key"`
+	Name            string              `json:"name"`
+	IsDefault       bool                `json:"isDefault"`
+	LocationGroups  json.RawMessage     `json:"locationGroups"`
+}
+
+// JSONImportCollection is a collection to create during import.
+// Products are referenced by listing slug.
+type JSONImportCollection struct {
+	Title       string   `json:"title"`
+	Description string   `json:"description,omitempty"`
+	Image       string   `json:"image,omitempty"`
+	SortOrder   string   `json:"sortOrder,omitempty"`
+	Published   *bool    `json:"published,omitempty"`
+	Products    []string `json:"products"` // listing slugs
+}
+
 // JSONImportPayload represents the root JSON structure
 type JSONImportPayload struct {
-	Listings []JSONListingInput `json:"listings"`
+	Listings         []JSONListingInput          `json:"listings"`
+	ShippingProfiles []JSONImportShippingProfile `json:"shippingProfiles,omitempty"`
+	Collections      []JSONImportCollection      `json:"collections,omitempty"`
 }
 
 // handlePOSTListingsImportJSON handles the batch import of listings from a ZIP file with JSON data
@@ -1153,6 +1178,50 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 	listingSvc := getListingService(r)
 	mediaSvc := getMediaService(r)
 
+	// --- Phase 1: Create shipping profiles from payload & build key→ID map ---
+	profileKeyToID := make(map[string]string) // user-defined key → real profile ID
+	if shippingSvc, ok := getShippingService(r); ok {
+		// Create new profiles from payload
+		for _, sp := range payload.ShippingProfiles {
+			profile := models.ShippingProfileEntity{
+				Name:      sp.Name,
+				IsDefault: sp.IsDefault,
+			}
+			if len(sp.LocationGroups) > 0 {
+				profile.LocationGroupsJSON = string(sp.LocationGroups)
+			}
+			if err := shippingSvc.CreateProfile(r.Context(), &profile); err != nil {
+				ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("failed to create shipping profile %q: %s", sp.Name, err.Error()))
+				return
+			}
+			if sp.Key != "" {
+				profileKeyToID[sp.Key] = profile.ID
+			}
+		}
+
+		// Also build a name→ID index from ALL existing profiles so that
+		// subsequent batches (without shippingProfiles in payload) can
+		// resolve key references against previously created profiles.
+		if existingProfiles, err := shippingSvc.ListProfiles(r.Context()); err == nil {
+			for _, p := range existingProfiles {
+				if _, exists := profileKeyToID[p.Name]; !exists {
+					profileKeyToID[p.Name] = p.ID
+				}
+			}
+		}
+	}
+
+	// Replace key references in listings with real profile IDs
+	for i := range payload.Listings {
+		ref := payload.Listings[i].ShippingProfileID
+		if ref == "" {
+			continue
+		}
+		if realID, ok := profileKeyToID[ref]; ok {
+			payload.Listings[i].ShippingProfileID = realID
+		}
+	}
+
 	// Resolve default shipping profile for PHYSICAL_GOOD listings that lack one
 	var defaultShippingPB *pb.ShippingProfile
 	if shippingSvc, ok := getShippingService(r); ok {
@@ -1166,11 +1235,46 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// Process import
+	// --- Phase 2: Import listings ---
 	result, err := g.processListingsImportJSON(listingSvc, mediaSvc, payload.Listings, images, videos, defaultShippingPB)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// --- Phase 3: Create collections from payload ---
+	if collSvc, ok := getCollectionService(r); ok && len(payload.Collections) > 0 {
+		for _, ic := range payload.Collections {
+			coll := &models.Collection{
+				Title:       ic.Title,
+				Description: ic.Description,
+				Image:       ic.Image,
+				Type:        models.CollectionTypeManual,
+				SortOrder:   models.CollectionSortManual,
+				Published:   true,
+			}
+			if ic.SortOrder != "" {
+				coll.SortOrder = models.CollectionSortOrder(ic.SortOrder)
+			}
+			if ic.Published != nil {
+				coll.Published = *ic.Published
+			}
+			if err := collSvc.CreateCollection(r.Context(), coll); err != nil {
+				result.Errors = append(result.Errors, ImportError{
+					Title: ic.Title,
+					Error: fmt.Sprintf("collection create failed: %s", err.Error()),
+				})
+				continue
+			}
+			if len(ic.Products) > 0 {
+				if err := collSvc.AddProducts(r.Context(), coll.ID, ic.Products); err != nil {
+					result.Errors = append(result.Errors, ImportError{
+						Title: ic.Title,
+						Error: fmt.Sprintf("collection add products failed: %s", err.Error()),
+					})
+				}
+			}
+		}
 	}
 
 	sanitizedJSONResponse(w, result)
@@ -1188,8 +1292,10 @@ func (g *Gateway) processListingsImportJSON(listingSvc contracts.ListingService,
 	// Get existing listings for duplicate detection
 	existingListings, _ := listingSvc.GetMyListings()
 	existingByTitle := make(map[string]string) // title -> slug
+	existingSlugs := make(map[string]bool)
 	for _, listing := range existingListings {
 		existingByTitle[listing.Title] = listing.Slug
+		existingSlugs[listing.Slug] = true
 	}
 
 	// Process each listing
@@ -1205,6 +1311,10 @@ func (g *Gateway) processListingsImportJSON(listingSvc contracts.ListingService,
 			})
 			result.Failed++
 			continue
+		}
+
+		if input.Slug != "" {
+			listing.Slug = input.Slug
 		}
 
 		// Process images
@@ -1245,26 +1355,31 @@ func (g *Gateway) processListingsImportJSON(listingSvc contracts.ListingService,
 			continue
 		}
 
-		// Auto-inject default shipping profile for physical goods
-		if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD && listing.ShippingProfile == nil {
+		// Auto-inject default shipping profile for physical goods that have no explicit profile
+		if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD &&
+			listing.ShippingProfile == nil && listing.ShippingProfileId == "" {
 			if defaultShippingPB != nil {
 				listing.ShippingProfile = defaultShippingPB
 			} else {
 				result.Errors = append(result.Errors, ImportError{
 					Row:   rowNum,
 					Title: listing.Item.Title,
-					Error: "physical good requires a shipping profile; create a default shipping profile first",
+					Error: "physical good requires a shipping profile; create a default shipping profile first or specify shippingProfileId",
 				})
 				result.Failed++
 				continue
 			}
 		}
 
-		// Check if listing exists (by title)
+		// Check if listing exists (by explicit slug first, then by title)
 		isUpdate := false
-		if existingSlug, exists := existingByTitle[listing.Item.Title]; exists {
-			listing.Slug = existingSlug
+		if listing.Slug != "" && existingSlugs[listing.Slug] {
 			isUpdate = true
+		} else if listing.Slug == "" {
+			if existingSlug, exists := existingByTitle[listing.Item.Title]; exists {
+				listing.Slug = existingSlug
+				isUpdate = true
+			}
 		}
 
 		// Save listing
@@ -1292,8 +1407,8 @@ func (g *Gateway) processListingsImportJSON(listingSvc contracts.ListingService,
 				Slug:  listing.Slug,
 				Title: listing.Item.Title,
 			})
-			// Add to existing map for subsequent duplicate detection
 			existingByTitle[listing.Item.Title] = listing.Slug
+			existingSlugs[listing.Slug] = true
 		}
 
 		result.Total++
@@ -1326,6 +1441,7 @@ func (g *Gateway) parseJSONListing(input JSONListingInput) (*pb.Listing, error) 
 	contractType := g.parseContractType(input.ContractType)
 
 	listing := &pb.Listing{
+		ShippingProfileId: input.ShippingProfileID,
 		Metadata: &pb.Listing_Metadata{
 			ContractType: contractType,
 			Format:       pb.Listing_Metadata_FIXED_PRICE,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -36,10 +37,15 @@ type Checker struct {
 }
 
 func NewChecker(logger *log.Logger) *Checker {
+	base := releasesURL
+	if override := os.Getenv("MOBAZHA_UPDATE_URL"); override != "" {
+		base = override
+		logger.Printf("Update URL overridden: %s", base)
+	}
 	return &Checker{
 		logger:  logger,
 		client:  &http.Client{Timeout: 30 * time.Second},
-		baseURL: releasesURL,
+		baseURL: base,
 	}
 }
 

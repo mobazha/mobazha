@@ -8,7 +8,7 @@ import (
 )
 
 func TestProcessManager_BackoffSchedule(t *testing.T) {
-	pm := NewProcessManager(t.TempDir(), log.New(os.Stderr, "[test] ", 0))
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
 
 	tests := []struct {
 		attempt  int
@@ -36,7 +36,7 @@ func TestProcessManager_BackoffSchedule(t *testing.T) {
 }
 
 func TestProcessManager_ShouldRestart(t *testing.T) {
-	pm := NewProcessManager(t.TempDir(), log.New(os.Stderr, "[test] ", 0))
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
 
 	for i := 0; i < maxRestartAttempts; i++ {
 		if !pm.ShouldRestart() {
@@ -53,7 +53,7 @@ func TestProcessManager_ShouldRestart(t *testing.T) {
 }
 
 func TestProcessManager_ResetBackoff(t *testing.T) {
-	pm := NewProcessManager(t.TempDir(), log.New(os.Stderr, "[test] ", 0))
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
 
 	pm.mu.Lock()
 	pm.attempts = 3
@@ -70,14 +70,14 @@ func TestProcessManager_ResetBackoff(t *testing.T) {
 }
 
 func TestProcessManager_IsRunning_InitiallyFalse(t *testing.T) {
-	pm := NewProcessManager(t.TempDir(), log.New(os.Stderr, "[test] ", 0))
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
 	if pm.IsRunning() {
 		t.Error("new ProcessManager should not be running")
 	}
 }
 
 func TestProcessManager_Done_NilWhenNotRunning(t *testing.T) {
-	pm := NewProcessManager(t.TempDir(), log.New(os.Stderr, "[test] ", 0))
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
 	if pm.Done() != nil {
 		t.Error("Done() should be nil when no process is running")
 	}

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/internal/repo"
 )
 
 // Status represents the current state of the supervised node.
@@ -52,6 +54,7 @@ type Supervisor struct {
 type Options struct {
 	DataDir     string
 	GatewayPort string
+	NodeArgs    []string // additional arguments passed to the node binary after "start"
 	UI          LauncherUI
 	Logger      *log.Logger
 }
@@ -72,7 +75,7 @@ func New(opts Options) *Supervisor {
 		opts.DataDir = filepath.Join(home, ".mobazha")
 	}
 	if opts.GatewayPort == "" {
-		opts.GatewayPort = "5104"
+		opts.GatewayPort = repo.DefaultGatewayPort
 	}
 	if opts.Logger == nil {
 		opts.Logger = log.New(os.Stdout, "[launcher] ", log.LstdFlags)
@@ -95,7 +98,7 @@ func New(opts Options) *Supervisor {
 	s.config = NewConfigManager(opts.DataDir)
 	s.statusW = NewStatusWriter(opts.DataDir)
 	s.trigger = NewTriggerWatcher(opts.DataDir)
-	s.proc = NewProcessManager(opts.DataDir, opts.Logger)
+	s.proc = NewProcessManager(opts.DataDir, opts.NodeArgs, opts.Logger)
 	s.health = NewHealthMonitor(opts.GatewayPort)
 	s.updater = NewUpdateManager(opts.DataDir, opts.Logger)
 
@@ -178,6 +181,7 @@ func (s *Supervisor) supervisionLoop() {
 }
 
 func (s *Supervisor) tick() {
+	s.config.Reload()
 	hr := s.health.Check()
 	procRunning := s.proc.IsRunning()
 

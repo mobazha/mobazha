@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,11 @@ import (
 const envBgKey = "MOBAZHA_LAUNCHER_BG"
 
 func main() {
+	nodeDataDir := flag.String("node-data-dir", "", "Data directory for the mobazha node (-d flag)")
+	gatewayPort := flag.String("gateway-port", repo.DefaultGatewayPort, "Gateway port the node listens on")
+	testnet := flag.Bool("testnet", false, "Run node in testnet mode")
+	flag.Parse()
+
 	home, _ := os.UserHomeDir()
 	dataDir := filepath.Join(home, ".mobazha")
 	logFile := setupLogging(dataDir)
@@ -22,11 +28,23 @@ func main() {
 
 	logger := log.New(os.Stdout, "[launcher] ", log.LstdFlags)
 
+	var nodeArgs []string
+	if *nodeDataDir != "" {
+		nodeArgs = append(nodeArgs, "-d", *nodeDataDir)
+	}
+	if *testnet {
+		nodeArgs = append(nodeArgs, "-t")
+	}
+	if *gatewayPort != repo.DefaultGatewayPort {
+		nodeArgs = append(nodeArgs, fmt.Sprintf("--gatewayaddr=/ip4/127.0.0.1/tcp/%s", *gatewayPort))
+	}
+
 	ui := createUI(logger)
 
 	s := supervisor.New(supervisor.Options{
 		DataDir:     dataDir,
-		GatewayPort: repo.DefaultGatewayPort,
+		GatewayPort: *gatewayPort,
+		NodeArgs:    nodeArgs,
 		UI:          ui,
 		Logger:      logger,
 	})

@@ -4,12 +4,24 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/supervisor"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
+
+// launcherDataDir returns the Launcher's IPC directory (~/.mobazha/).
+// This is where update-status.json, update-trigger.json, and launcher-config.json live.
+// It is separate from the Node's data directory (setupDataDir).
+func launcherDataDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".mobazha")
+}
 
 type systemHealthResponse struct {
 	Status         string             `json:"status"`
@@ -91,7 +103,7 @@ func (g *Gateway) handleGETSystemHealth(w http.ResponseWriter, r *http.Request) 
 		},
 	}
 
-	resp.Update = readUpdateInfo(dataDir)
+	resp.Update = readUpdateInfo(launcherDataDir())
 
 	response.Success(w, resp)
 }
@@ -171,8 +183,8 @@ func readUpdateInfo(dataDir string) *updateInfoResponse {
 
 // handlePOSTUpdateTrigger writes an update-trigger.json for the Launcher to pick up.
 func (g *Gateway) handlePOSTUpdateTrigger(w http.ResponseWriter, r *http.Request) {
-	dataDir := g.setupDataDir()
-	if dataDir == "" {
+	dir := launcherDataDir()
+	if dir == "" {
 		response.Error(w, http.StatusServiceUnavailable, response.CodeServiceUnavail,
 			"Not available in this deployment mode")
 		return
@@ -192,7 +204,7 @@ func (g *Gateway) handlePOSTUpdateTrigger(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := supervisor.WriteTrigger(dataDir, req.Action); err != nil {
+	if err := supervisor.WriteTrigger(dir, req.Action); err != nil {
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
 			"failed to write trigger file")
 		return
@@ -209,14 +221,14 @@ type updateConfigResponse struct {
 
 // handleGETUpdateConfig reads the launcher-config.json.
 func (g *Gateway) handleGETUpdateConfig(w http.ResponseWriter, r *http.Request) {
-	dataDir := g.setupDataDir()
-	if dataDir == "" {
+	dir := launcherDataDir()
+	if dir == "" {
 		response.Error(w, http.StatusServiceUnavailable, response.CodeServiceUnavail,
 			"Not available in this deployment mode")
 		return
 	}
 
-	cfg := supervisor.NewConfigManager(dataDir)
+	cfg := supervisor.NewConfigManager(dir)
 	c := cfg.Get()
 	response.Success(w, updateConfigResponse{
 		AutoUpdateEnabled: c.AutoUpdateEnabled,
@@ -227,8 +239,8 @@ func (g *Gateway) handleGETUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 // handlePUTUpdateConfig writes the launcher-config.json.
 func (g *Gateway) handlePUTUpdateConfig(w http.ResponseWriter, r *http.Request) {
-	dataDir := g.setupDataDir()
-	if dataDir == "" {
+	dir := launcherDataDir()
+	if dir == "" {
 		response.Error(w, http.StatusServiceUnavailable, response.CodeServiceUnavail,
 			"Not available in this deployment mode")
 		return
@@ -259,7 +271,12 @@ func (g *Gateway) handlePUTUpdateConfig(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	configPath := dataDir + "/launcher-config.json"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "create config dir")
+		return
+	}
+
+	configPath := filepath.Join(dir, "launcher-config.json")
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "write config")
 		return

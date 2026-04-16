@@ -30,14 +30,16 @@ type ProcessManager struct {
 	logFile *os.File
 
 	dataDir  string
+	nodeArgs []string
 	logger   *log.Logger
 	attempts int
 }
 
-func NewProcessManager(dataDir string, logger *log.Logger) *ProcessManager {
+func NewProcessManager(dataDir string, nodeArgs []string, logger *log.Logger) *ProcessManager {
 	return &ProcessManager{
-		dataDir: dataDir,
-		logger:  logger,
+		dataDir:  dataDir,
+		nodeArgs: nodeArgs,
+		logger:   logger,
 	}
 }
 
@@ -56,7 +58,8 @@ func (pm *ProcessManager) Start() {
 	}
 
 	bin := pm.findBinary()
-	cmd := exec.Command(bin, "start")
+	args := append([]string{"start"}, pm.nodeArgs...)
+	cmd := exec.Command(bin, args...)
 	cmd.Stdout = lf
 	cmd.Stderr = lf
 	setProcAttr(cmd)

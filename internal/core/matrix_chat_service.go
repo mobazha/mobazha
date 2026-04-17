@@ -1825,9 +1825,16 @@ func (s *mautrixChatService) handleDecryptError(evt *event.Event, err error) {
 			Timestamp: time.UnixMilli(evt.Timestamp),
 		},
 	})
+	// syncCtx is written under s.mu by startLocked/resumeFromIdle and cancelled
+	// under s.mu by idleStop/stop. Read it under RLock to avoid a data race on
+	// the interface value, and skip the retry entirely if the service is idle
+	// or shutting down — the retry goroutine would otherwise exit immediately
+	// when the cancelled ctx reaches its first context-aware wait.
+	s.mu.RLock()
 	ctx := s.syncCtx
-	if ctx == nil {
-		ctx = context.Background()
+	s.mu.RUnlock()
+	if ctx == nil || ctx.Err() != nil {
+		return
 	}
 	go s.retryDecryptAfterKeyRequest(ctx, evt)
 }

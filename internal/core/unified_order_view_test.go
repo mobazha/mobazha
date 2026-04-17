@@ -57,6 +57,7 @@ func (m *mockGuestSvc) GetGuestCheckoutConfig(ctx context.Context) (*models.Gues
 func (m *mockGuestSvc) SaveGuestCheckoutConfig(ctx context.Context, cfg *models.GuestCheckoutConfig) error {
 	return nil
 }
+func (m *mockGuestSvc) IsEnabled(ctx context.Context) bool { return true }
 
 // --- helpers ---
 

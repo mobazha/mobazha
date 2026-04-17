@@ -170,8 +170,9 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	if ssrHandler := ssr.NewFromEnv(config.LocalPeerID); ssrHandler != nil {
 		ssrHandler.RegisterRoutes(topMux)
 	} else if frontend.HasContent() {
-		// Native binary mode: serve the go:embed SPA as catch-all.
-		feHandler := frontend.NewHandler(frontend.ServerConfig{})
+		feHandler := frontend.NewHandler(frontend.ServerConfig{
+			GuestCheckoutEnabledFn: guestCheckoutEnabledFromNodeManager(nodeManager),
+		})
 		topMux.Handle("/", feHandler)
 		log.Info("Serving embedded Web UI on /")
 	}
@@ -376,6 +377,34 @@ func (g *Gateway) WebsocketDefaultHandler() http.HandlerFunc {
 }
 
 // EnsureHubForUser ensures that a hub exists for the given user ID.
+// guestCheckoutEnabledFromNodeManager returns a resolver callback that the
+// embedded frontend uses to advertise guest checkout status at runtime
+// (/runtime-config.js). It walks NodeManager → default node →
+// FeaturesProvider → Resolver so toggles via PATCH /features/{key}
+// propagate without a process restart. Any missing link returns false
+// (fail-closed) so misconfigured deployments do not advertise an
+// unreachable feature.
+func guestCheckoutEnabledFromNodeManager(nm coreiface.NodeManagerIface) func(context.Context) bool {
+	return func(ctx context.Context) bool {
+		if nm == nil {
+			return false
+		}
+		def := nm.GetDefaultNode()
+		if def == nil {
+			return false
+		}
+		fp, ok := def.(contracts.FeaturesProvider)
+		if !ok {
+			return false
+		}
+		resolver := fp.Features()
+		if resolver == nil {
+			return false
+		}
+		return resolver.IsEnabled(ctx, pkgconfig.FeatureGuestCheckout.Key)
+	}
+}
+
 func (g *Gateway) EnsureHubForUser(nodeID string) *hub {
 	g.hubsMtx.RLock()
 	h, exists := g.hubs[nodeID]

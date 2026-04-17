@@ -310,6 +310,12 @@ type AnalyticsProvider interface {
 // Handlers that need typed request/response objects use type assertion to the
 // concrete *GuestOrderAppService (same pattern as WebhookProvider).
 type GuestOrderService interface {
+	// IsEnabled reports whether Guest Checkout is currently enabled for the
+	// caller's evaluation scope (platform → tenant → node runtime). Handlers
+	// and views should gate writes and list-filter against this rather than
+	// consulting the legacy GuestCheckoutConfig.Enabled field.
+	IsEnabled(ctx context.Context) bool
+
 	CreateGuestOrder(ctx context.Context, req CreateGuestOrderRequest) (*GuestOrderResponse, error)
 	GetGuestOrderStatus(ctx context.Context, token string) (*GuestOrderStatusResponse, error)
 	ListGuestOrders(ctx context.Context, filter GuestOrderFilter) ([]models.GuestOrder, int64, error)

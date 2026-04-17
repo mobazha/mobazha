@@ -46,6 +46,12 @@ type Config struct {
 	// FrontendOverrideDir, when set, serves frontend files from this
 	// directory instead of the embedded SPA.
 	FrontendOverrideDir string
+
+	// GuestCheckoutEnabledFn, when set, is invoked per-request from the
+	// embedded frontend's /runtime-config.js handler so toggles via
+	// PATCH /v1/settings/features/{key} propagate without a restart.
+	// A nil callback defaults to false (fail-closed).
+	GuestCheckoutEnabledFn func(context.Context) bool
 }
 
 // Server is the unified HTTP(S) server for the native binary distribution.
@@ -60,7 +66,8 @@ type Server struct {
 // New creates a unified server with the given configuration.
 func New(cfg Config) *Server {
 	feHandler := frontend.NewHandler(frontend.ServerConfig{
-		OverrideDir: cfg.FrontendOverrideDir,
+		OverrideDir:            cfg.FrontendOverrideDir,
+		GuestCheckoutEnabledFn: cfg.GuestCheckoutEnabledFn,
 	})
 
 	mux := http.NewServeMux()

@@ -187,6 +187,9 @@ func (v *UnifiedOrderView) fetchGuest(ctx context.Context, f contracts.OrderList
 	if v.guestSvc == nil {
 		return nil, 0, nil
 	}
+	if !v.guestSvc.IsEnabled(ctx) {
+		return nil, 0, nil
+	}
 
 	filter := contracts.GuestOrderFilter{
 		Page:     0,

@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -21,9 +22,12 @@ type ServerConfig struct {
 	// switches the frontend to standalone mode.
 	SaaSURL string
 
-	// GuestCheckoutEnabled tells the frontend whether guest (anonymous)
-	// checkout is available on this node.
-	GuestCheckoutEnabled bool
+	// GuestCheckoutEnabledFn returns whether the guest checkout feature is
+	// currently enabled. The callback is invoked per /runtime-config.js
+	// request so resolver updates (via PATCH /features/{key}) propagate to
+	// the SPA without a process restart. A nil callback is treated as
+	// disabled (fail-closed).
+	GuestCheckoutEnabledFn func(context.Context) bool
 }
 
 // NewHandler returns an http.Handler that serves the SPA frontend.
@@ -36,23 +40,23 @@ func NewHandler(cfg ServerConfig) http.Handler {
 	embeddedSub, _ := fs.Sub(DistFS, "dist")
 
 	return &spaHandler{
-		embedded:             embeddedSub,
-		overrideDir:          cfg.OverrideDir,
-		saasURL:              cfg.SaaSURL,
-		guestCheckoutEnabled: cfg.GuestCheckoutEnabled,
+		embedded:               embeddedSub,
+		overrideDir:            cfg.OverrideDir,
+		saasURL:                cfg.SaaSURL,
+		guestCheckoutEnabledFn: cfg.GuestCheckoutEnabledFn,
 	}
 }
 
 type spaHandler struct {
-	embedded             fs.FS
-	overrideDir          string
-	saasURL              string
-	guestCheckoutEnabled bool
+	embedded               fs.FS
+	overrideDir            string
+	saasURL                string
+	guestCheckoutEnabledFn func(context.Context) bool
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/runtime-config.js" {
-		h.serveRuntimeConfig(w)
+		h.serveRuntimeConfig(w, r)
 		return
 	}
 
@@ -142,7 +146,7 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 
 // serveRuntimeConfig returns a JS snippet that tells the SPA it is
 // running in standalone mode (native binary or Docker without build-time env).
-func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter) {
+func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/javascript")
 	w.Header().Set("Cache-Control", "no-cache")
 
@@ -152,7 +156,7 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter) {
 	}
 
 	guestCheckout := "false"
-	if h.guestCheckoutEnabled {
+	if h.guestCheckoutEnabledFn != nil && h.guestCheckoutEnabledFn(r.Context()) {
 		guestCheckout = "true"
 	}
 

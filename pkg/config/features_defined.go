@@ -58,3 +58,45 @@ var FeatureGuestCheckout = registerFeature(Feature{
 	},
 	IntroducedIn: "pm-2",
 })
+
+// FeatureGroupMarketplace — 群组集市（Telegram / Discord 等平台的 group
+// marketplace 能力）。目前仅作为 hosting 平台级 kill switch 存在，由
+// hosting 在启动时决定是否初始化对应 PlatformVerifier 和注册 /platform/v1/
+// product-groups、/platform/v1/group-marketplace/* 路由。
+//
+// Scope：仅 PlatformGlobal — 这是面向运营的基础设施开关，tenant 不应
+// 自行绕过；如果将来需要租户粒度，可补充 ScopeTenant 再升级业务读取点。
+var FeatureGroupMarketplace = registerFeature(Feature{
+	Key:          "groupMarketplace",
+	DisplayName:  "Group marketplace",
+	Description:  "Enables Telegram/Discord-based group marketplace endpoints and platform verifiers on the hosting gateway.",
+	Category:     "marketplace",
+	Stability:    StabilityBeta,
+	DefaultValue: false,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+	},
+	IntroducedIn: "pre-pm2",
+})
+
+// FeatureIsTestEnv — 环境标识（test vs prod）。
+//
+// 语义上不是"动态功能开关"，而是给前端/Telegram webhook 标注当前环境
+// 以便做 UX 差异（测试环境横幅、Mini App 调试入口等）。部署时通过
+// app.yaml `features.is_test_env` 固定；之所以登记进 Registry，是为了
+// 满足 SSOT（Single Source of Truth）原则，让 `/platform/v1/features`
+// 能一视同仁地枚举所有平台级标识。**强烈不建议运维通过 PATCH API
+// 动态翻转它** — hosting 的 legacy `repo.Features.IsTestEnv` 字段仍然
+// 只从 yaml 加载，Reload 不会覆盖。
+var FeatureIsTestEnv = registerFeature(Feature{
+	Key:          "isTestEnv",
+	DisplayName:  "Test environment banner",
+	Description:  "Marks the deployment as a test environment so clients and webhooks can render environment-specific UI hints.",
+	Category:     "platform",
+	Stability:    StabilityStable,
+	DefaultValue: false,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+	},
+	IntroducedIn: "pre-pm2",
+})

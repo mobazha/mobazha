@@ -7,6 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -87,6 +88,19 @@ func (n *MobazhaNode) UnifiedOrders() contracts.UnifiedOrderViewService {
 		return nil
 	}
 	return n.unifiedOrderView
+}
+
+// Features returns the feature-flag resolver composed during node
+// construction. May be nil for mock nodes that skipped applyOptions;
+// callers should nil-check before invoking resolver methods.
+//
+// See pkg/contracts.FeaturesProvider for the canonical type assertion
+// pattern that handlers should use.
+func (n *MobazhaNode) Features() pkgconfig.ResolverInterface {
+	if n == nil {
+		return nil
+	}
+	return n.featureResolver
 }
 
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService {

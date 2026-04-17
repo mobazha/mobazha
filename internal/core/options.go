@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/storage"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -41,6 +42,34 @@ func WithKeyProvider(kp contracts.KeyProvider) NodeOption {
 func WithHostService(hs coreiface.HostService) NodeOption {
 	return func(n *MobazhaNode) {
 		n.hostService = hs
+	}
+}
+
+// WithPlatformFeatureProvider overrides the default PlatformGlobalProvider
+// (which allows every feature). SaaS hosting injects an adapter that
+// reads app.yaml / runtime admin API to honor platform-wide kill switches.
+func WithPlatformFeatureProvider(p pkgconfig.PlatformGlobalProvider) NodeOption {
+	return func(n *MobazhaNode) {
+		n.platformFeatureProvider = p
+	}
+}
+
+// WithTenantFeatureStore overrides the default FeatureOverrideStore.
+// Hosting SaaS can inject a proxying adapter that fans reads out to a
+// central multi-tenant store; standalone nodes use the local
+// feature_overrides GORM table.
+func WithTenantFeatureStore(s pkgconfig.TenantFeatureStore) NodeOption {
+	return func(n *MobazhaNode) {
+		n.tenantFeatureStore = s
+	}
+}
+
+// WithNodeFeatureProvider overrides the default ConfigNodeFeatureProvider
+// (which reads repo.Config CLI flags). Tests and SaaS tenant nodes can
+// substitute a NoopAllowAllNodeProvider or an in-memory implementation.
+func WithNodeFeatureProvider(p pkgconfig.NodeFeatureProvider) NodeOption {
+	return func(n *MobazhaNode) {
+		n.nodeFeatureProvider = p
 	}
 }
 
@@ -111,7 +140,62 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initPostsService()
 	n.initAnalyticsService()
 	n.initNetDBSyncService()
+	n.initFeatureResolver()
 	n.initGuestOrderService()
+}
+
+// initFeatureResolver composes the three-layer feature-flag resolver from
+// whatever providers have been installed on the node. Any provider that is
+// still nil is replaced with a safe default:
+//
+//   - platform  → AllowAllPlatformProvider (standalone nodes have no
+//     platform kill switch; hosting injects its own via WithPlatformFeatureProvider).
+//   - tenant    → FeatureOverrideStore backed by the node's GORM database.
+//   - node      → ConfigNodeFeatureProvider reading repo.Config CLI flags.
+//     When nothing is available (tests/mocks without config/db), the
+//     resolver falls back to the allow-all stubs from pkg/config.
+//
+// The resolver is idempotent and safe to call multiple times; it is a
+// no-op once featureResolver is set. infrastructure-only nodes also get
+// a resolver so shared handlers can query capability flags without
+// nil-checking `n.featureResolver`.
+func (n *MobazhaNode) initFeatureResolver() {
+	if n == nil || n.featureResolver != nil {
+		return
+	}
+	platform := n.platformFeatureProvider
+	if platform == nil {
+		platform = pkgconfig.AllowAllPlatformProvider{}
+		n.platformFeatureProvider = platform
+	}
+
+	tenant := n.tenantFeatureStore
+	if tenant == nil && n.db != nil {
+		store := NewFeatureOverrideStore(n.db)
+		if err := store.Migrate(); err != nil {
+			// Migrate failure is non-fatal: the resolver degrades to
+			// feature defaults because Get() will surface the error.
+			logger.LogErrorWithIDf(log, n.nodeID, "feature_override: migrate failed: %v", err)
+		}
+		tenant = store
+		n.tenantFeatureStore = tenant
+	}
+	if tenant == nil {
+		tenant = pkgconfig.NoopTenantStore{}
+		n.tenantFeatureStore = tenant
+	}
+
+	node := n.nodeFeatureProvider
+	if node == nil {
+		node = pkgconfig.AllowAllNodeProvider{}
+		n.nodeFeatureProvider = node
+	}
+
+	n.featureResolver = pkgconfig.NewResolver(
+		pkgconfig.WithPlatformProvider(platform),
+		pkgconfig.WithTenantStore(tenant),
+		pkgconfig.WithNodeProvider(node),
+	)
 }
 
 // initPaymentVerificationService creates the PaymentVerificationService.

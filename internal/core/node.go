@@ -201,6 +201,17 @@ type appServices struct {
 	autoSweepService           *AutoSweepService
 	guestPaymentMonitor        *GuestPaymentMonitor
 	unifiedOrderView           *UnifiedOrderView
+
+	// Feature flag resolver infrastructure (Phase FF-3).
+	// featureResolver is the SSOT for `isEnabled(ctx, key)` queries; it
+	// combines the three providers below under the registry's AllowedScopes.
+	// Providers remain injectable so SaaS hosting can swap in cross-tenant
+	// adapters (platform-global config from app.yaml, proxying tenant store,
+	// etc.) without forking core.
+	featureResolver         pkgconfig.ResolverInterface
+	platformFeatureProvider pkgconfig.PlatformGlobalProvider
+	tenantFeatureStore      pkgconfig.TenantFeatureStore
+	nodeFeatureProvider     pkgconfig.NodeFeatureProvider
 }
 
 // IsDefaultNode returns whether this node is the default node.

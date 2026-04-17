@@ -20,12 +20,14 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -154,14 +156,66 @@ func (g *Gateway) handlePUTFeatureSetting(w http.ResponseWriter, r *http.Request
 	if actorID == "" {
 		actorID = "admin"
 	}
+
+	// Capture the prior override state (if any) for audit logging. We do this
+	// before Set so a later failure in Set still leaves the audit row absent —
+	// audit rows represent *successful* changes only.
+	var oldValuePtr *bool
+	if prev, configured, err := admin.TenantFeatureStore().Get(ctx, database.StandaloneTenantID, key); err == nil {
+		if configured {
+			v := prev
+			oldValuePtr = &v
+		}
+	} else {
+		// Non-fatal: we still proceed with the write, but annotate the audit
+		// entry with "old=unknown" (nil) and surface a WARN for operators.
+		log.Warningf("feature audit: failed to read prior tenant override for %q: %v", key, err)
+	}
+
 	if err := admin.TenantFeatureStore().Set(ctx, database.StandaloneTenantID, key, body.Enabled, actorID); err != nil {
 		response.ErrorWithDetail(w, http.StatusInternalServerError, response.CodeInternalError,
 			"failed to persist feature override", err.Error())
 		return
 	}
 
+	// Best-effort audit + metrics. Failures here must not fail the request:
+	// the override has already been persisted and users expect the API to
+	// return success.
+	recordFeatureAudit(node, &models.FeatureFlagAuditLog{
+		Scope:      string(pkgconfig.ScopeTenant),
+		TenantID:   database.StandaloneTenantID,
+		FeatureKey: key,
+		OldValue:   oldValuePtr,
+		NewValue:   body.Enabled,
+		Actor:      actorID,
+		IPAddress:  extractClientIP(r),
+		UserAgent:  r.UserAgent(),
+		CreatedAt:  time.Now().UTC(),
+	})
+	pkgconfig.RecordFeatureChange(pkgconfig.ScopeTenant, key, body.Enabled)
+
 	updated := fp.Features().Evaluate(ctx, key)
 	response.Success(w, updated)
+}
+
+// recordFeatureAudit persists a feature-flag change event via the node's
+// FeatureAuditLogger when available. Absence of the logger (e.g. SaaS proxy
+// shims without a tenant DB) is benign — the change metric still fires and
+// the request succeeds.
+func recordFeatureAudit(node interface{}, entry *models.FeatureFlagAuditLog) {
+	ap, ok := node.(contracts.FeatureAuditProvider)
+	if !ok || ap.FeatureAuditLogger() == nil {
+		return
+	}
+	// Use a detached context so a client disconnect mid-write does not cancel
+	// the audit insert (we still want operational traceability for completed
+	// business writes). Retain a short timeout to bound the DB call.
+	auditCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := ap.FeatureAuditLogger().AppendAudit(auditCtx, entry); err != nil {
+		log.Warningf("feature audit: append failed (scope=%s key=%s actor=%s): %v",
+			entry.Scope, entry.FeatureKey, entry.Actor, err)
+	}
 }
 
 // ---------------------------------------------------------------------------

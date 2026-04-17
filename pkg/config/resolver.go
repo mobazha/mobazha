@@ -134,24 +134,31 @@ func NewResolver(opts ...ResolverOption) *Resolver {
 // IsEnabled 返回 feature 的 effective 值。
 //
 // 简化路径：不返回 Evaluation 细节。内部仍然走完整评估，但仅输出布尔。
+// 记录一次 feature_flag_evaluations_total 指标。
 func (r *Resolver) IsEnabled(ctx context.Context, key string) bool {
-	return r.evaluate(ctx, key, 0).Enabled
+	eval := r.evaluate(ctx, key, 0)
+	RecordFeatureEvaluation(eval)
+	return eval.Enabled
 }
 
 // Evaluate 返回带诊断信息的评估结果。
+// 记录一次 feature_flag_evaluations_total 指标。
 func (r *Resolver) Evaluate(ctx context.Context, key string) Evaluation {
-	return r.evaluate(ctx, key, 0)
+	eval := r.evaluate(ctx, key, 0)
+	RecordFeatureEvaluation(eval)
+	return eval
 }
 
 // List 枚举当前 ctx 下所有已注册 feature 的 effective 值。
 //
 // 用于 `GET /v1/features` 装配响应；feature 数量固定（注册表静态），
-// 性能可接受。
+// 性能可接受。每个 feature 记录一次 evaluation 指标。
 func (r *Resolver) List(ctx context.Context) []EffectiveFeature {
 	features := r.listFeatures()
 	out := make([]EffectiveFeature, 0, len(features))
 	for _, f := range features {
 		eval := r.evaluate(ctx, f.Key, 0)
+		RecordFeatureEvaluation(eval)
 		out = append(out, EffectiveFeature{
 			Feature:   f,
 			Effective: eval.Enabled,

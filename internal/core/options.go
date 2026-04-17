@@ -205,6 +205,17 @@ func (n *MobazhaNode) initFeatureResolver() {
 		pkgconfig.WithTenantStore(tenant),
 		pkgconfig.WithNodeProvider(node),
 	)
+
+	// Initialise the audit log store when a DB is available. Migrate
+	// failures are non-fatal: handlers log-and-continue on audit errors
+	// so the underlying feature-flag mutation still succeeds.
+	if n.featureAuditLogger == nil && n.db != nil {
+		auditStore := NewFeatureAuditLogStore(n.db)
+		if err := auditStore.Migrate(); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "feature_audit: migrate failed: %v", err)
+		}
+		n.featureAuditLogger = auditStore
+	}
 }
 
 // initPaymentVerificationService creates the PaymentVerificationService.

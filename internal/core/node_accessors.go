@@ -117,6 +117,20 @@ func (n *MobazhaNode) TenantFeatureStore() pkgconfig.TenantFeatureStore {
 	return n.tenantFeatureStore
 }
 
+// FeatureAuditLogger returns the feature-flag audit log persister used by
+// administrative write handlers to record who toggled which flag. Returns
+// nil on bare test harnesses / infrastructure-only nodes (no DB); callers
+// MUST nil-check and log-and-continue when it is absent — audit gaps are
+// surfaced by ops alerting rather than blocking the underlying write.
+//
+// Implements contracts.FeatureAuditProvider.
+func (n *MobazhaNode) FeatureAuditLogger() contracts.FeatureAuditLogger {
+	if n == nil {
+		return nil
+	}
+	return n.featureAuditLogger
+}
+
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService {
 	if n.shoppingCartService == nil {
 		return nil

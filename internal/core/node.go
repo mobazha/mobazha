@@ -212,6 +212,13 @@ type appServices struct {
 	platformFeatureProvider pkgconfig.PlatformGlobalProvider
 	tenantFeatureStore      pkgconfig.TenantFeatureStore
 	nodeFeatureProvider     pkgconfig.NodeFeatureProvider
+
+	// featureAuditLogger persists feature-flag write events to the
+	// feature_flag_audit_logs table. Initialised in initFeatureResolver
+	// once a database is available; remains nil on infrastructure-only /
+	// mock nodes, in which case handlers fall back to log-and-continue.
+	// See pkg/contracts/features.go FeatureAuditProvider.
+	featureAuditLogger contracts.FeatureAuditLogger
 }
 
 // IsDefaultNode returns whether this node is the default node.

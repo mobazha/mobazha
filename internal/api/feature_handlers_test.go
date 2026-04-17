@@ -23,6 +23,7 @@ import (
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 // ---------------------------------------------------------------------------
@@ -347,6 +348,100 @@ func TestPUTFeatureSetting_AdminUnavailable_Returns501(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotImplemented {
 		t.Errorf("want 501 (admin provider unavailable), got %d", resp.StatusCode)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// recordFeatureAudit — helper used by handlePUTFeatureSetting to persist
+// audit rows. Tests here cover the three shapes of `node`:
+//
+//  1. Non-provider (e.g. minimal NodeService stub) — no-op, no panic.
+//  2. Provider returning nil logger (e.g. SaaS proxy shim) — no-op, no panic.
+//  3. Provider returning a working logger — AppendAudit is invoked with the
+//     supplied entry. Logger errors are swallowed (best-effort contract).
+// ---------------------------------------------------------------------------
+
+// fakeAuditLogger records every AppendAudit call for assertions. If returnErr
+// is non-nil, AppendAudit returns it to simulate a transient DB failure.
+type fakeAuditLogger struct {
+	calls     []*models.FeatureFlagAuditLog
+	returnErr error
+}
+
+func (f *fakeAuditLogger) AppendAudit(_ context.Context, entry *models.FeatureFlagAuditLog) error {
+	f.calls = append(f.calls, entry)
+	return f.returnErr
+}
+
+// auditProviderNode implements contracts.FeatureAuditProvider on top of the
+// minimal NodeService stub. The logger may be nil to simulate a shim.
+type auditProviderNode struct {
+	contracts.NodeService
+	logger contracts.FeatureAuditLogger
+}
+
+func (a *auditProviderNode) FeatureAuditLogger() contracts.FeatureAuditLogger {
+	return a.logger
+}
+
+func TestRecordFeatureAudit_NonProviderNode_NoOp(t *testing.T) {
+	// Node does not implement FeatureAuditProvider — must not panic, must not
+	// attempt to call anything.
+	node := struct{ contracts.NodeService }{}
+	recordFeatureAudit(node, &models.FeatureFlagAuditLog{
+		Scope: "tenant", FeatureKey: "x", NewValue: true, Actor: "a",
+	})
+}
+
+func TestRecordFeatureAudit_NilLogger_NoOp(t *testing.T) {
+	// Node implements the provider but returns nil — must not panic.
+	node := &auditProviderNode{logger: nil}
+	recordFeatureAudit(node, &models.FeatureFlagAuditLog{
+		Scope: "tenant", FeatureKey: "x", NewValue: true, Actor: "a",
+	})
+}
+
+func TestRecordFeatureAudit_WritesEntry(t *testing.T) {
+	logger := &fakeAuditLogger{}
+	node := &auditProviderNode{logger: logger}
+
+	oldValue := false
+	entry := &models.FeatureFlagAuditLog{
+		Scope:      "tenant",
+		TenantID:   "_default",
+		FeatureKey: "guestCheckout",
+		OldValue:   &oldValue,
+		NewValue:   true,
+		Actor:      "admin-1",
+	}
+	recordFeatureAudit(node, entry)
+
+	if len(logger.calls) != 1 {
+		t.Fatalf("expected 1 AppendAudit call, got %d", len(logger.calls))
+	}
+	got := logger.calls[0]
+	if got.FeatureKey != "guestCheckout" {
+		t.Errorf("feature_key: got %q", got.FeatureKey)
+	}
+	if got.TenantID != "_default" {
+		t.Errorf("tenant_id: got %q", got.TenantID)
+	}
+	if !got.NewValue {
+		t.Error("new_value: want true")
+	}
+}
+
+func TestRecordFeatureAudit_LoggerError_Swallowed(t *testing.T) {
+	// AppendAudit failures are best-effort — recordFeatureAudit must swallow
+	// the error and not panic. We verify the call was attempted.
+	logger := &fakeAuditLogger{returnErr: context.DeadlineExceeded}
+	node := &auditProviderNode{logger: logger}
+
+	recordFeatureAudit(node, &models.FeatureFlagAuditLog{
+		Scope: "tenant", FeatureKey: "x", NewValue: true, Actor: "a",
+	})
+	if len(logger.calls) != 1 {
+		t.Fatalf("expected AppendAudit to be called once even on error, got %d", len(logger.calls))
 	}
 }
 

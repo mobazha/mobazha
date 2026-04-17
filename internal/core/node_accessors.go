@@ -103,6 +103,20 @@ func (n *MobazhaNode) Features() pkgconfig.ResolverInterface {
 	return n.featureResolver
 }
 
+// TenantFeatureStore returns the tenant-layer feature override store used
+// by administrative write handlers (e.g. PUT /v1/settings/features/{key}).
+// Returns nil when the node was constructed without a tenant store (e.g.
+// bare test harnesses); callers should nil-check before invoking store
+// methods or surface 501 to the client.
+//
+// Implements contracts.FeatureAdminProvider.
+func (n *MobazhaNode) TenantFeatureStore() pkgconfig.TenantFeatureStore {
+	if n == nil {
+		return nil
+	}
+	return n.tenantFeatureStore
+}
+
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService {
 	if n.shoppingCartService == nil {
 		return nil
@@ -318,3 +332,5 @@ func (a *identityInfoAdapter) IsGlobalBanned(peerID peer.ID) bool {
 
 // Compile-time checks for optional accessor interfaces.
 var _ contracts.FiatPaymentProviderAccessor = (*MobazhaNode)(nil)
+var _ contracts.FeaturesProvider = (*MobazhaNode)(nil)
+var _ contracts.FeatureAdminProvider = (*MobazhaNode)(nil)

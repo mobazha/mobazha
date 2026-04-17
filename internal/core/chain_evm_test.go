@@ -8,6 +8,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
@@ -57,6 +58,9 @@ func (m *mockHostService) GetDiscountAccessForPeer(_ peer.ID) (contracts.Discoun
 }
 func (m *mockHostService) GetBlobStore() contracts.BlobStore                      { return nil }
 func (m *mockHostService) GetNodeServiceByPeerID(_ peer.ID) contracts.NodeService { return nil }
+func (m *mockHostService) GetPlatformFeatureProvider() pkgconfig.PlatformGlobalProvider {
+	return nil
+}
 
 var _ coreiface.HostService = (*mockHostService)(nil)
 

@@ -164,10 +164,19 @@ func (n *MobazhaNode) initFeatureResolver() {
 		return
 	}
 	platform := n.platformFeatureProvider
+	// Fall back to the HostService before the allow-all default so that SaaS
+	// tenant nodes — which call core.NewNode (not NewNodeWithOptions) — still
+	// pick up platform kill switches without every call site having to thread
+	// WithPlatformFeatureProvider explicitly.
+	if platform == nil && n.hostService != nil {
+		if hp := n.hostService.GetPlatformFeatureProvider(); hp != nil {
+			platform = hp
+		}
+	}
 	if platform == nil {
 		platform = pkgconfig.AllowAllPlatformProvider{}
-		n.platformFeatureProvider = platform
 	}
+	n.platformFeatureProvider = platform
 
 	tenant := n.tenantFeatureStore
 	if tenant == nil && n.db != nil {

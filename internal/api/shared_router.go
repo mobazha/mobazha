@@ -64,6 +64,12 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 		r.Use(cfg.PostResolverMiddleware)
 	}
 
+	// StorefrontMiddleware parses X-Storefront-* headers injected by the
+	// hosting Gateway (MS-Phase-2a · MS2a.2c). No-op when headers are
+	// absent. Mounted after node resolution so downstream handlers can
+	// read both node and storefront context.
+	r.Use(g.StorefrontMiddleware)
+
 	g.registerBusinessRoutes(r)
 
 	r.HandleFunc("/ws/{nodeID}", g.WebsocketNodeHandler())

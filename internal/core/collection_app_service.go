@@ -179,6 +179,16 @@ func (s *CollectionAppService) ReorderProducts(ctx context.Context, collectionID
 	return nil
 }
 
+// IsProductInCollections forwards to the underlying store. Returns
+// (false, nil) when collectionIDs is empty so callers can treat an empty
+// filter as "no restriction". MS-Phase-2a · MS2a.2c.
+func (s *CollectionAppService) IsProductInCollections(ctx context.Context, collectionIDs []string, slug string) (bool, error) {
+	if len(collectionIDs) == 0 {
+		return false, nil
+	}
+	return s.store.IsProductInCollections(ctx, collectionIDs, slug)
+}
+
 func (s *CollectionAppService) RemoveProductFromAllCollections(ctx context.Context, slug string) error {
 	if err := s.store.RemoveProductFromAllCollections(ctx, slug); err != nil {
 		return err

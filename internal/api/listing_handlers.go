@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -141,7 +143,15 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 	ss := getSocialService(r)
 	reqCtx := extractRequestContext(r)
 
-	if peerIDStr == "" || peerIDStr == is.Identity().String() {
+	// MS-Phase-2a · MS2a.2c — capture storefront filter (if any) so we can
+	// scope the listing result to the storefront's product selection after
+	// the full index is loaded. isLocalPeer controls whether collection
+	// filtering is applied: collection membership lives in the local DB and
+	// is only meaningful for the node's own listings.
+	sfFilter := StorefrontFilterFromContext(r.Context())
+	isLocalPeer := peerIDStr == "" || peerIDStr == is.Identity().String()
+
+	if isLocalPeer {
 		listingIndex, listingErr = ls.GetMyListings()
 
 		if listingErr == nil {
@@ -170,6 +180,20 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// MS-Phase-2a · MS2a.2c — apply storefront collection filter before the
+	// rating enrichment pass so we don't waste work annotating listings
+	// that will be dropped. Collection filtering runs only for local-peer
+	// listings because CollectionService membership lookups hit the local
+	// DB. Tag include/exclude filtering is deferred to TD-033.
+	if isLocalPeer && sfFilter != nil && len(sfFilter.CollectionIDs) > 0 && len(listingIndex) > 0 {
+		filtered, filterErr := filterListingsByCollections(r, listingIndex, sfFilter.CollectionIDs)
+		if filterErr != nil {
+			ErrorResponse(w, http.StatusInternalServerError, fmt.Sprintf("storefront collection filter: %s", filterErr.Error()))
+			return
+		}
+		listingIndex = filtered
+	}
+
 	if ratingErr == nil {
 		ratings := make(map[string]models.RatingInfo)
 		for _, r := range ratingIndex {
@@ -187,6 +211,47 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 	}
 
 	sanitizedJSONResponse(w, listingIndex)
+}
+
+// filterListingsByCollections keeps only listings whose slug belongs to at
+// least one of the given collectionIDs. Returns the filtered slice (may be
+// empty) or an error from the collection service. When no collection
+// service is registered on the request (edge case — older wiring paths),
+// we return the input unchanged rather than failing the request hard.
+//
+// MS-Phase-2a · MS2a.2c.
+func filterListingsByCollections(r *http.Request, index models.ListingIndex, collectionIDs []string) (models.ListingIndex, error) {
+	cs, ok := getCollectionService(r)
+	if !ok || cs == nil {
+		return index, nil
+	}
+	return filterListingsByCollectionsWithService(r.Context(), cs, index, collectionIDs)
+}
+
+// filterListingsByCollectionsWithService is the pure core of collection
+// filtering — same semantics as filterListingsByCollections but takes the
+// CollectionService directly so it can be unit-tested without wiring up
+// a full NodeService mock.
+func filterListingsByCollectionsWithService(
+	ctx context.Context,
+	cs contracts.CollectionService,
+	index models.ListingIndex,
+	collectionIDs []string,
+) (models.ListingIndex, error) {
+	if cs == nil || len(collectionIDs) == 0 {
+		return index, nil
+	}
+	kept := make(models.ListingIndex, 0, len(index))
+	for _, l := range index {
+		ok, err := cs.IsProductInCollections(ctx, collectionIDs, l.Slug)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			kept = append(kept, l)
+		}
+	}
+	return kept, nil
 }
 
 func (g *Gateway) handlePOSTListing(w http.ResponseWriter, r *http.Request) {

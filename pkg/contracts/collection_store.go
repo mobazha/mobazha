@@ -38,4 +38,14 @@ type CollectionService interface {
 	AddProducts(ctx context.Context, collectionID string, slugs []string) error
 	RemoveProduct(ctx context.Context, collectionID, slug string) error
 	ReorderProducts(ctx context.Context, collectionID string, orderedSlugs []string) error
+
+	// IsProductInCollections reports whether slug belongs to any of the given
+	// collection IDs. Returns (false, nil) when collectionIDs is empty so
+	// callers can treat an empty filter as "no restriction".
+	//
+	// MS-Phase-2a · MS2a.2c — used by the listing handlers to apply the
+	// Storefront.Filter.CollectionIDs rule injected via X-Storefront-Filter-*
+	// headers. Per-slug call is acceptable for the typical listing count
+	// (dozens to low hundreds); batch API can be added if it becomes a bottleneck.
+	IsProductInCollections(ctx context.Context, collectionIDs []string, slug string) (bool, error)
 }

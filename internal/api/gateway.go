@@ -133,6 +133,11 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	// storefront routes (listings, profiles, exchange rates, etc.) are served
 	// without auth so that buyers can read store data on standalone nodes.
 	r.Use(g.NodeSelectionMiddleware)
+	// StorefrontMiddleware parses X-Storefront-* headers injected by the
+	// hosting Gateway (MS-Phase-2a · MS2a.2c) into a StorefrontContext on
+	// the request. It's a no-op when the headers are absent (main host or
+	// internal API traffic), so adding it globally is managed_escrow.
+	r.Use(g.StorefrontMiddleware)
 
 	// Create default hub
 	defaultNodeID := repo.DefaultNodeID

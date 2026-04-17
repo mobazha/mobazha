@@ -107,12 +107,13 @@ func (s *StoreHeartbeatSender) sendHeartbeat(ctx context.Context) {
 		return
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
 		log.Debugf("heartbeat sent successfully to %s", s.cfg.SaaSURL)
 	} else {
-		log.Warningf("heartbeat response: %d", resp.StatusCode)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		log.Warningf("heartbeat response: %d, body=%s", resp.StatusCode, string(respBody))
 	}
 }
 

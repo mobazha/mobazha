@@ -701,7 +701,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	if !cfg.SaaSMode && hbSaaSURL != "" && hbAPIKey != "" {
 		hbCfg := obnet.StoreHeartbeatConfig{
 			SaaSURL: hbSaaSURL,
-			PeerID:  nodeID,
+			PeerID:  obNode.peerID.String(),
 			APIKey:  hbAPIKey,
 			Version: nodeVersion.String(),
 		}

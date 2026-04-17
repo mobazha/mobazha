@@ -227,6 +227,45 @@ func TestResolver_NodeScope_Disabled(t *testing.T) {
 	}
 }
 
+// TestResolver_MultiLayerDisabled_ShortCircuitsAtPlatform ——
+// platform_global + tenant 都关闭时，短路于最靠前（AllowedScopes 首位）
+// 的 platform_global，DeniedAtLayer=platform_global，tenant 层不再被评估
+// （Resolution.Tenant == nil）。这守护 §3.3 "any layer false → false" 的
+// 报告语义：DeniedAtLayer 始终是首次失败的层，而不是最后一层。
+func TestResolver_MultiLayerDisabled_ShortCircuitsAtPlatform(t *testing.T) {
+	reg := newTestRegistry(t, &Feature{
+		Key: "alpha", DisplayName: "A", Description: "a",
+		Stability: StabilityStable, DefaultValue: true,
+		AllowedScopes: []Scope{ScopePlatformGlobal, ScopeTenant},
+	})
+	platform := fakePlatform{values: map[string]bool{"alpha": false}}
+	store := &fakeTenantStore{data: map[string]map[string]bool{
+		"t1": {"alpha": false}, // 也关闭，但不应被评估到
+	}}
+	r := NewResolver(
+		WithRegistry(reg),
+		WithPlatformProvider(platform),
+		WithTenantStore(store),
+	)
+
+	ctx := ContextWithTenantID(context.Background(), "t1")
+	eval := r.Evaluate(ctx, "alpha")
+
+	if eval.Enabled {
+		t.Error("expected enabled=false when platform disabled")
+	}
+	if eval.DeniedAtLayer != ScopePlatformGlobal {
+		t.Errorf("expected DeniedAtLayer=platform_global (short-circuit), got %q", eval.DeniedAtLayer)
+	}
+	// 短路应发生在 tenant 层之前 → Resolution.Tenant 必须为 nil
+	if eval.Resolution.Tenant != nil {
+		t.Errorf("expected Resolution.Tenant=nil (not evaluated after short-circuit), got %v", *eval.Resolution.Tenant)
+	}
+	if eval.Resolution.PlatformGlobal == nil || *eval.Resolution.PlatformGlobal {
+		t.Error("expected Resolution.PlatformGlobal=false (evaluated and rejected)")
+	}
+}
+
 // TestResolver_ThreeLayerAND —— 所有层都 true → 结果 true。
 func TestResolver_ThreeLayerAND(t *testing.T) {
 	reg := newTestRegistry(t, &Feature{
@@ -289,6 +328,61 @@ func TestResolver_Dependencies_DisabledCascade(t *testing.T) {
 	}
 	if eval.Dependencies[0].Enabled {
 		t.Error("expected parent dependency reported as disabled")
+	}
+}
+
+// TestResolver_Dependencies_TransitiveCascade —— 多级依赖链（A → B → C），
+// 最底层 C 在任一层关闭 → 整个链条都应被评估为关闭。守护 §13.5 的
+// 递归语义以及 DependencyStatus 仅记录直接依赖（而非传递展开）这一契约。
+func TestResolver_Dependencies_TransitiveCascade(t *testing.T) {
+	reg := newTestRegistry(t,
+		&Feature{
+			Key: "grandchild", DisplayName: "C", Description: "c",
+			Stability: StabilityStable, DefaultValue: true,
+			AllowedScopes: []Scope{ScopeNodeRuntime},
+		},
+		&Feature{
+			Key: "child", DisplayName: "B", Description: "b",
+			Stability: StabilityStable, DefaultValue: true,
+			AllowedScopes: []Scope{ScopeNodeRuntime},
+			Dependencies:  []string{"grandchild"},
+		},
+		&Feature{
+			Key: "parent", DisplayName: "A", Description: "a",
+			Stability: StabilityStable, DefaultValue: true,
+			AllowedScopes: []Scope{ScopeNodeRuntime},
+			Dependencies:  []string{"child"},
+		},
+	)
+	// 只关掉最底层 grandchild（通过 node 层）
+	r := NewResolver(
+		WithRegistry(reg),
+		WithNodeProvider(fakeNode{values: map[string]bool{"grandchild": false}}),
+	)
+
+	// parent 应因 child → grandchild 关闭而被级联关闭
+	eval := r.Evaluate(context.Background(), "parent")
+	if eval.Enabled {
+		t.Error("expected parent disabled due to transitive dependency on grandchild")
+	}
+	// DependencyStatus 只记录 parent 的直接依赖 child，且 child=false
+	if len(eval.Dependencies) != 1 || eval.Dependencies[0].Key != "child" {
+		t.Fatalf("expected parent.Dependencies=[child], got %+v", eval.Dependencies)
+	}
+	if eval.Dependencies[0].Enabled {
+		t.Error("expected child dependency reported disabled (transitive)")
+	}
+
+	// child 自身也应因 grandchild 关闭被级联关闭
+	childEval := r.Evaluate(context.Background(), "child")
+	if childEval.Enabled {
+		t.Error("expected child disabled due to grandchild")
+	}
+	if len(childEval.Dependencies) != 1 || childEval.Dependencies[0].Key != "grandchild" {
+		t.Fatalf("expected child.Dependencies=[grandchild], got %+v", childEval.Dependencies)
+	}
+	if childEval.Dependencies[0].Enabled {
+		t.Error("expected grandchild dependency reported disabled")
 	}
 }
 

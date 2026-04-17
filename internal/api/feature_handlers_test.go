@@ -93,10 +93,22 @@ type featureTestNode struct {
 	contracts.NodeService // embedded interface; other methods will panic if called
 	resolver              pkgconfig.ResolverInterface
 	store                 pkgconfig.TenantFeatureStore
+	// auditLogger is optional — when non-nil the node satisfies
+	// contracts.FeatureAuditProvider so handlePUTFeatureSetting's audit path
+	// can be exercised end-to-end. Leaving it nil preserves backwards
+	// compatibility for tests that only care about store writes.
+	auditLogger contracts.FeatureAuditLogger
 }
 
-func (n *featureTestNode) Features() pkgconfig.ResolverInterface   { return n.resolver }
+func (n *featureTestNode) Features() pkgconfig.ResolverInterface            { return n.resolver }
 func (n *featureTestNode) TenantFeatureStore() pkgconfig.TenantFeatureStore { return n.store }
+
+// FeatureAuditLogger implements contracts.FeatureAuditProvider. Returns nil
+// unless the test explicitly injects a logger, in which case recordFeatureAudit
+// will route audit entries through it.
+func (n *featureTestNode) FeatureAuditLogger() contracts.FeatureAuditLogger {
+	return n.auditLogger
+}
 
 // nilAdminNode implements FeaturesProvider but deliberately returns nil for
 // TenantFeatureStore(), modelling the SaaS proxy shim case.
@@ -348,6 +360,92 @@ func TestPUTFeatureSetting_AdminUnavailable_Returns501(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotImplemented {
 		t.Errorf("want 501 (admin provider unavailable), got %d", resp.StatusCode)
+	}
+}
+
+// TestPUTFeatureSetting_AuditLoggerInvoked —— 集成测试：验证完整
+// PUT /v1/settings/features/{key} 链路会把变更事件写入 FeatureAuditLogger。
+// 涵盖 HANDOFF §ff-impl-tests 要求的"审计日志"路径——handler 的 store 写入
+// 成功后必须调用 FeatureAuditLogger.AppendAudit（best-effort），并传入正确
+// 的 scope、tenant_id、feature_key、old/new value、actor 等字段。
+func TestPUTFeatureSetting_AuditLoggerInvoked(t *testing.T) {
+	store := newMemTenantStore()
+	resolver := buildResolver(nil, store)
+	logger := &fakeAuditLogger{}
+	node := &featureTestNode{resolver: resolver, store: store, auditLogger: logger}
+
+	ts := featureTestServer(t, node)
+
+	reqBody, _ := json.Marshal(map[string]bool{"enabled": true})
+	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckout.Key, reqBody)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d; body=%s", resp.StatusCode, respBody)
+	}
+
+	if len(logger.calls) != 1 {
+		t.Fatalf("expected 1 audit entry, got %d", len(logger.calls))
+	}
+	entry := logger.calls[0]
+	if entry.Scope != string(pkgconfig.ScopeTenant) {
+		t.Errorf("scope: got %q, want %q", entry.Scope, string(pkgconfig.ScopeTenant))
+	}
+	if entry.TenantID != database.StandaloneTenantID {
+		t.Errorf("tenant_id: got %q, want %q", entry.TenantID, database.StandaloneTenantID)
+	}
+	if entry.FeatureKey != pkgconfig.FeatureGuestCheckout.Key {
+		t.Errorf("feature_key: got %q", entry.FeatureKey)
+	}
+	if !entry.NewValue {
+		t.Error("new_value: want true")
+	}
+	if entry.CreatedAt.IsZero() {
+		t.Error("created_at should be populated by handler")
+	}
+}
+
+// TestPUTFeatureSetting_AuditLoggerErrorDoesNotFailRequest —— logger 失败
+// 必须被 handler 吞掉：商业操作（store 写入）已成功，API 仍应返回 200。
+// 守护 FeatureAuditLogger 接口的 best-effort 语义。
+func TestPUTFeatureSetting_AuditLoggerErrorDoesNotFailRequest(t *testing.T) {
+	store := newMemTenantStore()
+	resolver := buildResolver(nil, store)
+	logger := &fakeAuditLogger{returnErr: context.DeadlineExceeded}
+	node := &featureTestNode{resolver: resolver, store: store, auditLogger: logger}
+
+	ts := featureTestServer(t, node)
+
+	reqBody, _ := json.Marshal(map[string]bool{"enabled": true})
+	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckout.Key, reqBody)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200 despite logger error, got %d; body=%s", resp.StatusCode, respBody)
+	}
+	if len(logger.calls) != 1 {
+		t.Fatalf("expected AppendAudit to still be attempted once, got %d", len(logger.calls))
+	}
+	// Store must still reflect the successful write — audit failure should
+	// never roll the business op back.
+	if !store.values[database.StandaloneTenantID+"|"+pkgconfig.FeatureGuestCheckout.Key] {
+		t.Error("expected store to contain tenant override even though audit failed")
+	}
+}
+
+// TestPUTFeatureSetting_PlatformDisabled_NoAuditWrite —— 被 platform 层拒
+// 绝（409）的请求，不应触发 audit 写入。防止失败操作污染审计日志。
+func TestPUTFeatureSetting_PlatformDisabled_NoAuditWrite(t *testing.T) {
+	store := newMemTenantStore()
+	resolver := buildResolver(togglePlatformProvider{enabled: false}, store)
+	logger := &fakeAuditLogger{}
+	node := &featureTestNode{resolver: resolver, store: store, auditLogger: logger}
+
+	ts := featureTestServer(t, node)
+
+	reqBody, _ := json.Marshal(map[string]bool{"enabled": true})
+	resp, _ := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckout.Key, reqBody)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("want 409, got %d", resp.StatusCode)
+	}
+	if len(logger.calls) != 0 {
+		t.Errorf("expected zero audit writes on rejected request, got %d", len(logger.calls))
 	}
 }
 

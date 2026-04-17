@@ -7,6 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -74,6 +75,62 @@ func (n *MobazhaNode) Preferences() contracts.PreferencesService {
 	}
 	return n.preferencesService
 }
+func (n *MobazhaNode) GuestOrder() contracts.GuestOrderService {
+	if n.guestOrderService == nil {
+		return nil
+	}
+	return n.guestOrderService
+}
+
+// UnifiedOrders returns the unified order view combining standard and guest orders.
+func (n *MobazhaNode) UnifiedOrders() contracts.UnifiedOrderViewService {
+	if n.unifiedOrderView == nil {
+		return nil
+	}
+	return n.unifiedOrderView
+}
+
+// Features returns the feature-flag resolver composed during node
+// construction. May be nil for mock nodes that skipped applyOptions;
+// callers should nil-check before invoking resolver methods.
+//
+// See pkg/contracts.FeaturesProvider for the canonical type assertion
+// pattern that handlers should use.
+func (n *MobazhaNode) Features() pkgconfig.ResolverInterface {
+	if n == nil {
+		return nil
+	}
+	return n.featureResolver
+}
+
+// TenantFeatureStore returns the tenant-layer feature override store used
+// by administrative write handlers (e.g. PUT /v1/settings/features/{key}).
+// Returns nil when the node was constructed without a tenant store (e.g.
+// bare test harnesses); callers should nil-check before invoking store
+// methods or surface 501 to the client.
+//
+// Implements contracts.FeatureAdminProvider.
+func (n *MobazhaNode) TenantFeatureStore() pkgconfig.TenantFeatureStore {
+	if n == nil {
+		return nil
+	}
+	return n.tenantFeatureStore
+}
+
+// FeatureAuditLogger returns the feature-flag audit log persister used by
+// administrative write handlers to record who toggled which flag. Returns
+// nil on bare test harnesses / infrastructure-only nodes (no DB); callers
+// MUST nil-check and log-and-continue when it is absent — audit gaps are
+// surfaced by ops alerting rather than blocking the underlying write.
+//
+// Implements contracts.FeatureAuditProvider.
+func (n *MobazhaNode) FeatureAuditLogger() contracts.FeatureAuditLogger {
+	if n == nil {
+		return nil
+	}
+	return n.featureAuditLogger
+}
+
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService {
 	if n.shoppingCartService == nil {
 		return nil
@@ -289,3 +346,5 @@ func (a *identityInfoAdapter) IsGlobalBanned(peerID peer.ID) bool {
 
 // Compile-time checks for optional accessor interfaces.
 var _ contracts.FiatPaymentProviderAccessor = (*MobazhaNode)(nil)
+var _ contracts.FeaturesProvider = (*MobazhaNode)(nil)
+var _ contracts.FeatureAdminProvider = (*MobazhaNode)(nil)

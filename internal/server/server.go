@@ -46,6 +46,13 @@ type Config struct {
 	// FrontendOverrideDir, when set, serves frontend files from this
 	// directory instead of the embedded SPA.
 	FrontendOverrideDir string
+
+	// FeaturesSnapshotFn, when set, is invoked per-request from the
+	// embedded frontend's /runtime-config.js handler so toggles via
+	// PUT /v1/settings/features/{key} or PATCH /platform/v1/features/{key}
+	// propagate to the SPA without a process restart. A nil callback
+	// yields an empty features map (fail-closed).
+	FeaturesSnapshotFn func(context.Context) []frontend.FeatureSnapshot
 }
 
 // Server is the unified HTTP(S) server for the native binary distribution.
@@ -60,7 +67,8 @@ type Server struct {
 // New creates a unified server with the given configuration.
 func New(cfg Config) *Server {
 	feHandler := frontend.NewHandler(frontend.ServerConfig{
-		OverrideDir: cfg.FrontendOverrideDir,
+		OverrideDir:        cfg.FrontendOverrideDir,
+		FeaturesSnapshotFn: cfg.FeaturesSnapshotFn,
 	})
 
 	mux := http.NewServeMux()

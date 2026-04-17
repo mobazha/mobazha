@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"path"
+	"strconv"
 	"sync"
 	"time"
 
@@ -503,7 +504,15 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 }
 
 func (g *Gateway) handleGETSales(w http.ResponseWriter, r *http.Request) {
-	orderStates, searchTerm, sortByAscending, sortByRead, limit, err := parseSearchTerms(r.URL.Query())
+	q := r.URL.Query()
+	saleType := q.Get("type")
+
+	if saleType == "all" || saleType == "guest" {
+		g.handleUnifiedSales(w, r, saleType)
+		return
+	}
+
+	orderStates, searchTerm, sortByAscending, sortByRead, limit, err := parseSearchTerms(q)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -513,6 +522,40 @@ func (g *Gateway) handleGETSales(w http.ResponseWriter, r *http.Request) {
 	profileSvc := getProfileService(r)
 
 	g.getSalesImpl(w, r.Context(), orderSvc, profileSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
+}
+
+func (g *Gateway) handleUnifiedSales(w http.ResponseWriter, r *http.Request, saleType string) {
+	provider, ok := getNodeService(r).(contracts.UnifiedOrderViewProvider)
+	if !ok || provider.UnifiedOrders() == nil {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "unified order view not available")
+		return
+	}
+
+	q := r.URL.Query()
+	page, _ := strconv.Atoi(q.Get("page"))
+	pageSize, _ := strconv.Atoi(q.Get("pageSize"))
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+
+	filter := contracts.OrderListFilter{
+		View:     saleType,
+		State:    q.Get("state"),
+		Page:     page,
+		PageSize: pageSize,
+	}
+
+	orders, meta, err := provider.UnifiedOrders().ListOrders(r.Context(), filter)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+
+	responsePkg.List(w, orders, responsePkg.Meta{
+		Total:    meta.Total,
+		Page:     meta.Page,
+		PageSize: meta.PageSize,
+	})
 }
 
 func (g *Gateway) handlePostSales(w http.ResponseWriter, r *http.Request) {

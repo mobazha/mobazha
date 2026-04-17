@@ -2,6 +2,7 @@ package coreiface
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/relay"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
@@ -58,4 +59,16 @@ type HostService interface {
 	// LocalFS in standalone). Returns nil when no BlobStore is configured
 	// (legacy mode — media bytes stored in DB).
 	GetBlobStore() contracts.BlobStore
+
+	// GetPlatformFeatureProvider returns the platform-global feature flag
+	// provider (Scope=platform_global layer of the three-layer resolver).
+	//
+	// SaaS hosting returns an implementation backed by app.yaml + runtime
+	// admin API so platform-wide kill switches propagate to every tenant
+	// node. Standalone deployments (no platform control plane) return nil
+	// and the node falls back to pkgconfig.AllowAllPlatformProvider.
+	//
+	// Returning nil is explicitly allowed — the node core treats it as
+	// "no platform override available" and does NOT fail initialization.
+	GetPlatformFeatureProvider() pkgconfig.PlatformGlobalProvider
 }

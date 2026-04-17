@@ -305,6 +305,32 @@ type AnalyticsProvider interface {
 	Analytics() AnalyticsService
 }
 
+// GuestOrderService exposes Guest Checkout order lifecycle operations.
+// Anonymous buyers interact via HTTP (no P2P, no escrow).
+// Handlers that need typed request/response objects use type assertion to the
+// concrete *GuestOrderAppService (same pattern as WebhookProvider).
+type GuestOrderService interface {
+	// IsEnabled reports whether Guest Checkout is currently enabled for the
+	// caller's evaluation scope (platform → tenant → node runtime). Handlers
+	// and views should gate writes and list-filter against this rather than
+	// consulting the legacy GuestCheckoutConfig.Enabled field.
+	IsEnabled(ctx context.Context) bool
+
+	CreateGuestOrder(ctx context.Context, req CreateGuestOrderRequest) (*GuestOrderResponse, error)
+	GetGuestOrderStatus(ctx context.Context, token string) (*GuestOrderStatusResponse, error)
+	ListGuestOrders(ctx context.Context, filter GuestOrderFilter) ([]models.GuestOrder, int64, error)
+	FulfillGuestOrder(ctx context.Context, token string, tracking, carrier string) error
+	CompleteGuestOrder(ctx context.Context, token string) error
+	HandlePaymentDetected(orderToken string, txHash string) error
+	HandleConfirmationUpdate(orderToken string, confs int) error
+	CleanupExpiredOrders(ctx context.Context)
+	AutoCompleteOrders(ctx context.Context)
+	StartCleanupLoop()
+
+	GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error)
+	SaveGuestCheckoutConfig(ctx context.Context, cfg *models.GuestCheckoutConfig) error
+}
+
 // NodeService is the top-level aggregate interface that combines all domain services.
 // Both MobazhaNode (standalone) and TenantService (SaaS) implement this interface.
 //
@@ -329,6 +355,7 @@ type NodeService interface {
 	ExchangeRate() ExchangeRateService
 	ShoppingCart() ShoppingCartService
 	Wishlist() WishlistService
+	GuestOrder() GuestOrderService
 
 	// Cross-cutting methods (kept directly on NodeService)
 

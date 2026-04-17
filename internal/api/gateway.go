@@ -8,6 +8,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
@@ -16,6 +17,7 @@ import (
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 )
 
@@ -79,7 +81,8 @@ type Gateway struct {
 	shutdown       chan struct{}
 	closeOnce      sync.Once
 	mu             sync.RWMutex
-	featureManager *pkgconfig.FeatureManager
+	featureManager     *pkgconfig.FeatureManager
+	guestOrderLimiter  *rateLimiter
 }
 
 // NewGateway instantiates a new gateway.
@@ -92,7 +95,8 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			shutdown:       make(chan struct{}),
 			hubs:           make(map[string]*hub),
 			hubsMtx:        sync.RWMutex{},
-			featureManager: pkgconfig.GetGlobalFeatureManager(),
+			featureManager:    pkgconfig.GetGlobalFeatureManager(),
+			guestOrderLimiter: newRateLimiter(10, time.Hour),
 		}
 		topMux = http.NewServeMux()
 	)
@@ -167,8 +171,9 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	if ssrHandler := ssr.NewFromEnv(config.LocalPeerID); ssrHandler != nil {
 		ssrHandler.RegisterRoutes(topMux)
 	} else if frontend.HasContent() {
-		// Native binary mode: serve the go:embed SPA as catch-all.
-		feHandler := frontend.NewHandler(frontend.ServerConfig{})
+		feHandler := frontend.NewHandler(frontend.ServerConfig{
+			FeaturesSnapshotFn: featuresSnapshotFromNodeManager(nodeManager),
+		})
 		topMux.Handle("/", feHandler)
 		log.Info("Serving embedded Web UI on /")
 	}
@@ -249,6 +254,7 @@ func (g *Gateway) Serve() error {
 	if g.listener == nil {
 		return nil
 	}
+	g.guestOrderLimiter.startCleanup(g.shutdown)
 	log.Infof("Gateway/API server listening on %s\n", g.listener.Addr())
 	var err error
 	if g.config.UseSSL {
@@ -371,7 +377,54 @@ func (g *Gateway) WebsocketDefaultHandler() http.HandlerFunc {
 	}
 }
 
-// EnsureHubForUser ensures that a hub exists for the given user ID.
+// featuresSnapshotFromNodeManager returns a resolver callback that the
+// embedded frontend uses to seed window.__RUNTIME_CONFIG__.features at
+// /runtime-config.js request time. It walks NodeManager → default node →
+// FeaturesProvider → Resolver so toggles via PUT /v1/settings/features/{key}
+// or PATCH /platform/v1/features/{key} propagate without a process restart.
+// Any missing link returns an empty snapshot (fail-closed) so misconfigured
+// deployments do not advertise an unreachable feature.
+//
+// The callback seeds the Resolver ctx with the standalone tenantID so the
+// tenant layer participates in evaluation (matches handleGETFeatures).
+func featuresSnapshotFromNodeManager(nm coreiface.NodeManagerIface) func(context.Context) []frontend.FeatureSnapshot {
+	return func(ctx context.Context) []frontend.FeatureSnapshot {
+		if nm == nil {
+			return nil
+		}
+		def := nm.GetDefaultNode()
+		if def == nil {
+			return nil
+		}
+		fp, ok := def.(contracts.FeaturesProvider)
+		if !ok {
+			return nil
+		}
+		resolver := fp.Features()
+		if resolver == nil {
+			return nil
+		}
+
+		if pkgconfig.TenantIDFromContext(ctx) == "" {
+			ctx = pkgconfig.ContextWithTenantID(ctx, database.StandaloneTenantID)
+		}
+
+		entries := resolver.List(ctx)
+		out := make([]frontend.FeatureSnapshot, 0, len(entries))
+		for _, e := range entries {
+			if e.Feature == nil {
+				continue
+			}
+			out = append(out, frontend.FeatureSnapshot{
+				Key:         e.Feature.Key,
+				Effective:   e.Effective,
+				Overridable: overridableScopes(e.Feature),
+			})
+		}
+		return out
+	}
+}
+
 func (g *Gateway) EnsureHubForUser(nodeID string) *hub {
 	g.hubsMtx.RLock()
 	h, exists := g.hubs[nodeID]

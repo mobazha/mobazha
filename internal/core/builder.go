@@ -348,7 +348,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		initCollectionSubsystem(obNode)
 		initFiatSubsystem(obNode)
 		initShippingSubsystem(obNode)
-		obNode.applyOptions(nil)
+		obNode.applyOptions([]NodeOption{
+			WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
+		})
 		infraOwned = true
 		return obNode, nil
 	}
@@ -524,6 +526,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			ratingMasterKey: ratingKey,
 			solPrivKey:      &solPrivKey,
 			tronMasterKey:   tronMasterKey,
+			bip44Key:        bip44Key,
 		},
 		networkFields: networkFields{
 			networkService:         service,
@@ -682,7 +685,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	}
 
-	obNode.applyOptions(nil)
+	obNode.applyOptions([]NodeOption{
+		WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
+	})
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
 
@@ -1167,6 +1172,7 @@ func newLightweightNode(
 			ratingMasterKey: ratingKey,
 			solPrivKey:      &solPrivKey,
 			tronMasterKey:   tronMasterKey,
+			bip44Key:        bip44Key,
 		},
 		networkFields: networkFields{
 			networkService:         service,
@@ -1287,7 +1293,9 @@ func newLightweightNode(
 		StateValidator:       &coreStateBridge{},
 	})
 
-	obNode.applyOptions(nil)
+	obNode.applyOptions([]NodeOption{
+		WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
+	})
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
 

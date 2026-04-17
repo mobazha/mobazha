@@ -1,11 +1,14 @@
 package frontend
 
 import (
+	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -106,9 +109,69 @@ func TestSPAHandler_RuntimeConfig_StandaloneAuthMode(t *testing.T) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	js := string(body)
+	payload := parseRuntimeConfig(t, body)
 
 	assert.Equal(t, "application/javascript", resp.Header.Get("Content-Type"))
-	assert.Contains(t, js, `authMode:"standalone"`)
-	assert.Contains(t, js, `saasUrl:"https://app.mobazha.org"`)
+	assert.Equal(t, "standalone", payload["authMode"])
+	assert.Equal(t, "https://app.mobazha.org", payload["saasUrl"])
+	assert.Equal(t, false, payload["guestCheckoutEnabled"], "no snapshot fn → default off")
+	assert.Equal(t, map[string]any{}, payload["features"], "nil callback → empty features map, not null")
+}
+
+func TestSPAHandler_RuntimeConfig_FeaturesSnapshotInjection(t *testing.T) {
+	var captured context.Context
+	snapshotFn := func(ctx context.Context) []FeatureSnapshot {
+		captured = ctx
+		return []FeatureSnapshot{
+			{Key: "guestCheckout", Effective: true, Overridable: []string{"platform_global", "tenant"}},
+			{Key: "fiatPayments", Effective: false, Overridable: nil},
+			{Key: "", Effective: true}, // empty key should be dropped
+		}
+	}
+
+	h := NewHandler(ServerConfig{FeaturesSnapshotFn: snapshotFn})
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/runtime-config.js")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	payload := parseRuntimeConfig(t, body)
+
+	require.NotNil(t, captured, "callback must run and receive a context")
+
+	features, ok := payload["features"].(map[string]any)
+	require.True(t, ok, "features must be an object")
+
+	// guestCheckout mirrored onto legacy flat flag
+	assert.Equal(t, true, payload["guestCheckoutEnabled"])
+
+	gc, ok := features["guestCheckout"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, gc["effective"])
+	assert.Equal(t, []any{"platform_global", "tenant"}, gc["overridable"])
+
+	fp, ok := features["fiatPayments"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, false, fp["effective"])
+	// nil Overridable is normalized to [], never null, to save
+	// every frontend caller an unnecessary null check.
+	assert.Equal(t, []any{}, fp["overridable"])
+
+	_, hasEmpty := features[""]
+	assert.False(t, hasEmpty, "empty-key features must be dropped by the handler")
+}
+
+// parseRuntimeConfig strips the `window.__RUNTIME_CONFIG__=` prefix and
+// trailing `;` so tests can assert on structured JSON rather than raw bytes.
+func parseRuntimeConfig(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	raw := strings.TrimSpace(string(body))
+	raw = strings.TrimPrefix(raw, "window.__RUNTIME_CONFIG__=")
+	raw = strings.TrimSuffix(raw, ";")
+	var out map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &out), "runtime-config.js must be valid JSON after stripping the window assignment; got %s", raw)
+	return out
 }

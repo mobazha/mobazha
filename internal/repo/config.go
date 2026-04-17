@@ -118,6 +118,11 @@ type Config struct {
 	NetDBEndpoint          string   `long:"netdbendpoint" description:"Override the default NetDB endpoint for search index sync"`
 	RelayAPIURL            string   `long:"relayapiurl" description:"Platform Relay API URL for gas fee payment (EVM/Solana CANCELABLE payments)"`
 
+	// GuestCheckout enables the guest (anonymous) checkout feature.
+	// When true, the node accepts orders from unauthenticated buyers
+	// via direct on-chain payments (no escrow).
+	GuestCheckout bool `long:"guestcheckout" description:"Enable guest (anonymous) checkout for direct crypto payments"`
+
 	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.
 	// When set, the node uses this key instead of generating one from a mnemonic.
 	// This is used by mobazha_hosting to inject keys from KeyVault.

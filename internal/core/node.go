@@ -8,6 +8,7 @@ import (
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/gagliardetto/solana-go"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -112,6 +113,7 @@ type cryptoFields struct {
 	ratingMasterKey *btcec.PrivateKey
 	tronMasterKey   *btcec.PrivateKey
 	keyProvider     contracts.KeyProvider
+	bip44Key        *hdkeychain.ExtendedKey
 }
 
 // networkFields groups P2P networking components.
@@ -194,6 +196,29 @@ type appServices struct {
 	analyticsService           *AnalyticsAppService
 	paymentVerificationService *PaymentVerificationService
 	netDBSyncService           *NetDBSyncService
+	guestOrderService          *GuestOrderAppService
+	directPaymentService       *DirectPaymentService
+	autoSweepService           *AutoSweepService
+	guestPaymentMonitor        *GuestPaymentMonitor
+	unifiedOrderView           *UnifiedOrderView
+
+	// Feature flag resolver infrastructure (Phase FF-3).
+	// featureResolver is the SSOT for `isEnabled(ctx, key)` queries; it
+	// combines the three providers below under the registry's AllowedScopes.
+	// Providers remain injectable so SaaS hosting can swap in cross-tenant
+	// adapters (platform-global config from app.yaml, proxying tenant store,
+	// etc.) without forking core.
+	featureResolver         pkgconfig.ResolverInterface
+	platformFeatureProvider pkgconfig.PlatformGlobalProvider
+	tenantFeatureStore      pkgconfig.TenantFeatureStore
+	nodeFeatureProvider     pkgconfig.NodeFeatureProvider
+
+	// featureAuditLogger persists feature-flag write events to the
+	// feature_flag_audit_logs table. Initialised in initFeatureResolver
+	// once a database is available; remains nil on infrastructure-only /
+	// mock nodes, in which case handlers fall back to log-and-continue.
+	// See pkg/contracts/features.go FeatureAuditProvider.
+	featureAuditLogger contracts.FeatureAuditLogger
 }
 
 // IsDefaultNode returns whether this node is the default node.

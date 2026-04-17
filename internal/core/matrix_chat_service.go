@@ -326,6 +326,7 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	if s.config.CryptoDBAccountID != "" {
 		cryptoHelper.DBAccountID = s.config.CryptoDBAccountID
 	}
+	cryptoHelper.DecryptErrorCallback = s.handleDecryptError
 	s.cryptoHelper = cryptoHelper
 
 	if err := s.cryptoHelper.Init(ctx); err != nil {
@@ -586,6 +587,7 @@ func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to recreate crypto helper: %w", err)
 	}
+	cryptoHelper.DecryptErrorCallback = s.handleDecryptError
 	s.cryptoHelper = cryptoHelper
 	if err := s.cryptoHelper.Init(ctx); err != nil {
 		return fmt.Errorf("failed to init fresh crypto helper: %w", err)
@@ -649,6 +651,7 @@ func (s *mautrixChatService) resetCryptoDBSharedPG(ctx context.Context, cryptoSt
 	if s.config.CryptoDBAccountID != "" {
 		cryptoHelper.DBAccountID = s.config.CryptoDBAccountID
 	}
+	cryptoHelper.DecryptErrorCallback = s.handleDecryptError
 	s.cryptoHelper = cryptoHelper
 	if err := s.cryptoHelper.Init(ctx); err != nil {
 		return fmt.Errorf("failed to init fresh crypto helper on shared PG: %w", err)
@@ -1112,22 +1115,13 @@ func (s *mautrixChatService) registerEventHandlers() {
 		})
 	})
 
-	syncer.OnEventType(event.EventEncrypted, func(ctx context.Context, evt *event.Event) {
-		// Fires when the crypto helper failed to decrypt an incoming event.
-		log.Warningf("Undecryptable event: room=%s sender=%s eventID=%s", evt.RoomID, evt.Sender, evt.ID)
-		s.broadcast(contracts.MatrixChatEvent{
-			Type: "chat.message",
-			Data: contracts.MatrixMessage{
-				EventID:   evt.ID.String(),
-				RoomID:    evt.RoomID.String(),
-				Sender:    evt.Sender.String(),
-				Content:   "Unable to decrypt this message",
-				MsgType:   "m.bad.encrypted",
-				Timestamp: time.UnixMilli(evt.Timestamp),
-			},
-		})
-		go s.retryDecryptAfterKeyRequest(ctx, evt)
-	})
+	// Decryption failures are surfaced via cryptoHelper.DecryptErrorCallback
+	// (see handleDecryptError), NOT via syncer.OnEventType(EventEncrypted).
+	// Registering a listener on EventEncrypted would fire for EVERY encrypted
+	// event (including those that decrypt successfully), because DefaultSyncer
+	// dispatches to all listeners for a type regardless of what earlier
+	// listeners do — the crypto helper's HandleEncrypted does not consume the
+	// event.
 
 	syncer.OnEventType(event.EventReaction, func(ctx context.Context, evt *event.Event) {
 		if evt.Content.Parsed == nil {
@@ -1811,6 +1805,32 @@ func (s *mautrixChatService) CancelVerification(ctx context.Context, txnID strin
 // ---------------------------------------------------------------------------
 
 const keyRequestRetryTimeout = 10 * time.Second
+
+// handleDecryptError is wired into cryptoHelper.DecryptErrorCallback and is
+// invoked by mautrix-go ONLY when an incoming encrypted event fails to
+// decrypt. It broadcasts a placeholder "Unable to decrypt" message to the
+// client and launches a goroutine to request the missing Megolm session and
+// retry decryption (which, on success, will broadcast the real message and
+// supersede the placeholder).
+func (s *mautrixChatService) handleDecryptError(evt *event.Event, err error) {
+	log.Warningf("Undecryptable event: room=%s sender=%s eventID=%s err=%v", evt.RoomID, evt.Sender, evt.ID, err)
+	s.broadcast(contracts.MatrixChatEvent{
+		Type: "chat.message",
+		Data: contracts.MatrixMessage{
+			EventID:   evt.ID.String(),
+			RoomID:    evt.RoomID.String(),
+			Sender:    evt.Sender.String(),
+			Content:   "Unable to decrypt this message",
+			MsgType:   "m.bad.encrypted",
+			Timestamp: time.UnixMilli(evt.Timestamp),
+		},
+	})
+	ctx := s.syncCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	go s.retryDecryptAfterKeyRequest(ctx, evt)
+}
 
 // retryDecryptAfterKeyRequest is launched as a goroutine when an EventEncrypted
 // event fires (crypto helper failed to decrypt). It parses the encrypted

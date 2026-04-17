@@ -59,11 +59,20 @@ func createUI(logger *log.Logger) supervisor.LauncherUI {
 		// selfDetach calls os.Exit, so this is unreachable
 	}
 
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		iconRunning = iconRunningWin
 		iconStarting = iconStartingWin
 		iconStopped = iconStoppedWin
-	} else {
+	case "darwin":
+		iconRunning = iconRunningMac
+		iconStarting = iconStartingMac
+		iconStopped = iconStoppedMac
+	default:
+		// Linux (and other Unix-like systems) — fyne.io/systray uses PNG via
+		// AppIndicator, so the macOS PNG set renders correctly. If dedicated
+		// Linux icons are added later, switch on them here.
+		logger.Printf("systray: using PNG icon set for GOOS=%s", runtime.GOOS)
 		iconRunning = iconRunningMac
 		iconStarting = iconStartingMac
 		iconStopped = iconStoppedMac

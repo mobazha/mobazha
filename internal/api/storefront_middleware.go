@@ -1,14 +1,15 @@
 // Package api — storefront_middleware.go
 //
-// MS-Phase-2a · MS2a.2c — Node-side storefront resolver.
+// MS-Phase-2a · MS2a.2c · MS2a.5 — Node-side storefront resolver.
 //
 // The hosting Gateway resolves a storefront subdomain (`{slug}.app.mobazha.org`)
-// into a Storefront.Filter and injects four request headers:
+// into a Storefront.Filter + Storefront.PriceRule and injects request headers:
 //
 //   X-Storefront-ID                     — storefront identity (e.g. "spring-sale")
 //   X-Storefront-Filter-Collections     — comma-separated collection IDs
 //   X-Storefront-Filter-Tags            — comma-separated include tags
 //   X-Storefront-Filter-ExcludeTags     — comma-separated exclude tags
+//   X-Storefront-Price-Rule             — compact JSON (MS2a.5)
 //
 // This middleware parses those headers into a StorefrontContext and stores
 // it in request.Context for downstream handlers (listing/profile/order) to
@@ -18,12 +19,19 @@
 //
 // Tag-based filtering is NOT applied yet — ListingMetadata currently lacks
 // a Tags field (TD-033). Collection filtering is the primary MVP surface.
+//
+// The price rule is applied only to list-view DTOs (ListingMetadata) so we
+// never mutate a SignedListing (whose price field is cryptographically
+// signed by the seller). Detail / checkout flows deliberately ignore it —
+// see MULTI_STORE_ROADMAP.md MS2a.5 for the follow-up plan.
 package api
 
 import (
 	"context"
 	"net/http"
 	"strings"
+
+	"github.com/mobazha/mobazha3.0/pkg/storefront"
 )
 
 const (
@@ -31,6 +39,7 @@ const (
 	headerStorefrontFilterCollections = "X-Storefront-Filter-Collections"
 	headerStorefrontFilterTags        = "X-Storefront-Filter-Tags"
 	headerStorefrontFilterExcludeTags = "X-Storefront-Filter-ExcludeTags"
+	headerStorefrontPriceRule         = "X-Storefront-Price-Rule"
 )
 
 // DefaultStorefrontID matches hosting's `db.DefaultStorefrontID` — the
@@ -58,12 +67,14 @@ func (f *StorefrontFilter) IsEmpty() bool {
 }
 
 // StorefrontContext captures the storefront routing info for a single
-// request. Both fields are set together from headers — a non-empty ID
-// without filter means "storefront exists but has no restrictions"
-// (still treated as "show everything" at the listing layer).
+// request. ID is always set when the context is present; Filter/PriceRule
+// may be nil — a non-empty ID without either means "storefront exists but
+// has no restrictions and no pricing adjustment" (treated as "show
+// everything with base prices" at the listing layer).
 type StorefrontContext struct {
-	ID     string
-	Filter *StorefrontFilter
+	ID        string
+	Filter    *StorefrontFilter
+	PriceRule *storefront.PriceRule
 }
 
 // storefrontCtxKey is the private context key used to stash the parsed
@@ -89,8 +100,9 @@ func (g *Gateway) StorefrontMiddleware(next http.Handler) http.Handler {
 		}
 
 		sfCtx := &StorefrontContext{
-			ID:     sfID,
-			Filter: parseStorefrontFilterFromHeaders(r),
+			ID:        sfID,
+			Filter:    parseStorefrontFilterFromHeaders(r),
+			PriceRule: parseStorefrontPriceRuleFromHeader(r),
 		}
 		ctx := context.WithValue(r.Context(), storefrontCtxKey, sfCtx)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -119,6 +131,17 @@ func StorefrontFilterFromContext(ctx context.Context) *StorefrontFilter {
 	return sc.Filter
 }
 
+// StorefrontPriceRuleFromContext is a convenience that returns the price
+// rule or nil. Handlers applying the rule to list-view DTOs call this
+// right before emitting the response.
+func StorefrontPriceRuleFromContext(ctx context.Context) *storefront.PriceRule {
+	sc := StorefrontFromContext(ctx)
+	if sc == nil {
+		return nil
+	}
+	return sc.PriceRule
+}
+
 // parseStorefrontFilterFromHeaders reads the three X-Storefront-Filter-*
 // headers and returns a StorefrontFilter. Returns nil when all axes are
 // empty so callers can cheaply short-circuit via Filter == nil.
@@ -135,6 +158,24 @@ func parseStorefrontFilterFromHeaders(r *http.Request) *StorefrontFilter {
 		Tags:          tags,
 		ExcludeTags:   excludeTags,
 	}
+}
+
+// parseStorefrontPriceRuleFromHeader reads X-Storefront-Price-Rule and
+// returns the decoded rule. Parse failures are tolerated — they log a
+// warning and return nil so a malformed hosting header can never 500 a
+// listing endpoint. A nil rule means "use base prices" at the listing
+// layer.
+func parseStorefrontPriceRuleFromHeader(r *http.Request) *storefront.PriceRule {
+	raw := r.Header.Get(headerStorefrontPriceRule)
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	rule, err := storefront.ParsePriceRule(raw)
+	if err != nil {
+		log.Warningf("storefront middleware: invalid %s header: %v", headerStorefrontPriceRule, err)
+		return nil
+	}
+	return rule
 }
 
 // parseCSVHeader splits a comma-separated header value into cleaned tokens.

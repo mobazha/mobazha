@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
+	"github.com/mobazha/mobazha3.0/pkg/storefront"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -210,7 +211,36 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// MS-Phase-2a · MS2a.5 — apply storefront price rule to the list-view
+	// DTOs. Runs last (after collection filter + rating enrichment) so the
+	// adjustment only happens on listings that will actually be rendered.
+	// Applies to any storefront-scoped request, including cross-peer views
+	// on the SaaS Gateway — the rule is a storefront-owner-defined
+	// transform, not dependent on whether the data was served locally.
+	if rule := StorefrontPriceRuleFromContext(r.Context()); rule != nil && len(listingIndex) > 0 {
+		applyStorefrontPriceRuleToIndex(listingIndex, rule)
+	}
+
 	sanitizedJSONResponse(w, listingIndex)
+}
+
+// applyStorefrontPriceRuleToIndex mutates listingIndex in place, replacing
+// each entry's Price.Amount with the rule-adjusted value. The currency and
+// divisibility remain untouched because the rule operates on minor units
+// of the listing's native currency — no cross-currency conversion happens
+// here.
+//
+// Kept private to listing_handlers.go because the only caller is the
+// index handler. Profiles / search follow-ups that need the same behavior
+// should call rule.ApplyAmount() directly on their DTOs.
+func applyStorefrontPriceRuleToIndex(index models.ListingIndex, rule *storefront.PriceRule) {
+	if rule == nil || rule.IsZero() {
+		return
+	}
+	for idx := range index {
+		base := index[idx].Price.Amount
+		index[idx].Price.Amount = rule.ApplyAmount(base)
+	}
 }
 
 // filterListingsByCollections keeps only listings whose slug belongs to at
@@ -279,10 +309,9 @@ func (g *Gateway) handlePOSTListing(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
-		} else if err != nil {
-			ErrorResponse(w, http.StatusInternalServerError, err.Error())
-			return
 		}
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 
 	sanitizedJSONResponse(w, &struct {
@@ -317,10 +346,9 @@ func (g *Gateway) handlePUTListing(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
-		} else if err != nil {
-			ErrorResponse(w, http.StatusInternalServerError, err.Error())
-			return
 		}
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 
 	sanitizedJSONResponse(w, &struct {
@@ -339,10 +367,9 @@ func (g *Gateway) handleDELETEListing(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
-		} else if err != nil {
-			ErrorResponse(w, http.StatusInternalServerError, err.Error())
-			return
 		}
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	sanitizedJSONResponse(w, struct{}{})
 }

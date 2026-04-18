@@ -13,7 +13,7 @@ import (
 //
 //	fp, ok := node.(contracts.FeaturesProvider)
 //	if ok && fp.Features() != nil {
-//	    enabled, _ := fp.Features().IsEnabled(ctx, config.FeatureGuestCheckout.Key)
+//	    enabled, _ := fp.Features().IsEnabled(ctx, config.FeaturePaymentGuestCheckoutEnabled.Key)
 //	}
 //
 // The indirection keeps pkg/config as a leaf package (handlers use

@@ -148,8 +148,12 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 // whatever providers have been installed on the node. Any provider that is
 // still nil is replaced with a safe default:
 //
-//   - platform  → AllowAllPlatformProvider (standalone nodes have no
-//     platform kill switch; hosting injects its own via WithPlatformFeatureProvider).
+//   - platform  → NoopPlatformProvider (standalone nodes have no platform
+//     kill switch; hosting injects its own via WithPlatformFeatureProvider).
+//     The Noop provider returns configured=false for every key, which makes
+//     the resolver fall back to feature.DefaultValue — i.e. the value
+//     declared in pkg/config/features_defined.go is the source of truth on
+//     independent nodes.
 //   - tenant    → FeatureOverrideStore backed by the node's GORM database.
 //   - node      → ConfigNodeFeatureProvider reading repo.Config CLI flags.
 //     When nothing is available (tests/mocks without config/db), the
@@ -174,7 +178,7 @@ func (n *MobazhaNode) initFeatureResolver() {
 		}
 	}
 	if platform == nil {
-		platform = pkgconfig.AllowAllPlatformProvider{}
+		platform = pkgconfig.NoopPlatformProvider{}
 	}
 	n.platformFeatureProvider = platform
 

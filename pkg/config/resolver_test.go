@@ -11,20 +11,27 @@ import (
 // Fakes — 可注入的 provider 实现
 // ---------------------------------------------------------------------------
 
+// fakePlatform 实现 PlatformGlobalProvider (values, configured, err) 三元组
+// 契约。使用 values map：
+//   - key 存在 → configured=true，返回 values[key]
+//   - key 不存在 → configured=false，Resolver 将回落到 feature.DefaultValue
+//
+// 测试中想要精确模拟"平台未配置该 feature"时，留空 values 即可；想要
+// 模拟"平台显式启用/关闭"时，在 values 中显式写入。
 type fakePlatform struct {
 	values map[string]bool
 	err    error
 }
 
-func (f fakePlatform) IsEnabled(_ context.Context, key string) (bool, error) {
+func (f fakePlatform) Get(_ context.Context, key string) (bool, bool, error) {
 	if f.err != nil {
-		return false, f.err
+		return false, false, f.err
 	}
 	v, ok := f.values[key]
 	if !ok {
-		return true, nil // 默认放行
+		return false, false, nil // 未配置：Resolver 回落到 DefaultValue
 	}
-	return v, nil
+	return v, true, nil
 }
 
 type fakeTenantStore struct {
@@ -435,6 +442,94 @@ func TestResolver_PlatformProviderError_FallbackToDefault(t *testing.T) {
 	}
 	if r.IsEnabled(context.Background(), "beta") {
 		t.Error("expected beta=false (DefaultValue=false) on provider error")
+	}
+}
+
+// TestResolver_PlatformProvider_NotConfigured_FallbackToDefault ——
+// 平台未显式配置 feature（configured=false）时，Resolver 必须回落到
+// feature.DefaultValue，而不是沿用 provider 的隐式默认。这守护 §3.3 /
+// §13.11 的 single-source-of-truth 语义 —— 未配置的 feature 行为 100%
+// 由 registerFeature(...) 的 DefaultValue 决定，不受 provider 实现影响。
+//
+// 这是 TD-069 FF-impl bugfix 的回归测试：修复前，独立节点的
+// AllowAllPlatformProvider 恒返 true，会隐式开启 DefaultValue=false
+// 的 feature。
+func TestResolver_PlatformProvider_NotConfigured_FallbackToDefault(t *testing.T) {
+	reg := newTestRegistry(t,
+		&Feature{
+			Key: "alphaOn", DisplayName: "A", Description: "a",
+			Stability: StabilityStable, DefaultValue: true,
+			AllowedScopes: []Scope{ScopePlatformGlobal},
+		},
+		&Feature{
+			Key: "betaOff", DisplayName: "B", Description: "b",
+			Stability: StabilityStable, DefaultValue: false,
+			AllowedScopes: []Scope{ScopePlatformGlobal},
+		},
+	)
+	// platform 为空 → 所有 key 都 configured=false
+	platform := fakePlatform{values: map[string]bool{}}
+	r := NewResolver(WithRegistry(reg), WithPlatformProvider(platform))
+
+	if !r.IsEnabled(context.Background(), "alphaOn") {
+		t.Error("expected alphaOn=true (DefaultValue=true, platform not configured)")
+	}
+	if r.IsEnabled(context.Background(), "betaOff") {
+		t.Error("expected betaOff=false (DefaultValue=false, platform not configured) — this is the TD-069 bugfix regression")
+	}
+}
+
+// TestResolver_PlatformProvider_ConfiguredExplicitOverride —— 平台显式
+// 配置 true/false 时，覆盖 DefaultValue。
+func TestResolver_PlatformProvider_ConfiguredExplicitOverride(t *testing.T) {
+	reg := newTestRegistry(t,
+		&Feature{
+			Key: "alphaOverride", DisplayName: "A", Description: "a",
+			Stability: StabilityStable, DefaultValue: false, // 默认关
+			AllowedScopes: []Scope{ScopePlatformGlobal},
+		},
+		&Feature{
+			Key: "betaOverride", DisplayName: "B", Description: "b",
+			Stability: StabilityStable, DefaultValue: true, // 默认开
+			AllowedScopes: []Scope{ScopePlatformGlobal},
+		},
+	)
+	platform := fakePlatform{values: map[string]bool{
+		"alphaOverride": true,  // 显式开
+		"betaOverride":  false, // 显式关
+	}}
+	r := NewResolver(WithRegistry(reg), WithPlatformProvider(platform))
+
+	if !r.IsEnabled(context.Background(), "alphaOverride") {
+		t.Error("expected alphaOverride=true (platform override=true beats DefaultValue=false)")
+	}
+	if r.IsEnabled(context.Background(), "betaOverride") {
+		t.Error("expected betaOverride=false (platform override=false beats DefaultValue=true)")
+	}
+}
+
+// TestResolver_NoopPlatformProvider_UsesDefaultValue —— 默认 Noop provider
+// （独立节点、未 WithPlatformProvider）应让所有 feature 回落到 DefaultValue。
+func TestResolver_NoopPlatformProvider_UsesDefaultValue(t *testing.T) {
+	reg := newTestRegistry(t,
+		&Feature{
+			Key: "alphaOn", DisplayName: "A", Description: "a",
+			Stability: StabilityStable, DefaultValue: true,
+			AllowedScopes: []Scope{ScopePlatformGlobal},
+		},
+		&Feature{
+			Key: "betaOff", DisplayName: "B", Description: "b",
+			Stability: StabilityStable, DefaultValue: false,
+			AllowedScopes: []Scope{ScopePlatformGlobal},
+		},
+	)
+	r := NewResolver(WithRegistry(reg)) // 默认 NoopPlatformProvider
+
+	if !r.IsEnabled(context.Background(), "alphaOn") {
+		t.Error("expected alphaOn=true (Noop platform → DefaultValue=true)")
+	}
+	if r.IsEnabled(context.Background(), "betaOff") {
+		t.Error("expected betaOff=false (Noop platform → DefaultValue=false)")
 	}
 }
 

@@ -30,7 +30,7 @@ func TestInitFeatureResolver_FallsBackToAllowAllDefaults(t *testing.T) {
 	ctx := pkgconfig.ContextWithTenantID(context.Background(), "t-default")
 	ctx = pkgconfig.ContextWithActor(ctx, "test", "anonymous")
 	require.NotPanics(t, func() {
-		_ = n.Features().IsEnabled(ctx, pkgconfig.FeatureGuestCheckout.Key)
+		_ = n.Features().IsEnabled(ctx, pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key)
 	}, "resolver must answer without panic for registered feature")
 }
 

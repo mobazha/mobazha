@@ -7,18 +7,18 @@ import (
 
 // TestRegistry_LookupFeature — 已声明的 feature 必须可查到，且元数据与声明一致。
 func TestRegistry_LookupFeature(t *testing.T) {
-	f, ok := LookupFeature(FeatureGuestCheckout.Key)
+	f, ok := LookupFeature(FeaturePaymentGuestCheckoutEnabled.Key)
 	if !ok {
-		t.Fatalf("FeatureGuestCheckout not found in registry")
+		t.Fatalf("FeaturePaymentGuestCheckoutEnabled not found in registry")
 	}
-	if f != FeatureGuestCheckout {
+	if f != FeaturePaymentGuestCheckoutEnabled {
 		t.Errorf("LookupFeature returned a different pointer than package-level var")
 	}
 	if f.Category != "payment" || f.Stability != StabilityBeta {
 		t.Errorf("unexpected metadata: category=%q stability=%q", f.Category, f.Stability)
 	}
 	if len(f.AllowedScopes) != 3 {
-		t.Errorf("FeatureGuestCheckout should allow 3 scopes, got %d", len(f.AllowedScopes))
+		t.Errorf("FeaturePaymentGuestCheckoutEnabled should allow 3 scopes, got %d", len(f.AllowedScopes))
 	}
 }
 
@@ -32,7 +32,7 @@ func TestRegistry_ListFeatures(t *testing.T) {
 	for _, f := range all {
 		keys[f.Key] = true
 	}
-	for _, k := range []string{"noBuildinWallet", "localEncryptedStorage", "guestCheckout"} {
+	for _, k := range []string{"walletBuiltinDisabled", "privacyLocalEncryptedStorageEnabled", "paymentGuestCheckoutEnabled"} {
 		if !keys[k] {
 			t.Errorf("feature %q missing from ListFeatures()", k)
 		}

@@ -399,7 +399,7 @@ func (s *ListingAppService) GetMyListingBySlug(slugStr string) (*pb.SignedListin
 			return nil
 		}
 
-		useEncryption := s.featureManager != nil && s.featureManager.IsEnabled(pkgconfig.FeatureLocalEncryptedStorage)
+		useEncryption := s.featureManager != nil && s.featureManager.IsEnabled(pkgconfig.FeaturePrivacyLocalEncryptedStorageEnabled)
 		if !useEncryption {
 			return readPlaintext()
 		}
@@ -760,7 +760,7 @@ func (s *ListingAppService) saveListingToDB(dbtx database.Tx, listing *pb.Listin
 		return dbtx.SetListing(sl)
 	}
 
-	useEncryption := s.featureManager != nil && s.featureManager.IsEnabled(pkgconfig.FeatureLocalEncryptedStorage)
+	useEncryption := s.featureManager != nil && s.featureManager.IsEnabled(pkgconfig.FeaturePrivacyLocalEncryptedStorageEnabled)
 	if !useEncryption {
 		if err := savePlaintext(); err != nil {
 			return cid.Cid{}, err

@@ -62,7 +62,7 @@ func (p *ConfigNodeFeatureProvider) IsEnabled(ctx context.Context, key string) b
 }
 
 func (p *ConfigNodeFeatureProvider) registerDefaults() {
-	p.readers[config.FeatureGuestCheckout.Key] = func(c *repo.Config) bool {
+	p.readers[config.FeaturePaymentGuestCheckoutEnabled.Key] = func(c *repo.Config) bool {
 		if c == nil {
 			return false
 		}

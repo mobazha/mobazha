@@ -8,14 +8,14 @@ import (
 func TestFeatureManager_IsEnabled(t *testing.T) {
 	fm := NewFeatureManager()
 
-	if !fm.IsEnabled(FeatureNoBuildinWallet) {
-		t.Errorf("FeatureNoBuildinWallet default should be true")
+	if !fm.IsEnabled(FeatureWalletBuiltinDisabled) {
+		t.Errorf("FeatureWalletBuiltinDisabled default should be true")
 	}
-	if fm.IsEnabled(FeatureLocalEncryptedStorage) {
-		t.Errorf("FeatureLocalEncryptedStorage default should be false")
+	if fm.IsEnabled(FeaturePrivacyLocalEncryptedStorageEnabled) {
+		t.Errorf("FeaturePrivacyLocalEncryptedStorageEnabled default should be false")
 	}
-	if fm.IsEnabled(FeatureGuestCheckout) {
-		t.Errorf("FeatureGuestCheckout default should be false")
+	if fm.IsEnabled(FeaturePaymentGuestCheckoutEnabled) {
+		t.Errorf("FeaturePaymentGuestCheckoutEnabled default should be false")
 	}
 }
 
@@ -34,9 +34,9 @@ func TestFeatureManager_Snapshot(t *testing.T) {
 
 	// 至少应包含已定义的三个 feature
 	required := []string{
-		FeatureNoBuildinWallet.Key,
-		FeatureLocalEncryptedStorage.Key,
-		FeatureGuestCheckout.Key,
+		FeatureWalletBuiltinDisabled.Key,
+		FeaturePrivacyLocalEncryptedStorageEnabled.Key,
+		FeaturePaymentGuestCheckoutEnabled.Key,
 	}
 	for _, key := range required {
 		if _, ok := snap[key]; !ok {

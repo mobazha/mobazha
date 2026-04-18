@@ -88,7 +88,8 @@ func WithRegistry(r *Registry) ResolverOption {
 }
 
 // WithPlatformProvider 注入 platform_global 层 provider。
-// 未注入时使用 AllowAllPlatformProvider（独立节点默认行为）。
+// 未注入时使用 NoopPlatformProvider（configured=false → 回落到
+// feature.DefaultValue，独立节点默认行为）。
 func WithPlatformProvider(p PlatformGlobalProvider) ResolverOption {
 	return func(rs *Resolver) { rs.platformP = p }
 }
@@ -107,20 +108,20 @@ func WithNodeProvider(p NodeFeatureProvider) ResolverOption {
 
 // NewResolver 构造 Resolver。缺省值：
 //   - Registry = 全局 defaultRegistry
-//   - PlatformProvider = AllowAllPlatformProvider
-//   - TenantStore = NoopTenantStore
-//   - NodeProvider = AllowAllNodeProvider
+//   - PlatformProvider = NoopPlatformProvider（configured=false → DefaultValue）
+//   - TenantStore      = NoopTenantStore（configured=false → DefaultValue）
+//   - NodeProvider     = AllowAllNodeProvider（node 层恒 true，不影响 AND）
 //
 // 生产代码根据部署形态 override：
-//   - SaaS hosting: WithPlatformProvider(HostingGlobalProvider{...})
+//   - SaaS hosting: WithPlatformProvider(PlatformFeatureProvider{repo.Config})
 //                   WithTenantStore(TenantFeatureStoreGORM{...})
 //                   WithNodeProvider(AllowAllNodeProvider{})
-//   - 独立节点:     WithPlatformProvider(AllowAllPlatformProvider{})
+//   - 独立节点:     不 WithPlatformProvider（用默认 Noop）
 //                   WithTenantStore(TenantFeatureStoreGORM{固定 _default})
 //                   WithNodeProvider(NodeRuntimeProvider{repo.Config})
 func NewResolver(opts ...ResolverOption) *Resolver {
 	r := &Resolver{
-		platformP: AllowAllPlatformProvider{},
+		platformP: NoopPlatformProvider{},
 		tenantS:   NoopTenantStore{},
 		nodeP:     AllowAllNodeProvider{},
 		maxDepth:  16,
@@ -254,11 +255,20 @@ func (r *Resolver) evaluate(ctx context.Context, key string, depth int) Evaluati
 	return eval
 }
 
-// evalPlatform 评估 platform_global 层，错误降级到 DefaultValue（§13.11）。
+// evalPlatform 评估 platform_global 层。与 tenant 层对称：
+//   - err != nil      → 降级到 DefaultValue（§13.11）
+//   - configured=false → 回落到 DefaultValue（§3.3 step 1）
+//   - configured=true  → 使用 value
+//
+// 回落到 DefaultValue 确保 registerFeature 声明的值是 single source of
+// truth —— 未显式配置时，feature 的启用状态完全由 DefaultValue 决定。
 func (r *Resolver) evalPlatform(ctx context.Context, f *Feature) bool {
-	v, err := r.platformP.IsEnabled(ctx, f.Key)
+	v, configured, err := r.platformP.Get(ctx, f.Key)
 	if err != nil {
 		log.Printf("[feature] %s: platform provider error: %v; falling back to default=%v", f.Key, err, f.DefaultValue)
+		return f.DefaultValue
+	}
+	if !configured {
 		return f.DefaultValue
 	}
 	return v

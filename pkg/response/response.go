@@ -29,6 +29,10 @@ type APIError struct {
 	Detail  string       `json:"detail,omitempty"`
 	TraceID string       `json:"traceID,omitempty"`
 	Details []FieldError `json:"details,omitempty"`
+	// Data carries structured domain-specific payload for callers to act on
+	// (e.g. conflict resolution metadata). Use sparingly; field-level errors
+	// should still go through Details.
+	Data interface{} `json:"data,omitempty"`
 }
 
 type FieldError struct {
@@ -37,18 +41,23 @@ type FieldError struct {
 }
 
 const (
-	CodeValidation     = "VALIDATION_ERROR"
-	CodeBadRequest     = "BAD_REQUEST"
-	CodeNotFound       = "NOT_FOUND"
-	CodeUnauthorized   = "UNAUTHORIZED"
-	CodeForbidden      = "FORBIDDEN"
-	CodeConflict       = "CONFLICT"
-	CodeInternalError  = "INTERNAL_ERROR"
-	CodeNotImplemented = "NOT_IMPLEMENTED"
+	CodeValidation      = "VALIDATION_ERROR"
+	CodeBadRequest      = "BAD_REQUEST"
+	CodeNotFound        = "NOT_FOUND"
+	CodeUnauthorized    = "UNAUTHORIZED"
+	CodeForbidden       = "FORBIDDEN"
+	CodeConflict        = "CONFLICT"
+	CodeInternalError   = "INTERNAL_ERROR"
+	CodeNotImplemented  = "NOT_IMPLEMENTED"
 	CodeServiceUnavail  = "SERVICE_UNAVAILABLE"
 	CodePayloadTooLarge = "PAYLOAD_TOO_LARGE"
 	CodeProviderError   = "PROVIDER_ERROR"
 	CodeRateLimited     = "RATE_LIMITED"
+	// CodeAccountLinkConflict signals that an OAuth provider ID (e.g. Telegram,
+	// Discord) is already bound to a different Casdoor account. The response
+	// should include APIError.Data with the conflicting account's metadata so
+	// the client can guide the user to a resolution path (e.g. account merge).
+	CodeAccountLinkConflict = "ACCOUNT_LINK_CONFLICT"
 )
 
 // Success writes 200 + {"data": T}.
@@ -102,6 +111,19 @@ func ErrorWithDetail(w http.ResponseWriter, status int, code, message, detail st
 	})
 }
 
+// ErrorWithData writes a structured error with a domain-specific payload so
+// the client can act on the error (e.g. conflict resolution). Keep the payload
+// free of secrets and PII that the caller isn't already authorized to see.
+func ErrorWithData(w http.ResponseWriter, status int, code, message string, data interface{}) {
+	writeJSON(w, status, ErrorEnvelope{
+		Error: APIError{
+			Code:    code,
+			Message: message,
+			Data:    data,
+		},
+	})
+}
+
 // ErrorValidation writes 400 + field-level validation errors.
 func ErrorValidation(w http.ResponseWriter, details []FieldError) {
 	writeJSON(w, http.StatusBadRequest, ErrorEnvelope{
@@ -148,7 +170,7 @@ func PanicRecovery(next http.Handler) http.Handler {
 				fmt.Printf("[PANIC] request_id=%s method=%s path=%s err=%v\n%s\n",
 					reqID, r.Method, r.URL.Path, err, debug.Stack())
 				ErrorWithDetail(w, http.StatusInternalServerError, CodeInternalError,
-				"An unexpected error occurred", fmt.Sprintf("panic: %v", err))
+					"An unexpected error occurred", fmt.Sprintf("panic: %v", err))
 			}
 		}()
 		next.ServeHTTP(w, r)

@@ -95,6 +95,10 @@ type Config struct {
 	WalletTestnet          bool     `long:"wallettestnet" description:"Use testnet for wallet transactions (coins and chains)"`
 	Regtest                bool     `long:"regtest" description:"Use the regtest network for UTXO wallets (generates bcrt1q addresses for BTC)"`
 	DisableNATPortMap      bool     `long:"noupnp" description:"Disable use of upnp."`
+	DisableReuseport       bool     `long:"noreuseport" description:"Disable TCP SO_REUSEPORT (fixes macOS dial timeout when listener and dialer share port 4001)."`
+	AnnounceAddrs          []string `long:"announceaddr" description:"Extra multiaddrs to advertise to the network (e.g. public IP for Docker-hosted nodes)."`
+	EnableRelayServer      bool     `long:"enablerelayserver" description:"Run circuit-relay v2 service so this node can relay traffic for NAT'd peers."`
+	StaticRelayPeers       []string `long:"staticrelaypeer" description:"Multiaddr of known relay servers for AutoRelay (used by NAT'd nodes to get relay addresses)."` //nolint:lll
 	UseSSL                 bool     `long:"ssl" description:"Use SSL on the API"`
 	SSLCertFile            string   `long:"sslcertfile" description:"Path to the SSL certificate file"`
 	SSLKeyFile             string   `long:"sslkeyfile" description:"Path to the SSL key file"`

@@ -65,12 +65,13 @@ var FeaturePrivacyLocalEncryptedStorageEnabled = registerFeature(Feature{
 //   - Tenant：每个店铺自行启用（适配 merchant 自愿接单匿名订单）
 //   - NodeRuntime：独立节点 CLI flag / repo.Config（运维人员可快速关停）
 var FeatureGuestCheckoutEnabled = registerFeature(Feature{
-	Key:          "guestCheckout",
-	DisplayName:  "Guest checkout",
-	Description:  "Allows buyers to place anonymous orders via direct on-chain payment without creating an account (PM-2).",
-	Category:     "payment",
-	Stability:    StabilityBeta,
-	DefaultValue: false,
+	Key:           "guestCheckout",
+	DisplayName:   "Guest checkout",
+	Description:   "Allows buyers to place anonymous orders via direct on-chain payment without creating an account (PM-2).",
+	Category:      "payment",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 		ScopeTenant,
@@ -91,12 +92,13 @@ var FeatureGuestCheckoutEnabled = registerFeature(Feature{
 // Scope：仅 PlatformGlobal — 这是面向运营的基础设施开关，tenant 不应
 // 自行绕过；如果将来需要租户粒度，可补充 ScopeTenant 再升级业务读取点。
 var FeatureGroupMarketplaceEnabled = registerFeature(Feature{
-	Key:          "groupMarketplaceEnabled",
-	DisplayName:  "Group marketplace",
-	Description:  "Enables Telegram/Discord-based group marketplace endpoints and platform verifiers on the hosting gateway.",
-	Category:     "group",
-	Stability:    StabilityBeta,
-	DefaultValue: false,
+	Key:           "groupMarketplaceEnabled",
+	DisplayName:   "Group marketplace",
+	Description:   "Enables Telegram/Discord-based group marketplace endpoints and platform verifiers on the hosting gateway.",
+	Category:      "group",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -144,12 +146,13 @@ var FeaturePlatformTestEnvEnabled = registerFeature(Feature{
 
 // FeatureMultistoreMyStoresUIEnabled — MS-Phase-1 "My Stores" UI 入口
 var FeatureMultistoreMyStoresUIEnabled = registerFeature(Feature{
-	Key:          "multistoreMyStoresUIEnabled",
-	DisplayName:  "My Stores UI (MS-Phase-1)",
-	Description:  "Exposes the Platform Console \"My Stores\" entry point so operators can browse the stores they own across tenants.",
-	Category:     "multistore",
-	Stability:    StabilityBeta,
-	DefaultValue: false,
+	Key:           "multistoreMyStoresUIEnabled",
+	DisplayName:   "My Stores UI (MS-Phase-1)",
+	Description:   "Exposes the Platform Console \"My Stores\" entry point so operators can browse the stores they own across tenants.",
+	Category:      "multistore",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -158,12 +161,13 @@ var FeatureMultistoreMyStoresUIEnabled = registerFeature(Feature{
 
 // FeatureMultistoreClaimStoreEnabled — MS-Phase-1 认领店铺流程（/store-registry/claim）
 var FeatureMultistoreClaimStoreEnabled = registerFeature(Feature{
-	Key:          "multistoreClaimStoreEnabled",
-	DisplayName:  "Claim store (MS-Phase-1)",
-	Description:  "Opens the claim-store endpoint allowing verified owners to bind an existing peer to their SaaS account.",
-	Category:     "multistore",
-	Stability:    StabilityBeta,
-	DefaultValue: false,
+	Key:           "multistoreClaimStoreEnabled",
+	DisplayName:   "Claim store (MS-Phase-1)",
+	Description:   "Opens the claim-store endpoint allowing verified owners to bind an existing peer to their SaaS account.",
+	Category:      "multistore",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -172,12 +176,13 @@ var FeatureMultistoreClaimStoreEnabled = registerFeature(Feature{
 
 // FeatureMultistoreOwnerReputationBadgeEnabled — MS-Phase-1 店主信誉徽章
 var FeatureMultistoreOwnerReputationBadgeEnabled = registerFeature(Feature{
-	Key:          "multistoreOwnerReputationBadgeEnabled",
-	DisplayName:  "Owner reputation badge",
-	Description:  "Exposes /platform/v1/stores/{peerID}/owner-reputation so storefronts can render trust signals.",
-	Category:     "multistore",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "multistoreOwnerReputationBadgeEnabled",
+	DisplayName:   "Owner reputation badge",
+	Description:   "Exposes /platform/v1/stores/{peerID}/owner-reputation so storefronts can render trust signals.",
+	Category:      "multistore",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -188,12 +193,13 @@ var FeatureMultistoreOwnerReputationBadgeEnabled = registerFeature(Feature{
 
 // FeatureStorefrontsEnabled — MS-Phase-2a Storefront 轻量抽象总开关
 var FeatureStorefrontsEnabled = registerFeature(Feature{
-	Key:          "storefrontsEnabled",
-	DisplayName:  "Storefronts (MS-Phase-2a)",
-	Description:  "Enables the Storefront Lite abstraction — per-store subdomain routing, theme editor and collection filters.",
-	Category:     "storefronts",
-	Stability:    StabilityBeta,
-	DefaultValue: false,
+	Key:           "storefrontsEnabled",
+	DisplayName:   "Storefronts (MS-Phase-2a)",
+	Description:   "Enables the Storefront Lite abstraction — per-store subdomain routing, theme editor and collection filters.",
+	Category:      "storefronts",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -204,12 +210,13 @@ var FeatureStorefrontsEnabled = registerFeature(Feature{
 //
 // 行为选择器（未来可能支持多种路由模式），语义自包含，不加 Enabled 后缀。
 var FeatureStorefrontsSubdomainRouting = registerFeature(Feature{
-	Key:          "storefrontsSubdomainRouting",
-	DisplayName:  "Storefront subdomain routing",
-	Description:  "Routes *.mobazha.shop (and custom domains) to per-tenant storefronts via the host router middleware.",
-	Category:     "storefronts",
-	Stability:    StabilityBeta,
-	DefaultValue: false,
+	Key:           "storefrontsSubdomainRouting",
+	DisplayName:   "Storefront subdomain routing",
+	Description:   "Routes *.mobazha.shop (and custom domains) to per-tenant storefronts via the host router middleware.",
+	Category:      "storefronts",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -220,12 +227,13 @@ var FeatureStorefrontsSubdomainRouting = registerFeature(Feature{
 //
 // 行为选择器（定价规则引擎），语义自包含，不加 Enabled 后缀。
 var FeatureStorefrontsProgressivePrice = registerFeature(Feature{
-	Key:          "storefrontsProgressivePrice",
-	DisplayName:  "Storefront progressive pricing",
-	Description:  "Injects X-Storefront-PriceRule headers so downstream listing APIs can apply per-storefront progressive discounts.",
-	Category:     "storefronts",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "storefrontsProgressivePrice",
+	DisplayName:   "Storefront progressive pricing",
+	Description:   "Injects X-Storefront-PriceRule headers so downstream listing APIs can apply per-storefront progressive discounts.",
+	Category:      "storefronts",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -234,12 +242,13 @@ var FeatureStorefrontsProgressivePrice = registerFeature(Feature{
 
 // FeatureStorefrontsThemeEditorEnabled — MS-Phase-2a 主题编辑器
 var FeatureStorefrontsThemeEditorEnabled = registerFeature(Feature{
-	Key:          "storefrontsThemeEditorEnabled",
-	DisplayName:  "Storefront theme editor",
-	Description:  "Opens the visual theme editor (colors, fonts, hero section) for per-storefront customization.",
-	Category:     "storefronts",
-	Stability:    StabilityBeta,
-	DefaultValue: false,
+	Key:           "storefrontsThemeEditorEnabled",
+	DisplayName:   "Storefront theme editor",
+	Description:   "Opens the visual theme editor (colors, fonts, hero section) for per-storefront customization.",
+	Category:      "storefronts",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -250,12 +259,13 @@ var FeatureStorefrontsThemeEditorEnabled = registerFeature(Feature{
 
 // FeatureTgSellerBotWizardEnabled — MS-Phase-2b 自建 Seller Bot 向导
 var FeatureTgSellerBotWizardEnabled = registerFeature(Feature{
-	Key:          "tgSellerBotWizardEnabled",
-	DisplayName:  "Telegram seller bot wizard",
-	Description:  "Enables the self-service seller bot wizard (per-store Telegram webhook + onboarding flow) independent of Group Marketplace.",
-	Category:     "tg",
-	Stability:    StabilityBeta,
-	DefaultValue: false,
+	Key:           "tgSellerBotWizardEnabled",
+	DisplayName:   "Telegram seller bot wizard",
+	Description:   "Enables the self-service seller bot wizard (per-store Telegram webhook + onboarding flow) independent of Group Marketplace.",
+	Category:      "tg",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -264,12 +274,13 @@ var FeatureTgSellerBotWizardEnabled = registerFeature(Feature{
 
 // FeatureTgBridgeBotV2Enabled — MS-Phase-2b Bridge Bot v2 middleware
 var FeatureTgBridgeBotV2Enabled = registerFeature(Feature{
-	Key:          "tgBridgeBotV2Enabled",
-	DisplayName:  "Telegram bridge bot v2",
-	Description:  "Switches the hostRouterMiddleware to the v2 bridge bot flow (X-Store-* headers + storefront-aware routing).",
-	Category:     "tg",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "tgBridgeBotV2Enabled",
+	DisplayName:   "Telegram bridge bot v2",
+	Description:   "Switches the hostRouterMiddleware to the v2 bridge bot flow (X-Store-* headers + storefront-aware routing).",
+	Category:      "tg",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -278,12 +289,13 @@ var FeatureTgBridgeBotV2Enabled = registerFeature(Feature{
 
 // FeatureTgBotClusterEnabled — MS-Phase-2b Bot Cluster（多 bot 实例调度）
 var FeatureTgBotClusterEnabled = registerFeature(Feature{
-	Key:          "tgBotClusterEnabled",
-	DisplayName:  "Telegram bot cluster",
-	Description:  "Enables the Telegram Bot Cluster supervisor so multiple bot instances can be orchestrated under a single storefront.",
-	Category:     "tg",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "tgBotClusterEnabled",
+	DisplayName:   "Telegram bot cluster",
+	Description:   "Enables the Telegram Bot Cluster supervisor so multiple bot instances can be orchestrated under a single storefront.",
+	Category:      "tg",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -292,12 +304,13 @@ var FeatureTgBotClusterEnabled = registerFeature(Feature{
 
 // FeatureTgChannelEmbedEnabled — MS-Phase-2b Telegram Channel 嵌入
 var FeatureTgChannelEmbedEnabled = registerFeature(Feature{
-	Key:          "tgChannelEmbedEnabled",
-	DisplayName:  "Telegram channel embed",
-	Description:  "Enables Telegram channel embedding so public broadcast posts can surface inside the storefront.",
-	Category:     "tg",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "tgChannelEmbedEnabled",
+	DisplayName:   "Telegram channel embed",
+	Description:   "Enables Telegram channel embedding so public broadcast posts can surface inside the storefront.",
+	Category:      "tg",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -308,12 +321,13 @@ var FeatureTgChannelEmbedEnabled = registerFeature(Feature{
 
 // FeatureStaffAccountsEnabled — MS-Phase-3 员工账号基础
 var FeatureStaffAccountsEnabled = registerFeature(Feature{
-	Key:          "staffAccountsEnabled",
-	DisplayName:  "Staff accounts",
-	Description:  "Enables the staff account system — per-store delegated logins with role-based access control.",
-	Category:     "staff",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "staffAccountsEnabled",
+	DisplayName:   "Staff accounts",
+	Description:   "Enables the staff account system — per-store delegated logins with role-based access control.",
+	Category:      "staff",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -322,12 +336,13 @@ var FeatureStaffAccountsEnabled = registerFeature(Feature{
 
 // FeatureStaffAuditLogEnabled — MS-Phase-3 员工操作审计
 var FeatureStaffAuditLogEnabled = registerFeature(Feature{
-	Key:          "staffAuditLogEnabled",
-	DisplayName:  "Staff audit log",
-	Description:  "Records every staff action to the audit log store and exposes the audit trail UI for store owners.",
-	Category:     "staff",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "staffAuditLogEnabled",
+	DisplayName:   "Staff audit log",
+	Description:   "Records every staff action to the audit log store and exposes the audit trail UI for store owners.",
+	Category:      "staff",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -336,12 +351,13 @@ var FeatureStaffAuditLogEnabled = registerFeature(Feature{
 
 // FeatureStaffStepUpAuthEnabled — MS-Phase-3 员工敏感操作二次验证
 var FeatureStaffStepUpAuthEnabled = registerFeature(Feature{
-	Key:          "staffStepUpAuthEnabled",
-	DisplayName:  "Staff step-up authentication",
-	Description:  "Requires staff members to pass a second authentication factor (TOTP/passkey) before performing sensitive operations.",
-	Category:     "staff",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "staffStepUpAuthEnabled",
+	DisplayName:   "Staff step-up authentication",
+	Description:   "Requires staff members to pass a second authentication factor (TOTP/passkey) before performing sensitive operations.",
+	Category:      "staff",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -352,12 +368,13 @@ var FeatureStaffStepUpAuthEnabled = registerFeature(Feature{
 
 // FeatureSaasMultiNodeEnabled — MS-Phase-4 SaaS 多节点（突破 1:1 tenant↔node）
 var FeatureSaasMultiNodeEnabled = registerFeature(Feature{
-	Key:          "saasMultiNodeEnabled",
-	DisplayName:  "SaaS multi-node",
-	Description:  "Allows a SaaS tenant to own multiple peer nodes instead of the legacy 1:1 tenant-to-node mapping.",
-	Category:     "saas",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "saasMultiNodeEnabled",
+	DisplayName:   "SaaS multi-node",
+	Description:   "Allows a SaaS tenant to own multiple peer nodes instead of the legacy 1:1 tenant-to-node mapping.",
+	Category:      "saas",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -368,12 +385,13 @@ var FeatureSaasMultiNodeEnabled = registerFeature(Feature{
 //
 // 语义自包含（Enforced 本身即开关），不加 Enabled 后缀。
 var FeatureSaasPlanQuotaEnforced = registerFeature(Feature{
-	Key:          "saasPlanQuotaEnforced",
-	DisplayName:  "SaaS plan quota enforcement",
-	Description:  "Enforces per-plan resource quotas (stores, peers, listings, media) hard-fail at write paths instead of log-only soft limits.",
-	Category:     "saas",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "saasPlanQuotaEnforced",
+	DisplayName:   "SaaS plan quota enforcement",
+	Description:   "Enforces per-plan resource quotas (stores, peers, listings, media) hard-fail at write paths instead of log-only soft limits.",
+	Category:      "saas",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -384,12 +402,13 @@ var FeatureSaasPlanQuotaEnforced = registerFeature(Feature{
 
 // FeatureIdentityWalletAnchorEnabled — MS-Phase-5 钱包锚定身份
 var FeatureIdentityWalletAnchorEnabled = registerFeature(Feature{
-	Key:          "identityWalletAnchorEnabled",
-	DisplayName:  "Wallet-anchored identity",
-	Description:  "Anchors the global user identity to a self-custodial wallet address rather than SaaS account IDs; enables cross-node store ownership proofs.",
-	Category:     "identity",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "identityWalletAnchorEnabled",
+	DisplayName:   "Wallet-anchored identity",
+	Description:   "Anchors the global user identity to a self-custodial wallet address rather than SaaS account IDs; enables cross-node store ownership proofs.",
+	Category:      "identity",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -398,12 +417,13 @@ var FeatureIdentityWalletAnchorEnabled = registerFeature(Feature{
 
 // FeatureIdentityCrossStoreAnalyticsEnabled — MS-Phase-5 跨店铺分析
 var FeatureIdentityCrossStoreAnalyticsEnabled = registerFeature(Feature{
-	Key:          "identityCrossStoreAnalyticsEnabled",
-	DisplayName:  "Cross-store analytics",
-	Description:  "Aggregates GMV, orders and conversion metrics across all stores owned by the same wallet-anchored identity.",
-	Category:     "identity",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "identityCrossStoreAnalyticsEnabled",
+	DisplayName:   "Cross-store analytics",
+	Description:   "Aggregates GMV, orders and conversion metrics across all stores owned by the same wallet-anchored identity.",
+	Category:      "identity",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -412,12 +432,13 @@ var FeatureIdentityCrossStoreAnalyticsEnabled = registerFeature(Feature{
 
 // FeatureIdentityTaxAggregationEnabled — MS-Phase-5 跨店铺税务合并
 var FeatureIdentityTaxAggregationEnabled = registerFeature(Feature{
-	Key:          "identityTaxAggregationEnabled",
-	DisplayName:  "Cross-store tax aggregation",
-	Description:  "Aggregates tax liabilities across stores under the same wallet-anchored identity and exposes unified tax reports.",
-	Category:     "identity",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "identityTaxAggregationEnabled",
+	DisplayName:   "Cross-store tax aggregation",
+	Description:   "Aggregates tax liabilities across stores under the same wallet-anchored identity and exposes unified tax reports.",
+	Category:      "identity",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -426,12 +447,13 @@ var FeatureIdentityTaxAggregationEnabled = registerFeature(Feature{
 
 // FeatureIdentityMatrixProxyEnabled — MS-Phase-5 身份级 Matrix 代理
 var FeatureIdentityMatrixProxyEnabled = registerFeature(Feature{
-	Key:          "identityMatrixProxyEnabled",
-	DisplayName:  "Identity Matrix proxy",
-	Description:  "Proxies Matrix chat sessions through the wallet-anchored identity so one user can answer messages across all their stores from a unified inbox.",
-	Category:     "identity",
-	Stability:    StabilityExperimental,
-	DefaultValue: false,
+	Key:           "identityMatrixProxyEnabled",
+	DisplayName:   "Identity Matrix proxy",
+	Description:   "Proxies Matrix chat sessions through the wallet-anchored identity so one user can answer messages across all their stores from a unified inbox.",
+	Category:      "identity",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -447,12 +469,13 @@ var FeatureIdentityMatrixProxyEnabled = registerFeature(Feature{
 
 // FeatureKillStorefrontRoutingDisabled — 紧急关停 Storefront 路由
 var FeatureKillStorefrontRoutingDisabled = registerFeature(Feature{
-	Key:          "killStorefrontRoutingDisabled",
-	DisplayName:  "Kill switch: disable storefront routing",
-	Description:  "Emergency kill switch — when enabled, host router skips all storefront dispatch and treats traffic as default tenant.",
-	Category:     "kill",
-	Stability:    StabilityStable,
-	DefaultValue: false,
+	Key:           "killStorefrontRoutingDisabled",
+	DisplayName:   "Kill switch: disable storefront routing",
+	Description:   "Emergency kill switch — when enabled, host router skips all storefront dispatch and treats traffic as default tenant.",
+	Category:      "kill",
+	Stability:     StabilityStable,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -461,12 +484,13 @@ var FeatureKillStorefrontRoutingDisabled = registerFeature(Feature{
 
 // FeatureKillMultistoreReadsDisabled — 紧急关停多店铺读取路径
 var FeatureKillMultistoreReadsDisabled = registerFeature(Feature{
-	Key:          "killMultistoreReadsDisabled",
-	DisplayName:  "Kill switch: disable multistore reads",
-	Description:  "Emergency kill switch — when enabled, all multistore read paths (My Stores, claim-store listings, owner reputation) return 503 so operators can quarantine a broken rollout.",
-	Category:     "kill",
-	Stability:    StabilityStable,
-	DefaultValue: false,
+	Key:           "killMultistoreReadsDisabled",
+	DisplayName:   "Kill switch: disable multistore reads",
+	Description:   "Emergency kill switch — when enabled, all multistore read paths (My Stores, claim-store listings, owner reputation) return 503 so operators can quarantine a broken rollout.",
+	Category:      "kill",
+	Stability:     StabilityStable,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},
@@ -475,12 +499,13 @@ var FeatureKillMultistoreReadsDisabled = registerFeature(Feature{
 
 // FeatureKillBotClusterIngestDisabled — 紧急关停 Bot Cluster 入站消息
 var FeatureKillBotClusterIngestDisabled = registerFeature(Feature{
-	Key:          "killBotClusterIngestDisabled",
-	DisplayName:  "Kill switch: disable bot cluster ingest",
-	Description:  "Emergency kill switch — when enabled, the Telegram Bot Cluster stops accepting inbound webhook updates so operators can drain the queue safely.",
-	Category:     "kill",
-	Stability:    StabilityStable,
-	DefaultValue: false,
+	Key:           "killBotClusterIngestDisabled",
+	DisplayName:   "Kill switch: disable bot cluster ingest",
+	Description:   "Emergency kill switch — when enabled, the Telegram Bot Cluster stops accepting inbound webhook updates so operators can drain the queue safely.",
+	Category:      "kill",
+	Stability:     StabilityStable,
+	DefaultValue:  false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 	},

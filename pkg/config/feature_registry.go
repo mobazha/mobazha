@@ -98,6 +98,12 @@ type Feature struct {
 	// 仅做**关闭级联**：依赖被关闭 => 本 feature 视为关闭（§13.5）。
 	Dependencies []string
 
+	// ClientVisible — true if this flag should be included in the login API
+	// response (GET /server/info → features map) and consumed by the
+	// frontend via useFeature() / useFeatureFlags(). Node-only or infra
+	// flags (wallet, privacy, platform env) should leave this false.
+	ClientVisible bool
+
 	// IntroducedIn — 首次引入的版本（语义化版本或 build 号）
 	IntroducedIn string
 
@@ -217,6 +223,26 @@ func (r *Registry) List() []*Feature {
 // ListFeatures 是 List 在全局 Registry 上的便捷封装。
 func ListFeatures() []*Feature {
 	return defaultRegistry.List()
+}
+
+// ListClientVisible returns only features marked ClientVisible=true.
+// Used by the login API to build the features snapshot sent to frontends,
+// replacing the manual category whitelist that was prone to omissions.
+func (r *Registry) ListClientVisible() []*Feature {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]*Feature, 0, len(r.features))
+	for _, f := range r.features {
+		if f.ClientVisible {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// ListClientVisibleFeatures 是 ListClientVisible 在全局 Registry 上的便捷封装。
+func ListClientVisibleFeatures() []*Feature {
+	return defaultRegistry.ListClientVisible()
 }
 
 // ValidateRegistry 校验整个 Registry 的完整性：

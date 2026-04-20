@@ -14,8 +14,8 @@ func TestFeatureManager_IsEnabled(t *testing.T) {
 	if fm.IsEnabled(FeaturePrivacyLocalEncryptedStorageEnabled) {
 		t.Errorf("FeaturePrivacyLocalEncryptedStorageEnabled default should be false")
 	}
-	if fm.IsEnabled(FeaturePaymentGuestCheckoutEnabled) {
-		t.Errorf("FeaturePaymentGuestCheckoutEnabled default should be false")
+	if fm.IsEnabled(FeatureGuestCheckoutEnabled) {
+		t.Errorf("FeatureGuestCheckoutEnabled default should be false")
 	}
 }
 
@@ -36,7 +36,7 @@ func TestFeatureManager_Snapshot(t *testing.T) {
 	required := []string{
 		FeatureWalletBuiltinDisabled.Key,
 		FeaturePrivacyLocalEncryptedStorageEnabled.Key,
-		FeaturePaymentGuestCheckoutEnabled.Key,
+		FeatureGuestCheckoutEnabled.Key,
 	}
 	for _, key := range required {
 		if _, ok := snap[key]; !ok {

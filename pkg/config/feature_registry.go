@@ -132,7 +132,7 @@ func DefaultRegistry() *Registry {
 // registerFeature 向全局 Registry 注册一个 feature。
 //
 // 必须在 package-level var 块中调用，返回 *Feature 以供业务代码
-// 通过 `pkgconfig.FeaturePaymentGuestCheckoutEnabled` 形式引用。
+// 通过 `pkgconfig.FeatureGuestCheckoutEnabled` 形式引用。
 //
 // 失败时 panic：
 //   - Key 不符合 camelCase 规范

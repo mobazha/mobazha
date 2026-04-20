@@ -12,12 +12,12 @@ import (
 func TestConfigNodeFeatureProvider_GuestCheckoutReflectsCLIFlag(t *testing.T) {
 	t.Run("flag off → disabled", func(t *testing.T) {
 		p := NewConfigNodeFeatureProvider(&repo.Config{GuestCheckout: false})
-		assert.False(t, p.IsEnabled(context.Background(), config.FeaturePaymentGuestCheckoutEnabled.Key))
+		assert.False(t, p.IsEnabled(context.Background(), config.FeatureGuestCheckoutEnabled.Key))
 	})
 
 	t.Run("flag on → enabled", func(t *testing.T) {
 		p := NewConfigNodeFeatureProvider(&repo.Config{GuestCheckout: true})
-		assert.True(t, p.IsEnabled(context.Background(), config.FeaturePaymentGuestCheckoutEnabled.Key))
+		assert.True(t, p.IsEnabled(context.Background(), config.FeatureGuestCheckoutEnabled.Key))
 	})
 }
 
@@ -33,14 +33,14 @@ func TestConfigNodeFeatureProvider_NilConfigManagedEscrow(t *testing.T) {
 	// Guest Checkout reader must return false when cfg is nil so a
 	// mis-wired node does not leak an enabled state.
 	p := NewConfigNodeFeatureProvider(nil)
-	assert.False(t, p.IsEnabled(context.Background(), config.FeaturePaymentGuestCheckoutEnabled.Key))
+	assert.False(t, p.IsEnabled(context.Background(), config.FeatureGuestCheckoutEnabled.Key))
 }
 
 func TestConfigNodeFeatureProvider_NilReceiverManagedEscrow(t *testing.T) {
 	var p *ConfigNodeFeatureProvider
 	// Nil-receiver passthrough mirrors AllowAllNodeProvider semantics so
 	// callers can chain providers without nil guards.
-	assert.True(t, p.IsEnabled(context.Background(), config.FeaturePaymentGuestCheckoutEnabled.Key))
+	assert.True(t, p.IsEnabled(context.Background(), config.FeatureGuestCheckoutEnabled.Key))
 	assert.Nil(t, p.WithReader("x", func(*repo.Config) bool { return true }))
 }
 

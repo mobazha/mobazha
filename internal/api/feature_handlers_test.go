@@ -184,7 +184,7 @@ func buildResolver(platform pkgconfig.PlatformGlobalProvider, store pkgconfig.Te
 func TestGETFeatures_Success(t *testing.T) {
 	store := newMemTenantStore()
 	// Seed a tenant override so we can assert the tenant layer is honored.
-	_ = store.Set(context.Background(), database.StandaloneTenantID, pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key, true, "seed")
+	_ = store.Set(context.Background(), database.StandaloneTenantID, pkgconfig.FeatureGuestCheckoutEnabled.Key, true, "seed")
 
 	resolver := buildResolver(nil, store)
 	node := &featureTestNode{resolver: resolver, store: store}
@@ -210,7 +210,7 @@ func TestGETFeatures_Success(t *testing.T) {
 	// Locate guestCheckout in the response and sanity-check shape + values.
 	var found map[string]any
 	for _, f := range envelope.Data {
-		if f["key"] == pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key {
+		if f["key"] == pkgconfig.FeatureGuestCheckoutEnabled.Key {
 			found = f
 			break
 		}
@@ -254,7 +254,7 @@ func TestPUTFeatureSetting_Enable(t *testing.T) {
 	ts := featureTestServer(t, node)
 
 	body, _ := json.Marshal(map[string]bool{"enabled": true})
-	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key, body)
+	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckoutEnabled.Key, body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("want 200, got %d; body=%s", resp.StatusCode, respBody)
@@ -264,7 +264,7 @@ func TestPUTFeatureSetting_Enable(t *testing.T) {
 	if store.lastSet.tenant != database.StandaloneTenantID {
 		t.Errorf("tenant mismatch: got %q, want %q", store.lastSet.tenant, database.StandaloneTenantID)
 	}
-	if store.lastSet.key != pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key {
+	if store.lastSet.key != pkgconfig.FeatureGuestCheckoutEnabled.Key {
 		t.Errorf("key mismatch: got %q", store.lastSet.key)
 	}
 	if !store.lastSet.value {
@@ -284,7 +284,7 @@ func TestPUTFeatureSetting_Enable(t *testing.T) {
 	if err := json.Unmarshal(respBody, &envelope); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, respBody)
 	}
-	if envelope.Data.Key != pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key {
+	if envelope.Data.Key != pkgconfig.FeatureGuestCheckoutEnabled.Key {
 		t.Errorf("key in response: got %q", envelope.Data.Key)
 	}
 	if !envelope.Data.Enabled {
@@ -334,7 +334,7 @@ func TestPUTFeatureSetting_PlatformDisabled_Returns409(t *testing.T) {
 	ts := featureTestServer(t, node)
 
 	body, _ := json.Marshal(map[string]bool{"enabled": true})
-	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key, body)
+	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckoutEnabled.Key, body)
 
 	if resp.StatusCode != http.StatusConflict {
 		t.Errorf("want 409, got %d; body=%s", resp.StatusCode, respBody)
@@ -353,7 +353,7 @@ func TestPUTFeatureSetting_MalformedBody_Returns400(t *testing.T) {
 
 	ts := featureTestServer(t, node)
 
-	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key, []byte("{not-json"))
+	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckoutEnabled.Key, []byte("{not-json"))
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("want 400, got %d; body=%s", resp.StatusCode, respBody)
@@ -368,7 +368,7 @@ func TestPUTFeatureSetting_AdminUnavailable_Returns501(t *testing.T) {
 	ts := featureTestServer(t, node)
 
 	body, _ := json.Marshal(map[string]bool{"enabled": true})
-	resp, _ := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key, body)
+	resp, _ := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckoutEnabled.Key, body)
 
 	if resp.StatusCode != http.StatusNotImplemented {
 		t.Errorf("want 501 (admin provider unavailable), got %d", resp.StatusCode)
@@ -389,7 +389,7 @@ func TestPUTFeatureSetting_AuditLoggerInvoked(t *testing.T) {
 	ts := featureTestServer(t, node)
 
 	reqBody, _ := json.Marshal(map[string]bool{"enabled": true})
-	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key, reqBody)
+	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckoutEnabled.Key, reqBody)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("want 200, got %d; body=%s", resp.StatusCode, respBody)
 	}
@@ -404,7 +404,7 @@ func TestPUTFeatureSetting_AuditLoggerInvoked(t *testing.T) {
 	if entry.TenantID != database.StandaloneTenantID {
 		t.Errorf("tenant_id: got %q, want %q", entry.TenantID, database.StandaloneTenantID)
 	}
-	if entry.FeatureKey != pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key {
+	if entry.FeatureKey != pkgconfig.FeatureGuestCheckoutEnabled.Key {
 		t.Errorf("feature_key: got %q", entry.FeatureKey)
 	}
 	if !entry.NewValue {
@@ -427,7 +427,7 @@ func TestPUTFeatureSetting_AuditLoggerErrorDoesNotFailRequest(t *testing.T) {
 	ts := featureTestServer(t, node)
 
 	reqBody, _ := json.Marshal(map[string]bool{"enabled": true})
-	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key, reqBody)
+	resp, respBody := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckoutEnabled.Key, reqBody)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("want 200 despite logger error, got %d; body=%s", resp.StatusCode, respBody)
 	}
@@ -436,7 +436,7 @@ func TestPUTFeatureSetting_AuditLoggerErrorDoesNotFailRequest(t *testing.T) {
 	}
 	// Store must still reflect the successful write — audit failure should
 	// never roll the business op back.
-	if !store.values[database.StandaloneTenantID+"|"+pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key] {
+	if !store.values[database.StandaloneTenantID+"|"+pkgconfig.FeatureGuestCheckoutEnabled.Key] {
 		t.Error("expected store to contain tenant override even though audit failed")
 	}
 }
@@ -452,7 +452,7 @@ func TestPUTFeatureSetting_PlatformDisabled_NoAuditWrite(t *testing.T) {
 	ts := featureTestServer(t, node)
 
 	reqBody, _ := json.Marshal(map[string]bool{"enabled": true})
-	resp, _ := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeaturePaymentGuestCheckoutEnabled.Key, reqBody)
+	resp, _ := doReq(t, ts, "PUT", "/v1/settings/features/"+pkgconfig.FeatureGuestCheckoutEnabled.Key, reqBody)
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("want 409, got %d", resp.StatusCode)
 	}

@@ -115,10 +115,12 @@ func ErrorWithDetail(w http.ResponseWriter, status int, code, message, detail st
 // the client can act on the error (e.g. conflict resolution). Keep the payload
 // free of secrets and PII that the caller isn't already authorized to see.
 func ErrorWithData(w http.ResponseWriter, status int, code, message string, data interface{}) {
+	traceID := w.Header().Get("X-Request-ID")
 	writeJSON(w, status, ErrorEnvelope{
 		Error: APIError{
 			Code:    code,
 			Message: message,
+			TraceID: traceID,
 			Data:    data,
 		},
 	})

@@ -58,14 +58,14 @@ var FeaturePrivacyLocalEncryptedStorageEnabled = registerFeature(Feature{
 // Payment
 // ---------------------------------------------------------------------------
 
-// FeaturePaymentGuestCheckoutEnabled — 匿名游客支付（PM-2）
+// FeatureGuestCheckoutEnabled — 匿名游客支付（PM-2）
 //
 // 三层 Scope 均可控制：
 //   - PlatformGlobal：SaaS 平台总开关
 //   - Tenant：每个店铺自行启用（适配 merchant 自愿接单匿名订单）
 //   - NodeRuntime：独立节点 CLI flag / repo.Config（运维人员可快速关停）
-var FeaturePaymentGuestCheckoutEnabled = registerFeature(Feature{
-	Key:          "paymentGuestCheckoutEnabled",
+var FeatureGuestCheckoutEnabled = registerFeature(Feature{
+	Key:          "guestCheckout",
 	DisplayName:  "Guest checkout",
 	Description:  "Allows buyers to place anonymous orders via direct on-chain payment without creating an account (PM-2).",
 	Category:     "payment",

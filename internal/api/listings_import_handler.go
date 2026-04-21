@@ -280,8 +280,7 @@ func isProfileImage(normalizedName, basename string) (slot string, ok bool) {
 //   - If a .json file is found → JSON import (supports shippingProfiles + collections)
 //   - If a .xlsx file is found → Excel import
 func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Request) {
-	maxZipSize := g.nodeManager.GetMaxImportZipSize()
-	maxVideoSize := g.nodeManager.GetMaxImportVideoSize()
+	maxZipSize, maxVideoSize := g.importSizeLimits()
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxZipSize)
 
@@ -811,19 +810,17 @@ func (g *Gateway) processListingVideo(mediaSvc contracts.MediaService, listing *
 		return nil // Skip missing video
 	}
 
-	// Check video size
-	maxVideoSize := g.nodeManager.GetMaxImportVideoSize()
-	if int64(len(videoData)) > maxVideoSize {
-		return fmt.Errorf("video %s exceeds maximum size of %dMB", videoName, maxVideoSize/(1<<20))
+	_, maxVidSize := g.importSizeLimits()
+	if int64(len(videoData)) > maxVidSize {
+		return fmt.Errorf("video %s exceeds maximum size of %dMB", videoName, maxVidSize/(1<<20))
 	}
 
-	// Check if it's a valid video
 	if !filetype.IsVideo(videoData) {
 		return fmt.Errorf("file %s is not a valid video", videoName)
 	}
 
 	// Upload video
-	result, err := mediaSvc.UploadMedia(context.Background(), videoData, videoName, contracts.UploadOpts{MaxBytes: maxVideoSize})
+	result, err := mediaSvc.UploadMedia(context.Background(), videoData, videoName, contracts.UploadOpts{MaxBytes: maxVidSize})
 	if err != nil {
 		return fmt.Errorf("failed to upload video %s: %w", videoName, err)
 	}
@@ -1145,8 +1142,7 @@ type JSONImportPayload struct {
 // handlePOSTListingsImportJSON handles the batch import of listings from a ZIP file with JSON data.
 // This is a dedicated JSON endpoint kept for backward compatibility (import.sh uses it).
 func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Request) {
-	maxZipSize := g.nodeManager.GetMaxImportZipSize()
-	maxVideoSize := g.nodeManager.GetMaxImportVideoSize()
+	maxZipSize, maxVideoSize := g.importSizeLimits()
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxZipSize)
 
@@ -1707,19 +1703,17 @@ func (g *Gateway) processJSONListingVideo(mediaSvc contracts.MediaService, listi
 		return nil // Skip missing video
 	}
 
-	// Check video size
-	maxVideoSize := g.nodeManager.GetMaxImportVideoSize()
-	if int64(len(videoData)) > maxVideoSize {
-		return fmt.Errorf("video %s exceeds maximum size of %dMB", videoName, maxVideoSize/(1<<20))
+	_, maxVidSize := g.importSizeLimits()
+	if int64(len(videoData)) > maxVidSize {
+		return fmt.Errorf("video %s exceeds maximum size of %dMB", videoName, maxVidSize/(1<<20))
 	}
 
-	// Check if it's a valid video
 	if !filetype.IsVideo(videoData) {
 		return fmt.Errorf("file %s is not a valid video", videoName)
 	}
 
 	// Upload video
-	result, err := mediaSvc.UploadMedia(context.Background(), videoData, videoName, contracts.UploadOpts{MaxBytes: maxVideoSize})
+	result, err := mediaSvc.UploadMedia(context.Background(), videoData, videoName, contracts.UploadOpts{MaxBytes: maxVidSize})
 	if err != nil {
 		return fmt.Errorf("failed to upload video %s: %w", videoName, err)
 	}
@@ -1730,6 +1724,20 @@ func (g *Gateway) processJSONListingVideo(mediaSvc contracts.MediaService, listi
 	}
 
 	return nil
+}
+
+const (
+	defaultMaxImportZipSize   = 300 << 20 // 300MB
+	defaultMaxImportVideoSize = 15 << 20  // 15MB
+)
+
+// importSizeLimits returns (maxZipSize, maxVideoSize) safely even when
+// nodeManager is nil (e.g., SaaS bridge mode).
+func (g *Gateway) importSizeLimits() (int64, int64) {
+	if g.nodeManager != nil {
+		return g.nodeManager.GetMaxImportZipSize(), g.nodeManager.GetMaxImportVideoSize()
+	}
+	return defaultMaxImportZipSize, defaultMaxImportVideoSize
 }
 
 // processJSONListingVariants adds variants to a listing from JSON input

@@ -21,9 +21,13 @@
 #        -t ghcr.io/mobazha/standalone:dev .
 #
 # Frontend directory layout (.frontend-dist/):
-#   standalone/   — Next.js standalone server output
+#   standalone/   — Next.js standalone server output (monorepo: apps/web/server.js)
 #   static/       — .next/static/ assets (JS/CSS chunks)
 #   public/       — public/ assets (icons, manifest, etc.)
+#
+# In pnpm monorepo, standalone output preserves workspace structure:
+#   standalone/apps/web/server.js  (not standalone/server.js)
+#   standalone/node_modules/       (shared monorepo deps)
 
 ARG GO_VERSION=1.26
 ARG ALPINE_VERSION=3.23
@@ -74,6 +78,11 @@ FROM ${NODE_IMAGE:-go-builder} AS node-binary
 
 # ============================================================
 # Stage 2: Frontend assembler — organize pre-built Next.js output
+#
+# Monorepo standalone structure: apps/web/server.js
+# Static and public assets must be placed relative to server.js.
+# Also prunes platform-specific binaries and dev artifacts that
+# the build script may not have fully cleaned.
 # ============================================================
 FROM alpine:${ALPINE_VERSION} AS fe-assembler
 
@@ -81,8 +90,52 @@ WORKDIR /app
 
 ARG FRONTEND_DIR=deploy/standalone/frontend-placeholder
 COPY ${FRONTEND_DIR}/standalone/ ./
-COPY ${FRONTEND_DIR}/static/ ./.next/static/
-COPY ${FRONTEND_DIR}/public/ ./public/
+COPY ${FRONTEND_DIR}/static/ ./apps/web/.next/static/
+COPY ${FRONTEND_DIR}/public/ ./apps/web/public/
+
+ARG TARGETARCH
+RUN set -e; \
+    echo "Before cleanup: $(du -sm . | awk '{print $1}')MB"; \
+    # --- 1. Platform-specific sharp binaries (nested inside sharp@*/node_modules/@img/) --- \
+    find node_modules/.pnpm -path "*/sharp@*/node_modules/@img/*darwin*" -type d -exec rm -rf {} + 2>/dev/null; \
+    find node_modules/.pnpm -path "*/sharp@*/node_modules/@img/*win32*" -type d -exec rm -rf {} + 2>/dev/null; \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+      find node_modules/.pnpm -path "*/sharp@*/node_modules/@img/*linux-arm64*" -type d -exec rm -rf {} + 2>/dev/null; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+      find node_modules/.pnpm -path "*/sharp@*/node_modules/@img/*linux-x64*" -type d -exec rm -rf {} + 2>/dev/null; \
+    fi; \
+    rm -rf node_modules/.pnpm/node_modules/@img/sharp-darwin-* \
+           node_modules/.pnpm/node_modules/@img/sharp-libvips-darwin-* \
+           node_modules/.pnpm/node_modules/@img/sharp-win32-* \
+           node_modules/.pnpm/node_modules/@img/sharp-libvips-win32-*; \
+    # --- 2. Deduplicate hoisted next (identical copy of versioned) --- \
+    VERSIONED_NEXT=$(find node_modules/.pnpm -maxdepth 1 -name "next@*" -type d 2>/dev/null | head -1); \
+    if [ -n "$VERSIONED_NEXT" ] && [ -d "node_modules/.pnpm/node_modules/next" ]; then \
+      rm -rf node_modules/.pnpm/node_modules/next; \
+      ln -s "$VERSIONED_NEXT/node_modules/next" node_modules/.pnpm/node_modules/next; \
+    fi; \
+    # --- 3. Next.js build-only / dev-only content (not needed at runtime) --- \
+    for nextdir in node_modules/.pnpm/next@*/node_modules/next apps/web/node_modules/next; do \
+      [ -d "$nextdir/dist" ] || continue; \
+      rm -rf "$nextdir/dist/esm" \
+             "$nextdir/dist/compiled/react-dom-experimental" \
+             "$nextdir/dist/compiled/webpack" \
+             "$nextdir/dist/compiled/react-server-dom-webpack-experimental" \
+             "$nextdir/dist/compiled/react-server-dom-turbopack-experimental" \
+             "$nextdir/dist/bundle-analyzer"; \
+    done; \
+    # --- 4. Dev-only packages --- \
+    rm -rf node_modules/.pnpm/typescript@*/; \
+    # NOTE: do NOT remove jsdom — Next.js SSR uses it for _global-error rendering \
+    # --- 5. File tracing metadata --- \
+    find . -name "*.nft.json" -delete 2>/dev/null; \
+    # --- 6. Source maps, type declarations, docs in node_modules --- \
+    find node_modules -name "*.map" -delete 2>/dev/null; \
+    find node_modules -name "*.d.ts" -delete 2>/dev/null; \
+    find node_modules -name "*.d.mts" -delete 2>/dev/null; \
+    find node_modules \( -name "README.md" -o -name "CHANGELOG.md" -o -name "HISTORY.md" \) -delete 2>/dev/null; \
+    echo "After cleanup: $(du -sm . | awk '{print $1}')MB"; \
+    true
 
 # ============================================================
 # Stage 3: Runtime — alpine + s6 + Caddy + Node.js + mobazha

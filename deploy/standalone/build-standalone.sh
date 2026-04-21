@@ -137,10 +137,103 @@ if [[ "$SKIP_FRONTEND" == "false" ]]; then
     WEB_DIR="$FRONTEND_REPO/apps/web"
 
     rm -rf "$DIST_DIR"
-    mkdir -p "$DIST_DIR"
+    mkdir -p "$DIST_DIR/standalone"
 
-    # Next.js standalone output: self-contained server + minimal node_modules
-    cp -r "$WEB_DIR/.next/standalone/." "$DIST_DIR/standalone/"
+    # Next.js standalone output: self-contained server + minimal node_modules.
+    # pnpm uses symlinks extensively; some may be broken in standalone output.
+    # Use tar with -L (dereference) to resolve valid symlinks and skip broken ones.
+    (cd "$WEB_DIR/.next/standalone" && tar -cLf - . 2>/dev/null) | (cd "$DIST_DIR/standalone" && tar xf -)
+
+    # Fix incomplete pnpm packages in standalone output.
+    # Next.js file tracing sometimes copies only package.json without
+    # actual code files. We selectively copy ONLY missing files from the
+    # monorepo pnpm store — never overwrite existing content.
+    MONO_PNPM="$FRONTEND_REPO/node_modules/.pnpm"
+    STANDALONE_PNPM="$DIST_DIR/standalone/node_modules/.pnpm"
+    if [[ -d "$STANDALONE_PNPM" && -d "$MONO_PNPM" ]]; then
+        echo "    Fixing incomplete pnpm packages..."
+        FIXED=0
+
+        # Phase 1: fix versioned packages (e.g. .pnpm/tough-cookie@5.1.2/node_modules/tough-cookie)
+        while IFS= read -r pkg_json; do
+            pkg_dir="$(dirname "$pkg_json")"
+            rel="${pkg_dir#$STANDALONE_PNPM/}"
+            mono_dir="$MONO_PNPM/$rel"
+            [[ -d "$mono_dir" ]] || continue
+
+            mono_count=$(find "$mono_dir" -type f | wc -l | tr -d ' ')
+            standalone_count=$(find "$pkg_dir" -type f | wc -l | tr -d ' ')
+            if (( mono_count > standalone_count )); then
+                # Use rsync-like approach: copy only missing files (--ignore-existing)
+                # tar overlay: extract only files that don't already exist
+                (cd "$mono_dir" && find . -type f) | while read -r f; do
+                    if [[ ! -f "$pkg_dir/$f" ]]; then
+                        src="$mono_dir/$f"
+                        [[ -L "$src" ]] && src="$(readlink -f "$src" 2>/dev/null)" && [[ ! -f "$src" ]] && continue
+                        mkdir -p "$(dirname "$pkg_dir/$f")"
+                        cp -L "$src" "$pkg_dir/$f" 2>/dev/null || true
+                    fi
+                done
+                FIXED=$((FIXED + 1))
+            fi
+        done < <(find "$STANDALONE_PNPM" -mindepth 3 -maxdepth 5 -name "package.json" -not -path "*/node_modules/.pnpm/node_modules/*")
+
+        # Phase 2: re-sync hoisted packages (.pnpm/node_modules/<name>).
+        # tar -cL pre-resolved these from the (then-incomplete) versioned dirs.
+        # Multiple versions may exist; pick the one with the most files.
+        HOISTED_DIR="$STANDALONE_PNPM/node_modules"
+        if [[ -d "$HOISTED_DIR" ]]; then
+            for hoisted_pkg in "$HOISTED_DIR"/*/; do
+                [[ -d "$hoisted_pkg" ]] || continue
+                pkg_name=$(basename "$hoisted_pkg")
+                hoisted_count=$(find "$hoisted_pkg" -type f | wc -l | tr -d ' ')
+                # Find the versioned directory with the most files
+                best_versioned=""
+                best_count=0
+                while IFS= read -r candidate; do
+                    c=$(find "$candidate" -type f | wc -l | tr -d ' ')
+                    if (( c > best_count )); then
+                        best_count=$c
+                        best_versioned="$candidate"
+                    fi
+                done < <(find "$STANDALONE_PNPM" -maxdepth 3 -path "*/${pkg_name}@*/node_modules/${pkg_name}" -type d 2>/dev/null)
+                if [[ -n "$best_versioned" ]] && (( best_count > hoisted_count )); then
+                    (cd "$best_versioned" && find . -type f) | while read -r f; do
+                        if [[ ! -f "$hoisted_pkg/$f" ]]; then
+                            mkdir -p "$(dirname "$hoisted_pkg/$f")"
+                            cp "$best_versioned/$f" "$hoisted_pkg/$f" 2>/dev/null || true
+                        fi
+                    done
+                    FIXED=$((FIXED + 1))
+                fi
+            done
+        fi
+        echo "    Fixed $FIXED incomplete packages"
+    fi
+
+    # Prune files not needed at runtime to reduce image size.
+    echo "    Pruning dev artifacts..."
+    BEFORE=$(du -sm "$DIST_DIR/standalone" | awk '{print $1}')
+    # Platform-specific sharp native binaries (nested inside sharp@*/node_modules/@img/)
+    find "$DIST_DIR/standalone/node_modules/.pnpm" -path "*/sharp@*/node_modules/@img/*darwin*" -type d -exec rm -rf {} + 2>/dev/null
+    find "$DIST_DIR/standalone/node_modules/.pnpm" -path "*/sharp@*/node_modules/@img/*win32*" -type d -exec rm -rf {} + 2>/dev/null
+    # Hoisted sharp platform copies
+    rm -rf "$DIST_DIR"/standalone/node_modules/.pnpm/node_modules/@img/sharp-darwin-* \
+           "$DIST_DIR"/standalone/node_modules/.pnpm/node_modules/@img/sharp-libvips-darwin-* \
+           "$DIST_DIR"/standalone/node_modules/.pnpm/node_modules/@img/sharp-win32-* \
+           "$DIST_DIR"/standalone/node_modules/.pnpm/node_modules/@img/sharp-libvips-win32-*
+    # Dev-only packages
+    rm -rf "$DIST_DIR"/standalone/node_modules/.pnpm/typescript@*/
+    # File tracing metadata
+    find "$DIST_DIR/standalone" -name "*.nft.json" -delete 2>/dev/null
+    # Source maps and TypeScript declarations
+    find "$DIST_DIR/standalone/node_modules" -name "*.map" -delete 2>/dev/null
+    find "$DIST_DIR/standalone/node_modules" -name "*.d.ts" -delete 2>/dev/null
+    find "$DIST_DIR/standalone/node_modules" -name "*.d.mts" -delete 2>/dev/null
+    # Markdown/docs in node_modules
+    find "$DIST_DIR/standalone/node_modules" \( -name "README.md" -o -name "CHANGELOG.md" -o -name "LICENSE" -o -name "HISTORY.md" \) -delete 2>/dev/null
+    AFTER=$(du -sm "$DIST_DIR/standalone" | awk '{print $1}')
+    echo "    Pruned $((BEFORE - AFTER))MB (${BEFORE}MB → ${AFTER}MB)"
 
     # Static assets: must be alongside standalone server under .next/static/
     if [[ -d "$WEB_DIR/.next/static" ]]; then

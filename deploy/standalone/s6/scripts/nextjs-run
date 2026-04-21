@@ -24,4 +24,10 @@ export HOSTNAME="0.0.0.0"
 export PORT="$NEXTJS_PORT"
 export INTERNAL_API_URL="http://127.0.0.1:${NODE_PORT}"
 
-exec node /app/frontend/server.js
+# pnpm monorepo: hoisted deps live in .pnpm/node_modules/ which isn't
+# on the standard resolution path. Add it via NODE_PATH so packages
+# like styled-jsx can be found by Next.js require-hook.
+export NODE_PATH="/app/frontend/node_modules/.pnpm/node_modules"
+
+cd /app/frontend/apps/web
+exec node server.js

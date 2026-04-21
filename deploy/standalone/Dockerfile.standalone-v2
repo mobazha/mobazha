@@ -1,0 +1,238 @@
+# Mobazha Standalone Store — In-Docker Build Approach (v2, experimental)
+#
+# Key difference from v1: frontend is built INSIDE Docker.
+# Standalone output still needs targeted fixup (Next.js @vercel/nft
+# traces incomplete packages in pnpm monorepos). Uses --mount=type=bind
+# from the builder stage to patch only broken/incomplete packages
+# without copying the full node_modules tree.
+#
+# Build (local dev):
+#   docker buildx build -f deploy/standalone/Dockerfile.standalone-v2 \
+#     --build-context core=/path/to/mobazha-core \
+#     --build-context frontend=/path/to/mobazha-unified \
+#     -t ghcr.io/mobazha/standalone:v2 .
+
+ARG GO_VERSION=1.26
+ARG ALPINE_VERSION=3.23
+ARG S6_OVERLAY_VERSION=3.2.0.0
+ARG NODE_IMAGE=""
+
+# ============================================================
+# Stage 1: Go builder — compile mobazha-node on Alpine (musl)
+# ============================================================
+FROM golang:${GO_VERSION}-alpine AS go-builder
+
+RUN apk add --no-cache gcc musl-dev git upx
+
+WORKDIR /src
+
+COPY --from=core . /src/core
+
+WORKDIR /src/mobazha3.0
+COPY go.mod go.sum ./
+
+RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY . .
+RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod && \
+    go mod tidy
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 go build -tags goolm \
+    -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/api.Version=$(git describe --tags --always 2>/dev/null || echo dev)" \
+    -o /usr/local/bin/mobazha . && \
+    upx --best --lzma /usr/local/bin/mobazha || true
+
+# ============================================================
+# Stage: node-binary — alias to either go-builder or pre-built image
+# ============================================================
+FROM ${NODE_IMAGE:-go-builder} AS node-binary
+
+# ============================================================
+# Stage 2: Frontend builder — build Next.js inside Docker
+#
+# This is the standard industry approach:
+#   1. Copy monorepo lockfile + package.jsons for layer caching
+#   2. pnpm install (cached layer)
+#   3. Copy source and build
+#   4. The standalone output has valid symlinks
+# ============================================================
+FROM node:22-alpine AS fe-builder
+
+RUN corepack enable pnpm
+
+WORKDIR /frontend
+
+# Layer 1: dependency manifests only (maximizes Docker cache hits)
+COPY --from=frontend pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY --from=frontend apps/web/package.json ./apps/web/
+COPY --from=frontend packages/core/package.json ./packages/core/
+COPY --from=frontend packages/ui/package.json ./packages/ui/
+
+# tools/ may not have a package.json; create placeholder if pnpm-workspace expects it
+RUN mkdir -p tools && echo '{}' > tools/package.json 2>/dev/null || true
+
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# Layer 2: source code (changes more often → separate layer)
+COPY --from=frontend . .
+
+# Inject standalone build env
+COPY deploy/standalone/env.standalone.production ./apps/web/.env.production.local
+
+# Build workspace dependencies first, then the web app
+RUN pnpm --filter @mobazha/core build 2>&1 | tail -3 && \
+    pnpm --filter @mobazha/ui build 2>&1 | tail -3 && \
+    pnpm --filter @mobazha/web build:next 2>&1 | tail -10
+
+# Remove devDependencies from pnpm store (keeps structure, drops dev pkgs)
+RUN CI=true pnpm prune --prod 2>&1 | tail -10
+
+# ============================================================
+# Stage 3: Frontend assembler — standalone + targeted fixup
+#
+# Next.js standalone tracing (via @vercel/nft) is incomplete for
+# pnpm monorepos: some packages only get package.json traced.
+#
+# Strategy: use standalone output as base (small, traced), then
+# mount the builder's full node_modules and selectively patch
+# only the incomplete packages. Best of both worlds.
+# ============================================================
+FROM alpine:${ALPINE_VERSION} AS fe-assembler
+
+WORKDIR /app
+
+COPY --from=fe-builder /frontend/apps/web/.next/standalone/ ./
+COPY --from=fe-builder /frontend/apps/web/.next/static/ ./apps/web/.next/static/
+COPY --from=fe-builder /frontend/apps/web/public/ ./apps/web/public/
+
+# Patch incomplete packages: for each .pnpm/<pkg>@ver/node_modules/<name>/
+# that has ONLY package.json, copy the complete package from the builder.
+RUN --mount=type=bind,from=fe-builder,source=/frontend/node_modules/.pnpm,target=/full-pnpm \
+    set -e; \
+    PATCHED=0; \
+    echo "Scanning for incomplete packages in standalone output..."; \
+    for pkg_dir in node_modules/.pnpm/*/node_modules/*/; do \
+      [ -d "$pkg_dir" ] || continue; \
+      # Skip if has more than just package.json (i.e. already complete)
+      file_count=$(find "$pkg_dir" -maxdepth 1 -not -name "." -not -name "package.json" | head -2 | wc -l); \
+      [ "$file_count" -eq 0 ] || continue; \
+      # Only package.json exists — patch from full builder
+      rel="${pkg_dir#node_modules/.pnpm/}"; \
+      src="/full-pnpm/$rel"; \
+      if [ -d "$src" ]; then \
+        rm -rf "$pkg_dir"; \
+        cp -a "$src" "$pkg_dir"; \
+        PATCHED=$((PATCHED + 1)); \
+      fi; \
+    done; \
+    echo "Patched $PATCHED incomplete packages"; \
+    # Also fix broken symlinks in .pnpm/node_modules/
+    for link in node_modules/.pnpm/node_modules/*; do \
+      [ -L "$link" ] || continue; \
+      [ -e "$link" ] && continue; \
+      name=$(basename "$link"); \
+      target=$(readlink "$link"); \
+      src_dir="/full-pnpm/${target#../}"; \
+      if [ -d "$src_dir" ]; then \
+        rm "$link"; \
+        cp -a "$src_dir" "$link"; \
+        PATCHED=$((PATCHED + 1)); \
+      fi; \
+    done; \
+    echo "Total patched: $PATCHED"
+
+ARG TARGETARCH
+RUN set -e; \
+    echo "Before cleanup: $(du -sm . | awk '{print $1}')MB"; \
+    # --- 1. Platform-specific sharp binaries --- \
+    find node_modules -path "*/@img/*darwin*" -type d -exec rm -rf {} + 2>/dev/null; \
+    find node_modules -path "*/@img/*win32*" -type d -exec rm -rf {} + 2>/dev/null; \
+    find node_modules -path "*/@img/sharp-linux-*" -not -path "*musl*" -type d -exec rm -rf {} + 2>/dev/null; \
+    find node_modules -path "*/@img/sharp-libvips-linux-*" -not -path "*musl*" -type d -exec rm -rf {} + 2>/dev/null; \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+      find node_modules -path "*/@img/*arm64*" -type d -exec rm -rf {} + 2>/dev/null; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+      find node_modules -path "*/@img/*x64*" -type d -exec rm -rf {} + 2>/dev/null; \
+    fi; \
+    # --- 2. Next.js build-only content --- \
+    for nextdir in $(find . -path "*/next/dist" -type d 2>/dev/null); do \
+      rm -rf "$nextdir/esm" \
+             "$nextdir/compiled/react-dom-experimental" \
+             "$nextdir/compiled/webpack" \
+             "$nextdir/compiled/react-server-dom-webpack-experimental" \
+             "$nextdir/compiled/react-server-dom-turbopack-experimental" \
+             "$nextdir/bundle-analyzer" 2>/dev/null; \
+    done; \
+    # --- 3. Metadata and docs --- \
+    find . -name "*.nft.json" -delete 2>/dev/null; \
+    find node_modules -name "*.map" -delete 2>/dev/null; \
+    find node_modules -name "*.d.ts" -delete 2>/dev/null; \
+    find node_modules -name "*.d.mts" -delete 2>/dev/null; \
+    find node_modules \( -name "README.md" -o -name "CHANGELOG.md" -o -name "HISTORY.md" \) -delete 2>/dev/null; \
+    echo "After cleanup: $(du -sm . | awk '{print $1}')MB"; \
+    true
+
+# ============================================================
+# Stage 4: Runtime — alpine + s6 + Caddy + Node.js + mobazha
+# ============================================================
+FROM alpine:${ALPINE_VERSION}
+
+ARG S6_OVERLAY_VERSION
+ARG TARGETARCH
+
+RUN set -ex; \
+    case "${TARGETARCH}" in \
+      amd64) S6_ARCH="x86_64" ;; \
+      arm64) S6_ARCH="aarch64" ;; \
+      arm)   S6_ARCH="arm" ;; \
+      *)     S6_ARCH="${TARGETARCH}" ;; \
+    esac; \
+    wget -q "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" -O /tmp/s6-noarch.tar.xz && \
+    wget -q "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" -O /tmp/s6-arch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-noarch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-arch.tar.xz && \
+    rm -f /tmp/s6-*.tar.xz
+
+RUN apk add --no-cache \
+    ca-certificates \
+    curl \
+    jq \
+    gettext \
+    caddy \
+    nodejs
+
+COPY --from=node-binary /usr/local/bin/mobazha /usr/local/bin/mobazha
+
+COPY deploy/standalone/Caddyfile.tmpl /etc/caddy/Caddyfile.tmpl
+COPY deploy/standalone/Caddyfile.go.tmpl /etc/caddy/Caddyfile.go.tmpl
+COPY deploy/standalone/generate-caddyfile.sh /usr/local/bin/generate-caddyfile
+
+COPY --from=fe-assembler /app/ /app/frontend/
+
+COPY deploy/standalone/s6/ /etc/s6-overlay/
+
+VOLUME ["/data", "/data/caddy"]
+
+EXPOSE 80 443
+
+ENV S6_KEEP_ENV=1 \
+    NODE_PORT=5102 \
+    NEXTJS_PORT=3000 \
+    STORE_DOMAIN="" \
+    SAAS_API_URL="https://app.mobazha.org" \
+    STANDALONE_API_KEY="" \
+    ADMIN_PASSWORD="" \
+    SAAS_PEER_ID="" \
+    CONNECTIVITY="nat" \
+    TESTNET=""
+
+ENTRYPOINT ["/init"]
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -sf http://localhost:${NODE_PORT}/healthz || exit 1

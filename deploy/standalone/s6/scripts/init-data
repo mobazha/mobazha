@@ -19,7 +19,8 @@ fi
 # NEXT_PUBLIC_* env vars are baked at build time, but SAAS_API_URL is only
 # known at container startup. This generates a JS file that the frontend reads
 # via window.__RUNTIME_CONFIG__ before initializing.
-RUNTIME_JS="/app/frontend/public/runtime-config.js"
+# Monorepo standalone: public/ is at apps/web/public/
+RUNTIME_JS="/app/frontend/apps/web/public/runtime-config.js"
 SAAS_URL="${SAAS_API_URL:-}"
 cat > "$RUNTIME_JS" <<JSEOF
 window.__RUNTIME_CONFIG__={saasUrl:"${SAAS_URL}"};

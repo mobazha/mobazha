@@ -43,7 +43,7 @@ else
     BUILD_TAGS="${BUILD_TAGS:-goolm purego_sqlite embed_frontend}"
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
         -tags "${BUILD_TAGS}" \
-        -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/api.Version=${VERSION}" \
+        -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/version.buildVersion=${VERSION}" \
         -o "${STAGE_DIR}/mobazha.exe" \
         "${PROJECT_ROOT}"
 fi

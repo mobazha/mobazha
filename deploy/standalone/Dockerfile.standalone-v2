@@ -43,7 +43,7 @@ RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/m
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 go build -tags goolm \
-    -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/api.Version=$(git describe --tags --always 2>/dev/null || echo dev)" \
+    -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/version.buildVersion=$(git describe --tags --always 2>/dev/null || echo dev)" \
     -o /usr/local/bin/mobazha . && \
     upx --best --lzma /usr/local/bin/mobazha || true
 

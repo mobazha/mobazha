@@ -95,7 +95,7 @@ else
     BUILD_TAGS="${BUILD_TAGS:-goolm purego_sqlite embed_frontend}"
     CGO_ENABLED=0 GOARCH="${GOARCH}" go build \
         -tags "${BUILD_TAGS}" \
-        -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/api.Version=${VERSION}" \
+        -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/version.buildVersion=${VERSION}" \
         -o "${APP_DIR}/Contents/MacOS/mobazha" \
         "${PROJECT_ROOT}"
 fi

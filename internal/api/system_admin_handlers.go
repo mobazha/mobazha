@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/version"
+
 	"github.com/mobazha/mobazha3.0/internal/supervisor"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -81,7 +83,7 @@ func (g *Gateway) handleGETSystemHealth(w http.ResponseWriter, r *http.Request) 
 
 	resp := systemHealthResponse{
 		Status:         "healthy",
-		Version:        Version,
+		Version:        version.String(),
 		Uptime:         int64(time.Since(nodeStartTime).Seconds()),
 		Timestamp:      time.Now().Unix(),
 		DeploymentMode: detectDeploymentMode(),

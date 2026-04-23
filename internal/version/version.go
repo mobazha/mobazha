@@ -21,36 +21,28 @@ const (
 	AppPreRelease = ""
 )
 
-// appBuild is defined as a variable so it can be overridden during the build
-// process with '-ldflags "-X main.appBuild foo' if needed.  It MUST only
-// contain characters from semanticAlphabet per the semantic versioning spec.
-var appBuild string
+// buildVersion is set at build time via:
+//
+//	-ldflags "-X github.com/mobazha/mobazha3.0/internal/version.buildVersion=v0.3.0-beta.26"
+//
+// When set, String() returns this value (with the leading "v" stripped)
+// instead of the static constants above.
+var buildVersion string
 
 // String returns the application version as a properly formed string per the
 // semantic versioning 2.0.0 spec (http://semver.org/).
 func String() string {
-	// Start with the major, minor, and patch versions.
+	if buildVersion != "" {
+		return strings.TrimPrefix(buildVersion, "v")
+	}
+
+	// Fallback to the static constants (local dev builds).
 	version := fmt.Sprintf("%d.%d.%d", AppMajor, AppMinor, AppPatch)
 
-	// Append pre-release version if there is one.  The hyphen called for
-	// by the semantic versioning spec is automatically appended and should
-	// not be contained in the pre-release string.  The pre-release version
-	// is not appended if it contains invalid characters.
 	if AppPreRelease != "" {
 		preRelease := normalizeVerString(AppPreRelease)
 		if preRelease == AppPreRelease {
 			version = fmt.Sprintf("%s-%s", version, preRelease)
-		}
-	}
-
-	// Append build metadata if there is any.  The plus called for
-	// by the semantic versioning spec is automatically appended and should
-	// not be contained in the build metadata string.  The build metadata
-	// string is not appended if it contains invalid characters.
-	if appBuild != "" {
-		build := normalizeVerString(appBuild)
-		if build == appBuild {
-			version = fmt.Sprintf("%s+%s", version, build)
 		}
 	}
 

@@ -6,9 +6,9 @@ import (
 )
 
 func TestString(t *testing.T) {
-	base := fmt.Sprintf("%d.%d.%d", AppMajor, AppMinor, AppPatch)
+	fallback := fmt.Sprintf("%d.%d.%d", AppMajor, AppMinor, AppPatch)
 	if AppPreRelease != "" {
-		base = fmt.Sprintf("%s-%s", base, AppPreRelease)
+		fallback = fmt.Sprintf("%s-%s", fallback, AppPreRelease)
 	}
 
 	testCases := []struct {
@@ -17,25 +17,28 @@ func TestString(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "standard-release",
+			name:     "fallback-to-constants",
 			build:    "",
-			expected: base,
-		}, {
-			name:     "with-build",
-			build:    "012-abc",
-			expected: base + "+012-abc",
-		}, {
-			name:     "with-out-of-spec-build",
-			build:    "012_abc",
-			expected: base,
+			expected: fallback,
+		},
+		{
+			name:     "build-version-with-v-prefix",
+			build:    "v0.3.0-beta.26",
+			expected: "0.3.0-beta.26",
+		},
+		{
+			name:     "build-version-without-prefix",
+			build:    "0.4.0",
+			expected: "0.4.0",
 		},
 	}
 
 	for _, tc := range testCases {
-		appBuild = tc.build
+		buildVersion = tc.build
 		v := String()
 		if v != tc.expected {
 			t.Fatalf("%s: expected %s, got %s", tc.name, tc.expected, v)
 		}
 	}
+	buildVersion = ""
 }

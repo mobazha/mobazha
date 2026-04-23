@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
-)
 
-// Version is set at build time via -ldflags.
-var Version = "dev"
+	"github.com/mobazha/mobazha3.0/internal/version"
+)
 
 type healthResponse struct {
 	Status               string `json:"status"`
@@ -37,7 +36,7 @@ type versionResponse struct {
 func (g *Gateway) handleAdminVersion(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(versionResponse{
-		Version: Version,
+		Version: version.String(),
 		Go:      runtime.Version(),
 		OS:      runtime.GOOS,
 		Arch:    runtime.GOARCH,

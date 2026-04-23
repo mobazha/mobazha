@@ -135,16 +135,27 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 // validator snapshot. Returns true if the request carries a valid JWT from
 // an authorized admin user. The caller must obtain jv via getJWTValidator()
 // to avoid racing with EnableJWTAuth.
+//
+// Token sources (checked in order):
+//  1. Authorization: Bearer <token> header
+//  2. ?token=<jwt> query parameter (WebSocket fallback — browsers cannot set
+//     headers on the WebSocket constructor)
 func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) bool {
 	if jv == nil {
 		return false
 	}
 
+	var tokenStr string
 	authHeader := r.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr = authHeader[7:]
+	} else if qp := r.URL.Query().Get("token"); qp != "" && !strings.HasPrefix(qp, "basic:") {
+		tokenStr = qp
+	}
+
+	if tokenStr == "" {
 		return false
 	}
-	tokenStr := authHeader[7:]
 
 	claims, err := jv.ValidateToken(tokenStr)
 	if err != nil {

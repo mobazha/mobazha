@@ -269,6 +269,24 @@ func TestSupervisor_RunAndStop(t *testing.T) {
 	}
 }
 
+// --- Integration: stopped flag prevents restart ---
+
+func TestSupervisor_Tick_StoppedProcess_NoRestart(t *testing.T) {
+	s := newTestSupervisor(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+
+	// Simulate: user clicked "Stop Node" which sets stopped=true
+	s.proc.Stop()
+
+	s.tick()
+
+	// Should be "failed" (ShouldRestart returns false due to stopped), not "starting"
+	if s.GetStatus() != StatusFailed {
+		t.Errorf("status = %q, want failed (stopped process should not restart)", s.GetStatus())
+	}
+}
+
 // --- Safety: nil UI ---
 
 func TestSupervisor_NilUI_NoPanic(t *testing.T) {

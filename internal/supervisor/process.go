@@ -26,6 +26,7 @@ type ProcessManager struct {
 	mu      sync.Mutex
 	cmd     *exec.Cmd
 	running bool
+	stopped bool // set by Stop(); prevents any future Start()
 	done    chan struct{}
 	logFile *os.File
 
@@ -45,7 +46,7 @@ func NewProcessManager(dataDir string, nodeArgs []string, logger *log.Logger) *P
 
 func (pm *ProcessManager) Start() {
 	pm.mu.Lock()
-	if pm.running {
+	if pm.running || pm.stopped {
 		pm.mu.Unlock()
 		return
 	}
@@ -74,6 +75,15 @@ func (pm *ProcessManager) Start() {
 	done := make(chan struct{})
 
 	pm.mu.Lock()
+	if pm.stopped {
+		// Stop() was called while we were spawning — kill the orphaned process.
+		pm.mu.Unlock()
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		lf.Close()
+		pm.logger.Println("Node killed immediately: Stop() was called during startup")
+		return
+	}
 	if pm.logFile != nil {
 		pm.logFile.Close()
 	}
@@ -96,6 +106,7 @@ func (pm *ProcessManager) Start() {
 
 func (pm *ProcessManager) Stop() {
 	pm.mu.Lock()
+	pm.stopped = true
 	cmd := pm.cmd
 	done := pm.done
 	pm.mu.Unlock()
@@ -134,7 +145,7 @@ func (pm *ProcessManager) Done() <-chan struct{} {
 func (pm *ProcessManager) ShouldRestart() bool {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	return pm.attempts < maxRestartAttempts
+	return !pm.stopped && pm.attempts < maxRestartAttempts
 }
 
 func (pm *ProcessManager) Attempts() int {
@@ -161,6 +172,15 @@ func (pm *ProcessManager) NextBackoff() time.Duration {
 func (pm *ProcessManager) ResetBackoff() {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
+	pm.attempts = 0
+}
+
+// ResetStopped clears the stopped flag so Start() can work again.
+// Used when the user explicitly clicks "Start Node" in the UI.
+func (pm *ProcessManager) ResetStopped() {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	pm.stopped = false
 	pm.attempts = 0
 }
 

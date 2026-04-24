@@ -174,6 +174,7 @@ func (d *desktopUI) onReady() {
 			case <-mLogs.ClickedCh:
 				openLogInEditor(d.sup.ProcessManager().LogFilePath())
 			case <-d.mStart.ClickedCh:
+				d.sup.ProcessManager().ResetStopped()
 				go d.sup.ProcessManager().Start()
 			case <-d.mStop.ClickedCh:
 				go d.sup.ProcessManager().Stop()

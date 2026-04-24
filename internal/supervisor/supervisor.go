@@ -121,7 +121,7 @@ func (s *Supervisor) Run() {
 func (s *Supervisor) Stop() {
 	s.logger.Println("Stopping supervisor...")
 	s.cancel()
-	s.proc.Stop()
+	s.proc.Stop() // Stop() sets the stopped flag internally, preventing any future Start()
 	s.setStatus(StatusStopped)
 }
 
@@ -181,6 +181,13 @@ func (s *Supervisor) supervisionLoop() {
 }
 
 func (s *Supervisor) tick() {
+	// Bail out early if supervisor is shutting down.
+	select {
+	case <-s.ctx.Done():
+		return
+	default:
+	}
+
 	s.config.Reload()
 	hr := s.health.Check()
 	procRunning := s.proc.IsRunning()

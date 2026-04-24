@@ -82,3 +82,72 @@ func TestProcessManager_Done_NilWhenNotRunning(t *testing.T) {
 		t.Error("Done() should be nil when no process is running")
 	}
 }
+
+func TestProcessManager_StoppedFlag_PreventsStart(t *testing.T) {
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
+
+	pm.mu.Lock()
+	pm.stopped = true
+	pm.mu.Unlock()
+
+	pm.Start()
+
+	if pm.IsRunning() {
+		t.Error("Start() should be a no-op when stopped flag is set")
+	}
+}
+
+func TestProcessManager_ShouldRestart_FalseWhenStopped(t *testing.T) {
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
+
+	if !pm.ShouldRestart() {
+		t.Error("ShouldRestart() should be true initially")
+	}
+
+	pm.mu.Lock()
+	pm.stopped = true
+	pm.mu.Unlock()
+
+	if pm.ShouldRestart() {
+		t.Error("ShouldRestart() should be false when stopped flag is set")
+	}
+}
+
+func TestProcessManager_ResetStopped_AllowsRestart(t *testing.T) {
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
+
+	pm.mu.Lock()
+	pm.stopped = true
+	pm.attempts = 3
+	pm.mu.Unlock()
+
+	if pm.ShouldRestart() {
+		t.Error("ShouldRestart() should be false when stopped")
+	}
+
+	pm.ResetStopped()
+
+	if !pm.ShouldRestart() {
+		t.Error("after ResetStopped, ShouldRestart() should be true")
+	}
+	if pm.Attempts() != 0 {
+		t.Errorf("after ResetStopped, Attempts() = %d, want 0", pm.Attempts())
+	}
+}
+
+func TestProcessManager_Stop_SetsStoppedFlag(t *testing.T) {
+	pm := NewProcessManager(t.TempDir(), nil, log.New(os.Stderr, "[test] ", 0))
+
+	pm.Stop()
+
+	pm.mu.Lock()
+	stopped := pm.stopped
+	pm.mu.Unlock()
+
+	if !stopped {
+		t.Error("Stop() should set the stopped flag")
+	}
+	if pm.ShouldRestart() {
+		t.Error("ShouldRestart() should be false after Stop()")
+	}
+}

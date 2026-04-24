@@ -390,7 +390,10 @@ const launchdPlistTmpl = `<?xml version="1.0" encoding="UTF-8"?>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>KeepAlive</key>
-	<true/>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
 	<key>StandardOutPath</key>
 	<string>{{.LogDir}}/mobazha.log</string>
 	<key>StandardErrorPath</key>

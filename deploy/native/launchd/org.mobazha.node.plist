@@ -16,6 +16,11 @@
 		<key>SuccessfulExit</key>
 		<false/>
 	</dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>MOBAZHA_LAUNCHER_BG</key>
+		<string>1</string>
+	</dict>
 	<key>StandardOutPath</key>
 	<string>/usr/local/var/log/mobazha.log</string>
 	<key>StandardErrorPath</key>

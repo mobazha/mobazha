@@ -15,6 +15,7 @@ import (
 	"fyne.io/systray"
 
 	"github.com/mobazha/mobazha3.0/internal/supervisor"
+	"github.com/mobazha/mobazha3.0/internal/version"
 )
 
 //go:embed assets/icon.png
@@ -155,6 +156,8 @@ func (d *desktopUI) onReady() {
 	d.mStart.Hide()
 	d.mStop = systray.AddMenuItem("Stop Node", "Stop the Mobazha node")
 	systray.AddSeparator()
+	mVersion := systray.AddMenuItem("Mobazha "+version.String(), "")
+	mVersion.Disable()
 	mQuit := systray.AddMenuItem("Quit", "Quit Mobazha")
 
 	// Notification badge polling

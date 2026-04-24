@@ -30,6 +30,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - SAAS_PEER_ID=${SAAS_PEER_ID:-}
       - CONNECTIVITY=${CONNECTIVITY:-nat}
+      - TLS_MODE=${TLS_MODE:-internal}
       - TESTNET=${TESTNET:-}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:5102/healthz"]

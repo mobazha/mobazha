@@ -10,9 +10,11 @@
 #   NODE_PORT          — Local mobazha-node port (default: 5102)
 #   NEXTJS_PORT        — Local Next.js server port (default: 3000)
 #
-# Modes:
-#   Domain mode (STORE_DOMAIN set):     Caddy obtains TLS automatically via ACME
-#   IP mode     (STORE_DOMAIN empty):   Caddy listens on :443 with self-signed TLS
+# Modes (controlled by generate-caddyfile.sh):
+#   Domain + internal TLS (default):  Self-signed cert, use behind Cloudflare/proxy
+#   Domain + ACME (TLS_MODE=acme):    Let's Encrypt cert, for direct domain access
+#   Overlay (CONNECTIVITY=overlay):   No public domain, auto_https off
+#   IP mode (no STORE_DOMAIN):        HTTP :80, auto_https off
 
 {
 	storage file_system {

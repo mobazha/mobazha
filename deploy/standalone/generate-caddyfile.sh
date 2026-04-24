@@ -1,13 +1,17 @@
 #!/bin/sh
 set -e
 
-# Generate Caddyfile from template, adapting for connectivity mode.
+# Generate Caddyfile from template, adapting for connectivity and TLS mode.
 # Caddy natively resolves {$VAR} and {$VAR:default} syntax at startup.
 #
-# Overlay mode (CONNECTIVITY=overlay):
-#   - Prepends global block with `auto_https off`
-#   - Injects `tls internal` into the site block
-#   This prevents ACME attempts when there is no public domain.
+# TLS_MODE controls origin certificate strategy:
+#   internal  — Caddy self-signed cert (use behind Cloudflare or any L7 proxy)
+#   acme      — Caddy auto-obtains Let's Encrypt cert (direct domain, no proxy)
+#   Default: "internal" (most standalone sites sit behind Cloudflare)
+#
+# CONNECTIVITY controls network mode:
+#   overlay   — No public domain; auto_https off + tls internal
+#   public    — Normal mode (default)
 
 TEMPLATE="/etc/caddy/Caddyfile.tmpl"
 OUTPUT="/etc/caddy/Caddyfile"
@@ -18,6 +22,7 @@ if [ ! -f "$TEMPLATE" ]; then
 fi
 
 CONNECTIVITY="${CONNECTIVITY:-public}"
+TLS_MODE="${TLS_MODE:-internal}"
 
 if [ "$CONNECTIVITY" = "overlay" ]; then
     echo "Caddyfile: overlay mode (auto_https off, tls internal)"
@@ -25,14 +30,18 @@ if [ "$CONNECTIVITY" = "overlay" ]; then
 	auto_https off' \
         -e '/{\$STORE_DOMAIN/a\
 	tls internal' "$TEMPLATE" > "$OUTPUT"
-elif [ -n "$STORE_DOMAIN" ]; then
-    echo "Caddyfile: domain mode ($STORE_DOMAIN)"
-    cp "$TEMPLATE" "$OUTPUT"
-else
+elif [ -z "$STORE_DOMAIN" ]; then
     echo "Caddyfile: IP mode (HTTP :80, auto_https off)"
     sed -e '/^{$/a\
 	auto_https off' \
         -e 's/{$STORE_DOMAIN::443}/:80/' "$TEMPLATE" > "$OUTPUT"
+elif [ "$TLS_MODE" = "internal" ]; then
+    echo "Caddyfile: domain mode ($STORE_DOMAIN) with tls internal (behind proxy)"
+    sed -e '/{\$STORE_DOMAIN/a\
+	tls internal' "$TEMPLATE" > "$OUTPUT"
+else
+    echo "Caddyfile: domain mode ($STORE_DOMAIN) with ACME (direct)"
+    cp "$TEMPLATE" "$OUTPUT"
 fi
 
 echo "Caddyfile deployed at $OUTPUT"

@@ -1,16 +1,15 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/mcpconnect"
+	"github.com/mobazha/mobazha3.0/pkg/apitoken"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -20,9 +19,10 @@ type mcpConnectResponse struct {
 }
 
 // handlePOSTMCPConnect configures MCP for all detected AI clients.
-// Standalone-only: auto-mints a long-lived API token via SaaS platform.
+// Standalone-only: auto-mints a long-lived local API token (mbz_*) and writes
+// AI client config files pointing at the node's own /v1/mcp endpoint.
 func (g *Gateway) handlePOSTMCPConnect(w http.ResponseWriter, r *http.Request) {
-	if err := g.requireStandaloneWithSaaS(w); err != nil {
+	if err := g.requireLocalTokenStore(w); err != nil {
 		return
 	}
 
@@ -42,7 +42,7 @@ func (g *Gateway) handlePOSTMCPConnect(w http.ResponseWriter, r *http.Request) {
 
 // handlePOSTMCPConnectClient configures MCP for a specific AI client.
 func (g *Gateway) handlePOSTMCPConnectClient(w http.ResponseWriter, r *http.Request) {
-	if err := g.requireStandaloneWithSaaS(w); err != nil {
+	if err := g.requireLocalTokenStore(w); err != nil {
 		return
 	}
 
@@ -98,25 +98,40 @@ func (g *Gateway) handlePOSTMCPDisconnectClient(w http.ResponseWriter, r *http.R
 	response.Success(w, result)
 }
 
-// requireStandaloneWithSaaS blocks execution when not running as a standalone
-// node connected to a SaaS platform. Writes the error response and returns
-// a non-nil error to signal the caller should return immediately.
-func (g *Gateway) requireStandaloneWithSaaS(w http.ResponseWriter) error {
-	if g.config.SaaSAPIURL == "" {
+// requireLocalTokenStore blocks execution when no API token store is wired
+// into the gateway (e.g. PublicOnly mode, or DataDir + GormDB both unset).
+// MCP auto-connect needs to mint a token locally; without a store there is
+// nowhere to persist it.
+func (g *Gateway) requireLocalTokenStore(w http.ResponseWriter) error {
+	if g.getTokenStore() == nil {
 		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
-			"MCP auto-connect is only available on standalone nodes linked to the platform")
-		return fmt.Errorf("not standalone")
+			"MCP auto-connect requires a local API token store; this node is running without persistent token storage")
+		return fmt.Errorf("no token store")
 	}
 	return nil
 }
 
 // buildMCPConnectOpts constructs the connection options. It auto-mints a
-// long-lived API token via the SaaS platform using the caller's JWT, so
-// that AI clients get a stable credential instead of a short-lived JWT.
-// Returns the raw API token string for one-time display to the user.
+// long-lived API token using the local token store (no round-trip to the SaaS
+// platform — the standalone node owns its own credentials) and returns the raw
+// token string for one-time display to the user.
+//
+// Architectural note (Fix B): the previous implementation called
+// `${SaaSAPIURL}/platform/v1/auth/tokens` over HTTP using the caller's JWT,
+// which had two structural problems:
+//
+//  1. The token returned by SaaS is validated against SaaS's user table, but
+//     the standalone node's AuthenticationMiddleware only knows how to verify
+//     local mbz_ tokens. The minted token would have been silently rejected
+//     on every subsequent /v1/mcp request.
+//  2. It coupled standalone "MCP works" to "SaaS reachable", defeating the
+//     whole point of running standalone.
+//
+// We now mint locally, persist via apitoken.Store, and return the same
+// mbz_<id>_<secret> shape the manual /v1/auth/tokens flow produces.
 func (g *Gateway) buildMCPConnectOpts(r *http.Request) (mcpconnect.ConnectOpts, string, error) {
 	gatewayURL := g.resolveGatewayURL()
-	mcpURL := gatewayURL + "/platform/v1/mcp"
+	mcpURL := gatewayURL + "/v1/mcp"
 
 	var body struct {
 		Token string `json:"token"`
@@ -128,6 +143,8 @@ func (g *Gateway) buildMCPConnectOpts(r *http.Request) (mcpconnect.ConnectOpts, 
 	}
 
 	// If an explicit API token was provided in the body, use it directly.
+	// This path keeps the door open for "user generated their own token in
+	// the Admin UI and wants to wire it up" without re-minting.
 	if body.Token != "" {
 		binPath, _ := os.Executable()
 		return mcpconnect.ConnectOpts{
@@ -138,14 +155,17 @@ func (g *Gateway) buildMCPConnectOpts(r *http.Request) (mcpconnect.ConnectOpts, 
 		}, "", nil
 	}
 
-	// Otherwise, auto-mint a long-lived API token via SaaS platform.
-	jwt := extractBearerToken(r)
-	if jwt == "" {
+	// Defense-in-depth: only an admin (JWT / Basic Auth) can auto-mint. We
+	// already enforce this at the route level (the /v1/mcp/* handlers are
+	// not in routeScopeMap so API tokens hit 403 in ScopeEnforcementMiddleware),
+	// but mirroring the explicit check here gives a precise error message
+	// and survives any future routeScopeMap regression.
+	if id := GetAuthIdentity(r.Context()); id != nil && id.IsAPIToken {
 		return mcpconnect.ConnectOpts{}, "", fmt.Errorf(
-			"JWT Bearer token required for auto-connect; use the Admin UI or pass an explicit token in the request body")
+			"MCP auto-connect must be triggered by an admin session; api tokens cannot mint new tokens")
 	}
 
-	apiToken, err := g.mintMCPAPIToken(jwt)
+	apiToken, err := g.mintMCPAPIToken()
 	if err != nil {
 		return mcpconnect.ConnectOpts{}, "", fmt.Errorf("failed to create MCP API token: %w", err)
 	}
@@ -159,66 +179,56 @@ func (g *Gateway) buildMCPConnectOpts(r *http.Request) (mcpconnect.ConnectOpts, 
 	}, apiToken, nil
 }
 
-// mintMCPAPIToken calls the SaaS platform's token creation API to produce a
-// long-lived API token with seller scopes suitable for MCP usage.
-func (g *Gateway) mintMCPAPIToken(jwt string) (string, error) {
-	payload, _ := json.Marshal(map[string]interface{}{
-		"name":   "mcp-auto-connect",
-		"scopes": []string{"listings:read", "listings:write", "orders:read", "orders:manage", "profiles:read", "profiles:write", "media:read", "media:write", "settings:read", "ai:use"},
-	})
+// mintMCPAPIToken generates a long-lived local API token suitable for MCP
+// usage and persists it in the gateway's token store. The scope set is the
+// canonical "seller:*" preset (contracts.SellerScopes) — i.e. functionally
+// identical to the token a user would obtain via Quick Connect with the
+// seller preset in the web UI. We deliberately do NOT use defaultTokenScopes
+// here because that helper is the manual "create token" form's fallback and
+// trims optional scopes (wallet/chat/notifications/discounts/collections/
+// shipping/fiat/analytics) that the AI agent typically needs.
+func (g *Gateway) mintMCPAPIToken() (string, error) {
+	store := g.getTokenStore()
+	if store == nil {
+		return "", fmt.Errorf("token store unavailable")
+	}
 
-	url := g.config.SaaSAPIURL + "/platform/v1/auth/tokens"
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
+	count, err := store.CountActive()
 	if err != nil {
-		return "", fmt.Errorf("building request: %w", err)
+		return "", fmt.Errorf("counting tokens: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+jwt)
-	if g.config.StandaloneAPIKey != "" {
-		req.Header.Set("X-Standalone-Store-Key", g.config.StandaloneAPIKey)
+	if count >= int64(apitoken.MaxPerUser) {
+		return "", fmt.Errorf("maximum number of API tokens reached (%d); revoke an existing token before re-running auto-connect", apitoken.MaxPerUser)
 	}
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	scopes := contracts.ScopeStrings(contracts.SellerScopes())
+	rawToken, record, err := apitoken.Generate("mcp-auto-connect", scopes, nil)
 	if err != nil {
-		return "", fmt.Errorf("calling platform: %w", err)
+		return "", fmt.Errorf("generating token: %w", err)
 	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("platform returned %d: %s", resp.StatusCode, string(respBody))
+	if err := store.Create(record); err != nil {
+		return "", fmt.Errorf("persisting token: %w", err)
 	}
-
-	var result struct {
-		Data struct {
-			Token string `json:"token"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("parsing response: %w", err)
-	}
-	if result.Data.Token == "" {
-		return "", fmt.Errorf("platform returned empty token")
-	}
-
-	return result.Data.Token, nil
+	return rawToken, nil
 }
 
-// resolveGatewayURL returns the base URL for the node's HTTP gateway.
+// resolveGatewayURL returns the base URL for the node's HTTP gateway, written
+// into the AI client config (Cursor / Claude Desktop / etc.) by the
+// auto-connect flow.
+//
+// The listener address can be a wildcard host (":15104", "0.0.0.0:15104",
+// "[::]:15104") which is fine for the server itself but not routable from a
+// client. We normalize it to a loopback host with the same helper used for the
+// in-process MCP bridge (gateway.go::normalizeLoopbackAddr) so the address
+// written to the client config is always something the local AI client can
+// actually reach. Production deployments that want a public URL should
+// configure that explicitly upstream — this function only guarantees a
+// reachable default.
 func (g *Gateway) resolveGatewayURL() string {
-	addr := g.listener.Addr().String()
+	addr := normalizeLoopbackAddr(g.listener.Addr().String())
 	scheme := "http"
 	if g.config.UseSSL {
 		scheme = "https"
 	}
 	return fmt.Sprintf("%s://%s", scheme, addr)
-}
-
-func extractBearerToken(r *http.Request) string {
-	auth := r.Header.Get("Authorization")
-	if len(auth) > 7 && auth[:7] == "Bearer " {
-		return auth[7:]
-	}
-	return ""
 }

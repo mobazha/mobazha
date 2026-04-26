@@ -20,7 +20,7 @@ func TestWriteJSONConfig_NewFile(t *testing.T) {
 		},
 	}
 	opts := ConnectOpts{
-		MCPURL: "http://localhost:5102/platform/v1/mcp",
+		MCPURL: "http://localhost:5102/v1/mcp",
 		Token:  "mbz_sk_test_token_12345",
 	}
 
@@ -84,7 +84,7 @@ func TestWriteJSONConfig_PreservesExisting(t *testing.T) {
 		},
 	}
 	opts := ConnectOpts{
-		MCPURL: "http://localhost:5102/platform/v1/mcp",
+		MCPURL: "http://localhost:5102/v1/mcp",
 		Token:  "test-token",
 	}
 
@@ -121,7 +121,7 @@ func TestWriteStdioConfig(t *testing.T) {
 		},
 	}
 	opts := ConnectOpts{
-		MCPURL:        "http://localhost:5102/platform/v1/mcp",
+		MCPURL:        "http://localhost:5102/v1/mcp",
 		Token:         "mbz_sk_test",
 		BridgeBinPath: "/usr/local/bin/mobazha",
 	}
@@ -237,7 +237,7 @@ func TestBuildConnectArgs_ClaudeCode(t *testing.T) {
 		t.Fatal("claude-code not found")
 	}
 
-	args := c.BuildConnectArgs("http://localhost:5102/platform/v1/mcp", "mbz_sk_test")
+	args := c.BuildConnectArgs("http://localhost:5102/v1/mcp", "mbz_sk_test")
 	if len(args) == 0 {
 		t.Fatal("expected non-empty args")
 	}

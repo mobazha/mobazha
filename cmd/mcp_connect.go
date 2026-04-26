@@ -201,7 +201,7 @@ func resolveMCPURL(cfg *repo.Config) (string, error) {
 
 	scheme := "http"
 	base := fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(host, port))
-	return base + "/platform/v1/mcp", nil
+	return base + "/v1/mcp", nil
 }
 
 func parseMultiaddr(ma string) (host string, port string, err error) {

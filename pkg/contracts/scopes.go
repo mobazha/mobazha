@@ -90,6 +90,17 @@ const (
 	// Disputes
 	ScopeDisputesRead   Scope = "disputes:read"
 	ScopeDisputesManage Scope = "disputes:manage"
+
+	// ScopeAny is a sentinel value used in route → scope maps to mark a route
+	// as readable by ANY authenticated identity (including low-privilege API
+	// tokens). It is intentionally the empty string so that:
+	//   - IsValid() returns false → token-creation paths (which reject unknown
+	//     scopes via ValidateScopes) cannot accidentally accept it from clients.
+	//   - Scope-enforcement middleware can treat "" as "skip the HasScope check"
+	//     without conflating it with a real permission.
+	// Use this for global/metadata endpoints like /v1/auth/identity and
+	// /v1/auth/scopes that every authenticated caller needs.
+	ScopeAny Scope = ""
 )
 
 // allScopes is the canonical registry of valid scopes.
@@ -256,6 +267,11 @@ func SellerScopes() []Scope {
 }
 
 // BuyerScopes returns the default scope set for a buyer.
+//
+// Includes ScopeAIUse so a buyer:* token can drive the local MCP server (the
+// /v1/mcp endpoint enforces ai:use). The MCP routing plan explicitly states
+// that MCP is role-agnostic — sellers manage listings, buyers query
+// purchases/chat — through the same endpoint, gated only by scopes.
 func BuyerScopes() []Scope {
 	return []Scope{
 		ScopeListingsRead,
@@ -268,5 +284,34 @@ func BuyerScopes() []Scope {
 		ScopeRatingsRead,
 		ScopeWishlistsRead, ScopeWishlistsWrite,
 		ScopeCartsRead, ScopeCartsWrite,
+		ScopeAIUse,
 	}
+}
+
+// ExpandScopePresets replaces role-based wildcard scopes with their concrete
+// scope lists. Recognized presets are kept in this single place so both the
+// SaaS gateway and standalone node speak the same vocabulary.
+//
+// Supported presets:
+//   - "seller:*" → SellerScopes()
+//   - "buyer:*"  → BuyerScopes()
+//
+// Unknown values pass through unchanged so they can be rejected by the regular
+// validation pass (ValidateScopes / ParseScopes) with a precise error.
+func ExpandScopePresets(raw []string) []string {
+	if len(raw) == 0 {
+		return raw
+	}
+	expanded := make([]string, 0, len(raw))
+	for _, s := range raw {
+		switch s {
+		case "seller:*":
+			expanded = append(expanded, ScopeStrings(SellerScopes())...)
+		case "buyer:*":
+			expanded = append(expanded, ScopeStrings(BuyerScopes())...)
+		default:
+			expanded = append(expanded, s)
+		}
+	}
+	return expanded
 }

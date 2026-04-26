@@ -14,11 +14,14 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/ssr"
+	"github.com/mobazha/mobazha3.0/pkg/apitoken"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
+	mcppkg "github.com/mobazha/mobazha3.0/pkg/mcp"
+	"gorm.io/gorm"
 )
 
 var log = logging.MustGetLogger("API")
@@ -26,6 +29,25 @@ var log = logging.MustGetLogger("API")
 type contextKey string
 
 const nodeContextKey contextKey = "node"
+
+// normalizeLoopbackAddr rewrites wildcard listener addresses (0.0.0.0, ::,
+// empty host) to a routable loopback host for in-process MCP bridge calls.
+// IPv6 listeners ([::]:port) are normalized to 127.0.0.1:port because the
+// gateway also listens on IPv4 wildcard in practice and 127.0.0.1 is the
+// safest universally-routable target. If the address cannot be parsed it is
+// returned unchanged so misconfigurations surface in logs rather than being
+// silently masked.
+func normalizeLoopbackAddr(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	switch host {
+	case "", "0.0.0.0", "::", "[::]":
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, port)
+}
 
 type GatewayConfig struct {
 	Listener        net.Listener
@@ -66,6 +88,11 @@ type GatewayConfig struct {
 	// Used by native binary mode to persist domain config when Docker
 	// hostconfig is unavailable.
 	DataDir string
+
+	// GormDB is an optional GORM database for local API token storage.
+	// When set (standalone mode), the gateway auto-creates the api_tokens
+	// table and enables /v1/auth/tokens CRUD + mbz_ token authentication.
+	GormDB *gorm.DB
 }
 
 // Gateway represents an HTTP API gateway
@@ -76,6 +103,7 @@ type Gateway struct {
 	config         *GatewayConfig
 	auth           authState
 	jwtValidator   *JWTValidator // nil when no Casdoor cert configured
+	tokenStore     *apitoken.Store // nil in SaaS mode; set for standalone
 	hubs           map[string]*hub
 	hubsMtx        sync.RWMutex
 	shutdown       chan struct{}
@@ -106,6 +134,18 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 		passwordHash: config.Password,
 		hashFile:     config.HashFile,
 		plainFile:    config.PlainFile,
+	}
+
+	if config.GormDB != nil {
+		if err := g.InitTokenStore(config.GormDB); err != nil {
+			log.Warningf("Failed to init API token store: %v", err)
+		}
+	} else if config.DataDir != "" && !config.PublicOnly {
+		if tokenDB, err := openTokenDB(config.DataDir); err != nil {
+			log.Warningf("Failed to open token database: %v", err)
+		} else if err := g.InitTokenStore(tokenDB); err != nil {
+			log.Warningf("Failed to init API token store: %v", err)
+		}
 	}
 
 	if config.CasdoorCertificate != "" && config.LocalPeerID != "" {
@@ -154,6 +194,33 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 
 	topMux.HandleFunc("/healthz", g.handleHealthz)
 
+	// MCP Streamable HTTP — registered on topMux so it takes priority
+	// over the /v1/ catch-all. MCP tools call /v1/* Node business APIs
+	// via a loopback Bridge. Auth is per-request: the BridgeFactory
+	// extracts the Bearer token from each CallToolRequest and forwards
+	// it to the local gateway for authentication.
+	if !config.PublicOnly {
+		scheme := "http"
+		if config.UseSSL {
+			scheme = "https"
+		}
+		loopbackURL := fmt.Sprintf("%s://%s", scheme, normalizeLoopbackAddr(config.Listener.Addr().String()))
+		mcpOpts := &mcppkg.ServerOptions{
+			Transport: "streamable-http",
+			// Standalone identity endpoint. Required (with AuditLogger) for
+			// SSEIdentityFunc to resolve UserID/PeerID from request headers.
+			IdentityPath: "/v1/auth/identity",
+			// Stdout audit logger gives standalone deployments visibility into
+			// MCP tool calls without requiring a database table. SaaS hosting
+			// uses DBAuditLogger; this is the standalone equivalent.
+			AuditLogger: mcppkg.NewStdoutAuditLogger(),
+		}
+		mcpHTTPServer := mcppkg.NewStreamableHTTPMobazhaServer(loopbackURL, nil, mcpOpts)
+		topMux.Handle("/v1/mcp", mcpHTTPServer)
+		topMux.Handle("/v1/mcp/", mcpHTTPServer)
+		log.Info("MCP Streamable HTTP endpoint registered at /v1/mcp")
+	}
+
 	// Standalone mode: reverse-proxy /platform/* to the SaaS backend so
 	// that frontend calls to HOSTING_API (store-links, bots, domains, etc.)
 	// reach the platform instead of falling through to the SPA catch-all.
@@ -185,6 +252,24 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 
 	g.handler = topMux
 	return g, nil
+}
+
+// getTokenStore returns the token store (nil in SaaS mode).
+func (g *Gateway) getTokenStore() *apitoken.Store {
+	return g.tokenStore
+}
+
+// InitTokenStore initializes the local API token store using the
+// provided GORM database. Should be called during node startup for
+// standalone deployments.
+func (g *Gateway) InitTokenStore(db *gorm.DB) error {
+	store, err := apitoken.NewStore(db)
+	if err != nil {
+		return fmt.Errorf("init token store: %w", err)
+	}
+	g.tokenStore = store
+	log.Info("Local API token store initialized")
+	return nil
 }
 
 // getJWTValidator returns the current jwtValidator under read-lock.

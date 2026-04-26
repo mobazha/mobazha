@@ -6,12 +6,15 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 
+	"github.com/mobazha/mobazha3.0/pkg/apitoken"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -52,21 +55,35 @@ func (s *authState) isConfigured() bool {
 }
 
 // AuthenticationMiddleware checks credentials for every request on protected
-// /v1/* routes. It supports two authentication modes:
+// /v1/* routes. It supports three authentication modes (checked in order):
 //
-//  1. JWT Bearer token (for SaaS proxy-mediated requests, e.g. Mini App):
+//  1. mbz_ API token (for AI agents / MCP / programmatic access):
+//     Authorization: Bearer mbz_<id>_<secret>
+//     Validated against the local SQLite/GORM token store. Yields an
+//     AuthIdentity with IsAPIToken=true and a concrete ScopeSet — subject
+//     to ScopeEnforcementMiddleware.
+//
+//  2. JWT Bearer token (for SaaS proxy-mediated requests, e.g. Mini App):
 //     Authorization: Bearer <jwt-token>
-//     The JWT must be signed by SaaS Casdoor and the user must be the store
-//     owner (via claims.Id == ownerUserID, or legacy peerID fallback).
+//     Signed by SaaS Casdoor; the user must be the store owner. Yields an
+//     AuthIdentity with IsAdmin=true and Scopes=nil (full access).
 //
-//  2. Basic Auth (for direct admin access):
+//  3. Basic Auth (for direct admin access):
 //     Authorization: Basic <base64(user:pass)>
-//     Also supports ?token=basic:<base64> for WebSocket fallback.
+//     Also supports ?token=basic:<base64> for WebSocket fallback. Yields an
+//     AuthIdentity with IsAdmin=true and Scopes=nil (full access).
 //
-// JWT is attempted first when a Bearer token is present AND the JWT validator
-// is configured. If JWT validation fails, it falls through to Basic Auth.
+// On success, the AuthIdentity is attached to the request context so that
+// ScopeEnforcementMiddleware / RequireScope can make permission decisions.
 func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SaaS / SharedRouter: the hosting resolver has already populated
+		// AuthIdentity in the request context. Don't overwrite it.
+		if GetAuthIdentity(r.Context()) != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		if len(g.config.AllowedIPs) > 0 {
 			host, _, err := net.SplitHostPort(r.RemoteAddr)
 			if err != nil {
@@ -86,23 +103,36 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
+		authHeader := r.Header.Get("Authorization")
 		jv := g.getJWTValidator()
 
-		if g.tryJWTAuthWith(jv, r) {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// If a Bearer token was present but JWT auth failed, reject immediately
-		// instead of falling through to Basic Auth or unauthenticated access.
-		if jv != nil {
-			authHeader := r.Header.Get("Authorization")
-			if strings.HasPrefix(authHeader, "Bearer ") {
-				ErrorResponse(w, http.StatusUnauthorized, "Invalid or expired token")
+		// 1) mbz_ API token (highest priority — cheap to detect, distinct format).
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			bearerVal := authHeader[7:]
+			if apitoken.IsAPIToken(bearerVal) {
+				identity, ok := g.tryAPITokenAuth(bearerVal)
+				if !ok {
+					ErrorResponse(w, http.StatusUnauthorized, "Invalid or expired API token")
+					return
+				}
+				next.ServeHTTP(w, r.WithContext(WithAuthIdentity(r.Context(), identity)))
 				return
 			}
 		}
 
+		// 2) JWT Bearer (or ?token= query for WebSocket).
+		if identity, ok := g.tryJWTAuthWith(jv, r); ok {
+			next.ServeHTTP(w, r.WithContext(WithAuthIdentity(r.Context(), identity)))
+			return
+		}
+
+		// If a Bearer token was present but neither mbz_ nor a valid JWT, reject.
+		if jv != nil && strings.HasPrefix(authHeader, "Bearer ") {
+			ErrorResponse(w, http.StatusUnauthorized, "Invalid or expired token")
+			return
+		}
+
+		// 3) Basic Auth.
 		if g.auth.isConfigured() {
 			username, password, ok := r.BasicAuth()
 			if !ok {
@@ -121,28 +151,44 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 				ErrorResponse(w, http.StatusUnauthorized, "Invalid credentials")
 				return
 			}
-		} else if jv != nil {
-			// JWT validator configured but no Basic Auth: require authentication.
+			identity := &AuthIdentity{
+				UserID:  username,
+				Scopes:  nil,
+				IsAdmin: true,
+			}
+			next.ServeHTTP(w, r.WithContext(WithAuthIdentity(r.Context(), identity)))
+			return
+		}
+
+		if jv != nil {
+			// JWT validator configured but no Basic Auth and no Bearer: require auth.
 			ErrorResponse(w, http.StatusUnauthorized, "Authentication required")
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		// Fully open node (no auth configured): synthesize an admin identity so
+		// downstream middleware (ScopeEnforcementMiddleware) sees Scopes == nil
+		// and lets the request through.
+		identity := &AuthIdentity{
+			UserID:  "anonymous",
+			Scopes:  nil,
+			IsAdmin: true,
+		}
+		next.ServeHTTP(w, r.WithContext(WithAuthIdentity(r.Context(), identity)))
 	})
 }
 
 // tryJWTAuthWith attempts JWT Bearer token authentication using the provided
-// validator snapshot. Returns true if the request carries a valid JWT from
-// an authorized admin user. The caller must obtain jv via getJWTValidator()
-// to avoid racing with EnableJWTAuth.
+// validator snapshot. Returns the resolved AuthIdentity (with full-access
+// Scopes==nil and IsAdmin=true) and true on success.
 //
 // Token sources (checked in order):
 //  1. Authorization: Bearer <token> header
 //  2. ?token=<jwt> query parameter (WebSocket fallback — browsers cannot set
 //     headers on the WebSocket constructor)
-func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) bool {
+func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) (*AuthIdentity, bool) {
 	if jv == nil {
-		return false
+		return nil, false
 	}
 
 	var tokenStr string
@@ -154,15 +200,62 @@ func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) bool {
 	}
 
 	if tokenStr == "" {
-		return false
+		return nil, false
 	}
 
 	claims, err := jv.ValidateToken(tokenStr)
 	if err != nil {
-		return false
+		return nil, false
 	}
 
-	return jv.IsAdmin(claims)
+	if !jv.IsAdmin(claims) {
+		return nil, false
+	}
+
+	return &AuthIdentity{
+		UserID:  claims.Id,
+		PeerID:  claims.PeerID(),
+		Scopes:  nil, // admin: full access
+		IsAdmin: true,
+	}, true
+}
+
+// tryAPITokenAuth validates an mbz_ prefixed API token against the local store.
+// Returns the resolved AuthIdentity (carrying the token's persisted ScopeSet)
+// and true on success; (nil, false) if the token is missing, revoked, expired,
+// or has an invalid signature.
+func (g *Gateway) tryAPITokenAuth(rawToken string) (*AuthIdentity, bool) {
+	store := g.getTokenStore()
+	if store == nil {
+		return nil, false
+	}
+
+	prefix, err := apitoken.ExtractPrefix(rawToken)
+	if err != nil {
+		return nil, false
+	}
+
+	token, err := store.FindByPrefix(prefix)
+	if err != nil || token == nil {
+		return nil, false
+	}
+
+	if !token.IsActive() {
+		return nil, false
+	}
+
+	if !apitoken.Verify(rawToken, token.TokenHash) {
+		return nil, false
+	}
+
+	go store.TouchUsage(token.ID)
+
+	return &AuthIdentity{
+		UserID:     fmt.Sprintf("api_token:%d", token.ID),
+		Scopes:     contracts.NewScopeSet(contracts.ParseScopes(token.Scopes)),
+		IsAPIToken: true,
+		TokenID:    token.ID,
+	}, true
 }
 
 // parseBasicToken decodes a base64-encoded "user:pass" string.

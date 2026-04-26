@@ -57,6 +57,40 @@ func main() {
 		log.Fatal(err)
 	}
 
+	mcpCmd, err := parser.AddCommand("mcp",
+		"manage MCP connections for AI clients",
+		"Detect, configure, and manage MCP (Model Context Protocol) connections between this node and AI clients like Cursor, Claude, and VS Code.",
+		&cmd.MCP{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := mcpCmd.AddCommand("connect",
+		"configure AI clients to use this store's MCP server",
+		"Auto-detect installed AI clients and write MCP configuration. Optionally specify a client name as argument.",
+		&cmd.MCPConnect{}); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := mcpCmd.AddCommand("list",
+		"list detected AI clients and their MCP status",
+		"Scan the system for installed AI clients and show which ones are configured.",
+		&cmd.MCPList{}); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := mcpCmd.AddCommand("disconnect",
+		"remove MCP configuration from AI clients",
+		"Remove Mobazha MCP server entries from client configuration files. Pass a client name or 'all'.",
+		&cmd.MCPDisconnect{}); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := mcpCmd.AddCommand("bridge",
+		"start a stdio-to-MCP bridge",
+		"Start a bidirectional bridge between stdin/stdout and the MCP endpoint. "+
+			"This is typically launched automatically by AI clients (e.g. Claude Desktop) "+
+			"via their JSON config, not run manually.",
+		&cmd.MCPBridge{}); err != nil {
+		log.Fatal(err)
+	}
+
 	serviceCmd, err := parser.AddCommand("service",
 		"manage the background service",
 		"Install, uninstall, or check the status of the Mobazha background service (systemd on Linux, launchd on macOS).",

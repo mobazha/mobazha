@@ -23,8 +23,8 @@ fi
 RUNTIME_JS="/app/frontend/apps/web/public/runtime-config.js"
 SAAS_URL="${SAAS_API_URL:-}"
 cat > "$RUNTIME_JS" <<JSEOF
-window.__RUNTIME_CONFIG__={saasUrl:"${SAAS_URL}"};
+window.__RUNTIME_CONFIG__={saasUrl:"${SAAS_URL}",authMode:"standalone"};
 JSEOF
-echo "init-data: Runtime config written (saasUrl=${SAAS_URL:-(empty)})"
+echo "init-data: Runtime config written (saasUrl=${SAAS_URL:-(empty)}, authMode=standalone)"
 
 echo "=== init-data: Complete ==="

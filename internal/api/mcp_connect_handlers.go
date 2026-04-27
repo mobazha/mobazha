@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -12,6 +14,24 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
+
+// readAndRestoreBody reads the entire request body into a buffer and replaces
+// r.Body with a fresh reader so subsequent decoders see the same payload.
+// Bounded by a 1 MiB cap to defend against accidental large bodies (the MCP
+// connect flow only ever carries a token + force flag, well under 1 KiB).
+func readAndRestoreBody(r *http.Request) ([]byte, error) {
+	if r.Body == nil {
+		return nil, nil
+	}
+	const maxBody = 1 << 20
+	buf, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
+	if err != nil {
+		return nil, err
+	}
+	r.Body.Close()
+	r.Body = io.NopCloser(bytes.NewReader(buf))
+	return buf, nil
+}
 
 type mcpConnectResponse struct {
 	Token   string                     `json:"token,omitempty"`
@@ -26,6 +46,38 @@ func (g *Gateway) handlePOSTMCPConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hard pre-flight: containerized nodes cannot reach the host's filesystem
+	// to write AI client configs (~/.cursor/mcp.json etc.), so auto-connect
+	// is structurally impossible — not just "no clients found right now".
+	// Refuse even with force=true; the user must use the manual Quick Connect
+	// flow (copy token + paste config) instead.
+	if isContainerized() {
+		response.Error(w, http.StatusPreconditionFailed, response.CodeBadRequest,
+			"this node is running in a container and cannot write to the host's AI client config files; use Quick Connect to copy the token manually")
+		return
+	}
+
+	// Soft pre-flight: avoid burning a token slot when no AI clients are
+	// installed. We peek at the request body to honour the `force` override
+	// before buildMCPConnectOpts consumes it. Body is small; we re-use the
+	// parsed shape inside buildMCPConnectOpts via a closure-friendly path is
+	// not trivial here, so we accept one extra Detect call (cheap: filesystem
+	// stats on a handful of paths).
+	if !readForceFlag(r) {
+		any := false
+		for _, c := range mcpconnect.DetectAll() {
+			if c.Installed {
+				any = true
+				break
+			}
+		}
+		if !any {
+			response.Error(w, http.StatusPreconditionFailed, response.CodeBadRequest,
+				"no supported AI clients were detected on this host; install Cursor / Claude Desktop / etc., or pass force=true to override")
+			return
+		}
+	}
+
 	opts, rawToken, err := g.buildMCPConnectOpts(r)
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
@@ -38,6 +90,27 @@ func (g *Gateway) handlePOSTMCPConnect(w http.ResponseWriter, r *http.Request) {
 		Clients: results,
 	}
 	response.Success(w, resp)
+}
+
+// readForceFlag peeks at the optional `force` boolean in the JSON body without
+// consuming it for downstream readers. We wrap the body in a tee-style buffer
+// so buildMCPConnectOpts can re-decode the same payload.
+func readForceFlag(r *http.Request) bool {
+	if r.Body == nil {
+		return false
+	}
+	// We can't read-then-rewind http.Request.Body without buffering. Buffer
+	// the (small) JSON body once and replace r.Body with a fresh reader so
+	// buildMCPConnectOpts still sees the original payload.
+	buf, err := readAndRestoreBody(r)
+	if err != nil {
+		return false
+	}
+	var body struct {
+		Force bool `json:"force"`
+	}
+	_ = json.Unmarshal(buf, &body)
+	return body.Force
 }
 
 // handlePOSTMCPConnectClient configures MCP for a specific AI client.
@@ -74,6 +147,115 @@ func (g *Gateway) handlePOSTMCPConnectClient(w http.ResponseWriter, r *http.Requ
 func (g *Gateway) handleGETMCPClients(w http.ResponseWriter, r *http.Request) {
 	clients := mcpconnect.DetectAll()
 	response.Success(w, clients)
+}
+
+// mcpCapabilityResponse summarises whether MCP auto-connect is viable on this
+// host before the user clicks "Connect All". It is read-only and never mints
+// tokens or writes config files.
+type mcpCapabilityResponse struct {
+	// Supported is true when auto-connect is likely to succeed: a token store
+	// exists, at least one slot is free, and at least one AI client is installed
+	// in a detectable location on this machine.
+	Supported bool `json:"supported"`
+	// Reason is a stable machine-readable code explaining the most blocking
+	// issue when Supported is false: "ok" / "containerized" /
+	// "no_token_store" / "token_slots_exhausted" / "no_clients".
+	Reason string `json:"reason"`
+	// Containerized indicates the node is running inside a Docker container,
+	// where filesystem writes for AI client configs cannot reach the host.
+	// When true, Supported is forced to false and DetectedClients is empty
+	// (scanning the container's filesystem yields meaningless results — the
+	// host's Cursor / Claude install is invisible from in here).
+	Containerized bool `json:"containerized"`
+	// HasTokenStore is true when the gateway can persist API tokens. Without
+	// it, auto-connect cannot mint a credential.
+	HasTokenStore bool `json:"hasTokenStore"`
+	// TokenSlotsLeft is the remaining quota under apitoken.MaxPerUser.
+	TokenSlotsLeft int `json:"tokenSlotsLeft"`
+	// DetectedClients is the full client matrix (installed + configured),
+	// suitable for UI rendering. Frontend filters by installed=true to
+	// decide what to show in the "we found these" preview.
+	DetectedClients []mcpconnect.ClientStatus `json:"detectedClients"`
+}
+
+// handleGETMCPCapability is a read-only probe: tells the frontend whether
+// auto-connect can plausibly succeed (token store available, slots left, any
+// client installed) without minting a token or writing files. The Admin UI
+// uses this to decide between showing the "Connect All" button or a hint
+// like "no AI clients detected on this host".
+//
+// Why we need this: the previous flow happily minted a token even when zero
+// clients were detected, burning one of the 20 token slots for nothing.
+// Worse, when the standalone node runs inside Docker, mcpconnect.DetectAll
+// scans the container's filesystem (which has no AI client configs) and
+// auto-connect produces a "100% success" response that wrote nothing the
+// host can use. Surfacing both signals up-front avoids both pitfalls.
+func (g *Gateway) handleGETMCPCapability(w http.ResponseWriter, r *http.Request) {
+	resp := mcpCapabilityResponse{
+		Containerized:   isContainerized(),
+		DetectedClients: []mcpconnect.ClientStatus{},
+	}
+
+	// Token store status is reported in both modes — even when containerized,
+	// the user still needs to know if manual token creation will work.
+	store := g.getTokenStore()
+	resp.HasTokenStore = store != nil
+	if store != nil {
+		count, err := store.CountActive()
+		if err != nil {
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
+				fmt.Sprintf("counting tokens: %v", err))
+			return
+		}
+		left := apitoken.MaxPerUser - int(count)
+		if left < 0 {
+			left = 0
+		}
+		resp.TokenSlotsLeft = left
+	}
+
+	// Containerized short-circuit: scanning the container's filesystem for
+	// AI client configs is meaningless — the host's Cursor / Claude install
+	// is invisible from in here, and even if we found something to write,
+	// the host wouldn't see it. Stop here with a stable reason code so the
+	// frontend can render a manual-only path.
+	if resp.Containerized {
+		resp.Reason = "containerized"
+		response.Success(w, resp)
+		return
+	}
+
+	resp.DetectedClients = mcpconnect.DetectAll()
+	installedCount := 0
+	for _, c := range resp.DetectedClients {
+		if c.Installed {
+			installedCount++
+		}
+	}
+
+	switch {
+	case !resp.HasTokenStore:
+		resp.Reason = "no_token_store"
+	case resp.TokenSlotsLeft <= 0:
+		resp.Reason = "token_slots_exhausted"
+	case installedCount == 0:
+		resp.Reason = "no_clients"
+	default:
+		resp.Reason = "ok"
+		resp.Supported = true
+	}
+
+	response.Success(w, resp)
+}
+
+// isContainerized reports whether this process is likely running inside a
+// Docker container. We check `/.dockerenv` (created by `docker run`) which
+// is the lowest-effort, false-positive-free signal. Other heuristics
+// (cgroup parsing, kubernetes env) add complexity for marginal value at
+// this stage.
+func isContainerized() bool {
+	_, err := os.Stat("/.dockerenv")
+	return err == nil
 }
 
 // handlePOSTMCPDisconnect removes MCP configuration from all clients.

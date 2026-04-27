@@ -17,6 +17,17 @@ import (
 // bridge pattern as pkg/core.MobazhaNode = internal/core.MobazhaNode.
 type Gateway = internalapi.Gateway
 
+// NodeAuthIdentity re-exports the node-internal AuthIdentity type so that
+// external resolvers (e.g. hosting SaaSNodeResolver) can bridge their own
+// identity into the node's context key namespace.
+type NodeAuthIdentity = internalapi.AuthIdentity
+
+// WithNodeAuthIdentity sets the node's AuthIdentity in the request context.
+// External resolvers MUST call this (in addition to their own WithAuthIdentity)
+// so that the per-route AuthenticationMiddleware inside the node can find the
+// pre-validated identity and skip re-authentication.
+var WithNodeAuthIdentity = internalapi.WithAuthIdentity
+
 // NodeResolver resolves the target NodeService from an HTTP request.
 // SaaS mode: JWT → userID → EnsureNodeForUser → NodeService
 // Standalone mode: header/default node → NodeService

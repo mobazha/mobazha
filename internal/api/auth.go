@@ -108,7 +108,11 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 
 		// 1) mbz_ API token (highest priority — cheap to detect, distinct format).
 		if strings.HasPrefix(authHeader, "Bearer ") {
-			bearerVal := authHeader[7:]
+			bearerVal := strings.TrimSpace(authHeader[7:])
+			if bearerVal == "" {
+				ErrorResponse(w, http.StatusUnauthorized, "Empty Bearer token")
+				return
+			}
 			if apitoken.IsAPIToken(bearerVal) {
 				identity, ok := g.tryAPITokenAuth(bearerVal)
 				if !ok {
@@ -118,6 +122,7 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r.WithContext(WithAuthIdentity(r.Context(), identity)))
 				return
 			}
+			// Non-mbz_ Bearer: fall through to JWT validation below.
 		}
 
 		// 2) JWT Bearer (or ?token= query for WebSocket).
@@ -194,7 +199,7 @@ func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) (*AuthIdenti
 	var tokenStr string
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(authHeader, "Bearer ") {
-		tokenStr = authHeader[7:]
+		tokenStr = strings.TrimSpace(authHeader[7:])
 	} else if qp := r.URL.Query().Get("token"); qp != "" && !strings.HasPrefix(qp, "basic:") {
 		tokenStr = qp
 	}

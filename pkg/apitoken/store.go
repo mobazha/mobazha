@@ -111,10 +111,14 @@ func (s *Store) Revoke(tokenID int64) error {
 	return nil
 }
 
-// TouchUsage updates the last_used_at timestamp.
+// TouchUsage updates the last_used_at timestamp. Called asynchronously from
+// auth middleware; errors are logged but not propagated since a failed
+// timestamp update must never block request processing.
 func (s *Store) TouchUsage(tokenID int64) {
 	now := time.Now()
-	s.db.Model(&APITokenModel{}).Where("id = ?", tokenID).Update("last_used_at", now)
+	if err := s.db.Model(&APITokenModel{}).Where("id = ?", tokenID).Update("last_used_at", now).Error; err != nil {
+		stdlog.Printf("[apitoken] WARNING: failed to update last_used_at for token id=%d: %v", tokenID, err)
+	}
 }
 
 // CountActive returns the number of non-revoked, non-expired tokens.

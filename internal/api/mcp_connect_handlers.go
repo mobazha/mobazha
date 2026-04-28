@@ -25,11 +25,11 @@ func readAndRestoreBody(r *http.Request) ([]byte, error) {
 	}
 	const maxBody = 1 << 20
 	buf, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
+	r.Body.Close()
+	r.Body = io.NopCloser(bytes.NewReader(buf))
 	if err != nil {
 		return nil, err
 	}
-	r.Body.Close()
-	r.Body = io.NopCloser(bytes.NewReader(buf))
 	return buf, nil
 }
 
@@ -321,7 +321,9 @@ func (g *Gateway) buildMCPConnectOpts(r *http.Request) (mcpconnect.ConnectOpts, 
 	}
 	if r.Body != nil {
 		defer r.Body.Close()
-		json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err != io.EOF {
+			return mcpconnect.ConnectOpts{}, "", fmt.Errorf("invalid request body: %w", err)
+		}
 	}
 
 	// If an explicit API token was provided in the body, use it directly.

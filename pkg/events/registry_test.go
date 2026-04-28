@@ -110,7 +110,7 @@ func TestPersistentConsistency(t *testing.T) {
 		"order.funded":           true,
 		"order.payment_received": true,
 		"order.confirmed":        true,
-		"order.fulfilled":        true,
+		"order.shipped":          true,
 		"order.completed":        true,
 		"order.cancelled":        true,
 		"order.declined":         true,

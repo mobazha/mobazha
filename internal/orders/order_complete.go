@@ -60,8 +60,8 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 		return nil, err
 	}
 
-	if !isRatingSupplement && len(order.SerializedOrderFulfillments) == 0 {
-		logger.LogInfoWithIDf(log, op.nodeID, "Parking ORDER_COMPLETE for order %s: awaiting fulfillment", order.ID)
+	if !isRatingSupplement && len(order.SerializedOrderShipments) == 0 {
+		logger.LogInfoWithIDf(log, op.nodeID, "Parking ORDER_COMPLETE for order %s: awaiting shipment", order.ID)
 		if parkErr := order.ParkMessage(message); parkErr != nil {
 			return nil, parkErr
 		}

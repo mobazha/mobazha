@@ -80,7 +80,7 @@ type OrderService interface {
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	GetRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
-	FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
+	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
 	GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	RateOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
@@ -319,7 +319,7 @@ type GuestOrderService interface {
 	CreateGuestOrder(ctx context.Context, req CreateGuestOrderRequest) (*GuestOrderResponse, error)
 	GetGuestOrderStatus(ctx context.Context, token string) (*GuestOrderStatusResponse, error)
 	ListGuestOrders(ctx context.Context, filter GuestOrderFilter) ([]models.GuestOrder, int64, error)
-	FulfillGuestOrder(ctx context.Context, token string, tracking, carrier string) error
+	ShipGuestOrder(ctx context.Context, token string, tracking, carrier string) error
 	CompleteGuestOrder(ctx context.Context, token string) error
 	HandlePaymentDetected(orderToken string, txHash string) error
 	HandleConfirmationUpdate(orderToken string, confs int) error

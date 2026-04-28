@@ -15,7 +15,7 @@ const (
 	EventOrderFunded          = "order.funded"
 	EventOrderPaymentReceived = "order.payment_received"
 	EventOrderConfirmed       = "order.confirmed"
-	EventOrderFulfilled       = "order.fulfilled"
+	EventOrderShipped         = "order.shipped"
 	EventOrderCompleted       = "order.completed"
 	EventOrderCancelled       = "order.cancelled"
 	EventOrderDeclined        = "order.declined"

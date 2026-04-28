@@ -61,8 +61,8 @@ var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
 	"orders_decline": func(a map[string]interface{}) toolRoute {
 		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/cancel"}
 	},
-	"orders_fulfill": func(a map[string]interface{}) toolRoute {
-		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/fulfill"}
+	"orders_ship": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/ship"}
 	},
 	"orders_refund": func(a map[string]interface{}) toolRoute {
 		return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/refund"}

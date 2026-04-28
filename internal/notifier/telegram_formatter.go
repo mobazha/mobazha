@@ -34,7 +34,7 @@ func formatTelegramEvent(meta events.EventMeta, event interface{}) string {
 	case *events.OrderConfirmation:
 		fmt.Fprintf(&sb, "Order: `%s`\n", e.OrderID)
 
-	case *events.OrderFulfillment:
+	case *events.OrderShipment:
 		fmt.Fprintf(&sb, "Order: `%s`\n", e.OrderID)
 
 	case *events.OrderCompletion:
@@ -90,7 +90,7 @@ func eventTitle(name string) string {
 		"order.funded":           "Order Funded",
 		"order.payment_received": "Payment Received",
 		"order.confirmed":        "Order Confirmed",
-		"order.fulfilled":        "Order Fulfilled",
+		"order.shipped":          "Order Shipped",
 		"order.completed":        "Order Completed",
 		"order.cancelled":        "Order Cancelled",
 		"order.declined":         "Order Declined",

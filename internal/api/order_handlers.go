@@ -913,14 +913,14 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Request) {
+func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request) {
 	orderID := mux.Vars(r)["orderID"]
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
 	}
 
-	type orderFulfillment struct {
+	type orderShipment struct {
 		ItemIndex              int                            `json:"itemIndex"`
 		Note                   string                         `json:"note"`
 		PhysicalDelivery       *models.PhysicalDelivery       `json:"physicalDelivery"`
@@ -930,24 +930,24 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 	}
 
 	decoder := json.NewDecoder(r.Body)
-	var fulfillParam orderFulfillment
-	err := decoder.Decode(&fulfillParam)
+	var shipParam orderShipment
+	err := decoder.Decode(&shipParam)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	receivingAccountID := -1
-	if fulfillParam.ReceivingAccountID != nil {
-		receivingAccountID = *fulfillParam.ReceivingAccountID
+	if shipParam.ReceivingAccountID != nil {
+		receivingAccountID = *shipParam.ReceivingAccountID
 	}
 
-	fulFillment := models.Fulfillment{
+	shipment := models.Shipment{
 		ItemIndex:              0,
-		Note:                   fulfillParam.Note,
-		PhysicalDelivery:       fulfillParam.PhysicalDelivery,
-		DigitalDelivery:        fulfillParam.DigitalDelivery,
-		CryptocurrencyDelivery: fulfillParam.CryptocurrencyDelivery,
+		Note:                   shipParam.Note,
+		PhysicalDelivery:       shipParam.PhysicalDelivery,
+		DigitalDelivery:        shipParam.DigitalDelivery,
+		CryptocurrencyDelivery: shipParam.CryptocurrencyDelivery,
 	}
 
 	orderSvc := getOrderService(r)
@@ -958,11 +958,11 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 			ErrorResponse(w, http.StatusBadRequest, "收款账户不存在或无效")
 			return
 		}
-		fulFillment.ReceivingAccountAddress = receivingAccount.Address
+		shipment.ReceivingAccountAddress = receivingAccount.Address
 	}
 
 	done := make(chan struct{})
-	err = orderSvc.FulfillOrder(models.OrderID(orderID), []models.Fulfillment{fulFillment}, done)
+	err = orderSvc.ShipOrder(models.OrderID(orderID), []models.Shipment{shipment}, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1195,7 +1195,7 @@ func (g *Gateway) handlePOSTExtendProtection(w http.ResponseWriter, r *http.Requ
 // func RegisterOrderHandlers(r *mux.Router, g *Gateway) {
 // 	r.HandleFunc("/v1/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
 // 	r.HandleFunc("/v1/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")
-// 	r.HandleFunc("/v1/orderfulfillment", g.handlePOSTOrderFulfillment).Methods("POST")
+// 	r.HandleFunc("/v1/ordershipment", g.handlePOSTOrderShipment).Methods("POST")
 // 	r.HandleFunc("/v1/order/confirm/instructions", g.handleGetConfirmOrderInstructions).Methods("GET")
 // 	r.HandleFunc("/v1/order/decline/instructions", g.handleGetRefundOrderInstructions).Methods("GET")
 // }

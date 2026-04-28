@@ -26,15 +26,15 @@ func TestValidTransition_DetectedToExpired(t *testing.T) {
 	}
 }
 
-func TestValidTransition_FundedToFulfilled(t *testing.T) {
-	if !ValidTransition(GuestOrderFunded, GuestOrderFulfilled) {
-		t.Error("FUNDED → FULFILLED should be valid")
+func TestValidTransition_FundedToShipped(t *testing.T) {
+	if !ValidTransition(GuestOrderFunded, GuestOrderShipped) {
+		t.Error("FUNDED → SHIPPED should be valid")
 	}
 }
 
-func TestValidTransition_FulfilledToCompleted(t *testing.T) {
-	if !ValidTransition(GuestOrderFulfilled, GuestOrderCompleted) {
-		t.Error("FULFILLED → COMPLETED should be valid")
+func TestValidTransition_ShippedToCompleted(t *testing.T) {
+	if !ValidTransition(GuestOrderShipped, GuestOrderCompleted) {
+		t.Error("SHIPPED → COMPLETED should be valid")
 	}
 }
 
@@ -47,7 +47,7 @@ func TestInvalidTransition_FundedToAwaiting(t *testing.T) {
 func TestInvalidTransition_CompletedToAny(t *testing.T) {
 	for _, target := range []GuestOrderState{
 		GuestOrderAwaitingPayment, GuestOrderPaymentDetected,
-		GuestOrderFunded, GuestOrderFulfilled, GuestOrderExpired,
+		GuestOrderFunded, GuestOrderShipped, GuestOrderExpired,
 	} {
 		if ValidTransition(GuestOrderCompleted, target) {
 			t.Errorf("COMPLETED → %s should be invalid (terminal state)", target)
@@ -58,7 +58,7 @@ func TestInvalidTransition_CompletedToAny(t *testing.T) {
 func TestInvalidTransition_ExpiredToAny(t *testing.T) {
 	for _, target := range []GuestOrderState{
 		GuestOrderAwaitingPayment, GuestOrderPaymentDetected,
-		GuestOrderFunded, GuestOrderFulfilled, GuestOrderCompleted,
+		GuestOrderFunded, GuestOrderShipped, GuestOrderCompleted,
 	} {
 		if ValidTransition(GuestOrderExpired, target) {
 			t.Errorf("EXPIRED → %s should be invalid (terminal state)", target)
@@ -74,7 +74,7 @@ func TestGuestOrderState_String(t *testing.T) {
 		{GuestOrderAwaitingPayment, "AWAITING_PAYMENT"},
 		{GuestOrderPaymentDetected, "PAYMENT_DETECTED"},
 		{GuestOrderFunded, "FUNDED"},
-		{GuestOrderFulfilled, "FULFILLED"},
+		{GuestOrderShipped, "SHIPPED"},
 		{GuestOrderCompleted, "COMPLETED"},
 		{GuestOrderExpired, "EXPIRED"},
 		{GuestOrderState(99), "UNKNOWN(99)"},
@@ -92,7 +92,7 @@ func TestIsTerminal(t *testing.T) {
 	terminal := []GuestOrderState{GuestOrderCompleted, GuestOrderExpired}
 	nonTerminal := []GuestOrderState{
 		GuestOrderAwaitingPayment, GuestOrderPaymentDetected,
-		GuestOrderFunded, GuestOrderFulfilled,
+		GuestOrderFunded, GuestOrderShipped,
 	}
 
 	for _, s := range terminal {
@@ -112,7 +112,7 @@ func TestIsTerminal(t *testing.T) {
 func TestValidTransition_FullMatrix(t *testing.T) {
 	all := []GuestOrderState{
 		GuestOrderAwaitingPayment, GuestOrderPaymentDetected,
-		GuestOrderFunded, GuestOrderFulfilled,
+		GuestOrderFunded, GuestOrderShipped,
 		GuestOrderCompleted, GuestOrderExpired,
 	}
 
@@ -121,9 +121,9 @@ func TestValidTransition_FullMatrix(t *testing.T) {
 		{GuestOrderAwaitingPayment, GuestOrderExpired}:         true,
 		{GuestOrderPaymentDetected, GuestOrderFunded}:          true,
 		{GuestOrderPaymentDetected, GuestOrderExpired}:         true,
-		{GuestOrderFunded, GuestOrderFulfilled}:                true,
+		{GuestOrderFunded, GuestOrderShipped}:                true,
 		{GuestOrderFunded, GuestOrderCompleted}:                true,
-		{GuestOrderFulfilled, GuestOrderCompleted}:             true,
+		{GuestOrderShipped, GuestOrderCompleted}:             true,
 	}
 
 	for _, from := range all {

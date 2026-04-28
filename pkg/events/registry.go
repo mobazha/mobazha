@@ -25,7 +25,7 @@ func init() {
 		{Category: "order", Name: "order.funded", Persistent: true, Sample: new(OrderFunded)},
 		{Category: "order", Name: "order.payment_received", Persistent: true, Sample: new(OrderPaymentReceived)},
 		{Category: "order", Name: "order.confirmed", Persistent: true, Sample: new(OrderConfirmation)},
-		{Category: "order", Name: "order.fulfilled", Persistent: true, Sample: new(OrderFulfillment)},
+		{Category: "order", Name: "order.shipped", Persistent: true, Sample: new(OrderShipment)},
 		{Category: "order", Name: "order.completed", Persistent: true, Sample: new(OrderCompletion)},
 		{Category: "order", Name: "order.cancelled", Persistent: true, Sample: new(OrderCancel)},
 		{Category: "order", Name: "order.expired", Persistent: true, Sample: new(OrderExpired)},

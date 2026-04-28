@@ -12,8 +12,8 @@ func TestDefaultProtectionPolicy_PhysicalGood(t *testing.T) {
 	if p.AutoCompleteAfterShipDays != 14 {
 		t.Errorf("AutoCompleteAfterShipDays = %d, want 14", p.AutoCompleteAfterShipDays)
 	}
-	if p.MaxFulfillDays != 7 {
-		t.Errorf("MaxFulfillDays = %d, want 7", p.MaxFulfillDays)
+	if p.MaxShipDays != 7 {
+		t.Errorf("MaxShipDays = %d, want 7", p.MaxShipDays)
 	}
 	if p.ExtendProtectionDays != 14 {
 		t.Errorf("ExtendProtectionDays = %d, want 14", p.ExtendProtectionDays)
@@ -25,8 +25,8 @@ func TestDefaultProtectionPolicy_DigitalGood(t *testing.T) {
 	if p.AutoCompleteAfterShipDays != 3 {
 		t.Errorf("AutoCompleteAfterShipDays = %d, want 3", p.AutoCompleteAfterShipDays)
 	}
-	if p.MaxFulfillDays != 3 {
-		t.Errorf("MaxFulfillDays = %d, want 3", p.MaxFulfillDays)
+	if p.MaxShipDays != 3 {
+		t.Errorf("MaxShipDays = %d, want 3", p.MaxShipDays)
 	}
 	if p.ExtendProtectionDays != 0 {
 		t.Errorf("ExtendProtectionDays = %d, want 0", p.ExtendProtectionDays)
@@ -38,8 +38,8 @@ func TestDefaultProtectionPolicy_Service(t *testing.T) {
 	if p.AutoCompleteAfterShipDays != 7 {
 		t.Errorf("AutoCompleteAfterShipDays = %d, want 7", p.AutoCompleteAfterShipDays)
 	}
-	if p.MaxFulfillDays != 3 {
-		t.Errorf("MaxFulfillDays = %d, want 3", p.MaxFulfillDays)
+	if p.MaxShipDays != 3 {
+		t.Errorf("MaxShipDays = %d, want 3", p.MaxShipDays)
 	}
 	if p.ExtendProtectionDays != 0 {
 		t.Errorf("ExtendProtectionDays = %d, want 0", p.ExtendProtectionDays)
@@ -50,7 +50,7 @@ func TestDefaultProtectionPolicy_UnknownFallsBackToPhysical(t *testing.T) {
 	p := DefaultProtectionPolicy(pb.Listing_Metadata_ContractType(99))
 	expected := DefaultProtectionPolicy(pb.Listing_Metadata_PHYSICAL_GOOD)
 	if p.AutoCompleteAfterShipDays != expected.AutoCompleteAfterShipDays ||
-		p.MaxFulfillDays != expected.MaxFulfillDays ||
+		p.MaxShipDays != expected.MaxShipDays ||
 		p.AfterSaleWindowDays != expected.AfterSaleWindowDays ||
 		p.ExtendProtectionDays != expected.ExtendProtectionDays ||
 		p.DisputeNegotiationDays != expected.DisputeNegotiationDays ||
@@ -108,8 +108,8 @@ func TestOrderProtectionPolicy_DurationHelpers(t *testing.T) {
 	if got := p.AutoCompleteDuration(); got != 14*24*time.Hour {
 		t.Errorf("AutoCompleteDuration = %v, want %v", got, 14*24*time.Hour)
 	}
-	if got := p.MaxFulfillDuration(); got != 7*24*time.Hour {
-		t.Errorf("MaxFulfillDuration = %v, want %v", got, 7*24*time.Hour)
+	if got := p.MaxShipDuration(); got != 7*24*time.Hour {
+		t.Errorf("MaxShipDuration = %v, want %v", got, 7*24*time.Hour)
 	}
 	if got := p.AfterSaleWindowDuration(); got != 7*24*time.Hour {
 		t.Errorf("AfterSaleWindowDuration = %v, want %v", got, 7*24*time.Hour)
@@ -136,8 +136,8 @@ func TestComputeProtection_NilForInapplicableStates(t *testing.T) {
 	}
 }
 
-func TestComputeProtection_AwaitingFulfillment(t *testing.T) {
-	o := &Order{State: OrderState_AWAITING_FULFILLMENT}
+func TestComputeProtection_AwaitingShipment(t *testing.T) {
+	o := &Order{State: OrderState_AWAITING_SHIPMENT}
 	info := o.ComputeProtection(time.Now())
 	if info == nil {
 		t.Fatal("expected non-nil protection info")
@@ -156,11 +156,11 @@ func TestComputeProtection_AwaitingFulfillment(t *testing.T) {
 	}
 }
 
-func TestComputeProtection_Fulfilled_WithTimestamp(t *testing.T) {
-	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+func TestComputeProtection_Shipped_WithTimestamp(t *testing.T) {
+	shippedAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:          OrderState_FULFILLED,
-		OrderLifecycle: OrderLifecycle{FulfilledAt: &fulfilledAt},
+		State:          OrderState_SHIPPED,
+		OrderLifecycle: OrderLifecycle{ShippedAt: &shippedAt},
 	}
 
 	now := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
@@ -177,7 +177,7 @@ func TestComputeProtection_Fulfilled_WithTimestamp(t *testing.T) {
 	if info.AutoCompleteAt == nil {
 		t.Fatal("autoCompleteAt should not be nil")
 	}
-	expectedDeadline := fulfilledAt.Add(14 * 24 * time.Hour)
+	expectedDeadline := shippedAt.Add(14 * 24 * time.Hour)
 	if !info.AutoCompleteAt.Equal(expectedDeadline) {
 		t.Errorf("autoCompleteAt = %v, want %v", info.AutoCompleteAt, expectedDeadline)
 	}
@@ -186,10 +186,10 @@ func TestComputeProtection_Fulfilled_WithTimestamp(t *testing.T) {
 	}
 }
 
-func TestComputeProtection_Fulfilled_WithoutTimestamp(t *testing.T) {
+func TestComputeProtection_Shipped_WithoutTimestamp(t *testing.T) {
 	o := &Order{
-		State:          OrderState_FULFILLED,
-		OrderLifecycle: OrderLifecycle{FulfilledAt: nil},
+		State:          OrderState_SHIPPED,
+		OrderLifecycle: OrderLifecycle{ShippedAt: nil},
 	}
 	info := o.ComputeProtection(time.Now())
 	if info == nil {
@@ -199,15 +199,15 @@ func TestComputeProtection_Fulfilled_WithoutTimestamp(t *testing.T) {
 		t.Errorf("daysRemaining = %d, want 14 (fallback to full policy)", info.DaysRemaining)
 	}
 	if info.AutoCompleteAt != nil {
-		t.Error("autoCompleteAt should be nil when fulfilledAt is missing")
+		t.Error("autoCompleteAt should be nil when shippedAt is missing")
 	}
 }
 
-func TestComputeProtection_Fulfilled_DeadlinePassed(t *testing.T) {
-	fulfilledAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+func TestComputeProtection_Shipped_DeadlinePassed(t *testing.T) {
+	shippedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:          OrderState_FULFILLED,
-		OrderLifecycle: OrderLifecycle{FulfilledAt: &fulfilledAt},
+		State:          OrderState_SHIPPED,
+		OrderLifecycle: OrderLifecycle{ShippedAt: &shippedAt},
 	}
 	now := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
 	info := o.ComputeProtection(now)
@@ -299,13 +299,13 @@ func TestComputeProtection_PaymentFinalized(t *testing.T) {
 
 // ── Extended Protection tests ──────────────────────────────────────────
 
-func TestComputeProtection_Fulfilled_Extended_WithTimestamp(t *testing.T) {
-	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+func TestComputeProtection_Shipped_Extended_WithTimestamp(t *testing.T) {
+	shippedAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	extendedAt := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State: OrderState_FULFILLED,
+		State: OrderState_SHIPPED,
 		OrderLifecycle: OrderLifecycle{
-			FulfilledAt:          &fulfilledAt,
+			ShippedAt:          &shippedAt,
 			ProtectionExtendedAt: &extendedAt,
 		},
 	}
@@ -318,12 +318,12 @@ func TestComputeProtection_Fulfilled_Extended_WithTimestamp(t *testing.T) {
 	if info.Stage != ProtectionStageProtectionPeriod {
 		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageProtectionPeriod)
 	}
-	// 14 base + 14 extended = 28 days total from fulfilledAt
+	// 14 base + 14 extended = 28 days total from shippedAt
 	// 28 - 9 elapsed = 19 days remaining
 	if info.DaysRemaining != 19 {
 		t.Errorf("daysRemaining = %d, want 19 (28 - 9 days elapsed)", info.DaysRemaining)
 	}
-	expectedDeadline := fulfilledAt.Add(28 * 24 * time.Hour)
+	expectedDeadline := shippedAt.Add(28 * 24 * time.Hour)
 	if info.AutoCompleteAt == nil || !info.AutoCompleteAt.Equal(expectedDeadline) {
 		t.Errorf("autoCompleteAt = %v, want %v", info.AutoCompleteAt, expectedDeadline)
 	}
@@ -335,12 +335,12 @@ func TestComputeProtection_Fulfilled_Extended_WithTimestamp(t *testing.T) {
 	}
 }
 
-func TestComputeProtection_Fulfilled_Extended_WithoutTimestamp(t *testing.T) {
+func TestComputeProtection_Shipped_Extended_WithoutTimestamp(t *testing.T) {
 	extendedAt := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State: OrderState_FULFILLED,
+		State: OrderState_SHIPPED,
 		OrderLifecycle: OrderLifecycle{
-			FulfilledAt:          nil,
+			ShippedAt:          nil,
 			ProtectionExtendedAt: &extendedAt,
 		},
 	}
@@ -360,11 +360,11 @@ func TestComputeProtection_Fulfilled_Extended_WithoutTimestamp(t *testing.T) {
 	}
 }
 
-func TestComputeProtection_Fulfilled_NotExtended_Extendable(t *testing.T) {
-	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+func TestComputeProtection_Shipped_NotExtended_Extendable(t *testing.T) {
+	shippedAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:          OrderState_FULFILLED,
-		OrderLifecycle: OrderLifecycle{FulfilledAt: &fulfilledAt},
+		State:          OrderState_SHIPPED,
+		OrderLifecycle: OrderLifecycle{ShippedAt: &shippedAt},
 	}
 	info := o.ComputeProtection(time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC))
 	if !info.Extendable {

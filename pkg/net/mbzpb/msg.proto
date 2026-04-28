@@ -47,7 +47,7 @@ message OrderMessage {
         ORDER_CANCEL       = 2;
         ORDER_CONFIRMATION = 3;
         RATING_SIGNATURES  = 4;
-        ORDER_FULFILLMENT  = 5;
+        ORDER_SHIPMENT     = 5;
         ORDER_COMPLETE     = 6;
         DISPUTE_OPEN       = 7;
         DISPUTE_UPDATE     = 8;

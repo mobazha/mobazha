@@ -14,7 +14,7 @@ const (
 	GuestOrderAwaitingPayment GuestOrderState = 0
 	GuestOrderPaymentDetected GuestOrderState = 1
 	GuestOrderFunded          GuestOrderState = 2
-	GuestOrderFulfilled       GuestOrderState = 3
+	GuestOrderShipped         GuestOrderState = 3
 	GuestOrderCompleted       GuestOrderState = 4
 	GuestOrderExpired         GuestOrderState = 5
 )
@@ -27,8 +27,8 @@ func (s GuestOrderState) String() string {
 		return "PAYMENT_DETECTED"
 	case GuestOrderFunded:
 		return "FUNDED"
-	case GuestOrderFulfilled:
-		return "FULFILLED"
+	case GuestOrderShipped:
+		return "SHIPPED"
 	case GuestOrderCompleted:
 		return "COMPLETED"
 	case GuestOrderExpired:
@@ -48,8 +48,8 @@ func ParseGuestOrderState(s string) (GuestOrderState, bool) {
 		return GuestOrderPaymentDetected, true
 	case "FUNDED":
 		return GuestOrderFunded, true
-	case "FULFILLED":
-		return GuestOrderFulfilled, true
+	case "SHIPPED":
+		return GuestOrderShipped, true
 	case "COMPLETED":
 		return GuestOrderCompleted, true
 	case "EXPIRED":
@@ -92,7 +92,7 @@ type GuestOrder struct {
 	// Lifecycle
 	ExpiresAt       time.Time  `gorm:"index" json:"expiresAt"`
 	FundedAt        *time.Time `json:"fundedAt,omitempty"`
-	FulfilledAt     *time.Time `json:"fulfilledAt,omitempty"`
+	ShippedAt       *time.Time `json:"shippedAt,omitempty"`
 	CompletedAt     *time.Time `json:"completedAt,omitempty"`
 	TrackingNumber  string     `json:"trackingNumber,omitempty"`
 	ShippingCarrier string     `json:"shippingCarrier,omitempty"`
@@ -135,8 +135,8 @@ func (o *GuestOrder) IsTerminal() bool {
 var validTransitions = map[GuestOrderState][]GuestOrderState{
 	GuestOrderAwaitingPayment: {GuestOrderPaymentDetected, GuestOrderExpired},
 	GuestOrderPaymentDetected: {GuestOrderFunded, GuestOrderExpired},
-	GuestOrderFunded:          {GuestOrderFulfilled, GuestOrderCompleted},
-	GuestOrderFulfilled:       {GuestOrderCompleted},
+	GuestOrderFunded:          {GuestOrderShipped, GuestOrderCompleted},
+	GuestOrderShipped:         {GuestOrderCompleted},
 	// GuestOrderCompleted and GuestOrderExpired are terminal — no outgoing transitions.
 }
 

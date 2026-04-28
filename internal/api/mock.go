@@ -35,7 +35,7 @@ type mockNode struct {
 	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiatorAddress string, payoutAddress string) (iwallet.CoinType, any, error)
 	getRefundOrderInstructionsFunc          func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
-	fulfillOrderFunc                        func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
+	shipOrderFunc                           func(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
 	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	refundOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
@@ -216,8 +216,8 @@ func (m *mockNode) GetRefundOrderInstructions(orderID models.OrderID, initiatorA
 	return m.getRefundOrderInstructionsFunc(orderID, initiatorAddress)
 }
 
-func (m *mockNode) FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error {
-	return m.fulfillOrderFunc(orderID, fulfillments, done)
+func (m *mockNode) ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error {
+	return m.shipOrderFunc(orderID, shipments, done)
 }
 func (m *mockNode) CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
 	return m.completeOrderFunc(orderID, txid, ratings, includeIDInRating, done)

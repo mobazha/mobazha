@@ -243,8 +243,8 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 		key = "order_cancel_acked"
 	case npb.OrderMessage_ORDER_CONFIRMATION:
 		key = "order_confirmation_acked"
-	case npb.OrderMessage_ORDER_FULFILLMENT:
-		key = "order_fulfillment_acked"
+	case npb.OrderMessage_ORDER_SHIPMENT:
+		key = "order_shipment_acked"
 	case npb.OrderMessage_ORDER_COMPLETE:
 		key = "order_complete_acked"
 	case npb.OrderMessage_DISPUTE_OPEN:
@@ -360,8 +360,8 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 		event, err = op.processOrderCancelMessage(dbtx, order, message)
 	case npb.OrderMessage_REFUND:
 		event, err = op.processRefundMessage(dbtx, order, message)
-	case npb.OrderMessage_ORDER_FULFILLMENT:
-		event, err = op.processOrderFulfillmentMessage(dbtx, order, message)
+	case npb.OrderMessage_ORDER_SHIPMENT:
+		event, err = op.processOrderShipmentMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_COMPLETE:
 		event, err = op.processOrderCompleteMessage(dbtx, order, message)
 	case npb.OrderMessage_DISPUTE_OPEN:

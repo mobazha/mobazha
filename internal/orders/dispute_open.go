@@ -136,9 +136,9 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 				payoutAddress = iwallet.NewAddress(orderConfirmation.PayoutAddress, iwallet.CoinType(paymentSent.Coin))
 			}
 
-			orderFulfillments, err := order.OrderFulfillmentMessages()
-			if len(orderFulfillments) > 0 && err == nil {
-				payoutAddress = iwallet.NewAddress(orderFulfillments[0].ReleaseInfo.ToAddress, iwallet.CoinType(paymentSent.Coin))
+			orderShipments, err := order.OrderShipmentMessages()
+			if err == nil && len(orderShipments) > 0 && orderShipments[0].ReleaseInfo != nil {
+				payoutAddress = iwallet.NewAddress(orderShipments[0].ReleaseInfo.ToAddress, iwallet.CoinType(paymentSent.Coin))
 			}
 
 			if payoutAddress.String() == "" {

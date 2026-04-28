@@ -177,7 +177,7 @@ func TestE2E_PayPal_CaptureRefunded_OrderTransition(t *testing.T) {
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
 		ID:    "pp-refund-order",
-		State: models.OrderState_FULFILLED,
+		State: models.OrderState_SHIPPED,
 		OrderPaymentState: models.OrderPaymentState{
 			FiatPaymentState: models.FiatPaymentState{
 				PaymentTransactionID: "CAP-E2E",
@@ -217,7 +217,7 @@ func TestE2E_PayPal_DisputeCreated_StoresMetadata(t *testing.T) {
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
 		ID:    "pp-dispute-order",
-		State: models.OrderState_FULFILLED,
+		State: models.OrderState_SHIPPED,
 	})
 	svc.SetOrderRepo(orderRepo)
 
@@ -257,7 +257,7 @@ func TestE2E_PayPal_DisputeResolved_Lost_TransitionsToRefunded(t *testing.T) {
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
 		ID:    "pp-dispute-lost",
-		State: models.OrderState_FULFILLED,
+		State: models.OrderState_SHIPPED,
 	})
 	svc.SetOrderRepo(orderRepo)
 
@@ -298,7 +298,7 @@ func TestE2E_PayPal_DisputeResolved_Won_TransitionsToResolved(t *testing.T) {
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
 		ID:    "pp-dispute-won",
-		State: models.OrderState_FULFILLED,
+		State: models.OrderState_SHIPPED,
 	})
 	svc.SetOrderRepo(orderRepo)
 
@@ -372,7 +372,7 @@ func TestE2E_PayPal_SaleRefunded_OrderTransition(t *testing.T) {
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
 		ID:    "pp-sale-refund-order",
-		State: models.OrderState_FULFILLED,
+		State: models.OrderState_SHIPPED,
 		OrderPaymentState: models.OrderPaymentState{
 			FiatPaymentState: models.FiatPaymentState{
 				PaymentTransactionID: "CAP-SALE-E2E",
@@ -461,7 +461,7 @@ func TestE2E_Stripe_ChargeRefunded_OrderTransition(t *testing.T) {
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
 		ID:    "stripe-refund-order",
-		State: models.OrderState_FULFILLED,
+		State: models.OrderState_SHIPPED,
 	})
 	svc.SetOrderRepo(orderRepo)
 
@@ -499,7 +499,7 @@ func TestE2E_Stripe_DisputeCreated_StoresMetadata(t *testing.T) {
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
 		ID:    "stripe-dispute-order",
-		State: models.OrderState_FULFILLED,
+		State: models.OrderState_SHIPPED,
 	})
 	svc.SetOrderRepo(orderRepo)
 
@@ -534,7 +534,7 @@ func TestE2E_Stripe_DisputeClosed_Lost_TransitionsToRefunded(t *testing.T) {
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
 		ID:    "stripe-dispute-lost",
-		State: models.OrderState_FULFILLED,
+		State: models.OrderState_SHIPPED,
 	})
 	svc.SetOrderRepo(orderRepo)
 

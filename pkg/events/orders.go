@@ -157,7 +157,7 @@ type Refund struct {
 	VendorAvatar string    `json:"vendorAvatar,omitempty"`
 }
 
-type OrderFulfillment struct {
+type OrderShipment struct {
 	Notification
 	OrderID      string    `json:"orderID"`
 	Thumbnail    Thumbnail `json:"thumbnail"`
@@ -316,11 +316,11 @@ type PaymentVerificationExpired struct {
 
 // ── S6 Buyer-protection lifecycle events ──────────────────────────────
 
-// OrderAutoCompleted is emitted when a fulfilled order is automatically completed
+// OrderAutoCompleted is emitted when a shipped order is automatically completed
 // after the protection period expires without buyer action.
 type OrderAutoCompleted struct {
 	OrderID      string    `json:"orderID"`
-	Reason       string    `json:"reason,omitempty"` // "protection_expired" | "unfulfilled_cancelable"
+	Reason       string    `json:"reason,omitempty"` // "protection_expired" | "unshipped_cancelable"
 	BuyerName    string    `json:"buyerName"`
 	BuyerID      string    `json:"buyerID"`
 	BuyerAvatar  string    `json:"buyerAvatar"`
@@ -332,10 +332,10 @@ type OrderAutoCompleted struct {
 }
 
 // OrderAutoCancelled is emitted when an order is automatically cancelled because
-// the vendor did not fulfill within maxFulfillDays after payment.
+// the vendor did not ship within maxShipDays after payment.
 type OrderAutoCancelled struct {
 	OrderID      string    `json:"orderID"`
-	Reason       string    `json:"reason"` // "fulfillment_overdue"
+	Reason       string    `json:"reason"` // "shipment_overdue"
 	BuyerName    string    `json:"buyerName"`
 	BuyerID      string    `json:"buyerID"`
 	BuyerAvatar  string    `json:"buyerAvatar"`

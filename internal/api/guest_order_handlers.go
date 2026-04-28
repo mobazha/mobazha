@@ -111,9 +111,9 @@ func (g *Gateway) handleGETGuestOrders(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleFulfillGuestOrder marks a guest order as fulfilled with tracking info.
-// PUT /v1/guest/orders/{token}/fulfill
-func (g *Gateway) handleFulfillGuestOrder(w http.ResponseWriter, r *http.Request) {
+// handleShipGuestOrder marks a guest order as shipped with tracking info.
+// PUT /v1/guest/orders/{token}/ship
+func (g *Gateway) handleShipGuestOrder(w http.ResponseWriter, r *http.Request) {
 	svc := getGuestOrderService(r)
 	if svc == nil {
 		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
@@ -136,7 +136,7 @@ func (g *Gateway) handleFulfillGuestOrder(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := svc.FulfillGuestOrder(r.Context(), token, body.TrackingNumber, body.Carrier); err != nil {
+	if err := svc.ShipGuestOrder(r.Context(), token, body.TrackingNumber, body.Carrier); err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
 		return
 	}
@@ -144,7 +144,7 @@ func (g *Gateway) handleFulfillGuestOrder(w http.ResponseWriter, r *http.Request
 	response.NoContent(w)
 }
 
-// handleCompleteGuestOrder manually completes a funded/fulfilled guest order.
+// handleCompleteGuestOrder manually completes a funded/shipped guest order.
 // PUT /v1/guest/orders/{token}/complete
 func (g *Gateway) handleCompleteGuestOrder(w http.ResponseWriter, r *http.Request) {
 	svc := getGuestOrderService(r)

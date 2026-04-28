@@ -25,7 +25,7 @@ func (op *OrderProcessor) processOrderDeclineMessage(dbtx database.Tx, order *mo
 		return nil, nil
 	}
 
-	// FSM-covered: if the order is in AWAITING_FULFILLMENT (confirmed), the FSM rejects EventVendorDecline.
+	// FSM-covered: if the order is in AWAITING_SHIPMENT (confirmed), the FSM rejects EventVendorDecline.
 	if order.SerializedOrderConfirmation != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_DECLINE message for order %s after ORDER_CONFIRMATION", order.ID)
 		return nil, ErrUnexpectedMessage

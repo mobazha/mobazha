@@ -191,7 +191,7 @@ func TestGormOrderRepo_FindSales_FiltersRole(t *testing.T) {
 func TestGormOrderRepo_FindPurchases_StateFilter(t *testing.T) {
 	repo, db := newTestRepo(t)
 	seedRepoOrder(t, db, "p1", "buyer", models.OrderState_PENDING)
-	seedRepoOrder(t, db, "p2", "buyer", models.OrderState_AWAITING_FULFILLMENT)
+	seedRepoOrder(t, db, "p2", "buyer", models.OrderState_AWAITING_SHIPMENT)
 
 	orders, _, err := repo.FindPurchases(context.Background(), contracts.OrderFilter{
 		StateFilter: []models.OrderState{models.OrderState_PENDING},
@@ -257,14 +257,14 @@ func TestGormOrderRepo_FindSales_OffsetWithStateFilter(t *testing.T) {
 	repo, db := newTestRepo(t)
 	base := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	for i := 0; i < 4; i++ {
-		seedRepoOrderAt(t, db, fmt.Sprintf("s-%d", i), "vendor", models.OrderState_AWAITING_FULFILLMENT,
+		seedRepoOrderAt(t, db, fmt.Sprintf("s-%d", i), "vendor", models.OrderState_AWAITING_SHIPMENT,
 			base.Add(time.Duration(i)*time.Hour))
 	}
 	seedRepoOrderAt(t, db, "s-completed", "vendor", models.OrderState_COMPLETED,
 		base.Add(10*time.Hour))
 
 	orders, total, err := repo.FindSales(context.Background(), contracts.OrderFilter{
-		StateFilter:   []models.OrderState{models.OrderState_AWAITING_FULFILLMENT},
+		StateFilter:   []models.OrderState{models.OrderState_AWAITING_SHIPMENT},
 		Limit:         2,
 		Offset:        1,
 		SortAscending: true,
@@ -305,7 +305,7 @@ func TestGormOrderRepo_FindUnverifiedPaymentOrders(t *testing.T) {
 		OrderPaymentState:     models.OrderPaymentState{PaymentVerificationStatus: models.PaymentVerificationStatusPending},
 		SerializedPaymentSent: []byte("some-data"),
 	}
-	o1.SetFSMState(models.OrderState_AWAITING_FULFILLMENT)
+	o1.SetFSMState(models.OrderState_AWAITING_SHIPMENT)
 	require.NoError(t, db.gormDB.Create(o1).Error)
 
 	// Not matching: verified
@@ -316,7 +316,7 @@ func TestGormOrderRepo_FindUnverifiedPaymentOrders(t *testing.T) {
 		OrderPaymentState:     models.OrderPaymentState{PaymentVerificationStatus: models.PaymentVerificationStatusVerified},
 		SerializedPaymentSent: []byte("some-data"),
 	}
-	o2.SetFSMState(models.OrderState_AWAITING_FULFILLMENT)
+	o2.SetFSMState(models.OrderState_AWAITING_SHIPMENT)
 	require.NoError(t, db.gormDB.Create(o2).Error)
 
 	// Not matching: buyer role
@@ -353,12 +353,12 @@ func TestGormOrderRepo_Save_CreateAndUpdate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderState_PENDING, loaded.State)
 
-	order.SetFSMState(models.OrderState_AWAITING_FULFILLMENT)
+	order.SetFSMState(models.OrderState_AWAITING_SHIPMENT)
 	require.NoError(t, repo.Save(ctx, order))
 
 	loaded, err = repo.FindByID(ctx, "save-1")
 	require.NoError(t, err)
-	assert.Equal(t, models.OrderState_AWAITING_FULFILLMENT, loaded.State)
+	assert.Equal(t, models.OrderState_AWAITING_SHIPMENT, loaded.State)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -393,11 +393,11 @@ func TestGormOrderRepo_UpdateState(t *testing.T) {
 	repo, db := newTestRepo(t)
 	seedRepoOrder(t, db, "state-1", "buyer", models.OrderState_PENDING)
 
-	require.NoError(t, repo.UpdateState(context.Background(), "state-1", models.OrderState_AWAITING_FULFILLMENT))
+	require.NoError(t, repo.UpdateState(context.Background(), "state-1", models.OrderState_AWAITING_SHIPMENT))
 
 	order, err := repo.FindByID(context.Background(), "state-1")
 	require.NoError(t, err)
-	assert.Equal(t, models.OrderState_AWAITING_FULFILLMENT, order.State)
+	assert.Equal(t, models.OrderState_AWAITING_SHIPMENT, order.State)
 }
 
 // ═══════════════════════════════════════════════════════════════

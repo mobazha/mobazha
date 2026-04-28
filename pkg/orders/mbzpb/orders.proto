@@ -102,12 +102,12 @@ message RatingSignature {
     bytes vendorSignature = 3; // The signature covers the serialization of this object with the signature emptied.
 }
 
-message OrderFulfillment {
-    repeated FulfilledItem fulfillments = 1;
+message OrderShipment {
+    repeated ShippedItem shipments      = 1;
     EscrowRelease releaseInfo           = 2; // Moderated orders only.
     google.protobuf.Timestamp timestamp = 3;
 
-    message FulfilledItem {
+    message ShippedItem {
         uint32 itemIndex = 1;
         string note      = 2;
         oneof delivery {
@@ -298,12 +298,12 @@ message Signature {
     uint32 index    = 3;
 }
 
-message FulfillmentList {
+message ShipmentList {
     repeated Message messages = 1;
 
     message Message {
-        OrderFulfillment fulfillmentMessage = 1;
-        bytes signature                     = 2;
+        OrderShipment shipmentMessage = 1;
+        bytes signature               = 2;
     }
 }
 
@@ -351,8 +351,8 @@ message Contract {
     PaymentFinalized paymentFinalized = 22;
     bool paymentFinalizedAcked        = 23;
 
-    repeated OrderFulfillment orderFulfillments = 24;
-    bool fulfillmentsAcked            = 25;
+    repeated OrderShipment orderShipments = 24;
+    bool shipmentsAcked                = 25;
 
     repeated Refund refunds = 26;
     bool refundsAcked  = 27;

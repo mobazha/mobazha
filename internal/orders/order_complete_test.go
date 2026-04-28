@@ -197,7 +197,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 		Chaincode: hex.EncodeToString(chaincode),
 	}
 
-	fulfillment := &pb.OrderFulfillment{}
+	shipment := &pb.OrderShipment{}
 
 	tests := []struct {
 		setup         func(order *models.Order) error
@@ -205,7 +205,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 		expectedEvent interface{}
 	}{
 		{
-			// Normal case where order open and fulfillment exist.
+			// Normal case where order open and shipment exist.
 			setup: func(order *models.Order) error {
 				order.SetRole(models.RoleVendor)
 				order.ID = models.OrderID(orderID)
@@ -225,8 +225,8 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 				}
 				return order.PutMessage(&npb.OrderMessage{
 					Signature:   []byte("abc"),
-					Message:     mustBuildAny(fulfillment),
-					MessageType: npb.OrderMessage_ORDER_FULFILLMENT,
+					Message:     mustBuildAny(shipment),
+					MessageType: npb.OrderMessage_ORDER_SHIPMENT,
 				})
 			},
 			expectedError: nil,
@@ -285,7 +285,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Missing fulfillment — should park the message.
+			// Missing shipment — should park the message.
 			setup: func(order *models.Order) error {
 				order.SetRole(models.RoleVendor)
 				order.ID = models.OrderID(orderID)
@@ -447,7 +447,7 @@ func TestOrderComplete_WithoutRatings(t *testing.T) {
 		Chaincode: hex.EncodeToString(chaincode),
 	}
 
-	fulfillment := &pb.OrderFulfillment{}
+	shipment := &pb.OrderShipment{}
 
 	order := &models.Order{}
 	order.SetRole(models.RoleVendor)
@@ -467,8 +467,8 @@ func TestOrderComplete_WithoutRatings(t *testing.T) {
 	}
 	if err := order.PutMessage(&npb.OrderMessage{
 		Signature:   []byte("abc"),
-		Message:     mustBuildAny(fulfillment),
-		MessageType: npb.OrderMessage_ORDER_FULFILLMENT,
+		Message:     mustBuildAny(shipment),
+		MessageType: npb.OrderMessage_ORDER_SHIPMENT,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -603,7 +603,7 @@ func TestOrderComplete_RatingSupplement(t *testing.T) {
 		Chaincode: hex.EncodeToString(chaincode),
 	}
 
-	fulfillment := &pb.OrderFulfillment{}
+	shipment := &pb.OrderShipment{}
 
 	// Step 1: Complete without ratings
 	noRatingComplete := &pb.OrderComplete{Timestamp: timestamppb.Now()}
@@ -630,8 +630,8 @@ func TestOrderComplete_RatingSupplement(t *testing.T) {
 	}
 	if err := order.PutMessage(&npb.OrderMessage{
 		Signature:   []byte("abc"),
-		Message:     mustBuildAny(fulfillment),
-		MessageType: npb.OrderMessage_ORDER_FULFILLMENT,
+		Message:     mustBuildAny(shipment),
+		MessageType: npb.OrderMessage_ORDER_SHIPMENT,
 	}); err != nil {
 		t.Fatal(err)
 	}

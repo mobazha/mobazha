@@ -23,7 +23,7 @@ type mockGuestOrderService struct {
 	createGuestOrderFunc      func(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error)
 	getGuestOrderStatusFunc   func(ctx context.Context, token string) (*contracts.GuestOrderStatusResponse, error)
 	listGuestOrdersFunc       func(ctx context.Context, filter contracts.GuestOrderFilter) ([]models.GuestOrder, int64, error)
-	fulfillGuestOrderFunc     func(ctx context.Context, token, tracking, carrier string) error
+	shipGuestOrderFunc        func(ctx context.Context, token, tracking, carrier string) error
 	completeGuestOrderFunc    func(ctx context.Context, token string) error
 	getGuestCheckoutCfgFunc   func(ctx context.Context) (*models.GuestCheckoutConfig, error)
 	saveGuestCheckoutCfgFunc  func(ctx context.Context, cfg *models.GuestCheckoutConfig) error
@@ -50,9 +50,9 @@ func (m *mockGuestOrderService) ListGuestOrders(ctx context.Context, filter cont
 	return nil, 0, nil
 }
 
-func (m *mockGuestOrderService) FulfillGuestOrder(ctx context.Context, token, tracking, carrier string) error {
-	if m.fulfillGuestOrderFunc != nil {
-		return m.fulfillGuestOrderFunc(ctx, token, tracking, carrier)
+func (m *mockGuestOrderService) ShipGuestOrder(ctx context.Context, token, tracking, carrier string) error {
+	if m.shipGuestOrderFunc != nil {
+		return m.shipGuestOrderFunc(ctx, token, tracking, carrier)
 	}
 	return nil
 }
@@ -344,13 +344,13 @@ func TestGETGuestOrders_Pagination(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// H-08: PUT /v1/guest/orders/{token}/fulfill — valid → 204
+// H-08: PUT /v1/guest/orders/{token}/ship — valid → 204
 // ---------------------------------------------------------------------------
 
-func TestFulfillGuestOrder_Valid(t *testing.T) {
+func TestShipGuestOrder_Valid(t *testing.T) {
 	var capturedToken, capturedTracking, capturedCarrier string
 	svc := &mockGuestOrderService{
-		fulfillGuestOrderFunc: func(_ context.Context, token, tracking, carrier string) error {
+		shipGuestOrderFunc: func(_ context.Context, token, tracking, carrier string) error {
 			capturedToken = token
 			capturedTracking = tracking
 			capturedCarrier = carrier
@@ -377,7 +377,7 @@ func TestFulfillGuestOrder_Valid(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest("PUT", "/v1/guest/orders/tok_test/fulfill", bytes.NewReader(body))
+	req := httptest.NewRequest("PUT", "/v1/guest/orders/tok_test/ship", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(rr, req)
 

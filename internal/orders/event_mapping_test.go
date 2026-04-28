@@ -54,9 +54,9 @@ func TestMessageTypeToEvent_AllMappings(t *testing.T) {
 			isTransition: true,
 		},
 		{
-			name:         "ORDER_FULFILLMENT -> EventOrderFulfilled",
-			msgType:      npb.OrderMessage_ORDER_FULFILLMENT,
-			wantEvent:    coreorders.EventOrderFulfilled,
+			name:         "ORDER_SHIPMENT -> EventOrderShipped",
+			msgType:      npb.OrderMessage_ORDER_SHIPMENT,
+			wantEvent:    coreorders.EventOrderShipped,
 			isTransition: true,
 		},
 		{
@@ -176,9 +176,9 @@ func TestCoreTransitionTable_HappyPath(t *testing.T) {
 	}{
 		{"buyer submits payment", coreorders.StateAwaitingPayment, coreorders.EventPaymentSent, coreorders.StateAwaitingPaymentVerification},
 		{"payment verified", coreorders.StateAwaitingPaymentVerification, coreorders.EventPaymentVerified, coreorders.StatePending},
-		{"vendor confirms", coreorders.StatePending, coreorders.EventVendorConfirm, coreorders.StateAwaitingFulfillment},
-		{"vendor fulfills", coreorders.StateAwaitingFulfillment, coreorders.EventOrderFulfilled, coreorders.StateFulfilled},
-		{"buyer completes", coreorders.StateFulfilled, coreorders.EventBuyerComplete, coreorders.StateCompleted},
+		{"vendor confirms", coreorders.StatePending, coreorders.EventVendorConfirm, coreorders.StateAwaitingShipment},
+		{"vendor ships", coreorders.StateAwaitingShipment, coreorders.EventOrderShipped, coreorders.StateShipped},
+		{"buyer completes", coreorders.StateShipped, coreorders.EventBuyerComplete, coreorders.StateCompleted},
 	}
 
 	for _, step := range steps {
@@ -227,7 +227,7 @@ func TestCoreTransitionTable_InvalidTransitions(t *testing.T) {
 		from  coreorders.OrderState
 		event coreorders.OrderEvent
 	}{
-		{"fulfill from awaiting payment", coreorders.StateAwaitingPayment, coreorders.EventOrderFulfilled},
+		{"ship from awaiting payment", coreorders.StateAwaitingPayment, coreorders.EventOrderShipped},
 		{"complete from awaiting payment", coreorders.StateAwaitingPayment, coreorders.EventBuyerComplete},
 		{"event on completed", coreorders.StateCompleted, coreorders.EventPaymentSent},
 		{"event on canceled", coreorders.StateCanceled, coreorders.EventPaymentSent},

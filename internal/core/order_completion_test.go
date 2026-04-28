@@ -194,18 +194,18 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	fulfillSub, err := network.Nodes()[1].eventBus.Subscribe(&events.OrderFulfillment{})
+	shipSub, err := network.Nodes()[1].eventBus.Subscribe(&events.OrderShipment{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fulfillAck, err := network.Nodes()[0].eventBus.Subscribe(&events.MessageACK{})
+	shipAck, err := network.Nodes()[0].eventBus.Subscribe(&events.MessageACK{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done5 := make(chan struct{})
-	fulfillments := []models.Fulfillment{
+	shipments := []models.Shipment{
 		{
 			ItemIndex: 0,
 			PhysicalDelivery: &models.PhysicalDelivery{
@@ -214,7 +214,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 			},
 		},
 	}
-	if err := network.Nodes()[0].Order().FulfillOrder(orderID, fulfillments, done5); err != nil {
+	if err := network.Nodes()[0].Order().ShipOrder(orderID, shipments, done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -224,12 +224,12 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	}
 
 	select {
-	case <-fulfillSub.Out():
+	case <-shipSub.Out():
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
 	select {
-	case <-fulfillAck.Out():
+	case <-shipAck.Out():
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
@@ -418,18 +418,18 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	fulfillSub, err = network.Nodes()[1].eventBus.Subscribe(&events.OrderFulfillment{})
+	shipSub, err = network.Nodes()[1].eventBus.Subscribe(&events.OrderShipment{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fulfillAck, err = network.Nodes()[0].eventBus.Subscribe(&events.MessageACK{})
+	shipAck, err = network.Nodes()[0].eventBus.Subscribe(&events.MessageACK{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done5 = make(chan struct{})
-	fulfillments = []models.Fulfillment{
+	shipments = []models.Shipment{
 		{
 			ItemIndex: 0,
 			PhysicalDelivery: &models.PhysicalDelivery{
@@ -438,7 +438,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 			},
 		},
 	}
-	if err := network.Nodes()[0].Order().FulfillOrder(orderID, fulfillments, done5); err != nil {
+	if err := network.Nodes()[0].Order().ShipOrder(orderID, shipments, done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -448,12 +448,12 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	}
 
 	select {
-	case <-fulfillSub.Out():
+	case <-shipSub.Out():
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
 	select {
-	case <-fulfillAck.Out():
+	case <-shipAck.Out():
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}

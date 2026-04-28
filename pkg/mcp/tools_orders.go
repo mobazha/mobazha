@@ -18,7 +18,7 @@ func ordersToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 				gomcp.WithDescription(
 					"List seller's sales orders with buyer info, payment status, and shipping state. "+
 						"Returns order ID, buyer name, items, total amount, order state, and timestamps. "+
-						"Use when asked about recent sales, order status, revenue, or fulfillment progress.",
+						"Use when asked about recent sales, order status, revenue, or shipping progress.",
 				),
 				gomcp.WithString("limit",
 					gomcp.Description("Maximum number of orders to return (default: 20)"),
@@ -67,7 +67,7 @@ func ordersToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 				gomcp.WithDescription(
 					"Confirm a seller's acceptance of a buyer's order. "+
 						"Requires: order must be in PENDING state (newly placed, awaiting seller confirmation). "+
-						"After: order moves to AWAITING_FULFILLMENT, and on-chain payment begins processing. "+
+						"After: order moves to AWAITING_SHIPMENT, and on-chain payment begins processing. "+
 						"Use when a new order comes in and the seller wants to accept it.",
 				),
 				gomcp.WithString("order_id",
@@ -84,7 +84,7 @@ func ordersToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 					"Decline a buyer's order as a seller. "+
 						"Requires: order must be in PENDING state. "+
 						"After: order is cancelled and any held funds are released back to the buyer. "+
-						"Use when the seller cannot or does not want to fulfill an order.",
+						"Use when the seller cannot or does not want to ship or complete an order.",
 				),
 				gomcp.WithString("order_id",
 					gomcp.Required(),
@@ -94,20 +94,20 @@ func ordersToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 			Handler: makeOrderDecline(bf),
 		},
 		{
-			Name: "orders_fulfill",
-			Tool: gomcp.NewTool("orders_fulfill",
+			Name: "orders_ship",
+			Tool: gomcp.NewTool("orders_ship",
 				gomcp.WithDescription(
-					"Mark an order as fulfilled/shipped by the seller. "+
-						"Requires: order must be in AWAITING_FULFILLMENT state (confirmed and payment processed). "+
-						"After: order moves to FULFILLED state, buyer is notified. "+
+					"Mark an order as shipped by the seller. "+
+						"Requires: order must be in AWAITING_SHIPMENT state (confirmed and payment processed). "+
+						"After: order moves to SHIPPED state, buyer is notified. "+
 						"For physical goods, include shipping carrier and tracking number.",
 				),
 				gomcp.WithString("order_id",
 					gomcp.Required(),
-					gomcp.Description("The order ID to fulfill"),
+					gomcp.Description("The order ID to ship"),
 				),
 				gomcp.WithString("note",
-					gomcp.Description("Optional fulfillment note to the buyer"),
+					gomcp.Description("Optional shipment note to the buyer"),
 				),
 				gomcp.WithString("shipper",
 					gomcp.Description("Shipping carrier name (e.g., 'UPS', 'FedEx', 'USPS')"),
@@ -116,14 +116,14 @@ func ordersToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 					gomcp.Description("Shipment tracking number"),
 				),
 			),
-			Handler: makeOrderFulfill(bf),
+			Handler: makeOrderShip(bf),
 		},
 		{
 			Name: "orders_refund",
 			Tool: gomcp.NewTool("orders_refund",
 				gomcp.WithDescription(
 					"Refund an order's payment back to the buyer. [FINANCIAL] "+
-						"Requires: order must be in FUNDED or AWAITING_FULFILLMENT state. "+
+						"Requires: order must be in FUNDED or AWAITING_SHIPMENT state. "+
 						"After: funds are returned to buyer on-chain. "+
 						"The AI client MUST confirm with the user before calling this tool.",
 				),
@@ -139,7 +139,7 @@ func ordersToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 			Tool: gomcp.NewTool("orders_cancel",
 				gomcp.WithDescription(
 					"Cancel an order as a buyer. [FINANCIAL] "+
-						"Requires: order must be in a cancellable state (e.g., AWAITING_FULFILLMENT for direct payment). "+
+						"Requires: order must be in a cancellable state (e.g., AWAITING_SHIPMENT for direct payment). "+
 						"After: order is cancelled and escrowed funds are returned to the buyer on-chain. "+
 						"The AI client MUST confirm with the user before calling this tool.",
 				),
@@ -168,7 +168,7 @@ func ordersToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 			Tool: gomcp.NewTool("orders_complete",
 				gomcp.WithDescription(
 					"Complete an order, releasing escrow funds to the seller. "+
-						"Requires: order must be in FULFILLED state (buyer action). "+
+						"Requires: order must be in SHIPPED state (buyer action). "+
 						"After: payment is finalized and released from escrow to the seller. "+
 						"This is typically a buyer action after receiving their goods.",
 				),
@@ -253,7 +253,7 @@ func makeOrderDecline(bf BridgeFactory) server.ToolHandlerFunc {
 	}
 }
 
-func makeOrderFulfill(bf BridgeFactory) server.ToolHandlerFunc {
+func makeOrderShip(bf BridgeFactory) server.ToolHandlerFunc {
 	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 		orderID := req.GetString("order_id", "")
 		if orderID == "" {
@@ -274,7 +274,7 @@ func makeOrderFulfill(bf BridgeFactory) server.ToolHandlerFunc {
 			}
 		}
 
-		path := fmt.Sprintf("/v1/orders/%s/fulfill", url.PathEscape(orderID))
+		path := fmt.Sprintf("/v1/orders/%s/ship", url.PathEscape(orderID))
 		code, body, err := bridge.Call(ctx, "POST", path, nil, payload)
 		return HandleBridgeResult(code, body, err)
 	}

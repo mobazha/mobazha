@@ -9,10 +9,10 @@ import (
 // OrderProtectionPolicy defines buyer-protection timeout parameters for a
 // specific contract type. All durations are expressed in calendar days.
 type OrderProtectionPolicy struct {
-	// AutoCompleteAfterShipDays: days after fulfillment before auto-complete.
+	// AutoCompleteAfterShipDays: days after shipment before auto-complete.
 	AutoCompleteAfterShipDays int
-	// MaxFulfillDays: days after payment before auto-refund if unfulfilled.
-	MaxFulfillDays int
+	// MaxShipDays: days after payment before auto-refund if not shipped.
+	MaxShipDays int
 	// AfterSaleWindowDays: dispute window after auto-complete.
 	AfterSaleWindowDays int
 	// ExtendProtectionDays: buyer may extend protection (physical goods only; 0 = not allowed).
@@ -30,9 +30,9 @@ func (p OrderProtectionPolicy) AutoCompleteDuration() time.Duration {
 	return time.Duration(p.AutoCompleteAfterShipDays) * 24 * time.Hour
 }
 
-// MaxFulfillDuration returns MaxFulfillDays as time.Duration.
-func (p OrderProtectionPolicy) MaxFulfillDuration() time.Duration {
-	return time.Duration(p.MaxFulfillDays) * 24 * time.Hour
+// MaxShipDuration returns MaxShipDays as time.Duration.
+func (p OrderProtectionPolicy) MaxShipDuration() time.Duration {
+	return time.Duration(p.MaxShipDays) * 24 * time.Hour
 }
 
 // AfterSaleWindowDuration returns AfterSaleWindowDays as time.Duration.
@@ -43,7 +43,7 @@ func (p OrderProtectionPolicy) AfterSaleWindowDuration() time.Duration {
 var defaultProtectionPolicies = map[pb.Listing_Metadata_ContractType]OrderProtectionPolicy{
 	pb.Listing_Metadata_PHYSICAL_GOOD: {
 		AutoCompleteAfterShipDays: 14,
-		MaxFulfillDays:            7,
+		MaxShipDays:               7,
 		AfterSaleWindowDays:       7,
 		ExtendProtectionDays:      14,
 		DisputeNegotiationDays:    7,
@@ -52,7 +52,7 @@ var defaultProtectionPolicies = map[pb.Listing_Metadata_ContractType]OrderProtec
 	},
 	pb.Listing_Metadata_DIGITAL_GOOD: {
 		AutoCompleteAfterShipDays: 3,
-		MaxFulfillDays:            3,
+		MaxShipDays:               3,
 		AfterSaleWindowDays:       7,
 		ExtendProtectionDays:      0,
 		DisputeNegotiationDays:    7,
@@ -61,7 +61,7 @@ var defaultProtectionPolicies = map[pb.Listing_Metadata_ContractType]OrderProtec
 	},
 	pb.Listing_Metadata_SERVICE: {
 		AutoCompleteAfterShipDays: 7,
-		MaxFulfillDays:            3,
+		MaxShipDays:               3,
 		AfterSaleWindowDays:       7,
 		ExtendProtectionDays:      0,
 		DisputeNegotiationDays:    7,
@@ -106,7 +106,7 @@ func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 	policy := DefaultProtectionPolicy(o.ContractType())
 
 	switch o.State {
-	case OrderState_AWAITING_FULFILLMENT:
+	case OrderState_AWAITING_SHIPMENT:
 		return &OrderProtectionInfo{
 			Stage:               ProtectionStageEscrowed,
 			DaysRemaining:       0,
@@ -115,13 +115,13 @@ func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 			AfterSaleWindowDays: policy.AfterSaleWindowDays,
 		}
 
-	case OrderState_FULFILLED:
+	case OrderState_SHIPPED:
 		extended := o.ProtectionExtendedAt != nil
 		totalDuration := policy.AutoCompleteDuration()
 		if extended {
 			totalDuration += time.Duration(policy.ExtendProtectionDays) * 24 * time.Hour
 		}
-		if o.FulfilledAt == nil {
+		if o.ShippedAt == nil {
 			totalDays := policy.AutoCompleteAfterShipDays
 			if extended {
 				totalDays += policy.ExtendProtectionDays
@@ -134,7 +134,7 @@ func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 				AfterSaleWindowDays: policy.AfterSaleWindowDays,
 			}
 		}
-		deadline := o.FulfilledAt.Add(totalDuration)
+		deadline := o.ShippedAt.Add(totalDuration)
 		daysLeft := daysUntil(now, deadline)
 		return &OrderProtectionInfo{
 			Stage:               ProtectionStageProtectionPeriod,
@@ -168,8 +168,8 @@ func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 			DaysRemaining:       0,
 			AfterSaleWindowDays: policy.AfterSaleWindowDays,
 		}
-		if o.FulfilledAt != nil {
-			deadline := o.FulfilledAt.Add(policy.AutoCompleteDuration())
+		if o.ShippedAt != nil {
+			deadline := o.ShippedAt.Add(policy.AutoCompleteDuration())
 			daysLeft := daysUntil(now, deadline)
 			info.DaysRemaining = daysLeft
 			info.AutoCompleteAt = &deadline

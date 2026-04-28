@@ -57,9 +57,9 @@ func SellerTools() []ToolDefinition {
 			Parameters:  mustJSON(`{"type":"object","properties":{"orderId":{"type":"string","description":"Order ID to decline"},"reason":{"type":"string","description":"Decline reason"}},"required":["orderId"]}`),
 		},
 		{
-			Name:        "orders_fulfill",
-			Description: "Mark an order as shipped/fulfilled.",
-			Parameters:  mustJSON(`{"type":"object","properties":{"orderId":{"type":"string","description":"Order ID"},"shipper":{"type":"string","description":"Shipping carrier name"},"trackingNumber":{"type":"string","description":"Tracking number"},"note":{"type":"string","description":"Fulfillment note"}},"required":["orderId"]}`),
+			Name:        "orders_ship",
+			Description: "Mark an order as shipped.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"orderId":{"type":"string","description":"Order ID"},"shipper":{"type":"string","description":"Shipping carrier name"},"trackingNumber":{"type":"string","description":"Tracking number"},"note":{"type":"string","description":"Shipment note"}},"required":["orderId"]}`),
 		},
 		{
 			Name:        "orders_refund",

@@ -69,8 +69,8 @@ func TestCanRequestAfterSale_VendorRejected(t *testing.T) {
 func TestCanRequestAfterSale_WrongState(t *testing.T) {
 	completedAt := time.Now().Add(-1 * 24 * time.Hour)
 	states := []OrderState{
-		OrderState_AWAITING_FULFILLMENT,
-		OrderState_FULFILLED,
+		OrderState_AWAITING_SHIPMENT,
+		OrderState_SHIPPED,
 		OrderState_CANCELED,
 		OrderState_DECLINED,
 		OrderState_DISPUTED,

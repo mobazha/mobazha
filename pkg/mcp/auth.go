@@ -102,7 +102,7 @@ var toolScopeRequirement = map[string]string{
 	"listings_delete":          string(contracts.ScopeListingsWrite),
 	"orders_confirm":           string(contracts.ScopeOrdersManage),
 	"orders_decline":           string(contracts.ScopeOrdersManage),
-	"orders_fulfill":           string(contracts.ScopeOrdersManage),
+	"orders_ship":              string(contracts.ScopeOrdersManage),
 	"orders_refund":            string(contracts.ScopeOrdersManage),
 	"orders_cancel":            string(contracts.ScopeOrdersManage),
 	"orders_complete":          string(contracts.ScopeOrdersManage),

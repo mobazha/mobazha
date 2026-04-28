@@ -681,7 +681,7 @@ func TestFiatService_HandleWebhook_RefundCreated_TransitionsToRefunded(t *testin
 
 	svc, _ := newFiatTestService(t, reg)
 	repo := newMockOrderRepo()
-	repo.addOrder(&models.Order{ID: "order_rf_001", State: models.OrderState_FULFILLED})
+	repo.addOrder(&models.Order{ID: "order_rf_001", State: models.OrderState_SHIPPED})
 	svc.SetOrderRepo(repo)
 
 	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
@@ -734,7 +734,7 @@ func TestFiatService_HandleWebhook_DisputeOpened_StoresMetadata(t *testing.T) {
 
 	svc, _ := newFiatTestService(t, reg)
 	repo := newMockOrderRepo()
-	repo.addOrder(&models.Order{ID: "order_do_001", State: models.OrderState_FULFILLED})
+	repo.addOrder(&models.Order{ID: "order_do_001", State: models.OrderState_SHIPPED})
 	svc.SetOrderRepo(repo)
 
 	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
@@ -766,7 +766,7 @@ func TestFiatService_HandleWebhook_DisputeResolved_Lost_TransitionsToRefunded(t 
 
 	svc, _ := newFiatTestService(t, reg)
 	repo := newMockOrderRepo()
-	repo.addOrder(&models.Order{ID: "order_dr_lost", State: models.OrderState_FULFILLED})
+	repo.addOrder(&models.Order{ID: "order_dr_lost", State: models.OrderState_SHIPPED})
 	svc.SetOrderRepo(repo)
 
 	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
@@ -800,7 +800,7 @@ func TestFiatService_HandleWebhook_DisputeResolved_Lost_SaveFails_ReturnsError(t
 
 	svc, _ := newFiatTestService(t, reg)
 	repo := newMockOrderRepo()
-	repo.addOrder(&models.Order{ID: "order_dr_sf", State: models.OrderState_FULFILLED})
+	repo.addOrder(&models.Order{ID: "order_dr_sf", State: models.OrderState_SHIPPED})
 	repo.saveErr = errors.New("db connection lost")
 	svc.SetOrderRepo(repo)
 
@@ -1018,14 +1018,14 @@ func TestDisconnectProvider_ActiveOrders_ReturnsError(t *testing.T) {
 	svc, db := newFiatTestServiceWithOrders(t, reg)
 
 	seedFiatOrder(t, db, &models.Order{
-		ID: "fulfillment-order",
+		ID: "shipped-order",
 		OrderPaymentState: models.OrderPaymentState{
 			FiatPaymentState: models.FiatPaymentState{
-				PaymentTransactionID: "pi_fulfill_123",
+				PaymentTransactionID: "pi_ship_123",
 				FiatMetadata:         []byte(`{"fiat_provider":"stripe"}`),
 			},
 		},
-	}, models.OrderState_AWAITING_FULFILLMENT)
+	}, models.OrderState_AWAITING_SHIPMENT)
 
 	svc.SetOrderRepo(newMockOrderRepo())
 
@@ -1113,7 +1113,7 @@ func TestDisconnectProvider_CryptoOrderDoesNotBlock(t *testing.T) {
 				PaymentTransactionID: "0xabc123",
 			},
 		},
-	}, models.OrderState_AWAITING_FULFILLMENT)
+	}, models.OrderState_AWAITING_SHIPMENT)
 
 	svc.SetOrderRepo(newMockOrderRepo())
 

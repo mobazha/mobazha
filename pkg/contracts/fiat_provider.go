@@ -151,7 +151,7 @@ type FiatService interface {
 	SaveProviderConfig(providerID string, cfg ProviderConfigInput) error
 
 	// DisconnectProvider safely disconnects a fiat provider after checking for active orders.
-	// Returns ErrActiveOrdersExist if orders in fulfillment/dispute states exist.
+	// Returns ErrActiveOrdersExist if orders in shipment/dispute states exist.
 	// Cancels any AWAITING_PAYMENT sessions before cleaning up config.
 	DisconnectProvider(ctx context.Context, providerID string) error
 

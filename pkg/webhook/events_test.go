@@ -18,7 +18,7 @@ func TestClassifyEvent_AllTypes(t *testing.T) {
 		{"OrderFunded", events.OrderFunded{}, EventOrderFunded},
 		{"OrderPaymentReceived", events.OrderPaymentReceived{}, EventOrderPaymentReceived},
 		{"OrderConfirmation", events.OrderConfirmation{}, EventOrderConfirmed},
-		{"OrderFulfillment", events.OrderFulfillment{}, EventOrderFulfilled},
+		{"OrderShipment", events.OrderShipment{}, EventOrderShipped},
 		{"OrderCompletion", events.OrderCompletion{}, EventOrderCompleted},
 		{"OrderCancel", events.OrderCancel{}, EventOrderCancelled},
 		{"OrderDeclined", events.OrderDeclined{}, EventOrderDeclined},

@@ -45,31 +45,31 @@ func TestOrderStateBridge_HappyPath(t *testing.T) {
 		t.Errorf("Expected Pending, got %d", newState)
 	}
 
-	// PENDING + VendorConfirm → AWAITING_FULFILLMENT
+	// PENDING + VendorConfirm → AWAITING_SHIPMENT
 	newState, valid = bridge.ValidateTransition(
 		int(orders.StatePending), int(orders.EventVendorConfirm))
 	if !valid {
 		t.Fatal("Expected valid transition Pending + VendorConfirm")
 	}
-	if newState != int(orders.StateAwaitingFulfillment) {
-		t.Errorf("Expected AwaitingFulfillment, got %d", newState)
+	if newState != int(orders.StateAwaitingShipment) {
+		t.Errorf("Expected AwaitingShipment, got %d", newState)
 	}
 
-	// AWAITING_FULFILLMENT + OrderFulfilled → FULFILLED
+	// AWAITING_SHIPMENT + OrderShipped → SHIPPED
 	newState, valid = bridge.ValidateTransition(
-		int(orders.StateAwaitingFulfillment), int(orders.EventOrderFulfilled))
+		int(orders.StateAwaitingShipment), int(orders.EventOrderShipped))
 	if !valid {
-		t.Fatal("Expected valid transition AwaitingFulfillment + OrderFulfilled")
+		t.Fatal("Expected valid transition AwaitingShipment + OrderShipped")
 	}
-	if newState != int(orders.StateFulfilled) {
-		t.Errorf("Expected Fulfilled, got %d", newState)
+	if newState != int(orders.StateShipped) {
+		t.Errorf("Expected Shipped, got %d", newState)
 	}
 
-	// FULFILLED + BuyerComplete → COMPLETED
+	// SHIPPED + BuyerComplete → COMPLETED
 	newState, valid = bridge.ValidateTransition(
-		int(orders.StateFulfilled), int(orders.EventBuyerComplete))
+		int(orders.StateShipped), int(orders.EventBuyerComplete))
 	if !valid {
-		t.Fatal("Expected valid transition Fulfilled + BuyerComplete")
+		t.Fatal("Expected valid transition Shipped + BuyerComplete")
 	}
 	if newState != int(orders.StateCompleted) {
 		t.Errorf("Expected Completed, got %d", newState)

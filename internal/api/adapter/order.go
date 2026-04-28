@@ -12,7 +12,7 @@ const (
 	Signature_LISTING            Signature_Section = 0
 	Signature_ORDER              Signature_Section = 1
 	Signature_ORDER_CONFIRMATION Signature_Section = 2
-	Signature_ORDER_FULFILLMENT  Signature_Section = 3
+	Signature_ORDER_SHIPMENT     Signature_Section = 3
 	Signature_ORDER_COMPLETION   Signature_Section = 4
 	Signature_DISPUTE            Signature_Section = 5
 	Signature_DISPUTE_RESOLUTION Signature_Section = 6
@@ -23,7 +23,7 @@ var Signature_Section_name = map[int32]string{
 	0: "LISTING",
 	1: "ORDER",
 	2: "ORDER_CONFIRMATION",
-	3: "ORDER_FULFILLMENT",
+	3: "ORDER_SHIPMENT",
 	4: "ORDER_COMPLETION",
 	5: "DISPUTE",
 	6: "DISPUTE_RESOLUTION",
@@ -34,7 +34,7 @@ var Signature_Section_value = map[string]int32{
 	"LISTING":            0,
 	"ORDER":              1,
 	"ORDER_CONFIRMATION": 2,
-	"ORDER_FULFILLMENT":  3,
+	"ORDER_SHIPMENT":     3,
 	"ORDER_COMPLETION":   4,
 	"DISPUTE":            5,
 	"DISPUTE_RESOLUTION": 6,
@@ -45,7 +45,7 @@ type RicardianContract struct {
 	VendorListings          []*pb.SignedListing    `json:"vendorListings,omitempty"`
 	BuyerOrder              *pb.OrderOpen          `json:"buyerOrder,omitempty"`
 	VendorOrderConfirmation *pb.OrderConfirmation  `json:"vendorOrderConfirmation,omitempty"`
-	VendorOrderFulfillment  []*pb.OrderFulfillment `json:"vendorOrderFulfillment,omitempty"`
+	VendorOrderShipments    []*pb.OrderShipment    `json:"vendorOrderShipments,omitempty"`
 	BuyerOrderCompletion    *pb.OrderComplete      `json:"buyerOrderCompletion,omitempty"`
 	Dispute                 *pb.DisputeOpen        `json:"dispute,omitempty"`
 	DisputeResolution       *DisputeResolution     `json:"disputeResolution,omitempty"`

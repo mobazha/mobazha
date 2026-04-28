@@ -105,7 +105,7 @@ type OrderTimeoutState struct {
 
 	// LastStateChangeAt records when the order last transitioned to its
 	// current State via SetFSMState. Used by the timeout scheduler to
-	// detect stale PENDING / AWAITING_FULFILLMENT / DISPUTED orders.
+	// detect stale PENDING / AWAITING_SHIPMENT / DISPUTED orders.
 	LastStateChangeAt *time.Time `gorm:"index"`
 
 	// TimeoutWarnedAt tracks whether a stale-order warning has already
@@ -113,15 +113,15 @@ type OrderTimeoutState struct {
 	TimeoutWarnedAt *time.Time
 }
 
-// OrderLifecycle groups payment/fulfillment/completion timestamps.
+// OrderLifecycle groups payment/shipment/completion timestamps.
 type OrderLifecycle struct {
 	// PaidAt records when the payment was verified (chain-confirmed or fiat-captured).
-	// Used by OrderAutoRefundJob to enforce maxFulfillDays deadline.
+	// Used by OrderAutoRefundJob to enforce maxShipDays deadline.
 	PaidAt *time.Time `gorm:"index"`
 
-	// FulfilledAt records when all items were fulfilled (vendor shipped).
+	// ShippedAt records when all items were shipped by the vendor.
 	// Used by OrderAutoCompleteJob to enforce autoCompleteAfterShipDays deadline.
-	FulfilledAt *time.Time `gorm:"index"`
+	ShippedAt *time.Time `gorm:"index"`
 
 	// CompletedAt records when the order transitioned to COMPLETED (buyer confirm or auto-complete).
 	// Used to calculate afterSaleWindowDays expiry.
@@ -241,8 +241,8 @@ type Order struct {
 	PaymentFinalizedSignature  string
 	PaymentFinalizedAcked      bool
 
-	SerializedOrderFulfillments []byte
-	OrderFulfillmentAcked       bool
+	SerializedOrderShipments []byte
+	OrderShipmentAcked       bool
 
 	SerializedRefunds []byte
 	RefundAcked       bool
@@ -677,20 +677,20 @@ func (o *Order) RatingSignaturesMessage() (*pb.RatingSignatures, error) {
 	return ratingSignatures, nil
 }
 
-// OrderFulfillmentMessage returns the unmarshalled proto objects if they exists in the order.
-func (o *Order) OrderFulfillmentMessages() ([]*pb.OrderFulfillment, error) {
-	if len(o.SerializedOrderFulfillments) == 0 {
+// OrderShipmentMessages returns the unmarshalled proto objects if they exist in the order.
+func (o *Order) OrderShipmentMessages() ([]*pb.OrderShipment, error) {
+	if len(o.SerializedOrderShipments) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
-	fulfillmentList := new(pb.FulfillmentList)
-	if err := unmarshaler.Unmarshal(o.SerializedOrderFulfillments, fulfillmentList); err != nil {
+	shipmentList := new(pb.ShipmentList)
+	if err := unmarshaler.Unmarshal(o.SerializedOrderShipments, shipmentList); err != nil {
 		return nil, err
 	}
-	fulfillments := make([]*pb.OrderFulfillment, 0, len(fulfillmentList.Messages))
-	for _, m := range fulfillmentList.Messages {
-		fulfillments = append(fulfillments, m.FulfillmentMessage)
+	shipments := make([]*pb.OrderShipment, 0, len(shipmentList.Messages))
+	for _, m := range shipmentList.Messages {
+		shipments = append(shipments, m.ShipmentMessage)
 	}
-	return fulfillments, nil
+	return shipments, nil
 }
 
 // OrderCompleteMessage returns the unmarshalled proto object if it exists in the order.
@@ -860,34 +860,34 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 		msg = new(pb.DisputeAccept)
 		setMessage = func(ser []byte) { o.SerializedDisputeAccepted = ser }
 		o.DisputeAcceptedSignature = sig
-	case npb.OrderMessage_ORDER_FULFILLMENT:
-		fulfillmentMsg := new(pb.OrderFulfillment)
-		if err := message.Message.UnmarshalTo(fulfillmentMsg); err != nil {
+	case npb.OrderMessage_ORDER_SHIPMENT:
+		shipmentMsg := new(pb.OrderShipment)
+		if err := message.Message.UnmarshalTo(shipmentMsg); err != nil {
 			return err
 		}
 
-		fulfillmentList := new(pb.FulfillmentList)
-		if o.SerializedOrderFulfillments != nil {
-			if err := unmarshaler.Unmarshal(o.SerializedOrderFulfillments, fulfillmentList); err != nil {
+		shipmentList := new(pb.ShipmentList)
+		if o.SerializedOrderShipments != nil {
+			if err := unmarshaler.Unmarshal(o.SerializedOrderShipments, shipmentList); err != nil {
 				return err
 			}
 		}
-		for _, f := range fulfillmentList.Messages {
-			for _, item := range f.FulfillmentMessage.Fulfillments {
-				for _, fulfilledItems := range fulfillmentMsg.Fulfillments {
-					if item.ItemIndex == fulfilledItems.ItemIndex {
+		for _, f := range shipmentList.Messages {
+			for _, item := range f.ShipmentMessage.Shipments {
+				for _, newItem := range shipmentMsg.Shipments {
+					if item.ItemIndex == newItem.ItemIndex {
 						return ErrDuplicateTransaction
 					}
 				}
 			}
 		}
-		fulfillmentList.Messages = append(fulfillmentList.Messages, &pb.FulfillmentList_Message{
-			FulfillmentMessage: fulfillmentMsg,
-			Signature:          message.Signature,
+		shipmentList.Messages = append(shipmentList.Messages, &pb.ShipmentList_Message{
+			ShipmentMessage: shipmentMsg,
+			Signature:       message.Signature,
 		})
-		ser := marshaler.Format(fulfillmentList)
+		ser := marshaler.Format(shipmentList)
 
-		o.SerializedOrderFulfillments = []byte(ser)
+		o.SerializedOrderShipments = []byte(ser)
 		return nil
 	case npb.OrderMessage_REFUND:
 		refundMsg := new(pb.Refund)
@@ -1034,7 +1034,7 @@ func (o *Order) CanDecline() bool {
 
 	// Cannot cancel if the order has progressed passed order open.
 	if o.SerializedOrderDecline != nil || o.SerializedOrderCancel != nil ||
-		o.SerializedOrderConfirmation != nil || o.SerializedOrderFulfillments != nil ||
+		o.SerializedOrderConfirmation != nil || o.SerializedOrderShipments != nil ||
 		o.SerializedOrderComplete != nil || o.SerializedDisputeOpen != nil ||
 		o.SerializedDisputeUpdate != nil || o.SerializedDisputeClosed != nil ||
 		o.SerializedRefunds != nil || o.SerializedPaymentFinalized != nil {
@@ -1068,7 +1068,7 @@ func (o *Order) CanConfirm() bool {
 
 	// Cannot confirm if the order has progressed passed order open.
 	if o.SerializedOrderDecline != nil || o.SerializedOrderCancel != nil ||
-		o.SerializedOrderConfirmation != nil || o.SerializedOrderFulfillments != nil ||
+		o.SerializedOrderConfirmation != nil || o.SerializedOrderShipments != nil ||
 		o.SerializedOrderComplete != nil || o.SerializedDisputeOpen != nil ||
 		o.SerializedDisputeUpdate != nil || o.SerializedDisputeClosed != nil ||
 		o.SerializedRefunds != nil || o.SerializedPaymentFinalized != nil {
@@ -1094,7 +1094,7 @@ func (o *Order) CanCancel() bool {
 
 	// Cannot cancel if the order has progressed passed order open.
 	if o.SerializedOrderDecline != nil || o.SerializedOrderCancel != nil ||
-		o.SerializedOrderConfirmation != nil || o.SerializedOrderFulfillments != nil ||
+		o.SerializedOrderConfirmation != nil || o.SerializedOrderShipments != nil ||
 		o.SerializedOrderComplete != nil || o.SerializedDisputeOpen != nil ||
 		o.SerializedDisputeUpdate != nil || o.SerializedDisputeClosed != nil ||
 		o.SerializedRefunds != nil || o.SerializedPaymentFinalized != nil {
@@ -1131,16 +1131,15 @@ func (o *Order) CanRefund() bool {
 	return true
 }
 
-// CanFulfill returns whether or not this order is in a state where the user can
-// fulfill the order.
-func (o *Order) CanFulfill() bool {
+// CanShip returns whether or not this order is in a state where the seller can ship.
+func (o *Order) CanShip() bool {
 	// OrderOpen must exist.
 	_, err := o.OrderOpenMessage()
 	if err != nil {
 		return false
 	}
 
-	// Only vendors can fulfill.
+	// Only vendors can ship.
 	if o.Role() != RoleVendor {
 		return false
 	}
@@ -1160,17 +1159,17 @@ func (o *Order) CanFulfill() bool {
 		return false
 	}
 
-	// Order must not be fulfilled already.
-	fulfilled, err := o.IsFulfilled()
+	// Order must not be fully shipped already.
+	shipped, err := o.IsShipped()
 	if err != nil {
 		return false
 	}
 
-	if fulfilled {
+	if shipped {
 		return false
 	}
 
-	// Cannot fulfill if the order has been completed or canceled.
+	// Cannot ship if the order has been completed or canceled.
 	if o.SerializedOrderComplete != nil || o.SerializedRefunds != nil || o.SerializedPaymentFinalized != nil || o.SerializedOrderCancel != nil || o.SerializedDisputeOpen != nil {
 		return false
 	}
@@ -1192,13 +1191,13 @@ func (o *Order) CanComplete() bool {
 		return false
 	}
 
-	fulfilled, err := o.IsFulfilled()
+	shipped, err := o.IsShipped()
 	if err != nil {
 		return false
 	}
 
-	// Order must be fulfilled
-	if !fulfilled {
+	// Order must be fully shipped.
+	if !shipped {
 		return false
 	}
 
@@ -1230,13 +1229,13 @@ func (o *Order) CanDispute() bool {
 	}
 
 	if o.Role() == RoleVendor {
-		fulfilled, err := o.IsFulfilled()
+		shipped, err := o.IsShipped()
 		if err != nil {
 			return false
 		}
 
-		// Vendor must fulfill order prior to disputing.
-		if !fulfilled {
+		// Vendor must ship the order prior to disputing.
+		if !shipped {
 			return false
 		}
 	}
@@ -1315,22 +1314,22 @@ func (o *Order) DeriveState() OrderState {
 		return OrderState_PENDING
 	}
 
-	fulfillments, err := o.OrderFulfillmentMessages()
+	shipments, err := o.OrderShipmentMessages()
 	if err != nil && !IsMessageNotExistError(err) {
 		return OrderState_PROCESSING_ERROR
 	}
 
-	if cloneOrder.CanFulfill() && len(fulfillments) == 0 {
-		return OrderState_AWAITING_FULFILLMENT
+	if cloneOrder.CanShip() && len(shipments) == 0 {
+		return OrderState_AWAITING_SHIPMENT
 	}
 
-	if cloneOrder.CanFulfill() && len(fulfillments) > 0 {
-		return OrderState_PARTIALLY_FULFILLED
+	if cloneOrder.CanShip() && len(shipments) > 0 {
+		return OrderState_PARTIALLY_SHIPPED
 	}
 
 	cloneOrder.MyRole = string(RoleBuyer)
 	if cloneOrder.CanComplete() {
-		return OrderState_FULFILLED
+		return OrderState_SHIPPED
 	}
 
 	if cloneOrder.SerializedOrderComplete != nil {
@@ -1443,8 +1442,8 @@ func (o *Order) IsFunded() (bool, error) {
 	return false, nil
 }
 
-// IsFulfilled returns whether a fulfillment message is saved for each item in the order.
-func (o *Order) IsFulfilled() (bool, error) {
+// IsShipped returns whether a shipment message is saved for each item in the order.
+func (o *Order) IsShipped() (bool, error) {
 	orderOpen, err := o.OrderOpenMessage()
 	if err != nil {
 		return false, err
@@ -1456,13 +1455,13 @@ func (o *Order) IsFulfilled() (bool, error) {
 		m[i] = true
 	}
 
-	fulfillments, err := o.OrderFulfillmentMessages()
+	shipments, err := o.OrderShipmentMessages()
 	if err != nil && !IsMessageNotExistError(err) {
 		return false, err
 	}
 
-	for _, f := range fulfillments {
-		for _, f2 := range f.Fulfillments {
+	for _, f := range shipments {
+		for _, f2 := range f.Shipments {
 			delete(m, int(f2.ItemIndex))
 		}
 	}
@@ -1577,7 +1576,7 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
 		return nil, err
 	}
-	contract.OrderFulfillments, err = o.OrderFulfillmentMessages()
+	contract.OrderShipments, err = o.OrderShipmentMessages()
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
 		return nil, err
 	}
@@ -1650,7 +1649,7 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	contract.DisputeCloseAcked = o.DisputeClosedAcked
 	contract.DisputeAcceptAcked = o.DisputeAcceptedAcked
 	contract.PaymentFinalizedAcked = o.PaymentFinalizedAcked
-	contract.FulfillmentsAcked = o.OrderFulfillmentAcked
+	contract.ShipmentsAcked = o.OrderShipmentAcked
 	contract.RefundsAcked = o.RefundAcked
 	contract.PaymentSentAcked = o.PaymentSentAcked
 

@@ -89,7 +89,7 @@ type InstructionParams struct {
 	// internal/core/ type-assert to *models.Order.
 	OrderData any
 
-	// ReleaseInfo carries fulfillment release data for complete operations.
+	// ReleaseInfo carries shipment release data for complete operations.
 	//
 	// Concrete type: *pb.EscrowRelease (pkg/orders/mbzpb.EscrowRelease).
 	// Passed as any to keep pkg/payment free of protobuf imports — adapters

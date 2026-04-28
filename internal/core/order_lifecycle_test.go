@@ -406,7 +406,7 @@ func waitForDone(t *testing.T, done chan struct{}, opName string) {
 // registry initialized. They serve two purposes:
 //
 // 1. Verify the registry setup doesn't interfere with normal order flows
-// 2. Validate the complete happy path: Purchase → Payment → Confirm → Fulfill → Complete
+// 2. Validate the complete happy path: Purchase → Payment → Confirm → Ship → Complete
 //
 // Note on CANCELABLE path: The full CANCELABLE → auto-confirm flow requires
 // GetUTXOPaymentInfo which calls CalculateOrderTotalInCurrency. This function
@@ -417,7 +417,7 @@ func waitForDone(t *testing.T, done chan struct{}, opName string) {
 
 // TestOrderLifecycle_RegistryDriven_FullHappyPath tests the complete happy path:
 //
-//	Purchase → DIRECT Payment → Seller Confirm → Fulfill → Complete
+//	Purchase → DIRECT Payment → Seller Confirm → Ship → Complete
 //
 // This test initializes the payment registry on the seller node (matching
 // production setup) and verifies the full lifecycle completes correctly.
@@ -588,18 +588,18 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 		t.Fatal("Timeout waiting for confirm ACK on seller")
 	}
 
-	// ── Step 5: Seller Fulfills ─────────────────────────────────
-	fulfillSub, err := buyerNode.eventBus.Subscribe(&events.OrderFulfillment{})
+	// ── Step 5: Seller Ships ─────────────────────────────────
+	shipSub, err := buyerNode.eventBus.Subscribe(&events.OrderShipment{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fulfillAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	shipAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done5 := make(chan struct{})
-	fulfillments := []models.Fulfillment{
+	shipments := []models.Shipment{
 		{
 			ItemIndex: 0,
 			PhysicalDelivery: &models.PhysicalDelivery{
@@ -608,23 +608,23 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 			},
 		},
 	}
-	if err := sellerNode.Order().FulfillOrder(orderID, fulfillments, done5); err != nil {
+	if err := sellerNode.Order().ShipOrder(orderID, shipments, done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
 	case <-done5:
 	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting for FulfillOrder")
+		t.Fatal("Timeout waiting for ShipOrder")
 	}
 	select {
-	case <-fulfillSub.Out():
+	case <-shipSub.Out():
 	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting for OrderFulfillment event on buyer")
+		t.Fatal("Timeout waiting for OrderShipment event on buyer")
 	}
 	select {
-	case <-fulfillAck.Out():
+	case <-shipAck.Out():
 	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting for fulfill ACK on seller")
+		t.Fatal("Timeout waiting for shipment ACK on seller")
 	}
 
 	// ── Step 6: Buyer Completes ─────────────────────────────────
@@ -681,8 +681,8 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	if buyerFinalOrder.SerializedOrderConfirmation == nil {
 		t.Error("Missing OrderConfirmation on buyer")
 	}
-	if buyerFinalOrder.SerializedOrderFulfillments == nil {
-		t.Error("Missing OrderFulfillments on buyer")
+	if buyerFinalOrder.SerializedOrderShipments == nil {
+		t.Error("Missing OrderShipments on buyer")
 	}
 	if buyerFinalOrder.SerializedOrderComplete == nil {
 		t.Error("Missing OrderComplete on buyer")
@@ -708,11 +708,11 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	if sellerFinalOrder.SerializedOrderConfirmation == nil {
 		t.Error("Missing OrderConfirmation on seller")
 	}
-	if sellerFinalOrder.SerializedOrderFulfillments == nil {
-		t.Error("Missing OrderFulfillments on seller")
+	if sellerFinalOrder.SerializedOrderShipments == nil {
+		t.Error("Missing OrderShipments on seller")
 	}
 
-	t.Log("✓ Full happy path with registry completed: Purchase → Payment → Confirm → Fulfill → Complete")
+	t.Log("✓ Full happy path with registry completed: Purchase → Payment → Confirm → Ship → Complete")
 }
 
 // TestOrderLifecycle_Cancelable_AutoConfirm tests the CANCELABLE payment lifecycle
@@ -720,7 +720,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 //
 //	Purchase → GetUTXOPaymentInfo → ProcessOrderPayment(CANCELABLE)
 //	         → CancelablePaymentReady event → registry dispatch → AutoConfirm
-//	         → Fulfill → Complete
+//	         → Ship → Complete
 //
 // This exercises the entire payment registry dispatch chain that DIRECT payment
 // bypasses, validating the core value of the payment architecture refactoring.
@@ -877,18 +877,18 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 		t.Fatal("Timeout waiting for auto-confirm OrderConfirmation on buyer")
 	}
 
-	// ── Step 6: Seller Fulfills ─────────────────────────────────
-	fulfillSub, err := buyerNode.eventBus.Subscribe(&events.OrderFulfillment{})
+	// ── Step 6: Seller Ships ─────────────────────────────────
+	shipSub, err := buyerNode.eventBus.Subscribe(&events.OrderShipment{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fulfillAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	shipAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done5 := make(chan struct{})
-	fulfillments := []models.Fulfillment{
+	shipments := []models.Shipment{
 		{
 			ItemIndex: 0,
 			PhysicalDelivery: &models.PhysicalDelivery{
@@ -897,23 +897,23 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 			},
 		},
 	}
-	if err := sellerNode.Order().FulfillOrder(orderID, fulfillments, done5); err != nil {
+	if err := sellerNode.Order().ShipOrder(orderID, shipments, done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
 	case <-done5:
 	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting for FulfillOrder")
+		t.Fatal("Timeout waiting for ShipOrder")
 	}
 	select {
-	case <-fulfillSub.Out():
+	case <-shipSub.Out():
 	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting for OrderFulfillment event on buyer")
+		t.Fatal("Timeout waiting for OrderShipment event on buyer")
 	}
 	select {
-	case <-fulfillAck.Out():
+	case <-shipAck.Out():
 	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting for fulfill ACK on seller")
+		t.Fatal("Timeout waiting for shipment ACK on seller")
 	}
 
 	// ── Step 7: Buyer Completes ─────────────────────────────────
@@ -970,8 +970,8 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	if buyerFinalOrder.SerializedOrderConfirmation == nil {
 		t.Error("Missing OrderConfirmation on buyer (auto-confirm failed?)")
 	}
-	if buyerFinalOrder.SerializedOrderFulfillments == nil {
-		t.Error("Missing OrderFulfillments on buyer")
+	if buyerFinalOrder.SerializedOrderShipments == nil {
+		t.Error("Missing OrderShipments on buyer")
 	}
 	if buyerFinalOrder.SerializedOrderComplete == nil {
 		t.Error("Missing OrderComplete on buyer")
@@ -997,11 +997,11 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	if sellerFinalOrder.SerializedOrderConfirmation == nil {
 		t.Error("Missing OrderConfirmation on seller")
 	}
-	if sellerFinalOrder.SerializedOrderFulfillments == nil {
-		t.Error("Missing OrderFulfillments on seller")
+	if sellerFinalOrder.SerializedOrderShipments == nil {
+		t.Error("Missing OrderShipments on seller")
 	}
 
-	t.Log("CANCELABLE auto-confirm lifecycle completed: Purchase -> CANCELABLE Payment -> AutoConfirm -> Fulfill -> Complete")
+	t.Log("CANCELABLE auto-confirm lifecycle completed: Purchase -> CANCELABLE Payment -> AutoConfirm -> Ship -> Complete")
 }
 
 // TestOrderLifecycle_Cancelable_BuyerCancel tests the buyer cancel path:
@@ -1334,7 +1334,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 
 // TestOrderLifecycle_Moderated_FullHappyPath tests the full moderated order lifecycle:
 //
-//	Purchase → MODERATED Payment → Seller Confirm → Fulfill → Complete
+//	Purchase → MODERATED Payment → Seller Confirm → Ship → Complete
 //
 // This is the 3-node escrow path: Seller (node[0]), Buyer (node[1]), Moderator (node[2]).
 // Uses 2-of-3 multisig escrow so that either buyer+seller or moderator+one-party
@@ -1422,18 +1422,18 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 	waitForEvent(t, confirmSub, "OrderConfirmation on buyer")
 	waitForEvent(t, confirmAck, "MessageACK (confirm) on seller")
 
-	// ── Step 6: Seller Fulfills ─────────────────────────────────
-	fulfillSub, err := buyerNode.eventBus.Subscribe(&events.OrderFulfillment{})
+	// ── Step 6: Seller Ships ─────────────────────────────────
+	shipSub, err := buyerNode.eventBus.Subscribe(&events.OrderShipment{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fulfillAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	shipAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done6 := make(chan struct{})
-	fulfillments := []models.Fulfillment{
+	shipments := []models.Shipment{
 		{
 			ItemIndex: 0,
 			PhysicalDelivery: &models.PhysicalDelivery{
@@ -1442,12 +1442,12 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 			},
 		},
 	}
-	if err := sellerNode.Order().FulfillOrder(orderID, fulfillments, done6); err != nil {
+	if err := sellerNode.Order().ShipOrder(orderID, shipments, done6); err != nil {
 		t.Fatal(err)
 	}
-	waitForDone(t, done6, "FulfillOrder")
-	waitForEvent(t, fulfillSub, "OrderFulfillment on buyer")
-	waitForEvent(t, fulfillAck, "MessageACK (fulfill) on seller")
+	waitForDone(t, done6, "ShipOrder")
+	waitForEvent(t, shipSub, "OrderShipment on buyer")
+	waitForEvent(t, shipAck, "MessageACK (shipment) on seller")
 
 	// ── Step 7: Buyer Completes ─────────────────────────────────
 	completeSub, err := sellerNode.eventBus.Subscribe(&events.OrderCompletion{})
@@ -1491,8 +1491,8 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 	if buyerOrder.SerializedOrderConfirmation == nil {
 		t.Error("Missing OrderConfirmation on buyer")
 	}
-	if buyerOrder.SerializedOrderFulfillments == nil {
-		t.Error("Missing OrderFulfillments on buyer")
+	if buyerOrder.SerializedOrderShipments == nil {
+		t.Error("Missing OrderShipments on buyer")
 	}
 	if buyerOrder.SerializedOrderComplete == nil {
 		t.Error("Missing OrderComplete on buyer")
@@ -1533,11 +1533,11 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 	if sellerOrder.SerializedOrderConfirmation == nil {
 		t.Error("Missing OrderConfirmation on seller")
 	}
-	if sellerOrder.SerializedOrderFulfillments == nil {
-		t.Error("Missing OrderFulfillments on seller")
+	if sellerOrder.SerializedOrderShipments == nil {
+		t.Error("Missing OrderShipments on seller")
 	}
 
-	t.Log("Moderated happy path completed: Purchase -> MODERATED Payment -> Confirm -> Fulfill -> Complete")
+	t.Log("Moderated happy path completed: Purchase -> MODERATED Payment -> Confirm -> Ship -> Complete")
 }
 
 // TestOrderLifecycle_Moderated_Dispute_FullResolution tests the 3-node dispute flow:

@@ -36,7 +36,7 @@ func (m *mockGuestSvc) GetGuestOrderStatus(ctx context.Context, token string) (*
 func (m *mockGuestSvc) ListGuestOrders(ctx context.Context, filter contracts.GuestOrderFilter) ([]models.GuestOrder, int64, error) {
 	return m.orders, m.total, m.err
 }
-func (m *mockGuestSvc) FulfillGuestOrder(ctx context.Context, token string, tracking, carrier string) error {
+func (m *mockGuestSvc) ShipGuestOrder(ctx context.Context, token string, tracking, carrier string) error {
 	return nil
 }
 func (m *mockGuestSvc) CompleteGuestOrder(ctx context.Context, token string) error {

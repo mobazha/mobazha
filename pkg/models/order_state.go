@@ -13,9 +13,9 @@ const (
 	OrderState_AWAITING_PAYMENT              = orders.StateAwaitingPayment
 	OrderState_AWAITING_PAYMENT_VERIFICATION = orders.StateAwaitingPaymentVerification
 	OrderState_AWAITING_PICKUP               = orders.StateAwaitingPickup
-	OrderState_AWAITING_FULFILLMENT          = orders.StateAwaitingFulfillment
-	OrderState_PARTIALLY_FULFILLED           = orders.StatePartiallyFulfilled
-	OrderState_FULFILLED                     = orders.StateFulfilled
+	OrderState_AWAITING_SHIPMENT             = orders.StateAwaitingShipment
+	OrderState_PARTIALLY_SHIPPED             = orders.StatePartiallyShipped
+	OrderState_SHIPPED                       = orders.StateShipped
 	OrderState_COMPLETED                     = orders.StateCompleted
 	OrderState_CANCELED                      = orders.StateCanceled
 	OrderState_DECLINED                      = orders.StateDeclined
@@ -33,9 +33,9 @@ var OrderState_name = map[int32]string{
 	int32(OrderState_AWAITING_PAYMENT):              "AWAITING_PAYMENT",
 	int32(OrderState_AWAITING_PAYMENT_VERIFICATION): "AWAITING_PAYMENT_VERIFICATION",
 	int32(OrderState_AWAITING_PICKUP):               "AWAITING_PICKUP",
-	int32(OrderState_AWAITING_FULFILLMENT):          "AWAITING_FULFILLMENT",
-	int32(OrderState_PARTIALLY_FULFILLED):           "PARTIALLY_FULFILLED",
-	int32(OrderState_FULFILLED):                     "FULFILLED",
+	int32(OrderState_AWAITING_SHIPMENT):             "AWAITING_SHIPMENT",
+	int32(OrderState_PARTIALLY_SHIPPED):             "PARTIALLY_SHIPPED",
+	int32(OrderState_SHIPPED):                       "SHIPPED",
 	int32(OrderState_COMPLETED):                     "COMPLETED",
 	int32(OrderState_CANCELED):                      "CANCELED",
 	int32(OrderState_DECLINED):                      "DECLINED",
@@ -53,9 +53,9 @@ var OrderState_value = map[string]int32{
 	"AWAITING_PAYMENT":              int32(OrderState_AWAITING_PAYMENT),
 	"AWAITING_PAYMENT_VERIFICATION": int32(OrderState_AWAITING_PAYMENT_VERIFICATION),
 	"AWAITING_PICKUP":               int32(OrderState_AWAITING_PICKUP),
-	"AWAITING_FULFILLMENT":          int32(OrderState_AWAITING_FULFILLMENT),
-	"PARTIALLY_FULFILLED":           int32(OrderState_PARTIALLY_FULFILLED),
-	"FULFILLED":                     int32(OrderState_FULFILLED),
+	"AWAITING_SHIPMENT":             int32(OrderState_AWAITING_SHIPMENT),
+	"PARTIALLY_SHIPPED":             int32(OrderState_PARTIALLY_SHIPPED),
+	"SHIPPED":                       int32(OrderState_SHIPPED),
 	"COMPLETED":                     int32(OrderState_COMPLETED),
 	"CANCELED":                      int32(OrderState_CANCELED),
 	"DECLINED":                      int32(OrderState_DECLINED),

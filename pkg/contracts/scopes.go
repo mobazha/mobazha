@@ -19,7 +19,7 @@ const (
 	ScopeListingsRead  Scope = "listings:read"
 	ScopeListingsWrite Scope = "listings:write"
 
-	// Orders (seller perspective: confirm, fulfill, refund)
+	// Orders (seller perspective: confirm, ship, refund)
 	ScopeOrdersRead   Scope = "orders:read"
 	ScopeOrdersManage Scope = "orders:manage"
 

@@ -58,7 +58,7 @@ func formatEmailEvent(meta events.EventMeta, event interface{}, storeURL string)
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
 		actionURL = orderActionURL(storeURL, e.OrderID)
 
-	case *events.OrderFulfillment:
+	case *events.OrderShipment:
 		subject = fmt.Sprintf("Order Shipped: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
 		actionURL = orderActionURL(storeURL, e.OrderID)

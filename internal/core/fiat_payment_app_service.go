@@ -766,7 +766,7 @@ func (s *FiatPaymentAppService) buildWebhookURL(providerID string) string {
 }
 
 // DisconnectProvider safely disconnects a fiat provider after verifying no active orders depend on it.
-// Orders in verification/fulfillment/dispute states block disconnect. AWAITING_PAYMENT sessions are canceled.
+// Orders in verification/shipment/dispute states block disconnect. AWAITING_PAYMENT sessions are canceled.
 func (s *FiatPaymentAppService) DisconnectProvider(ctx context.Context, providerID string) error {
 	if s.orderRepo == nil {
 		return s.deleteProviderConfig(ctx, providerID)
@@ -774,8 +774,8 @@ func (s *FiatPaymentAppService) DisconnectProvider(ctx context.Context, provider
 
 	blockingStates := []models.OrderState{
 		models.OrderState_AWAITING_PAYMENT_VERIFICATION,
-		models.OrderState_AWAITING_FULFILLMENT,
-		models.OrderState_PARTIALLY_FULFILLED,
+		models.OrderState_AWAITING_SHIPMENT,
+		models.OrderState_PARTIALLY_SHIPPED,
 		models.OrderState_DISPUTED,
 		models.OrderState_DECIDED,
 	}

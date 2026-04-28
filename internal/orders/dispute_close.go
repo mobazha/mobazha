@@ -140,10 +140,10 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 	if conf, err := order.OrderConfirmationMessage(); err == nil {
 		vendorAddrs.Add(conf.PayoutAddress)
 	}
-	if ffs, err := order.OrderFulfillmentMessages(); err == nil {
-		for _, ff := range ffs {
-			if ff.ReleaseInfo != nil {
-				vendorAddrs.Add(ff.ReleaseInfo.ToAddress)
+	if shipMsgs, err := order.OrderShipmentMessages(); err == nil {
+		for _, sm := range shipMsgs {
+			if sm.ReleaseInfo != nil {
+				vendorAddrs.Add(sm.ReleaseInfo.ToAddress)
 			}
 		}
 	}

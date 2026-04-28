@@ -164,7 +164,7 @@ func TestOrder_PutAndGet(t *testing.T) {
 		&pb.OrderCancel{},
 		&pb.OrderConfirmation{},
 		&pb.RatingSignatures{},
-		&pb.OrderFulfillment{},
+		&pb.OrderShipment{},
 		&pb.OrderComplete{},
 		&pb.DisputeOpen{},
 		&pb.DisputeClose{},
@@ -230,11 +230,11 @@ func TestOrder_PutAndGet(t *testing.T) {
 	if order.RatingSignaturesSignature == "" {
 		t.Error("signature is empty")
 	}
-	orderFulfillment, err := order.OrderFulfillmentMessages()
+	orderShipments, err := order.OrderShipmentMessages()
 	if err != nil {
 		t.Errorf("Get failed: %s", err)
 	}
-	if orderFulfillment == nil {
+	if orderShipments == nil {
 		t.Error("Message is nil")
 	}
 	orderComplete, err := order.OrderCompleteMessage()
@@ -316,7 +316,7 @@ func TestOrder_PutAndGet(t *testing.T) {
 	if err != ErrMessageDoesNotExist {
 		t.Errorf("Get failed to return correct error: %s", err)
 	}
-	orderFulfillment, err = order.OrderFulfillmentMessages()
+	orderShipments, err = order.OrderShipmentMessages()
 	if err != ErrMessageDoesNotExist {
 		t.Errorf("Get failed to return correct error: %s", err)
 	}
@@ -376,15 +376,15 @@ func TestOrder_Payments(t *testing.T) {
 	}
 }
 
-func TestOrder_Fulfillments(t *testing.T) {
+func TestOrder_Shipments(t *testing.T) {
 	var (
 		order Order
 		idx1  = uint32(1)
 		idx2  = uint32(2)
 	)
 
-	err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-		Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+	err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+		Shipments: []*pb.OrderShipment_ShippedItem{
 			{
 				ItemIndex: idx1,
 			},
@@ -394,8 +394,8 @@ func TestOrder_Fulfillments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-		Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+	err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+		Shipments: []*pb.OrderShipment_ShippedItem{
 			{
 				ItemIndex: idx2,
 			},
@@ -405,8 +405,8 @@ func TestOrder_Fulfillments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-		Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+	err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+		Shipments: []*pb.OrderShipment_ShippedItem{
 			{
 				ItemIndex: idx1,
 			},
@@ -416,16 +416,16 @@ func TestOrder_Fulfillments(t *testing.T) {
 		t.Errorf("Failed to return duplicate transaction error")
 	}
 
-	fulfillments, err := order.OrderFulfillmentMessages()
+	shipments, err := order.OrderShipmentMessages()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for fulfillments[0].Fulfillments[0].ItemIndex != idx1 {
-		t.Errorf("Incorrect index returned. Expected %d, got %d", idx1, fulfillments[0].Fulfillments[0].ItemIndex)
+	for shipments[0].Shipments[0].ItemIndex != idx1 {
+		t.Errorf("Incorrect index returned. Expected %d, got %d", idx1, shipments[0].Shipments[0].ItemIndex)
 	}
-	for fulfillments[1].Fulfillments[0].ItemIndex != idx2 {
-		t.Errorf("Incorrect index returned. Expected %d, got %d", idx2, fulfillments[1].Fulfillments[0].ItemIndex)
+	for shipments[1].Shipments[0].ItemIndex != idx2 {
+		t.Errorf("Incorrect index returned. Expected %d, got %d", idx2, shipments[1].Shipments[0].ItemIndex)
 	}
 }
 
@@ -675,9 +675,9 @@ func TestOrder_CanCancel(t *testing.T) {
 			canCancel: false,
 		},
 		{
-			// Non nil fulfillment
+			// Non nil shipment
 			setup: func(order *Order) error {
-				order.SerializedOrderFulfillments = []byte{0x00}
+				order.SerializedOrderShipments = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
@@ -864,9 +864,9 @@ func TestOrder_CanDecline(t *testing.T) {
 			canDecline: false,
 		},
 		{
-			// Non nil fulfillment
+			// Non nil shipment
 			setup: func(order *Order) error {
-				order.SerializedOrderFulfillments = []byte{0x00}
+				order.SerializedOrderShipments = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
@@ -976,8 +976,8 @@ func TestOrder_CanDispute(t *testing.T) {
 					return err
 				}
 
-				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+					Shipments: []*pb.OrderShipment_ShippedItem{
 						{
 							ItemIndex: 0,
 						},
@@ -1016,7 +1016,7 @@ func TestOrder_CanDispute(t *testing.T) {
 			canDispute: false,
 		},
 		{
-			// Not fulfilled
+			// Not shipped
 			setup: func(order *Order) error {
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
 					Items: []*pb.OrderOpen_Item{
@@ -1205,11 +1205,11 @@ func TestOrder_CanRefund(t *testing.T) {
 	}
 }
 
-func TestOrder_CanFulfill(t *testing.T) {
+func TestOrder_CanShip(t *testing.T) {
 	tests := []struct {
 		setup      func(order *Order) error
 		ourRole    OrderRole
-		canFulfill bool
+		canShip bool
 	}{
 		{
 			// Success
@@ -1234,7 +1234,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleVendor,
-			canFulfill: true,
+			canShip: true,
 		},
 		{
 			// Unfunded
@@ -1260,10 +1260,10 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleVendor,
-			canFulfill: false,
+			canShip: false,
 		},
 		{
-			// Already fulfilled
+			// Already shipped
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
 					Items: []*pb.OrderOpen_Item{
@@ -1281,8 +1281,8 @@ func TestOrder_CanFulfill(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+					Shipments: []*pb.OrderShipment_ShippedItem{
 						{
 							ItemIndex: 0,
 						},
@@ -1295,7 +1295,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleVendor,
-			canFulfill: false,
+			canShip: false,
 		},
 		{
 			// Is buyer
@@ -1316,7 +1316,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleBuyer,
-			canFulfill: false,
+			canShip: false,
 		},
 		{
 			// Order is nil
@@ -1324,7 +1324,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return nil
 			},
 			ourRole:    RoleVendor,
-			canFulfill: false,
+			canShip: false,
 		},
 		{
 			// Nil order confirmation
@@ -1346,7 +1346,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleVendor,
-			canFulfill: false,
+			canShip: false,
 		},
 		{
 			// Non nil cancel
@@ -1372,7 +1372,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleVendor,
-			canFulfill: false,
+			canShip: false,
 		},
 		{
 			// Non nil complete
@@ -1398,7 +1398,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleVendor,
-			canFulfill: false,
+			canShip: false,
 		},
 		{
 			// Non nil payment finalized
@@ -1424,7 +1424,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 				return err
 			},
 			ourRole:    RoleVendor,
-			canFulfill: false,
+			canShip: false,
 		},
 	}
 
@@ -1435,9 +1435,9 @@ func TestOrder_CanFulfill(t *testing.T) {
 		}
 		order.SetRole(test.ourRole)
 
-		canFulfill := order.CanFulfill()
-		if canFulfill != test.canFulfill {
-			t.Errorf("Test %d: Got incorrect result. Expected %t, got %t", i, test.canFulfill, canFulfill)
+		canShip := order.CanShip()
+		if canShip != test.canShip {
+			t.Errorf("Test %d: Got incorrect result. Expected %t, got %t", i, test.canShip, canShip)
 		}
 	}
 }
@@ -1525,9 +1525,9 @@ func TestOrder_CanConfirm(t *testing.T) {
 			canConfirm: false,
 		},
 		{
-			// Non nil fulfillment
+			// Non nil shipment
 			setup: func(order *Order) error {
-				order.SerializedOrderFulfillments = []byte{0x00}
+				order.SerializedOrderShipments = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
@@ -1701,8 +1701,8 @@ func TestOrder_CanComplete(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+					Shipments: []*pb.OrderShipment_ShippedItem{
 						{
 							ItemIndex: 0,
 						},
@@ -1733,7 +1733,7 @@ func TestOrder_CanComplete(t *testing.T) {
 			canComplete: false,
 		},
 		{
-			// Not fulfilled
+			// Not shipped
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
 					Items: []*pb.OrderOpen_Item{
@@ -1755,8 +1755,8 @@ func TestOrder_CanComplete(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+					Shipments: []*pb.OrderShipment_ShippedItem{
 						{
 							ItemIndex: 0,
 						},
@@ -1777,8 +1777,8 @@ func TestOrder_CanComplete(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+					Shipments: []*pb.OrderShipment_ShippedItem{
 						{
 							ItemIndex: 0,
 						},
@@ -1799,8 +1799,8 @@ func TestOrder_CanComplete(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+					Shipments: []*pb.OrderShipment_ShippedItem{
 						{
 							ItemIndex: 0,
 						},
@@ -1997,12 +1997,12 @@ func TestOrder_IsFunded(t *testing.T) {
 	}
 }
 
-func TestOrder_IsFulfilled(t *testing.T) {
+func TestOrder_IsShipped(t *testing.T) {
 	tests := []struct {
 		setup       func(order *Order) error
-		isFulfilled bool
+		isShipped bool
 	}{
-		// Fulfilled
+		// Shipped
 		{
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
@@ -2026,8 +2026,8 @@ func TestOrder_IsFulfilled(t *testing.T) {
 					return err
 				}
 
-				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+					Shipments: []*pb.OrderShipment_ShippedItem{
 						{
 							ItemIndex: 0,
 						},
@@ -2037,9 +2037,9 @@ func TestOrder_IsFulfilled(t *testing.T) {
 					},
 				}))
 			},
-			isFulfilled: true,
+			isShipped: true,
 		},
-		// Only one fulfilled.
+		// Only one shipped.
 		{
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
@@ -2063,17 +2063,17 @@ func TestOrder_IsFulfilled(t *testing.T) {
 					return err
 				}
 
-				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
-					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+					Shipments: []*pb.OrderShipment_ShippedItem{
 						{
 							ItemIndex: 0,
 						},
 					},
 				}))
 			},
-			isFulfilled: false,
+			isShipped: false,
 		},
-		// No fulfillments
+		// No shipments
 		{
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
@@ -2094,7 +2094,7 @@ func TestOrder_IsFulfilled(t *testing.T) {
 					ToAddress: "aaaaaa",
 				}))
 			},
-			isFulfilled: false,
+			isShipped: false,
 		},
 	}
 
@@ -2104,12 +2104,12 @@ func TestOrder_IsFulfilled(t *testing.T) {
 			t.Errorf("Test %d setup failed: %s", i, err)
 		}
 
-		isFulfilled, err := order.IsFulfilled()
+		isShipped, err := order.IsShipped()
 		if err != nil {
 			t.Errorf("Test %d: Is fufilled error: %s", i, err)
 		}
-		if isFulfilled != test.isFulfilled {
-			t.Errorf("Got incorrect result. Expected %t, got %t", test.isFulfilled, isFulfilled)
+		if isShipped != test.isShipped {
+			t.Errorf("Got incorrect result. Expected %t, got %t", test.isShipped, isShipped)
 		}
 	}
 }

@@ -44,8 +44,8 @@ func MessageTypeToEvent(
 	case npb.OrderMessage_REFUND:
 		return coreorders.EventRefundIssued
 
-	case npb.OrderMessage_ORDER_FULFILLMENT:
-		return mapFulfillmentEvent(order)
+	case npb.OrderMessage_ORDER_SHIPMENT:
+		return mapShipmentEvent(order)
 
 	case npb.OrderMessage_ORDER_COMPLETE:
 		return coreorders.EventBuyerComplete
@@ -94,16 +94,16 @@ func mapCancelEvent(order *models.Order, senderPeerID string) coreorders.OrderEv
 	return coreorders.EventBuyerCancel
 }
 
-// mapFulfillmentEvent maps an ORDER_FULFILLMENT message to the appropriate core event.
+// mapShipmentEvent maps an ORDER_SHIPMENT message to the appropriate core event.
 //
-// The legacy protocol uses a single ORDER_FULFILLMENT message type for both partial
-// and full fulfillment. The core state machine distinguishes these via separate events
-// (EventPartialFulfill vs EventOrderFulfilled). Since the legacy message doesn't carry
-// this distinction, we default to EventOrderFulfilled and let the FSM validate:
-//   - From AWAITING_FULFILLMENT: EventOrderFulfilled → FULFILLED
-//   - From PARTIALLY_FULFILLED: EventOrderFulfilled → FULFILLED
-func mapFulfillmentEvent(order *models.Order) coreorders.OrderEvent {
-	return coreorders.EventOrderFulfilled
+// The protocol uses a single ORDER_SHIPMENT message type for both partial
+// and full shipment. The core state machine distinguishes these via separate events
+// (EventPartialShip vs EventOrderShipped). Since the legacy message doesn't carry
+// this distinction, we default to EventOrderShipped and let the FSM validate:
+//   - From AWAITING_SHIPMENT: EventOrderShipped → SHIPPED
+//   - From PARTIALLY_SHIPPED: EventOrderShipped → SHIPPED
+func mapShipmentEvent(_ *models.Order) coreorders.OrderEvent {
+	return coreorders.EventOrderShipped
 }
 
 // IsStateTransitionMessage returns true if the message type triggers a state transition.

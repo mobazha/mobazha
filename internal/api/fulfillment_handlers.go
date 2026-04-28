@@ -1,0 +1,366 @@
+package api
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+
+	"github.com/gorilla/mux"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+)
+
+func fulfillmentWebhookBaseURL(r *http.Request, providerID string) string {
+	scheme := "https"
+	if r.TLS == nil {
+		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+			scheme = proto
+		} else {
+			scheme = "http"
+		}
+	}
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		host = fwdHost
+	}
+	return fmt.Sprintf("%s://%s/v1/fulfillment/%s/webhooks", scheme, host, providerID)
+}
+
+// getSupplyChainService extracts the SupplyChainService from the request's
+// NodeService via the SupplyChainProvider type assertion. Returns nil when
+// the node does not support supply chain or the feature flag is off.
+func (g *Gateway) getSupplyChainService(r *http.Request) (contracts.SupplyChainService, bool) {
+	if g.featureManager != nil && !g.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled) {
+		return nil, false
+	}
+	ns := getNodeService(r)
+	sc, ok := ns.(contracts.SupplyChainProvider)
+	if !ok {
+		return nil, false
+	}
+	svc := sc.SupplyChain()
+	if svc == nil {
+		return nil, false
+	}
+	return svc, true
+}
+
+func fulfillmentNotAvailable(w http.ResponseWriter) {
+	responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
+		"Fulfillment providers not available")
+}
+
+// ---------------------------------------------------------------------------
+// Provider management
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handleGETFulfillmentProviders(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+	connections, err := svc.ListConnections(r.Context())
+	if err != nil {
+		log.Warningf("Failed to list fulfillment providers: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to list fulfillment providers")
+		return
+	}
+	if connections == nil {
+		connections = []contracts.ProviderConnection{}
+	}
+	responsePkg.Success(w, connections)
+}
+
+func (g *Gateway) handlePOSTConnectFulfillmentProvider(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	var req contracts.ConnectProviderParams
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+			"Invalid request body")
+		return
+	}
+	req.ProviderID = providerID
+	req.WebhookBaseURL = fulfillmentWebhookBaseURL(r, providerID)
+
+	conn, err := svc.ConnectProvider(r.Context(), req)
+	if err != nil {
+		log.Warningf("Failed to connect fulfillment provider %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeProviderError,
+			"Failed to connect provider")
+		return
+	}
+	responsePkg.Created(w, conn)
+}
+
+func (g *Gateway) handleDELETEDisconnectFulfillmentProvider(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	if err := svc.DisconnectProvider(r.Context(), providerID); err != nil {
+		log.Warningf("Failed to disconnect fulfillment provider %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to disconnect provider")
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
+func (g *Gateway) handleGETFulfillmentProviderStatus(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	status, err := svc.GetProviderStatus(r.Context(), providerID)
+	if err != nil {
+		if isNotFound(err) {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound,
+				"Provider not found")
+			return
+		}
+		log.Warningf("Failed to get provider status %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to get provider status")
+		return
+	}
+	responsePkg.Success(w, status)
+}
+
+// ---------------------------------------------------------------------------
+// Catalog browsing
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handleGETFulfillmentCatalog(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	searchParam := r.URL.Query().Get("search")
+	query := contracts.CatalogQuery{
+		CategoryID: r.URL.Query().Get("categoryId"),
+		Search:     searchParam,
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		query.Offset = parseInt(v, 0)
+	}
+	if v := r.URL.Query().Get("limit"); v != "" {
+		query.Limit = parseInt(v, 20)
+	}
+
+	page, err := svc.BrowseCatalog(r.Context(), providerID, query)
+	if err != nil {
+		log.Warningf("Failed to browse catalog %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to browse catalog")
+		return
+	}
+	if searchParam != "" && !page.SearchSupported {
+		w.Header().Set("X-Warning", "search parameter is not supported by this provider; results are unfiltered")
+	}
+	responsePkg.Success(w, page)
+}
+
+func (g *Gateway) handleGETFulfillmentCatalogProduct(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	vars := mux.Vars(r)
+	product, err := svc.GetCatalogProduct(r.Context(), vars["providerID"], vars["productID"])
+	if err != nil {
+		log.Warningf("Failed to get catalog product: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to get catalog product")
+		return
+	}
+	responsePkg.Success(w, product)
+}
+
+// ---------------------------------------------------------------------------
+// Product import & sync
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handlePOSTImportFulfillmentProduct(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	var req contracts.ImportProductParams
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+			"Invalid request body")
+		return
+	}
+	req.ProviderID = providerID
+
+	result, err := svc.ImportProduct(r.Context(), req)
+	if err != nil {
+		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
+				"Product import is not yet available (planned for FF-2)")
+			return
+		}
+		log.Warningf("Failed to import product from %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to import product")
+		return
+	}
+	responsePkg.Created(w, result)
+}
+
+func (g *Gateway) handleGETSyncedProducts(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	products, err := svc.ListSyncedProducts(r.Context(), providerID)
+	if err != nil {
+		log.Warningf("Failed to list synced products for %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to list synced products")
+		return
+	}
+	if products == nil {
+		products = []contracts.SyncedProduct{}
+	}
+	responsePkg.Success(w, products)
+}
+
+func (g *Gateway) handlePOSTSyncProduct(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	slug := mux.Vars(r)["slug"]
+	status, err := svc.SyncProduct(r.Context(), slug)
+	if err != nil {
+		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
+				"Product sync is not yet available (planned for FF-2)")
+			return
+		}
+		log.Warningf("Failed to sync product %s: %v", slug, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to sync product")
+		return
+	}
+	responsePkg.Success(w, status)
+}
+
+// ---------------------------------------------------------------------------
+// Shipping estimation
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handlePOSTEstimateShipping(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	var req contracts.ShippingEstimateParams
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+			"Invalid request body")
+		return
+	}
+
+	estimates, err := svc.EstimateShipping(r.Context(), providerID, req)
+	if err != nil {
+		log.Warningf("Failed to estimate shipping for %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to estimate shipping")
+		return
+	}
+	responsePkg.Success(w, estimates)
+}
+
+// ---------------------------------------------------------------------------
+// Webhook
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handlePOSTFulfillmentWebhook(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	vars := mux.Vars(r)
+	providerID := vars["providerID"]
+	webhookSecret := vars["webhookSecret"]
+
+	if webhookSecret == "" || !svc.ValidateWebhookSecret(r.Context(), providerID, webhookSecret) {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxWebhookBodySize))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	headers := make(map[string]string)
+	for k, v := range r.Header {
+		if len(v) > 0 {
+			headers[k] = v[0]
+		}
+	}
+
+	if err := svc.HandleProviderWebhook(r.Context(), providerID, body, headers); err != nil {
+		log.Warningf("Fulfillment webhook error (%s): %v", providerID, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+func isNotFound(err error) bool {
+	return err != nil && (err == contracts.ErrFulfillmentProviderNotFound ||
+		err == contracts.ErrFulfillmentOrderNotFound)
+}
+
+func parseInt(s string, defaultVal int) int {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return defaultVal
+	}
+	return n
+}

@@ -1358,15 +1358,31 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 		return
 	}
 	obNode.supplyChainRegistry = fulfillment.NewRegistry()
+	privKeyBytes, err := obNode.privKey.Raw()
+	if err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "SupplyChain: cannot get private key bytes: %v", err)
+		return
+	}
 	obNode.supplyChainService = NewSupplyChainAppService(
 		obNode.supplyChainRegistry,
 		obNode.db,
 		obNode.nodeID,
+		privKeyBytes,
 	)
 	obNode.supplyChainService.Start(context.Background())
 
 	if obNode.paymentService != nil {
 		obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)
+	}
+
+	if obNode.eventBus != nil && obNode.shutdown != nil {
+		obNode.supplyChainService.SetEventBus(obNode.eventBus, obNode.shutdown)
+	}
+	if obNode.orderService != nil {
+		obNode.supplyChainService.SetOrderOps(obNode.orderService)
+	}
+	if obNode.featureManager == nil || obNode.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled) {
+		obNode.supplyChainService.StartFulfillmentMonitor()
 	}
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Supply chain subsystem initialized")

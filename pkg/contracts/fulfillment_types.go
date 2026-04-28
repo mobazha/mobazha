@@ -19,6 +19,9 @@ type ProviderCredentials struct {
 type ConnectProviderParams struct {
 	ProviderID  string              `json:"providerId"`
 	Credentials ProviderCredentials `json:"credentials"`
+	// WebhookBaseURL is set by the handler (not from client JSON) so the
+	// service can construct the full webhook URL including the secret path.
+	WebhookBaseURL string `json:"-"`
 }
 
 // ProviderConnection represents a connected supplier with its current status.
@@ -28,6 +31,7 @@ type ProviderConnection struct {
 	ProviderName string    `json:"providerName"`
 	Status       string    `json:"status"` // "connected", "error", "disconnected"
 	StoreName    string    `json:"storeName"`
+	WebhookURL   string    `json:"webhookUrl,omitempty"`
 	ConnectedAt  time.Time `json:"connectedAt"`
 	LastSyncAt   time.Time `json:"lastSyncAt,omitempty"`
 	ErrorMessage string    `json:"errorMessage,omitempty"`
@@ -55,10 +59,11 @@ type CatalogQuery struct {
 
 // CatalogPage is a paginated response of supplier products.
 type CatalogPage struct {
-	Products []CatalogProduct `json:"products"`
-	Total    int              `json:"total"`
-	Offset   int              `json:"offset"`
-	Limit    int              `json:"limit"`
+	Products        []CatalogProduct `json:"products"`
+	Total           int              `json:"total"`
+	Offset          int              `json:"offset"`
+	Limit           int              `json:"limit"`
+	SearchSupported bool             `json:"searchSupported"`
 }
 
 // CatalogProduct represents a supplier product with its variants.

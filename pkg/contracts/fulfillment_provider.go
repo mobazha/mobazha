@@ -7,10 +7,11 @@ import (
 
 // Sentinel errors for typed error handling in fulfillment handlers.
 var (
-	ErrFulfillmentProviderNotFound = errors.New("fulfillment: provider not found")
-	ErrFulfillmentNotConnected     = errors.New("fulfillment: provider not connected")
-	ErrFulfillmentOrderNotFound    = errors.New("fulfillment: order mapping not found")
+	ErrFulfillmentProviderNotFound    = errors.New("fulfillment: provider not found")
+	ErrFulfillmentNotConnected        = errors.New("fulfillment: provider not connected")
+	ErrFulfillmentOrderNotFound       = errors.New("fulfillment: order mapping not found")
 	ErrFulfillmentCatalogNotSupported = errors.New("fulfillment: provider does not support catalog browsing")
+	ErrFulfillmentNotImplemented      = errors.New("fulfillment: not implemented")
 )
 
 // FulfillmentProvider is the core interface for external fulfillment services.
@@ -101,6 +102,7 @@ type SupplyChainService interface {
 	GetFulfillmentStatus(ctx context.Context, mobazhaOrderID string) (*FulfillmentOrder, error)
 
 	// Inbound webhook
+	ValidateWebhookSecret(ctx context.Context, providerID string, secret string) bool
 	HandleProviderWebhook(ctx context.Context, providerID string, payload []byte, headers map[string]string) error
 
 	// Shipping
@@ -112,6 +114,10 @@ type SupplyChainService interface {
 // This decouples payment logic from the supply chain module.
 type SupplyChainChecker interface {
 	IsListingManagedBySupplier(listingSlug string) bool
+	// IsOrderAutoFulfillable returns true when ALL slugs are supply-chain-managed
+	// AND they all belong to the same provider. Only then will handleOrderFunded
+	// actually create a supplier order, so only then should auto-confirm be suppressed.
+	IsOrderAutoFulfillable(slugs []string) bool
 }
 
 // SupplyChainProvider exposes the supply chain subsystem.

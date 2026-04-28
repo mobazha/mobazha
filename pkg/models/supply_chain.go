@@ -112,14 +112,21 @@ func (FulfillmentOrderMapping) TableName() string { return "fulfillment_order_ma
 // ProcessedFulfillmentEvent prevents duplicate processing of supplier webhook events.
 // Records are cleaned up after a retention period via a periodic job.
 //
-// uniqueIndex on (tenant_id, provider_id, event_id) created via migration SQL.
+// The unique index (tenant_id, provider_id, event_id) ensures tenant isolation:
+// the same Printful event for different SaaS tenants won't collide.
+// tenant_id is included via the explicit index tag on TenantID below.
+//
+// Status lifecycle: "processing" → "processed". A row in "processing" state means
+// another goroutine is currently handling this event. A unique constraint violation
+// on insert blocks concurrent duplicates atomically.
 type ProcessedFulfillmentEvent struct {
-	TenantMixin
+	TenantID    string    `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:idx_pfe_tenant_provider_event" json:"-"`
 	ID          string    `gorm:"primaryKey"`
-	ProviderID  string    `gorm:"column:provider_id;type:varchar(32);not null"`
-	EventID     string    `gorm:"column:event_id;type:varchar(255);not null"`
+	ProviderID  string    `gorm:"column:provider_id;type:varchar(32);not null;uniqueIndex:idx_pfe_tenant_provider_event"`
+	EventID     string    `gorm:"column:event_id;type:varchar(255);not null;uniqueIndex:idx_pfe_tenant_provider_event"`
 	EventType   string    `gorm:"column:event_type;type:varchar(64)"`
 	OrderID     string    `gorm:"column:order_id;type:varchar(255)"`
+	Status      string    `gorm:"column:status;type:varchar(16);not null;default:'processing'"`
 	ProcessedAt time.Time `gorm:"column:processed_at;autoCreateTime"`
 }
 

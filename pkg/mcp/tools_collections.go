@@ -28,11 +28,11 @@ func collectionsToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 			Tool: gomcp.NewTool("collections_create",
 				gomcp.WithDescription(
 					"Create a new product collection to organize store products. "+
-						"Pass a JSON object with collection details including name and description.",
+						"Pass a JSON object with collection details including title and description.",
 				),
 				gomcp.WithString("collection_json",
 					gomcp.Required(),
-					gomcp.Description("JSON object with collection details (name, description)"),
+					gomcp.Description(`JSON object with collection details, e.g. {"title":"Best Sellers","description":"Our top products"}`),
 				),
 			),
 			Handler: makeCollectionsCreate(bf),
@@ -42,7 +42,7 @@ func collectionsToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 			Tool: gomcp.NewTool("collections_add_products",
 				gomcp.WithDescription(
 					"Add products to an existing collection. "+
-						"Pass the collection ID and a JSON array of product slugs or IDs to add.",
+						"Pass the collection ID and a JSON object with a slugs array.",
 				),
 				gomcp.WithString("collection_id",
 					gomcp.Required(),
@@ -50,7 +50,7 @@ func collectionsToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 				),
 				gomcp.WithString("products_json",
 					gomcp.Required(),
-					gomcp.Description("JSON array of product slugs or IDs to add to the collection"),
+					gomcp.Description(`JSON object with a "slugs" array, e.g. {"slugs":["slug-1","slug-2"]}`),
 				),
 			),
 			Handler: makeCollectionsAddProducts(bf),

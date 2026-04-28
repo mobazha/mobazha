@@ -167,6 +167,29 @@ func (n *MobazhaNode) Fiat() contracts.FiatService {
 // Hosting (SaaS) uses this to register platform-level providers after node creation.
 func (n *MobazhaNode) FiatRegistry() contracts.FiatProviderRegistry { return n.fiatRegistry }
 
+// SupplyChainProvider implementation — supply chain fulfillment subsystem.
+func (n *MobazhaNode) SupplyChain() contracts.SupplyChainService {
+	if n.supplyChainService == nil {
+		return nil
+	}
+	return n.supplyChainService
+}
+
+// SupplyChainRegistry returns the fulfillment provider registry.
+// Hosting (SaaS) may use this for platform-level provider management.
+func (n *MobazhaNode) SupplyChainRegistry() contracts.FulfillmentProviderRegistry {
+	return n.supplyChainRegistry
+}
+
+// SupplyChainChecker returns the narrow port for checking if a listing is supply-chain-managed.
+// Used by PaymentAppService to suppress auto-confirm.
+func (n *MobazhaNode) SupplyChainChecker() contracts.SupplyChainChecker {
+	if n.supplyChainService == nil {
+		return nil
+	}
+	return n.supplyChainService
+}
+
 // WebhookProvider implementation — per-node webhook subsystem.
 func (n *MobazhaNode) WebhookStore() wh.EndpointStore { return n.webhookStore }
 func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }

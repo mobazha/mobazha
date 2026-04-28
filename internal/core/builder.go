@@ -41,6 +41,7 @@ import (
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/fulfillment"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -351,6 +352,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		initDiscountSubsystem(obNode)
 		initCollectionSubsystem(obNode)
 		initFiatSubsystem(obNode)
+		initSupplyChainSubsystem(obNode)
 		initShippingSubsystem(obNode)
 		obNode.applyOptions([]NodeOption{
 			WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
@@ -599,6 +601,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	initDiscountSubsystem(obNode)
 	initCollectionSubsystem(obNode)
 	initFiatSubsystem(obNode)
+	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
@@ -1238,6 +1241,7 @@ func newLightweightNode(
 	initDiscountSubsystem(obNode)
 	initCollectionSubsystem(obNode)
 	initFiatSubsystem(obNode)
+	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 	initPlatformAIConfig(obNode, cfg)
@@ -1343,6 +1347,29 @@ func initCollectionSubsystem(obNode *MobazhaNode) {
 	// because initCollectionSubsystem runs before applyOptions() where listingService is initialized.
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Collection subsystem initialized")
+}
+
+// initSupplyChainSubsystem initializes the per-node supply chain subsystem:
+// migrates DB models, creates FulfillmentProviderRegistry and SupplyChainAppService.
+// Concrete providers are registered via ConnectProvider API (FF-1+).
+func initSupplyChainSubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateFulfillmentModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "SupplyChain: failed to migrate models: %v", err)
+		return
+	}
+	obNode.supplyChainRegistry = fulfillment.NewRegistry()
+	obNode.supplyChainService = NewSupplyChainAppService(
+		obNode.supplyChainRegistry,
+		obNode.db,
+		obNode.nodeID,
+	)
+	obNode.supplyChainService.Start(context.Background())
+
+	if obNode.paymentService != nil {
+		obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)
+	}
+
+	logger.LogInfoWithID(log, obNode.nodeID, "Supply chain subsystem initialized")
 }
 
 // initFiatSubsystem initializes the per-node fiat payment subsystem:

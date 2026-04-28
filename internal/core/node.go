@@ -192,6 +192,8 @@ type appServices struct {
 	collectionService          *CollectionAppService
 	fiatRegistry               contracts.FiatProviderRegistry
 	fiatPaymentService         *FiatPaymentAppService
+	supplyChainRegistry        contracts.FulfillmentProviderRegistry
+	supplyChainService         *SupplyChainAppService
 	shippingService            *ShippingAppService
 	analyticsService           *AnalyticsAppService
 	paymentVerificationService *PaymentVerificationService

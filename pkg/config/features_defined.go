@@ -511,3 +511,29 @@ var FeatureKillBotClusterIngestDisabled = registerFeature(Feature{
 	},
 	IntroducedIn: "ms-phase-2b",
 })
+
+// ---------------------------------------------------------------------------
+// Supply Chain
+// ---------------------------------------------------------------------------
+
+// FeatureSupplyChainEnabled — 供应链集成（POD/Dropshipping 履约 + 数字商品交付）
+//
+// 门控点：
+//   - API 路由注册（flag 关闭时返回 404）
+//   - EventBus OrderFunded 监听（flag 关闭时不注册 listener）
+//   - Worker（重试/轮询/库存/成本）（flag 关闭时不启动）
+var FeatureSupplyChainEnabled = registerFeature(Feature{
+	Key:           "supplyChainEnabled",
+	DisplayName:   "Supply chain integration",
+	Description:   "Enables fulfillment provider integration (Printful, Printify, CJ, etc.) for POD/dropshipping auto-fulfillment and digital goods auto-delivery.",
+	Category:      "platform",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+		ScopeTenant,
+		ScopeNodeRuntime,
+	},
+	IntroducedIn: "supply-chain",
+})

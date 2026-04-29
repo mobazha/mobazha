@@ -223,7 +223,7 @@ func (g *Gateway) handlePOSTImportFulfillmentProduct(w http.ResponseWriter, r *h
 	if err != nil {
 		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
-				"Product import is not yet available (planned for FF-2)")
+				"Product import is not yet available (planned for FF-1.4a)")
 			return
 		}
 		log.Warningf("Failed to import product from %s: %v", providerID, err)
@@ -267,7 +267,7 @@ func (g *Gateway) handlePOSTSyncProduct(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
-				"Product sync is not yet available (planned for FF-2)")
+				"Product sync is not yet available (planned for FF-2.x)")
 			return
 		}
 		log.Warningf("Failed to sync product %s: %v", slug, err)

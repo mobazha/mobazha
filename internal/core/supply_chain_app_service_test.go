@@ -32,6 +32,7 @@ type stubFulfillmentProvider struct {
 	validateErr   error
 	createOrderFn func(ctx context.Context, params contracts.CreateFulfillmentParams) (*contracts.FulfillmentOrder, error)
 	parseWebFn    func(ctx context.Context, payload []byte, headers map[string]string) (*contracts.FulfillmentWebhookEvent, error)
+	cancelFn      func(ctx context.Context, orderID string) error
 }
 
 func (p *stubFulfillmentProvider) ProviderID() string   { return p.id }
@@ -48,7 +49,12 @@ func (p *stubFulfillmentProvider) CreateFulfillmentOrder(ctx context.Context, pa
 func (p *stubFulfillmentProvider) GetFulfillmentOrder(_ context.Context, orderID string) (*contracts.FulfillmentOrder, error) {
 	return &contracts.FulfillmentOrder{ExternalID: orderID, Status: contracts.FulfillmentStatusPending}, nil
 }
-func (p *stubFulfillmentProvider) CancelFulfillmentOrder(_ context.Context, _ string) error { return nil }
+func (p *stubFulfillmentProvider) CancelFulfillmentOrder(ctx context.Context, orderID string) error {
+	if p.cancelFn != nil {
+		return p.cancelFn(ctx, orderID)
+	}
+	return nil
+}
 func (p *stubFulfillmentProvider) ParseWebhook(ctx context.Context, payload []byte, headers map[string]string) (*contracts.FulfillmentWebhookEvent, error) {
 	if p.parseWebFn != nil {
 		return p.parseWebFn(ctx, payload, headers)
@@ -561,10 +567,12 @@ func TestHandleProviderWebhook_Shipped(t *testing.T) {
 		},
 	})
 	svc := NewSupplyChainAppService(reg, tdb, "test", testPrivKeyBytes)
-	if err := svc.HandleProviderWebhook(context.Background(), "printful", nil, nil); err != nil {
-		t.Fatal(err)
+	err := svc.HandleProviderWebhook(context.Background(), "printful", nil, nil)
+	if err == nil {
+		t.Fatal("expected error from autoConfirmAndShip (orderOps not wired), got nil")
 	}
-	time.Sleep(50 * time.Millisecond) // allow autoConfirmAndShip goroutine to log
+
+	// Mapping should still be updated to "shipped" with tracking (happens before autoConfirmAndShip).
 	var m models.FulfillmentOrderMapping
 	tdb.gormDB.First(&m, "id = ?", "fom-1")
 	if m.Status != "shipped" {
@@ -572,6 +580,13 @@ func TestHandleProviderWebhook_Shipped(t *testing.T) {
 	}
 	if m.TrackingNumber != "1Z999" {
 		t.Errorf("expected 1Z999, got %s", m.TrackingNumber)
+	}
+
+	// Event should be released (not processed) so provider can retry.
+	var pfe models.ProcessedFulfillmentEvent
+	result := tdb.gormDB.Where("event_id = ?", "e-ship").First(&pfe)
+	if result.Error == nil && pfe.Status == "processed" {
+		t.Error("event should NOT be marked processed when autoConfirmAndShip fails")
 	}
 }
 
@@ -612,13 +627,13 @@ func TestHandleProviderWebhook_ReleaseOnProcessingError(t *testing.T) {
 		FulfillmentOrderID: "pf-12345", Status: "pending",
 	})
 
-	// svc2: processes the shipped event successfully (reserve + process + mark processed)
+	// svc2: processes an order_updated event (no autoConfirmAndShip) → reserve + process + mark processed
 	reg2 := fulfillment.NewRegistry()
 	_ = reg2.Register(&stubFulfillmentProvider{
 		id: "printful", provType: "pod",
 		parseWebFn: func(_ context.Context, _ []byte, _ map[string]string) (*contracts.FulfillmentWebhookEvent, error) {
 			return &contracts.FulfillmentWebhookEvent{
-				Type: contracts.FulfillmentWebhookShipped, EventID: "evt-retry",
+				Type: contracts.FulfillmentWebhookOrderUpdated, EventID: "evt-retry",
 				OrderID: "order-abc", ExternalID: "pf-12345",
 			}, nil
 		},
@@ -640,7 +655,7 @@ func TestHandleProviderWebhook_ReleaseOnProcessingError(t *testing.T) {
 		id: "printful", provType: "pod",
 		parseWebFn: func(_ context.Context, _ []byte, _ map[string]string) (*contracts.FulfillmentWebhookEvent, error) {
 			return &contracts.FulfillmentWebhookEvent{
-				Type: contracts.FulfillmentWebhookShipped, EventID: "evt-retry",
+				Type: contracts.FulfillmentWebhookOrderUpdated, EventID: "evt-retry",
 				OrderID: "order-abc", ExternalID: "pf-12345",
 			}, nil
 		},
@@ -651,8 +666,8 @@ func TestHandleProviderWebhook_ReleaseOnProcessingError(t *testing.T) {
 	}
 	var m models.FulfillmentOrderMapping
 	tdb.gormDB.First(&m, "id = ?", "fom-1")
-	if m.Status != "shipped" {
-		t.Logf("mapping status: %s (expected shipped from first call)", m.Status)
+	if m.Status != string(contracts.FulfillmentStatusInProcess) {
+		t.Logf("mapping status: %s (expected in_process from first call)", m.Status)
 	}
 }
 
@@ -829,5 +844,459 @@ func TestListSyncedProducts(t *testing.T) {
 	}
 	if len(filtered) != 2 {
 		t.Errorf("expected 2, got %d", len(filtered))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: ImportProduct (FF-1.4a)
+// ---------------------------------------------------------------------------
+
+// richCatalogProvider returns a product with multiple variants for import testing.
+type richCatalogProvider struct {
+	stubFulfillmentProvider
+	getProductFn func(ctx context.Context, productID string) (*contracts.CatalogProduct, error)
+}
+
+func (p *richCatalogProvider) ListCategories(_ context.Context) ([]contracts.CatalogCategory, error) {
+	return nil, nil
+}
+func (p *richCatalogProvider) ListProducts(_ context.Context, _ contracts.CatalogQuery) (*contracts.CatalogPage, error) {
+	return nil, nil
+}
+func (p *richCatalogProvider) GetProduct(ctx context.Context, productID string) (*contracts.CatalogProduct, error) {
+	if p.getProductFn != nil {
+		return p.getProductFn(ctx, productID)
+	}
+	return &contracts.CatalogProduct{
+		ID:          productID,
+		Title:       "Unisex Softstyle T-Shirt",
+		Description: "A comfortable cotton tee.",
+		ImageURL:    "https://img.example.com/tshirt.jpg",
+		Images:      []string{"https://img.example.com/tshirt-front.jpg", "https://img.example.com/tshirt-back.jpg"},
+		Currency:    "USD",
+		Variants: []contracts.CatalogVariant{
+			{ID: "4011", Title: "S / Black", Price: "8.25", Currency: "USD", InStock: true, Attributes: map[string]string{"Size": "S", "Color": "Black"}, ImageURL: "https://img.example.com/s-black.jpg"},
+			{ID: "4012", Title: "M / Black", Price: "8.25", Currency: "USD", InStock: true, Attributes: map[string]string{"Size": "M", "Color": "Black"}},
+			{ID: "4013", Title: "L / White", Price: "9.50", Currency: "USD", InStock: true, Attributes: map[string]string{"Size": "L", "Color": "White"}},
+		},
+	}, nil
+}
+func (p *richCatalogProvider) GetVariant(_ context.Context, variantID string) (*contracts.CatalogVariant, error) {
+	return &contracts.CatalogVariant{ID: variantID}, nil
+}
+
+// mockListingOps captures SaveListing calls for testing.
+type mockListingOps struct {
+	savedListing *pb.Listing
+	err          error
+}
+
+func (m *mockListingOps) SaveListing(listing *pb.Listing, done chan<- struct{}) error {
+	m.savedListing = listing
+	if done != nil {
+		close(done)
+	}
+	return m.err
+}
+
+func TestImportProduct_HappyPath(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"}}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+
+	result, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID:   "printful",
+		ProductID:    "71",
+		RetailMarkup: 2.0,
+		Title:        "My Custom Tee",
+		Tags:         []string{"custom", "tee"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.ListingSlug == "" {
+		t.Error("expected non-empty listing slug")
+	}
+	if result.SyncProductID != "71" {
+		t.Errorf("expected SyncProductID '71', got %q", result.SyncProductID)
+	}
+	if result.VariantsCount != 3 {
+		t.Errorf("expected 3 variants, got %d", result.VariantsCount)
+	}
+
+	// Verify listing was passed to SaveListing
+	if listingOps.savedListing == nil {
+		t.Fatal("SaveListing was not called")
+	}
+	listing := listingOps.savedListing
+	if listing.Status != models.ListingStatusDraft {
+		t.Errorf("expected draft status, got %q", listing.Status)
+	}
+	if listing.Item.Title != "My Custom Tee" {
+		t.Errorf("expected custom title, got %q", listing.Item.Title)
+	}
+	if len(listing.Item.Tags) != 2 || listing.Item.Tags[0] != "custom" {
+		t.Errorf("unexpected tags: %v", listing.Item.Tags)
+	}
+	if len(listing.Item.Skus) != 3 {
+		t.Errorf("expected 3 SKUs, got %d", len(listing.Item.Skus))
+	}
+	if len(listing.Item.Options) != 2 {
+		t.Errorf("expected 2 options (Size, Color), got %d", len(listing.Item.Options))
+	}
+	if listing.Metadata.PricingCurrency == nil || listing.Metadata.PricingCurrency.Code != "USD" {
+		t.Error("expected USD pricing currency")
+	}
+
+	// Verify SyncedProductMapping was created in DB
+	var mapping models.SyncedProductMapping
+	if err := db.gormDB.Where("listing_slug = ?", result.ListingSlug).First(&mapping).Error; err != nil {
+		t.Fatalf("mapping not found in DB: %v", err)
+	}
+	if mapping.ProviderID != "printful" {
+		t.Errorf("expected provider 'printful', got %q", mapping.ProviderID)
+	}
+	if mapping.ExternalID != "71" {
+		t.Errorf("expected external ID '71', got %q", mapping.ExternalID)
+	}
+	if mapping.Status != "synced" {
+		t.Errorf("expected status 'synced', got %q", mapping.Status)
+	}
+	if len(mapping.Metadata) == 0 {
+		t.Error("expected non-empty metadata with variant mappings")
+	}
+}
+
+func TestImportProduct_FilterVariants(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"}}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+
+	result, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID:   "printful",
+		ProductID:    "71",
+		VariantIDs:   []string{"4011", "4012"},
+		RetailMarkup: 1.5,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.VariantsCount != 2 {
+		t.Errorf("expected 2 filtered variants, got %d", result.VariantsCount)
+	}
+	if len(listingOps.savedListing.Item.Skus) != 2 {
+		t.Errorf("expected 2 SKUs, got %d", len(listingOps.savedListing.Item.Skus))
+	}
+}
+
+func TestImportProduct_NoVariantsError(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{
+		stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"},
+		getProductFn: func(_ context.Context, _ string) (*contracts.CatalogProduct, error) {
+			return &contracts.CatalogProduct{ID: "99", Title: "Empty"}, nil
+		},
+	}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+
+	_, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID: "printful",
+		ProductID:  "99",
+	})
+	if err == nil {
+		t.Fatal("expected error for product with no variants")
+	}
+	if !strings.Contains(err.Error(), "no variants") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestImportProduct_InvalidVariantIDs(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"}}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+
+	_, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID: "printful",
+		ProductID:  "71",
+		VariantIDs: []string{"nonexistent-1", "nonexistent-2"},
+	})
+	if err == nil {
+		t.Fatal("expected error for non-matching variant IDs")
+	}
+	if !strings.Contains(err.Error(), "none of the requested variant IDs") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestImportProduct_ListingOpsNotWired(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"}}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	// listingOps not set
+
+	_, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID: "printful",
+		ProductID:  "71",
+	})
+	if err == nil {
+		t.Fatal("expected error when listing ops not wired")
+	}
+	if !strings.Contains(err.Error(), "listing ops not wired") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestImportProduct_SaveListingError(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"}}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{err: errors.New("save failed")}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+
+	_, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID:   "printful",
+		ProductID:    "71",
+		RetailMarkup: 1.5,
+	})
+	if err == nil {
+		t.Fatal("expected error when save listing fails")
+	}
+	if !strings.Contains(err.Error(), "save listing draft") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestImportProduct_DefaultMarkup(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"}}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+
+	result, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID: "printful",
+		ProductID:  "71",
+		// RetailMarkup = 0 → should default to 1.0
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// With markup=1.0 and minCost=$8.25 → retail=825 cents
+	if result.RetailPrice != result.SupplierCost {
+		t.Errorf("with default markup, retail (%s) should equal supplier cost (%s)", result.RetailPrice, result.SupplierCost)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: cancelFulfillmentForOrder
+// ---------------------------------------------------------------------------
+
+func seedMapping(t *testing.T, db *scTestDatabase, orderID, providerID, fulfillmentID, status string) {
+	t.Helper()
+	if err := db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.FulfillmentOrderMapping{
+			MobazhaOrderID:     orderID,
+			ProviderID:         providerID,
+			FulfillmentOrderID: fulfillmentID,
+			Status:             status,
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCancelFulfillment_HappyPath(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+	var cancelledID string
+	provider := &stubFulfillmentProvider{
+		id: "printful", provType: "pod",
+		cancelFn: func(_ context.Context, orderID string) error {
+			cancelledID = orderID
+			return nil
+		},
+	}
+	_ = reg.Register(provider)
+
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	seedMapping(t, db, "order-1", "printful", "ful-100", string(contracts.FulfillmentStatusPending))
+
+	svc.cancelFulfillmentForOrder("order-1")
+
+	if cancelledID != "ful-100" {
+		t.Errorf("expected provider cancel called with ful-100, got %q", cancelledID)
+	}
+
+	// Verify mapping status updated to canceled
+	var mapping models.FulfillmentOrderMapping
+	if err := db.View(func(tx database.Tx) error {
+		return tx.Read().Where("mobazha_order_id = ?", "order-1").First(&mapping).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if mapping.Status != string(contracts.FulfillmentStatusCanceled) {
+		t.Errorf("expected status canceled, got %s", mapping.Status)
+	}
+}
+
+func TestCancelFulfillment_NoMapping(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+	called := false
+	provider := &stubFulfillmentProvider{
+		id: "printful", provType: "pod",
+		cancelFn: func(_ context.Context, _ string) error {
+			called = true
+			return nil
+		},
+	}
+	_ = reg.Register(provider)
+
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.cancelFulfillmentForOrder("nonexistent-order")
+
+	if called {
+		t.Error("provider cancel should not be called when no mapping exists")
+	}
+}
+
+func TestCancelFulfillment_SkipsTerminalStatus(t *testing.T) {
+	terminalStatuses := []contracts.FulfillmentStatus{
+		contracts.FulfillmentStatusShipped,
+		contracts.FulfillmentStatusDelivered,
+		contracts.FulfillmentStatusCanceled,
+	}
+
+	for _, status := range terminalStatuses {
+		t.Run(string(status), func(t *testing.T) {
+			db := newSCTestDatabase(t)
+			reg := fulfillment.NewRegistry()
+			called := false
+			provider := &stubFulfillmentProvider{
+				id: "printful", provType: "pod",
+				cancelFn: func(_ context.Context, _ string) error {
+					called = true
+					return nil
+				},
+			}
+			_ = reg.Register(provider)
+
+			svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+			seedMapping(t, db, "order-t", "printful", "ful-t", string(status))
+
+			svc.cancelFulfillmentForOrder("order-t")
+
+			if called {
+				t.Errorf("cancel should be skipped for terminal status %s", status)
+			}
+		})
+	}
+}
+
+func TestCancelFulfillment_ProviderError(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+	provider := &stubFulfillmentProvider{
+		id: "printful", provType: "pod",
+		cancelFn: func(_ context.Context, _ string) error {
+			return errors.New("supplier API 500")
+		},
+	}
+	_ = reg.Register(provider)
+
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	seedMapping(t, db, "order-e", "printful", "ful-e", string(contracts.FulfillmentStatusPending))
+
+	svc.cancelFulfillmentForOrder("order-e")
+
+	var mapping models.FulfillmentOrderMapping
+	if err := db.View(func(tx database.Tx) error {
+		return tx.Read().Where("mobazha_order_id = ?", "order-e").First(&mapping).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if mapping.Status == string(contracts.FulfillmentStatusCanceled) {
+		t.Error("status should NOT be canceled when provider returns error")
+	}
+	if !strings.Contains(mapping.ErrorMessage, "supplier API 500") {
+		t.Errorf("expected error_message to contain 'supplier API 500', got %q", mapping.ErrorMessage)
+	}
+}
+
+func TestCancelFulfillment_InProgressAllowed(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+	provider := &stubFulfillmentProvider{
+		id: "printful", provType: "pod",
+		cancelFn: func(_ context.Context, _ string) error { return nil },
+	}
+	_ = reg.Register(provider)
+
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	seedMapping(t, db, "order-ip", "printful", "ful-ip", string(contracts.FulfillmentStatusInProcess))
+
+	svc.cancelFulfillmentForOrder("order-ip")
+
+	var mapping models.FulfillmentOrderMapping
+	if err := db.View(func(tx database.Tx) error {
+		return tx.Read().Where("mobazha_order_id = ?", "order-ip").First(&mapping).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if mapping.Status != string(contracts.FulfillmentStatusCanceled) {
+		t.Errorf("expected status canceled, got %s", mapping.Status)
 	}
 }

@@ -107,6 +107,11 @@ var routeScopeMap = []routeScope{
 	{"PUT /v1/fiat", contracts.ScopeFiatManage},
 	{"DELETE /v1/fiat", contracts.ScopeFiatManage},
 
+	// Fulfillment / supply chain
+	{"GET /v1/fulfillment", contracts.ScopeFulfillmentRead},
+	{"POST /v1/fulfillment", contracts.ScopeFulfillmentManage},
+	{"DELETE /v1/fulfillment", contracts.ScopeFulfillmentManage},
+
 	// AI
 	{"POST /v1/ai", contracts.ScopeAIUse},
 	{"GET /v1/ai", contracts.ScopeAIUse},

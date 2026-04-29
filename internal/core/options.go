@@ -820,6 +820,10 @@ func (n *MobazhaNode) initListingService() {
 			}
 		}
 	}
+
+	if n.supplyChainService != nil {
+		n.supplyChainService.SetListingOps(n.listingService)
+	}
 }
 
 // initAnalyticsService creates the AnalyticsAppService and migrates the table.

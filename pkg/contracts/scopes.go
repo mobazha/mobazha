@@ -91,6 +91,10 @@ const (
 	ScopeDisputesRead   Scope = "disputes:read"
 	ScopeDisputesManage Scope = "disputes:manage"
 
+	// Fulfillment / supply chain
+	ScopeFulfillmentRead   Scope = "fulfillment:read"
+	ScopeFulfillmentManage Scope = "fulfillment:manage"
+
 	// ScopeAny is a sentinel value used in route → scope maps to mark a route
 	// as readable by ANY authenticated identity (including low-privilege API
 	// tokens). It is intentionally the empty string so that:
@@ -125,6 +129,7 @@ var allScopes = map[Scope]bool{
 	ScopeWishlistsRead: true, ScopeWishlistsWrite: true,
 	ScopeCartsRead: true, ScopeCartsWrite: true,
 	ScopeDisputesRead: true, ScopeDisputesManage: true,
+	ScopeFulfillmentRead: true, ScopeFulfillmentManage: true,
 }
 
 // IsValid returns whether s is a recognized scope.
@@ -194,6 +199,7 @@ var scopeParents = map[Scope]Scope{
 	ScopeShippingRead:      ScopeShippingWrite,
 	ScopeFiatRead:          ScopeFiatManage,
 	ScopeDisputesRead:      ScopeDisputesManage,
+	ScopeFulfillmentRead:   ScopeFulfillmentManage,
 	ScopeWishlistsRead:     ScopeWishlistsWrite,
 	ScopeCartsRead:         ScopeCartsWrite,
 }
@@ -261,6 +267,7 @@ func SellerScopes() []Scope {
 		ScopeCollectionsRead, ScopeCollectionsWrite,
 		ScopeShippingRead, ScopeShippingWrite,
 		ScopeFiatRead, ScopeFiatManage,
+		ScopeFulfillmentRead, ScopeFulfillmentManage,
 		ScopeAIUse,
 		ScopeAnalyticsRead,
 	}

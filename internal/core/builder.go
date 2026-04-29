@@ -1371,10 +1371,6 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 	)
 	obNode.supplyChainService.Start(context.Background())
 
-	if obNode.paymentService != nil {
-		obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)
-	}
-
 	if obNode.eventBus != nil && obNode.shutdown != nil {
 		obNode.supplyChainService.SetEventBus(obNode.eventBus, obNode.shutdown)
 	}
@@ -1382,6 +1378,9 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 		obNode.supplyChainService.SetOrderOps(obNode.orderService)
 	}
 	if obNode.featureManager == nil || obNode.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled) {
+		if obNode.paymentService != nil {
+			obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)
+		}
 		obNode.supplyChainService.StartFulfillmentMonitor()
 	}
 

@@ -35,20 +35,28 @@ import (
 type SupplyChainOrderOps interface {
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
+	IsOrderConfirmed(orderID models.OrderID) (bool, error)
+}
+
+// SupplyChainListingOps is the subset of ListingAppService needed by ImportProduct.
+// Kept narrow to avoid a circular import between App Services.
+type SupplyChainListingOps interface {
+	SaveListing(listing *pb.Listing, done chan<- struct{}) error
 }
 
 // SupplyChainAppService orchestrates supply chain operations:
 // provider management, catalog browsing, product import, and order bridging.
 // It implements contracts.SupplyChainService and contracts.SupplyChainChecker.
 type SupplyChainAppService struct {
-	registry contracts.FulfillmentProviderRegistry
-	db       database.Database
-	nodeID   string
-	credKey  [32]byte // AES-256-GCM key for encrypting provider credentials at rest
+	registry   contracts.FulfillmentProviderRegistry
+	db         database.Database
+	nodeID     string
+	credKey    [32]byte // AES-256-GCM key for encrypting provider credentials at rest
 
-	eventBus events.Bus
-	shutdown <-chan struct{}
-	orderOps SupplyChainOrderOps
+	eventBus   events.Bus
+	shutdown   <-chan struct{}
+	orderOps   SupplyChainOrderOps
+	listingOps SupplyChainListingOps
 }
 
 // NewSupplyChainAppService creates the supply chain service skeleton.
@@ -94,6 +102,11 @@ func (s *SupplyChainAppService) SetOrderOps(ops SupplyChainOrderOps) {
 	s.orderOps = ops
 }
 
+// SetListingOps wires the listing operations interface for ImportProduct.
+func (s *SupplyChainAppService) SetListingOps(ops SupplyChainListingOps) {
+	s.listingOps = ops
+}
+
 // Start restores provider instances from DB into the in-memory registry.
 // Called during node initialization / SaaS EnsureNode.
 func (s *SupplyChainAppService) Start(ctx context.Context) {
@@ -102,14 +115,18 @@ func (s *SupplyChainAppService) Start(ctx context.Context) {
 	}
 }
 
-// StartFulfillmentMonitor subscribes to OrderFunded events and automatically
-// creates supplier fulfillment orders for supply-chain-managed listings.
-// Only starts if eventBus is wired (Feature Flag gating is external).
+// StartFulfillmentMonitor subscribes to order lifecycle events and automatically
+// bridges them to supplier fulfillment operations:
+// - OrderFunded  → create supplier fulfillment order
+// - OrderCancel  → cancel supplier fulfillment order
+// - Refund       → cancel supplier fulfillment order
 func (s *SupplyChainAppService) StartFulfillmentMonitor() {
 	if s.eventBus == nil {
 		return
 	}
 	go s.subscribeOrderFunded()
+	go s.subscribeOrderCancel()
+	go s.subscribeRefund()
 }
 
 func (s *SupplyChainAppService) subscribeOrderFunded() {
@@ -132,6 +149,106 @@ func (s *SupplyChainAppService) subscribeOrderFunded() {
 			return
 		}
 	}
+}
+
+func (s *SupplyChainAppService) subscribeOrderCancel() {
+	sub, err := s.eventBus.Subscribe(&events.OrderCancel{})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: failed to subscribe to OrderCancel: %v", err)
+		return
+	}
+	for {
+		select {
+		case event := <-sub.Out():
+			if e, ok := event.(*events.OrderCancel); ok {
+				go s.cancelFulfillmentForOrder(e.OrderID)
+			}
+		case <-s.shutdown:
+			sub.Close()
+			return
+		}
+	}
+}
+
+func (s *SupplyChainAppService) subscribeRefund() {
+	sub, err := s.eventBus.Subscribe(&events.Refund{})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: failed to subscribe to Refund: %v", err)
+		return
+	}
+	for {
+		select {
+		case event := <-sub.Out():
+			if e, ok := event.(*events.Refund); ok {
+				go s.cancelFulfillmentForOrder(e.OrderID)
+			}
+		case <-s.shutdown:
+			sub.Close()
+			return
+		}
+	}
+}
+
+// cancelFulfillmentForOrder attempts to cancel the supplier fulfillment order
+// associated with a Mobazha order. No-op if no mapping exists (non-supply-chain order).
+func (s *SupplyChainAppService) cancelFulfillmentForOrder(orderID string) {
+	var mapping models.FulfillmentOrderMapping
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("mobazha_order_id = ?", orderID).First(&mapping).Error
+	})
+	if err != nil {
+		return
+	}
+
+	terminalStatuses := map[string]bool{
+		string(contracts.FulfillmentStatusShipped):   true,
+		string(contracts.FulfillmentStatusDelivered): true,
+		string(contracts.FulfillmentStatusCanceled):  true,
+	}
+	if terminalStatuses[mapping.Status] {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"SupplyChain: skipping cancel for order %s — fulfillment already %s", orderID, mapping.Status)
+		return
+	}
+
+	provider, err := s.registry.ForProvider(mapping.ProviderID)
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain: cannot cancel fulfillment for order %s — provider %s not found: %v",
+			orderID, mapping.ProviderID, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := provider.CancelFulfillmentOrder(ctx, mapping.FulfillmentOrderID); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain: failed to cancel fulfillment %s for order %s: %v",
+			mapping.FulfillmentOrderID, orderID, err)
+		if updateErr := s.db.Update(func(tx database.Tx) error {
+			return tx.Update("error_message", fmt.Sprintf("cancel failed: %v", err),
+				map[string]interface{}{"mobazha_order_id = ?": orderID},
+				&models.FulfillmentOrderMapping{})
+		}); updateErr != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain: failed to update error on mapping for order %s: %v", orderID, updateErr)
+		}
+		return
+	}
+
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Update("status", string(contracts.FulfillmentStatusCanceled),
+			map[string]interface{}{"mobazha_order_id = ?": orderID},
+			&models.FulfillmentOrderMapping{})
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain: failed to update cancel status for order %s: %v", orderID, err)
+		return
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"SupplyChain: cancelled fulfillment %s for order %s", mapping.FulfillmentOrderID, orderID)
 }
 
 // handleOrderFunded checks whether the funded order contains supply-chain-managed
@@ -175,11 +292,11 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 		if li == nil || li.Listing == nil {
 			continue
 		}
+		totalListings++
 		slug := li.Listing.GetSlug()
 		if slug == "" {
 			continue
 		}
-		totalListings++
 		var mapping models.SyncedProductMapping
 		findErr := s.db.View(func(tx database.Tx) error {
 			return tx.Read().Where("listing_slug = ?", slug).First(&mapping).Error
@@ -188,13 +305,19 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 			continue
 		}
 		item := contracts.FulfillmentItem{
-			CatalogVariantID: mapping.ExternalID,
-			Quantity:         1,
+			Quantity: 1,
 		}
 		if i < len(oo.Items) && oo.Items[i] != nil {
 			if q, parseErr := strconv.Atoi(oo.Items[i].Quantity); parseErr == nil && q > 0 {
 				item.Quantity = q
 			}
+			item.CatalogVariantID = resolveVariantID(li.Listing, oo.Items[i])
+		}
+		if item.CatalogVariantID == "" {
+			logger.LogWarningWithIDf(log, s.nodeID,
+				"SupplyChain: order %s item %d (%s): could not resolve variant ID from buyer selections — skipping auto-fulfillment (fail closed)",
+				orderID, i, slug)
+			return
 		}
 		groups = append(groups, providerItems{
 			providerID: mapping.ProviderID,
@@ -226,6 +349,44 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 				orderID, providerID, g.providerID)
 			return
 		}
+	}
+
+	// Margin protection: sum up (supplier cost × quantity) for all items.
+	// If total supplier cost >= total retail price, or if any cost data is
+	// missing, skip auto-fulfillment (fail closed) to protect the seller.
+	var totalCost, totalRetail uint64
+	marginDataComplete := true
+	for _, g := range groups {
+		var mapping models.SyncedProductMapping
+		if findErr := s.db.View(func(tx database.Tx) error {
+			return tx.Read().Where("listing_slug = ?", g.itemSlug).First(&mapping).Error
+		}); findErr != nil || mapping.SupplierCost == "" || mapping.RetailPrice == "" {
+			marginDataComplete = false
+			break
+		}
+		costCents, costErr := strconv.ParseUint(mapping.SupplierCost, 10, 64)
+		retailCents, retailErr := strconv.ParseUint(mapping.RetailPrice, 10, 64)
+		if costErr != nil || retailErr != nil || costCents == 0 {
+			marginDataComplete = false
+			break
+		}
+		qty := uint64(1)
+		if len(g.items) > 0 && g.items[0].Quantity > 0 {
+			qty = uint64(g.items[0].Quantity)
+		}
+		totalCost += costCents * qty
+		totalRetail += retailCents * qty
+	}
+	if !marginDataComplete {
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain: order %s: incomplete cost data for margin check — skipping auto-fulfillment (fail closed)", orderID)
+		return
+	}
+	if totalCost >= totalRetail {
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain: order %s: total supplier cost (%d) >= total retail (%d) — skipping auto-fulfillment to protect margin",
+			orderID, totalCost, totalRetail)
+		return
 	}
 
 	recipient := extractRecipientFromOrder(oo)
@@ -305,7 +466,17 @@ func (s *SupplyChainAppService) rebuildProviders(_ context.Context) error {
 	return nil
 }
 
-// instantiateProvider creates the concrete FulfillmentProvider from persisted config.
+// newProviderFromCredentials creates a provider from plaintext credentials (used during ConnectProvider).
+func (s *SupplyChainAppService) newProviderFromCredentials(providerID string, creds contracts.ProviderCredentials) (contracts.FulfillmentProvider, error) {
+	switch providerID {
+	case "printful":
+		return printful.NewProvider(creds.APIKey, ""), nil
+	default:
+		return nil, fmt.Errorf("unknown provider %q", providerID)
+	}
+}
+
+// instantiateProvider creates the concrete FulfillmentProvider from persisted (encrypted) config.
 func (s *SupplyChainAppService) instantiateProvider(providerID, providerType string, credBlob []byte, webhookSecret string) (contracts.FulfillmentProvider, error) {
 	plaintext, err := decryptAESGCM(s.credKey[:], credBlob)
 	if err != nil {
@@ -337,11 +508,9 @@ func (s *SupplyChainAppService) ConnectProvider(ctx context.Context, params cont
 		return nil, fmt.Errorf("providerId is required")
 	}
 
-	provider, err := s.instantiateProvider(providerID, "pod", nil, "")
-	if err != nil && providerID == "printful" {
-		provider = printful.NewProvider(params.Credentials.APIKey, "")
-	} else if err != nil {
-		return nil, fmt.Errorf("unsupported provider: %s", providerID)
+	provider, err := s.newProviderFromCredentials(providerID, params.Credentials)
+	if err != nil {
+		return nil, fmt.Errorf("unsupported provider: %s: %w", providerID, err)
 	}
 
 	if err := provider.ValidateCredentials(ctx, params.Credentials); err != nil {
@@ -385,8 +554,7 @@ func (s *SupplyChainAppService) ConnectProvider(ctx context.Context, params cont
 		return nil, fmt.Errorf("persist provider config: %w", err)
 	}
 
-	realProvider := printful.NewProvider(params.Credentials.APIKey, "")
-	if regErr := s.registry.Register(realProvider); regErr != nil {
+	if regErr := s.registry.Register(provider); regErr != nil {
 		return nil, fmt.Errorf("register provider: %w", regErr)
 	}
 
@@ -486,15 +654,312 @@ func (s *SupplyChainAppService) getCatalogProvider(providerID string) (contracts
 }
 
 // ---------------------------------------------------------------------------
-// Product Import & Sync (stub — full implementation in FF-2)
+// Product Import & Sync
 // ---------------------------------------------------------------------------
 
-func (s *SupplyChainAppService) ImportProduct(_ context.Context, _ contracts.ImportProductParams) (*contracts.ImportResult, error) {
-	return nil, fmt.Errorf("ImportProduct (FF-2): %w", contracts.ErrFulfillmentNotImplemented)
+func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contracts.ImportProductParams) (*contracts.ImportResult, error) {
+	if s.listingOps == nil {
+		return nil, fmt.Errorf("ImportProduct: listing ops not wired")
+	}
+
+	cat, err := s.getCatalogProvider(params.ProviderID)
+	if err != nil {
+		return nil, err
+	}
+
+	product, err := cat.GetProduct(ctx, params.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch catalog product: %w", err)
+	}
+
+	variants := product.Variants
+	if len(params.VariantIDs) > 0 {
+		variants = filterVariants(product.Variants, params.VariantIDs)
+		if len(variants) == 0 {
+			return nil, fmt.Errorf("none of the requested variant IDs match the catalog product")
+		}
+	}
+	if len(variants) == 0 {
+		return nil, fmt.Errorf("catalog product has no variants")
+	}
+
+	markup := params.RetailMarkup
+	if markup <= 0 {
+		markup = 1.0
+	}
+
+	listing, supplierCost, retailPrice := s.buildListingFromCatalog(product, variants, markup, params)
+
+	done := make(chan struct{})
+	if err := s.listingOps.SaveListing(listing, done); err != nil {
+		return nil, fmt.Errorf("save listing draft: %w", err)
+	}
+	<-done
+
+	variantMeta := buildVariantMetadata(variants)
+	metaJSON, _ := json.Marshal(variantMeta)
+
+	mapping := &models.SyncedProductMapping{
+		ID:            uuid.NewString(),
+		ProviderID:    params.ProviderID,
+		ListingSlug:   listing.Slug,
+		ExternalID:    product.ID,
+		SyncProductID: product.ID,
+		SupplierCost:  supplierCost,
+		RetailPrice:   retailPrice,
+		Status:        "synced",
+		LastSyncAt:    time.Now(),
+		Metadata:      metaJSON,
+	}
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Save(mapping)
+	}); err != nil {
+		return nil, fmt.Errorf("save synced product mapping: %w", err)
+	}
+
+	return &contracts.ImportResult{
+		ListingSlug:   listing.Slug,
+		SyncProductID: product.ID,
+		VariantsCount: len(variants),
+		RetailPrice:   retailPrice,
+		SupplierCost:  supplierCost,
+	}, nil
+}
+
+// buildListingFromCatalog converts a catalog product into a draft protobuf Listing.
+// Returns the listing, supplier cost string, and retail price string.
+func (s *SupplyChainAppService) buildListingFromCatalog(
+	product *contracts.CatalogProduct,
+	variants []contracts.CatalogVariant,
+	markup float64,
+	params contracts.ImportProductParams,
+) (*pb.Listing, string, string) {
+	title := product.Title
+	if params.Title != "" {
+		title = params.Title
+	}
+	description := product.Description
+	if params.Description != "" {
+		description = params.Description
+	}
+	tags := params.Tags
+	if len(tags) == 0 {
+		tags = []string{"pod", "print-on-demand"}
+	}
+
+	currency := product.Currency
+	if currency == "" {
+		currency = "USD"
+	}
+
+	var images []*pb.Image
+	for _, url := range product.Images {
+		if url != "" {
+			images = append(images, &pb.Image{
+				Filename: url,
+				Large:    url,
+				Medium:   url,
+				Small:    url,
+				Tiny:     url,
+			})
+		}
+	}
+	if len(images) == 0 && product.ImageURL != "" {
+		images = []*pb.Image{{
+			Filename: product.ImageURL,
+			Large:    product.ImageURL,
+			Medium:   product.ImageURL,
+			Small:    product.ImageURL,
+			Tiny:     product.ImageURL,
+		}}
+	}
+
+	attrNames := collectOptionNames(variants)
+	var options []*pb.Listing_Item_Option
+	for _, attr := range attrNames {
+		seen := map[string]bool{}
+		var optVariants []*pb.Listing_Item_Option_Variant
+		for _, v := range variants {
+			val := v.Attributes[attr]
+			if val != "" && !seen[val] {
+				seen[val] = true
+				optVariants = append(optVariants, &pb.Listing_Item_Option_Variant{Name: val})
+			}
+		}
+		options = append(options, &pb.Listing_Item_Option{
+			Name:     attr,
+			Variants: optVariants,
+		})
+	}
+
+	var minCost float64
+	var skus []*pb.Listing_Item_Sku
+	for _, v := range variants {
+		costFloat := parseFloat(v.Price)
+		if minCost == 0 || costFloat < minCost {
+			minCost = costFloat
+		}
+		retailFloat := costFloat * markup
+		retailStr := strconv.FormatUint(uint64(retailFloat*100), 10)
+		costStr := strconv.FormatUint(uint64(costFloat*100), 10)
+
+		var selections []*pb.Listing_Item_Sku_Selection
+		for _, attr := range attrNames {
+			if val := v.Attributes[attr]; val != "" {
+				selections = append(selections, &pb.Listing_Item_Sku_Selection{
+					Option:  attr,
+					Variant: val,
+				})
+			}
+		}
+
+		sku := &pb.Listing_Item_Sku{
+			Selections:     selections,
+			ProductID:      v.ID,
+			Quantity:       "999",
+			Price:          retailStr,
+			CompareAtPrice: costStr,
+		}
+		if v.ImageURL != "" {
+			sku.Images = []*pb.Image{{
+				Filename: v.ImageURL,
+				Large:    v.ImageURL,
+				Medium:   v.ImageURL,
+				Small:    v.ImageURL,
+				Tiny:     v.ImageURL,
+			}}
+		}
+		skus = append(skus, sku)
+	}
+
+	supplierCost := strconv.FormatUint(uint64(minCost*100), 10)
+	retailPrice := strconv.FormatUint(uint64(minCost*markup*100), 10)
+
+	listing := &pb.Listing{
+		Slug:   uuid.NewString(),
+		Status: models.ListingStatusDraft,
+		Item: &pb.Listing_Item{
+			Title:       title,
+			Description: description,
+			Tags:        tags,
+			Images:      images,
+			Options:     options,
+			Skus:        skus,
+			Price:       retailPrice,
+			ProductType: "physical",
+		},
+		Metadata: &pb.Listing_Metadata{
+			Version:      1,
+			ContractType: pb.Listing_Metadata_PHYSICAL_GOOD,
+			Format:       pb.Listing_Metadata_FIXED_PRICE,
+			PricingCurrency: &pb.Currency{
+				Code:         currency,
+				Divisibility: 2,
+			},
+		},
+	}
+
+	return listing, supplierCost, retailPrice
+}
+
+// filterVariants keeps only variants whose IDs appear in the requested set.
+func filterVariants(all []contracts.CatalogVariant, ids []string) []contracts.CatalogVariant {
+	want := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		want[id] = true
+	}
+	var out []contracts.CatalogVariant
+	for _, v := range all {
+		if want[v.ID] {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// resolveVariantID finds the catalog variant ID by matching the buyer's
+// selected options against the listing's SKU table. Each SKU stores the
+// CatalogVariant.ID in its ProductID field (set during ImportProduct).
+func resolveVariantID(listing *pb.Listing, orderItem *pb.OrderOpen_Item) string {
+	if listing == nil || listing.Item == nil || orderItem == nil {
+		return ""
+	}
+
+	buyerSelections := make(map[string]string, len(orderItem.Options))
+	for _, opt := range orderItem.Options {
+		buyerSelections[opt.Name] = opt.Value
+	}
+	if len(buyerSelections) == 0 {
+		if len(listing.Item.Skus) == 1 {
+			return listing.Item.Skus[0].GetProductID()
+		}
+		return ""
+	}
+
+	for _, sku := range listing.Item.Skus {
+		if matchesSKUSelections(sku, buyerSelections) {
+			return sku.GetProductID()
+		}
+	}
+	return ""
+}
+
+func matchesSKUSelections(sku *pb.Listing_Item_Sku, buyerSelections map[string]string) bool {
+	if sku == nil || len(sku.Selections) == 0 {
+		return false
+	}
+	for _, sel := range sku.Selections {
+		if buyerSelections[sel.Option] != sel.Variant {
+			return false
+		}
+	}
+	return true
+}
+
+// collectOptionNames extracts the unique option attribute names across all
+// variants, preserving first-seen order (e.g. "Size", "Color").
+func collectOptionNames(variants []contracts.CatalogVariant) []string {
+	seen := map[string]bool{}
+	var names []string
+	for _, v := range variants {
+		for k := range v.Attributes {
+			if !seen[k] {
+				seen[k] = true
+				names = append(names, k)
+			}
+		}
+	}
+	return names
+}
+
+// parseFloat is a best-effort float parser; returns 0 on error.
+func parseFloat(s string) float64 {
+	f, _ := strconv.ParseFloat(s, 64)
+	return f
+}
+
+// variantMetadataEntry stores the mapping between a catalog variant and
+// the listing SKU productID for future sync operations.
+type variantMetadataEntry struct {
+	CatalogVariantID string            `json:"catalogVariantId"`
+	SKU              string            `json:"sku,omitempty"`
+	Attributes       map[string]string `json:"attributes"`
+}
+
+func buildVariantMetadata(variants []contracts.CatalogVariant) []variantMetadataEntry {
+	entries := make([]variantMetadataEntry, 0, len(variants))
+	for _, v := range variants {
+		entries = append(entries, variantMetadataEntry{
+			CatalogVariantID: v.ID,
+			SKU:              v.SKU,
+			Attributes:       v.Attributes,
+		})
+	}
+	return entries
 }
 
 func (s *SupplyChainAppService) SyncProduct(_ context.Context, _ string) (*contracts.SyncStatus, error) {
-	return nil, fmt.Errorf("SyncProduct (FF-2): %w", contracts.ErrFulfillmentNotImplemented)
+	return nil, fmt.Errorf("SyncProduct (FF-2.x): %w", contracts.ErrFulfillmentNotImplemented)
 }
 
 func (s *SupplyChainAppService) ListSyncedProducts(_ context.Context, providerID string) ([]contracts.SyncedProduct, error) {
@@ -530,6 +995,11 @@ func (s *SupplyChainAppService) ListSyncedProducts(_ context.Context, providerID
 // Order Fulfillment Bridge
 // ---------------------------------------------------------------------------
 
+// TECHDEBT(TD-025): CreateFulfillmentFromOrder 是早期 scaffold，
+// handleOrderFunded 已使用 createFulfillmentForItems 替代。
+// 此方法保留是因为 contracts.SupplyChainService 接口中定义了签名。
+// 清除条件: 评估是否需要保留手动触发路径（如前端"手动重试"按钮），
+// 若不需要则从接口和实现中一同删除。
 func (s *SupplyChainAppService) CreateFulfillmentFromOrder(ctx context.Context, mobazhaOrderID string) (*contracts.FulfillmentOrder, error) {
 	var existing models.FulfillmentOrderMapping
 	existsErr := s.db.View(func(tx database.Tx) error {
@@ -539,11 +1009,7 @@ func (s *SupplyChainAppService) CreateFulfillmentFromOrder(ctx context.Context, 
 		return nil, fmt.Errorf("fulfillment order already exists for order %s (status: %s)", mobazhaOrderID, existing.Status)
 	}
 
-	// For now, the handler passes a fully-formed mobazhaOrderID.
-	// The actual order → supplier item mapping requires reading order data
-	// and resolving SyncedProductMappings. This is a scaffold that the handler
-	// will feed with a CreateFulfillmentParams-based flow in FF-1.9.
-	return nil, fmt.Errorf("CreateFulfillmentFromOrder: full order bridging requires FF-1.9 EventBus integration")
+	return nil, fmt.Errorf("CreateFulfillmentFromOrder: use handleOrderFunded EventBus path instead")
 }
 
 // createFulfillmentForItems is the internal method called by the OrderFunded listener.
@@ -776,7 +1242,11 @@ func (s *SupplyChainAppService) processWebhookEvent(_ context.Context, providerI
 	}
 
 	if event.Type == contracts.FulfillmentWebhookShipped {
-		go s.autoConfirmAndShip(mobazhaOrderID, shipData)
+		if err := s.autoConfirmAndShip(mobazhaOrderID, shipData); err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain: order-advance failed for %s, returning error for provider retry: %v", mobazhaOrderID, err)
+			return fmt.Errorf("order advance: %w", err)
+		}
 	}
 	return nil
 }
@@ -892,35 +1362,40 @@ func isUniqueConstraintError(err error) bool {
 // this must be changed to confirm only supplier-managed item indices and
 // auto-ship/confirm only when ALL fulfillment mappings for the order are shipped.
 // Cleanup condition: FF-3 multi-supplier split implementation.
-func (s *SupplyChainAppService) autoConfirmAndShip(mobazhaOrderID string, shipData *contracts.FulfillmentShipment) {
+func (s *SupplyChainAppService) autoConfirmAndShip(mobazhaOrderID string, shipData *contracts.FulfillmentShipment) error {
 	if s.orderOps == nil {
-		logger.LogWarningWithIDf(log, s.nodeID,
-			"SupplyChain: orderOps not wired, skipping auto-confirm/ship for %s", mobazhaOrderID)
-		return
+		return fmt.Errorf("orderOps not wired")
 	}
 
-	// Safety check: only auto-confirm if ALL fulfillment mappings for this order are shipped.
-	// This prevents partial shipment from releasing escrow prematurely.
 	allShipped, checkErr := s.allFulfillmentsShipped(mobazhaOrderID)
 	if checkErr != nil {
-		logger.LogErrorWithIDf(log, s.nodeID,
-			"SupplyChain: cannot verify fulfillment status for %s: %v", mobazhaOrderID, checkErr)
-		return
+		return fmt.Errorf("cannot verify fulfillment status: %w", checkErr)
 	}
 	if !allShipped {
 		logger.LogInfoWithIDf(log, s.nodeID,
 			"SupplyChain: not all fulfillments shipped for %s, deferring auto-confirm", mobazhaOrderID)
-		return
+		return nil
 	}
 
 	oid := models.OrderID(mobazhaOrderID)
 
-	if err := s.orderOps.ConfirmOrder(oid, "", "", nil); err != nil {
-		logger.LogWarningWithIDf(log, s.nodeID,
-			"SupplyChain: auto-confirm failed for %s (may be MODERATED or already confirmed): %v", mobazhaOrderID, err)
-	} else {
+	// Idempotent: if a previous attempt already confirmed the order (but
+	// ShipOrder failed), skip ConfirmOrder on retry to avoid "order is not
+	// in a state where it can be confirmed" errors.
+	confirmed, err := s.orderOps.IsOrderConfirmed(oid)
+	if err != nil {
+		return fmt.Errorf("check order confirmed state: %w", err)
+	}
+
+	if !confirmed {
+		if err := s.orderOps.ConfirmOrder(oid, "", "", nil); err != nil {
+			return fmt.Errorf("auto-confirm: %w", err)
+		}
 		logger.LogInfoWithIDf(log, s.nodeID,
 			"SupplyChain: auto-confirmed order %s after supplier shipment", mobazhaOrderID)
+	} else {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"SupplyChain: order %s already confirmed, skipping (idempotent retry)", mobazhaOrderID)
 	}
 
 	shipments := []models.Shipment{{
@@ -932,12 +1407,11 @@ func (s *SupplyChainAppService) autoConfirmAndShip(mobazhaOrderID string, shipDa
 	}
 
 	if err := s.orderOps.ShipOrder(oid, shipments, nil); err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID,
-			"SupplyChain: auto-ship failed for %s: %v", mobazhaOrderID, err)
-		return
+		return fmt.Errorf("auto-ship: %w", err)
 	}
 	logger.LogInfoWithIDf(log, s.nodeID,
 		"SupplyChain: auto-shipped order %s with tracking from supplier", mobazhaOrderID)
+	return nil
 }
 
 // allFulfillmentsShipped returns true only if every FulfillmentOrderMapping

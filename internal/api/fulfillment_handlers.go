@@ -279,6 +279,33 @@ func (g *Gateway) handlePOSTSyncProduct(w http.ResponseWriter, r *http.Request) 
 }
 
 // ---------------------------------------------------------------------------
+// Order fulfillment status
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handleGETFulfillmentOrderStatus(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	orderID := mux.Vars(r)["orderID"]
+	fo, err := svc.GetFulfillmentStatus(r.Context(), orderID)
+	if err != nil {
+		if isNotFound(err) {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound,
+				"No fulfillment record for this order")
+			return
+		}
+		log.Warningf("Failed to get fulfillment status for order %s: %v", orderID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to get fulfillment status")
+		return
+	}
+	responsePkg.Success(w, fo)
+}
+
+// ---------------------------------------------------------------------------
 // Shipping estimation
 // ---------------------------------------------------------------------------
 

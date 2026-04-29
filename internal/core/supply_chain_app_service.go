@@ -353,8 +353,10 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 	}
 
 	// TECHDEBT(TD-027): Margin protection uses import-time snapshot costs, not
-	// actual order transaction prices. Acceptable for MVP (fail-closed on missing data).
+	// actual order transaction prices. A safety threshold compensates for
+	// variant cost spread and shipping/tax not included in the snapshot.
 	// 清除条件: FF-2/FF-3 按实际 SKU × qty + shipping/tax 校验
+	const marginSafetyPct uint64 = 80 // fail closed if cost >= 80% of retail
 	var totalCost, totalRetail uint64
 	marginDataComplete := true
 	for _, g := range groups {
@@ -383,10 +385,10 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 			"SupplyChain: order %s: incomplete cost data for margin check — skipping auto-fulfillment (fail closed)", orderID)
 		return
 	}
-	if totalCost >= totalRetail {
+	if totalCost*100 >= totalRetail*marginSafetyPct {
 		logger.LogWarningWithIDf(log, s.nodeID,
-			"SupplyChain: order %s: total supplier cost (%d) >= total retail (%d) — skipping auto-fulfillment to protect margin",
-			orderID, totalCost, totalRetail)
+			"SupplyChain: order %s: supplier cost (%d) >= %d%% of retail (%d) — skipping auto-fulfillment to protect margin",
+			orderID, totalCost, marginSafetyPct, totalRetail)
 		return
 	}
 

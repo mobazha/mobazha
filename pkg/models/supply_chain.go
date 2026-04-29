@@ -18,7 +18,7 @@ type FulfillmentProviderConfig struct {
 	ProviderType string `gorm:"column:provider_type;type:varchar(16);not null"`
 
 	// Encrypted JSON blob of ProviderCredentials (AES-256-GCM via pkg/encryption).
-	Credentials []byte `gorm:"column:credentials;type:blob"`
+	Credentials []byte `gorm:"column:credentials"`
 
 	// WebhookSecret is a per-connection crypto/rand hex token embedded in the webhook URL.
 	// Globally unique so SaaS can route incoming webhooks to the correct tenant.
@@ -62,7 +62,7 @@ type SyncedProductMapping struct {
 	LastSyncAt    time.Time `gorm:"column:last_sync_at"`
 
 	// Metadata stores provider-specific data (variant mappings, design files, etc.)
-	Metadata []byte `gorm:"column:metadata;type:blob"`
+	Metadata []byte `gorm:"column:metadata"`
 }
 
 func (SyncedProductMapping) TableName() string { return "synced_product_mappings" }

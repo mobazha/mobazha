@@ -36,6 +36,7 @@ type SupplyChainOrderOps interface {
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
 	IsOrderConfirmed(orderID models.OrderID) (bool, error)
+	IsOrderShipped(orderID models.OrderID) (bool, error)
 }
 
 // SupplyChainListingOps is the subset of ListingAppService needed by ImportProduct.
@@ -351,9 +352,9 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 		}
 	}
 
-	// Margin protection: sum up (supplier cost × quantity) for all items.
-	// If total supplier cost >= total retail price, or if any cost data is
-	// missing, skip auto-fulfillment (fail closed) to protect the seller.
+	// TECHDEBT(TD-027): Margin protection uses import-time snapshot costs, not
+	// actual order transaction prices. Acceptable for MVP (fail-closed on missing data).
+	// 清除条件: FF-2/FF-3 按实际 SKU × qty + shipping/tax 校验
 	var totalCost, totalRetail uint64
 	marginDataComplete := true
 	for _, g := range groups {
@@ -1396,6 +1397,16 @@ func (s *SupplyChainAppService) autoConfirmAndShip(mobazhaOrderID string, shipDa
 	} else {
 		logger.LogInfoWithIDf(log, s.nodeID,
 			"SupplyChain: order %s already confirmed, skipping (idempotent retry)", mobazhaOrderID)
+	}
+
+	shipped, err := s.orderOps.IsOrderShipped(oid)
+	if err != nil {
+		return fmt.Errorf("check order shipped state: %w", err)
+	}
+	if shipped {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"SupplyChain: order %s already shipped, skipping (idempotent retry)", mobazhaOrderID)
+		return nil
 	}
 
 	shipments := []models.Shipment{{

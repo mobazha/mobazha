@@ -31,6 +31,12 @@ func NewProvider(token string, webhookSecret string, opts ...ClientOption) *Prov
 	}
 }
 
+// Init discovers the Printful store ID for this API token.
+// Must be called before any store-scoped API calls (ListSyncProducts, etc.).
+func (p *Provider) Init(ctx context.Context) error {
+	return p.client.DiscoverStoreID(ctx)
+}
+
 // ---------------------------------------------------------------------------
 // contracts.FulfillmentProvider
 // ---------------------------------------------------------------------------

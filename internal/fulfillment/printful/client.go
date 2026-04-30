@@ -21,6 +21,7 @@ const (
 type Client struct {
 	baseURL    string
 	token      string
+	storeID    string
 	httpClient *http.Client
 
 	mu        sync.Mutex
@@ -45,6 +46,11 @@ func WithHTTPClient(hc *http.Client) ClientOption {
 // WithRateLimit overrides the per-minute request cap.
 func WithRateLimit(rpm int) ClientOption {
 	return func(c *Client) { c.rateLimit = rpm }
+}
+
+// WithStoreID sets the Printful store ID for store-scoped API calls.
+func WithStoreID(id string) ClientOption {
+	return func(c *Client) { c.storeID = id }
 }
 
 // NewClient creates a Printful API client with token-bucket rate limiting.
@@ -111,6 +117,9 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 		return fmt.Errorf("printful: create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	if c.storeID != "" {
+		req.Header.Set("X-PF-Store-Id", c.storeID)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -181,6 +190,25 @@ func (c *Client) waitForToken(ctx context.Context) error {
 		case <-time.After(wait):
 		}
 	}
+}
+
+// DiscoverStoreID calls GET /stores and sets the first store's ID.
+// Printful API tokens are typically scoped to a single store.
+func (c *Client) DiscoverStoreID(ctx context.Context) error {
+	if c.storeID != "" {
+		return nil
+	}
+	var stores []struct {
+		ID int `json:"id"`
+	}
+	if err := c.Get(ctx, "/stores", &stores); err != nil {
+		return fmt.Errorf("discover store ID: %w", err)
+	}
+	if len(stores) == 0 {
+		return fmt.Errorf("no stores found for this API token")
+	}
+	c.storeID = fmt.Sprintf("%d", stores[0].ID)
+	return nil
 }
 
 // Error types for callers to match on.

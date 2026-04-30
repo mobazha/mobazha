@@ -1119,7 +1119,7 @@ func extractRecipientFromOrder(oo *pb.OrderOpen) contracts.FulfillmentRecipient 
 
 // rebuildProviders scans FulfillmentProviderConfig WHERE status='connected',
 // decrypts credentials, instantiates the corresponding provider, and registers it.
-func (s *SupplyChainAppService) rebuildProviders(_ context.Context) error {
+func (s *SupplyChainAppService) rebuildProviders(ctx context.Context) error {
 	var configs []models.FulfillmentProviderConfig
 	err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("status = ?", "connected").Find(&configs).Error
@@ -1144,6 +1144,12 @@ func (s *SupplyChainAppService) rebuildProviders(_ context.Context) error {
 					&models.FulfillmentProviderConfig{})
 			})
 			continue
+		}
+		if initable, ok := provider.(interface{ Init(context.Context) error }); ok {
+			if err := initable.Init(ctx); err != nil {
+				logger.LogErrorWithIDf(log, s.nodeID,
+					"SupplyChain: provider %q init failed: %v", cfg.ProviderID, err)
+			}
 		}
 		if regErr := s.registry.Register(provider); regErr != nil {
 			logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: failed to register rebuilt provider %q: %v", cfg.ProviderID, regErr)
@@ -1241,6 +1247,12 @@ func (s *SupplyChainAppService) ConnectProvider(ctx context.Context, params cont
 		return tx.Save(cfg)
 	}); err != nil {
 		return nil, fmt.Errorf("persist provider config: %w", err)
+	}
+
+	if initable, ok := provider.(interface{ Init(context.Context) error }); ok {
+		if err := initable.Init(ctx); err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: provider %q init: %v", providerID, err)
+		}
 	}
 
 	if regErr := s.registry.Register(provider); regErr != nil {

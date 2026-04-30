@@ -110,15 +110,19 @@ type PrintArea struct {
 // ---------------------------------------------------------------------------
 
 // ImportProductParams is the request for importing a supplier product as a Mobazha listing.
+// Supports two modes:
+//   - Catalog import: set ProductID (generic template from supplier catalog)
+//   - Sync Product import: set SyncProductID (designed product from supplier dashboard)
 type ImportProductParams struct {
-	ProviderID   string            `json:"providerId"`
-	ProductID    string            `json:"productId"`
-	VariantIDs   []string          `json:"variantIds"`
-	RetailMarkup float64           `json:"retailMarkup"`
-	DesignFiles  map[string]string `json:"designFiles,omitempty"`
-	Title        string            `json:"title,omitempty"`
-	Description  string            `json:"description,omitempty"`
-	Tags         []string          `json:"tags,omitempty"`
+	ProviderID    string            `json:"providerId"`
+	ProductID     string            `json:"productId,omitempty"`
+	SyncProductID string            `json:"syncProductId,omitempty"`
+	VariantIDs    []string          `json:"variantIds"`
+	RetailMarkup  float64           `json:"retailMarkup"`
+	DesignFiles   map[string]string `json:"designFiles,omitempty"`
+	Title         string            `json:"title,omitempty"`
+	Description   string            `json:"description,omitempty"`
+	Tags          []string          `json:"tags,omitempty"`
 }
 
 // ImportResult is the response after successfully importing a supplier product.
@@ -146,6 +150,53 @@ type SyncedProduct struct {
 	LastSyncAt    time.Time `json:"lastSyncAt"`
 	SupplierCost  string    `json:"supplierCost"`
 	RetailPrice   string    `json:"retailPrice"`
+}
+
+// StoreSyncProduct represents a product in the supplier's store (created via
+// their dashboard or API with custom designs). Unlike CatalogProduct which is
+// a generic template, StoreSyncProduct already has designs applied.
+type StoreSyncProduct struct {
+	ID           string              `json:"id"`
+	ExternalID   string              `json:"externalId,omitempty"`
+	Name         string              `json:"name"`
+	ThumbnailURL string              `json:"thumbnailUrl"`
+	VariantCount int                 `json:"variantCount"`
+	SyncedCount  int                 `json:"syncedCount"`
+	Variants     []StoreSyncVariant  `json:"variants,omitempty"`
+}
+
+// StoreSyncVariant is a variant within a StoreSyncProduct.
+type StoreSyncVariant struct {
+	ID              string            `json:"id"`
+	SyncProductID   string            `json:"syncProductId"`
+	Name            string            `json:"name"`
+	CatalogVariantID string           `json:"catalogVariantId"`
+	RetailPrice     string            `json:"retailPrice"`
+	Currency        string            `json:"currency"`
+	SKU             string            `json:"sku,omitempty"`
+	Size            string            `json:"size,omitempty"`
+	Color           string            `json:"color,omitempty"`
+	ImageURL        string            `json:"imageUrl,omitempty"`
+	PreviewURL      string            `json:"previewUrl,omitempty"`
+	Files           []SyncVariantFile `json:"files,omitempty"`
+	InStock         bool              `json:"inStock"`
+}
+
+// SyncVariantFile is a design or preview file on a sync variant.
+type SyncVariantFile struct {
+	Type         string `json:"type"`
+	URL          string `json:"url"`
+	PreviewURL   string `json:"previewUrl,omitempty"`
+	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
+	Filename     string `json:"filename,omitempty"`
+}
+
+// StoreSyncPage is a paginated list of store sync products.
+type StoreSyncPage struct {
+	Products []StoreSyncProduct `json:"products"`
+	Total    int                `json:"total"`
+	Offset   int                `json:"offset"`
+	Limit    int                `json:"limit"`
 }
 
 // SyncStatus represents the current sync state of a product.

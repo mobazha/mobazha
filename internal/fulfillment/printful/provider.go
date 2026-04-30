@@ -339,6 +339,53 @@ func (p *Provider) GetVariant(ctx context.Context, variantID string) (*contracts
 }
 
 // ---------------------------------------------------------------------------
+// contracts.FulfillmentStoreSyncProvider
+// ---------------------------------------------------------------------------
+
+func (p *Provider) ListStoreSyncProducts(ctx context.Context, offset, limit int) (*contracts.StoreSyncPage, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	path := fmt.Sprintf("/store/products?offset=%d&limit=%d", offset, limit)
+
+	// Printful wraps the list response with paging at the envelope level.
+	// The Client.Get strips the envelope and gives us result directly.
+	var products []pfSyncProductSummary
+	if err := p.client.Get(ctx, path, &products); err != nil {
+		return nil, fmt.Errorf("list store sync products: %w", err)
+	}
+
+	result := make([]contracts.StoreSyncProduct, 0, len(products))
+	for _, sp := range products {
+		if sp.IsIgnored {
+			continue
+		}
+		result = append(result, contracts.StoreSyncProduct{
+			ID:           strconv.Itoa(sp.ID),
+			ExternalID:   sp.ExternalID,
+			Name:         sp.Name,
+			ThumbnailURL: sp.ThumbnailURL,
+			VariantCount: sp.Variants,
+			SyncedCount:  sp.Synced,
+		})
+	}
+	return &contracts.StoreSyncPage{
+		Products: result,
+		Total:    len(result),
+		Offset:   offset,
+		Limit:    limit,
+	}, nil
+}
+
+func (p *Provider) GetStoreSyncProduct(ctx context.Context, syncProductID string) (*contracts.StoreSyncProduct, error) {
+	var info pfSyncProductInfo
+	if err := p.client.Get(ctx, "/store/products/"+syncProductID, &info); err != nil {
+		return nil, fmt.Errorf("get store sync product: %w", err)
+	}
+	return convertStoreSyncProduct(&info), nil
+}
+
+// ---------------------------------------------------------------------------
 // Converters
 // ---------------------------------------------------------------------------
 
@@ -493,8 +540,55 @@ func ClassifyError(err error) *contracts.FulfillmentRetryableError {
 // jsonUnmarshal wraps encoding/json for consistency.
 var jsonUnmarshal = json.Unmarshal
 
+func convertStoreSyncProduct(info *pfSyncProductInfo) *contracts.StoreSyncProduct {
+	sp := &contracts.StoreSyncProduct{
+		ID:           strconv.Itoa(info.SyncProduct.ID),
+		ExternalID:   info.SyncProduct.ExternalID,
+		Name:         info.SyncProduct.Name,
+		ThumbnailURL: info.SyncProduct.ThumbnailURL,
+		VariantCount: info.SyncProduct.Variants,
+		SyncedCount:  info.SyncProduct.Synced,
+	}
+
+	for _, sv := range info.SyncVariants {
+		if sv.IsIgnored {
+			continue
+		}
+		variant := contracts.StoreSyncVariant{
+			ID:               strconv.Itoa(sv.ID),
+			SyncProductID:    strconv.Itoa(sv.SyncProductID),
+			Name:             sv.Name,
+			CatalogVariantID: strconv.Itoa(sv.VariantID),
+			RetailPrice:      sv.RetailPrice,
+			Currency:         sv.Currency,
+			SKU:              sv.SKU,
+			Size:             sv.Size,
+			Color:            sv.Color,
+			InStock:          sv.AvailabilityStatus == "active",
+		}
+		if sv.Product != nil {
+			variant.ImageURL = sv.Product.Image
+		}
+		for _, f := range sv.Files {
+			variant.Files = append(variant.Files, contracts.SyncVariantFile{
+				Type:         f.Type,
+				URL:          f.URL,
+				PreviewURL:   f.PreviewURL,
+				ThumbnailURL: f.ThumbnailURL,
+				Filename:     f.Filename,
+			})
+			if f.PreviewURL != "" && variant.PreviewURL == "" {
+				variant.PreviewURL = f.PreviewURL
+			}
+		}
+		sp.Variants = append(sp.Variants, variant)
+	}
+	return sp
+}
+
 // Compile-time interface checks.
 var (
-	_ contracts.FulfillmentProvider        = (*Provider)(nil)
-	_ contracts.FulfillmentCatalogProvider = (*Provider)(nil)
+	_ contracts.FulfillmentProvider          = (*Provider)(nil)
+	_ contracts.FulfillmentCatalogProvider   = (*Provider)(nil)
+	_ contracts.FulfillmentStoreSyncProvider = (*Provider)(nil)
 )

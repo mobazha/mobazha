@@ -218,6 +218,68 @@ type pfRetailCosts struct {
 	Currency string `json:"currency,omitempty"`
 }
 
+// ---------------------------------------------------------------------------
+// Sync Products (GET /store/products, GET /store/products/{id})
+// ---------------------------------------------------------------------------
+
+// pfSyncProductSummary is the summary returned by GET /store/products.
+type pfSyncProductSummary struct {
+	ID           int    `json:"id"`
+	ExternalID   string `json:"external_id"`
+	Name         string `json:"name"`
+	Variants     int    `json:"variants"`
+	Synced       int    `json:"synced"`
+	ThumbnailURL string `json:"thumbnail_url"`
+	IsIgnored    bool   `json:"is_ignored"`
+}
+
+// pfSyncProductInfo is the detailed response from GET /store/products/{id}.
+type pfSyncProductInfo struct {
+	SyncProduct  pfSyncProductSummary `json:"sync_product"`
+	SyncVariants []pfSyncVariant      `json:"sync_variants"`
+}
+
+// pfSyncVariant is a variant within a Printful Sync Product.
+type pfSyncVariant struct {
+	ID                int              `json:"id"`
+	ExternalID        string           `json:"external_id"`
+	SyncProductID     int              `json:"sync_product_id"`
+	Name              string           `json:"name"`
+	Synced            bool             `json:"synced"`
+	VariantID         int              `json:"variant_id"`
+	RetailPrice       string           `json:"retail_price"`
+	Currency          string           `json:"currency"`
+	IsIgnored         bool             `json:"is_ignored"`
+	SKU               string           `json:"sku"`
+	Product           *pfItemProduct   `json:"product"`
+	Files             []pfSyncFile     `json:"files"`
+	Options           []pfItemOption   `json:"options"`
+	MainCategoryID    int              `json:"main_category_id"`
+	Size              string           `json:"size"`
+	Color             string           `json:"color"`
+	AvailabilityStatus string          `json:"availability_status"`
+}
+
+// pfSyncFile is a design/mockup file attached to a sync variant.
+type pfSyncFile struct {
+	Type         string `json:"type"`
+	ID           int    `json:"id"`
+	URL          string `json:"url"`
+	Hash         string `json:"hash"`
+	Filename     string `json:"filename"`
+	MimeType     string `json:"mime_type"`
+	Size         int    `json:"size"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	DPI          int    `json:"dpi"`
+	Status       string `json:"status"`
+	Created      int64  `json:"created"`
+	ThumbnailURL string `json:"thumbnail_url"`
+	PreviewURL   string `json:"preview_url"`
+	Visible      bool   `json:"visible"`
+	IsTemporary  bool   `json:"is_temporary"`
+}
+
 // pfShippingRateRequest is the POST /shipping/rates body.
 type pfShippingRateRequest struct {
 	Recipient pfRecipient        `json:"recipient"`

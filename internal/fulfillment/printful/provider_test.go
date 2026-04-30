@@ -464,4 +464,157 @@ func TestConvertCatalogProduct_PriceRange(t *testing.T) {
 func TestInterfaceCompliance(t *testing.T) {
 	var _ contracts.FulfillmentProvider = (*Provider)(nil)
 	var _ contracts.FulfillmentCatalogProvider = (*Provider)(nil)
+	var _ contracts.FulfillmentStoreSyncProvider = (*Provider)(nil)
+}
+
+// ---------------------------------------------------------------------------
+// ListStoreSyncProducts
+// ---------------------------------------------------------------------------
+
+func TestListStoreSyncProducts_Success(t *testing.T) {
+	ts := newTestServer(map[string]http.HandlerFunc{
+		"GET /store/products": func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, []pfSyncProductSummary{
+				{ID: 100, Name: "Custom T-shirt", ThumbnailURL: "https://img.example.com/tshirt.png", Variants: 5, Synced: 5},
+				{ID: 101, Name: "Ignored Product", IsIgnored: true, Variants: 2, Synced: 0},
+				{ID: 102, Name: "Custom Hoodie", ThumbnailURL: "https://img.example.com/hoodie.png", Variants: 3, Synced: 3},
+			})
+		},
+	})
+	defer ts.Close()
+
+	p := NewProvider("token", "", WithBaseURL(ts.URL))
+	page, err := p.ListStoreSyncProducts(context.Background(), 0, 20)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(page.Products) != 2 {
+		t.Fatalf("expected 2 products (ignored filtered), got %d", len(page.Products))
+	}
+	if page.Products[0].ID != "100" || page.Products[0].Name != "Custom T-shirt" {
+		t.Errorf("unexpected first product: %+v", page.Products[0])
+	}
+	if page.Products[1].ID != "102" || page.Products[1].Name != "Custom Hoodie" {
+		t.Errorf("unexpected second product: %+v", page.Products[1])
+	}
+}
+
+func TestListStoreSyncProducts_Empty(t *testing.T) {
+	ts := newTestServer(map[string]http.HandlerFunc{
+		"GET /store/products": func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, []pfSyncProductSummary{})
+		},
+	})
+	defer ts.Close()
+
+	p := NewProvider("token", "", WithBaseURL(ts.URL))
+	page, err := p.ListStoreSyncProducts(context.Background(), 0, 20)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(page.Products) != 0 {
+		t.Errorf("expected 0 products, got %d", len(page.Products))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetStoreSyncProduct
+// ---------------------------------------------------------------------------
+
+func TestGetStoreSyncProduct_Success(t *testing.T) {
+	ts := newTestServer(map[string]http.HandlerFunc{
+		"GET /store/products/100": func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, pfSyncProductInfo{
+				SyncProduct: pfSyncProductSummary{
+					ID:           100,
+					Name:         "Custom T-shirt",
+					ThumbnailURL: "https://img.example.com/tshirt.png",
+					Variants:     2,
+					Synced:       2,
+				},
+				SyncVariants: []pfSyncVariant{
+					{
+						ID:            201,
+						SyncProductID: 100,
+						Name:          "Custom T-shirt / S / White",
+						VariantID:     3001,
+						RetailPrice:   "29.99",
+						Currency:      "USD",
+						Size:          "S",
+						Color:         "White",
+						AvailabilityStatus: "active",
+						Product: &pfItemProduct{
+							VariantID: 3001,
+							ProductID: 301,
+							Image:     "https://img.example.com/variant-s.png",
+							Name:      "Bella + Canvas 3001",
+						},
+						Files: []pfSyncFile{
+							{
+								Type:       "default",
+								URL:        "https://files.example.com/design.png",
+								PreviewURL: "https://files.example.com/preview.png",
+								Filename:   "design.png",
+							},
+						},
+					},
+					{
+						ID:            202,
+						SyncProductID: 100,
+						Name:          "Custom T-shirt / M / White",
+						VariantID:     3002,
+						RetailPrice:   "29.99",
+						Currency:      "USD",
+						Size:          "M",
+						Color:         "White",
+						AvailabilityStatus: "active",
+						IsIgnored:         true,
+					},
+				},
+			})
+		},
+	})
+	defer ts.Close()
+
+	p := NewProvider("token", "", WithBaseURL(ts.URL))
+	product, err := p.GetStoreSyncProduct(context.Background(), "100")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if product.ID != "100" || product.Name != "Custom T-shirt" {
+		t.Errorf("unexpected product: %+v", product)
+	}
+	if len(product.Variants) != 1 {
+		t.Fatalf("expected 1 variant (ignored filtered), got %d", len(product.Variants))
+	}
+	v := product.Variants[0]
+	if v.ID != "201" || v.CatalogVariantID != "3001" {
+		t.Errorf("unexpected variant: %+v", v)
+	}
+	if v.RetailPrice != "29.99" || v.Currency != "USD" {
+		t.Errorf("unexpected pricing: %+v", v)
+	}
+	if v.ImageURL != "https://img.example.com/variant-s.png" {
+		t.Errorf("expected image from product, got %q", v.ImageURL)
+	}
+	if v.PreviewURL != "https://files.example.com/preview.png" {
+		t.Errorf("expected preview from file, got %q", v.PreviewURL)
+	}
+	if len(v.Files) != 1 || v.Files[0].Type != "default" {
+		t.Errorf("unexpected files: %+v", v.Files)
+	}
+	if !v.InStock {
+		t.Error("expected InStock=true for 'active' availability")
+	}
+}
+
+func TestGetStoreSyncProduct_NotFound(t *testing.T) {
+	ts := newTestServer(map[string]http.HandlerFunc{})
+	defer ts.Close()
+
+	p := NewProvider("token", "", WithBaseURL(ts.URL))
+	_, err := p.GetStoreSyncProduct(context.Background(), "999")
+	if err == nil {
+		t.Fatal("expected error for not found product")
+	}
 }

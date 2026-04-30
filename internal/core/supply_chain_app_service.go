@@ -1351,6 +1351,10 @@ func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contra
 		return nil, fmt.Errorf("ImportProduct: listing ops not wired")
 	}
 
+	if params.SyncProductID != "" {
+		return s.importFromSyncProduct(ctx, params)
+	}
+
 	cat, err := s.getCatalogProvider(params.ProviderID)
 	if err != nil {
 		return nil, err
@@ -1581,6 +1585,260 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 	return listing, supplierCost, retailPrice, nil
 }
 
+// importFromSyncProduct imports a Sync Product (with custom designs) from the
+// supplier's store as a Mobazha listing. Unlike catalog import, sync products
+// already have mockup images and designs applied in the supplier dashboard.
+func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, params contracts.ImportProductParams) (*contracts.ImportResult, error) {
+	ssp, err := s.getStoreSyncProvider(params.ProviderID)
+	if err != nil {
+		return nil, err
+	}
+
+	syncProd, err := ssp.GetStoreSyncProduct(ctx, params.SyncProductID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch store sync product: %w", err)
+	}
+	if len(syncProd.Variants) == 0 {
+		return nil, fmt.Errorf("sync product has no variants")
+	}
+
+	markup := params.RetailMarkup
+	if markup <= 0 {
+		markup = 1.0
+	}
+
+	title := syncProd.Name
+	if params.Title != "" {
+		title = params.Title
+	}
+	description := params.Description
+	tags := params.Tags
+	if len(tags) == 0 {
+		tags = []string{"pod", "print-on-demand"}
+	}
+
+	variants := syncProd.Variants
+	if len(params.VariantIDs) > 0 {
+		want := make(map[string]bool, len(params.VariantIDs))
+		for _, id := range params.VariantIDs {
+			want[id] = true
+		}
+		filtered := make([]contracts.StoreSyncVariant, 0)
+		for _, v := range variants {
+			if want[v.ID] {
+				filtered = append(filtered, v)
+			}
+		}
+		if len(filtered) == 0 {
+			return nil, fmt.Errorf("none of the requested variant IDs match the sync product")
+		}
+		variants = filtered
+	}
+
+	// Collect images from variant previews/files for the listing
+	imageURLSet := map[string]bool{}
+	var images []*pb.Image
+	if syncProd.ThumbnailURL != "" {
+		imageURLSet[syncProd.ThumbnailURL] = true
+		images = append(images, &pb.Image{
+			Filename: syncProd.ThumbnailURL,
+			Large:    syncProd.ThumbnailURL,
+			Medium:   syncProd.ThumbnailURL,
+			Small:    syncProd.ThumbnailURL,
+			Tiny:     syncProd.ThumbnailURL,
+		})
+	}
+	for _, v := range variants {
+		for _, f := range v.Files {
+			imgURL := f.PreviewURL
+			if imgURL == "" {
+				imgURL = f.URL
+			}
+			if imgURL != "" && !imageURLSet[imgURL] {
+				imageURLSet[imgURL] = true
+				images = append(images, &pb.Image{
+					Filename: imgURL,
+					Large:    imgURL,
+					Medium:   imgURL,
+					Small:    imgURL,
+					Tiny:     imgURL,
+				})
+			}
+		}
+	}
+
+	// Build options (size/color) from sync variants
+	type attrEntry struct{ name, val string }
+	attrNames := []string{}
+	seenAttrs := map[string]bool{}
+	for _, v := range variants {
+		if v.Size != "" && !seenAttrs["size"] {
+			seenAttrs["size"] = true
+			attrNames = append(attrNames, "size")
+		}
+		if v.Color != "" && !seenAttrs["color"] {
+			seenAttrs["color"] = true
+			attrNames = append(attrNames, "color")
+		}
+	}
+
+	var options []*pb.Listing_Item_Option
+	for _, attr := range attrNames {
+		seen := map[string]bool{}
+		var optVariants []*pb.Listing_Item_Option_Variant
+		for _, v := range variants {
+			var val string
+			switch attr {
+			case "size":
+				val = v.Size
+			case "color":
+				val = v.Color
+			}
+			if val != "" && !seen[val] {
+				seen[val] = true
+				optVariants = append(optVariants, &pb.Listing_Item_Option_Variant{Name: val})
+			}
+		}
+		options = append(options, &pb.Listing_Item_Option{
+			Name:     attr,
+			Variants: optVariants,
+		})
+	}
+
+	// Build SKUs with pricing
+	currency := "USD"
+	var minCostCents uint64
+	var skus []*pb.Listing_Item_Sku
+
+	for _, v := range variants {
+		if v.Currency != "" {
+			currency = v.Currency
+		}
+		costCents, parseOK := parseUSDDollarsToCents(v.RetailPrice)
+		if !parseOK {
+			return nil, fmt.Errorf("sync variant %q has unparseable price %q", v.ID, v.RetailPrice)
+		}
+		if costCents == 0 {
+			return nil, fmt.Errorf("sync variant %q has zero price", v.ID)
+		}
+		if minCostCents == 0 || costCents < minCostCents {
+			minCostCents = costCents
+		}
+		retailCents := computeRetailCents(costCents, markup)
+		retailStr := strconv.FormatUint(retailCents, 10)
+
+		var selections []*pb.Listing_Item_Sku_Selection
+		if v.Size != "" {
+			selections = append(selections, &pb.Listing_Item_Sku_Selection{
+				Option:  "size",
+				Variant: v.Size,
+			})
+		}
+		if v.Color != "" {
+			selections = append(selections, &pb.Listing_Item_Sku_Selection{
+				Option:  "color",
+				Variant: v.Color,
+			})
+		}
+
+		sku := &pb.Listing_Item_Sku{
+			Selections: selections,
+			ProductID:  v.ID,
+			Quantity:   "999",
+			Price:      retailStr,
+		}
+		// Use preview image or variant image for the SKU
+		skuImg := v.PreviewURL
+		if skuImg == "" {
+			skuImg = v.ImageURL
+		}
+		if skuImg != "" {
+			sku.Images = []*pb.Image{{
+				Filename: skuImg,
+				Large:    skuImg,
+				Medium:   skuImg,
+				Small:    skuImg,
+				Tiny:     skuImg,
+			}}
+		}
+		skus = append(skus, sku)
+	}
+
+	supplierCost := strconv.FormatUint(minCostCents, 10)
+	retailPrice := strconv.FormatUint(computeRetailCents(minCostCents, markup), 10)
+
+	listing := &pb.Listing{
+		Slug:   uuid.NewString(),
+		Status: models.ListingStatusDraft,
+		Item: &pb.Listing_Item{
+			Title:       title,
+			Description: description,
+			Tags:        tags,
+			Images:      images,
+			Options:     options,
+			Skus:        skus,
+			Price:       retailPrice,
+			ProductType: "physical",
+		},
+		Metadata: &pb.Listing_Metadata{
+			Version:      1,
+			ContractType: pb.Listing_Metadata_PHYSICAL_GOOD,
+			Format:       pb.Listing_Metadata_FIXED_PRICE,
+			PricingCurrency: &pb.Currency{
+				Code:         currency,
+				Divisibility: 2,
+			},
+		},
+	}
+
+	done := make(chan struct{})
+	if err := s.listingOps.SaveListing(listing, done); err != nil {
+		return nil, fmt.Errorf("save listing draft: %w", err)
+	}
+	<-done
+
+	// Build variant metadata for margin gate
+	variantMeta := make([]variantMetadataEntry, 0, len(variants))
+	for _, v := range variants {
+		costCents, _ := parseUSDDollarsToCents(v.RetailPrice)
+		retailCents := computeRetailCents(costCents, markup)
+		variantMeta = append(variantMeta, variantMetadataEntry{
+			CatalogVariantID:  v.CatalogVariantID,
+			SyncVariantID:     v.ID,
+			SKU:               v.SKU,
+			SupplierCostCents: costCents,
+			RetailCents:       retailCents,
+		})
+	}
+	metaJSON, _ := json.Marshal(variantMeta)
+
+	mapping := &models.SyncedProductMapping{
+		ID:            uuid.NewString(),
+		ProviderID:    params.ProviderID,
+		ListingSlug:   listing.Slug,
+		ExternalID:    syncProd.ID,
+		SyncProductID: syncProd.ID,
+		SupplierCost:  supplierCost,
+		RetailPrice:   retailPrice,
+		Status:        "synced",
+		LastSyncAt:    time.Now(),
+		Metadata:      metaJSON,
+	}
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Save(mapping)
+	}); err != nil {
+		return nil, fmt.Errorf("save synced product mapping: %w", err)
+	}
+
+	return &contracts.ImportResult{
+		ListingSlug:   listing.Slug,
+		SyncProductID: syncProd.ID,
+		VariantsCount: len(variants),
+		RetailPrice:   retailPrice,
+		SupplierCost:  supplierCost,
+	}, nil
+}
+
 // filterVariants keeps only variants whose IDs appear in the requested set.
 func filterVariants(all []contracts.CatalogVariant, ids []string) []contracts.CatalogVariant {
 	want := make(map[string]bool, len(ids))
@@ -1666,6 +1924,7 @@ func parseFloat(s string) float64 {
 // cost to buyers. Keep economics in this private metadata only.
 type variantMetadataEntry struct {
 	CatalogVariantID  string            `json:"catalogVariantId"`
+	SyncVariantID     string            `json:"syncVariantId,omitempty"`
 	SKU               string            `json:"sku,omitempty"`
 	Attributes        map[string]string `json:"attributes"`
 	SupplierCostCents uint64            `json:"supplierCostCents,omitempty"`
@@ -1771,6 +2030,39 @@ func (s *SupplyChainAppService) ListSyncedProducts(_ context.Context, providerID
 		}
 	}
 	return products, nil
+}
+
+// ---------------------------------------------------------------------------
+// Store Sync Products (designed in supplier dashboard)
+// ---------------------------------------------------------------------------
+
+func (s *SupplyChainAppService) getStoreSyncProvider(providerID string) (contracts.FulfillmentStoreSyncProvider, error) {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return nil, err
+	}
+	ssp, ok := provider.(contracts.FulfillmentStoreSyncProvider)
+	if !ok {
+		return nil, fmt.Errorf("provider %q does not support store sync products: %w",
+			providerID, contracts.ErrFulfillmentNotImplemented)
+	}
+	return ssp, nil
+}
+
+func (s *SupplyChainAppService) BrowseStoreSyncProducts(ctx context.Context, providerID string, offset, limit int) (*contracts.StoreSyncPage, error) {
+	ssp, err := s.getStoreSyncProvider(providerID)
+	if err != nil {
+		return nil, err
+	}
+	return ssp.ListStoreSyncProducts(ctx, offset, limit)
+}
+
+func (s *SupplyChainAppService) GetStoreSyncProduct(ctx context.Context, providerID string, syncProductID string) (*contracts.StoreSyncProduct, error) {
+	ssp, err := s.getStoreSyncProvider(providerID)
+	if err != nil {
+		return nil, err
+	}
+	return ssp.GetStoreSyncProduct(ctx, syncProductID)
 }
 
 // ---------------------------------------------------------------------------

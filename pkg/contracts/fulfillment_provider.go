@@ -67,6 +67,16 @@ type FulfillmentSyncProvider interface {
 	DeleteSyncProduct(ctx context.Context, syncProductID string) error
 }
 
+// FulfillmentStoreSyncProvider is an optional extension for browsing products
+// the seller has already designed in the supplier's dashboard (Sync Products).
+// Unlike FulfillmentCatalogProvider (generic templates), these products have
+// custom designs/mockups applied.
+// Use type assertion: if ssp, ok := provider.(FulfillmentStoreSyncProvider); ok { ... }
+type FulfillmentStoreSyncProvider interface {
+	ListStoreSyncProducts(ctx context.Context, offset, limit int) (*StoreSyncPage, error)
+	GetStoreSyncProduct(ctx context.Context, syncProductID string) (*StoreSyncProduct, error)
+}
+
 // FulfillmentProviderRegistry manages registered FulfillmentProvider instances.
 type FulfillmentProviderRegistry interface {
 	Register(provider FulfillmentProvider) error
@@ -96,6 +106,10 @@ type SupplyChainService interface {
 	ImportProduct(ctx context.Context, params ImportProductParams) (*ImportResult, error)
 	SyncProduct(ctx context.Context, listingSlug string) (*SyncStatus, error)
 	ListSyncedProducts(ctx context.Context, providerID string) ([]SyncedProduct, error)
+
+	// Store sync products (designed in supplier dashboard)
+	BrowseStoreSyncProducts(ctx context.Context, providerID string, offset, limit int) (*StoreSyncPage, error)
+	GetStoreSyncProduct(ctx context.Context, providerID string, syncProductID string) (*StoreSyncProduct, error)
 
 	// Order fulfillment bridge
 	CreateFulfillmentFromOrder(ctx context.Context, mobazhaOrderID string) (*FulfillmentOrder, error)

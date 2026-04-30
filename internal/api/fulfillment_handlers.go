@@ -200,6 +200,59 @@ func (g *Gateway) handleGETFulfillmentCatalogProduct(w http.ResponseWriter, r *h
 }
 
 // ---------------------------------------------------------------------------
+// Store sync products (designed in supplier dashboard)
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handleGETStoreSyncProducts(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	offset := parseInt(r.URL.Query().Get("offset"), 0)
+	limit := parseInt(r.URL.Query().Get("limit"), 20)
+
+	page, err := svc.BrowseStoreSyncProducts(r.Context(), providerID, offset, limit)
+	if err != nil {
+		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
+				"Store sync products not supported by this provider")
+			return
+		}
+		log.Warningf("Failed to list store sync products for %s: %v", providerID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to list store sync products")
+		return
+	}
+	responsePkg.Success(w, page)
+}
+
+func (g *Gateway) handleGETStoreSyncProduct(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	vars := mux.Vars(r)
+	product, err := svc.GetStoreSyncProduct(r.Context(), vars["providerID"], vars["syncProductID"])
+	if err != nil {
+		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
+				"Store sync products not supported by this provider")
+			return
+		}
+		log.Warningf("Failed to get store sync product: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to get store sync product")
+		return
+	}
+	responsePkg.Success(w, product)
+}
+
+// ---------------------------------------------------------------------------
 // Product import & sync
 // ---------------------------------------------------------------------------
 

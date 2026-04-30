@@ -583,11 +583,18 @@ func convertStoreSyncProduct(info *pfSyncProductInfo) *contracts.StoreSyncProduc
 				ThumbnailURL: f.ThumbnailURL,
 				Filename:     f.Filename,
 			})
-			if f.PreviewURL != "" && variant.PreviewURL == "" {
-				variant.PreviewURL = f.PreviewURL
+			if f.PreviewURL != "" {
+				if f.Type == "preview" {
+					variant.PreviewURL = f.PreviewURL
+				} else if variant.PreviewURL == "" {
+					variant.PreviewURL = f.PreviewURL
+				}
 			}
 		}
 		sp.Variants = append(sp.Variants, variant)
+	}
+	if len(sp.Variants) > 0 && sp.Variants[0].PreviewURL != "" {
+		sp.ThumbnailURL = sp.Variants[0].PreviewURL
 	}
 	return sp
 }

@@ -2069,7 +2069,7 @@ func (s *SupplyChainAppService) GetStoreSyncProduct(ctx context.Context, provide
 // Order Fulfillment Bridge
 // ---------------------------------------------------------------------------
 
-// TECHDEBT(TD-082): CreateFulfillmentFromOrder 是早期 scaffold，
+// TECHDEBT(TD-091): CreateFulfillmentFromOrder 是早期 scaffold，
 // handleOrderFunded 已使用 createFulfillmentForItems 替代。
 // 此方法保留是因为 contracts.SupplyChainService 接口中定义了签名。
 // 清除条件: 评估是否需要保留手动触发路径（如前端"手动重试"按钮），

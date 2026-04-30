@@ -33,6 +33,11 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaMediaOperations(api)
 	g.registerNodeHumaProfileOperations(api)
 	g.registerNodeHumaSocialOperations(api)
+	g.registerNodeHumaOrderOperations(api)
+	g.registerNodeHumaDisputeOperations(api)
+	g.registerNodeHumaFiatOperations(api)
+	g.registerNodeHumaFulfillmentOperations(api)
+	g.registerNodeHumaCartOperations(api)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
@@ -156,10 +161,89 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"ratings-index-by-peer-and-slug",
 		"ratings-get-by-id",
 		"ratings-batch-fetch",
+		// AH-1.4 batch 3: orders, disputes, fiat, fulfillment, carts, analytics / guest / payment-methods
+		"analytics-get-stats",
+		"analytics-shop-post-events-public",
+		"carts-delete-all",
+		"carts-delete-peer-items",
+		"carts-get",
+		"carts-get-items-count",
+		"carts-post-peer-items",
+		"carts-put-peer-items",
+		"cases-get-detail",
+		"cases-get-query",
+		"cases-post-query",
+		"disputes-post-after-sale",
+		"disputes-post-close",
+		"disputes-post-instructions-release",
+		"disputes-post-open",
+		"disputes-post-release",
+		"disputes-post-release-after-timeout",
+		"fiat-capture-payment",
+		"fiat-create-payment-session",
+		"fiat-disconnect-provider",
+		"fiat-get-payment",
+		"fiat-get-provider-config-view",
+		"fiat-get-provider-connection-status",
+		"fiat-list-enabled-providers",
+		"fiat-public-capture-checkout-session",
+		"fiat-public-create-checkout-session",
+		"fiat-public-ingest-provider-webhook",
+		"fiat-public-list-providers-by-peer",
+		"fiat-refund-payment",
+		"fiat-register-provider-webhook",
+		"fiat-save-provider-config",
+		"fiat-verify-provider-credentials",
+		"fulfillment-delete-disconnect",
+		"fulfillment-get-catalog",
+		"fulfillment-get-catalog-product",
+		"fulfillment-get-order-status",
+		"fulfillment-get-provider-status",
+		"fulfillment-get-store-sync-product",
+		"fulfillment-get-store-sync-products",
+		"fulfillment-get-synced-products",
+		"fulfillment-list-providers",
+		"fulfillment-post-connect",
+		"fulfillment-post-import-product",
+		"fulfillment-post-shipping-estimates",
+		"fulfillment-post-sync-product-by-slug",
+		"fulfillment-public-post-provider-webhook",
+		"guest-orders-complete-token",
+		"guest-orders-get-public",
+		"guest-orders-list-auth",
+		"guest-orders-post-public",
+		"guest-orders-ship-token",
+		"orders-delete-payment-watch",
+		"orders-get-detail",
+		"orders-get-payment-remaining",
+		"orders-post-cancel",
+		"orders-post-checkout-breakdown",
+		"orders-post-complete",
+		"orders-post-confirm",
+		"orders-post-create-purchase",
+		"orders-post-estimate-total",
+		"orders-post-extend-protection",
+		"orders-post-instructions-cancel",
+		"orders-post-instructions-complete",
+		"orders-post-instructions-confirm",
+		"orders-post-instructions-decline",
+		"orders-post-instructions-payment",
+		"orders-post-instructions-refund",
+		"orders-post-payment-cancel-partial",
+		"orders-post-payment",
+		"orders-post-rate",
+		"orders-post-refund",
+		"orders-post-ship",
+		"orders-post-spend-for-order",
+		"payment-methods-get-by-peer-id",
+		"purchases-get-query",
+		"purchases-post-query",
+		"sales-get-query",
+		"sales-post-query",
 	}
 	sort.Strings(expectedOps)
 
-	const minOps = 80
+	const minOps = 157
 	if len(got) < minOps {
 		t.Errorf("Expected at least %d operations, got %d: %v", minOps, len(got), got)
 	}

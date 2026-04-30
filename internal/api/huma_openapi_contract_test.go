@@ -29,6 +29,10 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaSmokeRoutes(api)
 	g.registerNodeHumaWalletOperations(api)
 	g.registerNodeHumaChatOperations(api)
+	g.registerNodeHumaListingOperations(api)
+	g.registerNodeHumaMediaOperations(api)
+	g.registerNodeHumaProfileOperations(api)
+	g.registerNodeHumaSocialOperations(api)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
@@ -101,10 +105,61 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"chat-verification-confirm",
 		"chat-verification-cancel",
 		"chat-get-status",
+		// listings
+		"listings-get-mine-slug-or-cid",
+		"listings-create",
+		"listings-update",
+		"listings-delete",
+		"listings-import",
+		"listings-import-json",
+		"listings-index-by-peer-id",
+		"listings-index",
+		"listings-template",
+		"listings-get-by-peer-slug",
+		"listings-get-by-listing-id",
+		// media
+		"media-post-avatar",
+		"media-post-header",
+		"media-post-images",
+		"media-post-product-images",
+		"media-post-files",
+		"media-get-image",
+		"profiles-get-avatar",
+		"profiles-get-header",
+		"media-get-file",
+		// profiles
+		"profiles-batch-fetch-get",
+		"profiles-batch-fetch-post",
+		"profiles-create",
+		"profiles-create-scoped",
+		"profiles-update",
+		"profiles-update-scoped",
+		"profiles-get-by-peer-id",
+		"profiles-get-self",
+		// posts
+		"posts-create",
+		"posts-delete",
+		"posts-get-own-by-slug",
+		"posts-get-public-by-peer-slug",
+		// followers
+		"followers-check-follows-me",
+		"followers-list-by-peer-id",
+		"followers-list-self",
+		// following
+		"following-follow-peer",
+		"following-unfollow-peer",
+		"following-list-by-peer-id",
+		"following-list-self",
+		// ratings
+		"ratings-index-by-peer-or-slug",
+		"ratings-index-self",
+		"ratings-index-by-peer-and-slug",
+		"ratings-get-by-id",
+		"ratings-batch-fetch",
 	}
 	sort.Strings(expectedOps)
 
-	const minOps = 40
+	const minOps = 80
 	if len(got) < minOps {
 		t.Errorf("Expected at least %d operations, got %d: %v", minOps, len(got), got)
 	}

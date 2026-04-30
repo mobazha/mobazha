@@ -360,6 +360,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 	r.Methods("OPTIONS")
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	g.registerBusinessRoutes(r)
+	g.registerHumaAPI(r)
 	return r
 }
 

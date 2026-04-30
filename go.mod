@@ -15,7 +15,7 @@ require (
 	github.com/cretz/bine v0.2.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/ethereum/go-ethereum v1.17.0
-	github.com/evanphx/json-patch/v5 v5.6.0
+	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/fatih/color v1.16.0
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.12.0
@@ -40,7 +40,7 @@ require (
 	github.com/ipsn/go-libtor v1.0.380
 	github.com/jarcoal/httpmock v1.2.0
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
-	github.com/jessevdk/go-flags v1.5.0
+	github.com/jessevdk/go-flags v1.6.1
 	github.com/libp2p/go-libp2p v0.42.1
 	github.com/libp2p/go-libp2p-kad-dht v0.33.1
 	github.com/libp2p/go-libp2p-testing v0.12.0
@@ -105,6 +105,7 @@ require (
 	github.com/consensys/gnark-crypto v0.18.1 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20241020182519-7843d2ba8fdf // indirect
 	github.com/crate-crypto/go-eth-kzg v1.4.0 // indirect
+	github.com/danielgtaylor/huma/v2 v2.35.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/dchest/blake256 v1.1.0 // indirect

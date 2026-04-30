@@ -199,14 +199,17 @@ type FulfillmentFile struct {
 
 // FulfillmentOrder represents a supplier order and its current state.
 type FulfillmentOrder struct {
-	ID           string                `json:"id"`
-	ExternalID   string                `json:"externalId"`
-	Status       FulfillmentStatus     `json:"status"`
-	Shipments    []FulfillmentShipment `json:"shipments,omitempty"`
-	Costs        *FulfillmentCosts     `json:"costs,omitempty"`
-	CreatedAt    time.Time             `json:"createdAt"`
-	UpdatedAt    time.Time             `json:"updatedAt"`
-	ErrorMessage string                `json:"errorMessage,omitempty"`
+	ID            string                `json:"id"`
+	ExternalID    string                `json:"externalId"`
+	Status        FulfillmentStatus     `json:"status"`
+	Shipments     []FulfillmentShipment `json:"shipments,omitempty"`
+	Costs         *FulfillmentCosts     `json:"costs,omitempty"`
+	CreatedAt     time.Time             `json:"createdAt"`
+	UpdatedAt     time.Time             `json:"updatedAt"`
+	ErrorMessage  string                `json:"errorMessage,omitempty"`
+	FailureReason FailureReason         `json:"failureReason,omitempty"`
+	RetryCount    uint8                 `json:"retryCount,omitempty"`
+	MaxRetries    uint8                 `json:"maxRetries,omitempty"`
 }
 
 // FulfillmentStatus is the lifecycle state of a supplier order.

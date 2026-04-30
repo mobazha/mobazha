@@ -1887,6 +1887,20 @@ func (s *SupplyChainAppService) GetFulfillmentStatus(_ context.Context, mobazhaO
 	if mapping.ErrorMessage != "" {
 		fo.ErrorMessage = mapping.ErrorMessage
 	}
+	if mapping.FailureReason != "" {
+		fo.FailureReason = contracts.FailureReason(mapping.FailureReason)
+		// Only surface retry counters when there is an actual failure reason.
+		// Bound to uint8 to match DTO; retry_count is stored as int but is
+		// always small (<= maxRetryAttempts).
+		retryCount := mapping.RetryCount
+		if retryCount < 0 {
+			retryCount = 0
+		} else if retryCount > 255 {
+			retryCount = 255
+		}
+		fo.RetryCount = uint8(retryCount)
+		fo.MaxRetries = uint8(maxRetryAttempts)
+	}
 	if mapping.SupplierCost != "" {
 		fo.Costs = &contracts.FulfillmentCosts{Total: mapping.SupplierCost}
 	}

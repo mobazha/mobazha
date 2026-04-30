@@ -30,8 +30,14 @@ const (
 
 // Security scheme names referenced in huma.Operation.Security.
 const (
-	// SecuritySchemeNodeAuth covers Basic Auth (standalone admin),
-	// Bearer JWT (SaaS proxy / Mini App), and mbz_ API Token.
+	// SecuritySchemeBasicAuth is standalone admin Basic Auth.
+	SecuritySchemeBasicAuth = "basicAuth"
+	// SecuritySchemeBearerJWT is Casdoor Bearer JWT (SaaS proxy / Mini App).
+	SecuritySchemeBearerJWT = "bearerJWT"
+	// SecuritySchemeAPIToken is mbz_<id>_<secret> API token.
+	SecuritySchemeAPIToken = "apiToken"
+	// SecuritySchemeNodeAuth is the unified node auth scheme covering
+	// Basic Auth, Bearer JWT, and API token — used in Operation.Security.
 	SecuritySchemeNodeAuth = "nodeAuth"
 )
 
@@ -53,13 +59,27 @@ func (g *Gateway) registerHumaAPI(r *mux.Router) huma.API {
 	if cfg.Components.SecuritySchemes == nil {
 		cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{}
 	}
+	cfg.Components.SecuritySchemes[SecuritySchemeBasicAuth] = &huma.SecurityScheme{
+		Type:        "http",
+		Scheme:      "basic",
+		Description: "Standalone admin password via HTTP Basic Auth.",
+	}
+	cfg.Components.SecuritySchemes[SecuritySchemeBearerJWT] = &huma.SecurityScheme{
+		Type:         "http",
+		Scheme:       "bearer",
+		BearerFormat: "JWT",
+		Description:  "Casdoor JWT issued by the SaaS platform (Mini App / proxy).",
+	}
+	cfg.Components.SecuritySchemes[SecuritySchemeAPIToken] = &huma.SecurityScheme{
+		Type:         "http",
+		Scheme:       "bearer",
+		BearerFormat: "mbz_<id>_<secret>",
+		Description:  "Scoped API token (standalone). Prefix: mbz_.",
+	}
 	cfg.Components.SecuritySchemes[SecuritySchemeNodeAuth] = &huma.SecurityScheme{
-		Type:   "http",
-		Scheme: "bearer",
-		BearerFormat: "Basic Auth credentials, Casdoor JWT, or mbz_<id>_<secret> " +
-			"API token — all accepted via Authorization header",
-		Description: "Node authentication: Basic Auth (standalone admin), " +
-			"Bearer JWT (SaaS proxy), or Bearer mbz_ API token.",
+		Type:        "http",
+		Scheme:      "bearer",
+		Description: "Node authentication: Basic Auth (standalone admin), Bearer JWT (SaaS proxy), or Bearer mbz_ API token.",
 	}
 
 	installNodeHumaEnvelope(&cfg)
@@ -69,6 +89,8 @@ func (g *Gateway) registerHumaAPI(r *mux.Router) huma.API {
 	g.installNodeHumaMiddlewares(api)
 
 	g.registerNodeHumaSmokeRoutes(api)
+	g.registerNodeHumaWalletOperations(api)
+	g.registerNodeHumaChatOperations(api)
 
 	return api
 }

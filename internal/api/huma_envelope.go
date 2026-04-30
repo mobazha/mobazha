@@ -19,8 +19,8 @@ type envelopeError struct {
 	body   response.ErrorEnvelope
 }
 
-func (e *envelopeError) GetStatus() int  { return e.status }
-func (e *envelopeError) Error() string   { return e.body.Error.Message }
+func (e *envelopeError) GetStatus() int { return e.status }
+func (e *envelopeError) Error() string  { return e.body.Error.Message }
 
 func (e *envelopeError) ContentType(ct string) string {
 	if ct == "application/problem+json" {

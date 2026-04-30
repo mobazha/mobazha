@@ -9,6 +9,50 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
+// scopeMatch is the result of matching a request against routeScopeMap.
+type scopeMatch struct {
+	Matched bool
+	Scope   contracts.Scope
+	Allowed bool
+	DenyMsg string
+}
+
+// matchRouteScope checks method+path against routeScopeMap and evaluates
+// whether the given identity has the required scope. This is the single
+// source of truth for route-level scope decisions, shared by both
+// ScopeEnforcementMiddleware (legacy mux routes) and nodeHumaAuthMiddleware
+// (huma routes).
+func matchRouteScope(method, path string, identity *AuthIdentity) scopeMatch {
+	if identity == nil || identity.Scopes == nil {
+		return scopeMatch{Matched: true, Allowed: true}
+	}
+
+	key := method + " " + path
+	for _, rs := range routeScopeMap {
+		if !strings.HasPrefix(key, rs.pattern) {
+			continue
+		}
+		if rs.scope == contracts.ScopeAny {
+			return scopeMatch{Matched: true, Scope: rs.scope, Allowed: true}
+		}
+		if !identity.HasScope(rs.scope) {
+			return scopeMatch{
+				Matched: true,
+				Scope:   rs.scope,
+				Allowed: false,
+				DenyMsg: fmt.Sprintf("missing required scope: %s", rs.scope),
+			}
+		}
+		return scopeMatch{Matched: true, Scope: rs.scope, Allowed: true}
+	}
+
+	return scopeMatch{
+		Matched: false,
+		Allowed: false,
+		DenyMsg: "this route is not accessible to API tokens",
+	}
+}
+
 // ScopeEnforcementMiddleware enforces fine-grained permission checks for
 // API tokens (mbz_*) using the routeScopeMap.
 //
@@ -33,33 +77,15 @@ func (g *Gateway) ScopeEnforcementMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		key := r.Method + " " + r.URL.Path
-		var matched bool
-		for _, rs := range routeScopeMap {
-			if !strings.HasPrefix(key, rs.pattern) {
-				continue
+		result := matchRouteScope(r.Method, r.URL.Path, identity)
+		if !result.Allowed {
+			if !result.Matched {
+				log.Warningf("[SCOPE_DENIED] api token %d attempted unmapped route %s %s",
+					identity.TokenID, r.Method, r.URL.Path)
+			} else {
+				logScopeDenial(identity, result.Scope, r.URL.Path)
 			}
-			matched = true
-			// ScopeAny ("") = global metadata route; any authenticated
-			// identity (including API tokens) may pass without holding a
-			// specific permission.
-			if rs.scope == contracts.ScopeAny {
-				break
-			}
-			if !identity.HasScope(rs.scope) {
-				logScopeDenial(identity, rs.scope, r.URL.Path)
-				response.Error(w, http.StatusForbidden, response.CodeForbidden,
-					fmt.Sprintf("missing required scope: %s", rs.scope))
-				return
-			}
-			break
-		}
-
-		if !matched {
-			log.Warningf("[SCOPE_DENIED] api token %d attempted unmapped route %s %s",
-				identity.TokenID, r.Method, r.URL.Path)
-			response.Error(w, http.StatusForbidden, response.CodeForbidden,
-				"this route is not accessible to API tokens")
+			response.Error(w, http.StatusForbidden, response.CodeForbidden, result.DenyMsg)
 			return
 		}
 

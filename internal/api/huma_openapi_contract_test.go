@@ -27,6 +27,8 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 
 	g := &Gateway{}
 	g.registerNodeHumaSmokeRoutes(api)
+	g.registerNodeHumaWalletOperations(api)
+	g.registerNodeHumaChatOperations(api)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
@@ -57,10 +59,52 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 
 	expectedOps := []string{
 		"node-huma-ping",
+		// wallet
+		"wallet-spend",
+		"wallet-get-mnemonic",
+		"wallet-get-currencies",
+		"wallet-list-receiving-accounts",
+		"wallet-create-receiving-account",
+		"wallet-update-receiving-account",
+		"wallet-delete-receiving-account",
+		// chat
+		"chat-list-rooms",
+		"chat-list-invites",
+		"chat-create-room",
+		"chat-join-room",
+		"chat-leave-room",
+		"chat-get-messages",
+		"chat-send-message",
+		"chat-edit-message",
+		"chat-delete-message",
+		"chat-react-message",
+		"chat-typing",
+		"chat-mark-read",
+		"chat-get-members",
+		"chat-invite-member",
+		"chat-kick-member",
+		"chat-get-room-settings",
+		"chat-put-room-settings",
+		"chat-post-room-avatar",
+		"chat-media-upload",
+		"chat-media-download",
+		"chat-block-user",
+		"chat-unblock-user",
+		"chat-list-blocked-users",
+		"chat-get-presence",
+		"chat-set-presence",
+		"chat-get-settings",
+		"chat-put-settings",
+		"chat-verification-request",
+		"chat-verification-accept",
+		"chat-verification-start-sas",
+		"chat-verification-confirm",
+		"chat-verification-cancel",
+		"chat-get-status",
 	}
 	sort.Strings(expectedOps)
 
-	const minOps = 1
+	const minOps = 40
 	if len(got) < minOps {
 		t.Errorf("Expected at least %d operations, got %d: %v", minOps, len(got), got)
 	}

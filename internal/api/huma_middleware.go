@@ -2,12 +2,12 @@
 //
 // AH-1.4: Bridges the Node gateway's auth model onto huma's per-operation
 // declarative security. The Node supports three auth modes (in priority):
-//   1. mbz_ API token → AuthIdentity with IsAPIToken=true + ScopeSet
-//   2. Bearer JWT (Casdoor) → AuthIdentity with IsAdmin=true
-//   3. Basic Auth → AuthIdentity with IsAdmin=true
+//  1. mbz_ API token → AuthIdentity with IsAPIToken=true + ScopeSet
+//  2. Bearer JWT (Casdoor) → AuthIdentity with IsAdmin=true
+//  3. Basic Auth → AuthIdentity with IsAdmin=true
 //
 // huma operations declare their auth requirement via:
-//   - Security: []map[string][]string{{SecuritySchemeNodeAuth: {}}}
+//   - Security: nodeAuthSecurity (OR across basicAuth / bearerJWT / apiToken)
 //     for owner-only routes
 //   - omitting Security for anonymous/public routes
 //
@@ -25,6 +25,27 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/mobazha/mobazha3.0/pkg/apitoken"
 )
+
+// enforceHumaScope checks API-token scopes against routeScopeMap for the
+// given huma operation. Admin identities (Scopes == nil) always pass.
+// Returns true if the request should be blocked (error already written).
+func enforceHumaScope(api huma.API, ctx huma.Context, op *huma.Operation, identity *AuthIdentity) bool {
+	if identity.Scopes == nil {
+		return false
+	}
+	result := matchRouteScope(op.Method, op.Path, identity)
+	if result.Allowed {
+		return false
+	}
+	if !result.Matched {
+		log.Warningf("[SCOPE_DENIED] api token %d attempted unmapped huma route %s %s",
+			identity.TokenID, op.Method, op.Path)
+	} else {
+		logScopeDenial(identity, result.Scope, op.Path)
+	}
+	huma.WriteErr(api, ctx, http.StatusForbidden, result.DenyMsg)
+	return true
+}
 
 // installNodeHumaMiddlewares wires auth onto the huma API.
 func (g *Gateway) installNodeHumaMiddlewares(api huma.API) {
@@ -57,6 +78,9 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 				identity, ok := g.tryAPITokenAuth(bearerVal)
 				if !ok {
 					huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid or expired API token")
+					return
+				}
+				if enforceHumaScope(api, ctx, op, identity) {
 					return
 				}
 				next(huma.WithContext(ctx, WithAuthIdentity(ctx.Context(), identity)))

@@ -97,32 +97,32 @@ type GatewayConfig struct {
 
 // Gateway represents an HTTP API gateway
 type Gateway struct {
-	listener       net.Listener
-	nodeManager    coreiface.NodeManagerIface
-	handler        http.Handler
-	config         *GatewayConfig
-	auth           authState
-	jwtValidator   *JWTValidator // nil when no Casdoor cert configured
-	tokenStore     *apitoken.Store // nil in SaaS mode; set for standalone
-	hubs           map[string]*hub
-	hubsMtx        sync.RWMutex
-	shutdown       chan struct{}
-	closeOnce      sync.Once
-	mu             sync.RWMutex
-	featureManager     *pkgconfig.FeatureManager
-	guestOrderLimiter  *rateLimiter
+	listener          net.Listener
+	nodeManager       coreiface.NodeManagerIface
+	handler           http.Handler
+	config            *GatewayConfig
+	auth              authState
+	jwtValidator      *JWTValidator   // nil when no Casdoor cert configured
+	tokenStore        *apitoken.Store // nil in SaaS mode; set for standalone
+	hubs              map[string]*hub
+	hubsMtx           sync.RWMutex
+	shutdown          chan struct{}
+	closeOnce         sync.Once
+	mu                sync.RWMutex
+	featureManager    *pkgconfig.FeatureManager
+	guestOrderLimiter *rateLimiter
 }
 
 // NewGateway instantiates a new gateway.
 func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (*Gateway, error) {
 	var (
 		g = &Gateway{
-			nodeManager:    nodeManager,
-			config:         config,
-			listener:       config.Listener,
-			shutdown:       make(chan struct{}),
-			hubs:           make(map[string]*hub),
-			hubsMtx:        sync.RWMutex{},
+			nodeManager:       nodeManager,
+			config:            config,
+			listener:          config.Listener,
+			shutdown:          make(chan struct{}),
+			hubs:              make(map[string]*hub),
+			hubsMtx:           sync.RWMutex{},
 			featureManager:    pkgconfig.GetGlobalFeatureManager(),
 			guestOrderLimiter: newRateLimiter(10, time.Hour),
 		}

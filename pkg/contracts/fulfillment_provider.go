@@ -98,6 +98,10 @@ type SupplyChainService interface {
 	GetProviderStatus(ctx context.Context, providerID string) (*ProviderConnection, error)
 	ListConnections(ctx context.Context) ([]ProviderConnection, error)
 
+	// Locations
+	ListLocations(ctx context.Context) ([]FulfillmentLocation, error)
+	GetLocation(ctx context.Context, locationID string) (*FulfillmentLocation, error)
+
 	// Catalog
 	BrowseCatalog(ctx context.Context, providerID string, query CatalogQuery) (*CatalogPage, error)
 	GetCatalogProduct(ctx context.Context, providerID string, productID string) (*CatalogProduct, error)

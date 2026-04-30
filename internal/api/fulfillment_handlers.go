@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
@@ -250,6 +251,46 @@ func (g *Gateway) handleGETStoreSyncProduct(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	responsePkg.Success(w, product)
+}
+
+// ---------------------------------------------------------------------------
+// Fulfillment Locations
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handleGETFulfillmentLocations(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+	locs, err := svc.ListLocations(r.Context())
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to list locations")
+		return
+	}
+	responsePkg.Success(w, locs)
+}
+
+func (g *Gateway) handleGETFulfillmentLocation(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+	locationID := mux.Vars(r)["locationID"]
+	loc, err := svc.GetLocation(r.Context(), locationID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound,
+				"Location not found")
+			return
+		}
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to get location")
+		return
+	}
+	responsePkg.Success(w, loc)
 }
 
 // ---------------------------------------------------------------------------

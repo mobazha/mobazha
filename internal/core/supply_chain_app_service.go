@@ -1247,6 +1247,8 @@ func (s *SupplyChainAppService) ConnectProvider(ctx context.Context, params cont
 		return nil, fmt.Errorf("register provider: %w", regErr)
 	}
 
+	s.ensureDefaultLocation(providerID, provider.ProviderType())
+
 	var webhookURL string
 	if params.WebhookBaseURL != "" {
 		webhookURL = params.WebhookBaseURL + "/" + webhookSecret
@@ -1300,6 +1302,94 @@ func (s *SupplyChainAppService) ListConnections(_ context.Context) ([]contracts.
 		conns[i] = *configToConnection(&configs[i])
 	}
 	return conns, nil
+}
+
+// ---------------------------------------------------------------------------
+// Fulfillment Locations
+// ---------------------------------------------------------------------------
+
+func (s *SupplyChainAppService) ListLocations(_ context.Context) ([]contracts.FulfillmentLocation, error) {
+	var locs []models.FulfillmentLocation
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Order("is_default DESC, created_at ASC").Find(&locs).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]contracts.FulfillmentLocation, len(locs))
+	for i := range locs {
+		result[i] = locationModelToContract(&locs[i])
+	}
+	return result, nil
+}
+
+func (s *SupplyChainAppService) GetLocation(_ context.Context, locationID string) (*contracts.FulfillmentLocation, error) {
+	var loc models.FulfillmentLocation
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", locationID).First(&loc).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("location not found: %s", locationID)
+		}
+		return nil, err
+	}
+	c := locationModelToContract(&loc)
+	return &c, nil
+}
+
+// ensureDefaultLocation creates a default location for a provider if none exists.
+func (s *SupplyChainAppService) ensureDefaultLocation(providerID, providerType string) {
+	locType := "virtual"
+	locName := providerID
+	switch providerType {
+	case "pod":
+		locType = "pod"
+		locName = titleCase(providerID) + " POD"
+	case "dropship":
+		locType = "warehouse"
+		locName = titleCase(providerID) + " Default"
+	}
+
+	if err := s.db.Update(func(tx database.Tx) error {
+		var existing models.FulfillmentLocation
+		if tx.Read().Where("provider_id = ? AND external_key = ?", providerID, "default").
+			Select("id").First(&existing).Error == nil {
+			return nil
+		}
+		return tx.Save(&models.FulfillmentLocation{
+			ID:          uuid.New().String(),
+			ProviderID:  providerID,
+			ExternalKey: "default",
+			Name:        locName,
+			Type:        locType,
+			IsDefault:   true,
+		})
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: ensureDefaultLocation(%s): %v", providerID, err)
+	}
+}
+
+// defaultLocationID returns the default location ID for a provider, or empty if none.
+func (s *SupplyChainAppService) defaultLocationID(providerID string) string {
+	var loc models.FulfillmentLocation
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ? AND is_default = ?", providerID, true).
+			Select("id").First(&loc).Error
+	})
+	return loc.ID
+}
+
+func locationModelToContract(m *models.FulfillmentLocation) contracts.FulfillmentLocation {
+	return contracts.FulfillmentLocation{
+		ID:          m.ID,
+		ProviderID:  m.ProviderID,
+		ExternalKey: m.ExternalKey,
+		Name:        m.Name,
+		Type:        m.Type,
+		Country:     m.Country,
+		IsDefault:   m.IsDefault,
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1402,6 +1492,7 @@ func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contra
 	mapping := &models.SyncedProductMapping{
 		ID:            uuid.NewString(),
 		ProviderID:    params.ProviderID,
+		LocationID:    s.defaultLocationID(params.ProviderID),
 		ListingSlug:   listing.Slug,
 		ExternalID:    product.ID,
 		SyncProductID: product.ID,
@@ -1815,6 +1906,7 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 	mapping := &models.SyncedProductMapping{
 		ID:            uuid.NewString(),
 		ProviderID:    params.ProviderID,
+		LocationID:    s.defaultLocationID(params.ProviderID),
 		ListingSlug:   listing.Slug,
 		ExternalID:    syncProd.ID,
 		SyncProductID: syncProd.ID,
@@ -2752,6 +2844,13 @@ func classifyProviderError(providerID string, err error) contracts.FailureReason
 	default:
 		return contracts.ClassifyFulfillmentError(err)
 	}
+}
+
+func titleCase(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // Compile-time interface checks.

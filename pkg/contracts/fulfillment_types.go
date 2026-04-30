@@ -41,6 +41,23 @@ type ProviderConnection struct {
 }
 
 // ---------------------------------------------------------------------------
+// Fulfillment Location
+// ---------------------------------------------------------------------------
+
+// FulfillmentLocation represents a physical or virtual fulfillment origin.
+// POD providers get a single virtual location; warehouse providers (e.g.
+// CJ Dropshipping) may expose multiple locations in different countries.
+type FulfillmentLocation struct {
+	ID          string `json:"id"`
+	ProviderID  string `json:"providerId"`
+	ExternalKey string `json:"externalKey,omitempty"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`    // "pod", "warehouse", "virtual"
+	Country     string `json:"country"` // ISO 3166-1 alpha-2
+	IsDefault   bool   `json:"isDefault"`
+}
+
+// ---------------------------------------------------------------------------
 // Catalog & Product Browsing
 // ---------------------------------------------------------------------------
 

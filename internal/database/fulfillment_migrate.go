@@ -13,6 +13,7 @@ func MigrateFulfillmentModels(db pkgdb.Database) error {
 	return db.Update(func(tx pkgdb.Tx) error {
 		allModels := []interface{}{
 			&models.FulfillmentProviderConfig{},
+			&models.FulfillmentLocation{},
 			&models.SyncedProductMapping{},
 			&models.FulfillmentOrderMapping{},
 			&models.ProcessedFulfillmentEvent{},
@@ -28,15 +29,20 @@ func MigrateFulfillmentModels(db pkgdb.Database) error {
 			`CREATE UNIQUE INDEX IF NOT EXISTS idx_fpc_tenant_provider
 				ON fulfillment_provider_configs (tenant_id, provider_id)`,
 
+			// FulfillmentLocation: one external_key per (tenant, provider)
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_fl_tenant_provider_key
+				ON fulfillment_locations (tenant_id, provider_id, external_key)`,
+
 			// SyncedProductMapping: one listing per tenant
 			`CREATE UNIQUE INDEX IF NOT EXISTS idx_spm_tenant_slug
 				ON synced_product_mappings (tenant_id, listing_slug)`,
 			`CREATE INDEX IF NOT EXISTS idx_spm_tenant_provider
 				ON synced_product_mappings (tenant_id, provider_id)`,
 
-			// FulfillmentOrderMapping: one mapping per (tenant, mobazha_order_id)
-			`CREATE UNIQUE INDEX IF NOT EXISTS idx_fom_tenant_order
-				ON fulfillment_order_mappings (tenant_id, mobazha_order_id)`,
+			// FulfillmentOrderMapping: one group per (tenant, order, group_key)
+			// Replaces old idx_fom_tenant_order to support multi-supplier splitting.
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_fom_tenant_order_group
+				ON fulfillment_order_mappings (tenant_id, mobazha_order_id, fulfillment_group_key)`,
 
 			// ProcessedFulfillmentEvent: dedup key per (tenant, provider, event)
 			`CREATE UNIQUE INDEX IF NOT EXISTS idx_pfe_tenant_provider_event

@@ -42,6 +42,30 @@ func (c *FulfillmentProviderConfig) MaskCredentials() {
 }
 
 // ---------------------------------------------------------------------------
+// FulfillmentLocation — physical or virtual fulfillment location
+// ---------------------------------------------------------------------------
+
+// FulfillmentLocation represents a physical warehouse or virtual POD location
+// from which products are fulfilled. Each connected provider gets at least one
+// default location; multi-warehouse providers (e.g. CJ Dropshipping) may have
+// several.
+//
+// uniqueIndex on (tenant_id, provider_id, external_key) created via migration SQL.
+type FulfillmentLocation struct {
+	TenantMixin
+	ID          string `gorm:"primaryKey"`
+	ProviderID  string `gorm:"column:provider_id;type:varchar(32);not null"`
+	ExternalKey string `gorm:"column:external_key;type:varchar(255);not null;default:'default'"`
+	Name        string `gorm:"column:name;type:varchar(255);not null"`
+	Type        string `gorm:"column:type;type:varchar(16);not null;default:'virtual'"` // "pod", "warehouse", "virtual"
+	Country     string `gorm:"column:country;type:varchar(2)"`                          // ISO 3166-1 alpha-2
+	IsDefault   bool   `gorm:"column:is_default;default:true"`
+	CreatedAt   time.Time
+}
+
+func (FulfillmentLocation) TableName() string { return "fulfillment_locations" }
+
+// ---------------------------------------------------------------------------
 // SyncedProductMapping — supplier product ↔ Mobazha listing link
 // ---------------------------------------------------------------------------
 
@@ -53,6 +77,7 @@ type SyncedProductMapping struct {
 	TenantMixin
 	ID            string    `gorm:"primaryKey"`
 	ProviderID    string    `gorm:"column:provider_id;type:varchar(32);not null"`
+	LocationID    string    `gorm:"column:location_id;type:varchar(64)"`
 	ListingSlug   string    `gorm:"column:listing_slug;type:varchar(255);not null"`
 	ExternalID    string    `gorm:"column:external_id;type:varchar(255)"`
 	SyncProductID string    `gorm:"column:sync_product_id;type:varchar(255)"`
@@ -78,10 +103,12 @@ func (SyncedProductMapping) TableName() string { return "synced_product_mappings
 // uniqueIndex on (tenant_id, mobazha_order_id) created via migration SQL.
 type FulfillmentOrderMapping struct {
 	TenantMixin
-	ID                 string    `gorm:"primaryKey"`
-	MobazhaOrderID     string    `gorm:"column:mobazha_order_id;type:varchar(255);not null"`
-	ProviderID         string    `gorm:"column:provider_id;type:varchar(32);not null"`
-	FulfillmentOrderID string    `gorm:"column:fulfillment_order_id;type:varchar(255)"`
+	ID                  string `gorm:"primaryKey"`
+	MobazhaOrderID      string `gorm:"column:mobazha_order_id;type:varchar(255);not null"`
+	ProviderID          string `gorm:"column:provider_id;type:varchar(32);not null"`
+	LocationID          string `gorm:"column:location_id;type:varchar(64)"`
+	FulfillmentGroupKey string `gorm:"column:fulfillment_group_key;type:varchar(255);not null;default:'default'"`
+	FulfillmentOrderID  string `gorm:"column:fulfillment_order_id;type:varchar(255)"`
 	Status             string    `gorm:"column:status;type:varchar(32);not null;default:'pending'"`
 	TrackingNumber     string    `gorm:"column:tracking_number;type:varchar(255)"`
 	TrackingURL        string    `gorm:"column:tracking_url;type:text"`

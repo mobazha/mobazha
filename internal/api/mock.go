@@ -139,7 +139,7 @@ type mockNode struct {
 
 	updateOrderPaymentStatusFunc func(orderID models.OrderID, paymentIntentID, status string) error
 
-	// TECHDEBT(TD-030): legacy image handler stubs — kept for image_handlers_test.go compilation.
+	// TECHDEBT(TD-089): legacy image handler stubs — kept for image_handlers_test.go compilation.
 	// 清除条件: image_handlers_test.go 迁移到 MediaService 接口后删除
 	getAvatarFunc       func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 	getHeaderFunc       func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)

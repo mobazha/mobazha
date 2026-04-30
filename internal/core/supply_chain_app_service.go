@@ -297,7 +297,7 @@ func (s *SupplyChainAppService) processRetry(ctx context.Context, mapping models
 // contract. Returns (params, reason, msg, ok). When ok is false, reason+msg
 // describe why the retry is permanently abandoned (validation/permanent).
 //
-// TECHDEBT(TD-028): Uses ALL items from the order contract. Correct for
+// TECHDEBT(TD-085): Uses ALL items from the order contract. Correct for
 // FF-2 single-supplier orders (1 mapping per order). FF-3 multi-supplier
 // orders introduce mapping.ItemIndices and this function must filter by it.
 // Clearance: when FulfillmentOrderMapping.ItemIndices becomes non-empty
@@ -350,7 +350,7 @@ func (s *SupplyChainAppService) rebuildRetryParams(mapping models.FulfillmentOrd
 
 // executeRetryCreate calls the supplier and persists the outcome.
 //
-// TECHDEBT(TD-030): Uses the same ExternalOrderID as the first attempt and
+// TECHDEBT(TD-087): Uses the same ExternalOrderID as the first attempt and
 // relies on supplier-side uniqueness. If the first call actually succeeded
 // at the supplier but the response was lost, retry returns a 4xx duplicate
 // error which ClassifyError marks as validation_failed (not retryable). The
@@ -2069,7 +2069,7 @@ func (s *SupplyChainAppService) GetStoreSyncProduct(ctx context.Context, provide
 // Order Fulfillment Bridge
 // ---------------------------------------------------------------------------
 
-// TECHDEBT(TD-025): CreateFulfillmentFromOrder 是早期 scaffold，
+// TECHDEBT(TD-082): CreateFulfillmentFromOrder 是早期 scaffold，
 // handleOrderFunded 已使用 createFulfillmentForItems 替代。
 // 此方法保留是因为 contracts.SupplyChainService 接口中定义了签名。
 // 清除条件: 评估是否需要保留手动触发路径（如前端"手动重试"按钮），
@@ -2454,7 +2454,7 @@ func isUniqueConstraintError(err error) bool {
 // For CANCELABLE orders this releases escrow funds and records the shipment.
 // MODERATED orders are skipped (need manual multi-sig).
 //
-// TECHDEBT(TD-023): This confirms/ships the entire order, which is correct
+// TECHDEBT(TD-080): This confirms/ships the entire order, which is correct
 // for FF-1 (single supplier per order). For FF-3 (multi-supplier split orders),
 // this must be changed to confirm only supplier-managed item indices and
 // auto-ship/confirm only when ALL fulfillment mappings for the order are shipped.

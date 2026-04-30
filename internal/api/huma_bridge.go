@@ -79,6 +79,12 @@ func nodeBridgeToHumaError(rr *httptest.ResponseRecorder) error {
 	}
 }
 
+// nodeBridgedJSONBody carries an opaque JSON payload for bridging POST/PUT
+// handlers onto legacy mux-backed handlers that decode r.Body JSON.
+type nodeBridgedJSONBody struct {
+	Body json.RawMessage
+}
+
 // nodeDataOutput is a generic output wrapper for bridged handlers
 // whose response body is an opaque JSON object/array.
 type nodeDataOutput struct {

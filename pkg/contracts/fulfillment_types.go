@@ -1,6 +1,9 @@
 package contracts
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 // ---------------------------------------------------------------------------
 // Credentials & Connection
@@ -210,14 +213,57 @@ type FulfillmentOrder struct {
 type FulfillmentStatus string
 
 const (
-	FulfillmentStatusDraft      FulfillmentStatus = "draft"
-	FulfillmentStatusPending    FulfillmentStatus = "pending"
-	FulfillmentStatusInProcess  FulfillmentStatus = "in_process"
-	FulfillmentStatusShipped    FulfillmentStatus = "shipped"
-	FulfillmentStatusDelivered  FulfillmentStatus = "delivered"
-	FulfillmentStatusCanceled   FulfillmentStatus = "canceled"
-	FulfillmentStatusFailed     FulfillmentStatus = "failed"
+	FulfillmentStatusDraft        FulfillmentStatus = "draft"
+	FulfillmentStatusPending      FulfillmentStatus = "pending"
+	FulfillmentStatusInProcess    FulfillmentStatus = "in_process"
+	FulfillmentStatusShipped      FulfillmentStatus = "shipped"
+	FulfillmentStatusDelivered    FulfillmentStatus = "delivered"
+	FulfillmentStatusCanceled     FulfillmentStatus = "canceled"
+	FulfillmentStatusFailed       FulfillmentStatus = "failed"
+	FulfillmentStatusSupplierLoss FulfillmentStatus = "supplier_loss"
 )
+
+// FailureReason classifies why a fulfillment order failed.
+// Only retryable_provider_error is eligible for automatic retry.
+type FailureReason string
+
+const (
+	FailureReasonNone                    FailureReason = ""
+	FailureReasonRetryableProviderError  FailureReason = "retryable_provider_error"
+	FailureReasonValidationFailed        FailureReason = "validation_failed"
+	FailureReasonMarginProtectionFailed  FailureReason = "margin_protection_failed"
+	FailureReasonManualActionRequired    FailureReason = "manual_action_required"
+	FailureReasonPermanentlyFailed       FailureReason = "permanently_failed"
+)
+
+// IsRetryable returns true only for transient supplier errors eligible for automatic retry.
+func (r FailureReason) IsRetryable() bool {
+	return r == FailureReasonRetryableProviderError
+}
+
+// FulfillmentRetryableError wraps a provider error with retryability classification.
+type FulfillmentRetryableError struct {
+	Err       error
+	Retryable bool
+}
+
+func (e *FulfillmentRetryableError) Error() string { return e.Err.Error() }
+func (e *FulfillmentRetryableError) Unwrap() error { return e.Err }
+
+// ClassifyFulfillmentError inspects a provider error and returns the appropriate FailureReason.
+func ClassifyFulfillmentError(err error) FailureReason {
+	if err == nil {
+		return FailureReasonNone
+	}
+	var re *FulfillmentRetryableError
+	if errors.As(err, &re) {
+		if re.Retryable {
+			return FailureReasonRetryableProviderError
+		}
+		return FailureReasonValidationFailed
+	}
+	return FailureReasonRetryableProviderError
+}
 
 // FulfillmentShipment holds tracking info for a shipped package.
 type FulfillmentShipment struct {

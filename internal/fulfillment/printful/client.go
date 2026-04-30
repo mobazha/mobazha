@@ -217,3 +217,8 @@ func (e *APIError) Error() string {
 	}
 	return fmt.Sprintf("printful: API error %d", e.StatusCode)
 }
+
+// IsRetryable returns true for server errors (5xx) that are worth retrying.
+func (e *APIError) IsRetryable() bool {
+	return e.StatusCode >= 500
+}

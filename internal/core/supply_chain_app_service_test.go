@@ -33,6 +33,7 @@ type stubFulfillmentProvider struct {
 	createOrderFn func(ctx context.Context, params contracts.CreateFulfillmentParams) (*contracts.FulfillmentOrder, error)
 	parseWebFn    func(ctx context.Context, payload []byte, headers map[string]string) (*contracts.FulfillmentWebhookEvent, error)
 	cancelFn      func(ctx context.Context, orderID string) error
+	estimateFn    func(ctx context.Context, params contracts.ShippingEstimateParams) ([]contracts.ShippingEstimate, error)
 }
 
 func (p *stubFulfillmentProvider) ProviderID() string   { return p.id }
@@ -61,8 +62,11 @@ func (p *stubFulfillmentProvider) ParseWebhook(ctx context.Context, payload []by
 	}
 	return &contracts.FulfillmentWebhookEvent{Type: contracts.FulfillmentWebhookShipped, EventID: "evt-1", OrderID: "ext-123"}, nil
 }
-func (p *stubFulfillmentProvider) EstimateShipping(_ context.Context, _ contracts.ShippingEstimateParams) ([]contracts.ShippingEstimate, error) {
-	return []contracts.ShippingEstimate{{ID: "standard", Rate: "4.50"}}, nil
+func (p *stubFulfillmentProvider) EstimateShipping(ctx context.Context, params contracts.ShippingEstimateParams) ([]contracts.ShippingEstimate, error) {
+	if p.estimateFn != nil {
+		return p.estimateFn(ctx, params)
+	}
+	return []contracts.ShippingEstimate{{ID: "standard", Rate: "4.50", Currency: "USD"}}, nil
 }
 
 // Stub with catalog support

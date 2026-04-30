@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -466,6 +467,27 @@ func convertVariant(v *pfVariant) contracts.CatalogVariant {
 		Attributes: attrs,
 		ImageURL:   v.Image,
 	}
+}
+
+// ClassifyError wraps a Printful API error into a contracts.RetryableError
+// so the supply chain service can determine whether to retry or give up.
+func ClassifyError(err error) *contracts.FulfillmentRetryableError {
+	if err == nil {
+		return nil
+	}
+	var rateLimitErr *RateLimitError
+	if errors.As(err, &rateLimitErr) {
+		return &contracts.FulfillmentRetryableError{Err: err, Retryable: true}
+	}
+	var authErr *AuthError
+	if errors.As(err, &authErr) {
+		return &contracts.FulfillmentRetryableError{Err: err, Retryable: false}
+	}
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return &contracts.FulfillmentRetryableError{Err: err, Retryable: apiErr.IsRetryable()}
+	}
+	return &contracts.FulfillmentRetryableError{Err: err, Retryable: true}
 }
 
 // jsonUnmarshal wraps encoding/json for consistency.

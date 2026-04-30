@@ -89,6 +89,15 @@ type FulfillmentOrderMapping struct {
 	SupplierCost       string    `gorm:"column:supplier_cost;type:varchar(64)"`
 	ErrorMessage       string    `gorm:"column:error_message;type:text"`
 
+	// FailureReason classifies why the fulfillment failed (FF-2).
+	// Only "retryable_provider_error" is eligible for automatic retry by the worker.
+	// Other reasons (validation_failed, margin_protection_failed, etc.) require manual intervention.
+	FailureReason string `gorm:"column:failure_reason;type:varchar(64)"`
+
+	// DisputeHeld is set when a dispute is opened on the Mobazha order.
+	// Retry and reconcile workers skip rows where DisputeHeld is true.
+	DisputeHeld bool `gorm:"column:dispute_held;default:false"`
+
 	// ItemIndices: JSON array of item indices for multi-supplier split (FF-3).
 	ItemIndices string `gorm:"column:item_indices;type:text"`
 
@@ -96,8 +105,24 @@ type FulfillmentOrderMapping struct {
 	RetryCount  int       `gorm:"column:retry_count;default:0"`
 	NextRetryAt time.Time `gorm:"column:next_retry_at"`
 
+	// RetryLockedUntil is used for atomic worker lease. A worker sets this to
+	// now+5min before processing; other goroutines skip rows with a future value.
+	// On release, this is reset to time.Time{} (zero value, written as
+	// '0001-01-01 00:00:00' — not NULL — so claim queries also test for `<= now`).
+	RetryLockedUntil time.Time `gorm:"column:retry_locked_until"`
+
 	// LastWebhookEventID for idempotency (quick-check before ProcessedFulfillmentEvent).
 	LastWebhookEventID string `gorm:"column:last_webhook_event_id;type:varchar(255)"`
+
+	// OrderAdvancementStatus tracks whether the Mobazha order state has been
+	// advanced (AutoConfirmAndShip) after this mapping reached `shipped`.
+	// Decoupled from `Status` because if the supplier-side status update
+	// succeeded but the subsequent autoConfirm/ship call failed (chain hiccup,
+	// order app service error, etc.) the mapping must still be revisited by
+	// the reconcile worker. Values: "" (not yet shipped), "pending" (shipped
+	// in mapping, order advance not yet attempted/succeeded), "done"
+	// (advance succeeded), "permanent_fail" (advance permanently failed).
+	OrderAdvancementStatus string `gorm:"column:order_advancement_status;type:varchar(16);default:''"`
 
 	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime"`

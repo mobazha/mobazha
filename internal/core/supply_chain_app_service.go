@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,7 @@ type SupplyChainOrderOps interface {
 	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
 	IsOrderConfirmed(orderID models.OrderID) (bool, error)
 	IsOrderShipped(orderID models.OrderID) (bool, error)
+	GetOrderState(orderID models.OrderID) (models.OrderState, error)
 }
 
 // SupplyChainListingOps is the subset of ListingAppService needed by ImportProduct.
@@ -54,10 +56,12 @@ type SupplyChainAppService struct {
 	nodeID     string
 	credKey    [32]byte // AES-256-GCM key for encrypting provider credentials at rest
 
-	eventBus   events.Bus
-	shutdown   <-chan struct{}
-	orderOps   SupplyChainOrderOps
-	listingOps SupplyChainListingOps
+	eventBus       events.Bus
+	shutdown       <-chan struct{}
+	orderOps       SupplyChainOrderOps
+	listingOps     SupplyChainListingOps
+	saasMode       bool
+	webhookBaseURL string
 }
 
 // NewSupplyChainAppService creates the supply chain service skeleton.
@@ -128,6 +132,556 @@ func (s *SupplyChainAppService) StartFulfillmentMonitor() {
 	go s.subscribeOrderFunded()
 	go s.subscribeOrderCancel()
 	go s.subscribeRefund()
+	go s.subscribeDisputeOpen()
+	go s.subscribeDisputeClose()
+}
+
+// StartWorkers launches background workers for retry, reconciliation, and cleanup.
+// Must be called ONLY when FeatureSupplyChainEnabled is true (gated in builder.go).
+func (s *SupplyChainAppService) StartWorkers(ctx context.Context, saasMode bool, webhookBaseURL string) {
+	s.saasMode = saasMode
+	s.webhookBaseURL = webhookBaseURL
+	go s.retryFailedOrdersLoop(ctx)
+	go s.reconcileStaleOrdersLoop(ctx)
+	go s.cleanupProcessedEventsLoop(ctx)
+}
+
+const (
+	// Retry worker
+	retryWorkerInterval = 30 * time.Second
+	maxRetryAttempts    = 3
+	retryLeaseDuration  = 5 * time.Minute
+	retryBackoffBase    = 5 * time.Minute // attempt N delay = retryBackoffBase * 2^N
+
+	// Reconcile worker
+	reconcileIntervalDefault = 5 * time.Minute // SaaS / public-webhook standalone
+	reconcileIntervalNAT     = 1 * time.Minute // standalone behind NAT (no webhook)
+	reconcileStaleThreshold  = 30 * time.Minute
+
+	// Event cleanup
+	eventCleanupInterval = 1 * time.Hour
+	eventRetentionTTL    = 7 * 24 * time.Hour
+
+	// FulfillmentOrderMapping.OrderAdvancementStatus values (P1-3 / TD-075).
+	// Empty string = order has not yet reached `shipped`. Set as soon as the
+	// mapping is marked shipped so reconcile can pick up unfinished advances.
+	advancementStatusPending       = "pending"
+	advancementStatusDone          = "done"
+	advancementStatusPermanentFail = "permanent_fail"
+)
+
+func (s *SupplyChainAppService) retryFailedOrdersLoop(ctx context.Context) {
+	ticker := time.NewTicker(retryWorkerInterval)
+	defer ticker.Stop()
+	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: retry worker started (interval: %s)", retryWorkerInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			logger.LogInfoWithID(log, s.nodeID, "SupplyChain: retry worker stopped")
+			return
+		case <-s.shutdown:
+			logger.LogInfoWithID(log, s.nodeID, "SupplyChain: retry worker stopped")
+			return
+		case <-ticker.C:
+			s.retryFailedOrders(ctx)
+		}
+	}
+}
+
+func (s *SupplyChainAppService) retryFailedOrders(ctx context.Context) {
+	now := time.Now()
+
+	var candidates []models.FulfillmentOrderMapping
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"failure_reason = ? AND retry_count < ? AND next_retry_at <= ? AND dispute_held = ? AND (retry_locked_until IS NULL OR retry_locked_until < ?)",
+			string(contracts.FailureReasonRetryableProviderError), maxRetryAttempts, now, false, now,
+		).Select("id, mobazha_order_id, provider_id, retry_count").Find(&candidates).Error
+	})
+
+	for _, c := range candidates {
+		claimed := s.claimRetryLease(c.ID, now)
+		if !claimed {
+			continue
+		}
+		s.processRetry(ctx, c)
+	}
+}
+
+// claimRetryLease atomically claims a mapping row for exclusive processing by
+// setting retry_locked_until = now + retryLeaseDuration. Returns true if this
+// caller acquired the lease.
+//
+// Concurrency model:
+//  1. UPDATE ... WHERE retry_locked_until IS NULL OR retry_locked_until < now
+//     — at the SQL row-lock level, only one concurrent updater wins.
+//  2. After the update, we re-read the row and verify retry_locked_until equals
+//     the leaseUntil we wrote. If a faster process already overwrote it
+//     (extremely unlikely under SQL row locking but defensive), we treat the
+//     claim as lost.
+//
+// Note on time.Time{} (zero value): GORM stores zero time as '0001-01-01...',
+// not NULL. The condition (IS NULL OR < now) covers both freshly created rows
+// (NULL by schema default if pointer / explicit) and previously released
+// leases (zero time, which is < now).
+//
+// If processRetry / reconcileSingleOrder panic or are killed mid-flight, the
+// lease auto-expires after retryLeaseDuration (5min) and another worker can
+// retry — see releaseLease for normal cleanup.
+func (s *SupplyChainAppService) claimRetryLease(mappingID string, now time.Time) bool {
+	leaseUntil := now.Add(retryLeaseDuration)
+	err := s.db.Update(func(tx database.Tx) error {
+		return tx.Update(
+			"retry_locked_until", leaseUntil,
+			map[string]interface{}{
+				"id = ?": mappingID,
+				"(retry_locked_until IS NULL OR retry_locked_until < ?)": now,
+			},
+			&models.FulfillmentOrderMapping{},
+		)
+	})
+	if err != nil {
+		return false
+	}
+	var check models.FulfillmentOrderMapping
+	if readErr := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ? AND retry_locked_until = ?", mappingID, leaseUntil).First(&check).Error
+	}); readErr != nil {
+		return false
+	}
+	return true
+}
+
+// processRetry runs one retry attempt for a previously-failed mapping.
+// The lease must already be claimed by the caller.
+//
+// Steps:
+//  1. rebuildRetryParams — load order contract, derive recipient + items
+//     (no PII stored on the mapping row).
+//  2. EstimateShipping + margin gate — supplier prices may have shifted; the
+//     gate from FF-2.6 must pass at retry time.
+//  3. executeRetryCreate — call provider.CreateFulfillmentOrder, persist
+//     either success (clear failure_reason) or failure (bump retry_count,
+//     compute next backoff, mark permanently_failed at the limit).
+func (s *SupplyChainAppService) processRetry(ctx context.Context, mapping models.FulfillmentOrderMapping) {
+	oo, params, reason, msg, ok := s.rebuildRetryParams(mapping)
+	if !ok {
+		s.markRetryOutcome(mapping.ID, mapping.RetryCount, reason, msg)
+		return
+	}
+
+	// Re-run the FULL margin gate (cost+price+shipping) — not just shipping —
+	// because retail price or supplier cost may have shifted between attempts.
+	// Shared with the first-attempt path via evaluateMarginGate.
+	if ok, reason, msg := s.evaluateMarginGate(ctx, supplyMarginInputs{
+		oo:         oo,
+		providerID: mapping.ProviderID,
+		recipient:  params.Recipient,
+		items:      params.Items,
+	}); !ok {
+		s.markRetryOutcome(mapping.ID, mapping.RetryCount, reason, msg)
+		return
+	}
+
+	provider, provErr := s.registry.ForProvider(mapping.ProviderID)
+	if provErr != nil {
+		s.markRetryOutcome(mapping.ID, mapping.RetryCount, contracts.FailureReasonPermanentlyFailed,
+			fmt.Sprintf("provider not found: %v", provErr))
+		return
+	}
+
+	s.executeRetryCreate(ctx, mapping, params, provider)
+}
+
+// rebuildRetryParams reconstructs CreateFulfillmentParams from the order
+// contract. Returns (params, reason, msg, ok). When ok is false, reason+msg
+// describe why the retry is permanently abandoned (validation/permanent).
+//
+// TECHDEBT(TD-028): Uses ALL items from the order contract. Correct for
+// FF-2 single-supplier orders (1 mapping per order). FF-3 multi-supplier
+// orders introduce mapping.ItemIndices and this function must filter by it.
+// Clearance: when FulfillmentOrderMapping.ItemIndices becomes non-empty
+// (multi-supplier split lands), this helper must honor it.
+func (s *SupplyChainAppService) rebuildRetryParams(mapping models.FulfillmentOrderMapping) (
+	*pb.OrderOpen, contracts.CreateFulfillmentParams, contracts.FailureReason, string, bool,
+) {
+	orderID := mapping.MobazhaOrderID
+
+	var order models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&order).Error
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain retry: cannot fetch order %s: %v", orderID, err)
+		return nil, contracts.CreateFulfillmentParams{}, contracts.FailureReasonPermanentlyFailed, "order not found", false
+	}
+
+	oo, err := order.OrderOpenMessage()
+	if err != nil || oo == nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain retry: cannot decode OrderOpen for %s: %v", orderID, err)
+		return nil, contracts.CreateFulfillmentParams{}, contracts.FailureReasonPermanentlyFailed, "cannot decode order", false
+	}
+
+	recipient := extractRecipientFromOrder(oo)
+	var allItems []contracts.FulfillmentItem
+	for i, li := range oo.Listings {
+		if li == nil || li.Listing == nil {
+			continue
+		}
+		item := contracts.FulfillmentItem{Quantity: 1}
+		if i < len(oo.Items) && oo.Items[i] != nil {
+			if q, parseErr := strconv.Atoi(oo.Items[i].Quantity); parseErr == nil && q > 0 {
+				item.Quantity = q
+			}
+			item.CatalogVariantID = resolveVariantID(li.Listing, oo.Items[i])
+		}
+		if item.CatalogVariantID == "" {
+			return nil, contracts.CreateFulfillmentParams{}, contracts.FailureReasonValidationFailed,
+				fmt.Sprintf("cannot resolve variant for item %d", i), false
+		}
+		allItems = append(allItems, item)
+	}
+
+	return oo, contracts.CreateFulfillmentParams{
+		ExternalOrderID: orderID,
+		Recipient:       recipient,
+		Items:           allItems,
+	}, contracts.FailureReasonNone, "", true
+}
+
+// executeRetryCreate calls the supplier and persists the outcome.
+//
+// TECHDEBT(TD-030): Uses the same ExternalOrderID as the first attempt and
+// relies on supplier-side uniqueness. If the first call actually succeeded
+// at the supplier but the response was lost, retry returns a 4xx duplicate
+// error which ClassifyError marks as validation_failed (not retryable). The
+// reconcile worker (5min) recovers status. A future improvement is to call
+// GetFulfillmentOrder by external_id before retrying to avoid the duplicate
+// path entirely.
+func (s *SupplyChainAppService) executeRetryCreate(
+	ctx context.Context,
+	mapping models.FulfillmentOrderMapping,
+	params contracts.CreateFulfillmentParams,
+	provider contracts.FulfillmentProvider,
+) {
+	orderID := mapping.MobazhaOrderID
+	providerID := mapping.ProviderID
+
+	start := time.Now()
+	fo, createErr := provider.CreateFulfillmentOrder(ctx, params)
+	duration := time.Since(start)
+
+	if createErr != nil {
+		newRetryCount := mapping.RetryCount + 1
+		reason := classifyProviderError(providerID, createErr)
+		if newRetryCount >= maxRetryAttempts {
+			reason = contracts.FailureReasonPermanentlyFailed
+		}
+		nextRetry := time.Now().Add(retryBackoffBase * time.Duration(1<<uint(newRetryCount)))
+		if err := s.db.Update(func(tx database.Tx) error {
+			var m models.FulfillmentOrderMapping
+			if readErr := tx.Read().Where("id = ?", mapping.ID).First(&m).Error; readErr != nil {
+				return readErr
+			}
+			m.RetryCount = newRetryCount
+			m.FailureReason = string(reason)
+			m.ErrorMessage = createErr.Error()
+			m.NextRetryAt = nextRetry
+			m.RetryLockedUntil = time.Time{}
+			return tx.Save(&m)
+		}); err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain retry: failed to persist failure outcome mappingID=%s err=%v",
+				mapping.ID, err)
+		}
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain retry: orderID=%s providerID=%s attempt=%d/%d failureReason=%s duration=%s err=%v",
+			orderID, providerID, newRetryCount, maxRetryAttempts, reason, duration, createErr)
+		return
+	}
+
+	supplierOrderID := fo.ID
+	if supplierOrderID == "" {
+		supplierOrderID = fo.ExternalID
+	}
+	if err := s.db.Update(func(tx database.Tx) error {
+		var m models.FulfillmentOrderMapping
+		if readErr := tx.Read().Where("id = ?", mapping.ID).First(&m).Error; readErr != nil {
+			return readErr
+		}
+		m.FulfillmentOrderID = supplierOrderID
+		m.Status = string(fo.Status)
+		m.SupplierCost = costTotal(fo.Costs)
+		m.FailureReason = ""
+		m.ErrorMessage = ""
+		m.RetryLockedUntil = time.Time{}
+		return tx.Save(&m)
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain retry: created supplier order but failed to persist mappingID=%s supplierOrderID=%s err=%v",
+			mapping.ID, supplierOrderID, err)
+		return
+	}
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"SupplyChain retry: orderID=%s providerID=%s fulfillmentOrderID=%s attempt=%d supplierCost=%s duration=%s",
+		orderID, providerID, supplierOrderID, mapping.RetryCount+1, costTotal(fo.Costs), duration)
+}
+
+// markRetryOutcome records a terminal retry result (validation/permanent
+// failures, manual_action_required) and releases the lease.
+func (s *SupplyChainAppService) markRetryOutcome(mappingID string, currentRetryCount int, reason contracts.FailureReason, msg string) {
+	if err := s.db.Update(func(tx database.Tx) error {
+		var m models.FulfillmentOrderMapping
+		if readErr := tx.Read().Where("id = ?", mappingID).First(&m).Error; readErr != nil {
+			return readErr
+		}
+		m.FailureReason = string(reason)
+		m.ErrorMessage = msg
+		m.RetryCount = currentRetryCount + 1
+		m.RetryLockedUntil = time.Time{}
+		return tx.Save(&m)
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain retry: failed to mark outcome mappingID=%s reason=%s err=%v",
+			mappingID, reason, err)
+	}
+}
+
+func (s *SupplyChainAppService) reconcileStaleOrdersLoop(ctx context.Context) {
+	interval := reconcileIntervalDefault
+	if !s.saasMode && s.webhookBaseURL == "" {
+		interval = reconcileIntervalNAT
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: reconcile worker started (interval: %s)", interval)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.shutdown:
+			return
+		case <-ticker.C:
+			s.reconcileStaleOrders(ctx)
+		}
+	}
+}
+
+func (s *SupplyChainAppService) reconcileStaleOrders(ctx context.Context) {
+	now := time.Now()
+	staleThreshold := now.Add(-reconcileStaleThreshold)
+
+	// Track 1: stale pending/in_process fulfillment orders — re-poll supplier
+	// for status updates that may have been missed (no webhook, lost event).
+	var stale []models.FulfillmentOrderMapping
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"status IN (?, ?) AND updated_at < ? AND fulfillment_order_id != '' AND dispute_held = ? AND (retry_locked_until IS NULL OR retry_locked_until < ?)",
+			string(contracts.FulfillmentStatusPending), string(contracts.FulfillmentStatusInProcess),
+			staleThreshold, false, now,
+		).Find(&stale).Error
+	})
+	for _, m := range stale {
+		if !s.claimRetryLease(m.ID, now) {
+			continue
+		}
+		s.reconcileSingleOrder(ctx, m)
+	}
+
+	// Track 2 (P1-3 / TD-075): mappings already advanced to `shipped` whose
+	// AutoConfirmAndShip step never succeeded. Without this, an order that
+	// shipped at the supplier but whose chain confirm/ship call failed would
+	// leave the Mobazha order stuck in `funded` indefinitely.
+	var pendingAdvance []models.FulfillmentOrderMapping
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"status = ? AND order_advancement_status = ? AND updated_at < ? AND dispute_held = ? AND (retry_locked_until IS NULL OR retry_locked_until < ?)",
+			string(contracts.FulfillmentStatusShipped), advancementStatusPending,
+			staleThreshold, false, now,
+		).Find(&pendingAdvance).Error
+	})
+	for _, m := range pendingAdvance {
+		if !s.claimRetryLease(m.ID, now) {
+			continue
+		}
+		s.retryOrderAdvancement(m)
+	}
+}
+
+// retryOrderAdvancement re-attempts AutoConfirmAndShip for a mapping that
+// reached `shipped` but failed to advance the Mobazha order state.
+// Reconstructs the FulfillmentShipment from persisted tracking fields.
+func (s *SupplyChainAppService) retryOrderAdvancement(mapping models.FulfillmentOrderMapping) {
+	defer s.releaseLease(mapping.ID)
+
+	if mapping.TrackingNumber == "" && mapping.Carrier == "" && mapping.TrackingURL == "" {
+		// No tracking info to advance with — log and skip; manual intervention.
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain reconcile: orderID=%s mapping shipped but no tracking info to retry advancement",
+			mapping.MobazhaOrderID)
+		s.markAdvancementStatus(mapping.ID, advancementStatusPermanentFail)
+		return
+	}
+
+	shipment := &contracts.FulfillmentShipment{
+		Carrier:        mapping.Carrier,
+		TrackingNumber: mapping.TrackingNumber,
+		TrackingURL:    mapping.TrackingURL,
+	}
+	if err := s.autoConfirmAndShip(mapping.MobazhaOrderID, shipment); err != nil {
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain reconcile: autoConfirmAndShip retry failed orderID=%s err=%v",
+			mapping.MobazhaOrderID, err)
+		// Leave OrderAdvancementStatus = pending; next tick retries.
+		return
+	}
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"SupplyChain reconcile: order advancement recovered orderID=%s", mapping.MobazhaOrderID)
+	s.markAdvancementStatus(mapping.ID, advancementStatusDone)
+}
+
+// markAdvancementStatus updates the order_advancement_status column.
+// Failures are logged but not returned — they only affect reconcile efficiency.
+func (s *SupplyChainAppService) markAdvancementStatus(mappingID, status string) {
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Update(
+			"order_advancement_status", status,
+			map[string]interface{}{"id = ?": mappingID},
+			&models.FulfillmentOrderMapping{},
+		)
+	}); err != nil {
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain: failed to set order_advancement_status=%s on mapping %s: %v",
+			status, mappingID, err)
+	}
+}
+
+func (s *SupplyChainAppService) reconcileSingleOrder(ctx context.Context, mapping models.FulfillmentOrderMapping) {
+	provider, err := s.registry.ForProvider(mapping.ProviderID)
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain reconcile: providerID=%s orderID=%s err=provider_not_found",
+			mapping.ProviderID, mapping.MobazhaOrderID)
+		s.releaseLease(mapping.ID)
+		return
+	}
+
+	start := time.Now()
+	fo, err := provider.GetFulfillmentOrder(ctx, mapping.FulfillmentOrderID)
+	duration := time.Since(start)
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain reconcile: orderID=%s fulfillmentOrderID=%s duration=%s err=%v",
+			mapping.MobazhaOrderID, mapping.FulfillmentOrderID, duration, err)
+		s.releaseLease(mapping.ID)
+		return
+	}
+
+	s.applyFulfillmentStatus(ctx, mapping, fo)
+}
+
+// applyFulfillmentStatus is the unified status transition logic shared by webhook
+// and reconcile paths. It always releases the retry lease before returning,
+// regardless of whether the supplier-side status changed.
+func (s *SupplyChainAppService) applyFulfillmentStatus(_ context.Context, mapping models.FulfillmentOrderMapping, fo *contracts.FulfillmentOrder) {
+	if fo == nil {
+		s.releaseLease(mapping.ID)
+		return
+	}
+
+	newStatus := string(fo.Status)
+	if newStatus == mapping.Status {
+		s.releaseLease(mapping.ID)
+		return
+	}
+
+	var shipment *contracts.FulfillmentShipment
+	if err := s.db.Update(func(tx database.Tx) error {
+		var m models.FulfillmentOrderMapping
+		if readErr := tx.Read().Where("id = ?", mapping.ID).First(&m).Error; readErr != nil {
+			return readErr
+		}
+		m.Status = newStatus
+		m.RetryLockedUntil = time.Time{}
+		if len(fo.Shipments) > 0 {
+			shipment = &fo.Shipments[0]
+			m.Carrier = shipment.Carrier
+			m.TrackingNumber = shipment.TrackingNumber
+			m.TrackingURL = shipment.TrackingURL
+		}
+		// P1-3: As soon as we mark the mapping `shipped`, flag advancement as
+		// pending so the reconcile worker can retry AutoConfirmAndShip if the
+		// inline call below fails.
+		if fo.Status == contracts.FulfillmentStatusShipped && m.OrderAdvancementStatus == "" {
+			m.OrderAdvancementStatus = advancementStatusPending
+		}
+		return tx.Save(&m)
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain reconcile: failed to persist status orderID=%s fulfillmentOrderID=%s err=%v",
+			mapping.MobazhaOrderID, mapping.FulfillmentOrderID, err)
+		s.releaseLease(mapping.ID)
+		return
+	}
+
+	if fo.Status == contracts.FulfillmentStatusShipped && shipment != nil {
+		if err := s.autoConfirmAndShip(mapping.MobazhaOrderID, shipment); err != nil {
+			logger.LogWarningWithIDf(log, s.nodeID,
+				"SupplyChain reconcile: autoConfirmAndShip failed orderID=%s err=%v (will retry via reconcile)",
+				mapping.MobazhaOrderID, err)
+			// Leave OrderAdvancementStatus = pending so reconcile worker retries.
+		} else {
+			s.markAdvancementStatus(mapping.ID, advancementStatusDone)
+		}
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"SupplyChain reconcile: orderID=%s fulfillmentOrderID=%s statusOld=%s statusNew=%s",
+		mapping.MobazhaOrderID, mapping.FulfillmentOrderID, mapping.Status, newStatus)
+}
+
+// releaseLease clears retry_locked_until so subsequent worker ticks can
+// re-claim this mapping. Failures are logged but not returned — the lease
+// will auto-expire after retryLeaseDuration as a fallback.
+func (s *SupplyChainAppService) releaseLease(mappingID string) {
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Update(
+			"retry_locked_until", time.Time{},
+			map[string]interface{}{"id = ?": mappingID},
+			&models.FulfillmentOrderMapping{},
+		)
+	}); err != nil {
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain: failed to release lease on mapping %s: %v (will auto-expire)", mappingID, err)
+	}
+}
+
+func (s *SupplyChainAppService) cleanupProcessedEventsLoop(ctx context.Context) {
+	ticker := time.NewTicker(eventCleanupInterval)
+	defer ticker.Stop()
+	logger.LogInfoWithID(log, s.nodeID, "SupplyChain: event cleanup worker started")
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.shutdown:
+			return
+		case <-ticker.C:
+			s.cleanupProcessedEvents()
+		}
+	}
+}
+
+func (s *SupplyChainAppService) cleanupProcessedEvents() {
+	cutoff := time.Now().Add(-eventRetentionTTL)
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Delete(
+			"status", "processed",
+			map[string]interface{}{"processed_at < ?": cutoff},
+			&models.ProcessedFulfillmentEvent{},
+		)
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: event cleanup failed: %v", err)
+	}
 }
 
 func (s *SupplyChainAppService) subscribeOrderFunded() {
@@ -181,13 +735,173 @@ func (s *SupplyChainAppService) subscribeRefund() {
 		select {
 		case event := <-sub.Out():
 			if e, ok := event.(*events.Refund); ok {
-				go s.cancelFulfillmentForOrder(e.OrderID)
+				go s.handleOrderRefunded(e.OrderID)
 			}
 		case <-s.shutdown:
 			sub.Close()
 			return
 		}
 	}
+}
+
+// handleOrderRefunded handles a refund event. If the fulfillment has already shipped,
+// the supplier cost is unrecoverable — mark as supplier_loss and notify the seller.
+func (s *SupplyChainAppService) handleOrderRefunded(orderID string) {
+	var mapping models.FulfillmentOrderMapping
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("mobazha_order_id = ?", orderID).First(&mapping).Error
+	})
+	if err != nil {
+		return
+	}
+
+	postShipStatuses := map[string]bool{
+		string(contracts.FulfillmentStatusShipped):   true,
+		string(contracts.FulfillmentStatusDelivered): true,
+	}
+
+	if postShipStatuses[mapping.Status] {
+		lossMsg := fmt.Sprintf("Refund issued after fulfillment %s. Supplier cost %s is not recoverable.",
+			mapping.Status, mapping.SupplierCost)
+		if err := s.db.Update(func(tx database.Tx) error {
+			var m models.FulfillmentOrderMapping
+			if readErr := tx.Read().Where("id = ?", mapping.ID).First(&m).Error; readErr != nil {
+				return readErr
+			}
+			m.Status = string(contracts.FulfillmentStatusSupplierLoss)
+			m.ErrorMessage = lossMsg
+			return tx.Save(&m)
+		}); err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain: failed to mark supplier_loss for order %s: %v", orderID, err)
+		}
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain: supplier_loss for order %s — %s", orderID, lossMsg)
+		return
+	}
+
+	s.cancelFulfillmentForOrder(orderID)
+}
+
+func (s *SupplyChainAppService) subscribeDisputeOpen() {
+	sub, err := s.eventBus.Subscribe(&events.DisputeOpen{})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: failed to subscribe to DisputeOpen: %v", err)
+		return
+	}
+	for {
+		select {
+		case event := <-sub.Out():
+			if e, ok := event.(*events.DisputeOpen); ok {
+				go s.handleDisputeOpened(e.OrderID)
+			}
+		case <-s.shutdown:
+			sub.Close()
+			return
+		}
+	}
+}
+
+func (s *SupplyChainAppService) subscribeDisputeClose() {
+	sub, err := s.eventBus.Subscribe(&events.DisputeClose{})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: failed to subscribe to DisputeClose: %v", err)
+		return
+	}
+	for {
+		select {
+		case event := <-sub.Out():
+			if e, ok := event.(*events.DisputeClose); ok {
+				go s.handleDisputeClosed(e.OrderID)
+			}
+		case <-s.shutdown:
+			sub.Close()
+			return
+		}
+	}
+}
+
+func (s *SupplyChainAppService) handleDisputeOpened(orderID string) {
+	var mappings []models.FulfillmentOrderMapping
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("mobazha_order_id = ? AND status IN (?, ?)",
+			orderID, string(contracts.FulfillmentStatusPending), string(contracts.FulfillmentStatusInProcess),
+		).Find(&mappings).Error
+	})
+	if len(mappings) == 0 {
+		return
+	}
+
+	for _, m := range mappings {
+		if err := s.db.Update(func(tx database.Tx) error {
+			var mapping models.FulfillmentOrderMapping
+			if readErr := tx.Read().Where("id = ?", m.ID).First(&mapping).Error; readErr != nil {
+				return readErr
+			}
+			mapping.DisputeHeld = true
+			return tx.Save(&mapping)
+		}); err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain: failed to set DisputeHeld on mapping %s: %v", m.ID, err)
+		}
+	}
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"SupplyChain: dispute opened for order %s — held %d fulfillment(s)", orderID, len(mappings))
+}
+
+func (s *SupplyChainAppService) handleDisputeClosed(orderID string) {
+	var mappings []models.FulfillmentOrderMapping
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("mobazha_order_id = ? AND dispute_held = ?", orderID, true).Find(&mappings).Error
+	})
+	if len(mappings) == 0 {
+		return
+	}
+
+	// Determine outcome by querying the order's current state
+	var buyerWon bool
+	if s.orderOps != nil {
+		state, err := s.orderOps.GetOrderState(models.OrderID(orderID))
+		if err == nil {
+			buyerWon = state == models.OrderState_REFUNDED || state == models.OrderState_CANCELED
+		} else {
+			logger.LogWarningWithIDf(log, s.nodeID,
+				"SupplyChain: cannot determine dispute outcome for %s: %v — keeping held", orderID, err)
+			return
+		}
+	}
+
+	// First clear DisputeHeld so workers and cancelFulfillmentForOrder are
+	// no longer skipped by the dispute_held = false filter. This must
+	// happen BEFORE invoking cancelFulfillmentForOrder to avoid the supplier
+	// cancel call racing against a still-held mapping read.
+	for _, m := range mappings {
+		if updErr := s.db.Update(func(tx database.Tx) error {
+			var mapping models.FulfillmentOrderMapping
+			if readErr := tx.Read().Where("id = ?", m.ID).First(&mapping).Error; readErr != nil {
+				return readErr
+			}
+			mapping.DisputeHeld = false
+			return tx.Save(&mapping)
+		}); updErr != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain: failed to clear DisputeHeld on mapping %s: %v", m.ID, updErr)
+		}
+	}
+
+	if buyerWon {
+		// Synchronous cancel: cancelFulfillmentForOrder calls the supplier API
+		// and writes Status=canceled itself. Running it inline (not `go`) avoids
+		// a race against any subsequent worker tick reading a stale mapping.
+		s.cancelFulfillmentForOrder(orderID)
+	}
+
+	outcome := "seller won — resuming"
+	if buyerWon {
+		outcome = "buyer won — canceling"
+	}
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"SupplyChain: dispute closed for order %s (%s), %d fulfillment(s) updated", orderID, outcome, len(mappings))
 }
 
 // cancelFulfillmentForOrder attempts to cancel the supplier fulfillment order
@@ -352,46 +1066,6 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 		}
 	}
 
-	// TECHDEBT(TD-027): Margin protection uses import-time snapshot costs, not
-	// actual order transaction prices. A safety threshold compensates for
-	// variant cost spread and shipping/tax not included in the snapshot.
-	// 清除条件: FF-2/FF-3 按实际 SKU × qty + shipping/tax 校验
-	const marginSafetyPct uint64 = 80 // fail closed if cost >= 80% of retail
-	var totalCost, totalRetail uint64
-	marginDataComplete := true
-	for _, g := range groups {
-		var mapping models.SyncedProductMapping
-		if findErr := s.db.View(func(tx database.Tx) error {
-			return tx.Read().Where("listing_slug = ?", g.itemSlug).First(&mapping).Error
-		}); findErr != nil || mapping.SupplierCost == "" || mapping.RetailPrice == "" {
-			marginDataComplete = false
-			break
-		}
-		costCents, costErr := strconv.ParseUint(mapping.SupplierCost, 10, 64)
-		retailCents, retailErr := strconv.ParseUint(mapping.RetailPrice, 10, 64)
-		if costErr != nil || retailErr != nil || costCents == 0 {
-			marginDataComplete = false
-			break
-		}
-		qty := uint64(1)
-		if len(g.items) > 0 && g.items[0].Quantity > 0 {
-			qty = uint64(g.items[0].Quantity)
-		}
-		totalCost += costCents * qty
-		totalRetail += retailCents * qty
-	}
-	if !marginDataComplete {
-		logger.LogWarningWithIDf(log, s.nodeID,
-			"SupplyChain: order %s: incomplete cost data for margin check — skipping auto-fulfillment (fail closed)", orderID)
-		return
-	}
-	if totalCost*100 >= totalRetail*marginSafetyPct {
-		logger.LogWarningWithIDf(log, s.nodeID,
-			"SupplyChain: order %s: supplier cost (%d) >= %d%% of retail (%d) — skipping auto-fulfillment to protect margin",
-			orderID, totalCost, marginSafetyPct, totalRetail)
-		return
-	}
-
 	recipient := extractRecipientFromOrder(oo)
 
 	var allItems []contracts.FulfillmentItem
@@ -403,6 +1077,18 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 		ExternalOrderID: orderID,
 		Recipient:       recipient,
 		Items:           allItems,
+	}
+
+	// --- Margin Protection (FF-2.6) ---
+	// Shared with retry worker via evaluateMarginGate (supply_chain_margin.go).
+	if ok, reason, msg := s.evaluateMarginGate(ctx, supplyMarginInputs{
+		oo:         oo,
+		providerID: providerID,
+		recipient:  recipient,
+		items:      allItems,
+	}); !ok {
+		s.failFulfillmentWithReason(orderID, providerID, reason, msg)
+		return
 	}
 
 	fo, err := s.createFulfillmentForItems(ctx, orderID, providerID, params)
@@ -691,7 +1377,10 @@ func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contra
 		markup = 1.0
 	}
 
-	listing, supplierCost, retailPrice := s.buildListingFromCatalog(product, variants, markup, params)
+	listing, supplierCost, retailPrice, buildErr := s.buildListingFromCatalog(product, variants, markup, params)
+	if buildErr != nil {
+		return nil, fmt.Errorf("build listing from catalog: %w", buildErr)
+	}
 
 	done := make(chan struct{})
 	if err := s.listingOps.SaveListing(listing, done); err != nil {
@@ -699,7 +1388,11 @@ func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contra
 	}
 	<-done
 
-	variantMeta := buildVariantMetadata(variants)
+	variantMeta, metaErr := buildVariantMetadata(variants, markup)
+	if metaErr != nil {
+		// Should already have failed in buildListingFromCatalog above; defensive.
+		return nil, fmt.Errorf("build variant metadata: %w", metaErr)
+	}
 	metaJSON, _ := json.Marshal(variantMeta)
 
 	mapping := &models.SyncedProductMapping{
@@ -731,12 +1424,20 @@ func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contra
 
 // buildListingFromCatalog converts a catalog product into a draft protobuf Listing.
 // Returns the listing, supplier cost string, and retail price string.
+// buildListingFromCatalog renders a draft listing + canonical
+// (supplierCost, retailPrice) snapshot from a provider catalog product.
+//
+// If ANY catalog variant carries an unparseable price string, the function
+// fails the whole import — silently writing 0-cost SKUs would (a) create a
+// public listing with garbage prices for buyers and (b) confuse the margin
+// gate later (cost=0 trivially passes the 80% rule). Reviewer P2 (2nd
+// pass): "导入阶段应该对任何选中 variant 的价格解析失败直接返回错误".
 func (s *SupplyChainAppService) buildListingFromCatalog(
 	product *contracts.CatalogProduct,
 	variants []contracts.CatalogVariant,
 	markup float64,
 	params contracts.ImportProductParams,
-) (*pb.Listing, string, string) {
+) (*pb.Listing, string, string, error) {
 	title := product.Title
 	if params.Title != "" {
 		title = params.Title
@@ -795,16 +1496,27 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 		})
 	}
 
-	var minCost float64
+	// Track cheapest variant in CENTS (not float dollars) so the listing-level
+	// snapshot in SyncedProductMapping.SupplierCost is exact.
+	var minCostCents uint64
 	var skus []*pb.Listing_Item_Sku
 	for _, v := range variants {
-		costFloat := parseFloat(v.Price)
-		if minCost == 0 || costFloat < minCost {
-			minCost = costFloat
+		costCents, parseOK := parseUSDDollarsToCents(v.Price)
+		if !parseOK {
+			// Fail closed: reject the whole import. Silently writing a 0-cost
+			// SKU would publish bogus pricing to buyers and cause the margin
+			// gate to trivially pass (cost=0 always under 80% of retail).
+			return nil, "", "", fmt.Errorf("variant %q has unparseable price %q (must be USD decimal like \"4.50\")",
+				v.ID, v.Price)
 		}
-		retailFloat := costFloat * markup
-		retailStr := strconv.FormatUint(uint64(retailFloat*100), 10)
-		costStr := strconv.FormatUint(uint64(costFloat*100), 10)
+		if costCents == 0 {
+			return nil, "", "", fmt.Errorf("variant %q has zero price — refusing to import (would create $0 SKU)", v.ID)
+		}
+		if minCostCents == 0 || costCents < minCostCents {
+			minCostCents = costCents
+		}
+		retailCents := computeRetailCents(costCents, markup)
+		retailStr := strconv.FormatUint(retailCents, 10)
 
 		var selections []*pb.Listing_Item_Sku_Selection
 		for _, attr := range attrNames {
@@ -816,12 +1528,16 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 			}
 		}
 
+		// SECURITY: do NOT write supplier wholesale cost into CompareAtPrice.
+		// CompareAtPrice is a public "original / strike-through price" rendered
+		// on the storefront detail page (see Listing.proto and unified
+		// useProductDetail). Keep per-variant cost in the private
+		// SyncedProductMapping.Metadata blob (loadVariantCostMap).
 		sku := &pb.Listing_Item_Sku{
-			Selections:     selections,
-			ProductID:      v.ID,
-			Quantity:       "999",
-			Price:          retailStr,
-			CompareAtPrice: costStr,
+			Selections: selections,
+			ProductID:  v.ID,
+			Quantity:   "999",
+			Price:      retailStr,
 		}
 		if v.ImageURL != "" {
 			sku.Images = []*pb.Image{{
@@ -835,8 +1551,8 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 		skus = append(skus, sku)
 	}
 
-	supplierCost := strconv.FormatUint(uint64(minCost*100), 10)
-	retailPrice := strconv.FormatUint(uint64(minCost*markup*100), 10)
+	supplierCost := strconv.FormatUint(minCostCents, 10)
+	retailPrice := strconv.FormatUint(computeRetailCents(minCostCents, markup), 10)
 
 	listing := &pb.Listing{
 		Slug:   uuid.NewString(),
@@ -862,7 +1578,7 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 		},
 	}
 
-	return listing, supplierCost, retailPrice
+	return listing, supplierCost, retailPrice, nil
 }
 
 // filterVariants keeps only variants whose IDs appear in the requested set.
@@ -941,24 +1657,87 @@ func parseFloat(s string) float64 {
 	return f
 }
 
-// variantMetadataEntry stores the mapping between a catalog variant and
-// the listing SKU productID for future sync operations.
+// variantMetadataEntry stores the mapping between a catalog variant and the
+// listing SKU productID, plus PRIVATE economic data the margin gate needs.
+//
+// SupplierCostCents and RetailCents must NOT leak to public listing fields:
+// `Listing.Skus[i].CompareAtPrice` is rendered as a strike-through "original
+// price" on the storefront detail page and would expose Printful's wholesale
+// cost to buyers. Keep economics in this private metadata only.
 type variantMetadataEntry struct {
-	CatalogVariantID string            `json:"catalogVariantId"`
-	SKU              string            `json:"sku,omitempty"`
-	Attributes       map[string]string `json:"attributes"`
+	CatalogVariantID  string            `json:"catalogVariantId"`
+	SKU               string            `json:"sku,omitempty"`
+	Attributes        map[string]string `json:"attributes"`
+	SupplierCostCents uint64            `json:"supplierCostCents,omitempty"`
+	RetailCents       uint64            `json:"retailCents,omitempty"`
 }
 
-func buildVariantMetadata(variants []contracts.CatalogVariant) []variantMetadataEntry {
+// buildVariantMetadata captures per-variant supplier cost + computed retail at
+// import time. `markup` matches the value used by buildListingFromCatalog so
+// the snapshot stays internally consistent.
+//
+// Inputs are USD decimal strings from the provider catalog ("12.50", "8.29").
+// We use parseUSDDollarsToCents for exact integer conversion — using
+// `parseFloat(v.Price) * 100` would silently truncate values like "8.29" to
+// 828 cents (binary-float representation of 8.29 is 8.28999...). Margin gate
+// later trusts these numbers; off-by-one cents on each variant compounds to
+// real money on bulk-import catalogs.
+//
+// Retail = ceil(cost * markup) — rounding UP avoids letting a fractional cent
+// slip into the seller's margin and pass the safety gate by accident.
+//
+// Returns an error when ANY variant price is unparseable. Callers (currently
+// only ImportProduct) must surface this to the user — a 0-cent metadata blob
+// would let a thin-margin order squeak past the gate later.
+func buildVariantMetadata(variants []contracts.CatalogVariant, markup float64) ([]variantMetadataEntry, error) {
 	entries := make([]variantMetadataEntry, 0, len(variants))
 	for _, v := range variants {
+		costCents, parseOK := parseUSDDollarsToCents(v.Price)
+		if !parseOK {
+			return nil, fmt.Errorf("variant %q has unparseable price %q (must be USD decimal like \"4.50\")",
+				v.ID, v.Price)
+		}
+		retailCents := computeRetailCents(costCents, markup)
 		entries = append(entries, variantMetadataEntry{
-			CatalogVariantID: v.ID,
-			SKU:              v.SKU,
-			Attributes:       v.Attributes,
+			CatalogVariantID:  v.ID,
+			SKU:               v.SKU,
+			Attributes:        v.Attributes,
+			SupplierCostCents: costCents,
+			RetailCents:       retailCents,
 		})
 	}
-	return entries
+	return entries, nil
+}
+
+// computeRetailCents applies a markup factor to a cents amount, rounding UP.
+// Markup is provided as float64 (typical values: 1.5, 2.0, 2.5 from seller
+// input). math.Ceil guards against tiny float-representation errors causing
+// a 1-cent loss on the seller side.
+func computeRetailCents(costCents uint64, markup float64) uint64 {
+	if costCents == 0 || markup <= 0 {
+		return 0
+	}
+	return uint64(math.Ceil(float64(costCents) * markup))
+}
+
+// loadVariantCostMap returns catalogVariantID -> supplierCostCents from the
+// private SyncedProductMapping.Metadata blob. Returns nil on missing/invalid
+// metadata so callers can fall back to the snapshot for single-SKU listings.
+func loadVariantCostMap(spm *models.SyncedProductMapping) map[string]uint64 {
+	if spm == nil || len(spm.Metadata) == 0 {
+		return nil
+	}
+	var entries []variantMetadataEntry
+	if err := json.Unmarshal(spm.Metadata, &entries); err != nil {
+		return nil
+	}
+	out := make(map[string]uint64, len(entries))
+	for _, e := range entries {
+		if e.CatalogVariantID != "" && e.SupplierCostCents > 0 {
+			out[e.CatalogVariantID] = e.SupplierCostCents
+		}
+	}
+	return out
 }
 
 func (s *SupplyChainAppService) SyncProduct(_ context.Context, _ string) (*contracts.SyncStatus, error) {
@@ -1041,23 +1820,31 @@ func (s *SupplyChainAppService) createFulfillmentForItems(
 		return nil, fmt.Errorf("reserve fulfillment mapping: %w", saveErr)
 	}
 
+	start := time.Now()
 	fo, err := provider.CreateFulfillmentOrder(ctx, params)
+	providerDuration := time.Since(start)
 	if err != nil {
-		// Update the reserved mapping to failed state
-		_ = s.db.Update(func(tx database.Tx) error {
+		reason := classifyProviderError(providerID, err)
+		if persistErr := s.db.Update(func(tx database.Tx) error {
 			mapping.Status = string(contracts.FulfillmentStatusFailed)
 			mapping.ErrorMessage = err.Error()
-			mapping.RetryCount = 0
-			mapping.NextRetryAt = time.Now().Add(5 * time.Minute)
+			mapping.FailureReason = string(reason)
+			if reason.IsRetryable() {
+				mapping.RetryCount = 0
+				mapping.NextRetryAt = time.Now().Add(retryBackoffBase)
+			}
 			return tx.Save(mapping)
-		})
+		}); persistErr != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain: failed to persist failure mapping for order %s: %v",
+				mobazhaOrderID, persistErr)
+		}
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain: orderID=%s providerID=%s failureReason=%s duration=%s err=%v",
+			mobazhaOrderID, providerID, reason, providerDuration, err)
 		return nil, fmt.Errorf("create fulfillment order: %w", err)
 	}
 
-	// Update mapping with the supplier's internal order ID and costs.
-	// fo.ID is the supplier's own order identifier (e.g. Printful's integer ID),
-	// which webhooks reference as event.ExternalID. fo.ExternalID is the Mobazha
-	// order ID we originally sent, NOT the supplier's ID.
 	supplierOrderID := fo.ID
 	if supplierOrderID == "" {
 		supplierOrderID = fo.ExternalID
@@ -1069,7 +1856,8 @@ func (s *SupplyChainAppService) createFulfillmentForItems(
 		return tx.Save(mapping)
 	}); updateErr != nil {
 		logger.LogErrorWithIDf(log, s.nodeID,
-			"SupplyChain: created supplier order %s but failed to save mapping: %v", supplierOrderID, updateErr)
+			"SupplyChain: orderID=%s fulfillmentOrderID=%s supplierCost=%s duration=%s err=save_mapping_failed: %v",
+			mobazhaOrderID, supplierOrderID, costTotal(fo.Costs), providerDuration, updateErr)
 		return fo, fmt.Errorf("save fulfillment mapping after provider create: %w", updateErr)
 	}
 
@@ -1622,6 +2410,42 @@ func decryptAESGCM(key, ciphertext []byte) ([]byte, error) {
 	}
 	nonce, ct := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	return gcm.Open(nil, nonce, ct, nil)
+}
+
+// failFulfillmentWithReason creates a failed FulfillmentOrderMapping with the given reason.
+// Used by margin protection and validation gates to record why auto-fulfillment was skipped.
+func (s *SupplyChainAppService) failFulfillmentWithReason(orderID, providerID string, reason contracts.FailureReason, msg string) {
+	logger.LogWarningWithIDf(log, s.nodeID,
+		"SupplyChain: order %s: %s — %s", orderID, reason, msg)
+	if err := s.db.Update(func(tx database.Tx) error {
+		mapping := &models.FulfillmentOrderMapping{
+			ID:             uuid.New().String(),
+			MobazhaOrderID: orderID,
+			ProviderID:     providerID,
+			Status:         string(contracts.FulfillmentStatusFailed),
+			FailureReason:  string(reason),
+			ErrorMessage:   msg,
+		}
+		return tx.Save(mapping)
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain: failed to record failure mapping for order %s: %v", orderID, err)
+	}
+}
+
+// classifyProviderError delegates to a provider-specific error classifier.
+// For unknown providers, defaults to retryable (transient failures are assumed).
+func classifyProviderError(providerID string, err error) contracts.FailureReason {
+	switch providerID {
+	case "printful":
+		re := printful.ClassifyError(err)
+		if re != nil {
+			return contracts.ClassifyFulfillmentError(re)
+		}
+		return contracts.FailureReasonRetryableProviderError
+	default:
+		return contracts.ClassifyFulfillmentError(err)
+	}
 }
 
 // Compile-time interface checks.

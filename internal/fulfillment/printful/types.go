@@ -1,5 +1,10 @@
 package printful
 
+import (
+	"encoding/json"
+	"strings"
+)
+
 // Printful API response structs.
 // Docs: https://developers.printful.com/docs/
 
@@ -137,8 +142,20 @@ type pfOrderFile struct {
 }
 
 type pfItemOption struct {
-	ID    string `json:"id"`
-	Value string `json:"value"`
+	ID    string          `json:"id"`
+	Value json.RawMessage `json:"value"`
+}
+
+func (o pfItemOption) StringValue() string {
+	var s string
+	if json.Unmarshal(o.Value, &s) == nil {
+		return s
+	}
+	var arr []string
+	if json.Unmarshal(o.Value, &arr) == nil {
+		return strings.Join(arr, ",")
+	}
+	return string(o.Value)
 }
 
 // pfCosts is the cost breakdown.

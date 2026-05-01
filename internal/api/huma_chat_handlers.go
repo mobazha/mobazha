@@ -36,10 +36,8 @@ func (g *Gateway) registerNodeHumaChatOperations(api huma.API) {
 	// Room settings
 	g.registerChatGetRoomSettings(api)
 	g.registerChatPutRoomSettings(api)
-	g.registerChatPostRoomAvatar(api)
 
-	// Media
-	g.registerChatMediaUpload(api)
+	// Media (avatar + upload are mux passthrough in routes.go — multipart)
 	g.registerChatMediaDownload(api)
 
 	// Block
@@ -221,6 +219,13 @@ func (g *Gateway) registerChatLeaveRoom(api huma.API) {
 // --- Messages ---
 
 func (g *Gateway) registerChatGetMessages(api huma.API) {
+	type chatMessagesInput struct {
+		RoomID string `path:"roomID" doc:"Matrix room ID."`
+		Limit  string `query:"limit" required:"false" doc:"Max messages to return."`
+		Before string `query:"before" required:"false" doc:"Pagination cursor: events before this token."`
+		After  string `query:"after" required:"false" doc:"Pagination cursor: events after this token."`
+		Since  string `query:"since" required:"false" doc:"Sync-style incremental cursor."`
+	}
 	huma.Register(api, huma.Operation{
 		OperationID: "chat-get-messages",
 		Method:      http.MethodGet,
@@ -228,8 +233,24 @@ func (g *Gateway) registerChatGetMessages(api huma.API) {
 		Summary:     "Get messages in a chat room",
 		Tags:        []string{"chat"},
 		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *chatRoomInput) (*nodeDataOutput, error) {
+	}, func(ctx context.Context, in *chatMessagesInput) (*nodeDataOutput, error) {
 		rawURL := "/v1/chat/rooms/" + url.PathEscape(in.RoomID) + "/messages"
+		v := url.Values{}
+		if in.Limit != "" {
+			v.Set("limit", in.Limit)
+		}
+		if in.Before != "" {
+			v.Set("before", in.Before)
+		}
+		if in.After != "" {
+			v.Set("after", in.After)
+		}
+		if in.Since != "" {
+			v.Set("since", in.Since)
+		}
+		if enc := v.Encode(); enc != "" {
+			rawURL += "?" + enc
+		}
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"roomID": in.RoomID})
 		rr := httptest.NewRecorder()
 		g.handleGETMatrixChatRoomMessages(rr, req)
@@ -483,50 +504,7 @@ func (g *Gateway) registerChatPutRoomSettings(api huma.API) {
 	})
 }
 
-func (g *Gateway) registerChatPostRoomAvatar(api huma.API) {
-	huma.Register(api, huma.Operation{
-		OperationID: "chat-post-room-avatar",
-		Method:      http.MethodPost,
-		Path:        "/v1/chat/rooms/{roomID}/avatar",
-		Summary:     "Set chat room avatar",
-		Tags:        []string{"chat"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *chatRoomBodyInput) (*nodeDataOutput, error) {
-		rawURL := "/v1/chat/rooms/" + url.PathEscape(in.RoomID) + "/avatar"
-		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"roomID": in.RoomID})
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
-		g.handlePOSTMatrixChatRoomAvatar(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-}
-
 // --- Media ---
-
-func (g *Gateway) registerChatMediaUpload(api huma.API) {
-	huma.Register(api, huma.Operation{
-		OperationID: "chat-media-upload",
-		Method:      http.MethodPost,
-		Path:        "/v1/chat/media/upload",
-		Summary:     "Upload chat media",
-		Tags:        []string{"chat"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *chatBodyInput) (*nodeDataOutput, error) {
-		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/chat/media/upload", bytes.NewReader(in.Body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
-		g.handlePOSTMatrixChatMediaUpload(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-}
 
 func (g *Gateway) registerChatMediaDownload(api huma.API) {
 	huma.Register(api, huma.Operation{
@@ -536,16 +514,12 @@ func (g *Gateway) registerChatMediaDownload(api huma.API) {
 		Summary:     "Download chat media",
 		Tags:        []string{"chat"},
 		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *chatMediaInput) (*nodeDataOutput, error) {
+	}, func(ctx context.Context, in *chatMediaInput) (*nodeLegacyBinaryBody, error) {
 		rawURL := "/v1/chat/media/" + url.PathEscape(in.ServerName) + "/" + url.PathEscape(in.MediaID)
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"serverName": in.ServerName, "mediaID": in.MediaID})
 		rr := httptest.NewRecorder()
 		g.handleGETMatrixChatMediaDownload(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
+		return nodeBridgeRecorderBinary(rr)
 	})
 }
 

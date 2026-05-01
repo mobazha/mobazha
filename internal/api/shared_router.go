@@ -71,6 +71,7 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 	r.Use(g.StorefrontMiddleware)
 
 	g.registerBusinessRoutes(r)
+	g.registerHumaAPI(r)
 
 	r.HandleFunc("/ws/{nodeID}", g.WebsocketNodeHandler())
 	r.HandleFunc("/ws", g.WebsocketDefaultHandler())

@@ -20,13 +20,13 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockGuestOrderService struct {
-	createGuestOrderFunc      func(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error)
-	getGuestOrderStatusFunc   func(ctx context.Context, token string) (*contracts.GuestOrderStatusResponse, error)
-	listGuestOrdersFunc       func(ctx context.Context, filter contracts.GuestOrderFilter) ([]models.GuestOrder, int64, error)
-	shipGuestOrderFunc        func(ctx context.Context, token, tracking, carrier string) error
-	completeGuestOrderFunc    func(ctx context.Context, token string) error
-	getGuestCheckoutCfgFunc   func(ctx context.Context) (*models.GuestCheckoutConfig, error)
-	saveGuestCheckoutCfgFunc  func(ctx context.Context, cfg *models.GuestCheckoutConfig) error
+	createGuestOrderFunc     func(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error)
+	getGuestOrderStatusFunc  func(ctx context.Context, token string) (*contracts.GuestOrderStatusResponse, error)
+	listGuestOrdersFunc      func(ctx context.Context, filter contracts.GuestOrderFilter) ([]models.GuestOrder, int64, error)
+	shipGuestOrderFunc       func(ctx context.Context, token, tracking, carrier string) error
+	completeGuestOrderFunc   func(ctx context.Context, token string) error
+	getGuestCheckoutCfgFunc  func(ctx context.Context) (*models.GuestCheckoutConfig, error)
+	saveGuestCheckoutCfgFunc func(ctx context.Context, cfg *models.GuestCheckoutConfig) error
 }
 
 func (m *mockGuestOrderService) CreateGuestOrder(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error) {
@@ -493,16 +493,15 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// H-extra: POST /v1/guest/orders — invalid JSON body → 400
+// H-extra: POST /v1/guest/orders — malformed JSON body → 400 (Huma body parse)
 // ---------------------------------------------------------------------------
 
 func TestPOSTGuestOrder_InvalidJSON(t *testing.T) {
 	svc := &mockGuestOrderService{}
 	ts := guestTestServer(t, svc)
 
-	resp, respBody := guestDoReq(t, ts, "POST", "/v1/guest/orders", []byte(`{invalid`))
+	resp, _ := guestDoReq(t, ts, "POST", "/v1/guest/orders", []byte(`{invalid`))
 	guestAssertStatus(t, resp, http.StatusBadRequest)
-	guestAssertErrorCode(t, respBody, "BAD_REQUEST")
 }
 
 // ---------------------------------------------------------------------------

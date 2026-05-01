@@ -1,11 +1,50 @@
 package api
 
 import (
+	"context"
+	"crypto/tls"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
+
+	"github.com/danielgtaylor/huma/v2"
 )
+
+// stubHumaCtx is a minimal huma.Context for testing IP extraction.
+type stubHumaCtx struct {
+	headers    map[string]string
+	remoteAddr string
+}
+
+func (s *stubHumaCtx) Operation() *huma.Operation          { return nil }
+func (s *stubHumaCtx) Context() context.Context             { return context.Background() }
+func (s *stubHumaCtx) TLS() *tls.ConnectionState            { return nil }
+func (s *stubHumaCtx) Version() huma.ProtoVersion           { return huma.ProtoVersion{} }
+func (s *stubHumaCtx) Method() string                       { return "GET" }
+func (s *stubHumaCtx) Host() string                         { return "localhost" }
+func (s *stubHumaCtx) RemoteAddr() string                   { return s.remoteAddr }
+func (s *stubHumaCtx) URL() url.URL                         { return url.URL{} }
+func (s *stubHumaCtx) Param(string) string                  { return "" }
+func (s *stubHumaCtx) Query(string) string                  { return "" }
+func (s *stubHumaCtx) Header(name string) string {
+	if s.headers == nil {
+		return ""
+	}
+	return s.headers[name]
+}
+func (s *stubHumaCtx) EachHeader(func(string, string))      {}
+func (s *stubHumaCtx) BodyReader() io.Reader                { return nil }
+func (s *stubHumaCtx) GetMultipartForm() (*multipart.Form, error) { return nil, nil }
+func (s *stubHumaCtx) SetReadDeadline(time.Time) error      { return nil }
+func (s *stubHumaCtx) SetStatus(int)                        {}
+func (s *stubHumaCtx) Status() int                          { return 0 }
+func (s *stubHumaCtx) SetHeader(string, string)             {}
+func (s *stubHumaCtx) AppendHeader(string, string)          {}
+func (s *stubHumaCtx) BodyWriter() io.Writer                { return nil }
 
 func TestRateLimiter_AllowWithinLimit(t *testing.T) {
 	rl := newRateLimiter(3, time.Hour)
@@ -136,5 +175,45 @@ func TestGuestOrderRateLimitMiddleware_Returns429(t *testing.T) {
 	handler(w2, r2)
 	if w2.Code != http.StatusTooManyRequests {
 		t.Fatalf("second request: expected 429, got %d", w2.Code)
+	}
+}
+
+func TestClientIPFromContext_Roundtrip(t *testing.T) {
+	ctx := context.WithValue(context.Background(), clientIPKey{}, "10.0.0.99")
+	if got := clientIPFromContext(ctx); got != "10.0.0.99" {
+		t.Fatalf("expected 10.0.0.99, got %s", got)
+	}
+}
+
+func TestClientIPFromContext_Missing(t *testing.T) {
+	if got := clientIPFromContext(context.Background()); got != "unknown" {
+		t.Fatalf("expected unknown, got %s", got)
+	}
+}
+
+func TestExtractClientIPFromHumaContext_RemoteAddr(t *testing.T) {
+	ctx := &stubHumaCtx{remoteAddr: "192.168.1.50:9999"}
+	got := extractClientIPFromHumaContext(ctx)
+	if got != "192.168.1.50" {
+		t.Fatalf("expected 192.168.1.50, got %s", got)
+	}
+}
+
+func TestExtractClientIPFromHumaContext_XFF(t *testing.T) {
+	ctx := &stubHumaCtx{
+		headers:    map[string]string{"X-Forwarded-For": "1.2.3.4, 10.0.0.1"},
+		remoteAddr: "10.0.0.1:1234",
+	}
+	got := extractClientIPFromHumaContext(ctx)
+	if got != "1.2.3.4" {
+		t.Fatalf("expected 1.2.3.4, got %s", got)
+	}
+}
+
+func TestExtractClientIPFromHumaContext_NoHeaders_NoAddr(t *testing.T) {
+	ctx := &stubHumaCtx{}
+	got := extractClientIPFromHumaContext(ctx)
+	if got != "unknown" {
+		t.Fatalf("expected unknown, got %s", got)
 	}
 }

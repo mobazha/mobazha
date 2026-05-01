@@ -86,6 +86,23 @@ func nodeEnvelopeTransformer(_ huma.Context, status string, v any) (any, error) 
 	case *envelopeError, response.SuccessEnvelope, *response.SuccessEnvelope:
 		return v, nil
 	}
+	// Legacy handlers often return {"data":..., "meta":...} already. nodeBridgeRawSuccess
+	// passes that object as the huma output Body; unwrap so we do not nest data twice.
+	if m, ok := v.(map[string]any); ok {
+		if d, has := m["data"]; has {
+			se := response.SuccessEnvelope{Data: d}
+			if metaVal, ok := m["meta"]; ok && metaVal != nil {
+				b, err := json.Marshal(metaVal)
+				if err == nil {
+					var meta response.Meta
+					if json.Unmarshal(b, &meta) == nil {
+						se.Meta = &meta
+					}
+				}
+			}
+			return se, nil
+		}
+	}
 	return response.SuccessEnvelope{Data: v}, nil
 }
 

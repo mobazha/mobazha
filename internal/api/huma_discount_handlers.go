@@ -22,18 +22,19 @@ func (g *Gateway) registerNodeHumaDiscountOperations(api huma.API) {
 	}
 
 	huma.Register(api, huma.Operation{
-		OperationID: "discounts-post",
-		Method:      http.MethodPost,
-		Path:        "/v1/discounts",
-		Summary:     "Create discount",
-		Tags:        []string{"discounts"},
-		Security:    nodeAuthSecurity,
+		OperationID:   "discounts-post",
+		Method:        http.MethodPost,
+		Path:          "/v1/discounts",
+		Summary:       "Create discount",
+		Tags:          []string{"discounts"},
+		Security:      nodeAuthSecurity,
+		DefaultStatus: http.StatusCreated,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/discounts", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handleCreateDiscount(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
+		data, err := nodeBridgeRawSuccess(rr)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +79,7 @@ func (g *Gateway) registerNodeHumaDiscountOperations(api huma.API) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, rawURL, nil)
 		rr := httptest.NewRecorder()
 		g.handleListDiscounts(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
+		data, err := nodeBridgeRawSuccess(rr)
 		if err != nil {
 			return nil, err
 		}
@@ -147,19 +148,20 @@ func (g *Gateway) registerNodeHumaDiscountOperations(api huma.API) {
 	})
 
 	huma.Register(api, huma.Operation{
-		OperationID: "discounts-id-codes-post",
-		Method:      http.MethodPost,
-		Path:        "/v1/discounts/{discountID}/codes",
-		Summary:     "Add discount codes",
-		Tags:        []string{"discounts"},
-		Security:    nodeAuthSecurity,
+		OperationID:   "discounts-id-codes-post",
+		Method:        http.MethodPost,
+		Path:          "/v1/discounts/{discountID}/codes",
+		Summary:       "Add discount codes",
+		Tags:          []string{"discounts"},
+		Security:      nodeAuthSecurity,
+		DefaultStatus: http.StatusCreated,
 	}, func(ctx context.Context, in *discountPut) (*nodeDataOutput, error) {
 		rawURL := "/v1/discounts/" + url.PathEscape(in.DiscountID) + "/codes"
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"discountID": in.DiscountID})
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handleAddDiscountCodes(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
+		data, err := nodeBridgeRawSuccess(rr)
 		if err != nil {
 			return nil, err
 		}
@@ -237,7 +239,7 @@ func (g *Gateway) registerNodeHumaDiscountOperations(api huma.API) {
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"discountID": q.DiscountID})
 		rr := httptest.NewRecorder()
 		g.handleListDiscountRedemptions(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
+		data, err := nodeBridgeRawSuccess(rr)
 		if err != nil {
 			return nil, err
 		}

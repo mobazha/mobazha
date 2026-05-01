@@ -67,6 +67,22 @@ func nodeBridgeNoContent(rr *httptest.ResponseRecorder) error {
 	return nodeBridgeToHumaError(rr)
 }
 
+// nodeBridgeRawSuccess preserves the full JSON response from a legacy handler
+// (including envelope fields like "data" and "meta") rather than unwrapping only "data".
+func nodeBridgeRawSuccess(rr *httptest.ResponseRecorder) (any, error) {
+	if rr.Code < http.StatusOK || rr.Code >= http.StatusMultipleChoices {
+		return nil, nodeBridgeToHumaError(rr)
+	}
+	if rr.Body.Len() == 0 {
+		return nil, nil
+	}
+	var out any
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		return nil, huma.Error500InternalServerError("invalid node response")
+	}
+	return out, nil
+}
+
 // nodeBridgeFlexJSON unwraps a {"data":...} envelope when present; otherwise decodes
 // the raw JSON body. Use for legacy handlers that do not emit the standard envelope.
 func nodeBridgeFlexJSON(rr *httptest.ResponseRecorder) (any, error) {

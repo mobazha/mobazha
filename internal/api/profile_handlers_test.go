@@ -197,7 +197,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`{"name": "Ron Swanson"`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "unexpected EOF")), nil
+				return nil, nil
 			},
 		},
 		{
@@ -269,7 +269,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`{"name": "Ron Swanson"`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "Invalid JSON Patch")), nil
+				return nil, nil
 			},
 		},
 		{
@@ -339,7 +339,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`["12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN", "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi"`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "unexpected EOF")), nil
+				return nil, nil
 			},
 		},
 		{

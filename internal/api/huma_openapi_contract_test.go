@@ -104,8 +104,6 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"chat-kick-member",
 		"chat-get-room-settings",
 		"chat-put-room-settings",
-		"chat-post-room-avatar",
-		"chat-media-upload",
 		"chat-media-download",
 		"chat-block-user",
 		"chat-unblock-user",
@@ -125,7 +123,6 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"listings-create",
 		"listings-update",
 		"listings-delete",
-		"listings-import",
 		"listings-import-json",
 		"listings-index-by-peer-id",
 		"listings-index",
@@ -137,7 +134,6 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"media-post-header",
 		"media-post-images",
 		"media-post-product-images",
-		"media-post-files",
 		"media-get-image",
 		"profiles-get-avatar",
 		"profiles-get-header",
@@ -375,7 +371,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	}
 	sort.Strings(expectedOps)
 
-	const minOps = 283
+	const minOps = 279
 	if len(got) < minOps {
 		t.Errorf("Expected at least %d operations, got %d: %v", minOps, len(got), got)
 	}

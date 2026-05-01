@@ -934,17 +934,25 @@ func (g *Gateway) registerGuestOrderPostPublic(api huma.API) {
 		Body json.RawMessage `json:",omitempty"`
 	}
 	huma.Register(api, huma.Operation{
-		OperationID: "guest-orders-post-public",
-		Method:      http.MethodPost,
-		Path:        "/v1/guest/orders",
-		Summary:     "Public guest checkout initiation (skip rate-limit middleware)",
-		Tags:        []string{"orders", "guest"},
+		OperationID:   "guest-orders-post-public",
+		Method:        http.MethodPost,
+		Path:          "/v1/guest/orders",
+		Summary:       "Public guest checkout initiation",
+		Tags:          []string{"orders", "guest"},
+		DefaultStatus: http.StatusCreated,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		if g.guestOrderLimiter != nil {
+			ip := clientIPFromContext(ctx)
+			if !g.guestOrderLimiter.allow(ip) {
+				return nil, huma.NewError(http.StatusTooManyRequests,
+					"Rate limit exceeded. Please try again later.")
+			}
+		}
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/guest/orders", bytes.NewReader(hi.Body))
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handlePOSTGuestOrder(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
+		data, err := nodeBridgeRawSuccess(rr)
 		if err != nil {
 			return nil, err
 		}

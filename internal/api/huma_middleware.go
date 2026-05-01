@@ -17,14 +17,31 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"net"
 	"net/http"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/mobazha/mobazha3.0/pkg/apitoken"
 )
+
+// clientIPKey is the context key for the upstream client IP address
+// extracted by nodeHumaClientIPMiddleware. Used by rate-limited Huma
+// handlers (e.g. guest checkout) to throttle by IP.
+type clientIPKey struct{}
+
+// clientIPFromContext returns the upstream client IP previously stored
+// by nodeHumaClientIPMiddleware. Falls back to "unknown" when the
+// middleware has not run (e.g. unit tests).
+func clientIPFromContext(ctx context.Context) string {
+	if ip, ok := ctx.Value(clientIPKey{}).(string); ok {
+		return ip
+	}
+	return "unknown"
+}
 
 // enforceHumaScope checks API-token scopes against routeScopeMap for the
 // given huma operation. Admin identities (Scopes == nil) always pass.
@@ -47,9 +64,47 @@ func enforceHumaScope(api huma.API, ctx huma.Context, op *huma.Operation, identi
 	return true
 }
 
-// installNodeHumaMiddlewares wires auth onto the huma API.
+// installNodeHumaMiddlewares wires auth and client-IP extraction onto
+// the huma API. Client-IP runs first so rate-limited handlers can read
+// the IP from context even for anonymous operations.
 func (g *Gateway) installNodeHumaMiddlewares(api huma.API) {
+	api.UseMiddleware(nodeHumaClientIPMiddleware())
 	api.UseMiddleware(g.nodeHumaAuthMiddleware(api))
+}
+
+// nodeHumaClientIPMiddleware extracts the upstream client IP from
+// X-Forwarded-For / X-Real-IP headers and stores it in the request
+// context. Huma handlers read it via clientIPFromContext(ctx).
+func nodeHumaClientIPMiddleware() func(huma.Context, func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) {
+		ip := extractClientIPFromHumaContext(ctx)
+		newCtx := context.WithValue(ctx.Context(), clientIPKey{}, ip)
+		next(huma.WithContext(ctx, newCtx))
+	}
+}
+
+// extractClientIPFromHumaContext mirrors extractClientIP but reads
+// from huma.Context headers / RemoteAddr instead of *http.Request.
+func extractClientIPFromHumaContext(ctx huma.Context) string {
+	if xff := ctx.Header("X-Forwarded-For"); xff != "" {
+		for i, c := range xff {
+			if c == ',' {
+				return strings.TrimSpace(xff[:i])
+			}
+		}
+		return strings.TrimSpace(xff)
+	}
+	if xri := ctx.Header("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	if addr := ctx.RemoteAddr(); addr != "" {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return addr
+		}
+		return host
+	}
+	return "unknown"
 }
 
 // nodeHumaAuthMiddleware enforces Operation.Security for Node API routes.

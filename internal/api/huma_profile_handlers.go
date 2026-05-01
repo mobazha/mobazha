@@ -176,7 +176,8 @@ func (g *Gateway) registerProfilesUpdateScoped(api huma.API) {
 
 func (g *Gateway) registerProfilesGetScoped(api huma.API) {
 	type profileGetInput struct {
-		PeerID string `path:"peerID" doc:"Public profile peer ID."`
+		PeerID   string `path:"peerID" doc:"Public profile peer ID."`
+		UseCache bool   `query:"usecache" required:"false" doc:"Return cached profile when true."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "profiles-get-by-peer-id",
@@ -186,6 +187,9 @@ func (g *Gateway) registerProfilesGetScoped(api huma.API) {
 		Tags:        []string{"profiles"},
 	}, func(ctx context.Context, in *profileGetInput) (*nodeDataOutput, error) {
 		rawURL := "/v1/profiles/" + url.PathEscape(in.PeerID)
+		if in.UseCache {
+			rawURL += "?usecache=true"
+		}
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID})
 		rr := httptest.NewRecorder()
 		g.handleGETProfile(rr, req)

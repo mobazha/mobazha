@@ -17,7 +17,6 @@ func (g *Gateway) registerNodeHumaListingOperations(api huma.API) {
 	g.registerListingCreate(api)
 	g.registerListingUpdate(api)
 	g.registerListingDelete(api)
-	g.registerListingImport(api)
 	g.registerListingImportJSON(api)
 
 	g.registerListingIndexByPeer(api)
@@ -125,30 +124,6 @@ func (g *Gateway) registerListingDelete(api huma.API) {
 	})
 }
 
-func (g *Gateway) registerListingImport(api huma.API) {
-	type listingBodyInput struct {
-		Body json.RawMessage
-	}
-	huma.Register(api, huma.Operation{
-		OperationID: "listings-import",
-		Method:      http.MethodPost,
-		Path:        "/v1/listings/import",
-		Summary:     "Batch import listings",
-		Tags:        []string{"listings"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *listingBodyInput) (*nodeDataOutput, error) {
-		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/listings/import", bytes.NewReader(in.Body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
-		g.handlePOSTListingsImport(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-}
-
 func (g *Gateway) registerListingImportJSON(api huma.API) {
 	type listingBodyInput struct {
 		Body json.RawMessage
@@ -177,7 +152,8 @@ func (g *Gateway) registerListingImportJSON(api huma.API) {
 
 func (g *Gateway) registerListingIndexByPeer(api huma.API) {
 	type listingIndexPeerInput struct {
-		PeerID string `path:"peerID" doc:"Seller peer ID for listing index."`
+		PeerID   string `path:"peerID" doc:"Seller peer ID for listing index."`
+		UseCache bool   `query:"usecache" required:"false" doc:"Return cached listing index when true."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "listings-index-by-peer-id",
@@ -187,6 +163,9 @@ func (g *Gateway) registerListingIndexByPeer(api huma.API) {
 		Tags:        []string{"listings"},
 	}, func(ctx context.Context, in *listingIndexPeerInput) (*nodeDataOutput, error) {
 		rawURL := "/v1/listings/index/" + url.PathEscape(in.PeerID)
+		if in.UseCache {
+			rawURL += "?usecache=true"
+		}
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID})
 		rr := httptest.NewRecorder()
 		g.handleGETListingIndex(rr, req)
@@ -228,18 +207,15 @@ func (g *Gateway) registerListingTemplate(api huma.API) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/listings/template", nil)
 		rr := httptest.NewRecorder()
 		g.handleGETListingsTemplate(rr, req)
-		raw, err := nodeBridgeRecorderBinary(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeLegacyBinaryBody{Body: raw}, nil
+		return nodeBridgeRecorderBinary(rr)
 	})
 }
 
 func (g *Gateway) registerListingGetByPeerSlug(api huma.API) {
 	type listingPeerSlugInput struct {
-		PeerID string `path:"peerID" doc:"Seller peer ID."`
-		Slug   string `path:"slug" doc:"Listing slug."`
+		PeerID   string `path:"peerID" doc:"Seller peer ID."`
+		Slug     string `path:"slug" doc:"Listing slug."`
+		UseCache bool   `query:"usecache" required:"false" doc:"Return cached listing when true."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "listings-get-by-peer-slug",
@@ -249,6 +225,9 @@ func (g *Gateway) registerListingGetByPeerSlug(api huma.API) {
 		Tags:        []string{"listings"},
 	}, func(ctx context.Context, in *listingPeerSlugInput) (*nodeDataOutput, error) {
 		rawURL := "/v1/listings/" + url.PathEscape(in.PeerID) + "/" + url.PathEscape(in.Slug)
+		if in.UseCache {
+			rawURL += "?usecache=true"
+		}
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID, "slug": in.Slug})
 		rr := httptest.NewRecorder()
 		g.handleGETListing(rr, req)

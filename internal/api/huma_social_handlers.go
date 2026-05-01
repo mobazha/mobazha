@@ -183,8 +183,9 @@ func (g *Gateway) registerPostsGetMineBySlug(api huma.API) {
 
 func (g *Gateway) registerPostsGetByPeerSlug(api huma.API) {
 	type postsPeerSlugInput struct {
-		PeerID string `path:"peerID" doc:"Author peer ID."`
-		Slug   string `path:"slug" doc:"Post slug."`
+		PeerID   string `path:"peerID" doc:"Author peer ID."`
+		Slug     string `path:"slug" doc:"Post slug."`
+		UseCache bool   `query:"usecache" required:"false" doc:"Return cached post when true."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "posts-get-public-by-peer-slug",
@@ -194,6 +195,9 @@ func (g *Gateway) registerPostsGetByPeerSlug(api huma.API) {
 		Tags:        []string{"posts"},
 	}, func(ctx context.Context, in *postsPeerSlugInput) (*nodeDataOutput, error) {
 		rawURL := "/v1/posts/" + url.PathEscape(in.PeerID) + "/" + url.PathEscape(in.Slug)
+		if in.UseCache {
+			rawURL += "?usecache=true"
+		}
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID, "slug": in.Slug})
 		rr := httptest.NewRecorder()
 		g.handleGETPost(rr, req)
@@ -292,6 +296,7 @@ func (g *Gateway) registerFollowingListSelf(api huma.API) {
 func (g *Gateway) registerRatingsIndexByPeerOrSlug(api huma.API) {
 	type ratingIndexInput struct {
 		PeerIDOrSlug string `path:"peerIDOrSlug" doc:"Peer ID literal or ambiguous slug resolver input."`
+		UseCache     bool   `query:"usecache" required:"false" doc:"Return cached rating index when true."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "ratings-index-by-peer-or-slug",
@@ -301,6 +306,9 @@ func (g *Gateway) registerRatingsIndexByPeerOrSlug(api huma.API) {
 		Tags:        []string{"ratings"},
 	}, func(ctx context.Context, in *ratingIndexInput) (*nodeDataOutput, error) {
 		rawURL := "/v1/ratings/index/" + url.PathEscape(in.PeerIDOrSlug)
+		if in.UseCache {
+			rawURL += "?usecache=true"
+		}
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerIDOrSlug": in.PeerIDOrSlug})
 		rr := httptest.NewRecorder()
 		g.handleGETRatingIndex(rr, req)
@@ -333,8 +341,9 @@ func (g *Gateway) registerRatingsIndexSelf(api huma.API) {
 
 func (g *Gateway) registerRatingsIndexByPeerAndSlug(api huma.API) {
 	type ratingSlugInput struct {
-		PeerID string `path:"peerID" doc:"Seller peer identifier."`
-		Slug   string `path:"slug" doc:"Listing slug filter."`
+		PeerID   string `path:"peerID" doc:"Seller peer identifier."`
+		Slug     string `path:"slug" doc:"Listing slug filter."`
+		UseCache bool   `query:"usecache" required:"false" doc:"Return cached rating index when true."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "ratings-index-by-peer-and-slug",
@@ -344,6 +353,9 @@ func (g *Gateway) registerRatingsIndexByPeerAndSlug(api huma.API) {
 		Tags:        []string{"ratings"},
 	}, func(ctx context.Context, in *ratingSlugInput) (*nodeDataOutput, error) {
 		rawURL := "/v1/ratings/index/" + url.PathEscape(in.PeerID) + "/" + url.PathEscape(in.Slug)
+		if in.UseCache {
+			rawURL += "?usecache=true"
+		}
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID, "slug": in.Slug})
 		rr := httptest.NewRecorder()
 		g.handleGETPeerRatingsBySlug(rr, req)

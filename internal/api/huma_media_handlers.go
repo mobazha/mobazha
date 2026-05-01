@@ -11,18 +11,29 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// nodeLegacyBinaryBody documents bridged handlers that return raw bytes (images, spreadsheets, streams).
+// nodeLegacyBinaryBody bridges handlers that return raw bytes (images,
+// spreadsheets, streams). Header fields preserve the legacy handler's
+// Content-Type, Content-Disposition and Cache-Control so Huma forwards
+// them to the client instead of defaulting to application/octet-stream.
 type nodeLegacyBinaryBody struct {
-	Body []byte `format:"binary" doc:"Legacy handler response body bytes."`
+	ContentType        string `header:"Content-Type" doc:"MIME type from legacy handler." required:"false"`
+	ContentDisposition string `header:"Content-Disposition" doc:"Attachment hint for downloads." required:"false"`
+	CacheControl       string `header:"Cache-Control" doc:"Cache directive." required:"false"`
+	Body               []byte
 }
 
-func nodeBridgeRecorderBinary(rr *httptest.ResponseRecorder) ([]byte, error) {
+func nodeBridgeRecorderBinary(rr *httptest.ResponseRecorder) (*nodeLegacyBinaryBody, error) {
 	if rr.Code < http.StatusOK || rr.Code >= http.StatusMultipleChoices {
 		return nil, nodeBridgeToHumaError(rr)
 	}
 	b := rr.Body.Bytes()
 	cp := append([]byte(nil), b...)
-	return cp, nil
+	return &nodeLegacyBinaryBody{
+		ContentType:        rr.Header().Get("Content-Type"),
+		ContentDisposition: rr.Header().Get("Content-Disposition"),
+		CacheControl:       rr.Header().Get("Cache-Control"),
+		Body:               cp,
+	}, nil
 }
 
 // registerNodeHumaMediaOperations registers bridged media OpenAPI ops (AH-1.4 Batch 2).
@@ -31,7 +42,6 @@ func (g *Gateway) registerNodeHumaMediaOperations(api huma.API) {
 	g.registerMediaPostHeader(api)
 	g.registerMediaPostImages(api)
 	g.registerMediaPostProductImages(api)
-	g.registerMediaPostFiles(api)
 
 	g.registerMediaGetImage(api)
 	g.registerProfilesGetAvatar(api)
@@ -137,30 +147,6 @@ func (g *Gateway) registerMediaPostProductImages(api huma.API) {
 	})
 }
 
-func (g *Gateway) registerMediaPostFiles(api huma.API) {
-	type mediaBodyInput struct {
-		Body json.RawMessage
-	}
-	huma.Register(api, huma.Operation{
-		OperationID: "media-post-files",
-		Method:      http.MethodPost,
-		Path:        "/v1/media/files",
-		Summary:     "Upload media files",
-		Tags:        []string{"media"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *mediaBodyInput) (*nodeDataOutput, error) {
-		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/media/files", bytes.NewReader(in.Body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
-		g.handlePOSTFile(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-}
-
 // --- Public ---
 
 func (g *Gateway) registerMediaGetImage(api huma.API) {
@@ -178,11 +164,7 @@ func (g *Gateway) registerMediaGetImage(api huma.API) {
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"imageID": in.ImageID})
 		rr := httptest.NewRecorder()
 		g.handleGETImage(rr, req)
-		raw, err := nodeBridgeRecorderBinary(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeLegacyBinaryBody{Body: raw}, nil
+		return nodeBridgeRecorderBinary(rr)
 	})
 }
 
@@ -202,11 +184,7 @@ func (g *Gateway) registerProfilesGetAvatar(api huma.API) {
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID, "size": in.Size})
 		rr := httptest.NewRecorder()
 		g.handleGETAvatar(rr, req)
-		raw, err := nodeBridgeRecorderBinary(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeLegacyBinaryBody{Body: raw}, nil
+		return nodeBridgeRecorderBinary(rr)
 	})
 }
 
@@ -226,11 +204,7 @@ func (g *Gateway) registerProfilesGetHeader(api huma.API) {
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID, "size": in.Size})
 		rr := httptest.NewRecorder()
 		g.handleGETHeader(rr, req)
-		raw, err := nodeBridgeRecorderBinary(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeLegacyBinaryBody{Body: raw}, nil
+		return nodeBridgeRecorderBinary(rr)
 	})
 }
 
@@ -249,10 +223,6 @@ func (g *Gateway) registerMediaGetFile(api huma.API) {
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"fileID": in.FileID})
 		rr := httptest.NewRecorder()
 		g.handleGETFile(rr, req)
-		raw, err := nodeBridgeRecorderBinary(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeLegacyBinaryBody{Body: raw}, nil
+		return nodeBridgeRecorderBinary(rr)
 	})
 }

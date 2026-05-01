@@ -106,6 +106,10 @@ func (s *SupplyChainAppService) checkProviderInventory(
 }
 
 func (s *SupplyChainAppService) handleStockOut(ctx context.Context, providerID string, mapping models.SyncedProductMapping) {
+	// Always evaluate rules — condition may persist across polls and rules
+	// with auto-actions (e.g. hide) must fire even if alert already exists.
+	s.evaluateRules(ctx, models.RuleTriggerStockOut, providerID, mapping.ListingSlug, 0)
+
 	existing := s.findActiveAlert(mapping.ListingSlug, models.AlertTypeStockOut)
 	if existing != nil {
 		return
@@ -126,8 +130,6 @@ func (s *SupplyChainAppService) handleStockOut(ctx context.Context, providerID s
 	})
 
 	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: OOS alert created for %s", mapping.ListingSlug)
-
-	s.evaluateRules(ctx, models.RuleTriggerStockOut, providerID, mapping.ListingSlug, 0)
 }
 
 func (s *SupplyChainAppService) handleStockBack(ctx context.Context, providerID string, mapping models.SyncedProductMapping) {
@@ -302,6 +304,10 @@ func (s *SupplyChainAppService) handlePriceDrift(
 	mapping models.SyncedProductMapping,
 	storedCost, currentCost, driftPct float64,
 ) {
+	// Always evaluate rules — drift may worsen across polls and higher-threshold
+	// rules (e.g. 30% → hide) must fire even if a lower-threshold alert exists.
+	s.evaluateRules(ctx, models.RuleTriggerPriceDrift, providerID, mapping.ListingSlug, driftPct)
+
 	existing := s.findActiveAlert(mapping.ListingSlug, models.AlertTypePriceDrift)
 	if existing != nil {
 		return
@@ -341,8 +347,6 @@ func (s *SupplyChainAppService) handlePriceDrift(
 	})
 
 	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: price drift alert for %s (%.1f%%)", mapping.ListingSlug, driftPct)
-
-	s.evaluateRules(ctx, models.RuleTriggerPriceDrift, providerID, mapping.ListingSlug, driftPct)
 }
 
 // ---------------------------------------------------------------------------

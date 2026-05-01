@@ -265,7 +265,7 @@ func (p *Provider) EstimateShipping(ctx context.Context, params contracts.Shippi
 
 func (p *Provider) ListCategories(ctx context.Context) ([]contracts.CatalogCategory, error) {
 	var cats []pfCategory
-	if err := p.client.Get(ctx, "/categories", &cats); err != nil {
+	if err := p.client.GetPublic(ctx, "/categories", &cats); err != nil {
 		return nil, fmt.Errorf("list categories: %w", err)
 	}
 	result := make([]contracts.CatalogCategory, 0, len(cats))
@@ -286,7 +286,7 @@ func (p *Provider) ListProducts(ctx context.Context, params contracts.CatalogQue
 		path += "?category_id=" + params.CategoryID
 	}
 	var products []pfProduct
-	if err := p.client.Get(ctx, path, &products); err != nil {
+	if err := p.client.GetPublic(ctx, path, &products); err != nil {
 		return nil, fmt.Errorf("list products: %w", err)
 	}
 
@@ -320,12 +320,11 @@ func (p *Provider) ListProducts(ctx context.Context, params contracts.CatalogQue
 }
 
 func (p *Provider) GetProduct(ctx context.Context, productID string) (*contracts.CatalogProduct, error) {
-	// Printful returns {product: {}, variants: []}
 	var resp struct {
 		Product  pfProduct   `json:"product"`
 		Variants []pfVariant `json:"variants"`
 	}
-	if err := p.client.Get(ctx, "/products/"+productID, &resp); err != nil {
+	if err := p.client.GetPublic(ctx, "/products/"+productID, &resp); err != nil {
 		return nil, fmt.Errorf("get product: %w", err)
 	}
 	resp.Product.Variants = resp.Variants
@@ -337,7 +336,7 @@ func (p *Provider) GetVariant(ctx context.Context, variantID string) (*contracts
 	var resp struct {
 		Variant pfVariant `json:"variant"`
 	}
-	if err := p.client.Get(ctx, "/products/variant/"+variantID, &resp); err != nil {
+	if err := p.client.GetPublic(ctx, "/products/variant/"+variantID, &resp); err != nil {
 		return nil, fmt.Errorf("get variant: %w", err)
 	}
 	cv := convertVariant(&resp.Variant)

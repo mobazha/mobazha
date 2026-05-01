@@ -86,6 +86,13 @@ func (c *Client) Get(ctx context.Context, path string, out interface{}) error {
 	return c.do(ctx, http.MethodGet, path, nil, out)
 }
 
+// GetPublic performs a GET without the X-PF-Store-Id header.
+// Use for catalog endpoints (/products, /categories) that return the full
+// Printful catalog rather than store-specific data.
+func (c *Client) GetPublic(ctx context.Context, path string, out interface{}) error {
+	return c.doPublic(ctx, http.MethodGet, path, nil, out)
+}
+
 // Post performs a rate-limited POST request with a JSON body.
 func (c *Client) Post(ctx context.Context, path string, body interface{}, out interface{}) error {
 	return c.do(ctx, http.MethodPost, path, body, out)
@@ -96,7 +103,15 @@ func (c *Client) Delete(ctx context.Context, path string, out interface{}) error
 	return c.do(ctx, http.MethodDelete, path, nil, out)
 }
 
+func (c *Client) doPublic(ctx context.Context, method, path string, body interface{}, out interface{}) error {
+	return c.doInternal(ctx, method, path, body, out, false)
+}
+
 func (c *Client) do(ctx context.Context, method, path string, body interface{}, out interface{}) error {
+	return c.doInternal(ctx, method, path, body, out, true)
+}
+
+func (c *Client) doInternal(ctx context.Context, method, path string, body interface{}, out interface{}, includeStoreID bool) error {
 	if err := c.waitForToken(ctx); err != nil {
 		return err
 	}
@@ -117,7 +132,7 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 		return fmt.Errorf("printful: create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
-	if c.storeID != "" {
+	if includeStoreID && c.storeID != "" {
 		req.Header.Set("X-PF-Store-Id", c.storeID)
 	}
 	if body != nil {

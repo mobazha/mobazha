@@ -76,11 +76,13 @@ type pfFileOption struct {
 }
 
 // pfProductOption describes a product customization option.
+// Values can be either a map ({"#FFF":"White"}) or an array (["Yes","No"])
+// depending on the option type, so we use json.RawMessage.
 type pfProductOption struct {
-	ID     string   `json:"id"`
-	Title  string   `json:"title"`
-	Type   string   `json:"type"`
-	Values map[string]string `json:"values,omitempty"`
+	ID     string          `json:"id"`
+	Title  string          `json:"title"`
+	Type   string          `json:"type"`
+	Values json.RawMessage `json:"values,omitempty"`
 }
 
 // pfOrder is a Printful fulfillment order.

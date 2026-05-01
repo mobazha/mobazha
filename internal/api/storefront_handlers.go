@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -79,8 +79,7 @@ func (g *Gateway) handlePUTStorefrontConfig(w http.ResponseWriter, r *http.Reque
 
 // handleGETStorefrontConfigPublic returns the published store config for a peer (no auth).
 func (g *Gateway) handleGETStorefrontConfigPublic(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	peerID := vars["peerID"]
+	peerID := chi.URLParam(r, "peerID")
 	if peerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Missing peerID")
 		return

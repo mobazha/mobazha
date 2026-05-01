@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -85,7 +85,7 @@ func (g *Gateway) handlePOSTConnectFulfillmentProvider(w http.ResponseWriter, r 
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	var req contracts.ConnectProviderParams
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
@@ -112,7 +112,7 @@ func (g *Gateway) handleDELETEDisconnectFulfillmentProvider(w http.ResponseWrite
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if err := svc.DisconnectProvider(r.Context(), providerID); err != nil {
 		log.Warningf("Failed to disconnect fulfillment provider %s: %v", providerID, err)
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
@@ -129,7 +129,7 @@ func (g *Gateway) handleGETFulfillmentProviderStatus(w http.ResponseWriter, r *h
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	status, err := svc.GetProviderStatus(r.Context(), providerID)
 	if err != nil {
 		if isNotFound(err) {
@@ -156,7 +156,7 @@ func (g *Gateway) handleGETFulfillmentCatalog(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	searchParam := r.URL.Query().Get("search")
 	query := contracts.CatalogQuery{
 		CategoryID: r.URL.Query().Get("categoryId"),
@@ -189,8 +189,7 @@ func (g *Gateway) handleGETFulfillmentCatalogProduct(w http.ResponseWriter, r *h
 		return
 	}
 
-	vars := mux.Vars(r)
-	product, err := svc.GetCatalogProduct(r.Context(), vars["providerID"], vars["productID"])
+	product, err := svc.GetCatalogProduct(r.Context(), chi.URLParam(r, "providerID"), chi.URLParam(r, "productID"))
 	if err != nil {
 		log.Warningf("Failed to get catalog product: %v", err)
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
@@ -211,7 +210,7 @@ func (g *Gateway) handleGETStoreSyncProducts(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	offset := parseInt(r.URL.Query().Get("offset"), 0)
 	limit := parseInt(r.URL.Query().Get("limit"), 20)
 
@@ -237,8 +236,7 @@ func (g *Gateway) handleGETStoreSyncProduct(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	vars := mux.Vars(r)
-	product, err := svc.GetStoreSyncProduct(r.Context(), vars["providerID"], vars["syncProductID"])
+	product, err := svc.GetStoreSyncProduct(r.Context(), chi.URLParam(r, "providerID"), chi.URLParam(r, "syncProductID"))
 	if err != nil {
 		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
@@ -278,7 +276,7 @@ func (g *Gateway) handleGETFulfillmentLocation(w http.ResponseWriter, r *http.Re
 		fulfillmentNotAvailable(w)
 		return
 	}
-	locationID := mux.Vars(r)["locationID"]
+	locationID := chi.URLParam(r, "locationID")
 	loc, err := svc.GetLocation(r.Context(), locationID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -304,7 +302,7 @@ func (g *Gateway) handlePOSTImportFulfillmentProduct(w http.ResponseWriter, r *h
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	var req contracts.ImportProductParams
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
@@ -335,7 +333,7 @@ func (g *Gateway) handleGETSyncedProducts(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	products, err := svc.ListSyncedProducts(r.Context(), providerID)
 	if err != nil {
 		log.Warningf("Failed to list synced products for %s: %v", providerID, err)
@@ -356,7 +354,7 @@ func (g *Gateway) handlePOSTSyncProduct(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	slug := mux.Vars(r)["slug"]
+	slug := chi.URLParam(r, "slug")
 	status, err := svc.SyncProduct(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
@@ -383,7 +381,7 @@ func (g *Gateway) handleGETFulfillmentOrderStatus(w http.ResponseWriter, r *http
 		return
 	}
 
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	fo, err := svc.GetFulfillmentStatus(r.Context(), orderID)
 	if err != nil {
 		if isNotFound(err) {
@@ -410,7 +408,7 @@ func (g *Gateway) handlePOSTEstimateShipping(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	var req contracts.ShippingEstimateParams
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
@@ -439,9 +437,8 @@ func (g *Gateway) handlePOSTFulfillmentWebhook(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	vars := mux.Vars(r)
-	providerID := vars["providerID"]
-	webhookSecret := vars["webhookSecret"]
+	providerID := chi.URLParam(r, "providerID")
+	webhookSecret := chi.URLParam(r, "webhookSecret")
 
 	if webhookSecret == "" || !svc.ValidateWebhookSecret(r.Context(), providerID, webhookSecret) {
 		w.WriteHeader(http.StatusNotFound)
@@ -501,7 +498,7 @@ func (g *Gateway) handleDELETEFulfillmentAlert(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	alertID := mux.Vars(r)["alertID"]
+	alertID := chi.URLParam(r, "alertID")
 	if alertID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "alertID is required")
 		return
@@ -571,7 +568,7 @@ func (g *Gateway) handleDELETEFulfillmentRule(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	ruleID := mux.Vars(r)["ruleID"]
+	ruleID := chi.URLParam(r, "ruleID")
 	if ruleID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "ruleID is required")
 		return

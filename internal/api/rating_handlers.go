@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -38,8 +38,8 @@ func (g *Gateway) handleGETMyRatingIndex(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handleGETPeerRatingsBySlug(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
-	slug := mux.Vars(r)["slug"]
+	peerIDStr := chi.URLParam(r, "peerID")
+	slug := chi.URLParam(r, "slug")
 
 	pid, perr := peer.Decode(peerIDStr)
 	if perr != nil {
@@ -80,7 +80,7 @@ func (g *Gateway) handleGETPeerRatingsBySlug(w http.ResponseWriter, r *http.Requ
 }
 
 func (g *Gateway) handleGETRatingIndex(w http.ResponseWriter, r *http.Request) {
-	peerIDOrSlug := mux.Vars(r)["peerIDOrSlug"]
+	peerIDOrSlug := chi.URLParam(r, "peerIDOrSlug")
 	var slug string
 	pid, perr := peer.Decode(peerIDOrSlug)
 	if perr != nil {
@@ -145,7 +145,7 @@ func mergeRatings(index *models.RatingIndex) models.RatingInfo {
 }
 
 func (g *Gateway) handleGETRating(w http.ResponseWriter, r *http.Request) {
-	ratingIDStr := mux.Vars(r)["ratingID"]
+	ratingIDStr := chi.URLParam(r, "ratingID")
 
 	id, cerr := cid.Decode(ratingIDStr)
 	if cerr != nil {

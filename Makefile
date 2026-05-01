@@ -1,4 +1,4 @@
-.PHONY: build test test-libolm clean ios_framework android_framework protos sample-config docker push_docker
+.PHONY: build test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
 
 SYSTEM_GO := /usr/local/go/bin/go
 GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
@@ -71,5 +71,9 @@ push_docker:
 
 help: ## 显示帮助信息
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+# Generate OpenAPI 3.1 spec from huma operations (AH-1.6).
+openapi:
+	$(GO) run ./cmd/gen-openapi/main.go
 
 .DEFAULT_GOAL := help

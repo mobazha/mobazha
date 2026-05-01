@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 )
@@ -83,7 +83,7 @@ func (g *Gateway) handlePUTNotificationChannel(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	id := mux.Vars(r)["id"]
+	id := chi.URLParam(r, "id")
 
 	var cfg notifier.ChannelConfig
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
@@ -107,7 +107,7 @@ func (g *Gateway) handleDELETENotificationChannel(w http.ResponseWriter, r *http
 		return
 	}
 
-	id := mux.Vars(r)["id"]
+	id := chi.URLParam(r, "id")
 	if err := sink.RemoveChannel(id); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -123,7 +123,7 @@ func (g *Gateway) handlePOSTNotificationChannelTest(w http.ResponseWriter, r *ht
 		return
 	}
 
-	id := mux.Vars(r)["id"]
+	id := chi.URLParam(r, "id")
 	if err := sink.TestChannel(id); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

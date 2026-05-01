@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,7 @@ func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handlePOSTMarkNotificationMessageAsRead(w http.ResponseWriter, r *http.Request) {
-	notifID := mux.Vars(r)["notifID"]
+	notifID := chi.URLParam(r, "notifID")
 
 	node := getNotificationService(r)
 

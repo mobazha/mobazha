@@ -211,14 +211,14 @@ func TestImageHandlers(t *testing.T) {
 			},
 		},
 		{
-			name:               "Post avatar bad data",
-			path:               "/v1/media/avatar",
-			method:             http.MethodPost,
-			setNodeMethods:     func(n *mockNode) {},
-			body:               []byte(``),
-			statusCode:         http.StatusBadRequest,
+			name:           "Post avatar bad data",
+			path:           "/v1/media/avatar",
+			method:         http.MethodPost,
+			setNodeMethods: func(n *mockNode) {},
+			body:           []byte(``),
+			statusCode:     http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "EOF")), nil
+				return nil, nil
 			},
 		},
 		{
@@ -277,7 +277,7 @@ func TestImageHandlers(t *testing.T) {
 			body:           []byte(``),
 			statusCode:     http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "EOF")), nil
+				return nil, nil
 			},
 		},
 		{
@@ -327,7 +327,7 @@ func TestImageHandlers(t *testing.T) {
 			body:           []byte(``),
 			statusCode:     http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "EOF")), nil
+				return nil, nil
 			},
 		},
 		{

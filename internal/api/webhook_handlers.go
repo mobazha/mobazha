@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
@@ -97,7 +97,7 @@ func (g *Gateway) handleGetWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := mux.Vars(r)["id"]
+	id := chi.URLParam(r, "id")
 	ep, err := wp.WebhookStore().GetEndpoint(id)
 	if err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
@@ -120,7 +120,7 @@ func (g *Gateway) handleUpdateWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	store := wp.WebhookStore()
 
-	id := mux.Vars(r)["id"]
+	id := chi.URLParam(r, "id")
 	if _, err := store.GetEndpoint(id); err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
 			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")
@@ -179,7 +179,7 @@ func (g *Gateway) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	store := wp.WebhookStore()
 
-	id := mux.Vars(r)["id"]
+	id := chi.URLParam(r, "id")
 	if _, err := store.GetEndpoint(id); err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
 			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")
@@ -204,7 +204,7 @@ func (g *Gateway) handleListWebhookDeliveries(w http.ResponseWriter, r *http.Req
 	}
 	store := wp.WebhookStore()
 
-	endpointID := mux.Vars(r)["id"]
+	endpointID := chi.URLParam(r, "id")
 	if _, err := store.GetEndpoint(endpointID); err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
 			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")
@@ -246,7 +246,7 @@ func (g *Gateway) handleTestWebhook(w http.ResponseWriter, r *http.Request) {
 	store := wp.WebhookStore()
 	engine := wp.WebhookEngine()
 
-	endpointID := mux.Vars(r)["id"]
+	endpointID := chi.URLParam(r, "id")
 	if _, err := store.GetEndpoint(endpointID); err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
 			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")

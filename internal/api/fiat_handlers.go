@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -95,7 +95,7 @@ func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if providerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
 		return
@@ -146,8 +146,8 @@ func (g *Gateway) handlePOSTFiatCapture(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
-	sessionID := mux.Vars(r)["sessionID"]
+	providerID := chi.URLParam(r, "providerID")
+	sessionID := chi.URLParam(r, "sessionID")
 	if providerID == "" || sessionID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID and sessionID are required")
 		return
@@ -172,8 +172,8 @@ func (g *Gateway) handlePOSTFiatRefund(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
-	paymentID := mux.Vars(r)["paymentID"]
+	providerID := chi.URLParam(r, "providerID")
+	paymentID := chi.URLParam(r, "paymentID")
 	if providerID == "" || paymentID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID and paymentID are required")
 		return
@@ -213,8 +213,8 @@ func (g *Gateway) handleGETFiatPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
-	paymentID := mux.Vars(r)["paymentID"]
+	providerID := chi.URLParam(r, "providerID")
+	paymentID := chi.URLParam(r, "paymentID")
 	if providerID == "" || paymentID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID and paymentID are required")
 		return
@@ -237,7 +237,7 @@ func (g *Gateway) handlePOSTFiatWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if providerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
 		return
@@ -283,7 +283,7 @@ func (g *Gateway) handleGETFiatProviderStatus(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if providerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
 		return
@@ -310,7 +310,7 @@ func (g *Gateway) handleGETFiatProviderConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if providerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
 		return
@@ -337,7 +337,7 @@ func (g *Gateway) handlePUTFiatProviderConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if providerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
 		return
@@ -389,7 +389,7 @@ func (g *Gateway) handlePOSTFiatSetupWebhook(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if providerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
 		return
@@ -415,7 +415,7 @@ func (g *Gateway) handlePOSTFiatProviderVerify(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if providerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
 		return
@@ -439,7 +439,7 @@ func (g *Gateway) handleDELETEFiatProviderConfig(w http.ResponseWriter, r *http.
 		return
 	}
 
-	providerID := mux.Vars(r)["providerID"]
+	providerID := chi.URLParam(r, "providerID")
 	if providerID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
 		return

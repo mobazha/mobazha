@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -22,7 +21,7 @@ var largeBodyPaths = []string{
 // Multipart requests (file uploads, ZIP imports) are exempt because their
 // handlers manage limits individually — some need up to 300 MB.
 // Paths in largeBodyPaths get a higher limit to accommodate base64 image payloads.
-func maxBodySizeMiddleware(limit int64) mux.MiddlewareFunc {
+func maxBodySizeMiddleware(limit int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
@@ -38,13 +38,11 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 		g.featureManager = cfg.FeatureManager
 	}
 
-	r := mux.NewRouter()
-	r.Methods("OPTIONS")
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 
 	if cfg.AllowCORS {
 		r.Use(g.CORSAllowAllOriginsMiddleware)
-		r.Use(mux.CORSMethodMiddleware(r))
 	}
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -71,6 +69,7 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 	r.Use(g.StorefrontMiddleware)
 
 	g.registerBusinessRoutes(r)
+	g.registerHumaAPI(r)
 
 	r.HandleFunc("/ws/{nodeID}", g.WebsocketNodeHandler())
 	r.HandleFunc("/ws", g.WebsocketDefaultHandler())
@@ -78,7 +77,7 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 	return &SharedRouter{handler: r, gateway: g}, nil
 }
 
-// SharedRouter wraps the mux.Router and the underlying Gateway instance
+// SharedRouter wraps the chi.Router and the underlying Gateway instance
 // (needed for WebSocket hub access and event push).
 type SharedRouter struct {
 	handler http.Handler

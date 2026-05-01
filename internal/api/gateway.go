@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/ssr"
@@ -97,32 +97,32 @@ type GatewayConfig struct {
 
 // Gateway represents an HTTP API gateway
 type Gateway struct {
-	listener       net.Listener
-	nodeManager    coreiface.NodeManagerIface
-	handler        http.Handler
-	config         *GatewayConfig
-	auth           authState
-	jwtValidator   *JWTValidator // nil when no Casdoor cert configured
-	tokenStore     *apitoken.Store // nil in SaaS mode; set for standalone
-	hubs           map[string]*hub
-	hubsMtx        sync.RWMutex
-	shutdown       chan struct{}
-	closeOnce      sync.Once
-	mu             sync.RWMutex
-	featureManager     *pkgconfig.FeatureManager
-	guestOrderLimiter  *rateLimiter
+	listener          net.Listener
+	nodeManager       coreiface.NodeManagerIface
+	handler           http.Handler
+	config            *GatewayConfig
+	auth              authState
+	jwtValidator      *JWTValidator   // nil when no Casdoor cert configured
+	tokenStore        *apitoken.Store // nil in SaaS mode; set for standalone
+	hubs              map[string]*hub
+	hubsMtx           sync.RWMutex
+	shutdown          chan struct{}
+	closeOnce         sync.Once
+	mu                sync.RWMutex
+	featureManager    *pkgconfig.FeatureManager
+	guestOrderLimiter *rateLimiter
 }
 
 // NewGateway instantiates a new gateway.
 func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (*Gateway, error) {
 	var (
 		g = &Gateway{
-			nodeManager:    nodeManager,
-			config:         config,
-			listener:       config.Listener,
-			shutdown:       make(chan struct{}),
-			hubs:           make(map[string]*hub),
-			hubsMtx:        sync.RWMutex{},
+			nodeManager:       nodeManager,
+			config:            config,
+			listener:          config.Listener,
+			shutdown:          make(chan struct{}),
+			hubs:              make(map[string]*hub),
+			hubsMtx:           sync.RWMutex{},
 			featureManager:    pkgconfig.GetGlobalFeatureManager(),
 			guestOrderLimiter: newRateLimiter(10, time.Hour),
 		}
@@ -167,7 +167,6 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	if config.AllowAllOrigins {
 		r.Use(g.CORSAllowAllOriginsMiddleware)
 	}
-	r.Use(mux.CORSMethodMiddleware(r))
 	// Auth is NOT applied globally — each private route is individually wrapped
 	// with AuthenticationMiddleware inside registerBusinessRoutes. Public
 	// storefront routes (listings, profiles, exchange rates, etc.) are served
@@ -355,11 +354,11 @@ func (g *Gateway) Serve() error {
 	return err
 }
 
-func (g *Gateway) newV1Router() *mux.Router {
-	r := mux.NewRouter()
-	r.Methods("OPTIONS")
+func (g *Gateway) newV1Router() chi.Router {
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	g.registerBusinessRoutes(r)
+	g.registerHumaAPI(r)
 	return r
 }
 
@@ -441,8 +440,7 @@ func (g *Gateway) NodeSelectionMiddleware(next http.Handler) http.Handler {
 // WebsocketNodeHandler handle the websocket connection for a specific node
 func (g *Gateway) WebsocketNodeHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		nodeID := vars["nodeID"]
+		nodeID := chi.URLParam(r, "nodeID")
 		log.Debugf("Websocket connection for node %s", nodeID)
 
 		hub := g.EnsureHubForUser(nodeID)

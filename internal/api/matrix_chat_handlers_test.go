@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 )
 
@@ -248,10 +248,10 @@ func (m *mockNodeWithMatrixChat) MatrixChat() contracts.MatrixChatService {
 	return m.chatSvc
 }
 
-func newTestRouterWithChatMock(chatSvc *mockMatrixChatService) (*mux.Router, *Gateway) {
+func newTestRouterWithChatMock(chatSvc *mockMatrixChatService) (chi.Router, *Gateway) {
 	node := &mockNodeWithMatrixChat{chatSvc: chatSvc}
 	g := &Gateway{}
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
@@ -259,35 +259,35 @@ func newTestRouterWithChatMock(chatSvc *mockMatrixChatService) (*mux.Router, *Ga
 		})
 	})
 
-	r.HandleFunc("/v1/chat/status", g.handleGETMatrixChatStatus).Methods("GET")
-	r.HandleFunc("/v1/chat/rooms", g.handleGETMatrixChatRooms).Methods("GET")
-	r.HandleFunc("/v1/chat/rooms", g.handlePOSTMatrixChatRoom).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/join", g.handlePOSTMatrixChatRoomJoin).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/leave", g.handlePOSTMatrixChatRoomLeave).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/messages", g.handleGETMatrixChatRoomMessages).Methods("GET")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/messages", g.handlePOSTMatrixChatRoomMessage).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/messages/{eventID}", g.handlePUTMatrixChatRoomMessage).Methods("PUT")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/messages/{eventID}", g.handleDELETEMatrixChatRoomMessage).Methods("DELETE")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/messages/{eventID}/reactions", g.handlePOSTMatrixChatRoomReaction).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/typing", g.handlePOSTMatrixChatRoomTyping).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/read", g.handlePOSTMatrixChatRoomRead).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/members", g.handleGETMatrixChatRoomMembers).Methods("GET")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/invite", g.handlePOSTMatrixChatRoomInvite).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/kick", g.handlePOSTMatrixChatRoomKick).Methods("POST")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/settings", g.handleGETMatrixChatRoomSettings).Methods("GET")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/settings", g.handlePUTMatrixChatRoomSettings).Methods("PUT")
-	r.HandleFunc("/v1/chat/rooms/{roomID}/avatar", g.handlePOSTMatrixChatRoomAvatar).Methods("POST")
-	r.HandleFunc("/v1/chat/media/{serverName}/{mediaID}", g.handleGETMatrixChatMediaDownload).Methods("GET")
-	r.HandleFunc("/v1/chat/users/{userID}/block", g.handlePOSTMatrixChatUserBlock).Methods("POST")
-	r.HandleFunc("/v1/chat/users/{userID}/block", g.handleDELETEMatrixChatUserBlock).Methods("DELETE")
-	r.HandleFunc("/v1/chat/blocked-users", g.handleGETMatrixChatBlockedUsers).Methods("GET")
-	r.HandleFunc("/v1/chat/settings", g.handleGETMatrixChatSettings).Methods("GET")
-	r.HandleFunc("/v1/chat/settings", g.handlePUTMatrixChatSettings).Methods("PUT")
-	r.HandleFunc("/v1/chat/verification/request", g.handlePOSTMatrixChatVerificationRequest).Methods("POST")
-	r.HandleFunc("/v1/chat/verification/{txnId}/accept", g.handlePOSTMatrixChatVerificationAccept).Methods("POST")
-	r.HandleFunc("/v1/chat/verification/{txnId}/start-sas", g.handlePOSTMatrixChatVerificationStartSAS).Methods("POST")
-	r.HandleFunc("/v1/chat/verification/{txnId}/confirm", g.handlePOSTMatrixChatVerificationConfirm).Methods("POST")
-	r.HandleFunc("/v1/chat/verification/{txnId}/cancel", g.handlePOSTMatrixChatVerificationCancel).Methods("POST")
+	r.Get("/v1/chat/status", g.handleGETMatrixChatStatus)
+	r.Get("/v1/chat/rooms", g.handleGETMatrixChatRooms)
+	r.Post("/v1/chat/rooms", g.handlePOSTMatrixChatRoom)
+	r.Post("/v1/chat/rooms/{roomID}/join", g.handlePOSTMatrixChatRoomJoin)
+	r.Post("/v1/chat/rooms/{roomID}/leave", g.handlePOSTMatrixChatRoomLeave)
+	r.Get("/v1/chat/rooms/{roomID}/messages", g.handleGETMatrixChatRoomMessages)
+	r.Post("/v1/chat/rooms/{roomID}/messages", g.handlePOSTMatrixChatRoomMessage)
+	r.Put("/v1/chat/rooms/{roomID}/messages/{eventID}", g.handlePUTMatrixChatRoomMessage)
+	r.Delete("/v1/chat/rooms/{roomID}/messages/{eventID}", g.handleDELETEMatrixChatRoomMessage)
+	r.Post("/v1/chat/rooms/{roomID}/messages/{eventID}/reactions", g.handlePOSTMatrixChatRoomReaction)
+	r.Post("/v1/chat/rooms/{roomID}/typing", g.handlePOSTMatrixChatRoomTyping)
+	r.Post("/v1/chat/rooms/{roomID}/read", g.handlePOSTMatrixChatRoomRead)
+	r.Get("/v1/chat/rooms/{roomID}/members", g.handleGETMatrixChatRoomMembers)
+	r.Post("/v1/chat/rooms/{roomID}/invite", g.handlePOSTMatrixChatRoomInvite)
+	r.Post("/v1/chat/rooms/{roomID}/kick", g.handlePOSTMatrixChatRoomKick)
+	r.Get("/v1/chat/rooms/{roomID}/settings", g.handleGETMatrixChatRoomSettings)
+	r.Put("/v1/chat/rooms/{roomID}/settings", g.handlePUTMatrixChatRoomSettings)
+	r.Post("/v1/chat/rooms/{roomID}/avatar", g.handlePOSTMatrixChatRoomAvatar)
+	r.Get("/v1/chat/media/{serverName}/{mediaID}", g.handleGETMatrixChatMediaDownload)
+	r.Post("/v1/chat/users/{userID}/block", g.handlePOSTMatrixChatUserBlock)
+	r.Delete("/v1/chat/users/{userID}/block", g.handleDELETEMatrixChatUserBlock)
+	r.Get("/v1/chat/blocked-users", g.handleGETMatrixChatBlockedUsers)
+	r.Get("/v1/chat/settings", g.handleGETMatrixChatSettings)
+	r.Put("/v1/chat/settings", g.handlePUTMatrixChatSettings)
+	r.Post("/v1/chat/verification/request", g.handlePOSTMatrixChatVerificationRequest)
+	r.Post("/v1/chat/verification/{txnId}/accept", g.handlePOSTMatrixChatVerificationAccept)
+	r.Post("/v1/chat/verification/{txnId}/start-sas", g.handlePOSTMatrixChatVerificationStartSAS)
+	r.Post("/v1/chat/verification/{txnId}/confirm", g.handlePOSTMatrixChatVerificationConfirm)
+	r.Post("/v1/chat/verification/{txnId}/cancel", g.handlePOSTMatrixChatVerificationCancel)
 
 	return r, g
 }
@@ -1045,14 +1045,14 @@ func TestMatrixChat_JSONFieldCasing(t *testing.T) {
 func TestMatrixChat_ServiceUnavailable(t *testing.T) {
 	node := &mockNode{}
 	g := &Gateway{}
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	r.HandleFunc("/v1/chat/rooms", g.handleGETMatrixChatRooms).Methods("GET")
+	r.Get("/v1/chat/rooms", g.handleGETMatrixChatRooms)
 
 	req := httptest.NewRequest("GET", "/v1/chat/rooms", nil)
 	w := httptest.NewRecorder()
@@ -1144,14 +1144,14 @@ func TestMatrixChat_EditMessage_EmptyBody(t *testing.T) {
 func TestMatrixChat_GetStatus_ServiceUnavailable(t *testing.T) {
 	node := &mockNode{}
 	g := &Gateway{}
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	r.HandleFunc("/v1/chat/status", g.handleGETMatrixChatStatus).Methods("GET")
+	r.Get("/v1/chat/status", g.handleGETMatrixChatStatus)
 
 	req := httptest.NewRequest("GET", "/v1/chat/status", nil)
 	w := httptest.NewRecorder()

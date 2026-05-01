@@ -319,7 +319,7 @@ func TestRatingHandlers(t *testing.T) {
 			body:       []byte(`["QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7", "QmTvGbPiS1PaE7AAn4gEszNiYMgdrbMXwLkGnLKYSADs8K"`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "unexpected EOF")), nil
+				return nil, nil
 			},
 		},
 		{

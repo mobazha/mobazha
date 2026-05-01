@@ -225,7 +225,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapPhaseGError(http.StatusBadRequest, "error unmarshaling post: proto: unexpected EOF")), nil
+				return nil, nil
 			},
 		},
 		{

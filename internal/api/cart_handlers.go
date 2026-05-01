@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -37,7 +37,7 @@ func (g *Gateway) handleClearCarts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleAddToCart(w http.ResponseWriter, r *http.Request) {
-	vendorIDStr := mux.Vars(r)["peerID"]
+	vendorIDStr := chi.URLParam(r, "peerID")
 	pid, err := peer.Decode(vendorIDStr)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -62,7 +62,7 @@ func (g *Gateway) handleAddToCart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleRemoveCartItem(w http.ResponseWriter, r *http.Request) {
-	vendorIDStr := mux.Vars(r)["peerID"]
+	vendorIDStr := chi.URLParam(r, "peerID")
 	pid, err := peer.Decode(vendorIDStr)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())

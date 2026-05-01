@@ -10,7 +10,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -103,7 +103,7 @@ func (g *Gateway) handleDELETEPost(w http.ResponseWriter, r *http.Request) {
 
 // GET a list of posts (self or peer)
 func (g *Gateway) handleGETPosts(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
+	peerIDStr := chi.URLParam(r, "peerID")
 	var (
 		index []models.PostData
 		err   error
@@ -135,7 +135,7 @@ func (g *Gateway) handleGETPosts(w http.ResponseWriter, r *http.Request) {
 
 // GET a post (self)
 func (g *Gateway) handleGETMyPost(w http.ResponseWriter, r *http.Request) {
-	slug := mux.Vars(r)["slug"]
+	slug := chi.URLParam(r, "slug")
 
 	social := getSocialService(r)
 
@@ -154,8 +154,8 @@ func (g *Gateway) handleGETMyPost(w http.ResponseWriter, r *http.Request) {
 
 // GET a post (peer)
 func (g *Gateway) handleGETPost(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
-	slug := mux.Vars(r)["slug"]
+	peerIDStr := chi.URLParam(r, "peerID")
+	slug := chi.URLParam(r, "slug")
 
 	social := getSocialService(r)
 

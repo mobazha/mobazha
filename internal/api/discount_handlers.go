@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
@@ -99,7 +99,7 @@ func (g *Gateway) handleGetDiscount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := mux.Vars(r)["discountID"]
+	id := chi.URLParam(r, "discountID")
 	d, err := svc.GetDiscount(r.Context(), id)
 	if err != nil {
 		response.Error(w, http.StatusNotFound, response.CodeNotFound, "Discount not found")
@@ -115,7 +115,7 @@ func (g *Gateway) handleUpdateDiscount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := mux.Vars(r)["discountID"]
+	id := chi.URLParam(r, "discountID")
 	existing, err := svc.GetDiscount(r.Context(), id)
 	if err != nil {
 		response.Error(w, http.StatusNotFound, response.CodeNotFound, "Discount not found")
@@ -151,7 +151,7 @@ func (g *Gateway) handleDeleteDiscount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := mux.Vars(r)["discountID"]
+	id := chi.URLParam(r, "discountID")
 	if err := svc.DeleteDiscount(r.Context(), id); err != nil {
 		discountErrorResponse(w, err)
 		return
@@ -166,7 +166,7 @@ func (g *Gateway) handleAddDiscountCodes(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	discountID := mux.Vars(r)["discountID"]
+	discountID := chi.URLParam(r, "discountID")
 
 	var req struct {
 		Codes    []models.DiscountCode `json:"codes"`
@@ -208,7 +208,7 @@ func (g *Gateway) handleListDiscountCodes(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	discountID := mux.Vars(r)["discountID"]
+	discountID := chi.URLParam(r, "discountID")
 	codes, err := svc.ListCodes(r.Context(), discountID)
 	if err != nil {
 		log.Warningf("Failed to list discount codes for %s: %v", discountID, err)
@@ -225,7 +225,7 @@ func (g *Gateway) handleDeleteDiscountCode(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	codeID := mux.Vars(r)["codeID"]
+	codeID := chi.URLParam(r, "codeID")
 	if err := svc.DeleteCode(r.Context(), codeID); err != nil {
 		discountErrorResponse(w, err)
 		return
@@ -240,7 +240,7 @@ func (g *Gateway) handleListDiscountRedemptions(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	discountID := mux.Vars(r)["discountID"]
+	discountID := chi.URLParam(r, "discountID")
 	page := intQueryParam(r, "page", 1)
 	pageSize := intQueryParam(r, "pageSize", 20)
 

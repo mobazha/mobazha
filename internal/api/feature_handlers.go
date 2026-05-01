@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -97,7 +97,7 @@ func (g *Gateway) handleGETFeatures(w http.ResponseWriter, r *http.Request) {
 //   - 409 platform_global has already disabled this feature
 //   - 501 FeatureAdminProvider unavailable (e.g. SaaS proxy shim)
 func (g *Gateway) handlePUTFeatureSetting(w http.ResponseWriter, r *http.Request) {
-	key := mux.Vars(r)["key"]
+	key := chi.URLParam(r, "key")
 	if key == "" {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
 			"feature key is required")

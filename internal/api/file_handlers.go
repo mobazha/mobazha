@@ -11,14 +11,14 @@ import (
 
 	"github.com/h2non/filetype"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 )
 
 func (g *Gateway) handleGETFile(w http.ResponseWriter, r *http.Request) {
-	fileIDStr := mux.Vars(r)["fileID"]
+	fileIDStr := chi.URLParam(r, "fileID")
 
 	id, cerr := cid.Decode(fileIDStr)
 	if cerr != nil {

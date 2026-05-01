@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -236,7 +236,7 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 
 // handlePOSTPayment 处理支付结果通知
 func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -740,7 +740,7 @@ func (g *Gateway) handleGETOrderCancelInstructions(w http.ResponseWriter, r *htt
 }
 
 func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -795,7 +795,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		return
 	}
 
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -866,7 +866,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 }
 
 func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -914,7 +914,7 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 }
 
 func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -985,7 +985,7 @@ func (g *Gateway) handleGETOrderRefundInstructions(w http.ResponseWriter, r *htt
 }
 
 func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -1038,7 +1038,7 @@ func (g *Gateway) handleOrderInstructions(
 	r *http.Request,
 	getInstructions func(contracts.OrderService, models.OrderID, string) (iwallet.CoinType, any, error),
 ) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -1087,7 +1087,7 @@ func (g *Gateway) handleOrderInstructions(
 }
 
 func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -1127,7 +1127,7 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 }
 
 func (g *Gateway) handlePOSTOrderRate(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -1170,7 +1170,7 @@ func (g *Gateway) handlePOSTOrderRate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTExtendProtection(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -1193,11 +1193,11 @@ func (g *Gateway) handlePOSTExtendProtection(w http.ResponseWriter, r *http.Requ
 }
 
 // func RegisterOrderHandlers(r *mux.Router, g *Gateway) {
-// 	r.HandleFunc("/v1/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
-// 	r.HandleFunc("/v1/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")
-// 	r.HandleFunc("/v1/ordershipment", g.handlePOSTOrderShipment).Methods("POST")
-// 	r.HandleFunc("/v1/order/confirm/instructions", g.handleGetConfirmOrderInstructions).Methods("GET")
-// 	r.HandleFunc("/v1/order/decline/instructions", g.handleGetRefundOrderInstructions).Methods("GET")
+// 	r.Post("/v1/ordercancel", g.handlePOSTOrderCancel)
+// 	r.Post("/v1/orderconfirmation", g.handlePOSTOrderConfirmation)
+// 	r.Post("/v1/ordershipment", g.handlePOSTOrderShipment)
+// 	r.Get("/v1/order/confirm/instructions", g.handleGetConfirmOrderInstructions)
+// 	r.Get("/v1/order/decline/instructions", g.handleGetRefundOrderInstructions)
 // }
 
 // PaymentRemainingResponse represents the response for payment remaining endpoint
@@ -1224,7 +1224,7 @@ type PaymentRemainingResponse struct {
 // handleGETPaymentRemaining returns the remaining payment amount for an order
 // GET /v1/order/{orderID}/payment/remaining
 func (g *Gateway) handleGETPaymentRemaining(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -1309,7 +1309,7 @@ type CancelPartialPaymentResponse struct {
 // handlePOSTCancelPartialPayment cancels partial payment and refunds to buyer
 // POST /v1/order/{orderID}/payment/cancel-partial
 func (g *Gateway) handlePOSTCancelPartialPayment(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -1352,7 +1352,7 @@ func (g *Gateway) handlePOSTCancelPartialPayment(w http.ResponseWriter, r *http.
 // DELETE /v1/order/{orderID}/payment/watch
 // Called when buyer closes payment UI
 func (g *Gateway) handleDELETEPaymentWatch(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return

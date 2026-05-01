@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -90,7 +90,7 @@ func (g *Gateway) handleGetCollection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := mux.Vars(r)["collectionID"]
+	id := chi.URLParam(r, "collectionID")
 	c, err := svc.GetCollection(r.Context(), id)
 	if err != nil {
 		collectionErrorResponse(w, err)
@@ -106,7 +106,7 @@ func (g *Gateway) handleUpdateCollection(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	id := mux.Vars(r)["collectionID"]
+	id := chi.URLParam(r, "collectionID")
 	existing, err := svc.GetCollection(r.Context(), id)
 	if err != nil {
 		collectionErrorResponse(w, err)
@@ -155,7 +155,7 @@ func (g *Gateway) handleDeleteCollection(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	id := mux.Vars(r)["collectionID"]
+	id := chi.URLParam(r, "collectionID")
 	if err := svc.DeleteCollection(r.Context(), id); err != nil {
 		collectionErrorResponse(w, err)
 		return
@@ -170,7 +170,7 @@ func (g *Gateway) handleAddCollectionProducts(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	collectionID := mux.Vars(r)["collectionID"]
+	collectionID := chi.URLParam(r, "collectionID")
 	var req struct {
 		Slugs []string `json:"slugs"`
 	}
@@ -193,9 +193,8 @@ func (g *Gateway) handleRemoveCollectionProduct(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	vars := mux.Vars(r)
-	collectionID := vars["collectionID"]
-	slug := vars["slug"]
+	collectionID := chi.URLParam(r, "collectionID")
+	slug := chi.URLParam(r, "slug")
 
 	if err := svc.RemoveProduct(r.Context(), collectionID, slug); err != nil {
 		collectionErrorResponse(w, err)
@@ -211,7 +210,7 @@ func (g *Gateway) handleReorderCollectionProducts(w http.ResponseWriter, r *http
 		return
 	}
 
-	collectionID := mux.Vars(r)["collectionID"]
+	collectionID := chi.URLParam(r, "collectionID")
 	var req struct {
 		Slugs []string `json:"slugs"`
 	}
@@ -234,7 +233,7 @@ func (g *Gateway) handleGetCollectionPublic(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	id := mux.Vars(r)["collectionID"]
+	id := chi.URLParam(r, "collectionID")
 	c, err := svc.GetCollection(r.Context(), id)
 	if err != nil || !c.Published {
 		response.Error(w, http.StatusNotFound, response.CodeNotFound, "Collection not found")

@@ -37,6 +37,22 @@ func GetNodeManager() coreiface.NodeManagerIface {
 	return core.SharedManagerInstance
 }
 
+// GetNodeRegistry returns the global contracts.NodeRegistry adapter.
+// It exposes a race-free snapshot of all active NodeService instances for
+// the shared scheduler (Phase AH-3). Returns nil if SharedManagerInstance
+// is not yet initialized — callers should treat nil as "no registry available"
+// and skip Job registration that depends on NodeFn.
+//
+// This is intentionally a separate accessor from GetNodeManager(): the
+// scheduler only needs read-only iteration, and exposing it via a narrower
+// interface (NodeRegistry) keeps the dependency surface minimal.
+func GetNodeRegistry() contracts.NodeRegistry {
+	if core.SharedManagerInstance == nil {
+		return nil
+	}
+	return core.SharedManagerInstance
+}
+
 // NewDBPublicData creates a PublicData backed by the shared GORM database,
 // scoped to the given tenantID. Used by SaaS hosting to resolve co-tenant
 // public data directly from the shared DB.

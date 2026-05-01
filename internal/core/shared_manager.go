@@ -324,6 +324,24 @@ func (im *SharedManager) GetNodes() map[string]contracts.NodeService {
 	return im.clients
 }
 
+// GetNodesSnapshot returns a race-free copy of all active NodeService
+// instances. Callers may iterate the returned slice concurrently with
+// AddNode / RemoveNode / GetNode.
+//
+// This is the implementation of contracts.NodeRegistry consumed by the
+// shared scheduler (Phase AH-3): the scheduler iterates tenants on every
+// tick without holding im.mu, while AddNode/RemoveNode continue to mutate
+// im.clients safely under the write lock.
+func (im *SharedManager) GetNodesSnapshot() []contracts.NodeService {
+	im.mu.RLock()
+	defer im.mu.RUnlock()
+	out := make([]contracts.NodeService, 0, len(im.clients))
+	for _, n := range im.clients {
+		out = append(out, n)
+	}
+	return out
+}
+
 // GetMaxImportZipSize returns the maximum size for batch import ZIP files.
 func (im *SharedManager) GetMaxImportZipSize() int64 {
 	if im.NetConfig != nil {

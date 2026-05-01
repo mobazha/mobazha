@@ -370,5 +370,34 @@ type NodeService interface {
 
 	// SubscribeEvent subscribes to a specific event type.
 	SubscribeEvent(event any) (events.Subscription, error)
+}
 
+// SchedulerHooks exposes per-node worker tick methods for the shared scheduler
+// (Phase AH-3a). The process-wide scheduler calls these via type assertion on
+// NodeService, avoiding changes to the NodeService interface itself.
+//
+// Not all NodeService implementations need to implement this. Standalone nodes
+// run their own goroutines and never go through the shared scheduler.
+type SchedulerHooks interface {
+	RunOrderTimeoutOnce()
+	RunOutboxPollOnce()
+	RunOutboxCleanupOnce()
+	RunPaymentVerificationOnce()
+	RunWebhookDeliveryOnce()
+	RunWebhookCleanupOnce()
+}
+
+// NodeRegistry exposes a race-free snapshot of all active NodeService instances.
+//
+// Designed for the shared scheduler (Phase AH-3) so that process-wide periodic
+// jobs can iterate over active tenants without holding the SharedManager mutex
+// or risking concurrent map mutation.
+//
+// Implementations must return a fresh slice on every call (not the underlying
+// map values) so callers may iterate concurrently with AddNode / RemoveNode.
+type NodeRegistry interface {
+	// GetNodesSnapshot returns a point-in-time copy of all active NodeService
+	// instances. The returned slice is safe to iterate concurrently with
+	// registry mutations; node ordering is not guaranteed.
+	GetNodesSnapshot() []NodeService
 }

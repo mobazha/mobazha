@@ -754,3 +754,45 @@ func (n *MobazhaNode) ProductCatalog() []aipkg.ListingSummary {
 	}
 	return result
 }
+
+// ---------------------------------------------------------------------------
+// contracts.SchedulerHooks — delegate to App Services (Phase AH-3a)
+// ---------------------------------------------------------------------------
+
+var _ contracts.SchedulerHooks = (*MobazhaNode)(nil)
+
+func (n *MobazhaNode) RunOrderTimeoutOnce() {
+	if n.orderService != nil {
+		n.orderService.RunOrderTimeoutOnce()
+	}
+}
+
+func (n *MobazhaNode) RunOutboxPollOnce() {
+	if n.orderService != nil {
+		n.orderService.RunOutboxPollOnce()
+	}
+}
+
+func (n *MobazhaNode) RunOutboxCleanupOnce() {
+	if n.orderService != nil {
+		n.orderService.RunOutboxCleanupOnce()
+	}
+}
+
+func (n *MobazhaNode) RunPaymentVerificationOnce() {
+	if n.paymentService != nil {
+		n.paymentService.RunPaymentVerificationOnce()
+	}
+}
+
+func (n *MobazhaNode) RunWebhookDeliveryOnce() {
+	if n.webhookEngine != nil {
+		n.webhookEngine.RunDeliveryOnce()
+	}
+}
+
+func (n *MobazhaNode) RunWebhookCleanupOnce() {
+	if n.webhookEngine != nil {
+		n.webhookEngine.RunCleanupOnce()
+	}
+}

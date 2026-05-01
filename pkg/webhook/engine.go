@@ -23,12 +23,37 @@ type Engine struct {
 	cfg    Config
 	client *http.Client
 
+	skipDeliveryWorker bool
+	skipCleanupWorker  bool
+
 	shutdown chan struct{}
 	once     sync.Once
 }
 
-// NewEngine creates a new Engine with explicit config and starts background workers.
-func NewEngine(store EndpointStore, cfg Config) *Engine {
+// EngineOption configures Engine construction. See NewEngine.
+type EngineOption func(*Engine)
+
+// WithoutDeliveryWorker disables the internal delivery goroutine. Use when an
+// external scheduler will drive RunDeliveryOnce instead (Phase AH-3a — SaaS
+// shared scheduler). This prevents the in-engine worker and the scheduler
+// from racing on `GetPending` and double-posting webhooks: processPendingDeliveries
+// has no atomic claim, so two concurrent callers may pull the same pending
+// row and both deliver it. TD-090.
+func WithoutDeliveryWorker() EngineOption {
+	return func(e *Engine) { e.skipDeliveryWorker = true }
+}
+
+// WithoutCleanupWorker disables the internal cleanup goroutine. Cleanup is
+// idempotent (DELETE WHERE finished_before_cutoff), so duplicate runs are
+// safe; this option is provided primarily for symmetry and tests.
+func WithoutCleanupWorker() EngineOption {
+	return func(e *Engine) { e.skipCleanupWorker = true }
+}
+
+// NewEngine creates a new Engine with explicit config and starts background
+// workers. Pass WithoutDeliveryWorker / WithoutCleanupWorker to suppress the
+// internal goroutines (e.g. when an external scheduler drives delivery).
+func NewEngine(store EndpointStore, cfg Config, opts ...EngineOption) *Engine {
 	e := &Engine{
 		store: store,
 		cfg:   cfg,
@@ -37,8 +62,15 @@ func NewEngine(store EndpointStore, cfg Config) *Engine {
 		},
 		shutdown: make(chan struct{}),
 	}
-	go e.deliveryWorker()
-	go e.cleanupWorker()
+	for _, opt := range opts {
+		opt(e)
+	}
+	if !e.skipDeliveryWorker {
+		go e.deliveryWorker()
+	}
+	if !e.skipCleanupWorker {
+		go e.cleanupWorker()
+	}
 	return e
 }
 
@@ -116,6 +148,12 @@ func (e *Engine) deliveryWorker() {
 	}
 }
 
+// RunDeliveryOnce processes pending webhook deliveries in a single pass.
+// Called by the shared scheduler's NodeFn (Phase AH-3a).
+func (e *Engine) RunDeliveryOnce() {
+	e.processPendingDeliveries()
+}
+
 func (e *Engine) processPendingDeliveries() {
 	deliveries, err := e.store.GetPending(defaultBatchSize)
 	if err != nil {
@@ -183,6 +221,19 @@ func (e *Engine) markRetryOrFail(d *Delivery, statusCode *int, errMsg string) {
 		Error:      errMsg,
 		NextRetry:  &nextRetry,
 	})
+}
+
+// RunCleanupOnce removes old webhook deliveries in a single pass.
+// Called by the shared scheduler's NodeFn (Phase AH-3a).
+func (e *Engine) RunCleanupOnce() {
+	deleted, err := e.store.CleanupOld(e.cfg.retentionAge())
+	if err != nil {
+		log.Printf("[webhook] Failed to cleanup old deliveries: %v", err)
+		return
+	}
+	if deleted > 0 {
+		log.Printf("[webhook] Cleaned up %d old deliveries", deleted)
+	}
 }
 
 func (e *Engine) cleanupWorker() {

@@ -38,6 +38,13 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaFiatOperations(api)
 	g.registerNodeHumaFulfillmentOperations(api)
 	g.registerNodeHumaCartOperations(api)
+	g.registerNodeHumaNotificationOperations(api)
+	g.registerNodeHumaWebhookOperations(api)
+	g.registerNodeHumaAIOperations(api)
+	g.registerNodeHumaSettingsOperations(api)
+	g.registerNodeHumaShippingOperations(api)
+	g.registerNodeHumaDiscountOperations(api)
+	g.registerNodeHumaCollectionOperations(api)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
@@ -240,10 +247,87 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"purchases-post-query",
 		"sales-get-query",
 		"sales-post-query",
+		// AH-1.4 Batch 4: notifications, webhooks, AI, settings, shipping, discounts, collections
+		"ai-chat-post",
+		"ai-chat-session-delete",
+		"ai-chat-session-get",
+		"ai-chat-sessions-get",
+		"ai-generate-post",
+		"ai-status-get",
+		"collections-get",
+		"collections-id-delete",
+		"collections-id-get",
+		"collections-id-products-post",
+		"collections-id-products-reorder-put",
+		"collections-id-products-slug-delete",
+		"collections-id-put",
+		"collections-peer-published-get",
+		"collections-peer-published-id-get",
+		"collections-post",
+		"discounts-get",
+		"discounts-id-codes-code-delete",
+		"discounts-id-codes-get",
+		"discounts-id-codes-post",
+		"discounts-id-delete",
+		"discounts-id-get",
+		"discounts-id-put",
+		"discounts-id-redemptions-get",
+		"discounts-post",
+		"features-get",
+		"notifications-channel-types-get",
+		"notifications-channels-detect-chat-post",
+		"notifications-channels-get",
+		"notifications-channels-id-delete",
+		"notifications-channels-id-put",
+		"notifications-channels-id-test-post",
+		"notifications-channels-post",
+		"notifications-get-count",
+		"notifications-get-list",
+		"notifications-post-batch",
+		"notifications-post-notif-read",
+		"notifications-post-read-all",
+		"preferences-currency-post",
+		"preferences-get",
+		"preferences-put",
+		"settings-ai-get",
+		"settings-ai-providers-get",
+		"settings-ai-put",
+		"settings-ai-test-post",
+		"settings-feature-put",
+		"settings-guest-checkout-get",
+		"settings-guest-checkout-put",
+		"settings-storefront-get",
+		"settings-storefront-public-get",
+		"settings-storefront-put",
+		"shipping-locations-get",
+		"shipping-locations-id-delete",
+		"shipping-locations-id-get",
+		"shipping-locations-id-put",
+		"shipping-locations-post",
+		"shipping-profiles-default-post",
+		"shipping-profiles-get",
+		"shipping-profiles-id-delete",
+		"shipping-profiles-id-get",
+		"shipping-profiles-id-patch",
+		"shipping-profiles-id-put",
+		"shipping-profiles-listings-get",
+		"shipping-profiles-post",
+		"shipping-refresh-snapshots-post",
+		"shipping-stale-listings-get",
+		"webhooks-get",
+		"webhooks-id-delete",
+		"webhooks-id-deliveries-get",
+		"webhooks-id-get",
+		"webhooks-id-patch",
+		"webhooks-id-test-post",
+		"webhooks-post",
+		"wishlists-get",
+		"wishlists-peer-slug-delete",
+		"wishlists-post",
 	}
 	sort.Strings(expectedOps)
 
-	const minOps = 157
+	const minOps = 239
 	if len(got) < minOps {
 		t.Errorf("Expected at least %d operations, got %d: %v", minOps, len(got), got)
 	}

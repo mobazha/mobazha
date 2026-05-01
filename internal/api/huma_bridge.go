@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/gorilla/mux"
@@ -64,6 +65,46 @@ func nodeBridgeNoContent(rr *httptest.ResponseRecorder) error {
 		return nil
 	}
 	return nodeBridgeToHumaError(rr)
+}
+
+// nodeBridgeFlexJSON unwraps a {"data":...} envelope when present; otherwise decodes
+// the raw JSON body. Use for legacy handlers that do not emit the standard envelope.
+func nodeBridgeFlexJSON(rr *httptest.ResponseRecorder) (any, error) {
+	if rr.Code < http.StatusOK || rr.Code >= http.StatusMultipleChoices {
+		return nil, nodeBridgeToHumaError(rr)
+	}
+	if rr.Body.Len() == 0 {
+		return nil, nil
+	}
+	raw := rr.Body.Bytes()
+	var wrap struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &wrap); err == nil && len(wrap.Data) > 0 {
+		var out any
+		if err := json.Unmarshal(wrap.Data, &out); err != nil {
+			return nil, huma.Error500InternalServerError("invalid node response data")
+		}
+		return out, nil
+	}
+	var out any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, huma.Error500InternalServerError("invalid node response")
+	}
+	return out, nil
+}
+
+// nodeBridgeSSEOrFlexJSON handles legacy handlers that may return SSE (text/event-stream)
+// or JSON. For SSE success responses, returns a small placeholder map so huma/OpenAPI can
+// still type the operation.
+func nodeBridgeSSEOrFlexJSON(rr *httptest.ResponseRecorder) (any, error) {
+	if rr.Code < http.StatusOK || rr.Code >= http.StatusMultipleChoices {
+		return nil, nodeBridgeToHumaError(rr)
+	}
+	if strings.Contains(rr.Header().Get("Content-Type"), "text/event-stream") {
+		return map[string]any{"stream": true}, nil
+	}
+	return nodeBridgeFlexJSON(rr)
 }
 
 func nodeBridgeToHumaError(rr *httptest.ResponseRecorder) error {

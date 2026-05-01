@@ -154,15 +154,21 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 		return nil, fmt.Errorf("parse webhook: %w", err)
 	}
 
-	// EventID must be unique across orders AND shipments. Include the
-	// Printful order ID and shipment ID (when available) to prevent
-	// collisions in the idempotency table.
-	eventID := fmt.Sprintf("%s_%d", wh.Type, wh.Created)
-	if wh.Data.Order != nil && wh.Data.Order.ID != 0 {
+	// EventID must be unique across orders, shipments, AND sync products.
+	// Pick the most specific entity available; the previous chain of
+	// independent if-blocks could overwrite earlier additions and produced
+	// hard-to-read intent. Order ranks first because shipment events also
+	// carry an order; sync_product events never carry one.
+	var eventID string
+	switch {
+	case wh.Data.Shipment != nil && wh.Data.Shipment.ID != 0 && wh.Data.Order != nil && wh.Data.Order.ID != 0:
+		eventID = fmt.Sprintf("%s_%d_%d_s%d", wh.Type, wh.Data.Order.ID, wh.Created, wh.Data.Shipment.ID)
+	case wh.Data.Order != nil && wh.Data.Order.ID != 0:
 		eventID = fmt.Sprintf("%s_%d_%d", wh.Type, wh.Data.Order.ID, wh.Created)
-	}
-	if wh.Data.Shipment != nil && wh.Data.Shipment.ID != 0 {
-		eventID = fmt.Sprintf("%s_%d", eventID, wh.Data.Shipment.ID)
+	case wh.Data.SyncProduct != nil && wh.Data.SyncProduct.ID != 0:
+		eventID = fmt.Sprintf("%s_sp%d_%d", wh.Type, wh.Data.SyncProduct.ID, wh.Created)
+	default:
+		eventID = fmt.Sprintf("%s_%d", wh.Type, wh.Created)
 	}
 	event := &contracts.FulfillmentWebhookEvent{
 		EventID:   eventID,
@@ -207,6 +213,11 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 			}
 		}
 		event.Data = fo
+	}
+
+	if wh.Data.SyncProduct != nil {
+		event.SyncProductID = strconv.Itoa(wh.Data.SyncProduct.ID)
+		event.SyncProductName = wh.Data.SyncProduct.Name
 	}
 
 	return event, nil

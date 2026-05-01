@@ -42,6 +42,7 @@ var allScopesList = []string{
 	"collections:read", "collections:write",
 	"settings:read",
 	"fiat:read",
+	"fulfillment:read", "fulfillment:manage",
 }
 
 func TestNewMobazhaServer_AllScopes(t *testing.T) {
@@ -314,6 +315,7 @@ func TestFilterToolsByScopes_AllScopes(t *testing.T) {
 		"notifications:read", "notifications:manage",
 		"discounts:read", "discounts:write", "collections:read", "collections:write",
 		"settings:read", "fiat:read",
+		"fulfillment:read", "fulfillment:manage",
 	})
 
 	allowed := FilterToolsByScopes(scopes)

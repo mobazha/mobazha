@@ -68,11 +68,14 @@ func TestAutoActionRuleTypes(t *testing.T) {
 	assert.Equal(t, models.RuleTrigger("stock_out"), models.RuleTriggerStockOut)
 	assert.Equal(t, models.RuleTrigger("stock_back"), models.RuleTriggerStockBack)
 	assert.Equal(t, models.RuleTrigger("price_drift"), models.RuleTriggerPriceDrift)
+	assert.Equal(t, models.RuleTrigger("product_cost_changed"), models.RuleTriggerProductCostChanged)
+	assert.Equal(t, models.RuleTrigger("product_discontinued"), models.RuleTriggerProductDiscontinued)
 
 	assert.Equal(t, models.RuleAction("hide_listing"), models.RuleActionHideListing)
 	assert.Equal(t, models.RuleAction("show_listing"), models.RuleActionShowListing)
 	assert.Equal(t, models.RuleAction("pause_listing"), models.RuleActionPauseListing)
 	assert.Equal(t, models.RuleAction("notify_only"), models.RuleActionNotifyOnly)
+	assert.Equal(t, models.RuleAction("auto_delist"), models.RuleActionAutoDelist)
 }
 
 func TestAlertTypes(t *testing.T) {
@@ -80,6 +83,88 @@ func TestAlertTypes(t *testing.T) {
 	assert.Equal(t, models.AlertType("stock_back"), models.AlertTypeStockBack)
 	assert.Equal(t, models.AlertType("price_drift"), models.AlertTypePriceDrift)
 	assert.Equal(t, models.AlertType("rule_action"), models.AlertTypeRuleAction)
+	assert.Equal(t, models.AlertType("product_changed"), models.AlertTypeProductChanged)
+	assert.Equal(t, models.AlertType("product_discontinued"), models.AlertTypeProductDiscontinued)
+}
+
+func TestDetectProductChanges_CostIncrease(t *testing.T) {
+	svc := &SupplyChainAppService{}
+	mapping := models.SyncedProductMapping{
+		SupplierCost: "2000", // 2000 cents = $20.00
+	}
+	product := &contracts.StoreSyncProduct{
+		Variants: []contracts.StoreSyncVariant{
+			{RetailPrice: "25.00"}, // $25.00 = 2500 cents
+		},
+	}
+
+	changes := svc.detectProductChanges(mapping, product)
+	assert.Len(t, changes, 1)
+	assert.Equal(t, models.RuleTriggerProductCostChanged, changes[0].trigger)
+	assert.InDelta(t, 2000, changes[0].storedCost, 0.01)
+	assert.InDelta(t, 2500, changes[0].newCost, 0.01)
+	assert.InDelta(t, 25.0, changes[0].driftPct, 0.01)
+}
+
+func TestDetectProductChanges_CostDecrease(t *testing.T) {
+	svc := &SupplyChainAppService{}
+	mapping := models.SyncedProductMapping{
+		SupplierCost: "3000", // $30.00
+	}
+	product := &contracts.StoreSyncProduct{
+		Variants: []contracts.StoreSyncVariant{
+			{RetailPrice: "20.00"}, // $20.00 = 2000 cents
+		},
+	}
+
+	changes := svc.detectProductChanges(mapping, product)
+	assert.Len(t, changes, 1)
+	assert.Equal(t, models.RuleTriggerProductCostChanged, changes[0].trigger)
+	assert.InDelta(t, 33.33, changes[0].driftPct, 0.1)
+}
+
+func TestDetectProductChanges_NoCostChange(t *testing.T) {
+	svc := &SupplyChainAppService{}
+	mapping := models.SyncedProductMapping{
+		SupplierCost: "2999", // $29.99
+	}
+	product := &contracts.StoreSyncProduct{
+		Variants: []contracts.StoreSyncVariant{
+			{RetailPrice: "29.99"}, // $29.99 = 2999 cents
+		},
+	}
+
+	changes := svc.detectProductChanges(mapping, product)
+	assert.Len(t, changes, 0)
+}
+
+func TestDetectProductChanges_Discontinued(t *testing.T) {
+	svc := &SupplyChainAppService{}
+	mapping := models.SyncedProductMapping{
+		SupplierCost: "2000",
+	}
+	product := &contracts.StoreSyncProduct{
+		Variants: []contracts.StoreSyncVariant{},
+	}
+
+	changes := svc.detectProductChanges(mapping, product)
+	assert.Len(t, changes, 1)
+	assert.Equal(t, models.RuleTriggerProductDiscontinued, changes[0].trigger)
+}
+
+func TestDetectProductChanges_MissingStoredCost(t *testing.T) {
+	svc := &SupplyChainAppService{}
+	mapping := models.SyncedProductMapping{
+		SupplierCost: "",
+	}
+	product := &contracts.StoreSyncProduct{
+		Variants: []contracts.StoreSyncVariant{
+			{RetailPrice: "29.99"},
+		},
+	}
+
+	changes := svc.detectProductChanges(mapping, product)
+	assert.Len(t, changes, 0, "no changes when stored cost is empty (baseline not set)")
 }
 
 func TestSupplyChainMonitorServiceInterface(t *testing.T) {

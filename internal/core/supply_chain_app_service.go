@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha3.0/internal/fulfillment/printful"
+	"github.com/mobazha/mobazha3.0/internal/fulfillment/printify"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -361,6 +362,7 @@ func (s *SupplyChainAppService) rebuildRetryParams(mapping models.FulfillmentOrd
 				if lookupErr := s.db.View(func(tx database.Tx) error {
 					return tx.Read().Where("listing_slug = ?", slug).First(&spm).Error
 				}); lookupErr == nil && spm.SyncProductID != "" {
+					item.SyncProductID = spm.SyncProductID
 					item.SyncVariantID = variantID
 				} else {
 					item.CatalogVariantID = variantID
@@ -1048,6 +1050,7 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 			}
 			variantID := resolveVariantID(li.Listing, oo.Items[i])
 			if mapping.SyncProductID != "" {
+				item.SyncProductID = mapping.SyncProductID
 				item.SyncVariantID = variantID
 			} else {
 				item.CatalogVariantID = variantID
@@ -1211,6 +1214,8 @@ func (s *SupplyChainAppService) newProviderFromCredentials(providerID string, cr
 	switch providerID {
 	case "printful":
 		return printful.NewProvider(creds.APIKey, ""), nil
+	case "printify":
+		return printify.NewProvider(creds.APIKey, creds.WebhookSecret), nil
 	default:
 		return nil, fmt.Errorf("unknown provider %q", providerID)
 	}
@@ -1233,6 +1238,8 @@ func (s *SupplyChainAppService) instantiateProvider(providerID, providerType str
 		// Authentication relies on URL secret ({webhookSecret} in path).
 		// Pass empty string so ParseWebhook skips HMAC verification.
 		return printful.NewProvider(creds.APIKey, ""), nil
+	case "printify":
+		return printify.NewProvider(creds.APIKey, webhookSecret), nil
 	default:
 		return nil, fmt.Errorf("unknown provider %q (type %s)", providerID, providerType)
 	}
@@ -2148,8 +2155,84 @@ func loadVariantCostMap(spm *models.SyncedProductMapping) map[string]uint64 {
 	return out
 }
 
-func (s *SupplyChainAppService) SyncProduct(_ context.Context, _ string) (*contracts.SyncStatus, error) {
-	return nil, fmt.Errorf("SyncProduct (FF-2.x): %w", contracts.ErrFulfillmentNotImplemented)
+// SyncProduct performs a manual resync for a given listing. It fetches the
+// current supplier product data, detects changes, generates alerts, and
+// updates the stored cost baseline. This is the seller-initiated counterpart
+// to the webhook-driven processProductWebhookEvent.
+func (s *SupplyChainAppService) SyncProduct(ctx context.Context, listingSlug string) (*contracts.SyncStatus, error) {
+	var mapping models.SyncedProductMapping
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("listing_slug = ?", listingSlug).First(&mapping).Error
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing %s not found in synced products", listingSlug)
+	}
+	if mapping.SyncProductID == "" {
+		return nil, fmt.Errorf("listing %s has no sync product ID", listingSlug)
+	}
+
+	ssp, err := s.getStoreSyncProvider(mapping.ProviderID)
+	if err != nil {
+		return nil, fmt.Errorf("provider not available: %w", err)
+	}
+
+	product, err := ssp.GetStoreSyncProduct(ctx, mapping.SyncProductID)
+	if err != nil {
+		return &contracts.SyncStatus{
+			SyncProductID: mapping.SyncProductID,
+			Status:        "error",
+			LastSyncAt:    mapping.LastSyncAt,
+			ErrorMessage:  fmt.Sprintf("failed to fetch from supplier: %v", err),
+		}, nil
+	}
+
+	changes := s.detectProductChanges(mapping, product)
+	for _, change := range changes {
+		switch change.trigger {
+		case models.RuleTriggerProductCostChanged:
+			s.handleProductCostChange(ctx, mapping.ProviderID, mapping, change)
+		case models.RuleTriggerProductDiscontinued:
+			s.handleProductDiscontinued(ctx, mapping.ProviderID, mapping)
+		}
+	}
+
+	// Persist the new baseline (supplier cost + last_sync_at). Returning
+	// "synced" while the DB write silently failed would let webhooks/poll
+	// keep firing on stale data and re-alerting forever, so propagate the
+	// error and let the caller decide whether to retry.
+	now := time.Now()
+	var dbErr error
+	if newCost := s.findMinVariantCost(product.Variants); newCost > 0 {
+		dbErr = s.db.Update(func(tx database.Tx) error {
+			var m models.SyncedProductMapping
+			if err := tx.Read().Where("id = ?", mapping.ID).First(&m).Error; err != nil {
+				return err
+			}
+			m.SupplierCost = fmt.Sprintf("%.0f", newCost)
+			m.LastSyncAt = now
+			return tx.Save(&m)
+		})
+	} else {
+		dbErr = s.db.Update(func(tx database.Tx) error {
+			return tx.Update("last_sync_at", now,
+				map[string]interface{}{"id": mapping.ID}, &models.SyncedProductMapping{})
+		})
+	}
+	if dbErr != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain: SyncProduct DB persist failed for %s: %v", mapping.ID, dbErr)
+		return nil, fmt.Errorf("persist sync state: %w", dbErr)
+	}
+
+	status := "synced"
+	if len(changes) > 0 {
+		status = "changes_detected"
+	}
+	return &contracts.SyncStatus{
+		SyncProductID: mapping.SyncProductID,
+		Status:        status,
+		LastSyncAt:    now,
+	}, nil
 }
 
 func (s *SupplyChainAppService) ListSyncedProducts(_ context.Context, providerID string) ([]contracts.SyncedProduct, error) {
@@ -2566,7 +2649,14 @@ func (s *SupplyChainAppService) HandleProviderWebhook(ctx context.Context, provi
 	return nil
 }
 
-func (s *SupplyChainAppService) processWebhookEvent(_ context.Context, providerID string, event *contracts.FulfillmentWebhookEvent) error {
+func (s *SupplyChainAppService) processWebhookEvent(ctx context.Context, providerID string, event *contracts.FulfillmentWebhookEvent) error {
+	// Product-level webhooks (product_synced, stock_updated) carry a
+	// SyncProductID instead of OrderID/ExternalID. Route them to a
+	// dedicated handler that compares supplier data against stored state.
+	if event.SyncProductID != "" && event.OrderID == "" && event.ExternalID == "" {
+		return s.processProductWebhookEvent(ctx, providerID, event)
+	}
+
 	if event.OrderID == "" && event.ExternalID == "" {
 		logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: webhook event %s has no order ID, skipping mapping update", event.Type)
 		return nil
@@ -2659,6 +2749,183 @@ func (s *SupplyChainAppService) processWebhookEvent(_ context.Context, providerI
 		}
 	}
 	return nil
+}
+
+// processProductWebhookEvent handles product-level webhooks (product_synced,
+// stock_updated) that don't carry an order ID. It looks up the SyncedProductMapping
+// by sync_product_id, fetches current supplier data, compares against stored
+// state, and generates alerts + evaluates auto-action rules on changes.
+func (s *SupplyChainAppService) processProductWebhookEvent(ctx context.Context, providerID string, event *contracts.FulfillmentWebhookEvent) error {
+	var mapping models.SyncedProductMapping
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("provider_id = ? AND sync_product_id = ?", providerID, event.SyncProductID).
+			First(&mapping).Error
+	})
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"SupplyChain: product webhook for unknown sync product %s (provider %s), ignoring",
+			event.SyncProductID, providerID)
+		return nil
+	}
+
+	ssp, err := s.getStoreSyncProvider(providerID)
+	if err != nil {
+		return fmt.Errorf("get store sync provider: %w", err)
+	}
+	product, err := ssp.GetStoreSyncProduct(ctx, event.SyncProductID)
+	if err != nil {
+		return fmt.Errorf("fetch sync product %s: %w", event.SyncProductID, err)
+	}
+
+	changes := s.detectProductChanges(mapping, product)
+	if len(changes) == 0 {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"SupplyChain: product_synced for %s but no actionable changes detected", mapping.ListingSlug)
+		return nil
+	}
+
+	for _, change := range changes {
+		switch change.trigger {
+		case models.RuleTriggerProductCostChanged:
+			s.handleProductCostChange(ctx, providerID, mapping, change)
+		case models.RuleTriggerProductDiscontinued:
+			s.handleProductDiscontinued(ctx, providerID, mapping)
+		}
+	}
+
+	// Update stored cost to current value so future polls use the new baseline.
+	// If this DB write fails we MUST surface it: the webhook router will retry
+	// later, and dropping the error here would let the next event re-alert on
+	// the same drift forever.
+	if newCost := s.findMinVariantCost(product.Variants); newCost > 0 {
+		if err := s.db.Update(func(tx database.Tx) error {
+			return tx.Update("supplier_cost", fmt.Sprintf("%.0f", newCost),
+				map[string]interface{}{"id": mapping.ID}, &models.SyncedProductMapping{})
+		}); err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain: webhook supplier_cost persist failed for %s: %v", mapping.ID, err)
+			return fmt.Errorf("persist supplier cost: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// productChange captures a detected difference between stored and current state.
+type productChange struct {
+	trigger    models.RuleTrigger
+	storedCost float64
+	newCost    float64
+	driftPct   float64
+}
+
+// detectProductChanges compares stored mapping state against live supplier data.
+func (s *SupplyChainAppService) detectProductChanges(mapping models.SyncedProductMapping, product *contracts.StoreSyncProduct) []productChange {
+	var changes []productChange
+
+	// Check if product is discontinued (all variants removed or ignored).
+	if len(product.Variants) == 0 {
+		changes = append(changes, productChange{trigger: models.RuleTriggerProductDiscontinued})
+		return changes
+	}
+
+	// Check cost change.
+	if mapping.SupplierCost != "" {
+		storedCost, err := strconv.ParseFloat(mapping.SupplierCost, 64)
+		if err == nil && storedCost > 0 {
+			currentCost := s.findMinVariantCost(product.Variants)
+			if currentCost > 0 && currentCost != storedCost {
+				driftPct := math.Abs(currentCost-storedCost) / storedCost * 100
+				changes = append(changes, productChange{
+					trigger:    models.RuleTriggerProductCostChanged,
+					storedCost: storedCost,
+					newCost:    currentCost,
+					driftPct:   driftPct,
+				})
+			}
+		}
+	}
+
+	return changes
+}
+
+func (s *SupplyChainAppService) handleProductCostChange(ctx context.Context, providerID string, mapping models.SyncedProductMapping, change productChange) {
+	s.evaluateRules(ctx, models.RuleTriggerProductCostChanged, providerID, mapping.ListingSlug, change.driftPct)
+
+	// Also evaluate general price_drift rules since cost change is a subtype.
+	s.evaluateRules(ctx, models.RuleTriggerPriceDrift, providerID, mapping.ListingSlug, change.driftPct)
+
+	existing := s.findActiveAlert(mapping.ListingSlug, models.AlertTypeProductChanged)
+	if existing != nil {
+		return
+	}
+
+	direction := "increased"
+	if change.newCost < change.storedCost {
+		direction = "decreased"
+	}
+	storedDollars := change.storedCost / 100
+	currentDollars := change.newCost / 100
+
+	metadata, _ := json.Marshal(map[string]interface{}{
+		"type":             "cost_changed",
+		"storedCostCents":  change.storedCost,
+		"currentCostCents": change.newCost,
+		"storedCost":       storedDollars,
+		"currentCost":      currentDollars,
+		"driftPct":         change.driftPct,
+		"direction":        direction,
+	})
+
+	alert := &models.SupplyChainAlert{
+		ID:          uuid.NewString(),
+		ProviderID:  providerID,
+		ListingSlug: mapping.ListingSlug,
+		AlertType:   models.AlertTypeProductChanged,
+		Severity:    models.AlertSeverityWarning,
+		Title:       fmt.Sprintf("Supplier cost %s %.1f%%: %s", direction, change.driftPct, mapping.ListingSlug),
+		Message:     fmt.Sprintf("Supplier cost %s from $%.2f to $%.2f (%.1f%%). Review your retail price.", direction, storedDollars, currentDollars, change.driftPct),
+		Metadata:    metadata,
+	}
+
+	_ = s.db.Update(func(tx database.Tx) error {
+		return tx.Save(alert)
+	})
+
+	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: product cost change alert for %s (%.1f%%)", mapping.ListingSlug, change.driftPct)
+}
+
+func (s *SupplyChainAppService) handleProductDiscontinued(ctx context.Context, providerID string, mapping models.SyncedProductMapping) {
+	s.evaluateRules(ctx, models.RuleTriggerProductDiscontinued, providerID, mapping.ListingSlug, 0)
+
+	// Use a dedicated alert type so a less-severe "product_changed" cost-drift
+	// alert never suppresses a critical "discontinued" notification.
+	existing := s.findActiveAlert(mapping.ListingSlug, models.AlertTypeProductDiscontinued)
+	if existing != nil {
+		return
+	}
+
+	metadata, _ := json.Marshal(map[string]interface{}{
+		"type": "discontinued",
+	})
+
+	alert := &models.SupplyChainAlert{
+		ID:          uuid.NewString(),
+		ProviderID:  providerID,
+		ListingSlug: mapping.ListingSlug,
+		AlertType:   models.AlertTypeProductDiscontinued,
+		Severity:    models.AlertSeverityCritical,
+		Title:       fmt.Sprintf("Product discontinued: %s", mapping.ListingSlug),
+		Message:     "This product has been discontinued by the supplier (no variants available). Consider delisting.",
+		Metadata:    metadata,
+	}
+
+	_ = s.db.Update(func(tx database.Tx) error {
+		return tx.Save(alert)
+	})
+
+	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: product discontinued alert for %s", mapping.ListingSlug)
 }
 
 // reserveEvent atomically inserts a "processing" row.
@@ -3122,6 +3389,12 @@ func classifyProviderError(providerID string, err error) contracts.FailureReason
 	switch providerID {
 	case "printful":
 		re := printful.ClassifyError(err)
+		if re != nil {
+			return contracts.ClassifyFulfillmentError(re)
+		}
+		return contracts.FailureReasonRetryableProviderError
+	case "printify":
+		re := printify.ClassifyError(err)
 		if re != nil {
 			return contracts.ClassifyFulfillmentError(re)
 		}

@@ -319,23 +319,43 @@ func (s *SupplyChainAppService) handlePriceDrift(
 // ---------------------------------------------------------------------------
 
 // evaluateRules checks all enabled rules for the given trigger/provider pair.
-// For price_drift triggers, driftPct allows per-rule threshold gating: a rule
-// only fires if the observed drift exceeds that rule's own Threshold. For
-// stock-based triggers, pass driftPct=0 (threshold check is skipped).
+// For drift-based triggers (price_drift, product_cost_changed) the caller
+// passes the observed drift percentage; a rule only fires if that drift
+// exceeds the rule's own Threshold. Non-drift triggers (stock_out, stock_back,
+// product_discontinued) ignore Threshold entirely — the caller passes 0 and we
+// short-circuit the comparison.
 func (s *SupplyChainAppService) evaluateRules(ctx context.Context, trigger models.RuleTrigger, providerID, listingSlug string, driftPct float64) {
 	var rules []models.AutoActionRule
 	_ = s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("trigger = ? AND enabled = ?", trigger, true).Find(&rules).Error
 	})
 
+	driftBased := triggerIsDriftBased(trigger)
+
 	for _, rule := range rules {
 		if rule.ProviderID != "" && rule.ProviderID != providerID {
 			continue
 		}
-		if trigger == models.RuleTriggerPriceDrift && rule.Threshold > 0 && driftPct < rule.Threshold {
+		// Threshold gating must apply to every drift-based trigger, not just
+		// price_drift. Otherwise a rule configured "auto_delist when supplier
+		// cost moves >20%" would also fire on a 0.1% rounding wobble that
+		// arrived via product_cost_changed.
+		if driftBased && rule.Threshold > 0 && driftPct < rule.Threshold {
 			continue
 		}
 		s.executeRuleAction(ctx, rule, listingSlug)
+	}
+}
+
+// triggerIsDriftBased reports whether a trigger carries a meaningful drift
+// percentage that Threshold should gate on. Kept as a small helper so adding a
+// new drift-based trigger only requires one edit.
+func triggerIsDriftBased(t models.RuleTrigger) bool {
+	switch t {
+	case models.RuleTriggerPriceDrift, models.RuleTriggerProductCostChanged:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -350,9 +370,52 @@ func (s *SupplyChainAppService) executeRuleAction(ctx context.Context, rule mode
 	case models.RuleActionPauseListing:
 		s.setListingVisibility(ctx, listingSlug, false)
 		s.recordRuleAction(rule, listingSlug, "paused")
+	case models.RuleActionAutoDelist:
+		s.autoDelistProduct(ctx, rule, listingSlug)
 	case models.RuleActionNotifyOnly:
 		logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: rule %s triggered notify_only for %s", rule.ID, listingSlug)
 	}
+}
+
+// autoDelistProduct completely hides the listing and marks the sync mapping
+// as "delisted". Used when a product is discontinued by the supplier.
+//
+// The mapping update and listing visibility change are not in the same DB
+// transaction (listingOps writes through a separate write path), but we make
+// the failure modes explicit: persist the mapping status first inside a
+// single Update, and only flip the listing to draft if that succeeded.
+func (s *SupplyChainAppService) autoDelistProduct(_ context.Context, rule models.AutoActionRule, listingSlug string) {
+	var prevStatus string
+	if s.listingOps != nil {
+		prevStatus = s.getListingCurrentStatus(listingSlug)
+	}
+
+	dbErr := s.db.Update(func(tx database.Tx) error {
+		var m models.SyncedProductMapping
+		if err := tx.Read().Where("listing_slug = ?", listingSlug).First(&m).Error; err != nil {
+			return fmt.Errorf("lookup mapping: %w", err)
+		}
+		m.Status = "delisted"
+		if prevStatus != "" {
+			m.PreviousListingStatus = prevStatus
+		}
+		return tx.Save(&m)
+	})
+	if dbErr != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: auto_delist mapping update failed for %s: %v", listingSlug, dbErr)
+		s.recordRuleAction(rule, listingSlug, "delist_failed_db")
+		return
+	}
+
+	if s.listingOps != nil {
+		if err := s.listingOps.SetListingStatus(listingSlug, models.ListingStatusDraft); err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: auto_delist listing hide failed for %s: %v", listingSlug, err)
+			s.recordRuleAction(rule, listingSlug, "delist_failed_listing")
+			return
+		}
+	}
+
+	s.recordRuleAction(rule, listingSlug, "delisted")
 }
 
 func (s *SupplyChainAppService) setListingVisibility(ctx context.Context, listingSlug string, visible bool) {

@@ -359,7 +359,11 @@ func (g *Gateway) handlePOSTSyncProduct(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		if errors.Is(err, contracts.ErrFulfillmentNotImplemented) {
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
-				"Product sync is not yet available (planned for FF-2.x)")
+				"Product sync is not yet available")
+			return
+		}
+		if strings.Contains(err.Error(), "not found") {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, err.Error())
 			return
 		}
 		log.Warningf("Failed to sync product %s: %v", slug, err)

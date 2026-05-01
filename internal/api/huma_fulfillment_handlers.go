@@ -27,6 +27,13 @@ func (g *Gateway) registerNodeHumaFulfillmentOperations(api huma.API) {
 	g.registerFulfillmentOrderStatus(api)
 	g.registerFulfillmentShippingEstimates(api)
 	g.registerFulfillmentWebhookPublic(api)
+	g.registerFulfillmentLocations(api)
+	g.registerFulfillmentLocation(api)
+	g.registerFulfillmentAlerts(api)
+	g.registerFulfillmentDeleteAlert(api)
+	g.registerFulfillmentRules(api)
+	g.registerFulfillmentCreateRule(api)
+	g.registerFulfillmentDeleteRule(api)
 }
 
 func fulfillmentQuerySuffix(q url.Values) string {
@@ -380,6 +387,160 @@ func (g *Gateway) registerFulfillmentShippingEstimates(api huma.API) {
 			return nil, err
 		}
 		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerFulfillmentLocations(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "fulfillment-get-locations",
+		Method:      http.MethodGet,
+		Path:        "/v1/fulfillment/locations",
+		Summary:     "List fulfillment locations",
+		Tags:        []string{"fulfillment"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/fulfillment/locations", nil)
+		rr := httptest.NewRecorder()
+		g.handleGETFulfillmentLocations(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerFulfillmentLocation(api huma.API) {
+	type in struct {
+		LocationID string `path:"locationID" doc:"Fulfillment location ID."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "fulfillment-get-location",
+		Method:      http.MethodGet,
+		Path:        "/v1/fulfillment/locations/{locationID}",
+		Summary:     "Get fulfillment location detail",
+		Tags:        []string{"fulfillment"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/fulfillment/locations/" + url.PathEscape(hi.LocationID)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"locationID": hi.LocationID})
+		rr := httptest.NewRecorder()
+		g.handleGETFulfillmentLocation(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerFulfillmentAlerts(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "fulfillment-get-alerts",
+		Method:      http.MethodGet,
+		Path:        "/v1/fulfillment/alerts",
+		Summary:     "List fulfillment alerts",
+		Tags:        []string{"fulfillment"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/fulfillment/alerts", nil)
+		rr := httptest.NewRecorder()
+		g.handleGETFulfillmentAlerts(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerFulfillmentDeleteAlert(api huma.API) {
+	type in struct {
+		AlertID string `path:"alertID" doc:"Alert ID to dismiss."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "fulfillment-delete-alert",
+		Method:      http.MethodDelete,
+		Path:        "/v1/fulfillment/alerts/{alertID}",
+		Summary:     "Dismiss a fulfillment alert",
+		Tags:        []string{"fulfillment"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeNoContentOutput, error) {
+		rawURL := "/v1/fulfillment/alerts/" + url.PathEscape(hi.AlertID)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodDelete, rawURL, nil, map[string]string{"alertID": hi.AlertID})
+		rr := httptest.NewRecorder()
+		g.handleDELETEFulfillmentAlert(rr, req)
+		if err := nodeBridgeNoContent(rr); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	})
+}
+
+func (g *Gateway) registerFulfillmentRules(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "fulfillment-get-rules",
+		Method:      http.MethodGet,
+		Path:        "/v1/fulfillment/rules",
+		Summary:     "List fulfillment auto-action rules",
+		Tags:        []string{"fulfillment"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/fulfillment/rules", nil)
+		rr := httptest.NewRecorder()
+		g.handleGETFulfillmentRules(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerFulfillmentCreateRule(api huma.API) {
+	type in struct {
+		Body json.RawMessage `json:",omitempty"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "fulfillment-post-rule",
+		Method:      http.MethodPost,
+		Path:        "/v1/fulfillment/rules",
+		Summary:     "Create a fulfillment auto-action rule",
+		Tags:        []string{"fulfillment"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/fulfillment/rules", bytes.NewReader(hi.Body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePOSTFulfillmentRule(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerFulfillmentDeleteRule(api huma.API) {
+	type in struct {
+		RuleID string `path:"ruleID" doc:"Rule ID to delete."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "fulfillment-delete-rule",
+		Method:      http.MethodDelete,
+		Path:        "/v1/fulfillment/rules/{ruleID}",
+		Summary:     "Delete a fulfillment auto-action rule",
+		Tags:        []string{"fulfillment"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeNoContentOutput, error) {
+		rawURL := "/v1/fulfillment/rules/" + url.PathEscape(hi.RuleID)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodDelete, rawURL, nil, map[string]string{"ruleID": hi.RuleID})
+		rr := httptest.NewRecorder()
+		g.handleDELETEFulfillmentRule(rr, req)
+		if err := nodeBridgeNoContent(rr); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	})
 }
 

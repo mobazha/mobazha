@@ -256,7 +256,15 @@ type FulfillmentRecipient struct {
 }
 
 // FulfillmentItem is a line item in a fulfillment order.
+//
+// Provider-specific routing of these fields:
+//   - Printful uses SyncVariantID alone (its sync_variant identifies both the
+//     sync product and the variant) or CatalogVariantID for catalog passthrough.
+//   - Printify needs BOTH a sync product ID and a variant ID. SyncProductID
+//     carries the Printify product identifier; SyncVariantID (or
+//     CatalogVariantID) carries the numeric variant ID.
 type FulfillmentItem struct {
+	SyncProductID    string            `json:"syncProductId,omitempty"`
 	SyncVariantID    string            `json:"syncVariantId,omitempty"`
 	CatalogVariantID string            `json:"catalogVariantId,omitempty"`
 	Quantity         int               `json:"quantity"`
@@ -418,6 +426,11 @@ type FulfillmentWebhookEvent struct {
 	ExternalID string                 `json:"externalId"`
 	Data       interface{}            `json:"data"`
 	Timestamp  time.Time              `json:"timestamp"`
+
+	// SyncProductID and SyncProductName are populated for product-level
+	// webhooks (product_synced, stock_updated) that have no associated order.
+	SyncProductID   string `json:"syncProductId,omitempty"`
+	SyncProductName string `json:"syncProductName,omitempty"`
 }
 
 // FulfillmentWebhookType classifies the type of supplier webhook event.

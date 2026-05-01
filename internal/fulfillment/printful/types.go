@@ -209,8 +209,9 @@ type pfWebhookPayload struct {
 }
 
 type pfWebhookData struct {
-	Order    *pfOrder    `json:"order,omitempty"`
-	Shipment *pfShipment `json:"shipment,omitempty"`
+	Order       *pfOrder             `json:"order,omitempty"`
+	Shipment    *pfShipment          `json:"shipment,omitempty"`
+	SyncProduct *pfSyncProductSummary `json:"sync_product,omitempty"`
 }
 
 // pfCreateOrderRequest is the POST /orders request body.

@@ -198,10 +198,12 @@ func (ProcessedFulfillmentEvent) TableName() string { return "processed_fulfillm
 type AlertType string
 
 const (
-	AlertTypeStockOut   AlertType = "stock_out"
-	AlertTypeStockBack  AlertType = "stock_back"
-	AlertTypePriceDrift AlertType = "price_drift"
-	AlertTypeRuleAction AlertType = "rule_action"
+	AlertTypeStockOut            AlertType = "stock_out"
+	AlertTypeStockBack           AlertType = "stock_back"
+	AlertTypePriceDrift          AlertType = "price_drift"
+	AlertTypeRuleAction          AlertType = "rule_action"
+	AlertTypeProductChanged      AlertType = "product_changed"
+	AlertTypeProductDiscontinued AlertType = "product_discontinued"
 )
 
 // AlertSeverity indicates priority.
@@ -239,9 +241,11 @@ func (SupplyChainAlert) TableName() string { return "supply_chain_alerts" }
 type RuleTrigger string
 
 const (
-	RuleTriggerStockOut   RuleTrigger = "stock_out"
-	RuleTriggerStockBack  RuleTrigger = "stock_back"
-	RuleTriggerPriceDrift RuleTrigger = "price_drift"
+	RuleTriggerStockOut           RuleTrigger = "stock_out"
+	RuleTriggerStockBack          RuleTrigger = "stock_back"
+	RuleTriggerPriceDrift         RuleTrigger = "price_drift"
+	RuleTriggerProductCostChanged RuleTrigger = "product_cost_changed"
+	RuleTriggerProductDiscontinued RuleTrigger = "product_discontinued"
 )
 
 // RuleAction defines what happens when a rule fires.
@@ -252,6 +256,12 @@ const (
 	RuleActionShowListing  RuleAction = "show_listing"
 	RuleActionPauseListing RuleAction = "pause_listing"
 	RuleActionNotifyOnly   RuleAction = "notify_only"
+	RuleActionAutoDelist   RuleAction = "auto_delist"
+	// Note: an "auto_update_price" action was considered but removed — the
+	// monitor goroutine cannot safely sign + republish a listing, so the
+	// action would have been a misleading name for "notify". Sellers who
+	// want a heads-up on supplier cost changes use trigger
+	// `product_cost_changed` with action `notify_only`.
 )
 
 // AutoActionRule stores seller-configurable automation rules.

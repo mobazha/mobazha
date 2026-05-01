@@ -102,6 +102,7 @@ func getAllToolRegistrars(bf BridgeFactory, opts *ServerOptions) []ToolRegistrar
 	all = append(all, collectionsToolRegistrars(bf)...)
 	all = append(all, settingsToolRegistrars(bf)...)
 	all = append(all, fiatToolRegistrars(bf)...)
+	all = append(all, fulfillmentToolRegistrars(bf)...)
 
 	if opts != nil && opts.SearchURL != "" {
 		searchBridge := NewHTTPBridge(opts.SearchURL, "", "", nil)

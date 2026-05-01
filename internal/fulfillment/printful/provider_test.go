@@ -365,6 +365,50 @@ func TestParseWebhook_FullyFulfilledShipped(t *testing.T) {
 	}
 }
 
+func TestParseWebhook_ProductSynced(t *testing.T) {
+	payload := []byte(`{
+		"type": "product_synced",
+		"created": 1714000002,
+		"store": 1,
+		"data": {
+			"sync_product": {
+				"id": 42,
+				"external_id": "ext-42",
+				"name": "My Custom T-Shirt",
+				"variants": 3,
+				"synced": 3,
+				"thumbnail_url": "https://example.com/thumb.jpg",
+				"is_ignored": false
+			}
+		}
+	}`)
+
+	p := NewProvider("token", "")
+	event, err := p.ParseWebhook(context.Background(), payload, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if event.Type != contracts.FulfillmentWebhookProductSynced {
+		t.Errorf("expected product_synced, got %q", event.Type)
+	}
+	if event.SyncProductID != "42" {
+		t.Errorf("expected SyncProductID '42', got %q", event.SyncProductID)
+	}
+	if event.SyncProductName != "My Custom T-Shirt" {
+		t.Errorf("expected SyncProductName 'My Custom T-Shirt', got %q", event.SyncProductName)
+	}
+	if event.OrderID != "" {
+		t.Errorf("product_synced should have no OrderID, got %q", event.OrderID)
+	}
+	if event.ExternalID != "" {
+		t.Errorf("product_synced should have no ExternalID, got %q", event.ExternalID)
+	}
+	wantEventIDPrefix := "product_synced_sp42_"
+	if !strings.HasPrefix(event.EventID, wantEventIDPrefix) {
+		t.Errorf("EventID should start with %q, got %q", wantEventIDPrefix, event.EventID)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Rate Limiting (429)
 // ---------------------------------------------------------------------------

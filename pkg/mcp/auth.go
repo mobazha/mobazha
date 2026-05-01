@@ -114,6 +114,14 @@ var toolScopeRequirement = map[string]string{
 	"discounts_delete":         string(contracts.ScopeDiscountsWrite),
 	"collections_create":       string(contracts.ScopeCollectionsWrite),
 	"collections_add_products": string(contracts.ScopeCollectionsWrite),
+
+	// Fulfillment / Sourcing tools
+	"sourcing_list_providers":      string(contracts.ScopeFulfillmentRead),
+	"sourcing_browse_catalog":      string(contracts.ScopeFulfillmentRead),
+	"sourcing_list_designs":        string(contracts.ScopeFulfillmentRead),
+	"sourcing_list_synced_products": string(contracts.ScopeFulfillmentRead),
+	"sourcing_check_price_drift":   string(contracts.ScopeFulfillmentRead),
+	"sourcing_import_product":      string(contracts.ScopeFulfillmentManage),
 }
 
 // FilterToolsByScopes returns tool names that the given scopes permit.

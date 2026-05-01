@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -109,7 +109,7 @@ type mockNodeWithFiat struct {
 func (m *mockNodeWithFiat) Fiat() contracts.FiatService { return m.fiatSvc }
 
 // newFiatHandlerRequest creates an http.Request with the mock node injected in context
-// and optional mux vars.
+// and optional chi URL params.
 func newFiatHandlerRequest(t *testing.T, method, path string, body interface{}, vars map[string]string, fiatSvc *mockFiatService) *http.Request {
 	t.Helper()
 	var buf bytes.Buffer
@@ -124,7 +124,11 @@ func newFiatHandlerRequest(t *testing.T, method, path string, body interface{}, 
 	req = req.WithContext(ctx)
 
 	if len(vars) > 0 {
-		req = mux.SetURLVars(req, vars)
+		rctx := chi.NewRouteContext()
+		for k, v := range vars {
+			rctx.URLParams.Add(k, v)
+		}
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 	}
 	return req
 }

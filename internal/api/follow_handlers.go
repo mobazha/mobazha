@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 func (g *Gateway) handleGETFollowers(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
+	peerIDStr := chi.URLParam(r, "peerID")
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
@@ -54,7 +54,7 @@ func (g *Gateway) handleGETFollowers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETFollowing(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
+	peerIDStr := chi.URLParam(r, "peerID")
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
@@ -96,7 +96,7 @@ func (g *Gateway) handleGETFollowing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETFollowsMe(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
+	peerIDStr := chi.URLParam(r, "peerID")
 	pid, err := peer.Decode(peerIDStr)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -118,7 +118,7 @@ func (g *Gateway) handleGETFollowsMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTFollow(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
+	peerIDStr := chi.URLParam(r, "peerID")
 	pid, err := peer.Decode(peerIDStr)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -137,7 +137,7 @@ func (g *Gateway) handlePOSTFollow(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTUnFollow(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
+	peerIDStr := chi.URLParam(r, "peerID")
 	pid, err := peer.Decode(peerIDStr)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())

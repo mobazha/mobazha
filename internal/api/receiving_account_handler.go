@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -133,8 +133,7 @@ func (g *Gateway) DeleteReceivingAccount(w http.ResponseWriter, r *http.Request)
 	node := getWalletService(r)
 
 	// 从URL路径获取账户ID
-	vars := mux.Vars(r)
-	idStr := vars["id"]
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, "无效的账户ID")

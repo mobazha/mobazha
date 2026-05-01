@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/mcpconnect"
 	"github.com/mobazha/mobazha3.0/pkg/apitoken"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -119,7 +119,7 @@ func (g *Gateway) handlePOSTMCPConnectClient(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	clientName := mux.Vars(r)["client"]
+	clientName := chi.URLParam(r, "client")
 	if clientName == "" {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "client name required")
 		return
@@ -266,7 +266,7 @@ func (g *Gateway) handlePOSTMCPDisconnect(w http.ResponseWriter, r *http.Request
 
 // handlePOSTMCPDisconnectClient removes MCP configuration from a specific client.
 func (g *Gateway) handlePOSTMCPDisconnectClient(w http.ResponseWriter, r *http.Request) {
-	clientName := mux.Vars(r)["client"]
+	clientName := chi.URLParam(r, "client")
 	if clientName == "" {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "client name required")
 		return

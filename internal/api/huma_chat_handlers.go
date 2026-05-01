@@ -37,8 +37,10 @@ func (g *Gateway) registerNodeHumaChatOperations(api huma.API) {
 	g.registerChatGetRoomSettings(api)
 	g.registerChatPutRoomSettings(api)
 
-	// Media (avatar + upload are mux passthrough in routes.go — multipart)
+	// Media
 	g.registerChatMediaDownload(api)
+	g.registerChatSetRoomAvatar(api)
+	g.registerChatMediaUpload(api)
 
 	// Block
 	g.registerChatBlockUser(api)
@@ -794,6 +796,53 @@ func (g *Gateway) registerChatGetStatus(api huma.API) {
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		rr := httptest.NewRecorder()
 		g.handleGETMatrixChatStatus(rr, nodeBridgeRequest(ctx, http.MethodGet, "/v1/chat/status", nil))
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerChatSetRoomAvatar(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID:  "chat-set-room-avatar",
+		Method:       http.MethodPost,
+		Path:         "/v1/chat/rooms/{roomID}/avatar",
+		Summary:      "Set chat room avatar (multipart)",
+		Tags:         []string{"chat"},
+		Security:     nodeAuthSecurity,
+		MaxBodyBytes: 10 << 20,
+	}, func(ctx context.Context, in *nodeMultipartWithRoomInput) (*nodeDataOutput, error) {
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, "/v1/chat/rooms/"+in.RoomID+"/avatar",
+			bytes.NewReader(in.RawBody), map[string]string{"roomID": in.RoomID})
+		req.Header.Set("Content-Type", in.ContentType)
+		req.ContentLength = int64(len(in.RawBody))
+		rr := httptest.NewRecorder()
+		g.handlePOSTMatrixChatRoomAvatar(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerChatMediaUpload(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID:  "chat-media-upload",
+		Method:       http.MethodPost,
+		Path:         "/v1/chat/media/upload",
+		Summary:      "Upload chat media (multipart)",
+		Tags:         []string{"chat"},
+		Security:     nodeAuthSecurity,
+		MaxBodyBytes: 50 << 20,
+	}, func(ctx context.Context, in *nodeMultipartInput) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/chat/media/upload", bytes.NewReader(in.RawBody))
+		req.Header.Set("Content-Type", in.ContentType)
+		req.ContentLength = int64(len(in.RawBody))
+		rr := httptest.NewRecorder()
+		g.handlePOSTMatrixChatMediaUpload(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

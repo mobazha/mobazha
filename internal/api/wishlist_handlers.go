@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -86,9 +86,8 @@ func (g *Gateway) handleDELETEWishlist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vars := mux.Vars(r)
-	peerID := vars["peerID"]
-	slug := vars["slug"]
+	peerID := chi.URLParam(r, "peerID")
+	slug := chi.URLParam(r, "slug")
 	if peerID == "" || slug == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "peerID and slug are required")
 		return

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/apitoken"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
@@ -188,7 +188,7 @@ func (g *Gateway) handleDELETEAuthToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	idStr := mux.Vars(r)["tokenID"]
+	idStr := chi.URLParam(r, "tokenID")
 	tokenID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "invalid token ID")

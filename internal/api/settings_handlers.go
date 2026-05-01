@@ -8,7 +8,7 @@ import (
 	"os"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -111,7 +111,7 @@ func (g *Gateway) handleGetUserPreferences(w http.ResponseWriter, r *http.Reques
 func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request) {
 	exchange := getExchangeRateService(r)
 
-	currencyCode := mux.Vars(r)["currencyCode"]
+	currencyCode := chi.URLParam(r, "currencyCode")
 
 	var base models.CurrencyCode
 	if currencyCode != "" {

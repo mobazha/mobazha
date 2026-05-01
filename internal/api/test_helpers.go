@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	tnet "github.com/libp2p/go-libp2p-testing/net"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -85,10 +86,11 @@ func runAPITests(t *testing.T, tests apiTests) {
 		},
 		config: &GatewayConfig{},
 	}
-	r := gateway.newV1Router()
-	r.Use(gateway.NodeSelectionMiddleware)
+	outer := chi.NewMux()
+	outer.Use(gateway.NodeSelectionMiddleware)
+	outer.Mount("/", gateway.newV1Router())
 
-	ts := httptest.NewServer(r)
+	ts := httptest.NewServer(outer)
 	defer ts.Close()
 
 	for _, test := range tests {

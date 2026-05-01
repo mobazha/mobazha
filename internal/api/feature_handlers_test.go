@@ -18,7 +18,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -135,16 +135,15 @@ func featureTestServer(t *testing.T, node contracts.NodeService) *httptest.Serve
 
 	g := &Gateway{}
 
-	r := mux.NewRouter()
-	r.HandleFunc("/v1/features", g.handleGETFeatures).Methods("GET")
-	r.HandleFunc("/v1/settings/features/{key}", g.handlePUTFeatureSetting).Methods("PUT")
-
+	r := chi.NewMux()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, node)
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+	r.Get("/v1/features", g.handleGETFeatures)
+	r.Put("/v1/settings/features/{key}", g.handlePUTFeatureSetting)
 
 	ts := httptest.NewServer(r)
 	t.Cleanup(ts.Close)

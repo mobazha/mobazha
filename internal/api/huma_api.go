@@ -1,12 +1,12 @@
 // Package api — huma_api.go
 //
-// AH-1.4: Establishes the huma v2 + humamux base wiring for the Node
+// AH-1.4: Establishes the huma v2 + humachi base wiring for the Node
 // business API (/v1/*). Mirrors the hosting huma scaffold (AH-1.2/1.3)
 // with adaptations for the Node auth model (Basic Auth / JWT / API Token).
 //
 // Architectural choices (shared with hosting, locked in AH-1.2):
-//   - Shared gorilla/mux router. huma operations register directly on
-//     the existing V1 mux.
+//   - Shared chi router. huma operations register directly on
+//     the existing V1 chi mux.
 //   - OpenAPI 3.1 spec served at /v1/openapi.json.
 //   - Per-route auth via huma.Operation.Security + auth bridge middleware.
 package api
@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humamux"
-	"github.com/gorilla/mux"
+	"github.com/danielgtaylor/huma/v2/adapters/humachi"
+	"github.com/go-chi/chi/v5"
 )
 
 const (
@@ -43,7 +43,7 @@ const (
 
 // registerHumaAPI installs the huma adapter onto the V1 router and
 // registers all huma-managed operations.
-func (g *Gateway) registerHumaAPI(r *mux.Router) huma.API {
+func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 	cfg := huma.DefaultConfig(nodeHumaAPITitle, nodeHumaAPIVersion)
 	cfg.Info.Description = nodeHumaAPIDescription
 
@@ -84,7 +84,7 @@ func (g *Gateway) registerHumaAPI(r *mux.Router) huma.API {
 
 	installNodeHumaEnvelope(&cfg)
 
-	api := humamux.New(r, cfg)
+	api := humachi.New(r, cfg)
 
 	g.installNodeHumaMiddlewares(api)
 

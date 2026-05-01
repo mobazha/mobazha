@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -40,9 +40,9 @@ func extractRequestContext(r *http.Request) *request.Context {
 }
 
 func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
-	listingIDStr := mux.Vars(r)["listingID"]
-	peerIDStr := mux.Vars(r)["peerID"]
-	slug := mux.Vars(r)["slug"]
+	listingIDStr := chi.URLParam(r, "listingID")
+	peerIDStr := chi.URLParam(r, "peerID")
+	slug := chi.URLParam(r, "slug")
 
 	ls := getListingService(r)
 	is := getIdentityService(r)
@@ -97,7 +97,7 @@ func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETMyListing(w http.ResponseWriter, r *http.Request) {
-	slugOrCid := mux.Vars(r)["slugOrCID"]
+	slugOrCid := chi.URLParam(r, "slugOrCID")
 
 	var (
 		slug    string
@@ -130,7 +130,7 @@ func (g *Gateway) handleGETMyListing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
+	peerIDStr := chi.URLParam(r, "peerID")
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 	var (
 		listingIndex models.ListingIndex
@@ -359,7 +359,7 @@ func (g *Gateway) handlePUTListing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleDELETEListing(w http.ResponseWriter, r *http.Request) {
-	slug := mux.Vars(r)["slug"]
+	slug := chi.URLParam(r, "slug")
 
 	ls := getListingService(r)
 

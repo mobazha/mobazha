@@ -8,22 +8,22 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humamux"
-	"github.com/gorilla/mux"
+	"github.com/danielgtaylor/huma/v2/adapters/humachi"
+	"github.com/go-chi/chi/v5"
 )
 
 // TestNodeOpenAPI_OperationIDSnapshot asserts that every huma-registered
 // operation appears in the generated OpenAPI spec with the expected ID.
 // Add new IDs to expectedOps when migrating handlers.
 func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
-	r := mux.NewRouter()
+	r := chi.NewMux()
 
 	cfg := huma.DefaultConfig(nodeHumaAPITitle, nodeHumaAPIVersion)
 	cfg.OpenAPIPath = "/v1/openapi"
 	cfg.DocsPath = "/v1/docs"
 	cfg.SchemasPath = "/v1/schemas"
 	installNodeHumaEnvelope(&cfg)
-	api := humamux.New(r, cfg)
+	api := humachi.New(r, cfg)
 
 	g := &Gateway{}
 	g.registerNodeHumaSmokeRoutes(api)

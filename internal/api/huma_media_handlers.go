@@ -43,6 +43,8 @@ func (g *Gateway) registerNodeHumaMediaOperations(api huma.API) {
 	g.registerMediaPostImages(api)
 	g.registerMediaPostProductImages(api)
 
+	g.registerMediaPostFile(api)
+
 	g.registerMediaGetImage(api)
 	g.registerProfilesGetAvatar(api)
 	g.registerProfilesGetHeader(api)
@@ -139,6 +141,29 @@ func (g *Gateway) registerMediaPostProductImages(api huma.API) {
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handlePOSTProductImage(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerMediaPostFile(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID:  "media-post-file",
+		Method:       http.MethodPost,
+		Path:         "/v1/media/files",
+		Summary:      "Upload arbitrary media file (multipart)",
+		Tags:         []string{"media"},
+		Security:     nodeAuthSecurity,
+		MaxBodyBytes: 50 << 20,
+	}, func(ctx context.Context, in *nodeMultipartInput) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/media/files", bytes.NewReader(in.RawBody))
+		req.Header.Set("Content-Type", in.ContentType)
+		req.ContentLength = int64(len(in.RawBody))
+		rr := httptest.NewRecorder()
+		g.handlePOSTFile(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

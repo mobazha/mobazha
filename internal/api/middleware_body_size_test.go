@@ -6,20 +6,20 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 func TestMaxBodySizeMiddleware_JSON_UnderLimit(t *testing.T) {
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(1024))
-	r.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/test", func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(r.Body); err != nil {
 			http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	}).Methods("POST")
+	})
 
 	body := bytes.Repeat([]byte("a"), 512)
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader(body))
@@ -33,9 +33,9 @@ func TestMaxBodySizeMiddleware_JSON_UnderLimit(t *testing.T) {
 }
 
 func TestMaxBodySizeMiddleware_JSON_OverLimit(t *testing.T) {
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(1024))
-	r.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/test", func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(r.Body); err != nil {
 			if handleMaxBytesError(w, err) {
@@ -45,7 +45,7 @@ func TestMaxBodySizeMiddleware_JSON_OverLimit(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	}).Methods("POST")
+	})
 
 	body := bytes.Repeat([]byte("a"), 2048)
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader(body))
@@ -59,16 +59,16 @@ func TestMaxBodySizeMiddleware_JSON_OverLimit(t *testing.T) {
 }
 
 func TestMaxBodySizeMiddleware_Multipart_Exempt(t *testing.T) {
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(1024))
-	r.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(r.Body); err != nil {
 			http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	}).Methods("POST")
+	})
 
 	body := bytes.Repeat([]byte("a"), 2048)
 	req := httptest.NewRequest("POST", "/upload", bytes.NewReader(body))
@@ -82,11 +82,11 @@ func TestMaxBodySizeMiddleware_Multipart_Exempt(t *testing.T) {
 }
 
 func TestMaxBodySizeMiddleware_GET_NoLimit(t *testing.T) {
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(1024))
-	r.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}).Methods("GET")
+	})
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	rr := httptest.NewRecorder()
@@ -98,9 +98,9 @@ func TestMaxBodySizeMiddleware_GET_NoLimit(t *testing.T) {
 }
 
 func TestMaxBodySizeMiddleware_MediaPath_HigherLimit(t *testing.T) {
-	r := mux.NewRouter()
-	r.Use(maxBodySizeMiddleware(1024)) // 1 KB default
-	r.HandleFunc("/v1/media/product-images", func(w http.ResponseWriter, r *http.Request) {
+	r := chi.NewMux()
+	r.Use(maxBodySizeMiddleware(1024))
+	r.Post("/v1/media/product-images", func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(r.Body); err != nil {
 			if handleMaxBytesError(w, err) {
@@ -110,9 +110,8 @@ func TestMaxBodySizeMiddleware_MediaPath_HigherLimit(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	}).Methods("POST")
+	})
 
-	// 2 KB body exceeds default 1 KB but is under mediaMaxBodySize
 	body := bytes.Repeat([]byte("a"), 2048)
 	req := httptest.NewRequest("POST", "/v1/media/product-images", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -125,9 +124,9 @@ func TestMaxBodySizeMiddleware_MediaPath_HigherLimit(t *testing.T) {
 }
 
 func TestMaxBodySizeMiddleware_NonMediaPath_DefaultLimit(t *testing.T) {
-	r := mux.NewRouter()
-	r.Use(maxBodySizeMiddleware(1024)) // 1 KB default
-	r.HandleFunc("/v1/orders", func(w http.ResponseWriter, r *http.Request) {
+	r := chi.NewMux()
+	r.Use(maxBodySizeMiddleware(1024))
+	r.Post("/v1/orders", func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(r.Body); err != nil {
 			if handleMaxBytesError(w, err) {
@@ -137,9 +136,8 @@ func TestMaxBodySizeMiddleware_NonMediaPath_DefaultLimit(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	}).Methods("POST")
+	})
 
-	// 2 KB body exceeds default 1 KB — non-media path should be rejected
 	body := bytes.Repeat([]byte("a"), 2048)
 	req := httptest.NewRequest("POST", "/v1/orders", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -156,10 +154,10 @@ func TestIsMaxBytesError(t *testing.T) {
 		t.Error("expected false for nil error")
 	}
 
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(10))
 	var capturedErr error
-	r.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/test", func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		_, capturedErr = buf.ReadFrom(r.Body)
 		if capturedErr != nil {
@@ -167,7 +165,7 @@ func TestIsMaxBytesError(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	}).Methods("POST")
+	})
 
 	body := bytes.Repeat([]byte("a"), 100)
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader(body))

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -14,7 +14,7 @@ import (
 )
 
 func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -64,7 +64,7 @@ func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) 
 }
 
 func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -103,7 +103,7 @@ func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -139,7 +139,7 @@ func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handlePOSTOpenAfterSaleDispute(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -165,7 +165,7 @@ func (g *Gateway) handlePOSTOpenAfterSaleDispute(w http.ResponseWriter, r *http.
 }
 
 func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
@@ -190,7 +190,7 @@ func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request
 }
 
 func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return

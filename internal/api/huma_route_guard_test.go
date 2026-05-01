@@ -3,12 +3,13 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 // newTestGatewayForRouting creates a minimal Gateway that can register
@@ -79,9 +80,9 @@ func isActivatedDomain(path string) bool {
 	return false
 }
 
-// collectRouteCollisions walks the router and returns all method+path
+// collectRouteCollisions walks the chi router and returns all method+path
 // pairs that are registered more than once.
-func collectRouteCollisions(r *mux.Router) []string {
+func collectRouteCollisions(r chi.Router) []string {
 	type routeKey struct {
 		method   string
 		template string
@@ -90,21 +91,11 @@ func collectRouteCollisions(r *mux.Router) []string {
 	seen := map[routeKey]int{}
 	var collisions []string
 
-	_ = r.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
-		tmpl, err := route.GetPathTemplate()
-		if err != nil {
-			return nil
-		}
-		methods, err := route.GetMethods()
-		if err != nil {
-			return nil
-		}
-		for _, m := range methods {
-			key := routeKey{method: m, template: tmpl}
-			seen[key]++
-			if seen[key] == 2 {
-				collisions = append(collisions, fmt.Sprintf("%s %s", m, tmpl))
-			}
+	_ = chi.Walk(r, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		key := routeKey{method: method, template: route}
+		seen[key]++
+		if seen[key] == 2 {
+			collisions = append(collisions, fmt.Sprintf("%s %s", method, route))
 		}
 		return nil
 	})
@@ -116,7 +107,7 @@ func collectRouteCollisions(r *mux.Router) []string {
 // domain still has a collision with legacy routes.
 func TestAH14_NoRouteCollision_ActivatedDomains(t *testing.T) {
 	g := newTestGatewayForRouting()
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	g.registerBusinessRoutes(r)
 	g.registerHumaAPI(r)
@@ -144,71 +135,12 @@ func TestAH14_NoRouteCollision_ActivatedDomains(t *testing.T) {
 	}
 }
 
-// TestAH14_MuxPassthroughRoutes_Documented ensures that every route in
-// registerBusinessRoutes() (routes.go) is explicitly documented here.
-// These routes are NOT in the Huma OpenAPI surface. If you add or remove
-// a mux-only route you must update this list, preventing silent drift
-// between the live API and the generated spec.
-func TestAH14_MuxPassthroughRoutes_Documented(t *testing.T) {
-	g := newTestGatewayForRouting()
-
-	muxRouter := mux.NewRouter()
-	g.registerBusinessRoutes(muxRouter)
-
-	var actual []string
-	_ = muxRouter.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
-		tmpl, err := route.GetPathTemplate()
-		if err != nil {
-			return nil
-		}
-		methods, err := route.GetMethods()
-		if err != nil {
-			return nil
-		}
-		for _, m := range methods {
-			actual = append(actual, fmt.Sprintf("%s %s", m, tmpl))
-		}
-		return nil
-	})
-	sort.Strings(actual)
-
-	// Exhaustive documented set. Each entry is a route that cannot use the
-	// Huma JSON bridge and must remain as a direct mux handler:
-	//
-	//  multipart/form-data routes: Huma bridge wraps bodies as json.RawMessage,
-	//    which is incompatible with multipart uploads (avatars, media, ZIP import, files).
-	//
-	//  public storefront discount helpers: {peerID} path param conflicts with
-	//    {discountID} under /v1/discounts/ in gorilla/mux; chi migration will resolve.
-	documented := []string{
-		"GET /v1/discounts/{peerID}/applicable",
-		"POST /v1/chat/media/upload",
-		"POST /v1/chat/rooms/{roomID}/avatar",
-		"POST /v1/discounts/{peerID}/calculate",
-		"POST /v1/discounts/{peerID}/validate",
-		"POST /v1/listings/import",
-		"POST /v1/media/files",
-	}
-
-	if len(actual) != len(documented) {
-		t.Fatalf("mux-only route count mismatch: got %d, documented %d\n"+
-			"  got:        %v\n  documented: %v",
-			len(actual), len(documented), actual, documented)
-	}
-	for i := range documented {
-		if actual[i] != documented[i] {
-			t.Errorf("mux-only route mismatch at [%d]: got %q, documented %q",
-				i, actual[i], documented[i])
-		}
-	}
-}
-
 // TestAH14_ActivatedRoutesServedByHuma verifies that after legacy routes
 // are removed, representative endpoints from each activated domain are
 // still matched by the router (served by Huma handlers).
 func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 	g := newTestGatewayForRouting()
-	r := mux.NewRouter()
+	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	g.registerBusinessRoutes(r)
 	g.registerHumaAPI(r)
@@ -289,19 +221,28 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 		{"PUT", "/v1/blocklist/peer1"},
 		{"GET", "/v1/peers"},
 		{"GET", "/v1/config"},
-		// Multipart passthrough (mux, not Huma)
+		// AH-1.5: Multipart passthrough (migrated to Huma)
 		{"POST", "/v1/chat/rooms/room1/avatar"},
 		{"POST", "/v1/chat/media/upload"},
 		{"POST", "/v1/listings/import"},
 		{"POST", "/v1/media/files"},
+		// AH-1.6: Public discount helpers (migrated to Huma)
+		{"POST", "/v1/discounts/peer1/validate"},
+		{"GET", "/v1/discounts/peer1/applicable"},
+		{"POST", "/v1/discounts/peer1/calculate"},
 	}
 
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("%s_%s", tc.method, tc.path), func(t *testing.T) {
 			req, _ := http.NewRequest(tc.method, tc.path, nil)
-			var match mux.RouteMatch
-			if !r.Match(req, &match) {
-				t.Fatalf("no route matched %s %s — Huma handler missing?", tc.method, tc.path)
+			rr := httptest.NewRecorder()
+			func() {
+				defer func() { recover() }()
+				r.ServeHTTP(rr, req)
+			}()
+			if rr.Code == http.StatusNotFound || rr.Code == http.StatusMethodNotAllowed {
+				t.Fatalf("no route matched %s %s (status %d) — Huma handler missing?",
+					tc.method, tc.path, rr.Code)
 			}
 		})
 	}

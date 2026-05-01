@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -110,16 +111,16 @@ func guestTestServer(t *testing.T, svc *mockGuestOrderService) *httptest.Server 
 		config:            &GatewayConfig{},
 		guestOrderLimiter: newRateLimiter(1000, time.Hour), // generous limit for tests
 	}
-	r := gateway.newV1Router()
-
-	r.Use(func(next http.Handler) http.Handler {
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+	outer.Mount("/", gateway.newV1Router())
 
-	ts := httptest.NewServer(r)
+	ts := httptest.NewServer(outer)
 	t.Cleanup(ts.Close)
 	return ts
 }
@@ -363,13 +364,14 @@ func TestShipGuestOrder_Valid(t *testing.T) {
 		config:            &GatewayConfig{},
 		guestOrderLimiter: newRateLimiter(1000, time.Hour),
 	}
-	r := gateway.newV1Router()
-	r.Use(func(next http.Handler) http.Handler {
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+	outer.Mount("/", gateway.newV1Router())
 
 	body, _ := json.Marshal(map[string]string{
 		"trackingNumber": "TRACK123",
@@ -379,7 +381,7 @@ func TestShipGuestOrder_Valid(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("PUT", "/v1/guest/orders/tok_test/ship", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(rr, req)
+	outer.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d, body: %s", rr.Code, rr.Body.String())
@@ -411,17 +413,18 @@ func TestGETGuestCheckoutSettings(t *testing.T) {
 		config:            &GatewayConfig{},
 		guestOrderLimiter: newRateLimiter(1000, time.Hour),
 	}
-	r := gateway.newV1Router()
-	r.Use(func(next http.Handler) http.Handler {
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+	outer.Mount("/", gateway.newV1Router())
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/v1/settings/guest-checkout", nil)
-	r.ServeHTTP(rr, req)
+	outer.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d, body: %s", rr.Code, rr.Body.String())
@@ -459,13 +462,14 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 		config:            &GatewayConfig{},
 		guestOrderLimiter: newRateLimiter(1000, time.Hour),
 	}
-	r := gateway.newV1Router()
-	r.Use(func(next http.Handler) http.Handler {
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+	outer.Mount("/", gateway.newV1Router())
 
 	body, _ := json.Marshal(models.GuestCheckoutConfig{
 		Enabled:        true,
@@ -476,7 +480,7 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("PUT", "/v1/settings/guest-checkout", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(rr, req)
+	outer.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d, body: %s", rr.Code, rr.Body.String())
@@ -522,17 +526,18 @@ func TestCompleteGuestOrder_Valid(t *testing.T) {
 		config:            &GatewayConfig{},
 		guestOrderLimiter: newRateLimiter(1000, time.Hour),
 	}
-	r := gateway.newV1Router()
-	r.Use(func(next http.Handler) http.Handler {
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+	outer.Mount("/", gateway.newV1Router())
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("PUT", "/v1/guest/orders/tok_xyz/complete", nil)
-	r.ServeHTTP(rr, req)
+	outer.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d, body: %s", rr.Code, rr.Body.String())
@@ -552,15 +557,16 @@ func TestGuestOrder_NotImplemented(t *testing.T) {
 		config:            &GatewayConfig{},
 		guestOrderLimiter: newRateLimiter(1000, time.Hour),
 	}
-	r := gateway.newV1Router()
-	r.Use(func(next http.Handler) http.Handler {
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+	outer.Mount("/", gateway.newV1Router())
 
-	ts := httptest.NewServer(r)
+	ts := httptest.NewServer(outer)
 	defer ts.Close()
 
 	body, _ := json.Marshal(contracts.CreateGuestOrderRequest{

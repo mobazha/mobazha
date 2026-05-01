@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -19,7 +19,7 @@ import (
 )
 
 func (g *Gateway) handleGETImage(w http.ResponseWriter, r *http.Request) {
-	imageIDStr := mux.Vars(r)["imageID"]
+	imageIDStr := chi.URLParam(r, "imageID")
 
 	id, cerr := cid.Decode(imageIDStr)
 	if cerr != nil {
@@ -51,8 +51,8 @@ func (g *Gateway) handleGETImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETAvatar(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
-	sizeStr := mux.Vars(r)["size"]
+	peerIDStr := chi.URLParam(r, "peerID")
+	sizeStr := chi.URLParam(r, "size")
 
 	pid, cerr := peer.Decode(peerIDStr)
 	if cerr != nil {
@@ -76,8 +76,8 @@ func (g *Gateway) handleGETAvatar(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETHeader(w http.ResponseWriter, r *http.Request) {
-	peerIDStr := mux.Vars(r)["peerID"]
-	sizeStr := mux.Vars(r)["size"]
+	peerIDStr := chi.URLParam(r, "peerID")
+	sizeStr := chi.URLParam(r, "size")
 
 	pid, cerr := peer.Decode(peerIDStr)
 	if cerr != nil {

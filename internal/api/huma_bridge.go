@@ -9,13 +9,13 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
 // nodeBridgeRequest builds a synthetic *http.Request that carries the
 // huma-managed context (which includes nodeContextKey and AuthIdentity)
-// so legacy gorilla/mux handlers can read them via getNodeService(r)
+// so legacy handlers can read them via getNodeService(r)
 // and GetAuthIdentity(r.Context()).
 func nodeBridgeRequest(ctx context.Context, method, rawURL string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, rawURL, body)
@@ -23,11 +23,15 @@ func nodeBridgeRequest(ctx context.Context, method, rawURL string, body io.Reade
 }
 
 // nodeBridgeRequestWithVars is like nodeBridgeRequest but also injects
-// gorilla/mux path variables so legacy handlers using mux.Vars(r) work.
+// chi URL parameters so legacy handlers using chi.URLParam(r, key) work.
 func nodeBridgeRequestWithVars(ctx context.Context, method, rawURL string, body io.Reader, vars map[string]string) *http.Request {
 	req := nodeBridgeRequest(ctx, method, rawURL, body)
 	if len(vars) > 0 {
-		req = mux.SetURLVars(req, vars)
+		rctx := chi.NewRouteContext()
+		for k, v := range vars {
+			rctx.URLParams.Add(k, v)
+		}
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 	}
 	return req
 }
@@ -150,3 +154,17 @@ type nodeDataOutput struct {
 
 // nodeNoContentOutput is used for 204 responses.
 type nodeNoContentOutput struct{}
+
+// nodeMultipartInput carries a raw body (typically multipart/form-data) and
+// the original Content-Type header for bridging to legacy handlers.
+type nodeMultipartInput struct {
+	ContentType string `header:"Content-Type" required:"true"`
+	RawBody     []byte
+}
+
+// nodeMultipartWithRoomInput extends nodeMultipartInput with a room ID path param.
+type nodeMultipartWithRoomInput struct {
+	RoomID      string `path:"roomID" doc:"Matrix room ID."`
+	ContentType string `header:"Content-Type" required:"true"`
+	RawBody     []byte
+}

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -127,7 +127,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomJoin(w http.ResponseWriter, r *http.Re
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	if err := svc.JoinRoom(r.Context(), roomID); err != nil {
 		matrixChatError(w, err, "join room")
 		return
@@ -141,7 +141,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomLeave(w http.ResponseWriter, r *http.R
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	if err := svc.LeaveRoom(r.Context(), roomID); err != nil {
 		matrixChatError(w, err, "leave room")
 		return
@@ -155,7 +155,7 @@ func (g *Gateway) handleGETMatrixChatRoomMessages(w http.ResponseWriter, r *http
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	limitStr := r.URL.Query().Get("limit")
 	before := r.URL.Query().Get("before")
 	after := r.URL.Query().Get("after")
@@ -203,7 +203,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomMessage(w http.ResponseWriter, r *http
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	var req struct {
 		Body string `json:"body"`
 	}
@@ -230,9 +230,8 @@ func (g *Gateway) handlePUTMatrixChatRoomMessage(w http.ResponseWriter, r *http.
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	vars := mux.Vars(r)
-	roomID := vars["roomID"]
-	eventID := vars["eventID"]
+	roomID := chi.URLParam(r, "roomID")
+	eventID := chi.URLParam(r, "eventID")
 	var req struct {
 		Body string `json:"body"`
 	}
@@ -258,9 +257,8 @@ func (g *Gateway) handleDELETEMatrixChatRoomMessage(w http.ResponseWriter, r *ht
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	vars := mux.Vars(r)
-	roomID := vars["roomID"]
-	eventID := vars["eventID"]
+	roomID := chi.URLParam(r, "roomID")
+	eventID := chi.URLParam(r, "eventID")
 
 	if err := svc.RedactMessage(r.Context(), roomID, eventID); err != nil {
 		matrixChatError(w, err, "redact message")
@@ -275,9 +273,8 @@ func (g *Gateway) handlePOSTMatrixChatRoomReaction(w http.ResponseWriter, r *htt
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	vars := mux.Vars(r)
-	roomID := vars["roomID"]
-	eventID := vars["eventID"]
+	roomID := chi.URLParam(r, "roomID")
+	eventID := chi.URLParam(r, "eventID")
 
 	var req struct {
 		Key string `json:"key"`
@@ -305,7 +302,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomTyping(w http.ResponseWriter, r *http.
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	var req struct {
 		Typing bool `json:"typing"`
 	}
@@ -327,7 +324,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomRead(w http.ResponseWriter, r *http.Re
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	var req struct {
 		EventID string `json:"eventId"`
 	}
@@ -353,7 +350,7 @@ func (g *Gateway) handleGETMatrixChatRoomMembers(w http.ResponseWriter, r *http.
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	room, err := svc.GetRoom(r.Context(), roomID)
 	if err != nil {
 		matrixChatError(w, err, "get room members")
@@ -368,7 +365,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomInvite(w http.ResponseWriter, r *http.
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	var req struct {
 		UserID string `json:"userID"`
 	}
@@ -394,7 +391,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomKick(w http.ResponseWriter, r *http.Re
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	var req struct {
 		UserID string `json:"userID"`
 		Reason string `json:"reason"`
@@ -420,7 +417,7 @@ func (g *Gateway) handleGETMatrixChatRoomSettings(w http.ResponseWriter, r *http
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	room, err := svc.GetRoom(r.Context(), roomID)
 	if err != nil {
 		matrixChatError(w, err, "get room settings")
@@ -442,7 +439,7 @@ func (g *Gateway) handlePUTMatrixChatRoomSettings(w http.ResponseWriter, r *http
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 	var req struct {
 		Name  string  `json:"name"`
 		Topic *string `json:"topic"`
@@ -472,7 +469,7 @@ func (g *Gateway) handlePOSTMatrixChatRoomAvatar(w http.ResponseWriter, r *http.
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	roomID := mux.Vars(r)["roomID"]
+	roomID := chi.URLParam(r, "roomID")
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "file too large or invalid form")
@@ -539,9 +536,8 @@ func (g *Gateway) handleGETMatrixChatMediaDownload(w http.ResponseWriter, r *htt
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	vars := mux.Vars(r)
-	serverName := vars["serverName"]
-	mediaID := vars["mediaID"]
+	serverName := chi.URLParam(r, "serverName")
+	mediaID := chi.URLParam(r, "mediaID")
 
 	if !isValidMatrixServerName(serverName) {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid server name")
@@ -602,7 +598,7 @@ func (g *Gateway) handlePOSTMatrixChatUserBlock(w http.ResponseWriter, r *http.R
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	userID := mux.Vars(r)["userID"]
+	userID := chi.URLParam(r, "userID")
 	if userID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "userID is required")
 		return
@@ -620,7 +616,7 @@ func (g *Gateway) handleDELETEMatrixChatUserBlock(w http.ResponseWriter, r *http
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	userID := mux.Vars(r)["userID"]
+	userID := chi.URLParam(r, "userID")
 	if userID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "userID is required")
 		return
@@ -828,7 +824,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationAccept(w http.ResponseWriter, 
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	txnID := mux.Vars(r)["txnId"]
+	txnID := chi.URLParam(r, "txnId")
 	if txnID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "txnId is required")
 		return
@@ -850,7 +846,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationStartSAS(w http.ResponseWriter
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	txnID := mux.Vars(r)["txnId"]
+	txnID := chi.URLParam(r, "txnId")
 	if txnID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "txnId is required")
 		return
@@ -872,7 +868,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationConfirm(w http.ResponseWriter,
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	txnID := mux.Vars(r)["txnId"]
+	txnID := chi.URLParam(r, "txnId")
 	if txnID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "txnId is required")
 		return
@@ -894,7 +890,7 @@ func (g *Gateway) handlePOSTMatrixChatVerificationCancel(w http.ResponseWriter, 
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	txnID := mux.Vars(r)["txnId"]
+	txnID := chi.URLParam(r, "txnId")
 	if txnID == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "txnId is required")
 		return

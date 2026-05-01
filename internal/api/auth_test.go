@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -24,11 +25,12 @@ func TestGateway_AuthenticationMiddleware(t *testing.T) {
 		config: &GatewayConfig{},
 	}
 
-	r := gateway.newV1Router()
-	r.Use(gateway.AuthenticationMiddleware)
-	r.Use(gateway.NodeSelectionMiddleware)
+	outer := chi.NewMux()
+	outer.Use(gateway.AuthenticationMiddleware)
+	outer.Use(gateway.NodeSelectionMiddleware)
+	outer.Mount("/", gateway.newV1Router())
 
-	ts := httptest.NewServer(r)
+	ts := httptest.NewServer(outer)
 	defer ts.Close()
 
 	tests := []struct {
@@ -149,10 +151,11 @@ func TestGateway_JWTAuth(t *testing.T) {
 		jwtValidator: validator,
 	}
 
-	r := gateway.newV1Router()
-	r.Use(gateway.AuthenticationMiddleware)
-	r.Use(gateway.NodeSelectionMiddleware)
-	ts := httptest.NewServer(r)
+	outer := chi.NewMux()
+	outer.Use(gateway.AuthenticationMiddleware)
+	outer.Use(gateway.NodeSelectionMiddleware)
+	outer.Mount("/", gateway.newV1Router())
+	ts := httptest.NewServer(outer)
 	defer ts.Close()
 
 	t.Run("ValidJWT_AdminPeerID", func(t *testing.T) {

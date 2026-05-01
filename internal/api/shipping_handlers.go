@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -117,7 +117,7 @@ func (g *Gateway) handleGetShippingProfile(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	profileID := mux.Vars(r)["profileID"]
+	profileID := chi.URLParam(r, "profileID")
 	profile, err := svc.GetProfile(r.Context(), profileID)
 	if err != nil {
 		shippingErrorResponse(w, err, "get profile")
@@ -133,7 +133,7 @@ func (g *Gateway) handleUpdateShippingProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	profileID := mux.Vars(r)["profileID"]
+	profileID := chi.URLParam(r, "profileID")
 	var body struct {
 		models.ShippingProfileEntity
 		Version int `json:"version"`
@@ -163,7 +163,7 @@ func (g *Gateway) handlePatchShippingProfile(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	profileID := mux.Vars(r)["profileID"]
+	profileID := chi.URLParam(r, "profileID")
 	var patch models.ShippingProfilePatch
 	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
@@ -189,7 +189,7 @@ func (g *Gateway) handleDeleteShippingProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	profileID := mux.Vars(r)["profileID"]
+	profileID := chi.URLParam(r, "profileID")
 	migrateTo := r.URL.Query().Get("migrateTo")
 
 	if err := svc.DeleteProfile(r.Context(), profileID, migrateTo); err != nil {
@@ -206,7 +206,7 @@ func (g *Gateway) handleSetDefaultShippingProfile(w http.ResponseWriter, r *http
 		return
 	}
 
-	profileID := mux.Vars(r)["profileID"]
+	profileID := chi.URLParam(r, "profileID")
 	profile, err := svc.GetProfile(r.Context(), profileID)
 	if err != nil {
 		shippingErrorResponse(w, err, "get profile for set-default")
@@ -269,7 +269,7 @@ func (g *Gateway) handleGetShippingLocation(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	locationID := mux.Vars(r)["locationID"]
+	locationID := chi.URLParam(r, "locationID")
 	loc, err := svc.GetLocation(r.Context(), locationID)
 	if err != nil {
 		shippingErrorResponse(w, err, "get location")
@@ -285,7 +285,7 @@ func (g *Gateway) handleUpdateShippingLocation(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	locationID := mux.Vars(r)["locationID"]
+	locationID := chi.URLParam(r, "locationID")
 	var loc models.ShippingLocationEntity
 	if err := json.NewDecoder(r.Body).Decode(&loc); err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
@@ -307,7 +307,7 @@ func (g *Gateway) handleDeleteShippingLocation(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	locationID := mux.Vars(r)["locationID"]
+	locationID := chi.URLParam(r, "locationID")
 	if err := svc.DeleteLocation(r.Context(), locationID); err != nil {
 		shippingErrorResponse(w, err, "delete location")
 		return
@@ -324,7 +324,7 @@ func (g *Gateway) handleListProfileListings(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	profileID := mux.Vars(r)["profileID"]
+	profileID := chi.URLParam(r, "profileID")
 	page := intQueryParam(r, "page", 1)
 	pageSize := intQueryParam(r, "pageSize", 20)
 

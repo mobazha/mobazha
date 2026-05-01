@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -77,7 +77,7 @@ type EVMPaymentInfoResponse struct {
 // handleGetOrderPaymentInstructions 获取订单支付指令
 // 通过 PaymentStrategy 分发，根据 PaymentModel 格式化响应
 func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
-	orderID := mux.Vars(r)["orderID"]
+	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return

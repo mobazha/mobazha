@@ -18,6 +18,7 @@ func (g *Gateway) registerNodeHumaListingOperations(api huma.API) {
 	g.registerListingUpdate(api)
 	g.registerListingDelete(api)
 	g.registerListingImportJSON(api)
+	g.registerListingImportMultipart(api)
 
 	g.registerListingIndexByPeer(api)
 	g.registerListingIndex(api)
@@ -254,6 +255,29 @@ func (g *Gateway) registerListingGetByListingID(api huma.API) {
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"listingID": in.ListingID})
 		rr := httptest.NewRecorder()
 		g.handleGETListing(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerListingImportMultipart(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID:  "listing-import-multipart",
+		Method:       http.MethodPost,
+		Path:         "/v1/listings/import",
+		Summary:      "Import listings from ZIP (multipart)",
+		Tags:         []string{"listings"},
+		Security:     nodeAuthSecurity,
+		MaxBodyBytes: defaultMaxImportZipSize,
+	}, func(ctx context.Context, in *nodeMultipartInput) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/listings/import", bytes.NewReader(in.RawBody))
+		req.Header.Set("Content-Type", in.ContentType)
+		req.ContentLength = int64(len(in.RawBody))
+		rr := httptest.NewRecorder()
+		g.handlePOSTListingsImport(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

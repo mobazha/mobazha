@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -148,16 +149,16 @@ func discountTestServer(t *testing.T, svc *mockDiscountService) (*httptest.Serve
 	node := &mockDiscountNode{discountSvc: svc}
 
 	gateway := &Gateway{config: &GatewayConfig{}}
-	r := gateway.newV1Router()
-
-	r.Use(func(next http.Handler) http.Handler {
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+	outer.Mount("/", gateway.newV1Router())
 
-	ts := httptest.NewServer(r)
+	ts := httptest.NewServer(outer)
 	t.Cleanup(ts.Close)
 	return ts, node
 }
@@ -537,7 +538,8 @@ func TestDiscountHandlers_Validate(t *testing.T) {
 
 // Public endpoint tests use direct handler invocation (httptest.NewRecorder)
 // because /v1/discounts/{discountID} (auth, GET) shadows /v1/discounts/applicable (public, GET)
-// in gorilla/mux route matching order.
+// in linear route matching order. chi's radix tree resolves this deterministically,
+// but direct invocation remains the standard test pattern for handler-level testing.
 
 func publicHandlerReq(t *testing.T, svc *mockDiscountService, handler http.HandlerFunc, method, target string, body []byte) *httptest.ResponseRecorder {
 	t.Helper()
@@ -672,14 +674,15 @@ func TestDiscountHandlers_Calculate(t *testing.T) {
 func TestDiscountHandlers_NoProvider(t *testing.T) {
 	node := &mockNode{}
 	gateway := &Gateway{config: &GatewayConfig{}}
-	r := gateway.newV1Router()
-	r.Use(func(next http.Handler) http.Handler {
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	ts := httptest.NewServer(r)
+	outer.Mount("/", gateway.newV1Router())
+	ts := httptest.NewServer(outer)
 	defer ts.Close()
 
 	routerEndpoints := []struct {

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -283,7 +283,7 @@ func (g *Gateway) handleGETAIChatSession(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	sessionID := mux.Vars(r)["sessionId"]
+	sessionID := chi.URLParam(r, "sessionId")
 	session, err := p.ChatStore().GetSession(sessionID)
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load session")
@@ -304,7 +304,7 @@ func (g *Gateway) handleDELETEAIChatSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	sessionID := mux.Vars(r)["sessionId"]
+	sessionID := chi.URLParam(r, "sessionId")
 	if err := p.ChatStore().DeleteSession(sessionID); err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to delete session")
 		return

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -63,7 +63,7 @@ func (g *Gateway) handleGETGuestOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := mux.Vars(r)["token"]
+	token := chi.URLParam(r, "token")
 	if token == "" {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Order token is required")
 		return
@@ -121,7 +121,7 @@ func (g *Gateway) handleShipGuestOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := mux.Vars(r)["token"]
+	token := chi.URLParam(r, "token")
 	if token == "" {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Order token is required")
 		return
@@ -154,7 +154,7 @@ func (g *Gateway) handleCompleteGuestOrder(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	token := mux.Vars(r)["token"]
+	token := chi.URLParam(r, "token")
 	if token == "" {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Order token is required")
 		return

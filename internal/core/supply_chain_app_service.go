@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mobazha/mobazha3.0/internal/fulfillment/cj"
 	"github.com/mobazha/mobazha3.0/internal/fulfillment/printful"
 	"github.com/mobazha/mobazha3.0/internal/fulfillment/printify"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -1216,6 +1217,8 @@ func (s *SupplyChainAppService) newProviderFromCredentials(providerID string, cr
 		return printful.NewProvider(creds.APIKey, ""), nil
 	case "printify":
 		return printify.NewProvider(creds.APIKey, creds.WebhookSecret), nil
+	case "cj":
+		return cj.NewProvider(creds.APIKey, creds.WebhookSecret), nil
 	default:
 		return nil, fmt.Errorf("unknown provider %q", providerID)
 	}
@@ -1240,6 +1243,8 @@ func (s *SupplyChainAppService) instantiateProvider(providerID, providerType str
 		return printful.NewProvider(creds.APIKey, ""), nil
 	case "printify":
 		return printify.NewProvider(creds.APIKey, webhookSecret), nil
+	case "cj":
+		return cj.NewProvider(creds.APIKey, webhookSecret), nil
 	default:
 		return nil, fmt.Errorf("unknown provider %q (type %s)", providerID, providerType)
 	}
@@ -3395,6 +3400,12 @@ func classifyProviderError(providerID string, err error) contracts.FailureReason
 		return contracts.FailureReasonRetryableProviderError
 	case "printify":
 		re := printify.ClassifyError(err)
+		if re != nil {
+			return contracts.ClassifyFulfillmentError(re)
+		}
+		return contracts.FailureReasonRetryableProviderError
+	case "cj":
+		re := cj.ClassifyError(err)
 		if re != nil {
 			return contracts.ClassifyFulfillmentError(re)
 		}

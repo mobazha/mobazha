@@ -20,31 +20,31 @@ type stubHumaCtx struct {
 	remoteAddr string
 }
 
-func (s *stubHumaCtx) Operation() *huma.Operation          { return nil }
-func (s *stubHumaCtx) Context() context.Context             { return context.Background() }
-func (s *stubHumaCtx) TLS() *tls.ConnectionState            { return nil }
-func (s *stubHumaCtx) Version() huma.ProtoVersion           { return huma.ProtoVersion{} }
-func (s *stubHumaCtx) Method() string                       { return "GET" }
-func (s *stubHumaCtx) Host() string                         { return "localhost" }
-func (s *stubHumaCtx) RemoteAddr() string                   { return s.remoteAddr }
-func (s *stubHumaCtx) URL() url.URL                         { return url.URL{} }
-func (s *stubHumaCtx) Param(string) string                  { return "" }
-func (s *stubHumaCtx) Query(string) string                  { return "" }
+func (s *stubHumaCtx) Operation() *huma.Operation { return nil }
+func (s *stubHumaCtx) Context() context.Context   { return context.Background() }
+func (s *stubHumaCtx) TLS() *tls.ConnectionState  { return nil }
+func (s *stubHumaCtx) Version() huma.ProtoVersion { return huma.ProtoVersion{} }
+func (s *stubHumaCtx) Method() string             { return "GET" }
+func (s *stubHumaCtx) Host() string               { return "localhost" }
+func (s *stubHumaCtx) RemoteAddr() string         { return s.remoteAddr }
+func (s *stubHumaCtx) URL() url.URL               { return url.URL{} }
+func (s *stubHumaCtx) Param(string) string        { return "" }
+func (s *stubHumaCtx) Query(string) string        { return "" }
 func (s *stubHumaCtx) Header(name string) string {
 	if s.headers == nil {
 		return ""
 	}
 	return s.headers[name]
 }
-func (s *stubHumaCtx) EachHeader(func(string, string))      {}
-func (s *stubHumaCtx) BodyReader() io.Reader                { return nil }
+func (s *stubHumaCtx) EachHeader(func(string, string))            {}
+func (s *stubHumaCtx) BodyReader() io.Reader                      { return nil }
 func (s *stubHumaCtx) GetMultipartForm() (*multipart.Form, error) { return nil, nil }
-func (s *stubHumaCtx) SetReadDeadline(time.Time) error      { return nil }
-func (s *stubHumaCtx) SetStatus(int)                        {}
-func (s *stubHumaCtx) Status() int                          { return 0 }
-func (s *stubHumaCtx) SetHeader(string, string)             {}
-func (s *stubHumaCtx) AppendHeader(string, string)          {}
-func (s *stubHumaCtx) BodyWriter() io.Writer                { return nil }
+func (s *stubHumaCtx) SetReadDeadline(time.Time) error            { return nil }
+func (s *stubHumaCtx) SetStatus(int)                              {}
+func (s *stubHumaCtx) Status() int                                { return 0 }
+func (s *stubHumaCtx) SetHeader(string, string)                   {}
+func (s *stubHumaCtx) AppendHeader(string, string)                {}
+func (s *stubHumaCtx) BodyWriter() io.Writer                      { return nil }
 
 func TestRateLimiter_AllowWithinLimit(t *testing.T) {
 	rl := newRateLimiter(3, time.Hour)

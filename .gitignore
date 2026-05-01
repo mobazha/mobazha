@@ -54,6 +54,9 @@ deploy/standalone/.frontend-dist/
 
 # Solana test validator ledger
 test-ledger/
+# OpenAPI spec generator binary
+/gen-openapi
+
 # Go workspace (machine-specific local paths)
 go.work
 go.work.sum

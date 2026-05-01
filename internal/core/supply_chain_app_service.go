@@ -2979,6 +2979,18 @@ func (s *SupplyChainAppService) IsListingManagedBySupplier(listingSlug string) b
 	return count > 0
 }
 
+// ClearMappingForListing removes the synced product mapping for a deleted listing,
+// so the Sourcing page no longer shows it as "synced" and allows re-import.
+func (s *SupplyChainAppService) ClearMappingForListing(listingSlug string) {
+	err := s.db.Update(func(tx database.Tx) error {
+		return tx.Delete("listing_slug", listingSlug, nil, &models.SyncedProductMapping{})
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain: failed to clear mapping for deleted listing %q: %v", listingSlug, err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

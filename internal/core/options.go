@@ -813,11 +813,14 @@ func (n *MobazhaNode) initListingService() {
 		ShippingStore:      shippingStore,
 	})
 
-	if n.collectionService != nil {
-		n.listingService.onDeleteCleanup = func(slug string) {
+	n.listingService.onDeleteCleanup = func(slug string) {
+		if n.collectionService != nil {
 			if err := n.collectionService.RemoveProductFromAllCollections(context.Background(), slug); err != nil {
 				log.Errorf("Collection: failed to remove product %s from collections: %v", slug, err)
 			}
+		}
+		if n.supplyChainService != nil {
+			n.supplyChainService.ClearMappingForListing(slug)
 		}
 	}
 

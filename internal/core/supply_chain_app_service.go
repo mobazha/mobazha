@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha3.0/internal/fulfillment/printful"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -50,6 +53,12 @@ type SupplyChainListingOps interface {
 	GetListingStatus(slug string) (string, error)
 }
 
+// SupplyChainMediaOps is the subset of MediaAppService needed by ImportProduct
+// to download external images and upload them into the local media pipeline.
+type SupplyChainMediaOps interface {
+	UploadMedia(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error)
+}
+
 // SupplyChainAppService orchestrates supply chain operations:
 // provider management, catalog browsing, product import, and order bridging.
 // It implements contracts.SupplyChainService and contracts.SupplyChainChecker.
@@ -63,6 +72,8 @@ type SupplyChainAppService struct {
 	shutdown       <-chan struct{}
 	orderOps       SupplyChainOrderOps
 	listingOps     SupplyChainListingOps
+	mediaOps       SupplyChainMediaOps
+	exchangeRates  *wallet.ExchangeRateProvider
 	saasMode       bool
 	webhookBaseURL string
 }
@@ -113,6 +124,17 @@ func (s *SupplyChainAppService) SetOrderOps(ops SupplyChainOrderOps) {
 // SetListingOps wires the listing operations interface for ImportProduct.
 func (s *SupplyChainAppService) SetListingOps(ops SupplyChainListingOps) {
 	s.listingOps = ops
+}
+
+// SetMediaOps wires the media operations interface for importing product images.
+func (s *SupplyChainAppService) SetMediaOps(ops SupplyChainMediaOps) {
+	s.mediaOps = ops
+}
+
+// SetExchangeRates wires the exchange rate provider for cross-currency
+// margin gate evaluation (TD-078).
+func (s *SupplyChainAppService) SetExchangeRates(erp *wallet.ExchangeRateProvider) {
+	s.exchangeRates = erp
 }
 
 // Start restores provider instances from DB into the in-memory registry.
@@ -1804,20 +1826,13 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 		variants = filtered
 	}
 
-	// Collect images from variant previews/files for the listing.
-	// Only include "preview" type files (product mockups); exclude "default"
-	// type files which are raw design assets (logos, artwork) uploaded by the user.
+	// Collect image URLs from variant previews. Only "preview" type files
+	// (product mockups); exclude "default" (raw design assets).
 	imageURLSet := map[string]bool{}
-	var images []*pb.Image
+	var imageURLs []string
 	if syncProd.ThumbnailURL != "" {
 		imageURLSet[syncProd.ThumbnailURL] = true
-		images = append(images, &pb.Image{
-			Filename: syncProd.ThumbnailURL,
-			Large:    syncProd.ThumbnailURL,
-			Medium:   syncProd.ThumbnailURL,
-			Small:    syncProd.ThumbnailURL,
-			Tiny:     syncProd.ThumbnailURL,
-		})
+		imageURLs = append(imageURLs, syncProd.ThumbnailURL)
 	}
 	for _, v := range variants {
 		for _, f := range v.Files {
@@ -1830,15 +1845,18 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 			}
 			if imgURL != "" && !imageURLSet[imgURL] {
 				imageURLSet[imgURL] = true
-				images = append(images, &pb.Image{
-					Filename: imgURL,
-					Large:    imgURL,
-					Medium:   imgURL,
-					Small:    imgURL,
-					Tiny:     imgURL,
-				})
+				imageURLs = append(imageURLs, imgURL)
 			}
 		}
+	}
+
+	// Download external images and upload them through the media pipeline
+	// to get CID-based references. Falls back to raw URLs if media ops
+	// are not wired or download fails.
+	images := make([]*pb.Image, 0, len(imageURLs))
+	for _, imgURL := range imageURLs {
+		img := s.downloadAndUploadImage(ctx, imgURL)
+		images = append(images, img)
 	}
 
 	// Build options (size/color) from sync variants
@@ -2793,11 +2811,16 @@ func isUniqueConstraintError(err error) bool {
 // For CANCELABLE orders this releases escrow funds and records the shipment.
 // MODERATED orders are skipped (need manual multi-sig).
 //
-// TECHDEBT(TD-080): This confirms/ships the entire order, which is correct
-// for FF-1 (single supplier per order). For FF-3 (multi-supplier split orders),
-// this must be changed to confirm only supplier-managed item indices and
-// auto-ship/confirm only when ALL fulfillment mappings for the order are shipped.
-// Cleanup condition: FF-3 multi-supplier split implementation.
+// Multi-supplier safety: allFulfillmentsShipped ensures we only proceed when
+// every FulfillmentOrderMapping for this order has reached "shipped". When
+// that condition is met, we gather tracking info from ALL mappings (not just
+// the triggering webhook) so that the Mobazha ShipOrder message contains a
+// complete set of tracking numbers for the buyer.
+//
+// Note: Mobazha escrow is per-order, not per-item. Per-item confirm/ship
+// would require protocol-level changes. IsOrderAutoFulfillable already
+// rejects mixed orders (partially supplier-managed), so confirming the
+// entire order is correct for all current scenarios.
 func (s *SupplyChainAppService) autoConfirmAndShip(mobazhaOrderID string, shipData *contracts.FulfillmentShipment) error {
 	if s.orderOps == nil {
 		return fmt.Errorf("orderOps not wired")
@@ -2844,20 +2867,53 @@ func (s *SupplyChainAppService) autoConfirmAndShip(mobazhaOrderID string, shipDa
 		return nil
 	}
 
-	shipments := []models.Shipment{{
-		PhysicalDelivery: &models.PhysicalDelivery{},
-	}}
-	if shipData != nil {
-		shipments[0].PhysicalDelivery.TrackingNumber = shipData.TrackingNumber
-		shipments[0].PhysicalDelivery.Shipper = shipData.Carrier
+	shipments := s.gatherAllTrackingForOrder(mobazhaOrderID)
+	if len(shipments) == 0 && shipData != nil {
+		shipments = []models.Shipment{{
+			PhysicalDelivery: &models.PhysicalDelivery{
+				TrackingNumber: shipData.TrackingNumber,
+				Shipper:        shipData.Carrier,
+			},
+		}}
+	}
+	if len(shipments) == 0 {
+		shipments = []models.Shipment{{PhysicalDelivery: &models.PhysicalDelivery{}}}
 	}
 
 	if err := s.orderOps.ShipOrder(oid, shipments, nil); err != nil {
 		return fmt.Errorf("auto-ship: %w", err)
 	}
 	logger.LogInfoWithIDf(log, s.nodeID,
-		"SupplyChain: auto-shipped order %s with tracking from supplier", mobazhaOrderID)
+		"SupplyChain: auto-shipped order %s with %d shipment(s) from supplier(s)", mobazhaOrderID, len(shipments))
 	return nil
+}
+
+// gatherAllTrackingForOrder reads all FulfillmentOrderMapping entries for the
+// given order and builds a Shipment per mapping that has a tracking number.
+// For single-supplier orders this returns one shipment; for multi-supplier
+// orders it returns one per fulfillment group, giving the buyer complete
+// tracking visibility.
+func (s *SupplyChainAppService) gatherAllTrackingForOrder(mobazhaOrderID string) []models.Shipment {
+	var mappings []models.FulfillmentOrderMapping
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("mobazha_order_id = ? AND status = ?", mobazhaOrderID, string(contracts.FulfillmentStatusShipped)).
+			Find(&mappings).Error
+	})
+
+	var shipments []models.Shipment
+	for _, m := range mappings {
+		if m.TrackingNumber == "" {
+			continue
+		}
+		shipments = append(shipments, models.Shipment{
+			PhysicalDelivery: &models.PhysicalDelivery{
+				TrackingNumber: m.TrackingNumber,
+				Shipper:        m.Carrier,
+			},
+		})
+	}
+	return shipments
 }
 
 // allFulfillmentsShipped returns true only if every FulfillmentOrderMapping
@@ -3112,6 +3168,75 @@ func titleCase(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+const maxImageDownloadBytes = 20 * 1024 * 1024 // 20 MB
+
+// downloadAndUploadImage fetches an external image URL and uploads it through
+// the media pipeline to obtain CID-based references. If mediaOps is nil or
+// the download/upload fails, it falls back to using the raw external URL.
+func (s *SupplyChainAppService) downloadAndUploadImage(ctx context.Context, imgURL string) *pb.Image {
+	fallback := &pb.Image{
+		Filename: imgURL, Large: imgURL, Medium: imgURL, Small: imgURL, Tiny: imgURL,
+	}
+
+	if s.mediaOps == nil {
+		return fallback
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, imgURL, nil)
+	if err != nil {
+		log.Warningf("supply chain: cannot create request for image %s: %v", imgURL, err)
+		return fallback
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Warningf("supply chain: failed to download image %s: %v", imgURL, err)
+		return fallback
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Warningf("supply chain: image %s returned status %d", imgURL, resp.StatusCode)
+		return fallback
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxImageDownloadBytes))
+	if err != nil {
+		log.Warningf("supply chain: failed to read image %s: %v", imgURL, err)
+		return fallback
+	}
+
+	filename := path.Base(imgURL)
+	if idx := strings.Index(filename, "?"); idx > 0 {
+		filename = filename[:idx]
+	}
+
+	result, err := s.mediaOps.UploadMedia(ctx, data, filename, contracts.UploadOpts{Variants: true})
+	if err != nil {
+		log.Warningf("supply chain: failed to upload image %s: %v", imgURL, err)
+		return fallback
+	}
+
+	img := &pb.Image{Filename: filename}
+	if result.Hashes != nil {
+		img.Tiny = result.Hashes.Tiny
+		img.Small = result.Hashes.Small
+		img.Medium = result.Hashes.Medium
+		img.Large = result.Hashes.Large
+		img.Original = result.Hashes.Original
+	} else {
+		img.Tiny = result.Hash
+		img.Small = result.Hash
+		img.Medium = result.Hash
+		img.Large = result.Hash
+		img.Original = result.Hash
+	}
+	return img
 }
 
 // Compile-time interface checks.

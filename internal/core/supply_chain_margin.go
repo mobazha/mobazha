@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -227,11 +228,10 @@ func (s *SupplyChainAppService) evaluateMarginGate(
 	//     when buyer pays a token for a USD-priced item.
 	//
 	// We compare scRetail (listing units) with the discount amounts directly
-	// in proratedSCDiscount, so we MUST verify the units actually match. If
-	// PricingCoin diverges from the listing currency we have no FX path
-	// inside this service yet → fail closed (manual_action_required) rather
-	// than silently mixing units. TD-078 tracks adding ExchangeRates injection
-	// so we can convert and prorate properly.
+	// in proratedSCDiscount, so we MUST verify the units actually match. When
+	// PricingCoin diverges from listing currency and exchangeRates is available,
+	// Pass 2 converts discount amounts via wallet.ConvertFiatAmount. When
+	// exchangeRates is nil, we fail closed (manual_action_required).
 	var totalSupplierCost, scRetail, allRetail uint64
 	var scListingCurrency string
 
@@ -302,20 +302,27 @@ func (s *SupplyChainAppService) evaluateMarginGate(
 	// Pass 2: prorate post-discount revenue onto the supply-chain portion.
 	// Discount amount lives in OrderOpen.PricingCoin's smallest unit, which
 	// must match the listing currency for direct subtraction to be managed_escrow.
+	// When currencies differ and ExchangeRates is available, we convert each
+	// discount amount from PricingCoin → scListingCurrency before prorate.
 	pricingCoin := strings.ToUpper(strings.TrimSpace(in.oo.GetPricingCoin()))
+	discountsForProrate := in.oo.AppliedDiscounts
 	if len(in.oo.AppliedDiscounts) > 0 && pricingCoin != "" && pricingCoin != scListingCurrency {
-		// TODO(TD-078): inject ExchangeRates into SupplyChainAppService,
-		// convert each discount amount from PricingCoin → scListingCurrency
-		// before prorate. Until then, refuse to auto-ship rather than mix
-		// USD cents with satoshis/wei/MCK smallest units (would either let
-		// thin-margin orders through or wrongly reject high-value ones).
-		return false, contracts.FailureReasonManualActionRequired,
-			fmt.Sprintf("order pays in %s but supply-chain listings price in %s; "+
-				"discount amounts cannot be prorated without exchange rate (auto-ship blocked, "+
-				"manual review required)",
-				pricingCoin, scListingCurrency)
+		if s.exchangeRates == nil {
+			return false, contracts.FailureReasonManualActionRequired,
+				fmt.Sprintf("order pays in %s but supply-chain listings price in %s; "+
+					"discount amounts cannot be prorated without exchange rate (auto-ship blocked, "+
+					"manual review required)",
+					pricingCoin, scListingCurrency)
+		}
+		converted, convErr := s.convertDiscountsToListingCurrency(in.oo.AppliedDiscounts, pricingCoin, scListingCurrency)
+		if convErr != nil {
+			return false, contracts.FailureReasonManualActionRequired,
+				fmt.Sprintf("cross-currency discount conversion failed (%s→%s): %v",
+					pricingCoin, scListingCurrency, convErr)
+		}
+		discountsForProrate = converted
 	}
-	scDiscount, drErr := proratedSCDiscount(in.oo.AppliedDiscounts, scRetail, allRetail)
+	scDiscount, drErr := proratedSCDiscount(discountsForProrate, scRetail, allRetail)
 	if drErr != nil {
 		return false, contracts.FailureReasonManualActionRequired, drErr.Error()
 	}
@@ -345,11 +352,10 @@ func (s *SupplyChainAppService) evaluateMarginGate(
 			"supplier returned no shipping estimates"
 	}
 
-	// Shipping unit invariant: each rate's Currency must equal the supply-chain
-	// listing currency. Otherwise we'd add EUR/CNY cents to USD cents and
-	// mis-evaluate the gate. Same constraint as the discount path. Provider
-	// adapters MUST set ShippingEstimate.Currency explicitly — empty values
-	// fail closed rather than defaulting silently. See TD-078 for FX work.
+	// Shipping unit invariant: each rate's Currency should equal the supply-chain
+	// listing currency. When they differ and ExchangeRates is available, we
+	// convert the rate amount. Provider adapters MUST set
+	// ShippingEstimate.Currency explicitly — empty values fail closed.
 	var minShippingCents uint64
 	firstSet := false
 	for _, est := range estimates {
@@ -358,21 +364,32 @@ func (s *SupplyChainAppService) evaluateMarginGate(
 			return false, contracts.FailureReasonManualActionRequired,
 				fmt.Sprintf("shipping estimate %q has no Currency set — provider must declare it explicitly", est.ID)
 		}
-		if rateCurrency != scListingCurrency {
-			return false, contracts.FailureReasonManualActionRequired,
-				fmt.Sprintf("shipping estimate %q quotes %s but supply-chain listings price in %s; "+
-					"cannot add to supplier cost without exchange rate (auto-ship blocked, manual review required)",
-					est.ID, rateCurrency, scListingCurrency)
-		}
-		// Currency-agnostic decimal-to-smallest-unit conversion. Listing
-		// divisibility is fixed at 2 in buildListingFromCatalog (Printful
-		// catalog), so 2 fractional digits is correct for USD/EUR/CNY etc.
+		// Decimal-to-smallest-unit conversion. Listing divisibility is fixed
+		// at 2 in buildListingFromCatalog (Printful catalog), so 2 fractional
+		// digits is correct for USD/EUR/CNY etc.
 		rateCents, ok := parseUSDDollarsToCents(est.Rate)
 		if !ok {
-			// Fail closed: don't silently treat unparseable rates as 0.
 			return false, contracts.FailureReasonManualActionRequired,
 				fmt.Sprintf("shipping rate %q (option %q, currency %s) is not a parseable decimal amount",
 					est.Rate, est.ID, rateCurrency)
+		}
+		if rateCurrency != scListingCurrency {
+			if s.exchangeRates == nil {
+				return false, contracts.FailureReasonManualActionRequired,
+					fmt.Sprintf("shipping estimate %q quotes %s but supply-chain listings price in %s; "+
+						"cannot add to supplier cost without exchange rate (auto-ship blocked, manual review required)",
+						est.ID, rateCurrency, scListingCurrency)
+			}
+			converted, convErr := wallet.ConvertFiatAmount(int64(rateCents), rateCurrency, scListingCurrency, s.exchangeRates)
+			if convErr != nil {
+				return false, contracts.FailureReasonManualActionRequired,
+					fmt.Sprintf("shipping estimate %q: cross-currency conversion failed (%s→%s): %v",
+						est.ID, rateCurrency, scListingCurrency, convErr)
+			}
+			if converted < 0 {
+				converted = 0
+			}
+			rateCents = uint64(converted)
 		}
 		if !firstSet || rateCents < minShippingCents {
 			minShippingCents = rateCents
@@ -400,6 +417,59 @@ func (s *SupplyChainAppService) evaluateMarginGate(
 		in.providerID, effectiveRevenue, scRetail, scDiscount,
 		totalCost, totalSupplierCost, minShippingCents, marginSafetyPct)
 	return true, contracts.FailureReasonNone, ""
+}
+
+// convertDiscountsToListingCurrency clones the applied discounts and converts
+// each non-shipping amount from pricingCoin to scListingCurrency using the
+// node's exchange rate provider. The returned slice can be passed directly to
+// proratedSCDiscount which expects amounts in the listing currency's smallest
+// unit (cents). Conversion errors are surfaced immediately — we never silently
+// fall back to unconverted amounts.
+func (s *SupplyChainAppService) convertDiscountsToListingCurrency(
+	discounts []*pb.OrderOpen_AppliedDiscount,
+	pricingCoin, scListingCurrency string,
+) ([]*pb.OrderOpen_AppliedDiscount, error) {
+	result := make([]*pb.OrderOpen_AppliedDiscount, 0, len(discounts))
+	for _, d := range discounts {
+		if d == nil {
+			continue
+		}
+		if strings.EqualFold(d.GetValueType(), freeShippingDiscountValueType) {
+			result = append(result, d)
+			continue
+		}
+		raw := strings.TrimSpace(d.GetAmount())
+		if raw == "" {
+			result = append(result, d)
+			continue
+		}
+
+		neg := false
+		numStr := raw
+		if numStr[0] == '-' {
+			neg = true
+			numStr = numStr[1:]
+		}
+		v, err := strconv.ParseInt(numStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("discount %q has unparseable amount %q", d.GetDiscountID(), raw)
+		}
+
+		converted, convErr := wallet.ConvertFiatAmount(v, pricingCoin, scListingCurrency, s.exchangeRates)
+		if convErr != nil {
+			return nil, fmt.Errorf("discount %q conversion %s→%s: %w",
+				d.GetDiscountID(), pricingCoin, scListingCurrency, convErr)
+		}
+
+		sign := ""
+		if neg {
+			sign = "-"
+		}
+		clone := *d
+		clone.Amount = fmt.Sprintf("%s%d", sign, converted)
+		result = append(result, &clone)
+	}
+	return result, nil
 }
 
 // publicSKURetailCents returns the retail cents for a buyer-selected SKU

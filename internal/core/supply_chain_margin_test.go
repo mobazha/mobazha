@@ -6,10 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/fulfillment"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // ---------------------------------------------------------------------------
@@ -807,11 +809,8 @@ func TestBuildVariantMetadata_RejectsUnparseablePrice(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestEvaluateMarginGate_CrossCurrencyDiscountFailsClosed exercises the unit
-// invariant: scRetail/SKU.Price are in LISTING currency cents (USD here),
-// but AppliedDiscount.Amount is in PAYMENT currency smallest unit (BTC
-// satoshis). Mixing them — even with prorate — would silently zero out the
-// discount allocation (satoshi numbers are tiny relative to USD cents) and
-// let thin-margin orders auto-ship at a loss.
+// invariant: when exchangeRates is nil (TD-078 fallback), cross-currency
+// discounts still fail closed rather than silently mixing units.
 func TestEvaluateMarginGate_CrossCurrencyDiscountFailsClosed(t *testing.T) {
 	tdb := newSCTestDatabase(t)
 	seedSyncedProduct(t, tdb, "tee", "p1", "1400", nil)
@@ -838,6 +837,38 @@ func TestEvaluateMarginGate_CrossCurrencyDiscountFailsClosed(t *testing.T) {
 	}
 	if reason != contracts.FailureReasonManualActionRequired {
 		t.Errorf("want manual_action_required, got %s (msg=%s)", reason, msg)
+	}
+}
+
+// TestEvaluateMarginGate_CrossCurrencyDiscountConverted verifies that when
+// exchangeRates is available, cross-currency discounts are converted to the
+// listing currency before prorate. Setup: listing $20 USD, cost $10,
+// buyer pays EUR, -500 EUR-cents discount. At 1 EUR = 1.1 USD, the
+// converted discount ≈ 550 USD-cents. Effective revenue = 2000-550 = 1450.
+// cost+ship = 1000+450 = 1450 → 100% ≥ 80% → REJECT.
+func TestEvaluateMarginGate_CrossCurrencyDiscountConverted(t *testing.T) {
+	tdb := newSCTestDatabase(t)
+	seedSyncedProduct(t, tdb, "tee", "p1", "1000", nil)
+	svc := newSCSvcWithProvider(t, tdb, &stubFulfillmentProvider{id: "p1", provType: "pod"})
+	svc.SetExchangeRates(newTestFXProvider(t))
+
+	oo := makeOrderOpenSingleSKU("tee", "2000", 1)
+	oo.PricingCoin = "EUR"
+	oo.Listings[0].Listing.Metadata = &pb.Listing_Metadata{
+		PricingCurrency: &pb.Currency{Code: "USD", Divisibility: 2},
+	}
+	oo.AppliedDiscounts = []*pb.OrderOpen_AppliedDiscount{{
+		DiscountID: "d1", ValueType: "fixed", Amount: "-500",
+	}}
+
+	ok, reason, _ := svc.evaluateMarginGate(context.Background(), supplyMarginInputs{
+		oo: oo, providerID: "p1",
+	})
+	if ok {
+		t.Fatal("converted discount should push cost ratio past 80%, must reject")
+	}
+	if reason != contracts.FailureReasonMarginProtectionFailed {
+		t.Errorf("want margin_protection_failed, got %s", reason)
 	}
 }
 
@@ -869,8 +900,8 @@ func TestEvaluateMarginGate_SameCurrencyDiscountStillProrates(t *testing.T) {
 
 // TestEvaluateMarginGate_ShippingCurrencyMismatchFailsClosed exercises the
 // case where the supplier returns shipping rates in a different currency
-// than the listing (EUR shipping for a USD-priced supply-chain listing).
-// Adding EUR cents to USD cents would mis-evaluate the margin gate.
+// than the listing (EUR shipping for a USD-priced supply-chain listing)
+// and no ExchangeRates is available.
 func TestEvaluateMarginGate_ShippingCurrencyMismatchFailsClosed(t *testing.T) {
 	tdb := newSCTestDatabase(t)
 	seedSyncedProduct(t, tdb, "tee", "p1", "500", nil)
@@ -890,6 +921,30 @@ func TestEvaluateMarginGate_ShippingCurrencyMismatchFailsClosed(t *testing.T) {
 	}
 	if reason != contracts.FailureReasonManualActionRequired {
 		t.Errorf("want manual_action_required, got %s (msg=%s)", reason, msg)
+	}
+}
+
+// TestEvaluateMarginGate_ShippingCurrencyConverted verifies that when
+// exchangeRates is available, a EUR shipping rate is converted to USD before
+// adding to supplier cost. Setup: cost $5 USD, retail $20 USD, shipping
+// 4.50 EUR → ~4.95 USD. Total cost = 500+495 = 995. 995/2000 = 49.7% < 80% → PASS.
+func TestEvaluateMarginGate_ShippingCurrencyConverted(t *testing.T) {
+	tdb := newSCTestDatabase(t)
+	seedSyncedProduct(t, tdb, "tee", "p1", "500", nil)
+	svc := newSCSvcWithProvider(t, tdb, &stubFulfillmentProvider{
+		id: "p1", provType: "pod",
+		estimateFn: func(_ context.Context, _ contracts.ShippingEstimateParams) ([]contracts.ShippingEstimate, error) {
+			return []contracts.ShippingEstimate{{ID: "std", Rate: "4.50", Currency: "EUR"}}, nil
+		},
+	})
+	svc.SetExchangeRates(newTestFXProvider(t))
+
+	oo := makeOrderOpenSingleSKU("tee", "2000", 1)
+	ok, reason, msg := svc.evaluateMarginGate(context.Background(), supplyMarginInputs{
+		oo: oo, providerID: "p1",
+	})
+	if !ok {
+		t.Fatalf("EUR shipping converted to USD should keep margin OK; reason=%s msg=%s", reason, msg)
 	}
 }
 
@@ -953,4 +1008,14 @@ func contains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// newTestFXProvider returns an ExchangeRateProvider pre-loaded with a fixed
+// USD → EUR rate (1 EUR = 1.10 USD). This makes cross-currency margin gate
+// tests deterministic without network calls.
+func newTestFXProvider(t *testing.T) *wallet.ExchangeRateProvider {
+	t.Helper()
+	return wallet.NewFixedRateProvider("USD", map[models.CurrencyCode]iwallet.Amount{
+		"EUR": iwallet.NewAmount(110), // 1 EUR = 1.10 USD (divisibility 2)
+	})
 }

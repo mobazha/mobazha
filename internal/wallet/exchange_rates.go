@@ -96,6 +96,20 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 	return &e
 }
 
+// NewFixedRateProvider returns an ExchangeRateProvider pre-loaded with the
+// supplied rates for a single base currency. Intended for deterministic
+// unit/integration tests — no network calls.
+func NewFixedRateProvider(base models.CurrencyCode, rates map[models.CurrencyCode]iwallet.Amount) *ExchangeRateProvider {
+	cache := map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount{
+		base: rates,
+	}
+	return &ExchangeRateProvider{
+		cache:       cache,
+		lastQueried: map[models.CurrencyCode]time.Time{base: time.Now().Add(time.Hour)},
+		cacheTTL:    time.Hour,
+	}
+}
+
 func normalizeBaseForRateQuery(base models.CurrencyCode) models.CurrencyCode {
 	rawBase := strings.TrimSpace(string(base))
 	if rawBase == "" {

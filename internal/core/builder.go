@@ -1377,6 +1377,9 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 	if obNode.orderService != nil {
 		obNode.supplyChainService.SetOrderOps(obNode.orderService)
 	}
+	if obNode.exchangeRates != nil {
+		obNode.supplyChainService.SetExchangeRates(obNode.exchangeRates)
+	}
 	if obNode.featureManager == nil || obNode.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled) {
 		if obNode.paymentService != nil {
 			obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)

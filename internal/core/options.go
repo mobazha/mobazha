@@ -823,6 +823,9 @@ func (n *MobazhaNode) initListingService() {
 
 	if n.supplyChainService != nil {
 		n.supplyChainService.SetListingOps(n.listingService)
+		if n.mediaService != nil {
+			n.supplyChainService.SetMediaOps(n.mediaService)
+		}
 	}
 }
 

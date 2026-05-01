@@ -45,6 +45,9 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaShippingOperations(api)
 	g.registerNodeHumaDiscountOperations(api)
 	g.registerNodeHumaCollectionOperations(api)
+	g.registerNodeHumaSystemOperations(api)
+	g.registerNodeHumaAuthOperations(api)
+	g.registerNodeHumaMiscOperations(api)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
@@ -324,10 +327,55 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"wishlists-get",
 		"wishlists-peer-slug-delete",
 		"wishlists-post",
+		// AH-1.4 Batch 5: system, auth, crypto, moderators, blocklist, fx, peers
+		"admin-password-post",
+		"admin-version-get",
+		"auth-identity-get",
+		"auth-scopes-get",
+		"auth-tokens-get",
+		"auth-tokens-post",
+		"auth-tokens-token-id-delete",
+		"blocklist-peer-id-delete",
+		"blocklist-peer-id-put",
+		"config-get",
+		"crypto-hash-post",
+		"crypto-sign-post",
+		"crypto-verify-post",
+		"exchange-rates-currency-code-get",
+		"exchange-rates-get",
+		"moderators-delete",
+		"moderators-get",
+		"moderators-post",
+		"peers-get",
+		"system-cache-delete",
+		"system-claim-store-post",
+		"system-connect-platform-post",
+		"system-diagnostics-get",
+		"system-doctor-get",
+		"system-domain-get",
+		"system-domain-post",
+		"system-health-get",
+		"system-info-get",
+		"system-logs-get",
+		"system-mcp-capability-get",
+		"system-mcp-clients-get",
+		"system-mcp-connect-client-post",
+		"system-mcp-connect-post",
+		"system-mcp-disconnect-client-post",
+		"system-mcp-disconnect-post",
+		"system-network-get",
+		"system-network-post",
+		"system-publish-post",
+		"system-setup-get",
+		"system-setup-post",
+		"system-shutdown-post",
+		"system-update-config-get",
+		"system-update-config-put",
+		"system-update-trigger-post",
 	}
 	sort.Strings(expectedOps)
 
-	const minOps = 239
+	const minOps = 283
 	if len(got) < minOps {
 		t.Errorf("Expected at least %d operations, got %d: %v", minOps, len(got), got)
 	}

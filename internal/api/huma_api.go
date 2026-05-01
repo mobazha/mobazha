@@ -111,6 +111,10 @@ func (g *Gateway) registerHumaAPI(r *mux.Router) huma.API {
 	g.registerNodeHumaDiscountOperations(api)
 	g.registerNodeHumaCollectionOperations(api)
 
+	g.registerNodeHumaSystemOperations(api)
+	g.registerNodeHumaAuthOperations(api)
+	g.registerNodeHumaMiscOperations(api)
+
 	return api
 }
 

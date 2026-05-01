@@ -2109,19 +2109,34 @@ func (s *SupplyChainAppService) SyncProduct(_ context.Context, _ string) (*contr
 
 func (s *SupplyChainAppService) ListSyncedProducts(_ context.Context, providerID string) ([]contracts.SyncedProduct, error) {
 	var mappings []models.SyncedProductMapping
+	var listingIndex models.ListingIndex
 	err := s.db.View(func(tx database.Tx) error {
 		q := tx.Read()
 		if providerID != "" {
 			q = q.Where("provider_id = ?", providerID)
 		}
-		return q.Find(&mappings).Error
+		if err := q.Find(&mappings).Error; err != nil {
+			return err
+		}
+		var indexErr error
+		listingIndex, indexErr = tx.GetListingIndex()
+		if indexErr != nil {
+			listingIndex = nil
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	slugToMeta := make(map[string]models.ListingMetadata, len(listingIndex))
+	for _, lm := range listingIndex {
+		slugToMeta[lm.Slug] = lm
+	}
+
 	products := make([]contracts.SyncedProduct, len(mappings))
 	for i, m := range mappings {
-		products[i] = contracts.SyncedProduct{
+		p := contracts.SyncedProduct{
 			ID:            m.ID,
 			ProviderID:    m.ProviderID,
 			ListingSlug:   m.ListingSlug,
@@ -2132,6 +2147,11 @@ func (s *SupplyChainAppService) ListSyncedProducts(_ context.Context, providerID
 			SupplierCost:  m.SupplierCost,
 			RetailPrice:   m.RetailPrice,
 		}
+		if meta, ok := slugToMeta[m.ListingSlug]; ok {
+			p.Title = meta.Title
+			p.ThumbnailUrl = meta.Thumbnail.Small
+		}
+		products[i] = p
 	}
 	return products, nil
 }
@@ -2158,7 +2178,36 @@ func (s *SupplyChainAppService) BrowseStoreSyncProducts(ctx context.Context, pro
 	if err != nil {
 		return nil, err
 	}
-	return ssp.ListStoreSyncProducts(ctx, offset, limit)
+	page, err := ssp.ListStoreSyncProducts(ctx, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Enrich with import status from synced_product_mappings.
+	syncIDs := make([]string, 0, len(page.Products))
+	for _, p := range page.Products {
+		syncIDs = append(syncIDs, p.ID)
+	}
+	if len(syncIDs) > 0 {
+		importMap := make(map[string]string) // syncProductID → listingSlug
+		var mappings []models.SyncedProductMapping
+		if dbErr := s.db.View(func(tx database.Tx) error {
+			return tx.Read().Where("provider_id = ? AND sync_product_id IN ?", providerID, syncIDs).
+				Select("sync_product_id", "listing_slug").
+				Find(&mappings).Error
+		}); dbErr == nil {
+			for _, m := range mappings {
+				importMap[m.SyncProductID] = m.ListingSlug
+			}
+		}
+		for i := range page.Products {
+			if slug, ok := importMap[page.Products[i].ID]; ok {
+				page.Products[i].ImportedListingSlug = slug
+			}
+		}
+	}
+
+	return page, nil
 }
 
 func (s *SupplyChainAppService) GetStoreSyncProduct(ctx context.Context, providerID string, syncProductID string) (*contracts.StoreSyncProduct, error) {
@@ -2166,7 +2215,21 @@ func (s *SupplyChainAppService) GetStoreSyncProduct(ctx context.Context, provide
 	if err != nil {
 		return nil, err
 	}
-	return ssp.GetStoreSyncProduct(ctx, syncProductID)
+	product, err := ssp.GetStoreSyncProduct(ctx, syncProductID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Enrich with import status.
+	var mapping models.SyncedProductMapping
+	if dbErr := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ? AND sync_product_id = ?", providerID, syncProductID).
+			Select("listing_slug").First(&mapping).Error
+	}); dbErr == nil {
+		product.ImportedListingSlug = mapping.ListingSlug
+	}
+
+	return product, nil
 }
 
 // ---------------------------------------------------------------------------

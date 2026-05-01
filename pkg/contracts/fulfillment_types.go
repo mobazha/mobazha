@@ -161,6 +161,8 @@ type SyncedProduct struct {
 	ID            string    `json:"id"`
 	ProviderID    string    `json:"providerId"`
 	ListingSlug   string    `json:"listingSlug"`
+	Title         string    `json:"title,omitempty"`
+	ThumbnailUrl  string    `json:"thumbnailUrl,omitempty"`
 	ExternalID    string    `json:"externalId"`
 	SyncProductID string    `json:"syncProductId"`
 	Status        string    `json:"status"`
@@ -180,6 +182,10 @@ type StoreSyncProduct struct {
 	VariantCount int                 `json:"variantCount"`
 	SyncedCount  int                 `json:"syncedCount"`
 	Variants     []StoreSyncVariant  `json:"variants,omitempty"`
+
+	// ImportedListingSlug is set when this sync product has been imported
+	// into a Mobazha listing (populated from synced_product_mappings).
+	ImportedListingSlug string `json:"importedListingSlug,omitempty"`
 }
 
 // StoreSyncVariant is a variant within a StoreSyncProduct.

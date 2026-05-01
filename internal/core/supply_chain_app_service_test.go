@@ -778,7 +778,7 @@ func TestCreateFulfillmentForItems_Success(t *testing.T) {
 		},
 	})
 	svc := NewSupplyChainAppService(reg, tdb, "test", testPrivKeyBytes)
-	fo, err := svc.createFulfillmentForItems(context.Background(), "order-xyz", "printful", contracts.CreateFulfillmentParams{
+	fo, err := svc.createFulfillmentForItems(context.Background(), "order-xyz", "printful", "", "default", nil, contracts.CreateFulfillmentParams{
 		ExternalOrderID: "order-xyz",
 		Recipient:       contracts.FulfillmentRecipient{Name: "Bob"},
 		Items:           []contracts.FulfillmentItem{{CatalogVariantID: "v1", Quantity: 1}},
@@ -812,7 +812,7 @@ func TestCreateFulfillmentForItems_ProviderError(t *testing.T) {
 		},
 	})
 	svc := NewSupplyChainAppService(reg, tdb, "test", testPrivKeyBytes)
-	_, err := svc.createFulfillmentForItems(context.Background(), "order-fail", "printful", contracts.CreateFulfillmentParams{})
+	_, err := svc.createFulfillmentForItems(context.Background(), "order-fail", "printful", "", "default", nil, contracts.CreateFulfillmentParams{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -820,6 +820,44 @@ func TestCreateFulfillmentForItems_ProviderError(t *testing.T) {
 	tdb.gormDB.First(&mapping, "mobazha_order_id = ?", "order-fail")
 	if mapping.Status != "failed" {
 		t.Errorf("expected failed, got %s", mapping.Status)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: parseItemIndices (multi-supplier split helper)
+// ---------------------------------------------------------------------------
+
+func TestParseItemIndices(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  map[int]bool
+	}{
+		{"empty string", "", nil},
+		{"empty array", "[]", nil},
+		{"single index", "[2]", map[int]bool{2: true}},
+		{"multiple indices", "[0,2,4]", map[int]bool{0: true, 2: true, 4: true}},
+		{"invalid JSON", "not-json", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseItemIndices(tt.input)
+			if tt.want == nil {
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+				return
+			}
+			if len(got) != len(tt.want) {
+				t.Errorf("expected %d entries, got %d", len(tt.want), len(got))
+				return
+			}
+			for k := range tt.want {
+				if !got[k] {
+					t.Errorf("expected index %d to be present", k)
+				}
+			}
+		})
 	}
 }
 
@@ -901,6 +939,14 @@ func (m *mockListingOps) SaveListing(listing *pb.Listing, done chan<- struct{}) 
 		close(done)
 	}
 	return m.err
+}
+
+func (m *mockListingOps) SetListingStatus(slug string, status string) error {
+	return m.err
+}
+
+func (m *mockListingOps) GetListingStatus(slug string) (string, error) {
+	return "published", m.err
 }
 
 func TestImportProduct_HappyPath(t *testing.T) {

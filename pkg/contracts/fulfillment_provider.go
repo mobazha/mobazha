@@ -125,6 +125,13 @@ type SupplyChainService interface {
 
 	// Shipping
 	EstimateShipping(ctx context.Context, providerID string, params ShippingEstimateParams) ([]ShippingEstimate, error)
+
+	// Alerts & Rules (M6 monitoring)
+	ListAlerts(ctx context.Context, dismissed bool, limit int) ([]SupplyChainAlert, error)
+	DismissAlert(ctx context.Context, alertID string) error
+	ListRules(ctx context.Context) ([]AutoActionRule, error)
+	CreateRule(ctx context.Context, rule *AutoActionRule) error
+	DeleteRule(ctx context.Context, ruleID string) error
 }
 
 // SupplyChainChecker is the narrow port that PaymentAppService depends on

@@ -41,10 +41,13 @@ type SupplyChainOrderOps interface {
 	GetOrderState(orderID models.OrderID) (models.OrderState, error)
 }
 
-// SupplyChainListingOps is the subset of ListingAppService needed by ImportProduct.
+// SupplyChainListingOps is the subset of ListingAppService needed by ImportProduct
+// and the supply chain monitoring system.
 // Kept narrow to avoid a circular import between App Services.
 type SupplyChainListingOps interface {
 	SaveListing(listing *pb.Listing, done chan<- struct{}) error
+	SetListingStatus(slug string, status string) error
+	GetListingStatus(slug string) (string, error)
 }
 
 // SupplyChainAppService orchestrates supply chain operations:
@@ -144,6 +147,8 @@ func (s *SupplyChainAppService) StartWorkers(ctx context.Context, saasMode bool,
 	go s.retryFailedOrdersLoop(ctx)
 	go s.reconcileStaleOrdersLoop(ctx)
 	go s.cleanupProcessedEventsLoop(ctx)
+	go s.inventoryMonitorLoop(ctx)
+	go s.priceDriftDetectorLoop(ctx)
 }
 
 const (
@@ -297,11 +302,8 @@ func (s *SupplyChainAppService) processRetry(ctx context.Context, mapping models
 // contract. Returns (params, reason, msg, ok). When ok is false, reason+msg
 // describe why the retry is permanently abandoned (validation/permanent).
 //
-// TECHDEBT(TD-085): Uses ALL items from the order contract. Correct for
-// FF-2 single-supplier orders (1 mapping per order). FF-3 multi-supplier
-// orders introduce mapping.ItemIndices and this function must filter by it.
-// Clearance: when FulfillmentOrderMapping.ItemIndices becomes non-empty
-// (multi-supplier split lands), this helper must honor it.
+// For multi-supplier orders, mapping.ItemIndices restricts the rebuild to
+// only the item positions belonging to this fulfillment group.
 func (s *SupplyChainAppService) rebuildRetryParams(mapping models.FulfillmentOrderMapping) (
 	*pb.OrderOpen, contracts.CreateFulfillmentParams, contracts.FailureReason, string, bool,
 ) {
@@ -321,10 +323,16 @@ func (s *SupplyChainAppService) rebuildRetryParams(mapping models.FulfillmentOrd
 		return nil, contracts.CreateFulfillmentParams{}, contracts.FailureReasonPermanentlyFailed, "cannot decode order", false
 	}
 
+	// Parse item indices filter. Empty/null means all items (backward compat).
+	allowedIndices := parseItemIndices(mapping.ItemIndices)
+
 	recipient := extractRecipientFromOrder(oo)
 	var allItems []contracts.FulfillmentItem
 	for i, li := range oo.Listings {
 		if li == nil || li.Listing == nil {
+			continue
+		}
+		if len(allowedIndices) > 0 && !allowedIndices[i] {
 			continue
 		}
 		item := contracts.FulfillmentItem{Quantity: 1}
@@ -332,9 +340,22 @@ func (s *SupplyChainAppService) rebuildRetryParams(mapping models.FulfillmentOrd
 			if q, parseErr := strconv.Atoi(oo.Items[i].Quantity); parseErr == nil && q > 0 {
 				item.Quantity = q
 			}
-			item.CatalogVariantID = resolveVariantID(li.Listing, oo.Items[i])
+			variantID := resolveVariantID(li.Listing, oo.Items[i])
+			slug := li.Listing.GetSlug()
+			if slug != "" {
+				var spm models.SyncedProductMapping
+				if lookupErr := s.db.View(func(tx database.Tx) error {
+					return tx.Read().Where("listing_slug = ?", slug).First(&spm).Error
+				}); lookupErr == nil && spm.SyncProductID != "" {
+					item.SyncVariantID = variantID
+				} else {
+					item.CatalogVariantID = variantID
+				}
+			} else {
+				item.CatalogVariantID = variantID
+			}
 		}
-		if item.CatalogVariantID == "" {
+		if item.SyncVariantID == "" && item.CatalogVariantID == "" {
 			return nil, contracts.CreateFulfillmentParams{}, contracts.FailureReasonValidationFailed,
 				fmt.Sprintf("cannot resolve variant for item %d", i), false
 		}
@@ -346,6 +367,26 @@ func (s *SupplyChainAppService) rebuildRetryParams(mapping models.FulfillmentOrd
 		Recipient:       recipient,
 		Items:           allItems,
 	}, contracts.FailureReasonNone, "", true
+}
+
+// parseItemIndices decodes a JSON int array stored in FulfillmentOrderMapping.ItemIndices.
+// Returns a set of allowed indices. An empty map means "all items" (legacy/single-supplier).
+func parseItemIndices(raw string) map[int]bool {
+	if raw == "" || raw == "[]" {
+		return nil
+	}
+	var indices []int
+	if err := json.Unmarshal([]byte(raw), &indices); err != nil {
+		return nil
+	}
+	if len(indices) == 0 {
+		return nil
+	}
+	m := make(map[int]bool, len(indices))
+	for _, idx := range indices {
+		m[idx] = true
+	}
+	return m
 }
 
 // executeRetryCreate calls the supplier and persists the outcome.
@@ -994,11 +1035,12 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 		return
 	}
 
-	// Find which items are supply-chain-managed and group by provider
+	// Find which items are supply-chain-managed and group by provider + location
 	type providerItems struct {
 		providerID string
+		locationID string
 		items      []contracts.FulfillmentItem
-		itemSlug   string
+		itemIndex  int
 	}
 	var groups []providerItems
 	totalListings := 0
@@ -1026,9 +1068,14 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 			if q, parseErr := strconv.Atoi(oo.Items[i].Quantity); parseErr == nil && q > 0 {
 				item.Quantity = q
 			}
-			item.CatalogVariantID = resolveVariantID(li.Listing, oo.Items[i])
+			variantID := resolveVariantID(li.Listing, oo.Items[i])
+			if mapping.SyncProductID != "" {
+				item.SyncVariantID = variantID
+			} else {
+				item.CatalogVariantID = variantID
+			}
 		}
-		if item.CatalogVariantID == "" {
+		if item.SyncVariantID == "" && item.CatalogVariantID == "" {
 			logger.LogWarningWithIDf(log, s.nodeID,
 				"SupplyChain: order %s item %d (%s): could not resolve variant ID from buyer selections — skipping auto-fulfillment (fail closed)",
 				orderID, i, slug)
@@ -1036,8 +1083,9 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 		}
 		groups = append(groups, providerItems{
 			providerID: mapping.ProviderID,
+			locationID: mapping.LocationID,
 			items:      []contracts.FulfillmentItem{item},
-			itemSlug:   slug,
+			itemIndex:  i,
 		})
 	}
 
@@ -1055,51 +1103,69 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 		return
 	}
 
-	// Safety: all items must be from the same provider. Multi-provider split is FF-3.
-	providerID := groups[0].providerID
-	for _, g := range groups[1:] {
-		if g.providerID != providerID {
-			logger.LogWarningWithIDf(log, s.nodeID,
-				"SupplyChain: order %s has items from multiple providers (%s, %s) — skipping until FF-3",
-				orderID, providerID, g.providerID)
-			return
+	// Group items by (providerID, locationID) for multi-supplier splitting.
+	type fulfillmentGroup struct {
+		providerID  string
+		locationID  string
+		items       []contracts.FulfillmentItem
+		itemIndices []int
+	}
+	groupMap := make(map[string]*fulfillmentGroup)
+	for _, g := range groups {
+		key := g.providerID + ":" + g.locationID
+		fg, ok := groupMap[key]
+		if !ok {
+			fg = &fulfillmentGroup{
+				providerID: g.providerID,
+				locationID: g.locationID,
+			}
+			groupMap[key] = fg
 		}
+		fg.items = append(fg.items, g.items...)
+		fg.itemIndices = append(fg.itemIndices, g.itemIndex)
 	}
 
 	recipient := extractRecipientFromOrder(oo)
 
-	var allItems []contracts.FulfillmentItem
-	for _, g := range groups {
-		allItems = append(allItems, g.items...)
+	var anySuccess bool
+	for groupKey, fg := range groupMap {
+		// Margin protection per group
+		if ok, reason, msg := s.evaluateMarginGate(ctx, supplyMarginInputs{
+			oo:         oo,
+			providerID: fg.providerID,
+			recipient:  recipient,
+			items:      fg.items,
+		}); !ok {
+			s.failFulfillmentWithReason(orderID, fg.providerID, groupKey, fg.locationID, fg.itemIndices, reason, msg)
+			continue
+		}
+
+		externalID := orderID
+		if len(groupMap) > 1 {
+			externalID = orderID + "|" + groupKey
+		}
+		params := contracts.CreateFulfillmentParams{
+			ExternalOrderID: externalID,
+			Recipient:       recipient,
+			Items:           fg.items,
+		}
+
+		fo, err := s.createFulfillmentForItems(ctx, orderID, fg.providerID, fg.locationID, groupKey, fg.itemIndices, params)
+		if err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID,
+				"SupplyChain: failed to create fulfillment group %s for order %s: %v", groupKey, orderID, err)
+			continue
+		}
+		anySuccess = true
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"SupplyChain: created fulfillment order %s for Mobazha order %s (provider: %s, group: %s)",
+			fo.ExternalID, orderID, fg.providerID, groupKey)
 	}
 
-	params := contracts.CreateFulfillmentParams{
-		ExternalOrderID: orderID,
-		Recipient:       recipient,
-		Items:           allItems,
-	}
-
-	// --- Margin Protection (FF-2.6) ---
-	// Shared with retry worker via evaluateMarginGate (supply_chain_margin.go).
-	if ok, reason, msg := s.evaluateMarginGate(ctx, supplyMarginInputs{
-		oo:         oo,
-		providerID: providerID,
-		recipient:  recipient,
-		items:      allItems,
-	}); !ok {
-		s.failFulfillmentWithReason(orderID, providerID, reason, msg)
-		return
-	}
-
-	fo, err := s.createFulfillmentForItems(ctx, orderID, providerID, params)
-	if err != nil {
+	if !anySuccess && len(groupMap) > 0 {
 		logger.LogErrorWithIDf(log, s.nodeID,
-			"SupplyChain: failed to create fulfillment for order %s: %v", orderID, err)
-		return
+			"SupplyChain: all %d fulfillment groups failed for order %s", len(groupMap), orderID)
 	}
-	logger.LogInfoWithIDf(log, s.nodeID,
-		"SupplyChain: created fulfillment order %s for Mobazha order %s (provider: %s)",
-		fo.ExternalID, orderID, providerID)
 }
 
 // extractRecipientFromOrder builds a FulfillmentRecipient from the order's shipping address.
@@ -1155,6 +1221,7 @@ func (s *SupplyChainAppService) rebuildProviders(ctx context.Context) error {
 			logger.LogErrorWithIDf(log, s.nodeID, "SupplyChain: failed to register rebuilt provider %q: %v", cfg.ProviderID, regErr)
 			continue
 		}
+		s.ensureDefaultLocation(cfg.ProviderID, cfg.ProviderType)
 		rebuilt++
 	}
 	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: rebuilt %d/%d providers from DB", rebuilt, len(configs))
@@ -1502,17 +1569,16 @@ func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contra
 	metaJSON, _ := json.Marshal(variantMeta)
 
 	mapping := &models.SyncedProductMapping{
-		ID:            uuid.NewString(),
-		ProviderID:    params.ProviderID,
-		LocationID:    s.defaultLocationID(params.ProviderID),
-		ListingSlug:   listing.Slug,
-		ExternalID:    product.ID,
-		SyncProductID: product.ID,
-		SupplierCost:  supplierCost,
-		RetailPrice:   retailPrice,
-		Status:        "synced",
-		LastSyncAt:    time.Now(),
-		Metadata:      metaJSON,
+		ID:           uuid.NewString(),
+		ProviderID:   params.ProviderID,
+		LocationID:   s.defaultLocationID(params.ProviderID),
+		ListingSlug:  listing.Slug,
+		ExternalID:   product.ID,
+		SupplierCost: supplierCost,
+		RetailPrice:  retailPrice,
+		Status:       "synced",
+		LastSyncAt:   time.Now(),
+		Metadata:     metaJSON,
 	}
 	if err := s.db.Update(func(tx database.Tx) error {
 		return tx.Save(mapping)
@@ -1738,7 +1804,9 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 		variants = filtered
 	}
 
-	// Collect images from variant previews/files for the listing
+	// Collect images from variant previews/files for the listing.
+	// Only include "preview" type files (product mockups); exclude "default"
+	// type files which are raw design assets (logos, artwork) uploaded by the user.
 	imageURLSet := map[string]bool{}
 	var images []*pb.Image
 	if syncProd.ThumbnailURL != "" {
@@ -1753,6 +1821,9 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 	}
 	for _, v := range variants {
 		for _, f := range v.Files {
+			if f.Type != "" && f.Type != "preview" {
+				continue
+			}
 			imgURL := f.PreviewURL
 			if imgURL == "" {
 				imgURL = f.URL
@@ -2255,10 +2326,15 @@ func (s *SupplyChainAppService) CreateFulfillmentFromOrder(ctx context.Context, 
 
 // createFulfillmentForItems is the internal method called by the OrderFunded listener.
 // It bridges a Mobazha order to a supplier fulfillment order.
+// groupKey is "providerID:locationID" for multi-supplier orders, or "default"
+// for single-supplier backward compatibility.
 func (s *SupplyChainAppService) createFulfillmentForItems(
 	ctx context.Context,
 	mobazhaOrderID string,
 	providerID string,
+	locationID string,
+	groupKey string,
+	itemIndices []int,
 	params contracts.CreateFulfillmentParams,
 ) (*contracts.FulfillmentOrder, error) {
 	provider, err := s.registry.ForProvider(providerID)
@@ -2266,14 +2342,21 @@ func (s *SupplyChainAppService) createFulfillmentForItems(
 		return nil, fmt.Errorf("provider lookup: %w", err)
 	}
 
-	// Reserve mapping row BEFORE calling the external provider.
-	// This ensures we always have a local record to correlate webhooks/retries,
-	// even if the DB write after the provider call were to fail.
+	indicesJSON := "[]"
+	if len(itemIndices) > 0 {
+		if b, jsonErr := json.Marshal(itemIndices); jsonErr == nil {
+			indicesJSON = string(b)
+		}
+	}
+
 	mapping := &models.FulfillmentOrderMapping{
-		ID:             uuid.New().String(),
-		MobazhaOrderID: mobazhaOrderID,
-		ProviderID:     providerID,
-		Status:         string(contracts.FulfillmentStatusPending),
+		ID:                  uuid.New().String(),
+		MobazhaOrderID:      mobazhaOrderID,
+		ProviderID:          providerID,
+		LocationID:          locationID,
+		FulfillmentGroupKey: groupKey,
+		ItemIndices:         indicesJSON,
+		Status:              string(contracts.FulfillmentStatusPending),
 	}
 	if saveErr := s.db.Update(func(tx database.Tx) error { return tx.Save(mapping) }); saveErr != nil {
 		return nil, fmt.Errorf("reserve fulfillment mapping: %w", saveErr)
@@ -2324,34 +2407,74 @@ func (s *SupplyChainAppService) createFulfillmentForItems(
 }
 
 func (s *SupplyChainAppService) GetFulfillmentStatus(_ context.Context, mobazhaOrderID string) (*contracts.FulfillmentOrder, error) {
-	var mapping models.FulfillmentOrderMapping
+	var mappings []models.FulfillmentOrderMapping
 	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("mobazha_order_id = ?", mobazhaOrderID).First(&mapping).Error
+		return tx.Read().Where("mobazha_order_id = ?", mobazhaOrderID).
+			Order("created_at ASC").Find(&mappings).Error
 	})
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, contracts.ErrFulfillmentOrderNotFound
-		}
 		return nil, err
 	}
+	if len(mappings) == 0 {
+		return nil, contracts.ErrFulfillmentOrderNotFound
+	}
 
+	first := mappings[0]
 	fo := &contracts.FulfillmentOrder{
-		ID:         mapping.FulfillmentOrderID,
-		ExternalID: mapping.MobazhaOrderID,
-		Status:     contracts.FulfillmentStatus(mapping.Status),
-		Shipments:  buildShipments(&mapping),
-		CreatedAt:  mapping.CreatedAt,
-		UpdatedAt:  mapping.UpdatedAt,
+		ID:         first.FulfillmentOrderID,
+		ExternalID: first.MobazhaOrderID,
+		CreatedAt:  first.CreatedAt,
+		UpdatedAt:  first.UpdatedAt,
 	}
-	if mapping.ErrorMessage != "" {
-		fo.ErrorMessage = mapping.ErrorMessage
+
+	if len(mappings) == 1 {
+		// Single-group order: backward compatible flat response.
+		fo.Status = contracts.FulfillmentStatus(first.Status)
+		fo.Shipments = buildShipments(&first)
+		fillErrorFields(fo, &first)
+		if first.SupplierCost != "" {
+			fo.Costs = &contracts.FulfillmentCosts{Total: first.SupplierCost}
+		}
+		return fo, nil
 	}
-	if mapping.FailureReason != "" {
-		fo.FailureReason = contracts.FailureReason(mapping.FailureReason)
-		// Only surface retry counters when there is an actual failure reason.
-		// Bound to uint8 to match DTO; retry_count is stored as int but is
-		// always small (<= maxRetryAttempts).
-		retryCount := mapping.RetryCount
+
+	// Multi-group: build per-group details and compute aggregate status.
+	var allShipments []contracts.FulfillmentShipment
+	for _, m := range mappings {
+		g := contracts.FulfillmentGroup{
+			GroupKey:   m.FulfillmentGroupKey,
+			ProviderID: m.ProviderID,
+			LocationID: m.LocationID,
+			Status:     contracts.FulfillmentStatus(m.Status),
+			Shipments:  buildShipments(&m),
+		}
+		if m.ErrorMessage != "" {
+			g.ErrorMessage = m.ErrorMessage
+		}
+		if m.FailureReason != "" {
+			g.FailureReason = contracts.FailureReason(m.FailureReason)
+		}
+		g.ItemIndices = parseItemIndicesSlice(m.ItemIndices)
+		fo.Groups = append(fo.Groups, g)
+		allShipments = append(allShipments, g.Shipments...)
+		if m.UpdatedAt.After(fo.UpdatedAt) {
+			fo.UpdatedAt = m.UpdatedAt
+		}
+	}
+	fo.Status = aggregateFulfillmentStatus(mappings)
+	fo.Shipments = allShipments
+	return fo, nil
+}
+
+// fillErrorFields populates error/retry fields on a FulfillmentOrder from a
+// single mapping (single-group backward compatibility).
+func fillErrorFields(fo *contracts.FulfillmentOrder, m *models.FulfillmentOrderMapping) {
+	if m.ErrorMessage != "" {
+		fo.ErrorMessage = m.ErrorMessage
+	}
+	if m.FailureReason != "" {
+		fo.FailureReason = contracts.FailureReason(m.FailureReason)
+		retryCount := m.RetryCount
 		if retryCount < 0 {
 			retryCount = 0
 		} else if retryCount > 255 {
@@ -2360,10 +2483,47 @@ func (s *SupplyChainAppService) GetFulfillmentStatus(_ context.Context, mobazhaO
 		fo.RetryCount = uint8(retryCount)
 		fo.MaxRetries = uint8(maxRetryAttempts)
 	}
-	if mapping.SupplierCost != "" {
-		fo.Costs = &contracts.FulfillmentCosts{Total: mapping.SupplierCost}
+}
+
+// aggregateFulfillmentStatus derives a single status from multiple groups.
+// Priority (worst first): failed > pending > in_process > shipped > delivered.
+func aggregateFulfillmentStatus(mappings []models.FulfillmentOrderMapping) contracts.FulfillmentStatus {
+	priority := map[string]int{
+		"failed":     0,
+		"pending":    1,
+		"in_process": 2,
+		"shipped":    3,
+		"delivered":  4,
+		"canceled":   5,
 	}
-	return fo, nil
+	worst := 999
+	for _, m := range mappings {
+		p, ok := priority[m.Status]
+		if !ok {
+			p = 1 // treat unknown as pending
+		}
+		if p < worst {
+			worst = p
+		}
+	}
+	for status, p := range priority {
+		if p == worst {
+			return contracts.FulfillmentStatus(status)
+		}
+	}
+	return contracts.FulfillmentStatusPending
+}
+
+// parseItemIndicesSlice returns a []int from the JSON stored in the mapping.
+func parseItemIndicesSlice(raw string) []int {
+	if raw == "" || raw == "[]" {
+		return nil
+	}
+	var indices []int
+	if err := json.Unmarshal([]byte(raw), &indices); err != nil {
+		return nil
+	}
+	return indices
 }
 
 // ---------------------------------------------------------------------------
@@ -2455,9 +2615,21 @@ func (s *SupplyChainAppService) processWebhookEvent(_ context.Context, providerI
 			}
 		}
 		if !found && event.OrderID != "" {
-			if err := tx.Read().
-				Where("provider_id = ? AND mobazha_order_id = ?", providerID, event.OrderID).
-				First(&mapping).Error; err != nil {
+			// Multi-group fulfillment sends "orderID|groupKey" as the supplier
+			// external order ID (pipe delimiter chosen because group keys contain
+			// colons, e.g. "printful:us"). Parse the suffix to recover the Mobazha
+			// order ID and narrow by group key if present.
+			lookupOrderID := event.OrderID
+			var lookupGroupKey string
+			if idx := strings.Index(event.OrderID, "|"); idx > 0 {
+				lookupOrderID = event.OrderID[:idx]
+				lookupGroupKey = event.OrderID[idx+1:]
+			}
+			q := tx.Read().Where("provider_id = ? AND mobazha_order_id = ?", providerID, lookupOrderID)
+			if lookupGroupKey != "" {
+				q = q.Where("fulfillment_group_key = ?", lookupGroupKey)
+			}
+			if err := q.First(&mapping).Error; err != nil {
 				return err
 			}
 		} else if !found {
@@ -2712,25 +2884,21 @@ func (s *SupplyChainAppService) allFulfillmentsShipped(mobazhaOrderID string) (b
 // contracts.SupplyChainChecker implementation
 // ---------------------------------------------------------------------------
 
-// IsOrderAutoFulfillable returns true only when every slug maps to the same
-// fulfillment provider. This mirrors the safety checks in handleOrderFunded:
-// mixed orders and multi-provider orders are NOT auto-fulfillable.
+// IsOrderAutoFulfillable returns true when every slug in the order has a
+// SyncedProductMapping (i.e. all items are supplier-managed). Multi-provider
+// orders are allowed since Phase 5 (FF-3) supports splitting fulfillment
+// across providers. A mixed order (some items managed, some not) is NOT
+// auto-fulfillable because the un-managed items require manual shipping.
 func (s *SupplyChainAppService) IsOrderAutoFulfillable(slugs []string) bool {
 	if len(slugs) == 0 {
 		return false
 	}
-	var providerID string
 	for _, slug := range slugs {
-		var mapping models.SyncedProductMapping
-		err := s.db.View(func(tx database.Tx) error {
-			return tx.Read().Where("listing_slug = ?", slug).First(&mapping).Error
+		var count int64
+		_ = s.db.View(func(tx database.Tx) error {
+			return tx.Read().Model(&models.SyncedProductMapping{}).Where("listing_slug = ?", slug).Count(&count).Error
 		})
-		if err != nil {
-			return false
-		}
-		if providerID == "" {
-			providerID = mapping.ProviderID
-		} else if mapping.ProviderID != providerID {
+		if count == 0 {
 			return false
 		}
 	}
@@ -2887,22 +3055,40 @@ func decryptAESGCM(key, ciphertext []byte) ([]byte, error) {
 
 // failFulfillmentWithReason creates a failed FulfillmentOrderMapping with the given reason.
 // Used by margin protection and validation gates to record why auto-fulfillment was skipped.
-func (s *SupplyChainAppService) failFulfillmentWithReason(orderID, providerID string, reason contracts.FailureReason, msg string) {
+func (s *SupplyChainAppService) failFulfillmentWithReason(
+	orderID, providerID, groupKey, locationID string,
+	itemIndices []int,
+	reason contracts.FailureReason, msg string,
+) {
 	logger.LogWarningWithIDf(log, s.nodeID,
-		"SupplyChain: order %s: %s — %s", orderID, reason, msg)
+		"SupplyChain: order %s group %s: %s — %s", orderID, groupKey, reason, msg)
+
+	if groupKey == "" {
+		groupKey = "default"
+	}
+	indicesJSON := "[]"
+	if len(itemIndices) > 0 {
+		if b, jsonErr := json.Marshal(itemIndices); jsonErr == nil {
+			indicesJSON = string(b)
+		}
+	}
+
 	if err := s.db.Update(func(tx database.Tx) error {
 		mapping := &models.FulfillmentOrderMapping{
-			ID:             uuid.New().String(),
-			MobazhaOrderID: orderID,
-			ProviderID:     providerID,
-			Status:         string(contracts.FulfillmentStatusFailed),
-			FailureReason:  string(reason),
-			ErrorMessage:   msg,
+			ID:                  uuid.New().String(),
+			MobazhaOrderID:      orderID,
+			ProviderID:          providerID,
+			LocationID:          locationID,
+			FulfillmentGroupKey: groupKey,
+			ItemIndices:         indicesJSON,
+			Status:              string(contracts.FulfillmentStatusFailed),
+			FailureReason:       string(reason),
+			ErrorMessage:        msg,
 		}
 		return tx.Save(mapping)
 	}); err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID,
-			"SupplyChain: failed to record failure mapping for order %s: %v", orderID, err)
+			"SupplyChain: failed to record failure mapping for order %s group %s: %v", orderID, groupKey, err)
 	}
 }
 

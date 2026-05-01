@@ -86,6 +86,11 @@ type SyncedProductMapping struct {
 	Status        string    `gorm:"column:status;type:varchar(16);not null;default:'synced'"`
 	LastSyncAt    time.Time `gorm:"column:last_sync_at"`
 
+	// PreviousListingStatus records the listing status before automation hid it.
+	// Used by stock_back / show_listing rules to only restore listings that were
+	// previously published — prevents auto-publishing seller drafts.
+	PreviousListingStatus string `gorm:"column:previous_listing_status;type:varchar(16)"`
+
 	// Metadata stores provider-specific data (variant mappings, design files, etc.)
 	Metadata []byte `gorm:"column:metadata"`
 }
@@ -96,11 +101,12 @@ func (SyncedProductMapping) TableName() string { return "synced_product_mappings
 // FulfillmentOrderMapping — Mobazha order ↔ supplier fulfillment order link
 // ---------------------------------------------------------------------------
 
-// FulfillmentOrderMapping tracks the relationship between a Mobazha order and one
-// or more supplier fulfillment orders. For v1, each Mobazha order maps to at most
-// one supplier order (multi-supplier split deferred to FF-3).
+// FulfillmentOrderMapping tracks the relationship between a Mobazha order and
+// supplier fulfillment orders. A single Mobazha order may produce multiple
+// mappings when items come from different providers or locations — each group
+// is keyed by FulfillmentGroupKey ("providerID:locationID").
 //
-// uniqueIndex on (tenant_id, mobazha_order_id) created via migration SQL.
+// uniqueIndex on (tenant_id, mobazha_order_id, fulfillment_group_key) in migration SQL.
 type FulfillmentOrderMapping struct {
 	TenantMixin
 	ID                  string `gorm:"primaryKey"`
@@ -183,3 +189,82 @@ type ProcessedFulfillmentEvent struct {
 }
 
 func (ProcessedFulfillmentEvent) TableName() string { return "processed_fulfillment_events" }
+
+// ---------------------------------------------------------------------------
+// SupplyChainAlert — inventory/price/rule-triggered alerts
+// ---------------------------------------------------------------------------
+
+// AlertType classifies the nature of a supply chain alert.
+type AlertType string
+
+const (
+	AlertTypeStockOut   AlertType = "stock_out"
+	AlertTypeStockBack  AlertType = "stock_back"
+	AlertTypePriceDrift AlertType = "price_drift"
+	AlertTypeRuleAction AlertType = "rule_action"
+)
+
+// AlertSeverity indicates priority.
+type AlertSeverity string
+
+const (
+	AlertSeverityInfo     AlertSeverity = "info"
+	AlertSeverityWarning  AlertSeverity = "warning"
+	AlertSeverityCritical AlertSeverity = "critical"
+)
+
+// SupplyChainAlert records a supply chain event requiring seller attention.
+type SupplyChainAlert struct {
+	TenantMixin
+	ID          string        `gorm:"primaryKey"`
+	ProviderID  string        `gorm:"column:provider_id;type:varchar(32);not null"`
+	ListingSlug string        `gorm:"column:listing_slug;type:varchar(255)"`
+	AlertType   AlertType     `gorm:"column:alert_type;type:varchar(32);not null"`
+	Severity    AlertSeverity `gorm:"column:severity;type:varchar(16);not null;default:'warning'"`
+	Title       string        `gorm:"column:title;type:varchar(255);not null"`
+	Message     string        `gorm:"column:message;type:text"`
+	Metadata    []byte        `gorm:"column:metadata"`
+	Dismissed   bool          `gorm:"column:dismissed;default:false"`
+	ActionTaken string        `gorm:"column:action_taken;type:varchar(64)"`
+	CreatedAt   time.Time     `gorm:"column:created_at;autoCreateTime"`
+}
+
+func (SupplyChainAlert) TableName() string { return "supply_chain_alerts" }
+
+// ---------------------------------------------------------------------------
+// AutoActionRule — configurable trigger → action rules
+// ---------------------------------------------------------------------------
+
+// RuleTrigger defines what triggers an auto-action.
+type RuleTrigger string
+
+const (
+	RuleTriggerStockOut   RuleTrigger = "stock_out"
+	RuleTriggerStockBack  RuleTrigger = "stock_back"
+	RuleTriggerPriceDrift RuleTrigger = "price_drift"
+)
+
+// RuleAction defines what happens when a rule fires.
+type RuleAction string
+
+const (
+	RuleActionHideListing  RuleAction = "hide_listing"
+	RuleActionShowListing  RuleAction = "show_listing"
+	RuleActionPauseListing RuleAction = "pause_listing"
+	RuleActionNotifyOnly   RuleAction = "notify_only"
+)
+
+// AutoActionRule stores seller-configurable automation rules.
+type AutoActionRule struct {
+	TenantMixin
+	ID         string      `gorm:"primaryKey"`
+	ProviderID string      `gorm:"column:provider_id;type:varchar(32)"`
+	Trigger    RuleTrigger `gorm:"column:trigger;type:varchar(32);not null"`
+	Action     RuleAction  `gorm:"column:action;type:varchar(32);not null"`
+	Threshold  float64     `gorm:"column:threshold;default:0"`
+	Enabled    bool        `gorm:"column:enabled;default:true"`
+	CreatedAt  time.Time   `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt  time.Time   `gorm:"column:updated_at;autoUpdateTime"`
+}
+
+func (AutoActionRule) TableName() string { return "auto_action_rules" }

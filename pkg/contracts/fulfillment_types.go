@@ -271,7 +271,9 @@ type FulfillmentFile struct {
 	Filename string `json:"filename,omitempty"`
 }
 
-// FulfillmentOrder represents a supplier order and its current state.
+// FulfillmentOrder represents the fulfillment state for a Mobazha order.
+// When an order has multiple supplier groups (multi-supplier split), Groups
+// contains each group's state and Status is the aggregate (worst-case) status.
 type FulfillmentOrder struct {
 	ID            string                `json:"id"`
 	ExternalID    string                `json:"externalId"`
@@ -284,6 +286,21 @@ type FulfillmentOrder struct {
 	FailureReason FailureReason         `json:"failureReason,omitempty"`
 	RetryCount    uint8                 `json:"retryCount,omitempty"`
 	MaxRetries    uint8                 `json:"maxRetries,omitempty"`
+	Groups        []FulfillmentGroup    `json:"groups,omitempty"`
+}
+
+// FulfillmentGroup represents one provider/location slice of a multi-supplier
+// fulfillment. For single-supplier orders, Groups is empty and the top-level
+// fields carry the state (backward compatible).
+type FulfillmentGroup struct {
+	GroupKey      string                `json:"groupKey"`
+	ProviderID    string                `json:"providerId"`
+	LocationID    string                `json:"locationId,omitempty"`
+	Status        FulfillmentStatus     `json:"status"`
+	Shipments     []FulfillmentShipment `json:"shipments,omitempty"`
+	ErrorMessage  string                `json:"errorMessage,omitempty"`
+	FailureReason FailureReason         `json:"failureReason,omitempty"`
+	ItemIndices   []int                 `json:"itemIndices,omitempty"`
 }
 
 // FulfillmentStatus is the lifecycle state of a supplier order.
@@ -431,4 +448,34 @@ type MockupResult struct {
 	TaskID string   `json:"taskId"`
 	Status string   `json:"status"` // "pending", "completed", "failed"
 	Images []string `json:"images,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
+// Supply Chain Alerts & Auto-Action Rules (M6)
+// ---------------------------------------------------------------------------
+
+// SupplyChainAlert represents a monitoring alert surfaced to the seller.
+type SupplyChainAlert struct {
+	ID          string    `json:"id"`
+	ProviderID  string    `json:"providerId"`
+	ListingSlug string    `json:"listingSlug"`
+	AlertType   string    `json:"alertType"`
+	Severity    string    `json:"severity"`
+	Title       string    `json:"title"`
+	Message     string    `json:"message"`
+	Dismissed   bool      `json:"dismissed"`
+	ActionTaken string    `json:"actionTaken,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+// AutoActionRule represents a configurable trigger → action automation.
+type AutoActionRule struct {
+	ID         string    `json:"id"`
+	ProviderID string    `json:"providerId,omitempty"`
+	Trigger    string    `json:"trigger"`
+	Action     string    `json:"action"`
+	Threshold  float64   `json:"threshold,omitempty"`
+	Enabled    *bool     `json:"enabled,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }

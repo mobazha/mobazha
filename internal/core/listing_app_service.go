@@ -267,6 +267,36 @@ func (s *ListingAppService) RepublishListing(ctx context.Context, slug string) e
 	return s.SaveListing(sl.Listing, nil)
 }
 
+// GetListingStatus returns the current status of a listing by slug.
+func (s *ListingAppService) GetListingStatus(slug string) (string, error) {
+	sl, err := s.GetMyListingBySlug(slug)
+	if err != nil {
+		return "", err
+	}
+	if sl.Listing == nil {
+		return "", fmt.Errorf("listing %s has no content", slug)
+	}
+	return sl.Listing.Status, nil
+}
+
+// SetListingStatus changes a listing's status (e.g. "published" ↔ "draft")
+// and re-saves it. Used by supply chain monitoring to hide/show listings
+// based on supplier stock availability.
+func (s *ListingAppService) SetListingStatus(slug string, status string) error {
+	sl, err := s.GetMyListingBySlug(slug)
+	if err != nil {
+		return fmt.Errorf("get listing %s: %w", slug, err)
+	}
+	if sl.Listing == nil {
+		return fmt.Errorf("listing %s has no content", slug)
+	}
+	if sl.Listing.Status == status {
+		return nil
+	}
+	sl.Listing.Status = status
+	return s.SaveListing(sl.Listing, nil)
+}
+
 func (s *ListingAppService) UpdateAllListings(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
 	var (
 		listingsUpdated = false

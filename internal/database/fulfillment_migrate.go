@@ -17,6 +17,8 @@ func MigrateFulfillmentModels(db pkgdb.Database) error {
 			&models.SyncedProductMapping{},
 			&models.FulfillmentOrderMapping{},
 			&models.ProcessedFulfillmentEvent{},
+			&models.SupplyChainAlert{},
+			&models.AutoActionRule{},
 		}
 		for _, m := range allModels {
 			if err := tx.Migrate(m); err != nil {
@@ -39,8 +41,9 @@ func MigrateFulfillmentModels(db pkgdb.Database) error {
 			`CREATE INDEX IF NOT EXISTS idx_spm_tenant_provider
 				ON synced_product_mappings (tenant_id, provider_id)`,
 
-			// FulfillmentOrderMapping: one group per (tenant, order, group_key)
-			// Replaces old idx_fom_tenant_order to support multi-supplier splitting.
+			// FulfillmentOrderMapping: one group per (tenant, order, group_key).
+			// Drop legacy 1:1 index if it still exists (pre-FF-3).
+			`DROP INDEX IF EXISTS idx_fom_tenant_order`,
 			`CREATE UNIQUE INDEX IF NOT EXISTS idx_fom_tenant_order_group
 				ON fulfillment_order_mappings (tenant_id, mobazha_order_id, fulfillment_group_key)`,
 
@@ -49,6 +52,18 @@ func MigrateFulfillmentModels(db pkgdb.Database) error {
 				ON processed_fulfillment_events (tenant_id, provider_id, event_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_pfe_tenant_order
 				ON processed_fulfillment_events (tenant_id, order_id)`,
+
+			// SupplyChainAlert: query by tenant + active (non-dismissed)
+			`CREATE INDEX IF NOT EXISTS idx_sca_tenant_active
+				ON supply_chain_alerts (tenant_id, dismissed, created_at)`,
+			`CREATE INDEX IF NOT EXISTS idx_sca_tenant_listing
+				ON supply_chain_alerts (tenant_id, listing_slug)`,
+
+			// AutoActionRule: one rule per (tenant, provider, trigger, action).
+			// Drop old narrow index if it exists (pre provider-specific support).
+			`DROP INDEX IF EXISTS idx_aar_tenant_trigger_action`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_aar_tenant_provider_trigger_action
+				ON auto_action_rules (tenant_id, provider_id, trigger, action)`,
 		}
 
 		gormDB := tx.Read()

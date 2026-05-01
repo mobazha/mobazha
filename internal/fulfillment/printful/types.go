@@ -42,20 +42,21 @@ type pfProduct struct {
 }
 
 // pfVariant is a Printful product variant (specific size/color).
+// Note: availability_status can be a string (list endpoint) or an array of
+// objects (detail endpoint), so we use json.RawMessage.
 type pfVariant struct {
-	ID                int     `json:"id"`
-	ProductID         int     `json:"product_id"`
-	Name              string  `json:"name"`
-	Size              string  `json:"size"`
-	Color             string  `json:"color"`
-	ColorCode         string  `json:"color_code"`
-	ColorCode2        string  `json:"color_code2"`
-	Image             string  `json:"image"`
-	Price             string  `json:"price"`
-	InStock           bool    `json:"in_stock"`
-	AvailabilityStatus string `json:"availability_status"`
+	ID                int              `json:"id"`
+	ProductID         int              `json:"product_id"`
+	Name              string           `json:"name"`
+	Size              string           `json:"size"`
+	Color             string           `json:"color"`
+	ColorCode         string           `json:"color_code"`
+	ColorCode2        string           `json:"color_code2"`
+	Image             string           `json:"image"`
+	Price             string           `json:"price"`
+	InStock           bool             `json:"in_stock"`
+	AvailabilityStatus json.RawMessage `json:"availability_status,omitempty"`
 
-	// Availability regions may vary
 	AvailabilityRegions map[string]string `json:"availability_regions,omitempty"`
 }
 

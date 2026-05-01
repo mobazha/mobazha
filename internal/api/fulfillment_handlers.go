@@ -470,6 +470,125 @@ func (g *Gateway) handlePOSTFulfillmentWebhook(w http.ResponseWriter, r *http.Re
 }
 
 // ---------------------------------------------------------------------------
+// Alerts (M6)
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handleGETFulfillmentAlerts(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	dismissed := r.URL.Query().Get("dismissed") == "true"
+	limit := parseInt(r.URL.Query().Get("limit"), 50)
+
+	alerts, err := svc.ListAlerts(r.Context(), dismissed, limit)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to list alerts")
+		return
+	}
+	if alerts == nil {
+		alerts = []contracts.SupplyChainAlert{}
+	}
+	responsePkg.Success(w, alerts)
+}
+
+func (g *Gateway) handleDELETEFulfillmentAlert(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	alertID := mux.Vars(r)["alertID"]
+	if alertID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "alertID is required")
+		return
+	}
+
+	if err := svc.DismissAlert(r.Context(), alertID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Alert not found")
+			return
+		}
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to dismiss alert")
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
+// ---------------------------------------------------------------------------
+// Auto-Action Rules (M6)
+// ---------------------------------------------------------------------------
+
+func (g *Gateway) handleGETFulfillmentRules(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	rules, err := svc.ListRules(r.Context())
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to list rules")
+		return
+	}
+	if rules == nil {
+		rules = []contracts.AutoActionRule{}
+	}
+	responsePkg.Success(w, rules)
+}
+
+func (g *Gateway) handlePOSTFulfillmentRule(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	var rule contracts.AutoActionRule
+	if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Invalid request body")
+		return
+	}
+	if rule.Trigger == "" || rule.Action == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "trigger and action are required")
+		return
+	}
+
+	if err := svc.CreateRule(r.Context(), &rule); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to create rule")
+		return
+	}
+	responsePkg.Created(w, rule)
+}
+
+func (g *Gateway) handleDELETEFulfillmentRule(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	ruleID := mux.Vars(r)["ruleID"]
+	if ruleID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "ruleID is required")
+		return
+	}
+
+	if err := svc.DeleteRule(r.Context(), ruleID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Rule not found")
+			return
+		}
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to delete rule")
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

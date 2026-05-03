@@ -51,7 +51,6 @@ func TestWebhookSink_Handle_EnqueuesEvent(t *testing.T) {
 	}
 	cfg := wh.DefaultConfig()
 	engine := wh.NewEngine(store, cfg)
-	defer engine.Stop()
 
 	sink := NewWebhookSink(engine, "node-test")
 	meta := events.EventMeta{Category: "order", Name: "order.created"}
@@ -93,7 +92,6 @@ func TestWebhookSink_Handle_FiltersByEventType(t *testing.T) {
 	}
 	cfg := wh.DefaultConfig()
 	engine := wh.NewEngine(store, cfg)
-	defer engine.Stop()
 
 	sink := NewWebhookSink(engine, "node-test")
 	meta := events.EventMeta{Category: "order", Name: "order.created"}

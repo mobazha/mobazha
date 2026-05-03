@@ -1314,7 +1314,7 @@ func newLightweightNode(
 
 // initWebhookSubsystem initializes the per-node webhook subsystem:
 // migrates DB models, creates store + engine.
-// The Engine is started here; the WebhookSink is plugged into the Dispatcher later.
+// Delivery/cleanup are driven externally by the shared scheduler.
 func initWebhookSubsystem(obNode *MobazhaNode) {
 	if err := webhookinternal.MigrateModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Webhook: failed to migrate models: %v", err)
@@ -1385,7 +1385,6 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 			obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)
 		}
 		obNode.supplyChainService.StartFulfillmentMonitor()
-		obNode.supplyChainService.StartWorkers(context.Background(), "")
 	}
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Supply chain subsystem initialized")

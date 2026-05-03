@@ -23,7 +23,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/deploy"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/fulfillment"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -161,32 +160,44 @@ func (s *SupplyChainAppService) StartFulfillmentMonitor() {
 	go s.subscribeDisputeClose()
 }
 
-// StartWorkers launches background workers for retry, reconciliation, and cleanup.
-// Must be called ONLY when FeatureSupplyChainEnabled is true (gated in builder.go).
-func (s *SupplyChainAppService) StartWorkers(ctx context.Context, webhookBaseURL string) {
-	s.webhookBaseURL = webhookBaseURL
-	go s.retryFailedOrdersLoop(ctx)
-	go s.reconcileStaleOrdersLoop(ctx)
-	go s.cleanupProcessedEventsLoop(ctx)
-	go s.inventoryMonitorLoop(ctx)
-	go s.priceDriftDetectorLoop(ctx)
+// SetWebhookBaseURL stores the webhook base URL for standalone webhook registration.
+func (s *SupplyChainAppService) SetWebhookBaseURL(url string) {
+	s.webhookBaseURL = url
+}
+
+// RunSupplyChainRetryOnce retries failed fulfillment orders in a single pass.
+func (s *SupplyChainAppService) RunSupplyChainRetryOnce(ctx context.Context) {
+	s.retryFailedOrders(ctx)
+}
+
+// RunSupplyChainReconcileOnce reconciles stale fulfillment orders in a single pass.
+func (s *SupplyChainAppService) RunSupplyChainReconcileOnce(ctx context.Context) {
+	s.reconcileStaleOrders(ctx)
+}
+
+// RunSupplyChainCleanupOnce removes old processed fulfillment events in a single pass.
+func (s *SupplyChainAppService) RunSupplyChainCleanupOnce() {
+	s.cleanupProcessedEvents()
+}
+
+// RunSupplyChainInventoryCheckOnce checks inventory levels in a single pass.
+func (s *SupplyChainAppService) RunSupplyChainInventoryCheckOnce(ctx context.Context) {
+	s.checkInventory(ctx)
+}
+
+// RunSupplyChainPriceDriftOnce detects price drifts in a single pass.
+func (s *SupplyChainAppService) RunSupplyChainPriceDriftOnce(ctx context.Context) {
+	s.detectPriceDrifts(ctx)
 }
 
 const (
-	// Retry worker
-	retryWorkerInterval = 30 * time.Second
 	maxRetryAttempts    = 3
 	retryLeaseDuration  = 5 * time.Minute
 	retryBackoffBase    = 5 * time.Minute // attempt N delay = retryBackoffBase * 2^N
 
-	// Reconcile worker
-	reconcileIntervalDefault = 5 * time.Minute // SaaS / public-webhook standalone
-	reconcileIntervalNAT     = 1 * time.Minute // standalone behind NAT (no webhook)
-	reconcileStaleThreshold  = 30 * time.Minute
+	reconcileStaleThreshold = 30 * time.Minute
 
-	// Event cleanup
-	eventCleanupInterval = 1 * time.Hour
-	eventRetentionTTL    = 7 * 24 * time.Hour
+	eventRetentionTTL = 7 * 24 * time.Hour
 
 	// FulfillmentOrderMapping.OrderAdvancementStatus values (P1-3 / TD-075).
 	// Empty string = order has not yet reached `shipped`. Set as soon as the
@@ -195,24 +206,6 @@ const (
 	advancementStatusDone          = "done"
 	advancementStatusPermanentFail = "permanent_fail"
 )
-
-func (s *SupplyChainAppService) retryFailedOrdersLoop(ctx context.Context) {
-	ticker := time.NewTicker(retryWorkerInterval)
-	defer ticker.Stop()
-	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: retry worker started (interval: %s)", retryWorkerInterval)
-	for {
-		select {
-		case <-ctx.Done():
-			logger.LogInfoWithID(log, s.nodeID, "SupplyChain: retry worker stopped")
-			return
-		case <-s.shutdown:
-			logger.LogInfoWithID(log, s.nodeID, "SupplyChain: retry worker stopped")
-			return
-		case <-ticker.C:
-			s.retryFailedOrders(ctx)
-		}
-	}
-}
 
 func (s *SupplyChainAppService) retryFailedOrders(ctx context.Context) {
 	now := time.Now()
@@ -508,26 +501,6 @@ func (s *SupplyChainAppService) markRetryOutcome(mappingID string, currentRetryC
 	}
 }
 
-func (s *SupplyChainAppService) reconcileStaleOrdersLoop(ctx context.Context) {
-	interval := reconcileIntervalDefault
-	if !deploy.IsSaaS() && s.webhookBaseURL == "" {
-		interval = reconcileIntervalNAT
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: reconcile worker started (interval: %s)", interval)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.shutdown:
-			return
-		case <-ticker.C:
-			s.reconcileStaleOrders(ctx)
-		}
-	}
-}
-
 func (s *SupplyChainAppService) reconcileStaleOrders(ctx context.Context) {
 	now := time.Now()
 	staleThreshold := now.Add(-reconcileStaleThreshold)
@@ -714,22 +687,6 @@ func (s *SupplyChainAppService) releaseLease(mappingID string) {
 	}); err != nil {
 		logger.LogWarningWithIDf(log, s.nodeID,
 			"SupplyChain: failed to release lease on mapping %s: %v (will auto-expire)", mappingID, err)
-	}
-}
-
-func (s *SupplyChainAppService) cleanupProcessedEventsLoop(ctx context.Context) {
-	ticker := time.NewTicker(eventCleanupInterval)
-	defer ticker.Stop()
-	logger.LogInfoWithID(log, s.nodeID, "SupplyChain: event cleanup worker started")
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.shutdown:
-			return
-		case <-ticker.C:
-			s.cleanupProcessedEvents()
-		}
 	}
 }
 

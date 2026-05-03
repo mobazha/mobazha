@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -17,30 +16,12 @@ import (
 )
 
 const (
-	inventoryMonitorInterval = 5 * time.Minute
-	priceDriftInterval       = 30 * time.Minute
-	defaultPriceDriftPct     = 10.0 // 10% threshold
+	defaultPriceDriftPct = 10.0 // 10% threshold
 )
 
 // ---------------------------------------------------------------------------
 // M6.1: Inventory Monitor Worker
 // ---------------------------------------------------------------------------
-
-func (s *SupplyChainAppService) inventoryMonitorLoop(ctx context.Context) {
-	ticker := time.NewTicker(inventoryMonitorInterval)
-	defer ticker.Stop()
-	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: inventory monitor started (interval: %s)", inventoryMonitorInterval)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.shutdown:
-			return
-		case <-ticker.C:
-			s.checkInventory(ctx)
-		}
-	}
-}
 
 func (s *SupplyChainAppService) checkInventory(ctx context.Context) {
 	var mappings []models.SyncedProductMapping
@@ -174,22 +155,6 @@ func (s *SupplyChainAppService) findActiveAlert(listingSlug string, alertType mo
 // ---------------------------------------------------------------------------
 // M6.2: Price Drift Detector Worker
 // ---------------------------------------------------------------------------
-
-func (s *SupplyChainAppService) priceDriftDetectorLoop(ctx context.Context) {
-	ticker := time.NewTicker(priceDriftInterval)
-	defer ticker.Stop()
-	logger.LogInfoWithIDf(log, s.nodeID, "SupplyChain: price drift detector started (interval: %s)", priceDriftInterval)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.shutdown:
-			return
-		case <-ticker.C:
-			s.detectPriceDrifts(ctx)
-		}
-	}
-}
 
 func (s *SupplyChainAppService) detectPriceDrifts(ctx context.Context) {
 	var mappings []models.SyncedProductMapping

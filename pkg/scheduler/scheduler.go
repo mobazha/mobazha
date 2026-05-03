@@ -71,6 +71,12 @@ var Jobs = map[string]JobMeta{
 	"follower-connect":     {Name: "follower-connect", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
 	"netdb-reconcile":      {Name: "netdb-reconcile", Interval: 10 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 60 * time.Second},
 	"order-lock-cleanup":   {Name: "order-lock-cleanup", Interval: 30 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+
+	"supply-chain-retry":           {Name: "supply-chain-retry", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 25 * time.Second},
+	"supply-chain-reconcile":       {Name: "supply-chain-reconcile", Interval: 5 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 4 * time.Minute},
+	"supply-chain-cleanup":         {Name: "supply-chain-cleanup", Interval: 1 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"supply-chain-inventory-check": {Name: "supply-chain-inventory-check", Interval: 5 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 4 * time.Minute},
+	"supply-chain-price-drift":     {Name: "supply-chain-price-drift", Interval: 30 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 25 * time.Minute},
 }
 
 // Job describes a scheduled task.
@@ -125,12 +131,12 @@ type Config struct {
 
 // Errors returned by Scheduler.
 var (
-	ErrAlreadyStarted    = errors.New("scheduler: already started")
-	ErrInvalidJob        = errors.New("scheduler: invalid job")
-	ErrDuplicateJob      = errors.New("scheduler: duplicate job name")
-	ErrNodeFnNoRegistry  = errors.New("scheduler: NodeFn requires Config.Registry")
-	ErrLeaseRequiresDB   = errors.New("scheduler: UseLease requires Config.DB")
-	ErrHolderIDRequired  = errors.New("scheduler: Config.HolderID required")
+	ErrAlreadyStarted   = errors.New("scheduler: already started")
+	ErrInvalidJob       = errors.New("scheduler: invalid job")
+	ErrDuplicateJob     = errors.New("scheduler: duplicate job name")
+	ErrNodeFnNoRegistry = errors.New("scheduler: NodeFn requires Config.Registry")
+	ErrLeaseRequiresDB  = errors.New("scheduler: UseLease requires Config.DB")
+	ErrHolderIDRequired = errors.New("scheduler: Config.HolderID required")
 )
 
 // New constructs a Scheduler with the given config.
@@ -277,6 +283,34 @@ loop:
 		go func(node contracts.NodeService) {
 			defer nodeWg.Done()
 			defer func() { <-sem }()
+
+			// Per-(job, tenant) work lock: prevents double-running across
+			// multiple hosting instances. Only active when DB is configured.
+			tenantID := ""
+			if id := node.IdentityInfo(); id != nil {
+				tenantID = id.GetNodeID()
+			}
+			if s.cfg.DB != nil && tenantID != "" {
+				ok, claimErr := TryClaimWork(s.cfg.DB, j.Name, tenantID, s.cfg.HolderID, s.cfg.LeaseTTL, s.cfg.Now)
+				if claimErr != nil || !ok {
+					return
+				}
+
+				workCtx, workCancel := context.WithCancel(ctx)
+				renewer := StartLeaseRenewer(ctx, workCancel, s.cfg.DB, j.Name, tenantID, s.cfg.HolderID, s.cfg.LeaseTTL, s.cfg.Now)
+				defer renewer.Stop()
+				defer func() { _ = ReleaseWork(s.cfg.DB, j.Name, tenantID, s.cfg.HolderID) }()
+
+				nodeCtx := workCtx
+				if j.PerNodeTimeout > 0 {
+					var cancel context.CancelFunc
+					nodeCtx, cancel = context.WithTimeout(workCtx, j.PerNodeTimeout)
+					defer cancel()
+				}
+				_ = j.NodeFn(nodeCtx, node)
+				workCancel()
+				return
+			}
 
 			nodeCtx := ctx
 			if j.PerNodeTimeout > 0 {

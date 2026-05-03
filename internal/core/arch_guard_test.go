@@ -203,8 +203,6 @@ func TestArchGuard_CollectionRoutesFollowConvention(t *testing.T) {
 // Allowed exceptions:
 //   - _test.go files
 //   - payment_monitor_utxo.go (UTXO chain monitor, event-driven not periodic)
-//   - supply_chain_app_service.go (per-tenant workers, pending migration)
-//   - supply_chain_monitor.go (fulfillment monitor, event-driven)
 //   - guest_payment_monitor.go (per-order reactive watcher, not schedulable)
 //   - matrix_chat_service.go (Matrix connection lifecycle, not schedulable)
 func TestArchGuard_NoNewTickerInCore(t *testing.T) {
@@ -214,11 +212,9 @@ func TestArchGuard_NoNewTickerInCore(t *testing.T) {
 	require.NoError(t, err)
 
 	allowed := map[string]bool{
-		"payment_monitor_utxo.go":      true,
-		"supply_chain_app_service.go":  true,
-		"supply_chain_monitor.go":      true,
-		"guest_payment_monitor.go":     true,
-		"matrix_chat_service.go":       true,
+		"payment_monitor_utxo.go":  true,
+		"guest_payment_monitor.go": true,
+		"matrix_chat_service.go":   true,
 	}
 
 	var violations []string

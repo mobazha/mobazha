@@ -25,7 +25,7 @@ type Engine struct {
 
 // NewEngine creates a new Engine. Delivery and cleanup are driven by the caller
 // via RunDeliveryOnce / RunCleanupOnce — no internal goroutines are started.
-func NewEngine(store EndpointStore, cfg Config, opts ...EngineOption) *Engine {
+func NewEngine(store EndpointStore, cfg Config) *Engine {
 	return &Engine{
 		store: store,
 		cfg:   cfg,
@@ -34,21 +34,6 @@ func NewEngine(store EndpointStore, cfg Config, opts ...EngineOption) *Engine {
 		},
 	}
 }
-
-// EngineOption is kept for backward API compatibility but has no effect.
-// All internal workers have been removed (AH-3 Sprint 2).
-type EngineOption func(*Engine)
-
-// WithoutDeliveryWorker is a no-op retained for API compatibility.
-// Deprecated: internal delivery worker has been removed.
-func WithoutDeliveryWorker() EngineOption { return func(e *Engine) {} }
-
-// WithoutCleanupWorker is a no-op retained for API compatibility.
-// Deprecated: internal cleanup worker has been removed.
-func WithoutCleanupWorker() EngineOption { return func(e *Engine) {} }
-
-// Stop is a no-op. Retained for interface compatibility.
-func (e *Engine) Stop() {}
 
 // Config returns the engine's current configuration (read-only snapshot).
 func (e *Engine) Config() Config {

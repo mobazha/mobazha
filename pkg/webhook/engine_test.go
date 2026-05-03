@@ -71,15 +71,3 @@ func TestRunCleanupOnce(t *testing.T) {
 	}
 }
 
-func TestStop_Idempotent(t *testing.T) {
-	store := &fakeStore{}
-	e := NewEngine(store, DefaultConfig())
-	e.Stop()
-	e.Stop()
-}
-
-func TestEngineOptionCompat(t *testing.T) {
-	store := &fakeStore{}
-	e := NewEngine(store, DefaultConfig(), WithoutDeliveryWorker(), WithoutCleanupWorker())
-	_ = e
-}

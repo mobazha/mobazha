@@ -403,13 +403,8 @@ func (n *MobazhaNode) Stop(force bool) error {
 			n.multiwallet.Close()
 		}
 	}
-	// Shutdown order matters: EventDispatcher must stop before WebhookEngine
-	// so that WebhookSink stops emitting before the engine shuts down.
 	if n.eventDispatcher != nil {
 		n.eventDispatcher.Stop()
-	}
-	if n.webhookEngine != nil {
-		n.webhookEngine.Stop()
 	}
 	if n.shutdownTorFunc != nil {
 		n.shutdownTorFunc()
@@ -834,5 +829,40 @@ func (n *MobazhaNode) RunNetDBReconcileOnce(_ context.Context) {
 func (n *MobazhaNode) RunOrderLockCleanupOnce(_ context.Context) {
 	if n.orderLockManager != nil {
 		n.orderLockManager.RunLockCleanupOnce()
+	}
+}
+
+func (n *MobazhaNode) supplyChainWorkersEnabled() bool {
+	return n.supplyChainService != nil &&
+		(n.featureManager == nil || n.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled))
+}
+
+func (n *MobazhaNode) RunSupplyChainRetryOnce(ctx context.Context) {
+	if n.supplyChainWorkersEnabled() {
+		n.supplyChainService.RunSupplyChainRetryOnce(ctx)
+	}
+}
+
+func (n *MobazhaNode) RunSupplyChainReconcileOnce(ctx context.Context) {
+	if n.supplyChainWorkersEnabled() {
+		n.supplyChainService.RunSupplyChainReconcileOnce(ctx)
+	}
+}
+
+func (n *MobazhaNode) RunSupplyChainCleanupOnce(_ context.Context) {
+	if n.supplyChainWorkersEnabled() {
+		n.supplyChainService.RunSupplyChainCleanupOnce()
+	}
+}
+
+func (n *MobazhaNode) RunSupplyChainInventoryCheckOnce(ctx context.Context) {
+	if n.supplyChainWorkersEnabled() {
+		n.supplyChainService.RunSupplyChainInventoryCheckOnce(ctx)
+	}
+}
+
+func (n *MobazhaNode) RunSupplyChainPriceDriftOnce(ctx context.Context) {
+	if n.supplyChainWorkersEnabled() {
+		n.supplyChainService.RunSupplyChainPriceDriftOnce(ctx)
 	}
 }

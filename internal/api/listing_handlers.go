@@ -155,7 +155,7 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 	if isLocalPeer {
 		listingIndex, listingErr = ls.GetMyListings()
 
-		if listingErr == nil {
+		if listingErr == nil && ss != nil {
 			ratingIndex, ratingErr = ss.GetMyRatings()
 		}
 	} else {
@@ -170,7 +170,7 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		} else {
 			listingIndex, listingErr = ls.GetListings(r.Context(), pid, reqCtx, useCache)
 
-			if listingErr == nil {
+			if listingErr == nil && ss != nil {
 				ratingIndex, ratingErr = ss.GetRatings(r.Context(), pid, reqCtx, useCache)
 			}
 		}

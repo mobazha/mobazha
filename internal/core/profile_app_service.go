@@ -410,7 +410,7 @@ func validateProfile(profile *models.Profile) error {
 			return errors.New("invalid snf server peerID")
 		}
 	}
-	if len(profile.EscrowPublicKey) != 66 {
+	if profile.EscrowPublicKey != "" && len(profile.EscrowPublicKey) != 66 {
 		return fmt.Errorf("bad request: secp256k1 public key must be exactly %d hex characters, got %d", 66, len(profile.EscrowPublicKey))
 	}
 	return nil

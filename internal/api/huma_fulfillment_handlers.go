@@ -11,8 +11,15 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaFulfillmentOperations registers bridged fulfillment / supply-chain OpenAPI ops (AH-1.4 Batch 3).
-func (g *Gateway) registerNodeHumaFulfillmentOperations(api huma.API) {
+// registerNodeHumaFulfillmentPublicOperations registers public fulfillment ops
+// (provider webhook receiver — no auth, validated by webhook secret in path).
+func (g *Gateway) registerNodeHumaFulfillmentPublicOperations(api huma.API) {
+	g.registerFulfillmentWebhookPublic(api)
+}
+
+// registerNodeHumaFulfillmentAdminOperations registers authenticated fulfillment
+// management ops (provider CRUD, catalog, sync, orders, locations, alerts, rules).
+func (g *Gateway) registerNodeHumaFulfillmentAdminOperations(api huma.API) {
 	g.registerFulfillmentListProviders(api)
 	g.registerFulfillmentConnect(api)
 	g.registerFulfillmentDisconnect(api)
@@ -26,7 +33,6 @@ func (g *Gateway) registerNodeHumaFulfillmentOperations(api huma.API) {
 	g.registerFulfillmentSyncProduct(api)
 	g.registerFulfillmentOrderStatus(api)
 	g.registerFulfillmentShippingEstimates(api)
-	g.registerFulfillmentWebhookPublic(api)
 	g.registerFulfillmentLocations(api)
 	g.registerFulfillmentLocation(api)
 	g.registerFulfillmentAlerts(api)

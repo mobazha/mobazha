@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package api
 
 import (
@@ -11,8 +13,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaMiscOperations registers crypto/signing, moderator, blocklist, FX, and peers OpenAPI ops (AH-1.4 Batch 5).
-func (g *Gateway) registerNodeHumaMiscOperations(api huma.API) {
+// registerNodeHumaMiscAdminOperations registers admin misc operations
+// (crypto, moderators, blocklist) that require authentication.
+func (g *Gateway) registerNodeHumaMiscAdminOperations(api huma.API) {
 	type jsonBody struct {
 		Body json.RawMessage `json:",omitempty"`
 	}
@@ -43,17 +46,6 @@ func (g *Gateway) registerNodeHumaMiscOperations(api huma.API) {
 			raw += "?" + enc
 		}
 		return raw
-	}
-
-	type exchangeRatesQuery struct {
-		Refresh bool `query:"refresh"`
-	}
-
-	buildExchangeRatesQuery := func(in exchangeRatesQuery) string {
-		if in.Refresh {
-			return "?refresh=true"
-		}
-		return ""
 	}
 
 	huma.Register(api, huma.Operation{
@@ -206,6 +198,22 @@ func (g *Gateway) registerNodeHumaMiscOperations(api huma.API) {
 		}
 		return &nodeDataOutput{Body: data}, nil
 	})
+
+}
+
+// registerNodeHumaMiscPublicOperations registers public misc operations
+// (exchange rates, peers) that do not require authentication.
+func (g *Gateway) registerNodeHumaMiscPublicOperations(api huma.API) {
+	type exchangeRatesQuery struct {
+		Refresh bool `query:"refresh"`
+	}
+
+	buildExchangeRatesQuery := func(in exchangeRatesQuery) string {
+		if in.Refresh {
+			return "?refresh=true"
+		}
+		return ""
+	}
 
 	type fxByCode struct {
 		CurrencyCode string `path:"currencyCode"`

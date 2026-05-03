@@ -11,8 +11,30 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaAuthOperations registers admin auth, tokens, identity, scopes, and admin version OpenAPI ops (AH-1.4 Batch 5).
-func (g *Gateway) registerNodeHumaAuthOperations(api huma.API) {
+// registerNodeHumaAuthPublicOperations registers public auth ops
+// (node version fingerprint — unauthenticated health check).
+func (g *Gateway) registerNodeHumaAuthPublicOperations(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-version-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/admin/version",
+		Summary:     "Node binary version fingerprint (public)",
+		Tags:        []string{"system"},
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/admin/version", nil)
+		rr := httptest.NewRecorder()
+		g.handleAdminVersion(rr, req)
+		data, err := nodeBridgeFlexJSON(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerNodeHumaAuthAdminOperations registers authenticated admin auth ops:
+// tokens, identity, scopes.
+func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 	type jsonBody struct {
 		Body json.RawMessage `json:",omitempty"`
 	}
@@ -125,23 +147,6 @@ func (g *Gateway) registerNodeHumaAuthOperations(api huma.API) {
 		rr := httptest.NewRecorder()
 		g.handleGETAuthScopes(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "admin-version-get",
-		Method:      http.MethodGet,
-		Path:        "/v1/admin/version",
-		Summary:     "Node binary version fingerprint (public)",
-		Tags:        []string{"system"},
-	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
-		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/admin/version", nil)
-		rr := httptest.NewRecorder()
-		g.handleAdminVersion(rr, req)
-		data, err := nodeBridgeFlexJSON(rr)
 		if err != nil {
 			return nil, err
 		}

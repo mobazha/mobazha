@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package api
 
 import (
@@ -60,28 +62,43 @@ func BuildOpenAPISpec() []byte {
 
 	api := humachi.New(r, cfg)
 
+	// Public operations.
 	g.registerNodeHumaSmokeRoutes(api)
+	g.registerNodeHumaListingPublicOperations(api)
+	g.registerNodeHumaMediaPublicOperations(api)
+	g.registerNodeHumaProfilePublicOperations(api)
+	g.registerNodeHumaDiscountPublicOperations(api)
+	g.registerNodeHumaCollectionPublicOperations(api)
+	g.registerNodeHumaSystemPublicOperations(api)
+	g.registerNodeHumaMiscPublicOperations(api)
+	g.registerNodeHumaSocialPublicOperations(api)
+	g.registerNodeHumaOrderPublicOperations(api)
+	g.registerNodeHumaFiatPublicOperations(api)
+	g.registerNodeHumaFulfillmentPublicOperations(api)
+	g.registerNodeHumaSettingsPublicOperations(api)
+	g.registerNodeHumaAuthPublicOperations(api)
+	// Admin operations.
+	g.registerNodeHumaListingAdminOperations(api)
+	g.registerNodeHumaMediaAdminOperations(api)
+	g.registerNodeHumaProfileAdminOperations(api)
+	g.registerNodeHumaDiscountAdminOperations(api)
+	g.registerNodeHumaCollectionAdminOperations(api)
+	g.registerNodeHumaSystemAdminOperations(api)
+	g.registerNodeHumaMiscAdminOperations(api)
+	g.registerNodeHumaSocialAdminOperations(api)
+	g.registerNodeHumaOrderAdminOperations(api)
+	g.registerNodeHumaFiatAdminOperations(api)
+	g.registerNodeHumaFulfillmentAdminOperations(api)
+	g.registerNodeHumaSettingsAdminOperations(api)
+	g.registerNodeHumaAuthAdminOperations(api)
 	g.registerNodeHumaWalletOperations(api)
 	g.registerNodeHumaChatOperations(api)
-	g.registerNodeHumaListingOperations(api)
-	g.registerNodeHumaMediaOperations(api)
-	g.registerNodeHumaProfileOperations(api)
-	g.registerNodeHumaSocialOperations(api)
-	g.registerNodeHumaOrderOperations(api)
 	g.registerNodeHumaDisputeOperations(api)
-	g.registerNodeHumaFiatOperations(api)
-	g.registerNodeHumaFulfillmentOperations(api)
 	g.registerNodeHumaCartOperations(api)
 	g.registerNodeHumaNotificationOperations(api)
 	g.registerNodeHumaWebhookOperations(api)
 	g.registerNodeHumaAIOperations(api)
-	g.registerNodeHumaSettingsOperations(api)
 	g.registerNodeHumaShippingOperations(api)
-	g.registerNodeHumaDiscountOperations(api)
-	g.registerNodeHumaCollectionOperations(api)
-	g.registerNodeHumaSystemOperations(api)
-	g.registerNodeHumaAuthOperations(api)
-	g.registerNodeHumaMiscOperations(api)
 
 	spec, err := json.MarshalIndent(api.OpenAPI(), "", "  ")
 	if err != nil {

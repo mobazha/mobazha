@@ -2,8 +2,11 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
+	"crypto/tls"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,13 +16,77 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
+// originRequestMeta holds the original HTTP request metadata captured at the
+// Huma middleware layer. nodeBridgeRequest restores these onto synthetic
+// requests so legacy handlers can read Host, Authorization, TLS state, etc.
+type originRequestMeta struct {
+	Host          string
+	Authorization string
+	Cookie        string
+	RemoteAddr    string
+	IsTLS         bool
+}
+
+type originRequestMetaKey struct{}
+
+// withOriginMeta stores the original request metadata into context.
+func withOriginMeta(ctx context.Context, meta *originRequestMeta) context.Context {
+	return context.WithValue(ctx, originRequestMetaKey{}, meta)
+}
+
+// getOriginMeta retrieves the stored original request metadata from context.
+func getOriginMeta(ctx context.Context) *originRequestMeta {
+	if m, ok := ctx.Value(originRequestMetaKey{}).(*originRequestMeta); ok {
+		return m
+	}
+	return nil
+}
+
+// extractCookieFromMeta parses a named cookie value from the raw Cookie header
+// stored in originRequestMeta.
+func extractCookieFromMeta(meta *originRequestMeta, name string) string {
+	if meta == nil || meta.Cookie == "" {
+		return ""
+	}
+	for _, part := range strings.Split(meta.Cookie, ";") {
+		part = strings.TrimSpace(part)
+		eq := strings.IndexByte(part, '=')
+		if eq < 0 {
+			continue
+		}
+		if part[:eq] == name {
+			return part[eq+1:]
+		}
+	}
+	return ""
+}
+
 // nodeBridgeRequest builds a synthetic *http.Request that carries the
 // huma-managed context (which includes nodeContextKey and AuthIdentity)
 // so legacy handlers can read them via getNodeService(r)
 // and GetAuthIdentity(r.Context()).
+//
+// It automatically restores Host, Authorization, RemoteAddr and TLS state
+// from the originRequestMeta captured by nodeHumaOriginMiddleware.
 func nodeBridgeRequest(ctx context.Context, method, rawURL string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, rawURL, body)
-	return req.WithContext(ctx)
+	req = req.WithContext(ctx)
+
+	if meta := getOriginMeta(ctx); meta != nil {
+		if meta.Host != "" {
+			req.Host = meta.Host
+		}
+		if meta.Authorization != "" {
+			req.Header.Set("Authorization", meta.Authorization)
+		}
+		if meta.RemoteAddr != "" {
+			req.RemoteAddr = meta.RemoteAddr
+		}
+		if meta.IsTLS {
+			req.TLS = &tls.ConnectionState{}
+		}
+	}
+	return req
 }
 
 // nodeBridgeRequestWithVars is like nodeBridgeRequest but also injects
@@ -140,10 +207,64 @@ func nodeBridgeToHumaError(rr *httptest.ResponseRecorder) error {
 	}
 }
 
-// nodeBridgedJSONBody carries an opaque JSON payload for bridging POST/PUT
-// handlers onto legacy mux-backed handlers that decode r.Body JSON.
-type nodeBridgedJSONBody struct {
-	Body json.RawMessage
+// nodeBridgeRequestWithOptionalAuth is like nodeBridgeRequest but additionally
+// performs Basic Auth validation when admin credentials are configured and
+// injects an AuthIdentity if valid. Used for public endpoints that optionally
+// require auth (e.g. POST /v1/system/setup when password is already set).
+//
+// Security: applies rate-limit, AllowedIPs, and Cookie gate checks (mirroring
+// nodeHumaAuthMiddleware) to prevent brute-force attacks on the admin password
+// even though the operation itself is public (no Security declaration).
+// Note: on first setup (no cookie configured yet), g.config.Cookie == "" so the
+// Cookie gate is automatically skipped.
+//
+// Authorization header is already restored from originRequestMeta by
+// nodeBridgeRequest — this method adds security checks + inline credential check.
+func (g *Gateway) nodeBridgeRequestWithOptionalAuth(ctx context.Context, method, rawURL string, body io.Reader) *http.Request {
+	req := nodeBridgeRequest(ctx, method, rawURL, body)
+	if !g.auth.isConfigured() || GetAuthIdentity(req.Context()) != nil {
+		return req
+	}
+
+	meta := getOriginMeta(ctx)
+	peerIP := "unknown"
+	if meta != nil && meta.RemoteAddr != "" {
+		peerIP = meta.RemoteAddr
+		if host, _, err := net.SplitHostPort(peerIP); err == nil {
+			peerIP = host
+		}
+	}
+
+	if g.authLimiter != nil && g.authLimiter.isBlocked(peerIP) {
+		return req
+	}
+	if len(g.config.AllowedIPs) > 0 && !g.config.AllowedIPs[peerIP] {
+		return req
+	}
+	if g.config.Cookie != "" {
+		cookieVal := extractCookieFromMeta(meta, AuthCookieName)
+		if subtle.ConstantTimeCompare([]byte(cookieVal), []byte(g.config.Cookie)) != 1 {
+			return req
+		}
+	}
+
+	if username, password, ok := req.BasicAuth(); ok {
+		matched, _ := g.auth.checkPassword(username, password)
+		if !matched {
+			if g.authLimiter != nil {
+				g.authLimiter.recordFailure(peerIP)
+			}
+			return req
+		}
+		if g.authLimiter != nil {
+			g.authLimiter.resetIP(peerIP)
+		}
+		req = req.WithContext(WithAuthIdentity(req.Context(), &AuthIdentity{
+			UserID:  username,
+			IsAdmin: true,
+		}))
+	}
+	return req
 }
 
 // nodeDataOutput is a generic output wrapper for bridged handlers

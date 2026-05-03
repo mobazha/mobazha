@@ -11,9 +11,34 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaSettingsOperations registers preferences, wishlists, storefront, guest checkout,
-// feature flags, and public storefront OpenAPI ops (AH-1.4 Batch 4).
-func (g *Gateway) registerNodeHumaSettingsOperations(api huma.API) {
+// registerNodeHumaSettingsPublicOperations registers public settings ops
+// (storefront branding by peerID — buyer browsing).
+func (g *Gateway) registerNodeHumaSettingsPublicOperations(api huma.API) {
+	type storefrontPeerPath struct {
+		PeerID string `path:"peerID" doc:"Store peer ID."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "settings-storefront-public-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/settings/storefront/{peerID}",
+		Summary:     "Get storefront branding (public)",
+		Tags:        []string{"settings"},
+	}, func(ctx context.Context, in *storefrontPeerPath) (*nodeDataOutput, error) {
+		rawURL := "/v1/settings/storefront/" + url.PathEscape(in.PeerID)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID})
+		rr := httptest.NewRecorder()
+		g.handleGETStorefrontConfigPublic(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerNodeHumaSettingsAdminOperations registers authenticated settings ops:
+// preferences, wishlists, storefront (seller), guest checkout, features.
+func (g *Gateway) registerNodeHumaSettingsAdminOperations(api huma.API) {
 	type jsonBody struct {
 		Body json.RawMessage `json:",omitempty"`
 	}
@@ -166,27 +191,6 @@ func (g *Gateway) registerNodeHumaSettingsOperations(api huma.API) {
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handlePUTStorefrontConfig(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-
-	type storefrontPeerPath struct {
-		PeerID string `path:"peerID" doc:"Store peer ID."`
-	}
-	huma.Register(api, huma.Operation{
-		OperationID: "settings-storefront-public-get",
-		Method:      http.MethodGet,
-		Path:        "/v1/settings/storefront/{peerID}",
-		Summary:     "Get storefront branding (public)",
-		Tags:        []string{"settings"},
-	}, func(ctx context.Context, in *storefrontPeerPath) (*nodeDataOutput, error) {
-		rawURL := "/v1/settings/storefront/" + url.PathEscape(in.PeerID)
-		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID})
-		rr := httptest.NewRecorder()
-		g.handleGETStorefrontConfigPublic(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

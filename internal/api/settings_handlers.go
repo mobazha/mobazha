@@ -6,9 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"

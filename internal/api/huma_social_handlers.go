@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package api
 
 import (
@@ -11,27 +13,30 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaSocialOperations registers posts, following, and ratings OpenAPI ops (AH-1.4 Batch 2).
-func (g *Gateway) registerNodeHumaSocialOperations(api huma.API) {
-	g.registerPostsCreate(api)
-	g.registerPostsDelete(api)
-
-	g.registerFollowersCheckFollowsMe(api)
-	g.registerFollowingFollow(api)
-	g.registerFollowingUnfollow(api)
-
+// registerNodeHumaSocialPublicOperations registers public social ops: posts
+// retrieval, follower/following lists, and all ratings queries.
+func (g *Gateway) registerNodeHumaSocialPublicOperations(api huma.API) {
 	g.registerPostsGetMineBySlug(api)
 	g.registerPostsGetByPeerSlug(api)
 	g.registerFollowersListByPeer(api)
 	g.registerFollowersListSelf(api)
 	g.registerFollowingListByPeer(api)
 	g.registerFollowingListSelf(api)
-
 	g.registerRatingsIndexByPeerOrSlug(api)
 	g.registerRatingsIndexSelf(api)
 	g.registerRatingsIndexByPeerAndSlug(api)
 	g.registerRatingsGetByRatingID(api)
 	g.registerRatingsBatchFetch(api)
+}
+
+// registerNodeHumaSocialAdminOperations registers admin social ops: post
+// create/delete, follow/unfollow, and follows-me check.
+func (g *Gateway) registerNodeHumaSocialAdminOperations(api huma.API) {
+	g.registerPostsCreate(api)
+	g.registerPostsDelete(api)
+	g.registerFollowersCheckFollowsMe(api)
+	g.registerFollowingFollow(api)
+	g.registerFollowingUnfollow(api)
 }
 
 // --- Auth ---

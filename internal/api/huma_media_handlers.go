@@ -36,19 +36,23 @@ func nodeBridgeRecorderBinary(rr *httptest.ResponseRecorder) (*nodeLegacyBinaryB
 	}, nil
 }
 
-// registerNodeHumaMediaOperations registers bridged media OpenAPI ops (AH-1.4 Batch 2).
-func (g *Gateway) registerNodeHumaMediaOperations(api huma.API) {
-	g.registerMediaPostAvatar(api)
-	g.registerMediaPostHeader(api)
-	g.registerMediaPostImages(api)
-	g.registerMediaPostProductImages(api)
-
-	g.registerMediaPostFile(api)
-
+// registerNodeHumaMediaPublicOperations registers public media retrieval
+// operations that do not require authentication.
+func (g *Gateway) registerNodeHumaMediaPublicOperations(api huma.API) {
 	g.registerMediaGetImage(api)
 	g.registerProfilesGetAvatar(api)
 	g.registerProfilesGetHeader(api)
 	g.registerMediaGetFile(api)
+}
+
+// registerNodeHumaMediaAdminOperations registers admin media upload ops that
+// require authentication.
+func (g *Gateway) registerNodeHumaMediaAdminOperations(api huma.API) {
+	g.registerMediaPostAvatar(api)
+	g.registerMediaPostHeader(api)
+	g.registerMediaPostImages(api)
+	g.registerMediaPostProductImages(api)
+	g.registerMediaPostFile(api)
 }
 
 // --- Auth ---

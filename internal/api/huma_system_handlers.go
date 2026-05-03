@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package api
 
 import (
@@ -11,9 +13,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaSystemOperations registers config/system/MCP/connect endpoints (AH-1.4 Batch 5).
-// GET /v1/wallet/currencies is covered by registerNodeHumaWalletOperations (wallet-get-currencies).
-func (g *Gateway) registerNodeHumaSystemOperations(api huma.API) {
+// registerNodeHumaSystemAdminOperations registers admin system operations
+// (config, health, publish, logs, MCP, etc.) that require authentication.
+func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 	type jsonBody struct {
 		Body json.RawMessage `json:",omitempty"`
 	}
@@ -461,31 +463,18 @@ func (g *Gateway) registerNodeHumaSystemOperations(api huma.API) {
 		return &nodeDataOutput{Body: data}, nil
 	})
 
-	huma.Register(api, huma.Operation{
-		OperationID: "system-setup-get",
-		Method:      http.MethodGet,
-		Path:        "/v1/system/setup",
-		Summary:     "Standalone onboarding status (public)",
-		Tags:        []string{"system"},
-	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
-		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/setup", nil)
-		rr := httptest.NewRecorder()
-		g.handleSetup(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-
+	// setup POST and claim-store POST use custom auth logic inside their
+	// handlers (optional-auth / JWT+admin-password), so they must NOT carry
+	// Security: nodeAuthSecurity which would reject callers who aren't yet
+	// the node admin.
 	huma.Register(api, huma.Operation{
 		OperationID: "system-setup-post",
 		Method:      http.MethodPost,
 		Path:        "/v1/system/setup",
-		Summary:     "Standalone one-time password setup (public)",
+		Summary:     "Standalone one-time password setup",
 		Tags:        []string{"system"},
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
-		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/setup", bytes.NewReader(in.Body))
+		req := g.nodeBridgeRequestWithOptionalAuth(ctx, http.MethodPost, "/v1/system/setup", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handleSetup(rr, req)
@@ -507,6 +496,27 @@ func (g *Gateway) registerNodeHumaSystemOperations(api huma.API) {
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handlePOSTClaimStore(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerNodeHumaSystemPublicOperations registers public system operations
+// (GET-only) that do not require authentication.
+func (g *Gateway) registerNodeHumaSystemPublicOperations(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "system-setup-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/system/setup",
+		Summary:     "Standalone onboarding status (public)",
+		Tags:        []string{"system"},
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/setup", nil)
+		rr := httptest.NewRecorder()
+		g.handleSetup(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

@@ -170,7 +170,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 		r.Use(g.CORSAllowAllOriginsMiddleware)
 	}
 	// Auth is NOT applied globally — each private route is individually wrapped
-	// with AuthenticationMiddleware inside registerBusinessRoutes. Public
+	// with AuthenticationMiddleware inside Huma operation handlers. Public
 	// storefront routes (listings, profiles, exchange rates, etc.) are served
 	// without auth so that buyers can read store data on standalone nodes.
 	r.Use(g.NodeSelectionMiddleware)
@@ -368,7 +368,6 @@ func (g *Gateway) Serve() error {
 func (g *Gateway) newV1Router() chi.Router {
 	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
-	g.registerBusinessRoutes(r)
 	g.registerHumaAPI(r)
 	return r
 }

@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package api
 
 import (
@@ -11,11 +13,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-var nodeAuthSecurity = []map[string][]string{
-	{SecuritySchemeBasicAuth: {}},
-	{SecuritySchemeBearerJWT: {}},
-	{SecuritySchemeAPIToken: {}},
-}
 
 func (g *Gateway) registerNodeHumaWalletOperations(api huma.API) {
 	g.registerWalletSpend(api)

@@ -12,14 +12,13 @@
 //   - omitting Security for anonymous/public routes
 //
 // The middleware delegates the actual credential check to the Gateway's
-// existing auth helpers (tryAPITokenAuth, tryJWTAuthWith, auth.check),
+// existing auth helpers (tryAPITokenAuth, tryJWTAuthWith, auth.checkPassword),
 // keeping a single source of truth for credential validation.
 package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"crypto/subtle"
 	"net"
 	"net/http"
 	"strings"
@@ -32,6 +31,42 @@ import (
 // extracted by nodeHumaClientIPMiddleware. Used by rate-limited Huma
 // handlers (e.g. guest checkout) to throttle by IP.
 type clientIPKey struct{}
+
+// remoteIPFromHuma extracts the direct peer IP from huma.Context's
+// RemoteAddr, deliberately ignoring proxy headers (X-Forwarded-For,
+// X-Real-IP). Used for security-sensitive operations where trusting
+// proxy headers would allow IP-based bypass (auth rate limiting,
+// AllowedIPs, Cookie gate).
+func remoteIPFromHuma(ctx huma.Context) string {
+	addr := ctx.RemoteAddr()
+	if addr == "" {
+		return "unknown"
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	return host
+}
+
+// extractCookieFromHuma parses the Cookie header to find a named cookie's value.
+func extractCookieFromHuma(ctx huma.Context, name string) string {
+	header := ctx.Header("Cookie")
+	if header == "" {
+		return ""
+	}
+	for _, part := range strings.Split(header, ";") {
+		part = strings.TrimSpace(part)
+		eq := strings.IndexByte(part, '=')
+		if eq < 0 {
+			continue
+		}
+		if part[:eq] == name {
+			return part[eq+1:]
+		}
+	}
+	return ""
+}
 
 // clientIPFromContext returns the upstream client IP previously stored
 // by nodeHumaClientIPMiddleware. Falls back to "unknown" when the
@@ -65,11 +100,33 @@ func enforceHumaScope(api huma.API, ctx huma.Context, op *huma.Operation, identi
 }
 
 // installNodeHumaMiddlewares wires auth and client-IP extraction onto
-// the huma API. Client-IP runs first so rate-limited handlers can read
-// the IP from context even for anonymous operations.
+// the huma API. Origin-meta runs first to capture Host/Auth/TLS for
+// bridged handlers. Client-IP runs second so rate-limited handlers can
+// read the IP from context even for anonymous operations.
 func (g *Gateway) installNodeHumaMiddlewares(api huma.API) {
+	api.UseMiddleware(nodeHumaOriginMiddleware())
 	api.UseMiddleware(nodeHumaClientIPMiddleware())
 	api.UseMiddleware(g.nodeHumaAuthMiddleware(api))
+}
+
+// nodeHumaOriginMiddleware captures the original HTTP request metadata
+// (Host, Authorization, RemoteAddr, TLS) and stores it in context so
+// that nodeBridgeRequest can restore them on synthetic requests passed
+// to legacy handlers. This ensures handlers that rely on r.Host,
+// r.Header.Get("Authorization"), r.RemoteAddr, or r.TLS work correctly
+// through the Huma bridge layer.
+func nodeHumaOriginMiddleware() func(huma.Context, func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) {
+		meta := &originRequestMeta{
+			Host:          ctx.Host(),
+			Authorization: ctx.Header("Authorization"),
+			Cookie:        ctx.Header("Cookie"),
+			RemoteAddr:    ctx.RemoteAddr(),
+			IsTLS:         ctx.TLS() != nil,
+		}
+		newCtx := withOriginMeta(ctx.Context(), meta)
+		next(huma.WithContext(ctx, newCtx))
+	}
 }
 
 // nodeHumaClientIPMiddleware extracts the upstream client IP from
@@ -121,6 +178,30 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		if GetAuthIdentity(ctx.Context()) != nil {
 			next(ctx)
 			return
+		}
+
+		// Security layers — mirror legacy AuthenticationMiddleware behavior.
+		// Use RemoteAddr directly (not proxy headers) to prevent XFF bypass.
+		peerIP := remoteIPFromHuma(ctx)
+
+		if g.authLimiter != nil && g.authLimiter.isBlocked(peerIP) {
+			ctx.SetHeader("Retry-After", "900")
+			huma.WriteErr(api, ctx, http.StatusTooManyRequests,
+				"Too many authentication failures. Try again later.")
+			return
+		}
+
+		if len(g.config.AllowedIPs) > 0 && !g.config.AllowedIPs[peerIP] {
+			huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
+			return
+		}
+
+		if g.config.Cookie != "" {
+			cookieVal := extractCookieFromHuma(ctx, AuthCookieName)
+			if subtle.ConstantTimeCompare([]byte(cookieVal), []byte(g.config.Cookie)) != 1 {
+				huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
+				return
+			}
 		}
 
 		authHeader := ctx.Header("Authorization")
@@ -180,11 +261,19 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 				huma.WriteErr(api, ctx, http.StatusUnauthorized, "Authentication required")
 				return
 			}
-			h := sha256.Sum256([]byte(password))
-			providedHash := hex.EncodeToString(h[:])
-			if !g.auth.check(username, providedHash) {
+			matched, upgradable := g.auth.checkPassword(username, password)
+			if !matched {
+				if g.authLimiter != nil {
+					g.authLimiter.recordFailure(peerIP)
+				}
 				huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid credentials")
 				return
+			}
+			if g.authLimiter != nil {
+				g.authLimiter.resetIP(peerIP)
+			}
+			if upgradable {
+				go g.auth.upgradeHash(password)
 			}
 			identity := &AuthIdentity{
 				UserID:  username,

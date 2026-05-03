@@ -11,8 +11,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaCollectionOperations registers bridged collection management + public storefront ops (AH-1.4 Batch 4).
-func (g *Gateway) registerNodeHumaCollectionOperations(api huma.API) {
+// registerNodeHumaCollectionAdminOperations registers admin collection CRUD ops
+// that require authentication.
+func (g *Gateway) registerNodeHumaCollectionAdminOperations(api huma.API) {
 	type jsonBody struct {
 		Body json.RawMessage `json:",omitempty"`
 	}
@@ -202,6 +203,11 @@ func (g *Gateway) registerNodeHumaCollectionOperations(api huma.API) {
 		return &nodeNoContentOutput{}, nil
 	})
 
+}
+
+// registerNodeHumaCollectionPublicOperations registers public collection
+// operations for buyer storefront browsing (no auth required).
+func (g *Gateway) registerNodeHumaCollectionPublicOperations(api huma.API) {
 	type peerPublishedQ struct {
 		PeerID   string `path:"peerID" doc:"Store peer ID."`
 		Page     string `query:"page"`

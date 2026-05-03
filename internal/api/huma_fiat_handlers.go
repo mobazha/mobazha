@@ -11,8 +11,18 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaFiatOperations registers bridged fiat payment OpenAPI ops (AH-1.4 Batch 3).
-func (g *Gateway) registerNodeHumaFiatOperations(api huma.API) {
+// registerNodeHumaFiatPublicOperations registers public fiat ops accessible
+// without authentication (buyer checkout, provider webhooks).
+func (g *Gateway) registerNodeHumaFiatPublicOperations(api huma.API) {
+	g.registerFiatPublicWebhook(api)
+	g.registerFiatPublicListProviders(api)
+	g.registerFiatPublicPostPayment(api)
+	g.registerFiatPublicCapturePayment(api)
+}
+
+// registerNodeHumaFiatAdminOperations registers seller-facing fiat provider
+// management and authenticated payment ops.
+func (g *Gateway) registerNodeHumaFiatAdminOperations(api huma.API) {
 	g.registerFiatSellerListProviders(api)
 	g.registerFiatSellerPostPayment(api)
 	g.registerFiatSellerGetPayment(api)
@@ -24,10 +34,6 @@ func (g *Gateway) registerNodeHumaFiatOperations(api huma.API) {
 	g.registerFiatSellerDeleteProviderConfig(api)
 	g.registerFiatSellerSetupWebhook(api)
 	g.registerFiatSellerVerifyProvider(api)
-	g.registerFiatPublicWebhook(api)
-	g.registerFiatPublicListProviders(api)
-	g.registerFiatPublicPostPayment(api)
-	g.registerFiatPublicCapturePayment(api)
 }
 
 func (g *Gateway) registerFiatSellerListProviders(api huma.API) {

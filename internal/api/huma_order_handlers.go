@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package api
 
 import (
@@ -11,8 +13,18 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaOrderOperations registers bridged order / checkout / analytics OpenAPI ops (AH-1.4 Batch 3).
-func (g *Gateway) registerNodeHumaOrderOperations(api huma.API) {
+// registerNodeHumaOrderPublicOperations registers public order/checkout ops
+// accessible without authentication (buyer storefront browsing).
+func (g *Gateway) registerNodeHumaOrderPublicOperations(api huma.API) {
+	g.registerGuestOrderPostPublic(api)
+	g.registerGuestOrderGetPublic(api)
+	g.registerPaymentMethodsGet(api)
+	g.registerAnalyticsShopEventsPost(api)
+}
+
+// registerNodeHumaOrderAdminOperations registers authenticated order lifecycle,
+// checkout, and seller analytics ops.
+func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 	g.registerOrdersInstructionPayment(api)
 	g.registerOrdersInstructionConfirm(api)
 	g.registerOrdersInstructionRefund(api)
@@ -50,11 +62,6 @@ func (g *Gateway) registerNodeHumaOrderOperations(api huma.API) {
 	g.registerGuestOrderComplete(api)
 
 	g.registerAnalyticsStatsGet(api)
-
-	g.registerGuestOrderPostPublic(api)
-	g.registerGuestOrderGetPublic(api)
-	g.registerPaymentMethodsGet(api)
-	g.registerAnalyticsShopEventsPost(api)
 }
 
 func orderSearchQueryVals(state, search, sortBy, limit string) url.Values {

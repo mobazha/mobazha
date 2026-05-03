@@ -150,7 +150,7 @@ func TestArchGuard_CollectionStoreRequiredMethods(t *testing.T) {
 
 func TestArchGuard_CollectionRoutesFollowConvention(t *testing.T) {
 	root := repoRoot(t)
-	routesFile := filepath.Join(root, "internal", "api", "routes.go")
+	routesFile := filepath.Join(root, "internal", "api", "huma_collection_handlers.go")
 	data, err := os.ReadFile(routesFile)
 	require.NoError(t, err)
 

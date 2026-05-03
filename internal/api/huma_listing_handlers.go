@@ -11,20 +11,25 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaListingOperations registers bridged listing OpenAPI ops (AH-1.4 Batch 2).
-func (g *Gateway) registerNodeHumaListingOperations(api huma.API) {
+// registerNodeHumaListingPublicOperations registers public storefront listing
+// operations that do not require authentication.
+func (g *Gateway) registerNodeHumaListingPublicOperations(api huma.API) {
+	g.registerListingIndexByPeer(api)
+	g.registerListingIndex(api)
+	g.registerListingTemplate(api)
+	g.registerListingGetByPeerSlug(api)
+	g.registerListingGetByListingID(api)
+}
+
+// registerNodeHumaListingAdminOperations registers admin listing ops that
+// require authentication (CRUD, import).
+func (g *Gateway) registerNodeHumaListingAdminOperations(api huma.API) {
 	g.registerListingGetMineSlugOrCID(api)
 	g.registerListingCreate(api)
 	g.registerListingUpdate(api)
 	g.registerListingDelete(api)
 	g.registerListingImportJSON(api)
 	g.registerListingImportMultipart(api)
-
-	g.registerListingIndexByPeer(api)
-	g.registerListingIndex(api)
-	g.registerListingTemplate(api)
-	g.registerListingGetByPeerSlug(api)
-	g.registerListingGetByListingID(api)
 }
 
 // --- Auth ---

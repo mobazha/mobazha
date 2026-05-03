@@ -109,7 +109,6 @@ func TestAH14_NoRouteCollision_ActivatedDomains(t *testing.T) {
 	g := newTestGatewayForRouting()
 	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
-	g.registerBusinessRoutes(r)
 	g.registerHumaAPI(r)
 
 	collisions := collectRouteCollisions(r)
@@ -142,7 +141,6 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 	g := newTestGatewayForRouting()
 	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
-	g.registerBusinessRoutes(r)
 	g.registerHumaAPI(r)
 
 	cases := []struct {

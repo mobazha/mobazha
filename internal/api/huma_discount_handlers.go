@@ -11,8 +11,86 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaDiscountOperations registers bridged seller discount management OpenAPI ops (AH-1.4 Batch 4).
-func (g *Gateway) registerNodeHumaDiscountOperations(api huma.API) {
+// registerNodeHumaDiscountPublicOperations registers public discount
+// operations (validate, applicable, calculate) that buyers can access
+// without authentication.
+func (g *Gateway) registerNodeHumaDiscountPublicOperations(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "discounts-validate",
+		Method:      http.MethodPost,
+		Path:        "/v1/discounts/{peerID}/validate",
+		Summary:     "Validate a discount code (public)",
+		Tags:        []string{"discounts"},
+	}, func(ctx context.Context, in *struct {
+		PeerID string          `path:"peerID"`
+		Body   json.RawMessage `json:",omitempty"`
+	}) (*nodeDataOutput, error) {
+		rawURL := "/v1/discounts/" + url.PathEscape(in.PeerID) + "/validate"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"peerID": in.PeerID})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handleValidateDiscount(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "discounts-applicable",
+		Method:      http.MethodGet,
+		Path:        "/v1/discounts/{peerID}/applicable",
+		Summary:     "Get applicable discounts (public)",
+		Tags:        []string{"discounts"},
+	}, func(ctx context.Context, in *struct {
+		PeerID      string `path:"peerID"`
+		ListingSlug string `query:"listingSlug"`
+	}) (*nodeDataOutput, error) {
+		v := url.Values{}
+		if in.ListingSlug != "" {
+			v.Set("listingSlug", in.ListingSlug)
+		}
+		rawURL := "/v1/discounts/" + url.PathEscape(in.PeerID) + "/applicable"
+		if enc := v.Encode(); enc != "" {
+			rawURL += "?" + enc
+		}
+		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID})
+		rr := httptest.NewRecorder()
+		g.handleGetApplicableDiscounts(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "discounts-calculate",
+		Method:      http.MethodPost,
+		Path:        "/v1/discounts/{peerID}/calculate",
+		Summary:     "Calculate discount amounts (public)",
+		Tags:        []string{"discounts"},
+	}, func(ctx context.Context, in *struct {
+		PeerID string          `path:"peerID"`
+		Body   json.RawMessage `json:",omitempty"`
+	}) (*nodeDataOutput, error) {
+		rawURL := "/v1/discounts/" + url.PathEscape(in.PeerID) + "/calculate"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"peerID": in.PeerID})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handleCalculateDiscounts(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerNodeHumaDiscountAdminOperations registers admin discount CRUD ops
+// that require authentication.
+func (g *Gateway) registerNodeHumaDiscountAdminOperations(api huma.API) {
 	type jsonBody struct {
 		Body json.RawMessage `json:",omitempty"`
 	}
@@ -210,84 +288,6 @@ func (g *Gateway) registerNodeHumaDiscountOperations(api huma.API) {
 			return nil, err
 		}
 		return &nodeNoContentOutput{}, nil
-	})
-
-	// --- Public storefront discount helpers (AH-1.6) ---
-
-	type peerIDPath struct {
-		PeerID string `path:"peerID" doc:"Store peer ID."`
-	}
-
-	huma.Register(api, huma.Operation{
-		OperationID: "discounts-validate",
-		Method:      http.MethodPost,
-		Path:        "/v1/discounts/{peerID}/validate",
-		Summary:     "Validate a discount code (public)",
-		Tags:        []string{"discounts"},
-	}, func(ctx context.Context, in *struct {
-		PeerID string          `path:"peerID"`
-		Body   json.RawMessage `json:",omitempty"`
-	}) (*nodeDataOutput, error) {
-		rawURL := "/v1/discounts/" + url.PathEscape(in.PeerID) + "/validate"
-		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"peerID": in.PeerID})
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
-		g.handleValidateDiscount(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "discounts-applicable",
-		Method:      http.MethodGet,
-		Path:        "/v1/discounts/{peerID}/applicable",
-		Summary:     "Get applicable discounts (public)",
-		Tags:        []string{"discounts"},
-	}, func(ctx context.Context, in *struct {
-		PeerID      string `path:"peerID"`
-		ListingSlug string `query:"listingSlug"`
-	}) (*nodeDataOutput, error) {
-		v := url.Values{}
-		if in.ListingSlug != "" {
-			v.Set("listingSlug", in.ListingSlug)
-		}
-		rawURL := "/v1/discounts/" + url.PathEscape(in.PeerID) + "/applicable"
-		if enc := v.Encode(); enc != "" {
-			rawURL += "?" + enc
-		}
-		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID})
-		rr := httptest.NewRecorder()
-		g.handleGetApplicableDiscounts(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "discounts-calculate",
-		Method:      http.MethodPost,
-		Path:        "/v1/discounts/{peerID}/calculate",
-		Summary:     "Calculate discount amounts (public)",
-		Tags:        []string{"discounts"},
-	}, func(ctx context.Context, in *struct {
-		PeerID string          `path:"peerID"`
-		Body   json.RawMessage `json:",omitempty"`
-	}) (*nodeDataOutput, error) {
-		rawURL := "/v1/discounts/" + url.PathEscape(in.PeerID) + "/calculate"
-		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"peerID": in.PeerID})
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
-		g.handleCalculateDiscounts(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
 	})
 
 	type redemptionsQ struct {

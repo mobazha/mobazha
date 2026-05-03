@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 // Command gen-openapi writes the Node business API OpenAPI 3.1 spec to
 // api-spec/openapi.json. Used by `make openapi` and the unified codegen
 // pipeline (AH-1.6).

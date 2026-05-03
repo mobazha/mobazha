@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 // Package api — huma_api.go
 //
 // AH-1.4: Establishes the huma v2 + humachi base wiring for the Node
@@ -12,10 +14,6 @@
 package api
 
 import (
-	"context"
-	"net/http"
-	"time"
-
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
@@ -26,19 +24,6 @@ const (
 	nodeHumaAPITitle       = "Mobazha Node API"
 	nodeHumaAPIDescription = "OpenAPI 3.1 contract for the Node business domain " +
 		"(/v1/*). Generated from typed Go handlers via huma v2."
-)
-
-// Security scheme names referenced in huma.Operation.Security.
-const (
-	// SecuritySchemeBasicAuth is standalone admin Basic Auth.
-	SecuritySchemeBasicAuth = "basicAuth"
-	// SecuritySchemeBearerJWT is Casdoor Bearer JWT (SaaS proxy / Mini App).
-	SecuritySchemeBearerJWT = "bearerJWT"
-	// SecuritySchemeAPIToken is mbz_<id>_<secret> API token.
-	SecuritySchemeAPIToken = "apiToken"
-	// SecuritySchemeNodeAuth is the unified node auth scheme covering
-	// Basic Auth, Bearer JWT, and API token — used in Operation.Security.
-	SecuritySchemeNodeAuth = "nodeAuth"
 )
 
 // registerHumaAPI installs the huma adapter onto the V1 router and
@@ -88,56 +73,48 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 
 	g.installNodeHumaMiddlewares(api)
 
+	// Public storefront routes — always registered, even in PublicOnly mode.
 	g.registerNodeHumaSmokeRoutes(api)
-	g.registerNodeHumaWalletOperations(api)
-	g.registerNodeHumaChatOperations(api)
+	g.registerNodeHumaListingPublicOperations(api)
+	g.registerNodeHumaMediaPublicOperations(api)
+	g.registerNodeHumaProfilePublicOperations(api)
+	g.registerNodeHumaDiscountPublicOperations(api)
+	g.registerNodeHumaCollectionPublicOperations(api)
+	g.registerNodeHumaSystemPublicOperations(api)
+	g.registerNodeHumaMiscPublicOperations(api)
+	g.registerNodeHumaSocialPublicOperations(api)
+	g.registerNodeHumaOrderPublicOperations(api)
+	g.registerNodeHumaFiatPublicOperations(api)
+	g.registerNodeHumaFulfillmentPublicOperations(api)
+	g.registerNodeHumaSettingsPublicOperations(api)
+	g.registerNodeHumaAuthPublicOperations(api)
 
-	g.registerNodeHumaListingOperations(api)
-	g.registerNodeHumaMediaOperations(api)
-	g.registerNodeHumaProfileOperations(api)
-	g.registerNodeHumaSocialOperations(api)
-
-	g.registerNodeHumaOrderOperations(api)
-	g.registerNodeHumaDisputeOperations(api)
-	g.registerNodeHumaFiatOperations(api)
-	g.registerNodeHumaFulfillmentOperations(api)
-	g.registerNodeHumaCartOperations(api)
-
-	g.registerNodeHumaNotificationOperations(api)
-	g.registerNodeHumaWebhookOperations(api)
-	g.registerNodeHumaAIOperations(api)
-	g.registerNodeHumaSettingsOperations(api)
-	g.registerNodeHumaShippingOperations(api)
-	g.registerNodeHumaDiscountOperations(api)
-	g.registerNodeHumaCollectionOperations(api)
-
-	g.registerNodeHumaSystemOperations(api)
-	g.registerNodeHumaAuthOperations(api)
-	g.registerNodeHumaMiscOperations(api)
+	// Admin/seller routes — suppressed in PublicOnly (--publicgateway) mode.
+	if !g.config.PublicOnly {
+		// Admin parts of mixed domains (public parts already registered above).
+		g.registerNodeHumaListingAdminOperations(api)
+		g.registerNodeHumaMediaAdminOperations(api)
+		g.registerNodeHumaProfileAdminOperations(api)
+		g.registerNodeHumaDiscountAdminOperations(api)
+		g.registerNodeHumaCollectionAdminOperations(api)
+		g.registerNodeHumaSystemAdminOperations(api)
+		g.registerNodeHumaMiscAdminOperations(api)
+		g.registerNodeHumaSocialAdminOperations(api)
+		g.registerNodeHumaOrderAdminOperations(api)
+		g.registerNodeHumaFiatAdminOperations(api)
+		g.registerNodeHumaFulfillmentAdminOperations(api)
+		g.registerNodeHumaSettingsAdminOperations(api)
+		g.registerNodeHumaAuthAdminOperations(api)
+		// Pure admin domains.
+		g.registerNodeHumaWalletOperations(api)
+		g.registerNodeHumaChatOperations(api)
+		g.registerNodeHumaDisputeOperations(api)
+		g.registerNodeHumaCartOperations(api)
+		g.registerNodeHumaNotificationOperations(api)
+		g.registerNodeHumaWebhookOperations(api)
+		g.registerNodeHumaAIOperations(api)
+		g.registerNodeHumaShippingOperations(api)
+	}
 
 	return api
-}
-
-// HumaNodePingOutput is the smoke-test response.
-type HumaNodePingOutput struct {
-	Body struct {
-		Message    string    `json:"message" example:"pong" doc:"Static greeting."`
-		ServerTime time.Time `json:"serverTime" doc:"Server time at request handling."`
-	}
-}
-
-func (g *Gateway) registerNodeHumaSmokeRoutes(api huma.API) {
-	huma.Register(api, huma.Operation{
-		OperationID: "node-huma-ping",
-		Method:      http.MethodGet,
-		Path:        "/v1/system/huma-ping",
-		Summary:     "Huma pipeline smoke test",
-		Description: "Returns a static greeting and server time.",
-		Tags:        []string{"system"},
-	}, func(ctx context.Context, _ *struct{}) (*HumaNodePingOutput, error) {
-		out := &HumaNodePingOutput{}
-		out.Body.Message = "pong"
-		out.Body.ServerTime = time.Now().UTC()
-		return out, nil
-	})
 }

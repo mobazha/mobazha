@@ -11,18 +11,22 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// registerNodeHumaProfileOperations registers bridged profile OpenAPI ops (AH-1.4 Batch 2).
-func (g *Gateway) registerNodeHumaProfileOperations(api huma.API) {
+// registerNodeHumaProfilePublicOperations registers public profile retrieval
+// operations that do not require authentication.
+func (g *Gateway) registerNodeHumaProfilePublicOperations(api huma.API) {
+	g.registerProfilesGetScoped(api)
+	g.registerProfilesGetSelf(api)
 	g.registerProfilesBatchFetchGet(api)
 	g.registerProfilesBatchFetchPost(api)
+}
 
+// registerNodeHumaProfileAdminOperations registers admin profile ops that
+// require authentication (create, update).
+func (g *Gateway) registerNodeHumaProfileAdminOperations(api huma.API) {
 	g.registerProfilesCreate(api)
 	g.registerProfilesCreateScoped(api)
 	g.registerProfilesUpdate(api)
 	g.registerProfilesUpdateScoped(api)
-
-	g.registerProfilesGetScoped(api)
-	g.registerProfilesGetSelf(api)
 }
 
 // --- Auth (batch route registered once with security; gorilla mux also exposes public parity) ---

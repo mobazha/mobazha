@@ -1,41 +1,14 @@
 package core
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
-	"sync/atomic"
-	"time"
 
-	btcec "github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/gagliardetto/solana-go"
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/host"
-	peer "github.com/libp2p/go-libp2p/core/peer"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	tronchain "github.com/mobazha/mobazha3.0/internal/chains/tron"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/net"
-	"github.com/mobazha/mobazha3.0/internal/notifier"
-	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
-	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/evm"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 )
 
 // MobazhaNode holds all the components that make up a network node
@@ -58,98 +31,12 @@ type MobazhaNode struct {
 	modeFlags
 	lifecycleFields
 	appServices
-
-	// Webhook subsystem
-	webhookStore  wh.EndpointStore
-	webhookEngine *wh.Engine
-
-	// Event subsystem
-	eventDispatcher *events.Dispatcher
-	notifierSink    *notifier.ChannelNotificationSink
-
-	// SaaS co-tenant fast path (nil in standalone mode)
-	coTenantPublicData contracts.CoTenantPublicDataFn
-
-	// AI proxy and platform fallback
-	aiProxy         *aipkg.Proxy
-	platformAIConfig *aipkg.Config
-	aiRateLimiter    *aipkg.DailyRateLimiter
-
-	// Stripe account
-	stripeAccountID string
-
-	// Phase 2 encryption
-	keyManager         *encryption.KeyManager
-	localListingCrypto *encryption.LocalListingCrypto
-
-	// Hosting interface
-	hostService coreiface.HostService
+	platformFields
 }
 
-// identityFields groups node identity and lifecycle context.
-type identityFields struct {
-	nodeID     string
-	peerID     peer.ID
-	privKey    crypto.PrivKey
-	peerHost   host.Host
-	nodeCtx    context.Context
-	nodeCancel context.CancelFunc
-}
-
-// storageFields groups data storage dependencies.
-type storageFields struct {
-	p2pInfra     *P2PInfra
-	contentStore contracts.ContentStore
-	db           database.Database
-	repo         *repo.Repo
-}
-
-// cryptoFields groups cryptographic key material and signing.
-type cryptoFields struct {
-	signer          corecontracts.Signer
-	ethMasterKey    *btcec.PrivateKey
-	escrowMasterKey *btcec.PrivateKey
-	solPrivKey      *solana.PrivateKey
-	ratingMasterKey *btcec.PrivateKey
-	tronMasterKey   *btcec.PrivateKey
-	keyProvider     contracts.KeyProvider
-	bip44Key        *hdkeychain.ExtendedKey
-}
-
-// networkFields groups P2P networking components.
-type networkFields struct {
-	messenger              contracts.Messenger
-	networkService         contracts.NetworkService
-	banManager             *net.BanManager
-	eventBus               events.Bus
-	followerTracker        *FollowerTracker
-	storeAndForwardServers []string
-	boostrapPeers          []peer.ID
-}
-
-// walletFields groups wallet and payment processing.
-type walletFields struct {
-	multiwallet     contracts.WalletOperator
-	orderProcessor  *orders.OrderProcessor
-	exchangeRates   *wallet.ExchangeRateProvider
-	paymentRegistry *payment.Registry
-	relayAPIURL     string
-}
-
-// chainFields groups blockchain client configuration.
-type chainFields struct {
-	evmChainConfigs   []evm.EVMClientConfig
-	solanaChainConfig *SolanaChainConfig
-	tronChainConfig   *TronChainConfig
-	tronClient        *tronchain.TronClient
-	monitorService    utxo.UTXOMonitorService
-}
-
-// ipnsFields groups NetDB configuration (IPNS resolution retired).
-type ipnsFields struct {
-	netDB     *netdb.NetDB
-	netConfig *config.NetConfig
-}
+// identityFields, storageFields, cryptoFields, networkFields, walletFields,
+// chainFields, ipnsFields, and platformFields are defined in
+// node_fields_full.go (!private_distribution) / node_fields_private_distribution.go (private_distribution).
 
 // modeFlags groups boolean mode switches.
 type modeFlags struct {
@@ -228,132 +115,9 @@ func (n *MobazhaNode) IsDefaultNode() bool {
 	return n.nodeID == repo.DefaultNodeID
 }
 
-// SetCoTenantPublicData injects a resolver for co-located tenant data on the
-// same SaaS host. Called after construction; the deferred wrappers created
-// during applyOptions will pick up the injected fn at call time.
-func (n *MobazhaNode) SetCoTenantPublicData(fn contracts.CoTenantPublicDataFn) {
-	n.coTenantPublicData = fn
-}
-
-// coTenantPublicDataDeferred returns a closure that forwards to
-// n.coTenantPublicData at call time. This allows App Services to be
-// initialized before SetCoTenantPublicData is called by hosting.
-func (n *MobazhaNode) coTenantPublicDataDeferred() contracts.CoTenantPublicDataFn {
-	return func(peerID peer.ID) (pkgdb.PublicData, error) {
-		fn := n.coTenantPublicData
-		if fn == nil {
-			return nil, fmt.Errorf("co-tenant resolver not configured")
-		}
-		return fn(peerID)
-	}
-}
-
-// Start gets the node up and running and listens for a signal interrupt.
-func (n *MobazhaNode) Start() {
-	// Check repo migration
-	go func() {
-		if err := n.checkRepoMigration(); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "checkRepoMigration failed, %v", err)
-		}
-	}()
-
-	go n.bootstrapDHT()
-
-	// Default node always starts the SharedManager (HTTP gateway) regardless of mode,
-	// because hosting proxies /v1/* requests to the internal API (default port: 5102).
-	if n.IsDefaultNode() {
-		go n.SharedManager().Start()
-	}
-
-	if !n.infrastructureOnly {
-		n.publishHandler()
-		go n.messenger.Start()
-		go n.followerTracker.Start()
-
-		go n.orderProcessor.Start()
-		go n.syncMessages()
-		go func() {
-			n.multiwallet.Start()
-		}()
-
-		if n.eventDispatcher != nil {
-			if err := n.eventDispatcher.Start(); err != nil {
-				logger.LogErrorWithIDf(log, n.nodeID, "Failed to start event dispatcher: %v", err)
-			}
-		}
-		if err := n.profileService.UpdateSNFServers(); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Error updating store and forward servers in profile: %s", err)
-		}
-
-		// Start UTXO payment monitor for external wallet payments
-		go n.startUTXOPaymentMonitor()
-
-		// Inject EVM chain clients into wallets (symmetric with UTXO monitor above)
-		// SaaS: shared clients from HostService; Standalone: per-node clients via factory
-		n.startEVMChainClients()
-
-		// Inject Solana chain client into wallet (symmetric with EVM and UTXO above)
-		// SaaS: shared client from HostService; Standalone: per-node client + escrow resolution
-		n.startSolanaChainClients()
-
-		// Inject TRON chain client into wallet (symmetric with Solana/EVM above)
-		n.startTRONChainClients()
-
-		// Register payment strategies for all supported chains.
-		// Must be called before startCancelablePaymentMonitor which uses the registry.
-		n.registerPaymentStrategies()
-
-		// Start unified cancelable payment monitor for auto-confirmation
-		// This handles UTXO, EVM, and (future) Solana chains via event dispatch
-		n.paymentService.StartCancelablePaymentMonitor()
-
-		// Start event-driven monitors for payment→order decoupling
-		// Handles auto-confirm, UTXO payment detection, and RWA instant buy via EventBus
-		n.startPaymentEventMonitors()
-
-		// Fiat reconciliation + cleanup are driven by the shared scheduler
-		// (SaaS) via RunFiatReconciliationOnce / RunFiatCleanupOnce.
-
-		if n.matrixChatService != nil {
-			go func() {
-				if err := n.matrixChatService.Start(n.nodeCtx); err != nil {
-					logger.LogErrorWithIDf(log, n.nodeID, "Matrix chat service start failed: %v", err)
-				}
-			}()
-			// In SaaS mode, hosting starts the WS bridge via onNodeCreated callback.
-			// Standalone nodes must start it here to enable real-time chat over WS.
-			if n.hostService == nil {
-				if gw := n.SharedManager().GetHTTPGateway(); gw != nil {
-					go gw.StartMatrixChatEventBridge(n.nodeCtx, n.nodeID, n.matrixChatService)
-				}
-			}
-		}
-
-		if n.netDBSyncService != nil {
-			n.netDBSyncService.Start()
-			go n.netDBSyncService.Reconcile()
-		}
-
-		// Standalone mode: start a local scheduler to drive periodic workers.
-		// In SaaS mode, hosting's shared scheduler handles this.
-		if n.hostService == nil {
-			n.startStandaloneScheduler(n.nodeCtx)
-		}
-	}
-
-	// Add log to verify connection reuse
-	go func() {
-		if n.peerHost == nil {
-			return
-		}
-		conns := n.peerHost.Network().Conns()
-		for _, conn := range conns {
-			streams := conn.GetStreams()
-			logger.LogDebugWithIDf(log, n.nodeID, "Connection to %s has %d streams",
-				conn.RemotePeer(), len(streams))
-		}
-	}()
-}
+// Start, Stop, SetCoTenantPublicData, coTenantPublicDataDeferred are defined
+// in node_lifecycle_full.go (!private_distribution) / node_lifecycle_private_distribution.go (private_distribution) and
+// node_methods_full.go (!private_distribution) / node_methods_private_distribution.go (private_distribution).
 
 func (n *MobazhaNode) checkRepoMigration() error {
 	version, err := n.repo.ReadVersion()
@@ -364,100 +128,6 @@ func (n *MobazhaNode) checkRepoMigration() error {
 	if version != repo.DefaultRepoVersion {
 		if err := n.repo.WriteVersion(repo.DefaultRepoVersion); err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-// Stop cleanly shutsdown the MobazhaNode and signals to any
-// listening goroutines that it's time to stop.
-func (n *MobazhaNode) Stop(force bool) error {
-	if atomic.LoadInt32(&n.publishActive) > 0 && !force {
-		return coreiface.ErrPublishingActive
-	}
-	if !atomic.CompareAndSwapInt32(&n.stopped, 0, 1) {
-		return nil
-	}
-
-	if n.IsDefaultNode() {
-		n.SharedManager().Stop()
-	}
-
-	if !n.infrastructureOnly {
-		if n.messenger != nil {
-			n.messenger.Stop()
-		}
-		if n.networkService != nil {
-			n.networkService.Close()
-		}
-		if n.orderProcessor != nil {
-			n.orderProcessor.Stop()
-		}
-		if n.orderLockManager != nil {
-			n.orderLockManager.Stop()
-		}
-		if n.followerTracker != nil {
-			n.followerTracker.Close()
-		}
-		if n.multiwallet != nil {
-			n.multiwallet.Close()
-		}
-	}
-	if n.eventDispatcher != nil {
-		n.eventDispatcher.Stop()
-	}
-	if n.shutdownTorFunc != nil {
-		n.shutdownTorFunc()
-	}
-	// Stop UTXO payment monitor (unregister from shared service if applicable)
-	n.StopUTXOPaymentMonitor()
-	if n.shutdown != nil {
-		close(n.shutdown)
-	}
-	if n.matrixChatService != nil {
-		if err := n.matrixChatService.Stop(); err != nil {
-			log.Errorf("Matrix chat service stop error: %v", err)
-		}
-	}
-	if n.netDBSyncService != nil {
-		n.netDBSyncService.Stop()
-	}
-
-	if n.repo != nil {
-		n.repo.Close()
-	}
-
-	// Cancel node-scoped context so goroutines watching node.Context()
-	// (e.g. MatrixChatEventBridge, Subscribe cleanup) exit promptly.
-	if n.nodeCancel != nil {
-		n.nodeCancel()
-	}
-
-	if n.p2pInfra != nil {
-		stop := make(chan struct{})
-		go func() {
-			n.p2pInfra.Close()
-			close(stop)
-		}()
-		select {
-		case <-time.After(time.Second * 2):
-			log.Warning("P2P infrastructure close timed out after 2s, proceeding with shutdown")
-			if n.eventBus != nil {
-				n.eventBus.Emit(&events.P2PShutdown{})
-			}
-			return coreiface.ErrP2PDelayedShutdown
-		case <-stop:
-			if n.eventBus != nil {
-				n.eventBus.Emit(&events.P2PShutdown{})
-			}
-		}
-	} else {
-		// Lightweight node: close the minimal libp2p host
-		if n.peerHost != nil {
-			n.peerHost.Close()
-		}
-		if n.eventBus != nil {
-			n.eventBus.Emit(&events.P2PShutdown{})
 		}
 	}
 	return nil
@@ -489,21 +159,9 @@ func (n *MobazhaNode) DestroyNode() {
 	n.repo.DestroyRepo()
 }
 
-// Multiwallet returns the WalletOperator interface.
-// Internal callers that need concrete map access can type-assert to
-// *chains.Multiwallet.
-func (n *MobazhaNode) Multiwallet() contracts.WalletOperator {
-	return n.multiwallet
-}
-
 // DB returns the node's database.
 func (n *MobazhaNode) DB() database.Database {
 	return n.db
-}
-
-// ExchangeRates returns the node's exchange rate provider.
-func (n *MobazhaNode) ExchangeRates() *wallet.ExchangeRateProvider {
-	return n.exchangeRates
 }
 
 // GetNodeID returns the user ID for this node.
@@ -515,38 +173,6 @@ func (n *MobazhaNode) SharedManager() *SharedManager {
 	return n.sharedManager
 }
 
-// Identity returns the peer ID for this node.
-func (n *MobazhaNode) Identity() peer.ID {
-	return n.peerID
-}
-
-// PrivKey returns the libp2p private key for this node.
-func (n *MobazhaNode) PrivKey() crypto.PrivKey {
-	return n.privKey
-}
-
-// SignMessage signs a payload with the node's identity key via the injected Signer.
-// Returns (signature, publicKeyBytes, error).
-func (n *MobazhaNode) SignMessage(payload []byte) ([]byte, []byte, error) {
-	if n.signer == nil {
-		return nil, nil, fmt.Errorf("signer not available")
-	}
-	sig, err := n.signer.Sign(payload)
-	if err != nil {
-		return nil, nil, fmt.Errorf("signing payload: %w", err)
-	}
-	pubkey, err := n.signer.PublicKey()
-	if err != nil {
-		return nil, nil, fmt.Errorf("getting public key: %w", err)
-	}
-	return sig, pubkey, nil
-}
-
-// PeerHost returns the libp2p host for this node.
-func (n *MobazhaNode) PeerHost() host.Host {
-	return n.peerHost
-}
-
 // SubscribeEvent returns a subscription to the provided event. The event argument
 // may be an interface slice.
 func (n *MobazhaNode) SubscribeEvent(event interface{}) (events.Subscription, error) {
@@ -556,96 +182,6 @@ func (n *MobazhaNode) SubscribeEvent(event interface{}) (events.Subscription, er
 // EventBus returns the node's event bus.
 func (n *MobazhaNode) EventBus() events.Bus {
 	return n.eventBus
-}
-
-// NetService returns the underlying NetworkService for this node.
-func (n *MobazhaNode) NetService() contracts.NetworkService {
-	return n.networkService
-}
-
-// NetConfig returns the network configuration.
-func (n *MobazhaNode) NetConfig() *config.NetConfig {
-	return n.netConfig
-}
-
-// NotifierSink returns the node's channel notification sink (may be nil).
-func (n *MobazhaNode) NotifierSink() *notifier.ChannelNotificationSink {
-	return n.notifierSink
-}
-
-// SaveNotificationChannels persists channel configs to the database.
-func (n *MobazhaNode) SaveNotificationChannels(channels []notifier.ChannelConfig) error {
-	data, err := json.Marshal(channels)
-	if err != nil {
-		return fmt.Errorf("marshal notification channels: %w", err)
-	}
-	return n.saveSetting(models.SettingsKeyNotificationChannels, string(data))
-}
-
-// loadNotificationChannels reads the persisted channel configs from the database.
-func (n *MobazhaNode) loadNotificationChannels() []notifier.ChannelConfig {
-	val, err := n.getSetting(models.SettingsKeyNotificationChannels)
-	if err != nil || val == "" {
-		return nil
-	}
-	var channels []notifier.ChannelConfig
-	if err := json.Unmarshal([]byte(val), &channels); err != nil {
-		return nil
-	}
-	return channels
-}
-
-// AIProxy returns the node's AI proxy (may be nil).
-func (n *MobazhaNode) AIProxy() *aipkg.Proxy {
-	return n.aiProxy
-}
-
-// AIConfig returns the flat Config for the currently active provider.
-// Priority: user BYOK (if valid) → platform config (if valid) → empty config.
-func (n *MobazhaNode) AIConfig() aipkg.Config {
-	mc := n.AIMultiConfig()
-	userCfg := mc.ActiveConfig()
-	if userCfg.IsValid() {
-		return userCfg
-	}
-	if n.platformAIConfig != nil && n.platformAIConfig.IsValid() {
-		return *n.platformAIConfig
-	}
-	return userCfg
-}
-
-// AIRateLimiter returns the per-tenant daily rate limiter (may be nil).
-func (n *MobazhaNode) AIRateLimiter() *aipkg.DailyRateLimiter {
-	return n.aiRateLimiter
-}
-
-// PlatformAIConfig returns the platform-provided AI config (may be nil).
-func (n *MobazhaNode) PlatformAIConfig() *aipkg.Config {
-	return n.platformAIConfig
-}
-
-// AIMultiConfig reads the full multi-provider config from the database.
-// Automatically handles migration from legacy single-provider format
-// via MultiConfig.UnmarshalJSON.
-func (n *MobazhaNode) AIMultiConfig() aipkg.MultiConfig {
-	val, err := n.getSetting(models.SettingsKeyAIConfig)
-	if err != nil || val == "" {
-		return aipkg.MultiConfig{}
-	}
-	var mc aipkg.MultiConfig
-	if err := json.Unmarshal([]byte(val), &mc); err != nil {
-		return aipkg.MultiConfig{}
-	}
-	return mc
-}
-
-// SaveAIMultiConfig persists the multi-provider AI config to the database.
-func (n *MobazhaNode) SaveAIMultiConfig(mc aipkg.MultiConfig) error {
-	data, err := json.Marshal(mc)
-	if err != nil {
-		return fmt.Errorf("marshal AI multi config: %w", err)
-	}
-	return n.saveSetting(models.SettingsKeyAIConfig, string(data))
 }
 
 // StoreConfig reads the storefront branding config from the database.
@@ -694,175 +230,5 @@ func MigrateNodeSettings(db database.Database) error {
 	})
 }
 
-// ChatStore returns a chat store backed by this node's database.
-func (n *MobazhaNode) ChatStore() *aipkg.ChatStore {
-	return aipkg.NewChatStore(n.db)
-}
-
-// ProfileName returns the display name of this node's store profile.
-func (n *MobazhaNode) ProfileName() string {
-	ps := n.Profile()
-	if ps == nil {
-		return ""
-	}
-	profile, err := ps.GetMyProfile()
-	if err != nil || profile == nil {
-		return ""
-	}
-	return profile.Name
-}
-
-// ProductCatalog returns a lightweight summary of all published listings
-// for AI context injection. Prices are converted to human-readable format
-// using the currency's divisibility.
-func (n *MobazhaNode) ProductCatalog() []aipkg.ListingSummary {
-	var index models.ListingIndex
-	err := n.db.View(func(tx database.Tx) error {
-		var e error
-		index, e = tx.GetListingIndex()
-		return e
-	})
-	if err != nil || len(index) == 0 {
-		return nil
-	}
-
-	var result []aipkg.ListingSummary
-	for i := range index {
-		lm := &index[i]
-		if lm.Status != models.ListingStatusPublished {
-			continue
-		}
-		price := ""
-		if lm.Price.Currency != nil {
-			price = aipkg.FormatAmountForDisplay(lm.Price.Amount.String(), lm.Price.Currency.Divisibility)
-		}
-		result = append(result, aipkg.ListingSummary{
-			Slug:        lm.Slug,
-			Title:       lm.Title,
-			Description: lm.Description,
-			Price:       price,
-			CoinType:    lm.CoinType,
-			ProductType: lm.ProductType,
-		})
-	}
-	return result
-}
-
-// ---------------------------------------------------------------------------
-// contracts.SchedulerHooks — delegate to App Services (Phase AH-3a)
-// ---------------------------------------------------------------------------
-
-var _ contracts.SchedulerHooks = (*MobazhaNode)(nil)
-
-func (n *MobazhaNode) RunOrderTimeoutOnce(_ context.Context) {
-	if n.orderService != nil {
-		n.orderService.RunOrderTimeoutOnce()
-	}
-}
-
-func (n *MobazhaNode) RunOutboxPollOnce(_ context.Context) {
-	if n.orderService != nil {
-		n.orderService.RunOutboxPollOnce()
-	}
-}
-
-func (n *MobazhaNode) RunOutboxCleanupOnce(_ context.Context) {
-	if n.orderService != nil {
-		n.orderService.RunOutboxCleanupOnce()
-	}
-}
-
-func (n *MobazhaNode) RunPaymentVerificationOnce(_ context.Context) {
-	if n.paymentService != nil {
-		n.paymentService.RunPaymentVerificationOnce()
-	}
-}
-
-func (n *MobazhaNode) RunWebhookDeliveryOnce(_ context.Context) {
-	if n.webhookEngine != nil {
-		n.webhookEngine.RunDeliveryOnce()
-	}
-}
-
-func (n *MobazhaNode) RunWebhookCleanupOnce(_ context.Context) {
-	if n.webhookEngine != nil {
-		n.webhookEngine.RunCleanupOnce()
-	}
-}
-
-func (n *MobazhaNode) RunAnalyticsCleanupOnce(_ context.Context) {
-	if n.analyticsService != nil {
-		n.analyticsService.RunAnalyticsCleanupOnce()
-	}
-}
-
-func (n *MobazhaNode) RunFiatReconciliationOnce(_ context.Context) {
-	if n.fiatPaymentService != nil {
-		n.fiatPaymentService.RunFiatReconciliationOnce()
-	}
-}
-
-func (n *MobazhaNode) RunFiatCleanupOnce(_ context.Context) {
-	if n.fiatPaymentService != nil {
-		n.fiatPaymentService.RunFiatCleanupOnce()
-	}
-}
-
-func (n *MobazhaNode) RunGuestOrderCleanupOnce(_ context.Context) {
-	if n.guestOrderService != nil {
-		n.guestOrderService.RunGuestCleanupOnce()
-	}
-}
-
-func (n *MobazhaNode) RunFollowerConnectOnce(_ context.Context) {
-	if n.followerTracker != nil {
-		n.followerTracker.RunFollowerConnectOnce()
-	}
-}
-
-func (n *MobazhaNode) RunNetDBReconcileOnce(_ context.Context) {
-	if n.netDBSyncService != nil {
-		n.netDBSyncService.Reconcile()
-	}
-}
-
-func (n *MobazhaNode) RunOrderLockCleanupOnce(_ context.Context) {
-	if n.orderLockManager != nil {
-		n.orderLockManager.RunLockCleanupOnce()
-	}
-}
-
-func (n *MobazhaNode) supplyChainWorkersEnabled() bool {
-	return n.supplyChainService != nil &&
-		(n.featureManager == nil || n.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled))
-}
-
-func (n *MobazhaNode) RunSupplyChainRetryOnce(ctx context.Context) {
-	if n.supplyChainWorkersEnabled() {
-		n.supplyChainService.RunSupplyChainRetryOnce(ctx)
-	}
-}
-
-func (n *MobazhaNode) RunSupplyChainReconcileOnce(ctx context.Context) {
-	if n.supplyChainWorkersEnabled() {
-		n.supplyChainService.RunSupplyChainReconcileOnce(ctx)
-	}
-}
-
-func (n *MobazhaNode) RunSupplyChainCleanupOnce(_ context.Context) {
-	if n.supplyChainWorkersEnabled() {
-		n.supplyChainService.RunSupplyChainCleanupOnce()
-	}
-}
-
-func (n *MobazhaNode) RunSupplyChainInventoryCheckOnce(ctx context.Context) {
-	if n.supplyChainWorkersEnabled() {
-		n.supplyChainService.RunSupplyChainInventoryCheckOnce(ctx)
-	}
-}
-
-func (n *MobazhaNode) RunSupplyChainPriceDriftOnce(ctx context.Context) {
-	if n.supplyChainWorkersEnabled() {
-		n.supplyChainService.RunSupplyChainPriceDriftOnce(ctx)
-	}
-}
+// ChatStore, ProfileName, ProductCatalog, and SchedulerHooks are defined
+// in node_methods_full.go (!private_distribution) / node_methods_private_distribution.go (private_distribution).

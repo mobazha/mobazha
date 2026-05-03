@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package core
 
 import (
@@ -485,7 +487,7 @@ func (n *MobazhaNode) initPreferencesService() {
 	}
 	n.preferencesService = NewPreferencesAppService(PreferencesAppServiceConfig{
 		DB:         n.db,
-		BanManager: n.banManager,
+		BanChecker: n.banManager,
 	})
 }
 
@@ -803,7 +805,7 @@ func (n *MobazhaNode) initListingService() {
 		ContentStore:       n.contentStore,
 		NetDB:              n.netDB,
 		EventBus:           n.eventBus,
-		BanManager:         n.banManager,
+		BanChecker:         n.banManager,
 		Keys:               n.keyProvider,
 		FeatureManager:     n.featureManager,
 		LocalListingCrypto: n.localListingCrypto,

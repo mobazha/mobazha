@@ -1,4 +1,4 @@
-.PHONY: build test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
+.PHONY: build build-private_distribution test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
 
 SYSTEM_GO := /usr/local/go/bin/go
 GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
@@ -6,6 +6,9 @@ GO_TEST_TAGS ?= goolm
 
 build: ## 构建项目
 	bash ./scripts/with-libolm-env.sh $(GO) build -o mobazha
+
+build-private_distribution: ## 构建 PrivateDistribution 精简版（CGO-free，隐私模式）
+	CGO_ENABLED=0 $(GO) build -tags "private_distribution purego_sqlite embed_frontend" -ldflags "-s -w" -o mobazha-private_distribution .
 
 test: ## 运行测试
 	$(GO) test -tags '$(GO_TEST_TAGS)' ./...

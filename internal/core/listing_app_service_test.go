@@ -18,8 +18,8 @@ func newTestListingAppService(t *testing.T, cfg ListingAppServiceConfig) *Listin
 		t.Cleanup(func() { _ = db.Close() })
 		cfg.DB = db
 	}
-	if cfg.BanManager == nil {
-		cfg.BanManager = mbznet.NewBanManager(nil, nil)
+	if cfg.BanChecker == nil {
+		cfg.BanChecker = mbznet.NewBanManager(nil, nil)
 	}
 	if cfg.Publish == nil {
 		cfg.Publish = noopPublish
@@ -56,7 +56,7 @@ func TestListingAppService_IsGlobalBanned_True(t *testing.T) {
 	bannedPeer := mustPeerID(t, testVendorPeerID)
 	bm := mbznet.NewBanManager([]peer.ID{bannedPeer}, nil)
 	svc := newTestListingAppService(t, ListingAppServiceConfig{
-		BanManager: bm,
+		BanChecker: bm,
 	})
 	assert.True(t, svc.IsGlobalBanned(bannedPeer))
 }
@@ -65,17 +65,17 @@ func TestListingAppService_IsGlobalBanned_NotBanned(t *testing.T) {
 	otherPeer, _ := peer.Decode("12D3KooWHHzSeKaY8xuZVzkLbKFfvNgPPeKhFBGrMbNbXRwuFCA5")
 	bm := mbznet.NewBanManager([]peer.ID{otherPeer}, nil)
 	svc := newTestListingAppService(t, ListingAppServiceConfig{
-		BanManager: bm,
+		BanChecker: bm,
 	})
 	queryPeer := mustPeerID(t, testVendorPeerID)
 	assert.False(t, svc.IsGlobalBanned(queryPeer))
 }
 
-func TestListingAppService_BanManager_BlockedPeer(t *testing.T) {
+func TestListingAppService_BanChecker_BlockedPeer(t *testing.T) {
 	blockedPeer := mustPeerID(t, testVendorPeerID)
 	bm := mbznet.NewBanManager(nil, []peer.ID{blockedPeer})
 	svc := newTestListingAppService(t, ListingAppServiceConfig{
-		BanManager: bm,
+		BanChecker: bm,
 	})
 	assert.False(t, svc.IsGlobalBanned(blockedPeer), "blocked is not the same as global-banned")
 }
@@ -83,7 +83,7 @@ func TestListingAppService_BanManager_BlockedPeer(t *testing.T) {
 func TestListingAppService_NewBanManager_Empty(t *testing.T) {
 	bm := mbznet.NewBanManager(nil, nil)
 	svc := newTestListingAppService(t, ListingAppServiceConfig{
-		BanManager: bm,
+		BanChecker: bm,
 	})
 	pid := mustPeerID(t, testVendorPeerID)
 	assert.False(t, svc.IsGlobalBanned(pid))

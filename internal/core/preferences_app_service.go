@@ -6,7 +6,7 @@ import (
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	obnet "github.com/mobazha/mobazha3.0/internal/net"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -15,18 +15,18 @@ import (
 // PreferencesAppService encapsulates user preferences and block-list management.
 type PreferencesAppService struct {
 	db         database.Database
-	banManager *obnet.BanManager
+	banChecker contracts.BanChecker
 }
 
 type PreferencesAppServiceConfig struct {
 	DB         database.Database
-	BanManager *obnet.BanManager
+	BanChecker contracts.BanChecker
 }
 
 func NewPreferencesAppService(cfg PreferencesAppServiceConfig) *PreferencesAppService {
 	return &PreferencesAppService{
 		db:         cfg.DB,
-		banManager: cfg.BanManager,
+		banChecker: cfg.BanChecker,
 	}
 }
 
@@ -119,8 +119,8 @@ func (s *PreferencesAppService) BlockNode(peerID string) (bool, error) {
 		return addedToBlock, err
 	}
 
-	if s.banManager != nil {
-		s.banManager.AddBlockedID(pid)
+	if s.banChecker != nil {
+		s.banChecker.AddBlockedID(pid)
 	}
 
 	return addedToBlock, err
@@ -149,8 +149,8 @@ func (s *PreferencesAppService) UnblockNode(peerID string) (bool, error) {
 		return removeFromBlock, err
 	}
 
-	if s.banManager != nil {
-		s.banManager.RemoveBlockedID(pid)
+	if s.banChecker != nil {
+		s.banChecker.RemoveBlockedID(pid)
 	}
 
 	return removeFromBlock, err

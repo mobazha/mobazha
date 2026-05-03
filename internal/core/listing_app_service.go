@@ -36,8 +36,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
-
-	mbznet "github.com/mobazha/mobazha3.0/internal/net"
 )
 
 var _ contracts.ListingPublisher = (*ListingAppService)(nil)
@@ -49,7 +47,7 @@ type ListingAppService struct {
 	contentStore       contracts.ContentStore
 	netDB              *netdb.NetDB
 	eventBus           events.Bus
-	banManager         *mbznet.BanManager
+	banChecker         contracts.BanChecker
 	keys               contracts.KeyProvider
 	featureManager     *pkgconfig.FeatureManager
 	localListingCrypto *encryption.LocalListingCrypto
@@ -71,7 +69,7 @@ type ListingAppServiceConfig struct {
 	ContentStore       contracts.ContentStore
 	NetDB              *netdb.NetDB
 	EventBus           events.Bus
-	BanManager         *mbznet.BanManager
+	BanChecker         contracts.BanChecker
 	Keys               contracts.KeyProvider
 	FeatureManager     *pkgconfig.FeatureManager
 	LocalListingCrypto *encryption.LocalListingCrypto
@@ -93,7 +91,7 @@ func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 		contentStore:       cfg.ContentStore,
 		netDB:              cfg.NetDB,
 		eventBus:           cfg.EventBus,
-		banManager:         cfg.BanManager,
+		banChecker:         cfg.BanChecker,
 		keys:               cfg.Keys,
 		featureManager:     cfg.FeatureManager,
 		localListingCrypto: cfg.LocalListingCrypto,
@@ -119,7 +117,10 @@ func (s *ListingAppService) SetCoTenantAllPeers(fn func() []peer.ID) {
 }
 
 func (s *ListingAppService) IsGlobalBanned(peerID peer.ID) bool {
-	return s.banManager.IsGlobalBanned(peerID)
+	if s.banChecker == nil {
+		return false
+	}
+	return s.banChecker.IsGlobalBanned(peerID)
 }
 
 // resolveShippingProfile resolves the shipping profile entity for a physical listing.

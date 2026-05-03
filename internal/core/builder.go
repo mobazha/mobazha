@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package core
 
 import (
@@ -331,7 +333,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 				initialBootstrapChan: make(chan struct{}),
 				shutdown:             make(chan struct{}),
 			},
-			hostService: hs,
+			platformFields: platformFields{
+				hostService: hs,
+			},
 		}
 		sharedManager.AddNode(nodeID, obNode)
 
@@ -567,7 +571,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			initialBootstrapChan: make(chan struct{}),
 			shutdown:             make(chan struct{}),
 		},
-		hostService: hs,
+		platformFields: platformFields{
+			hostService: hs,
+		},
 	}
 	obNode.contentStore = &cidContentStore{}
 	infraOwned = true
@@ -1209,7 +1215,9 @@ func newLightweightNode(
 			initialBootstrapChan: make(chan struct{}),
 			shutdown:             make(chan struct{}),
 		},
-		hostService: hs,
+		platformFields: platformFields{
+			hostService: hs,
+		},
 	}
 
 	obNode.contentStore = &cidContentStore{}

@@ -240,6 +240,56 @@ func TestArchGuard_NoNewTickerInCore(t *testing.T) {
 			"use Run*Once methods instead. Violations: %v", violations)
 }
 
+// TestArchGuard_PrivateDistributionServiceCoverage scans applyOptions in options.go for all
+// n.initXxx() calls, then verifies that builder_private_distribution.go's initPrivateDistributionServices
+// doc comment has a corresponding "initXxx" line marked as "covered" or
+// "excluded". This prevents silent omissions when new services are added.
+func TestArchGuard_PrivateDistributionServiceCoverage(t *testing.T) {
+	root := repoRoot(t)
+
+	optionsData, err := os.ReadFile(filepath.Join(root, "internal", "core", "options.go"))
+	require.NoError(t, err)
+
+	private_distributionData, err := os.ReadFile(filepath.Join(root, "internal", "core", "builder_private_distribution.go"))
+	require.NoError(t, err)
+
+	private_distributionContent := string(private_distributionData)
+
+	var initCalls []string
+	inApplyOptions := false
+	braceDepth := 0
+	for _, line := range strings.Split(string(optionsData), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !inApplyOptions && strings.Contains(trimmed, "func (n *MobazhaNode) applyOptions(") {
+			inApplyOptions = true
+			braceDepth = 0
+		}
+		if inApplyOptions {
+			braceDepth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
+			if (strings.HasPrefix(trimmed, "n.init") || strings.HasPrefix(trimmed, "n.wire")) &&
+				strings.Contains(trimmed, "(") {
+				name := trimmed[2:strings.Index(trimmed, "(")]
+				initCalls = append(initCalls, name)
+			}
+			if braceDepth <= 0 {
+				break
+			}
+		}
+	}
+	require.NotEmpty(t, initCalls, "failed to parse applyOptions — no initXxx calls found")
+
+	var missing []string
+	for _, call := range initCalls {
+		if !strings.Contains(private_distributionContent, call) {
+			missing = append(missing, call)
+		}
+	}
+	assert.Empty(t, missing,
+		"options.go applyOptions has initXxx calls not mentioned in builder_private_distribution.go. "+
+			"Add each to the initPrivateDistributionServices doc comment as 'covered' or 'excluded: <reason>'. "+
+			"Missing: %v", missing)
+}
+
 func TestArchGuard_QueriesDoNotImportInternal(t *testing.T) {
 	root := repoRoot(t)
 	dir := filepath.Join(root, "pkg", "queries")

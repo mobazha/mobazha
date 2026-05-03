@@ -43,11 +43,6 @@ const (
 	// signs and sends the transaction, then submits txHash to the backend (EVM, Solana).
 	// Flow: frontend gets instructions → wallet signs tx → submit txHash to backend.
 	PaymentModelClientSigned PaymentModel = "client_signed"
-
-	// PaymentModelThirdParty is for third-party payment providers (e.g., Stripe)
-	// that handle payment outside the blockchain.
-	// Flow: frontend uses provider SDK → webhook notifies backend.
-	PaymentModelThirdParty PaymentModel = "third_party"
 )
 
 // ── Instruction Params / Result ─────────────────────────────────

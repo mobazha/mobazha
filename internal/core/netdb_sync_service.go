@@ -107,8 +107,6 @@ func (s *NetDBSyncService) Start() {
 
 	go func() {
 		defer sub.Close()
-		ticker := time.NewTicker(reconcileInterval)
-		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
@@ -118,8 +116,6 @@ func (s *NetDBSyncService) Start() {
 					return
 				}
 				s.dispatch(evt)
-			case <-ticker.C:
-				s.Reconcile()
 			}
 		}
 	}()

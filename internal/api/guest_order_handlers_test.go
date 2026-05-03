@@ -69,7 +69,7 @@ func (m *mockGuestOrderService) HandlePaymentDetected(string, string) error { re
 func (m *mockGuestOrderService) HandleConfirmationUpdate(string, int) error { return nil }
 func (m *mockGuestOrderService) CleanupExpiredOrders(context.Context)       {}
 func (m *mockGuestOrderService) AutoCompleteOrders(context.Context)         {}
-func (m *mockGuestOrderService) StartCleanupLoop()                          {}
+func (m *mockGuestOrderService) RunGuestCleanupOnce()                       {}
 func (m *mockGuestOrderService) IsEnabled(context.Context) bool             { return true }
 
 func (m *mockGuestOrderService) GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error) {

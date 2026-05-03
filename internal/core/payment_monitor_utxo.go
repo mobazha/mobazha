@@ -126,11 +126,6 @@ func (n *MobazhaNode) StopWatchingPayment(orderID string) error {
 
 // ── Payment verification & event monitors ───────────────────────────────
 
-func (n *MobazhaNode) startPaymentVerificationLoop() {
-	if n.paymentService != nil {
-		n.paymentService.StartPaymentVerificationLoop()
-	}
-}
 
 func (n *MobazhaNode) verifyPendingPayments() {
 	if n.paymentService != nil {

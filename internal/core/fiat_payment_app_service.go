@@ -1068,21 +1068,10 @@ func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 	}
 }
 
-// StartReconciliationScheduler launches a background goroutine that periodically
-// checks awaiting-payment fiat orders against the payment provider.
-func (s *FiatPaymentAppService) StartReconciliationScheduler(ctx context.Context, interval time.Duration) {
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				s.ReconcileFiatOrders(ctx)
-			}
-		}
-	}()
+// RunFiatReconciliationOnce executes a single pass of fiat order reconciliation.
+// Called by the shared scheduler (SaaS) or standalone maintenance scripts.
+func (s *FiatPaymentAppService) RunFiatReconciliationOnce() {
+	s.ReconcileFiatOrders(context.Background())
 }
 
 // CleanupProcessedEvents deletes ProcessedFiatEvent records older than the given TTL.
@@ -1112,23 +1101,13 @@ func (s *FiatPaymentAppService) CleanupProcessedEvents(ttl time.Duration) (int64
 	return deleted, nil
 }
 
-// StartPeriodicCleanup launches a background goroutine that cleans up old
-// ProcessedFiatEvent records every interval. Stop it by canceling the context.
-func (s *FiatPaymentAppService) StartPeriodicCleanup(ctx context.Context, interval, ttl time.Duration) {
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if _, err := s.CleanupProcessedEvents(ttl); err != nil {
-					logger.LogErrorWithIDf(log, s.nodeID, "fiat event cleanup failed: %v", err)
-				}
-			}
-		}
-	}()
+// RunFiatCleanupOnce executes a single pass of processed fiat event cleanup
+// with a 7-day TTL. Called by the shared scheduler (SaaS) or standalone scripts.
+func (s *FiatPaymentAppService) RunFiatCleanupOnce() {
+	const defaultTTL = 7 * 24 * time.Hour
+	if _, err := s.CleanupProcessedEvents(defaultTTL); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "fiat event cleanup failed: %v", err)
+	}
 }
 
 // Compile-time checks.

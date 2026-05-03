@@ -35,31 +35,22 @@ type AnalyticsAppServiceConfig struct {
 	Shutdown <-chan struct{}
 }
 
-// NewAnalyticsAppService creates a new AnalyticsAppService and starts background cleanup.
+// NewAnalyticsAppService creates a new AnalyticsAppService.
+// In SaaS mode the shared scheduler calls RunAnalyticsCleanupOnce;
+// standalone nodes should call Cleanup() on their own schedule.
 func NewAnalyticsAppService(cfg AnalyticsAppServiceConfig) *AnalyticsAppService {
-	s := &AnalyticsAppService{
+	return &AnalyticsAppService{
 		db:       cfg.DB,
 		nodeID:   cfg.NodeID,
 		shutdown: cfg.Shutdown,
 	}
-	if cfg.Shutdown != nil {
-		go s.cleanupLoop()
-	}
-	return s
 }
 
-func (s *AnalyticsAppService) cleanupLoop() {
-	ticker := time.NewTicker(cleanupInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-s.shutdown:
-			return
-		case <-ticker.C:
-			if err := s.Cleanup(); err != nil {
-				logger.LogErrorWithIDf(log, s.nodeID, "analytics cleanup: %v", err)
-			}
-		}
+// RunAnalyticsCleanupOnce executes a single pass of analytics data cleanup.
+// Called by the shared scheduler (SaaS) or standalone maintenance scripts.
+func (s *AnalyticsAppService) RunAnalyticsCleanupOnce() {
+	if err := s.Cleanup(); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "analytics cleanup: %v", err)
 	}
 }
 

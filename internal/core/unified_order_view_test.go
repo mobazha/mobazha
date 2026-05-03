@@ -50,7 +50,7 @@ func (m *mockGuestSvc) HandleConfirmationUpdate(orderToken string, confs int) er
 }
 func (m *mockGuestSvc) CleanupExpiredOrders(ctx context.Context) {}
 func (m *mockGuestSvc) AutoCompleteOrders(ctx context.Context)   {}
-func (m *mockGuestSvc) StartCleanupLoop()                        {}
+func (m *mockGuestSvc) RunGuestCleanupOnce()                     {}
 func (m *mockGuestSvc) GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error) {
 	return nil, nil
 }

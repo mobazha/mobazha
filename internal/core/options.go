@@ -17,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/storage"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/deploy"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -350,7 +351,7 @@ func (n *MobazhaNode) initMatrixChatService() {
 		registrationSecret = os.Getenv("MATRIX_REGISTRATION_SECRET")
 	}
 
-	if registrationSecret == "" && n.sharedManager != nil && !n.sharedManager.saasMode {
+	if registrationSecret == "" && !deploy.IsSaaS() {
 		homeserverURL, serverName = n.tryStandaloneMatrixProvision(homeserverURL, serverName)
 	}
 

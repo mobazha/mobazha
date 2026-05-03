@@ -288,9 +288,6 @@ func (n *MobazhaNode) Start() {
 		// Start UTXO payment monitor for external wallet payments
 		go n.startUTXOPaymentMonitor()
 
-		// ADR-7: Verify unconfirmed PaymentSent transactions on-chain
-		go n.startPaymentVerificationLoop()
-
 		// Inject EVM chain clients into wallets (symmetric with UTXO monitor above)
 		// SaaS: shared clients from HostService; Standalone: per-node clients via factory
 		n.startEVMChainClients()
@@ -314,13 +311,8 @@ func (n *MobazhaNode) Start() {
 		// Handles auto-confirm, UTXO payment detection, and RWA instant buy via EventBus
 		n.startPaymentEventMonitors()
 
-		go n.orderService.StartOrderTimeoutScheduler()
-		go n.orderService.StartOutboxPoller()
-
-		if n.fiatPaymentService != nil {
-			n.fiatPaymentService.StartPeriodicCleanup(n.nodeCtx, 24*time.Hour, 7*24*time.Hour)
-			n.fiatPaymentService.StartReconciliationScheduler(n.nodeCtx, 2*time.Minute)
-		}
+		// Fiat reconciliation + cleanup are driven by the shared scheduler
+		// (SaaS) via RunFiatReconciliationOnce / RunFiatCleanupOnce.
 
 		if n.matrixChatService != nil {
 			go func() {
@@ -340,6 +332,12 @@ func (n *MobazhaNode) Start() {
 		if n.netDBSyncService != nil {
 			n.netDBSyncService.Start()
 			go n.netDBSyncService.Reconcile()
+		}
+
+		// Standalone mode: start a local scheduler to drive periodic workers.
+		// In SaaS mode, hosting's shared scheduler handles this.
+		if n.hostService == nil {
+			n.startStandaloneScheduler(n.nodeCtx)
 		}
 	}
 
@@ -761,38 +759,80 @@ func (n *MobazhaNode) ProductCatalog() []aipkg.ListingSummary {
 
 var _ contracts.SchedulerHooks = (*MobazhaNode)(nil)
 
-func (n *MobazhaNode) RunOrderTimeoutOnce() {
+func (n *MobazhaNode) RunOrderTimeoutOnce(_ context.Context) {
 	if n.orderService != nil {
 		n.orderService.RunOrderTimeoutOnce()
 	}
 }
 
-func (n *MobazhaNode) RunOutboxPollOnce() {
+func (n *MobazhaNode) RunOutboxPollOnce(_ context.Context) {
 	if n.orderService != nil {
 		n.orderService.RunOutboxPollOnce()
 	}
 }
 
-func (n *MobazhaNode) RunOutboxCleanupOnce() {
+func (n *MobazhaNode) RunOutboxCleanupOnce(_ context.Context) {
 	if n.orderService != nil {
 		n.orderService.RunOutboxCleanupOnce()
 	}
 }
 
-func (n *MobazhaNode) RunPaymentVerificationOnce() {
+func (n *MobazhaNode) RunPaymentVerificationOnce(_ context.Context) {
 	if n.paymentService != nil {
 		n.paymentService.RunPaymentVerificationOnce()
 	}
 }
 
-func (n *MobazhaNode) RunWebhookDeliveryOnce() {
+func (n *MobazhaNode) RunWebhookDeliveryOnce(_ context.Context) {
 	if n.webhookEngine != nil {
 		n.webhookEngine.RunDeliveryOnce()
 	}
 }
 
-func (n *MobazhaNode) RunWebhookCleanupOnce() {
+func (n *MobazhaNode) RunWebhookCleanupOnce(_ context.Context) {
 	if n.webhookEngine != nil {
 		n.webhookEngine.RunCleanupOnce()
+	}
+}
+
+func (n *MobazhaNode) RunAnalyticsCleanupOnce(_ context.Context) {
+	if n.analyticsService != nil {
+		n.analyticsService.RunAnalyticsCleanupOnce()
+	}
+}
+
+func (n *MobazhaNode) RunFiatReconciliationOnce(_ context.Context) {
+	if n.fiatPaymentService != nil {
+		n.fiatPaymentService.RunFiatReconciliationOnce()
+	}
+}
+
+func (n *MobazhaNode) RunFiatCleanupOnce(_ context.Context) {
+	if n.fiatPaymentService != nil {
+		n.fiatPaymentService.RunFiatCleanupOnce()
+	}
+}
+
+func (n *MobazhaNode) RunGuestOrderCleanupOnce(_ context.Context) {
+	if n.guestOrderService != nil {
+		n.guestOrderService.RunGuestCleanupOnce()
+	}
+}
+
+func (n *MobazhaNode) RunFollowerConnectOnce(_ context.Context) {
+	if n.followerTracker != nil {
+		n.followerTracker.RunFollowerConnectOnce()
+	}
+}
+
+func (n *MobazhaNode) RunNetDBReconcileOnce(_ context.Context) {
+	if n.netDBSyncService != nil {
+		n.netDBSyncService.Reconcile()
+	}
+}
+
+func (n *MobazhaNode) RunOrderLockCleanupOnce(_ context.Context) {
+	if n.orderLockManager != nil {
+		n.orderLockManager.RunLockCleanupOnce()
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/deploy"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/fulfillment"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -74,7 +75,6 @@ type SupplyChainAppService struct {
 	listingOps     SupplyChainListingOps
 	mediaOps       SupplyChainMediaOps
 	exchangeRates  *wallet.ExchangeRateProvider
-	saasMode       bool
 	webhookBaseURL string
 }
 
@@ -163,8 +163,7 @@ func (s *SupplyChainAppService) StartFulfillmentMonitor() {
 
 // StartWorkers launches background workers for retry, reconciliation, and cleanup.
 // Must be called ONLY when FeatureSupplyChainEnabled is true (gated in builder.go).
-func (s *SupplyChainAppService) StartWorkers(ctx context.Context, saasMode bool, webhookBaseURL string) {
-	s.saasMode = saasMode
+func (s *SupplyChainAppService) StartWorkers(ctx context.Context, webhookBaseURL string) {
 	s.webhookBaseURL = webhookBaseURL
 	go s.retryFailedOrdersLoop(ctx)
 	go s.reconcileStaleOrdersLoop(ctx)
@@ -511,7 +510,7 @@ func (s *SupplyChainAppService) markRetryOutcome(mappingID string, currentRetryC
 
 func (s *SupplyChainAppService) reconcileStaleOrdersLoop(ctx context.Context) {
 	interval := reconcileIntervalDefault
-	if !s.saasMode && s.webhookBaseURL == "" {
+	if !deploy.IsSaaS() && s.webhookBaseURL == "" {
 		interval = reconcileIntervalNAT
 	}
 	ticker := time.NewTicker(interval)

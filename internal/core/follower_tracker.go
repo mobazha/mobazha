@@ -158,19 +158,15 @@ func (t *FollowerTracker) listenEvents() {
 	if err != nil {
 		log.Errorf("Error subscribing to UnfollowNotification event: %v", err)
 	}
-	ticker := time.NewTicker(TrackerInterval)
 	t.bus.Emit(&events.TrackerStarted{})
 	for {
 		select {
 		case <-t.shutdown:
-			ticker.Stop()
 			connectedSub.Close()
 			disonnectedSub.Close()
 			followerSub.Close()
 			unfollowerSub.Close()
 			return
-		case <-ticker.C:
-			go t.tryConnectFollowers()
 		case event := <-connectedSub.Out():
 			notif, ok := event.(*events.PeerConnected)
 			if !ok {
@@ -263,6 +259,12 @@ func (t *FollowerTracker) listenEvents() {
 		}
 	}
 
+}
+
+// RunFollowerConnectOnce triggers a single pass of follower connection attempts.
+// Called by the shared scheduler (SaaS) or standalone timer loops.
+func (t *FollowerTracker) RunFollowerConnectOnce() {
+	go t.tryConnectFollowers()
 }
 
 func (t *FollowerTracker) tryConnectFollowers() {

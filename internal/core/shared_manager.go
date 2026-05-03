@@ -47,9 +47,6 @@ type SharedManager struct {
 	// testnet indicates if running on testnet
 	testnet bool
 
-	// saasMode indicates if this is a SaaS deployment
-	saasMode bool
-
 	// saasAPIURL is the SaaS platform URL for standalone → SaaS calls
 	saasAPIURL string
 
@@ -216,7 +213,6 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			NetConfig:            netConfig,
 			clients:              make(map[string]contracts.NodeService),
 			testnet:              cfg.Testnet,
-			saasMode:             cfg.SaaSMode,
 			saasAPIURL:           cfg.SaaSAPIURL,
 			standaloneAPIKey:     cfg.StandaloneAPIKey,
 			appDataDir:           cfg.DataDir,

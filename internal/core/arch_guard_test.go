@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -193,6 +194,54 @@ func TestArchGuard_CollectionRoutesFollowConvention(t *testing.T) {
 	}
 	assert.Empty(t, violations,
 		"Collection routes must use kebab-case, no camelCase segments; found: %v", violations)
+}
+
+// TestArchGuard_NoNewTickerInCore ensures no per-tenant ticker loops are
+// reintroduced in internal/core/. All periodic work must go through the
+// shared scheduler (pkg/scheduler) via Run*Once methods.
+//
+// Allowed exceptions:
+//   - _test.go files
+//   - payment_monitor_utxo.go (UTXO chain monitor, event-driven not periodic)
+//   - supply_chain_app_service.go (per-tenant workers, pending migration)
+//   - supply_chain_monitor.go (fulfillment monitor, event-driven)
+//   - guest_payment_monitor.go (per-order reactive watcher, not schedulable)
+//   - matrix_chat_service.go (Matrix connection lifecycle, not schedulable)
+func TestArchGuard_NoNewTickerInCore(t *testing.T) {
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "core")
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+
+	allowed := map[string]bool{
+		"payment_monitor_utxo.go":      true,
+		"supply_chain_app_service.go":  true,
+		"supply_chain_monitor.go":      true,
+		"guest_payment_monitor.go":     true,
+		"matrix_chat_service.go":       true,
+	}
+
+	var violations []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		if allowed[e.Name()] {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		require.NoError(t, err)
+		for i, line := range strings.Split(string(data), "\n") {
+			if strings.Contains(line, "time.NewTicker") {
+				violations = append(violations, fmt.Sprintf(
+					"internal/core/%s:%d: %s", e.Name(), i+1, strings.TrimSpace(line)))
+			}
+		}
+	}
+	assert.Empty(t, violations,
+		"internal/core/ must not use time.NewTicker — "+
+			"periodic work is driven by the shared scheduler (pkg/scheduler); "+
+			"use Run*Once methods instead. Violations: %v", violations)
 }
 
 func TestArchGuard_QueriesDoNotImportInternal(t *testing.T) {

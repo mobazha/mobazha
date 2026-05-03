@@ -38,6 +38,41 @@ const (
 	OverlapQueue
 )
 
+// JobMeta holds the canonical metadata for a scheduled job. Both SaaS
+// (hosting scheduler_jobs.go) and standalone (standalone_scheduler.go)
+// reference the Jobs registry so that name, interval, concurrency, and
+// timeout stay in sync across deployment modes.
+//
+// ARCHITECTURAL CONSTRAINT: SchedulerHooks is a typed interface — each
+// job maps to a dedicated Run*Once method. Do NOT replace this with a
+// generic ProcessScheduledWork(jobName) dispatch. The compiler-enforced
+// 1:1 mapping between job name and typed method prevents silent drift.
+type JobMeta struct {
+	Name           string
+	Interval       time.Duration
+	OverlapPolicy  OverlapPolicy
+	MaxConcurrency int           // NodeFn parallelism cap; standalone (GlobalFn) ignores this.
+	PerNodeTimeout time.Duration // Single NodeFn invocation timeout; must be < Interval.
+}
+
+// Jobs is the single-source-of-truth registry for all scheduler-driven
+// workers. The map key equals JobMeta.Name.
+var Jobs = map[string]JobMeta{
+	"order-timeout":        {Name: "order-timeout", Interval: 1 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 30 * time.Second},
+	"outbox-poll":          {Name: "outbox-poll", Interval: 5 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 4 * time.Second},
+	"outbox-cleanup":       {Name: "outbox-cleanup", Interval: 1 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"payment-verification": {Name: "payment-verification", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
+	"webhook-delivery":     {Name: "webhook-delivery", Interval: 5 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 4 * time.Second},
+	"webhook-cleanup":      {Name: "webhook-cleanup", Interval: 1 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"analytics-cleanup":    {Name: "analytics-cleanup", Interval: 24 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 60 * time.Second},
+	"fiat-reconciliation":  {Name: "fiat-reconciliation", Interval: 2 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 90 * time.Second},
+	"fiat-cleanup":         {Name: "fiat-cleanup", Interval: 24 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"guest-order-cleanup":  {Name: "guest-order-cleanup", Interval: 1 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 30 * time.Second},
+	"follower-connect":     {Name: "follower-connect", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
+	"netdb-reconcile":      {Name: "netdb-reconcile", Interval: 10 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 60 * time.Second},
+	"order-lock-cleanup":   {Name: "order-lock-cleanup", Interval: 30 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+}
+
 // Job describes a scheduled task.
 //
 // Exactly one of GlobalFn or NodeFn must be set:

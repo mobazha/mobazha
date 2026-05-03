@@ -325,7 +325,7 @@ type GuestOrderService interface {
 	HandleConfirmationUpdate(orderToken string, confs int) error
 	CleanupExpiredOrders(ctx context.Context)
 	AutoCompleteOrders(ctx context.Context)
-	StartCleanupLoop()
+	RunGuestCleanupOnce()
 
 	GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error)
 	SaveGuestCheckoutConfig(ctx context.Context, cfg *models.GuestCheckoutConfig) error
@@ -372,19 +372,24 @@ type NodeService interface {
 	SubscribeEvent(event any) (events.Subscription, error)
 }
 
-// SchedulerHooks exposes per-node worker tick methods for the shared scheduler
-// (Phase AH-3a). The process-wide scheduler calls these via type assertion on
-// NodeService, avoiding changes to the NodeService interface itself.
-//
-// Not all NodeService implementations need to implement this. Standalone nodes
-// run their own goroutines and never go through the shared scheduler.
+// SchedulerHooks exposes per-node worker tick methods for the scheduler
+// (Phase AH-3). Both the SaaS shared scheduler and the standalone local
+// scheduler call these via type assertion on NodeService, avoiding changes
+// to the NodeService interface itself.
 type SchedulerHooks interface {
-	RunOrderTimeoutOnce()
-	RunOutboxPollOnce()
-	RunOutboxCleanupOnce()
-	RunPaymentVerificationOnce()
-	RunWebhookDeliveryOnce()
-	RunWebhookCleanupOnce()
+	RunOrderTimeoutOnce(ctx context.Context)
+	RunOutboxPollOnce(ctx context.Context)
+	RunOutboxCleanupOnce(ctx context.Context)
+	RunPaymentVerificationOnce(ctx context.Context)
+	RunWebhookDeliveryOnce(ctx context.Context)
+	RunWebhookCleanupOnce(ctx context.Context)
+	RunAnalyticsCleanupOnce(ctx context.Context)
+	RunFiatReconciliationOnce(ctx context.Context)
+	RunFiatCleanupOnce(ctx context.Context)
+	RunGuestOrderCleanupOnce(ctx context.Context)
+	RunFollowerConnectOnce(ctx context.Context)
+	RunNetDBReconcileOnce(ctx context.Context)
+	RunOrderLockCleanupOnce(ctx context.Context)
 }
 
 // NodeRegistry exposes a race-free snapshot of all active NodeService instances.

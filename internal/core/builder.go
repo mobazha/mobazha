@@ -1385,9 +1385,7 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 			obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)
 		}
 		obNode.supplyChainService.StartFulfillmentMonitor()
-
-		saasMode := obNode.sharedManager != nil && obNode.sharedManager.saasMode
-		obNode.supplyChainService.StartWorkers(context.Background(), saasMode, "")
+		obNode.supplyChainService.StartWorkers(context.Background(), "")
 	}
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Supply chain subsystem initialized")

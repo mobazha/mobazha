@@ -7,77 +7,48 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 )
 
 const (
 	defaultBatchSize = 50
-	cleanupInterval  = 1 * time.Hour
 )
 
-// Engine manages webhook enqueuing and background delivery.
-// It is tenant-agnostic: all tenant scoping is handled by the EndpointStore implementation.
+// Engine manages webhook enqueuing and delivery.
+// Delivery and cleanup are driven externally via RunDeliveryOnce / RunCleanupOnce
+// (shared scheduler in SaaS, or per-node scheduler in standalone).
 type Engine struct {
 	store  EndpointStore
 	cfg    Config
 	client *http.Client
-
-	skipDeliveryWorker bool
-	skipCleanupWorker  bool
-
-	shutdown chan struct{}
-	once     sync.Once
 }
 
-// EngineOption configures Engine construction. See NewEngine.
-type EngineOption func(*Engine)
-
-// WithoutDeliveryWorker disables the internal delivery goroutine. Use when an
-// external scheduler will drive RunDeliveryOnce instead (Phase AH-3a — SaaS
-// shared scheduler). This prevents the in-engine worker and the scheduler
-// from racing on `GetPending` and double-posting webhooks: processPendingDeliveries
-// has no atomic claim, so two concurrent callers may pull the same pending
-// row and both deliver it. TD-090.
-func WithoutDeliveryWorker() EngineOption {
-	return func(e *Engine) { e.skipDeliveryWorker = true }
-}
-
-// WithoutCleanupWorker disables the internal cleanup goroutine. Cleanup is
-// idempotent (DELETE WHERE finished_before_cutoff), so duplicate runs are
-// safe; this option is provided primarily for symmetry and tests.
-func WithoutCleanupWorker() EngineOption {
-	return func(e *Engine) { e.skipCleanupWorker = true }
-}
-
-// NewEngine creates a new Engine with explicit config and starts background
-// workers. Pass WithoutDeliveryWorker / WithoutCleanupWorker to suppress the
-// internal goroutines (e.g. when an external scheduler drives delivery).
+// NewEngine creates a new Engine. Delivery and cleanup are driven by the caller
+// via RunDeliveryOnce / RunCleanupOnce — no internal goroutines are started.
 func NewEngine(store EndpointStore, cfg Config, opts ...EngineOption) *Engine {
-	e := &Engine{
+	return &Engine{
 		store: store,
 		cfg:   cfg,
 		client: &http.Client{
 			Timeout: cfg.httpTimeout(),
 		},
-		shutdown: make(chan struct{}),
 	}
-	for _, opt := range opts {
-		opt(e)
-	}
-	if !e.skipDeliveryWorker {
-		go e.deliveryWorker()
-	}
-	if !e.skipCleanupWorker {
-		go e.cleanupWorker()
-	}
-	return e
 }
 
-// Stop gracefully shuts down the background workers. ManagedEscrow to call multiple times.
-func (e *Engine) Stop() {
-	e.once.Do(func() { close(e.shutdown) })
-}
+// EngineOption is kept for backward API compatibility but has no effect.
+// All internal workers have been removed (AH-3 Sprint 2).
+type EngineOption func(*Engine)
+
+// WithoutDeliveryWorker is a no-op retained for API compatibility.
+// Deprecated: internal delivery worker has been removed.
+func WithoutDeliveryWorker() EngineOption { return func(e *Engine) {} }
+
+// WithoutCleanupWorker is a no-op retained for API compatibility.
+// Deprecated: internal cleanup worker has been removed.
+func WithoutCleanupWorker() EngineOption { return func(e *Engine) {} }
+
+// Stop is a no-op. Retained for interface compatibility.
+func (e *Engine) Stop() {}
 
 // Config returns the engine's current configuration (read-only snapshot).
 func (e *Engine) Config() Config {
@@ -134,22 +105,7 @@ func (e *Engine) Enqueue(eventType string, payload []byte) {
 	}
 }
 
-func (e *Engine) deliveryWorker() {
-	ticker := time.NewTicker(e.cfg.pollInterval())
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-e.shutdown:
-			return
-		case <-ticker.C:
-			e.processPendingDeliveries()
-		}
-	}
-}
-
 // RunDeliveryOnce processes pending webhook deliveries in a single pass.
-// Called by the shared scheduler's NodeFn (Phase AH-3a).
 func (e *Engine) RunDeliveryOnce() {
 	e.processPendingDeliveries()
 }
@@ -224,7 +180,6 @@ func (e *Engine) markRetryOrFail(d *Delivery, statusCode *int, errMsg string) {
 }
 
 // RunCleanupOnce removes old webhook deliveries in a single pass.
-// Called by the shared scheduler's NodeFn (Phase AH-3a).
 func (e *Engine) RunCleanupOnce() {
 	deleted, err := e.store.CleanupOld(e.cfg.retentionAge())
 	if err != nil {
@@ -233,26 +188,5 @@ func (e *Engine) RunCleanupOnce() {
 	}
 	if deleted > 0 {
 		log.Printf("[webhook] Cleaned up %d old deliveries", deleted)
-	}
-}
-
-func (e *Engine) cleanupWorker() {
-	ticker := time.NewTicker(cleanupInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-e.shutdown:
-			return
-		case <-ticker.C:
-			deleted, err := e.store.CleanupOld(e.cfg.retentionAge())
-			if err != nil {
-				log.Printf("[webhook] Failed to cleanup old deliveries: %v", err)
-				continue
-			}
-			if deleted > 0 {
-				log.Printf("[webhook] Cleaned up %d old deliveries", deleted)
-			}
-		}
 	}
 }

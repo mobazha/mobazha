@@ -17,8 +17,10 @@ func (g *Gateway) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	resp := healthResponse{Status: "ok"}
 
 	if defaultNode := g.nodeManager.GetDefaultNode(); defaultNode != nil {
-		if unread, err := defaultNode.Notification().GetNotificationsUnreadCount(); err == nil {
-			resp.UnreadNotifications = unread
+		if ns := defaultNode.Notification(); ns != nil {
+			if unread, err := ns.GetNotificationsUnreadCount(); err == nil {
+				resp.UnreadNotifications = unread
+			}
 		}
 	}
 

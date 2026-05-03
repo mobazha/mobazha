@@ -1,10 +1,8 @@
 package api
 
 import (
-	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -28,24 +26,49 @@ const AuthCookieName = "Mobazha_Auth_Cookie"
 type authState struct {
 	mu           sync.RWMutex
 	username     string // plaintext username
-	passwordHash string // SHA-256 hex
+	passwordHash string // bcrypt ($2a$/$2b$) or legacy SHA-256 hex
 	hashFile     string // if non-empty, password hash is persisted here
 	plainFile    string // first-run plaintext file, removed after password change
 }
 
-func (s *authState) check(username, passwordHash string) bool {
+// checkPassword verifies a plaintext password against the stored hash.
+// Supports both bcrypt and legacy SHA-256 hex hashes. When a legacy hash
+// matches, upgradable is true so the caller can optionally re-hash.
+func (s *authState) checkPassword(username, plainPassword string) (ok bool, upgradable bool) {
 	s.mu.RLock()
 	storedUser := s.username
 	storedHash := s.passwordHash
 	s.mu.RUnlock()
 
 	if storedUser == "" || storedHash == "" {
-		return false
+		return false, false
 	}
 
-	userOK := subtle.ConstantTimeCompare([]byte(username), []byte(storedUser)) == 1
-	passOK := subtle.ConstantTimeCompare([]byte(passwordHash), []byte(storedHash)) == 1
-	return userOK && passOK
+	if subtle.ConstantTimeCompare([]byte(username), []byte(storedUser)) != 1 {
+		return false, false
+	}
+
+	ok, isLegacy := VerifyPassword(plainPassword, storedHash)
+	return ok, ok && isLegacy
+}
+
+// upgradeHash re-hashes a plaintext password with bcrypt and persists the
+// new hash to disk + memory. Best-effort; failures are logged, not fatal.
+func (s *authState) upgradeHash(plainPassword string) {
+	newHash, err := HashPassword(plainPassword)
+	if err != nil {
+		log.Warningf("Failed to upgrade password hash: %v", err)
+		return
+	}
+	if s.hashFile != "" {
+		if err := os.WriteFile(s.hashFile, []byte(newHash), 0600); err != nil {
+			log.Warningf("Failed to persist upgraded hash: %v", err)
+			return
+		}
+	}
+	s.mu.Lock()
+	s.passwordHash = newHash
+	s.mu.Unlock()
 }
 
 func (s *authState) isConfigured() bool {
@@ -81,6 +104,13 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 		// AuthIdentity in the request context. Don't overwrite it.
 		if GetAuthIdentity(r.Context()) != nil {
 			next.ServeHTTP(w, r)
+			return
+		}
+
+		if g.authLimiter != nil && g.authLimiter.isBlocked(remoteIP(r)) {
+			w.Header().Set("Retry-After", "900")
+			response.Error(w, http.StatusTooManyRequests, response.CodeRateLimited,
+				"Too many authentication failures. Try again later.")
 			return
 		}
 
@@ -149,12 +179,16 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 				ErrorResponse(w, http.StatusUnauthorized, "Authentication required")
 				return
 			}
-			h := sha256.Sum256([]byte(password))
-			providedHash := hex.EncodeToString(h[:])
 
-			if !g.auth.check(username, providedHash) {
+			matched, upgradable := g.auth.checkPassword(username, password)
+			if !matched {
+				g.RecordAuthFailure(r)
 				ErrorResponse(w, http.StatusUnauthorized, "Invalid credentials")
 				return
+			}
+			g.ResetAuthFailure(r)
+			if upgradable {
+				go g.auth.upgradeHash(password)
 			}
 			identity := &AuthIdentity{
 				UserID:  username,
@@ -317,24 +351,25 @@ func (g *Gateway) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	curHash := sha256.Sum256([]byte(req.CurrentPassword))
-	curHex := hex.EncodeToString(curHash[:])
-
 	g.auth.mu.RLock()
 	storedHash := g.auth.passwordHash
 	g.auth.mu.RUnlock()
 
-	if subtle.ConstantTimeCompare([]byte(curHex), []byte(storedHash)) != 1 {
+	curOK, _ := VerifyPassword(req.CurrentPassword, storedHash)
+	if !curOK {
 		ErrorResponse(w, http.StatusForbidden, "Current password is incorrect")
 		return
 	}
 
-	newHash := sha256.Sum256([]byte(req.NewPassword))
-	newHex := hex.EncodeToString(newHash[:])
+	newHash, err := HashPassword(req.NewPassword)
+	if err != nil {
+		log.Errorf("Failed to hash new password: %v", err)
+		ErrorResponse(w, http.StatusInternalServerError, "Failed to save password")
+		return
+	}
 
-	// Persist to disk first so a restart doesn't revert the change.
 	if g.auth.hashFile != "" {
-		if err := os.WriteFile(g.auth.hashFile, []byte(newHex), 0600); err != nil {
+		if err := os.WriteFile(g.auth.hashFile, []byte(newHash), 0600); err != nil {
 			log.Errorf("Failed to persist password hash: %v", err)
 			ErrorResponse(w, http.StatusInternalServerError, "Failed to save password")
 			return
@@ -342,7 +377,7 @@ func (g *Gateway) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	g.auth.mu.Lock()
-	g.auth.passwordHash = newHex
+	g.auth.passwordHash = newHash
 	g.auth.mu.Unlock()
 
 	if g.auth.plainFile != "" {

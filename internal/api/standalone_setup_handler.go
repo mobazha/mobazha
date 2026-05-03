@@ -1,10 +1,6 @@
-//go:build !private_distribution
-
 package api
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -131,6 +127,15 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Prevent unauthenticated password override: if admin auth is already
+	// configured (e.g. EnsureStandaloneAuth generated a password at boot),
+	// require the caller to prove they know the current password first.
+	if g.auth.isConfigured() && GetAuthIdentity(r.Context()) == nil {
+		response.Error(w, http.StatusUnauthorized, response.CodeUnauthorized,
+			"Authentication required — admin password already configured")
+		return
+	}
+
 	var req initialSetupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
@@ -144,11 +149,16 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h := sha256.Sum256([]byte(req.Password))
-	hashHex := hex.EncodeToString(h[:])
+	hash, err := HashPassword(req.Password)
+	if err != nil {
+		log.Errorf("Failed to hash password: %v", err)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
+			"Failed to save password")
+		return
+	}
 
 	hashPath := HashFilePath(dataDir)
-	if err := os.WriteFile(hashPath, []byte(hashHex), 0600); err != nil {
+	if err := os.WriteFile(hashPath, []byte(hash), 0600); err != nil {
 		log.Errorf("Failed to write password hash: %v", err)
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
 			"Failed to save password")
@@ -157,7 +167,7 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 
 	g.auth.mu.Lock()
 	g.auth.username = adminUsername
-	g.auth.passwordHash = hashHex
+	g.auth.passwordHash = hash
 	g.auth.mu.Unlock()
 
 	plainPath := PlainFilePath(dataDir)

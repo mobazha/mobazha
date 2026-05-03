@@ -3,9 +3,6 @@
 package api
 
 import (
-	"encoding/json"
-	"errors"
-	"io"
 	"net/http"
 	"os"
 
@@ -13,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -47,69 +43,6 @@ func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
 	sanitizedJSONResponse(w, &ret)
 }
 
-func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Request) {
-	prefsSvc := getPreferencesService(r)
-	if prefsSvc == nil {
-		ErrorResponse(w, http.StatusServiceUnavailable, "node services initializing")
-		return
-	}
-
-	currentPrefs, err := prefsSvc.GetPreferences()
-	if err != nil && !errors.Is(err, coreiface.ErrNotFound) {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	var prefs models.UserPreferences
-	if err == nil {
-		prefsBytes, _ := json.Marshal(currentPrefs)
-		request, _ := io.ReadAll(r.Body)
-		patch, err := jsonpatch.MergePatch(prefsBytes, request)
-		if err != nil {
-			ErrorResponse(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		if err = json.Unmarshal(patch, &prefs); err != nil {
-			ErrorResponse(w, http.StatusBadRequest, err.Error())
-			return
-		}
-	} else {
-		decoder := json.NewDecoder(r.Body)
-
-		if err := decoder.Decode(&prefs); err != nil {
-			ErrorResponse(w, http.StatusBadRequest, err.Error())
-			return
-		}
-	}
-
-	err = prefsSvc.SavePreferences(&prefs, nil)
-	if errors.Is(err, coreiface.ErrBadRequest) {
-		ErrorResponse(w, http.StatusBadRequest, err.Error())
-		return
-	} else if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	sanitizedJSONResponse(w, struct{}{})
-}
-
-func (g *Gateway) handleGetUserPreferences(w http.ResponseWriter, r *http.Request) {
-	prefsSvc := getPreferencesService(r)
-	if prefsSvc == nil {
-		ErrorResponse(w, http.StatusServiceUnavailable, "node services initializing")
-		return
-	}
-
-	prefs, err := prefsSvc.GetPreferences()
-	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	prefs.UserAgent = version.UserAgent()
-	sanitizedJSONResponse(w, prefs)
-}
-
 func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request) {
 	exchange := getExchangeRateService(r)
 
@@ -134,11 +67,6 @@ func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	sanitizedJSONResponse(w, rates)
-}
-
-func (g *Gateway) handlePOSTBulkUpdateCurrency(w http.ResponseWriter, r *http.Request) {
-	// Do nothing. Listing中不再添加acceptedCurrencies，通过下单时卖家设置的货币来决定
-	sanitizedStringResponse(w, `{"success": "true"}`)
 }
 
 func (g *Gateway) handlePOSTPublish(w http.ResponseWriter, r *http.Request) {

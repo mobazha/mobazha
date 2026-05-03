@@ -2,8 +2,6 @@ package api
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,19 +9,23 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // testGateway creates a minimal Gateway with auth configured for testing.
 func testGateway(t *testing.T, password string) *Gateway {
 	t.Helper()
 	dir := t.TempDir()
-	h := sha256.Sum256([]byte(password))
-	hashHex := hex.EncodeToString(h[:])
+	hash, err := HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return &Gateway{
 		config: &GatewayConfig{},
 		auth: authState{
 			username:     "admin",
-			passwordHash: hashHex,
+			passwordHash: hash,
 			hashFile:     filepath.Join(dir, adminHashFile),
 			plainFile:    filepath.Join(dir, adminPasswordFile),
 		},
@@ -133,18 +135,16 @@ func TestChangePassword_Success(t *testing.T) {
 		t.Errorf("expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
 
-	newHash := sha256.Sum256([]byte("newpassword123"))
-	expectedHash := hex.EncodeToString(newHash[:])
-	if g.auth.passwordHash != expectedHash {
-		t.Error("password hash was not updated in memory")
+	if err := bcrypt.CompareHashAndPassword([]byte(g.auth.passwordHash), []byte("newpassword123")); err != nil {
+		t.Errorf("password hash in memory doesn't match new password: %v", err)
 	}
 
 	persistedHash, err := os.ReadFile(g.auth.hashFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(persistedHash) != expectedHash {
-		t.Error("password hash was not persisted to disk")
+	if err := bcrypt.CompareHashAndPassword(persistedHash, []byte("newpassword123")); err != nil {
+		t.Errorf("persisted hash doesn't match new password: %v", err)
 	}
 }
 
@@ -219,7 +219,7 @@ func TestChangePassword_RejectsWhenNoAuth(t *testing.T) {
 func TestEnsureStandaloneAuth_GeneratesOnFirstRun(t *testing.T) {
 	dir := t.TempDir()
 
-	username, hashHex, password, err := EnsureStandaloneAuth(dir)
+	username, hash, err := EnsureStandaloneAuth(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,39 +227,38 @@ func TestEnsureStandaloneAuth_GeneratesOnFirstRun(t *testing.T) {
 	if username != adminUsername {
 		t.Errorf("expected username %q, got %q", adminUsername, username)
 	}
-	if password == "" {
-		t.Fatal("expected generated password on first run")
-	}
-	if len(password) != adminPasswordLength {
-		t.Errorf("expected password length %d, got %d", adminPasswordLength, len(password))
-	}
-	if hashHex == "" {
+	if hash == "" {
 		t.Fatal("expected non-empty hash")
+	}
+	if !strings.HasPrefix(hash, "$2a$") && !strings.HasPrefix(hash, "$2b$") {
+		t.Errorf("expected bcrypt hash, got %q", hash)
 	}
 
 	hashPath := filepath.Join(dir, adminHashFile)
 	if _, err := os.Stat(hashPath); os.IsNotExist(err) {
 		t.Error("hash file should exist")
 	}
+
+	plainPath := filepath.Join(dir, adminPasswordFile)
+	if _, err := os.Stat(plainPath); os.IsNotExist(err) {
+		t.Error("plaintext file should exist for first-run retrieval")
+	}
 }
 
 func TestEnsureStandaloneAuth_ReusesExistingHash(t *testing.T) {
 	dir := t.TempDir()
 
-	_, hash1, pw1, err := EnsureStandaloneAuth(dir)
+	_, hash1, err := EnsureStandaloneAuth(dir)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if pw1 == "" {
-		t.Fatal("expected password on first init")
 	}
 
-	_, hash2, pw2, err := EnsureStandaloneAuth(dir)
+	// Remove plaintext to simulate post-setup state
+	_ = os.Remove(PlainFilePath(dir))
+
+	_, hash2, err := EnsureStandaloneAuth(dir)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if pw2 != "" {
-		t.Error("should not regenerate password on subsequent init")
 	}
 	if hash2 != hash1 {
 		t.Error("hash should be the same across inits")
@@ -273,21 +272,16 @@ func TestEnsureStandaloneAuth_HashesExistingPlaintext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	username, hashHex, pw, err := EnsureStandaloneAuth(dir)
+	username, hash, err := EnsureStandaloneAuth(dir)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if pw != "" {
-		t.Error("should not return generated password when plain file already exists")
 	}
 	if username != adminUsername {
 		t.Errorf("expected %q, got %q", adminUsername, username)
 	}
 
-	expected := sha256.Sum256([]byte("docker-env-password"))
-	expectedHex := hex.EncodeToString(expected[:])
-	if hashHex != expectedHex {
-		t.Errorf("hash mismatch: got %s, want %s", hashHex, expectedHex)
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte("docker-env-password")); err != nil {
+		t.Errorf("bcrypt hash should verify docker-env-password: %v", err)
 	}
 
 	if _, err := os.Stat(plainPath); !os.IsNotExist(err) {

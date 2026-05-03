@@ -401,22 +401,20 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 	//   3. Auto-generate (non-SaaS nodes with no auth at all)
 	username, passwordHash := api.LoadCredentials(cfg.DataDir, cfg.APIUsername, cfg.APIPassword)
 
-	var generatedPassword string
 	noBasicAuth := username == "" || passwordHash == ""
 	noCookieAuth := cfg.APICookie == ""
 	if !cfg.SaaSMode && cfg.DataDir != "" && noBasicAuth && noCookieAuth {
 		var err error
-		username, passwordHash, generatedPassword, err = api.EnsureStandaloneAuth(cfg.DataDir)
+		username, passwordHash, err = api.EnsureStandaloneAuth(cfg.DataDir)
 		if err != nil {
 			return nil, fmt.Errorf("initializing standalone auth: %w", err)
 		}
-		if generatedPassword != "" {
+		plainPath := api.PlainFilePath(cfg.DataDir)
+		if _, statErr := os.Stat(plainPath); statErr == nil {
 			if frontend.HasContent() {
 				log.Infof("Admin credentials generated — set your password in the Web UI setup wizard.")
 			} else {
-				log.Warningf("══════════════════════════════════════════")
-				log.Warningf("  Admin password (change after login): %s", generatedPassword)
-				log.Warningf("══════════════════════════════════════════")
+				log.Warningf("Admin password saved to %s — read it from the file and change after first login", plainPath)
 			}
 		}
 	}

@@ -111,6 +111,7 @@ type Gateway struct {
 	mu                sync.RWMutex
 	featureManager    *pkgconfig.FeatureManager
 	guestOrderLimiter *rateLimiter
+	authLimiter       *authRateLimiter
 }
 
 // NewGateway instantiates a new gateway.
@@ -125,6 +126,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			hubsMtx:           sync.RWMutex{},
 			featureManager:    pkgconfig.GetGlobalFeatureManager(),
 			guestOrderLimiter: newRateLimiter(10, time.Hour),
+			authLimiter:       newAuthRateLimiter(),
 		}
 		topMux = http.NewServeMux()
 	)
@@ -215,8 +217,13 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			AuditLogger: mcppkg.NewStdoutAuditLogger(),
 		}
 		mcpHTTPServer := mcppkg.NewStreamableHTTPMobazhaServer(loopbackURL, nil, mcpOpts)
-		topMux.Handle("/v1/mcp", mcpHTTPServer)
-		topMux.Handle("/v1/mcp/", mcpHTTPServer)
+		mcpWithBodyLimit := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			const maxMCPBody = 4 << 20 // 4 MiB
+			r.Body = http.MaxBytesReader(w, r.Body, maxMCPBody)
+			mcpHTTPServer.ServeHTTP(w, r)
+		})
+		topMux.Handle("/v1/mcp", mcpWithBodyLimit)
+		topMux.Handle("/v1/mcp/", mcpWithBodyLimit)
 		log.Info("MCP Streamable HTTP endpoint registered at /v1/mcp")
 	}
 
@@ -299,6 +306,10 @@ func (g *Gateway) Close() error {
 	var err error
 	g.closeOnce.Do(func() {
 		close(g.shutdown)
+
+		if g.authLimiter != nil {
+			g.authLimiter.stop()
+		}
 
 		g.hubsMtx.Lock()
 		for _, hub := range g.hubs {

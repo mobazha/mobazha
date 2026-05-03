@@ -5,8 +5,6 @@ package api
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -78,12 +76,11 @@ func (g *Gateway) handlePOSTClaimStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h := sha256.Sum256([]byte(req.AdminPassword))
-	providedHash := hex.EncodeToString(h[:])
 	g.auth.mu.RLock()
 	username := g.auth.username
 	g.auth.mu.RUnlock()
-	if !g.auth.check(username, providedHash) {
+	matched, _ := g.auth.checkPassword(username, req.AdminPassword)
+	if !matched {
 		response.Error(w, http.StatusForbidden, response.CodeForbidden,
 			"Incorrect password")
 		return

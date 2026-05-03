@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -82,44 +84,72 @@ func GenerateAdminPassword() (string, error) {
 }
 
 // EnsureStandaloneAuth guarantees that admin credentials exist on disk and
-// returns (username, passwordHashHex, generatedPlaintext, error).
-// generatedPlaintext is non-empty only when a new password was created.
-func EnsureStandaloneAuth(dataDir string) (string, string, string, error) {
+// returns (username, passwordHash, error). New passwords are hashed with
+// bcrypt (cost 10). The plaintext is written to the admin_password file for
+// first-run retrieval; the caller must NEVER log it.
+func EnsureStandaloneAuth(dataDir string) (string, string, error) {
 	hashPath := HashFilePath(dataDir)
 	plainPath := PlainFilePath(dataDir)
 
 	// Case 1: hash file already exists — load it.
 	if hashBytes, err := os.ReadFile(hashPath); err == nil {
-		return adminUsername, strings.TrimSpace(string(hashBytes)), "", nil
+		return adminUsername, strings.TrimSpace(string(hashBytes)), nil
 	}
 
 	// Case 2: plaintext file exists (e.g. set by Docker env via init-data) — hash and remove.
 	if plainBytes, err := os.ReadFile(plainPath); err == nil {
 		plain := strings.TrimSpace(string(plainBytes))
-		h := sha256.Sum256([]byte(plain))
-		hashHex := hex.EncodeToString(h[:])
-		if err := os.WriteFile(hashPath, []byte(hashHex), 0600); err != nil {
-			return "", "", "", fmt.Errorf("writing hash file: %w", err)
+		hash, err := HashPassword(plain)
+		if err != nil {
+			return "", "", fmt.Errorf("hashing plaintext password: %w", err)
+		}
+		if err := os.WriteFile(hashPath, []byte(hash), 0600); err != nil {
+			return "", "", fmt.Errorf("writing hash file: %w", err)
 		}
 		_ = os.Remove(plainPath)
-		return adminUsername, hashHex, "", nil
+		return adminUsername, hash, nil
 	}
 
-	// Case 3: first run — generate new password.
+	// Case 3: first run — generate new password, persist plaintext for retrieval.
 	password, err := GenerateAdminPassword()
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
 	if err := os.WriteFile(plainPath, []byte(password), 0600); err != nil {
-		return "", "", "", fmt.Errorf("writing plaintext file: %w", err)
+		return "", "", fmt.Errorf("writing plaintext file: %w", err)
 	}
 
+	hash, err := HashPassword(password)
+	if err != nil {
+		return "", "", fmt.Errorf("hashing generated password: %w", err)
+	}
+	if err := os.WriteFile(hashPath, []byte(hash), 0600); err != nil {
+		return "", "", fmt.Errorf("writing hash file: %w", err)
+	}
+
+	return adminUsername, hash, nil
+}
+
+// HashPassword produces a bcrypt hash string (cost 10).
+func HashPassword(password string) (string, error) {
+	b, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// VerifyPassword checks a plaintext password against a stored hash.
+// Supports bcrypt ($2a$/$2b$) and legacy SHA-256 hex formats.
+// When a legacy hash matches, it returns (true, true) so the caller
+// can optionally upgrade the stored hash.
+func VerifyPassword(password, storedHash string) (ok bool, isLegacy bool) {
+	if strings.HasPrefix(storedHash, "$2a$") || strings.HasPrefix(storedHash, "$2b$") {
+		err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
+		return err == nil, false
+	}
 	h := sha256.Sum256([]byte(password))
-	hashHex := hex.EncodeToString(h[:])
-	if err := os.WriteFile(hashPath, []byte(hashHex), 0600); err != nil {
-		return "", "", "", fmt.Errorf("writing hash file: %w", err)
-	}
-
-	return adminUsername, hashHex, password, nil
+	hexHash := hex.EncodeToString(h[:])
+	return hexHash == storedHash, true
 }

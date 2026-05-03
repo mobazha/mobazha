@@ -175,9 +175,9 @@ type lifecycleFields struct {
 type appServices struct {
 	paymentService             *PaymentAppService
 	orderService               *OrderAppService
-	matrixChatService  contracts.MatrixChatService
-	matrixCryptoStore  interface{} // shared *dbutil.Database for SaaS multi-tenant; nil = SQLite
-	preferencesService *PreferencesAppService
+	matrixChatService          contracts.MatrixChatService
+	matrixCryptoStore          interface{} // shared *dbutil.Database for SaaS multi-tenant; nil = SQLite
+	preferencesService         *PreferencesAppService
 	mediaService               *MediaAppService
 	ratingsService             *RatingsAppService
 	profileService             *ProfileAppService

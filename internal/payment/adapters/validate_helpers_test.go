@@ -144,15 +144,6 @@ func TestAssertPaymentMessageParams(t *testing.T) {
 		assert.Contains(t, err.Error(), "OrderOpen")
 	})
 
-	t.Run("wrong OrderOpen type", func(t *testing.T) {
-		_, _, err := assertPaymentMessageParams(payment.PaymentMessageParams{
-			OrderOpen:   "not-an-order",
-			PaymentSent: &pb.PaymentSent{},
-		})
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "OrderOpen")
-	})
-
 	t.Run("nil PaymentSent", func(t *testing.T) {
 		_, _, err := assertPaymentMessageParams(payment.PaymentMessageParams{
 			OrderOpen:   &pb.OrderOpen{},

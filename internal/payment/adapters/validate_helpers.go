@@ -12,15 +12,13 @@ import (
 )
 
 func assertPaymentMessageParams(params payment.PaymentMessageParams) (*pb.OrderOpen, *pb.PaymentSent, error) {
-	orderOpen, ok := params.OrderOpen.(*pb.OrderOpen)
-	if !ok || orderOpen == nil {
-		return nil, nil, errors.New("PaymentMessageParams.OrderOpen must be *pb.OrderOpen")
+	if params.OrderOpen == nil {
+		return nil, nil, errors.New("PaymentMessageParams.OrderOpen is required")
 	}
-	paymentSent, ok := params.PaymentSent.(*pb.PaymentSent)
-	if !ok || paymentSent == nil {
-		return nil, nil, errors.New("PaymentMessageParams.PaymentSent must be *pb.PaymentSent")
+	if params.PaymentSent == nil {
+		return nil, nil, errors.New("PaymentMessageParams.PaymentSent is required")
 	}
-	return orderOpen, paymentSent, nil
+	return params.OrderOpen, params.PaymentSent, nil
 }
 
 // validatePaymentAmountCrossCurrency validates the payment amount against the

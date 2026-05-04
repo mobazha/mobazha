@@ -175,7 +175,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	result, err := walletSvc.GeneratePaymentInstructions(r.Context(), params)
 	if err != nil {
 		if result != nil && result.PaymentData != nil {
-			if paymentData, ok := result.PaymentData.(*models.PaymentData); ok && paymentData != nil {
+			if paymentData := result.PaymentData; paymentData != nil {
 				if errors.Is(err, coreiface.ErrCoinSwitchRequiresConfirmation) {
 					response := UTXOPaymentInfoResponse{
 						PaymentType:       "external_wallet",
@@ -232,8 +232,8 @@ func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Re
 
 // formatMonitoredPaymentResponse formats the response for Monitored (UTXO) payments.
 func (g *Gateway) formatMonitoredPaymentResponse(w http.ResponseWriter, params models.InitializeEscrowData, result *payment.PaymentSetupResult) {
-	paymentData, ok := result.PaymentData.(*models.PaymentData)
-	if !ok || paymentData == nil {
+	paymentData := result.PaymentData
+	if paymentData == nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for monitored chain")
 		return
 	}
@@ -276,8 +276,8 @@ func (g *Gateway) formatMonitoredPaymentResponse(w http.ResponseWriter, params m
 
 // formatClientSignedPaymentResponse formats the response for ClientSigned (EVM/Solana) payments.
 func (g *Gateway) formatClientSignedPaymentResponse(w http.ResponseWriter, result *payment.PaymentSetupResult) {
-	paymentData, ok := result.PaymentData.(*models.PaymentData)
-	if !ok || paymentData == nil {
+	paymentData := result.PaymentData
+	if paymentData == nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for client-signed chain")
 		return
 	}

@@ -234,17 +234,7 @@ func TestClientSignedAdapter_GetCancelInstructions_NilOrderData(t *testing.T) {
 		OrderData: nil,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "OrderData must be *models.Order")
-}
-
-func TestClientSignedAdapter_GetCancelInstructions_WrongType(t *testing.T) {
-	adapter := adapters.NewClientSignedAdapter(&stubChainOps{}, nil, nil)
-
-	_, err := adapter.GetCancelInstructions(context.Background(), payment.InstructionParams{
-		OrderData: "not-an-order",
-	})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "OrderData must be *models.Order")
+	assert.Contains(t, err.Error(), "OrderData")
 }
 
 func TestClientSignedAdapter_GetCancelInstructions_Success(t *testing.T) {
@@ -268,7 +258,7 @@ func TestClientSignedAdapter_GetCompleteInstructions_NilOrderData(t *testing.T) 
 		ReleaseInfo: &pb.EscrowRelease{},
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "OrderData must be *models.Order")
+	assert.Contains(t, err.Error(), "OrderData")
 }
 
 func TestClientSignedAdapter_GetCompleteInstructions_NilReleaseInfo(t *testing.T) {
@@ -279,7 +269,7 @@ func TestClientSignedAdapter_GetCompleteInstructions_NilReleaseInfo(t *testing.T
 		ReleaseInfo: nil,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "ReleaseInfo must be *pb.EscrowRelease")
+	assert.Contains(t, err.Error(), "ReleaseInfo")
 }
 
 func TestClientSignedAdapter_GetCompleteInstructions_Success(t *testing.T) {
@@ -301,7 +291,7 @@ func TestClientSignedAdapter_GetDisputeReleaseInstructions_NilOrderData(t *testi
 		OrderData: nil,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "OrderData must be *models.Order")
+	assert.Contains(t, err.Error(), "OrderData")
 }
 
 func TestClientSignedAdapter_GetDisputeReleaseInstructions_Success(t *testing.T) {

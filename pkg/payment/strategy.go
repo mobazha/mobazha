@@ -26,6 +26,8 @@ import (
 	"context"
 
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -98,18 +100,10 @@ type InstructionParams struct {
 	Script string
 
 	// OrderData carries the pre-fetched order object to avoid redundant DB fetches.
-	//
-	// Concrete type: *models.Order (pkg/models.Order).
-	// Passed as any to keep pkg/payment free of model imports — adapters in
-	// internal/core/ type-assert to *models.Order.
-	OrderData any
+	OrderData *models.Order
 
 	// ReleaseInfo carries shipment release data for complete operations.
-	//
-	// Concrete type: *pb.EscrowRelease (pkg/orders/mbzpb.EscrowRelease).
-	// Passed as any to keep pkg/payment free of protobuf imports — adapters
-	// in internal/core/ type-assert to *pb.EscrowRelease.
-	ReleaseInfo any
+	ReleaseInfo *pb.EscrowRelease
 }
 
 // InstructionResult contains chain-specific instructions for the frontend.
@@ -118,8 +112,9 @@ type InstructionParams struct {
 type InstructionResult struct {
 	// Instructions contains chain-specific data for the frontend.
 	// nil = no frontend action needed (backend handles it).
-	// EVM: contract call data ({to, data, value}).
-	// Solana: program instructions ([]SolanaGoInstruction).
+	// EVM: map[string]interface{} with {to, data, value}.
+	// Solana: []SolanaGoInstruction.
+	// Retained as `any` — true polymorphism across chains; JSON-serialized to frontend.
 	Instructions any
 }
 
@@ -174,14 +169,14 @@ type PaymentSetupResult struct {
 	PaymentModel PaymentModel
 
 	// PaymentData carries chain-specific payment data.
-	// Concrete type: *models.PaymentData — adapters populate this.
-	PaymentData any
+	PaymentData *models.PaymentData
 
 	// EscrowAddr is the escrow account address (ClientSigned only, empty for Monitored).
 	EscrowAddr string
 
 	// Instructions contains chain-specific instructions for the frontend.
 	// nil for Monitored (backend handles it), non-nil for ClientSigned.
+	// Retained as `any` — same polymorphism as InstructionResult.Instructions.
 	Instructions any
 }
 
@@ -366,16 +361,13 @@ type DepositVerifyParams struct {
 // ── Payment Message Validation Params ───────────────────────────
 
 // PaymentMessageParams provides parameters for validating a PaymentSent
-// message against the original OrderOpen. Each chain adapter type-asserts
-// the any fields to their concrete protobuf types.
+// message against the original OrderOpen.
 type PaymentMessageParams struct {
 	// OrderOpen is the original order opening message.
-	// Concrete type: *pb.OrderOpen (pkg/orders/mbzpb.OrderOpen).
-	OrderOpen any
+	OrderOpen *pb.OrderOpen
 
 	// PaymentSent is the payment sent message to validate.
-	// Concrete type: *pb.PaymentSent (pkg/orders/mbzpb.PaymentSent).
-	PaymentSent any
+	PaymentSent *pb.PaymentSent
 
 	// EscrowTimeoutHours is the configured escrow timeout.
 	EscrowTimeoutHours uint32

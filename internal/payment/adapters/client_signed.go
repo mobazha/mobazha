@@ -138,9 +138,9 @@ func (a *ClientSignedAdapter) GetConfirmInstructions(_ context.Context, params p
 // ── Delegated to ChainOps (with shared type-assert boilerplate) ─
 
 func (a *ClientSignedAdapter) GetCancelInstructions(_ context.Context, params payment.InstructionParams) (*payment.InstructionResult, error) {
-	order, ok := params.OrderData.(*models.Order)
-	if !ok || order == nil {
-		return nil, fmt.Errorf("GetCancelInstructions: OrderData must be *models.Order")
+	order := params.OrderData
+	if order == nil {
+		return nil, fmt.Errorf("GetCancelInstructions: OrderData is required")
 	}
 	instructions, err := a.ops.BuildCancelableRelease(order, params.InitiatorAddr, params.PayoutAddr)
 	if err != nil {
@@ -150,13 +150,13 @@ func (a *ClientSignedAdapter) GetCancelInstructions(_ context.Context, params pa
 }
 
 func (a *ClientSignedAdapter) GetCompleteInstructions(_ context.Context, params payment.InstructionParams) (*payment.InstructionResult, error) {
-	order, ok := params.OrderData.(*models.Order)
-	if !ok || order == nil {
-		return nil, fmt.Errorf("GetCompleteInstructions: OrderData must be *models.Order")
+	order := params.OrderData
+	if order == nil {
+		return nil, fmt.Errorf("GetCompleteInstructions: OrderData is required")
 	}
-	releaseInfo, ok := params.ReleaseInfo.(*pb.EscrowRelease)
-	if !ok || releaseInfo == nil {
-		return nil, fmt.Errorf("GetCompleteInstructions: ReleaseInfo must be *pb.EscrowRelease")
+	releaseInfo := params.ReleaseInfo
+	if releaseInfo == nil {
+		return nil, fmt.Errorf("GetCompleteInstructions: ReleaseInfo is required")
 	}
 	instructions, err := a.ops.BuildCompleteEscrow(order, params.InitiatorAddr, releaseInfo)
 	if err != nil {
@@ -166,9 +166,9 @@ func (a *ClientSignedAdapter) GetCompleteInstructions(_ context.Context, params 
 }
 
 func (a *ClientSignedAdapter) GetDisputeReleaseInstructions(_ context.Context, params payment.InstructionParams) (*payment.InstructionResult, error) {
-	order, ok := params.OrderData.(*models.Order)
-	if !ok || order == nil {
-		return nil, fmt.Errorf("GetDisputeReleaseInstructions: OrderData must be *models.Order")
+	order := params.OrderData
+	if order == nil {
+		return nil, fmt.Errorf("GetDisputeReleaseInstructions: OrderData is required")
 	}
 	instructions, err := a.ops.BuildDisputeRelease(order, params.InitiatorAddr)
 	if err != nil {

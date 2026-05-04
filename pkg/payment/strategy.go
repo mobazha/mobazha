@@ -45,6 +45,26 @@ const (
 	PaymentModelClientSigned PaymentModel = "client_signed"
 )
 
+// ── Chain Capabilities ──────────────────────────────────────────
+
+// ChainCapabilities describes what a chain supports. Strategy consumers query
+// capabilities instead of hardcoding chain type checks (IsEthTypeChain, etc.).
+type ChainCapabilities struct {
+	// HasReceiptVerification indicates whether the chain's transactions
+	// produce verifiable receipts (EVM receipt.Status, Solana Meta.Err, TRON receipt.Result).
+	// UTXO chains return false — deposits are detected by address monitoring.
+	HasReceiptVerification bool
+
+	// HasClientSignedEscrow indicates whether the escrow is controlled by
+	// frontend-signed transactions (EVM/Solana/TRON smart contracts).
+	// UTXO chains return false — escrow is backend-signed multisig.
+	HasClientSignedEscrow bool
+
+	// EscrowType classifies the escrow mechanism for UI/logging purposes.
+	// Values: "multisig" (UTXO), "smart-contract" (EVM/Solana/TRON).
+	EscrowType string
+}
+
 // ── Instruction Params / Result ─────────────────────────────────
 
 // InstructionParams provides context for chain-specific instruction generation.
@@ -194,6 +214,10 @@ type PaymentStrategy interface {
 
 	// Model returns the payment paradigm for this chain.
 	Model() PaymentModel
+
+	// Capabilities returns the chain's supported features. Consumers use this
+	// instead of hardcoded chain type checks (IsEthTypeChain, ChainSolana, etc.).
+	Capabilities() ChainCapabilities
 
 	// ── Auto-Confirm ───────────────────────────────────
 

@@ -7,51 +7,69 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-var _ contracts.ReceiptVerifier = (*CompositeReceiptVerifier)(nil)
+var _ contracts.ReceiptVerifier = (*ReceiptVerifierRegistry)(nil)
 
-// CompositeReceiptVerifier dispatches receipt verification to the appropriate
-// chain-specific verifier based on the coin code. Non-supported chains are
+// ReceiptVerifierRegistry dispatches receipt verification to chain-specific
+// verifiers via a map[ChainType]ReceiptVerifier. Unregistered chains are
 // treated as noop (return nil).
-type CompositeReceiptVerifier struct {
-	evm    *EVMReceiptVerifier
-	solana *SolanaReceiptVerifier
+//
+// This replaces the former CompositeReceiptVerifier which hardcoded
+// EVM + Solana dispatch, silently excluding TRON.
+type ReceiptVerifierRegistry struct {
+	verifiers map[iwallet.ChainType]contracts.ReceiptVerifier
 }
 
-func NewCompositeReceiptVerifier(mw contracts.WalletOperator) *CompositeReceiptVerifier {
-	return &CompositeReceiptVerifier{
-		evm:    NewEVMReceiptVerifier(mw),
-		solana: NewSolanaReceiptVerifier(mw),
+// NewReceiptVerifierRegistry creates a registry with EVM (all chains) + Solana + TRON verifiers.
+func NewReceiptVerifierRegistry(mw contracts.WalletOperator) *ReceiptVerifierRegistry {
+	evmVerifier := NewEVMReceiptVerifier(mw)
+	return &ReceiptVerifierRegistry{
+		verifiers: map[iwallet.ChainType]contracts.ReceiptVerifier{
+			iwallet.ChainEthereum: evmVerifier,
+			iwallet.ChainBSC:      evmVerifier,
+			iwallet.ChainPolygon:  evmVerifier,
+			iwallet.ChainBase:     evmVerifier,
+			iwallet.ChainConflux:  evmVerifier,
+			iwallet.ChainSolana:   NewSolanaReceiptVerifier(mw),
+			iwallet.ChainTRON:     NewTRONReceiptVerifier(mw),
+		},
 	}
 }
 
-func (c *CompositeReceiptVerifier) VerifyTransactionReceipt(ctx context.Context, coinCode string, txHash string) error {
+// NewReceiptVerifierRegistryFromMap creates a registry from an explicit verifier map.
+func NewReceiptVerifierRegistryFromMap(verifiers map[iwallet.ChainType]contracts.ReceiptVerifier) *ReceiptVerifierRegistry {
+	return &ReceiptVerifierRegistry{verifiers: verifiers}
+}
+
+func (r *ReceiptVerifierRegistry) resolveVerifier(coinCode string) contracts.ReceiptVerifier {
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinCode))
 	if err != nil {
 		return nil
 	}
-
-	switch {
-	case coinInfo.IsEthTypeChain():
-		return c.evm.VerifyTransactionReceipt(ctx, coinCode, txHash)
-	case coinInfo.Chain == iwallet.ChainSolana:
-		return c.solana.VerifyTransactionReceipt(ctx, coinCode, txHash)
-	default:
-		return nil
-	}
+	return r.verifiers[coinInfo.Chain]
 }
 
-func (c *CompositeReceiptVerifier) WaitAndVerifyReceipt(ctx context.Context, coinCode string, txHash string) error {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinCode))
-	if err != nil {
+func (r *ReceiptVerifierRegistry) VerifyTransactionReceipt(ctx context.Context, coinCode string, txHash string) error {
+	v := r.resolveVerifier(coinCode)
+	if v == nil {
 		return nil
 	}
+	return v.VerifyTransactionReceipt(ctx, coinCode, txHash)
+}
 
-	switch {
-	case coinInfo.IsEthTypeChain():
-		return c.evm.WaitAndVerifyReceipt(ctx, coinCode, txHash)
-	case coinInfo.Chain == iwallet.ChainSolana:
-		return c.solana.WaitAndVerifyReceipt(ctx, coinCode, txHash)
-	default:
+func (r *ReceiptVerifierRegistry) WaitAndVerifyReceipt(ctx context.Context, coinCode string, txHash string) error {
+	v := r.resolveVerifier(coinCode)
+	if v == nil {
 		return nil
 	}
+	return v.WaitAndVerifyReceipt(ctx, coinCode, txHash)
+}
+
+// CompositeReceiptVerifier is a type alias for backward compatibility.
+// Deprecated: use ReceiptVerifierRegistry directly.
+type CompositeReceiptVerifier = ReceiptVerifierRegistry
+
+// NewCompositeReceiptVerifier is a backward-compatible constructor.
+// Deprecated: use NewReceiptVerifierRegistry directly.
+func NewCompositeReceiptVerifier(mw contracts.WalletOperator) *ReceiptVerifierRegistry {
+	return NewReceiptVerifierRegistry(mw)
 }

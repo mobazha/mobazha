@@ -40,6 +40,15 @@ func (a *UTXOAutoConfirmAdapter) Model() payment.PaymentModel {
 	return payment.PaymentModelMonitored
 }
 
+// Capabilities returns UTXO chain capabilities.
+func (a *UTXOAutoConfirmAdapter) Capabilities() payment.ChainCapabilities {
+	return payment.ChainCapabilities{
+		HasReceiptVerification: false,
+		HasClientSignedEscrow:  false,
+		EscrowType:             "multisig",
+	}
+}
+
 // AutoConfirm invokes the OnAutoConfirm callback.
 func (a *UTXOAutoConfirmAdapter) AutoConfirm(_ context.Context, event *events.CancelablePaymentReady) error {
 	a.OnAutoConfirm(event)

@@ -15,6 +15,9 @@ type mockStrategy struct {
 }
 
 func (m *mockStrategy) Model() payment.PaymentModel { return m.model }
+func (m *mockStrategy) Capabilities() payment.ChainCapabilities {
+	return payment.ChainCapabilities{}
+}
 func (m *mockStrategy) AutoConfirm(_ context.Context, _ *events.CancelablePaymentReady) error {
 	return nil
 }

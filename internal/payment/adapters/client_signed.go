@@ -75,6 +75,14 @@ func (a *ClientSignedAdapter) Model() payment.PaymentModel {
 	return payment.PaymentModelClientSigned
 }
 
+func (a *ClientSignedAdapter) Capabilities() payment.ChainCapabilities {
+	return payment.ChainCapabilities{
+		HasReceiptVerification: true,
+		HasClientSignedEscrow:  true,
+		EscrowType:             "smart-contract",
+	}
+}
+
 // ── Delegated to ChainOps ───────────────────────────────────────
 
 func (a *ClientSignedAdapter) AutoConfirm(_ context.Context, event *events.CancelablePaymentReady) error {

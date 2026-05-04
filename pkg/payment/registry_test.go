@@ -9,7 +9,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// mockStrategy implements PaymentStrategy for testing.
+// mockStrategy implements ChainEscrow for testing.
 type mockStrategy struct {
 	model payment.PaymentModel
 }

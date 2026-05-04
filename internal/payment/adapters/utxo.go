@@ -24,7 +24,7 @@ type UTXOMonitorQuerier interface {
 	GetAddressTransactions(chainType iwallet.ChainType, address string, scriptPubKey []byte) ([]iwallet.Transaction, error)
 }
 
-// UTXOAutoConfirmAdapter wraps UTXO auto-confirm logic as a PaymentStrategy.
+// UTXOAutoConfirmAdapter wraps UTXO auto-confirm logic as a ChainEscrow.
 // This is a thin adapter — complex business logic (wallet, DB, messenger)
 // is accessed via injected callbacks, not a direct MobazhaNode reference.
 type UTXOAutoConfirmAdapter struct {

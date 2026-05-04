@@ -1,8 +1,8 @@
 // Package payment defines the payment strategy abstraction layer.
 //
-// This package provides the [PaymentStrategy] interface and [Registry] that
+// This package provides the [ChainEscrow] interface and [Registry] that
 // decouple chain-specific payment logic from the core order state machine.
-// Each blockchain (UTXO, EVM, Solana, etc.) implements PaymentStrategy to
+// Each blockchain (UTXO, EVM, Solana, etc.) implements ChainEscrow to
 // declare its payment paradigm and handle chain-specific operations.
 //
 // Architecture (Strategy + Registry):
@@ -180,13 +180,13 @@ type PaymentSetupResult struct {
 	Instructions any
 }
 
-// ── PaymentStrategy Interface ───────────────────────────────────
+// ── ChainEscrow Interface ───────────────────────────────────
 
-// PaymentStrategy defines chain-level payment operations covering the full
+// ChainEscrow defines chain-level payment operations covering the full
 // order lifecycle.
 //
 // The order state machine itself is chain-agnostic, but each state transition
-// involving an on-chain transaction needs chain-specific logic. PaymentStrategy
+// involving an on-chain transaction needs chain-specific logic. ChainEscrow
 // provides a unified interface for these operations.
 //
 // # Instruction Generation Methods
@@ -204,7 +204,7 @@ type PaymentSetupResult struct {
 // SignEscrowRelease and EstimateEscrowFee centralize chain-specific escrow
 // operations that were previously scattered across order lifecycle files as
 // 3-way if/else branches (UTXO vs EVM vs Solana).
-type PaymentStrategy interface {
+type ChainEscrow interface {
 	// ── Meta ────────────────────────────────────────────
 
 	// Model returns the payment paradigm for this chain.

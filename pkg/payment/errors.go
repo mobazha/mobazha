@@ -3,7 +3,7 @@ package payment
 import "errors"
 
 // Chain-agnostic deposit verification errors.
-// Returned by PaymentStrategy.VerifyDeposit implementations and checked
+// Returned by ChainEscrow.VerifyDeposit implementations and checked
 // by the OrderProcessor in payment_sent.go to distinguish permanent
 // failures (reject order) from transient ones (retry later).
 var (

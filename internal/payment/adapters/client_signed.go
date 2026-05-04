@@ -46,7 +46,7 @@ type BuildInitEscrowFn func(ctx context.Context, params models.InitializeEscrowD
 // Signature matches MobazhaNode.GetEscrowReleaseInstructions.
 type GetEscrowReleaseFn func(orderID models.OrderID, initiator, payout string) (iwallet.CoinType, any, error)
 
-// ClientSignedAdapter implements PaymentStrategy for all ClientSigned chains
+// ClientSignedAdapter implements ChainEscrow for all ClientSigned chains
 // (EVM, Solana, future SUI). Shared logic lives here; chain-specific operations
 // are delegated to the injected ChainOps implementation.
 //

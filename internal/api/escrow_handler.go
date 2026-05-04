@@ -77,7 +77,7 @@ type EVMPaymentInfoResponse struct {
 // ============================================================================
 
 // handleGetOrderPaymentInstructions 获取订单支付指令
-// 通过 PaymentStrategy 分发，根据 PaymentModel 格式化响应
+// 通过 ChainEscrow 分发，根据 PaymentModel 格式化响应
 func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
 	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
@@ -209,7 +209,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 // 场景处理函数
 // ============================================================================
 
-// handleGetRWATokenPaymentInfo 处理 RWA Token 支付（特殊产品类型，不走 PaymentStrategy）
+// handleGetRWATokenPaymentInfo 处理 RWA Token 支付（特殊产品类型，不走 ChainEscrow）
 func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Request, orderSvc contracts.OrderService, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
 	if !coinInfo.IsEthTypeChain() {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "RWA Token only supports EVM chains")

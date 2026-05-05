@@ -164,21 +164,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 		}
 	}
 
-	r := g.newV1Router()
-
-	if config.AllowAllOrigins {
-		r.Use(g.CORSAllowAllOriginsMiddleware)
-	}
-	// Auth is NOT applied globally — each private route is individually wrapped
-	// with AuthenticationMiddleware inside Huma operation handlers. Public
-	// storefront routes (listings, profiles, exchange rates, etc.) are served
-	// without auth so that buyers can read store data on standalone nodes.
-	r.Use(g.NodeSelectionMiddleware)
-	// StorefrontMiddleware parses X-Storefront-* headers injected by the
-	// hosting Gateway (MS-Phase-2a · MS2a.2c) into a StorefrontContext on
-	// the request. It's a no-op when the headers are absent (main host or
-	// internal API traffic), so adding it globally is managed_escrow.
-	r.Use(g.StorefrontMiddleware)
+	r := g.newV1Router(config.AllowAllOrigins)
 
 	// Create default hub
 	defaultNodeID := repo.DefaultNodeID
@@ -365,9 +351,16 @@ func (g *Gateway) Serve() error {
 	return err
 }
 
-func (g *Gateway) newV1Router() chi.Router {
+func (g *Gateway) newV1Router(allowAllOrigins bool) chi.Router {
 	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
+	if allowAllOrigins {
+		r.Use(g.CORSAllowAllOriginsMiddleware)
+	}
+	if g.nodeManager != nil {
+		r.Use(g.NodeSelectionMiddleware)
+	}
+	r.Use(g.StorefrontMiddleware)
 	g.registerHumaAPI(r)
 	return r
 }

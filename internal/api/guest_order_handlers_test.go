@@ -118,7 +118,7 @@ func guestTestServer(t *testing.T, svc *mockGuestOrderService) *httptest.Server 
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router())
+	outer.Mount("/", gateway.newV1Router(false))
 
 	ts := httptest.NewServer(outer)
 	t.Cleanup(ts.Close)
@@ -371,7 +371,7 @@ func TestShipGuestOrder_Valid(t *testing.T) {
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router())
+	outer.Mount("/", gateway.newV1Router(false))
 
 	body, _ := json.Marshal(map[string]string{
 		"trackingNumber": "TRACK123",
@@ -420,7 +420,7 @@ func TestGETGuestCheckoutSettings(t *testing.T) {
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router())
+	outer.Mount("/", gateway.newV1Router(false))
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/v1/settings/guest-checkout", nil)
@@ -469,7 +469,7 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router())
+	outer.Mount("/", gateway.newV1Router(false))
 
 	body, _ := json.Marshal(models.GuestCheckoutConfig{
 		Enabled:        true,
@@ -533,7 +533,7 @@ func TestCompleteGuestOrder_Valid(t *testing.T) {
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router())
+	outer.Mount("/", gateway.newV1Router(false))
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("PUT", "/v1/guest/orders/tok_xyz/complete", nil)
@@ -564,7 +564,7 @@ func TestGuestOrder_NotImplemented(t *testing.T) {
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router())
+	outer.Mount("/", gateway.newV1Router(false))
 
 	ts := httptest.NewServer(outer)
 	defer ts.Close()

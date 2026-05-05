@@ -15,6 +15,7 @@ import (
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/jarcoal/httpmock"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -1160,14 +1161,20 @@ func NewMockExchangeRates() (*ExchangeRateProvider, error) {
 		},
 	)
 
-	provider := NewExchangeRateProvider(nil)
-	for _, p := range provider.providers {
-		if cgProvider, ok := p.(*coinGeckoProvider); ok {
-			cgProvider.client = &mockedHTTPClient
-		}
-	}
+	cgProvider := newCoinGeckoProvider(
+		"https://api.coingecko.com/api/v3",
+		"",
+		&mockedHTTPClient,
+		time.Hour,
+	)
 
-	return provider, nil
+	return &ExchangeRateProvider{
+		cache:          make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried:    make(map[models.CurrencyCode]time.Time),
+		providers:      []provider{cgProvider},
+		providerHealth: []providerHealth{{name: "coingecko_mock"}},
+		cacheTTL:       time.Hour,
+	}, nil
 }
 
 // MockCoinGeckoResponse is a mock CoinGecko /simple/price response.

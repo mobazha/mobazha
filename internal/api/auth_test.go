@@ -27,8 +27,7 @@ func TestGateway_AuthenticationMiddleware(t *testing.T) {
 
 	outer := chi.NewMux()
 	outer.Use(gateway.AuthenticationMiddleware)
-	outer.Use(gateway.NodeSelectionMiddleware)
-	outer.Mount("/", gateway.newV1Router())
+	outer.Mount("/", gateway.newV1Router(false))
 
 	ts := httptest.NewServer(outer)
 	defer ts.Close()
@@ -153,8 +152,7 @@ func TestGateway_JWTAuth(t *testing.T) {
 
 	outer := chi.NewMux()
 	outer.Use(gateway.AuthenticationMiddleware)
-	outer.Use(gateway.NodeSelectionMiddleware)
-	outer.Mount("/", gateway.newV1Router())
+	outer.Mount("/", gateway.newV1Router(false))
 	ts := httptest.NewServer(outer)
 	defer ts.Close()
 

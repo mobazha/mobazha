@@ -23,107 +23,108 @@ import (
 )
 
 type mockNode struct {
-	requestAddressFunc                      func(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
-	getNotificationsFunc                    func(offsetID string, limit int, typeFilters []string) ([]models.NotificationRecord, int64, error)
-	markNotificationAsReadFunc              func(notifID string) error
-	markAllNotificationsAsReadFunc          func() error
-	getNotificationsUnreadCountFunc         func() (int, error)
-	getOrderFunc                            func(orderID string) (*models.Order, error)
-	getPurchasesFunc                        func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error)
-	getSalesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error)
-	getCaseFunc                             func(orderID string) (*models.Case, error)
-	getCasesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
-	confirmOrderFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
-	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiatorAddress string, payoutAddress string) (iwallet.CoinType, any, error)
-	getRefundOrderInstructionsFunc          func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
-	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
-	shipOrderFunc                           func(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
-	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
-	cancelOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
-	refundOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
-	declineOrderViaRelayFunc                 func(orderID models.OrderID, reason string, done chan struct{}) error
-	cancelOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
-	openDisputeFunc                         func(orderID models.OrderID, reason string, evidenceHashes []string, done chan struct{}) error
-	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
-	getReleaseFundsInstructionsFunc         func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
-	releaseFundsFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
-	releaseFundsAfterTimeoutFunc            func(orderID models.OrderID, done chan struct{}) error
-	followNodeFunc                          func(peerID peer.ID, done chan<- struct{}) error
-	unfollowNodeFunc                        func(peerID peer.ID, done chan<- struct{}) error
-	followsMeFunc                           func(peerID peer.ID) (bool, error)
-	getMyFollowersFunc                      func() (models.Followers, error)
-	getMyFollowingFunc                      func() (models.Following, error)
-	getFollowersFunc                        func(ctx context.Context, peerID peer.ID, useCache bool) (models.Followers, error)
-	getFollowingFunc                        func(ctx context.Context, peerID peer.ID, useCache bool) (models.Following, error)
-	saveListingFunc                         func(listing *pb.Listing, done chan<- struct{}) error
-	updateAllListingsFunc                   func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
-	deleteListingFunc                       func(slug string, done chan<- struct{}) error
-	getMyListingsFunc                       func() (models.ListingIndex, error)
-	getListingsFunc                         func(ctx context.Context, peerID peer.ID, useCache bool) (models.ListingIndex, error)
-	getMyListingBySlugFunc                  func(slug string) (*pb.SignedListing, error)
-	getMyListingByCIDFunc                   func(cid cid.Cid) (*pb.SignedListing, error)
-	getListingBySlugFunc                    func(ctx context.Context, peerID peer.ID, slug string, useCache bool) (*pb.SignedListing, error)
-	getListingByCIDFunc                     func(ctx context.Context, cid cid.Cid) (*pb.SignedListing, error)
-	getCartsTotalItemsCountFunc             func() (int, error)
-	getCartsFunc                            func() ([]models.StoreCart, error)
-	addToCartFunc                           func(peerID peer.ID, item models.ShoppingCartItem) error
-	removeCartItemFunc                      func(peerID peer.ID, item models.ShoppingCartItem) error
-	clearCartsFunc                          func(vendorID peer.ID) error
-	clearAllCartsFunc                       func() error
-	uploadMediaFunc      func(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error)
-	getMediaFunc         func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error)
-	setProfileMediaFunc  func(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error)
-	getProfileMediaFunc  func(ctx context.Context, peerID peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
-	setSelfAsModeratorFunc                  func(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error
-	removeSelfAsModeratorFunc               func(ctx context.Context, done chan<- struct{}) error
-	getModeratorsFunc                       func(ctx context.Context) []peer.ID
-	getModeratorsAsyncFunc                  func(ctx context.Context) <-chan peer.ID
-	getVerifiedModeratorsFunc               func(ctx context.Context) []peer.ID
-	publishFunc                             func(done chan<- struct{})
-	usingTestnetFunc                        func() bool
-	usingTorFunc                            func() bool
-	multiwalletFunc                         func() contracts.WalletOperator
-	nodeIDFunc                              func() string
-	identityFunc                            func() peer.ID
-	subscribeEventFunc                      func(event any) (events.Subscription, error)
-	startFunc                               func()
-	destroyNodeFunc                         func()
-	eventBusFunc                            func() events.Bus
-	dbFunc                                  func() database.Database
-	stopFunc                                func(force bool) error
-	setProfileFunc                          func(profile *models.Profile, done chan<- struct{}) error
-	getMyProfileFunc                        func() (*models.Profile, error)
-	getProfileStatsFunc                     func() (*models.ProfileStats, error)
-	getProfileFunc                          func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error)
-	getMyRatingsFunc                        func() (models.RatingIndex, error)
-	getRatingsFunc                          func(ctx context.Context, peerID peer.ID, useCache bool) (models.RatingIndex, error)
-	getRatingFunc                           func(ctx context.Context, cid cid.Cid) (*pb.Rating, error)
-	purchaseFunc                            func(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)
-	estimateOrderTotalFunc                  func(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
-	getOrderInfoFunc                        func(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
-	processOrderPaymentFunc                 func(ctx context.Context, paymentData *models.PaymentData) error
-	declineOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
-	refundOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
-	pingNodeFunc                            func(ctx context.Context, peer peer.ID) error
-	getUserPreferencesFunc                  func() (*models.UserPreferences, error)
-	saveUserPreferencesFunc                 func(prefs *models.UserPreferences, done chan struct{}) error
-	blockNodeFunc                           func(peerID string) (bool, error)
-	unblockNodeFunc                         func(peerID string) (bool, error)
-	spendFunc                               func(spendData *models.SpendRequest) (*models.SpendResponse, error)
-	saveTransactionMetadataFunc             func(metadata *models.TransactionMetadata) error
-	getTransactionMetadataFunc              func(txid iwallet.TransactionID) (models.TransactionMetadata, error)
-	getMnemonicFunc                         func() (string, error)
-	getExchangeRatesFunc                    func() *wallet.ExchangeRateProvider
-	getAllRatesFunc                         func(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error)
+	requestAddressFunc               func(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
+	getNotificationsFunc             func(offsetID string, limit int, typeFilters []string) ([]models.NotificationRecord, int64, error)
+	markNotificationAsReadFunc       func(notifID string) error
+	markAllNotificationsAsReadFunc   func() error
+	getNotificationsUnreadCountFunc  func() (int, error)
+	getOrderFunc                     func(orderID string) (*models.Order, error)
+	getPurchasesFunc                 func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error)
+	getSalesFunc                     func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error)
+	getCaseFunc                      func(orderID string) (*models.Case, error)
+	getCasesFunc                     func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
+	confirmOrderFunc                 func(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
+	getConfirmOrderInstructionsFunc  func(orderID models.OrderID, initiatorAddress string, payoutAddress string) (iwallet.CoinType, any, error)
+	getRefundOrderInstructionsFunc   func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
+	getCompleteOrderInstructionsFunc func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
+	shipOrderFunc                    func(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
+	completeOrderFunc                func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
+	cancelOrderFunc                  func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	refundOrderViaRelayFunc          func(orderID models.OrderID, done chan struct{}) error
+	declineOrderViaRelayFunc         func(orderID models.OrderID, reason string, done chan struct{}) error
+	cancelOrderViaRelayFunc          func(orderID models.OrderID, done chan struct{}) error
+	openDisputeFunc                  func(orderID models.OrderID, reason string, evidenceHashes []string, done chan struct{}) error
+	closeDisputeFunc                 func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
+	getReleaseFundsInstructionsFunc  func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
+	releaseFundsFunc                 func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	releaseFundsAfterTimeoutFunc     func(orderID models.OrderID, done chan struct{}) error
+	followNodeFunc                   func(peerID peer.ID, done chan<- struct{}) error
+	unfollowNodeFunc                 func(peerID peer.ID, done chan<- struct{}) error
+	followsMeFunc                    func(peerID peer.ID) (bool, error)
+	getMyFollowersFunc               func() (models.Followers, error)
+	getMyFollowingFunc               func() (models.Following, error)
+	getFollowersFunc                 func(ctx context.Context, peerID peer.ID, useCache bool) (models.Followers, error)
+	getFollowingFunc                 func(ctx context.Context, peerID peer.ID, useCache bool) (models.Following, error)
+	saveListingFunc                  func(listing *pb.Listing, done chan<- struct{}) error
+	updateAllListingsFunc            func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
+	deleteListingFunc                func(slug string, done chan<- struct{}) error
+	getMyListingsFunc                func() (models.ListingIndex, error)
+	getListingsFunc                  func(ctx context.Context, peerID peer.ID, useCache bool) (models.ListingIndex, error)
+	getMyListingBySlugFunc           func(slug string) (*pb.SignedListing, error)
+	getMyListingByCIDFunc            func(cid cid.Cid) (*pb.SignedListing, error)
+	getListingBySlugFunc             func(ctx context.Context, peerID peer.ID, slug string, useCache bool) (*pb.SignedListing, error)
+	getListingByCIDFunc              func(ctx context.Context, cid cid.Cid) (*pb.SignedListing, error)
+	getCartsTotalItemsCountFunc      func() (int, error)
+	getCartsFunc                     func() ([]models.StoreCart, error)
+	addToCartFunc                    func(peerID peer.ID, item models.ShoppingCartItem) error
+	removeCartItemFunc               func(peerID peer.ID, item models.ShoppingCartItem) error
+	clearCartsFunc                   func(vendorID peer.ID) error
+	clearAllCartsFunc                func() error
+	uploadMediaFunc                  func(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error)
+	getMediaFunc                     func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error)
+	setProfileMediaFunc              func(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error)
+	getProfileMediaFunc              func(ctx context.Context, peerID peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
+	setSelfAsModeratorFunc           func(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error
+	removeSelfAsModeratorFunc        func(ctx context.Context, done chan<- struct{}) error
+	getModeratorsFunc                func(ctx context.Context) []peer.ID
+	getModeratorsAsyncFunc           func(ctx context.Context) <-chan peer.ID
+	getVerifiedModeratorsFunc        func(ctx context.Context) []peer.ID
+	publishFunc                      func(done chan<- struct{})
+	usingTestnetFunc                 func() bool
+	usingTorFunc                     func() bool
+	multiwalletFunc                  func() contracts.WalletOperator
+	nodeIDFunc                       func() string
+	identityFunc                     func() peer.ID
+	subscribeEventFunc               func(event any) (events.Subscription, error)
+	startFunc                        func()
+	destroyNodeFunc                  func()
+	eventBusFunc                     func() events.Bus
+	dbFunc                           func() database.Database
+	stopFunc                         func(force bool) error
+	setProfileFunc                   func(profile *models.Profile, done chan<- struct{}) error
+	getMyProfileFunc                 func() (*models.Profile, error)
+	getProfileStatsFunc              func() (*models.ProfileStats, error)
+	getProfileFunc                   func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error)
+	getMyRatingsFunc                 func() (models.RatingIndex, error)
+	getRatingsFunc                   func(ctx context.Context, peerID peer.ID, useCache bool) (models.RatingIndex, error)
+	getRatingFunc                    func(ctx context.Context, cid cid.Cid) (*pb.Rating, error)
+	purchaseFunc                     func(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)
+	estimateOrderTotalFunc           func(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
+	getOrderInfoFunc                 func(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
+	processOrderPaymentFunc          func(ctx context.Context, paymentData *models.PaymentData) error
+	declineOrderFunc                 func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
+	refundOrderFunc                  func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	pingNodeFunc                     func(ctx context.Context, peer peer.ID) error
+	getUserPreferencesFunc           func() (*models.UserPreferences, error)
+	saveUserPreferencesFunc          func(prefs *models.UserPreferences, done chan struct{}) error
+	blockNodeFunc                    func(peerID string) (bool, error)
+	unblockNodeFunc                  func(peerID string) (bool, error)
+	spendFunc                        func(spendData *models.SpendRequest) (*models.SpendResponse, error)
+	saveTransactionMetadataFunc      func(metadata *models.TransactionMetadata) error
+	getTransactionMetadataFunc       func(txid iwallet.TransactionID) (models.TransactionMetadata, error)
+	getMnemonicFunc                  func() (string, error)
+	getExchangeRatesFunc             func() *wallet.ExchangeRateProvider
+	getAllRatesFunc                  func(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error)
 
-	// 收款账户相关
-	addReceivingAccountFunc         func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
-	updateReceivingAccountFunc      func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
-	deleteReceivingAccountFunc      func(id int) error
-	getReceivingAccountsFunc        func() ([]models.ReceivingAccount, error)
-	getReceivingAccountByIDFunc     func(id int) (*models.ReceivingAccount, error)
-	getActiveReceivingAccountFunc   func(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
-	getReceivingAccountsByChainFunc func(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
+	// ReceivingAccountService
+	raAddFunc               func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
+	raUpdateFunc            func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
+	raDeleteFunc            func(id int) error
+	raListFunc              func() ([]models.ReceivingAccount, error)
+	raGetByIDFunc           func(id int) (*models.ReceivingAccount, error)
+	raGetActiveFunc         func(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
+	raGetByChainFunc        func(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
+	raGetAcceptedCurrencies func() ([]string, error)
 
 	generatePaymentInstructionsFunc func(ctx context.Context, params models.InitializeEscrowData) (*payment.PaymentSetupResult, error)
 	buildInitEscrowInstructionsFunc func(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error)
@@ -151,20 +152,21 @@ type mockNode struct {
 }
 
 // Service accessors — mockNode returns itself for each sub-interface.
-func (m *mockNode) IdentityInfo() contracts.IdentityService         { return m }
-func (m *mockNode) Notification() contracts.NotificationService     { return m }
-func (m *mockNode) Order() contracts.OrderService                   { return m }
-func (m *mockNode) Listing() contracts.ListingService               { return m }
-func (m *mockNode) Profile() contracts.ProfileService               { return m }
-func (m *mockNode) Wallet() contracts.WalletService                 { return m }
-func (m *mockNode) Media() contracts.MediaService                   { return m }
-func (m *mockNode) Social() contracts.SocialService                 { return m }
-func (m *mockNode) MatrixChat() contracts.MatrixChatService         { return nil }
-func (m *mockNode) Preferences() contracts.PreferencesService       { return m }
-func (m *mockNode) ExchangeRate() contracts.ExchangeRateService     { return m }
-func (m *mockNode) ShoppingCart() contracts.ShoppingCartService     { return m }
-func (m *mockNode) Wishlist() contracts.WishlistService             { return nil }
-func (m *mockNode) GuestOrder() contracts.GuestOrderService         { return nil }
+func (m *mockNode) IdentityInfo() contracts.IdentityService              { return m }
+func (m *mockNode) Notification() contracts.NotificationService          { return m }
+func (m *mockNode) Order() contracts.OrderService                        { return m }
+func (m *mockNode) Listing() contracts.ListingService                    { return m }
+func (m *mockNode) Profile() contracts.ProfileService                    { return m }
+func (m *mockNode) Wallet() contracts.WalletService                      { return m }
+func (m *mockNode) Media() contracts.MediaService                        { return m }
+func (m *mockNode) Social() contracts.SocialService                      { return m }
+func (m *mockNode) MatrixChat() contracts.MatrixChatService              { return nil }
+func (m *mockNode) Preferences() contracts.PreferencesService            { return m }
+func (m *mockNode) ExchangeRate() contracts.ExchangeRateService          { return m }
+func (m *mockNode) ShoppingCart() contracts.ShoppingCartService          { return m }
+func (m *mockNode) Wishlist() contracts.WishlistService                  { return nil }
+func (m *mockNode) GuestOrder() contracts.GuestOrderService              { return nil }
+func (m *mockNode) ReceivingAccounts() contracts.ReceivingAccountService { return m }
 
 func (m *mockNode) RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error) {
 	return m.requestAddressFunc(ctx, to, coinType)
@@ -476,27 +478,33 @@ func (m *mockNode) GetMnemonic() (string, error) {
 	return m.getMnemonicFunc()
 }
 
-// 收款账户相关
-func (m *mockNode) AddReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error) {
-	return m.addReceivingAccountFunc(account)
+// ReceivingAccountService implementation
+func (m *mockNode) Add(account *models.ReceivingAccount) (*models.ReceivingAccount, error) {
+	return m.raAddFunc(account)
 }
-func (m *mockNode) UpdateReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error) {
-	return m.updateReceivingAccountFunc(account)
+func (m *mockNode) Update(account *models.ReceivingAccount) (*models.ReceivingAccount, error) {
+	return m.raUpdateFunc(account)
 }
-func (m *mockNode) DeleteReceivingAccount(id int) error {
-	return m.deleteReceivingAccountFunc(id)
+func (m *mockNode) Delete(id int) error {
+	return m.raDeleteFunc(id)
 }
-func (m *mockNode) GetReceivingAccounts() ([]models.ReceivingAccount, error) {
-	return m.getReceivingAccountsFunc()
+func (m *mockNode) List() ([]models.ReceivingAccount, error) {
+	return m.raListFunc()
 }
-func (m *mockNode) GetReceivingAccountByID(id int) (*models.ReceivingAccount, error) {
-	return m.getReceivingAccountByIDFunc(id)
+func (m *mockNode) GetByID(id int) (*models.ReceivingAccount, error) {
+	return m.raGetByIDFunc(id)
 }
-func (m *mockNode) GetActiveReceivingAccount(chainType iwallet.ChainType) (*models.ReceivingAccount, error) {
-	return m.getActiveReceivingAccountFunc(chainType)
+func (m *mockNode) GetActive(chainType iwallet.ChainType) (*models.ReceivingAccount, error) {
+	return m.raGetActiveFunc(chainType)
 }
-func (m *mockNode) GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error) {
-	return m.getReceivingAccountsByChainFunc(chainType)
+func (m *mockNode) GetByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error) {
+	return m.raGetByChainFunc(chainType)
+}
+func (m *mockNode) GetAcceptedCurrencies() ([]string, error) {
+	if m.raGetAcceptedCurrencies != nil {
+		return m.raGetAcceptedCurrencies()
+	}
+	return nil, nil
 }
 
 // Escrow

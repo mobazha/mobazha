@@ -82,9 +82,9 @@ func (g *Gateway) handleGETSetup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	walletSvc := node.Wallet()
-	if walletSvc != nil {
-		if accounts, err := walletSvc.GetReceivingAccounts(); err == nil {
+	raSvc := node.ReceivingAccounts()
+	if raSvc != nil {
+		if accounts, err := raSvc.List(); err == nil {
 			paymentDone = len(accounts) > 0
 		}
 	}

@@ -133,6 +133,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initProfileService()
 	n.initModerationService()
 	n.initListingService()
+	n.initReceivingAccountService()
 	n.initPaymentService()
 	n.initSettlementService()
 	n.initPaymentVerificationService()

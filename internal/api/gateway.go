@@ -353,6 +353,7 @@ func (g *Gateway) Serve() error {
 
 func (g *Gateway) newV1Router(allowAllOrigins bool) chi.Router {
 	r := chi.NewMux()
+	r.Use(securityHeadersMiddleware)
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	if allowAllOrigins {
 		r.Use(g.CORSAllowAllOriginsMiddleware)
@@ -363,6 +364,17 @@ func (g *Gateway) newV1Router(allowAllOrigins bool) chi.Router {
 	r.Use(g.StorefrontMiddleware)
 	g.registerHumaAPI(r)
 	return r
+}
+
+// securityHeadersMiddleware sets baseline HTTP security headers on every response.
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func wrapError(err error) string {
@@ -388,7 +400,10 @@ func getListingService(r *http.Request) contracts.ListingService { return getNod
 func getProfileService(r *http.Request) contracts.ProfileService { return getNodeService(r).Profile() }
 func getSocialService(r *http.Request) contracts.SocialService   { return getNodeService(r).Social() }
 func getWalletService(r *http.Request) contracts.WalletService   { return getNodeService(r).Wallet() }
-func getMediaService(r *http.Request) contracts.MediaService     { return getNodeService(r).Media() }
+func getReceivingAccountService(r *http.Request) contracts.ReceivingAccountService {
+	return getNodeService(r).ReceivingAccounts()
+}
+func getMediaService(r *http.Request) contracts.MediaService { return getNodeService(r).Media() }
 func getMatrixChatService(r *http.Request) contracts.MatrixChatService {
 	return getNodeService(r).MatrixChat()
 }

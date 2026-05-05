@@ -161,15 +161,19 @@ type WalletService interface {
 	GetTotalPaidToAddress(order *models.Order) (uint64, error)
 	CancelPartialPayment(orderID string) (txid string, refundedAmount uint64, err error)
 	StopWatchingPayment(orderID string) error
+}
 
-	// Receiving accounts
-	AddReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
-	UpdateReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
-	DeleteReceivingAccount(id int) error
-	GetReceivingAccounts() ([]models.ReceivingAccount, error)
-	GetReceivingAccountByID(id int) (*models.ReceivingAccount, error)
-	GetActiveReceivingAccount(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
-	GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
+// ReceivingAccountService manages external wallet addresses for receiving
+// payments. Lightweight — no multiwallet or escrow dependency. Pure DB CRUD.
+type ReceivingAccountService interface {
+	Add(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
+	Update(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
+	Delete(id int) error
+	List() ([]models.ReceivingAccount, error)
+	GetByID(id int) (*models.ReceivingAccount, error)
+	GetActive(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
+	GetByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
+	GetAcceptedCurrencies() ([]string, error)
 }
 
 // MediaService handles media (images, videos, files) storage and retrieval.
@@ -356,6 +360,7 @@ type NodeService interface {
 	ShoppingCart() ShoppingCartService
 	Wishlist() WishlistService
 	GuestOrder() GuestOrderService
+	ReceivingAccounts() ReceivingAccountService
 
 	// Cross-cutting methods (kept directly on NodeService)
 

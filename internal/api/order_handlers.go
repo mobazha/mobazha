@@ -955,7 +955,7 @@ func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request
 	orderSvc := getOrderService(r)
 
 	if receivingAccountID >= 0 {
-		receivingAccount, err := getWalletService(r).GetReceivingAccountByID(receivingAccountID)
+		receivingAccount, err := getReceivingAccountService(r).GetByID(receivingAccountID)
 		if err != nil {
 			ErrorResponse(w, http.StatusBadRequest, "收款账户不存在或无效")
 			return

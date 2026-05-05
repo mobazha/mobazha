@@ -92,6 +92,7 @@ type appServices struct {
 	guestOrderService          *GuestOrderAppService
 	directPaymentService       *DirectPaymentService
 	autoSweepService           *AutoSweepService
+	receivingAccountService    *receivingAccountService
 	guestPaymentMonitor        *GuestPaymentMonitor
 	unifiedOrderView           *UnifiedOrderView
 

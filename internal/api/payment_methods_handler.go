@@ -11,8 +11,8 @@ import (
 //
 // GET /v1/payment-methods/{peerID}
 func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request) {
-	walletSvc := getWalletService(r)
-	accounts, err := walletSvc.GetReceivingAccounts()
+	raSvc := getReceivingAccountService(r)
+	accounts, err := raSvc.List()
 	if err != nil {
 		log.Warningf("Failed to get receiving accounts: %v", err)
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load payment methods")

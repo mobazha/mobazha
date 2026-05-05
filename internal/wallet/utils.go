@@ -9,9 +9,17 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
+// ExchangeRateQuerier is the minimal interface needed by currency conversion
+// helpers. Both *ExchangeRateProvider and contracts.ExchangeRateService
+// satisfy it, allowing callers in shared (build-neutral) code to avoid a
+// hard dependency on the concrete provider.
+type ExchangeRateQuerier interface {
+	GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error)
+}
+
 // ConvertCurrencyAmount converts the value of one currency into another using the exchange rate.
 // Supports crypto-to-fiat, fiat-to-crypto, and fiat-to-fiat conversions.
-func ConvertCurrencyAmount(value *models.CurrencyValue, paymentCurrency *models.Currency, erp *ExchangeRateProvider) (iwallet.Amount, error) {
+func ConvertCurrencyAmount(value *models.CurrencyValue, paymentCurrency *models.Currency, erp ExchangeRateQuerier) (iwallet.Amount, error) {
 	if value.Currency.Equal(paymentCurrency) {
 		return value.Amount, nil
 	}
@@ -40,7 +48,7 @@ func ConvertCurrencyAmount(value *models.CurrencyValue, paymentCurrency *models.
 
 // ConvertFiatAmount converts a fiat amount from one currency to another.
 // amount is in smallest currency units (e.g. cents). Returns in smallest units of target.
-func ConvertFiatAmount(amount int64, from, to string, erp *ExchangeRateProvider) (int64, error) {
+func ConvertFiatAmount(amount int64, from, to string, erp ExchangeRateQuerier) (int64, error) {
 	if from == to {
 		return amount, nil
 	}

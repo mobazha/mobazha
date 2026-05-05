@@ -84,6 +84,12 @@ func (n *MobazhaNode) GuestOrder() contracts.GuestOrderService {
 	}
 	return n.guestOrderService
 }
+func (n *MobazhaNode) ReceivingAccounts() contracts.ReceivingAccountService {
+	if n.receivingAccountService == nil {
+		return nil
+	}
+	return n.receivingAccountService
+}
 
 // UnifiedOrders returns the unified order view combining standard and guest orders.
 func (n *MobazhaNode) UnifiedOrders() contracts.UnifiedOrderViewService {

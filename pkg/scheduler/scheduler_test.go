@@ -19,23 +19,24 @@ import (
 // argument to NodeFn.
 type stubNode struct{ id string }
 
-func (s *stubNode) IdentityInfo() contracts.IdentityService    { return nil }
-func (s *stubNode) Notification() contracts.NotificationService { return nil }
-func (s *stubNode) Order() contracts.OrderService               { return nil }
-func (s *stubNode) Listing() contracts.ListingService           { return nil }
-func (s *stubNode) Profile() contracts.ProfileService           { return nil }
-func (s *stubNode) Wallet() contracts.WalletService             { return nil }
-func (s *stubNode) Media() contracts.MediaService               { return nil }
-func (s *stubNode) Social() contracts.SocialService             { return nil }
-func (s *stubNode) MatrixChat() contracts.MatrixChatService     { return nil }
-func (s *stubNode) Preferences() contracts.PreferencesService   { return nil }
-func (s *stubNode) ExchangeRate() contracts.ExchangeRateService { return nil }
-func (s *stubNode) ShoppingCart() contracts.ShoppingCartService  { return nil }
-func (s *stubNode) Wishlist() contracts.WishlistService          { return nil }
-func (s *stubNode) GuestOrder() contracts.GuestOrderService      { return nil }
-func (s *stubNode) EventBus() events.Bus                         { return nil }
-func (s *stubNode) Publish(_ chan<- struct{})                     {}
-func (s *stubNode) PingNode(_ context.Context, _ peer.ID) error  { return nil }
+func (s *stubNode) IdentityInfo() contracts.IdentityService              { return nil }
+func (s *stubNode) Notification() contracts.NotificationService          { return nil }
+func (s *stubNode) Order() contracts.OrderService                        { return nil }
+func (s *stubNode) Listing() contracts.ListingService                    { return nil }
+func (s *stubNode) Profile() contracts.ProfileService                    { return nil }
+func (s *stubNode) Wallet() contracts.WalletService                      { return nil }
+func (s *stubNode) Media() contracts.MediaService                        { return nil }
+func (s *stubNode) Social() contracts.SocialService                      { return nil }
+func (s *stubNode) MatrixChat() contracts.MatrixChatService              { return nil }
+func (s *stubNode) Preferences() contracts.PreferencesService            { return nil }
+func (s *stubNode) ExchangeRate() contracts.ExchangeRateService          { return nil }
+func (s *stubNode) ShoppingCart() contracts.ShoppingCartService          { return nil }
+func (s *stubNode) Wishlist() contracts.WishlistService                  { return nil }
+func (s *stubNode) GuestOrder() contracts.GuestOrderService              { return nil }
+func (s *stubNode) ReceivingAccounts() contracts.ReceivingAccountService { return nil }
+func (s *stubNode) EventBus() events.Bus                                 { return nil }
+func (s *stubNode) Publish(_ chan<- struct{})                            {}
+func (s *stubNode) PingNode(_ context.Context, _ peer.ID) error          { return nil }
 func (s *stubNode) SubscribeEvent(_ any) (events.Subscription, error) {
 	return nil, nil
 }

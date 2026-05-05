@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package api
 
 import (
@@ -20,10 +18,9 @@ func (g *Gateway) GetReceivingAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getWalletService(r)
+	svc := getReceivingAccountService(r)
 
-	// 从数据库获取用户的收款账户信息
-	receivingAccounts, err := node.GetReceivingAccounts()
+	receivingAccounts, err := svc.List()
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -51,7 +48,7 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	node := getWalletService(r)
+	svc := getReceivingAccountService(r)
 
 	type ReceivingAccountParams struct {
 		ID             int               `json:"id"`
@@ -94,9 +91,9 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 	}
 
 	if isUpdate {
-		account, err = node.UpdateReceivingAccount(account)
+		account, err = svc.Update(account)
 	} else {
-		account, err = node.AddReceivingAccount(account)
+		account, err = svc.Add(account)
 	}
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -132,9 +129,8 @@ func (g *Gateway) DeleteReceivingAccount(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	node := getWalletService(r)
+	svc := getReceivingAccountService(r)
 
-	// 从URL路径获取账户ID
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -142,8 +138,7 @@ func (g *Gateway) DeleteReceivingAccount(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// 删除账户
-	err = node.DeleteReceivingAccount(id)
+	err = svc.Delete(id)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

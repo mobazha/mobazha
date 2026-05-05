@@ -124,15 +124,14 @@ func (c *Client) ObtainAccessToken(ctx context.Context) error {
 		return err
 	}
 
-	url := c.baseURL + "/authentication/getAccessToken"
-	body, _ := json.Marshal(map[string]string{"email": c.apiKey})
+	authURL := c.baseURL + "/authentication/getAccessToken"
+	body, _ := json.Marshal(map[string]string{"apiKey": c.apiKey})
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, authURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("cj: create auth request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("CJ-Access-Token", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

@@ -538,6 +538,7 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.ShippingProfileEntity{},
 		&models.ShippingLocationEntity{},
 		&models.ListingShippingRef{},
+		&models.OutboxEvent{},
 		&dbstore.PublicDataRecord{},
 		&dbstore.PublicMediaRecord{},
 	}
@@ -630,6 +631,7 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		&models.ShippingProfileEntity{},
 		&models.ShippingLocationEntity{},
 		&models.ListingShippingRef{},
+		&models.OutboxEvent{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

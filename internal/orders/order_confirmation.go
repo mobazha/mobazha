@@ -58,6 +58,16 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 		return nil, err
 	}
 
+	// Park if payment has been submitted but not yet chain/provider-verified.
+	// The async verification worker will replay parked messages after
+	// verification via RecordVerifiedPayment.
+	if !order.IsPaymentVerified() {
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
+	}
+
 	// Wallet I/O (GetTransaction, verifyConfirmReceipt, processOutgoingPayment)
 	// has been moved to the orchestration layer:
 	//   preProcessOrderConfirmation  — fetches chain tx + verifies EVM receipt

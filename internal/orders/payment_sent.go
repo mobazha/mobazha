@@ -1,7 +1,9 @@
 package orders
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	coreorders "github.com/mobazha/mobazha-core/orders"
@@ -241,6 +243,12 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 	}
 	op.advanceToPendingAfterVerification(order)
 
+	// Replay parked messages that were waiting for payment verification.
+	// ORDER_CONFIRMATION (and potentially other messages) may have arrived
+	// while the order was at AWAITING_PAYMENT_VERIFICATION and been parked.
+	// Now that we've advanced to PENDING, they can be processed.
+	op.replayParkedMessages(dbtx, order)
+
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		return nil
@@ -270,6 +278,35 @@ func (op *OrderProcessor) advanceToPendingAfterVerification(order *models.Order)
 		models.OrderState_AWAITING_PAYMENT_VERIFICATION,
 		models.OrderState_PROCESSING_ERROR:
 		order.SetFSMState(models.OrderState_PENDING)
+	}
+}
+
+// replayParkedMessages processes any messages that were parked while the
+// order was in a state that couldn't accept them (e.g., ORDER_CONFIRMATION
+// arriving at AWAITING_PAYMENT_VERIFICATION). Follows the same pattern as
+// ProcessMessage's post-handler replay loop.
+func (op *OrderProcessor) replayParkedMessages(dbtx database.Tx, order *models.Order) {
+	parkedMsgs, err := order.GetParkedMessages()
+	if err != nil || len(parkedMsgs.Messages) == 0 {
+		return
+	}
+
+	sort.Slice(parkedMsgs.Messages, func(i, j int) bool {
+		return parkedMsgs.Messages[i].MessageType < parkedMsgs.Messages[j].MessageType
+	})
+
+	for _, parked := range parkedMsgs.Messages {
+		_, replayErr := op.processMessage(dbtx, order, parked)
+		if errors.Is(replayErr, ErrMessageParked) {
+			continue
+		}
+		if replayErr != nil {
+			logger.LogInfoWithIDf(log, op.nodeID,
+				"Error replaying parked message for order %s (type=%s): %s",
+				order.ID, parked.MessageType, replayErr)
+		} else {
+			_ = order.DeleteParkedMessage(parked.MessageType)
+		}
 	}
 }
 

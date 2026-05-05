@@ -89,12 +89,45 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 	}
 
 	tests := []struct {
+		name          string
 		setup         func(order *models.Order) error
 		expectedError error
 		expectedEvent interface{}
 	}{
 		{
-			// Normal case where order open exists.
+			name: "Normal case with verified payment",
+			setup: func(order *models.Order) error {
+				order.ID = models.OrderID(orderID)
+				err := order.PutMessage(&npb.OrderMessage{
+					Signature: []byte("abc"),
+					Message:   mustBuildAny(orderOpen),
+				})
+				if err != nil {
+					return err
+				}
+				if err := order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(paymentSent),
+					MessageType: npb.OrderMessage_PAYMENT_SENT,
+				}); err != nil {
+					return err
+				}
+				order.MarkPaymentVerified()
+				return nil
+			},
+			expectedError: nil,
+			expectedEvent: &events.OrderConfirmation{
+				OrderID: orderID,
+				Thumbnail: events.Thumbnail{
+					Tiny:  tinyImageHash,
+					Small: smallImageHash,
+				},
+				VendorName: vendorHandle,
+				VendorID:   vendorPeerID,
+			},
+		},
+		{
+			name: "Park when payment not yet verified",
 			setup: func(order *models.Order) error {
 				order.ID = models.OrderID(orderID)
 				err := order.PutMessage(&npb.OrderMessage{
@@ -110,19 +143,11 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 					MessageType: npb.OrderMessage_PAYMENT_SENT,
 				})
 			},
-			expectedError: nil,
-			expectedEvent: &events.OrderConfirmation{
-				OrderID: orderID,
-				Thumbnail: events.Thumbnail{
-					Tiny:  tinyImageHash,
-					Small: smallImageHash,
-				},
-				VendorName: vendorHandle,
-				VendorID:   vendorPeerID,
-			},
+			expectedError: ErrMessageParked,
+			expectedEvent: nil,
 		},
 		{
-			// Order decline already exists.
+			name: "Order decline already exists",
 			setup: func(order *models.Order) error {
 				order.SerializedOrderDecline = []byte{0x00}
 				return nil
@@ -131,7 +156,7 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Order cancel already exists.
+			name: "Order cancel already exists",
 			setup: func(order *models.Order) error {
 				order.SerializedOrderDecline = nil
 				order.SerializedOrderCancel = []byte{0x00}
@@ -141,7 +166,7 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Duplicate order confirmation.
+			name: "Duplicate order confirmation",
 			setup: func(order *models.Order) error {
 				return order.PutMessage(&npb.OrderMessage{
 					Signature:   []byte("abc"),
@@ -153,7 +178,7 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Out of order.
+			name: "Out of order - no order open",
 			setup: func(order *models.Order) error {
 				order.SerializedOrderOpen = nil
 				return nil
@@ -164,23 +189,24 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		order := &models.Order{}
-		if err := test.setup(order); err != nil {
-			t.Errorf("Test %d setup error: %s", i, err)
-			continue
-		}
-		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processOrderConfirmationMessage(tx, order, orderMsg)
-			if !errors.Is(err, test.expectedError) {
-				return fmt.Errorf("incorrect error returned. Expected %v, got %v", test.expectedError, err)
+		t.Run(test.name, func(t *testing.T) {
+			order := &models.Order{}
+			if err := test.setup(order); err != nil {
+				t.Fatalf("Test %d setup error: %s", i, err)
 			}
-			if !reflect.DeepEqual(event, test.expectedEvent) {
-				return fmt.Errorf("incorrect event returned")
+			err := op.db.Update(func(tx database.Tx) error {
+				event, err := op.processOrderConfirmationMessage(tx, order, orderMsg)
+				if !errors.Is(err, test.expectedError) {
+					return fmt.Errorf("incorrect error returned. Expected %v, got %v", test.expectedError, err)
+				}
+				if !reflect.DeepEqual(event, test.expectedEvent) {
+					return fmt.Errorf("incorrect event returned")
+				}
+				return nil
+			})
+			if err != nil {
+				t.Errorf("Error executing db update in test %d: %s", i, err)
 			}
-			return nil
 		})
-		if err != nil {
-			t.Errorf("Error executing db update in test %d: %s", i, err)
-		}
 	}
 }

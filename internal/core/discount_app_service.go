@@ -227,7 +227,7 @@ func (s *DiscountAppService) CalculateDiscounts(ctx context.Context, req contrac
 		return nil, fmt.Errorf("invalid subtotal: %s", req.Subtotal)
 	}
 
-	dc := DiscountContext{
+	dc := models.DiscountContext{
 		DiscountCodes:   req.DiscountCodes,
 		ProductIDs:      req.ProductIDs,
 		CustomerPeerID:  req.CustomerPeerID,

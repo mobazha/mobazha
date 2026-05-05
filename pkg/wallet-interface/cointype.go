@@ -82,6 +82,21 @@ func (ct CoinType) IsFiatPayment() bool {
 	return strings.HasPrefix(strings.ToLower(string(ct)), "fiat:")
 }
 
+// FiatProviderID extracts the payment provider identifier from a canonical
+// fiat coin type. Requires the three-part format "fiat:{provider}:{currency}".
+// "fiat:stripe:USD" → "stripe", "fiat:paypal:EUR" → "paypal".
+// Returns "" for non-fiat coins or malformed strings.
+func (ct CoinType) FiatProviderID() string {
+	if !ct.IsFiatPayment() {
+		return ""
+	}
+	parts := strings.Split(string(ct), ":")
+	if len(parts) >= 3 && parts[1] != "" {
+		return strings.ToLower(parts[1])
+	}
+	return ""
+}
+
 // FiatBaseCurrency extracts the ISO currency code from fiat coin strings.
 // "fiat:stripe:USD" → "USD", "fiat:paypal:EUR" → "EUR", "USD" → "USD".
 func (ct CoinType) FiatBaseCurrency() string {

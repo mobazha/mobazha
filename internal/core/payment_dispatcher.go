@@ -3,19 +3,16 @@
 package core
 
 import (
-	"sync"
+	"context"
 
+	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
-
-// cancelableAutoConfirmInProgress tracks orders currently being auto-confirmed to prevent concurrent processing.
-// Shared across all chain types (UTXO, EVM, Solana). Keys are "nodeID:orderID" to prevent
-// cross-tenant collisions in multi-tenant SaaS mode.
-var cancelableAutoConfirmInProgress sync.Map
 
 // ── Payment Strategy Registration ───────────────────────────────────────
 
@@ -52,7 +49,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	evmOps := &adapters.EVMChainOps{
 		Keys:            n.keyProvider,
 		Multiwallet:     n.multiwallet,
-		BuildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
+		BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
 		OnAutoConfirm:   n.handleCancelablePaymentForEVM,
 	}
 	evmStrategy := adapters.NewClientSignedAdapter(evmOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
@@ -64,7 +61,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	solOps := &adapters.SolanaChainOps{
 		Keys:            n.keyProvider,
 		Multiwallet:     n.multiwallet,
-		BuildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
+		BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
 		OnAutoConfirm:   n.handleCancelablePaymentForSolana,
 		NodeID:          n.nodeID,
 	}
@@ -74,7 +71,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	tronOps := &adapters.TRONChainOps{
 		Keys:            n.keyProvider,
 		Multiwallet:     n.multiwallet,
-		BuildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
+		BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
 		OnAutoConfirm:   n.handleCancelablePaymentForTRON,
 		TronClient:      n.tronClient,
 		NodeID:          n.nodeID,
@@ -116,4 +113,106 @@ func (n *MobazhaNode) handleCancelablePaymentForSolana(event *events.CancelableP
 
 func (n *MobazhaNode) handleCancelablePaymentForTRON(event *events.CancelablePaymentReady) {
 	n.settlementService.HandleCancelablePaymentForTRON(event)
+}
+
+// ── Cancelable payment event dispatching ─────────────────────────────────
+
+// startCancelablePaymentMonitor subscribes to CancelablePaymentReady events
+// synchronously (so the subscription is registered before any Emit calls),
+// then spawns a goroutine to consume and dispatch events.
+//
+// IMPORTANT: Must be called BEFORE startUTXOPaymentMonitor to avoid a race
+// where CheckPendingPaymentsOnStartup emits events before the subscriber
+// is registered (basicBus.Emit silently drops events with no subscribers).
+func (n *MobazhaNode) startCancelablePaymentMonitor() {
+	sub, err := n.eventBus.Subscribe(&events.CancelablePaymentReady{})
+	if err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "Failed to subscribe to CancelablePaymentReady events: %v", err)
+		return
+	}
+
+	logger.LogInfoWithIDf(log, n.nodeID, "Cancelable payment monitor started")
+
+	go func() {
+		for {
+			select {
+			case event := <-sub.Out():
+				if e, ok := event.(*events.CancelablePaymentReady); ok {
+					n.dispatchCancelablePayment(e)
+				}
+			case <-n.shutdown:
+				sub.Close()
+				logger.LogInfoWithIDf(log, n.nodeID, "Cancelable payment monitor stopped")
+				return
+			}
+		}
+	}()
+}
+
+func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentReady) {
+	coinType := iwallet.CoinType(event.Coin)
+
+	if n.paymentRegistry == nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "Payment registry not initialized, cannot dispatch order %s", event.OrderID)
+		return
+	}
+
+	if n.isSupplyChainManagedOrder(event.OrderID) {
+		logger.LogInfoWithIDf(log, n.nodeID,
+			"Skipping auto-confirm for supply-chain-managed order %s, waiting for supplier shipment", event.OrderID)
+		return
+	}
+
+	strategy, err := n.paymentRegistry.ForCoin(coinType)
+	if err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "No payment strategy for coin %s (order %s): %v", event.Coin, event.OrderID, err)
+		return
+	}
+
+	go func() {
+		if err := strategy.AutoConfirm(context.Background(), event); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "AutoConfirm failed for order %s (coin=%s): %v", event.OrderID, event.Coin, err)
+		}
+	}()
+}
+
+func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) bool {
+	if n.supplyChainService == nil {
+		return false
+	}
+
+	var order models.Order
+	err := n.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&order).Error
+	})
+	if err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID,
+			"SupplyChain check: cannot fetch order %s: %v", orderID, err)
+		return false
+	}
+
+	return n.isOrderManagedBySupplier(&order)
+}
+
+func (n *MobazhaNode) isOrderManagedBySupplier(order *models.Order) bool {
+	if n.supplyChainService == nil {
+		return false
+	}
+
+	oo, err := order.OrderOpenMessage()
+	if err != nil || oo == nil {
+		return false
+	}
+
+	var slugs []string
+	for _, item := range oo.Listings {
+		if item == nil || item.Listing == nil {
+			continue
+		}
+		slug := item.Listing.GetSlug()
+		if slug != "" {
+			slugs = append(slugs, slug)
+		}
+	}
+	return len(slugs) > 0 && n.supplyChainService.IsOrderAutoFulfillable(slugs)
 }

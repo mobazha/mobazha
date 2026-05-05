@@ -149,7 +149,7 @@ func TestDiscountEngine_PercentageCode(t *testing.T) {
 	svc.registerCode("SAVE10", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"SAVE10"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -169,7 +169,7 @@ func TestDiscountEngine_FixedAmountCode(t *testing.T) {
 	svc.registerCode("FLAT5", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"FLAT5"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -189,7 +189,7 @@ func TestDiscountEngine_FixedAmount_CappedToSubTotal(t *testing.T) {
 	svc.registerCode("BIG", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"BIG"},
 		SubTotal:      big.NewInt(3000),
 	})
@@ -208,7 +208,7 @@ func TestDiscountEngine_PercentageWithMaxCap(t *testing.T) {
 	svc.registerCode("HALF", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"HALF"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -226,7 +226,7 @@ func TestDiscountEngine_FreeShipping(t *testing.T) {
 	svc.registerCode("FREESHIP", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"FREESHIP"},
 		SubTotal:      big.NewInt(5000),
 	})
@@ -251,7 +251,7 @@ func TestDiscountEngine_AutomaticDiscount(t *testing.T) {
 	}
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		SubTotal: big.NewInt(10000),
 	})
 	require.NoError(t, err)
@@ -272,7 +272,7 @@ func TestDiscountEngine_MinPurchaseAmount_NotMet(t *testing.T) {
 	svc.registerCode("MIN50", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"MIN50"},
 		SubTotal:      big.NewInt(3000),
 	})
@@ -292,7 +292,7 @@ func TestDiscountEngine_MinPurchaseAmount_Met(t *testing.T) {
 	svc.registerCode("MIN50", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"MIN50"},
 		SubTotal:      big.NewInt(6000),
 	})
@@ -312,7 +312,7 @@ func TestDiscountEngine_MinQuantity_NotMet(t *testing.T) {
 	svc.registerCode("QTY3", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"QTY3"},
 		SubTotal:      big.NewInt(10000),
 		ItemQuantity:  2,
@@ -338,7 +338,7 @@ func TestDiscountEngine_Stacking_ProductAndOrder_Combinable(t *testing.T) {
 	svc.registerCode("ORDER5", dOrder, cOrder)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"PROD10", "ORDER5"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -365,7 +365,7 @@ func TestDiscountEngine_Stacking_ProductAndOrder_NotCombinable(t *testing.T) {
 	svc.registerCode("ORDER20", dOrder, cOrder)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"PROD10", "ORDER20"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -391,7 +391,7 @@ func TestDiscountEngine_Stacking_ShippingBlockedByNonCombinableDiscount(t *testi
 	svc.registerCode("SHIP", dShip, cShip)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"ORDER10", "SHIP"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -405,7 +405,7 @@ func TestDiscountEngine_InvalidCodeSkipped(t *testing.T) {
 	store := &mockEngineStore{}
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"NOSUCHCODE"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -425,7 +425,7 @@ func TestDiscountEngine_ExpiredDiscountFiltered(t *testing.T) {
 	svc.registerCode("OLD", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"OLD"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -444,7 +444,7 @@ func TestDiscountEngine_UsageLimitReachedFiltered(t *testing.T) {
 	svc.registerCode("USED", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"USED"},
 		SubTotal:      big.NewInt(10000),
 	})
@@ -463,7 +463,7 @@ func TestDiscountEngine_ProductScope_NoMatch(t *testing.T) {
 	svc.registerCode("PROD", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"PROD"},
 		ProductIDs:    []string{"prod99"},
 		SubTotal:      big.NewInt(10000),
@@ -477,7 +477,7 @@ func TestDiscountEngine_NoDiscounts(t *testing.T) {
 	store := &mockEngineStore{}
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		SubTotal: big.NewInt(10000),
 	})
 	require.NoError(t, err)
@@ -552,7 +552,7 @@ func TestDiscountEngine_CollectionScope_Match(t *testing.T) {
 	svc.registerCode("SUMMER", d, code)
 
 	engine := NewDiscountEngine(svc, store, colStore)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"SUMMER"},
 		ProductIDs:    []string{"tshirt-1"},
 		SubTotal:      big.NewInt(10000),
@@ -578,7 +578,7 @@ func TestDiscountEngine_CollectionScope_NoMatch(t *testing.T) {
 	svc.registerCode("SUMMER", d, code)
 
 	engine := NewDiscountEngine(svc, store, colStore)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"SUMMER"},
 		ProductIDs:    []string{"pants-1"},
 		SubTotal:      big.NewInt(10000),
@@ -598,7 +598,7 @@ func TestDiscountEngine_CollectionScope_NilStore(t *testing.T) {
 	svc.registerCode("COL", d, code)
 
 	engine := NewDiscountEngine(svc, store, nil)
-	result, err := engine.Calculate(context.Background(), DiscountContext{
+	result, err := engine.Calculate(context.Background(), models.DiscountContext{
 		DiscountCodes: []string{"COL"},
 		ProductIDs:    []string{"prod1"},
 		SubTotal:      big.NewInt(10000),

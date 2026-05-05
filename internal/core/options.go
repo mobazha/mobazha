@@ -13,6 +13,9 @@ import (
 	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
+	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
+	coresettlement "github.com/mobazha/mobazha3.0/internal/core/settlement"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
@@ -238,7 +241,7 @@ func (n *MobazhaNode) initPaymentVerificationService() {
 	if n.paymentVerificationService != nil {
 		return
 	}
-	n.paymentVerificationService = NewPaymentVerificationService(
+	n.paymentVerificationService = corepayment.NewPaymentVerificationService(
 		n.paymentRegistry,
 		n.multiwallet,
 		nil,
@@ -589,7 +592,7 @@ func (n *MobazhaNode) initOrderService() {
 		return
 	}
 
-	n.orderService = NewOrderAppService(OrderAppServiceConfig{
+	n.orderService = coreorder.NewOrderAppService(coreorder.OrderAppServiceConfig{
 		DB:             n.db,
 		Multiwallet:    n.multiwallet,
 		Signer:         n.signer,
@@ -618,9 +621,9 @@ func (n *MobazhaNode) initOrderService() {
 // buildDiscountResolver returns a DiscountResolverFunc that resolves discounts
 // for a vendor. In SaaS mode it crosses tenant boundaries via HostService;
 // in standalone mode it uses the local node's DiscountAppService.
-func (n *MobazhaNode) buildDiscountResolver() DiscountResolverFunc {
+func (n *MobazhaNode) buildDiscountResolver() coreorder.DiscountResolverFunc {
 	if n.hostService != nil {
-		return func(ctx context.Context, vendorPeerID string, dc DiscountContext) (*DiscountResult, error) {
+		return func(ctx context.Context, vendorPeerID string, dc models.DiscountContext) (*models.DiscountResult, error) {
 			pid, err := peer.Decode(vendorPeerID)
 			if err != nil {
 				return nil, fmt.Errorf("invalid vendor peerID: %w", err)
@@ -633,7 +636,7 @@ func (n *MobazhaNode) buildDiscountResolver() DiscountResolverFunc {
 		}
 	}
 	if n.discountService != nil {
-		return func(ctx context.Context, vendorPeerID string, dc DiscountContext) (*DiscountResult, error) {
+		return func(ctx context.Context, vendorPeerID string, dc models.DiscountContext) (*models.DiscountResult, error) {
 			store := n.discountService.Store()
 			if store == nil {
 				return nil, nil
@@ -650,7 +653,7 @@ func (n *MobazhaNode) buildDiscountResolver() DiscountResolverFunc {
 
 // buildDiscountRecorder returns a DiscountRedemptionRecorderFunc that records
 // discount usage on the vendor's store. Uses the same SaaS/standalone split.
-func (n *MobazhaNode) buildDiscountRecorder() DiscountRedemptionRecorderFunc {
+func (n *MobazhaNode) buildDiscountRecorder() coreorder.DiscountRedemptionRecorderFunc {
 	if n.hostService != nil {
 		return func(ctx context.Context, vendorPeerID string, discountID string, codeID *string, orderID, customerPeerID, amount, currency string) error {
 			pid, err := peer.Decode(vendorPeerID)
@@ -682,7 +685,7 @@ func (n *MobazhaNode) initPaymentService() {
 		return
 	}
 
-	n.paymentService = NewPaymentAppService(PaymentAppServiceConfig{
+	n.paymentService = corepayment.NewPaymentAppService(corepayment.PaymentAppServiceConfig{
 		DB:          n.db,
 		Multiwallet: n.multiwallet,
 		EventBus:    n.eventBus,
@@ -714,7 +717,7 @@ func (n *MobazhaNode) initSettlementService() {
 		solanaRelay = n.hostService.GetSolanaRelayService()
 	}
 
-	n.settlementService = NewSettlementService(SettlementServiceConfig{
+	n.settlementService = coresettlement.NewSettlementService(coresettlement.SettlementServiceConfig{
 		DB:                 n.db,
 		Multiwallet:        n.multiwallet,
 		Keys:               n.keyProvider,
@@ -729,7 +732,7 @@ func (n *MobazhaNode) initSettlementService() {
 	})
 
 	if n.paymentService != nil {
-		n.paymentService.SetSettlement(n.settlementService)
+		n.paymentService.SetEscrowOps(n.settlementService)
 	}
 }
 

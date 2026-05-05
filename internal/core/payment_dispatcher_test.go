@@ -1,8 +1,6 @@
 package core
 
 import (
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -221,89 +219,16 @@ func TestRegistryDispatch_UnknownCoinNotInRegistry(t *testing.T) {
 	}
 }
 
-// ── tryLockAutoConfirm ──────────────────────────────────────────────────
-
-func TestTryLockAutoConfirm_SingleOrder(t *testing.T) {
-	svc := &PaymentAppService{}
-
-	// First lock should succeed
-	unlock := svc.TryLockAutoConfirm("order-1")
-	if unlock == nil {
-		t.Fatal("first tryLockAutoConfirm should succeed")
-	}
-
-	// Second lock for same order should fail
-	unlock2 := svc.TryLockAutoConfirm("order-1")
-	if unlock2 != nil {
-		t.Fatal("second tryLockAutoConfirm for same order should return nil")
-	}
-
-	// After unlock, should be able to lock again
-	unlock()
-	unlock3 := svc.TryLockAutoConfirm("order-1")
-	if unlock3 == nil {
-		t.Fatal("tryLockAutoConfirm should succeed after unlock")
-	}
-	unlock3()
-}
-
-func TestTryLockAutoConfirm_DifferentOrders(t *testing.T) {
-	svc := &PaymentAppService{}
-
-	unlock1 := svc.TryLockAutoConfirm("order-1")
-	if unlock1 == nil {
-		t.Fatal("lock for order-1 should succeed")
-	}
-	defer unlock1()
-
-	// Different order should also succeed
-	unlock2 := svc.TryLockAutoConfirm("order-2")
-	if unlock2 == nil {
-		t.Fatal("lock for order-2 should succeed while order-1 is locked")
-	}
-	defer unlock2()
-}
-
-func TestTryLockAutoConfirm_ConcurrentSafety(t *testing.T) {
-	svc := &PaymentAppService{}
-	const orderID = "concurrent-order"
-
-	var lockCount int32
-	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			unlock := svc.TryLockAutoConfirm(orderID)
-			if unlock != nil {
-				atomic.AddInt32(&lockCount, 1)
-				// Hold lock briefly
-				unlock()
-			}
-		}()
-	}
-	wg.Wait()
-
-	// At least 1 goroutine must have acquired the lock, and all should eventually succeed
-	// (since they release quickly). The exact count depends on scheduling.
-	if lockCount == 0 {
-		t.Fatal("no goroutine was able to acquire the lock")
-	}
-	t.Logf("concurrent test: %d out of 100 goroutines acquired the lock", lockCount)
-}
-
-// ── dispatchCancelablePayment safety ────────────────────────────────────
+// ── dispatchCancelablePayment safety (MobazhaNode level) ────────────────
 
 func TestDispatchCancelablePayment_NilRegistrySafety(t *testing.T) {
-	svc := NewPaymentAppService(PaymentAppServiceConfig{
-		NodeID: "test-dispatch-nil",
-	})
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-dispatch-nil"}}
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("dispatchCancelablePayment panicked with nil registry: %v", r)
 		}
 	}()
-	svc.dispatchCancelablePayment(&events.CancelablePaymentReady{
+	n.dispatchCancelablePayment(&events.CancelablePaymentReady{
 		OrderID:       "test-nil-registry",
 		TransactionID: "test-tx",
 		Coin:          string(testBTCNativeCoin),
@@ -314,11 +239,6 @@ func TestDispatchCancelablePayment_NilRegistrySafety(t *testing.T) {
 func TestDispatchCancelablePayment_UnknownCoinSafety(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-dispatch"}}
 	n.registerPaymentStrategies()
-
-	svc := NewPaymentAppService(PaymentAppServiceConfig{
-		NodeID:          "test-dispatch",
-		PaymentRegistry: n.paymentRegistry,
-	})
 
 	testCases := []struct {
 		name string
@@ -335,7 +255,7 @@ func TestDispatchCancelablePayment_UnknownCoinSafety(t *testing.T) {
 					t.Errorf("dispatchCancelablePayment panicked for coin %q: %v", tc.coin, r)
 				}
 			}()
-			svc.dispatchCancelablePayment(&events.CancelablePaymentReady{
+			n.dispatchCancelablePayment(&events.CancelablePaymentReady{
 				OrderID:       "test-order-" + tc.name,
 				TransactionID: "test-tx",
 				Coin:          tc.coin,

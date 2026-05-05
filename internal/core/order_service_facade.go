@@ -3,6 +3,9 @@
 package core
 
 import (
+	"github.com/mobazha/mobazha3.0/internal/core/order"
+	"github.com/mobazha/mobazha3.0/internal/core/payment"
+	"github.com/mobazha/mobazha3.0/internal/core/settlement"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -11,9 +14,9 @@ import (
 // to satisfy contracts.OrderService. Most methods are promoted from the embedded
 // OrderAppService; bridged methods are defined explicitly below.
 type orderServiceFacade struct {
-	*OrderAppService
-	payment    *PaymentAppService
-	settlement *SettlementService
+	*order.OrderAppService
+	payment    *payment.PaymentAppService
+	settlement *settlement.SettlementService
 }
 
 func (f *orderServiceFacade) GetOrderInfo(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error) {

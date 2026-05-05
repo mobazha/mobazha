@@ -24,6 +24,7 @@ import (
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	coreorders "github.com/mobazha/mobazha-core/orders"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
@@ -657,7 +658,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
 	obNode.signer = signer
-	obNode.orderLockManager = NewOrderLockManager()
+	obNode.orderLockManager = coreorder.NewOrderLockManager()
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:               nodeID,
@@ -896,10 +897,10 @@ func (n *MobazhaNode) registerHandlers() {
 		return n.handleOrderMessage(from, message)
 	})
 	n.networkService.RegisterHandler(pb.Message_ADDRESS_REQUEST, func(from peer.ID, message *pb.Message) error {
-		return n.orderService.handleAddressRequest(from, message)
+		return n.orderService.HandleAddressRequest(from, message)
 	})
 	n.networkService.RegisterHandler(pb.Message_ADDRESS_RESPONSE, func(from peer.ID, message *pb.Message) error {
-		return n.orderService.handleAddressResponse(from, message)
+		return n.orderService.HandleAddressResponse(from, message)
 	})
 	n.networkService.RegisterHandler(pb.Message_PING, func(from peer.ID, message *pb.Message) error {
 		return n.handlePingMessage(from, message)
@@ -908,7 +909,7 @@ func (n *MobazhaNode) registerHandlers() {
 		return n.handlePongMessage(from, message)
 	})
 	n.networkService.RegisterHandler(pb.Message_DISPUTE, func(from peer.ID, message *pb.Message) error {
-		return n.orderService.handleDisputeMessage(from, message, n.isDuplicate, n.sendAckMessage)
+		return n.orderService.HandleDisputeMessage(from, message, n.isDuplicate, n.sendAckMessage)
 	})
 }
 
@@ -1293,7 +1294,7 @@ func newLightweightNode(
 		return nil, fmt.Errorf("lightweight: failed to create signer: %w", err)
 	}
 	obNode.signer = signer
-	obNode.orderLockManager = NewOrderLockManager()
+	obNode.orderLockManager = coreorder.NewOrderLockManager()
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:               nodeID,
@@ -1389,12 +1390,6 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 		obNode.supplyChainService.SetExchangeRates(obNode.exchangeRates)
 	}
 	if obNode.featureManager == nil || obNode.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled) {
-		if obNode.paymentService != nil {
-			obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)
-		}
-		if obNode.settlementService != nil {
-			obNode.settlementService.SetSupplyChainChecker(obNode.supplyChainService)
-		}
 		obNode.supplyChainService.StartFulfillmentMonitor()
 	}
 

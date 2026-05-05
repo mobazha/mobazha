@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/paypal"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/stripe"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -618,11 +619,11 @@ func TestE2E_Stripe_WebhookToBuyerRelay(t *testing.T) {
 	fiatSvc.SetOrderRepo(orderRepo)
 
 	mockMsgr := &capturingMessenger{}
-	sellerOrderSvc := newTestOrderAppService(t, OrderAppServiceConfig{
+	sellerOrderSvc := coreorder.NewTestOrderAppService(t, coreorder.OrderAppServiceConfig{
 		Messenger: mockMsgr,
 		Signer:    newMockSigner(),
 	})
-	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
+	coreorder.SeedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
 
 	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
 		pd, err := buildFiatPaymentData(event)
@@ -687,11 +688,11 @@ func TestE2E_PayPal_WebhookToBuyerRelay(t *testing.T) {
 	fiatSvc.SetOrderRepo(orderRepo)
 
 	mockMsgr := &capturingMessenger{}
-	sellerOrderSvc := newTestOrderAppService(t, OrderAppServiceConfig{
+	sellerOrderSvc := coreorder.NewTestOrderAppService(t, coreorder.OrderAppServiceConfig{
 		Messenger: mockMsgr,
 		Signer:    newMockSigner(),
 	})
-	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
+	coreorder.SeedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
 
 	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
 		pd, err := buildFiatPaymentData(event)
@@ -747,11 +748,11 @@ func TestE2E_Stripe_WebhookIdempotency_BuyerCalledOnce(t *testing.T) {
 	fiatSvc.SetOrderRepo(orderRepo)
 
 	mockMsgr := &capturingMessenger{}
-	sellerOrderSvc := newTestOrderAppService(t, OrderAppServiceConfig{
+	sellerOrderSvc := coreorder.NewTestOrderAppService(t, coreorder.OrderAppServiceConfig{
 		Messenger: mockMsgr,
 		Signer:    newMockSigner(),
 	})
-	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
+	coreorder.SeedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
 
 	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
 		pd, err := buildFiatPaymentData(event)

@@ -9,38 +9,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
-// DiscountContext holds all inputs needed to calculate applicable discounts.
-type DiscountContext struct {
-	DiscountCodes   []string
-	ProductIDs      []string
-	CustomerPeerID  string
-	PaymentCurrency string
-	SubTotal        *big.Int
-	ItemQuantity    int
-	// ConvertAmount converts a value in the discount's currency to the payment currency.
-	// Returns the converted amount as *big.Int in the smallest unit.
-	ConvertAmount func(amount string, fromCurrency string) (*big.Int, error)
-}
-
-// AppliedDiscount represents a single discount that has been applied.
-type AppliedDiscount struct {
-	DiscountID string `json:"discountID"`
-	CodeID     string `json:"codeID,omitempty"`
-	Title      string `json:"title"`
-	Code       string `json:"code,omitempty"`
-	ValueType  string `json:"valueType"`
-	Value      string `json:"value"`
-	Amount     string `json:"amount"`
-	Auto       bool   `json:"auto,omitempty"`
-}
-
-// DiscountResult holds the output of discount calculation.
-type DiscountResult struct {
-	AppliedDiscounts []AppliedDiscount `json:"appliedDiscounts,omitempty"`
-	DiscountsTotal   *big.Int          `json:"discountsTotal"`
-	ShippingDiscount bool              `json:"shippingDiscount"`
-}
-
 // DiscountEngine calculates applicable discounts for a checkout.
 type DiscountEngine struct {
 	svc             contracts.DiscountService
@@ -54,8 +22,8 @@ func NewDiscountEngine(svc contracts.DiscountService, store contracts.DiscountSt
 
 // Calculate evaluates all applicable discounts for the given context and returns
 // the optimal set considering stacking rules.
-func (e *DiscountEngine) Calculate(ctx context.Context, dc DiscountContext) (*DiscountResult, error) {
-	result := &DiscountResult{
+func (e *DiscountEngine) Calculate(ctx context.Context, dc models.DiscountContext) (*models.DiscountResult, error) {
+	result := &models.DiscountResult{
 		DiscountsTotal: big.NewInt(0),
 	}
 
@@ -146,7 +114,7 @@ func (e *DiscountEngine) Calculate(ctx context.Context, dc DiscountContext) (*Di
 
 		amountStr := new(big.Int).Neg(rd.amount).String()
 
-		result.AppliedDiscounts = append(result.AppliedDiscounts, AppliedDiscount{
+		result.AppliedDiscounts = append(result.AppliedDiscounts, models.AppliedDiscount{
 			DiscountID: c.discount.ID,
 			CodeID:     codeID,
 			Title:      c.discount.Title,
@@ -185,7 +153,7 @@ type resolvedDiscount struct {
 	amount    *big.Int
 }
 
-func (e *DiscountEngine) checkMinPurchase(d *models.Discount, dc DiscountContext) bool {
+func (e *DiscountEngine) checkMinPurchase(d *models.Discount, dc models.DiscountContext) bool {
 	switch d.MinPurchaseType {
 	case models.DiscountMinPurchaseAmount:
 		if d.MinAmount == nil {
@@ -233,7 +201,7 @@ func (e *DiscountEngine) checkProductScope(ctx context.Context, d *models.Discou
 	}
 }
 
-func (e *DiscountEngine) calculateAmount(d *models.Discount, dc DiscountContext) (*big.Int, bool) {
+func (e *DiscountEngine) calculateAmount(d *models.Discount, dc models.DiscountContext) (*big.Int, bool) {
 	switch d.ValueType {
 	case models.DiscountValuePercentage:
 		pct, ok := new(big.Int).SetString(d.Value, 10)

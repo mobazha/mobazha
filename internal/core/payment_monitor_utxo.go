@@ -120,7 +120,7 @@ func (n *MobazhaNode) GetMonitorService() utxo.UTXOMonitorService {
 // ── Thin delegates to PaymentAppService ─────────────────────────────────
 
 func (n *MobazhaNode) handleCancelablePaymentForUTXO(event *events.CancelablePaymentReady) {
-	n.paymentService.HandleCancelablePaymentForUTXO(event)
+	n.settlementService.HandleCancelablePaymentForUTXO(event)
 }
 
 func (n *MobazhaNode) handleUTXOPayment(tx iwallet.Transaction, wa *utxo.WatchedAddress) {
@@ -139,7 +139,7 @@ func (n *MobazhaNode) StopWatchingPayment(orderID string) error {
 
 func (n *MobazhaNode) verifyPendingPayments() {
 	if n.paymentService != nil {
-		n.paymentService.verifyPendingPayments()
+		n.paymentService.VerifyPendingPayments()
 	}
 }
 

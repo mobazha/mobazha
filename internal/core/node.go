@@ -3,6 +3,9 @@ package core
 import (
 	"encoding/json"
 
+	"github.com/mobazha/mobazha3.0/internal/core/order"
+	"github.com/mobazha/mobazha3.0/internal/core/payment"
+	"github.com/mobazha/mobazha3.0/internal/core/settlement"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
@@ -55,14 +58,14 @@ type lifecycleFields struct {
 	initialBootstrapChan chan struct{}
 	shutdown             chan struct{}
 	stopped              int32
-	orderLockManager     *OrderLockManager
+	orderLockManager     *order.OrderLockManager
 }
 
 // appServices groups all extracted App Service dependencies.
 type appServices struct {
-	paymentService             *PaymentAppService
-	settlementService          *SettlementService
-	orderService               *OrderAppService
+	paymentService             *payment.PaymentAppService
+	settlementService          *settlement.SettlementService
+	orderService               *order.OrderAppService
 	matrixChatService          contracts.MatrixChatService
 	matrixCryptoStore          interface{} // shared *dbutil.Database for SaaS multi-tenant; nil = SQLite
 	preferencesService         *PreferencesAppService
@@ -84,7 +87,7 @@ type appServices struct {
 	supplyChainService         *SupplyChainAppService
 	shippingService            *ShippingAppService
 	analyticsService           *AnalyticsAppService
-	paymentVerificationService *PaymentVerificationService
+	paymentVerificationService *payment.PaymentVerificationService
 	netDBSyncService           *NetDBSyncService
 	guestOrderService          *GuestOrderAppService
 	directPaymentService       *DirectPaymentService

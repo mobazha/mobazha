@@ -470,7 +470,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	}
 
 	// Start the cancelable payment monitor (same as production)
-	sellerNode.paymentService.StartCancelablePaymentMonitor()
+	sellerNode.startCancelablePaymentMonitor()
 
 	// Start order processors for message handling
 	for _, node := range network.Nodes() {
@@ -767,7 +767,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	}
 
 	// Start the cancelable payment monitor (key for auto-confirm)
-	sellerNode.paymentService.StartCancelablePaymentMonitor()
+	sellerNode.startCancelablePaymentMonitor()
 
 	// Start the order event monitor so OrderAutoConfirmRequest is handled
 	sellerNode.orderService.StartPaymentEventMonitor()

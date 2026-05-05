@@ -15,6 +15,7 @@ type EscrowOperations interface {
 	ReleaseCancelableFunds(order *models.Order, payoutAddress string) (iwallet.TransactionID, string, error)
 	ReleaseFromCancelableAddressWithParams(order *models.Order, params ReleaseFromCancelableParams) (iwallet.Tx, *iwallet.Transaction, error)
 	RelayInstructions(orderID string, coinType iwallet.CoinType, instructions any) (string, error)
+	CancelPartialPayment(orderID string) (txid string, refundedAmount uint64, err error)
 }
 
 // ReleaseFromCancelableParams holds parameters for releasing from a CANCELABLE escrow address.

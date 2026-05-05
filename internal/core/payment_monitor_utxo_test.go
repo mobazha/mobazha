@@ -11,6 +11,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/sources/electrum"
+	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -223,7 +224,7 @@ func TestUTXOMonitor_WatchAddress(t *testing.T) {
 		OrderID:        "order_123",
 		ExpectedAmount: 100000,
 		CreatedAt:      time.Now(),
-		ExpiresAt:      time.Now().Add(AddressMonitorDuration),
+		ExpiresAt:      time.Now().Add(corepayment.AddressMonitorDuration),
 	}
 
 	err := monitor.WatchAddress(wa)
@@ -249,7 +250,7 @@ func TestUTXOMonitor_PaymentDetection(t *testing.T) {
 		OrderID:        "order_456",
 		ExpectedAmount: 100000,
 		CreatedAt:      time.Now(),
-		ExpiresAt:      time.Now().Add(AddressMonitorDuration),
+		ExpiresAt:      time.Now().Add(corepayment.AddressMonitorDuration),
 	}
 
 	err := monitor.WatchAddress(wa)

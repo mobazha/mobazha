@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat"
 )
 
@@ -27,12 +28,12 @@ func TestWireServiceSetters_BackfillsOrderFiatOps(t *testing.T) {
 	node := &MobazhaNode{}
 	node.db = db
 	node.nodeID = "test-node"
-	node.orderService = NewOrderAppService(OrderAppServiceConfig{})
+	node.orderService = coreorder.NewOrderAppService(coreorder.OrderAppServiceConfig{})
 	node.fiatPaymentService = NewFiatPaymentAppService(fiat.NewRegistry(), db, node.nodeID, false)
 
 	node.wireServiceSetters()
 
-	if node.orderService.fiatOps == nil {
+	if node.orderService.FiatOpsForTesting() == nil {
 		t.Fatal("expected wireServiceSetters to backfill orderService fiatOps")
 	}
 }

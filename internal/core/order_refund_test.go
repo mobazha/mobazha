@@ -647,7 +647,7 @@ func Test_buildRefundMessage(t *testing.T) {
 			t.Errorf("Test %d: setup failed: %s", i, err)
 		}
 
-		_, msg, err := n.orderService.buildRefundMessage(&order, net.Wallets()[0], "")
+		_, msg, err := n.orderService.BuildRefundMessageForTesting(&order, net.Wallets()[0], "")
 		if err != nil {
 			t.Errorf("Test %d: build failed: %s", i, err)
 			continue

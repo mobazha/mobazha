@@ -7,13 +7,13 @@
 ```
 订单状态机（链无关）
      ↓ 查询
-Payment Registry（ChainType → PaymentStrategy 映射）
+Payment Registry（ChainType → ChainEscrow 映射）
      ↓ 分发
 链特定策略实现（UTXO / EVM / Solana）
 ```
 
 - **Registry**（`pkg/payment/`）：按 `ChainType` 注册和查找策略
-- **PaymentStrategy 接口**：定义支付模型声明 + 自动确认 + 指令生成（4 个生命周期方法）
+- **ChainEscrow 接口**：定义支付模型声明 + 自动确认 + 指令生成（4 个生命周期方法）
 - **Adapter 实现**（每链一个文件，在 `internal/core/`，统一 `payment_` 前缀）：
   - `payment_strategy_utxo.go` — `utxoAutoConfirmAdapter`：UTXO 链（BTC/BCH/LTC/ZEC），后端监控+签名广播
   - `payment_strategy_evm.go` — `evmAutoConfirmAdapter`：EVM 链（ETH/BSC 等），客户端签名 + 平台 Relay
@@ -179,7 +179,7 @@ UTXO:   escrowWallet.SignMultisigTransaction(txn, key, script) → chain-native
 | `GetReleaseFundsInstructions` | 释放争议资金 | `order_disputes.go` |
 | `GetRefundOrderInstructions` | 退款/拒绝订单 | `order_reject.go` |
 
-### 4.2 PaymentStrategy 接口方法
+### 4.2 ChainEscrow 接口方法
 
 每个方法通过 Registry 分发到链策略，返回 `InstructionResult`：
 - `nil` Instructions → 后端处理（UTXO）
@@ -363,7 +363,7 @@ EVM/Solana 智能合约的 `_verifyTransaction` / `verify_signatures_with_timelo
 
 **决策**：`InstructionParams` 中的 `OrderData` 和 `ReleaseInfo` 字段使用 `any` 而非具体类型。
 
-**原因**：`PaymentStrategy` 接口定义在 `pkg/payment/`（公共 API 层），如果引入 `*models.Order` 或 `*pb.EscrowRelease` 会导致 pkg 层依赖 pkg/models 和 pkg/orders/mbzpb，增加包耦合。使用 `any` + 适配器中类型断言保持了接口的轻量和独立性。
+**原因**：`ChainEscrow` 接口定义在 `pkg/payment/`（公共 API 层），如果引入 `*models.Order` 或 `*pb.EscrowRelease` 会导致 pkg 层依赖 pkg/models 和 pkg/orders/mbzpb，增加包耦合。使用 `any` + 适配器中类型断言保持了接口的轻量和独立性。
 
 **权衡**：丧失编译时类型安全，但适配器中的类型断言提供了运行时保障，且错误信息清晰（如 "OrderData must be *models.Order"）。
 

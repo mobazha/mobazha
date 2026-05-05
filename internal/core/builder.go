@@ -43,10 +43,10 @@ import (
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/fulfillment"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/fulfillment"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -1391,6 +1391,9 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 	if obNode.featureManager == nil || obNode.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled) {
 		if obNode.paymentService != nil {
 			obNode.paymentService.SetSupplyChainChecker(obNode.supplyChainService)
+		}
+		if obNode.settlementService != nil {
+			obNode.settlementService.SetSupplyChainChecker(obNode.supplyChainService)
 		}
 		obNode.supplyChainService.StartFulfillmentMonitor()
 	}

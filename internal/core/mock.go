@@ -13,10 +13,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
-	ma "github.com/multiformats/go-multiaddr"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/chains"
+	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -31,6 +30,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // MockNode builds a mock node with a temp data directory,
@@ -199,6 +199,7 @@ func MockNode() (*MobazhaNode, error) {
 	seedMockShippingProfile(node)
 	node.initListingService()
 	node.initPaymentService()
+	node.initSettlementService()
 	node.initPaymentVerificationService()
 	node.initOrderService()
 	node.wireServiceSetters()
@@ -225,9 +226,9 @@ func MockNode() (*MobazhaNode, error) {
 
 // MockNet represents a network of connected mock nodes.
 type Mocknet struct {
-	nodes   []*MobazhaNode
+	nodes  []*MobazhaNode
 	p2pNet mocknet.Mocknet
-	wn      *wallet.MockWalletNetwork
+	wn     *wallet.MockWalletNetwork
 }
 
 // NewMocknet returns a new MockNet with all nodes linked and connected.
@@ -406,6 +407,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		seedMockShippingProfile(node)
 		node.initListingService()
 		node.initPaymentService()
+		node.initSettlementService()
 		node.initPaymentVerificationService()
 		node.initOrderService()
 		node.wireServiceSetters()
@@ -628,21 +630,21 @@ func (d *dbViewPublicData) GetMediaByCID(cidHash string) ([]byte, string, error)
 }
 
 // Write stubs — coTenantPublicData callers only read.
-func (d *dbViewPublicData) SetProfile(*models.Profile) error            { return nil }
-func (d *dbViewPublicData) SetFollowers(models.Followers) error         { return nil }
-func (d *dbViewPublicData) SetFollowing(models.Following) error         { return nil }
-func (d *dbViewPublicData) SetListingIndex(models.ListingIndex) error   { return nil }
-func (d *dbViewPublicData) SetListing(*pb.SignedListing) error          { return nil }
-func (d *dbViewPublicData) SetEncryptedListing(string, []byte) error    { return nil }
-func (d *dbViewPublicData) DeleteListing(string) error                  { return nil }
-func (d *dbViewPublicData) SetRatingIndex(models.RatingIndex) error     { return nil }
-func (d *dbViewPublicData) SetRating(*pb.Rating) error                  { return nil }
-func (d *dbViewPublicData) SetPostIndex([]models.PostData) error        { return nil }
-func (d *dbViewPublicData) AddPost(*postsPb.SignedPost) error           { return nil }
-func (d *dbViewPublicData) DeletePost(string) error                     { return nil }
-func (d *dbViewPublicData) SetImage(models.Image) error                 { return nil }
-func (d *dbViewPublicData) SetUploadedFile(models.UploadedFile) error   { return nil }
-func (d *dbViewPublicData) SetIntroVideo(models.IntroVideo) error       { return nil }
+func (d *dbViewPublicData) SetProfile(*models.Profile) error          { return nil }
+func (d *dbViewPublicData) SetFollowers(models.Followers) error       { return nil }
+func (d *dbViewPublicData) SetFollowing(models.Following) error       { return nil }
+func (d *dbViewPublicData) SetListingIndex(models.ListingIndex) error { return nil }
+func (d *dbViewPublicData) SetListing(*pb.SignedListing) error        { return nil }
+func (d *dbViewPublicData) SetEncryptedListing(string, []byte) error  { return nil }
+func (d *dbViewPublicData) DeleteListing(string) error                { return nil }
+func (d *dbViewPublicData) SetRatingIndex(models.RatingIndex) error   { return nil }
+func (d *dbViewPublicData) SetRating(*pb.Rating) error                { return nil }
+func (d *dbViewPublicData) SetPostIndex([]models.PostData) error      { return nil }
+func (d *dbViewPublicData) AddPost(*postsPb.SignedPost) error         { return nil }
+func (d *dbViewPublicData) DeletePost(string) error                   { return nil }
+func (d *dbViewPublicData) SetImage(models.Image) error               { return nil }
+func (d *dbViewPublicData) SetUploadedFile(models.UploadedFile) error { return nil }
+func (d *dbViewPublicData) SetIntroVideo(models.IntroVideo) error     { return nil }
 func (d *dbViewPublicData) IndexMediaCID(string, string, string, string, string) error {
 	return nil
 }

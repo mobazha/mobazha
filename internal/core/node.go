@@ -61,6 +61,7 @@ type lifecycleFields struct {
 // appServices groups all extracted App Service dependencies.
 type appServices struct {
 	paymentService             *PaymentAppService
+	settlementService          *SettlementService
 	orderService               *OrderAppService
 	matrixChatService          contracts.MatrixChatService
 	matrixCryptoStore          interface{} // shared *dbutil.Database for SaaS multi-tenant; nil = SQLite

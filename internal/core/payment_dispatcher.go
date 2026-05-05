@@ -92,6 +92,10 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.paymentService.SetRegistry(n.paymentRegistry)
 		n.paymentService.SetReceiptVerifier(compositeVerifier)
 	}
+	if n.settlementService != nil {
+		n.settlementService.SetRegistry(n.paymentRegistry)
+		n.settlementService.SetReceiptVerifier(compositeVerifier)
+	}
 	if n.orderService != nil {
 		n.orderService.SetRegistry(n.paymentRegistry)
 		n.orderService.SetReceiptVerifier(compositeVerifier)
@@ -100,15 +104,16 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 }
 
 // ── Thin delegates for strategy callbacks ────────────────────────────────
+// These delegate to SettlementService for money-out operations.
 
 func (n *MobazhaNode) handleCancelablePaymentForEVM(event *events.CancelablePaymentReady, chainType string) {
-	n.paymentService.HandleCancelablePaymentForEVM(event, chainType)
+	n.settlementService.HandleCancelablePaymentForEVM(event, chainType)
 }
 
 func (n *MobazhaNode) handleCancelablePaymentForSolana(event *events.CancelablePaymentReady) {
-	n.paymentService.HandleCancelablePaymentForSolana(event)
+	n.settlementService.HandleCancelablePaymentForSolana(event)
 }
 
 func (n *MobazhaNode) handleCancelablePaymentForTRON(event *events.CancelablePaymentReady) {
-	n.paymentService.HandleCancelablePaymentForTRON(event)
+	n.settlementService.HandleCancelablePaymentForTRON(event)
 }

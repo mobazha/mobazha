@@ -62,6 +62,7 @@ func (n *MobazhaNode) Media() contracts.MediaService {
 	}
 	return n.mediaService
 }
+
 // MatrixChat returns the node-side Matrix chat service (mautrix-go backed).
 // Returns nil if the service hasn't been initialized (e.g. no Matrix config).
 func (n *MobazhaNode) MatrixChat() contracts.MatrixChatService {
@@ -238,6 +239,7 @@ func (n *MobazhaNode) Order() contracts.OrderService {
 	return &orderServiceFacade{
 		OrderAppService: n.orderService,
 		payment:         n.paymentService,
+		settlement:      n.settlementService,
 	}
 }
 

@@ -5,9 +5,9 @@ package core
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	internalutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -38,9 +38,12 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 		logger.LogInfoWithIDf(log, n.nodeID, "Created standalone UTXO monitor")
 	}
 
-	// Inject monitor into PaymentAppService
+	// Inject monitor into PaymentAppService and SettlementService
 	if n.paymentService != nil {
 		n.paymentService.SetMonitorService(n.monitorService)
+	}
+	if n.settlementService != nil {
+		n.settlementService.SetMonitorService(n.monitorService)
 	}
 
 	// Register callback — routes to PaymentAppService
@@ -93,6 +96,9 @@ func (n *MobazhaNode) StopUTXOPaymentMonitor() {
 	if n.paymentService != nil {
 		n.paymentService.SetMonitorService(nil)
 	}
+	if n.settlementService != nil {
+		n.settlementService.SetMonitorService(nil)
+	}
 }
 
 // SetUTXOMonitor sets a custom UTXO monitor (primarily for testing).
@@ -100,6 +106,9 @@ func (n *MobazhaNode) SetUTXOMonitor(monitor *utxo.Monitor) {
 	n.monitorService = monitor
 	if n.paymentService != nil {
 		n.paymentService.SetMonitorService(monitor)
+	}
+	if n.settlementService != nil {
+		n.settlementService.SetMonitorService(monitor)
 	}
 }
 
@@ -128,7 +137,6 @@ func (n *MobazhaNode) StopWatchingPayment(orderID string) error {
 
 // ── Payment verification & event monitors ───────────────────────────────
 
-
 func (n *MobazhaNode) verifyPendingPayments() {
 	if n.paymentService != nil {
 		n.paymentService.verifyPendingPayments()
@@ -142,4 +150,3 @@ func (n *MobazhaNode) startPaymentEventMonitors() {
 		n.orderService.StartPaymentEventMonitor()
 	}
 }
-

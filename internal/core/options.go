@@ -19,10 +19,11 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/storage"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/deploy"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/deploy"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/relay"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -90,8 +91,9 @@ func WithNodeFeatureProvider(p pkgconfig.NodeFeatureProvider) NodeOption {
 //	 1   │ profileService       │                                         │
 //	 2   │ moderationService    │                                         │
 //	 3   │ listingService       │                                         │
-//	 4   │ paymentService       │ profileService (PeerProfileReader)       │ fiatPaymentService (FiatPaymentQuery)
-//	 5   │ orderService         │ paymentService (EscrowOperations)        │
+//	 4   │ paymentService       │ profileService (PeerProfileReader)       │ fiatPaymentService, settlement
+//	4.5  │ settlementService    │ paymentService (UTXOKeyDeriver)          │ paymentRegistry, receiptVerifier, supplyChainChecker, monitorService
+//	 5   │ orderService         │ settlementService (EscrowOperations)     │
 //	     │                      │ listingService (ListingQuery)            │
 //	     │                      │ moderationService (ModeratorQuery)       │
 //	 6   │ chatService          │                                         │
@@ -129,6 +131,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initModerationService()
 	n.initListingService()
 	n.initPaymentService()
+	n.initSettlementService()
 	n.initPaymentVerificationService()
 	n.initOrderService()
 	n.wireServiceSetters()
@@ -602,7 +605,7 @@ func (n *MobazhaNode) initOrderService() {
 		OrderLockMgr:   n.orderLockManager,
 		Shutdown:       n.shutdown,
 
-		Escrow:     n.paymentService,
+		Escrow:     n.settlementService,
 		Listings:   n.listingService,
 		Moderators: n.moderationService,
 		Profiles:   n.profileService,
@@ -679,13 +682,6 @@ func (n *MobazhaNode) initPaymentService() {
 		return
 	}
 
-	var evmRelay EVMRelayService
-	var solanaRelay SolanaRelayService
-	if n.hostService != nil {
-		evmRelay = n.hostService.GetEVMRelayService()
-		solanaRelay = n.hostService.GetSolanaRelayService()
-	}
-
 	n.paymentService = NewPaymentAppService(PaymentAppServiceConfig{
 		DB:          n.db,
 		Multiwallet: n.multiwallet,
@@ -698,11 +694,43 @@ func (n *MobazhaNode) initPaymentService() {
 
 		Keys:          n.keyProvider,
 		ExchangeRates: n.exchangeRates,
+	})
+}
 
+// initSettlementService creates the SettlementService and wires it
+// into PaymentAppService. Called after initPaymentService.
+//
+// Note: paymentRegistry is nil at construction time; it is wired later
+// by registerPaymentStrategies() which also calls SetRegistry on settlement.
+func (n *MobazhaNode) initSettlementService() {
+	if n.infrastructureOnly {
+		return
+	}
+
+	var evmRelay relay.EVMRelayService
+	var solanaRelay relay.SolanaRelayService
+	if n.hostService != nil {
+		evmRelay = n.hostService.GetEVMRelayService()
+		solanaRelay = n.hostService.GetSolanaRelayService()
+	}
+
+	n.settlementService = NewSettlementService(SettlementServiceConfig{
+		DB:                 n.db,
+		Multiwallet:        n.multiwallet,
+		Keys:               n.keyProvider,
+		EventBus:           n.eventBus,
+		NodeID:             n.nodeID,
+		MonitorService:     n.monitorService,
+		EscrowMasterPubKey: n.escrowMasterKey.PubKey(),
+		UTXOKeyDeriver:     n.paymentService,
 		EVMRelayService:    evmRelay,
 		SolanaRelayService: solanaRelay,
 		RelayAPIURL:        n.relayAPIURL,
 	})
+
+	if n.paymentService != nil {
+		n.paymentService.SetSettlement(n.settlementService)
+	}
 }
 
 // initProfileService creates the ProfileAppService.

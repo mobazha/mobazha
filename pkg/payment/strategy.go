@@ -1,21 +1,21 @@
-// Package payment defines the payment strategy abstraction layer.
+// Package payment defines the chain escrow abstraction layer.
 //
 // This package provides the [ChainEscrow] interface and [Registry] that
 // decouple chain-specific payment logic from the core order state machine.
 // Each blockchain (UTXO, EVM, Solana, etc.) implements ChainEscrow to
 // declare its payment paradigm and handle chain-specific operations.
 //
-// Architecture (Strategy + Registry):
+// Architecture (ChainEscrow + Registry):
 //
 //	Order State Machine (chain-agnostic)
 //	         ↓ queries
-//	Payment Registry (maps ChainType → Strategy)
+//	Payment Registry (maps ChainType → ChainEscrow)
 //	         ↓ dispatches to
-//	Chain Strategy Implementations (chain-specific)
+//	ChainEscrow implementations (chain-specific)
 //
 // The order state machine remains completely chain-agnostic. When a state
 // transition requires a chain-specific operation (e.g., escrow release,
-// fund refund), it queries the registry to get the appropriate strategy.
+// fund refund), it queries the registry to get the appropriate ChainEscrow implementation.
 //
 // Capabilities:
 //   - AutoConfirm dispatch: handles CANCELABLE payment auto-confirmation

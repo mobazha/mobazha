@@ -737,7 +737,7 @@ func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, ini
 
 	refundStrategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
 	if refundStrategy.Model() == payment.PaymentModelMonitored {
@@ -773,7 +773,7 @@ func resolveFiatProvider(order *models.Order, paymentSent *pb.PaymentSent) strin
 }
 
 // GetEscrowReleaseInstructions delegates escrow release instruction generation
-// to the payment strategy. This is used by both cancel and refund flows.
+// to the ChainEscrow implementation. This is used by both cancel and refund flows.
 func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, initiatorAddress string, toAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
@@ -795,7 +795,7 @@ func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, i
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
 	result, err := strategy.GetCancelInstructions(context.Background(), payment.InstructionParams{
@@ -842,7 +842,7 @@ func (s *OrderAppService) buildRefundMessage(order *models.Order, wallet iwallet
 
 	strategy, err := s.paymentRegistry.ForCoin(iwallet.CoinType(paymentSent.Coin))
 	if err != nil {
-		return nil, nil, fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return nil, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 	isClientSigned := strategy.Model() == payment.PaymentModelClientSigned
 	if isClientSigned {
@@ -1217,7 +1217,7 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	coinType := iwallet.CoinType(paymentSent.Coin)
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return nil, fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
 	if strategy.Model() == payment.PaymentModelClientSigned {

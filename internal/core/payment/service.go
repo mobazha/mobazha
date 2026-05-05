@@ -186,7 +186,7 @@ func (s *PaymentAppService) SetPaymentRecorder(pr VerifiedPaymentRecorder) {
 func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, params models.InitializeEscrowData) (*payment.PaymentSetupResult, error) {
 	strategy, err := s.paymentRegistry.ForCoin(params.CoinType)
 	if err != nil {
-		return nil, fmt.Errorf("no payment strategy for coin %s: %w", params.CoinType, err)
+		return nil, fmt.Errorf("no chain escrow for coin %s: %w", params.CoinType, err)
 	}
 	return strategy.GeneratePaymentInstructions(ctx, payment.PaymentSetupParams{
 		OrderID:      params.OrderID,

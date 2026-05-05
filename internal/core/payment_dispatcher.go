@@ -165,7 +165,7 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 
 	strategy, err := n.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		logger.LogWarningWithIDf(log, n.nodeID, "No payment strategy for coin %s (order %s): %v", event.Coin, event.OrderID, err)
+		logger.LogWarningWithIDf(log, n.nodeID, "No chain escrow for coin %s (order %s): %v", event.Coin, event.OrderID, err)
 		return
 	}
 

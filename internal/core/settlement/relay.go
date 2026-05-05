@@ -49,7 +49,7 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return "", payoutAddress, fmt.Errorf("no payment strategy for coin %s: %w", coinType, err)
+		return "", payoutAddress, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
 	switch strategy.Model() {
@@ -275,7 +275,7 @@ func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, 
 	}
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
 	result, err := strategy.GetConfirmInstructions(context.Background(), payment.InstructionParams{

@@ -526,7 +526,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 
 	disputeStrategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
 	totalFee, err := disputeStrategy.EstimateEscrowFee(paymentSent.Coin, 2, 3, iwallet.FlNormal)
@@ -1085,7 +1085,7 @@ func (s *OrderAppService) GetReleaseFundsInstructions(orderID models.OrderID, in
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
 	result, err := strategy.GetDisputeReleaseInstructions(context.Background(), payment.InstructionParams{

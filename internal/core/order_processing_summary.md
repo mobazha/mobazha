@@ -2,22 +2,22 @@
 
 ## 1. 架构概览
 
-### 1.1 支付策略模式（Strategy + Registry）
+### 1.1 ChainEscrow + Registry（注册表分发）
 
 ```
 订单状态机（链无关）
      ↓ 查询
 Payment Registry（ChainType → ChainEscrow 映射）
      ↓ 分发
-链特定策略实现（UTXO / EVM / Solana）
+链特定 ChainEscrow 实现（UTXO / EVM / Solana）
 ```
 
-- **Registry**（`pkg/payment/`）：按 `ChainType` 注册和查找策略
+- **Registry**（`pkg/payment/`）：按 `ChainType` 注册和查找 ChainEscrow
 - **ChainEscrow 接口**：定义支付模型声明 + 自动确认 + 指令生成（4 个生命周期方法）
-- **Adapter 实现**（每链一个文件，在 `internal/core/`，统一 `payment_` 前缀）：
-  - `payment_strategy_utxo.go` — `utxoAutoConfirmAdapter`：UTXO 链（BTC/BCH/LTC/ZEC），后端监控+签名广播
-  - `payment_strategy_evm.go` — `evmAutoConfirmAdapter`：EVM 链（ETH/BSC 等），客户端签名 + 平台 Relay
-  - `payment_strategy_solana.go` — `solanaAutoConfirmAdapter`：Solana，客户端签名（Relay 暂未实现）
+- **ChainEscrow 适配器**（每链一个文件，在 `internal/payment/adapters/`）：
+  - `utxo.go` — `utxoAutoConfirmAdapter`：UTXO 链（BTC/BCH/LTC/ZEC），后端监控+签名广播
+  - `evm.go` — `evmAutoConfirmAdapter`：EVM 链（ETH/BSC 等），客户端签名 + 平台 Relay
+  - `solana.go` — `solanaAutoConfirmAdapter`：Solana，客户端签名（Relay 暂未实现）
 
 ### 1.2 支付模型（PaymentModel）
 
@@ -181,11 +181,11 @@ UTXO:   escrowWallet.SignMultisigTransaction(txn, key, script) → chain-native
 
 ### 4.2 ChainEscrow 接口方法
 
-每个方法通过 Registry 分发到链策略，返回 `InstructionResult`：
+每个方法通过 Registry 分发到对应 ChainEscrow，返回 `InstructionResult`：
 - `nil` Instructions → 后端处理（UTXO）
 - 非 `nil` Instructions → 前端签名提交（EVM/Solana）
 
-| 策略方法 | 用途 | UTXO | EVM/Solana |
+| ChainEscrow 方法 | 用途 | UTXO | EVM/Solana |
 |----------|------|------|------------|
 | `GetConfirmInstructions` | 确认 CANCELABLE 订单 | nil（后端释放） | 返回 escrow 释放指令 |
 | `GetCancelInstructions` | 取消 CANCELABLE 订单 | nil（后端释放） | 返回 escrow 释放指令 |
@@ -249,7 +249,7 @@ EVM/Solana 智能合约的 `_verifyTransaction` / `verify_signatures_with_timelo
 钱包监控检测到付款
   → 发布 CancelablePaymentReady 事件
     → subscribeCancelablePayments 接收
-      → dispatchCancelablePayment 通过 Registry 查找策略
+      → dispatchCancelablePayment 通过 Registry 查找 ChainEscrow
         → strategy.AutoConfirm() 执行链特定逻辑
 ```
 
@@ -331,10 +331,10 @@ EVM/Solana 智能合约的 `_verifyTransaction` / `verify_signatures_with_timelo
 | `order_refund.go` | 退款处理（DIRECT/MODERATED/EVM/Solana） |
 | `order_disputes.go` | 争议处理（开启/关闭/释放/超时释放） |
 | `order_address_request.go` | 订单支付地址请求 |
-| `payment_dispatcher.go` | 策略注册 + 自动确认监控 + 共享辅助函数 |
-| `payment_strategy_utxo.go` | UTXO 链支付策略适配器 |
-| `payment_strategy_evm.go` | EVM 链支付策略适配器 |
-| `payment_strategy_solana.go` | Solana 链支付策略适配器 |
+| `payment_dispatcher.go` | ChainEscrow 注册 + 自动确认监控 + 共享辅助函数 |
+| `internal/payment/adapters/utxo.go` | UTXO 链 ChainEscrow 适配器 |
+| `internal/payment/adapters/evm.go` | EVM 链 ChainEscrow 适配器 |
+| `internal/payment/adapters/solana.go` | Solana 链 ChainEscrow 适配器 |
 | `payment_relay_evm.go` | EVM 链 relay 交易执行（HostService / HTTP） |
 | `payment_relay.go` | ViaRelay 方法 + relayOrDirect + relayInstructions |
 | `payment_monitor_utxo.go` | UTXO 支付监控 + 地址订阅 + 多笔聚合 |
@@ -351,13 +351,13 @@ EVM/Solana 智能合约的 `_verifyTransaction` / `verify_signatures_with_timelo
 
 ## 10. 架构决策记录（ADR）
 
-### ADR-1: 适配器放在 internal/core/ 而非 internal/payment/
+### ADR-1: ChainEscrow 适配器位置（`internal/payment/adapters/`）
 
-**决策**：chain adapter（utxoAutoConfirmAdapter 等）保留在 `internal/core/` 而非移到 `internal/payment/utxo/`。
+**决策**：UTXO/EVM/Solana/client-signed 的 ChainEscrow 适配器位于 `internal/payment/adapters/`（如 `utxo.go`、`evm.go`、`solana.go`、`client_signed.go`），由 `internal/core/payment_dispatcher.go` 在 `registerPaymentStrategies()` 中注册到 `paymentRegistry`。
 
-**原因**：适配器需要深度访问 `MobazhaNode` 的内部资源（wallet、DB、messenger、signer），如果放到独立包需要暴露大量内部接口。适配器只是薄薄的转发层，逻辑本身由 `MobazhaNode` 方法实现，留在 `internal/core/` 保持耦合显式可控。
+**原因**：适配器通过 `pkg/contracts` 的 ports 与节点注入的回调访问钱包/签名等能力，与订单状态机解耦；链上 calldata/指令的纯构建逻辑保留在 `internal/payment/evm/`、`internal/payment/solana/` 等子包。
 
-**影响**：`internal/payment/evm/` 和 `internal/payment/solana/` 仅包含纯计算逻辑（BuildXxxInstructions / SignEscrowRelease），不依赖 MobazhaNode。
+**影响**：订单与支付验证代码只通过 `payment.Registry` 解析 `ChainEscrow`，不直接依赖具体适配器类型。
 
 ### ADR-2: InstructionParams.OrderData / ReleaseInfo 使用 any 类型
 
@@ -394,7 +394,7 @@ EVM/Solana 智能合约的 `_verifyTransaction` / `verify_signatures_with_timelo
 **现状**：`MobazhaNode` 有 311 个方法，分布在 81 个文件中（29K+ 行）。这是典型的 God Object，但因项目演进历史而形成，不适合一次性重构。
 
 **命名约定（已实施）**：通过文件前缀按域分组，使目录中相关文件自然聚合：
-- `payment_*` — 支付策略、relay、监控、escrow、stripe、rwa、收款账户
+- `payment_*` — ChainEscrow 分发（dispatcher）、relay、监控、escrow、stripe、rwa、收款账户
 - `chain_*` — 链客户端初始化（EVM、Solana）
 - 订单生命周期保持原名（confirm、cancel、refund、reject、completion、disputes）
 

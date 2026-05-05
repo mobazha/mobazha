@@ -402,8 +402,8 @@ func waitForDone(t *testing.T, done chan struct{}, opName string) {
 
 // ── Registry-Driven Order Lifecycle Tests ────────────────────────────────
 //
-// These tests validate the full order lifecycle with the payment strategy
-// registry initialized. They serve two purposes:
+// These tests validate the full order lifecycle with chain escrow dispatch via Registry
+// once the registry is initialized. They serve two purposes:
 //
 // 1. Verify the registry setup doesn't interfere with normal order flows
 // 2. Validate the complete happy path: Purchase → Payment → Confirm → Ship → Complete

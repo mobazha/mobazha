@@ -203,7 +203,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_NoCoinStrategy(t *testing
 		CoinType: iwallet.CoinType("NONEXISTENT"),
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no payment strategy")
+	assert.Contains(t, err.Error(), "no chain escrow")
 }
 
 func TestPaymentAppService_GeneratePaymentInstructions_StrategyError(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 
 // Registry maps ChainType to ChainEscrow.
 //
-// Strategies are registered during node initialization and looked up at runtime
+// Chain escrow implementations are registered during node initialization and looked up at runtime
 // when chain-specific payment operations are needed. The registry is safe for
 // concurrent access.
 //
@@ -26,15 +26,15 @@ type Registry struct {
 	strategies map[iwallet.ChainType]ChainEscrow
 }
 
-// NewRegistry creates an empty payment strategy registry.
+// NewRegistry creates an empty chain escrow registry.
 func NewRegistry() *Registry {
 	return &Registry{
 		strategies: make(map[iwallet.ChainType]ChainEscrow),
 	}
 }
 
-// Register adds or replaces a payment strategy for the given chain.
-// If a strategy was previously registered for this chain, it is overwritten.
+// Register adds or replaces the ChainEscrow implementation for the given chain.
+// If a ChainEscrow implementation was previously registered for this chain, it is overwritten.
 func (r *Registry) Register(chain iwallet.ChainType, strategy ChainEscrow) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -42,18 +42,18 @@ func (r *Registry) Register(chain iwallet.ChainType, strategy ChainEscrow) {
 }
 
 // ForChain returns the ChainEscrow registered for the given chain type.
-// Returns an error if no strategy is registered for the chain.
+// Returns an error if no chain escrow is registered for the chain.
 func (r *Registry) ForChain(chain iwallet.ChainType) (ChainEscrow, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	s, ok := r.strategies[chain]
 	if !ok {
-		return nil, fmt.Errorf("no payment strategy registered for chain %s", chain)
+		return nil, fmt.Errorf("no chain escrow registered for chain %s", chain)
 	}
 	return s, nil
 }
 
-// ForCoin resolves a CoinType to its ChainType and returns the corresponding strategy.
+// ForCoin resolves a CoinType to its ChainType and returns the corresponding ChainEscrow implementation.
 // This is the primary lookup method used by dispatchers, since events carry coin types.
 //
 // Example: ForCoin("crypto:eip155:56:native") → CoinInfo.Chain == ChainBSC → ForChain(ChainBSC)
@@ -65,7 +65,7 @@ func (r *Registry) ForCoin(coin iwallet.CoinType) (ChainEscrow, error) {
 	return r.ForChain(info.Chain)
 }
 
-// Chains returns all chain types that have a registered strategy.
+// Chains returns all chain types that have a registered ChainEscrow implementation.
 // The order is not guaranteed.
 func (r *Registry) Chains() []iwallet.ChainType {
 	r.mu.RLock()

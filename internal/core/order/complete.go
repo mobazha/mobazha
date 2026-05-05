@@ -73,7 +73,7 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
 	result, err := strategy.GetCompleteInstructions(context.Background(), payment.InstructionParams{
@@ -492,7 +492,7 @@ func (s *OrderAppService) releaseCompleteEscrowFunds(order *models.Order, wallet
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return nil, nil, fmt.Errorf("no payment strategy for coin %s: %w", paymentSent.Coin, err)
+		return nil, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
 	buyerSigs, err := strategy.SignEscrowRelease(context.Background(), payment.SignEscrowParams{

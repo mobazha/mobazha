@@ -43,7 +43,7 @@ func NewPaymentVerificationService(
 	}
 }
 
-// SetRegistry wires the payment registry after strategies are registered during Start().
+// SetRegistry wires the chain escrow registry after ChainEscrow implementations are registered during Start().
 func (s *PaymentVerificationService) SetRegistry(r *payment.Registry) {
 	s.registry = r
 }
@@ -57,7 +57,7 @@ func (s *PaymentVerificationService) SetFiatPaymentQuery(fq FiatPaymentQuery) {
 // appropriate ChainEscrow. Purely computational — no network I/O.
 //
 // Fiat payments are handled directly (not in Registry) via validateFiatPayment.
-// Crypto payments dispatch through registry → strategy.ValidatePaymentMessage.
+// Crypto payments dispatch through registry → ChainEscrow.ValidatePaymentMessage.
 func (s *PaymentVerificationService) ValidateMessage(
 	coinType iwallet.CoinType,
 	orderOpen *pb.OrderOpen,
@@ -79,11 +79,11 @@ func (s *PaymentVerificationService) ValidateMessage(
 	}
 
 	if s.registry == nil {
-		return fmt.Errorf("payment strategy registry not configured for %s", string(coinType))
+		return fmt.Errorf("chain escrow registry not configured for %s", string(coinType))
 	}
 	strategy, err := s.registry.ForCoin(coinType)
 	if err != nil {
-		return fmt.Errorf("no strategy for %s: %w", string(coinType), err)
+		return fmt.Errorf("no chain escrow for %s: %w", string(coinType), err)
 	}
 
 	return strategy.ValidatePaymentMessage(payment.PaymentMessageParams{

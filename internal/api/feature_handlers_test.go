@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 // Unit tests for Feature flag HTTP handlers (Phase FF-impl-api §4.1).
 //
 // We avoid the full MobazhaNode and instead compose:

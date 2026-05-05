@@ -46,10 +46,11 @@ func (s *Summary) Overall() Status {
 }
 
 type Config struct {
-	DataDir string
-	Testnet bool
-	NodePort int
-	SaaSURL  string
+	DataDir           string
+	Testnet           bool
+	NodePort          int
+	SaaSURL           string
+	SkipNetworkChecks bool
 }
 
 func DefaultConfig() Config {
@@ -71,14 +72,18 @@ func (r *Runner) RunAll() Summary {
 	checks := []func() CheckResult{
 		r.CheckDataDir,
 		r.CheckDisk,
-		r.CheckDNS,
-		r.CheckHTTPS,
-		r.CheckDocker,
-		r.CheckNodeAPI,
-		r.CheckSaaSReachability,
 		r.CheckSystem,
-		r.CheckCaddy,
-		r.CheckTLSCert,
+	}
+	if !r.cfg.SkipNetworkChecks {
+		checks = append(checks,
+			r.CheckDNS,
+			r.CheckHTTPS,
+			r.CheckSaaSReachability,
+			r.CheckDocker,
+			r.CheckNodeAPI,
+			r.CheckCaddy,
+			r.CheckTLSCert,
+		)
 	}
 
 	var s Summary

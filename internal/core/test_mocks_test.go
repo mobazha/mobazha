@@ -10,8 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	"github.com/mobazha/mobazha-core/identity"
+	"github.com/mobazha/mobazha3.0/pkg/identity"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/media"
@@ -80,7 +79,7 @@ type mockSigner struct {
 	pid     identity.PeerID
 }
 
-var _ corecontracts.Signer = (*mockSigner)(nil)
+var _ contracts.Signer = (*mockSigner)(nil)
 
 func newMockSigner() *mockSigner {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)

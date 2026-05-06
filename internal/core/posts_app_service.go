@@ -18,8 +18,7 @@ import (
 	"github.com/gosimple/slug"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	"github.com/mobazha/mobazha-core/identity"
+	"github.com/mobazha/mobazha3.0/pkg/identity"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -34,7 +33,7 @@ import (
 // PostsAppService encapsulates post CRUD and signing logic.
 type PostsAppService struct {
 	db      database.Database
-	signer  corecontracts.Signer
+	signer  contracts.Signer
 	keys    contracts.KeyProvider
 	peerID  peer.ID
 	publish PublishFunc
@@ -43,7 +42,7 @@ type PostsAppService struct {
 // PostsAppServiceConfig holds dependencies for constructing a PostsAppService.
 type PostsAppServiceConfig struct {
 	DB      database.Database
-	Signer  corecontracts.Signer
+	Signer  contracts.Signer
 	Keys    contracts.KeyProvider
 	PeerID  peer.ID
 	Publish PublishFunc

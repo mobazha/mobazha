@@ -1,7 +1,7 @@
 package orders
 
 import (
-	coreorders "github.com/mobazha/mobazha-core/orders"
+	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 )

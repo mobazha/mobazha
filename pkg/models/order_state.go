@@ -1,6 +1,6 @@
 package models
 
-import "github.com/mobazha/mobazha-core/orders"
+import "github.com/mobazha/mobazha3.0/pkg/orders"
 
 // OrderState is a type alias for the canonical definition in mobazha-core.
 // This ensures mobazha3.0 and mobazha-cloud share the same OrderState type.

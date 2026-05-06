@@ -2,10 +2,6 @@ module github.com/mobazha/mobazha3.0
 
 go 1.25.5
 
-// Sentinel path: matches Docker container layout. On dev machines, go.work
-// overrides with actual local path.
-replace github.com/mobazha/mobazha-core => /src/mobazha-core
-
 require (
 	fyne.io/systray v1.12.0
 	github.com/btcsuite/btcd v0.25.0
@@ -59,7 +55,6 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/mobazha/ethereum-watcher v0.0.0-20240109073302-d1cf31cdeef6
-	github.com/mobazha/mobazha-core v0.0.0-00010101000000-000000000000
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-base32 v0.1.0
 	github.com/multiformats/go-multiaddr v0.16.0

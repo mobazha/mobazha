@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -347,7 +346,7 @@ type identityInfoAdapter struct {
 	nodeID         string
 	peerID         peer.ID
 	testnet        bool
-	signer         corecontracts.Signer
+	signer         contracts.Signer
 	listingService *ListingAppService
 }
 

@@ -7,14 +7,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	ma "github.com/multiformats/go-multiaddr"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/chains"
+	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -69,7 +69,7 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 		return nil, nil, err
 	}
 
-	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
+	signer, err := contracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
 	if err != nil {
 		return nil, nil, err
 	}

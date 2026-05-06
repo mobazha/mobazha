@@ -11,7 +11,6 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -70,7 +69,7 @@ type OrderAppService struct {
 	db              database.Database
 	paymentRegistry *payment.Registry
 	multiwallet     contracts.WalletOperator
-	signer          corecontracts.Signer
+	signer          contracts.Signer
 	orderProcessor  *orders.OrderProcessor
 	messenger       contracts.Messenger
 	networkService  contracts.NetworkService
@@ -101,7 +100,7 @@ type OrderAppServiceConfig struct {
 	DB              database.Database
 	PaymentRegistry *payment.Registry
 	Multiwallet     contracts.WalletOperator
-	Signer          corecontracts.Signer
+	Signer          contracts.Signer
 	OrderProcessor  *orders.OrderProcessor
 	Messenger       contracts.Messenger
 	NetworkService  contracts.NetworkService

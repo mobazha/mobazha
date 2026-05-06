@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	coreorders "github.com/mobazha/mobazha-core/orders"
+	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"

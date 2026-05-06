@@ -21,8 +21,7 @@ import (
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	coreorders "github.com/mobazha/mobazha-core/orders"
+	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/chains"
@@ -653,7 +652,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	// Create a Signer from the node's identity key (external or DB-loaded).
 	// This is the standard contracts.Signer implementation from mobazha-core.
-	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(identityKeyBytes)
+	signer, err := pkgcontracts.NewKeyPairSignerFromMarshaledKey(identityKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
@@ -1289,7 +1288,7 @@ func newLightweightNode(
 	}
 
 	// ── 8. Signer & OrderProcessor ───────────────────────────────────
-	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(identityKeyBytes)
+	signer, err := pkgcontracts.NewKeyPairSignerFromMarshaledKey(identityKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("lightweight: failed to create signer: %w", err)
 	}

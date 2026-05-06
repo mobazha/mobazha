@@ -22,8 +22,7 @@ import (
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/microcosm-cc/bluemonday"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	"github.com/mobazha/mobazha-core/identity"
+	"github.com/mobazha/mobazha3.0/pkg/identity"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -43,7 +42,7 @@ var _ contracts.ListingPublisher = (*ListingAppService)(nil)
 // ListingAppService encapsulates listing CRUD, validation, signing, and network sync.
 type ListingAppService struct {
 	db                 database.Database
-	signer             corecontracts.Signer
+	signer             contracts.Signer
 	contentStore       contracts.ContentStore
 	netDB              *netdb.NetDB
 	eventBus           events.Bus
@@ -65,7 +64,7 @@ type ListingAppService struct {
 
 type ListingAppServiceConfig struct {
 	DB                 database.Database
-	Signer             corecontracts.Signer
+	Signer             contracts.Signer
 	ContentStore       contracts.ContentStore
 	NetDB              *netdb.NetDB
 	EventBus           events.Bus

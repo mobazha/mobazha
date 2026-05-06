@@ -3,10 +3,10 @@ package core
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha-core/contracts"
-	"github.com/mobazha/mobazha-core/identity"
-	"github.com/mobazha/mobazha-core/orders"
-	"github.com/mobazha/mobazha-core/p2p"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/identity"
+	"github.com/mobazha/mobazha3.0/pkg/orders"
+	"github.com/mobazha/mobazha3.0/pkg/p2p"
 )
 
 func newTestSigner(t *testing.T) *contracts.KeyPairSigner {

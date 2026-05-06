@@ -8,8 +8,8 @@ import (
 
 	"github.com/ipfs/go-cid"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha-core/contracts"
-	coreorders "github.com/mobazha/mobazha-core/orders"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/wallet"

@@ -13,7 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -24,6 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -173,7 +173,7 @@ func MockNode() (*MobazhaNode, error) {
 	if err != nil {
 		return nil, err
 	}
-	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
+	signer, err := pkgcontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +381,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		if err != nil {
 			return nil, err
 		}
-		signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
+		signer, err := pkgcontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
 		if err != nil {
 			return nil, err
 		}

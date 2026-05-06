@@ -278,24 +278,14 @@ func TestBitcoinCashWallet_Multisig1of2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var txBytes []byte
-	err = w.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testBitcoinCashNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	scriptAddr, err := bchutil.NewAddressScriptHash(redeemScript, w.params())
 	if err != nil {
@@ -418,24 +408,14 @@ func TestBitcoinCashWallet_Multisig2of3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var txBytes []byte
-	err = w1.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testBitcoinCashNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w1.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	scriptAddr, err := bchutil.NewAddressScriptHash(redeemScript, w1.params())
 	if err != nil {
@@ -558,24 +538,14 @@ func TestBitcoinCashWallet_Multisig2of3Timlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var txBytes []byte
-	err = w1.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testBitcoinCashNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w1.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	scriptAddr, err := bchutil.NewAddressScriptHash(redeemScript, w1.params())
 	if err != nil {
@@ -684,24 +654,14 @@ func TestBitcoinCashWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var txBytes []byte
-	err = w.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testBitcoinCashNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	scriptAddr, err := bchutil.NewAddressScriptHash(redeemScript, w.params())
 	if err != nil {

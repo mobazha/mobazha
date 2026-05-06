@@ -1,7 +1,6 @@
 package base
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -214,136 +213,10 @@ func (w *WalletBase) CoinCategory() iwallet.CoinCategory {
 
 // GetTransaction returns a transaction given it's ID.
 func (w *WalletBase) GetTransaction(id iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
-	var record database.TransactionRecord
-	err := w.DB.View(func(tx database.Tx) error {
-		return tx.Read().Where("coin=?", coinType.CurrencyCode()).Where("txid=?", id.String()).First(&record).Error
-	})
-	if err == nil {
-		// We need to return the input metadata with this transaction. If it isn't stored with this
-		// transaction in the database then we will need to use the API to get a copy of the transaction
-		// with the input metadata.
-		tx, err := record.Transaction()
-		if err == nil {
-			missingInputMetadata := false
-			for _, in := range tx.From {
-				if in.Address.String() == "" || in.Amount.String() == "" || in.Amount.Cmp(iwallet.NewAmount(0)) == 0 {
-					missingInputMetadata = true
-				}
-			}
-			if !missingInputMetadata {
-				return &tx, nil
-			}
-		}
-	}
-
-	// Use ChainClient (which is now ElectrumChainClient for UTXO chains).
-	// ChainClient may be nil before Start() injects it (keys-only wallet).
 	if w.ChainClient == nil {
-		if err != nil {
-			return nil, fmt.Errorf("transaction %s not found in database and chain client not available: %w", id, err)
-		}
-		return nil, fmt.Errorf("transaction %s found in database but has incomplete metadata and chain client not available", id)
+		return nil, fmt.Errorf("transaction %s: chain client not available", id)
 	}
 	return w.ChainClient.GetTransaction(id, coinType)
-}
-
-// Transactions returns a slice of this wallet's transactions. The transactions should
-// be sorted last to first and the limit and offset respected. The offsetID means
-// 'return transactions starting with the transaction after offsetID in the sorted list'
-func (w *WalletBase) Transactions(limit int, offsetID iwallet.TransactionID) ([]iwallet.Transaction, error) {
-	var records []database.TransactionRecord
-	err := w.DB.View(func(tx database.Tx) error {
-		if offsetID != "" {
-			var rec database.TransactionRecord
-			err := tx.Read().Where("coin=?", w.CoinType.CurrencyCode()).Where("txid=?", offsetID.String()).First(&rec).Error
-			if err != nil {
-				return err
-			}
-			return tx.Read().Where("coin=?", w.CoinType.CurrencyCode()).Where("timestamp < ?", rec.Timestamp).Order("timestamp desc").Limit(limit).Find(&records).Error
-		}
-
-		return tx.Read().Where("coin=?", w.CoinType.CurrencyCode()).Order("timestamp desc").Limit(limit).Find(&records).Error
-	})
-	if err != nil {
-		return nil, err
-	}
-	txs := make([]iwallet.Transaction, len(records))
-	for i, rec := range records {
-		txs[i], err = rec.Transaction()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return txs, nil
-}
-
-// Balance should return the confirmed and unconfirmed balance for the wallet.
-func (w *WalletBase) Balance() (unconfirmed iwallet.Amount, confirmed iwallet.Amount, err error) {
-	err = w.DB.View(func(dbtx database.Tx) error {
-		var (
-			utxoRecords []database.UtxoRecord
-			txRecords   []database.TransactionRecord
-			txMap       = make(map[iwallet.TransactionID]iwallet.Transaction)
-		)
-		err := dbtx.Read().Where("coin=?", w.CoinType.CurrencyCode()).Find(&utxoRecords).Error
-		if err != nil {
-			return err
-		}
-		err = dbtx.Read().Where("coin=?", w.CoinType.CurrencyCode()).Find(&txRecords).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		for _, record := range txRecords {
-			tx, err := record.Transaction()
-			if err != nil {
-				return err
-			}
-			txMap[tx.ID] = tx
-		}
-
-		for _, utxo := range utxoRecords {
-			if utxo.Height > 0 {
-				confirmed = confirmed.Add(iwallet.NewAmount(utxo.Amount))
-			} else {
-				if checkIfStxoIsConfirmed(iwallet.TransactionID(utxo.Outpoint[:64]), txMap) {
-					confirmed = confirmed.Add(iwallet.NewAmount(utxo.Amount))
-				} else {
-					unconfirmed = unconfirmed.Add(iwallet.NewAmount(utxo.Amount))
-				}
-			}
-		}
-		return nil
-	})
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return
-	} else if errors.Is(err, gorm.ErrRecordNotFound) {
-		return unconfirmed, confirmed, nil
-	}
-	return unconfirmed, confirmed, nil
-}
-
-func checkIfStxoIsConfirmed(txid iwallet.TransactionID, txMap map[iwallet.TransactionID]iwallet.Transaction) bool {
-	tx, ok := txMap[txid]
-	if !ok {
-		return false
-	}
-
-	// For each input, recursively check if confirmed
-	inputsConfirmed := true
-	for _, from := range tx.From {
-		checkTx, ok := txMap[iwallet.TransactionID(hex.EncodeToString(from.ID[:32]))]
-		if ok { // Is an stxo. If confirmed we can return true. If no, we need to check the dependency.
-			if checkTx.Height == 0 {
-				if !checkIfStxoIsConfirmed(iwallet.TransactionID(hex.EncodeToString(from.ID[:32])), txMap) {
-					inputsConfirmed = false
-				}
-			}
-		} else { // We don't have the tx in our db so it can't be an stxo. Return false.
-			return false
-		}
-	}
-	return inputsConfirmed
 }
 
 // SetPassphase is called after creating the wallet. It gives the wallet

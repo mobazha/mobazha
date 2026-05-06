@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -455,12 +456,19 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 }
 
 func getNodeTotalBalance(network *Mocknet, index int) (iwallet.Amount, error) {
-	wallet, err := network.Nodes()[index].Multiwallet().WalletForCurrencyCode(iwallet.CtMock.String())
+	w, err := network.Nodes()[index].Multiwallet().WalletForCurrencyCode(iwallet.CtMock.String())
 	if err != nil {
 		return iwallet.NewAmount(0), err
 	}
 
-	unconf, conf, err := wallet.Balance()
+	type balancer interface {
+		Balance() (iwallet.Amount, iwallet.Amount, error)
+	}
+	bw, ok := w.(balancer)
+	if !ok {
+		return iwallet.NewAmount(0), fmt.Errorf("wallet does not support Balance()")
+	}
+	unconf, conf, err := bw.Balance()
 	if err != nil {
 		return iwallet.NewAmount(0), err
 	}

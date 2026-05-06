@@ -381,24 +381,14 @@ func TestBitcoinWallet_Multisig1of2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var txBytes []byte
-	err = w.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testBitcoinNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	witnessProgram := sha256.Sum256(redeemScript)
 
@@ -520,24 +510,14 @@ func TestBitcoinWallet_Multisig2of3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var txBytes []byte
-	err = w1.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testBitcoinNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w1.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	witnessProgram := sha256.Sum256(redeemScript)
 
@@ -659,24 +639,14 @@ func TestBitcoinWallet_Multisig2of3Timlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var txBytes []byte
-	err = w1.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testBitcoinNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w1.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	witnessProgram := sha256.Sum256(redeemScript)
 
@@ -784,24 +754,14 @@ func TestBitcoinWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var txBytes []byte
-	err = w.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testBitcoinNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	witnessProgram := sha256.Sum256(redeemScript)
 
@@ -1061,23 +1021,15 @@ func TestBitcoinWallet_SpendFromDerivedAddress_ScriptVerification(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	// Retrieve the saved transaction and verify the signature
-	var txBytes []byte
-	err = w.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("txid = ?", txid.String()).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-			return nil
-		}
-		txBytes = txs[0].TxBytes
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	// Use broadcast capture from mock chain client and verify the signature
+	chainClient, ok := w.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
 	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
 
 	// Decode and verify the transaction
 	var msgTx wire.MsgTx

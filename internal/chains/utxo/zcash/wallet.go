@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
@@ -22,7 +21,6 @@ import (
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/minio/blake2b-simd"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -340,18 +338,7 @@ func (w *ZCashWallet) BuildAndSend(wtx iwallet.Tx, txn iwallet.Transaction, sign
 	}
 
 	wbtx.OnCommit = func() error {
-		return w.DB.Update(func(dbtx database.Tx) error {
-			err := dbtx.Save(&database.UnconfirmedTransaction{
-				Timestamp: time.Now(),
-				Coin:      w.CoinType.String(),
-				TxBytes:   buf,
-				Txid:      tx.TxHash().String(),
-			})
-			if err != nil {
-				return err
-			}
-			return w.ChainClient.Broadcast(buf)
-		})
+		return w.ChainClient.Broadcast(buf)
 	}
 
 	return txid, nil
@@ -806,18 +793,7 @@ func (w *ZCashWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet.UTXO,
 	}
 
 	wbtx.OnCommit = func() error {
-		return w.DB.Update(func(dbtx database.Tx) error {
-			err := dbtx.Save(&database.UnconfirmedTransaction{
-				Timestamp: time.Now(),
-				Coin:      w.CoinType.String(),
-				TxBytes:   txBytes,
-				Txid:      h.String(),
-			})
-			if err != nil {
-				return err
-			}
-			return w.ChainClient.Broadcast(txBytes)
-		})
+		return w.ChainClient.Broadcast(txBytes)
 	}
 
 	return txid, nil

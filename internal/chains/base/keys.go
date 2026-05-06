@@ -16,7 +16,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"golang.org/x/crypto/pbkdf2"
-	"gorm.io/gorm"
 )
 
 const (
@@ -404,21 +403,6 @@ func (kc *Keychain) IsEncrypted() bool {
 	return kc.internalPrivkey == nil || kc.externalPrivkey == nil
 }
 
-// GetAddresses returns all addresses in the wallet.
-func (kc *Keychain) GetAddresses() ([]iwallet.Address, error) {
-	var records []database.AddressRecord
-	err := kc.db.Update(func(tx database.Tx) error {
-		return tx.Read().Where("coin=?", kc.coinType.CurrencyCode()).Find(&records).Error
-	})
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-	var addrs []iwallet.Address
-	for _, rec := range records {
-		addrs = append(addrs, rec.Address())
-	}
-	return addrs, nil
-}
 
 func generateAccountPrivKeys(accountPrivKey *hd.ExtendedKey) (external, internal *hd.ExtendedKey, err error) {
 	// Change(0) = external

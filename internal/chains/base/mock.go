@@ -22,6 +22,8 @@ type MockChainClient struct {
 
 	fees map[iwallet.FeeLevel]iwallet.EstimateFeeRes
 
+	BroadcastedTxs [][]byte
+
 	returnErr error
 }
 
@@ -231,6 +233,9 @@ func (m *MockChainClient) Broadcast(serializedTx []byte) error {
 	if m.returnErr != nil {
 		return m.returnErr
 	}
+	m.mtx.Lock()
+	m.BroadcastedTxs = append(m.BroadcastedTxs, serializedTx)
+	m.mtx.Unlock()
 	return nil
 }
 

@@ -274,21 +274,12 @@ func TestZCashWallet_Multisig1of2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = w.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testZCashNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
+	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
 	}
 }
 
@@ -384,21 +375,12 @@ func TestZCashWallet_Multisig2of3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = w1.DB.View(func(tx database.Tx) error {
-		var txs []database.UnconfirmedTransaction
-		if err := tx.Read().Where("coin=?", testZCashNativeCoin).Find(&txs).Error; err != nil {
-			return err
-		}
-		if len(txs) != 1 {
-			t.Errorf("Expected 1 tx found %d", len(txs))
-		}
-		if txs[0].Txid != txid.String() {
-			t.Errorf("Expected txid %s, got %s", txid, txs[0].Txid)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	chainClient, ok := w1.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
+	}
+	if len(chainClient.BroadcastedTxs) == 0 {
+		t.Fatal("Expected broadcasted transaction")
 	}
 }
 

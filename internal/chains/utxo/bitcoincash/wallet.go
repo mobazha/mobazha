@@ -19,7 +19,6 @@ import (
 	"github.com/gcash/bchwallet/wallet/txrules"
 	"github.com/gcash/bchwallet/wallet/txsizes"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -351,18 +350,7 @@ func (w *BitcoinCashWallet) BuildAndSend(wtx iwallet.Tx, txn iwallet.Transaction
 	}
 
 	wbtx.OnCommit = func() error {
-		return w.DB.Update(func(dbtx database.Tx) error {
-			err := dbtx.Save(&database.UnconfirmedTransaction{
-				Timestamp: time.Now(),
-				Coin:      w.CoinType.String(),
-				TxBytes:   buf.Bytes(),
-				Txid:      tx.TxHash().String(),
-			})
-			if err != nil {
-				return err
-			}
-			return w.ChainClient.Broadcast(buf.Bytes())
-		})
+		return w.ChainClient.Broadcast(buf.Bytes())
 	}
 
 	return txid, nil
@@ -475,18 +463,7 @@ func (w *BitcoinCashWallet) ReleaseFundsAfterTimeout(wtx iwallet.Tx, txn iwallet
 	}
 
 	wbtx.OnCommit = func() error {
-		return w.DB.Update(func(dbtx database.Tx) error {
-			err := dbtx.Save(&database.UnconfirmedTransaction{
-				Timestamp: time.Now(),
-				Coin:      w.CoinType.String(),
-				TxBytes:   buf.Bytes(),
-				Txid:      tx.TxHash().String(),
-			})
-			if err != nil {
-				return err
-			}
-			return w.ChainClient.Broadcast(buf.Bytes())
-		})
+		return w.ChainClient.Broadcast(buf.Bytes())
 	}
 
 	return txid, nil
@@ -641,18 +618,7 @@ func (w *BitcoinCashWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet
 	}
 
 	wbtx.OnCommit = func() error {
-		return w.DB.Update(func(dbtx database.Tx) error {
-			err := dbtx.Save(&database.UnconfirmedTransaction{
-				Timestamp: time.Now(),
-				Coin:      w.CoinType.String(),
-				TxBytes:   buf.Bytes(),
-				Txid:      tx.TxHash().String(),
-			})
-			if err != nil {
-				return err
-			}
-			return w.ChainClient.Broadcast(buf.Bytes())
-		})
+		return w.ChainClient.Broadcast(buf.Bytes())
 	}
 
 	return txid, nil

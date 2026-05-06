@@ -96,9 +96,6 @@ type Wallet interface {
 	// for this coin and network. It returns an error if it isn't.
 	ValidateAddress(addr Address) error
 
-	// Balance should return the confirmed and unconfirmed balance for the wallet.
-	Balance() (unconfirmed Amount, confirmed Amount, err error)
-
 	// GetTransaction returns a transaction given it's ID. This is used by Mobazha to
 	// request transactions paid to an order's payment address. This means we expect both
 	// internal wallet transactions and transactions sending to or from a watched address

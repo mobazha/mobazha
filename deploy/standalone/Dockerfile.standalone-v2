@@ -8,7 +8,6 @@
 #
 # Build (local dev):
 #   docker buildx build -f deploy/standalone/Dockerfile.standalone-v2 \
-#     --build-context core=/path/to/mobazha-core \
 #     --build-context frontend=/path/to/mobazha-unified \
 #     -t ghcr.io/mobazha/standalone:v2 .
 
@@ -26,18 +25,15 @@ RUN apk add --no-cache gcc musl-dev git upx
 
 WORKDIR /src
 
-COPY --from=core . /src/core
 
 WORKDIR /src/mobazha3.0
 COPY go.mod go.sum ./
 
-RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 COPY . .
-RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod && \
     go mod tidy
 
 RUN --mount=type=cache,target=/go/pkg/mod \

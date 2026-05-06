@@ -56,16 +56,14 @@ fi
 # Auto-detect mobazha-core repo
 if [[ -z "$CORE_REPO" && -z "$NODE_IMAGE" ]]; then
     if [[ -f "$REPO_ROOT/go.work" ]]; then
-        CORE_PATH=$(grep 'replace github.com/mobazha/mobazha-core =>' "$REPO_ROOT/go.work" 2>/dev/null | sed 's/.*=> //' | xargs)
+        # CORE_PATH removed (mobazha-core merged into pkg)
         if [[ -n "$CORE_PATH" && -f "$CORE_PATH/go.mod" ]]; then
             CORE_REPO="$(cd "$CORE_PATH" && pwd)"
         fi
     fi
     if [[ -z "$CORE_REPO" ]]; then
         for candidate in \
-            "$REPO_ROOT/../mobazha-core" \
             "$HOME/dev/mobazha/core" \
-            "$HOME/go/src/github.com/mobazha/mobazha-core"; do
             if [[ -f "$candidate/go.mod" ]]; then
                 CORE_REPO="$(cd "$candidate" && pwd)"
                 break
@@ -73,7 +71,6 @@ if [[ -z "$CORE_REPO" && -z "$NODE_IMAGE" ]]; then
         done
     fi
 fi
-[[ -n "$NODE_IMAGE" || -n "$CORE_REPO" ]] || { echo "ERROR: Cannot find mobazha-core repo. Use -c or -n." >&2; exit 1; }
 
 echo "==> Config (v2 — standard in-Docker build)"
 echo "    Backend repo:  $REPO_ROOT"

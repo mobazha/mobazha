@@ -76,7 +76,7 @@ fi
 if [[ -z "$CORE_REPO" ]]; then
     # Try go.work first (most reliable)
     if [[ -f "$REPO_ROOT/go.work" ]]; then
-        CORE_PATH=$(grep 'replace github.com/mobazha/mobazha-core =>' "$REPO_ROOT/go.work" | sed 's/.*=> //' | xargs)
+        # CORE_PATH removed (mobazha-core merged into pkg)
         if [[ -n "$CORE_PATH" && -f "$CORE_PATH/go.mod" ]]; then
             CORE_REPO="$(cd "$CORE_PATH" && pwd)"
         fi
@@ -84,9 +84,7 @@ if [[ -z "$CORE_REPO" ]]; then
     # Fallback: common locations
     if [[ -z "$CORE_REPO" ]]; then
         for candidate in \
-            "$REPO_ROOT/../mobazha-core" \
             "$HOME/dev/mobazha/core" \
-            "$HOME/go/src/github.com/mobazha/mobazha-core"; do
             if [[ -f "$candidate/go.mod" ]]; then
                 CORE_REPO="$(cd "$candidate" && pwd)"
                 break
@@ -96,7 +94,6 @@ if [[ -z "$CORE_REPO" ]]; then
 fi
 
 if [[ -z "$NODE_IMAGE" && -z "$CORE_REPO" ]]; then
-    echo "ERROR: Cannot find mobazha-core repo. Use -c to specify path, or -n to use a pre-built node image." >&2
     exit 1
 fi
 

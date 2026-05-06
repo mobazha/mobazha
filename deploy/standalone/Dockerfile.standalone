@@ -17,7 +17,6 @@
 #   B) Build from source (default, for local dev):
 #      docker buildx build -f deploy/standalone/Dockerfile.standalone \
 #        --build-arg FRONTEND_DIR=deploy/standalone/.frontend-dist \
-#        --build-context core=/path/to/mobazha-core \
 #        -t ghcr.io/mobazha/standalone:dev .
 #
 # Frontend directory layout (.frontend-dist/):
@@ -44,21 +43,13 @@ FROM golang:${GO_VERSION}-alpine AS go-builder
 
 RUN apk add --no-cache gcc musl-dev git upx
 
-WORKDIR /src
-
-COPY --from=core . /src/core
-
 WORKDIR /src/mobazha3.0
 COPY go.mod go.sum ./
-
-RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 COPY . .
-RUN sed -i 's|replace github.com/mobazha/mobazha-core => .*|replace github.com/mobazha/mobazha-core => /src/core|' go.mod && \
-    go mod tidy
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

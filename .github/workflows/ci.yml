@@ -19,8 +19,6 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: mobazha/mobazha-core
-          path: core
           token: ${{ secrets.GH_PAT || github.token }}
 
       - uses: actions/setup-go@v5
@@ -40,7 +38,6 @@ jobs:
           EOF
           sed -i 's/^          //' go.work
 
-          cd node && go mod edit -replace=github.com/mobazha/mobazha-core=../core
 
       - name: Vet
         run: go vet -tags goolm ./...
@@ -59,8 +56,6 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: mobazha/mobazha-core
-          path: core
           token: ${{ secrets.GH_PAT || github.token }}
 
       - uses: actions/setup-go@v5
@@ -80,7 +75,6 @@ jobs:
           EOF
           sed -i 's/^          //' go.work
 
-          cd node && go mod edit -replace=github.com/mobazha/mobazha-core=../core
 
       - name: Build
         run: go build -tags goolm -o /dev/null .

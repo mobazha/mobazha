@@ -333,7 +333,8 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 
 	if err := s.cryptoHelper.Init(ctx); err != nil {
 		resettable := strings.Contains(err.Error(), "mismatching device ID") ||
-			strings.Contains(err.Error(), "not marked as shared")
+			strings.Contains(err.Error(), "not marked as shared") ||
+			strings.Contains(err.Error(), "keys seem to have disappeared")
 		if resettable {
 			log.Warningf("Crypto store state mismatch (device=%s, account=%s), resetting crypto state: %v",
 				stableDeviceID, s.config.CryptoDBAccountID, err)

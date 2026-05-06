@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/mobazha/mobazha3.0/pkg/apitoken"
 )
 
@@ -110,19 +111,19 @@ func (g *Gateway) installNodeHumaMiddlewares(api huma.API) {
 }
 
 // nodeHumaOriginMiddleware captures the original HTTP request metadata
-// (Host, Authorization, RemoteAddr, TLS) and stores it in context so
-// that nodeBridgeRequest can restore them on synthetic requests passed
-// to legacy handlers. This ensures handlers that rely on r.Host,
-// r.Header.Get("Authorization"), r.RemoteAddr, or r.TLS work correctly
-// through the Huma bridge layer.
+// and ALL headers, then stores them in context so that nodeBridgeRequest
+// can faithfully restore them on synthetic requests passed to legacy
+// handlers. Using humachi.Unwrap gives us the full http.Header map,
+// eliminating any per-header allowlist and ensuring webhook signatures,
+// custom headers, and future provider headers are transparently forwarded.
 func nodeHumaOriginMiddleware() func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
+		r, _ := humachi.Unwrap(ctx)
 		meta := &originRequestMeta{
-			Host:          ctx.Host(),
-			Authorization: ctx.Header("Authorization"),
-			Cookie:        ctx.Header("Cookie"),
-			RemoteAddr:    ctx.RemoteAddr(),
-			IsTLS:         ctx.TLS() != nil,
+			OriginalHeaders: r.Header.Clone(),
+			Host:            ctx.Host(),
+			RemoteAddr:      ctx.RemoteAddr(),
+			IsTLS:           ctx.TLS() != nil,
 		}
 		newCtx := withOriginMeta(ctx.Context(), meta)
 		next(huma.WithContext(ctx, newCtx))

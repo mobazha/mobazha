@@ -179,6 +179,12 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, message *npb.OrderMes
 
 	orderCopy := order
 	event, err = op.processMessage(dbtx, &order, message)
+	if errors.Is(err, ErrMessageParked) {
+		// Handler already called order.ParkMessage — save the mutated order
+		// (which contains the parked data) and return success to callers.
+		// Do NOT enter the generic error path which would use orderCopy.
+		return nil, dbtx.Save(&order)
+	}
 	if err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Error processing order message for order %s: %s", order.ID.String(), err)
 		if err1 := orderCopy.PutErrorMessage(message); err1 != nil {
@@ -376,7 +382,7 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 		return nil, errors.New("unknown order message type")
 	}
 	if errors.Is(err, ErrMessageParked) {
-		return nil, nil
+		return nil, ErrMessageParked
 	}
 	if err != nil {
 		return nil, err

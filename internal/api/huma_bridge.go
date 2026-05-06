@@ -18,13 +18,18 @@ import (
 
 // originRequestMeta holds the original HTTP request metadata captured at the
 // Huma middleware layer. nodeBridgeRequest restores these onto synthetic
-// requests so legacy handlers can read Host, Authorization, TLS state, etc.
+// requests so legacy handlers see the same headers, Host, RemoteAddr,
+// and TLS state as the original inbound request.
+//
+// OriginalHeaders stores ALL HTTP headers from the inbound request
+// (via humachi.Unwrap). This eliminates the need for per-header
+// allowlists and ensures webhook signatures, custom headers, etc.
+// are transparently forwarded through the bridge.
 type originRequestMeta struct {
-	Host          string
-	Authorization string
-	Cookie        string
-	RemoteAddr    string
-	IsTLS         bool
+	OriginalHeaders http.Header // all inbound HTTP headers
+	Host            string
+	RemoteAddr      string
+	IsTLS           bool
 }
 
 type originRequestMetaKey struct{}
@@ -42,13 +47,17 @@ func getOriginMeta(ctx context.Context) *originRequestMeta {
 	return nil
 }
 
-// extractCookieFromMeta parses a named cookie value from the raw Cookie header
-// stored in originRequestMeta.
+// extractCookieFromMeta parses a named cookie value from the Cookie header
+// stored in originRequestMeta.OriginalHeaders.
 func extractCookieFromMeta(meta *originRequestMeta, name string) string {
-	if meta == nil || meta.Cookie == "" {
+	if meta == nil {
 		return ""
 	}
-	for _, part := range strings.Split(meta.Cookie, ";") {
+	raw := meta.OriginalHeaders.Get("Cookie")
+	if raw == "" {
+		return ""
+	}
+	for _, part := range strings.Split(raw, ";") {
 		part = strings.TrimSpace(part)
 		eq := strings.IndexByte(part, '=')
 		if eq < 0 {
@@ -66,18 +75,26 @@ func extractCookieFromMeta(meta *originRequestMeta, name string) string {
 // so legacy handlers can read them via getNodeService(r)
 // and GetAuthIdentity(r.Context()).
 //
-// It automatically restores Host, Authorization, RemoteAddr and TLS state
-// from the originRequestMeta captured by nodeHumaOriginMiddleware.
+// It restores ALL original HTTP headers plus Host, RemoteAddr and TLS
+// state from the originRequestMeta captured by nodeHumaOriginMiddleware.
 func nodeBridgeRequest(ctx context.Context, method, rawURL string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, rawURL, body)
 	req = req.WithContext(ctx)
 
 	if meta := getOriginMeta(ctx); meta != nil {
+		for k, vals := range meta.OriginalHeaders {
+			req.Header[k] = vals
+		}
+		// Remove hop-by-hop and body-framing headers that refer to the
+		// original inbound request. The synthetic body may differ in size,
+		// and httptest.NewRequest will set Content-Length from the reader.
+		req.Header.Del("Content-Length")
+		req.Header.Del("Transfer-Encoding")
+		req.Header.Del("Trailer")
+		req.Header.Del("Connection")
+
 		if meta.Host != "" {
 			req.Host = meta.Host
-		}
-		if meta.Authorization != "" {
-			req.Header.Set("Authorization", meta.Authorization)
 		}
 		if meta.RemoteAddr != "" {
 			req.RemoteAddr = meta.RemoteAddr

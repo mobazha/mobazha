@@ -327,7 +327,6 @@ func (g *Gateway) registerFiatPublicWebhook(api huma.API) {
 	}, func(ctx context.Context, hi *in) (*nodeNoContentOutput, error) {
 		rawURL := "/v1/fiat/" + url.PathEscape(hi.ProviderID) + "/webhooks"
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(hi.Body), map[string]string{"providerID": hi.ProviderID})
-		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handlePOSTFiatWebhook(rr, req)
 		if err := nodeBridgeNoContent(rr); err != nil {

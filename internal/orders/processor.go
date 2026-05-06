@@ -14,7 +14,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -58,8 +57,8 @@ type Config struct {
 	Identity             libp2ppeer.ID
 	Db                   database.Database
 	Signer               contracts.Signer
-	Messenger            pkgcontracts.Messenger
-	Multiwallet          pkgcontracts.WalletOperator
+	Messenger            contracts.Messenger
+	Multiwallet          contracts.WalletOperator
 	ExchangeRateProvider *wallet.ExchangeRateProvider
 	EventBus             events.Bus
 	CalcCIDFunc          func(file []byte) (cid.Cid, error)
@@ -80,8 +79,8 @@ type OrderProcessor struct {
 	identity       libp2ppeer.ID
 	signer         contracts.Signer
 	db             database.Database
-	messenger      pkgcontracts.Messenger
-	multiwallet    pkgcontracts.WalletOperator
+	messenger      contracts.Messenger
+	multiwallet    contracts.WalletOperator
 	erp            *wallet.ExchangeRateProvider
 	bus            events.Bus
 	calcCIDFunc    func(file []byte) (cid.Cid, error)

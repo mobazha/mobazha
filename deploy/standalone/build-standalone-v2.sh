@@ -53,31 +53,11 @@ if [[ -z "$FRONTEND_REPO" ]]; then
 fi
 [[ -n "$FRONTEND_REPO" ]] || { echo "ERROR: Cannot find mobazha-unified repo. Use -f to specify." >&2; exit 1; }
 
-# Auto-detect mobazha-core repo
-if [[ -z "$CORE_REPO" && -z "$NODE_IMAGE" ]]; then
-    if [[ -f "$REPO_ROOT/go.work" ]]; then
-        # CORE_PATH removed (mobazha-core merged into pkg)
-        if [[ -n "$CORE_PATH" && -f "$CORE_PATH/go.mod" ]]; then
-            CORE_REPO="$(cd "$CORE_PATH" && pwd)"
-        fi
-    fi
-    if [[ -z "$CORE_REPO" ]]; then
-        for candidate in \
-            "$HOME/dev/mobazha/core" \
-            if [[ -f "$candidate/go.mod" ]]; then
-                CORE_REPO="$(cd "$candidate" && pwd)"
-                break
-            fi
-        done
-    fi
-fi
 
 echo "==> Config (v2 — standard in-Docker build)"
 echo "    Backend repo:  $REPO_ROOT"
 if [[ -n "$NODE_IMAGE" ]]; then
     echo "    Node image:    $NODE_IMAGE (pre-built)"
-else
-    echo "    Core repo:     $CORE_REPO"
 fi
 echo "    Frontend repo: $FRONTEND_REPO"
 echo "    Image tag:     $IMAGE_TAG"
@@ -93,8 +73,6 @@ BUILD_ARGS=(
 
 if [[ -n "$NODE_IMAGE" ]]; then
     BUILD_ARGS+=(--build-arg "NODE_IMAGE=$NODE_IMAGE")
-else
-    BUILD_ARGS+=(--build-context "core=$CORE_REPO")
 fi
 
 if [[ -n "$PLATFORM" ]]; then

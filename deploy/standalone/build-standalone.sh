@@ -11,8 +11,7 @@ fi
 # This script:
 #   1. Builds the Next.js app (standalone output) from the mobazha-unified monorepo
 #   2. Copies the standalone output into this repo's build context
-#   3. Detects mobazha-core path for multi-repo Docker build
-#   4. Builds the multi-stage Docker image with the real frontend
+#   3. Builds the multi-stage Docker image with the real frontend
 #
 # Usage:
 #   ./deploy/standalone/build-standalone.sh [OPTIONS]
@@ -20,7 +19,6 @@ fi
 # Options:
 #   -t TAG         Docker image tag (default: ghcr.io/mobazha/standalone:dev)
 #   -f FRONTEND    Path to mobazha-unified repo (default: auto-detect)
-#   -c CORE        Path to mobazha-core repo (default: auto-detect from go.work)
 #   -n NODE_IMAGE  Pre-built node image (skip Go compilation, e.g. ghcr.io/mobazha/standalone-node:v1.0)
 #   -s             Skip frontend build (use existing dist in FRONTEND_DIR)
 #   -p             Push image after build
@@ -72,37 +70,11 @@ if [[ -z "$FRONTEND_REPO" ]]; then
     exit 1
 fi
 
-# Auto-detect mobazha-core repo location
-if [[ -z "$CORE_REPO" ]]; then
-    # Try go.work first (most reliable)
-    if [[ -f "$REPO_ROOT/go.work" ]]; then
-        # CORE_PATH removed (mobazha-core merged into pkg)
-        if [[ -n "$CORE_PATH" && -f "$CORE_PATH/go.mod" ]]; then
-            CORE_REPO="$(cd "$CORE_PATH" && pwd)"
-        fi
-    fi
-    # Fallback: common locations
-    if [[ -z "$CORE_REPO" ]]; then
-        for candidate in \
-            "$HOME/dev/mobazha/core" \
-            if [[ -f "$candidate/go.mod" ]]; then
-                CORE_REPO="$(cd "$candidate" && pwd)"
-                break
-            fi
-        done
-    fi
-fi
-
-if [[ -z "$NODE_IMAGE" && -z "$CORE_REPO" ]]; then
-    exit 1
-fi
 
 echo "==> Config"
 echo "    Backend repo:  $REPO_ROOT"
 if [[ -n "$NODE_IMAGE" ]]; then
     echo "    Node image:    $NODE_IMAGE (pre-built, skipping Go compilation)"
-else
-    echo "    Core repo:     $CORE_REPO"
 fi
 echo "    Frontend repo: $FRONTEND_REPO"
 echo "    Image tag:     $IMAGE_TAG"
@@ -265,8 +237,6 @@ BUILD_ARGS=(
 
 if [[ -n "$NODE_IMAGE" ]]; then
     BUILD_ARGS+=(--build-arg "NODE_IMAGE=$NODE_IMAGE")
-else
-    BUILD_ARGS+=(--build-context "core=$CORE_REPO")
 fi
 
 if [[ -n "$PLATFORM" ]]; then

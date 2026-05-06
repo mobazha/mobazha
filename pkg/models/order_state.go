@@ -2,12 +2,10 @@ package models
 
 import "github.com/mobazha/mobazha3.0/pkg/orders"
 
-// OrderState is a type alias for the canonical definition in mobazha-core.
-// This ensures mobazha3.0 and mobazha-cloud share the same OrderState type.
+// OrderState is a type alias for the canonical definition in pkg/orders.
 type OrderState = orders.OrderState
 
-// Backward-compatible constants mapping to mobazha-core values.
-// Existing code can continue using OrderState_PENDING etc. without changes.
+// Constants mapping to pkg/orders state values.
 const (
 	OrderState_PENDING                       = orders.StatePending
 	OrderState_AWAITING_PAYMENT              = orders.StateAwaitingPayment
@@ -25,6 +23,9 @@ const (
 	OrderState_RESOLVED                      = orders.StateResolved
 	OrderState_PAYMENT_FINALIZED             = orders.StatePaymentFinalized
 	OrderState_PROCESSING_ERROR              = orders.StateProcessingError
+	OrderState_AWAITING_FULFILLMENT          = orders.StateAwaitingFulfillment
+	OrderState_PARTIALLY_FULFILLED           = orders.StatePartiallyFulfilled
+	OrderState_FULFILLED                     = orders.StateFulfilled
 )
 
 // OrderState_name maps int32 values to string names (kept for protobuf compatibility).
@@ -45,6 +46,9 @@ var OrderState_name = map[int32]string{
 	int32(OrderState_RESOLVED):                      "RESOLVED",
 	int32(OrderState_PAYMENT_FINALIZED):             "PAYMENT_FINALIZED",
 	int32(OrderState_PROCESSING_ERROR):              "PROCESSING_ERROR",
+	int32(OrderState_AWAITING_FULFILLMENT):          "AWAITING_FULFILLMENT",
+	int32(OrderState_PARTIALLY_FULFILLED):           "PARTIALLY_FULFILLED",
+	int32(OrderState_FULFILLED):                     "FULFILLED",
 }
 
 // OrderState_value maps string names to int32 values (kept for protobuf compatibility).
@@ -65,4 +69,7 @@ var OrderState_value = map[string]int32{
 	"RESOLVED":                      int32(OrderState_RESOLVED),
 	"PAYMENT_FINALIZED":             int32(OrderState_PAYMENT_FINALIZED),
 	"PROCESSING_ERROR":              int32(OrderState_PROCESSING_ERROR),
+	"AWAITING_FULFILLMENT":          int32(OrderState_AWAITING_FULFILLMENT),
+	"PARTIALLY_FULFILLED":           int32(OrderState_PARTIALLY_FULFILLED),
+	"FULFILLED":                     int32(OrderState_FULFILLED),
 }

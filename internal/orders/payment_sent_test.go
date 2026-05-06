@@ -27,6 +27,7 @@ func Test_processPaymentSentMessage(t *testing.T) {
 	defer teardown()
 
 	wn := wallet.NewMockWalletNetwork(1)
+	txCh := wn.Wallets()[0].SubscribeTransactions()
 	go wn.Start()
 
 	addr, err := wn.Wallets()[0].CurrentAddress()
@@ -37,10 +38,10 @@ func Test_processPaymentSentMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txs, err := wn.Wallets()[0].Transactions(-1, iwallet.TransactionID(""))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Wait for the transaction to be processed by the wallet goroutine.
+	generatedTx := <-txCh
+
+	txs := []iwallet.Transaction{generatedTx}
 
 	mw := op.multiwallet.(*chains.Multiwallet)
 	(*mw)[iwallet.ChainMock] = wn.Wallets()[0]

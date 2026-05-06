@@ -585,6 +585,28 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 		return err
 	}
 
+	// Payment verification: attempt FetchAndVerify outside the DB transaction
+	// (may do chain/wallet I/O). This mirrors the seller's preProcessPaymentSent
+	// → postProcessPaymentSentInTx flow. If the tx is already confirmed (fast
+	// blocks or mock wallets), RecordVerifiedPayment marks the order verified and
+	// replays parked messages. If not yet confirmed, the async
+	// VerifyPendingPayments loop will handle it later.
+	if !order.IsPaymentVerified() && s.paymentVerifier != nil && !iwallet.CoinType(paymentSent.Coin).IsFiatPayment() {
+		vp, verifyErr := s.paymentVerifier.FetchAndVerify(ctx, orderOpen, paymentSent, paymentSent.ToAddress)
+		if verifyErr == nil && vp != nil {
+			if dbErr := s.db.Update(func(tx database.Tx) error {
+				if reloadErr := tx.Read().Where("id = ?", order.ID).First(order).Error; reloadErr != nil {
+					return reloadErr
+				}
+				return s.orderProcessor.RecordVerifiedPayment(tx, order, vp.Transaction)
+			}); dbErr != nil {
+				logger.LogErrorWithIDf(log, s.nodeID,
+					"Immediate payment verification persist failed for order %s (async retry will cover): %v",
+					paymentData.OrderID, dbErr)
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -142,7 +142,10 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 	if err == nil {
 		for _, tx := range txs {
 			if tx.ID.String() == paymentSent.TransactionID {
-				return nil, nil
+				if order.IsPaymentVerified() {
+					return nil, nil
+				}
+				break
 			}
 		}
 	}

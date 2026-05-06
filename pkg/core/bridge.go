@@ -1,5 +1,5 @@
-// Package core provides bridging utilities between mobazha3.0 and mobazha-core.
-// This package enables gradual migration from legacy code to the shared core library.
+// Package core provides bridging utilities for order state and P2P messaging.
+// It wraps pkg/orders, pkg/p2p, and pkg/identity for legacy integration points.
 package core
 
 import (
@@ -12,7 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/p2p"
 )
 
-// OrderStateBridge bridges legacy order state handling with mobazha-core order module.
+// OrderStateBridge bridges legacy order state handling with pkg/orders.
 type OrderStateBridge struct{}
 
 // NewOrderStateBridge creates a new order state bridge.
@@ -36,7 +36,7 @@ func (b *OrderStateBridge) GetAllowedEvents(state int) []int {
 	return result
 }
 
-// MessageBridge bridges legacy P2P messaging with mobazha-core p2p module.
+// MessageBridge bridges legacy P2P messaging with pkg/p2p.
 type MessageBridge struct {
 	signer contracts.Signer
 }

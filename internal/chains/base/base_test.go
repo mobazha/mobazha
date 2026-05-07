@@ -5,28 +5,22 @@ import (
 	"time"
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/mobazha/mobazha3.0/internal/chains/database"
-	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func setupWallet() (*WalletBase, error) {
-	db, err := sqlitedb.NewMemoryDB()
-	if err != nil {
-		return nil, err
-	}
-	if err := database.InitializeDatabase(db); err != nil {
-		return nil, err
-	}
 	logger, err := logging.GetLogger("test")
 	if err != nil {
 		return nil, err
 	}
+
+	ks := NewKeyStore()
+
 	w := &WalletBase{
 		ChainClient: NewMockChainClient(),
 		Done:        make(chan struct{}),
-		DB:          db,
+		KeyStore:    ks,
 		Logger:      logger,
 		CoinType:    iwallet.CtMock,
 		PostInitFunc: func(xpriv *hd.ExtendedKey) error {

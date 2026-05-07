@@ -1,26 +1,22 @@
 package base
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"gorm.io/gorm"
 )
 
 // WalletConfig is struct that can be used pass into the constructor
 // for each coin's wallet.
 type WalletConfig struct {
 	NodeID    string
-	DB        database.Database
+	KeyStore  *KeyStore
 	Logger    *logging.Logger
 	Testnet   bool
 	Regtest   bool
@@ -73,7 +69,7 @@ type WalletBase struct {
 	ChainClient  iwallet.ChainClient
 	Keychain     *Keychain
 	KeychainOpts []KeychainOption
-	DB           database.Database
+	KeyStore     *KeyStore
 	CoinType     iwallet.CoinType
 	Logger       *logging.Logger
 	PostInitFunc WalletPostInitFunc
@@ -106,8 +102,6 @@ type ChainClientSetter interface {
 // Note: This is a default implementation that should be overridden
 // by specific wallet implementations that have testnet field.
 func (w *WalletBase) IsTestnet() bool {
-	// Default implementation returns true
-	// Each wallet should override this method to return their actual testnet status
 	return true
 }
 
@@ -121,67 +115,42 @@ func (w *WalletBase) Begin() (iwallet.Tx, error) {
 // WalletExists should return whether the wallet exits or has been
 // initialized.
 func (w *WalletBase) WalletExists() bool {
-	err := w.DB.View(func(tx database.Tx) error {
-		var rec database.CoinRecord
-		return tx.Read().Where("coin = ?", w.CoinType).First(&rec).Error
-	})
-	return !errors.Is(err, gorm.ErrRecordNotFound)
+	return w.KeyStore.Has(w.CoinType)
 }
 
-// CreateWallet should initialize the wallet. This will be called by
-// Mobazha if WalletExists() returns false.
-//
-// The xPriv may be used to create a bip44 keychain. The xPriv is
-// `cointype` level in the bip44 path. For example in the following
-// path the wallet should only derive the paths after `account` as
-// m, purpose', and coin_type' are kept private by Mobazha so this
-// wallet cannot derive keys from other wallets.
-//
-// m / purpose' / coin_type' / account' / change / address_index
-//
-// The birthday can be used determine where to sync state from if
-// appropriate.
-//
-// If the wallet does not implement WalletCrypter then pw will be
-// nil. Otherwise it should be used to encrypt the private keys.
+// CreateWallet initializes the wallet by storing key material in the in-memory KeyStore.
+// The pw parameter is unused (WalletCrypter is deprecated) and will always be nil.
 func (w *WalletBase) CreateWallet(xpriv hd.ExtendedKey, pw []byte, birthday time.Time) error {
 	xpub, err := xpriv.Neuter()
 	if err != nil {
 		return err
 	}
 
-	err = w.DB.View(func(tx database.Tx) error {
-		var rec database.CoinRecord
-		return tx.Read().Where("coin = ?", w.CoinType).First(&rec).Error
-	})
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	} else if err == nil {
+	if w.KeyStore.Has(w.CoinType) {
 		return fmt.Errorf("wallet already exists for coin %s", w.CoinType.CurrencyCode())
 	}
 
-	err = w.PostInitFunc(&xpriv)
-	if err != nil {
-		return err
+	if w.PostInitFunc != nil {
+		if err := w.PostInitFunc(&xpriv); err != nil {
+			return err
+		}
 	}
 
-	return w.DB.Update(func(tx database.Tx) error {
-		return tx.Save(&database.CoinRecord{
-			MasterPriv:         xpriv.String(),
-			EncryptedMasterKey: false,
-			MasterPub:          xpub.String(),
-			Coin:               w.CoinType.String(),
-			Birthday:           birthday,
-			BestBlockHeight:    0,
-			BestBlockID:        strings.Repeat("0", 64),
-		})
+	w.KeyStore.Put(w.CoinType, &KeyMaterial{
+		AccountPriv: &xpriv,
+		AccountPub:  xpub,
 	})
+	return nil
 }
 
-// Open wallet will be called each time on Mobazha start. It
+// OpenWallet will be called each time on Mobazha start. It
 // will also be called after CreateWallet().
 func (w *WalletBase) OpenWallet() error {
-	keychain, err := NewKeychain(w.DB, w.CoinType, w.KeychainOpts...)
+	km, ok := w.KeyStore.Get(w.CoinType)
+	if !ok {
+		return fmt.Errorf("key material not found for coin %s", w.CoinType.CurrencyCode())
+	}
+	keychain, err := NewKeychain(km, w.CoinType, w.KeychainOpts...)
 	if err != nil {
 		return err
 	}
@@ -193,10 +162,6 @@ func (w *WalletBase) OpenWallet() error {
 
 // CloseWallet will be called when Mobazha shuts down.
 func (w *WalletBase) CloseWallet() error {
-	if err := w.DB.Close(); err != nil {
-		return err
-	}
-
 	close(w.Done)
 	return nil
 }
@@ -219,30 +184,3 @@ func (w *WalletBase) GetTransaction(id iwallet.TransactionID, coinType iwallet.C
 	return w.ChainClient.GetTransaction(id, coinType)
 }
 
-// SetPassphase is called after creating the wallet. It gives the wallet
-// the opportunity to set up encryption of the private keys.
-func (w *WalletBase) SetPassphase(pw []byte) error {
-	return w.Keychain.SetPassphase(pw)
-}
-
-// ChangePassphrase is called in response to user action requesting the
-// passphrase be changed. It is expected that this will return an error
-// if the old password is incorrect.
-func (w *WalletBase) ChangePassphrase(old, new []byte) error {
-	return w.Keychain.ChangePassphrase(old, new)
-}
-
-// RemovePassphrase is called in response to user action requesting the
-// passphrase be removed. It is expected that this will return an error
-// if the old password is incorrect.
-func (w *WalletBase) RemovePassphrase(pw []byte) error {
-	return w.Keychain.RemovePassphrase(pw)
-}
-
-// Unlock is called just prior to calling Spend(). The wallet should
-// decrypt the private key and hold the decrypted key in memory for
-// the provided duration after which it should be purged from memory.
-// If the provided password is incorrect it should error.
-func (w *WalletBase) Unlock(pw []byte, howLong time.Duration) error {
-	return w.Keychain.Unlock(pw, howLong)
-}

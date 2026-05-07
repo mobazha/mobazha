@@ -26,7 +26,7 @@ import (
 
 // Assert interfaces
 var _ = iwallet.Wallet(&LitecoinWallet{})
-var _ = iwallet.WalletCrypter(&LitecoinWallet{})
+
 var _ = iwallet.UTXOEscrow(&LitecoinWallet{})
 var _ = iwallet.UTXOEscrowWithTimeout(&LitecoinWallet{})
 var _ = iwallet.UTXODirectPayment(&LitecoinWallet{})
@@ -59,7 +59,7 @@ func NewLitecoinWallet(cfg *base.WalletConfig) (*LitecoinWallet, error) {
 
 	// ChainClient intentionally left nil — will be set by configureUTXOWallets()
 	// via SetChainClient() with a shared UTXOChainClient (Electrum/Mempool).
-	w.DB = cfg.DB
+	w.KeyStore = cfg.KeyStore
 	w.Logger = cfg.Logger
 	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainLitecoin)
 	if err != nil {

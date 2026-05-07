@@ -58,7 +58,7 @@ func (x *Init) Execute(args []string) error {
 		chains.Testnet(x.Testnet),
 		chains.NetConfig(config.DefaultNetConfig()),
 	}
-	mw, err := chains.NewMultiwallet(opts...)
+	mw, _, err := chains.NewMultiwallet(opts...)
 	if err != nil {
 		return err
 	}

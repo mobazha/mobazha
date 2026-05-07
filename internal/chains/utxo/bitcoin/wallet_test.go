@@ -15,8 +15,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	"github.com/mobazha/mobazha3.0/internal/chains/database"
-	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -49,16 +47,8 @@ func newTestWallet() (*BitcoinWallet, error) {
 		iwallet.FLSuperEconomic: {FeePerTx: iwallet.NewAmount(20), FeePerUnit: iwallet.NewAmount(20 * 1000)},
 	})
 
-	db, err := sqlitedb.NewMemoryDB()
-	if err != nil {
-		return nil, err
-	}
-	if err := database.InitializeDatabase(db); err != nil {
-		return nil, err
-	}
-
 	w.ChainClient = chainClient
-	w.DB = db
+	w.KeyStore = base.NewKeyStore()
 	w.Logger = logging.MustGetLogger("bchtest")
 	w.CoinType = testBitcoinNativeCoin
 	w.Done = make(chan struct{})

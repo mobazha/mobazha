@@ -10,7 +10,6 @@ import (
 )
 
 var _ = iwallet.Wallet(&TronWallet{})
-var _ = iwallet.WalletCrypter(&TronWallet{})
 var _ = iwallet.EscrowProcessor(&TronWallet{})
 
 // TronWallet is a skeleton wallet for the TRON chain.
@@ -33,7 +32,7 @@ func NewTronWallet(cfg *base.WalletConfig) (*TronWallet, error) {
 	}
 	w.Init()
 
-	w.DB = cfg.DB
+	w.KeyStore = cfg.KeyStore
 	w.Logger = cfg.Logger
 	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainTRON)
 	if err != nil {

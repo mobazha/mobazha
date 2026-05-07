@@ -8,8 +8,6 @@ import (
 	"path"
 
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	"github.com/mobazha/mobazha3.0/internal/chains/database"
-	"github.com/mobazha/mobazha3.0/internal/chains/database/sqlitedb"
 	"github.com/mobazha/mobazha3.0/internal/chains/evm"
 	"github.com/mobazha/mobazha3.0/internal/chains/fiat/shim"
 	"github.com/mobazha/mobazha3.0/internal/chains/solana"
@@ -35,10 +33,10 @@ var _ contracts.WalletOperator = (*Multiwallet)(nil)
 // Multiwallet is the basic wallet map
 type Multiwallet map[iwallet.ChainType]iwallet.Wallet
 
-func NewMultiwallet(opts ...Option) (Multiwallet, error) {
+func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 	var cfg Config
 	if err := cfg.Apply(append([]Option{Defaults}, opts...)...); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	writers := []io.Writer{os.Stdout}
@@ -55,14 +53,8 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 	logger := logging.MustGetLogger("multiwallet").With("node_id", cfg.NodeID)
 
 	os.MkdirAll(cfg.DataDir, os.ModePerm)
-	db, err := sqlitedb.NewSqliteDB(cfg.DataDir)
-	if err != nil {
-		return nil, err
-	}
 
-	if err := database.InitializeDatabase(db); err != nil {
-		return nil, err
-	}
+	keyStore := base.NewKeyStore()
 
 	multiwallet := make(map[iwallet.ChainType]iwallet.Wallet)
 	for _, chain := range cfg.Chains {
@@ -71,13 +63,13 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 			w, err := bitcoincash.NewBitcoinCashWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
-				DB:        db,
+				KeyStore:  keyStore,
 				Testnet:   cfg.UseTestnet,
 				Regtest:   cfg.UseRegtest,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			multiwallet[chain] = w
@@ -85,13 +77,13 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 			w, err := bitcoin.NewBitcoinWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
-				DB:        db,
+				KeyStore:  keyStore,
 				Testnet:   cfg.UseTestnet,
 				Regtest:   cfg.UseRegtest,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			multiwallet[chain] = w
@@ -99,13 +91,13 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 			w, err := litecoin.NewLitecoinWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
-				DB:        db,
+				KeyStore:  keyStore,
 				Testnet:   cfg.UseTestnet,
 				Regtest:   cfg.UseRegtest,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			multiwallet[chain] = w
@@ -113,87 +105,77 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 			w, err := zcash.NewZCashWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
-				DB:        db,
+				KeyStore:  keyStore,
 				Testnet:   cfg.UseTestnet,
 				Regtest:   cfg.UseRegtest,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			multiwallet[chain] = w
 
 		case iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon, iwallet.ChainBase, iwallet.ChainConflux:
-			// ChainClient always nil at construction — unified with UTXO pattern.
-			// Injected during MobazhaNode.Start() via startEVMChainClients():
-			//   - Standalone: creates own EthClient per chain via pkg/evm factory
-			//   - SaaS: gets shared EthClient from HostService
 			coinType, err := iwallet.RequireCanonicalNativeCoinType(chain)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			w, err := evm.NewETHWallet(coinType, nil, &base.WalletConfig{
 				Logger:    logger,
-				DB:        db,
+				KeyStore:  keyStore,
 				Testnet:   cfg.UseTestnet,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			multiwallet[chain] = w
 
 		case iwallet.ChainSolana:
-			// ChainClient always nil at construction — unified with EVM/UTXO pattern.
-			// Injected during MobazhaNode.Start() via startSolanaChainClients():
-			//   - Standalone: creates own SolanaClient + resolves escrow from ContractManager
-			//   - SaaS: gets shared SolanaClient + pre-resolved escrow from HostService
 			w, err := solana.NewSolanaWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
-				DB:        db,
+				KeyStore:  keyStore,
 				Testnet:   cfg.UseTestnet,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			multiwallet[chain] = w
 		case iwallet.ChainTRON:
-			// TronClient nil at construction — injected during MobazhaNode.Start()
-			// via startTRONChainClients(), symmetric with Solana/EVM pattern.
 			w, err := tronWal.NewTronWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
-				DB:        db,
+				KeyStore:  keyStore,
 				Testnet:   cfg.UseTestnet,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			multiwallet[chain] = w
 		case iwallet.ChainFiat:
 			w, err := shim.NewFiatWalletShim(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
-				DB:        db,
+				KeyStore:  keyStore,
 				Testnet:   cfg.UseTestnet,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			multiwallet[chain] = w
 		default:
-			return nil, fmt.Errorf("a wallet implementation for %s does not exist", chain)
+			return nil, nil, fmt.Errorf("a wallet implementation for %s does not exist", chain)
 		}
 	}
 
-	return multiwallet, nil
+	return multiwallet, keyStore, nil
 }
 
 func (w *Multiwallet) Start() error {

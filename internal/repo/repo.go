@@ -686,7 +686,7 @@ func migrateRepoToNodesStructure(rootPath string) error {
 	itemsToMove := []string{
 		common.PublicDirName,
 		common.DatabaseFileName,
-		common.MultiwalletFileName,
+		"multiwallet.db",
 		versionFileName,
 	}
 

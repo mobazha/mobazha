@@ -456,7 +456,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		chains.Testnet(walletTestnet),
 		chains.Regtest(cfg.Regtest),
 	}
-	mw, err := chains.NewMultiwallet(opts...)
+	mw, _, err := chains.NewMultiwallet(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1123,7 +1123,7 @@ func newLightweightNode(
 		chains.Regtest(cfg.Regtest),
 	}
 
-	mw, err := chains.NewMultiwallet(opts...)
+	mw, _, err := chains.NewMultiwallet(opts...)
 	if err != nil {
 		return nil, err
 	}

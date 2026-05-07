@@ -51,7 +51,7 @@ const (
 
 // Assert interfaces
 var _ = iwallet.Wallet(&ZCashWallet{})
-var _ = iwallet.WalletCrypter(&ZCashWallet{})
+
 var _ = iwallet.UTXOEscrow(&ZCashWallet{})
 var _ = iwallet.UTXODirectPayment(&ZCashWallet{})
 
@@ -92,7 +92,7 @@ func NewZCashWallet(cfg *base.WalletConfig) (*ZCashWallet, error) {
 	// ChainClient intentionally left nil — will be set by configureUTXOWallets()
 	// via SetChainClient() with a shared UTXOChainClient (Electrum/Mempool).
 
-	w.DB = cfg.DB
+	w.KeyStore = cfg.KeyStore
 	w.Logger = cfg.Logger
 	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainZCash)
 	if err != nil {

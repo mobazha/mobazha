@@ -20,9 +20,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// Assert interfaces
 var _ = iwallet.Wallet(&ETHWallet{})
-var _ = iwallet.WalletCrypter(&ETHWallet{})
 var _ = iwallet.EscrowProcessor(&ETHWallet{})
 
 // ETHWallet extends wallet base and implements the
@@ -47,7 +45,7 @@ func NewETHWallet(coinType iwallet.CoinType, chainClient *EthClient, cfg *base.W
 	if chainClient != nil {
 		w.ChainClient = chainClient
 	}
-	w.DB = cfg.DB
+	w.KeyStore = cfg.KeyStore
 	w.Logger = cfg.Logger
 	w.CoinType = coinType
 	w.Done = make(chan struct{})

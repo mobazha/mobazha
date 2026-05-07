@@ -24,7 +24,7 @@ import (
 
 // Assert interfaces
 var _ = iwallet.Wallet(&BitcoinCashWallet{})
-var _ = iwallet.WalletCrypter(&BitcoinCashWallet{})
+
 var _ = iwallet.UTXOEscrow(&BitcoinCashWallet{})
 var _ = iwallet.UTXOEscrowWithTimeout(&BitcoinCashWallet{})
 var _ = iwallet.UTXODirectPayment(&BitcoinCashWallet{})
@@ -48,7 +48,7 @@ func NewBitcoinCashWallet(cfg *base.WalletConfig) (*BitcoinCashWallet, error) {
 	// ChainClient intentionally left nil — will be set by configureUTXOWallets()
 	// via SetChainClient() with a shared UTXOChainClient (Electrum/Mempool).
 	// Previously used Blockbook or BCHD clients, both replaced at runtime.
-	w.DB = cfg.DB
+	w.KeyStore = cfg.KeyStore
 	w.Logger = cfg.Logger
 	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBitcoinCash)
 	if err != nil {

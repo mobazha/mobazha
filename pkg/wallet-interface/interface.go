@@ -63,8 +63,7 @@ type WalletLoader interface {
 	// The birthday can be used determine where to sync state from if
 	// appropriate.
 	//
-	// If the wallet does not implement WalletCrypter then pw will be
-	// nil. Otherwise it should be used to encrypt the private keys.
+	// The pw parameter is unused (WalletCrypter is deprecated) and will always be nil.
 	CreateWallet(xpriv hd.ExtendedKey, pw []byte, birthday time.Time) error
 
 	// Open wallet will be called each time on Mobazha start. It
@@ -207,29 +206,4 @@ type UTXOEscrowWithTimeout interface {
 	// ReleaseFundsAfterTimeout will release funds from the escrow. The signature will
 	// be created using the timeoutKey.
 	ReleaseFundsAfterTimeout(dbtx Tx, txn Transaction, timeoutKey btcec.PrivateKey, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
-}
-
-// WalletCrypter is an optional interface that the wallet may implement to allow
-// for encrypting private keys. If this is implemented Mobazha will call these
-// functions as specified below.
-type WalletCrypter interface {
-	// SetPassphase is called after creating the wallet. It gives the wallet
-	// the opportunity to set up encryption of the private keys.
-	SetPassphase(pw []byte) error
-
-	// ChangePassphrase is called in response to user action requesting the
-	// passphrase be changed. It is expected that this will return an error
-	// if the old password is incorrect.
-	ChangePassphrase(old, new []byte) error
-
-	// RemovePassphrase is called in response to user action requesting the
-	// passphrase be removed. It is expected that this will return an error
-	// if the old password is incorrect.
-	RemovePassphrase(pw []byte) error
-
-	// Unlock is called just prior to calling Spend(). The wallet should
-	// decrypt the private key and hold the decrypted key in memory for
-	// the provided duration after which it should be purged from memory.
-	// If the provided password is incorrect it should error.
-	Unlock(pw []byte, howLong time.Duration) error
 }

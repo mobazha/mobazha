@@ -4,6 +4,5 @@ const (
 	PublicDirName = "public"
 
 	// File names
-	DatabaseFileName    = "mobazha.db"
-	MultiwalletFileName = "multiwallet.db"
+	DatabaseFileName = "mobazha.db"
 )

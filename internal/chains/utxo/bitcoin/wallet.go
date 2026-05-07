@@ -23,9 +23,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// Assert interfaces
 var _ = iwallet.Wallet(&BitcoinWallet{})
-var _ = iwallet.WalletCrypter(&BitcoinWallet{})
 var _ = iwallet.UTXOEscrow(&BitcoinWallet{})
 var _ = iwallet.UTXOEscrowWithTimeout(&BitcoinWallet{})
 var _ = iwallet.UTXODirectPayment(&BitcoinWallet{})
@@ -50,7 +48,7 @@ func NewBitcoinWallet(cfg *base.WalletConfig) (*BitcoinWallet, error) {
 
 	// ChainClient intentionally left nil — will be set by configureUTXOWallets()
 	// via SetChainClient() with a shared UTXOChainClient (Electrum/Mempool).
-	w.DB = cfg.DB
+	w.KeyStore = cfg.KeyStore
 	w.Logger = cfg.Logger
 	nativeCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBitcoin)
 	if err != nil {

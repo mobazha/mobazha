@@ -32,10 +32,12 @@ func NewMonitorWithDefaultSources(ctx context.Context, testnet bool) (*Monitor, 
 }
 
 // ElectrumOverride allows overriding the default Electrum servers for a chain.
-// Used in E2E tests to point at a local electrs instance on regtest.
+// Used by private_distribution mode (user-configured endpoints with TLS pinning) and
+// E2E tests (local electrs on regtest).
 type ElectrumOverride struct {
-	Servers []string
-	UseTLS  bool
+	Servers        []string
+	UseTLS         bool
+	TLSFingerprint string // SHA-256 hex fingerprint for certificate pinning (empty = system CA)
 }
 
 // MonitorFactoryWithOverrides extends MonitorFactory with the ability to
@@ -66,6 +68,14 @@ type SourceConfig struct {
 	Testnet bool
 }
 
+// UnspentOutput represents an unspent transaction output for sweep operations.
+type UnspentOutput struct {
+	TxHash      string
+	OutputIndex uint32
+	Height      int64
+	Value       uint64
+}
+
 // ChainOperations defines the interface for chain operations used by ChainClient
 // Both *Monitor and UTXOMonitorService implement this interface
 type ChainOperations interface {
@@ -74,6 +84,17 @@ type ChainOperations interface {
 	BroadcastTransaction(chainType iwallet.ChainType, txHex string) (string, error)
 	GetAddressTransactions(chainType iwallet.ChainType, address string, scriptPubKey []byte) ([]iwallet.Transaction, error)
 	IsHealthy(chainType iwallet.ChainType) bool
+
+	// ListUnspent returns unspent outputs for a scriptPubKey on the given chain.
+	// The implementation handles protocol-specific conversions (e.g. Electrum scripthash)
+	// internally, keeping callers chain-agnostic.
+	// TECHDEBT(TD-052): All ChainOperations methods omit context.Context for
+	// historical consistency; a follow-up pass will add ctx to every method.
+	ListUnspent(chainType iwallet.ChainType, scriptPubKey []byte) ([]UnspentOutput, error)
+
+	// GetTxConfirmations returns the number of on-chain confirmations for a
+	// transaction. Returns 0 for mempool (unconfirmed) transactions.
+	GetTxConfirmations(chainType iwallet.ChainType, txHash string) (int, error)
 }
 
 // UTXOMonitorService 定义 UTXO 监控服务的统一接口
@@ -115,4 +136,10 @@ type UTXOMonitorService interface {
 
 	// IsHealthy 检查 Monitor 是否健康
 	IsHealthy(chainType iwallet.ChainType) bool
+
+	// ListUnspent 列出 scriptPubKey 对应的未花费输出
+	ListUnspent(chainType iwallet.ChainType, scriptPubKey []byte) ([]UnspentOutput, error)
+
+	// GetTxConfirmations 获取交易确认数
+	GetTxConfirmations(chainType iwallet.ChainType, txHash string) (int, error)
 }

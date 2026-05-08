@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,7 +60,7 @@ func newTestWallet() (*LitecoinWallet, error) {
 		return nil, err
 	}
 
-	if err := w.CreateWallet(*key, nil, time.Now()); err != nil {
+	if err := w.CreateWallet(*key, time.Now()); err != nil {
 		return nil, err
 	}
 
@@ -667,280 +668,191 @@ func TestLitecoinWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 	}
 }
 
-// TestLitecoinWallet_SpendFromDerivedAddress tests the SpendFromDerivedAddress method
-// which is used for spending from single-sig addresses
-func TestLitecoinWallet_SpendFromDerivedAddress(t *testing.T) {
+func TestLitecoinWallet_BuildSweepTx(t *testing.T) {
 	w, err := newTestWallet()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a private key for signing
-	keyBytes, err := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
-	if err != nil {
-		t.Fatal(err)
-	}
+	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
 	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
 
-	// Create P2WPKH address from the public key
 	pubKeyHash := ltcutil.Hash160(pubKey.SerializeCompressed())
-	witnessAddr, err := ltcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet4Params)
-	if err != nil {
-		t.Fatal(err)
-	}
+	witnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet4Params)
+	scriptPubKey, _ := txscript.PayToAddrScript(witnessAddr)
 
-	// Create the scriptPubKey for P2WPKH
-	scriptPubKey, err := txscript.PayToAddrScript(witnessAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	destPubKeyHash := ltcutil.Hash160([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+		0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
+		0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21})
+	destWitnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(destPubKeyHash, &chaincfg.TestNet4Params)
+	destAddr := destWitnessAddr.String()
 
-	// Create a fake UTXO
 	txidStr := "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d"
-	inputAmount := int64(1000000) // 1 LTC in litoshis
-
-	utxo := iwallet.UTXO{
-		TxID:         iwallet.TransactionID(txidStr),
-		OutputIndex:  0,
-		Amount:       iwallet.NewAmount(inputAmount),
-		ScriptPubKey: scriptPubKey,
-	}
-
-	// Create outputs: seller gets 900000, platform gets 50000, fee is 50000
-	// Use valid Litecoin testnet addresses - derive from known public keys
-	sellerPubKeyHash := ltcutil.Hash160([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
-		0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
-		0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21})
-	sellerWitnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(sellerPubKeyHash, &chaincfg.TestNet4Params)
-
-	platformPubKeyHash := ltcutil.Hash160([]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a,
-		0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34,
-		0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41})
-	platformWitnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(platformPubKeyHash, &chaincfg.TestNet4Params)
-
-	outputs := []iwallet.SpendInfo{
-		{
-			Address: iwallet.NewAddress(sellerWitnessAddr.String(), testLitecoinNativeCoin),
-			Amount:  iwallet.NewAmount(900000),
-		},
-		{
-			Address: iwallet.NewAddress(platformWitnessAddr.String(), testLitecoinNativeCoin),
-			Amount:  iwallet.NewAmount(50000),
-		},
-	}
-	// Total outputs: 950000, Input: 1000000, Implicit fee: 50000
-
-	// Begin transaction
-	wtx, err := w.Begin()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Call SpendFromDerivedAddress
-	txid, err := w.SpendFromDerivedAddress(wtx, utxo, outputs, *privKey, iwallet.FlNormal)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Logf("Transaction ID: %s", txid)
-
-	// Verify the txid is not empty
-	if txid.String() == "" {
-		t.Error("Expected non-empty txid")
-	}
-
-	// Verify OnCommit is set
-	wbtx, ok := wtx.(*base.DBTx)
-	if !ok {
-		t.Fatal("wtx is not expected type")
-	}
-	if wbtx.OnCommit == nil {
-		t.Error("OnCommit should be set")
-	}
-}
-
-// TestLitecoinWallet_SpendFromDerivedAddress_OutputsExceedInput tests error when outputs > input
-func TestLitecoinWallet_SpendFromDerivedAddress_OutputsExceedInput(t *testing.T) {
-	w, err := newTestWallet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
-	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
-
-	pubKeyHash := ltcutil.Hash160(pubKey.SerializeCompressed())
-	witnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet4Params)
-	scriptPubKey, _ := txscript.PayToAddrScript(witnessAddr)
-
-	utxo := iwallet.UTXO{
-		TxID:         iwallet.TransactionID("bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d"),
-		OutputIndex:  0,
-		Amount:       iwallet.NewAmount(1000000),
-		ScriptPubKey: scriptPubKey,
-	}
-
-	// Generate valid testnet address
-	destPubKeyHash := ltcutil.Hash160([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
-		0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
-		0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21})
-	destWitnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(destPubKeyHash, &chaincfg.TestNet4Params)
-
-	outputs := []iwallet.SpendInfo{
-		{
-			Address: iwallet.NewAddress(destWitnessAddr.String(), testLitecoinNativeCoin),
-			Amount:  iwallet.NewAmount(2000000), // More than input
-		},
-	}
-
-	wtx, _ := w.Begin()
-	_, err = w.SpendFromDerivedAddress(wtx, utxo, outputs, *privKey, iwallet.FlNormal)
-	if err == nil {
-		t.Error("Expected error when outputs exceed input")
-	}
-	t.Logf("Got expected error: %v", err)
-}
-
-// TestLitecoinWallet_SpendFromDerivedAddress_ZeroFee tests error when fee is zero
-func TestLitecoinWallet_SpendFromDerivedAddress_ZeroFee(t *testing.T) {
-	w, err := newTestWallet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
-	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
-
-	pubKeyHash := ltcutil.Hash160(pubKey.SerializeCompressed())
-	witnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet4Params)
-	scriptPubKey, _ := txscript.PayToAddrScript(witnessAddr)
-
-	utxo := iwallet.UTXO{
-		TxID:         iwallet.TransactionID("bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d"),
-		OutputIndex:  0,
-		Amount:       iwallet.NewAmount(1000000),
-		ScriptPubKey: scriptPubKey,
-	}
-
-	// Generate valid testnet address
-	destPubKeyHash := ltcutil.Hash160([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
-		0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
-		0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21})
-	destWitnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(destPubKeyHash, &chaincfg.TestNet4Params)
-
-	outputs := []iwallet.SpendInfo{
-		{
-			Address: iwallet.NewAddress(destWitnessAddr.String(), testLitecoinNativeCoin),
-			Amount:  iwallet.NewAmount(1000000), // Equals input, zero fee
-		},
-	}
-
-	wtx, _ := w.Begin()
-	_, err = w.SpendFromDerivedAddress(wtx, utxo, outputs, *privKey, iwallet.FlNormal)
-	if err == nil {
-		t.Error("Expected error when fee is zero")
-	}
-	t.Logf("Got expected error: %v", err)
-}
-
-// TestLitecoinWallet_SpendFromDerivedAddress_ScriptVerification tests that the signed transaction is valid
-func TestLitecoinWallet_SpendFromDerivedAddress_ScriptVerification(t *testing.T) {
-	w, err := newTestWallet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a private key for signing
-	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
-	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
-
-	// Create P2WPKH address
-	pubKeyHash := ltcutil.Hash160(pubKey.SerializeCompressed())
-	witnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet4Params)
-	scriptPubKey, _ := txscript.PayToAddrScript(witnessAddr)
-
 	inputAmount := int64(1000000)
-	txidStr := "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d"
 
-	utxo := iwallet.UTXO{
-		TxID:         iwallet.TransactionID(txidStr),
-		OutputIndex:  0,
-		Amount:       iwallet.NewAmount(inputAmount),
-		ScriptPubKey: scriptPubKey,
+	inputs := []iwallet.SweepInput{
+		{TxHash: txidStr, OutputIndex: 0, Value: inputAmount},
 	}
 
-	// Generate valid testnet address
-	destPubKeyHash := ltcutil.Hash160([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
-		0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
-		0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21})
-	destWitnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(destPubKeyHash, &chaincfg.TestNet4Params)
-
-	outputs := []iwallet.SpendInfo{
-		{
-			Address: iwallet.NewAddress(destWitnessAddr.String(), testLitecoinNativeCoin),
-			Amount:  iwallet.NewAmount(950000), // 50000 sat fee
-		},
-	}
-
-	wtx, _ := w.Begin()
-	txid, err := w.SpendFromDerivedAddress(wtx, utxo, outputs, *privKey, iwallet.FlNormal)
+	rawTx, txHash, err := w.BuildSweepTx(inputs, *privKey, destAddr, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Logf("Generated txid: %s", txid)
-
-	// Get the transaction bytes by triggering OnCommit
-	wbtx := wtx.(*base.DBTx)
-
-	// Execute OnCommit to save the transaction
-	if err := wbtx.OnCommit(); err != nil {
-		t.Fatal(err)
+	if txHash == "" {
+		t.Error("Expected non-empty txHash")
+	}
+	if len(rawTx) == 0 {
+		t.Error("Expected non-empty rawTx")
 	}
 
-	// Use broadcast capture from mock chain client and verify the signature
-	chainClient, ok := w.ChainClient.(*base.MockChainClient)
-	if !ok {
-		t.Fatal("expected *base.MockChainClient")
-	}
-	if len(chainClient.BroadcastedTxs) == 0 {
-		t.Fatal("Expected broadcasted transaction")
-	}
-	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
-
-	// Decode and verify the transaction
 	var msgTx wire.MsgTx
-	if err := msgTx.Deserialize(bytes.NewReader(txBytes)); err != nil {
+	if err := msgTx.Deserialize(bytes.NewReader(rawTx)); err != nil {
 		t.Fatal(err)
 	}
-
-	// Verify with txscript engine
-	vm, err := txscript.NewEngine(scriptPubKey, &msgTx, 0, txscript.StandardVerifyFlags, nil, nil, inputAmount)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.Execute(); err != nil {
-		t.Errorf("Script verification failed: %s", err)
-	} else {
-		t.Log("Script verification passed!")
-	}
-
-	// Verify transaction structure
 	if len(msgTx.TxIn) != 1 {
 		t.Errorf("Expected 1 input, got %d", len(msgTx.TxIn))
 	}
 	if len(msgTx.TxOut) != 1 {
 		t.Errorf("Expected 1 output, got %d", len(msgTx.TxOut))
 	}
-	if msgTx.TxOut[0].Value != 950000 {
-		t.Errorf("Expected output value 950000, got %d", msgTx.TxOut[0].Value)
+
+	vm, err := txscript.NewEngine(scriptPubKey, &msgTx, 0, txscript.StandardVerifyFlags, nil, nil, inputAmount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.Execute(); err != nil {
+		t.Errorf("Script verification failed: %s", err)
 	}
 
-	// Calculate and verify fee
 	fee := inputAmount - msgTx.TxOut[0].Value
-	t.Logf("Transaction fee: %d litoshis", fee)
-	if fee != 50000 {
-		t.Errorf("Expected fee 50000, got %d", fee)
+	t.Logf("Transaction fee: %d litoshis (%.1f sat/vB)", fee, float64(fee)/float64(10+68+31))
+}
+
+func TestLitecoinWallet_BuildSweepTx_FeeExceedsInput(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	privKey, _ := btcec.PrivKeyFromBytes(keyBytes)
+
+	inputs := []iwallet.SweepInput{
+		{TxHash: "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d", OutputIndex: 0, Value: 100},
+	}
+
+	destPubKeyHash := ltcutil.Hash160([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+		0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
+		0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21})
+	destWitnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(destPubKeyHash, &chaincfg.TestNet4Params)
+
+	_, _, err = w.BuildSweepTx(inputs, *privKey, destWitnessAddr.String(), 2)
+	if err == nil {
+		t.Error("Expected error when fee exceeds input")
+	}
+}
+
+func TestLitecoinWallet_BuildSweepTx_NoInputs(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	privKey, _ := btcec.PrivKeyFromBytes(keyBytes)
+
+	destPubKeyHash := ltcutil.Hash160([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+		0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
+		0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21})
+	destWitnessAddr, _ := ltcutil.NewAddressWitnessPubKeyHash(destPubKeyHash, &chaincfg.TestNet4Params)
+
+	_, _, err = w.BuildSweepTx(nil, *privKey, destWitnessAddr.String(), 2)
+	if err == nil {
+		t.Error("Expected error with no inputs")
+	}
+}
+
+// --- UTXOAddressUtilities tests ---
+
+const (
+	testLTCPubKeyHex      = "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c"
+	testLTCMainnetAddress = "ltc1qcr8te4kr609gcawutmrza0j4xv80jy8z4nqduv"
+	testLTCTestnetAddress = "tltc1qcr8te4kr609gcawutmrza0j4xv80jy8zzpry0x"
+)
+
+func TestLitecoinWallet_DerivePaymentAddressFromPubKey_Mainnet(t *testing.T) {
+	w := &LitecoinWallet{testnet: false}
+
+	pubKeyBytes, _ := hex.DecodeString(testLTCPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, scriptPubKey, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+
+	if addr != testLTCMainnetAddress {
+		t.Errorf("address mismatch: got %s, want %s", addr, testLTCMainnetAddress)
+	}
+	if !strings.HasPrefix(addr, "ltc1") {
+		t.Errorf("LTC mainnet address should start with ltc1: got %s", addr)
+	}
+	if len(scriptPubKey) != 22 {
+		t.Errorf("expected 22-byte P2WPKH scriptPubKey, got %d bytes", len(scriptPubKey))
+	}
+	if scriptPubKey[0] != txscript.OP_0 {
+		t.Errorf("scriptPubKey[0]=%x, want OP_0=%x", scriptPubKey[0], txscript.OP_0)
+	}
+}
+
+func TestLitecoinWallet_DerivePaymentAddressFromPubKey_Testnet(t *testing.T) {
+	w := &LitecoinWallet{testnet: true}
+
+	pubKeyBytes, _ := hex.DecodeString(testLTCPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, _, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+	if addr != testLTCTestnetAddress {
+		t.Errorf("address mismatch: got %s, want %s", addr, testLTCTestnetAddress)
+	}
+	if !strings.HasPrefix(addr, "tltc1") {
+		t.Errorf("LTC testnet address should start with tltc1: got %s", addr)
+	}
+}
+
+func TestLitecoinWallet_DerivePaymentAddressFromPubKey_NilPubKey(t *testing.T) {
+	w := &LitecoinWallet{testnet: true}
+	if _, _, err := w.DerivePaymentAddressFromPubKey(nil); err == nil {
+		t.Errorf("expected error for nil pubkey")
+	}
+}
+
+func TestLitecoinWallet_AddressToScriptPubKey_RoundTrip(t *testing.T) {
+	w := &LitecoinWallet{testnet: false}
+
+	pubKeyBytes, _ := hex.DecodeString(testLTCPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, expected, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := w.AddressToScriptPubKey(addr)
+	if err != nil {
+		t.Fatalf("AddressToScriptPubKey: %v", err)
+	}
+	if !bytes.Equal(got, expected) {
+		t.Errorf("scriptPubKey mismatch: derive=%x, decoded=%x", expected, got)
+	}
+}
+
+func TestLitecoinWallet_AddressToScriptPubKey_Invalid(t *testing.T) {
+	w := &LitecoinWallet{testnet: true}
+	if _, err := w.AddressToScriptPubKey(testInvalidAddress); err == nil {
+		t.Errorf("expected error for invalid address")
 	}
 }

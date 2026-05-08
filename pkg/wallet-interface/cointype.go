@@ -290,6 +290,14 @@ func (c ChainType) IsUTXOChain() bool {
 	return slices.Contains(utxoChains, c)
 }
 
+// IsValid reports whether the receiver is one of the chains the platform
+// recognises. Useful when callers parse a string of unknown provenance into
+// a ChainType — IsValid lets them distinguish "BTC" (a real chain) from
+// arbitrary strings like a canonical CoinType ("crypto:bip122:...").
+func (c ChainType) IsValid() bool {
+	return slices.Contains(GetAllSupportedChainTypes(), c) || c == ChainMock
+}
+
 // SupportsHDDerivation returns true if the chain supports HD key derivation (BIP32/44)
 func (c ChainType) SupportsHDDerivation() bool {
 	// All UTXO chains support HD derivation

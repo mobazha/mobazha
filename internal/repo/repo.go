@@ -541,6 +541,12 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.OutboxEvent{},
 		&dbstore.PublicDataRecord{},
 		&dbstore.PublicMediaRecord{},
+		&models.GuestCheckoutConfig{},
+		&models.GuestOrder{},
+		&models.GuestOrderItem{},
+		&models.InventoryReservation{},
+		&models.DirectPaymentAddressCounter{},
+		&models.SweepTask{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
@@ -632,6 +638,12 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		&models.ShippingLocationEntity{},
 		&models.ListingShippingRef{},
 		&models.OutboxEvent{},
+		&models.GuestCheckoutConfig{},
+		&models.GuestOrder{},
+		&models.GuestOrderItem{},
+		&models.InventoryReservation{},
+		&models.DirectPaymentAddressCounter{},
+		&models.SweepTask{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
@@ -686,7 +698,6 @@ func migrateRepoToNodesStructure(rootPath string) error {
 	itemsToMove := []string{
 		common.PublicDirName,
 		common.DatabaseFileName,
-		"multiwallet.db",
 		versionFileName,
 	}
 

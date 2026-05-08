@@ -48,6 +48,9 @@ func (m *mockGuestSvc) HandlePaymentDetected(orderToken string, txHash string) e
 func (m *mockGuestSvc) HandleConfirmationUpdate(orderToken string, confs int) error {
 	return nil
 }
+func (m *mockGuestSvc) HandleLatePayment(orderToken, txHash, status string, paid, expected uint64) error {
+	return nil
+}
 func (m *mockGuestSvc) CleanupExpiredOrders(ctx context.Context) {}
 func (m *mockGuestSvc) AutoCompleteOrders(ctx context.Context)   {}
 func (m *mockGuestSvc) RunGuestCleanupOnce()                     {}
@@ -87,6 +90,7 @@ func TestUnifiedOrderView_MergesGuestAndStandard(t *testing.T) {
 	v := NewUnifiedOrderView(
 		&mockStandardFetcher{},
 		&mockGuestSvc{orders: guestOrders, total: 2},
+		nil,
 	)
 
 	results, meta, err := v.ListOrders(context.Background(), contracts.OrderListFilter{
@@ -119,7 +123,7 @@ func TestUnifiedOrderView_PaginationFirstPage(t *testing.T) {
 			models.GuestOrderAwaitingPayment, now.Add(-time.Duration(i)*time.Hour))
 	}
 
-	v := NewUnifiedOrderView(nil, &mockGuestSvc{orders: guests, total: 5})
+	v := NewUnifiedOrderView(nil, &mockGuestSvc{orders: guests, total: 5}, nil)
 
 	results, meta, err := v.ListOrders(context.Background(), contracts.OrderListFilter{
 		View: "guest", Page: 0, PageSize: 2,
@@ -145,7 +149,7 @@ func TestUnifiedOrderView_PaginationSecondPage(t *testing.T) {
 			models.GuestOrderAwaitingPayment, now.Add(-time.Duration(i)*time.Hour))
 	}
 
-	v := NewUnifiedOrderView(nil, &mockGuestSvc{orders: guests, total: 5})
+	v := NewUnifiedOrderView(nil, &mockGuestSvc{orders: guests, total: 5}, nil)
 
 	results, meta, err := v.ListOrders(context.Background(), contracts.OrderListFilter{
 		View: "guest", Page: 1, PageSize: 2,
@@ -171,7 +175,7 @@ func TestUnifiedOrderView_FilterByState(t *testing.T) {
 		makeGuestOrder("tok2", "", "BTC", models.GuestOrderFunded, now.Add(-time.Hour)),
 	}
 
-	v := NewUnifiedOrderView(nil, &mockGuestSvc{orders: []models.GuestOrder{guests[1]}, total: 1})
+	v := NewUnifiedOrderView(nil, &mockGuestSvc{orders: []models.GuestOrder{guests[1]}, total: 1}, nil)
 
 	results, _, err := v.ListOrders(context.Background(), contracts.OrderListFilter{
 		View: "guest", State: funded.String(), PageSize: 20,
@@ -193,6 +197,7 @@ func TestUnifiedOrderView_EmptyGuest(t *testing.T) {
 	v := NewUnifiedOrderView(
 		&mockStandardFetcher{},
 		&mockGuestSvc{},
+		nil,
 	)
 
 	results, meta, err := v.ListOrders(context.Background(), contracts.OrderListFilter{
@@ -217,7 +222,7 @@ func TestUnifiedOrderView_EmptyStandard(t *testing.T) {
 		makeGuestOrder("tok1", "x@y.com", "ETH", models.GuestOrderFunded, now),
 	}
 
-	v := NewUnifiedOrderView(nil, &mockGuestSvc{orders: guests, total: 1})
+	v := NewUnifiedOrderView(nil, &mockGuestSvc{orders: guests, total: 1}, nil)
 
 	results, _, err := v.ListOrders(context.Background(), contracts.OrderListFilter{
 		View: "all", PageSize: 20,
@@ -236,7 +241,7 @@ func TestUnifiedOrderView_EmptyStandard(t *testing.T) {
 // --- U-07: BothEmpty ---
 
 func TestUnifiedOrderView_BothEmpty(t *testing.T) {
-	v := NewUnifiedOrderView(nil, nil)
+	v := NewUnifiedOrderView(nil, nil, nil)
 
 	results, meta, err := v.ListOrders(context.Background(), contracts.OrderListFilter{
 		View: "all", PageSize: 20,
@@ -269,7 +274,7 @@ func TestConvertGuestOrder_BasicFields(t *testing.T) {
 		},
 	}
 
-	s := convertGuestOrder(g)
+	s := convertGuestOrder(g, "")
 
 	if s.ID != "gst_abc123" {
 		t.Errorf("expected ID=gst_abc123, got %s", s.ID)
@@ -301,7 +306,7 @@ func TestConvertGuestOrder_NoEmail_DefaultsToGuest(t *testing.T) {
 		CreatedAt:  time.Now(),
 	}
 
-	s := convertGuestOrder(g)
+	s := convertGuestOrder(g, "")
 	if s.BuyerName != "Guest" {
 		t.Errorf("expected buyerName=Guest, got %s", s.BuyerName)
 	}
@@ -315,9 +320,14 @@ func TestConvertGuestOrder_SweepStatus(t *testing.T) {
 		CreatedAt:      time.Now(),
 	}
 
-	s := convertGuestOrder(g)
+	s := convertGuestOrder(g, "")
 	if s.SweepStatus != "pending" {
-		t.Errorf("expected sweepStatus=pending, got %s", s.SweepStatus)
+		t.Errorf("expected sweepStatus=pending when no real task status, got %s", s.SweepStatus)
+	}
+
+	s2 := convertGuestOrder(g, "submitted")
+	if s2.SweepStatus != "submitted" {
+		t.Errorf("expected sweepStatus=submitted, got %s", s2.SweepStatus)
 	}
 }
 
@@ -334,8 +344,11 @@ func TestConvertGuestOrder_UpdatedAtUsesLatestTimestamp(t *testing.T) {
 		State:       models.GuestOrderCompleted,
 	}
 
-	s := convertGuestOrder(g)
+	s := convertGuestOrder(g, "confirmed")
 	if !s.UpdatedAt.Equal(completed) {
 		t.Errorf("expected updatedAt=%v, got %v", completed, s.UpdatedAt)
+	}
+	if s.SweepStatus != "confirmed" {
+		t.Errorf("expected sweepStatus=confirmed, got %s", s.SweepStatus)
 	}
 }

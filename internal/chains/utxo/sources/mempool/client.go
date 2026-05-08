@@ -3,6 +3,7 @@ package mempool
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
+	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -799,4 +801,138 @@ func (s *Source) EstimateFee(ctx context.Context, numBlocks int) (uint64, error)
 	}
 
 	return feeRate, nil
+}
+
+// addressUTXO represents a single UTXO from the mempool.space /address/:address/utxo endpoint.
+type addressUTXO struct {
+	Txid   string    `json:"txid"`
+	Vout   uint32    `json:"vout"`
+	Value  uint64    `json:"value"`
+	Status StatusAPI `json:"status"`
+}
+
+// ListUnspent returns unspent outputs for the given scriptPubKey.
+// mempool.space /scripthash/ endpoints expect the Electrum scripthash
+// format: reversed sha256 of the raw scriptPubKey bytes.
+func (s *Source) ListUnspent(ctx context.Context, scriptPubKey []byte) ([]pkgutxo.UnspentOutput, error) {
+	sh := scriptPubKeyToScripthash(scriptPubKey)
+	url := fmt.Sprintf("%s/scripthash/%s/utxo", s.baseURL, sh)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		s.markUnhealthy()
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.markUnhealthy()
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("ListUnspent API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var utxos []addressUTXO
+	if err := json.NewDecoder(resp.Body).Decode(&utxos); err != nil {
+		return nil, err
+	}
+
+	s.markHealthy()
+
+	result := make([]pkgutxo.UnspentOutput, 0, len(utxos))
+	for _, u := range utxos {
+		height := int64(0)
+		if u.Status.Confirmed {
+			height = u.Status.BlockHeight
+		}
+		result = append(result, pkgutxo.UnspentOutput{
+			TxHash:      u.Txid,
+			OutputIndex: u.Vout,
+			Height:      height,
+			Value:       u.Value,
+		})
+	}
+	return result, nil
+}
+
+// GetTxConfirmations returns the number of confirmations for a transaction.
+// It fetches the transaction status and computes confirmations from the
+// block height if confirmed, returning 0 for unconfirmed transactions.
+func (s *Source) GetTxConfirmations(ctx context.Context, txHash string) (int, error) {
+	url := fmt.Sprintf("%s/tx/%s/status", s.baseURL, txHash)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		s.markUnhealthy()
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.markUnhealthy()
+		return 0, fmt.Errorf("GetTxConfirmations API returned status %d", resp.StatusCode)
+	}
+
+	var status StatusAPI
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return 0, err
+	}
+
+	s.markHealthy()
+
+	if !status.Confirmed {
+		return 0, nil
+	}
+
+	tipURL := fmt.Sprintf("%s/blocks/tip/height", s.baseURL)
+	tipReq, err := http.NewRequestWithContext(ctx, "GET", tipURL, nil)
+	if err != nil {
+		return 1, nil
+	}
+
+	tipResp, err := s.httpClient.Do(tipReq)
+	if err != nil {
+		return 1, nil
+	}
+	defer tipResp.Body.Close()
+
+	if tipResp.StatusCode != http.StatusOK {
+		return 1, nil
+	}
+
+	tipBody, err := io.ReadAll(tipResp.Body)
+	if err != nil {
+		return 1, nil
+	}
+
+	var tipHeight int64
+	if err := json.Unmarshal(tipBody, &tipHeight); err != nil {
+		return 1, nil
+	}
+
+	confirmations := int(tipHeight - status.BlockHeight + 1)
+	if confirmations < 1 {
+		confirmations = 1
+	}
+	return confirmations, nil
+}
+
+// scriptPubKeyToScripthash converts a raw scriptPubKey to the Electrum
+// scripthash format used by mempool.space: reversed sha256 of the raw bytes.
+func scriptPubKeyToScripthash(spk []byte) string {
+	hash := sha256.Sum256(spk)
+	reversed := make([]byte, 32)
+	for i := 0; i < 32; i++ {
+		reversed[i] = hash[31-i]
+	}
+	return hex.EncodeToString(reversed)
 }

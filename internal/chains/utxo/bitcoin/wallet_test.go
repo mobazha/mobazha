@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,7 +61,7 @@ func newTestWallet() (*BitcoinWallet, error) {
 		return nil, err
 	}
 
-	if err := w.CreateWallet(*key, nil, time.Now()); err != nil {
+	if err := w.CreateWallet(*key, time.Now()); err != nil {
 		return nil, err
 	}
 
@@ -781,288 +782,234 @@ func TestBitcoinWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 	}
 }
 
-// TestBitcoinWallet_SpendFromDerivedAddress tests the SpendFromDerivedAddress method
-// which is used for spending from single-sig addresses
-func TestBitcoinWallet_SpendFromDerivedAddress(t *testing.T) {
+func TestBitcoinWallet_BuildSweepTx(t *testing.T) {
 	w, err := newTestWallet()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a private key for signing
-	keyBytes, err := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
-	if err != nil {
-		t.Fatal(err)
-	}
+	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
 	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
 
-	// Create P2WPKH address from the public key
 	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
-	witnessAddr, err := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet3Params)
-	if err != nil {
-		t.Fatal(err)
-	}
+	witnessAddr, _ := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet3Params)
+	scriptPubKey, _ := txscript.PayToAddrScript(witnessAddr)
 
-	// Create the scriptPubKey for P2WPKH
-	scriptPubKey, err := txscript.PayToAddrScript(witnessAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a fake UTXO
 	txidStr := "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d"
-	inputAmount := int64(1000000) // 1 BTC in satoshis
-
-	utxo := iwallet.UTXO{
-		TxID:         iwallet.TransactionID(txidStr),
-		OutputIndex:  0,
-		Amount:       iwallet.NewAmount(inputAmount),
-		ScriptPubKey: scriptPubKey,
-	}
-
-	// Create outputs: seller gets 900000, platform gets 50000, fee is 50000
-	sellerAddr := testBTCTestnetAddr
-	platformAddr := "tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7"
-
-	outputs := []iwallet.SpendInfo{
-		{
-			Address: iwallet.NewAddress(sellerAddr, testBitcoinNativeCoin),
-			Amount:  iwallet.NewAmount(900000),
-		},
-		{
-			Address: iwallet.NewAddress(platformAddr, testBitcoinNativeCoin),
-			Amount:  iwallet.NewAmount(50000),
-		},
-	}
-	// Total outputs: 950000, Input: 1000000, Implicit fee: 50000
-
-	// Begin transaction
-	wtx, err := w.Begin()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Call SpendFromDerivedAddress
-	txid, err := w.SpendFromDerivedAddress(wtx, utxo, outputs, *privKey, iwallet.FlNormal)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Logf("Transaction ID: %s", txid)
-
-	// Commit to trigger broadcast (which will fail in test, but that's ok)
-	// In test environment, we just want to verify the transaction is built correctly
-	// Skip commit since mock chain client doesn't handle broadcast
-
-	// Verify the transaction was built correctly
-	// We need to access the transaction bytes from the DBTx
-	wbtx, ok := wtx.(*base.DBTx)
-	if !ok {
-		t.Fatal("wtx is not expected type")
-	}
-
-	// Manually trigger OnCommit to build the transaction
-	// First, let's just verify the txid is not empty
-	if txid.String() == "" {
-		t.Error("Expected non-empty txid")
-	}
-
-	// Now let's verify the transaction is valid by rebuilding and checking
-	txidHash, _ := chainhash.NewHashFromStr(txidStr)
-	outpoint := wire.NewOutPoint(txidHash, 0)
-
-	// Rebuild the transaction for verification
-	verifyTx := wire.NewMsgTx(wire.TxVersion)
-	verifyTx.AddTxIn(wire.NewTxIn(outpoint, nil, nil))
-
-	for _, out := range outputs {
-		script, err := txscript.PayToAddrScript(mustDecodeAddress(out.Address.String(), &chaincfg.TestNet3Params))
-		if err != nil {
-			t.Fatal(err)
-		}
-		verifyTx.AddTxOut(wire.NewTxOut(out.Amount.Int64(), script))
-	}
-
-	// The DBTx should have OnCommit set
-	if wbtx.OnCommit == nil {
-		t.Error("OnCommit should be set")
-	}
-}
-
-// TestBitcoinWallet_SpendFromDerivedAddress_OutputsExceedInput tests error when outputs > input
-func TestBitcoinWallet_SpendFromDerivedAddress_OutputsExceedInput(t *testing.T) {
-	w, err := newTestWallet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
-	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
-
-	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
-	witnessAddr, _ := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet3Params)
-	scriptPubKey, _ := txscript.PayToAddrScript(witnessAddr)
-
-	utxo := iwallet.UTXO{
-		TxID:         iwallet.TransactionID("bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d"),
-		OutputIndex:  0,
-		Amount:       iwallet.NewAmount(1000000),
-		ScriptPubKey: scriptPubKey,
-	}
-
-	outputs := []iwallet.SpendInfo{
-		{
-			Address: iwallet.NewAddress(testBTCTestnetAddr, testBitcoinNativeCoin),
-			Amount:  iwallet.NewAmount(2000000), // More than input
-		},
-	}
-
-	wtx, _ := w.Begin()
-	_, err = w.SpendFromDerivedAddress(wtx, utxo, outputs, *privKey, iwallet.FlNormal)
-	if err == nil {
-		t.Error("Expected error when outputs exceed input")
-	}
-	t.Logf("Got expected error: %v", err)
-}
-
-// TestBitcoinWallet_SpendFromDerivedAddress_ZeroFee tests error when fee is zero
-func TestBitcoinWallet_SpendFromDerivedAddress_ZeroFee(t *testing.T) {
-	w, err := newTestWallet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
-	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
-
-	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
-	witnessAddr, _ := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet3Params)
-	scriptPubKey, _ := txscript.PayToAddrScript(witnessAddr)
-
-	utxo := iwallet.UTXO{
-		TxID:         iwallet.TransactionID("bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d"),
-		OutputIndex:  0,
-		Amount:       iwallet.NewAmount(1000000),
-		ScriptPubKey: scriptPubKey,
-	}
-
-	outputs := []iwallet.SpendInfo{
-		{
-			Address: iwallet.NewAddress(testBTCTestnetAddr, testBitcoinNativeCoin),
-			Amount:  iwallet.NewAmount(1000000), // Equals input, zero fee
-		},
-	}
-
-	wtx, _ := w.Begin()
-	_, err = w.SpendFromDerivedAddress(wtx, utxo, outputs, *privKey, iwallet.FlNormal)
-	if err == nil {
-		t.Error("Expected error when fee is zero")
-	}
-	t.Logf("Got expected error: %v", err)
-}
-
-// TestBitcoinWallet_SpendFromDerivedAddress_ScriptVerification tests that the signed transaction is valid
-func TestBitcoinWallet_SpendFromDerivedAddress_ScriptVerification(t *testing.T) {
-	w, err := newTestWallet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a private key for signing
-	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
-	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
-
-	// Create P2WPKH address
-	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
-	witnessAddr, _ := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.TestNet3Params)
-	scriptPubKey, _ := txscript.PayToAddrScript(witnessAddr)
-
 	inputAmount := int64(1000000)
-	txidStr := "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d"
 
-	utxo := iwallet.UTXO{
-		TxID:         iwallet.TransactionID(txidStr),
-		OutputIndex:  0,
-		Amount:       iwallet.NewAmount(inputAmount),
-		ScriptPubKey: scriptPubKey,
+	inputs := []iwallet.SweepInput{
+		{TxHash: txidStr, OutputIndex: 0, Value: inputAmount},
 	}
 
-	outputs := []iwallet.SpendInfo{
-		{
-			Address: iwallet.NewAddress(testBTCTestnetAddr, testBitcoinNativeCoin),
-			Amount:  iwallet.NewAmount(950000), // 50000 sat fee
-		},
-	}
-
-	wtx, _ := w.Begin()
-	txid, err := w.SpendFromDerivedAddress(wtx, utxo, outputs, *privKey, iwallet.FlNormal)
+	rawTx, txHash, err := w.BuildSweepTx(inputs, *privKey, testBTCTestnetAddr, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Logf("Generated txid: %s", txid)
-
-	// Get the transaction bytes by triggering OnCommit
-	// In a real scenario, this would broadcast, but MockChainClient handles it
-	wbtx := wtx.(*base.DBTx)
-
-	// Execute OnCommit to save the transaction
-	if err := wbtx.OnCommit(); err != nil {
-		t.Fatal(err)
+	if txHash == "" {
+		t.Error("Expected non-empty txHash")
+	}
+	if len(rawTx) == 0 {
+		t.Error("Expected non-empty rawTx")
 	}
 
-	// Use broadcast capture from mock chain client and verify the signature
-	chainClient, ok := w.ChainClient.(*base.MockChainClient)
-	if !ok {
-		t.Fatal("expected *base.MockChainClient")
-	}
-	if len(chainClient.BroadcastedTxs) == 0 {
-		t.Fatal("Expected broadcasted transaction")
-	}
-	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
-
-	// Decode and verify the transaction
 	var msgTx wire.MsgTx
-	if err := msgTx.BtcDecode(bytes.NewReader(txBytes), wire.ProtocolVersion, wire.WitnessEncoding); err != nil {
+	if err := msgTx.BtcDecode(bytes.NewReader(rawTx), wire.ProtocolVersion, wire.WitnessEncoding); err != nil {
 		t.Fatal(err)
 	}
-
-	// Verify with txscript engine
-	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(scriptPubKey, inputAmount)
-	vm, err := txscript.NewEngine(scriptPubKey, &msgTx, 0, txscript.StandardVerifyFlags, nil, nil, inputAmount, prevOutputFetcher)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.Execute(); err != nil {
-		t.Errorf("Script verification failed: %s", err)
-	} else {
-		t.Log("Script verification passed!")
-	}
-
-	// Verify transaction structure
 	if len(msgTx.TxIn) != 1 {
 		t.Errorf("Expected 1 input, got %d", len(msgTx.TxIn))
 	}
 	if len(msgTx.TxOut) != 1 {
 		t.Errorf("Expected 1 output, got %d", len(msgTx.TxOut))
 	}
-	if msgTx.TxOut[0].Value != 950000 {
-		t.Errorf("Expected output value 950000, got %d", msgTx.TxOut[0].Value)
-	}
 
-	// Calculate and verify fee
-	fee := inputAmount - msgTx.TxOut[0].Value
-	t.Logf("Transaction fee: %d satoshis", fee)
-	if fee != 50000 {
-		t.Errorf("Expected fee 50000, got %d", fee)
-	}
-}
-
-func mustDecodeAddress(addr string, params *chaincfg.Params) btcutil.Address {
-	decoded, err := btcutil.DecodeAddress(addr, params)
+	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(scriptPubKey, inputAmount)
+	vm, err := txscript.NewEngine(scriptPubKey, &msgTx, 0, txscript.StandardVerifyFlags, nil, nil, inputAmount, prevOutputFetcher)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	return decoded
+	if err := vm.Execute(); err != nil {
+		t.Errorf("Script verification failed: %s", err)
+	}
+
+	fee := inputAmount - msgTx.TxOut[0].Value
+	t.Logf("Transaction fee: %d satoshis (%.1f sat/vB)", fee, float64(fee)/float64(10+68+31))
 }
+
+func TestBitcoinWallet_BuildSweepTx_MultiInput(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	privKey, _ := btcec.PrivKeyFromBytes(keyBytes)
+
+	inputs := []iwallet.SweepInput{
+		{TxHash: "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d", OutputIndex: 0, Value: 500000},
+		{TxHash: "adb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d", OutputIndex: 1, Value: 300000},
+	}
+
+	rawTx, _, err := w.BuildSweepTx(inputs, *privKey, testBTCTestnetAddr, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var msgTx wire.MsgTx
+	if err := msgTx.BtcDecode(bytes.NewReader(rawTx), wire.ProtocolVersion, wire.WitnessEncoding); err != nil {
+		t.Fatal(err)
+	}
+	if len(msgTx.TxIn) != 2 {
+		t.Errorf("Expected 2 inputs, got %d", len(msgTx.TxIn))
+	}
+	if len(msgTx.TxOut) != 1 {
+		t.Errorf("Expected 1 output, got %d", len(msgTx.TxOut))
+	}
+
+	totalInput := int64(800000)
+	fee := totalInput - msgTx.TxOut[0].Value
+	if fee <= 0 {
+		t.Errorf("Expected positive fee, got %d", fee)
+	}
+}
+
+func TestBitcoinWallet_BuildSweepTx_FeeExceedsInput(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	privKey, _ := btcec.PrivKeyFromBytes(keyBytes)
+
+	inputs := []iwallet.SweepInput{
+		{TxHash: "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d", OutputIndex: 0, Value: 100},
+	}
+
+	_, _, err = w.BuildSweepTx(inputs, *privKey, testBTCTestnetAddr, 2)
+	if err == nil {
+		t.Error("Expected error when fee exceeds input")
+	}
+}
+
+func TestBitcoinWallet_BuildSweepTx_NoInputs(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	privKey, _ := btcec.PrivKeyFromBytes(keyBytes)
+
+	_, _, err = w.BuildSweepTx(nil, *privKey, testBTCTestnetAddr, 2)
+	if err == nil {
+		t.Error("Expected error with no inputs")
+	}
+}
+
+// --- UTXOAddressUtilities tests ---
+
+const (
+	testBIP84PubKeyHex      = "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c"
+	testBIP84MainnetAddress = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu"
+)
+
+func TestBitcoinWallet_DerivePaymentAddressFromPubKey_Mainnet(t *testing.T) {
+	w := &BitcoinWallet{testnet: false, regtest: false}
+
+	pubKeyBytes, err := hex.DecodeString(testBIP84PubKeyHex)
+	if err != nil {
+		t.Fatalf("decode pubkey hex: %v", err)
+	}
+	pubKey, err := btcec.ParsePubKey(pubKeyBytes)
+	if err != nil {
+		t.Fatalf("parse pubkey: %v", err)
+	}
+
+	addr, scriptPubKey, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+
+	if addr != testBIP84MainnetAddress {
+		t.Errorf("address mismatch: got %s, want %s", addr, testBIP84MainnetAddress)
+	}
+	if !strings.HasPrefix(addr, "bc1") {
+		t.Errorf("mainnet address should start with bc1: got %s", addr)
+	}
+	if len(scriptPubKey) != 22 {
+		t.Errorf("expected 22-byte P2WPKH scriptPubKey, got %d bytes", len(scriptPubKey))
+	}
+	if scriptPubKey[0] != txscript.OP_0 {
+		t.Errorf("scriptPubKey[0]=%x, want OP_0=%x", scriptPubKey[0], txscript.OP_0)
+	}
+}
+
+func TestBitcoinWallet_DerivePaymentAddressFromPubKey_Testnet(t *testing.T) {
+	w := &BitcoinWallet{testnet: true, regtest: false}
+
+	pubKeyBytes, _ := hex.DecodeString(testBIP84PubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, _, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+	if !strings.HasPrefix(addr, "tb1") {
+		t.Errorf("testnet address should start with tb1: got %s", addr)
+	}
+	if _, err := btcutil.DecodeAddress(addr, &chaincfg.TestNet3Params); err != nil {
+		t.Errorf("testnet address should decode with TestNet3Params: %v", err)
+	}
+}
+
+func TestBitcoinWallet_DerivePaymentAddressFromPubKey_Regtest(t *testing.T) {
+	w := &BitcoinWallet{regtest: true}
+
+	pubKeyBytes, _ := hex.DecodeString(testBIP84PubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, _, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+	if !strings.HasPrefix(addr, "bcrt") {
+		t.Errorf("regtest address should start with bcrt: got %s", addr)
+	}
+}
+
+func TestBitcoinWallet_DerivePaymentAddressFromPubKey_NilPubKey(t *testing.T) {
+	w := &BitcoinWallet{testnet: true}
+	if _, _, err := w.DerivePaymentAddressFromPubKey(nil); err == nil {
+		t.Errorf("expected error for nil pubkey")
+	}
+}
+
+func TestBitcoinWallet_AddressToScriptPubKey_Mainnet(t *testing.T) {
+	w := &BitcoinWallet{testnet: false, regtest: false}
+
+	pubKeyBytes, _ := hex.DecodeString(testBIP84PubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, expectedScript, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gotScript, err := w.AddressToScriptPubKey(addr)
+	if err != nil {
+		t.Fatalf("AddressToScriptPubKey: %v", err)
+	}
+	if !bytes.Equal(gotScript, expectedScript) {
+		t.Errorf("scriptPubKey mismatch: derive=%x, decoded=%x", expectedScript, gotScript)
+	}
+}
+
+func TestBitcoinWallet_AddressToScriptPubKey_Invalid(t *testing.T) {
+	w := &BitcoinWallet{testnet: true}
+	if _, err := w.AddressToScriptPubKey(testInvalidAddress); err == nil {
+		t.Errorf("expected error for invalid address")
+	}
+}
+

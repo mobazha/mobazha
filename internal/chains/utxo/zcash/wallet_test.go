@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,7 +58,7 @@ func newTestWallet() (*ZCashWallet, error) {
 		return nil, err
 	}
 
-	if err := w.CreateWallet(*key, nil, time.Now()); err != nil {
+	if err := w.CreateWallet(*key, time.Now()); err != nil {
 		return nil, err
 	}
 
@@ -455,5 +456,86 @@ func TestCalcSignatureHash(t *testing.T) {
 	}
 	if !bytes.Equal(sigHash, expected) {
 		t.Fatal("Failed to calculate correct sig hash")
+	}
+}
+
+// --- UTXOAddressUtilities tests ---
+
+const (
+	testZECPubKeyHex      = "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c"
+	testZECMainnetAddress = "t1bT5QYuWPxVFyWYgYhZenSgJh1GMM6b26N"
+	testZECTestnetAddress = "tmTHpjPPunczm7kk8DRsPe7M4HzMArXctqE"
+)
+
+func TestZCashWallet_DerivePaymentAddressFromPubKey_Mainnet(t *testing.T) {
+	w := &ZCashWallet{testnet: false}
+
+	pubKeyBytes, _ := hex.DecodeString(testZECPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, scriptPubKey, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+	if addr != testZECMainnetAddress {
+		t.Errorf("address mismatch: got %s, want %s", addr, testZECMainnetAddress)
+	}
+	if !strings.HasPrefix(addr, "t1") {
+		t.Errorf("ZEC mainnet t-address should start with t1: got %s", addr)
+	}
+	if len(scriptPubKey) != 25 {
+		t.Errorf("expected 25-byte P2PKH scriptPubKey, got %d bytes", len(scriptPubKey))
+	}
+}
+
+func TestZCashWallet_DerivePaymentAddressFromPubKey_Testnet(t *testing.T) {
+	w := &ZCashWallet{testnet: true}
+
+	pubKeyBytes, _ := hex.DecodeString(testZECPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, _, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+	if addr != testZECTestnetAddress {
+		t.Errorf("address mismatch: got %s, want %s", addr, testZECTestnetAddress)
+	}
+	if !strings.HasPrefix(addr, "tm") {
+		t.Errorf("ZEC testnet t-address should start with tm: got %s", addr)
+	}
+}
+
+func TestZCashWallet_DerivePaymentAddressFromPubKey_NilPubKey(t *testing.T) {
+	w := &ZCashWallet{testnet: true}
+	if _, _, err := w.DerivePaymentAddressFromPubKey(nil); err == nil {
+		t.Errorf("expected error for nil pubkey")
+	}
+}
+
+func TestZCashWallet_AddressToScriptPubKey_RoundTrip(t *testing.T) {
+	w := &ZCashWallet{testnet: false}
+
+	pubKeyBytes, _ := hex.DecodeString(testZECPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, expected, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := w.AddressToScriptPubKey(addr)
+	if err != nil {
+		t.Fatalf("AddressToScriptPubKey: %v", err)
+	}
+	if !bytes.Equal(got, expected) {
+		t.Errorf("scriptPubKey mismatch: derive=%x, decoded=%x", expected, got)
+	}
+}
+
+func TestZCashWallet_AddressToScriptPubKey_Invalid(t *testing.T) {
+	w := &ZCashWallet{testnet: true}
+	if _, err := w.AddressToScriptPubKey(testInvalidAddress); err == nil {
+		t.Errorf("expected error for invalid address")
 	}
 }

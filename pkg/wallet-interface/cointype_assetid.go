@@ -11,6 +11,7 @@ import (
 var canonicalAssetRegistry = assetid.DefaultRegistry()
 var canonicalNativeCoinByChain = buildCanonicalNativeCoinByChain()
 var canonicalBlockIntervalByChain = buildCanonicalBlockIntervalByChain()
+var canonicalBIP44ByChain = buildCanonicalBIP44ByChain()
 
 const (
 	btcMainnetGenesis = "000000000019d6689c085ae165831e93"
@@ -51,6 +52,35 @@ func RequireCanonicalNativeCoinType(chain ChainType) (CoinType, error) {
 func CanonicalBlockInterval(chain ChainType) (time.Duration, bool) {
 	interval, ok := canonicalBlockIntervalByChain[chain]
 	return interval, ok
+}
+
+func buildCanonicalBIP44ByChain() map[ChainType]uint32 {
+	result := make(map[ChainType]uint32)
+	for _, def := range canonicalAssetRegistry.List() {
+		parsed, err := assetid.Parse(def.AssetID)
+		if err != nil || !parsed.IsNative() || def.Runtime.Bip44Code == 0 {
+			continue
+		}
+		chain, err := chainTypeFromAssetID(parsed)
+		if err != nil {
+			continue
+		}
+		result[chain] = uint32(def.Runtime.Bip44Code)
+	}
+	// Bitcoin's BIP44 code is 0, which is skipped by the > 0 check above.
+	// Hard-code it since 0 is a valid coin type for Bitcoin.
+	if _, ok := result[ChainBitcoin]; !ok {
+		result[ChainBitcoin] = 0
+	}
+	return result
+}
+
+// CanonicalBIP44CoinType returns the SLIP-0044 coin type for a chain's native
+// asset, derived from the assetid registry. Returns false for chains without a
+// registered BIP44 code (e.g. Solana uses ed25519, not BIP-44).
+func CanonicalBIP44CoinType(chain ChainType) (uint32, bool) {
+	code, ok := canonicalBIP44ByChain[chain]
+	return code, ok
 }
 
 func buildCanonicalBlockIntervalByChain() map[ChainType]time.Duration {

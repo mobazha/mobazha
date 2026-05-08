@@ -2,10 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -46,7 +49,8 @@ func (g *Gateway) handlePOSTGuestOrder(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := svc.CreateGuestOrder(r.Context(), req)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		status, code := classifyGuestOrderError(err)
+		response.Error(w, status, code, err.Error())
 		return
 	}
 
@@ -71,7 +75,11 @@ func (g *Gateway) handleGETGuestOrder(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := svc.GetGuestOrderStatus(r.Context(), token)
 	if err != nil {
-		response.Error(w, http.StatusNotFound, response.CodeNotFound, "Order not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Order not found")
+		} else {
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Failed to retrieve order")
+		}
 		return
 	}
 
@@ -221,4 +229,42 @@ func parseIntQuery(r *http.Request, key string, defaultVal int) int {
 		return defaultVal
 	}
 	return v
+}
+
+// classifyGuestOrderError maps service-layer errors to HTTP status / error
+// code via typed sentinels (errors.Is) — substring matches are fragile
+// because operator-friendly suffixes like "not configured" can appear in
+// many roots and the order of substring checks would silently mis-route
+// new errors.
+//
+// Falls back to a coarse substring sweep only for legacy validation
+// errors that haven't been wrapped with a sentinel yet ("not found",
+// "must be positive", etc); these all map to HTTP 400.
+func classifyGuestOrderError(err error) (int, string) {
+	switch {
+	case errors.Is(err, contracts.ErrGuestCheckoutDisabled):
+		return http.StatusForbidden, response.CodeForbidden
+	case errors.Is(err, contracts.ErrCoinUnavailable):
+		return http.StatusServiceUnavailable, response.CodeServiceUnavail
+	case errors.Is(err, contracts.ErrCoinUnsupported):
+		return http.StatusBadRequest, response.CodeBadRequest
+	case errors.Is(err, contracts.ErrInsufficientStock):
+		return http.StatusConflict, response.CodeConflict
+	case errors.Is(err, contracts.ErrInvalidVariant):
+		return http.StatusBadRequest, response.CodeBadRequest
+	case errors.Is(err, contracts.ErrInvalidGuestRequest):
+		return http.StatusBadRequest, response.CodeBadRequest
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "not found"),
+		strings.Contains(msg, "must be positive"),
+		strings.Contains(msg, "invalid"),
+		strings.Contains(msg, "mixed pricing"),
+		strings.Contains(msg, "not available"),
+		strings.Contains(msg, "no shipping profile"):
+		return http.StatusBadRequest, response.CodeBadRequest
+	default:
+		return http.StatusInternalServerError, response.CodeInternalError
+	}
 }

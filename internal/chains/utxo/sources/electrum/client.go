@@ -37,6 +37,7 @@ type Client struct {
 	reconnectDelay time.Duration
 	timeout        time.Duration
 	useTLS         bool
+	tlsConfig      *tls.Config
 	chain          string
 }
 
@@ -46,6 +47,7 @@ type ClientConfig struct {
 	Timeout        time.Duration // Connection and read timeout
 	ReconnectDelay time.Duration // Delay between reconnection attempts
 	UseTLS         bool          // Whether to use TLS
+	TLSConfig      *tls.Config   // Optional custom TLS config (e.g. for cert pinning)
 	Chain          string        // Chain identifier (BTC, LTC, etc.)
 	Testnet        bool          // Whether to use testnet servers
 }
@@ -63,10 +65,30 @@ func DefaultClientConfig(chain string, testnet bool) *ClientConfig {
 	}
 }
 
+// redactedServer returns a privacy-safe representation of a server address.
+// It keeps only the host portion (no port) for named hosts, or replaces IP
+// addresses with a placeholder to avoid leaking private infrastructure info.
+func redactedServer(server string) string {
+	host := server
+	if h, _, err := net.SplitHostPort(server); err == nil {
+		host = h
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return "<ip>:***"
+	}
+	return host + ":***"
+}
+
 // NewClient creates a new Electrum client
 func NewClient(config *ClientConfig) *Client {
 	if config == nil {
 		config = DefaultClientConfig("BTC", false)
+	}
+
+	reconnect := config.ReconnectDelay
+	if reconnect <= 0 {
+		reconnect = 5 * time.Second
 	}
 
 	return &Client{
@@ -75,9 +97,10 @@ func NewClient(config *ClientConfig) *Client {
 		pending:        make(map[uint64]chan *Response),
 		subscriptions:  make(map[string]func(params []interface{})),
 		shutdown:       make(chan struct{}),
-		reconnectDelay: config.ReconnectDelay,
+		reconnectDelay: reconnect,
 		timeout:        config.Timeout,
 		useTLS:         config.UseTLS,
+		tlsConfig:      config.TLSConfig,
 		chain:          config.Chain,
 	}
 }
@@ -132,8 +155,11 @@ func (c *Client) connectWithoutLock(ctx context.Context) error {
 		}(serverIdx, c.servers[serverIdx])
 	}
 
-	// Collect results
-	var lastErr error
+	// Collect results. Per-endpoint failures are accumulated and emitted as a
+	// single aggregated warning at the end — logging one warning per failed
+	// server creates noise that dwarfs the eventual success line and floods
+	// logs when the first few hosts in a public endpoint list are stale.
+	var failures []endpointFailure
 	received := 0
 
 	for received < len(c.servers) {
@@ -142,13 +168,22 @@ func (c *Client) connectWithoutLock(ctx context.Context) error {
 			received++
 
 			if result.err != nil {
-				log.Warningf("[%s] Failed to connect to %s: %v", c.chain, c.servers[result.serverIdx], result.err)
-				lastErr = result.err
+				failures = append(failures, endpointFailure{
+					server: redactedServer(c.servers[result.serverIdx]),
+					err:    result.err,
+				})
 				continue
 			}
 
 			// Got a connection, try handshake
 			if c.tryHandshake(ctx, result.conn, result.serverIdx) {
+				if len(failures) > 0 {
+					// At least one endpoint was unhealthy, but we recovered.
+					// Emit a single info-level summary so operators can spot
+					// flaky endpoints without flooding warning logs.
+					log.Infof("[%s] Connected to Electrum after %d endpoint failure(s): %s",
+						c.chain, len(failures), formatEndpointFailures(failures))
+				}
 				// Close any remaining connections that come in
 				remaining := len(c.servers) - received
 				go func(toClose int) {
@@ -164,14 +199,46 @@ func (c *Client) connectWithoutLock(ctx context.Context) error {
 
 			// Handshake failed, close connection
 			result.conn.Close()
-			lastErr = fmt.Errorf("handshake failed")
+			failures = append(failures, endpointFailure{
+				server: redactedServer(c.servers[result.serverIdx]),
+				err:    fmt.Errorf("handshake failed"),
+			})
 
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 
-	return fmt.Errorf("failed to connect to any Electrum server: %w", lastErr)
+	// All endpoints failed — emit one aggregated warning instead of N.
+	log.Warningf("[%s] Failed to connect to all %d Electrum endpoints: %s",
+		c.chain, len(failures), formatEndpointFailures(failures))
+	if len(failures) == 0 {
+		return fmt.Errorf("no Electrum endpoints configured")
+	}
+	return fmt.Errorf("failed to connect to any Electrum server (%d endpoints): %w",
+		len(failures), failures[len(failures)-1].err)
+}
+
+// endpointFailure carries one server's connect/handshake failure for the
+// aggregated log emitted by connectWithoutLock.
+type endpointFailure struct {
+	server string
+	err    error
+}
+
+// formatEndpointFailures renders a compact "server=err; server=err" summary,
+// truncating after a few entries to keep log lines bounded.
+func formatEndpointFailures(failures []endpointFailure) string {
+	const maxShown = 3
+	parts := make([]string, 0, len(failures))
+	for i, f := range failures {
+		if i >= maxShown {
+			parts = append(parts, fmt.Sprintf("(+%d more)", len(failures)-maxShown))
+			break
+		}
+		parts = append(parts, fmt.Sprintf("%s=%v", f.server, f.err))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // tryHandshake attempts to complete the Electrum handshake on a connection
@@ -215,7 +282,7 @@ func (c *Client) tryHandshake(ctx context.Context, conn net.Conn, serverIdx int)
 	defer cancel()
 
 	if _, err := c.serverVersion(handshakeCtx); err != nil {
-		log.Warningf("[%s] Handshake failed with %s: %v", c.chain, server, err)
+		log.Warningf("[%s] Handshake failed with %s: %v", c.chain, redactedServer(server), err)
 		c.mu.Lock()
 		c.closeConnection()
 		c.mu.Unlock()
@@ -230,7 +297,7 @@ func (c *Client) tryHandshake(ctx context.Context, conn net.Conn, serverIdx int)
 	c.mu.Unlock()
 	go c.heartbeatLoop(hbStop)
 
-	log.Infof("[%s] Connected to Electrum server: %s", c.chain, server)
+	log.Infof("[%s] Connected to Electrum server: %s", c.chain, redactedServer(server))
 	return true
 }
 
@@ -272,18 +339,22 @@ func (c *Client) dialServer(ctx context.Context, server string) (net.Conn, error
 	dialer := &net.Dialer{Timeout: c.timeout}
 
 	if c.useTLS {
-		// Extract host for TLS config
 		host := server
 		if idx := strings.LastIndex(server, ":"); idx > 0 {
 			host = server[:idx]
 		}
 
-		// Note: Electrum servers often use self-signed certificates
-		// InsecureSkipVerify is acceptable here as we're not transmitting sensitive data
-		// and the protocol itself doesn't rely on TLS for authentication
-		tlsConfig := &tls.Config{
-			ServerName:         host,
-			InsecureSkipVerify: true,
+		tlsConfig := c.tlsConfig
+		if tlsConfig == nil {
+			tlsConfig = &tls.Config{
+				ServerName:         host,
+				InsecureSkipVerify: true,
+			}
+		} else {
+			tlsConfig = tlsConfig.Clone()
+			if tlsConfig.ServerName == "" {
+				tlsConfig.ServerName = host
+			}
 		}
 
 		conn, err := tls.DialWithDialer(dialer, "tcp", server, tlsConfig)

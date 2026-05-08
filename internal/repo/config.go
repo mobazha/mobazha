@@ -127,6 +127,17 @@ type Config struct {
 	// via direct on-chain payments (no escrow).
 	GuestCheckout bool `long:"guestcheckout" description:"Enable guest (anonymous) checkout for direct crypto payments"`
 
+	// ElectrumServers holds per-chain Electrum server configurations for UTXO
+	// payment monitoring (guest checkout). Each entry is "chain=host:port"
+	// (e.g. "ltc=electrum-ltc.bysh.me:50002"). When a chain has no entry,
+	// guest checkout is unavailable for it. Repeatable.
+	ElectrumServers []string `long:"electrum" description:"Per-chain Electrum endpoint (chain=host:port, repeatable)"`
+
+	// ElectrumTLSFingerprints holds per-chain optional SHA256 fingerprints (hex)
+	// of the Electrum server's TLS certificate for certificate pinning.
+	// Each entry is "chain=sha256hex". Repeatable.
+	ElectrumTLSFingerprints []string `long:"electrumtls" description:"Per-chain Electrum TLS fingerprint (chain=sha256hex, repeatable)"`
+
 	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.
 	// When set, the node uses this key instead of generating one from a mnemonic.
 	// This is used by mobazha_hosting to inject keys from KeyVault.
@@ -200,6 +211,38 @@ type Config struct {
 	PlatformAIModel      string `no-flag:"true"`
 	PlatformAIBaseURL    string `no-flag:"true"`
 	PlatformAIDailyLimit int    `no-flag:"true"` // per-tenant daily call limit (0 = unlimited)
+}
+
+// ParseElectrumServers parses the repeatable "chain=host:port" entries into a map.
+func (c *Config) ParseElectrumServers() map[string]string {
+	return parseKeyValueSlice(c.ElectrumServers)
+}
+
+// ParseElectrumTLSFingerprints parses the repeatable "chain=fingerprint" entries into a map.
+func (c *Config) ParseElectrumTLSFingerprints() map[string]string {
+	return parseKeyValueSlice(c.ElectrumTLSFingerprints)
+}
+
+func parseKeyValueSlice(entries []string) map[string]string {
+	if len(entries) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		k, v, ok := strings.Cut(entry, "=")
+		if !ok {
+			continue
+		}
+		k = strings.TrimSpace(strings.ToLower(k))
+		v = strings.TrimSpace(v)
+		if k != "" && v != "" {
+			m[k] = v
+		}
+	}
+	if len(m) == 0 {
+		return nil
+	}
+	return m
 }
 
 // LoadConfig initializes and parses the config using a config file and command

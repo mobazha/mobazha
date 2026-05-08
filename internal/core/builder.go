@@ -23,10 +23,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
+	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
@@ -862,7 +862,7 @@ func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creation
 					return err
 				}
 
-				if err := wallet.CreateWallet(*accountKey, nil, creationDate); err != nil {
+				if err := wallet.CreateWallet(*accountKey, creationDate); err != nil {
 					return err
 				}
 			}

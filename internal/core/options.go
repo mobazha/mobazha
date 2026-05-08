@@ -13,6 +13,7 @@ import (
 	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/core/guest"
 	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	coresettlement "github.com/mobazha/mobazha3.0/internal/core/settlement"
@@ -915,26 +916,72 @@ func (n *MobazhaNode) initGuestOrderService() {
 		return
 	}
 
-	keyDeriver := NewNodeKeyDeriver(n.bip44Key, n.testnet)
-	n.directPaymentService = NewDirectPaymentService(n.db, keyDeriver)
-	n.autoSweepService = NewAutoSweepService(n.db, keyDeriver, n.eventBus)
-	n.guestOrderService = NewGuestOrderAppService(GuestOrderAppServiceConfig{
-		DB:            n.db,
-		DirectPayment: n.directPaymentService,
-		SweepService:  n.autoSweepService,
-		EventBus:      n.eventBus,
-		NodeID:        n.nodeID,
-		Shutdown:      n.shutdown,
-		Listings:      n.listingService,
-		ExchangeRates: n.exchangeRates,
-		Resolver:      n.featureResolver,
+	keyDeriver := guest.NewNodeKeyDeriver(n.bip44Key, n.multiwallet)
+	n.directPaymentService = guest.NewDirectPaymentService(n.db, keyDeriver)
+	n.autoSweepService = guest.NewAutoSweepService(n.db, keyDeriver, n.eventBus)
+
+	// Capability gating: the GuestOrderAppService rejects orders whose chain
+	// has no monitoring path. In the full build the monitoring infrastructure
+	// is created from the same node config used to build the wallets and
+	// chain clients, so we derive availability from those:
+	//   - UTXO chains: each chain whose wallet is loaded in the multiwallet
+	//   - EVM/TRON:    presence of any EVM chain config (TRON config exposed
+	//                  through the same shared rpc layer)
+	//   - Solana:      presence of a Solana chain config
+	// This keeps full-build guest checkout fail-open by default for every
+	// chain the operator already configured, matching private_distribution's behaviour
+	// (which enables a chain once its Electrum endpoint connects).
+	supportedUTXO := n.detectGuestUTXOChains()
+
+	// EVM/Solana guest checkout is disabled until concrete
+	// ChainBalanceChecker / SolanaReferenceChecker adapters are
+	// implemented and wired via SetCheckers in the lifecycle.
+	// Without working checkers, payments would be accepted but
+	// never detected — risking buyer fund loss.
+	guestEvmAvailable := false
+	guestSolanaAvailable := false
+
+	n.guestOrderService = guest.NewGuestOrderAppService(guest.GuestOrderAppServiceConfig{
+		DB:                     n.db,
+		DirectPayment:          n.directPaymentService,
+		SweepService:           n.autoSweepService,
+		EventBus:               n.eventBus,
+		NodeID:                 n.nodeID,
+		Shutdown:               n.shutdown,
+		Listings:               n.listingService,
+		ExchangeRates:          n.exchangeRates,
+		Resolver:               n.featureResolver,
+		SupportedUTXOChains:    supportedUTXO,
+		EVMMonitorAvailable:    guestEvmAvailable,
+		SolanaMonitorAvailable: guestSolanaAvailable,
 	})
 
-	// Monitor is created with nil chain checkers initially.
-	// Concrete adapters are injected later via SetCheckers
-	// once chain clients are fully initialized.
-	n.guestPaymentMonitor = NewGuestPaymentMonitor(n.db, n.guestOrderService, nil, nil)
+	n.guestPaymentMonitor = guest.NewGuestPaymentMonitor(n.db, n.guestOrderService, nil, nil)
+	n.guestPaymentMonitor.SetMultiwallet(n.multiwallet)
 	n.guestOrderService.SetPaymentWatcher(n.guestPaymentMonitor)
 
-	n.unifiedOrderView = NewUnifiedOrderView(n.orderService, n.guestOrderService)
+	n.unifiedOrderView = NewUnifiedOrderView(n.orderService, n.guestOrderService, n.db)
+}
+
+// detectGuestUTXOChains returns the UTXO chains that should be enabled for
+// guest checkout in the full build, based on which UTXO wallets the
+// multiwallet has loaded AND for which a sweeper exists today. BCH/ZEC are
+// excluded because the sweep path only signs P2WPKH (BIP-143) — see
+// node_lifecycle_private_distribution.go for the matching gate. When a P2PKH-capable
+// sweeper is added, drop the isSweepableP2WPKHChain filter here.
+func (n *MobazhaNode) detectGuestUTXOChains() []iwallet.ChainType {
+	if n.multiwallet == nil {
+		return nil
+	}
+	out := make([]iwallet.ChainType, 0, 4)
+	for _, chain := range n.multiwallet.SupportedChains() {
+		if !chain.IsUTXOChain() {
+			continue
+		}
+		if !isSweepableP2WPKHChain(chain) {
+			continue
+		}
+		out = append(out, chain)
+	}
+	return out
 }

@@ -37,6 +37,12 @@ func (m *mockUTXOMonitor) BroadcastTransaction(iwallet.ChainType, string) (strin
 	return "", nil
 }
 func (m *mockUTXOMonitor) IsHealthy(iwallet.ChainType) bool { return true }
+func (m *mockUTXOMonitor) ListUnspent(iwallet.ChainType, []byte) ([]utxo.UnspentOutput, error) {
+	return nil, nil
+}
+func (m *mockUTXOMonitor) GetTxConfirmations(iwallet.ChainType, string) (int, error) {
+	return 0, nil
+}
 
 func (m *mockUTXOMonitor) GetWatchedAddress(address string) *utxo.WatchedAddress {
 	if m.watchedAddresses == nil {

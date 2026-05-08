@@ -83,13 +83,28 @@ func CreateMonitor(ctx context.Context, testnet bool) (*pkgutxo.Monitor, error) 
 
 // CreateMonitorWithOverrides creates a monitor using custom Electrum servers
 // for the chains listed in overrides. Other chains use the compiled-in defaults.
+// Override-only chains (e.g. BCH, ZEC in private_distribution mode) are added even if they
+// are not in the default chain list.
 func (f *defaultMonitorFactory) CreateMonitorWithOverrides(ctx context.Context, testnet bool, overrides map[iwallet.ChainType]pkgutxo.ElectrumOverride) (*pkgutxo.Monitor, error) {
 	config := pkgutxo.DefaultMonitorConfig()
 	monitor := pkgutxo.NewMonitor(config)
 
-	chains := []iwallet.ChainType{
+	defaultChains := []iwallet.ChainType{
 		iwallet.ChainBitcoin,
 		iwallet.ChainLitecoin,
+	}
+
+	seen := make(map[iwallet.ChainType]bool, len(defaultChains)+len(overrides))
+	chains := make([]iwallet.ChainType, 0, len(defaultChains)+len(overrides))
+	for _, c := range defaultChains {
+		chains = append(chains, c)
+		seen[c] = true
+	}
+	for c := range overrides {
+		if !seen[c] {
+			chains = append(chains, c)
+			seen[c] = true
+		}
 	}
 
 	for _, chain := range chains {
@@ -99,6 +114,7 @@ func (f *defaultMonitorFactory) CreateMonitorWithOverrides(ctx context.Context, 
 				Timeout:        30 * time.Second,
 				ReconnectDelay: 5 * time.Second,
 				UseTLS:         ov.UseTLS,
+				TLSConfig:      electrum.TLSConfigWithPin(ov.TLSFingerprint),
 				Chain:          string(chain),
 				Testnet:        testnet,
 			}
@@ -107,7 +123,7 @@ func (f *defaultMonitorFactory) CreateMonitorWithOverrides(ctx context.Context, 
 				factoryLog.Warningf("Failed to connect custom Electrum source for %s (%v): %v", chain, ov.Servers, err)
 			} else {
 				monitor.AddSource(chain, src)
-				factoryLog.Infof("Added custom Electrum source for %s → %v (tls=%v)", chain, ov.Servers, ov.UseTLS)
+				factoryLog.Infof("Added custom Electrum source for %s → %v (tls=%v, pin=%v)", chain, ov.Servers, ov.UseTLS, ov.TLSFingerprint != "")
 			}
 			continue
 		}

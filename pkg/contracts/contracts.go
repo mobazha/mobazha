@@ -327,6 +327,12 @@ type GuestOrderService interface {
 	CompleteGuestOrder(ctx context.Context, token string) error
 	HandlePaymentDetected(orderToken string, txHash string) error
 	HandleConfirmationUpdate(orderToken string, confs int) error
+	// HandleLatePayment records a payment that arrived but cannot fund the
+	// order (partial / overpay / received after expiry). It persists the
+	// txHash for seller-side recovery without changing the order state, so
+	// the natural lifecycle (CleanupExpiredOrders) still applies. The status
+	// argument is a free-form classifier (e.g. "partial", "overpay", "expired").
+	HandleLatePayment(orderToken, txHash, status string, paid, expected uint64) error
 	CleanupExpiredOrders(ctx context.Context)
 	AutoCompleteOrders(ctx context.Context)
 	RunGuestCleanupOnce()

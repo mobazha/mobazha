@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/logging"
@@ -50,6 +51,10 @@ type WatchedAddress struct {
 	CreatedAt      time.Time
 	ExpiresAt      time.Time
 
+	// Cumulative tracking (atomic — handleTransaction may be called concurrently
+	// from the polling loop and a subscription callback).
+	TotalPaid atomic.Uint64
+
 	// Polling optimization fields
 	Subscribed bool      // Whether subscription was successful
 	LastPolled time.Time // Last time this address was polled
@@ -80,6 +85,12 @@ type PaymentSource interface {
 
 	// Close closes the source
 	Close() error
+
+	// ListUnspent returns unspent outputs for a scriptPubKey.
+	ListUnspent(ctx context.Context, scriptPubKey []byte) ([]UnspentOutput, error)
+
+	// GetTxConfirmations returns the confirmation count for a transaction.
+	GetTxConfirmations(ctx context.Context, txHash string) (int, error)
 }
 
 // Monitor monitors addresses for transactions and provides a subscription interface
@@ -581,7 +592,9 @@ func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction)
 	m.seenTxs[dedupeKey] = time.Now()
 	m.seenTxsMu.Unlock()
 
-	// Determine payment status
+	txPaid := AmountPaidTo(tx, wa.Address)
+	wa.TotalPaid.Add(txPaid)
+
 	status := m.determinePaymentStatus(wa, tx)
 
 	// Call the OnPayment callback if set
@@ -602,27 +615,48 @@ func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction)
 		wa.OrderID, wa.NodeID, tx.ID, tx.Value.String(), status.String())
 }
 
-// determinePaymentStatus determines the status of a payment
+// determinePaymentStatus determines the status of a payment using the
+// cumulative TotalPaid across all transactions to this watched address.
+// This correctly handles top-up (multiple partial) payments.
 func (m *Monitor) determinePaymentStatus(wa *WatchedAddress, tx *iwallet.Transaction) PaymentStatus {
 	now := time.Now()
 
-	// Check if payment is after expiry (but within grace period)
 	if !wa.ExpiresAt.IsZero() && now.After(wa.ExpiresAt) {
 		return PaymentStatusExpired
 	}
 
-	// Check payment amount
 	if wa.ExpectedAmount > 0 {
-		txAmount := uint64(tx.Value.Int64())
-		if txAmount < wa.ExpectedAmount {
+		totalPaid := wa.TotalPaid.Load()
+		if totalPaid < wa.ExpectedAmount {
 			return PaymentStatusPartial
 		}
-		if txAmount > wa.ExpectedAmount {
+		if totalPaid > wa.ExpectedAmount {
 			return PaymentStatusOverpay
 		}
 	}
 
 	return PaymentStatusNormal
+}
+
+// AmountPaidTo sums the values of all transaction outputs (vouts) that pay the
+// given address. Multiple outputs to the same address are aggregated, which
+// correctly handles a buyer splitting a payment across two outputs to the same
+// invoice address. Outputs to *other* addresses (e.g. change) are excluded.
+func AmountPaidTo(tx *iwallet.Transaction, address string) uint64 {
+	var total uint64
+	for _, out := range tx.To {
+		if out.Address.String() != address {
+			continue
+		}
+		v := out.Amount.Uint64()
+		// Saturate on overflow rather than wrap around silently. The 2^64 - 1
+		// cap is purely defensive — no real chain produces vouts that big.
+		if total+v < total {
+			return ^uint64(0)
+		}
+		total += v
+	}
+	return total
 }
 
 // GetTransaction gets a transaction by ID from any available source
@@ -693,6 +727,17 @@ func (m *Monitor) GetWatchedAddress(address string) *WatchedAddress {
 // GetSources returns sources for a chain
 func (m *Monitor) GetSources(chain iwallet.ChainType) []PaymentSource {
 	return m.sources[chain]
+}
+
+// ConnectedChains returns all chain types that have at least one source registered.
+func (m *Monitor) ConnectedChains() []iwallet.ChainType {
+	chains := make([]iwallet.ChainType, 0, len(m.sources))
+	for chain, sources := range m.sources {
+		if len(sources) > 0 {
+			chains = append(chains, chain)
+		}
+	}
+	return chains
 }
 
 // GetAddressTransactions gets all transactions for an address (one-time query, not subscribe)
@@ -861,6 +906,56 @@ func (m *Monitor) checkSourceHealth() {
 	}
 }
 
+// ListUnspent returns unspent outputs for a scriptPubKey on the given chain.
+// Implements ChainOperations.
+func (m *Monitor) ListUnspent(chain iwallet.ChainType, scriptPubKey []byte) ([]UnspentOutput, error) {
+	sources := m.sources[chain]
+	if len(sources) == 0 {
+		return nil, errors.New("no sources available for chain")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	for _, source := range sources {
+		if !source.IsHealthy() {
+			continue
+		}
+		utxos, err := source.ListUnspent(ctx, scriptPubKey)
+		if err != nil {
+			log.Warningf("ListUnspent failed from source for chain %s: %v", chain, err)
+			continue
+		}
+		return utxos, nil
+	}
+	return nil, errors.New("failed to list unspent from all sources")
+}
+
+// GetTxConfirmations returns the confirmation count for a transaction on the given chain.
+// Implements ChainOperations.
+func (m *Monitor) GetTxConfirmations(chain iwallet.ChainType, txHash string) (int, error) {
+	sources := m.sources[chain]
+	if len(sources) == 0 {
+		return 0, errors.New("no sources available for chain")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	for _, source := range sources {
+		if !source.IsHealthy() {
+			continue
+		}
+		confs, err := source.GetTxConfirmations(ctx, txHash)
+		if err != nil {
+			log.Warningf("GetTxConfirmations failed from source for tx %s: %v", txHash, err)
+			continue
+		}
+		return confs, nil
+	}
+	return 0, errors.New("failed to get tx confirmations from all sources")
+}
+
 // resubscribeChain re-subscribes all un-subscribed watched addresses for a chain
 // via the given (recovered) source.
 func (m *Monitor) resubscribeChain(chain iwallet.ChainType, source PaymentSource) {
@@ -879,6 +974,7 @@ func (m *Monitor) resubscribeChain(chain iwallet.ChainType, source PaymentSource
 
 	ctx := context.Background()
 	resubscribed := 0
+	succeeded := make([]*WatchedAddress, 0, len(toResubscribe))
 	for _, wa := range toResubscribe {
 		err := source.Subscribe(ctx, wa.Address, wa.ScriptPubKey, func(tx *iwallet.Transaction) {
 			m.handleTransaction(wa, tx)
@@ -887,12 +983,13 @@ func (m *Monitor) resubscribeChain(chain iwallet.ChainType, source PaymentSource
 			log.Warningf("Failed to re-subscribe address %s after source recovery: %v", wa.Address, err)
 			continue
 		}
+		succeeded = append(succeeded, wa)
 		resubscribed++
 	}
 
 	if resubscribed > 0 {
 		m.watchMu.Lock()
-		for _, wa := range toResubscribe {
+		for _, wa := range succeeded {
 			wa.Subscribed = true
 		}
 		m.watchMu.Unlock()

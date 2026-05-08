@@ -17,10 +17,6 @@ jobs:
         with:
           path: node
 
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_PAT || github.token }}
-
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
@@ -33,11 +29,9 @@ jobs:
 
           use (
             ./node
-            ./core
           )
           EOF
           sed -i 's/^          //' go.work
-
 
       - name: Vet
         run: go vet -tags goolm ./...
@@ -54,10 +48,6 @@ jobs:
         with:
           path: node
 
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_PAT || github.token }}
-
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
@@ -70,11 +60,9 @@ jobs:
 
           use (
             ./node
-            ./core
           )
           EOF
           sed -i 's/^          //' go.work
-
 
       - name: Build
         run: go build -tags goolm -o /dev/null .

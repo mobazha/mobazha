@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 
+	"github.com/mobazha/mobazha3.0/internal/core/guest"
 	"github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/core/settlement"
@@ -89,11 +90,11 @@ type appServices struct {
 	analyticsService           *AnalyticsAppService
 	paymentVerificationService *payment.PaymentVerificationService
 	netDBSyncService           *NetDBSyncService
-	guestOrderService          *GuestOrderAppService
-	directPaymentService       *DirectPaymentService
-	autoSweepService           *AutoSweepService
+	guestOrderService          *guest.GuestOrderAppService
+	directPaymentService       *guest.DirectPaymentService
+	autoSweepService           *guest.AutoSweepService
 	receivingAccountService    *receivingAccountService
-	guestPaymentMonitor        *GuestPaymentMonitor
+	guestPaymentMonitor        *guest.GuestPaymentMonitor
 	unifiedOrderView           *UnifiedOrderView
 
 	// Feature flag resolver infrastructure (Phase FF-3).

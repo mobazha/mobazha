@@ -27,10 +27,13 @@ type SweepTask struct {
 func (SweepTask) TableName() string { return "sweep_tasks" }
 
 const (
-	SweepStatusPending   = "pending"
-	SweepStatusSubmitted = "submitted"
-	SweepStatusConfirmed = "confirmed"
-	SweepStatusFailed    = "failed"
+	SweepStatusPending    = "pending"
+	SweepStatusProcessing = "processing"
+	SweepStatusSubmitted  = "submitted"
+	SweepStatusConfirmed  = "confirmed"
+	SweepStatusFailed     = "failed"
 )
+
+const SweepStaleTimeout = 10 * time.Minute
 
 const MaxSweepRetries = 5

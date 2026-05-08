@@ -62,9 +62,7 @@ type WalletLoader interface {
 	//
 	// The birthday can be used determine where to sync state from if
 	// appropriate.
-	//
-	// The pw parameter is unused (WalletCrypter is deprecated) and will always be nil.
-	CreateWallet(xpriv hd.ExtendedKey, pw []byte, birthday time.Time) error
+	CreateWallet(xpriv hd.ExtendedKey, birthday time.Time) error
 
 	// Open wallet will be called each time on Mobazha start. It
 	// will also be called after CreateWallet().
@@ -167,30 +165,45 @@ type UTXOEscrow interface {
 	BuildAndSend(dbtx Tx, txn Transaction, signatures [][]EscrowSignature, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
 }
 
-// UTXODirectPayment is an interface for spending from single-sig P2WPKH addresses.
-// Note: The DIRECT payment mode has been removed in favor of CANCELABLE (1-of-2 multisig).
-// This interface is retained for potential future use cases involving single-sig addresses.
-type UTXODirectPayment interface {
-	// SpendFromDerivedAddress spends funds from an HD-derived address (identified by utxo)
-	// to multiple outputs using a single private key.
-	//
-	// Parameters:
-	//   - dbtx: Database transaction for atomic operations
-	//   - utxo: The UTXO to spend from (txid, vout, amount, scriptPubKey)
-	//   - outputs: List of outputs (addresses and amounts)
-	//   - signingKey: The private key to sign the transaction
-	//   - feeLevel: Fee level for the transaction
-	//
-	// Returns the transaction ID of the broadcast transaction.
-	SpendFromDerivedAddress(dbtx Tx, utxo UTXO, outputs []SpendInfo, signingKey btcec.PrivateKey, feeLevel FeeLevel) (TransactionID, error)
+// SweepInput describes one unspent output to spend during a sweep.
+type SweepInput struct {
+	TxHash      string // hex-encoded transaction hash
+	OutputIndex uint32
+	Value       int64 // amount in satoshi/litoshi
 }
 
-// UTXO represents an unspent transaction output for SpendFromDerivedAddress
-type UTXO struct {
-	TxID         TransactionID
-	OutputIndex  uint32
-	Amount       Amount
-	ScriptPubKey []byte // The scriptPubKey of the output (for signing)
+// UTXOSweeper builds and signs a sweep transaction that spends all provided
+// inputs into a single output (minus fee). Each UTXO chain implements this
+// with its own signing method (P2WPKH for BTC/LTC, P2PKH+ForkID for BCH,
+// ZIP-243 for ZEC). The returned bytes are the fully-signed serialized
+// transaction ready for broadcast.
+type UTXOSweeper interface {
+	BuildSweepTx(inputs []SweepInput, signingKey btcec.PrivateKey, destAddress string, feePerByte int64) (rawTx []byte, txHash string, err error)
+}
+
+// UTXOAddressUtilities provides chain-specific address derivation and parsing
+// utilities. Implemented by all UTXO wallets (BTC/LTC/BCH/ZEC). This interface
+// centralizes chain-specific logic (HRP, network params, encoding format) inside
+// each wallet package, so callers (KeyDeriver, GuestPaymentMonitor) need not
+// branch on chain type and need not depend on btcd-only chain params.
+//
+// Each chain uses its preferred derivation type:
+//   - BTC, LTC: P2WPKH (native Segwit, bech32 with chain-specific HRP)
+//   - BCH, ZEC: P2PKH (legacy, base58)
+//
+// All implementations are testnet-aware via the wallet's internal params().
+type UTXOAddressUtilities interface {
+	// DerivePaymentAddressFromPubKey derives the canonical payment address
+	// for this chain from a public key, returning both the encoded address
+	// (mainnet/testnet HRP per wallet config) and its scriptPubKey for
+	// transaction signing/monitoring.
+	DerivePaymentAddressFromPubKey(pubKey *btcec.PublicKey) (address string, scriptPubKey []byte, err error)
+
+	// AddressToScriptPubKey decodes an encoded address (string) into its
+	// scriptPubKey. The address must be valid for this chain on the wallet's
+	// configured network (mainnet/testnet); returns an error otherwise.
+	// Used by chain monitors to compute scripthashes for Electrum subscriptions.
+	AddressToScriptPubKey(address string) ([]byte, error)
 }
 
 // UTXOEscrowWithTimeout is an optional interface to be implemented by wallets whos coins

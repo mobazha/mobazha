@@ -7,8 +7,34 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/mobazha/mobazha3.0/internal/core/guest"
+	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
+
+// testMultiwallet builds a real UTXO-only multiwallet (BTC/LTC/BCH/ZEC) at a
+// per-test temp directory. Used by BIP44KeyDeriver tests that exercise UTXO
+// address derivation.
+func testMultiwallet(t *testing.T, masterKey *hdkeychain.ExtendedKey) contracts.WalletOperator {
+	t.Helper()
+	cfg := &repo.Config{LogLevel: "error"}
+	mw, err := loadPrivateDistributionMultiwallet(masterKey, cfg, nil, false, t.TempDir())
+	if err != nil {
+		t.Fatalf("testMultiwallet: %v", err)
+	}
+	return &mw
+}
+
+// newTestNodeKeyDeriver is a convenience wrapper that builds a deriver wired
+// to a real multiwallet for UTXO derivation. Tests that don't exercise UTXO
+// can pass nil multiwallet, but most tests use this helper for completeness.
+func newTestNodeKeyDeriver(t *testing.T) *guest.NodeKeyDeriver {
+	t.Helper()
+	mk := testMasterKey(t)
+	return guest.NewNodeKeyDeriver(mk, testMultiwallet(t, mk))
+}
 
 // testMasterKey creates a deterministic BIP44 master key for testing.
 // Uses a fixed seed so all tests produce reproducible addresses.
@@ -35,7 +61,7 @@ func testMasterKey(t *testing.T) *hdkeychain.ExtendedKey {
 }
 
 func TestNodeKeyDeriver_DeriveAddress_BTC(t *testing.T) {
-	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver := newTestNodeKeyDeriver(t)
 
 	addr0, err := deriver.DeriveAddress(iwallet.ChainBitcoin, 0)
 	if err != nil {
@@ -55,7 +81,7 @@ func TestNodeKeyDeriver_DeriveAddress_BTC(t *testing.T) {
 }
 
 func TestNodeKeyDeriver_DeriveAddress_ETH(t *testing.T) {
-	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver := newTestNodeKeyDeriver(t)
 
 	addr0, err := deriver.DeriveAddress(iwallet.ChainEthereum, 0)
 	if err != nil {
@@ -75,7 +101,7 @@ func TestNodeKeyDeriver_DeriveAddress_ETH(t *testing.T) {
 }
 
 func TestNodeKeyDeriver_DeriveAddress_EVM_SharesCoinType(t *testing.T) {
-	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver := newTestNodeKeyDeriver(t)
 
 	ethAddr, err := deriver.DeriveAddress(iwallet.ChainEthereum, 0)
 	if err != nil {
@@ -93,7 +119,7 @@ func TestNodeKeyDeriver_DeriveAddress_EVM_SharesCoinType(t *testing.T) {
 }
 
 func TestNodeKeyDeriver_DeriveAddress_TRON(t *testing.T) {
-	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver := newTestNodeKeyDeriver(t)
 
 	addr0, err := deriver.DeriveAddress(iwallet.ChainTRON, 0)
 	if err != nil {
@@ -113,7 +139,7 @@ func TestNodeKeyDeriver_DeriveAddress_TRON(t *testing.T) {
 }
 
 func TestNodeKeyDeriver_DeriveAddress_UnsupportedChain(t *testing.T) {
-	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver := newTestNodeKeyDeriver(t)
 
 	_, err := deriver.DeriveAddress(iwallet.ChainSolana, 0)
 	if err == nil {
@@ -122,13 +148,13 @@ func TestNodeKeyDeriver_DeriveAddress_UnsupportedChain(t *testing.T) {
 }
 
 func TestNodeKeyDeriver_DerivePrivateKey_NotEmpty(t *testing.T) {
-	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver := newTestNodeKeyDeriver(t)
 
 	privKey, err := deriver.DerivePrivateKey(iwallet.ChainEthereum, 0)
 	if err != nil {
 		t.Fatalf("DerivePrivateKey(ETH, 0) error: %v", err)
 	}
-	defer zeroBytes(privKey)
+	defer encryption.ZeroBytes(privKey)
 
 	if len(privKey) != 32 {
 		t.Errorf("private key should be 32 bytes, got %d", len(privKey))
@@ -147,19 +173,19 @@ func TestNodeKeyDeriver_DerivePrivateKey_NotEmpty(t *testing.T) {
 }
 
 func TestNodeKeyDeriver_DerivePrivateKey_DifferentPerIndex(t *testing.T) {
-	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver := newTestNodeKeyDeriver(t)
 
 	pk0, err := deriver.DerivePrivateKey(iwallet.ChainBitcoin, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer zeroBytes(pk0)
+	defer encryption.ZeroBytes(pk0)
 
 	pk1, err := deriver.DerivePrivateKey(iwallet.ChainBitcoin, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer zeroBytes(pk1)
+	defer encryption.ZeroBytes(pk1)
 
 	if hex.EncodeToString(pk0) == hex.EncodeToString(pk1) {
 		t.Error("private keys at different indices should differ")
@@ -168,7 +194,7 @@ func TestNodeKeyDeriver_DerivePrivateKey_DifferentPerIndex(t *testing.T) {
 
 func TestZeroBytes(t *testing.T) {
 	data := []byte{0x01, 0x02, 0x03, 0x04}
-	zeroBytes(data)
+	encryption.ZeroBytes(data)
 	for i, b := range data {
 		if b != 0 {
 			t.Errorf("byte %d should be 0, got %d", i, b)
@@ -180,7 +206,7 @@ func TestZeroBytes(t *testing.T) {
 // for the fixed test seed. These are locked in as regression guards — if they change,
 // existing Guest Orders would lose access to payment addresses.
 func TestNodeKeyDeriver_ExactAddressVectors(t *testing.T) {
-	deriver := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver := newTestNodeKeyDeriver(t)
 
 	// BTC index=0: derive and lock the exact bech32 address
 	btcAddr, err := deriver.DeriveAddress(iwallet.ChainBitcoin, 0)
@@ -208,8 +234,8 @@ func TestNodeKeyDeriver_ExactAddressVectors(t *testing.T) {
 }
 
 func TestNodeKeyDeriver_Deterministic(t *testing.T) {
-	deriver1 := NewNodeKeyDeriver(testMasterKey(t), false)
-	deriver2 := NewNodeKeyDeriver(testMasterKey(t), false)
+	deriver1 := newTestNodeKeyDeriver(t)
+	deriver2 := newTestNodeKeyDeriver(t)
 
 	for _, chain := range []iwallet.ChainType{
 		iwallet.ChainBitcoin,

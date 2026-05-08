@@ -27,7 +27,8 @@ var _ = iwallet.Wallet(&BitcoinCashWallet{})
 
 var _ = iwallet.UTXOEscrow(&BitcoinCashWallet{})
 var _ = iwallet.UTXOEscrowWithTimeout(&BitcoinCashWallet{})
-var _ = iwallet.UTXODirectPayment(&BitcoinCashWallet{})
+var _ = iwallet.UTXOSweeper(&BitcoinCashWallet{})
+var _ iwallet.UTXOAddressUtilities = (*BitcoinCashWallet)(nil)
 
 // BitcoinCashWallet extends wallet base and implements the
 // remaining functions for each interface.
@@ -510,64 +511,44 @@ func lockTimeFromRedeemScript(redeemScript []byte) (uint32, error) {
 	return uint32(result), nil
 }
 
-// SpendFromDerivedAddress spends funds from an HD-derived address (identified by utxo)
-// to multiple outputs using a single private key.
-// Note: DIRECT payment mode has been removed. This method is retained for potential future use.
-//
-// Network fee handling: In UTXO model, fee = inputs - outputs.
-// The caller must pre-calculate outputs to leave the desired fee as the difference.
-// This function does NOT calculate or deduct fees - it uses exact output amounts provided.
-func (w *BitcoinCashWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet.UTXO, outputs []iwallet.SpendInfo, signingKey btcec.PrivateKey, _ iwallet.FeeLevel) (iwallet.TransactionID, error) {
-	// Build the transaction
+// BuildSweepTx builds and signs a P2PKH sweep transaction using BCH's
+// SigHashForkID that spends all provided inputs to a single destination.
+func (w *BitcoinCashWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, destAddress string, feePerByte int64) ([]byte, string, error) {
+	if len(inputs) == 0 {
+		return nil, "", errors.New("no inputs provided")
+	}
+
 	tx := wire.NewMsgTx(wire.TxVersion)
+	var totalInput int64
 
-	// Add the input
-	txidHash, err := chainhash.NewHashFromStr(string(utxo.TxID))
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("invalid txid: %w", err)
-	}
-	outpoint := wire.NewOutPoint(txidHash, utxo.OutputIndex)
-	txIn := wire.NewTxIn(outpoint, nil)
-	tx.TxIn = append(tx.TxIn, txIn)
-
-	// Calculate total output amount
-	var totalOutputAmt int64
-	for _, out := range outputs {
-		totalOutputAmt += out.Amount.Int64()
-	}
-
-	// Verify: outputs must be less than input (difference becomes network fee)
-	inputAmount := utxo.Amount.Int64()
-	implicitFee := inputAmount - totalOutputAmt
-	if implicitFee < 0 {
-		return iwallet.TransactionID(""), fmt.Errorf("outputs exceed input: input=%d, outputs=%d", inputAmount, totalOutputAmt)
-	}
-	if implicitFee == 0 {
-		return iwallet.TransactionID(""), fmt.Errorf("zero fee transaction not allowed")
-	}
-
-	// Add outputs
-	for _, out := range outputs {
-		if out.Amount.Int64() <= 0 {
-			continue
-		}
-		scriptPubKey, err := w.getPayToAddrScript(out.Address.String())
+	for _, inp := range inputs {
+		hash, err := chainhash.NewHashFromStr(inp.TxHash)
 		if err != nil {
-			return iwallet.TransactionID(""), fmt.Errorf("failed to get scriptPubKey for %s: %w", out.Address, err)
+			return nil, "", fmt.Errorf("invalid txid %s: %w", inp.TxHash, err)
 		}
-		txOut := wire.NewTxOut(out.Amount.Int64(), scriptPubKey)
-		tx.TxOut = append(tx.TxOut, txOut)
+		tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(hash, inp.OutputIndex), nil))
+		totalInput += inp.Value
+	}
+	if totalInput == 0 {
+		return nil, "", errors.New("total input is zero")
 	}
 
-	// BIP 69 sorting
-	txsort.InPlaceSort(tx)
+	// P2PKH: ~148 bytes per input, ~34 bytes for output + 10 overhead
+	estimatedSize := int64(10 + len(inputs)*148 + 34)
+	fee := estimatedSize * feePerByte
+	if fee >= totalInput {
+		return nil, "", fmt.Errorf("fee (%d) exceeds total input (%d)", fee, totalInput)
+	}
 
-	// Sign the input using BCH's SigHashForkID
+	destScript, err := w.getPayToAddrScript(destAddress)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode dest address: %w", err)
+	}
+	tx.AddTxOut(wire.NewTxOut(totalInput-fee, destScript))
+
 	pubKey := signingKey.PubKey()
 	pubKeyHash := bchutil.Hash160(pubKey.SerializeCompressed())
-
-	// Create the P2PKH script for signing
-	sigScript, err := txscript.NewScriptBuilder().
+	prevScript, err := txscript.NewScriptBuilder().
 		AddOp(txscript.OP_DUP).
 		AddOp(txscript.OP_HASH160).
 		AddData(pubKeyHash).
@@ -575,51 +556,64 @@ func (w *BitcoinCashWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet
 		AddOp(txscript.OP_CHECKSIG).
 		Script()
 	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to create sig script: %w", err)
+		return nil, "", fmt.Errorf("build P2PKH script: %w", err)
 	}
 
-	// Calculate signature hash with ForkID
-	sigHashes := txscript.NewTxSigHashes(tx)
-	sigHash, err := txscript.CalcSignatureHash(sigScript, sigHashes, txscript.SigHashAll|txscript.SigHashForkID, tx, 0, inputAmount, true)
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to calculate sig hash: %w", err)
-	}
-
-	// Convert to bchec key and sign
 	bchPrivKey, _ := bchec.PrivKeyFromBytes(bchec.S256(), signingKey.Serialize())
-	sig, err := bchPrivKey.SignECDSA(sigHash)
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to sign: %w", err)
+
+	for i, inp := range inputs {
+		sigHashes := txscript.NewTxSigHashes(tx)
+		sigHash, hashErr := txscript.CalcSignatureHash(prevScript, sigHashes,
+			txscript.SigHashAll|txscript.SigHashForkID, tx, i, inp.Value, true)
+		if hashErr != nil {
+			return nil, "", fmt.Errorf("sighash input %d: %w", i, hashErr)
+		}
+		sig, sigErr := bchPrivKey.SignECDSA(sigHash)
+		if sigErr != nil {
+			return nil, "", fmt.Errorf("sign input %d: %w", i, sigErr)
+		}
+
+		builder := txscript.NewScriptBuilder()
+		builder.AddData(append(sig.Serialize(), byte(txscript.SigHashAll|txscript.SigHashForkID)))
+		builder.AddData(pubKey.SerializeCompressed())
+		sigScriptFinal, buildErr := builder.Script()
+		if buildErr != nil {
+			return nil, "", fmt.Errorf("build sig script input %d: %w", i, buildErr)
+		}
+		tx.TxIn[i].SignatureScript = sigScriptFinal
 	}
 
-	// Build the signature script (P2PKH)
-	builder := txscript.NewScriptBuilder()
-	builder.AddData(append(sig.Serialize(), byte(txscript.SigHashAll|txscript.SigHashForkID)))
-	builder.AddData(pubKey.SerializeCompressed())
-	sigScriptFinal, err := builder.Script()
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to build sig script: %w", err)
-	}
-
-	tx.TxIn[0].SignatureScript = sigScriptFinal
-
-	txid := iwallet.TransactionID(tx.TxHash().String())
-
-	// Serialize the transaction
 	var buf bytes.Buffer
 	if err := tx.BchEncode(&buf, wire.ProtocolVersion, wire.BaseEncoding); err != nil {
-		return txid, fmt.Errorf("failed to encode transaction: %w", err)
+		return nil, "", fmt.Errorf("serialize tx: %w", err)
+	}
+	return buf.Bytes(), tx.TxHash().String(), nil
+}
+
+// DerivePaymentAddressFromPubKey derives a P2PKH (legacy) payment address from
+// a single public key. BCH uses the CashAddr encoding format.
+func (w *BitcoinCashWallet) DerivePaymentAddressFromPubKey(pubKey *btcec.PublicKey) (string, []byte, error) {
+	if pubKey == nil {
+		return "", nil, errors.New("public key cannot be nil")
 	}
 
-	// Broadcast via OnCommit callback
-	wbtx, ok := wtx.(*base.DBTx)
-	if !ok {
-		return txid, errors.New("tx is not expected type")
+	pubKeyHash := bchutil.Hash160(pubKey.SerializeCompressed())
+
+	addr, err := bchutil.NewAddressPubKeyHash(pubKeyHash, w.params())
+	if err != nil {
+		return "", nil, err
 	}
 
-	wbtx.OnCommit = func() error {
-		return w.ChainClient.Broadcast(buf.Bytes())
+	scriptPubKey, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		return "", nil, err
 	}
 
-	return txid, nil
+	return addr.EncodeAddress(), scriptPubKey, nil
+}
+
+// AddressToScriptPubKey decodes an encoded BCH address (CashAddr or legacy
+// base58) into its scriptPubKey.
+func (w *BitcoinCashWallet) AddressToScriptPubKey(address string) ([]byte, error) {
+	return w.getPayToAddrScript(address)
 }

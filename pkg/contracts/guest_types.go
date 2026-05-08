@@ -2,9 +2,42 @@ package contracts
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
+)
+
+// Sentinel errors for guest checkout. Service implementations wrap these
+// (via fmt.Errorf("%w: ...", ...)) and HTTP handlers route status codes via
+// errors.Is — substring-matching error messages is fragile because the
+// human-readable suffix often shares words across roots.
+var (
+	// ErrGuestCheckoutDisabled — guestCheckout feature flag is disabled.
+	// Maps to HTTP 403 FEATURE_DISABLED.
+	ErrGuestCheckoutDisabled = errors.New("guest checkout is disabled")
+
+	// ErrCoinUnavailable — payment coin's chain monitor is not configured
+	// in this deployment. The request itself is well-formed; the operator
+	// just hasn't enabled this chain. Maps to HTTP 503 SERVICE_UNAVAILABLE.
+	ErrCoinUnavailable = errors.New("payment coin unavailable")
+
+	// ErrCoinUnsupported — payment coin doesn't belong to any chain
+	// family supported by guest checkout. Maps to HTTP 400.
+	ErrCoinUnsupported = errors.New("payment coin not supported")
+
+	// ErrInsufficientStock — listing inventory cannot satisfy the order.
+	// Maps to HTTP 409 CONFLICT.
+	ErrInsufficientStock = errors.New("insufficient stock")
+
+	// ErrInvalidVariant — buyer's variant options don't match any SKU on the
+	// listing. The listing is valid; the option combination isn't.
+	// Maps to HTTP 400 BAD_REQUEST.
+	ErrInvalidVariant = errors.New("invalid variant options")
+
+	// ErrInvalidGuestRequest — request validation failure (bad amounts,
+	// unknown listing slug, mixed pricing, etc). Maps to HTTP 400.
+	ErrInvalidGuestRequest = errors.New("invalid guest order request")
 )
 
 // CreateGuestOrderRequest is the input for creating a Guest Order.
@@ -35,6 +68,8 @@ type GuestOrderResponse struct {
 	ExpiresAt         time.Time               `json:"expiresAt"`
 	Items             []models.GuestOrderItem `json:"items"`
 	Subtotal          uint64                  `json:"subtotal"`
+	ShippingCost      uint64                  `json:"shippingCost"`
+	TotalPrice        uint64                  `json:"totalPrice"`
 	PriceCurrency     string                  `json:"priceCurrency"`
 	PriceDivisibility uint32                  `json:"priceDivisibility"`
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -388,4 +389,44 @@ func (s *Source) EstimateFee(ctx context.Context, numBlocks int) (uint64, error)
 		satPerVB = 1
 	}
 	return satPerVB, nil
+}
+
+// ListUnspent returns unspent outputs for a scriptPubKey. The Electrum-specific
+// scripthash conversion is handled internally, keeping the public interface
+// chain-agnostic.
+func (s *Source) ListUnspent(ctx context.Context, scriptPubKey []byte) ([]pkgutxo.UnspentOutput, error) {
+	scriptHash := AddressToScriptHash("", scriptPubKey)
+
+	items, err := s.client.ListUnspent(ctx, scriptHash)
+	if err != nil {
+		s.markUnhealthy()
+		return nil, err
+	}
+
+	s.markHealthy()
+
+	out := make([]pkgutxo.UnspentOutput, len(items))
+	for i, item := range items {
+		out[i] = pkgutxo.UnspentOutput{
+			TxHash:      item.TxHash,
+			OutputIndex: item.TxPos,
+			Height:      item.Height,
+			Value:       item.Value,
+		}
+	}
+	return out, nil
+}
+
+// GetTxConfirmations returns the confirmation count for a transaction by
+// fetching verbose transaction info from the Electrum server.
+func (s *Source) GetTxConfirmations(ctx context.Context, txHash string) (int, error) {
+	txInfo, err := s.client.GetTransaction(ctx, txHash, true)
+	if err != nil {
+		return 0, err
+	}
+	confs := int(txInfo.Confirmations)
+	if confs < 0 {
+		confs = 0
+	}
+	return confs, nil
 }

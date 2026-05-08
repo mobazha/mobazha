@@ -5,7 +5,6 @@ package core
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	internalutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -55,33 +54,44 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 
 	n.configureUTXOWallets(n.monitorService)
 
-	// Delegate startup recovery to PaymentAppService
+	// Wire the guest checkout subsystem to the running monitor.
+	//
+	//   1. UTXO monitor → guestPaymentMonitor (so WatchAddress works).
+	//   2. ChainOperations (monitor) → autoSweepService (confirmation polling).
+	//   3. Wire UTXOSweepBroadcaster for sweepable chains.
+	//   4. EnableUTXOChain for every UTXO chain whose wallet is loaded and
+	//      whose sweeper is supported (P2WPKH today).
+	if n.guestPaymentMonitor != nil {
+		if mon, ok := n.monitorService.(*utxo.Monitor); ok {
+			n.guestPaymentMonitor.SetUTXOMonitor(mon)
+		}
+	}
+	if n.autoSweepService != nil {
+		n.autoSweepService.SetChainOps(n.monitorService)
+		n.autoSweepService.SetMultiwallet(n.multiwallet)
+	}
+	if n.guestOrderService != nil && n.multiwallet != nil {
+		for _, chain := range n.multiwallet.SupportedChains() {
+			if !chain.IsUTXOChain() || !isSweepableP2WPKHChain(chain) {
+				continue
+			}
+			n.guestOrderService.EnableUTXOChain(chain)
+		}
+	}
+
+	// Delegate startup recovery to PaymentAppService (escrow orders)
 	if n.paymentService != nil {
 		n.paymentService.CheckPendingPaymentsOnStartup()
 	}
-}
 
-// configureUTXOWallets sets up UTXO wallets to use UTXOChainClient.
-func (n *MobazhaNode) configureUTXOWallets(ops utxo.ChainOperations) {
-	if n.multiwallet == nil || ops == nil {
-		return
+	// Restore guest checkout watches and pending sweeps after restart.
+	if n.guestPaymentMonitor != nil {
+		if err := n.guestPaymentMonitor.RestoreWatches(context.Background()); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "restore guest payment watches: %v", err)
+		}
 	}
-
-	for _, chain := range n.multiwallet.SupportedChains() {
-		if !chain.IsUTXOChain() {
-			continue
-		}
-
-		wallet, ok := n.multiwallet.WalletForChain(chain)
-		if !ok {
-			continue
-		}
-
-		if setter, ok := wallet.(base.ChainClientSetter); ok {
-			client := internalutxo.NewUTXOChainClient(ops, chain)
-			setter.SetChainClient(client)
-			logger.LogInfoWithIDf(log, n.nodeID, "Configured %s wallet with UTXOChainClient", chain)
-		}
+	if n.autoSweepService != nil {
+		n.autoSweepService.RestorePendingSweeps(context.Background())
 	}
 }
 

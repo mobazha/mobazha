@@ -98,6 +98,14 @@ func (m *mockPaymentSource) BroadcastTransaction(ctx context.Context, txHex stri
 	return "mock_txid", nil
 }
 
+func (m *mockPaymentSource) ListUnspent(_ context.Context, _ []byte) ([]UnspentOutput, error) {
+	return nil, nil
+}
+
+func (m *mockPaymentSource) GetTxConfirmations(_ context.Context, _ string) (int, error) {
+	return 0, nil
+}
+
 // failingBroadcastSource fails N times then succeeds
 type failingBroadcastSource struct {
 	mockPaymentSource
@@ -639,12 +647,36 @@ func TestMonitorGetFeeEstimate(t *testing.T) {
 func TestMonitorDeterminePaymentStatus(t *testing.T) {
 	m := NewMonitor(nil)
 
-	t.Run("normal payment", func(t *testing.T) {
+	const watchAddr = "bc1qwatch"
+	const changeAddr = "bc1qchange"
+	const btcCoin = iwallet.CoinType("BTC")
+	mkTx := func(toWatch, toChange uint64) *iwallet.Transaction {
+		var outs []iwallet.SpendInfo
+		if toWatch > 0 {
+			outs = append(outs, iwallet.SpendInfo{
+				Address: iwallet.NewAddress(watchAddr, btcCoin),
+				Amount:  iwallet.NewAmount(toWatch),
+			})
+		}
+		if toChange > 0 {
+			outs = append(outs, iwallet.SpendInfo{
+				Address: iwallet.NewAddress(changeAddr, btcCoin),
+				Amount:  iwallet.NewAmount(toChange),
+			})
+		}
+		// tx.Value is the *total* output value (incl. change). Status decisions
+		// must rely on AmountPaidTo(tx, watchAddr) instead.
+		return &iwallet.Transaction{Value: iwallet.NewAmount(toWatch + toChange), To: outs}
+	}
+
+	t.Run("normal payment with change still classifies as normal", func(t *testing.T) {
 		wa := &WatchedAddress{
+			Address:        watchAddr,
 			ExpectedAmount: 100000,
 			ExpiresAt:      time.Now().Add(1 * time.Hour),
 		}
-		tx := &iwallet.Transaction{Value: iwallet.NewAmount(100000)}
+		tx := mkTx(100000, 900000)
+		wa.TotalPaid.Store(AmountPaidTo(tx, wa.Address))
 		status := m.determinePaymentStatus(wa, tx)
 		if status != PaymentStatusNormal {
 			t.Errorf("Expected normal, got %s", status)
@@ -653,46 +685,76 @@ func TestMonitorDeterminePaymentStatus(t *testing.T) {
 
 	t.Run("expired payment", func(t *testing.T) {
 		wa := &WatchedAddress{
+			Address:        watchAddr,
 			ExpectedAmount: 100000,
-			ExpiresAt:      time.Now().Add(-1 * time.Hour), // Already expired
+			ExpiresAt:      time.Now().Add(-1 * time.Hour),
 		}
-		tx := &iwallet.Transaction{Value: iwallet.NewAmount(100000)}
+		tx := mkTx(100000, 0)
+		wa.TotalPaid.Store(AmountPaidTo(tx, wa.Address))
 		status := m.determinePaymentStatus(wa, tx)
 		if status != PaymentStatusExpired {
 			t.Errorf("Expected expired, got %s", status)
 		}
 	})
 
-	t.Run("partial payment", func(t *testing.T) {
+	t.Run("partial payment ignores change", func(t *testing.T) {
 		wa := &WatchedAddress{
+			Address:        watchAddr,
 			ExpectedAmount: 100000,
 			ExpiresAt:      time.Now().Add(1 * time.Hour),
 		}
-		tx := &iwallet.Transaction{Value: iwallet.NewAmount(50000)} // Less than expected
+		tx := mkTx(50000, 1000000)
+		wa.TotalPaid.Store(AmountPaidTo(tx, wa.Address))
 		status := m.determinePaymentStatus(wa, tx)
 		if status != PaymentStatusPartial {
 			t.Errorf("Expected partial, got %s", status)
 		}
 	})
 
-	t.Run("overpay payment", func(t *testing.T) {
+	t.Run("genuine overpay", func(t *testing.T) {
 		wa := &WatchedAddress{
+			Address:        watchAddr,
 			ExpectedAmount: 100000,
 			ExpiresAt:      time.Now().Add(1 * time.Hour),
 		}
-		tx := &iwallet.Transaction{Value: iwallet.NewAmount(150000)} // More than expected
+		tx := mkTx(150000, 0)
+		wa.TotalPaid.Store(AmountPaidTo(tx, wa.Address))
 		status := m.determinePaymentStatus(wa, tx)
 		if status != PaymentStatusOverpay {
 			t.Errorf("Expected overpay, got %s", status)
 		}
 	})
 
-	t.Run("no expected amount", func(t *testing.T) {
+	t.Run("two outputs to same address aggregate", func(t *testing.T) {
 		wa := &WatchedAddress{
-			ExpectedAmount: 0, // No expected amount
+			Address:        watchAddr,
+			ExpectedAmount: 100000,
 			ExpiresAt:      time.Now().Add(1 * time.Hour),
 		}
-		tx := &iwallet.Transaction{Value: iwallet.NewAmount(100000)}
+		tx := &iwallet.Transaction{
+			To: []iwallet.SpendInfo{
+				{Address: iwallet.NewAddress(watchAddr, btcCoin), Amount: iwallet.NewAmount(60000)},
+				{Address: iwallet.NewAddress(watchAddr, btcCoin), Amount: iwallet.NewAmount(40000)},
+				{Address: iwallet.NewAddress(changeAddr, btcCoin), Amount: iwallet.NewAmount(900000)},
+			},
+		}
+		if got := AmountPaidTo(tx, watchAddr); got != 100000 {
+			t.Fatalf("AmountPaidTo expected 100000, got %d", got)
+		}
+		wa.TotalPaid.Store(AmountPaidTo(tx, wa.Address))
+		status := m.determinePaymentStatus(wa, tx)
+		if status != PaymentStatusNormal {
+			t.Errorf("Expected normal, got %s", status)
+		}
+	})
+
+	t.Run("no expected amount", func(t *testing.T) {
+		wa := &WatchedAddress{
+			Address:        watchAddr,
+			ExpectedAmount: 0,
+			ExpiresAt:      time.Now().Add(1 * time.Hour),
+		}
+		tx := mkTx(100000, 0)
 		status := m.determinePaymentStatus(wa, tx)
 		if status != PaymentStatusNormal {
 			t.Errorf("Expected normal when no expected amount, got %s", status)
@@ -791,8 +853,14 @@ func TestMonitorHandleTransaction(t *testing.T) {
 	}
 
 	tx := &iwallet.Transaction{
-		ID:     "txid123",
-		Value:  iwallet.NewAmount(100000),
+		ID:    "txid123",
+		Value: iwallet.NewAmount(100000),
+		To: []iwallet.SpendInfo{
+			{
+				Address: iwallet.NewAddress("test_addr", iwallet.CoinType("BTC")),
+				Amount:  iwallet.NewAmount(100000),
+			},
+		},
 		Height: 3,
 	}
 

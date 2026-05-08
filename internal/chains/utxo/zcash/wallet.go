@@ -53,7 +53,8 @@ const (
 var _ = iwallet.Wallet(&ZCashWallet{})
 
 var _ = iwallet.UTXOEscrow(&ZCashWallet{})
-var _ = iwallet.UTXODirectPayment(&ZCashWallet{})
+var _ = iwallet.UTXOSweeper(&ZCashWallet{})
+var _ iwallet.UTXOAddressUtilities = (*ZCashWallet)(nil)
 
 func init() {
 	MainNetParams = chaincfg.MainNetParams
@@ -687,63 +688,43 @@ func selectBranchID(currentHeight uint64) uint32 {
 	return 0xc8e71055
 }
 
-// SpendFromDerivedAddress spends funds from an HD-derived address (identified by utxo)
-// to multiple outputs using a single private key.
-// Note: DIRECT payment mode has been removed. This method is retained for potential future use.
-//
-// Network fee handling: In UTXO model, fee = inputs - outputs.
-// The caller must pre-calculate outputs to leave the desired fee as the difference.
-// This function does NOT calculate or deduct fees - it uses exact output amounts provided.
-func (w *ZCashWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet.UTXO, outputs []iwallet.SpendInfo, signingKey btcec.PrivateKey, _ iwallet.FeeLevel) (iwallet.TransactionID, error) {
-	// Build the transaction (version 4 for Sapling+)
+// BuildSweepTx builds and signs a P2PKH sweep transaction using ZCash's
+// ZIP-243 signature hash that spends all provided inputs to a single destination.
+func (w *ZCashWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, destAddress string, feePerByte int64) ([]byte, string, error) {
+	if len(inputs) == 0 {
+		return nil, "", errors.New("no inputs provided")
+	}
+
 	tx := wire.NewMsgTx(1)
+	var totalInput int64
 
-	// Add the input
-	txidHash, err := chainhash.NewHashFromStr(string(utxo.TxID))
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("invalid txid: %w", err)
-	}
-	outpoint := wire.NewOutPoint(txidHash, utxo.OutputIndex)
-	txIn := wire.NewTxIn(outpoint, nil, nil)
-	tx.TxIn = append(tx.TxIn, txIn)
-
-	// Calculate total output amount
-	var totalOutputAmt int64
-	for _, out := range outputs {
-		totalOutputAmt += out.Amount.Int64()
-	}
-
-	// Verify: outputs must be less than input (difference becomes network fee)
-	inputAmount := utxo.Amount.Int64()
-	implicitFee := inputAmount - totalOutputAmt
-	if implicitFee < 0 {
-		return iwallet.TransactionID(""), fmt.Errorf("outputs exceed input: input=%d, outputs=%d", inputAmount, totalOutputAmt)
-	}
-	if implicitFee == 0 {
-		return iwallet.TransactionID(""), fmt.Errorf("zero fee transaction not allowed")
-	}
-
-	// Add outputs
-	for _, out := range outputs {
-		if out.Amount.Int64() <= 0 {
-			continue
-		}
-		scriptPubKey, err := w.getPayToAddrScript(out.Address.String())
+	for _, inp := range inputs {
+		hash, err := chainhash.NewHashFromStr(inp.TxHash)
 		if err != nil {
-			return iwallet.TransactionID(""), fmt.Errorf("failed to get scriptPubKey for %s: %w", out.Address, err)
+			return nil, "", fmt.Errorf("invalid txid %s: %w", inp.TxHash, err)
 		}
-		txOut := wire.NewTxOut(out.Amount.Int64(), scriptPubKey)
-		tx.TxOut = append(tx.TxOut, txOut)
+		tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(hash, inp.OutputIndex), nil, nil))
+		totalInput += inp.Value
+	}
+	if totalInput == 0 {
+		return nil, "", errors.New("total input is zero")
 	}
 
-	// BIP 69 sorting
-	txsort.InPlaceSort(tx)
+	// P2PKH: ~148 bytes per input, ~34 bytes for output + 10 overhead
+	estimatedSize := int64(10 + len(inputs)*148 + 34)
+	fee := estimatedSize * feePerByte
+	if fee >= totalInput {
+		return nil, "", fmt.Errorf("fee (%d) exceeds total input (%d)", fee, totalInput)
+	}
 
-	// Sign the input using ZCash's signature hash
+	destScript, err := w.getPayToAddrScript(destAddress)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode dest address: %w", err)
+	}
+	tx.AddTxOut(wire.NewTxOut(totalInput-fee, destScript))
+
 	pubKey := signingKey.PubKey()
 	pubKeyHash := btc.Hash160(pubKey.SerializeCompressed())
-
-	// Create the P2PKH script for signing
 	prevScript, err := txscript.NewScriptBuilder().
 		AddOp(txscript.OP_DUP).
 		AddOp(txscript.OP_HASH160).
@@ -752,49 +733,63 @@ func (w *ZCashWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet.UTXO,
 		AddOp(txscript.OP_CHECKSIG).
 		Script()
 	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to create prev script: %w", err)
+		return nil, "", fmt.Errorf("build P2PKH script: %w", err)
 	}
 
-	// Get current block height for branch ID selection
 	chainInfo, _ := w.BlockchainInfo()
 	currentHeight := chainInfo.Height
 
-	// Sign using ZCash's rawTxInSignature
-	sig, err := rawTxInSignature(tx, 0, prevScript, txscript.SigHashAll, &signingKey, inputAmount, currentHeight)
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to sign: %w", err)
+	for i, inp := range inputs {
+		sig, sigErr := rawTxInSignature(tx, i, prevScript, txscript.SigHashAll, &signingKey, inp.Value, currentHeight)
+		if sigErr != nil {
+			return nil, "", fmt.Errorf("sign input %d: %w", i, sigErr)
+		}
+
+		builder := txscript.NewScriptBuilder()
+		builder.AddData(sig)
+		builder.AddData(pubKey.SerializeCompressed())
+		sigScript, buildErr := builder.Script()
+		if buildErr != nil {
+			return nil, "", fmt.Errorf("build sig script input %d: %w", i, buildErr)
+		}
+		tx.TxIn[i].SignatureScript = sigScript
 	}
 
-	// Build the signature script (P2PKH)
-	builder := txscript.NewScriptBuilder()
-	builder.AddData(sig)
-	builder.AddData(pubKey.SerializeCompressed())
-	sigScript, err := builder.Script()
+	txBytes, err := serializeVersion4Transaction(tx, 0)
 	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to build sig script: %w", err)
+		return nil, "", fmt.Errorf("serialize tx: %w", err)
 	}
 
-	tx.TxIn[0].SignatureScript = sigScript
-
-	// Serialize using ZCash format
-	txBytes, err := serializeVersion4Transaction(tx, 0) // 0 for no expiry
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to serialize transaction: %w", err)
-	}
-
-	// Calculate txid from serialized transaction
 	h := chainhash.DoubleHashH(txBytes)
-	txid := iwallet.TransactionID(h.String())
+	return txBytes, h.String(), nil
+}
 
-	// Broadcast via OnCommit callback
-	wbtx, ok := wtx.(*base.DBTx)
-	if !ok {
-		return txid, errors.New("tx is not expected type")
+// DerivePaymentAddressFromPubKey derives a P2PKH transparent (t-address) payment
+// address from a single public key. ZCash transparent addresses use the legacy
+// base58check format with chain-specific 2-byte prefixes (`t1` mainnet, `tm`
+// testnet for P2PKH).
+func (w *ZCashWallet) DerivePaymentAddressFromPubKey(pubKey *btcec.PublicKey) (string, []byte, error) {
+	if pubKey == nil {
+		return "", nil, errors.New("public key cannot be nil")
 	}
 
-	wbtx.OnCommit = func() error {
-		return w.ChainClient.Broadcast(txBytes)
+	pubKeyHash := btc.Hash160(pubKey.SerializeCompressed())
+
+	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, w.params())
+	if err != nil {
+		return "", nil, err
 	}
 
-	return txid, nil
+	scriptPubKey, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return addr.EncodeAddress(), scriptPubKey, nil
+}
+
+// AddressToScriptPubKey decodes an encoded ZCash transparent address into its
+// scriptPubKey.
+func (w *ZCashWallet) AddressToScriptPubKey(address string) ([]byte, error) {
+	return w.getPayToAddrScript(address)
 }

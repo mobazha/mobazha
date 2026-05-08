@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
+
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -69,6 +71,9 @@ func (m *mockGuestOrderService) CompleteGuestOrder(ctx context.Context, token st
 
 func (m *mockGuestOrderService) HandlePaymentDetected(string, string) error { return nil }
 func (m *mockGuestOrderService) HandleConfirmationUpdate(string, int) error { return nil }
+func (m *mockGuestOrderService) HandleLatePayment(string, string, string, uint64, uint64) error {
+	return nil
+}
 func (m *mockGuestOrderService) CleanupExpiredOrders(context.Context)       {}
 func (m *mockGuestOrderService) AutoCompleteOrders(context.Context)         {}
 func (m *mockGuestOrderService) RunGuestCleanupOnce()                       {}
@@ -285,7 +290,7 @@ func TestGETGuestOrderStatus_Found(t *testing.T) {
 func TestGETGuestOrderStatus_NotFound(t *testing.T) {
 	svc := &mockGuestOrderService{
 		getGuestOrderStatusFunc: func(context.Context, string) (*contracts.GuestOrderStatusResponse, error) {
-			return nil, errors.New("not found")
+			return nil, gorm.ErrRecordNotFound
 		},
 	}
 	ts := guestTestServer(t, svc)

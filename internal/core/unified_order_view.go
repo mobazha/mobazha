@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
@@ -24,10 +25,11 @@ type standardOrderFetcher interface {
 type UnifiedOrderView struct {
 	orderSvc standardOrderFetcher
 	guestSvc contracts.GuestOrderService
+	db       database.Database
 }
 
-func NewUnifiedOrderView(orderSvc standardOrderFetcher, guestSvc contracts.GuestOrderService) *UnifiedOrderView {
-	return &UnifiedOrderView{orderSvc: orderSvc, guestSvc: guestSvc}
+func NewUnifiedOrderView(orderSvc standardOrderFetcher, guestSvc contracts.GuestOrderService, db database.Database) *UnifiedOrderView {
+	return &UnifiedOrderView{orderSvc: orderSvc, guestSvc: guestSvc, db: db}
 }
 
 // ListOrders returns a merged, sorted, and paginated list of orders.
@@ -193,7 +195,7 @@ func (v *UnifiedOrderView) fetchGuest(ctx context.Context, f contracts.OrderList
 
 	filter := contracts.GuestOrderFilter{
 		Page:     0,
-		PageSize: 1000,
+		PageSize: 10000,
 	}
 	if f.State != "" {
 		if st, ok := models.ParseGuestOrderState(f.State); ok {
@@ -206,14 +208,44 @@ func (v *UnifiedOrderView) fetchGuest(ctx context.Context, f contracts.OrderList
 		return nil, 0, err
 	}
 
+	sweepMap := v.batchSweepStatuses(orders)
+
 	out := make([]contracts.OrderSummary, 0, len(orders))
 	for _, g := range orders {
-		out = append(out, convertGuestOrder(g))
+		out = append(out, convertGuestOrder(g, sweepMap[g.OrderToken]))
 	}
 	return out, total, nil
 }
 
-func convertGuestOrder(g models.GuestOrder) contracts.OrderSummary {
+func (v *UnifiedOrderView) batchSweepStatuses(orders []models.GuestOrder) map[string]string {
+	result := make(map[string]string, len(orders))
+	if v.db == nil || len(orders) == 0 {
+		return result
+	}
+
+	tokens := make([]string, 0, len(orders))
+	for _, o := range orders {
+		if o.SweepToAddress != "" {
+			tokens = append(tokens, o.OrderToken)
+		}
+	}
+	if len(tokens) == 0 {
+		return result
+	}
+
+	var tasks []models.SweepTask
+	_ = v.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_token IN ?", tokens).
+			Select("order_token, status").Find(&tasks).Error
+	})
+
+	for _, t := range tasks {
+		result[t.OrderToken] = string(t.Status)
+	}
+	return result
+}
+
+func convertGuestOrder(g models.GuestOrder, sweepStatus string) contracts.OrderSummary {
 	items := make([]contracts.ItemBrief, 0, len(g.Items))
 	for _, it := range g.Items {
 		items = append(items, contracts.ItemBrief{
@@ -227,8 +259,7 @@ func convertGuestOrder(g models.GuestOrder) contracts.OrderSummary {
 		buyerName = g.ContactEmail
 	}
 
-	sweepStatus := ""
-	if g.SweepToAddress != "" {
+	if sweepStatus == "" && g.SweepToAddress != "" {
 		sweepStatus = "pending"
 	}
 

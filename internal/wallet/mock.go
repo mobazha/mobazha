@@ -407,9 +407,7 @@ func (w *MockWallet) WalletExists() bool {
 //
 // The birthday can be used determine where to sync state from if
 // appropriate.
-//
-// The pw parameter is unused (WalletCrypter is deprecated) and will always be nil.
-func (w *MockWallet) CreateWallet(xpriv hd.ExtendedKey, pw []byte, birthday time.Time) error {
+func (w *MockWallet) CreateWallet(xpriv hd.ExtendedKey, birthday time.Time) error {
 	return nil
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,6 +106,14 @@ func (m *mockUTXOPaymentSource) EstimateFee(ctx context.Context, targetBlocks in
 
 func (m *mockUTXOPaymentSource) BroadcastTransaction(ctx context.Context, txHex string) (string, error) {
 	return "mock_broadcast_txid", nil
+}
+
+func (m *mockUTXOPaymentSource) ListUnspent(_ context.Context, _ []byte) ([]pkgutxo.UnspentOutput, error) {
+	return nil, nil
+}
+
+func (m *mockUTXOPaymentSource) GetTxConfirmations(_ context.Context, _ string) (int, error) {
+	return 0, nil
 }
 
 // SimulatePayment simulates a payment being detected

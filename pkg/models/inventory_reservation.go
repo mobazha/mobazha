@@ -9,8 +9,10 @@ type InventoryReservation struct {
 	ID          int       `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	OrderRef    string    `gorm:"index" json:"orderRef"`
 	OrderType   string    `gorm:"index" json:"orderType"`
-	ListingSlug string    `gorm:"index" json:"listingSlug"`
-	VariantHash string    `json:"variantHash"`
+	ListingSlug string    `gorm:"index;index:idx_reservation_variant" json:"listingSlug"`
+	// VariantHash scopes inventory to a specific variant (empty for listings
+	// without SKUs). Combined with ListingSlug it forms the inventory bucket key.
+	VariantHash string    `gorm:"index:idx_reservation_variant" json:"variantHash"`
 	Quantity    int       `json:"quantity"`
 	ReservedAt  time.Time `json:"reservedAt"`
 	ExpiresAt   time.Time `gorm:"index" json:"expiresAt"`

@@ -29,17 +29,8 @@ var _ = iwallet.Wallet(&LitecoinWallet{})
 
 var _ = iwallet.UTXOEscrow(&LitecoinWallet{})
 var _ = iwallet.UTXOEscrowWithTimeout(&LitecoinWallet{})
-var _ = iwallet.UTXODirectPayment(&LitecoinWallet{})
-
-const (
-	divisibility           = 8
-	averageTransactionSize = 350
-	maxFeePerByte          = 200
-	priorityTarget         = 1
-	normalTarget           = 0.6
-	economicTarget         = 0.4
-	superEconomicTarget    = 0.2
-)
+var _ = iwallet.UTXOSweeper(&LitecoinWallet{})
+var _ iwallet.UTXOAddressUtilities = (*LitecoinWallet)(nil)
 
 // LitecoinWallet extends wallet base and implements the
 // remaining functions for each interface.
@@ -471,65 +462,43 @@ func serializeOutpoint(op *wire.OutPoint) []byte {
 	return append(op.Hash[:], i...)
 }
 
-// SpendFromDerivedAddress spends funds from an HD-derived address (identified by utxo)
-// to multiple outputs using a single private key.
-// Note: DIRECT payment mode has been removed. This method is retained for potential future use.
-//
-// Network fee handling: In UTXO model, fee = inputs - outputs.
-// The caller must pre-calculate outputs to leave the desired fee as the difference.
-// This function does NOT calculate or deduct fees - it uses exact output amounts provided.
-func (w *LitecoinWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet.UTXO, outputs []iwallet.SpendInfo, signingKey btcec.PrivateKey, _ iwallet.FeeLevel) (iwallet.TransactionID, error) {
-	// Build the transaction
+// BuildSweepTx builds and signs a P2WPKH sweep transaction that spends all
+// provided inputs to a single destination address minus fee.
+func (w *LitecoinWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, destAddress string, feePerByte int64) ([]byte, string, error) {
+	if len(inputs) == 0 {
+		return nil, "", errors.New("no inputs provided")
+	}
+
 	tx := wire.NewMsgTx(wire.TxVersion)
+	var totalInput int64
 
-	// Add the input
-	txidHash, err := chainhash.NewHashFromStr(string(utxo.TxID))
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("invalid txid: %w", err)
-	}
-	outpoint := wire.NewOutPoint(txidHash, utxo.OutputIndex)
-	txIn := wire.NewTxIn(outpoint, nil, nil)
-	tx.TxIn = append(tx.TxIn, txIn)
-
-	// Calculate total output amount
-	var totalOutputAmt int64
-	for _, out := range outputs {
-		totalOutputAmt += out.Amount.Int64()
-	}
-
-	// Verify: outputs must be less than input (difference becomes network fee)
-	inputAmount := utxo.Amount.Int64()
-	implicitFee := inputAmount - totalOutputAmt
-	if implicitFee < 0 {
-		return iwallet.TransactionID(""), fmt.Errorf("outputs exceed input: input=%d, outputs=%d", inputAmount, totalOutputAmt)
-	}
-	if implicitFee == 0 {
-		return iwallet.TransactionID(""), fmt.Errorf("zero fee transaction not allowed")
-	}
-
-	// Add outputs
-	for _, out := range outputs {
-		if out.Amount.Int64() <= 0 {
-			continue
-		}
-		scriptPubKey, err := w.getPayToAddrScript(out.Address.String())
+	for _, inp := range inputs {
+		hash, err := chainhash.NewHashFromStr(inp.TxHash)
 		if err != nil {
-			return iwallet.TransactionID(""), fmt.Errorf("failed to get scriptPubKey for %s: %w", out.Address, err)
+			return nil, "", fmt.Errorf("invalid txid %s: %w", inp.TxHash, err)
 		}
-		txOut := wire.NewTxOut(out.Amount.Int64(), scriptPubKey)
-		tx.TxOut = append(tx.TxOut, txOut)
+		tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(hash, inp.OutputIndex), nil, nil))
+		totalInput += inp.Value
+	}
+	if totalInput == 0 {
+		return nil, "", errors.New("total input is zero")
 	}
 
-	// BIP 69 sorting
-	txsort.InPlaceSort(tx)
+	estimatedSize := int64(10 + len(inputs)*68 + 31)
+	fee := estimatedSize * feePerByte
+	if fee >= totalInput {
+		return nil, "", fmt.Errorf("fee (%d) exceeds total input (%d)", fee, totalInput)
+	}
 
-	// Sign the input
-	// For P2WPKH, we need the public key and create a witness signature
+	destScript, err := w.getPayToAddrScript(destAddress)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode dest address: %w", err)
+	}
+	tx.AddTxOut(wire.NewTxOut(totalInput-fee, destScript))
+
 	pubKey := signingKey.PubKey()
 	pubKeyHash := ltcutil.Hash160(pubKey.SerializeCompressed())
-
-	// Create the P2WPKH script for signing (same as scriptPubKey for P2WPKH)
-	witnessScript, err := txscript.NewScriptBuilder().
+	p2pkhScriptCode, err := txscript.NewScriptBuilder().
 		AddOp(txscript.OP_DUP).
 		AddOp(txscript.OP_HASH160).
 		AddData(pubKeyHash).
@@ -537,49 +506,56 @@ func (w *LitecoinWallet) SpendFromDerivedAddress(wtx iwallet.Tx, utxo iwallet.UT
 		AddOp(txscript.OP_CHECKSIG).
 		Script()
 	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to create witness script: %w", err)
+		return nil, "", fmt.Errorf("build P2PKH scriptCode: %w", err)
 	}
 
-	// Convert btcec key to ltcec key for signing
 	ltcPrivKey, _ := ltcec.PrivKeyFromBytes(signingKey.Serialize())
 
-	// Sign the transaction using Litecoin's txscript
-	sig, err := txscript.RawTxInWitnessSignature(
-		tx,
-		txscript.NewTxSigHashes(tx),
-		0, // input index
-		inputAmount,
-		witnessScript,
-		txscript.SigHashAll,
-		ltcPrivKey,
-	)
-	if err != nil {
-		return iwallet.TransactionID(""), fmt.Errorf("failed to sign transaction: %w", err)
+	for i, inp := range inputs {
+		witnessScript, sigErr := txscript.WitnessSignature(
+			tx, txscript.NewTxSigHashes(tx),
+			i, inp.Value, p2pkhScriptCode, txscript.SigHashAll, ltcPrivKey, true,
+		)
+		if sigErr != nil {
+			return nil, "", fmt.Errorf("sign input %d: %w", i, sigErr)
+		}
+		tx.TxIn[i].Witness = witnessScript
 	}
 
-	// Set the witness data
-	tx.TxIn[0].Witness = wire.TxWitness{
-		sig,
-		pubKey.SerializeCompressed(),
-	}
-
-	txid := iwallet.TransactionID(tx.TxHash().String())
-
-	// Serialize the transaction
 	var buf bytes.Buffer
-	if err := tx.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding); err != nil {
-		return txid, fmt.Errorf("failed to encode transaction: %w", err)
+	if err := tx.Serialize(&buf); err != nil {
+		return nil, "", fmt.Errorf("serialize tx: %w", err)
+	}
+	return buf.Bytes(), tx.TxHash().String(), nil
+}
+
+// DerivePaymentAddressFromPubKey derives a P2WPKH (native Segwit, bech32) payment
+// address from a single public key. The encoded address uses the wallet's
+// configured network HRP (`ltc` for mainnet, `tltc` for testnet).
+func (w *LitecoinWallet) DerivePaymentAddressFromPubKey(pubKey *btcec.PublicKey) (string, []byte, error) {
+	if pubKey == nil {
+		return "", nil, errors.New("public key cannot be nil")
 	}
 
-	// Broadcast via OnCommit callback
-	wbtx, ok := wtx.(*base.DBTx)
-	if !ok {
-		return txid, errors.New("tx is not expected type")
+	pubKeyHash := ltcutil.Hash160(pubKey.SerializeCompressed())
+
+	scriptPubKey, err := txscript.NewScriptBuilder().
+		AddOp(txscript.OP_0).
+		AddData(pubKeyHash).
+		Script()
+	if err != nil {
+		return "", nil, err
 	}
 
-	wbtx.OnCommit = func() error {
-		return w.ChainClient.Broadcast(buf.Bytes())
+	addr, err := ltcutil.NewAddressWitnessPubKeyHash(pubKeyHash, w.params())
+	if err != nil {
+		return "", nil, err
 	}
 
-	return txid, nil
+	return addr.EncodeAddress(), scriptPubKey, nil
+}
+
+// AddressToScriptPubKey decodes an encoded LTC address into its scriptPubKey.
+func (w *LitecoinWallet) AddressToScriptPubKey(address string) ([]byte, error) {
+	return w.getPayToAddrScript(address)
 }

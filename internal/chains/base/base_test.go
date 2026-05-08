@@ -45,7 +45,7 @@ func TestWalletBase_WalletExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := w.CreateWallet(*xpriv, nil, time.Now()); err != nil {
+	if err := w.CreateWallet(*xpriv, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -65,7 +65,7 @@ func TestWalletBase_OpenCloseWallet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := w.CreateWallet(*xpriv, nil, time.Now()); err != nil {
+	if err := w.CreateWallet(*xpriv, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 

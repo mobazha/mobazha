@@ -57,7 +57,7 @@ func newTestWallet() (*BitcoinCashWallet, error) {
 		return nil, err
 	}
 
-	if err := w.CreateWallet(*key, nil, time.Now()); err != nil {
+	if err := w.CreateWallet(*key, time.Now()); err != nil {
 		return nil, err
 	}
 
@@ -674,5 +674,80 @@ func TestBitcoinCashWallet_ReleaseFundsAfterTimeout(t *testing.T) {
 	}
 	if err := vm.Execute(); err != nil {
 		t.Errorf("Script verificationf failed: %s", err)
+	}
+}
+
+// --- UTXOAddressUtilities tests ---
+
+const (
+	testBCHPubKeyHex      = "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c"
+	testBCHMainnetAddress = "qrqva0xkc0fu4rr4m30vvt4725esa7gsug52ypqews"
+	testBCHTestnetAddress = "qrqva0xkc0fu4rr4m30vvt4725esa7gsugscqxzwfv"
+)
+
+func TestBitcoinCashWallet_DerivePaymentAddressFromPubKey_Mainnet(t *testing.T) {
+	w := &BitcoinCashWallet{testnet: false}
+
+	pubKeyBytes, _ := hex.DecodeString(testBCHPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, scriptPubKey, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+	if addr != testBCHMainnetAddress {
+		t.Errorf("address mismatch: got %s, want %s", addr, testBCHMainnetAddress)
+	}
+	if len(scriptPubKey) != 25 {
+		t.Errorf("expected 25-byte P2PKH scriptPubKey, got %d bytes", len(scriptPubKey))
+	}
+}
+
+func TestBitcoinCashWallet_DerivePaymentAddressFromPubKey_Testnet(t *testing.T) {
+	w := &BitcoinCashWallet{testnet: true}
+
+	pubKeyBytes, _ := hex.DecodeString(testBCHPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, _, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatalf("DerivePaymentAddressFromPubKey: %v", err)
+	}
+	if addr != testBCHTestnetAddress {
+		t.Errorf("address mismatch: got %s, want %s", addr, testBCHTestnetAddress)
+	}
+}
+
+func TestBitcoinCashWallet_DerivePaymentAddressFromPubKey_NilPubKey(t *testing.T) {
+	w := &BitcoinCashWallet{testnet: true}
+	if _, _, err := w.DerivePaymentAddressFromPubKey(nil); err == nil {
+		t.Errorf("expected error for nil pubkey")
+	}
+}
+
+func TestBitcoinCashWallet_AddressToScriptPubKey_RoundTrip(t *testing.T) {
+	w := &BitcoinCashWallet{testnet: false}
+
+	pubKeyBytes, _ := hex.DecodeString(testBCHPubKeyHex)
+	pubKey, _ := btcec.ParsePubKey(pubKeyBytes)
+
+	addr, expected, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := w.AddressToScriptPubKey(addr)
+	if err != nil {
+		t.Fatalf("AddressToScriptPubKey: %v", err)
+	}
+	if !bytes.Equal(got, expected) {
+		t.Errorf("scriptPubKey mismatch: derive=%x, decoded=%x", expected, got)
+	}
+}
+
+func TestBitcoinCashWallet_AddressToScriptPubKey_Invalid(t *testing.T) {
+	w := &BitcoinCashWallet{testnet: true}
+	if _, err := w.AddressToScriptPubKey(testInvalidAddress); err == nil {
+		t.Errorf("expected error for invalid address")
 	}
 }

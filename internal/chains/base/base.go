@@ -119,8 +119,7 @@ func (w *WalletBase) WalletExists() bool {
 }
 
 // CreateWallet initializes the wallet by storing key material in the in-memory KeyStore.
-// The pw parameter is unused (WalletCrypter is deprecated) and will always be nil.
-func (w *WalletBase) CreateWallet(xpriv hd.ExtendedKey, pw []byte, birthday time.Time) error {
+func (w *WalletBase) CreateWallet(xpriv hd.ExtendedKey, birthday time.Time) error {
 	xpub, err := xpriv.Neuter()
 	if err != nil {
 		return err
@@ -183,4 +182,3 @@ func (w *WalletBase) GetTransaction(id iwallet.TransactionID, coinType iwallet.C
 	}
 	return w.ChainClient.GetTransaction(id, coinType)
 }
-

@@ -162,9 +162,13 @@ type GuestOrderItem struct {
 
 	ListingHash   string `json:"listingHash"`
 	ListingTitle  string `json:"listingTitle"`
-	ListingSlug   string `json:"listingSlug"`
+	ListingSlug   string `gorm:"index:idx_guest_item_variant" json:"listingSlug"`
 	Quantity      int    `json:"quantity"`
 	VariantOptions []byte `json:"-"`
+	// VariantHash is a stable hash of the buyer's variant options
+	// (empty for listings without SKUs). Used in conjunction with
+	// ListingSlug to scope inventory reservations per variant.
+	VariantHash   string `gorm:"index:idx_guest_item_variant" json:"variantHash,omitempty"`
 	UnitPrice     uint64 `json:"unitPrice"`
 	ItemTotal     uint64 `json:"itemTotal"`
 	PriceCurrency string `json:"priceCurrency"`

@@ -12,18 +12,20 @@ import (
 )
 
 func (g *Gateway) handleGETSystemDoctor(w http.ResponseWriter, r *http.Request) {
-	dataDir := g.setupDataDir()
-
 	cfg := doctor.DefaultConfig()
-	cfg.DataDir = dataDir
+	cfg.DataDir = g.setupDataDir()
 
-	if portStr := os.Getenv("NODE_PORT"); portStr != "" {
-		if p, err := strconv.Atoi(portStr); err == nil {
-			cfg.NodePort = p
+	if detectDeploymentMode() == "private_distribution" {
+		cfg.SkipNetworkChecks = true
+	} else {
+		if portStr := os.Getenv("NODE_PORT"); portStr != "" {
+			if p, err := strconv.Atoi(portStr); err == nil {
+				cfg.NodePort = p
+			}
 		}
-	}
-	if saasURL := os.Getenv("SAAS_API_URL"); saasURL != "" {
-		cfg.SaaSURL = saasURL
+		if saasURL := os.Getenv("SAAS_API_URL"); saasURL != "" {
+			cfg.SaaSURL = saasURL
+		}
 	}
 
 	runner := doctor.NewRunner(cfg)
@@ -43,13 +45,17 @@ func (g *Gateway) handleGETSystemDiagnostics(w http.ResponseWriter, r *http.Requ
 	cfg := doctor.DefaultConfig()
 	cfg.DataDir = dataDir
 
-	if portStr := os.Getenv("NODE_PORT"); portStr != "" {
-		if p, err := strconv.Atoi(portStr); err == nil {
-			cfg.NodePort = p
+	if detectDeploymentMode() == "private_distribution" {
+		cfg.SkipNetworkChecks = true
+	} else {
+		if portStr := os.Getenv("NODE_PORT"); portStr != "" {
+			if p, err := strconv.Atoi(portStr); err == nil {
+				cfg.NodePort = p
+			}
 		}
-	}
-	if saasURL := os.Getenv("SAAS_API_URL"); saasURL != "" {
-		cfg.SaaSURL = saasURL
+		if saasURL := os.Getenv("SAAS_API_URL"); saasURL != "" {
+			cfg.SaaSURL = saasURL
+		}
 	}
 
 	runner := doctor.NewRunner(cfg)

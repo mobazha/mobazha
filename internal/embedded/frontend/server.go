@@ -41,6 +41,10 @@ type ServerConfig struct {
 	// switches the frontend to standalone mode.
 	SaaSURL string
 
+	// PrivateDistributionMode enables extreme privacy headers (CSP, no-store,
+	// no-referrer) and a stripped-down runtime-config.js payload.
+	PrivateDistributionMode bool
+
 	// FeaturesSnapshotFn returns the current set of feature flags and
 	// their effective values for the requesting caller. It is invoked
 	// per /runtime-config.js request so resolver updates (via PUT
@@ -63,6 +67,7 @@ func NewHandler(cfg ServerConfig) http.Handler {
 		embedded:           embeddedSub,
 		overrideDir:        cfg.OverrideDir,
 		saasURL:            cfg.SaaSURL,
+		private_distributionMode:        cfg.PrivateDistributionMode,
 		featuresSnapshotFn: cfg.FeaturesSnapshotFn,
 	}
 }
@@ -71,10 +76,15 @@ type spaHandler struct {
 	embedded           fs.FS
 	overrideDir        string
 	saasURL            string
+	private_distributionMode        bool
 	featuresSnapshotFn func(context.Context) []FeatureSnapshot
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h.private_distributionMode {
+		h.setPrivateDistributionSecurityHeaders(w, r)
+	}
+
 	if r.URL.Path == "/runtime-config.js" {
 		h.serveRuntimeConfig(w, r)
 		return
@@ -164,6 +174,33 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
+// private_distributionCSP is the Content-Security-Policy for PrivateDistribution mode.
+// It blocks all external resource loading — only same-origin and
+// local RPC endpoints (127.0.0.1) are permitted.
+const private_distributionCSP = "default-src 'self'; " +
+	"connect-src 'self' http://127.0.0.1:*; " +
+	"img-src 'self' data:; " +
+	"script-src 'self'; " +
+	"style-src 'self' 'unsafe-inline'; " +
+	"font-src 'self'; " +
+	"frame-src 'none'; " +
+	"object-src 'none'; " +
+	"base-uri 'self'"
+
+func (h *spaHandler) setPrivateDistributionSecurityHeaders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Security-Policy", private_distributionCSP)
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+
+	path := r.URL.Path
+	if strings.HasPrefix(path, "/admin") ||
+		strings.HasPrefix(path, "/guest-order") ||
+		path == "/runtime-config.js" {
+		w.Header().Set("Cache-Control", "no-store")
+	}
+}
+
 // runtimeFeatureEntry is the per-feature shape inside
 // window.__RUNTIME_CONFIG__.features. Keep it aligned with
 // FEATURE_FLAG_ARCHITECTURE.md §4.3 and the frontend's
@@ -181,10 +218,11 @@ type runtimeFeatureEntry struct {
 // featureFlags service ships (Phase B of ff-impl-frontend), these flat
 // fields move to TECHDEBT(TD-032) and get removed in Phase E.
 type runtimeConfigPayload struct {
-	SaasURL              string                         `json:"saasUrl"`
+	SaasURL              string                         `json:"saasUrl,omitempty"`
 	AuthMode             string                         `json:"authMode"`
 	GuestCheckoutEnabled bool                           `json:"guestCheckoutEnabled"`
 	Features             map[string]runtimeFeatureEntry `json:"features"`
+	PrivateDistributionMode          bool                           `json:"private_distributionMode,omitempty"`
 }
 
 // serveRuntimeConfig emits a JS snippet that assigns window.__RUNTIME_CONFIG__
@@ -193,11 +231,10 @@ type runtimeConfigPayload struct {
 // escaped — do not revert to fmt.Fprintf string interpolation.
 func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/javascript")
-	w.Header().Set("Cache-Control", "no-cache")
-
-	saasURL := h.saasURL
-	if saasURL == "" {
-		saasURL = "https://app.mobazha.org"
+	if h.private_distributionMode {
+		w.Header().Set("Cache-Control", "no-store")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache")
 	}
 
 	features := map[string]runtimeFeatureEntry{}
@@ -225,19 +262,38 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	payload := runtimeConfigPayload{
-		SaasURL:              saasURL,
-		AuthMode:             "standalone",
-		GuestCheckoutEnabled: guestCheckoutEnabled,
-		Features:             features,
+	var payload runtimeConfigPayload
+	if h.private_distributionMode {
+		payload = runtimeConfigPayload{
+			AuthMode:             "standalone",
+			GuestCheckoutEnabled: true,
+			Features:             features,
+			PrivateDistributionMode:          true,
+		}
+	} else {
+		saasURL := h.saasURL
+		if saasURL == "" {
+			saasURL = "https://app.mobazha.org"
+		}
+		payload = runtimeConfigPayload{
+			SaasURL:              saasURL,
+			AuthMode:             "standalone",
+			GuestCheckoutEnabled: guestCheckoutEnabled,
+			Features:             features,
+		}
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		// Marshal can only fail on unsupported types; payload is all
-		// plain strings/bools/maps. Fall back to a minimal static config
-		// rather than a 500 so the SPA still boots.
-		fmt.Fprintf(w, `window.__RUNTIME_CONFIG__={saasUrl:%q,authMode:"standalone",guestCheckoutEnabled:false,features:{}};`, saasURL)
+		if h.private_distributionMode {
+			fmt.Fprint(w, `window.__RUNTIME_CONFIG__={authMode:"standalone",guestCheckoutEnabled:true,private_distributionMode:true,features:{}};`)
+		} else {
+			saasURL := h.saasURL
+			if saasURL == "" {
+				saasURL = "https://app.mobazha.org"
+			}
+			fmt.Fprintf(w, `window.__RUNTIME_CONFIG__={saasUrl:%q,authMode:"standalone",guestCheckoutEnabled:false,features:{}};`, saasURL)
+		}
 		return
 	}
 

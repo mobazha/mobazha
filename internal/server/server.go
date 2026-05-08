@@ -47,6 +47,10 @@ type Config struct {
 	// directory instead of the embedded SPA.
 	FrontendOverrideDir string
 
+	// PrivateDistributionMode, when true, enables extreme privacy headers (CSP,
+	// no-store, no-referrer) and a stripped-down runtime-config.js payload.
+	PrivateDistributionMode bool
+
 	// FeaturesSnapshotFn, when set, is invoked per-request from the
 	// embedded frontend's /runtime-config.js handler so toggles via
 	// PUT /v1/settings/features/{key} or PATCH /platform/v1/features/{key}
@@ -68,6 +72,7 @@ type Server struct {
 func New(cfg Config) *Server {
 	feHandler := frontend.NewHandler(frontend.ServerConfig{
 		OverrideDir:        cfg.FrontendOverrideDir,
+		PrivateDistributionMode:        cfg.PrivateDistributionMode,
 		FeaturesSnapshotFn: cfg.FeaturesSnapshotFn,
 	})
 

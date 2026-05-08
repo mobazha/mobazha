@@ -236,6 +236,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 		ssrHandler.RegisterRoutes(topMux)
 	} else if frontend.HasContent() {
 		feHandler := frontend.NewHandler(frontend.ServerConfig{
+			PrivateDistributionMode:        detectDeploymentMode() == "private_distribution",
 			FeaturesSnapshotFn: featuresSnapshotFromNodeManager(nodeManager),
 		})
 		topMux.Handle("/", feHandler)

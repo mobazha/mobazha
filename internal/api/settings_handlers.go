@@ -4,42 +4,12 @@ package api
 
 import (
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
-
-type nodeConfig struct {
-	PeerID  string   `json:"peerID"`
-	Testnet bool     `json:"testnet"`
-	Tor     bool     `json:"tor"`
-	Wallets []string `json:"wallets"`
-}
-
-func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
-	identity := getIdentityService(r)
-
-	ret := nodeConfig{
-		PeerID:  identity.Identity().String(),
-		Testnet: identity.UsingTestnet(),
-	}
-
-	// Tor and Wallets are only available on full nodes (CoreIface).
-	// In SaaS mode these default to false/empty, which is correct.
-	if ci, ok := getCoreIface(r); ok {
-		ret.Tor = ci.UsingTorMode()
-		if mw := ci.Multiwallet(); mw != nil {
-			for _, chain := range mw.SupportedChains() {
-				ret.Wallets = append(ret.Wallets, chain.String())
-			}
-		}
-	}
-
-	sanitizedJSONResponse(w, &ret)
-}
 
 func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request) {
 	exchange := getExchangeRateService(r)
@@ -79,19 +49,6 @@ func (g *Gateway) handlePOSTPurgeCache(w http.ResponseWriter, r *http.Request) {
 	node := getNodeService(r)
 
 	node.Publish(nil)
-
-	sanitizedStringResponse(w, "{}")
-}
-
-func (g *Gateway) handlePOSTShutdown(w http.ResponseWriter, r *http.Request) {
-	node, ok := getCoreIface(r)
-	if !ok {
-		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Not available in SaaS mode")
-		return
-	}
-
-	node.Stop(true)
-	os.Exit(1)
 
 	sanitizedStringResponse(w, "{}")
 }

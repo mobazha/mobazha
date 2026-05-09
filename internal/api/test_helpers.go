@@ -89,7 +89,7 @@ func runAPITests(t *testing.T, tests apiTests) {
 		config: &GatewayConfig{},
 	}
 	outer := chi.NewMux()
-	outer.Mount("/", gateway.newV1Router(false))
+	outer.Mount("/", gateway.newV1Router(false, false))
 
 	ts := httptest.NewServer(outer)
 	defer ts.Close()

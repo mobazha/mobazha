@@ -10,6 +10,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -179,7 +180,7 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinType))
 	if err != nil {
-		log.Warningf("unknown coin type %q (order %s) — cannot monitor", coinType, order.OrderToken)
+		log.Warningf("unknown coin type %q (order %s) — cannot monitor", coinType, redact.Token(order.OrderToken))
 		return
 	}
 
@@ -190,7 +191,7 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 			m.watches[order.OrderToken] = cancel
 			go m.pollEVMLoop(ctx, order)
 		} else {
-			log.Warningf("no EVM/TRON balance checker for coin %q (order %s) — will retry on RestoreWatches", coinType, order.OrderToken)
+			log.Warningf("no EVM/TRON balance checker for coin %q (order %s) — will retry on RestoreWatches", coinType, redact.Token(order.OrderToken))
 		}
 
 	case coinInfo.Chain.IsUTXOChain():
@@ -199,11 +200,11 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 			m.watches[order.OrderToken] = cancel
 			go m.watchUTXOOrder(ctx, order)
 		} else {
-			log.Warningf("no UTXO monitor for coin %q (order %s) — will retry on RestoreWatches", coinType, order.OrderToken)
+			log.Warningf("no UTXO monitor for coin %q (order %s) — will retry on RestoreWatches", coinType, redact.Token(order.OrderToken))
 		}
 
 	default:
-		log.Warningf("no monitor strategy for coin %q (order %s)", coinType, order.OrderToken)
+		log.Warningf("no monitor strategy for coin %q (order %s)", coinType, redact.Token(order.OrderToken))
 	}
 }
 
@@ -237,13 +238,13 @@ func (m *GuestPaymentMonitor) checkBalancePayment(ctx context.Context, order *mo
 
 	expectedAmount := new(big.Int)
 	if _, ok := expectedAmount.SetString(order.PaymentAmount, 10); !ok {
-		log.Warningf("invalid payment amount %q for order %s", order.PaymentAmount, order.OrderToken)
+		log.Warningf("invalid payment amount %q for order %s", order.PaymentAmount, redact.Token(order.OrderToken))
 		return false
 	}
 
 	if balance.Cmp(expectedAmount) >= 0 {
 		if err := m.guestService.HandlePaymentDetected(order.OrderToken, ""); err != nil {
-			log.Warningf("handle payment detected for %s (%s): %v", order.OrderToken, order.PaymentCoin, err)
+			log.Warningf("handle payment detected for %s (%s): %v", redact.Token(order.OrderToken), order.PaymentCoin, err)
 			return false
 		}
 		return true
@@ -282,7 +283,7 @@ func (m *GuestPaymentMonitor) checkSolanaPayment(ctx context.Context, order *mod
 	}
 
 	if err := m.guestService.HandlePaymentDetected(order.OrderToken, txHash); err != nil {
-		log.Warningf("handle Solana payment detected for %s: %v", order.OrderToken, err)
+		log.Warningf("handle Solana payment detected for %s: %v", redact.Token(order.OrderToken), err)
 		return false
 	}
 	return true
@@ -302,23 +303,23 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(order.PaymentCoin))
 	if err != nil {
-		log.Warningf("parse coin type for %s: %v", order.OrderToken, err)
+		log.Warningf("parse coin type for %s: %v", redact.Token(order.OrderToken), err)
 		return
 	}
 	utils, err := utxoAddressUtilsFor(m.multiwallet, coinInfo.Chain)
 	if err != nil {
-		log.Warningf("UTXO wallet for %s unavailable: %v", order.OrderToken, err)
+		log.Warningf("UTXO wallet for %s unavailable: %v", redact.Token(order.OrderToken), err)
 		return
 	}
 	scriptPubKey, err := utils.AddressToScriptPubKey(order.PaymentAddress)
 	if err != nil {
-		log.Warningf("compute scriptPubKey for %s: %v", order.OrderToken, err)
+		log.Warningf("compute scriptPubKey for %s: %v", redact.Token(order.OrderToken), err)
 		return
 	}
 
 	expectedAmount, ok := parsePaymentAmount(order.PaymentAmount)
 	if !ok {
-		log.Warningf("invalid payment amount %q for order %s", order.PaymentAmount, order.OrderToken)
+		log.Warningf("invalid payment amount %q for order %s", order.PaymentAmount, redact.Token(order.OrderToken))
 		return
 	}
 
@@ -337,11 +338,11 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 			switch status {
 			case pkgutxo.PaymentStatusNormal, pkgutxo.PaymentStatusOverpay:
 				if status == pkgutxo.PaymentStatusOverpay {
-					log.Warningf("overpayment for guest order %s: paid=%d expected=%d tx=%s",
-						order.OrderToken, paid, expectedAmount, txHash)
+				log.Warningf("overpayment for guest order %s: paid=%d expected=%d tx=%s",
+					redact.Token(order.OrderToken), paid, expectedAmount, txHash)
 				}
 				if err := m.guestService.HandlePaymentDetected(order.OrderToken, txHash); err != nil {
-					log.Warningf("handle UTXO payment detected for %s: %v", order.OrderToken, err)
+					log.Warningf("handle UTXO payment detected for %s: %v", redact.Token(order.OrderToken), err)
 					return
 				}
 				select {
@@ -350,20 +351,20 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 				}
 			case pkgutxo.PaymentStatusPartial:
 				if err := m.guestService.HandleLatePayment(order.OrderToken, txHash, "partial", paid, expectedAmount); err != nil {
-					log.Warningf("record partial payment for %s: %v", order.OrderToken, err)
+					log.Warningf("record partial payment for %s: %v", redact.Token(order.OrderToken), err)
 				}
 			case pkgutxo.PaymentStatusExpired:
 				if err := m.guestService.HandleLatePayment(order.OrderToken, txHash, "expired", paid, expectedAmount); err != nil {
-					log.Warningf("record expired-window payment for %s: %v", order.OrderToken, err)
+					log.Warningf("record expired-window payment for %s: %v", redact.Token(order.OrderToken), err)
 				}
 			default:
-				log.Warningf("unknown payment status %v for guest order %s", status, order.OrderToken)
+				log.Warningf("unknown payment status %v for guest order %s", status, redact.Token(order.OrderToken))
 			}
 		},
 	}
 
 	if err := m.utxoMonitor.WatchAddress(wa); err != nil {
-		log.Warningf("watch UTXO address for %s: %v", order.OrderToken, err)
+		log.Warningf("watch UTXO address for %s: %v", redact.Token(order.OrderToken), err)
 		return
 	}
 
@@ -373,7 +374,7 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 	// transactions (top-ups, double-spends) are handled correctly.
 	if order.State == models.GuestOrderPaymentDetected && order.PaymentTxHash != "" {
 		log.Infof("restored PAYMENT_DETECTED order %s — resuming confirmation polling for tx %s",
-			order.OrderToken, order.PaymentTxHash)
+			redact.Token(order.OrderToken), order.PaymentTxHash)
 		m.pollConfirmations(ctx, coinInfo.Chain, order.OrderToken, order.PaymentTxHash)
 		_ = m.utxoMonitor.UnwatchAddress(order.PaymentAddress)
 		return
@@ -396,7 +397,7 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 
 func (m *GuestPaymentMonitor) pollConfirmations(ctx context.Context, chain iwallet.ChainType, orderToken, txHash string) {
 	if m.chainOps == nil || !m.chainOps.IsHealthy(chain) {
-		log.Warningf("no chain ops for chain %s (order %s)", chain, orderToken)
+		log.Warningf("no chain ops for chain %s (order %s)", chain, redact.Token(orderToken))
 		return
 	}
 
@@ -421,7 +422,7 @@ func (m *GuestPaymentMonitor) pollConfirmations(ctx context.Context, chain iwall
 				continue
 			}
 			if err := m.guestService.HandleConfirmationUpdate(orderToken, confs); err != nil {
-				log.Warningf("handle UTXO confirmation update for %s: %v", orderToken, err)
+				log.Warningf("handle UTXO confirmation update for %s: %v", redact.Token(orderToken), err)
 			}
 		}
 	}

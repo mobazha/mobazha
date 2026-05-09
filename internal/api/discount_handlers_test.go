@@ -158,7 +158,7 @@ func discountTestServer(t *testing.T, svc *mockDiscountService) (*httptest.Serve
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router(false))
+	outer.Mount("/", gateway.newV1Router(false, false))
 
 	ts := httptest.NewServer(outer)
 	t.Cleanup(ts.Close)
@@ -683,7 +683,7 @@ func TestDiscountHandlers_NoProvider(t *testing.T) {
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router(false))
+	outer.Mount("/", gateway.newV1Router(false, false))
 	ts := httptest.NewServer(outer)
 	defer ts.Close()
 

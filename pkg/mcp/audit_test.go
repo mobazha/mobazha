@@ -9,6 +9,8 @@ import (
 	"time"
 
 	gomcp "github.com/mark3labs/mcp-go/mcp"
+
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 )
 
 type inMemoryAuditLogger struct {
@@ -143,7 +145,7 @@ func TestRedactArguments(t *testing.T) {
 		"limit":    10,
 	}
 
-	result := redactArguments(args)
+	result := redact.RedactMapJSON(args)
 
 	if result == "{}" {
 		t.Fatal("expected non-empty result")
@@ -164,12 +166,12 @@ func TestRedactArguments(t *testing.T) {
 }
 
 func TestRedactArguments_EmptyArgs(t *testing.T) {
-	result := redactArguments(nil)
+	result := redact.RedactMapJSON(nil)
 	if result != "{}" {
 		t.Errorf("expected '{}', got %s", result)
 	}
 
-	result = redactArguments(map[string]any{})
+	result = redact.RedactMapJSON(map[string]any{})
 	if result != "{}" {
 		t.Errorf("expected '{}', got %s", result)
 	}

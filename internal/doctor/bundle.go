@@ -10,8 +10,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 )
 
 func ExportBundle(outPath string, cfg Config, summary Summary) error {
@@ -63,21 +64,10 @@ func ExportBundle(outPath string, cfg Config, summary Summary) error {
 	return nil
 }
 
+// SanitizeEnv delegates to pkg/redact.SanitizeEnvBlock which uses
+// the shared sensitive key registry.
 func SanitizeEnv(content string) string {
-	var lines []string
-	sensitiveKeys := map[string]bool{
-		"STANDALONE_API_KEY": true,
-		"ADMIN_PASSWORD":     true,
-	}
-	for _, line := range strings.Split(content, "\n") {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 && sensitiveKeys[strings.TrimSpace(parts[0])] {
-			lines = append(lines, parts[0]+"=<REDACTED>")
-		} else {
-			lines = append(lines, line)
-		}
-	}
-	return strings.Join(lines, "\n")
+	return redact.SanitizeEnvBlock(content)
 }
 
 func addToTar(tw *tar.Writer, name string, data []byte) error {

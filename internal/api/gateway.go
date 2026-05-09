@@ -164,7 +164,8 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 		}
 	}
 
-	r := g.newV1Router(config.AllowAllOrigins)
+	csrfEnabled := !config.PublicOnly && config.Password != ""
+	r := g.newV1Router(config.AllowAllOrigins, csrfEnabled)
 
 	// Create default hub
 	defaultNodeID := repo.DefaultNodeID
@@ -352,12 +353,15 @@ func (g *Gateway) Serve() error {
 	return err
 }
 
-func (g *Gateway) newV1Router(allowAllOrigins bool) chi.Router {
+func (g *Gateway) newV1Router(allowAllOrigins, csrfEnabled bool) chi.Router {
 	r := chi.NewMux()
 	r.Use(securityHeadersMiddleware)
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	if allowAllOrigins {
 		r.Use(g.CORSAllowAllOriginsMiddleware)
+	}
+	if csrfEnabled {
+		r.Use(csrfOriginCheckMiddleware)
 	}
 	if g.nodeManager != nil {
 		r.Use(g.NodeSelectionMiddleware)

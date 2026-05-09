@@ -20,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -431,7 +432,7 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken string, txHash s
 
 		if order.RequiredConfs > 0 {
 			if err := s.extendReservationForConfirmation(tx, order.OrderToken, order.ExpiresAt); err != nil {
-				log.Warningf("extend reservation for %s during confirmation: %v", orderToken, err)
+				log.Warningf("extend reservation for %s during confirmation: %v", redact.Token(orderToken), err)
 			}
 		}
 
@@ -444,12 +445,12 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken string, txHash s
 			order.FundedAt = &now
 
 			if err := s.confirmReservation(tx, order.OrderToken); err != nil {
-				log.Warningf("confirm reservation for %s: %v", orderToken, err)
+				log.Warningf("confirm reservation for %s: %v", redact.Token(orderToken), err)
 			}
 
 			if order.SweepToAddress != "" && s.sweepService != nil {
 				if err := s.sweepService.CreateSweepTask(tx, &order); err != nil {
-					log.Warningf("create sweep task for %s (non-blocking): %v", orderToken, err)
+					log.Warningf("create sweep task for %s (non-blocking): %v", redact.Token(orderToken), err)
 				}
 			}
 		}
@@ -466,14 +467,14 @@ func (s *GuestOrderAppService) HandleLatePayment(orderToken, txHash, status stri
 			return err
 		}
 		if order.IsTerminal() {
-			log.Infof("late payment for terminal guest order %s (status=%s, tx=%s)", orderToken, status, txHash)
+			log.Infof("late payment for terminal guest order %s (status=%s, tx=%s)", redact.Token(orderToken), status, txHash)
 			return nil
 		}
 		if order.PaymentTxHash == "" {
 			order.PaymentTxHash = txHash
 		}
 		log.Warningf("late/abnormal payment for guest order %s: status=%s tx=%s paid=%d expected=%d state=%s",
-			orderToken, status, txHash, paid, expected, order.State)
+			redact.Token(orderToken), status, txHash, paid, expected, order.State)
 		return tx.Save(&order)
 	})
 }
@@ -498,12 +499,12 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 			order.FundedAt = &now
 
 			if err := s.confirmReservation(tx, order.OrderToken); err != nil {
-				log.Warningf("confirm reservation for %s: %v", orderToken, err)
+				log.Warningf("confirm reservation for %s: %v", redact.Token(orderToken), err)
 			}
 
 			if order.SweepToAddress != "" && s.sweepService != nil {
 				if err := s.sweepService.CreateSweepTask(tx, &order); err != nil {
-					log.Warningf("create sweep task for %s (non-blocking): %v", orderToken, err)
+					log.Warningf("create sweep task for %s (non-blocking): %v", redact.Token(orderToken), err)
 				}
 			}
 		}
@@ -566,7 +567,7 @@ func (s *GuestOrderAppService) CleanupExpiredOrders(ctx context.Context) {
 
 	for _, order := range orders {
 		if err := s.expireOrder(order.OrderToken, order.State); err != nil {
-			log.Warningf("expire guest order %s: %v", order.OrderToken, err)
+			log.Warningf("expire guest order %s: %v", redact.Token(order.OrderToken), err)
 		}
 	}
 }
@@ -588,7 +589,7 @@ func (s *GuestOrderAppService) AutoCompleteOrders(ctx context.Context) {
 				o.CompletedAt = &now
 				return nil
 			}); err != nil {
-			log.Warningf("auto-complete guest order %s: %v", order.OrderToken, err)
+			log.Warningf("auto-complete guest order %s: %v", redact.Token(order.OrderToken), err)
 		}
 	}
 }

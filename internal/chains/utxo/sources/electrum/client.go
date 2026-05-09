@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 )
 
 var log = logging.MustGetLogger("electrum")
@@ -65,20 +66,6 @@ func DefaultClientConfig(chain string, testnet bool) *ClientConfig {
 	}
 }
 
-// redactedServer returns a privacy-safe representation of a server address.
-// It keeps only the host portion (no port) for named hosts, or replaces IP
-// addresses with a placeholder to avoid leaking private infrastructure info.
-func redactedServer(server string) string {
-	host := server
-	if h, _, err := net.SplitHostPort(server); err == nil {
-		host = h
-	}
-	ip := net.ParseIP(host)
-	if ip != nil {
-		return "<ip>:***"
-	}
-	return host + ":***"
-}
 
 // NewClient creates a new Electrum client
 func NewClient(config *ClientConfig) *Client {
@@ -169,7 +156,7 @@ func (c *Client) connectWithoutLock(ctx context.Context) error {
 
 			if result.err != nil {
 				failures = append(failures, endpointFailure{
-					server: redactedServer(c.servers[result.serverIdx]),
+					server: redact.ServerAddr(c.servers[result.serverIdx]),
 					err:    result.err,
 				})
 				continue
@@ -200,7 +187,7 @@ func (c *Client) connectWithoutLock(ctx context.Context) error {
 			// Handshake failed, close connection
 			result.conn.Close()
 			failures = append(failures, endpointFailure{
-				server: redactedServer(c.servers[result.serverIdx]),
+				server: redact.ServerAddr(c.servers[result.serverIdx]),
 				err:    fmt.Errorf("handshake failed"),
 			})
 
@@ -282,7 +269,7 @@ func (c *Client) tryHandshake(ctx context.Context, conn net.Conn, serverIdx int)
 	defer cancel()
 
 	if _, err := c.serverVersion(handshakeCtx); err != nil {
-		log.Warningf("[%s] Handshake failed with %s: %v", c.chain, redactedServer(server), err)
+		log.Warningf("[%s] Handshake failed with %s: %v", c.chain, redact.ServerAddr(server), err)
 		c.mu.Lock()
 		c.closeConnection()
 		c.mu.Unlock()
@@ -297,7 +284,7 @@ func (c *Client) tryHandshake(ctx context.Context, conn net.Conn, serverIdx int)
 	c.mu.Unlock()
 	go c.heartbeatLoop(hbStop)
 
-	log.Infof("[%s] Connected to Electrum server: %s", c.chain, redactedServer(server))
+	log.Infof("[%s] Connected to Electrum server: %s", c.chain, redact.ServerAddr(server))
 	return true
 }
 
@@ -347,8 +334,8 @@ func (c *Client) dialServer(ctx context.Context, server string) (net.Conn, error
 		tlsConfig := c.tlsConfig
 		if tlsConfig == nil {
 			tlsConfig = &tls.Config{
-				ServerName:         host,
-				InsecureSkipVerify: true,
+				ServerName: host,
+				MinVersion: tls.VersionTLS12,
 			}
 		} else {
 			tlsConfig = tlsConfig.Clone()

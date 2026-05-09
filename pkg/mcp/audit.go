@@ -2,14 +2,14 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	stdlog "log"
 	"net/http"
-	"strings"
 	"time"
 
 	gomcp "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 )
 
 // MCPAuditEntry contains data for a single audit log entry.
@@ -105,7 +105,7 @@ func AuditMiddleware(logger AuditLogger, transport string, identityFn IdentityFu
 				UserID:    userID,
 				PeerID:    peerID,
 				ToolName:  req.Params.Name,
-				Arguments: redactArguments(req.GetArguments()),
+				Arguments: redact.RedactMapJSON(req.GetArguments()),
 				Success:   err == nil && (result == nil || !result.IsError),
 				Duration:  duration,
 				Transport: transport,
@@ -146,7 +146,7 @@ func WithAudit(logger AuditLogger, transport string, identityFn IdentityFunc,
 			UserID:    userID,
 			PeerID:    peerID,
 			ToolName:  toolName,
-			Arguments: redactArguments(req.GetArguments()),
+			Arguments: redact.RedactMapJSON(req.GetArguments()),
 			Success:   err == nil && (result == nil || !result.IsError),
 			Duration:  duration,
 			Transport: transport,
@@ -163,31 +163,6 @@ func WithAudit(logger AuditLogger, transport string, identityFn IdentityFunc,
 	}
 }
 
-// sensitiveKeys are argument keys that should be redacted in audit logs.
-var sensitiveKeys = map[string]bool{
-	"token":      true,
-	"password":   true,
-	"mnemonic":   true,
-	"privateKey": true,
-	"private_key": true,
-	"secret":     true,
-}
-
-func redactArguments(args map[string]any) string {
-	if len(args) == 0 {
-		return "{}"
-	}
-	redacted := make(map[string]any, len(args))
-	for k, v := range args {
-		if sensitiveKeys[k] || sensitiveKeys[strings.ToLower(k)] {
-			redacted[k] = "[REDACTED]"
-		} else {
-			redacted[k] = v
-		}
-	}
-	data, _ := json.Marshal(redacted)
-	return string(data)
-}
 
 func extractErrorText(result *gomcp.CallToolResult) string {
 	if result == nil || len(result.Content) == 0 {

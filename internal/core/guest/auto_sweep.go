@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -398,15 +399,15 @@ func (s *AutoSweepService) reconcileOrphanedFunded() {
 			if err := tx.Read().Model(&models.SweepTask{}).
 				Where("order_token = ?", orphans[i].OrderToken).
 				Count(&count).Error; err != nil {
-				log.Warningf("reconcile: count sweep tasks for %s: %v", orphans[i].OrderToken, err)
+				log.Warningf("reconcile: count sweep tasks for %s: %v", redact.Token(orphans[i].OrderToken), err)
 				continue
 			}
 			if count > 0 {
 				continue
 			}
-			log.Infof("reconcile: creating missing sweep task for order %s (state=%s)", orphans[i].OrderToken, orphans[i].State)
+			log.Infof("reconcile: creating missing sweep task for order %s (state=%s)", redact.Token(orphans[i].OrderToken), orphans[i].State)
 			if err := s.CreateSweepTask(tx, &orphans[i]); err != nil {
-				log.Warningf("reconcile: create sweep for %s: %v", orphans[i].OrderToken, err)
+				log.Warningf("reconcile: create sweep for %s: %v", redact.Token(orphans[i].OrderToken), err)
 			}
 		}
 		return nil

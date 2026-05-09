@@ -37,8 +37,8 @@ func TestDirectElectrumConnection(t *testing.T) {
 	// Connect with TLS
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 	conn, err := tls.DialWithDialer(dialer, "tcp", server, &tls.Config{
-		ServerName:         "electrum.blockstream.info",
-		InsecureSkipVerify: true,
+		ServerName: "electrum.blockstream.info",
+		MinVersion: tls.VersionTLS12,
 	})
 	if err != nil {
 		t.Fatalf("Connect failed: %v", err)

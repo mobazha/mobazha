@@ -218,11 +218,12 @@ type runtimeFeatureEntry struct {
 // featureFlags service ships (Phase B of ff-impl-frontend), these flat
 // fields move to TECHDEBT(TD-032) and get removed in Phase E.
 type runtimeConfigPayload struct {
-	SaasURL              string                         `json:"saasUrl,omitempty"`
-	AuthMode             string                         `json:"authMode"`
-	GuestCheckoutEnabled bool                           `json:"guestCheckoutEnabled"`
-	Features             map[string]runtimeFeatureEntry `json:"features"`
-	PrivateDistributionMode          bool                           `json:"private_distributionMode,omitempty"`
+	SaasURL                  string                         `json:"saasUrl,omitempty"`
+	AuthMode                 string                         `json:"authMode"`
+	GuestCheckoutEnabled     bool                           `json:"guestCheckoutEnabled"`
+	Features                 map[string]runtimeFeatureEntry `json:"features"`
+	PrivateDistributionMode              bool                           `json:"private_distributionMode,omitempty"`
+	DisableExternalResources bool                           `json:"disableExternalResources,omitempty"`
 }
 
 // serveRuntimeConfig emits a JS snippet that assigns window.__RUNTIME_CONFIG__
@@ -265,10 +266,11 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) 
 	var payload runtimeConfigPayload
 	if h.private_distributionMode {
 		payload = runtimeConfigPayload{
-			AuthMode:             "standalone",
-			GuestCheckoutEnabled: true,
-			Features:             features,
-			PrivateDistributionMode:          true,
+			AuthMode:                 "standalone",
+			GuestCheckoutEnabled:     true,
+			Features:                 features,
+			PrivateDistributionMode:              true,
+			DisableExternalResources: true,
 		}
 	} else {
 		saasURL := h.saasURL
@@ -286,7 +288,7 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) 
 	body, err := json.Marshal(payload)
 	if err != nil {
 		if h.private_distributionMode {
-			fmt.Fprint(w, `window.__RUNTIME_CONFIG__={authMode:"standalone",guestCheckoutEnabled:true,private_distributionMode:true,features:{}};`)
+			fmt.Fprint(w, `window.__RUNTIME_CONFIG__={authMode:"standalone",guestCheckoutEnabled:true,private_distributionMode:true,disableExternalResources:true,features:{}};`)
 		} else {
 			saasURL := h.saasURL
 			if saasURL == "" {

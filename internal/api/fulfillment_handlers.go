@@ -347,6 +347,35 @@ func (g *Gateway) handleGETSyncedProducts(w http.ResponseWriter, r *http.Request
 	responsePkg.Success(w, products)
 }
 
+func (g *Gateway) handleDELETESyncedProduct(w http.ResponseWriter, r *http.Request) {
+	svc, ok := g.getSupplyChainService(r)
+	if !ok {
+		fulfillmentNotAvailable(w)
+		return
+	}
+
+	providerID := chi.URLParam(r, "providerID")
+	mappingID := chi.URLParam(r, "mappingID")
+	if mappingID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+			"Mapping ID is required")
+		return
+	}
+
+	if err := svc.UnlinkSyncedProduct(r.Context(), providerID, mappingID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound,
+				"Synced product mapping not found")
+			return
+		}
+		log.Warningf("Failed to unlink synced product %s: %v", mappingID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+			"Failed to unlink synced product")
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
 func (g *Gateway) handlePOSTSyncProduct(w http.ResponseWriter, r *http.Request) {
 	svc, ok := g.getSupplyChainService(r)
 	if !ok {

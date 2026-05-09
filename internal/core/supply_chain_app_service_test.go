@@ -889,6 +889,70 @@ func TestListSyncedProducts(t *testing.T) {
 	}
 }
 
+func TestUnlinkSyncedProduct_HappyPath(t *testing.T) {
+	tdb := newSCTestDatabase(t)
+	tdb.gormDB.Create(&models.SyncedProductMapping{
+		ID: "spm-1", ProviderID: "printful", ListingSlug: "tee-1", Status: "synced",
+	})
+	svc := NewSupplyChainAppService(fulfillment.NewRegistry(), tdb, "test", testPrivKeyBytes)
+
+	err := svc.UnlinkSyncedProduct(context.Background(), "printful", "spm-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var count int64
+	tdb.gormDB.Model(&models.SyncedProductMapping{}).Count(&count)
+	if count != 0 {
+		t.Errorf("expected 0 remaining mappings, got %d", count)
+	}
+}
+
+func TestUnlinkSyncedProduct_NotFound(t *testing.T) {
+	tdb := newSCTestDatabase(t)
+	svc := NewSupplyChainAppService(fulfillment.NewRegistry(), tdb, "test", testPrivKeyBytes)
+
+	err := svc.UnlinkSyncedProduct(context.Background(), "printful", "non-existent")
+	if err == nil {
+		t.Fatal("expected error for non-existent mapping")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
+	}
+}
+
+func TestUnlinkSyncedProduct_EmptyID(t *testing.T) {
+	tdb := newSCTestDatabase(t)
+	svc := NewSupplyChainAppService(fulfillment.NewRegistry(), tdb, "test", testPrivKeyBytes)
+
+	err := svc.UnlinkSyncedProduct(context.Background(), "printful", "")
+	if err == nil {
+		t.Fatal("expected error for empty ID")
+	}
+}
+
+func TestUnlinkSyncedProduct_ProviderMismatch(t *testing.T) {
+	tdb := newSCTestDatabase(t)
+	tdb.gormDB.Create(&models.SyncedProductMapping{
+		ID: "spm-1", ProviderID: "printful", ListingSlug: "tee-1", Status: "synced",
+	})
+	svc := NewSupplyChainAppService(fulfillment.NewRegistry(), tdb, "test", testPrivKeyBytes)
+
+	err := svc.UnlinkSyncedProduct(context.Background(), "printify", "spm-1")
+	if err == nil {
+		t.Fatal("expected error for provider mismatch")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
+	}
+
+	var count int64
+	tdb.gormDB.Model(&models.SyncedProductMapping{}).Count(&count)
+	if count != 1 {
+		t.Errorf("mapping should not have been deleted, got %d remaining", count)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tests: ImportProduct (FF-1.4a)
 // ---------------------------------------------------------------------------

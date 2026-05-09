@@ -2269,8 +2269,15 @@ func (s *SupplyChainAppService) ListSyncedProducts(_ context.Context, providerID
 		slugToMeta[lm.Slug] = lm
 	}
 
-	products := make([]contracts.SyncedProduct, len(mappings))
-	for i, m := range mappings {
+	products := make([]contracts.SyncedProduct, 0, len(mappings))
+	var orphanSlugs []string
+	for _, m := range mappings {
+		if listingIndex != nil {
+			if _, exists := slugToMeta[m.ListingSlug]; !exists {
+				orphanSlugs = append(orphanSlugs, m.ListingSlug)
+				continue
+			}
+		}
 		p := contracts.SyncedProduct{
 			ID:            m.ID,
 			ProviderID:    m.ProviderID,
@@ -2286,8 +2293,19 @@ func (s *SupplyChainAppService) ListSyncedProducts(_ context.Context, providerID
 			p.Title = meta.Title
 			p.ThumbnailUrl = meta.Thumbnail.Small
 		}
-		products[i] = p
+		products = append(products, p)
 	}
+
+	if len(orphanSlugs) > 0 {
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain: auto-cleaning %d orphan mapping(s) for deleted listing(s): %v", len(orphanSlugs), orphanSlugs)
+		go func() {
+			for _, slug := range orphanSlugs {
+				s.ClearMappingForListing(slug)
+			}
+		}()
+	}
+
 	return products, nil
 }
 
@@ -3207,6 +3225,33 @@ func (s *SupplyChainAppService) IsListingManagedBySupplier(listingSlug string) b
 		return false
 	}
 	return count > 0
+}
+
+// UnlinkSyncedProduct removes a synced product mapping by its ID, allowing
+// the seller to manually unlink an imported product from its supplier.
+// providerID is validated against the mapping to prevent cross-provider deletion.
+func (s *SupplyChainAppService) UnlinkSyncedProduct(_ context.Context, providerID, mappingID string) error {
+	if mappingID == "" {
+		return fmt.Errorf("mapping ID is required")
+	}
+	err := s.db.Update(func(tx database.Tx) error {
+		var existing models.SyncedProductMapping
+		if err := tx.Read().Where("id = ?", mappingID).First(&existing).Error; err != nil {
+			return fmt.Errorf("synced product mapping not found: %w", err)
+		}
+		if providerID != "" && existing.ProviderID != providerID {
+			return fmt.Errorf("synced product mapping not found: provider mismatch")
+		}
+		return tx.Delete("id", mappingID, nil, &models.SyncedProductMapping{})
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"SupplyChain: failed to unlink synced product %q: %v", mappingID, err)
+		return err
+	}
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"SupplyChain: unlinked synced product mapping %q (provider=%s)", mappingID, providerID)
+	return nil
 }
 
 // ClearMappingForListing removes the synced product mapping for a deleted listing,

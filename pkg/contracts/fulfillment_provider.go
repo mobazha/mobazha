@@ -110,6 +110,7 @@ type SupplyChainService interface {
 	ImportProduct(ctx context.Context, params ImportProductParams) (*ImportResult, error)
 	SyncProduct(ctx context.Context, listingSlug string) (*SyncStatus, error)
 	ListSyncedProducts(ctx context.Context, providerID string) ([]SyncedProduct, error)
+	UnlinkSyncedProduct(ctx context.Context, providerID, mappingID string) error
 
 	// Store sync products (designed in supplier dashboard)
 	BrowseStoreSyncProducts(ctx context.Context, providerID string, offset, limit int) (*StoreSyncPage, error)

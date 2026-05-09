@@ -225,6 +225,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"fulfillment-get-store-sync-product",
 		"fulfillment-get-store-sync-products",
 		"fulfillment-get-synced-products",
+		"fulfillment-delete-synced-product",
 		"fulfillment-list-providers",
 		"fulfillment-post-connect",
 		"fulfillment-post-import-product",

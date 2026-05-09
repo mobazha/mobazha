@@ -28,6 +28,7 @@ func (g *Gateway) registerNodeHumaFulfillmentAdminOperations(api huma.API) {
 	g.registerFulfillmentCatalogProduct(api)
 	g.registerFulfillmentImportProduct(api)
 	g.registerFulfillmentSyncedProducts(api)
+	g.registerFulfillmentDeleteSyncedProduct(api)
 	g.registerFulfillmentStoreSyncProducts(api)
 	g.registerFulfillmentStoreSyncProduct(api)
 	g.registerFulfillmentSyncProduct(api)
@@ -258,6 +259,33 @@ func (g *Gateway) registerFulfillmentSyncedProducts(api huma.API) {
 			return nil, err
 		}
 		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerFulfillmentDeleteSyncedProduct(api huma.API) {
+	type in struct {
+		ProviderID string `path:"providerID" doc:"Fulfillment provider ID."`
+		MappingID  string `path:"mappingID" doc:"Synced product mapping ID."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "fulfillment-delete-synced-product",
+		Method:      http.MethodDelete,
+		Path:        "/v1/fulfillment/{providerID}/synced-products/{mappingID}",
+		Summary:     "Unlink a synced product from its supplier",
+		Tags:        []string{"fulfillment"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeNoContentOutput, error) {
+		rawURL := "/v1/fulfillment/" + url.PathEscape(hi.ProviderID) + "/synced-products/" + url.PathEscape(hi.MappingID)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodDelete, rawURL, nil, map[string]string{
+			"providerID": hi.ProviderID,
+			"mappingID":  hi.MappingID,
+		})
+		rr := httptest.NewRecorder()
+		g.handleDELETESyncedProduct(rr, req)
+		if err := nodeBridgeNoContent(rr); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	})
 }
 

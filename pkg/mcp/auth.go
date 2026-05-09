@@ -122,6 +122,7 @@ var toolScopeRequirement = map[string]string{
 	"sourcing_list_synced_products": string(contracts.ScopeFulfillmentRead),
 	"sourcing_check_price_drift":   string(contracts.ScopeFulfillmentRead),
 	"sourcing_import_product":      string(contracts.ScopeFulfillmentManage),
+	"sourcing_unlink_product":      string(contracts.ScopeFulfillmentManage),
 }
 
 // FilterToolsByScopes returns tool names that the given scopes permit.

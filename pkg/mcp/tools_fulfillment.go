@@ -99,6 +99,25 @@ func fulfillmentToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 			Handler: makeSourcingListSyncedProducts(bf),
 		},
 		{
+			Name: "sourcing_unlink_product",
+			Tool: gomcp.NewTool("sourcing_unlink_product",
+				gomcp.WithDescription(
+					"Unlink (remove) a synced product mapping between a supplier product and a Mobazha listing. "+
+						"This does NOT delete the listing itself, only removes the supplier association. "+
+						"Use when asked to disconnect a product from its supplier, remove an import link, or clean up orphan mappings.",
+				),
+				gomcp.WithString("provider_id",
+					gomcp.Required(),
+					gomcp.Description("The fulfillment provider ID (e.g. 'printful')"),
+				),
+				gomcp.WithString("mapping_id",
+					gomcp.Required(),
+					gomcp.Description("The synced product mapping ID to remove"),
+				),
+			),
+			Handler: makeSourcingUnlinkProduct(bf),
+		},
+		{
 			Name: "sourcing_check_price_drift",
 			Tool: gomcp.NewTool("sourcing_check_price_drift",
 				gomcp.WithDescription(
@@ -183,6 +202,24 @@ func makeSourcingListSyncedProducts(bf BridgeFactory) server.ToolHandlerFunc {
 		bridge := bf(req)
 		path := fmt.Sprintf("/v1/fulfillment/%s/synced-products", url.PathEscape(providerID))
 		code, body, err := bridge.Call(ctx, "GET", path, nil, nil)
+		return HandleBridgeResult(code, body, err)
+	}
+}
+
+func makeSourcingUnlinkProduct(bf BridgeFactory) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		providerID := req.GetString("provider_id", "")
+		if providerID == "" {
+			return gomcp.NewToolResultError("provider_id is required"), nil
+		}
+		mappingID := req.GetString("mapping_id", "")
+		if mappingID == "" {
+			return gomcp.NewToolResultError("mapping_id is required"), nil
+		}
+		bridge := bf(req)
+		path := fmt.Sprintf("/v1/fulfillment/%s/synced-products/%s",
+			url.PathEscape(providerID), url.PathEscape(mappingID))
+		code, body, err := bridge.Call(ctx, "DELETE", path, nil, nil)
 		return HandleBridgeResult(code, body, err)
 	}
 }

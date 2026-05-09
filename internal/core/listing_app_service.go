@@ -290,11 +290,41 @@ func (s *ListingAppService) SetListingStatus(slug string, status string) error {
 	if sl.Listing == nil {
 		return fmt.Errorf("listing %s has no content", slug)
 	}
-	if sl.Listing.Status == status {
+	oldStatus := sl.Listing.Status
+	if oldStatus == status {
 		return nil
 	}
 	sl.Listing.Status = status
-	return s.SaveListing(sl.Listing, nil)
+	if err := s.SaveListing(sl.Listing, nil); err != nil {
+		return err
+	}
+
+	// published/private → draft: remove from public listing index + notify search
+	if oldStatus != models.ListingStatusDraft && status == models.ListingStatusDraft {
+		if err := s.removeFromPublicIndex(slug); err != nil {
+			return fmt.Errorf("remove %s from listing index: %w", slug, err)
+		}
+		if s.eventBus != nil && sl.Cid != "" {
+			s.eventBus.Emit(&events.ListingDeleted{Cid: sl.Cid})
+		}
+	}
+	return nil
+}
+
+// removeFromPublicIndex removes a slug from the local listing index without
+// deleting the listing blob. On failure the caller must NOT emit events.
+func (s *ListingAppService) removeFromPublicIndex(slugStr string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		index, err := tx.GetListingIndex()
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		index.DeleteListing(slugStr)
+		return tx.SetListingIndex(index)
+	})
 }
 
 func (s *ListingAppService) UpdateAllListings(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {

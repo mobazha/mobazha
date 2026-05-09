@@ -179,6 +179,7 @@ func (s *NetDBSyncService) dispatch(evt interface{}) {
 				logger.LogDebugWithIDf(log, s.nodeID, "NetDBSync: DeleteOwnListing(%s): %v", e.Cid, err)
 			}
 		}
+		s.pushListingIndex()
 	case *events.ListingsReindexed:
 		s.pushAllListings()
 		s.pushProfile()

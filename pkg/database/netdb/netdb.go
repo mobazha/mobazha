@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
@@ -335,15 +334,16 @@ func (ndb *NetDB) SetOwnListing(sl *pb.SignedListing) error {
 
 // DeleteListing deletes the given listing.
 func (ndb *NetDB) DeleteOwnListing(listingID string) error {
-	trackingID := uuid.New().String()
-	sig, err := ndb.nodePrivateKey.Sign([]byte(trackingID))
+	// TrackingID must equal listingID (CID) — info-side signature verification
+	// validates Sign(TrackingID) and uses TrackingID as the deletion key.
+	sig, err := ndb.nodePrivateKey.Sign([]byte(listingID))
 	if err != nil {
 		return err
 	}
 
 	nounce := &Nounce{
 		PeerID:     ndb.ownPeerID,
-		TrackingID: trackingID,
+		TrackingID: listingID,
 		Sig:        sig,
 	}
 

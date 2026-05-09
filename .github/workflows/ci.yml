@@ -67,3 +67,40 @@ jobs:
       - name: Build
         run: go build -tags goolm -o /dev/null .
         working-directory: node
+
+  private_distribution-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: node
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: node/go.sum
+
+      - name: Create workspace
+        run: |
+          cat > go.work <<'EOF'
+          go 1.25.0
+
+          use (
+            ./node
+          )
+          EOF
+          sed -i 's/^          //' go.work
+
+      - name: Build private_distribution binary
+        working-directory: node
+        run: |
+          CGO_ENABLED=0 go build \
+            -tags "private_distribution purego_sqlite" \
+            -ldflags "-s -w" \
+            -o mobazha-private_distribution .
+
+      - name: Run network smoke test
+        working-directory: node
+        run: |
+          chmod +x scripts/private_distribution-network-smoke.sh
+          ./scripts/private_distribution-network-smoke.sh ./mobazha-private_distribution 20

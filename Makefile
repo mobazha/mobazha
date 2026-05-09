@@ -1,4 +1,4 @@
-.PHONY: build build-private_distribution test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
+.PHONY: build build-private_distribution smoke-private_distribution test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
 
 SYSTEM_GO := /usr/local/go/bin/go
 GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
@@ -12,6 +12,9 @@ build-private_distribution: ## 构建 PrivateDistribution 精简版（CGO-free�
 
 test: ## 运行测试
 	$(GO) test -tags '$(GO_TEST_TAGS)' ./...
+
+smoke-private_distribution: build-private_distribution ## 构建 private_distribution 并运行网络隔离 smoke test
+	./scripts/private_distribution-network-smoke.sh ./mobazha-private_distribution 20
 
 test-libolm: ## 使用 libolm(cgo) 运行测试
 	bash ./scripts/with-libolm-env.sh $(GO) test ./...

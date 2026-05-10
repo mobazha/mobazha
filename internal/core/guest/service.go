@@ -367,23 +367,29 @@ func (s *GuestOrderAppService) GetGuestOrderStatus(_ context.Context, token stri
 		return nil, fmt.Errorf("guest order not found: %w", err)
 	}
 
+	var chainBlockTimeSec uint32
+	if coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(order.PaymentCoin)); err == nil {
+		chainBlockTimeSec = coinInfo.Chain.AvgBlockTimeSec()
+	}
+
 	return &contracts.GuestOrderStatusResponse{
-		OrderToken:     order.OrderToken,
-		State:          order.State.String(),
-		PaymentAddress: order.PaymentAddress,
-		PaymentAmount:  order.PaymentAmount,
-		PaymentCoin:    order.PaymentCoin,
-		ReferenceKey:   order.ReferenceKey,
-		Confirmations:  order.Confirmations,
-		RequiredConfs:  order.RequiredConfs,
-		TrackingNumber: order.TrackingNumber,
-		Items:          order.Items,
-		ExpiresAt:      order.ExpiresAt,
-		CreatedAt:      order.CreatedAt,
-		PoolDetected:   order.PoolDetectedAt != nil,
-		PoolTxHash:     order.PoolTxHash,
-		PoolAmount:     order.PoolAmount,
-		PoolDetectedAt: order.PoolDetectedAt,
+		OrderToken:        order.OrderToken,
+		State:             order.State.String(),
+		PaymentAddress:    order.PaymentAddress,
+		PaymentAmount:     order.PaymentAmount,
+		PaymentCoin:       order.PaymentCoin,
+		ReferenceKey:      order.ReferenceKey,
+		Confirmations:     order.Confirmations,
+		RequiredConfs:     order.RequiredConfs,
+		ChainBlockTimeSec: chainBlockTimeSec,
+		TrackingNumber:    order.TrackingNumber,
+		Items:             order.Items,
+		ExpiresAt:         order.ExpiresAt,
+		CreatedAt:         order.CreatedAt,
+		PoolDetected:      order.PoolDetectedAt != nil,
+		PoolTxHash:        order.PoolTxHash,
+		PoolAmount:        order.PoolAmount,
+		PoolDetectedAt:    order.PoolDetectedAt,
 	}, nil
 }
 

@@ -331,6 +331,27 @@ func (c ChainType) GetDefaultDerivationType() DerivationType {
 	}
 }
 
+// AvgBlockTimeSec returns the average block interval in seconds for the chain.
+// Callers use this with confirmation counts to estimate remaining wait time.
+// Returns 0 for chains that do not use block-based confirmation polling
+// (EVM balance checks, Solana reference-key checks, TRON).
+func (c ChainType) AvgBlockTimeSec() uint32 {
+	switch c {
+	case ChainBitcoin:
+		return 600
+	case ChainLitecoin:
+		return 150
+	case ChainBitcoinCash:
+		return 600
+	case ChainZCash:
+		return 75
+	case ChainExternalPayment:
+		return 120
+	default:
+		return 0
+	}
+}
+
 // GetSupportedDerivationTypes returns all supported derivation types for a chain
 func (c ChainType) GetSupportedDerivationTypes() []DerivationType {
 	switch c {

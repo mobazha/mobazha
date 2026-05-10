@@ -264,6 +264,11 @@ func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
 			return "", fmt.Errorf("unsupported zcash chain_ref %q", id.ChainRef)
 		}
 		return ChainZCash, nil
+	case assetid.NamespaceExternalPayment:
+		if id.ChainRef != "mainnet" {
+			return "", fmt.Errorf("unsupported external_payment chain_ref %q", id.ChainRef)
+		}
+		return ChainExternalPayment, nil
 	default:
 		return "", fmt.Errorf("unsupported namespace %q", id.Namespace)
 	}

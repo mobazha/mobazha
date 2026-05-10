@@ -56,6 +56,14 @@ type GuestOrderAppServiceConfig struct {
 	SupportedUTXOChains    []iwallet.ChainType
 	EVMMonitorAvailable    bool
 	SolanaMonitorAvailable bool
+	// ExternalPaymentAvailable is a closure that reports whether EXTERNAL_PAYMENT guest checkout
+	// can serve a request *right now*. It typically combines two signals:
+	//   1. operator configured the wallet-rpc endpoint
+	//   2. wallet-rpc passes the current health probe (IsHealthy()).
+	// nil means EXTERNAL_PAYMENT is unavailable. The closure is consulted on every
+	// CreateGuestOrder call so transient wallet-rpc outages surface as
+	// ErrCoinUnavailable instead of a generic 500 on CreateAddress later.
+	ExternalPaymentAvailable func() bool
 }
 
 // GuestOrderAppService manages the Guest Order lifecycle:
@@ -75,6 +83,8 @@ type GuestOrderAppService struct {
 	supportedUTXOChains    map[iwallet.ChainType]struct{}
 	evmMonitorAvailable    bool
 	solanaMonitorAvailable bool
+	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
+	external_paymentAvailable func() bool
 }
 
 // NewGuestOrderAppService constructs the service.
@@ -92,6 +102,7 @@ func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppServi
 		supportedUTXOChains:    toChainSet(cfg.SupportedUTXOChains),
 		evmMonitorAvailable:    cfg.EVMMonitorAvailable,
 		solanaMonitorAvailable: cfg.SolanaMonitorAvailable,
+		external_paymentAvailable:        cfg.ExternalPaymentAvailable,
 	}
 }
 
@@ -313,7 +324,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 				VariantHash: items[i].VariantHash,
 				Quantity:    items[i].Quantity,
 				ReservedAt:  time.Now(),
-				ExpiresAt:   expiresAt,
+				ExpiresAt:   reservationExpiresAtForOrder(expiresAt, req.PaymentCoin),
 			}
 			if err := tx.Save(&reservation); err != nil {
 				return fmt.Errorf("reserve inventory for %s: %w", items[i].ListingSlug, err)
@@ -369,6 +380,10 @@ func (s *GuestOrderAppService) GetGuestOrderStatus(_ context.Context, token stri
 		Items:          order.Items,
 		ExpiresAt:      order.ExpiresAt,
 		CreatedAt:      order.CreatedAt,
+		PoolDetected:   order.PoolDetectedAt != nil,
+		PoolTxHash:     order.PoolTxHash,
+		PoolAmount:     order.PoolAmount,
+		PoolDetectedAt: order.PoolDetectedAt,
 	}, nil
 }
 
@@ -403,7 +418,8 @@ func (s *GuestOrderAppService) CompleteGuestOrder(_ context.Context, token strin
 }
 
 // HandlePaymentDetected is called when a matching transaction is first seen on-chain.
-func (s *GuestOrderAppService) HandlePaymentDetected(orderToken string, txHash string) error {
+// opts carries chain-specific metadata (e.g. EXTERNAL_PAYMENT block height); nil for UTXO/EVM/Solana.
+func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, opts *contracts.PaymentDetectedOpts) error {
 	return s.db.Update(func(tx database.Tx) error {
 		var order models.GuestOrder
 		if err := tx.Read().Where("order_token = ?", orderToken).First(&order).Error; err != nil {
@@ -417,6 +433,11 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken string, txHash s
 			order.State == models.GuestOrderFunded ||
 			order.State == models.GuestOrderShipped ||
 			order.State == models.GuestOrderCompleted {
+			// EXTERNAL_PAYMENT pool→confirmed upgrade: persist height even if already detected.
+			if opts != nil && opts.TxBlockHeight > 0 && order.ExternalPaymentTxHeight == 0 {
+				order.ExternalPaymentTxHeight = opts.TxBlockHeight
+				return tx.Save(&order)
+			}
 			return nil
 		}
 
@@ -429,6 +450,9 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken string, txHash s
 
 		order.State = models.GuestOrderPaymentDetected
 		order.PaymentTxHash = txHash
+		if opts != nil && opts.TxBlockHeight > 0 {
+			order.ExternalPaymentTxHeight = opts.TxBlockHeight
+		}
 
 		if order.RequiredConfs > 0 {
 			if err := s.extendReservationForConfirmation(tx, order.OrderToken, order.ExpiresAt); err != nil {
@@ -455,6 +479,41 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken string, txHash s
 			}
 		}
 
+		return tx.Save(&order)
+	})
+}
+
+// HandlePoolPayment records a mempool-only payment observation.
+//
+// Design: pool detection is a UX hint, not a state transition.
+// The order remains in AWAITING_PAYMENT until the transfer is mined and
+// HandlePaymentDetected fires. This preserves the invariant
+// "PAYMENT_DETECTED ⇒ tx is on-chain" and lets CleanupExpiredOrders sweep
+// pool-evicted orders without special casing the PAYMENT_DETECTED state.
+//
+// Idempotency: identical (txHash, poolAmount) pairs are no-ops; PoolDetectedAt
+// is only set on the first observation so the UX timestamp doesn't churn
+// between polls. State changes after AWAITING_PAYMENT (e.g. the tx mined
+// between the pool poll and the next confirmed poll) are also no-ops —
+// the on-chain state machine takes over from PAYMENT_DETECTED onward.
+func (s *GuestOrderAppService) HandlePoolPayment(orderToken, txHash string, poolAmount uint64) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var order models.GuestOrder
+		if err := tx.Read().Where("order_token = ?", orderToken).First(&order).Error; err != nil {
+			return err
+		}
+		if order.State != models.GuestOrderAwaitingPayment {
+			return nil
+		}
+		if order.PoolTxHash == txHash && order.PoolAmount == poolAmount {
+			return nil
+		}
+		order.PoolTxHash = txHash
+		order.PoolAmount = poolAmount
+		if order.PoolDetectedAt == nil {
+			now := time.Now()
+			order.PoolDetectedAt = &now
+		}
 		return tx.Save(&order)
 	})
 }
@@ -556,7 +615,18 @@ func (s *GuestOrderAppService) ListActiveOrders(_ context.Context) ([]*models.Gu
 
 // CleanupExpiredOrders transitions timed-out AWAITING_PAYMENT orders to EXPIRED.
 // PAYMENT_DETECTED orders are NOT expired here — their lifecycle is managed
-// by pollConfirmations (which includes a grace period beyond expires_at).
+// by pollConfirmationsLoop (which includes a grace period beyond expires_at).
+//
+// Per-coin grace: an order whose ExpiresAt has passed may still receive an
+// in-flight payment during the watcher's grace window (e.g. an EXTERNAL_PAYMENT pool tx
+// observed before expiry mining 30min later, or a UTXO mempool tx confirming
+// just past expiry). Cleanup honors the same grace period the watcher uses
+// (gracePeriodForCoin). This eliminates the race where:
+//   - watcher detects payment in grace → calls HandlePaymentDetected
+//   - cleanup already flipped state to EXPIRED → HandlePaymentDetected rejects
+//     (state mismatch) → funds stranded
+// RestoreWatches uses the same predicate, keeping cleanup and watcher's
+// notion of "still in flight" in sync.
 func (s *GuestOrderAppService) CleanupExpiredOrders(ctx context.Context) {
 	var orders []models.GuestOrder
 	now := time.Now()
@@ -566,6 +636,13 @@ func (s *GuestOrderAppService) CleanupExpiredOrders(ctx context.Context) {
 	})
 
 	for _, order := range orders {
+		grace := gracePeriodForCoin(order.PaymentCoin)
+		if now.Before(order.ExpiresAt.Add(grace)) {
+			// Watcher still owns this order — let it land
+			// HandlePaymentDetected (mined) or HandleLatePayment
+			// (Partial/Expired from monitor) before we expire.
+			continue
+		}
 		if err := s.expireOrder(order.OrderToken, order.State); err != nil {
 			log.Warningf("expire guest order %s: %v", redact.Token(order.OrderToken), err)
 		}
@@ -671,6 +748,15 @@ func computeVariantHashFromSku(sku *pb.Listing_Item_Sku) string {
 }
 
 const reservationConfirmationGrace = 2 * time.Hour
+
+// reservationExpiresAtForOrder returns the reservation expiry that
+// matches the watcher's lifetime (order.ExpiresAt + per-coin payment
+// grace). Releasing earlier can leak inventory mid-grace while the
+// watcher could still fund the order. Single source of truth shared by
+// CreateGuestOrder and its regression test.
+func reservationExpiresAtForOrder(orderExpiresAt time.Time, paymentCoin string) time.Time {
+	return orderExpiresAt.Add(gracePeriodForCoin(paymentCoin))
+}
 
 func (s *GuestOrderAppService) extendReservationForConfirmation(tx database.Tx, orderToken string, orderExpiry time.Time) error {
 	var reservations []models.InventoryReservation
@@ -928,6 +1014,25 @@ func (s *GuestOrderAppService) convertToPaymentCoin(totalSmallest *big.Int, pric
 
 // --- Helpers ---
 
+// requiredConfsForCoin returns the minimum on-chain confirmations required
+// before a guest order transitions PAYMENT_DETECTED → FUNDED.
+//
+// Values are conservative defaults intended to defend against shallow chain
+// reorgs. For chains with longer block times or weaker finality, callers can
+// raise these via per-store configuration (future).
+//
+// Chain-by-chain rationale:
+//   - UTXO chains: BTC/BCH/ZEC = 1, LTC = 3 (LTC has higher orphan rate);
+//     watchUTXOOrder polls confirmations after PAYMENT_DETECTED.
+//   - ExternalPayment: 10 (matches ExternalPayment ecosystem convention; pollConfirmationsLoop
+//     polls block height after pool→confirmed transition via external_paymentHeightFetcher).
+//   - EVM/Solana/TRON: 0 — pollEVMLoop / pollSolanaLoop have no confirmation
+//     polling step, so any non-zero value would strand orders in
+//     PAYMENT_DETECTED forever. This is a known design compromise: balance/
+//     reference-key checks ARE the finality signal for these chains. Adding
+//     1-block reorg defense here requires implementing per-chain receipt
+//     polling first (tracked separately from Phase B EXTERNAL_PAYMENT work).
+//   - Unknown coin: 1 (safe default).
 func requiredConfsForCoin(coinType iwallet.CoinType) int {
 	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
 	if err != nil {
@@ -940,7 +1045,10 @@ func requiredConfsForCoin(coinType iwallet.CoinType) int {
 		return 1
 	case coinInfo.Chain == iwallet.ChainBitcoinCash, coinInfo.Chain == iwallet.ChainZCash:
 		return 1
+	case coinInfo.Chain == iwallet.ChainExternalPayment:
+		return 10
 	default:
+		// EVM / Solana / TRON / unknown — see godoc above.
 		return 0
 	}
 }
@@ -965,6 +1073,21 @@ func (s *GuestOrderAppService) validateCoinAvailability(coinType iwallet.CoinTyp
 	case coinInfo.Chain == iwallet.ChainSolana:
 		if !s.solanaMonitorAvailable {
 			return fmt.Errorf("%w: Solana reference checker not configured (coin %q)",
+				contracts.ErrCoinUnavailable, coinType)
+		}
+		return nil
+	case coinInfo.Chain == iwallet.ChainExternalPayment:
+		// Two failure modes need to surface as ErrCoinUnavailable:
+		//   - operator never wired wallet-rpc (closure is nil)
+		//   - wallet-rpc was wired but is currently unhealthy (closure returns false)
+		// Both should yield 503 at the API layer rather than letting the
+		// request proceed to CreateAddress and crash with a generic 500.
+		if s.external_paymentAvailable == nil {
+			return fmt.Errorf("%w: ExternalPayment wallet-rpc not configured (coin %q)",
+				contracts.ErrCoinUnavailable, coinType)
+		}
+		if !s.external_paymentAvailable() {
+			return fmt.Errorf("%w: ExternalPayment wallet-rpc unreachable (coin %q)",
 				contracts.ErrCoinUnavailable, coinType)
 		}
 		return nil

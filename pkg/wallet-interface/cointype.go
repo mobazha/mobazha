@@ -26,6 +26,7 @@ const (
 	ChainConflux     ChainType = "CFX"
 	ChainSolana      ChainType = "SOL"
 	ChainTRON        ChainType = "TRX"
+	ChainExternalPayment      ChainType = "EXTERNAL_PAYMENT"
 
 	ChainFiat ChainType = "Fiat"
 )
@@ -47,6 +48,7 @@ func GetAllSupportedChainTypes() []ChainType {
 		ChainConflux,
 		ChainSolana,
 		ChainTRON,
+		ChainExternalPayment,
 		ChainFiat,
 	}
 }

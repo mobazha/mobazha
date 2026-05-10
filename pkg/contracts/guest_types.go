@@ -88,6 +88,16 @@ type GuestOrderStatusResponse struct {
 	Items          []models.GuestOrderItem `json:"items"`
 	ExpiresAt      time.Time               `json:"expiresAt"`
 	CreatedAt      time.Time               `json:"createdAt"`
+	// Pool-stage UX hint (currently EXTERNAL_PAYMENT only). When PoolDetected is true,
+	// a mempool transfer has been observed but is not yet mined; the order
+	// is still in AWAITING_PAYMENT and may transition to PAYMENT_DETECTED
+	// (if mined) or EXPIRED (if evicted / never mined). Frontends use this
+	// to show "we saw your payment, waiting for confirmation" instead of a
+	// blank "waiting for payment" screen.
+	PoolDetected   bool       `json:"poolDetected,omitempty"`
+	PoolTxHash     string     `json:"poolTxHash,omitempty"`
+	PoolAmount     uint64     `json:"poolAmount,omitempty"`
+	PoolDetectedAt *time.Time `json:"poolDetectedAt,omitempty"`
 }
 
 // GuestOrderFilter for listing guest orders.

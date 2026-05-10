@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,10 +19,13 @@ func TestRequiredConfsForCoin(t *testing.T) {
 	}{
 		{"LTC native", iwallet.CoinType("crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native"), 3},
 		{"BTC native", iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native"), 1},
+		// EVM/Solana/TRON: 0 confs — see godoc on requiredConfsForCoin
+		// (no confirmation polling implemented for these chains yet).
 		{"ETH native", iwallet.CoinType("crypto:eip155:1:native"), 0},
 		{"SOL native", iwallet.CoinType("crypto:solana:mainnet:native"), 0},
 		{"BSC native", iwallet.CoinType("crypto:eip155:56:native"), 0},
 		{"TRON native", iwallet.CoinType("crypto:tron:mainnet:native"), 0},
+		{"EXTERNAL_PAYMENT native", iwallet.CoinType("crypto:external_payment:mainnet:native"), 10},
 		{"unknown fallback", iwallet.CoinType("INVALID"), 1},
 	}
 	for _, tt := range tests {
@@ -44,7 +48,7 @@ func TestHandlePaymentDetected_ZeroConfs_AtomicFunded(t *testing.T) {
 		ExpiresAt:     time.Now().Add(time.Hour),
 	})
 
-	err := svc.HandlePaymentDetected("gst_test_zero_confs", "0xabc123")
+	err := svc.HandlePaymentDetected("gst_test_zero_confs", "0xabc123", nil)
 	require.NoError(t, err)
 
 	order := loadGuestOrder(t, db, "gst_test_zero_confs")
@@ -65,7 +69,7 @@ func TestHandlePaymentDetected_NonZeroConfs_StaysDetected(t *testing.T) {
 		ExpiresAt:     time.Now().Add(time.Hour),
 	})
 
-	err := svc.HandlePaymentDetected("gst_test_ltc", "ltctxhash123")
+	err := svc.HandlePaymentDetected("gst_test_ltc", "ltctxhash123", nil)
 	require.NoError(t, err)
 
 	order := loadGuestOrder(t, db, "gst_test_ltc")
@@ -140,7 +144,7 @@ func TestHandlePaymentDetected_IdempotentForLaterStates(t *testing.T) {
 				ExpiresAt:     time.Now().Add(time.Hour),
 			})
 
-			err := svc.HandlePaymentDetected(token, "0xtx")
+			err := svc.HandlePaymentDetected(token, "0xtx", nil)
 			require.NoError(t, err, "should be idempotent for state %s", tc.state)
 		})
 	}
@@ -158,9 +162,92 @@ func TestHandlePaymentDetected_WrongState_Error(t *testing.T) {
 		ExpiresAt:     time.Now().Add(time.Hour),
 	})
 
-	err := svc.HandlePaymentDetected("gst_expired", "0xtx")
+	err := svc.HandlePaymentDetected("gst_expired", "0xtx", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "state mismatch")
+}
+
+// TestHandlePoolPayment_KeepsAwaitingState exercises the EXTERNAL_PAYMENT pool-stage UX
+// hint contract: HandlePoolPayment must NOT transition state out of
+// AWAITING_PAYMENT, must populate the pool-stage fields for the buyer-facing
+// status response, and must be idempotent across repeated polls.
+func TestHandlePoolPayment_KeepsAwaitingState(t *testing.T) {
+	db := newGuestTestDB(t)
+	svc := &GuestOrderAppService{db: db}
+
+	seedGuestOrder(t, db, 300, models.GuestOrder{
+		OrderToken:    "gst_external_payment_pool",
+		State:         models.GuestOrderAwaitingPayment,
+		PaymentCoin:   "crypto:external_payment:mainnet:native",
+		RequiredConfs: 10,
+		ExpiresAt:     time.Now().Add(time.Hour),
+	})
+
+	// Phase 1: pool detection — state must stay AWAITING_PAYMENT,
+	// PoolTxHash + PoolAmount + PoolDetectedAt populated.
+	err := svc.HandlePoolPayment("gst_external_payment_pool", "external_paymenttxhash001", 50_000_000_000)
+	require.NoError(t, err)
+	order := loadGuestOrder(t, db, "gst_external_payment_pool")
+	assert.Equal(t, models.GuestOrderAwaitingPayment, order.State,
+		"pool observation must NOT transition state — preserves CleanupExpiredOrders sweep semantics")
+	assert.Equal(t, "external_paymenttxhash001", order.PoolTxHash)
+	assert.Equal(t, uint64(50_000_000_000), order.PoolAmount)
+	require.NotNil(t, order.PoolDetectedAt)
+	firstDetectedAt := *order.PoolDetectedAt
+
+	// Phase 1 idempotent: same (txHash, amount) is a no-op; PoolDetectedAt
+	// must NOT churn to keep the buyer-facing timestamp stable across polls.
+	time.Sleep(2 * time.Millisecond)
+	err = svc.HandlePoolPayment("gst_external_payment_pool", "external_paymenttxhash001", 50_000_000_000)
+	require.NoError(t, err)
+	order = loadGuestOrder(t, db, "gst_external_payment_pool")
+	require.NotNil(t, order.PoolDetectedAt)
+	assert.True(t, firstDetectedAt.Equal(*order.PoolDetectedAt),
+		"identical pool observations must be no-ops to keep PoolDetectedAt stable")
+
+	// Phase 2: confirmed detection upgrades state and persists block height.
+	// PoolDetectedAt is preserved (it's a UX hint about when we first saw the tx).
+	opts := &contracts.PaymentDetectedOpts{TxBlockHeight: 12345}
+	err = svc.HandlePaymentDetected("gst_external_payment_pool", "external_paymenttxhash001", opts)
+	require.NoError(t, err)
+	order = loadGuestOrder(t, db, "gst_external_payment_pool")
+	assert.Equal(t, models.GuestOrderPaymentDetected, order.State,
+		"state advances on confirmed detection")
+	assert.Equal(t, uint64(12345), order.ExternalPaymentTxHeight)
+	assert.Equal(t, "external_paymenttxhash001", order.PaymentTxHash)
+	require.NotNil(t, order.PoolDetectedAt, "PoolDetectedAt is preserved post-confirmation")
+
+	// Phase 3: pool poll fires AFTER confirmed (race during poll cadence).
+	// HandlePoolPayment must be a no-op on non-AWAITING orders to avoid
+	// stomping on the on-chain state machine.
+	err = svc.HandlePoolPayment("gst_external_payment_pool", "external_paymenttxhash001", 60_000_000_000)
+	require.NoError(t, err)
+	order = loadGuestOrder(t, db, "gst_external_payment_pool")
+	assert.Equal(t, models.GuestOrderPaymentDetected, order.State, "state unchanged")
+	assert.Equal(t, uint64(50_000_000_000), order.PoolAmount,
+		"PoolAmount frozen post-confirmation — on-chain state owns truth")
+}
+
+func TestHandlePaymentDetected_EXTERNAL_PAYMENT_DirectConfirmed(t *testing.T) {
+	db := newGuestTestDB(t)
+	svc := &GuestOrderAppService{db: db}
+
+	seedGuestOrder(t, db, 301, models.GuestOrder{
+		OrderToken:    "gst_external_payment_direct",
+		State:         models.GuestOrderAwaitingPayment,
+		PaymentCoin:   "crypto:external_payment:mainnet:native",
+		RequiredConfs: 10,
+		ExpiresAt:     time.Now().Add(time.Hour),
+	})
+
+	// Skip pool, go directly to confirmed detection
+	opts := &contracts.PaymentDetectedOpts{TxBlockHeight: 99000}
+	err := svc.HandlePaymentDetected("gst_external_payment_direct", "external_paymenttxhash002", opts)
+	require.NoError(t, err)
+	order := loadGuestOrder(t, db, "gst_external_payment_direct")
+	assert.Equal(t, models.GuestOrderPaymentDetected, order.State)
+	assert.Equal(t, uint64(99000), order.ExternalPaymentTxHeight)
+	assert.Equal(t, "external_paymenttxhash002", order.PaymentTxHash)
 }
 
 func TestValidateCoinAvailability(t *testing.T) {
@@ -240,5 +327,33 @@ func TestValidateCoinAvailability(t *testing.T) {
 	t.Run("Full build allows TRON", func(t *testing.T) {
 		err := fullBuildSvc.validateCoinAvailability(tronCoin, tronInfo)
 		assert.NoError(t, err)
+	})
+
+	external_paymentCoin := iwallet.CoinType("crypto:external_payment:mainnet:native")
+	external_paymentInfo, _ := iwallet.CoinInfoFromCoinType(external_paymentCoin)
+
+	t.Run("PrivateDistribution rejects EXTERNAL_PAYMENT without client", func(t *testing.T) {
+		err := private_distributionSvc.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ExternalPayment wallet-rpc not configured")
+	})
+
+	external_paymentSvc := &GuestOrderAppService{
+		supportedUTXOChains: toChainSet([]iwallet.ChainType{iwallet.ChainLitecoin}),
+		external_paymentAvailable:     func() bool { return true },
+	}
+	t.Run("EXTERNAL_PAYMENT allowed when client available and healthy", func(t *testing.T) {
+		err := external_paymentSvc.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
+		assert.NoError(t, err)
+	})
+
+	external_paymentUnhealthy := &GuestOrderAppService{
+		supportedUTXOChains: toChainSet([]iwallet.ChainType{iwallet.ChainLitecoin}),
+		external_paymentAvailable:     func() bool { return false },
+	}
+	t.Run("EXTERNAL_PAYMENT rejected when client unhealthy", func(t *testing.T) {
+		err := external_paymentUnhealthy.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ExternalPayment wallet-rpc unreachable")
 	})
 }

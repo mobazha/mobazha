@@ -309,8 +309,22 @@ type AnalyticsProvider interface {
 	Analytics() AnalyticsService
 }
 
+// PaymentDetectedOpts carries chain-specific metadata for HandlePaymentDetected.
+// nil for chains that don't need extra metadata (UTXO/EVM/Solana — txHash
+// alone identifies the payment). Currently only ExternalPayment populates this:
+// EXTERNAL_PAYMENT has no global tx index, so the watcher must communicate the block
+// height for downstream confirmation polling. If a second chain needs
+// chain-specific metadata, evaluate switching to a typed-per-chain method
+// (e.g. HandleEXTERNAL_PAYMENTPaymentConfirmed) or a generic map[string]any.
+type PaymentDetectedOpts struct {
+	// TxBlockHeight is the block height of the confirmed EXTERNAL_PAYMENT transfer.
+	// 0 means the transfer was first observed in the mempool (pool phase).
+	TxBlockHeight uint64
+}
+
 // GuestOrderService exposes Guest Checkout order lifecycle operations.
 // Anonymous buyers interact via HTTP (no P2P, no escrow).
+//
 // Handlers that need typed request/response objects use type assertion to the
 // concrete *GuestOrderAppService (same pattern as WebhookProvider).
 type GuestOrderService interface {
@@ -325,8 +339,15 @@ type GuestOrderService interface {
 	ListGuestOrders(ctx context.Context, filter GuestOrderFilter) ([]models.GuestOrder, int64, error)
 	ShipGuestOrder(ctx context.Context, token string, tracking, carrier string) error
 	CompleteGuestOrder(ctx context.Context, token string) error
-	HandlePaymentDetected(orderToken string, txHash string) error
+	HandlePaymentDetected(orderToken, txHash string, opts *PaymentDetectedOpts) error
 	HandleConfirmationUpdate(orderToken string, confs int) error
+	// HandlePoolPayment records a mempool-only payment observation (currently
+	// EXTERNAL_PAYMENT-only). It does NOT change order state — the order remains in
+	// AWAITING_PAYMENT until the transfer is mined and HandlePaymentDetected
+	// fires. This preserves the invariant that PAYMENT_DETECTED implies an
+	// on-chain tx, while still surfacing a "we saw your pool tx" hint to
+	// the buyer via GetGuestOrderStatus. poolAmount is in atomic units.
+	HandlePoolPayment(orderToken, txHash string, poolAmount uint64) error
 	// HandleLatePayment records a payment that arrived but cannot fund the
 	// order (partial / overpay / received after expiry). It persists the
 	// txHash for seller-side recovery without changing the order state, so

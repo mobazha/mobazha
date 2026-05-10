@@ -22,6 +22,7 @@ const (
 	NamespaceSolana      Namespace = "solana"
 	NamespaceBitcoinCash Namespace = "bitcoincash"
 	NamespaceZCash       Namespace = "zcash"
+	NamespaceExternalPayment      Namespace = "external_payment"
 )
 
 type Standard string
@@ -92,6 +93,7 @@ var (
 	tronChainRefs   = map[string]struct{}{"mainnet": {}, "shasta": {}, "nile": {}}
 	bchChainRefs    = map[string]struct{}{"mainnet": {}, "testnet": {}}
 	zecChainRefs    = map[string]struct{}{"mainnet": {}, "testnet": {}}
+	external_paymentChainRefs = map[string]struct{}{"mainnet": {}, "stagenet": {}, "testnet": {}}
 )
 
 func validateChainRefWhitelist(ns Namespace, chainRef string, allowed map[string]struct{}) (string, error) {
@@ -181,6 +183,8 @@ func normalizeChainRef(ns Namespace, chainRef string) (string, error) {
 		return validateChainRefWhitelist(ns, chainRef, bchChainRefs)
 	case NamespaceZCash:
 		return validateChainRefWhitelist(ns, chainRef, zecChainRefs)
+	case NamespaceExternalPayment:
+		return validateChainRefWhitelist(ns, chainRef, external_paymentChainRefs)
 	default:
 		return "", newError(ErrCodeInvalidNamespace, fmt.Sprintf("unsupported namespace %q", ns))
 	}
@@ -208,7 +212,7 @@ func validateStandardForNamespace(ns Namespace, standard Standard) error {
 			return newError(ErrCodeInvalidStandard, fmt.Sprintf("namespace %s only supports native/spl", ns))
 		}
 		return nil
-	case NamespaceBitcoinCash, NamespaceZCash:
+	case NamespaceBitcoinCash, NamespaceZCash, NamespaceExternalPayment:
 		if standard != StandardNative {
 			return newError(ErrCodeInvalidStandard, fmt.Sprintf("namespace %s only supports native", ns))
 		}
@@ -249,7 +253,7 @@ func normalizeAssetRef(ns Namespace, standard Standard, assetRef string) (string
 		}
 		return pk.String(), nil
 
-	case NamespaceBIP122, NamespaceBitcoinCash, NamespaceZCash:
+	case NamespaceBIP122, NamespaceBitcoinCash, NamespaceZCash, NamespaceExternalPayment:
 		return "", newError(ErrCodeInvalidStandard, fmt.Sprintf("namespace %s does not support token asset_ref", ns))
 
 	default:

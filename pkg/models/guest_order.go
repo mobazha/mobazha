@@ -77,6 +77,18 @@ type GuestOrder struct {
 	Confirmations  int    `json:"confirmations"`
 	RequiredConfs  int    `json:"requiredConfs"`
 	AddressIndex   uint32 `json:"-"`
+	ExternalPaymentTxHeight uint64 `json:"-"`
+
+	// Pool-stage tracking (currently only populated by ExternalPayment, where
+	// mempool transfers are visible via wallet-rpc). These fields are a
+	// UX hint only — the order remains in AWAITING_PAYMENT until the
+	// transfer is mined and HandlePaymentDetected fires. This keeps the
+	// invariant `state == PAYMENT_DETECTED ⇒ tx is on-chain` and lets
+	// CleanupExpiredOrders handle pool-evicted orders without special
+	// casing. PoolAmount is in atomic units of PaymentCoin.
+	PoolTxHash      string     `json:"poolTxHash,omitempty"`
+	PoolAmount      uint64     `json:"poolAmount,omitempty"`
+	PoolDetectedAt  *time.Time `json:"poolDetectedAt,omitempty"`
 
 	// Pricing (denormalized totals in listing currency)
 	Subtotal          uint64 `json:"subtotal"`

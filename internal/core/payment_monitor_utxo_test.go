@@ -10,10 +10,9 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/sources/electrum"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
@@ -649,47 +648,8 @@ func TestCheckOrderPendingPayment(t *testing.T) {
 }
 
 // Note: TestMobazhaNode_releaseFromCancelableAddress is defined in cancel_test.go
-
-// TestExtractBuyerAddressFromRealNetwork tests fetching a real LTC testnet transaction
-// and verifying the from address is correctly populated.
-// Transaction: f946ec1b50c2a150dd55571028e28cefc94cdfd8cd6c5dfc34cfd8ec151eda2f
-func TestExtractBuyerAddressFromRealNetwork(t *testing.T) {
-	ctx := context.Background()
-
-	// Create Electrum source for LTC testnet
-	source := electrum.NewSource(iwallet.ChainLitecoin, nil, true)
-	err := source.Connect(ctx)
-	require.NoError(t, err, "Failed to connect to Electrum server")
-	defer source.Close()
-
-	// Real LTC testnet transaction ID
-	txid := "f946ec1b50c2a150dd55571028e28cefc94cdfd8cd6c5dfc34cfd8ec151eda2f"
-
-	// Fetch transaction from network
-	tx, err := source.GetTransaction(ctx, txid)
-	require.NoError(t, err, "Failed to get transaction from Electrum")
-	require.NotNil(t, tx)
-
-	// Verify transaction has inputs with addresses populated
-	require.NotEmpty(t, tx.From, "Transaction should have inputs")
-
-	// Get the from address
-	fromAddress := ""
-	for _, from := range tx.From {
-		if from.Address.String() != "" {
-			fromAddress = from.Address.String()
-			break
-		}
-	}
-
-	// Verify from address is not empty
-	assert.NotEmpty(t, fromAddress, "From address should be populated by Electrum source")
-
-	// Log the actual address for verification
-	t.Logf("Transaction %s from address: %s", txid, fromAddress)
-
-	// The expected from address based on the previous transaction output
-	// This is the buyer's original address that should be used for refunds
-	expectedFromAddress := "tltc1qlzvdlmughcr6frf5pq89jq8c30tn43wpqnqq7q"
-	assert.Equal(t, expectedFromAddress, fromAddress, "From address should match expected buyer address")
-}
+//
+// TestExtractBuyerAddressFromRealNetwork lives in
+// payment_monitor_utxo_integration_test.go behind the `integration` build
+// tag because it requires outbound TLS to a public LTC testnet Electrum
+// server. Run it with `go test -tags integration ./internal/core/...`.

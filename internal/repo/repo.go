@@ -9,6 +9,7 @@ import (
 	"path"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -18,6 +19,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/internal/version"
+	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/tyler-smith/go-bip39"
@@ -550,11 +552,25 @@ func autoMigrateDatabase(db database.Database) error {
 	}
 
 	return db.Update(func(tx database.Tx) error {
-		// 先迁移其他表
+		// Phase 1: Detect v4 tables that need composite PK rebuild.
+		// GORM AutoMigrate cannot change primary keys in SQLite, so we
+		// rename old tables, let AutoMigrate create new ones with the
+		// correct (tenant_id, ...) composite PK, then copy data back.
+		backups, err := prepareV4PKMigration(tx)
+		if err != nil {
+			return fmt.Errorf("v4 PK migration prep failed: %v", err)
+		}
+
+		// Phase 2: AutoMigrate all models
 		for _, m := range dbModels {
 			if err := tx.Migrate(m); err != nil {
 				return fmt.Errorf("failed to migrate table %s: %v", reflect.TypeOf(m).String(), err)
 			}
+		}
+
+		// Phase 3: Restore data from v4 backup tables
+		if err := completeV4PKMigration(tx, backups); err != nil {
+			return fmt.Errorf("v4 PK migration restore failed: %v", err)
 		}
 
 		// 特殊处理 ReceivingAccount 表
@@ -607,6 +623,121 @@ func autoMigrateDatabase(db database.Database) error {
 
 		return nil
 	})
+}
+
+// v4BackupTable holds info needed to restore data after PK migration.
+type v4BackupTable struct {
+	tableName  string
+	backupName string
+	columns    []string // non-tenant_id column names from old table
+}
+
+// prepareV4PKMigration detects tables from old v4 databases that have
+// single-column primary keys instead of the required composite PKs with
+// tenant_id. For each such table it renames the old table to a backup so
+// that AutoMigrate can create the correct table. Returns the list of tables
+// whose data needs to be restored after AutoMigrate.
+func prepareV4PKMigration(tx database.Tx) ([]v4BackupTable, error) {
+	type pragmaCol struct {
+		Name string `gorm:"column:name"`
+		PK   int    `gorm:"column:pk"`
+	}
+
+	// Tables that had single-column PKs in v4 and now require composite
+	// PKs including tenant_id. Tables added in v3.0.0 (discounts, shipping,
+	// public_data, etc.) are excluded — they don't exist in v4.
+	candidates := []string{
+		"keys",
+		"outgoing_messages",
+		"incoming_messages",
+		"notification_records",
+		"follower_stats",
+		"follow_sequences",
+		"events",
+		"orders",
+		"transaction_metadata",
+		"user_preferences",
+		"store_and_forward_servers",
+		"cases",
+		"store_cart_records",
+	}
+
+	var backups []v4BackupTable
+
+	for _, name := range candidates {
+		var cols []pragmaCol
+		tx.Read().Raw(fmt.Sprintf("PRAGMA table_info(`%s`)", name)).Scan(&cols)
+		if len(cols) == 0 {
+			continue
+		}
+
+		tenantInPK := false
+		var dataCols []string
+		for _, c := range cols {
+			if c.Name == "tenant_id" {
+				if c.PK > 0 {
+					tenantInPK = true
+				}
+				continue
+			}
+			dataCols = append(dataCols, c.Name)
+		}
+
+		if tenantInPK {
+			continue
+		}
+
+		backup := "_v4_bak_" + name
+
+		// Drop any leftover from a previous failed attempt
+		tx.Read().Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", backup))
+
+		if err := tx.Read().Exec(
+			fmt.Sprintf("ALTER TABLE `%s` RENAME TO `%s`", name, backup),
+		).Error; err != nil {
+			return nil, fmt.Errorf("rename %s → %s: %v", name, backup, err)
+		}
+		log.Infof("V4 PK migration: renamed %s → %s", name, backup)
+
+		backups = append(backups, v4BackupTable{
+			tableName:  name,
+			backupName: backup,
+			columns:    dataCols,
+		})
+	}
+
+	return backups, nil
+}
+
+// completeV4PKMigration copies data from backup tables into the newly
+// created tables (with correct composite PKs) and drops the backups.
+func completeV4PKMigration(tx database.Tx, backups []v4BackupTable) error {
+	for _, b := range backups {
+		quoted := make([]string, len(b.columns))
+		for i, c := range b.columns {
+			quoted[i] = "`" + c + "`"
+		}
+		colList := strings.Join(quoted, ", ")
+
+		sql := fmt.Sprintf(
+			"INSERT OR IGNORE INTO `%s` (`tenant_id`, %s) SELECT '%s', %s FROM `%s`",
+			b.tableName, colList,
+			pkgdb.StandaloneTenantID,
+			colList, b.backupName,
+		)
+		if err := tx.Read().Exec(sql).Error; err != nil {
+			return fmt.Errorf("restore %s: %v", b.tableName, err)
+		}
+
+		if err := tx.Read().Exec(
+			fmt.Sprintf("DROP TABLE `%s`", b.backupName),
+		).Error; err != nil {
+			return fmt.Errorf("drop backup %s: %v", b.backupName, err)
+		}
+
+		log.Infof("V4 PK migration: restored %s (%d cols)", b.tableName, len(b.columns))
+	}
+	return nil
 }
 
 // autoMigrateDatabaseManagedEscrow is the shared-DB variant of autoMigrateDatabase.

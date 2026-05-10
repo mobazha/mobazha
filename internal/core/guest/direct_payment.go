@@ -12,6 +12,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/external_payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -47,9 +48,12 @@ type PaymentAddressResult struct {
 // DirectPaymentService generates unique payment addresses for Guest Checkout orders.
 // For UTXO/EVM/TRON chains, it derives HD addresses from the node's BIP44 master key.
 // For Solana, it generates a one-time reference key while using the seller's address directly.
+// For ExternalPayment, it creates subaddresses via external_payment-wallet-rpc.
 type DirectPaymentService struct {
-	db         database.Database
-	keyDeriver BIP44KeyDeriver
+	db           database.Database
+	keyDeriver   BIP44KeyDeriver
+	external_paymentSource external_payment.Source
+	external_paymentAccount   uint32
 }
 
 // NewDirectPaymentService creates a DirectPaymentService.
@@ -62,6 +66,14 @@ func NewDirectPaymentService(
 		db:         db,
 		keyDeriver: keyDeriver,
 	}
+}
+
+// SetExternalPaymentSource injects the ExternalPayment wallet-rpc source for subaddress generation.
+// Pass the same Source the Monitor was built against to keep address generation
+// and payment detection bound to one wallet account.
+func (s *DirectPaymentService) SetExternalPaymentSource(source external_payment.Source, accountIndex uint32) {
+	s.external_paymentSource = source
+	s.external_paymentAccount = accountIndex
 }
 
 // GeneratePaymentAddress creates a payment address for a Guest Order.
@@ -78,6 +90,8 @@ func (s *DirectPaymentService) GeneratePaymentAddress(ctx context.Context, req P
 		return s.derivePaymentAddress(ctx, coinInfo.Chain, req)
 	case coinInfo.Chain == iwallet.ChainSolana:
 		return s.generateSolanaReference(ctx, coinInfo.Chain, req)
+	case coinInfo.Chain == iwallet.ChainExternalPayment:
+		return s.generateExternalPaymentSubaddress(ctx, req)
 	default:
 		return nil, fmt.Errorf("unsupported chain for guest checkout: %s", coinInfo.Chain)
 	}
@@ -148,6 +162,27 @@ func (s *DirectPaymentService) generateSolanaReference(
 	return &PaymentAddressResult{
 		Address:      account.Address,
 		ReferenceKey: base58.Encode(refPubKey),
+	}, nil
+}
+
+// generateExternalPaymentSubaddress creates a new subaddress via external_payment-wallet-rpc.
+// The subaddress index is stored in AddressIndex for later transfer matching.
+// Note: SweepTo is intentionally empty — EXTERNAL_PAYMENT auto-sweep is not supported in Phase B.
+// Funds stay in the wallet-rpc subaddress until manual withdrawal by the seller.
+func (s *DirectPaymentService) generateExternalPaymentSubaddress(ctx context.Context, req PaymentAddressRequest) (*PaymentAddressResult, error) {
+	if s.external_paymentSource == nil {
+		return nil, fmt.Errorf("external_payment wallet-rpc client not configured")
+	}
+
+	label := fmt.Sprintf("guest_%s", req.OrderToken)
+	addr, addrIndex, err := s.external_paymentSource.CreateAddress(ctx, s.external_paymentAccount, label)
+	if err != nil {
+		return nil, fmt.Errorf("create EXTERNAL_PAYMENT subaddress: %w", err)
+	}
+
+	return &PaymentAddressResult{
+		Address:      addr,
+		AddressIndex: addrIndex,
 	}, nil
 }
 

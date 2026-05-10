@@ -10,7 +10,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	walletbase "github.com/mobazha/mobazha3.0/internal/chains/base"
 	"github.com/mobazha/mobazha3.0/internal/net"
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"

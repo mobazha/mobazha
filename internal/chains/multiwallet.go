@@ -170,6 +170,22 @@ func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 			}
 
 			multiwallet[chain] = w
+		case iwallet.ChainExternalPayment:
+			// ExternalPayment is intentionally not part of Multiwallet:
+			//   - keys live inside the external_payment-wallet-rpc sidecar (not a shared
+			//     in-process KeyStore), so the iwallet.Wallet contract
+			//     (Spend/Sweep/HasKey/Balance) cannot be honoured here without
+			//     leaking abstractions or breaking EXTERNAL_PAYMENT's privacy model;
+			//   - on-chain transactions are not publicly visible (no
+			//     GetTransaction semantics);
+			//   - guest-checkout integration goes through
+			//     pkg/external_payment.Source (impl: internal/chains/external_payment.Client) +
+			//     pkg/external_payment.Monitor + DirectPaymentService instead.
+			// GetAllSupportedChainTypes() includes ChainExternalPayment so that
+			// ChainType.IsValid() and unrelated enumeration paths still treat
+			// it as a recognised chain, but we explicitly skip it here rather
+			// than fall through to the "implementation missing" error.
+			continue
 		default:
 			return nil, nil, fmt.Errorf("a wallet implementation for %s does not exist", chain)
 		}

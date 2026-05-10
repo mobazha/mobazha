@@ -42,10 +42,13 @@ func (m *mockGuestSvc) ShipGuestOrder(ctx context.Context, token string, trackin
 func (m *mockGuestSvc) CompleteGuestOrder(ctx context.Context, token string) error {
 	return nil
 }
-func (m *mockGuestSvc) HandlePaymentDetected(orderToken string, txHash string) error {
+func (m *mockGuestSvc) HandlePaymentDetected(orderToken string, txHash string, _ *contracts.PaymentDetectedOpts) error {
 	return nil
 }
 func (m *mockGuestSvc) HandleConfirmationUpdate(orderToken string, confs int) error {
+	return nil
+}
+func (m *mockGuestSvc) HandlePoolPayment(orderToken, txHash string, amount uint64) error {
 	return nil
 }
 func (m *mockGuestSvc) HandleLatePayment(orderToken, txHash, status string, paid, expected uint64) error {

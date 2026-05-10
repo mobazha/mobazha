@@ -10,6 +10,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pkgexternal_payment "github.com/mobazha/mobazha3.0/pkg/external_payment"
 	"github.com/mobazha/mobazha3.0/pkg/redact"
 	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -18,9 +19,19 @@ import (
 const (
 	evmPollInterval    = 15 * time.Second
 	solanaPollInterval = 5 * time.Second
-	evmGracePeriod     = 1 * time.Hour
-	solanaGracePeriod  = 30 * time.Minute
-	utxoGracePeriod    = 1 * time.Hour
+	// confirmationPollInterval is the tick used by pollConfirmationsLoop
+	// for every chain family. UTXO and ExternalPayment historically both used 30s;
+	// EVM/Solana have their own confs-less monitors elsewhere and are
+	// unaffected.
+	confirmationPollInterval = 30 * time.Second
+	evmGracePeriod           = 1 * time.Hour
+	solanaGracePeriod        = 30 * time.Minute
+	utxoGracePeriod          = 1 * time.Hour
+	// external_paymentGracePeriod is the legacy constant retained for the watcher's
+	// confirmation deadline computation. Subaddress reaping inside the
+	// pkg/external_payment monitor uses its own GracePeriod from MonitorConfig
+	// (defaulted to the same 2h to preserve historical behaviour).
+	external_paymentGracePeriod = 2 * time.Hour
 )
 
 // ChainBalanceChecker abstracts chain-specific balance queries so the monitor
@@ -42,10 +53,15 @@ type GuestPaymentMonitor struct {
 	guestService contracts.GuestOrderService
 	balanceCheck ChainBalanceChecker
 	solanaCheck  SolanaReferenceChecker
-	utxoMonitor  *pkgutxo.Monitor
-	chainOps     pkgutxo.ChainOperations
-	multiwallet  contracts.WalletOperator
-	gracePeriod  time.Duration
+	utxoMonitor   *pkgutxo.Monitor
+	chainOps      pkgutxo.ChainOperations
+	multiwallet   contracts.WalletOperator
+	external_paymentMonitor *pkgexternal_payment.Monitor
+	gracePeriod   time.Duration
+	// confirmationInterval is the tick used by pollConfirmationsLoop.
+	// Defaults to confirmationPollInterval (30s); test-only setter shrinks it
+	// so suite runtime stays under a second instead of multi-minute waits.
+	confirmationInterval time.Duration
 
 	mu      sync.Mutex
 	watches map[string]context.CancelFunc // orderToken → cancel
@@ -62,13 +78,26 @@ func NewGuestPaymentMonitor(
 	solanaCheck SolanaReferenceChecker,
 ) *GuestPaymentMonitor {
 	return &GuestPaymentMonitor{
-		db:           db,
-		guestService: guestService,
-		balanceCheck: balanceCheck,
-		solanaCheck:  solanaCheck,
-		gracePeriod:  utxoGracePeriod,
-		watches:      make(map[string]context.CancelFunc),
-		stopCh:       make(chan struct{}),
+		db:                   db,
+		guestService:         guestService,
+		balanceCheck:         balanceCheck,
+		solanaCheck:          solanaCheck,
+		gracePeriod:          utxoGracePeriod,
+		confirmationInterval: confirmationPollInterval,
+		watches:              make(map[string]context.CancelFunc),
+		stopCh:               make(chan struct{}),
+	}
+}
+
+// SetConfirmationPollInterval overrides the default 30s tick used by
+// pollConfirmationsLoop. Test-only — production callers should rely on
+// the default. Must be called before any WatchOrder for the change to
+// affect new polling goroutines.
+func (m *GuestPaymentMonitor) SetConfirmationPollInterval(d time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if d > 0 {
+		m.confirmationInterval = d
 	}
 }
 
@@ -96,6 +125,15 @@ func (m *GuestPaymentMonitor) SetMultiwallet(mw contracts.WalletOperator) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.multiwallet = mw
+}
+
+// SetExternalPaymentMonitor injects the per-account ExternalPayment monitor that fans out
+// transfers to subaddress watches. The monitor must already be Started
+// (its lifecycle is owned by the builder, not the guest layer).
+func (m *GuestPaymentMonitor) SetExternalPaymentMonitor(mon *pkgexternal_payment.Monitor) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.external_paymentMonitor = mon
 }
 
 // WatchOrder starts monitoring a newly created guest order for incoming payments.
@@ -148,7 +186,8 @@ func (m *GuestPaymentMonitor) RestoreWatches(ctx context.Context) error {
 
 	restored := 0
 	for i := range orders {
-		if time.Now().After(orders[i].ExpiresAt.Add(m.gracePeriod)) {
+		grace := gracePeriodForCoin(orders[i].PaymentCoin)
+		if time.Now().After(orders[i].ExpiresAt.Add(grace)) {
 			continue
 		}
 		if _, exists := m.watches[orders[i].OrderToken]; exists {
@@ -203,6 +242,15 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 			log.Warningf("no UTXO monitor for coin %q (order %s) — will retry on RestoreWatches", coinType, redact.Token(order.OrderToken))
 		}
 
+	case coinInfo.Chain == iwallet.ChainExternalPayment:
+		if m.external_paymentMonitor != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			m.watches[order.OrderToken] = cancel
+			go m.watchExternalPaymentOrder(ctx, order)
+		} else {
+			log.Warningf("no ExternalPayment monitor for order %s — will retry on RestoreWatches", redact.Token(order.OrderToken))
+		}
+
 	default:
 		log.Warningf("no monitor strategy for coin %q (order %s)", coinType, redact.Token(order.OrderToken))
 	}
@@ -243,7 +291,7 @@ func (m *GuestPaymentMonitor) checkBalancePayment(ctx context.Context, order *mo
 	}
 
 	if balance.Cmp(expectedAmount) >= 0 {
-		if err := m.guestService.HandlePaymentDetected(order.OrderToken, ""); err != nil {
+		if err := m.guestService.HandlePaymentDetected(order.OrderToken, "", nil); err != nil {
 			log.Warningf("handle payment detected for %s (%s): %v", redact.Token(order.OrderToken), order.PaymentCoin, err)
 			return false
 		}
@@ -282,7 +330,7 @@ func (m *GuestPaymentMonitor) checkSolanaPayment(ctx context.Context, order *mod
 		return false
 	}
 
-	if err := m.guestService.HandlePaymentDetected(order.OrderToken, txHash); err != nil {
+	if err := m.guestService.HandlePaymentDetected(order.OrderToken, txHash, nil); err != nil {
 		log.Warningf("handle Solana payment detected for %s: %v", redact.Token(order.OrderToken), err)
 		return false
 	}
@@ -341,7 +389,7 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 				log.Warningf("overpayment for guest order %s: paid=%d expected=%d tx=%s",
 					redact.Token(order.OrderToken), paid, expectedAmount, txHash)
 				}
-				if err := m.guestService.HandlePaymentDetected(order.OrderToken, txHash); err != nil {
+				if err := m.guestService.HandlePaymentDetected(order.OrderToken, txHash, nil); err != nil {
 					log.Warningf("handle UTXO payment detected for %s: %v", redact.Token(order.OrderToken), err)
 					return
 				}
@@ -368,6 +416,11 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 		return
 	}
 
+	// Single deadline shared with pollConfirmationsLoop, mirroring the
+	// EXTERNAL_PAYMENT watcher: payment window + grace covers both detection and
+	// confirmation polling.
+	deadline := order.ExpiresAt.Add(utxoGracePeriod)
+
 	// If the order was restored at PAYMENT_DETECTED (node restart), skip
 	// waiting for the detected channel and go straight to confirmation
 	// polling. The WatchAddress above is still needed so that any new
@@ -375,13 +428,13 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 	if order.State == models.GuestOrderPaymentDetected && order.PaymentTxHash != "" {
 		log.Infof("restored PAYMENT_DETECTED order %s — resuming confirmation polling for tx %s",
 			redact.Token(order.OrderToken), order.PaymentTxHash)
-		m.pollConfirmations(ctx, coinInfo.Chain, order.OrderToken, order.PaymentTxHash)
+		fetcher := &chainTxFetcher{ops: m.chainOps, chain: coinInfo.Chain, txHash: order.PaymentTxHash}
+		m.pollConfirmationsLoop(ctx, order.OrderToken, order.RequiredConfs, fetcher, deadline)
 		_ = m.utxoMonitor.UnwatchAddress(order.PaymentAddress)
 		return
 	}
 
-	expiry := order.ExpiresAt.Add(utxoGracePeriod)
-	expiryTimer := time.NewTimer(time.Until(expiry))
+	expiryTimer := time.NewTimer(time.Until(deadline))
 	defer expiryTimer.Stop()
 
 	select {
@@ -389,22 +442,57 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 	case <-m.stopCh:
 	case <-expiryTimer.C:
 	case txHash := <-detected:
-		m.pollConfirmations(ctx, coinInfo.Chain, order.OrderToken, txHash)
+		fetcher := &chainTxFetcher{ops: m.chainOps, chain: coinInfo.Chain, txHash: txHash}
+		m.pollConfirmationsLoop(ctx, order.OrderToken, order.RequiredConfs, fetcher, deadline)
 	}
 
 	_ = m.utxoMonitor.UnwatchAddress(order.PaymentAddress)
 }
 
-func (m *GuestPaymentMonitor) pollConfirmations(ctx context.Context, chain iwallet.ChainType, orderToken, txHash string) {
-	if m.chainOps == nil || !m.chainOps.IsHealthy(chain) {
-		log.Warningf("no chain ops for chain %s (order %s)", chain, redact.Token(orderToken))
-		return
+// pollConfirmationsLoop is the unified confirmation polling loop used by
+// every chain family (UTXO/EVM/Solana via chainTxFetcher, EXTERNAL_PAYMENT via
+// external_paymentHeightFetcher). It exits early — without burning extra RPC cycles —
+// once any of the following happens:
+//
+//   - confs reaches requiredConfs: the order has already transitioned to
+//     FUNDED inside HandleConfirmationUpdate and the auto-sweep task has been
+//     queued, so further polling is pure waste;
+//   - deadline elapses: the surrounding watcher has its own grace period,
+//     after which the order will be reconciled via the expiry path;
+//   - context / stopCh fires: monitor shutdown.
+//
+// requiredConfs comes from order.RequiredConfs (set at CreateOrder via
+// requiredConfsForCoin). requiredConfs <= 0 still triggers early exit on
+// the first successful update — leaving such orders to poll forever would
+// be a strictly worse failure mode than stopping eagerly.
+//
+// Health: a transient health failure (e.g. wallet-rpc restarting during
+// node startup, Electrum reconnect) MUST NOT terminate the loop — the
+// in-loop Healthy() check + continue plus the underlying source's own
+// backoff handle recovery. The loop only exits via ctx / stopCh / deadline
+// / requiredConfs-met. Previous code did an early-return on initial
+// !Healthy(), which silently broke confirmation polling for any order
+// whose monitor was rehydrated during a flaky window.
+//
+// Note: prior to unification the UTXO/EVM/Solana path did NOT early-exit on
+// funding threshold, so every funded order kept hitting Electrum/EVM RPC
+// every 30s until its 1h grace expired (~239 wasted calls per order). This
+// loop fixes that as a side effect of the merge.
+func (m *GuestPaymentMonitor) pollConfirmationsLoop(
+	ctx context.Context,
+	orderToken string,
+	requiredConfs int,
+	fetcher confirmationFetcher,
+	deadline time.Time,
+) {
+	interval := m.confirmationInterval
+	if interval <= 0 {
+		interval = confirmationPollInterval
 	}
-
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	graceTimer := time.NewTimer(utxoGracePeriod)
+	graceTimer := time.NewTimer(time.Until(deadline))
 	defer graceTimer.Stop()
 
 	for {
@@ -414,17 +502,50 @@ func (m *GuestPaymentMonitor) pollConfirmations(ctx context.Context, chain iwall
 		case <-m.stopCh:
 			return
 		case <-graceTimer.C:
+			log.Warningf("%s confirmation polling for %s expired (deadline reached)",
+				fetcher.Label(), redact.Token(orderToken))
 			return
 		case <-ticker.C:
-			confs, err := m.chainOps.GetTxConfirmations(chain, txHash)
+			if !fetcher.Healthy() {
+				continue
+			}
+			confs, err := fetcher.Fetch(ctx)
 			if err != nil {
-				log.Warningf("get tx %s confirmations: %v", txHash, err)
+				log.Warningf("%s confirmations for %s: %v",
+					fetcher.Label(), redact.Token(orderToken), err)
 				continue
 			}
 			if err := m.guestService.HandleConfirmationUpdate(orderToken, confs); err != nil {
-				log.Warningf("handle UTXO confirmation update for %s: %v", redact.Token(orderToken), err)
+				log.Warningf("handle %s confirmation update for %s: %v",
+					fetcher.Label(), redact.Token(orderToken), err)
+				continue
+			}
+			if requiredConfs > 0 && confs >= requiredConfs {
+				log.Infof("%s order %s reached %d/%d confirmations, polling complete",
+					fetcher.Label(), redact.Token(orderToken), confs, requiredConfs)
+				return
+			}
+			if requiredConfs <= 0 {
+				return
 			}
 		}
+	}
+}
+
+func gracePeriodForCoin(paymentCoin string) time.Duration {
+	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(paymentCoin))
+	if err != nil {
+		return utxoGracePeriod
+	}
+	switch {
+	case coinInfo.Chain == iwallet.ChainExternalPayment:
+		return external_paymentGracePeriod
+	case coinInfo.IsEthTypeChain() || coinInfo.Chain == iwallet.ChainTRON:
+		return evmGracePeriod
+	case coinInfo.Chain == iwallet.ChainSolana:
+		return solanaGracePeriod
+	default:
+		return utxoGracePeriod
 	}
 }
 
@@ -435,3 +556,159 @@ func parsePaymentAmount(amount string) (uint64, bool) {
 	}
 	return v, true
 }
+
+// watcherSettleSlack is how many monitor poll cycles the local expiry
+// timer waits past order.ExpiresAt + grace before unwatching the
+// subaddress. The monitor's reapExpired runs on its own pollLoop tick,
+// so the local watcher must outlive at least one (ideally a few) of those
+// ticks — otherwise the watcher's deferred UnwatchSubaddress can race the
+// monitor's late Partial/Expired callback, swallowing HandleLatePayment.
+//
+// Sized in multiples of PollInterval (default 30s × 4 = 2min slack) so
+// the buffer scales with whatever poll cadence the monitor is configured
+// for. Tests inject sub-second intervals; production uses 30s.
+const watcherSettleSlack = 4
+
+// computeWatcherDeadline returns the local expiryTimer deadline used by
+// watchExternalPaymentOrder. Extracted so the slack contract can be unit tested
+// without spinning up a full Monitor + Source stack. monitorPollInterval
+// is whatever pkg/external_payment.Monitor is currently configured with.
+func computeWatcherDeadline(orderDeadline time.Time, monitorPollInterval time.Duration) time.Time {
+	return orderDeadline.Add(time.Duration(watcherSettleSlack) * monitorPollInterval)
+}
+
+// watchExternalPaymentOrder is a thin watcher shell symmetric to watchUTXOOrder.
+// All polling and state machine work happens inside pkg/external_payment.Monitor —
+// this function just translates external_payment.PaymentEvent into the GuestOrderService
+// contract and drives confirmation polling once the order is funded.
+//
+// Lifecycle:
+//   - WatchSubaddress registers OnPayment with the monitor.
+//   - The first Confirmed/Overpay event hands off to pollConfirmationsLoop
+//     and the function returns once the loop completes.
+//   - Pool events fire HandlePoolPayment (UX hint; state stays in
+//     AWAITING_PAYMENT — see service.HandlePoolPayment for rationale).
+//   - Partial/Expired events fire HandleLatePayment and the watcher returns.
+//   - On context cancel / shutdown the function returns and the deferred
+//     UnwatchSubaddress unregisters.
+//
+// Expiry: the local select-case timer fires at
+// (deadline + watcherSettleSlack × PollInterval). The slack guarantees
+// the monitor's reapExpired has time to deliver Partial/Expired into our
+// terminated channel before we tear down. Without the slack, a tx that
+// arrives partial right at the grace boundary can be lost.
+func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, order *models.GuestOrder) {
+	defer func() {
+		m.mu.Lock()
+		delete(m.watches, order.OrderToken)
+		m.mu.Unlock()
+	}()
+
+	expectedAmount, ok := parsePaymentAmount(order.PaymentAmount)
+	if !ok || expectedAmount == 0 {
+		log.Warningf("invalid EXTERNAL_PAYMENT payment amount %q for order %s", order.PaymentAmount, redact.Token(order.OrderToken))
+		return
+	}
+
+	// Shared deadline: payment window + confirmation window. Same value is
+	// used both for the local select-case timeout and as the
+	// pollConfirmationsLoop deadline once the order funds.
+	deadline := order.ExpiresAt.Add(external_paymentGracePeriod)
+
+	type detection struct {
+		txHash string
+		height uint64
+	}
+	detected := make(chan detection, 1)
+	terminated := make(chan struct{})
+
+	wa := &pkgexternal_payment.WatchedSubaddress{
+		SubAddrIndex:   order.AddressIndex,
+		OrderID:        order.OrderToken,
+		ExpectedAmount: expectedAmount,
+		ExpiresAt:      order.ExpiresAt,
+		OnPayment: func(evt pkgexternal_payment.PaymentEvent) {
+			switch evt.Status {
+			case pkgexternal_payment.PaymentStatusConfirmed, pkgexternal_payment.PaymentStatusOverpay:
+				if evt.Status == pkgexternal_payment.PaymentStatusOverpay {
+					log.Warningf("EXTERNAL_PAYMENT overpayment for guest order %s: paid=%d expected=%d",
+						redact.Token(order.OrderToken), evt.TotalConfirmed, expectedAmount)
+				}
+				opts := &contracts.PaymentDetectedOpts{TxBlockHeight: evt.MaxBlockHeight}
+				if err := m.guestService.HandlePaymentDetected(order.OrderToken, evt.LastTxHash, opts); err != nil {
+					log.Warningf("handle EXTERNAL_PAYMENT confirmed payment for %s: %v", redact.Token(order.OrderToken), err)
+					return
+				}
+				select {
+				case detected <- detection{txHash: evt.LastTxHash, height: evt.MaxBlockHeight}:
+				default:
+				}
+
+			case pkgexternal_payment.PaymentStatusPool:
+				// Pool tx is mempool-only — record as a UX hint without
+				// changing order state. State remains AWAITING_PAYMENT
+				// until reapExpired (Partial/Expired) or a confirmed
+				// poll mines the tx. This preserves the invariant that
+				// PAYMENT_DETECTED implies an on-chain tx and lets
+				// CleanupExpiredOrders sweep pool-evicted orders on the
+				// AWAITING_PAYMENT path without special casing.
+				if err := m.guestService.HandlePoolPayment(order.OrderToken, evt.LastTxHash, evt.TotalPool); err != nil {
+					log.Warningf("handle EXTERNAL_PAYMENT pool payment for %s: %v", redact.Token(order.OrderToken), err)
+				}
+
+			case pkgexternal_payment.PaymentStatusPartial, pkgexternal_payment.PaymentStatusExpired:
+				status := "expired"
+				if evt.Status == pkgexternal_payment.PaymentStatusPartial {
+					status = "partial"
+				}
+				log.Warningf("EXTERNAL_PAYMENT watch for %s ended (%s); confirmed=%d pool=%d expected=%d",
+					redact.Token(order.OrderToken), status, evt.TotalConfirmed, evt.TotalPool, expectedAmount)
+				if err := m.guestService.HandleLatePayment(order.OrderToken, evt.LastTxHash, status, evt.TotalConfirmed, expectedAmount); err != nil {
+					log.Warningf("record EXTERNAL_PAYMENT %s payment for %s: %v", status, redact.Token(order.OrderToken), err)
+				}
+				select {
+				case <-terminated:
+				default:
+					close(terminated)
+				}
+			}
+		},
+	}
+
+	if err := m.external_paymentMonitor.WatchSubaddress(wa); err != nil {
+		log.Warningf("watch EXTERNAL_PAYMENT subaddr for %s: %v", redact.Token(order.OrderToken), err)
+		return
+	}
+	defer m.external_paymentMonitor.UnwatchSubaddress(order.AddressIndex)
+
+	// Watcher deadline = monitor's logical deadline + slack so reapExpired
+	// has time to deliver Partial/Expired before we unwatch. See
+	// watcherSettleSlack docs and computeWatcherDeadline.
+	watcherDeadline := computeWatcherDeadline(deadline, m.external_paymentMonitor.PollInterval())
+	expiryTimer := time.NewTimer(time.Until(watcherDeadline))
+	defer expiryTimer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-m.stopCh:
+		return
+	case <-expiryTimer.C:
+		// pollLoop's reapExpired didn't beat our deadline+slack —
+		// either it raced us (common; ReapWatch is idempotent) or
+		// wallet-rpc was unhealthy through the whole window (rare;
+		// reap with the last accumulated snapshot is best-effort but
+		// preferable to a silent UnwatchSubaddress that loses any
+		// pool/partial state).
+		log.Warningf("EXTERNAL_PAYMENT watcher for %s past deadline+slack; reaping",
+			redact.Token(order.OrderToken))
+		m.external_paymentMonitor.ReapWatch(order.AddressIndex)
+		return
+	case <-terminated:
+		return
+	case d := <-detected:
+		fetcher := &external_paymentHeightFetcher{monitor: m.external_paymentMonitor, txHeight: d.height}
+		m.pollConfirmationsLoop(ctx, order.OrderToken, order.RequiredConfs, fetcher, deadline)
+	}
+}
+

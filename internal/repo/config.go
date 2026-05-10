@@ -138,6 +138,20 @@ type Config struct {
 	// Each entry is "chain=sha256hex". Repeatable.
 	ElectrumTLSFingerprints []string `long:"electrumtls" description:"Per-chain Electrum TLS fingerprint (chain=sha256hex, repeatable)"`
 
+	// EXTERNAL_PAYMENTWalletRPCAddr is the external_payment-wallet-rpc JSON-RPC endpoint
+	// (e.g. "http://127.0.0.1:18082/json_rpc"). When empty, EXTERNAL_PAYMENT guest checkout is disabled.
+	EXTERNAL_PAYMENTWalletRPCAddr string `long:"external_paymentwalletrpc" description:"external_payment-wallet-rpc JSON-RPC endpoint (e.g. http://127.0.0.1:18082/json_rpc)"`
+
+	// EXTERNAL_PAYMENTWalletRPCUser is the HTTP Digest auth username for external_payment-wallet-rpc.
+	EXTERNAL_PAYMENTWalletRPCUser string `long:"external_paymentwalletrpcuser" description:"external_payment-wallet-rpc Digest auth username"`
+
+	// EXTERNAL_PAYMENTWalletRPCPass is the HTTP Digest auth password for external_payment-wallet-rpc.
+	EXTERNAL_PAYMENTWalletRPCPass string `long:"external_paymentwalletrpcpass" description:"external_payment-wallet-rpc Digest auth password"`
+
+	// EXTERNAL_PAYMENTAccountIndex is the ExternalPayment wallet account index for guest checkout
+	// subaddress generation. Default 0.
+	EXTERNAL_PAYMENTAccountIndex uint32 `long:"external_paymentaccount" description:"ExternalPayment wallet account index (default 0)"`
+
 	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.
 	// When set, the node uses this key instead of generating one from a mnemonic.
 	// This is used by mobazha_hosting to inject keys from KeyVault.

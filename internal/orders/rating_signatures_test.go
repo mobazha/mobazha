@@ -10,6 +10,7 @@ import (
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -270,7 +271,7 @@ func TestOrderProcessor_sendRatingSignatures(t *testing.T) {
 		ID: models.OrderID(orderID),
 	}
 
-	if err := order.PutMessage(utils.MustWrapOrderMessage(orderOpen)); err != nil {
+	if err := order.PutMessage(testutil.MustWrapOrderMessage(orderOpen)); err != nil {
 		t.Fatal(err)
 	}
 

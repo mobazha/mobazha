@@ -64,6 +64,8 @@ func (m *mockSolanaChecker) FindTransferByReference(_ context.Context, reference
 type recordingGuestService struct {
 	mu       sync.Mutex
 	detected []paymentDetection
+	pool     []poolDetection
+	late     []latePayment
 }
 
 type paymentDetection struct {
@@ -71,11 +73,48 @@ type paymentDetection struct {
 	txHash     string
 }
 
-func (r *recordingGuestService) HandlePaymentDetected(orderToken, txHash string) error {
+type poolDetection struct {
+	orderToken string
+	txHash     string
+	amount     uint64
+}
+
+type latePayment struct {
+	orderToken string
+	txHash     string
+	status     string
+	paid       uint64
+	expected   uint64
+}
+
+func (r *recordingGuestService) HandlePaymentDetected(orderToken, txHash string, _ *contracts.PaymentDetectedOpts) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.detected = append(r.detected, paymentDetection{orderToken, txHash})
 	return nil
+}
+
+func (r *recordingGuestService) HandlePoolPayment(orderToken, txHash string, amount uint64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.pool = append(r.pool, poolDetection{orderToken, txHash, amount})
+	return nil
+}
+
+func (r *recordingGuestService) getPoolDetections() []poolDetection {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := make([]poolDetection, len(r.pool))
+	copy(cp, r.pool)
+	return cp
+}
+
+func (r *recordingGuestService) getLatePayments() []latePayment {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := make([]latePayment, len(r.late))
+	copy(cp, r.late)
+	return cp
 }
 
 func (r *recordingGuestService) getDetections() []paymentDetection {
@@ -99,8 +138,11 @@ func (r *recordingGuestService) ShipGuestOrder(context.Context, string, string, 
 	return nil
 }
 func (r *recordingGuestService) CompleteGuestOrder(context.Context, string) error { return nil }
-func (r *recordingGuestService) HandleConfirmationUpdate(string, int) error       { return nil }
-func (r *recordingGuestService) HandleLatePayment(string, string, string, uint64, uint64) error {
+func (r *recordingGuestService) HandleConfirmationUpdate(string, int) error { return nil }
+func (r *recordingGuestService) HandleLatePayment(orderToken, txHash, status string, paid, expected uint64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.late = append(r.late, latePayment{orderToken, txHash, status, paid, expected})
 	return nil
 }
 func (r *recordingGuestService) CleanupExpiredOrders(context.Context)             {}
@@ -332,6 +374,137 @@ func TestStopAll_DoubleCallNoPanic(t *testing.T) {
 	monitor.WatchOrder(order)
 	monitor.StopAll()
 	monitor.StopAll()
+}
+
+// TestComputeWatcherDeadline_AddsSlackInPollIntervalUnits is the regression
+// guard for the architectural fix that prevents UnwatchSubaddress from
+// racing pkg/external_payment.Monitor's reapExpired callback. The watcher's local
+// expiryTimer must always fire AFTER the monitor has had at least one
+// reap cycle past the order's logical deadline; otherwise late
+// Partial/Expired events are silently dropped.
+//
+// Lock the contract numerically — if anyone reduces watcherSettleSlack or
+// changes the formula, this test fails before the bug ships.
+func TestComputeWatcherDeadline_AddsSlackInPollIntervalUnits(t *testing.T) {
+	tests := []struct {
+		name         string
+		pollInterval time.Duration
+		expectedAdd  time.Duration // watcherSettleSlack × pollInterval
+	}{
+		{"production-30s", 30 * time.Second, 2 * time.Minute},
+		{"test-100ms", 100 * time.Millisecond, 400 * time.Millisecond},
+		{"degenerate-zero", 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			base := time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC)
+			got := computeWatcherDeadline(base, tc.pollInterval)
+			delta := got.Sub(base)
+			if delta != tc.expectedAdd {
+				t.Fatalf("computeWatcherDeadline added %s, want %s", delta, tc.expectedAdd)
+			}
+		})
+	}
+}
+
+// fakeFetcher implements confirmationFetcher and lets us script Healthy()
+// transitions and Fetch() returns over time. Records every call so tests
+// can assert that the loop survives initial outages and eventually polls.
+type fakeFetcher struct {
+	mu       sync.Mutex
+	healthy  []bool // index per call; clamps to last element if exhausted
+	confs    []int
+	fetchErr []error
+	calls    int
+	healthCalls int
+}
+
+func (f *fakeFetcher) Healthy() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	idx := f.healthCalls
+	if idx >= len(f.healthy) {
+		idx = len(f.healthy) - 1
+	}
+	f.healthCalls++
+	if idx < 0 {
+		return true
+	}
+	return f.healthy[idx]
+}
+
+func (f *fakeFetcher) Fetch(ctx context.Context) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	idx := f.calls
+	if idx >= len(f.confs) {
+		idx = len(f.confs) - 1
+	}
+	f.calls++
+	if idx < 0 {
+		return 0, nil
+	}
+	var err error
+	if idx < len(f.fetchErr) {
+		err = f.fetchErr[idx]
+	}
+	return f.confs[idx], err
+}
+
+func (f *fakeFetcher) Label() string { return "FAKE" }
+
+func (f *fakeFetcher) fetchCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
+}
+
+// TestPollConfirmationsLoop_SurvivesInitialUnhealthy is the regression test
+// for P3 — the previous implementation early-returned on initial !Healthy(),
+// which silently broke confirmation polling whenever the monitor was
+// rehydrated during a flaky RPC window (node startup, sidecar reconnect).
+// The new loop must stay alive and pick up confirmations once the source
+// recovers.
+//
+// Drives a fake fetcher that returns unhealthy for the first poll and
+// healthy thereafter; uses SetConfirmationPollInterval to shrink the tick
+// so the test stays under a second.
+func TestPollConfirmationsLoop_SurvivesInitialUnhealthy(t *testing.T) {
+	svc := &recordingGuestService{}
+	monitor := NewGuestPaymentMonitor(nil, svc, nil, nil)
+	defer monitor.StopAll()
+	monitor.SetConfirmationPollInterval(20 * time.Millisecond)
+
+	// healthy=[false, true, true...] — first probe inside the loop reports
+	// unhealthy and we want it to skip rather than return. Fetch returns
+	// 5 confs once the source is healthy → meets requiredConfs=5 → loop
+	// exits early.
+	fetcher := &fakeFetcher{
+		healthy: []bool{false, true},
+		confs:   []int{5},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		deadline := time.Now().Add(2 * time.Second)
+		monitor.pollConfirmationsLoop(ctx, "gst_resilience_test", 5, fetcher, deadline)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Expected: loop noticed confs >= requiredConfs after the source
+		// recovered and exited cleanly. A pre-fix loop would have returned
+		// on the first Healthy()=false and never called Fetch at all.
+		if fetcher.fetchCount() == 0 {
+			t.Fatal("loop exited without ever calling Fetch — regression of P3 early-return bug")
+		}
+	case <-time.After(2500 * time.Millisecond):
+		t.Fatal("pollConfirmationsLoop did not exit within deadline")
+	}
 }
 
 func TestParseGuestOrderState_CaseInsensitive(t *testing.T) {

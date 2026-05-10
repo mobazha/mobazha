@@ -69,8 +69,13 @@ func (m *mockGuestOrderService) CompleteGuestOrder(ctx context.Context, token st
 	return nil
 }
 
-func (m *mockGuestOrderService) HandlePaymentDetected(string, string) error { return nil }
+func (m *mockGuestOrderService) HandlePaymentDetected(string, string, *contracts.PaymentDetectedOpts) error {
+	return nil
+}
 func (m *mockGuestOrderService) HandleConfirmationUpdate(string, int) error { return nil }
+func (m *mockGuestOrderService) HandlePoolPayment(string, string, uint64) error {
+	return nil
+}
 func (m *mockGuestOrderService) HandleLatePayment(string, string, string, uint64, uint64) error {
 	return nil
 }

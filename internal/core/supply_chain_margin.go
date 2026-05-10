@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"google.golang.org/protobuf/proto"
 )
 
 // freeShippingDiscountValueType matches mbzpb.Order.AppliedDiscount.valueType
@@ -467,9 +468,10 @@ func (s *SupplyChainAppService) convertDiscountsToListingCurrency(
 		if neg {
 			sign = "-"
 		}
-		clone := *d
+		// proto.Clone deep-copies without copying the embedded protoimpl.MessageState mutex.
+		clone := proto.Clone(d).(*pb.OrderOpen_AppliedDiscount)
 		clone.Amount = fmt.Sprintf("%s%d", sign, converted)
-		result = append(result, &clone)
+		result = append(result, clone)
 	}
 	return result, nil
 }

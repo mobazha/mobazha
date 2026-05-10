@@ -9,7 +9,6 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	"github.com/mobazha/mobazha3.0/internal/chains/evm"
-	"github.com/mobazha/mobazha3.0/internal/chains/fiat/shim"
 	"github.com/mobazha/mobazha3.0/internal/chains/solana"
 	tronWal "github.com/mobazha/mobazha3.0/internal/chains/tron"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
@@ -158,18 +157,23 @@ func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 			}
 			multiwallet[chain] = w
 		case iwallet.ChainFiat:
-			w, err := shim.NewFiatWalletShim(&base.WalletConfig{
-				NodeID:    cfg.NodeID,
-				Logger:    logger,
-				KeyStore:  keyStore,
-				Testnet:   cfg.UseTestnet,
-				NetConfig: cfg.NetConfig,
-			})
-			if err != nil {
-				return nil, nil, err
-			}
-
-			multiwallet[chain] = w
+			// Fiat is intentionally not part of Multiwallet, aligned with
+			// ChainExternalPayment handling below:
+			//   - no cryptographic keys (Stripe/PayPal manage tokens
+			//     server-side), so the iwallet.Wallet contract
+			//     (Spend/Sweep/HasKey/Balance/HD-derive) is a category
+			//     mismatch;
+			//   - no on-chain semantics (GetTransaction /
+			//     SubscribeTransactions / EstimateFee do not apply to
+			//     PaymentIntents);
+			//   - all fiat verification flows through
+			//     FiatPaymentAppService + FiatProviderRegistry instead of
+			//     iwallet.Wallet.
+			// GetAllSupportedChainTypes() retains ChainFiat so that
+			// ChainType.IsValid() and unrelated enumeration paths still treat
+			// it as a recognised chain; we explicitly skip wallet
+			// instantiation here.
+			continue
 		case iwallet.ChainExternalPayment:
 			// ExternalPayment is intentionally not part of Multiwallet:
 			//   - keys live inside the external_payment-wallet-rpc sidecar (not a shared
@@ -232,12 +236,7 @@ func (w *Multiwallet) WalletForCurrencyCode(currencyCode string) (iwallet.Wallet
 		return nil, err
 	}
 
-	chainType := coinInfo.Chain
-	if coinType.IsFiatPayment() {
-		chainType = iwallet.ChainFiat
-	}
-
-	if wallet, ok := (*w)[chainType]; ok {
+	if wallet, ok := (*w)[coinInfo.Chain]; ok {
 		return wallet, nil
 	}
 	return nil, ErrUnsuppertedCoin

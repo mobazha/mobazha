@@ -119,6 +119,9 @@ func (op *OrderProcessor) validatePaymentSent(coinType iwallet.CoinType, orderOp
 	if op.multiwallet == nil {
 		return nil
 	}
+	if coinType.IsFiatPayment() || paymentSent.Method == pb.PaymentSent_FIAT {
+		return nil
+	}
 	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 	if err != nil {
 		return fmt.Errorf("cannot validate paymentSent. coin not supported. %w", err)

@@ -828,10 +828,11 @@ func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creation
 			if err := solWallet.InitializeWithKey(solPrivKey, creationDate); err != nil {
 				return err
 			}
-		} else if chain == iwallet.ChainFiat {
-			// Do nothing
 		} else {
 			// 其他钱包使用 bip44Key
+			// Note: ChainFiat and ChainExternalPayment are intentionally excluded from
+			// the Multiwallet map (see internal/chains/multiwallet.go), so
+			// they cannot appear in this loop and need no special branch.
 			if !wallet.WalletExists() {
 				canonicalNative := iwallet.CoinType("")
 				if chain == iwallet.ChainMock {

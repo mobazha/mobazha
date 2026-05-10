@@ -282,7 +282,6 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		RequiredConfs:     requiredConfsForCoin(coinType),
 		ExpiresAt:         expiresAt,
 		ContactEmail:      req.ContactEmail,
-		Items:             items,
 	}
 
 	if req.ShippingAddress != nil {
@@ -390,6 +389,13 @@ func (s *GuestOrderAppService) GetGuestOrderStatus(_ context.Context, token stri
 		PoolTxHash:        order.PoolTxHash,
 		PoolAmount:        order.PoolAmount,
 		PoolDetectedAt:    order.PoolDetectedAt,
+
+		PriceCurrency:     order.PriceCurrency,
+		PriceDivisibility: order.PriceDivisibility,
+		Subtotal:          order.Subtotal,
+		ShippingCost:      order.ShippingCost,
+		TotalPrice:        order.TotalPrice,
+		PaymentTxHash:     order.PaymentTxHash,
 	}, nil
 }
 

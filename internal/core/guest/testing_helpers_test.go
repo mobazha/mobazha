@@ -103,6 +103,11 @@ func newGuestTestDB(t *testing.T) *testDatabase {
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+
 	require.NoError(t, db.AutoMigrate(
 		&models.GuestOrder{},
 		&models.GuestOrderItem{},

@@ -76,12 +76,12 @@ type GuestOrderResponse struct {
 
 // GuestOrderStatusResponse is the public status for a guest order.
 type GuestOrderStatusResponse struct {
-	OrderToken     string                  `json:"orderToken"`
-	State          string                  `json:"state"`
-	PaymentAddress string                  `json:"paymentAddress"`
-	PaymentAmount  string                  `json:"paymentAmount"`
-	PaymentCoin    string                  `json:"paymentCoin"`
-	ReferenceKey   string                  `json:"referenceKey,omitempty"`
+	OrderToken        string                  `json:"orderToken"`
+	State             string                  `json:"state"`
+	PaymentAddress    string                  `json:"paymentAddress"`
+	PaymentAmount     string                  `json:"paymentAmount"`
+	PaymentCoin       string                  `json:"paymentCoin"`
+	ReferenceKey      string                  `json:"referenceKey,omitempty"`
 	Confirmations     int                     `json:"confirmations"`
 	RequiredConfs     int                     `json:"requiredConfs"`
 	ChainBlockTimeSec uint32                  `json:"chainBlockTimeSec,omitempty"`
@@ -99,6 +99,16 @@ type GuestOrderStatusResponse struct {
 	PoolTxHash     string     `json:"poolTxHash,omitempty"`
 	PoolAmount     uint64     `json:"poolAmount,omitempty"`
 	PoolDetectedAt *time.Time `json:"poolDetectedAt,omitempty"`
+
+	// Pricing in listing currency (denormalized from GuestOrder model).
+	PriceCurrency     string `json:"priceCurrency,omitempty"`
+	PriceDivisibility uint32 `json:"priceDivisibility,omitempty"`
+	Subtotal          uint64 `json:"subtotal,omitempty"`
+	ShippingCost      uint64 `json:"shippingCost,omitempty"`
+	TotalPrice        uint64 `json:"totalPrice,omitempty"`
+
+	// On-chain transaction hash (set when payment is mined / detected).
+	PaymentTxHash string `json:"txHash,omitempty"`
 }
 
 // GuestOrderFilter for listing guest orders.

@@ -219,6 +219,7 @@ type DisputeClose struct {
 	OtherPartyName   string    `json:"otherPartyName"`
 	OtherPartyAvatar string    `json:"otherPartyAvatar,omitempty"`
 	Buyer            string    `json:"buyer"`
+	BuyerRefunded    bool      `json:"buyerRefunded"`
 }
 
 type DisputeAccepted struct {
@@ -272,6 +273,15 @@ type CancelablePaymentReady struct {
 	TransactionID string `json:"transactionID"`
 	Coin          string `json:"coin"`
 	Amount        uint64 `json:"amount"`
+}
+
+// FiatPaymentReady is emitted when a fiat payment (Stripe/PayPal) capture succeeds.
+// Triggers OrderAutoConfirmRequest so the order transitions to confirmed.
+// No on-chain escrow involved — funds are held by the payment processor.
+type FiatPaymentReady struct {
+	OrderID    string `json:"orderID"`
+	ProviderID string `json:"providerID"`
+	SessionID  string `json:"sessionID"`
 }
 
 // RwaInstantBuyCompleted is emitted when an RWA instant buy (atomic swap) has completed on-chain.

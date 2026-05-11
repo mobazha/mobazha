@@ -34,11 +34,19 @@ func fulfillmentWebhookBaseURL(r *http.Request, providerID string) string {
 // getSupplyChainService extracts the SupplyChainService from the request's
 // NodeService via the SupplyChainProvider type assertion. Returns nil when
 // the node does not support supply chain or the feature flag is off.
+//
+// Feature gating uses the per-node Resolver (SSOT) rather than the gateway's
+// legacy *FeatureManager: the latter only reads DefaultValue and would
+// silently 404 every fulfillment endpoint when hosting flips the platform
+// flag at runtime. See pkg/config/feature_manager.go for context (TD-098).
 func (g *Gateway) getSupplyChainService(r *http.Request) (contracts.SupplyChainService, bool) {
-	if g.featureManager != nil && !g.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled) {
-		return nil, false
-	}
 	ns := getNodeService(r)
+	if fp, ok := ns.(contracts.FeaturesProvider); ok {
+		if res := fp.Features(); res != nil &&
+			!res.IsEnabled(r.Context(), pkgconfig.FeatureSupplyChainEnabled.Key) {
+			return nil, false
+		}
+	}
 	sc, ok := ns.(contracts.SupplyChainProvider)
 	if !ok {
 		return nil, false

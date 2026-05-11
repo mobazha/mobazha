@@ -549,6 +549,11 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.InventoryReservation{},
 		&models.DirectPaymentAddressCounter{},
 		&models.SweepTask{},
+		&models.DigitalAsset{},
+		&models.DigitalLicenseKey{},
+		&models.LicenseActivation{},
+		&models.DownloadGrant{},
+		&models.DigitalDownloadLog{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
@@ -775,6 +780,11 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		&models.InventoryReservation{},
 		&models.DirectPaymentAddressCounter{},
 		&models.SweepTask{},
+		&models.DigitalAsset{},
+		&models.DigitalLicenseKey{},
+		&models.LicenseActivation{},
+		&models.DownloadGrant{},
+		&models.DigitalDownloadLog{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

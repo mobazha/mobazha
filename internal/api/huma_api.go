@@ -89,6 +89,12 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 	g.registerNodeHumaSettingsPublicOperations(api)
 	g.registerNodeHumaAuthPublicOperations(api)
 
+	// Buyer portal and license validation are public endpoints — they use
+	// capability-based auth (orderID / license key), not admin tokens. They
+	// must be available even in PublicOnly mode so buyers can access their
+	// purchased digital goods.
+	g.registerNodeHumaDigitalOperations(api)
+
 	// Admin/seller routes — suppressed in PublicOnly (--publicgateway) mode.
 	if !g.config.PublicOnly {
 		// Admin parts of mixed domains (public parts already registered above).
@@ -114,6 +120,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 		g.registerNodeHumaWebhookOperations(api)
 		g.registerNodeHumaAIOperations(api)
 		g.registerNodeHumaShippingOperations(api)
+		g.registerNodeHumaSellerDigitalOperations(api)
 	}
 
 	return api

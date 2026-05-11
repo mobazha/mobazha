@@ -221,3 +221,24 @@ func (s *SettlementService) autoConfirmSolanaCancelablePayment(order *models.Ord
 func (s *SettlementService) HandleCancelablePaymentForTRON(event *events.CancelablePaymentReady) {
 	logger.LogInfoWithIDf(log, s.nodeID, "Handling TRON CANCELABLE payment ready event for order %s (relay not yet implemented)", event.OrderID)
 }
+
+// ── FIAT Auto-Confirm ───────────────────────────────────────────────────
+
+// HandleFiatPaymentReady handles FiatPaymentReady event emitted after a fiat
+// payment (Stripe/PayPal) is successfully captured. No on-chain escrow involved,
+// so the handler simply emits OrderAutoConfirmRequest to trigger ConfirmOrder.
+func (s *SettlementService) HandleFiatPaymentReady(event *events.FiatPaymentReady) {
+	logger.LogInfoWithIDf(log, s.nodeID, "Handling fiat payment ready for order %s (provider=%s)", event.OrderID, event.ProviderID)
+
+	unlock := s.TryLockAutoConfirm(event.OrderID)
+	if unlock == nil {
+		return
+	}
+	defer unlock()
+
+	s.eventBus.Emit(&events.OrderAutoConfirmRequest{
+		OrderID: event.OrderID,
+	})
+
+	logger.LogInfoWithIDf(log, s.nodeID, "Emitted OrderAutoConfirmRequest for fiat order %s", event.OrderID)
+}

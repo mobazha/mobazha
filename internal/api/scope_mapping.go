@@ -174,6 +174,13 @@ var routeScopeMap = []routeScope{
 	{"GET /v1/analytics", contracts.ScopeAnalyticsRead},
 	{"POST /v1/analytics", contracts.ScopeAnalyticsRead},
 
+	// Digital assets (seller management shares listings scope)
+	{"GET /v1/digital-assets", contracts.ScopeListingsRead},
+	{"POST /v1/digital-assets", contracts.ScopeListingsWrite},
+	{"PATCH /v1/digital-assets", contracts.ScopeListingsWrite},
+	{"PUT /v1/digital-assets", contracts.ScopeListingsWrite},
+	{"DELETE /v1/digital-assets", contracts.ScopeListingsWrite},
+
 	// Moderators (profile-related actions)
 	{"GET /v1/moderators", contracts.ScopeProfilesRead},
 	{"POST /v1/moderators", contracts.ScopeProfilesWrite},

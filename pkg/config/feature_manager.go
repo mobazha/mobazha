@@ -1,22 +1,30 @@
-// Package config — FeatureManager (Phase FF-1 transitional facade)
+// Package config — FeatureManager (legacy DefaultValue facade)
 //
-// FF-1 目标：保留 *FeatureManager 字段签名以减少调用点 churn，但：
-//   - 移除旧的 Toggle{} / RegisterToggle / Enable 运行期可变 API；
-//   - IsEnabled 改为接受 *Feature 指针，仅从全局 Registry 读取 DefaultValue；
+// 历史背景（FF-1 阶段引入）：保留 *FeatureManager 字段签名以减少调用点 churn，
+// 仅从全局 Registry 读取 DefaultValue，不持有任何可变状态。
 //
-// FF-2 将引入 FeatureResolver（三层 Scope + Dependencies），此结构体会退化为
-// 对 Resolver 的瘦封装；FF-3 加接入点后将被彻底替换。为了让上层代码只改一次，
-// 这里保持 *FeatureManager.IsEnabled(*Feature) bool 的形态。
+// 当前定位：FF-2/FF-3 已落地的真正 SSOT 是 Resolver / ResolverInterface
+// （pkg/config/resolver.go），它叠加 PlatformGlobal / Tenant / NodeRuntime
+// 三层 Scope，处理依赖级联、错误降级与指标。**业务代码应优先依赖
+// pkgconfig.ResolverInterface**（通过 contracts.FeaturesProvider.Features()
+// 注入），而不是这里的 *FeatureManager。
+//
+// 本类型保留只做两件事：
+//  1. 兜底查询单个 Feature 的 DefaultValue（启动早期，Resolver 还未装配）。
+//  2. Snapshot() 给少数报表场景快速返回所有 feature 的默认值。
+//
+// 待办：TD-098 计划退役本类型，将 Resolver 重命名为 FeatureManager 以统一
+// 入口，详见 hosting/docs/TECH_DEBT.md。**新代码不应再依赖此类型。**
 package config
 
 import (
 	"sync"
 )
 
-// FeatureManager 提供对 feature flag 的运行期查询能力。
+// FeatureManager 仅作为 Registry.DefaultValue 的只读适配器；不持有任何可变状态。
 //
-// FF-1 阶段：仅作为 Registry 的只读适配器；不持有任何可变状态。
-// FF-2 接入 Resolver 后，此类型会注入 Scope provider。
+// 业务请改用 pkgconfig.ResolverInterface（多层 Scope + 依赖 + 错误降级）。
+// 详见包注释和 TD-098。
 type FeatureManager struct{}
 
 var (
@@ -37,11 +45,12 @@ func NewFeatureManager() *FeatureManager {
 	return &FeatureManager{}
 }
 
-// IsEnabled 返回 feature 的当前启用状态。
+// IsEnabled 返回 feature 的 Registry DefaultValue。
 //
-// FF-1 语义：仅查询 Registry 中登记的 DefaultValue。
-// FF-2 之后：会委托给 FeatureResolver，叠加 PlatformGlobal / Tenant /
-// NodeRuntime 三层 Scope 的 AND 合并与 Dependency 级联。
+// 注意：本方法只看 DefaultValue，不参与 PlatformGlobal / Tenant /
+// NodeRuntime 三层 Scope 的合并与 Dependency 级联。**业务代码请改用
+// pkgconfig.ResolverInterface.IsEnabled(ctx, key)**。本方法仅在启动早期
+// （Resolver 未装配）或快照场景使用。
 //
 // 约定：
 //   - f == nil：返回 false（防御性兜底）
@@ -57,9 +66,10 @@ func (m *FeatureManager) IsEnabled(f *Feature) bool {
 	return registered.DefaultValue
 }
 
-// Snapshot 返回所有已注册 feature 的当前状态快照。
+// Snapshot 返回所有已注册 feature 的 DefaultValue 快照。
 //
-// FF-1 阶段结果等同于 DefaultValue 映射；FF-2 后会反映 Resolver 合并结果。
+// 注意：结果等同于 DefaultValue 映射，**不反映 Resolver 多层合并结果**。
+// 需要真实启用状态请改用 ResolverInterface.List(ctx)。
 func (m *FeatureManager) Snapshot() map[string]bool {
 	all := ListFeatures()
 	out := make(map[string]bool, len(all))

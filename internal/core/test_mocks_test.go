@@ -135,6 +135,10 @@ func (m *mockKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error) {
 	return k, nil
 }
 
+func (m *mockKeyProvider) DigitalContentMasterKey(version int) ([]byte, error) {
+	return make([]byte, 32), nil
+}
+
 // ── helpers ─────────────────────────────────────────────────────
 
 func testCID() cid.Cid {

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+
 	"strings"
 	"time"
 
@@ -21,7 +22,6 @@ import (
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
@@ -50,6 +50,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
@@ -358,6 +359,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		initFiatSubsystem(obNode)
 		initSupplyChainSubsystem(obNode)
 		initShippingSubsystem(obNode)
+		initDigitalSubsystem(obNode)
 		obNode.applyOptions([]NodeOption{
 			WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
 		})
@@ -609,6 +611,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	initFiatSubsystem(obNode)
 	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
+	initDigitalSubsystem(obNode)
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
 	initEventDispatcher(obNode, notifyWsFn)
@@ -1252,6 +1255,7 @@ func newLightweightNode(
 	initFiatSubsystem(obNode)
 	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
+	initDigitalSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 	initPlatformAIConfig(obNode, cfg)
 
@@ -1338,25 +1342,7 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Webhook subsystem initialized")
 }
 
-// initCollectionSubsystem initializes the per-node collection subsystem:
-// migrates DB models, creates CollectionStore, and wires up CollectionAppService.
-func initCollectionSubsystem(obNode *MobazhaNode) {
-	if err := database.MigrateCollectionModels(obNode.db); err != nil {
-		logger.LogErrorWithIDf(log, obNode.nodeID, "Collection: failed to migrate models: %v", err)
-		return
-	}
-	store := database.NewGormCollectionStore(obNode.db)
-	obNode.collectionService = NewCollectionAppService(store, obNode.eventBus, obNode.nodeID)
-
-	if obNode.discountService != nil {
-		obNode.discountService.collectionStore = store
-	}
-
-	// NOTE: onDeleteCleanup wiring moved to options.go after listingService is created,
-	// because initCollectionSubsystem runs before applyOptions() where listingService is initialized.
-
-	logger.LogInfoWithID(log, obNode.nodeID, "Collection subsystem initialized")
-}
+// initCollectionSubsystem moved to builder_shared.go (shared between full and private_distribution builds).
 
 // initSupplyChainSubsystem initializes the per-node supply chain subsystem:
 // migrates DB models, creates FulfillmentProviderRegistry and SupplyChainAppService.
@@ -1389,7 +1375,12 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 	if obNode.exchangeRates != nil {
 		obNode.supplyChainService.SetExchangeRates(obNode.exchangeRates)
 	}
-	if obNode.featureManager == nil || obNode.featureManager.IsEnabled(pkgconfig.FeatureSupplyChainEnabled) {
+	// Feature gate SSOT is featureResolver (Platform → Tenant → Node scope stack).
+	// Previously this used featureManager.IsEnabled which only reads DefaultValue,
+	// silently disabling SupplyChain whenever Platform/Tenant flipped the flag.
+	// We pass a fresh background ctx because monitor startup is fire-and-forget.
+	if obNode.featureResolver == nil ||
+		obNode.featureResolver.IsEnabled(context.Background(), pkgconfig.FeatureSupplyChainEnabled.Key) {
 		obNode.supplyChainService.StartFulfillmentMonitor()
 	}
 
@@ -1407,6 +1398,7 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	obNode.fiatRegistry = fiat.NewRegistry()
 	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID, obNode.walletTestnet)
 	obNode.fiatPaymentService.SetOrderRepo(NewGormOrderRepo(obNode.db))
+	obNode.fiatPaymentService.SetEventBus(obNode.eventBus)
 	obNode.fiatPaymentService.LoadAndRegisterProviders()
 
 	if obNode.orderService != nil {
@@ -1416,50 +1408,10 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
 }
 
-// initDiscountSubsystem initializes the per-node discount subsystem:
-// migrates DB models, creates DiscountStore, and wires up DiscountAppService.
-func initDiscountSubsystem(obNode *MobazhaNode) {
-	if err := database.MigrateDiscountModels(obNode.db); err != nil {
-		logger.LogErrorWithIDf(log, obNode.nodeID, "Discount: failed to migrate models: %v", err)
-		return
-	}
-	store := database.NewGormDiscountStore(obNode.db)
-	obNode.discountService = NewDiscountAppService(store, nil, obNode.eventBus, obNode.nodeID)
-	logger.LogInfoWithID(log, obNode.nodeID, "Discount subsystem initialized")
-}
+// initDiscountSubsystem moved to builder_shared.go (shared between full and private_distribution builds).
 
-// initShippingSubsystem initializes the per-node shipping subsystem:
-// migrates DB models, creates ShippingStore, and wires up ShippingAppService.
-// ListingPublisher is injected via closure to avoid nil receiver capture
-// (listingService may not be initialized yet at call time).
-func initShippingSubsystem(obNode *MobazhaNode) {
-	if err := database.MigrateShippingModels(obNode.db); err != nil {
-		logger.LogErrorWithIDf(log, obNode.nodeID, "Shipping: failed to migrate models: %v", err)
-		return
-	}
-	store := database.NewGormShippingStore(obNode.db)
-
-	if err := MigrateShippingFromPreferences(obNode.db, store); err != nil {
-		logger.LogErrorWithIDf(log, obNode.nodeID, "Shipping: data migration failed (non-fatal): %v", err)
-	}
-
-	publisher := &lazyListingPublisher{node: obNode}
-	svc := NewShippingAppService(store, publisher)
-	svc.SetEventBus(obNode.eventBus)
-	obNode.shippingService = svc
-	logger.LogInfoWithID(log, obNode.nodeID, "Shipping subsystem initialized")
-}
-
-// lazyListingPublisher wraps MobazhaNode to implement contracts.ListingPublisher
-// using closure-style deferred evaluation. This avoids capturing a nil
-// listingService during initialization (callback-safety-rules).
-type lazyListingPublisher struct {
-	node *MobazhaNode
-}
-
-func (p *lazyListingPublisher) RepublishListing(ctx context.Context, slug string) error {
-	return p.node.listingService.RepublishListing(ctx, slug)
-}
+// initShippingSubsystem / managed_escrowListingPublisher are in builder_shared.go
+// (shared between full and private_distribution builds — no build tags).
 
 // initEventDispatcher creates the unified EventDispatcher with NotificationSink,
 // WebhookSink, and ChannelNotificationSink. Provides error isolation between sinks.
@@ -1534,4 +1486,11 @@ func gatewayLocalAddr(cfg *repo.Config) string {
 		host = "127.0.0.1"
 	}
 	return "http://" + net.JoinHostPort(host, port)
+}
+
+func getHostBlobStore(obNode *MobazhaNode) pkgcontracts.BlobStore {
+	if obNode.hostService != nil {
+		return obNode.hostService.GetBlobStore()
+	}
+	return nil
 }

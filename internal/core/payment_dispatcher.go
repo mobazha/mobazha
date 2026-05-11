@@ -194,6 +194,38 @@ func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) bool {
 	return n.isOrderManagedBySupplier(&order)
 }
 
+// ── Fiat payment event dispatching ───────────────────────────────────────
+
+// startFiatPaymentMonitor subscribes to FiatPaymentReady events and
+// dispatches them to SettlementService for auto-confirmation.
+func (n *MobazhaNode) startFiatPaymentMonitor() {
+	if n.settlementService == nil {
+		return
+	}
+	sub, err := n.eventBus.Subscribe(&events.FiatPaymentReady{})
+	if err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "Failed to subscribe to FiatPaymentReady events: %v", err)
+		return
+	}
+
+	logger.LogInfoWithIDf(log, n.nodeID, "Fiat payment monitor started")
+
+	go func() {
+		for {
+			select {
+			case event := <-sub.Out():
+				if e, ok := event.(*events.FiatPaymentReady); ok {
+					n.settlementService.HandleFiatPaymentReady(e)
+				}
+			case <-n.shutdown:
+				sub.Close()
+				logger.LogInfoWithIDf(log, n.nodeID, "Fiat payment monitor stopped")
+				return
+			}
+		}
+	}()
+}
+
 func (n *MobazhaNode) isOrderManagedBySupplier(order *models.Order) bool {
 	if n.supplyChainService == nil {
 		return false

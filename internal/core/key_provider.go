@@ -1,9 +1,14 @@
 package core
 
 import (
+	"crypto/sha256"
+	"fmt"
+	"io"
+
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"golang.org/x/crypto/hkdf"
 )
 
 var _ contracts.KeyProvider = (*fileKeyProvider)(nil)
@@ -28,8 +33,28 @@ func newFileKeyProvider(ethKey, escrowKey, ratingKey *btcec.PrivateKey, solKey *
 	}
 }
 
-func (p *fileKeyProvider) EVMMasterKey() (*btcec.PrivateKey, error)      { return p.ethKey, nil }
-func (p *fileKeyProvider) SolanaMasterKey() (*solana.PrivateKey, error)  { return p.solKey, nil }
-func (p *fileKeyProvider) EscrowMasterKey() (*btcec.PrivateKey, error)   { return p.escrowKey, nil }
-func (p *fileKeyProvider) RatingMasterKey() (*btcec.PrivateKey, error)   { return p.ratingKey, nil }
-func (p *fileKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error)     { return p.tronKey, nil }
+func (p *fileKeyProvider) EVMMasterKey() (*btcec.PrivateKey, error)     { return p.ethKey, nil }
+func (p *fileKeyProvider) SolanaMasterKey() (*solana.PrivateKey, error) { return p.solKey, nil }
+func (p *fileKeyProvider) EscrowMasterKey() (*btcec.PrivateKey, error)  { return p.escrowKey, nil }
+func (p *fileKeyProvider) RatingMasterKey() (*btcec.PrivateKey, error)  { return p.ratingKey, nil }
+func (p *fileKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error)    { return p.tronKey, nil }
+
+// DigitalContentMasterKey derives a 32-byte master key for digital asset
+// encryption from the escrow master key using HKDF. The version parameter
+// supports key rotation — old versions remain derivable until all content
+// is re-encrypted.
+func (p *fileKeyProvider) DigitalContentMasterKey(version int) ([]byte, error) {
+	if p.escrowKey == nil {
+		return nil, fmt.Errorf("escrow master key not available")
+	}
+	ikm := p.escrowKey.Serialize()
+	salt := []byte("mobazha-digital-content-master-v1")
+	info := []byte(fmt.Sprintf("digital-content-master:v%d", version))
+
+	kdf := hkdf.New(sha256.New, ikm, salt, info)
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(kdf, key); err != nil {
+		return nil, fmt.Errorf("HKDF expand failed: %w", err)
+	}
+	return key, nil
+}

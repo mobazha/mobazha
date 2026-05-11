@@ -99,6 +99,8 @@ func BuildOpenAPISpec() []byte {
 	g.registerNodeHumaWebhookOperations(api)
 	g.registerNodeHumaAIOperations(api)
 	g.registerNodeHumaShippingOperations(api)
+	g.registerNodeHumaDigitalOperations(api)
+	g.registerNodeHumaSellerDigitalOperations(api)
 
 	spec, err := json.MarshalIndent(api.OpenAPI(), "", "  ")
 	if err != nil {

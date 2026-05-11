@@ -84,6 +84,8 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 		otherPartyAvatar = orderOpen.BuyerID.DisplayAvatar()
 	}
 
+	buyerRefunded := !isZeroAmount(disputeClose.ReleaseInfo.BuyerAmount)
+
 	event := &events.DisputeClose{
 		OrderID: order.ID.String(),
 		Thumbnail: events.Thumbnail{
@@ -94,6 +96,7 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 		OtherPartyName:   otherPartyName,
 		OtherPartyAvatar: otherPartyAvatar,
 		Buyer:            orderOpen.BuyerID.PeerID,
+		BuyerRefunded:    buyerRefunded,
 	}
 
 	order.Open = false

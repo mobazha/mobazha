@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/paypal"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/stripe"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"gorm.io/gorm"
@@ -38,6 +39,7 @@ type FiatPaymentAppService struct {
 	testnet        bool
 	webhookHandler FiatWebhookHandler
 	orderRepo      contracts.OrderRepo
+	eventBus       events.Bus
 	platformMu     sync.RWMutex
 	platformIDs    map[string]struct{}
 }
@@ -67,6 +69,11 @@ func (s *FiatPaymentAppService) SetWebhookHandler(h FiatWebhookHandler) {
 // direct order access (refund, dispute, etc.).
 func (s *FiatPaymentAppService) SetOrderRepo(repo contracts.OrderRepo) {
 	s.orderRepo = repo
+}
+
+// SetEventBus injects the event bus for emitting FiatPaymentReady after successful capture.
+func (s *FiatPaymentAppService) SetEventBus(bus events.Bus) {
+	s.eventBus = bus
 }
 
 func (s *FiatPaymentAppService) EnabledProviders(ctx context.Context) ([]contracts.ProviderInfo, error) {
@@ -320,7 +327,19 @@ func (s *FiatPaymentAppService) handlePaymentSucceeded(ctx context.Context, prov
 	if s.webhookHandler == nil {
 		return fmt.Errorf("no webhook handler registered, cannot process fiat payment for order %s", event.OrderID)
 	}
-	return s.webhookHandler(ctx, event)
+	if err := s.webhookHandler(ctx, event); err != nil {
+		return err
+	}
+
+	if s.eventBus != nil {
+		s.eventBus.Emit(&events.FiatPaymentReady{
+			OrderID:    event.OrderID,
+			ProviderID: providerID,
+			SessionID:  event.PaymentID,
+		})
+		logger.LogInfoWithIDf(log, s.nodeID, "emitted FiatPaymentReady for order %s (provider=%s)", event.OrderID, providerID)
+	}
+	return nil
 }
 
 // autoRefundCanceledOrder attempts a full refund for a payment on a canceled order.

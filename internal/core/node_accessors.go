@@ -237,6 +237,13 @@ func (n *MobazhaNode) Shipping() contracts.ShippingService {
 	return n.shippingService
 }
 
+func (n *MobazhaNode) DigitalAssets() contracts.DigitalAssetService {
+	if n.digitalAssetService == nil {
+		return nil
+	}
+	return n.digitalAssetService
+}
+
 func (n *MobazhaNode) Order() contracts.OrderService {
 	if n.orderService == nil {
 		return nil

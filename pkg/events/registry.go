@@ -86,6 +86,7 @@ func init() {
 		// ── Internal domain events (non-persistent, no WebSocket push) ──
 		{Category: "internal", Name: "internal.order_auto_confirm", Sample: new(OrderAutoConfirmRequest)},
 		{Category: "internal", Name: "internal.utxo_payment_detected", Sample: new(UTXOPaymentDetected)},
+		{Category: "internal", Name: "internal.fiat_payment_ready", Sample: new(FiatPaymentReady)},
 
 		// ── NetDB sync events (internal, drive centralized search-service push) ──
 		{Category: "netdb", Name: "netdb.profile_changed", Sample: new(ProfileChanged)},

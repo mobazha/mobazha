@@ -196,6 +196,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 				OtherPartyID:     buyerPeerID,
 				OtherPartyName: buyerHandle,
 				Buyer:            orderOpen.BuyerID.PeerID,
+				BuyerRefunded:    true,
 			},
 		},
 		{

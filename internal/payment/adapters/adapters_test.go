@@ -33,6 +33,9 @@ func (s *stubKeyProvider) SolanaMasterKey() (*solana.PrivateKey, error) { return
 func (s *stubKeyProvider) EscrowMasterKey() (*btcec.PrivateKey, error)  { return s.escrowKey, s.err }
 func (s *stubKeyProvider) RatingMasterKey() (*btcec.PrivateKey, error)  { return s.ratingKey, s.err }
 func (s *stubKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error)    { return s.tronKey, s.err }
+func (s *stubKeyProvider) DigitalContentMasterKey(_ int) ([]byte, error) {
+	return make([]byte, 32), s.err
+}
 
 func newTestKeyProvider() *stubKeyProvider {
 	ethKey, _ := btcec.NewPrivateKey()

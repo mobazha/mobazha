@@ -10,12 +10,12 @@
 //
 // 命名规范（详见 docs/FEATURE_FLAG_ARCHITECTURE.md §3.6）：
 //
-//	{domain}{Feature}[Suffix]
+//		{domain}{Feature}[Suffix]
 //
-// - domain 必选（wallet / privacy / payment / group / platform / storefronts /
-//   multistore / tg / staff / saas / identity / kill）
-// - Suffix 纯 gating 用 Enabled；kill/wallet 反向开关用 Disabled；
-//   形容词自包含语义（Enforced / SubdomainRouting）则不加 Enabled。
+//	  - domain 必选（wallet / privacy / payment / group / platform / storefronts /
+//	    multistore / tg / staff / saas / identity / kill）
+//	  - Suffix 纯 gating 用 Enabled；kill/wallet 反向开关用 Disabled；
+//	    形容词自包含语义（Enforced / SubdomainRouting）则不加 Enabled。
 package config
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,8 @@ var FeaturePlatformTestEnvEnabled = registerFeature(Feature{
 // 每个 feature 当前仅需 PlatformGlobal scope — hosting operator 在 Platform
 // Console 一键切换，租户/节点级细化等 Phase MS 业务稳定后再扩展。
 //
-// 业务消费：`featureManager.IsEnabled(ctx, pkgconfig.FeatureXxx.Key)`
+// 业务消费：通过 contracts.FeaturesProvider 注入 ResolverInterface，
+// 然后调用 `node.Features().IsEnabled(ctx, pkgconfig.FeatureXxx.Key)`。
 // 详见 docs/MULTI_STORE_DESIGN.md §Feature Flags v2.4。
 // ---------------------------------------------------------------------------
 
@@ -510,6 +511,74 @@ var FeatureKillBotClusterIngestDisabled = registerFeature(Feature{
 		ScopePlatformGlobal,
 	},
 	IntroducedIn: "ms-phase-2b",
+})
+
+// ---------------------------------------------------------------------------
+// Digital Goods
+// ---------------------------------------------------------------------------
+
+// FeatureDigitalAutoDeliveryEnabled — 数字商品自动交付（DG-1）
+//
+// 门控点：
+//   - EventBus OrderConfirmation 监听 — 自动创建 DownloadGrant / License 分配
+//   - ShipOrder 自动调用 — 写入 Buyer Portal 摘要
+var FeatureDigitalAutoDeliveryEnabled = registerFeature(Feature{
+	Key:           "digitalAutoDeliveryEnabled",
+	DisplayName:   "Digital auto-delivery",
+	Description:   "Automatically delivers digital assets (files, links, license keys) to buyers upon order confirmation.",
+	Category:      "payment",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+		ScopeTenant,
+		ScopeNodeRuntime,
+	},
+	IntroducedIn: "dg-1",
+})
+
+// FeatureDigitalLicenseValidationEnabled — License 验证 API（DG-1）
+//
+// 门控点：
+//   - /v1/stores/{storeID}/licenses/validate 端点
+//   - /v1/stores/{storeID}/licenses/activate 端点
+//   - /v1/stores/{storeID}/licenses/deactivate 端点
+var FeatureDigitalLicenseValidationEnabled = registerFeature(Feature{
+	Key:           "digitalLicenseValidationEnabled",
+	DisplayName:   "License validation API",
+	Description:   "Exposes public license validation, activation, and deactivation endpoints for software products.",
+	Category:      "payment",
+	Stability:     StabilityBeta,
+	DefaultValue:  false,
+	ClientVisible: true,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+		ScopeTenant,
+		ScopeNodeRuntime,
+	},
+	IntroducedIn: "dg-1",
+})
+
+// FeatureDigitalTokenGatingEnabled — Token Gating 验证（Phase 2）
+//
+// 门控点：
+//   - /v1/listings/{slug}/verify-token-gate 端点
+//   - Token Gate claim → 零价 DIRECT 订单
+var FeatureDigitalTokenGatingEnabled = registerFeature(Feature{
+	Key:           "digitalTokenGatingEnabled",
+	DisplayName:   "Token gating",
+	Description:   "Enables NFT/Token-based gating for digital content — wallet signature verification and on-chain balance checks.",
+	Category:      "payment",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+		ScopeTenant,
+		ScopeNodeRuntime,
+	},
+	IntroducedIn: "dg-2",
 })
 
 // ---------------------------------------------------------------------------

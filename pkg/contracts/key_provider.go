@@ -35,4 +35,15 @@ type KeyProvider interface {
 	// escrow operations. Derived from an independent HD path
 	// (m/44'/195'/0'/0/0) to avoid cross-chain key reuse with EVM.
 	TRONMasterKey() (*btcec.PrivateKey, error)
+
+	// DigitalContentMasterKey returns the 32-byte master key for digital
+	// asset encryption at the given version. Per-asset keys are derived via
+	// HKDF at runtime and never stored.
+	//
+	// Standalone: deterministic derivation from node mnemonic (BIP32).
+	// SaaS: KeyVault per-tenant, supports multiple version coexistence.
+	//
+	// Version is 1-based and monotonically increasing. Old versions MUST
+	// remain accessible until all assets have been re-encrypted.
+	DigitalContentMasterKey(version int) ([]byte, error)
 }

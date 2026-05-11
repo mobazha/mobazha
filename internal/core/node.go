@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 
+	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/core/guest"
 	"github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/core/payment"
@@ -96,6 +97,8 @@ type appServices struct {
 	receivingAccountService    *receivingAccountService
 	guestPaymentMonitor        *guest.GuestPaymentMonitor
 	unifiedOrderView           *UnifiedOrderView
+	digitalAssetService        *digital.DigitalAssetAppService
+	digitalEntitlementService  *digital.DigitalEntitlementAppService
 
 	// Feature flag resolver infrastructure (Phase FF-3).
 	// featureResolver is the SSOT for `isEnabled(ctx, key)` queries; it

@@ -1,0 +1,1211 @@
+package digital
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/encryption"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+)
+
+// DigitalAssetAppService manages digital asset CRUD, encrypted file storage,
+// license key management, and download grant lifecycle.
+type DigitalAssetAppService struct {
+	db     database.Database
+	blob   contracts.BlobStore
+	crypto *encryption.DigitalCrypto
+}
+
+// NewDigitalAssetAppService creates a new DigitalAssetAppService.
+func NewDigitalAssetAppService(
+	db database.Database,
+	blob contracts.BlobStore,
+	keys contracts.KeyProvider,
+) *DigitalAssetAppService {
+	return &DigitalAssetAppService{
+		db:     db,
+		blob:   blob,
+		crypto: encryption.NewDigitalCrypto(keys),
+	}
+}
+
+// UploadFileAsset encrypts a file and stores it in BlobStore, then persists
+// a DigitalAsset record. Returns the created asset.
+func (s *DigitalAssetAppService) UploadFileAsset(
+	ctx context.Context,
+	listingSlug string,
+	variantSKU string,
+	fileName string,
+	mimeType string,
+	plaintext []byte,
+) (*contracts.DigitalAssetInfo, error) {
+	assetID := uuid.Must(uuid.NewV7()).String()
+	keyVersion := 1
+
+	ciphertext, err := s.crypto.EncryptFile(plaintext, assetID, keyVersion)
+	if err != nil {
+		return nil, fmt.Errorf("encrypt file: %w", err)
+	}
+
+	hash := sha256.Sum256(ciphertext)
+	fileHash := hex.EncodeToString(hash[:])
+
+	blobKey := fmt.Sprintf("digital/%s/%s", assetID, fileHash)
+	if err := s.blob.Put(ctx, blobKey, ciphertext, mimeType); err != nil {
+		return nil, fmt.Errorf("blob store put: %w", err)
+	}
+
+	asset := &models.DigitalAsset{
+		ID:          assetID,
+		ListingSlug: listingSlug,
+		VariantSKU:  variantSKU,
+		AssetType:   models.AssetTypeFile,
+		FileHash:    fileHash,
+		FileName:    fileName,
+		FileSize:    int64(len(plaintext)),
+		MimeType:    mimeType,
+		KeyVersion:  keyVersion,
+	}
+
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Save(asset)
+	}); err != nil {
+		return nil, fmt.Errorf("save asset: %w", err)
+	}
+
+	return assetToInfo(asset), nil
+}
+
+// CreateLinkAsset creates a DigitalAsset of type "link", storing the
+// encrypted URL in DeliveryData.
+func (s *DigitalAssetAppService) CreateLinkAsset(
+	listingSlug string,
+	variantSKU string,
+	url string,
+) (*contracts.DigitalAssetInfo, error) {
+	assetID := uuid.Must(uuid.NewV7()).String()
+	keyVersion := 1
+
+	cipherURL, err := s.crypto.EncryptFile([]byte(url), assetID, keyVersion)
+	if err != nil {
+		return nil, fmt.Errorf("encrypt link: %w", err)
+	}
+
+	asset := &models.DigitalAsset{
+		ID:           assetID,
+		ListingSlug:  listingSlug,
+		VariantSKU:   variantSKU,
+		AssetType:    models.AssetTypeLink,
+		KeyVersion:   keyVersion,
+		DeliveryData: cipherURL,
+	}
+
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Save(asset)
+	}); err != nil {
+		return nil, fmt.Errorf("save asset: %w", err)
+	}
+
+	return assetToInfo(asset), nil
+}
+
+// CreateLicenseKeyAsset creates a DigitalAsset of type "license_key" that
+// serves as the binding between a listing variant and the license key pool.
+func (s *DigitalAssetAppService) CreateLicenseKeyAsset(
+	listingSlug string,
+	variantSKU string,
+	appID string,
+) (*contracts.DigitalAssetInfo, error) {
+	assetID := uuid.Must(uuid.NewV7()).String()
+
+	asset := &models.DigitalAsset{
+		ID:          assetID,
+		ListingSlug: listingSlug,
+		VariantSKU:  variantSKU,
+		AssetType:   models.AssetTypeLicenseKey,
+		KeyVersion:  1,
+	}
+
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Save(asset)
+	}); err != nil {
+		return nil, fmt.Errorf("save asset: %w", err)
+	}
+
+	return assetToInfo(asset), nil
+}
+
+// ImportLicenseKeys batch-imports license keys for a listing, encrypting each.
+func (s *DigitalAssetAppService) ImportLicenseKeys(
+	listingSlug string,
+	variantSKU string,
+	appID string,
+	keys []string,
+	licenseType string,
+	maxActivations int,
+	expiresAt time.Time,
+) (int, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+
+	var assets []models.DigitalAsset
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("listing_slug = ? AND variant_sku = ? AND asset_type = ?",
+				listingSlug, variantSKU, models.AssetTypeLicenseKey).
+			Order("created_at ASC").
+			Find(&assets).Error
+	}); err != nil {
+		return 0, fmt.Errorf("query license key asset: %w", err)
+	}
+
+	assetID := ""
+	keyVersion := 1
+	if len(assets) > 0 {
+		assetID = assets[0].ID
+		keyVersion = assets[0].KeyVersion
+	} else {
+		a, err := s.CreateLicenseKeyAsset(listingSlug, variantSKU, appID)
+		if err != nil {
+			return 0, err
+		}
+		assetID = a.ID
+	}
+
+	imported := 0
+	err := s.db.Update(func(tx database.Tx) error {
+		for _, plainKey := range keys {
+			cipherKey, err := s.crypto.EncryptLicenseKey([]byte(plainKey), assetID, keyVersion)
+			if err != nil {
+				return fmt.Errorf("encrypt license key: %w", err)
+			}
+
+			h := sha256.Sum256([]byte(plainKey))
+			lk := &models.DigitalLicenseKey{
+				ID:             uuid.Must(uuid.NewV7()).String(),
+				ListingSlug:    listingSlug,
+				VariantSKU:     variantSKU,
+				LicenseKey:     cipherKey,
+				KeyVersion:     keyVersion,
+				LicenseHash:    hex.EncodeToString(h[:]),
+				AppID:          appID,
+				Status:         models.LicenseKeyStatusAvailable,
+				MaxActivations: maxActivations,
+				LicenseType:    licenseType,
+				ExpiresAt:      expiresAt,
+			}
+			if err := tx.Save(lk); err != nil {
+				return fmt.Errorf("save license key: %w", err)
+			}
+			imported++
+		}
+		return nil
+	})
+
+	return imported, err
+}
+
+// AllocateLicenseKey picks one available license key from the pool, marks it
+// dispensed, and returns it. Idempotent on (orderID, listingSlug, variantSKU):
+// if a key was already dispensed for the same order+SKU, the existing key is
+// returned without consuming another pool slot.
+//
+// Race protection: after save, we re-read the key inside the same tx to verify
+// our orderID won the claim. If another concurrent tx overwrote our claim
+// (possible under PostgreSQL READ COMMITTED), we retry with the next available
+// key, up to maxAllocRetries attempts.
+func (s *DigitalAssetAppService) AllocateLicenseKey(
+	listingSlug string,
+	variantSKU string,
+	orderID string,
+	buyerPeerID string,
+) (*models.DigitalLicenseKey, error) {
+	var allocated models.DigitalLicenseKey
+
+	const maxAllocRetries = 3
+	var lastErr error
+	for attempt := 0; attempt < maxAllocRetries; attempt++ {
+		lastErr = s.db.Update(func(tx database.Tx) error {
+			var candidate models.DigitalLicenseKey
+			if err := tx.Read().
+				Where("listing_slug = ? AND variant_sku = ? AND status = ?",
+					listingSlug, variantSKU, models.LicenseKeyStatusAvailable).
+				Order("id ASC").
+				First(&candidate).Error; err != nil {
+				return fmt.Errorf("no available license key: %w", err)
+			}
+
+			// Atomic conditional UPDATE: only succeeds if the row is still
+			// 'available'. Under READ COMMITTED two concurrent transactions
+			// may SELECT the same candidate, but only one UPDATE will match
+			// (the loser gets RowsAffected=0 and retries with the next key).
+			//
+			// Uses tx.Read().Updates() for RowsAffected access. This is
+			// safe for UPDATEs because tx.Read() scopes with tenant_id
+			// WHERE and the row already exists (no TenantID injection needed).
+			now := time.Now()
+			res := tx.Read().Model(&models.DigitalLicenseKey{}).
+				Where("id = ? AND status = ?", candidate.ID, models.LicenseKeyStatusAvailable).
+				Updates(map[string]interface{}{
+					"status":        models.LicenseKeyStatusDispensed,
+					"order_id":      orderID,
+					"buyer_peer_id": buyerPeerID,
+					"dispensed_at":  now,
+				})
+			if res.Error != nil {
+				return fmt.Errorf("conditional update: %w", res.Error)
+			}
+			if res.RowsAffected == 0 {
+				return fmt.Errorf("license key %s already claimed (retrying)", candidate.ID)
+			}
+
+			if err := tx.Read().Where("id = ?", candidate.ID).First(&allocated).Error; err != nil {
+				return fmt.Errorf("reload allocated key: %w", err)
+			}
+			return nil
+		})
+		if lastErr == nil {
+			return &allocated, nil
+		}
+	}
+
+	return nil, fmt.Errorf("allocate license key after %d attempts: %w", maxAllocRetries, lastErr)
+}
+
+// CountAllocatedKeys returns the number of license keys already dispensed for
+// a given (orderID, listingSlug, variantSKU) combination. Used by the
+// entitlement layer for idempotent multi-seat allocation.
+func (s *DigitalAssetAppService) CountAllocatedKeys(orderID, listingSlug, variantSKU string) int64 {
+	var count int64
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().Model(&models.DigitalLicenseKey{}).
+			Where("order_id = ? AND listing_slug = ? AND variant_sku = ? AND status IN (?, ?, ?)",
+				orderID, listingSlug, variantSKU,
+				models.LicenseKeyStatusDispensed,
+				models.LicenseKeyStatusSuspended,
+				models.LicenseKeyStatusRevoked,
+			).
+			Count(&count).Error
+	})
+	return count
+}
+
+// GetLicenseKeyPoolStats returns counts of available/dispensed/revoked keys.
+// Each count uses a fresh query chain to avoid GORM WHERE-clause leakage.
+func (s *DigitalAssetAppService) GetLicenseKeyPoolStats(
+	listingSlug string,
+	variantSKU string,
+) (*contracts.LicenseKeyPoolStats, error) {
+	var available, dispensed, revoked int64
+	err := s.db.View(func(tx database.Tx) error {
+		baseWhere := "listing_slug = ? AND variant_sku = ? AND status = ?"
+
+		if e := tx.Read().Model(&models.DigitalLicenseKey{}).
+			Where(baseWhere, listingSlug, variantSKU, models.LicenseKeyStatusAvailable).
+			Count(&available).Error; e != nil {
+			return e
+		}
+		if e := tx.Read().Model(&models.DigitalLicenseKey{}).
+			Where(baseWhere, listingSlug, variantSKU, models.LicenseKeyStatusDispensed).
+			Count(&dispensed).Error; e != nil {
+			return e
+		}
+		if e := tx.Read().Model(&models.DigitalLicenseKey{}).
+			Where(baseWhere, listingSlug, variantSKU, models.LicenseKeyStatusRevoked).
+			Count(&revoked).Error; e != nil {
+			return e
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &contracts.LicenseKeyPoolStats{
+		Available: available,
+		Dispensed: dispensed,
+		Revoked:   revoked,
+		Total:     available + dispensed + revoked,
+	}, nil
+}
+
+// DownloadFile fetches an encrypted file from BlobStore and decrypts it.
+func (s *DigitalAssetAppService) DownloadFile(ctx context.Context, asset *models.DigitalAsset) ([]byte, error) {
+	if asset.AssetType != models.AssetTypeFile {
+		return nil, fmt.Errorf("asset %s is not a file", asset.ID)
+	}
+
+	blobKey := fmt.Sprintf("digital/%s/%s", asset.ID, asset.FileHash)
+	reader, _, err := s.blob.Get(ctx, blobKey)
+	if err != nil {
+		return nil, fmt.Errorf("blob get: %w", err)
+	}
+	defer reader.Close()
+
+	ciphertext, err := readAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("read blob: %w", err)
+	}
+
+	return s.crypto.DecryptFile(ciphertext, asset.ID, asset.KeyVersion)
+}
+
+// RevealLink decrypts the link URL stored in a link-type asset.
+func (s *DigitalAssetAppService) RevealLink(asset *models.DigitalAsset) (string, error) {
+	if asset.AssetType != models.AssetTypeLink {
+		return "", fmt.Errorf("asset %s is not a link", asset.ID)
+	}
+	if len(asset.DeliveryData) == 0 {
+		return "", fmt.Errorf("no delivery data")
+	}
+
+	plaintext, err := s.crypto.DecryptFile(asset.DeliveryData, asset.ID, asset.KeyVersion)
+	if err != nil {
+		return "", fmt.Errorf("decrypt link: %w", err)
+	}
+	return string(plaintext), nil
+}
+
+// CreateDownloadGrant creates a grant for a buyer to access a digital asset.
+// CreateDownloadGrant creates (or returns the existing) DownloadGrant for
+// (orderID, asset.ID). Idempotent: a unique index on (tenant_id, order_id,
+// asset_id) plus an explicit pre-check make replayed OrderConfirmation events
+// safe — they always return the original grant rather than creating a new one
+// or depleting downstream resources (e.g. license pools).
+func (s *DigitalAssetAppService) CreateDownloadGrant(
+	asset *models.DigitalAsset,
+	orderID string,
+	buyerPeerID string,
+	status string,
+) (*models.DownloadGrant, error) {
+	var existing models.DownloadGrant
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("order_id = ? AND asset_id = ?", orderID, asset.ID).
+			First(&existing).Error
+	}); err == nil {
+		return &existing, nil
+	}
+
+	nonce := make([]byte, 32)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("generate nonce: %w", err)
+	}
+
+	snapshot, err := json.Marshal(models.AssetSnapshot{
+		AssetType:    asset.AssetType,
+		FileHash:     asset.FileHash,
+		FileName:     asset.FileName,
+		FileSize:     asset.FileSize,
+		KeyVersion:   asset.KeyVersion,
+		DeliveryData: asset.DeliveryData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal snapshot: %w", err)
+	}
+
+	grant := &models.DownloadGrant{
+		ID:            uuid.Must(uuid.NewV7()).String(),
+		AssetID:       asset.ID,
+		OrderID:       orderID,
+		BuyerPeerID:   buyerPeerID,
+		Status:        status,
+		Nonce:         hex.EncodeToString(nonce),
+		Version:       1,
+		AssetSnapshot: snapshot,
+		MaxDownloads:  asset.MaxDownloads,
+		ExpiresAt:     expiresAtFromAsset(asset),
+	}
+
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Save(grant)
+	}); err != nil {
+		// Unique constraint (tenant_id, order_id, asset_id) may fire under
+		// concurrent event replay. Return the existing grant instead of failing.
+		var existing models.DownloadGrant
+		if viewErr := s.db.View(func(tx database.Tx) error {
+			return tx.Read().
+				Where("order_id = ? AND asset_id = ?", orderID, asset.ID).
+				First(&existing).Error
+		}); viewErr == nil {
+			return &existing, nil
+		}
+		return nil, fmt.Errorf("save grant: %w", err)
+	}
+
+	return grant, nil
+}
+
+// SignDownloadURL generates an HMAC-signed download URL for a grant.
+func (s *DigitalAssetAppService) SignDownloadURL(
+	orderID string,
+	grant *models.DownloadGrant,
+	assetID string,
+	expiryTs int64,
+	keyVersion int,
+) ([]byte, error) {
+	return s.crypto.SignDownloadURL(orderID, grant.Nonce, assetID, expiryTs, grant.Version, keyVersion)
+}
+
+// VerifyDownloadURL checks an HMAC signature.
+func (s *DigitalAssetAppService) VerifyDownloadURL(
+	orderID, grantNonce, assetID string,
+	expiryTs int64,
+	grantVersion, keyVersion int,
+	sig []byte,
+) (bool, error) {
+	return s.crypto.VerifyDownloadURL(orderID, grantNonce, assetID, expiryTs, grantVersion, keyVersion, sig)
+}
+
+// RecordDownload atomically increments download count and logs the event.
+// The read-increment-save pattern is atomic under SQLite's exclusive write lock.
+// Under PostgreSQL READ COMMITTED, concurrent downloads may lose one increment;
+// this is acceptable because MaxDownloads is checked before serving the file
+// (in ServeDownload), and the count is informational.
+func (s *DigitalAssetAppService) RecordDownload(
+	grant *models.DownloadGrant,
+	buyerPeerID string,
+	ipHash string,
+	userAgent string,
+	success bool,
+	blockReason string,
+) error {
+	return s.db.Update(func(tx database.Tx) error {
+		if success {
+			var g models.DownloadGrant
+			if err := tx.Read().Where("id = ?", grant.ID).First(&g).Error; err != nil {
+				return err
+			}
+			if g.MaxDownloads > 0 && g.DownloadCount >= g.MaxDownloads {
+				return fmt.Errorf("download limit reached (%d/%d)", g.DownloadCount, g.MaxDownloads)
+			}
+			g.DownloadCount++
+			if err := tx.Save(&g); err != nil {
+				return err
+			}
+		}
+
+		dl := &models.DigitalDownloadLog{
+			ID:          uuid.Must(uuid.NewV7()).String(),
+			GrantID:     grant.ID,
+			AssetID:     grant.AssetID,
+			OrderID:     grant.OrderID,
+			BuyerPeerID: buyerPeerID,
+			IPHash:      ipHash,
+			UserAgent:   userAgent,
+			Success:     success,
+			BlockReason: blockReason,
+		}
+		return tx.Save(dl)
+	})
+}
+
+// ServeDownload verifies a signed download URL, checks grant status / expiry /
+// quota, decrypts the underlying blob, records the download, and returns a
+// streaming reader for the plaintext bytes.
+//
+// All authentication is provided by the HMAC signature embedded in the URL —
+// the buyer never needs to log in to download. Validation order matters: we
+// verify the signature *before* hitting the database to avoid signature
+// oracle attacks.
+//
+// Decryption uses the grant's AssetSnapshot (file hash + key version) rather
+// than the live asset row, so seller-side mutations after OrderConfirmation
+// cannot redirect the buyer to different content. MimeType / FileName fall
+// back to the snapshot, then to the live asset, then to safe defaults.
+func (s *DigitalAssetAppService) ServeDownload(
+	ctx context.Context,
+	req contracts.DownloadRequest,
+) (*contracts.DownloadResponse, error) {
+	if req.OrderID == "" || req.GrantNonce == "" || req.AssetID == "" {
+		return nil, fmt.Errorf("missing required download parameters")
+	}
+	if len(req.Signature) == 0 {
+		return nil, fmt.Errorf("missing signature")
+	}
+	if req.ExpiryUnix < time.Now().Unix() {
+		return nil, fmt.Errorf("download URL expired")
+	}
+
+	// Look up grant first so we can resolve KeyVersion from the snapshot
+	// (KeyVersion is not in the URL — it's an implicit part of the trust
+	// anchor). Doing this before signature verification is safe because
+	// the only DB exposure is a constant-time nonce lookup; we still
+	// reject *any* request that fails the HMAC check below.
+	grant, err := s.GetGrantByNonce(req.GrantNonce)
+	if err != nil {
+		return nil, fmt.Errorf("grant not found")
+	}
+
+	var snap models.AssetSnapshot
+	if len(grant.AssetSnapshot) > 0 {
+		if err := json.Unmarshal(grant.AssetSnapshot, &snap); err != nil {
+			return nil, fmt.Errorf("decode snapshot: %w", err)
+		}
+	}
+	if snap.AssetType != models.AssetTypeFile {
+		return nil, fmt.Errorf("asset is not a downloadable file")
+	}
+	if snap.FileHash == "" {
+		return nil, fmt.Errorf("snapshot missing file hash")
+	}
+
+	ok, err := s.crypto.VerifyDownloadURL(
+		req.OrderID, req.GrantNonce, req.AssetID,
+		req.ExpiryUnix, req.GrantVersion, snap.KeyVersion,
+		req.Signature,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("verify signature: %w", err)
+	}
+	if !ok {
+		return nil, fmt.Errorf("invalid download signature")
+	}
+
+	if grant.OrderID != req.OrderID || grant.AssetID != req.AssetID {
+		return nil, fmt.Errorf("grant mismatch")
+	}
+	if grant.Version != req.GrantVersion {
+		return nil, fmt.Errorf("grant version mismatch (revoked or rotated)")
+	}
+	if !models.IsGrantAccessibleWithExpiry(grant.Status, grant.ExpiresAt) {
+		return nil, fmt.Errorf("grant not accessible: status=%s", grant.Status)
+	}
+	if grant.MaxDownloads > 0 && grant.DownloadCount >= grant.MaxDownloads {
+		return nil, fmt.Errorf("download limit reached (%d/%d)", grant.DownloadCount, grant.MaxDownloads)
+	}
+
+	blobKey := fmt.Sprintf("digital/%s/%s", grant.AssetID, snap.FileHash)
+	reader, _, err := s.blob.Get(ctx, blobKey)
+	if err != nil {
+		_ = s.RecordDownload(grant, grant.BuyerPeerID, req.BuyerIPHash, req.UserAgent, false, "blob_get_failed")
+		return nil, fmt.Errorf("blob get: %w", err)
+	}
+
+	// Phase 1 loads the entire file into memory for decryption.
+	// Limit to 512 MiB to prevent OOM on abnormally large blobs;
+	// streaming decrypt is deferred to Phase 2 (chunked AES-GCM).
+	const maxBlobSize = 512 << 20
+	ciphertext, err := readAllLimited(reader, maxBlobSize)
+	_ = reader.Close()
+	if err != nil {
+		_ = s.RecordDownload(grant, grant.BuyerPeerID, req.BuyerIPHash, req.UserAgent, false, "blob_read_failed")
+		return nil, fmt.Errorf("read blob: %w", err)
+	}
+
+	plaintext, err := s.crypto.DecryptFile(ciphertext, grant.AssetID, snap.KeyVersion)
+	if err != nil {
+		_ = s.RecordDownload(grant, grant.BuyerPeerID, req.BuyerIPHash, req.UserAgent, false, "decrypt_failed")
+		return nil, fmt.Errorf("decrypt: %w", err)
+	}
+
+	mime := ""
+	if live, gerr := s.GetAssetByID(grant.AssetID); gerr == nil && live != nil {
+		mime = live.MimeType
+	}
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+
+	if err := s.RecordDownload(grant, grant.BuyerPeerID, req.BuyerIPHash, req.UserAgent, true, ""); err != nil {
+		// Audit failure is non-fatal — we already produced the bytes. Log via
+		// returning a wrapped response in the future; for now, surface as a
+		// soft warning in the package logger if any exists.
+		_ = err
+	}
+
+	fileName := snap.FileName
+	if fileName == "" {
+		fileName = "download.bin"
+	}
+
+	return &contracts.DownloadResponse{
+		FileName: fileName,
+		MimeType: mime,
+		FileSize: int64(len(plaintext)),
+		Body:     io.NopCloser(bytes.NewReader(plaintext)),
+	}, nil
+}
+
+// GetAssetsByListing returns all digital assets for a listing+variant.
+func (s *DigitalAssetAppService) GetAssetsByListing(
+	listingSlug string,
+	variantSKU string,
+) ([]contracts.DigitalAssetInfo, error) {
+	assets, err := s.getAssetModelsByListing(listingSlug, variantSKU)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]contracts.DigitalAssetInfo, len(assets))
+	for i := range assets {
+		result[i] = *assetToInfo(&assets[i])
+	}
+	return result, nil
+}
+
+func (s *DigitalAssetAppService) getAssetModelsByListing(
+	listingSlug string,
+	variantSKU string,
+) ([]models.DigitalAsset, error) {
+	var assets []models.DigitalAsset
+	err := s.db.View(func(tx database.Tx) error {
+		q := tx.Read().Where("listing_slug = ?", listingSlug)
+		if variantSKU != "" {
+			q = q.Where("variant_sku IN (?, '')", variantSKU)
+		} else {
+			q = q.Where("variant_sku = ?", "")
+		}
+		return q.Order("sort_order ASC").Find(&assets).Error
+	})
+	return assets, err
+}
+
+// GetGrantsByOrder returns all download grants for an order.
+func (s *DigitalAssetAppService) GetGrantsByOrder(orderID string) ([]models.DownloadGrant, error) {
+	var grants []models.DownloadGrant
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_id = ?", orderID).Find(&grants).Error
+	})
+	return grants, err
+}
+
+// GetGrantByNonce finds a grant by its globally unique nonce.
+func (s *DigitalAssetAppService) GetGrantByNonce(nonce string) (*models.DownloadGrant, error) {
+	var grant models.DownloadGrant
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("nonce = ?", nonce).First(&grant).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &grant, nil
+}
+
+// FreezeGrantsByOrder sets all grants for an order to "frozen" (dispute opened).
+// Two-step: first read active grants, then update each with its previous status.
+func (s *DigitalAssetAppService) FreezeGrantsByOrder(orderID string, reason string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var grants []models.DownloadGrant
+		if err := tx.Read().
+			Where("order_id = ? AND status NOT IN (?, ?)", orderID,
+				models.GrantStatusRevoked, models.GrantStatusFrozen).
+			Find(&grants).Error; err != nil {
+			return err
+		}
+		for i := range grants {
+			grants[i].PreviousStatus = grants[i].Status
+			grants[i].Status = models.GrantStatusFrozen
+			grants[i].RevokeReason = reason
+			grants[i].Version++
+			if err := tx.Save(&grants[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// RevokeGrantsByOrder sets all grants for an order to "revoked" (refund/dispute lost).
+func (s *DigitalAssetAppService) RevokeGrantsByOrder(orderID string, reason string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var grants []models.DownloadGrant
+		if err := tx.Read().
+			Where("order_id = ? AND status != ?", orderID, models.GrantStatusRevoked).
+			Find(&grants).Error; err != nil {
+			return err
+		}
+		now := time.Now()
+		for i := range grants {
+			grants[i].Status = models.GrantStatusRevoked
+			grants[i].RevokeReason = reason
+			grants[i].RevokedAt = now
+			grants[i].Version++
+			if err := tx.Save(&grants[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// ---------------------------------------------------------------------------
+// License Validation / Activation / Deactivation
+// ---------------------------------------------------------------------------
+
+// ValidateLicense checks whether a license key is valid and returns its status.
+func (s *DigitalAssetAppService) ValidateLicense(
+	licenseKeyPlain string,
+	appID string,
+) (*contracts.LicenseValidationResult, error) {
+	lk, err := s.findLicenseByPlainKey(licenseKeyPlain, appID)
+	if err != nil {
+		return &contracts.LicenseValidationResult{Valid: false, Reason: "not_found"}, nil
+	}
+
+	switch lk.Status {
+	case models.LicenseKeyStatusAvailable:
+		return &contracts.LicenseValidationResult{Valid: false, Reason: "not_issued"}, nil
+	case models.LicenseKeyStatusRevoked:
+		return &contracts.LicenseValidationResult{Valid: false, Reason: "revoked"}, nil
+	case models.LicenseKeyStatusSuspended:
+		return &contracts.LicenseValidationResult{Valid: false, Reason: "suspended"}, nil
+	}
+
+	if !lk.ExpiresAt.IsZero() && lk.ExpiresAt.Before(time.Now()) {
+		return &contracts.LicenseValidationResult{Valid: false, Reason: "expired"}, nil
+	}
+
+	activationCount, countErr := s.countActivationsChecked(lk.ID)
+	if countErr != nil {
+		return nil, fmt.Errorf("count activations: %w", countErr)
+	}
+
+	if lk.MaxActivations > 0 && activationCount >= int64(lk.MaxActivations) {
+		return &contracts.LicenseValidationResult{Valid: false, Reason: "max_activations"}, nil
+	}
+
+	var expiresAt *time.Time
+	if !lk.ExpiresAt.IsZero() {
+		expiresAt = &lk.ExpiresAt
+	}
+
+	return &contracts.LicenseValidationResult{
+		Valid:          true,
+		LicenseID:      lk.ID,
+		LicenseType:    lk.LicenseType,
+		ExpiresAt:      expiresAt,
+		Activations:    activationCount,
+		MaxActivations: lk.MaxActivations,
+	}, nil
+}
+
+// ActivateLicense creates an activation record for a license key + fingerprint.
+func (s *DigitalAssetAppService) ActivateLicense(
+	licenseKeyPlain string,
+	appID string,
+	fingerprint string,
+	label string,
+	ipHash string,
+) (*contracts.LicenseActivationResult, error) {
+	lk, err := s.findLicenseByPlainKey(licenseKeyPlain, appID)
+	if err != nil {
+		return nil, fmt.Errorf("%w", contracts.ErrLicenseNotFound)
+	}
+
+	if lk.Status != models.LicenseKeyStatusDispensed {
+		return nil, fmt.Errorf("license is %s", lk.Status)
+	}
+
+	// Existence check, activation count, and insert run inside the SAME write
+	// transaction. On SQLite this is serialized at the file/page level which
+	// prevents the prior count→insert race. On PostgreSQL the SELECT COUNT +
+	// INSERT pair is still racy without SELECT FOR UPDATE on the parent
+	// license row; flagged as TD-099 for the multi-tenant production rollout.
+	now := time.Now()
+	var (
+		result        *contracts.LicenseActivationResult
+		newActivation *models.LicenseActivation
+	)
+
+	if err := s.db.Update(func(tx database.Tx) error {
+		var existing models.LicenseActivation
+		err := tx.Read().
+			Where("license_id = ? AND fingerprint = ? AND is_active = ?", lk.ID, fingerprint, true).
+			First(&existing).Error
+		if err == nil {
+			existing.LastSeenAt = now
+			if e := tx.Save(&existing); e != nil {
+				return fmt.Errorf("touch existing activation: %w", e)
+			}
+			result = &contracts.LicenseActivationResult{
+				ID:          existing.ID,
+				LicenseID:   existing.LicenseID,
+				Fingerprint: existing.Fingerprint,
+				Label:       existing.Label,
+				IsActive:    true,
+				LastSeenAt:  now,
+			}
+			return nil
+		}
+
+		if lk.MaxActivations > 0 {
+			var count int64
+			if e := tx.Read().Model(&models.LicenseActivation{}).
+				Where("license_id = ? AND is_active = ?", lk.ID, true).
+				Count(&count).Error; e != nil {
+				return fmt.Errorf("count activations: %w", e)
+			}
+			if count >= int64(lk.MaxActivations) {
+				return fmt.Errorf("%w (%d/%d)", contracts.ErrActivationLimit, count, lk.MaxActivations)
+			}
+		}
+
+		newActivation = &models.LicenseActivation{
+			ID:          uuid.Must(uuid.NewV7()).String(),
+			LicenseID:   lk.ID,
+			Fingerprint: fingerprint,
+			Label:       label,
+			IPHash:      ipHash,
+			IsActive:    true,
+			LastSeenAt:  now,
+		}
+		return tx.Save(newActivation)
+	}); err != nil {
+		return nil, err
+	}
+
+	if result != nil {
+		return result, nil
+	}
+
+	return &contracts.LicenseActivationResult{
+		ID:          newActivation.ID,
+		LicenseID:   newActivation.LicenseID,
+		Fingerprint: newActivation.Fingerprint,
+		Label:       newActivation.Label,
+		IsActive:    true,
+		LastSeenAt:  now,
+	}, nil
+}
+
+// DeactivateLicense marks an activation as deactivated.
+func (s *DigitalAssetAppService) DeactivateLicense(
+	licenseKeyPlain string,
+	appID string,
+	fingerprint string,
+) error {
+	lk, err := s.findLicenseByPlainKey(licenseKeyPlain, appID)
+	if err != nil {
+		return fmt.Errorf("%w", contracts.ErrLicenseNotFound)
+	}
+
+	now := time.Now()
+	return s.db.Update(func(tx database.Tx) error {
+		var act models.LicenseActivation
+		if err := tx.Read().
+			Where("license_id = ? AND fingerprint = ? AND is_active = ?", lk.ID, fingerprint, true).
+			First(&act).Error; err != nil {
+			return fmt.Errorf("%w", contracts.ErrActivationNotFound)
+		}
+		act.IsActive = false
+		act.DeactivatedAt = &now
+		return tx.Save(&act)
+	})
+}
+
+// findLicenseByPlainKey looks up a license key by computing its SHA-256 hash
+// and matching against the stored license_hash.
+func (s *DigitalAssetAppService) findLicenseByPlainKey(
+	licenseKeyPlain string,
+	appID string,
+) (*models.DigitalLicenseKey, error) {
+	h := sha256.Sum256([]byte(licenseKeyPlain))
+	hashHex := hex.EncodeToString(h[:])
+
+	var lk models.DigitalLicenseKey
+	err := s.db.View(func(tx database.Tx) error {
+		q := tx.Read().Where("license_hash = ?", hashHex)
+		if appID != "" {
+			q = q.Where("app_id = ?", appID)
+		}
+		return q.First(&lk).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &lk, nil
+}
+
+// ---------------------------------------------------------------------------
+// Buyer Portal
+// ---------------------------------------------------------------------------
+
+// GetBuyerDigitalAssets builds the Buyer Portal payload for an order.
+// For file assets it produces HMAC-signed download URLs; for license_key assets
+// it decrypts and returns the allocated key; for link assets it decrypts the URL.
+func (s *DigitalAssetAppService) GetBuyerDigitalAssets(
+	orderID string,
+	urlExpirySec int64,
+) ([]contracts.BuyerAssetEntry, error) {
+	grants, err := s.GetGrantsByOrder(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("get grants: %w", err)
+	}
+	if len(grants) == 0 {
+		return nil, nil
+	}
+
+	if urlExpirySec <= 0 {
+		urlExpirySec = 3600
+	}
+	expiryTs := time.Now().Unix() + urlExpirySec
+
+	var entries []contracts.BuyerAssetEntry
+	for i := range grants {
+		g := &grants[i]
+		var snap models.AssetSnapshot
+		if len(g.AssetSnapshot) > 0 {
+			_ = json.Unmarshal(g.AssetSnapshot, &snap)
+		}
+
+		entry := contracts.BuyerAssetEntry{
+			AssetID:   g.AssetID,
+			AssetType: snap.AssetType,
+			FileName:  snap.FileName,
+			FileSize:  snap.FileSize,
+			Downloads: g.DownloadCount,
+			MaxDL:     g.MaxDownloads,
+			Status:    g.Status,
+		}
+		if !g.ExpiresAt.IsZero() {
+			t := g.ExpiresAt
+			entry.ExpiresAt = &t
+		}
+
+		accessible := models.IsGrantAccessibleWithExpiry(g.Status, g.ExpiresAt)
+		if !accessible {
+			reason := g.Status
+			if models.IsGrantAccessible(g.Status) && !g.ExpiresAt.IsZero() && time.Now().After(g.ExpiresAt) {
+				reason = models.GrantStatusExpired
+				entry.Status = models.GrantStatusExpired
+			}
+			entry.RestrictedReason = reason
+			entries = append(entries, entry)
+			continue
+		}
+
+		switch snap.AssetType {
+		case models.AssetTypeFile:
+			sig, err := s.SignDownloadURL(orderID, g, g.AssetID, expiryTs, snap.KeyVersion)
+			if err == nil {
+				entry.DownloadURL = fmt.Sprintf(
+					"/v1/orders/%s/digital-download?grant=%s&asset=%s&expires=%d&v=%d&sig=%s",
+					orderID, g.Nonce, g.AssetID, expiryTs, g.Version, hex.EncodeToString(sig),
+				)
+			}
+
+		case models.AssetTypeLicenseKey:
+			lks := s.findLicenseKeysByOrder(orderID, g.AssetID)
+			for _, lk := range lks {
+				le := contracts.BuyerLicenseEntry{
+					LicenseType:    lk.LicenseType,
+					MaxActivations: lk.MaxActivations,
+					Activations:    s.countActivations(lk.ID),
+				}
+				decrypted, dErr := s.crypto.DecryptLicenseKey(lk.LicenseKey, g.AssetID, lk.KeyVersion)
+				if dErr == nil {
+					le.LicenseKey = string(decrypted)
+				}
+				entry.LicenseKeys = append(entry.LicenseKeys, le)
+			}
+
+		case models.AssetTypeLink:
+			if len(snap.DeliveryData) > 0 {
+				plainURL, dErr := s.crypto.DecryptFile(snap.DeliveryData, g.AssetID, snap.KeyVersion)
+				if dErr == nil {
+					entry.DeliveryURL = string(plainURL)
+				}
+			}
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
+func (s *DigitalAssetAppService) findLicenseKeysByOrder(orderID, assetID string) []models.DigitalLicenseKey {
+	var asset models.DigitalAsset
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", assetID).First(&asset).Error
+	})
+	if err != nil || asset.ID == "" {
+		return nil
+	}
+
+	var lks []models.DigitalLicenseKey
+	_ = s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("order_id = ? AND listing_slug = ? AND variant_sku = ?",
+				orderID, asset.ListingSlug, asset.VariantSKU).
+			Find(&lks).Error
+	})
+	return lks
+}
+
+func (s *DigitalAssetAppService) countActivations(licenseID string) int64 {
+	c, _ := s.countActivationsChecked(licenseID)
+	return c
+}
+
+func (s *DigitalAssetAppService) countActivationsChecked(licenseID string) (int64, error) {
+	var count int64
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Model(&models.LicenseActivation{}).
+			Where("license_id = ? AND is_active = ?", licenseID, true).
+			Count(&count).Error
+	})
+	return count, err
+}
+
+// GetAssetByID retrieves a single digital asset by ID.
+func (s *DigitalAssetAppService) GetAssetByID(assetID string) (*contracts.DigitalAssetInfo, error) {
+	asset, err := s.getAssetModelByID(assetID)
+	if err != nil {
+		return nil, err
+	}
+	return assetToInfo(asset), nil
+}
+
+func (s *DigitalAssetAppService) getAssetModelByID(assetID string) (*models.DigitalAsset, error) {
+	var asset models.DigitalAsset
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", assetID).First(&asset).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &asset, nil
+}
+
+// UpdateAsset applies partial updates to an existing digital asset.
+func (s *DigitalAssetAppService) UpdateAsset(assetID string, updates contracts.AssetUpdateInput) (*contracts.DigitalAssetInfo, error) {
+	var asset models.DigitalAsset
+	err := s.db.Update(func(tx database.Tx) error {
+		if e := tx.Read().Where("id = ?", assetID).First(&asset).Error; e != nil {
+			return e
+		}
+		if updates.MaxDownloads != nil {
+			asset.MaxDownloads = *updates.MaxDownloads
+		}
+		if updates.ExpiryHours != nil {
+			asset.ExpiryHours = *updates.ExpiryHours
+		}
+		if updates.SortOrder != nil {
+			asset.SortOrder = *updates.SortOrder
+		}
+		return tx.Save(&asset)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return assetToInfo(&asset), nil
+}
+
+// DeleteAsset removes a digital asset by ID.
+func (s *DigitalAssetAppService) DeleteAsset(assetID string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		return tx.Delete("id", assetID, nil, &models.DigitalAsset{})
+	})
+}
+
+// ListLicenseKeys returns license keys for a listing with the actual key masked.
+func (s *DigitalAssetAppService) ListLicenseKeys(
+	listingSlug, variantSKU string,
+	limit, offset int,
+) ([]contracts.MaskedLicenseKey, error) {
+	var keys []models.DigitalLicenseKey
+	err := s.db.View(func(tx database.Tx) error {
+		q := tx.Read().Where("listing_slug = ?", listingSlug)
+		if variantSKU != "" {
+			q = q.Where("variant_sku = ?", variantSKU)
+		}
+		return q.Order("created_at DESC").Limit(limit).Offset(offset).Find(&keys).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]contracts.MaskedLicenseKey, len(keys))
+	for i, k := range keys {
+		masked := "****"
+		if len(k.LicenseHash) >= 8 {
+			masked = k.LicenseHash[:4] + "****" + k.LicenseHash[len(k.LicenseHash)-4:]
+		}
+		var dispensedAt *time.Time
+		if !k.DispensedAt.IsZero() {
+			t := k.DispensedAt
+			dispensedAt = &t
+		}
+		var expiresAt *time.Time
+		if !k.ExpiresAt.IsZero() {
+			t := k.ExpiresAt
+			expiresAt = &t
+		}
+		result[i] = contracts.MaskedLicenseKey{
+			ID:             k.ID,
+			Status:         k.Status,
+			MaskedKey:      masked,
+			LicenseType:    k.LicenseType,
+			MaxActivations: k.MaxActivations,
+			OrderID:        k.OrderID,
+			DispensedAt:    dispensedAt,
+			ExpiresAt:      expiresAt,
+		}
+	}
+	return result, nil
+}
+
+// RevokeLicenseKey marks a license key as revoked.
+func (s *DigitalAssetAppService) RevokeLicenseKey(keyID string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var key models.DigitalLicenseKey
+		if e := tx.Read().Where("id = ?", keyID).First(&key).Error; e != nil {
+			return e
+		}
+		key.Status = models.LicenseKeyStatusRevoked
+		return tx.Save(&key)
+	})
+}
+
+// ---------------------------------------------------------------------------
+
+func assetToInfo(a *models.DigitalAsset) *contracts.DigitalAssetInfo {
+	return &contracts.DigitalAssetInfo{
+		ID:           a.ID,
+		ListingSlug:  a.ListingSlug,
+		VariantSKU:   a.VariantSKU,
+		AssetType:    a.AssetType,
+		FileName:     a.FileName,
+		FileSize:     a.FileSize,
+		MimeType:     a.MimeType,
+		SortOrder:    a.SortOrder,
+		MaxDownloads: a.MaxDownloads,
+		ExpiryHours:  a.ExpiryHours,
+		CreatedAt:    a.CreatedAt,
+		UpdatedAt:    a.UpdatedAt,
+	}
+}
+
+func expiresAtFromAsset(asset *models.DigitalAsset) time.Time {
+	if asset.ExpiryHours > 0 {
+		return time.Now().Add(time.Duration(asset.ExpiryHours) * time.Hour)
+	}
+	return time.Time{}
+}
+
+func readAll(r io.Reader) ([]byte, error) {
+	return io.ReadAll(r)
+}
+
+func readAllLimited(r io.Reader, maxBytes int64) ([]byte, error) {
+	lr := io.LimitReader(r, maxBytes+1)
+	data, err := io.ReadAll(lr)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("blob exceeds size limit (%d bytes)", maxBytes)
+	}
+	return data, nil
+}

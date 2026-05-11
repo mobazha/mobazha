@@ -89,10 +89,10 @@ func (g *Gateway) handleGETSetup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Password is the only hard gate for setup completion. Profile and other
-	// steps are tracked in completedSteps so the frontend can prompt the user
-	// to finish them inside the admin panel — but they should never block login.
-	setupComplete := passwordDone
+	// Setup is complete only when both password and profile are done.
+	// This ensures the wizard re-appears if interrupted between Step 1
+	// (password) and Step 2 (profile), preventing empty-store scenarios.
+	setupComplete := passwordDone && profileDone
 
 	var ownerUID string
 	if jv := g.getJWTValidator(); jv != nil {

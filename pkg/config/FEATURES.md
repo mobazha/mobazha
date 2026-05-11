@@ -438,6 +438,50 @@
 
 ---
 
+## Digital Goods (DG-1)
+
+### `digitalAutoDeliveryEnabled`
+
+- **Category**: payment
+- **Stability**: beta
+- **Default**: false
+- **Scopes**: PlatformGlobal, Tenant, NodeRuntime
+- **Client-visible**: yes
+- **Introduced in**: dg-1
+- **Consumers**:
+  - `DigitalEntitlementAppService` — EventBus OrderConfirmation 监听，自动创建 DownloadGrant / License 分配
+  - `SettlementService.HandleFiatPaymentReady` — Fiat 支付成功后自动 ShipOrder
+- **Dependencies**: 无
+
+### `digitalLicenseValidationEnabled`
+
+- **Category**: payment
+- **Stability**: beta
+- **Default**: false
+- **Scopes**: PlatformGlobal, Tenant, NodeRuntime
+- **Client-visible**: yes
+- **Introduced in**: dg-1
+- **Consumers**:
+  - `/v1/stores/{storeID}/licenses/validate` 端点
+  - `/v1/stores/{storeID}/licenses/activate` 端点
+  - `/v1/stores/{storeID}/licenses/deactivate` 端点
+- **Dependencies**: digitalAutoDeliveryEnabled (逻辑前置 — 需先有 license pool 数据)
+
+### `digitalTokenGatingEnabled`
+
+- **Category**: payment
+- **Stability**: experimental
+- **Default**: false
+- **Scopes**: PlatformGlobal, Tenant, NodeRuntime
+- **Client-visible**: yes
+- **Introduced in**: dg-1 (Phase 2 预注册)
+- **Consumers**:
+  - (Phase 2) `/v1/listings/{slug}/verify-token-gate` 端点
+  - (Phase 2) Token Gate claim → 零价 DIRECT 订单
+- **Dependencies**: 无
+
+---
+
 ## Scheduler Workers (AH-3 Sprint 4 — 待注册)
 
 > 以下 flag 将在 AH-3 Sprint 4 中注册，语义为 kill switch（default=true）。
@@ -461,7 +505,7 @@
 |---|---|---|
 | wallet | 1 | 1 stable |
 | privacy | 1 | 1 beta |
-| payment | 1 | 1 beta |
+| payment | 4 | 3 beta, 1 experimental |
 | group | 1 | 1 beta |
 | platform | 2 | 1 stable, 1 beta |
 | multistore | 3 | 2 beta, 1 experimental |
@@ -471,4 +515,4 @@
 | saas | 2 | 2 experimental |
 | identity | 4 | 4 experimental |
 | kill | 3 | 3 stable |
-| **Total** | **29** | 5 stable, 9 beta, 15 experimental |
+| **Total** | **32** | 5 stable, 11 beta, 16 experimental |

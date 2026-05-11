@@ -482,6 +482,77 @@
 
 ---
 
+## Smart Commerce Agent (Phase SCA)
+
+### `scaEnabled`
+
+- **Category**: platform
+- **Stability**: experimental
+- **Default**: false
+- **Scopes**: PlatformGlobal, Tenant
+- **Client-visible**: yes
+- **Introduced in**: sca-foundation
+- **Consumers**:
+  - Agent Runtime Orchestrator 启动
+  - Agent API handlers 注册
+  - Agent MCP tools 注册
+- **Dependencies**: 无
+
+### `scaIntelPipelineEnabled`
+
+- **Category**: platform
+- **Stability**: experimental
+- **Default**: false
+- **Scopes**: PlatformGlobal
+- **Client-visible**: no
+- **Introduced in**: sca-0
+- **Consumers**:
+  - Intel Pipeline Collector / Analyzer 启动
+  - Scheduler Intel tick job 注册
+- **Dependencies**: scaEnabled
+
+### `scaSelectionEngineEnabled`
+
+- **Category**: platform
+- **Stability**: experimental
+- **Default**: false
+- **Scopes**: PlatformGlobal, Tenant
+- **Client-visible**: yes
+- **Introduced in**: sca-2
+- **Consumers**:
+  - SelectionEngine API handler
+  - OneClickAction listing draft creation
+- **Dependencies**: scaEnabled, scaIntelPipelineEnabled
+
+### `scaAgentExecuteEnabled`
+
+- **Category**: platform
+- **Stability**: experimental
+- **Default**: false
+- **Scopes**: PlatformGlobal, Tenant
+- **Client-visible**: yes
+- **Introduced in**: sca-3
+- **Consumers**:
+  - Agent write-action permission gate
+  - Auto-draft listing / adjust pricing / send notifications
+- **Dependencies**: scaEnabled
+
+### `scaCommercialEnabled`
+
+- **Category**: platform
+- **Stability**: experimental
+- **Default**: false
+- **Scopes**: PlatformGlobal
+- **Client-visible**: no
+- **Introduced in**: sca-6
+- **Consumers**:
+  - Token quota metering middleware
+  - 5% success fee attribution system
+  - Tiered subscription enforcement
+- **Dependencies**: scaEnabled
+
+---
+
 ## Scheduler Workers (AH-3 Sprint 4 — 待注册)
 
 > 以下 flag 将在 AH-3 Sprint 4 中注册，语义为 kill switch（default=true）。
@@ -507,7 +578,7 @@
 | privacy | 1 | 1 beta |
 | payment | 4 | 3 beta, 1 experimental |
 | group | 1 | 1 beta |
-| platform | 2 | 1 stable, 1 beta |
+| platform | 7 | 1 stable, 1 beta, 5 experimental |
 | multistore | 3 | 2 beta, 1 experimental |
 | storefronts | 4 | 3 beta, 1 experimental |
 | tg | 4 | 1 beta, 3 experimental |
@@ -515,4 +586,4 @@
 | saas | 2 | 2 experimental |
 | identity | 4 | 4 experimental |
 | kill | 3 | 3 stable |
-| **Total** | **32** | 5 stable, 11 beta, 16 experimental |
+| **Total** | **37** | 5 stable, 11 beta, 21 experimental |

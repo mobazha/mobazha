@@ -582,6 +582,93 @@ var FeatureDigitalTokenGatingEnabled = registerFeature(Feature{
 })
 
 // ---------------------------------------------------------------------------
+// Smart Commerce Agent (Phase SCA)
+// ---------------------------------------------------------------------------
+
+// FeatureScaEnabled — SCA 总开关（master switch）
+//
+// 门控点：
+//   - Agent Runtime Orchestrator 启动
+//   - Agent API handlers 注册
+//   - Agent MCP tools 注册
+var FeatureScaEnabled = registerFeature(Feature{
+	Key:           "scaEnabled",
+	DisplayName:   "Smart Commerce Agent",
+	Description:   "Master switch for the Smart Commerce Agent system — enables the agent runtime, MCP tools, and business engines.",
+	Category:      "platform",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+		ScopeTenant,
+	},
+	IntroducedIn: "sca-foundation",
+})
+
+// FeatureScaIntelPipelineEnabled — 市场情报管道
+var FeatureScaIntelPipelineEnabled = registerFeature(Feature{
+	Key:           "scaIntelPipelineEnabled",
+	DisplayName:   "SCA Intel Pipeline",
+	Description:   "Enables the market intelligence data collection and analysis pipeline (Telegram Bot API, Twitter metadata, Reddit, on-chain analytics).",
+	Category:      "platform",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: false,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+	},
+	IntroducedIn: "sca-0",
+})
+
+// FeatureScaSelectionEngineEnabled — 选品引擎
+var FeatureScaSelectionEngineEnabled = registerFeature(Feature{
+	Key:           "scaSelectionEngineEnabled",
+	DisplayName:   "SCA Selection Engine",
+	Description:   "Enables the AI-powered product selection engine that recommends trending SKUs and generates listing drafts from market intelligence.",
+	Category:      "platform",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+		ScopeTenant,
+	},
+	IntroducedIn: "sca-2",
+})
+
+// FeatureScaAgentExecuteEnabled — Agent 动作执行权限
+var FeatureScaAgentExecuteEnabled = registerFeature(Feature{
+	Key:           "scaAgentExecuteEnabled",
+	DisplayName:   "SCA agent execution",
+	Description:   "Allows the agent to execute write actions (draft listings, adjust pricing, send notifications) rather than only providing recommendations.",
+	Category:      "platform",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: true,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+		ScopeTenant,
+	},
+	IntroducedIn: "sca-3",
+})
+
+// FeatureScaCommercialEnabled — SCA 商业化功能
+var FeatureScaCommercialEnabled = registerFeature(Feature{
+	Key:           "scaCommercialEnabled",
+	DisplayName:   "SCA commercial features",
+	Description:   "Enables commercial features: token quota metering, 5% success fee attribution, and tiered subscription enforcement.",
+	Category:      "platform",
+	Stability:     StabilityExperimental,
+	DefaultValue:  false,
+	ClientVisible: false,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+	},
+	IntroducedIn: "sca-6",
+})
+
+// ---------------------------------------------------------------------------
 // Supply Chain
 // ---------------------------------------------------------------------------
 

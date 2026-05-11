@@ -179,11 +179,15 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 // local RPC endpoints (127.0.0.1) are permitted.
 const private_distributionCSP = "default-src 'self'; " +
 	"connect-src 'self' http://127.0.0.1:*; " +
-	"img-src 'self' data:; " +
+	"img-src 'self' data: blob:; " +
+	"media-src 'self' blob:; " +
 	"script-src 'self'; " +
 	"style-src 'self' 'unsafe-inline'; " +
 	"font-src 'self'; " +
+	"worker-src 'self'; " +
 	"frame-src 'none'; " +
+	"frame-ancestors 'none'; " +
+	"form-action 'self'; " +
 	"object-src 'none'; " +
 	"base-uri 'self'"
 

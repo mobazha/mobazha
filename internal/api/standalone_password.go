@@ -22,16 +22,16 @@ const (
 	setupCompleteFile   = "setup_complete"
 )
 
-// HashFilePath returns the path to the admin password hash file within dataDir.
-func HashFilePath(dataDir string) string {
+// AdminPasswordHashPath returns the path to the admin password hash file within dataDir.
+func AdminPasswordHashPath(dataDir string) string {
 	if dataDir == "" {
 		return ""
 	}
 	return filepath.Join(dataDir, adminHashFile)
 }
 
-// PlainFilePath returns the path to the first-run plaintext password file within dataDir.
-func PlainFilePath(dataDir string) string {
+// AdminPasswordPlaintextPath returns the path to the first-run plaintext password file within dataDir.
+func AdminPasswordPlaintextPath(dataDir string) string {
 	if dataDir == "" {
 		return ""
 	}
@@ -53,7 +53,7 @@ func SetupCompleteFilePath(dataDir string) string {
 // Returns (username, passwordHash). Both empty if no credentials found.
 func LoadCredentials(dataDir, configUsername, configPassword string) (string, string) {
 	if dataDir != "" {
-		hashPath := HashFilePath(dataDir)
+		hashPath := AdminPasswordHashPath(dataDir)
 		if hashBytes, err := os.ReadFile(hashPath); err == nil {
 			hash := strings.TrimSpace(string(hashBytes))
 			if hash != "" {
@@ -88,8 +88,8 @@ func GenerateAdminPassword() (string, error) {
 // bcrypt (cost 10). The plaintext is written to the admin_password file for
 // first-run retrieval; the caller must NEVER log it.
 func EnsureStandaloneAuth(dataDir string) (string, string, error) {
-	hashPath := HashFilePath(dataDir)
-	plainPath := PlainFilePath(dataDir)
+	hashPath := AdminPasswordHashPath(dataDir)
+	plainPath := AdminPasswordPlaintextPath(dataDir)
 
 	// Case 1: hash file already exists — load it.
 	if hashBytes, err := os.ReadFile(hashPath); err == nil {

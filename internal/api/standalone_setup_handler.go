@@ -89,7 +89,10 @@ func (g *Gateway) handleGETSetup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	setupComplete := passwordDone && profileDone
+	// Password is the only hard gate for setup completion. Profile and other
+	// steps are tracked in completedSteps so the frontend can prompt the user
+	// to finish them inside the admin panel — but they should never block login.
+	setupComplete := passwordDone
 
 	var ownerUID string
 	if jv := g.getJWTValidator(); jv != nil {
@@ -127,13 +130,18 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prevent unauthenticated password override: if admin auth is already
-	// configured (e.g. EnsureStandaloneAuth generated a password at boot),
-	// require the caller to prove they know the current password first.
+	// If admin auth is already configured AND the password was explicitly
+	// set by the user (plaintext bootstrap file removed), require auth
+	// to prevent hijacking. During first-run setup (plaintext file still
+	// exists from EnsureStandaloneAuth), allow unauthenticated access so
+	// the embedded Setup Wizard can work.
 	if g.auth.isConfigured() && GetAuthIdentity(r.Context()) == nil {
-		response.Error(w, http.StatusUnauthorized, response.CodeUnauthorized,
-			"Authentication required — admin password already configured")
-		return
+		plainPath := AdminPasswordPlaintextPath(dataDir)
+		if _, err := os.Stat(plainPath); errors.Is(err, os.ErrNotExist) {
+			response.Error(w, http.StatusUnauthorized, response.CodeUnauthorized,
+				"Authentication required — admin password already configured")
+			return
+		}
 	}
 
 	var req initialSetupRequest
@@ -157,7 +165,7 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashPath := HashFilePath(dataDir)
+	hashPath := AdminPasswordHashPath(dataDir)
 	if err := os.WriteFile(hashPath, []byte(hash), 0600); err != nil {
 		log.Errorf("Failed to write password hash: %v", err)
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
@@ -170,7 +178,7 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 	g.auth.passwordHash = hash
 	g.auth.mu.Unlock()
 
-	plainPath := PlainFilePath(dataDir)
+	plainPath := AdminPasswordPlaintextPath(dataDir)
 	if err := os.Remove(plainPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Warningf("Failed to remove plaintext password file: %v", err)
 	}

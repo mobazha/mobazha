@@ -254,7 +254,7 @@ func TestEnsureStandaloneAuth_ReusesExistingHash(t *testing.T) {
 	}
 
 	// Remove plaintext to simulate post-setup state
-	_ = os.Remove(PlainFilePath(dir))
+	_ = os.Remove(AdminPasswordPlaintextPath(dir))
 
 	_, hash2, err := EnsureStandaloneAuth(dir)
 	if err != nil {

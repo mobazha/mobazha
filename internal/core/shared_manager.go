@@ -409,7 +409,7 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		if err != nil {
 			return nil, fmt.Errorf("initializing standalone auth: %w", err)
 		}
-		plainPath := api.PlainFilePath(cfg.DataDir)
+		plainPath := api.AdminPasswordPlaintextPath(cfg.DataDir)
 		if _, statErr := os.Stat(plainPath); statErr == nil {
 			if frontend.HasContent() {
 				log.Infof("Admin credentials generated — set your password in the Web UI setup wizard.")
@@ -450,8 +450,8 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		Cookie:                 cfg.APICookie,
 		PublicOnly:             cfg.APIPublicGateway,
 		AllowedIPs:             allowedIPs,
-		HashFile:               api.HashFilePath(cfg.DataDir),
-		PlainFile:              api.PlainFilePath(cfg.DataDir),
+		HashFile:               api.AdminPasswordHashPath(cfg.DataDir),
+		PlainFile:              api.AdminPasswordPlaintextPath(cfg.DataDir),
 		CasdoorCertificate:     casdoorCert,
 		LocalPeerID:            localPeerID,
 		OwnerUserID:            ownerUserID,

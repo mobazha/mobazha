@@ -1009,6 +1009,15 @@ func (s *GuestOrderAppService) convertToPaymentCoin(totalSmallest *big.Int, pric
 		return totalSmallest.String(), nil
 	}
 
+	// PrivateDistribution is intentionally crypto-native with no exchange-rate oracle
+	// (zero outbound dependency). When pricing and payment coins differ,
+	// private_distribution rejects the order with a user-facing message rather than
+	// surface the lower-level "exchange rate provider not configured"
+	// error. No-op in full builds.
+	if err := guardCrossCurrencyCheckoutOnPrivateDistribution(priceCurCode, coinInfo.Symbol); err != nil {
+		return "", err
+	}
+
 	if s.exchangeRates == nil {
 		return "", fmt.Errorf("exchange rate provider not configured")
 	}

@@ -932,6 +932,13 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 	if sl.Listing.Metadata.Format > pb.Listing_Metadata_MARKET_PRICE {
 		return errors.New("invalid listing format")
 	}
+	// PrivateDistribution build rejects MARKET_PRICE (needs exchange-rate oracle) and
+	// RWA_TOKEN / CRYPTOCURRENCY contract types (need on-chain monitors).
+	// No-op on full builds. Runs before the PricingCurrency block so we
+	// catch MARKET_PRICE even when PricingCurrency is nil.
+	if err := validatePrivateDistributionListingFormat(sl.Listing.Metadata.Format, sl.Listing.Metadata.ContractType); err != nil {
+		return err
+	}
 	if sl.Listing.Metadata.Expiry == nil {
 		return coreiface.ErrMissingField("metadata.expiry")
 	}
@@ -960,6 +967,13 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 		}
 		if sl.Listing.Metadata.PricingCurrency.Divisibility != uint32(def.Divisibility) {
 			return errors.New("divisibility differs from expected value")
+		}
+		// Crypto-native pricing guard: private_distribution builds reject any pricing
+		// currency outside the supported payment coin set (LTC, EXTERNAL_PAYMENT). This
+		// is a server-side defense against API bypass of the UI restriction
+		// in BasicInfoSection. No-op on full builds.
+		if err := validatePrivateDistributionPricingCurrency(sl.Listing.Metadata.PricingCurrency.Code); err != nil {
+			return err
 		}
 	}
 

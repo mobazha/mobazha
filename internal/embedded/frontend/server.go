@@ -29,6 +29,22 @@ type FeatureSnapshot struct {
 	Overridable []string
 }
 
+// BrandSnapshot holds white-label branding values injected into
+// /runtime-config.js so the SPA can apply partner theming without
+// rebuilding. Nil means "use Mobazha defaults".
+type BrandSnapshot struct {
+	Name          string `json:"name"`
+	ShortName     string `json:"shortName,omitempty"`
+	Tagline       string `json:"tagline,omitempty"`
+	Description   string `json:"description,omitempty"`
+	PrimaryColor  string `json:"primaryColor,omitempty"`
+	AccentColor   string `json:"accentColor,omitempty"`
+	LogoURL       string `json:"logoUrl,omitempty"`
+	FaviconURL    string `json:"faviconUrl,omitempty"`
+	PrivacyNotice string `json:"privacyNotice,omitempty"`
+	HidePoweredBy bool   `json:"hidePoweredBy,omitempty"`
+}
+
 // ServerConfig configures the embedded frontend HTTP handler.
 type ServerConfig struct {
 	// OverrideDir, when set, serves files from this directory first,
@@ -44,6 +60,10 @@ type ServerConfig struct {
 	// PrivateDistributionMode enables extreme privacy headers (CSP, no-store,
 	// no-referrer) and a stripped-down runtime-config.js payload.
 	PrivateDistributionMode bool
+
+	// Brand holds white-label overrides from brand.yaml. When nil
+	// the SPA renders Mobazha default branding.
+	Brand *BrandSnapshot
 
 	// FeaturesSnapshotFn returns the current set of feature flags and
 	// their effective values for the requesting caller. It is invoked
@@ -68,6 +88,7 @@ func NewHandler(cfg ServerConfig) http.Handler {
 		overrideDir:        cfg.OverrideDir,
 		saasURL:            cfg.SaaSURL,
 		private_distributionMode:        cfg.PrivateDistributionMode,
+		brand:              cfg.Brand,
 		featuresSnapshotFn: cfg.FeaturesSnapshotFn,
 	}
 }
@@ -77,6 +98,7 @@ type spaHandler struct {
 	overrideDir        string
 	saasURL            string
 	private_distributionMode        bool
+	brand              *BrandSnapshot
 	featuresSnapshotFn func(context.Context) []FeatureSnapshot
 }
 
@@ -181,7 +203,7 @@ const private_distributionCSP = "default-src 'self'; " +
 	"connect-src 'self' http://127.0.0.1:*; " +
 	"img-src 'self' data: blob:; " +
 	"media-src 'self' blob:; " +
-	"script-src 'self'; " +
+	"script-src 'self' 'unsafe-inline'; " +
 	"style-src 'self' 'unsafe-inline'; " +
 	"font-src 'self'; " +
 	"worker-src 'self'; " +
@@ -228,6 +250,7 @@ type runtimeConfigPayload struct {
 	Features                 map[string]runtimeFeatureEntry `json:"features"`
 	PrivateDistributionMode              bool                           `json:"private_distributionMode,omitempty"`
 	DisableExternalResources bool                           `json:"disableExternalResources,omitempty"`
+	Brand                    *BrandSnapshot                 `json:"brand,omitempty"`
 }
 
 // serveRuntimeConfig emits a JS snippet that assigns window.__RUNTIME_CONFIG__
@@ -275,6 +298,7 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) 
 			Features:                 features,
 			PrivateDistributionMode:              true,
 			DisableExternalResources: true,
+			Brand:                    h.brand,
 		}
 	} else {
 		saasURL := h.saasURL

@@ -77,6 +77,7 @@ require (
 	golang.org/x/net v0.52.0
 	golang.org/x/sys v0.42.0
 	google.golang.org/protobuf v1.36.11
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.5.6
 	gorm.io/gorm v1.25.10
 	maunium.net/go/mautrix v0.26.4
@@ -263,7 +264,6 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect

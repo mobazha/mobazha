@@ -51,6 +51,10 @@ type Config struct {
 	// no-store, no-referrer) and a stripped-down runtime-config.js payload.
 	PrivateDistributionMode bool
 
+	// Brand holds white-label overrides from brand.yaml. Passed to the
+	// embedded frontend handler for /runtime-config.js injection.
+	Brand *frontend.BrandSnapshot
+
 	// FeaturesSnapshotFn, when set, is invoked per-request from the
 	// embedded frontend's /runtime-config.js handler so toggles via
 	// PUT /v1/settings/features/{key} or PATCH /platform/v1/features/{key}
@@ -73,6 +77,7 @@ func New(cfg Config) *Server {
 	feHandler := frontend.NewHandler(frontend.ServerConfig{
 		OverrideDir:        cfg.FrontendOverrideDir,
 		PrivateDistributionMode:        cfg.PrivateDistributionMode,
+		Brand:              cfg.Brand,
 		FeaturesSnapshotFn: cfg.FeaturesSnapshotFn,
 	})
 

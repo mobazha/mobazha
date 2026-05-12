@@ -89,6 +89,15 @@ type GatewayConfig struct {
 	// hostconfig is unavailable.
 	DataDir string
 
+	// FrontendOverrideDir serves static files from this directory before
+	// falling back to the embedded SPA. Used for white-label logo/favicon.
+	FrontendOverrideDir string
+
+	// Brand holds white-label overrides loaded from brand.yaml.
+	// When non-nil, the embedded frontend receives brand theming
+	// via /runtime-config.js. CLI and API docs also honour the name.
+	Brand *frontend.BrandSnapshot
+
 	// GormDB is an optional GORM database for local API token storage.
 	// When set (standalone mode), the gateway auto-creates the api_tokens
 	// table and enables /v1/auth/tokens CRUD + mbz_ token authentication.
@@ -237,7 +246,9 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 		ssrHandler.RegisterRoutes(topMux)
 	} else if frontend.HasContent() {
 		feHandler := frontend.NewHandler(frontend.ServerConfig{
+			OverrideDir:        config.FrontendOverrideDir,
 			PrivateDistributionMode:        detectDeploymentMode() == "private_distribution",
+			Brand:              config.Brand,
 			FeaturesSnapshotFn: featuresSnapshotFromNodeManager(nodeManager),
 		})
 		topMux.Handle("/", feHandler)

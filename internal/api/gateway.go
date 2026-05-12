@@ -355,6 +355,7 @@ func (g *Gateway) Serve() error {
 
 func (g *Gateway) newV1Router(allowAllOrigins, csrfEnabled bool) chi.Router {
 	r := chi.NewMux()
+	r.Use(panicRecoveryMiddleware)
 	r.Use(securityHeadersMiddleware)
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	if allowAllOrigins {
@@ -367,6 +368,14 @@ func (g *Gateway) newV1Router(allowAllOrigins, csrfEnabled bool) chi.Router {
 		r.Use(g.NodeSelectionMiddleware)
 	}
 	r.Use(g.StorefrontMiddleware)
+
+	// Register raw chi routes BEFORE huma so that static path segments
+	// ("upload-stream") are already in the trie when huma adds the
+	// parameterized sibling ("{assetID}"). Chi's radix tree resolves
+	// static nodes before param nodes at the same level, but only if the
+	// static node exists when the param node is inserted.
+	g.registerPreHumaRoutes(r)
+
 	g.registerHumaAPI(r)
 	return r
 }
@@ -391,7 +400,11 @@ func wrapError(err error) string {
 // Prefer the domain-specific getters below when the handler only needs
 // a single domain's methods — they return narrower interface types.
 func getNodeService(r *http.Request) contracts.NodeService {
-	return r.Context().Value(nodeContextKey).(contracts.NodeService)
+	ns, ok := r.Context().Value(nodeContextKey).(contracts.NodeService)
+	if !ok || ns == nil {
+		panic(fmt.Sprintf("BUG: nodeContextKey missing from request context: %s %s (NodeSelectionMiddleware may not have run)", r.Method, r.URL.Path))
+	}
+	return ns
 }
 
 func getIdentityService(r *http.Request) contracts.IdentityService {

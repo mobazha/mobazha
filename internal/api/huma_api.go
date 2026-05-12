@@ -121,10 +121,6 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 		g.registerNodeHumaAIOperations(api)
 		g.registerNodeHumaShippingOperations(api)
 		g.registerNodeHumaSellerDigitalOperations(api)
-
-		// Raw chi multipart streaming upload — bypasses huma to avoid body
-		// buffering (TD-110: long-term streaming upload path).
-		g.registerDigitalAssetStreamRoute(r)
 	}
 
 	return api

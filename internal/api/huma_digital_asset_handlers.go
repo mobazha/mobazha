@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"net"
@@ -264,43 +263,9 @@ type importKeysOutput struct {
 }
 
 func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
-	// POST /v1/digital-assets/upload — upload file asset
-	huma.Register(api, huma.Operation{
-		OperationID: "digital-asset-upload-file",
-		Method:      http.MethodPost,
-		Path:        "/v1/digital-assets/upload",
-		Summary:     "Upload a file as a digital asset",
-		Tags:        []string{"digital-assets"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *struct {
-		Body struct {
-			ListingSlug string `json:"listingSlug" required:"true"`
-			VariantSKU  string `json:"variantSku,omitempty"`
-			FileName    string `json:"fileName" required:"true"`
-			MimeType    string `json:"mimeType,omitempty"`
-			Data        string `json:"data" required:"true" doc:"Base64-encoded file content."`
-		}
-	}) (*assetInfoOutput, error) {
-		r := nodeBridgeRequest(ctx, http.MethodPost, "/v1/digital-assets/upload", nil)
-		svc, ok := getDigitalAssetService(r)
-		if !ok {
-			return nil, huma.Error501NotImplemented("digital asset subsystem not available")
-		}
-		raw, err := base64Decode(in.Body.Data)
-		if err != nil {
-			return nil, huma.Error400BadRequest("invalid base64 data: " + err.Error())
-		}
-		const maxUploadSize = 512 << 20 // 512 MiB
-		if len(raw) > maxUploadSize {
-			return nil, huma.Error400BadRequest("file exceeds maximum upload size of 512 MiB")
-		}
-		info, err := svc.UploadFileAsset(ctx, in.Body.ListingSlug, in.Body.VariantSKU, in.Body.FileName, in.Body.MimeType, raw)
-		if err != nil {
-			log.Errorf("digital asset upload failed: %v", err)
-			return nil, huma.Error500InternalServerError("failed to upload file asset")
-		}
-		return &assetInfoOutput{Body: *info}, nil
-	})
+	// File uploads use streaming multipart at POST /v1/digital-assets/upload-stream
+	// (registered as a raw chi handler in registerDigitalAssetStreamRoute) — Huma's
+	// JSON body model isn't suitable for hundred-MiB binary payloads.
 
 	// POST /v1/digital-assets/link — create link asset
 	huma.Register(api, huma.Operation{
@@ -583,6 +548,3 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 	})
 }
 
-func base64Decode(s string) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(s)
-}

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strconv"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/storage"
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"gorm.io/gorm"
 )
 
 // initDiscountSubsystem initializes the per-node discount subsystem:
@@ -141,9 +143,18 @@ type dbOrderQuerier struct {
 
 func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadata, error) {
 	var ord models.Order
-	if err := q.db.View(func(tx database.Tx) error {
+	err := q.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID).First(&ord).Error
-	}); err != nil {
+	})
+	if err != nil {
+		// Phase 1.0: orderID may also be a GuestOrder.OrderToken
+		// (anonymous buyer flow). Guest order metadata is stored as flat
+		// columns (no embedded protobuf), so the lookup is simpler than
+		// the escrow path above. We only fall through on RecordNotFound;
+		// any other DB error (connection, schema) propagates as-is.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return q.getGuestOrderMetadata(orderID)
+		}
 		return nil, err
 	}
 
@@ -190,6 +201,50 @@ func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadat
 			}
 			meta.LineItems = append(meta.LineItems, item)
 		}
+	}
+
+	return meta, nil
+}
+
+// getGuestOrderMetadata builds OrderMetadata from a GuestOrder row keyed by
+// order_token. Used by the entitlement service when the buyer is anonymous
+// (no peer ID, no embedded protobufs). PaymentMethod is reported as "DIRECT"
+// to match guest checkout's on-chain settlement model — DigitalEntitlement
+// uses this to pick the initial grant status (active, not protected).
+//
+// BuyerPeerID is intentionally empty: the orderToken itself is the only
+// capability the buyer has, mirroring the existing public buyer-portal
+// trust model (see huma_digital_asset_handlers.go::digital-assets-buyer-get).
+func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.OrderMetadata, error) {
+	var go_ models.GuestOrder
+	if err := q.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_token = ?", orderToken).
+			Preload("Items").First(&go_).Error
+	}); err != nil {
+		return nil, err
+	}
+
+	meta := &digital.OrderMetadata{
+		ContractType:  "DIGITAL_GOOD",
+		PaymentMethod: "DIRECT",
+		BuyerPeerID:   "", // anonymous guest buyer
+	}
+
+	for _, it := range go_.Items {
+		if it.ListingSlug == "" {
+			continue
+		}
+		qty := uint32(it.Quantity)
+		if qty == 0 {
+			qty = 1
+		}
+		meta.LineItems = append(meta.LineItems, digital.OrderLineItem{
+			ListingSlug: it.ListingSlug,
+			// TECHDEBT(TD-099): GuestOrderItem stores VariantHash, not
+			// VariantSKU. Resolving SKU requires the listing variant
+			// table; getAssetModelsByListing treats "" as "any variant".
+			Quantity: qty,
+		})
 	}
 
 	return meta, nil

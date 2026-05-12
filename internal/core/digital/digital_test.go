@@ -1,6 +1,7 @@
 package digital
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"testing"
@@ -107,7 +108,7 @@ func TestAssetService_UploadAndDownloadFile(t *testing.T) {
 	ctx := context.Background()
 	plaintext := []byte("PDF content here")
 
-	assetInfo, err := svc.UploadFileAsset(ctx, "listing-1", "", "test.pdf", "application/pdf", plaintext)
+	assetInfo, err := svc.UploadFileAssetStream(ctx, "listing-1", "", "test.pdf", "application/pdf", bytes.NewReader(plaintext), int64(len(plaintext)))
 	require.NoError(t, err)
 	assert.Equal(t, models.AssetTypeFile, assetInfo.AssetType)
 
@@ -250,7 +251,7 @@ func TestAssetService_CreateGrant_WithEntitlementSnapshot(t *testing.T) {
 	svc, _ := newTestAssetService(t)
 
 	ctx := context.Background()
-	assetInfo, err := svc.UploadFileAsset(ctx, "listing-snap", "", "file.zip", "application/zip", []byte("data"))
+	assetInfo, err := svc.UploadFileAssetStream(ctx, "listing-snap", "", "file.zip", "application/zip", bytes.NewReader([]byte("data")), int64(len([]byte("data"))))
 	require.NoError(t, err)
 
 	snapAsset, err := svc.getAssetModelByID(assetInfo.ID)
@@ -272,7 +273,7 @@ func TestAssetService_FreezeAndRestoreGrants(t *testing.T) {
 	svc, _ := newTestAssetService(t)
 
 	ctx := context.Background()
-	ai, err := svc.UploadFileAsset(ctx, "listing-frz", "", "f.pdf", "application/pdf", []byte("x"))
+	ai, err := svc.UploadFileAssetStream(ctx, "listing-frz", "", "f.pdf", "application/pdf", bytes.NewReader([]byte("x")), int64(len([]byte("x"))))
 	require.NoError(t, err)
 	asset, err := svc.getAssetModelByID(ai.ID)
 	require.NoError(t, err)
@@ -294,7 +295,7 @@ func TestAssetService_RevokeGrants(t *testing.T) {
 	svc, _ := newTestAssetService(t)
 
 	ctx := context.Background()
-	ai, err := svc.UploadFileAsset(ctx, "listing-rev", "", "f.pdf", "application/pdf", []byte("x"))
+	ai, err := svc.UploadFileAssetStream(ctx, "listing-rev", "", "f.pdf", "application/pdf", bytes.NewReader([]byte("x")), int64(len([]byte("x"))))
 	require.NoError(t, err)
 	asset, err := svc.getAssetModelByID(ai.ID)
 	require.NoError(t, err)
@@ -315,7 +316,7 @@ func TestAssetService_RecordDownload(t *testing.T) {
 	svc, _ := newTestAssetService(t)
 
 	ctx := context.Background()
-	ai, err := svc.UploadFileAsset(ctx, "listing-dl", "", "f.pdf", "application/pdf", []byte("x"))
+	ai, err := svc.UploadFileAssetStream(ctx, "listing-dl", "", "f.pdf", "application/pdf", bytes.NewReader([]byte("x")), int64(len([]byte("x"))))
 	require.NoError(t, err)
 	asset, err := svc.getAssetModelByID(ai.ID)
 	require.NoError(t, err)
@@ -367,7 +368,7 @@ func TestEntitlement_OrderConfirmation_CreatesActiveGrant_CANCELABLE(t *testing.
 	entSvc, assetSvc, bus, _ := newTestEntitlementService(t)
 
 	ctx := context.Background()
-	_, err := assetSvc.UploadFileAsset(ctx, "listing-ent", "", "file.zip", "application/zip", []byte("test"))
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "file.zip", "application/zip", bytes.NewReader([]byte("test")), int64(len([]byte("test"))))
 	require.NoError(t, err)
 
 	require.NoError(t, entSvc.Start())
@@ -387,7 +388,7 @@ func TestEntitlement_OrderConfirmation_CreatesProtectedGrant_MODERATED(t *testin
 	orderQ.paymentMethod = "MODERATED"
 
 	ctx := context.Background()
-	_, err := assetSvc.UploadFileAsset(ctx, "listing-ent", "", "file.zip", "application/zip", []byte("test"))
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "file.zip", "application/zip", bytes.NewReader([]byte("test")), int64(len([]byte("test"))))
 	require.NoError(t, err)
 
 	require.NoError(t, entSvc.Start())
@@ -422,12 +423,43 @@ func TestEntitlement_OrderConfirmation_AllocatesLicenseKey(t *testing.T) {
 	assert.Equal(t, int64(1), poolStats.Dispensed)
 }
 
+// TestEntitlement_GuestOrder_CreatesGrant verifies the guest checkout path:
+// when an order is funded with empty BuyerPeerID and PaymentMethod="DIRECT"
+// (the values produced by dbOrderQuerier.getGuestOrderMetadata), the
+// entitlement service still creates a download grant. The grant uses the
+// orderToken as OrderID — the buyer-portal endpoint
+// (/v1/orders/{orderID}/digital-assets) treats orderID as a capability
+// token, so this is the only thing the anonymous buyer needs.
+func TestEntitlement_GuestOrder_CreatesGrant(t *testing.T) {
+	entSvc, assetSvc, bus, orderQ := newTestEntitlementService(t)
+	orderQ.buyerPeerID = "" // anonymous guest
+	orderQ.paymentMethod = "DIRECT"
+
+	ctx := context.Background()
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "guest.zip", "application/zip", bytes.NewReader([]byte("guest-payload")), int64(len("guest-payload")))
+	require.NoError(t, err)
+
+	require.NoError(t, entSvc.Start())
+
+	const orderToken = "gst_0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab"
+	bus.Emit(&events.OrderConfirmation{OrderID: orderToken})
+	time.Sleep(100 * time.Millisecond)
+
+	grants, err := assetSvc.GetGrantsByOrder(orderToken)
+	require.NoError(t, err)
+	require.Len(t, grants, 1, "guest order must produce exactly one grant")
+	assert.Equal(t, models.GrantStatusActive, grants[0].Status, "DIRECT payment yields active grant (no escrow protection)")
+	assert.Empty(t, grants[0].BuyerPeerID, "anonymous buyer: BuyerPeerID stays empty")
+	assert.Equal(t, orderToken, grants[0].OrderID)
+	assert.NotEmpty(t, grants[0].AssetSnapshot, "EntitlementSnapshot must be present")
+}
+
 func TestEntitlement_SkipsNonDigitalOrders(t *testing.T) {
 	entSvc, assetSvc, bus, orderQ := newTestEntitlementService(t)
 	orderQ.contractType = "PHYSICAL_GOOD"
 
 	ctx := context.Background()
-	_, err := assetSvc.UploadFileAsset(ctx, "listing-ent", "", "file.zip", "application/zip", []byte("test"))
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "file.zip", "application/zip", bytes.NewReader([]byte("test")), int64(len([]byte("test"))))
 	require.NoError(t, err)
 
 	require.NoError(t, entSvc.Start())
@@ -458,7 +490,7 @@ func TestEntitlement_SkipsWhenFeatureFlagDisabled(t *testing.T) {
 	entSvc := NewDigitalEntitlementAppService(context.Background(), db, features, assetSvc, orderQ, bus)
 
 	ctx := context.Background()
-	_, err := assetSvc.UploadFileAsset(ctx, "listing-ff", "", "f.zip", "application/zip", []byte("x"))
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ff", "", "f.zip", "application/zip", bytes.NewReader([]byte("x")), int64(len([]byte("x"))))
 	require.NoError(t, err)
 
 	require.NoError(t, entSvc.Start())
@@ -499,7 +531,7 @@ func TestEntitlement_DisputeClose_SellerWins_RestoresGrants(t *testing.T) {
 	entSvc, assetSvc, bus, _ := newTestEntitlementService(t)
 
 	ctx := context.Background()
-	_, err := assetSvc.UploadFileAsset(ctx, "listing-ent", "", "f.pdf", "application/pdf", []byte("x"))
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "f.pdf", "application/pdf", bytes.NewReader([]byte("x")), int64(len([]byte("x"))))
 	require.NoError(t, err)
 
 	require.NoError(t, entSvc.Start())
@@ -523,7 +555,7 @@ func TestEntitlement_DisputeClose_BuyerWins_RevokesGrants(t *testing.T) {
 	entSvc, assetSvc, bus, _ := newTestEntitlementService(t)
 
 	ctx := context.Background()
-	_, err := assetSvc.UploadFileAsset(ctx, "listing-ent", "", "f.pdf", "application/pdf", []byte("x"))
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "f.pdf", "application/pdf", bytes.NewReader([]byte("x")), int64(len([]byte("x"))))
 	require.NoError(t, err)
 
 	require.NoError(t, entSvc.Start())
@@ -571,7 +603,7 @@ func TestAssetService_GetBuyerDigitalAssets_FileEntry(t *testing.T) {
 	svc, _ := newTestAssetService(t)
 
 	ctx := context.Background()
-	ai, err := svc.UploadFileAsset(ctx, "listing-bp", "", "report.pdf", "application/pdf", []byte("data"))
+	ai, err := svc.UploadFileAssetStream(ctx, "listing-bp", "", "report.pdf", "application/pdf", bytes.NewReader([]byte("data")), int64(len([]byte("data"))))
 	require.NoError(t, err)
 	asset, err := svc.getAssetModelByID(ai.ID)
 	require.NoError(t, err)

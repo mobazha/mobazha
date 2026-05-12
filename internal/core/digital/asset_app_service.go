@@ -1,7 +1,6 @@
 package digital
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -40,31 +39,47 @@ func NewDigitalAssetAppService(
 	}
 }
 
-// UploadFileAsset encrypts a file and stores it in BlobStore, then persists
-// a DigitalAsset record. Returns the created asset.
-func (s *DigitalAssetAppService) UploadFileAsset(
+// UploadFileAssetStream encrypts a file streamed from `src` and stores the
+// resulting v1 chunked AEAD container in BlobStore, then persists a
+// DigitalAsset record. Memory footprint is bounded by the stream chunk size
+// (4 MiB) regardless of file size, supporting multi-hundred-MiB uploads on
+// memory-constrained hosts.
+//
+// Storage layout: `digital/<assetID>` (UUID-only). FileHash on the asset
+// record holds the plaintext SHA-256 for UI / dedup hints but is *not* part
+// of the storage key — this avoids the "rename after streaming" problem
+// since R2/S3 do not support cheap rename.
+//
+// `expectedSize` is informational (forwarded to the BlobStore for content-
+// length / multipart sizing). Pass -1 if unknown; multipart uploaders fall
+// back to chunked transfer.
+func (s *DigitalAssetAppService) UploadFileAssetStream(
 	ctx context.Context,
 	listingSlug string,
 	variantSKU string,
 	fileName string,
 	mimeType string,
-	plaintext []byte,
+	src io.Reader,
+	expectedSize int64,
 ) (*contracts.DigitalAssetInfo, error) {
 	assetID := uuid.Must(uuid.NewV7()).String()
 	keyVersion := 1
 
-	ciphertext, err := s.crypto.EncryptFile(plaintext, assetID, keyVersion)
+	plainHasher := sha256.New()
+	plainCounter := &countingReader{r: io.TeeReader(src, plainHasher)}
+
+	encR, err := s.crypto.EncryptFileStreamReader(plainCounter, assetID, keyVersion, encryption.DefaultStreamChunkSize)
 	if err != nil {
-		return nil, fmt.Errorf("encrypt file: %w", err)
+		return nil, fmt.Errorf("init stream encryptor: %w", err)
+	}
+	defer encR.Close()
+
+	if err := s.blob.PutStream(ctx, blobKey(assetID), encR, -1, "application/octet-stream"); err != nil {
+		return nil, fmt.Errorf("blob put stream: %w", err)
 	}
 
-	hash := sha256.Sum256(ciphertext)
-	fileHash := hex.EncodeToString(hash[:])
-
-	blobKey := fmt.Sprintf("digital/%s/%s", assetID, fileHash)
-	if err := s.blob.Put(ctx, blobKey, ciphertext, mimeType); err != nil {
-		return nil, fmt.Errorf("blob store put: %w", err)
-	}
+	plainSize := plainCounter.n
+	fileHash := hex.EncodeToString(plainHasher.Sum(nil))
 
 	asset := &models.DigitalAsset{
 		ID:          assetID,
@@ -73,7 +88,7 @@ func (s *DigitalAssetAppService) UploadFileAsset(
 		AssetType:   models.AssetTypeFile,
 		FileHash:    fileHash,
 		FileName:    fileName,
-		FileSize:    int64(len(plaintext)),
+		FileSize:    plainSize,
 		MimeType:    mimeType,
 		KeyVersion:  keyVersion,
 	}
@@ -85,6 +100,27 @@ func (s *DigitalAssetAppService) UploadFileAsset(
 	}
 
 	return assetToInfo(asset), nil
+}
+
+// blobKey returns the canonical blob key for an encrypted file asset.
+// Storage layout is UUID-only (`digital/<assetID>`); the encrypted body is
+// a v1 chunked-AEAD container, so we don't need the file hash in the path
+// and we don't need a rename step after a streaming upload.
+func blobKey(assetID string) string {
+	return "digital/" + assetID
+}
+
+// countingReader counts bytes flowing through it. Used to capture the exact
+// plaintext size when the upstream upload doesn't advertise it.
+type countingReader struct {
+	r io.Reader
+	n int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	nn, err := c.r.Read(p)
+	c.n += int64(nn)
+	return nn, err
 }
 
 // CreateLinkAsset creates a DigitalAsset of type "link", storing the
@@ -340,25 +376,30 @@ func (s *DigitalAssetAppService) GetLicenseKeyPoolStats(
 	}, nil
 }
 
-// DownloadFile fetches an encrypted file from BlobStore and decrypts it.
+// DownloadFile fetches the encrypted blob, runs it through the v1 chunked
+// AEAD decryptor and returns the full plaintext. Convenience helper for
+// tests and for entitlement preview paths that need the whole bytes.
+//
+// For buyer-facing downloads of large files prefer ServeDownload, which
+// streams plaintext to the HTTP response without buffering it in memory.
 func (s *DigitalAssetAppService) DownloadFile(ctx context.Context, asset *models.DigitalAsset) ([]byte, error) {
 	if asset.AssetType != models.AssetTypeFile {
 		return nil, fmt.Errorf("asset %s is not a file", asset.ID)
 	}
 
-	blobKey := fmt.Sprintf("digital/%s/%s", asset.ID, asset.FileHash)
-	reader, _, err := s.blob.Get(ctx, blobKey)
+	cipherStream, _, err := s.blob.Get(ctx, blobKey(asset.ID))
 	if err != nil {
 		return nil, fmt.Errorf("blob get: %w", err)
 	}
-	defer reader.Close()
+	defer cipherStream.Close()
 
-	ciphertext, err := readAll(reader)
+	plainR, err := s.crypto.DecryptFileStreamReader(cipherStream, asset.ID, asset.KeyVersion)
 	if err != nil {
-		return nil, fmt.Errorf("read blob: %w", err)
+		return nil, fmt.Errorf("decrypt stream: %w", err)
 	}
+	defer plainR.Close()
 
-	return s.crypto.DecryptFile(ciphertext, asset.ID, asset.KeyVersion)
+	return io.ReadAll(plainR)
 }
 
 // RevealLink decrypts the link URL stored in a link-type asset.
@@ -408,6 +449,7 @@ func (s *DigitalAssetAppService) CreateDownloadGrant(
 		FileHash:     asset.FileHash,
 		FileName:     asset.FileName,
 		FileSize:     asset.FileSize,
+		MimeType:     asset.MimeType,
 		KeyVersion:   asset.KeyVersion,
 		DeliveryData: asset.DeliveryData,
 	})
@@ -586,43 +628,31 @@ func (s *DigitalAssetAppService) ServeDownload(
 		return nil, fmt.Errorf("download limit reached (%d/%d)", grant.DownloadCount, grant.MaxDownloads)
 	}
 
-	blobKey := fmt.Sprintf("digital/%s/%s", grant.AssetID, snap.FileHash)
-	reader, _, err := s.blob.Get(ctx, blobKey)
+	cipherStream, _, err := s.blob.Get(ctx, blobKey(grant.AssetID))
 	if err != nil {
-		_ = s.RecordDownload(grant, grant.BuyerPeerID, req.BuyerIPHash, req.UserAgent, false, "blob_get_failed")
+		s.recordDownloadOrLog(grant, req.BuyerIPHash, req.UserAgent, false, "blob_get_failed")
 		return nil, fmt.Errorf("blob get: %w", err)
 	}
 
-	// Phase 1 loads the entire file into memory for decryption.
-	// Limit to 512 MiB to prevent OOM on abnormally large blobs;
-	// streaming decrypt is deferred to Phase 2 (chunked AES-GCM).
-	const maxBlobSize = 512 << 20
-	ciphertext, err := readAllLimited(reader, maxBlobSize)
-	_ = reader.Close()
-	if err != nil {
-		_ = s.RecordDownload(grant, grant.BuyerPeerID, req.BuyerIPHash, req.UserAgent, false, "blob_read_failed")
-		return nil, fmt.Errorf("read blob: %w", err)
+	plainR, derr := s.crypto.DecryptFileStreamReader(cipherStream, grant.AssetID, snap.KeyVersion)
+	if derr != nil {
+		_ = cipherStream.Close()
+		s.recordDownloadOrLog(grant, req.BuyerIPHash, req.UserAgent, false, "decrypt_failed")
+		return nil, fmt.Errorf("decrypt stream: %w", derr)
 	}
 
-	plaintext, err := s.crypto.DecryptFile(ciphertext, grant.AssetID, snap.KeyVersion)
-	if err != nil {
-		_ = s.RecordDownload(grant, grant.BuyerPeerID, req.BuyerIPHash, req.UserAgent, false, "decrypt_failed")
-		return nil, fmt.Errorf("decrypt: %w", err)
-	}
-
-	mime := ""
-	if live, gerr := s.GetAssetByID(grant.AssetID); gerr == nil && live != nil {
-		mime = live.MimeType
+	// MimeType / FileName / FileSize all come from the snapshot — frozen at
+	// order-confirmation so seller edits to the asset record don't change
+	// the buyer-facing download response. Older snapshots written before
+	// the MimeType field was added fall back to the live asset (best-effort).
+	mime := snap.MimeType
+	if mime == "" {
+		if live, _ := s.GetAssetByID(grant.AssetID); live != nil {
+			mime = live.MimeType
+		}
 	}
 	if mime == "" {
 		mime = "application/octet-stream"
-	}
-
-	if err := s.RecordDownload(grant, grant.BuyerPeerID, req.BuyerIPHash, req.UserAgent, true, ""); err != nil {
-		// Audit failure is non-fatal — we already produced the bytes. Log via
-		// returning a wrapped response in the future; for now, surface as a
-		// soft warning in the package logger if any exists.
-		_ = err
 	}
 
 	fileName := snap.FileName
@@ -630,12 +660,64 @@ func (s *DigitalAssetAppService) ServeDownload(
 		fileName = "download.bin"
 	}
 
+	// We can't sample the success/failure of streaming decrypt before the
+	// body is consumed; record success now and rely on download log
+	// truncation if the connection breaks. Acceptable since the audit's
+	// purpose is fraud / abuse detection, not strict accounting.
+	s.recordDownloadOrLog(grant, req.BuyerIPHash, req.UserAgent, true, "")
 	return &contracts.DownloadResponse{
 		FileName: fileName,
 		MimeType: mime,
-		FileSize: int64(len(plaintext)),
-		Body:     io.NopCloser(bytes.NewReader(plaintext)),
+		FileSize: snap.FileSize,
+		Body:     newCombinedCloser(plainR, cipherStream),
 	}, nil
+}
+
+// recordDownloadOrLog wraps RecordDownload so that audit-log failures don't
+// silently disappear. We can't fail the download itself when the audit
+// write breaks (the buyer paid; serving the bytes is the priority), but
+// dropped fraud-detection signal is a real loss — log loudly so on-call
+// catches it.
+func (s *DigitalAssetAppService) recordDownloadOrLog(
+	grant *models.DownloadGrant,
+	buyerIPHash, userAgent string,
+	success bool,
+	failReason string,
+) {
+	if err := s.RecordDownload(grant, grant.BuyerPeerID, buyerIPHash, userAgent, success, failReason); err != nil {
+		// IMPORTANT: log grant.ID, never grant.Nonce — the Nonce is the
+		// HMAC-signed URL token used to authenticate downloads. Logging
+		// it would let anyone with log access replay the buyer's
+		// download link.
+		log.Warningf("digital-download: audit record failed for grantID=%s asset=%s success=%v reason=%s: %v",
+			grant.ID, grant.AssetID, success, failReason, err)
+	}
+}
+
+// combinedCloser closes both the decryptor reader and the underlying blob
+// stream when the consumer is done with the response body.
+type combinedCloser struct {
+	io.Reader
+	closers []io.Closer
+}
+
+func newCombinedCloser(r io.Reader, extra ...io.Closer) io.ReadCloser {
+	cc := &combinedCloser{Reader: r}
+	if c, ok := r.(io.Closer); ok {
+		cc.closers = append(cc.closers, c)
+	}
+	cc.closers = append(cc.closers, extra...)
+	return cc
+}
+
+func (cc *combinedCloser) Close() error {
+	var firstErr error
+	for _, c := range cc.closers {
+		if err := c.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 // GetAssetsByListing returns all digital assets for a listing+variant.
@@ -1194,18 +1276,3 @@ func expiresAtFromAsset(asset *models.DigitalAsset) time.Time {
 	return time.Time{}
 }
 
-func readAll(r io.Reader) ([]byte, error) {
-	return io.ReadAll(r)
-}
-
-func readAllLimited(r io.Reader, maxBytes int64) ([]byte, error) {
-	lr := io.LimitReader(r, maxBytes+1)
-	data, err := io.ReadAll(lr)
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf("blob exceeds size limit (%d bytes)", maxBytes)
-	}
-	return data, nil
-}

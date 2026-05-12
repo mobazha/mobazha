@@ -432,7 +432,8 @@ func (s *GuestOrderAppService) CompleteGuestOrder(_ context.Context, token strin
 // HandlePaymentDetected is called when a matching transaction is first seen on-chain.
 // opts carries chain-specific metadata (e.g. EXTERNAL_PAYMENT block height); nil for UTXO/EVM/Solana.
 func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, opts *contracts.PaymentDetectedOpts) error {
-	return s.db.Update(func(tx database.Tx) error {
+	var becameFunded bool
+	err := s.db.Update(func(tx database.Tx) error {
 		var order models.GuestOrder
 		if err := tx.Read().Where("order_token = ?", orderToken).First(&order).Error; err != nil {
 			return err
@@ -479,6 +480,7 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 			now := time.Now()
 			order.State = models.GuestOrderFunded
 			order.FundedAt = &now
+			becameFunded = true
 
 			if err := s.confirmReservation(tx, order.OrderToken); err != nil {
 				log.Warningf("confirm reservation for %s: %v", redact.Token(orderToken), err)
@@ -493,6 +495,10 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 
 		return tx.Save(&order)
 	})
+	if err == nil && becameFunded {
+		s.emitGuestOrderFunded(orderToken)
+	}
+	return err
 }
 
 // HandlePoolPayment records a mempool-only payment observation.
@@ -552,7 +558,8 @@ func (s *GuestOrderAppService) HandleLatePayment(orderToken, txHash, status stri
 
 // HandleConfirmationUpdate updates confirmation count and transitions to FUNDED if threshold met.
 func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs int) error {
-	return s.db.Update(func(tx database.Tx) error {
+	var becameFunded bool
+	err := s.db.Update(func(tx database.Tx) error {
 		var order models.GuestOrder
 		if err := tx.Read().Where("order_token = ?", orderToken).First(&order).Error; err != nil {
 			return err
@@ -568,6 +575,7 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 			}
 			order.State = models.GuestOrderFunded
 			order.FundedAt = &now
+			becameFunded = true
 
 			if err := s.confirmReservation(tx, order.OrderToken); err != nil {
 				log.Warningf("confirm reservation for %s: %v", redact.Token(orderToken), err)
@@ -580,6 +588,31 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 			}
 		}
 		return tx.Save(&order)
+	})
+	if err == nil && becameFunded {
+		s.emitGuestOrderFunded(orderToken)
+	}
+	return err
+}
+
+// emitGuestOrderFunded fires events.OrderConfirmation when a guest order
+// transitions into FUNDED. Subscribers (notably DigitalEntitlementAppService)
+// use this to create download grants and allocate license keys for digital
+// goods. The OrderID field carries the orderToken — DownloadGrant.OrderID
+// is varchar(255) and the public buyer-portal endpoint
+// (/v1/orders/{orderID}/digital-assets) uses orderID as a capability token,
+// matching the trust model already in place for escrow orders.
+//
+// Fired outside the DB transaction so a rollback never leaves a phantom
+// event behind. eventBus may be nil during early init or in test setups
+// without a bus — silently no-op in that case.
+func (s *GuestOrderAppService) emitGuestOrderFunded(orderToken string) {
+	if s.eventBus == nil {
+		return
+	}
+	s.eventBus.Emit(&events.OrderConfirmation{
+		OrderID:  orderToken,
+		VendorID: s.nodeID,
 	})
 }
 

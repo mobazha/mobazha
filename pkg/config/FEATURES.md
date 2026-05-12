@@ -444,7 +444,7 @@
 
 - **Category**: payment
 - **Stability**: beta
-- **Default**: false
+- **Default**: true
 - **Scopes**: PlatformGlobal, Tenant, NodeRuntime
 - **Client-visible**: yes
 - **Introduced in**: dg-1
@@ -457,7 +457,7 @@
 
 - **Category**: payment
 - **Stability**: beta
-- **Default**: false
+- **Default**: true
 - **Scopes**: PlatformGlobal, Tenant, NodeRuntime
 - **Client-visible**: yes
 - **Introduced in**: dg-1
@@ -471,7 +471,7 @@
 
 - **Category**: payment
 - **Stability**: experimental
-- **Default**: false
+- **Default**: false (Phase 2 预注册 — 端点未实施，启用为空操作)
 - **Scopes**: PlatformGlobal, Tenant, NodeRuntime
 - **Client-visible**: yes
 - **Introduced in**: dg-1 (Phase 2 预注册)

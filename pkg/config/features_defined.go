@@ -528,7 +528,7 @@ var FeatureDigitalAutoDeliveryEnabled = registerFeature(Feature{
 	Description:   "Automatically delivers digital assets (files, links, license keys) to buyers upon order confirmation.",
 	Category:      "payment",
 	Stability:     StabilityBeta,
-	DefaultValue:  false,
+	DefaultValue:  true,
 	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
@@ -550,7 +550,7 @@ var FeatureDigitalLicenseValidationEnabled = registerFeature(Feature{
 	Description:   "Exposes public license validation, activation, and deactivation endpoints for software products.",
 	Category:      "payment",
 	Stability:     StabilityBeta,
-	DefaultValue:  false,
+	DefaultValue:  true,
 	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
@@ -566,11 +566,16 @@ var FeatureDigitalLicenseValidationEnabled = registerFeature(Feature{
 //   - /v1/listings/{slug}/verify-token-gate 端点
 //   - Token Gate claim → 零价 DIRECT 订单
 var FeatureDigitalTokenGatingEnabled = registerFeature(Feature{
-	Key:           "digitalTokenGatingEnabled",
-	DisplayName:   "Token gating",
-	Description:   "Enables NFT/Token-based gating for digital content — wallet signature verification and on-chain balance checks.",
-	Category:      "payment",
-	Stability:     StabilityExperimental,
+	Key:         "digitalTokenGatingEnabled",
+	DisplayName: "Token gating",
+	Description: "Enables NFT/Token-based gating for digital content — wallet signature verification and on-chain balance checks.",
+	Category:    "payment",
+	Stability:   StabilityExperimental,
+	// Default off: the gating endpoints (/v1/listings/{slug}/verify-token-gate,
+	// zero-price DIRECT order short-circuit) are reserved for Phase 2 and
+	// not yet wired. Flipping this on today wires nothing but signals
+	// "supported" to clients, which is misleading. Re-evaluate when Phase 2
+	// implementation lands.
 	DefaultValue:  false,
 	ClientVisible: true,
 	AllowedScopes: []Scope{

@@ -67,6 +67,55 @@ func (a *LocalFSAdapter) Put(_ context.Context, key string, data []byte, content
 		return fmt.Errorf("rename blob %s: %w", key, err)
 	}
 
+	return a.writeMeta(key, contentType)
+}
+
+// PutStream streams data from r to {rootDir}/{key[0:2]}/{key} via a temp
+// file and atomic rename. Idempotent — existing keys are skipped.
+//
+// Memory footprint is bounded by io.Copy's internal 32 KiB buffer regardless
+// of file size, supporting multi-hundred-MiB digital asset uploads.
+func (a *LocalFSAdapter) PutStream(_ context.Context, key string, r io.Reader, _ int64, contentType string) error {
+	bpath := a.blobPath(key)
+	if _, err := os.Stat(bpath); err == nil {
+		// Drain reader so the upstream encryptor / pipe can finish cleanly,
+		// otherwise the goroutine writing to the pipe will block forever.
+		_, _ = io.Copy(io.Discard, r)
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(bpath), 0o755); err != nil {
+		return fmt.Errorf("mkdir for blob %s: %w", key, err)
+	}
+
+	tmp := bpath + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("create tmp blob %s: %w", key, err)
+	}
+	if _, err := io.Copy(f, r); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return fmt.Errorf("write blob stream %s: %w", key, err)
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return fmt.Errorf("sync blob %s: %w", key, err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("close blob %s: %w", key, err)
+	}
+	if err := os.Rename(tmp, bpath); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("rename blob %s: %w", key, err)
+	}
+
+	return a.writeMeta(key, contentType)
+}
+
+func (a *LocalFSAdapter) writeMeta(key, contentType string) error {
 	ct := strings.TrimSpace(contentType)
 	if ct == "" {
 		ct = "application/octet-stream"

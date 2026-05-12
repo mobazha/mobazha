@@ -539,6 +539,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			solPrivKey:      &solPrivKey,
 			tronMasterKey:   tronMasterKey,
 			bip44Key:        bip44Key,
+			keyProvider:     newFileKeyProvider(ethMasterKey, escrowKey, ratingKey, &solPrivKey, tronMasterKey),
 		},
 		networkFields: networkFields{
 			networkService:         service,
@@ -1190,6 +1191,7 @@ func newLightweightNode(
 			solPrivKey:      &solPrivKey,
 			tronMasterKey:   tronMasterKey,
 			bip44Key:        bip44Key,
+			keyProvider:     newFileKeyProvider(ethMasterKey, escrowKey, ratingKey, &solPrivKey, tronMasterKey),
 		},
 		networkFields: networkFields{
 			networkService:         service,

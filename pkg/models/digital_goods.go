@@ -42,7 +42,7 @@ type DigitalAsset struct {
 	KeyVersion int `gorm:"column:key_version;default:1"`
 
 	// DeliveryData holds encrypted JSON config per AssetType (link URL, webhook config, etc.).
-	DeliveryData []byte `gorm:"column:delivery_data;type:blob"`
+	DeliveryData []byte `gorm:"column:delivery_data"`
 
 	SortOrder    int `gorm:"column:sort_order;default:0"`
 	MaxDownloads int `gorm:"column:max_downloads;default:0"`
@@ -79,7 +79,7 @@ type DigitalLicenseKey struct {
 	ID          string `gorm:"primaryKey"`
 	ListingSlug string `gorm:"column:listing_slug;type:varchar(255);not null"`
 	VariantSKU  string `gorm:"column:variant_sku;type:varchar(255);not null;default:''"`
-	LicenseKey  []byte `gorm:"column:license_key;type:blob"`
+	LicenseKey  []byte `gorm:"column:license_key"`
 	KeyVersion  int    `gorm:"column:key_version;default:1"`
 	LicenseHash string `gorm:"column:license_hash;type:varchar(128);not null"`
 
@@ -96,7 +96,7 @@ type DigitalLicenseKey struct {
 
 	MaxActivations int    `gorm:"column:max_activations;default:0"`
 	LicenseType    string `gorm:"column:license_type;type:varchar(32);default:'perpetual'"`
-	Metadata       []byte `gorm:"column:metadata;type:blob"`
+	Metadata       []byte `gorm:"column:metadata"`
 }
 
 func (DigitalLicenseKey) TableName() string { return "digital_license_keys" }
@@ -194,7 +194,7 @@ type DownloadGrant struct {
 
 	// EntitlementSnapshot freezes the DigitalAsset definition at OrderConfirmation time.
 	// Prevents "content drift" — seller updating file/link after buyer paid.
-	AssetSnapshot []byte `gorm:"column:asset_snapshot;type:blob"`
+	AssetSnapshot []byte `gorm:"column:asset_snapshot"`
 
 	// PreviousStatus stores the status before freeze, for correct restoration on dispute close.
 	PreviousStatus string `gorm:"column:previous_status;type:varchar(16)"`
@@ -238,10 +238,15 @@ func (DigitalDownloadLog) TableName() string { return "digital_download_logs" }
 // AssetSnapshot captures the DigitalAsset state at OrderConfirmation time.
 // Serialized as JSON into DownloadGrant.AssetSnapshot.
 type AssetSnapshot struct {
-	AssetType    string `json:"assetType"`
-	FileHash     string `json:"fileHash,omitempty"`
-	FileName     string `json:"fileName,omitempty"`
-	FileSize     int64  `json:"fileSize,omitempty"`
+	AssetType string `json:"assetType"`
+	FileHash  string `json:"fileHash,omitempty"`
+	FileName  string `json:"fileName,omitempty"`
+	FileSize  int64  `json:"fileSize,omitempty"`
+	// MimeType is captured at order-confirmation time so buyer-facing
+	// download responses don't drift if the seller edits the asset record
+	// after the sale (the file body is already pinned by FileHash, but
+	// the Content-Type header should also be stable for the buyer).
+	MimeType     string `json:"mimeType,omitempty"`
 	KeyVersion   int    `json:"keyVersion,omitempty"`
 	DeliveryData []byte `json:"deliveryData,omitempty"`
 }

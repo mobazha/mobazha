@@ -31,7 +31,16 @@ type DigitalAssetService interface {
 	DeactivateLicense(licenseKeyPlain, appID, fingerprint string) error
 
 	// Seller asset management
-	UploadFileAsset(ctx context.Context, listingSlug, variantSKU, fileName, mimeType string, plaintext []byte) (*DigitalAssetInfo, error)
+	// UploadFileAssetStream encrypts plaintext streamed from `src` (chunked
+	// AEAD v1) and stores the ciphertext in BlobStore. Memory footprint is
+	// bounded by the stream chunk size regardless of total file size.
+	//
+	// `expectedSize` is forwarded as advisory metadata to the BlobStore
+	// (see BlobStore.PutStream) — pass the exact plaintext byte count when
+	// you know it (e.g. from `Content-Length`), or -1 to let the storage
+	// adapter pick its default chunked path. Reserved for future single-PUT
+	// optimizations; not currently consumed by any adapter.
+	UploadFileAssetStream(ctx context.Context, listingSlug, variantSKU, fileName, mimeType string, src io.Reader, expectedSize int64) (*DigitalAssetInfo, error)
 	CreateLinkAsset(listingSlug, variantSKU, url string) (*DigitalAssetInfo, error)
 	CreateLicenseKeyAsset(listingSlug, variantSKU, appID string) (*DigitalAssetInfo, error)
 	GetAssetsByListing(listingSlug, variantSKU string) ([]DigitalAssetInfo, error)

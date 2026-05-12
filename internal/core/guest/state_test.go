@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -356,4 +357,100 @@ func TestValidateCoinAvailability(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "ExternalPayment wallet-rpc unreachable")
 	})
+}
+
+// TestHandlePaymentDetected_ZeroConfs_EmitsOrderConfirmation verifies the
+// digital-goods bridge: when a guest order transitions into FUNDED via the
+// 0-conf path, GuestOrderAppService emits events.OrderConfirmation so
+// DigitalEntitlementAppService (the only non-test subscriber) can create
+// download grants for digital purchases.
+func TestHandlePaymentDetected_ZeroConfs_EmitsOrderConfirmation(t *testing.T) {
+	db := newGuestTestDB(t)
+	bus := events.NewBus()
+	sub, err := bus.Subscribe(&events.OrderConfirmation{}, events.BufSize(4))
+	require.NoError(t, err)
+	defer sub.Close()
+
+	svc := &GuestOrderAppService{db: db, eventBus: bus, nodeID: "test-node-1"}
+
+	seedGuestOrder(t, db, 1, models.GuestOrder{
+		OrderToken:    "gst_emit_zero_confs",
+		State:         models.GuestOrderAwaitingPayment,
+		PaymentCoin:   "crypto:eip155:1:native",
+		RequiredConfs: 0,
+		ExpiresAt:     time.Now().Add(time.Hour),
+	})
+
+	require.NoError(t, svc.HandlePaymentDetected("gst_emit_zero_confs", "0xemit", nil))
+
+	select {
+	case evt := <-sub.Out():
+		oc, ok := evt.(*events.OrderConfirmation)
+		require.True(t, ok)
+		assert.Equal(t, "gst_emit_zero_confs", oc.OrderID, "OrderID must be the orderToken")
+		assert.Equal(t, "test-node-1", oc.VendorID)
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected OrderConfirmation event after FUNDED transition, got none")
+	}
+}
+
+// TestHandleConfirmationUpdate_ReachesThreshold_EmitsOrderConfirmation
+// verifies the same bridge for the multi-confirmation path (UTXO/EXTERNAL_PAYMENT).
+func TestHandleConfirmationUpdate_ReachesThreshold_EmitsOrderConfirmation(t *testing.T) {
+	db := newGuestTestDB(t)
+	bus := events.NewBus()
+	sub, err := bus.Subscribe(&events.OrderConfirmation{}, events.BufSize(4))
+	require.NoError(t, err)
+	defer sub.Close()
+
+	svc := &GuestOrderAppService{db: db, eventBus: bus, nodeID: "test-node-2"}
+
+	seedGuestOrder(t, db, 1, models.GuestOrder{
+		OrderToken:    "gst_emit_confirm",
+		State:         models.GuestOrderPaymentDetected,
+		PaymentCoin:   "crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native",
+		PaymentTxHash: "ltctx-emit",
+		RequiredConfs: 3,
+		ExpiresAt:     time.Now().Add(time.Hour),
+	})
+
+	// Below threshold: no event.
+	require.NoError(t, svc.HandleConfirmationUpdate("gst_emit_confirm", 2))
+	select {
+	case <-sub.Out():
+		t.Fatal("must NOT emit before reaching confirmation threshold")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// Reaches threshold: event must fire.
+	require.NoError(t, svc.HandleConfirmationUpdate("gst_emit_confirm", 3))
+	select {
+	case evt := <-sub.Out():
+		oc := evt.(*events.OrderConfirmation)
+		assert.Equal(t, "gst_emit_confirm", oc.OrderID)
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected OrderConfirmation event after threshold reached")
+	}
+}
+
+// TestHandlePaymentDetected_NilEventBus_NoCrash guards against accidental
+// regressions: the helper must tolerate a nil eventBus (e.g. tests / private_distribution
+// init order). If this regresses, every guest payment crashes the node.
+func TestHandlePaymentDetected_NilEventBus_NoCrash(t *testing.T) {
+	db := newGuestTestDB(t)
+	svc := &GuestOrderAppService{db: db, eventBus: nil}
+
+	seedGuestOrder(t, db, 1, models.GuestOrder{
+		OrderToken:    "gst_no_bus",
+		State:         models.GuestOrderAwaitingPayment,
+		PaymentCoin:   "crypto:eip155:1:native",
+		RequiredConfs: 0,
+		ExpiresAt:     time.Now().Add(time.Hour),
+	})
+
+	require.NotPanics(t, func() {
+		_ = svc.HandlePaymentDetected("gst_no_bus", "0xnobus", nil)
+	})
+	order := loadGuestOrder(t, db, "gst_no_bus")
+	assert.Equal(t, models.GuestOrderFunded, order.State, "FUNDED transition still happens without bus")
 }

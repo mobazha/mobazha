@@ -12,6 +12,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -164,12 +165,28 @@ func (s *memBlobStore) Put(_ context.Context, key string, data []byte, _ string)
 	return nil
 }
 
+// PutStream mirrors the streaming contract of contracts.BlobStore by
+// reading the source into memory. Tests deal with small payloads where this
+// simpler implementation matches the production semantics (LocalFS uses a
+// temp file + atomic rename; R2 uses S3 multipart). The tests assert
+// round-trip correctness, which the in-memory copy preserves.
+func (s *memBlobStore) PutStream(_ context.Context, key string, r io.Reader, _ int64, _ string) error {
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data[key] = buf
+	return nil
+}
+
 func (s *memBlobStore) Get(_ context.Context, key string) (io.ReadCloser, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	d, ok := s.data[key]
 	if !ok {
-		return nil, "", io.EOF
+		return nil, "", contracts.ErrBlobNotFound
 	}
 	return io.NopCloser(bytes.NewReader(d)), "application/octet-stream", nil
 }

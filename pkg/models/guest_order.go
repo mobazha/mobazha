@@ -67,6 +67,14 @@ type GuestOrder struct {
 	OrderToken string          `gorm:"uniqueIndex;size:64" json:"orderToken"`
 	State      GuestOrderState `gorm:"index" json:"state"`
 
+	// BuyerPortalTokenHash stores the SHA-256 hash of the independent bearer
+	// secret used to retrieve digital entitlements. OrderToken remains the
+	// order status/payment reference; it must not grant access to delivered
+	// files, links, or license keys.
+	BuyerPortalTokenHash      string     `gorm:"size:64" json:"-"`
+	BuyerPortalTokenExpiresAt *time.Time `gorm:"index" json:"-"`
+	BuyerPortalTokenVersion   int        `json:"-"`
+
 	// Payment
 	PaymentCoin    string `gorm:"index" json:"paymentCoin"`
 	PaymentAddress string `gorm:"index" json:"paymentAddress"`
@@ -86,9 +94,9 @@ type GuestOrder struct {
 	// invariant `state == PAYMENT_DETECTED ⇒ tx is on-chain` and lets
 	// CleanupExpiredOrders handle pool-evicted orders without special
 	// casing. PoolAmount is in atomic units of PaymentCoin.
-	PoolTxHash      string     `json:"poolTxHash,omitempty"`
-	PoolAmount      uint64     `json:"poolAmount,omitempty"`
-	PoolDetectedAt  *time.Time `json:"poolDetectedAt,omitempty"`
+	PoolTxHash     string     `json:"poolTxHash,omitempty"`
+	PoolAmount     uint64     `json:"poolAmount,omitempty"`
+	PoolDetectedAt *time.Time `json:"poolDetectedAt,omitempty"`
 
 	// Pricing (denormalized totals in listing currency)
 	Subtotal          uint64 `json:"subtotal"`
@@ -172,18 +180,18 @@ type GuestOrderItem struct {
 	ID         int    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	OrderToken string `gorm:"index;size:64" json:"orderToken"`
 
-	ListingHash   string `json:"listingHash"`
-	ListingTitle  string `json:"listingTitle"`
-	ListingSlug   string `gorm:"index:idx_guest_item_variant" json:"listingSlug"`
-	Quantity      int    `json:"quantity"`
+	ListingHash    string `json:"listingHash"`
+	ListingTitle   string `json:"listingTitle"`
+	ListingSlug    string `gorm:"index:idx_guest_item_variant" json:"listingSlug"`
+	Quantity       int    `json:"quantity"`
 	VariantOptions []byte `json:"-"`
 	// VariantHash is a stable hash of the buyer's variant options
 	// (empty for listings without SKUs). Used in conjunction with
 	// ListingSlug to scope inventory reservations per variant.
-	VariantHash   string `gorm:"index:idx_guest_item_variant" json:"variantHash,omitempty"`
-	UnitPrice     uint64 `json:"unitPrice"`
-	ItemTotal     uint64 `json:"itemTotal"`
-	PriceCurrency string `json:"priceCurrency"`
+	VariantHash       string `gorm:"index:idx_guest_item_variant" json:"variantHash,omitempty"`
+	UnitPrice         uint64 `json:"unitPrice"`
+	ItemTotal         uint64 `json:"itemTotal"`
+	PriceCurrency     string `json:"priceCurrency"`
 	PriceDivisibility uint32 `json:"priceDivisibility"`
 
 	ShippingOption  string `json:"shippingOption,omitempty"`

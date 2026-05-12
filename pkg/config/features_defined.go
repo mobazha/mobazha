@@ -531,9 +531,7 @@ var FeatureDigitalAutoDeliveryEnabled = registerFeature(Feature{
 	DefaultValue:  true,
 	ClientVisible: true,
 	AllowedScopes: []Scope{
-		ScopePlatformGlobal,
 		ScopeTenant,
-		ScopeNodeRuntime,
 	},
 	IntroducedIn: "dg-1",
 })
@@ -550,12 +548,10 @@ var FeatureDigitalLicenseValidationEnabled = registerFeature(Feature{
 	Description:   "Exposes public license validation, activation, and deactivation endpoints for software products.",
 	Category:      "payment",
 	Stability:     StabilityBeta,
-	DefaultValue:  true,
+	DefaultValue:  false,
 	ClientVisible: true,
 	AllowedScopes: []Scope{
-		ScopePlatformGlobal,
 		ScopeTenant,
-		ScopeNodeRuntime,
 	},
 	IntroducedIn: "dg-1",
 })

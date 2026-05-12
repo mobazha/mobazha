@@ -49,11 +49,11 @@ func (d *testDatabase) Update(fn func(database.Tx) error) error {
 }
 
 func (d *testDatabase) ComputePublicDataHash() (cid.Cid, error) { return cid.Undef, nil }
-func (d *testDatabase) Close() error                             { return nil }
+func (d *testDatabase) Close() error                            { return nil }
 
 type testTx struct{ db *gorm.DB }
 
-func (t *testTx) Read() *gorm.DB       { return t.db }
+func (t *testTx) Read() *gorm.DB           { return t.db }
 func (t *testTx) Save(i interface{}) error { return t.db.Save(i).Error }
 func (t *testTx) Update(key string, value interface{}, where map[string]interface{}, model interface{}) error {
 	q := t.db.Model(model)
@@ -61,6 +61,14 @@ func (t *testTx) Update(key string, value interface{}, where map[string]interfac
 		q = q.Where(k, v)
 	}
 	return q.UpdateColumn(key, value).Error
+}
+func (t *testTx) UpdateColumns(values map[string]interface{}, where map[string]interface{}, model interface{}) (int64, error) {
+	q := t.db.Model(model)
+	for k, v := range where {
+		q = q.Where(k, v)
+	}
+	res := q.UpdateColumns(values)
+	return res.RowsAffected, res.Error
 }
 func (t *testTx) Commit() error   { panic("managed tx") }
 func (t *testTx) Rollback() error { panic("managed tx") }
@@ -76,34 +84,34 @@ func (t *testTx) Migrate(interface{}) error   { return nil }
 func (t *testTx) RegisterCommitHook(func())   {}
 
 // PublicData stubs
-func (t *testTx) GetProfile() (*models.Profile, error)                         { return nil, nil }
-func (t *testTx) SetProfile(*models.Profile) error                             { return nil }
-func (t *testTx) GetFollowers() (models.Followers, error)                      { return models.Followers{}, nil }
-func (t *testTx) SetFollowers(models.Followers) error                          { return nil }
-func (t *testTx) GetFollowing() (models.Following, error)                      { return models.Following{}, nil }
-func (t *testTx) SetFollowing(models.Following) error                          { return nil }
-func (t *testTx) GetListing(string) (*pb.SignedListing, error)                 { return nil, nil }
-func (t *testTx) SetListing(*pb.SignedListing) error                           { return nil }
-func (t *testTx) GetEncryptedListing(string) ([]byte, error)                   { return nil, nil }
-func (t *testTx) SetEncryptedListing(string, []byte) error                     { return nil }
-func (t *testTx) DeleteListing(string) error                                   { return nil }
-func (t *testTx) GetListingIndex() (models.ListingIndex, error)                { return nil, nil }
-func (t *testTx) SetListingIndex(models.ListingIndex) error                    { return nil }
-func (t *testTx) GetRatingIndex() (models.RatingIndex, error)                  { return nil, nil }
-func (t *testTx) SetRatingIndex(models.RatingIndex) error                      { return nil }
-func (t *testTx) SetRating(*pb.Rating) error                                   { return nil }
-func (t *testTx) GetPostIndex() ([]models.PostData, error)                     { return nil, nil }
-func (t *testTx) SetPostIndex([]models.PostData) error                         { return nil }
-func (t *testTx) AddPost(*postsPb.SignedPost) error                            { return nil }
-func (t *testTx) DeletePost(string) error                                      { return nil }
-func (t *testTx) PostExist(string) bool                                        { return false }
-func (t *testTx) GetPost(string) (*postsPb.SignedPost, error)                  { return nil, nil }
-func (t *testTx) SetImage(models.Image) error                                  { return nil }
-func (t *testTx) GetImageByName(models.ImageSize, string) ([]byte, error)      { return nil, nil }
-func (t *testTx) GetMediaByCID(string) ([]byte, string, error)                 { return nil, "", nil }
-func (t *testTx) IndexMediaCID(string, string, string, string, string) error   { return nil }
-func (t *testTx) SetUploadedFile(models.UploadedFile) error                    { return nil }
-func (t *testTx) SetIntroVideo(models.IntroVideo) error                        { return nil }
+func (t *testTx) GetProfile() (*models.Profile, error)                       { return nil, nil }
+func (t *testTx) SetProfile(*models.Profile) error                           { return nil }
+func (t *testTx) GetFollowers() (models.Followers, error)                    { return models.Followers{}, nil }
+func (t *testTx) SetFollowers(models.Followers) error                        { return nil }
+func (t *testTx) GetFollowing() (models.Following, error)                    { return models.Following{}, nil }
+func (t *testTx) SetFollowing(models.Following) error                        { return nil }
+func (t *testTx) GetListing(string) (*pb.SignedListing, error)               { return nil, nil }
+func (t *testTx) SetListing(*pb.SignedListing) error                         { return nil }
+func (t *testTx) GetEncryptedListing(string) ([]byte, error)                 { return nil, nil }
+func (t *testTx) SetEncryptedListing(string, []byte) error                   { return nil }
+func (t *testTx) DeleteListing(string) error                                 { return nil }
+func (t *testTx) GetListingIndex() (models.ListingIndex, error)              { return nil, nil }
+func (t *testTx) SetListingIndex(models.ListingIndex) error                  { return nil }
+func (t *testTx) GetRatingIndex() (models.RatingIndex, error)                { return nil, nil }
+func (t *testTx) SetRatingIndex(models.RatingIndex) error                    { return nil }
+func (t *testTx) SetRating(*pb.Rating) error                                 { return nil }
+func (t *testTx) GetPostIndex() ([]models.PostData, error)                   { return nil, nil }
+func (t *testTx) SetPostIndex([]models.PostData) error                       { return nil }
+func (t *testTx) AddPost(*postsPb.SignedPost) error                          { return nil }
+func (t *testTx) DeletePost(string) error                                    { return nil }
+func (t *testTx) PostExist(string) bool                                      { return false }
+func (t *testTx) GetPost(string) (*postsPb.SignedPost, error)                { return nil, nil }
+func (t *testTx) SetImage(models.Image) error                                { return nil }
+func (t *testTx) GetImageByName(models.ImageSize, string) ([]byte, error)    { return nil, nil }
+func (t *testTx) GetMediaByCID(string) ([]byte, string, error)               { return nil, "", nil }
+func (t *testTx) IndexMediaCID(string, string, string, string, string) error { return nil }
+func (t *testTx) SetUploadedFile(models.UploadedFile) error                  { return nil }
+func (t *testTx) SetIntroVideo(models.IntroVideo) error                      { return nil }
 
 // mockEventBus is a lightweight events.Bus for unit tests within this package.
 type mockEventBus struct {

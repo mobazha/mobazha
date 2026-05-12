@@ -259,6 +259,39 @@ func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) (*AuthIdenti
 	}, true
 }
 
+// tryJWTSubjectWith validates a JWT and returns its subject identity without
+// granting admin/full-access privileges. Use only on explicitly public routes
+// that perform their own resource ownership checks.
+func (g *Gateway) tryJWTSubjectWith(jv *JWTValidator, r *http.Request) (*AuthIdentity, bool) {
+	if jv == nil {
+		return nil, false
+	}
+
+	var tokenStr string
+	authHeader := r.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr = strings.TrimSpace(authHeader[7:])
+	} else if qp := r.URL.Query().Get("token"); qp != "" && !strings.HasPrefix(qp, "basic:") {
+		tokenStr = qp
+	}
+
+	if tokenStr == "" {
+		return nil, false
+	}
+
+	claims, err := jv.ValidateToken(tokenStr)
+	if err != nil {
+		return nil, false
+	}
+
+	return &AuthIdentity{
+		UserID:  claims.Id,
+		PeerID:  claims.PeerID(),
+		Scopes:  contracts.NewScopeSet([]contracts.Scope{contracts.ScopePurchasesRead}),
+		IsAdmin: false,
+	}, true
+}
+
 // tryAPITokenAuth validates an mbz_ prefixed API token against the local store.
 // Returns the resolved AuthIdentity (carrying the token's persisted ScopeSet)
 // and true on success; (nil, false) if the token is missing, revoked, expired,

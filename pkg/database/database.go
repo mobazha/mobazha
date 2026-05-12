@@ -150,6 +150,11 @@ type Tx interface {
 	// for using alternative conditions such as "timestamp <= ?".
 	Update(key string, value interface{}, where map[string]interface{}, model interface{}) error
 
+	// UpdateColumns updates multiple columns for the given model and returns
+	// the number of affected rows. Implementations must apply the same tenant
+	// scoping and write-safety guarantees as Update.
+	UpdateColumns(values map[string]interface{}, where map[string]interface{}, model interface{}) (int64, error)
+
 	// Delete will delete all models of the given type from the database where
 	// key == value. The map can be used to impose extra conditions on which
 	// specific model gets updated. The map key must be of the format "key = ?".

@@ -24,11 +24,12 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-
 const (
 	defaultGuestOrderExpiry   = 24 * time.Hour
+	defaultBuyerPortalTTL     = 90 * 24 * time.Hour
 	defaultAutoCompletePeriod = 14 * 24 * time.Hour
 	guestOrderTokenPrefix     = "gst_"
+	buyerPortalTokenPrefix    = "bpt_"
 )
 
 // PaymentWatcher is implemented by GuestPaymentMonitor.
@@ -44,15 +45,15 @@ type GuestListingQuery interface {
 
 // GuestOrderAppServiceConfig groups dependencies for GuestOrderAppService.
 type GuestOrderAppServiceConfig struct {
-	DB            database.Database
-	DirectPayment *DirectPaymentService
-	SweepService  *AutoSweepService
-	EventBus      events.Bus
-	NodeID        string
-	Shutdown      <-chan struct{}
-	Listings      GuestListingQuery
-	ExchangeRates wallet.ExchangeRateQuerier
-	Resolver      pkgconfig.ResolverInterface
+	DB                     database.Database
+	DirectPayment          *DirectPaymentService
+	SweepService           *AutoSweepService
+	EventBus               events.Bus
+	NodeID                 string
+	Shutdown               <-chan struct{}
+	Listings               GuestListingQuery
+	ExchangeRates          wallet.ExchangeRateQuerier
+	Resolver               pkgconfig.ResolverInterface
 	SupportedUTXOChains    []iwallet.ChainType
 	EVMMonitorAvailable    bool
 	SolanaMonitorAvailable bool
@@ -69,16 +70,16 @@ type GuestOrderAppServiceConfig struct {
 // GuestOrderAppService manages the Guest Order lifecycle:
 // creation, payment detection, confirmation, shipping, expiry, and auto-completion.
 type GuestOrderAppService struct {
-	db                   database.Database
-	directPayment        *DirectPaymentService
-	sweepService         *AutoSweepService
-	eventBus             events.Bus
-	nodeID               string
-	shutdown             <-chan struct{}
-	watcher              PaymentWatcher
-	listings             GuestListingQuery
-	exchangeRates        wallet.ExchangeRateQuerier
-	resolver             pkgconfig.ResolverInterface
+	db                     database.Database
+	directPayment          *DirectPaymentService
+	sweepService           *AutoSweepService
+	eventBus               events.Bus
+	nodeID                 string
+	shutdown               <-chan struct{}
+	watcher                PaymentWatcher
+	listings               GuestListingQuery
+	exchangeRates          wallet.ExchangeRateQuerier
+	resolver               pkgconfig.ResolverInterface
 	utxoMu                 sync.RWMutex
 	supportedUTXOChains    map[iwallet.ChainType]struct{}
 	evmMonitorAvailable    bool
@@ -90,15 +91,15 @@ type GuestOrderAppService struct {
 // NewGuestOrderAppService constructs the service.
 func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppService {
 	return &GuestOrderAppService{
-		db:                   cfg.DB,
-		directPayment:        cfg.DirectPayment,
-		sweepService:         cfg.SweepService,
-		eventBus:             cfg.EventBus,
-		nodeID:               cfg.NodeID,
-		shutdown:             cfg.Shutdown,
-		listings:             cfg.Listings,
-		exchangeRates:        cfg.ExchangeRates,
-		resolver:             cfg.Resolver,
+		db:                     cfg.DB,
+		directPayment:          cfg.DirectPayment,
+		sweepService:           cfg.SweepService,
+		eventBus:               cfg.EventBus,
+		nodeID:                 cfg.NodeID,
+		shutdown:               cfg.Shutdown,
+		listings:               cfg.Listings,
+		exchangeRates:          cfg.ExchangeRates,
+		resolver:               cfg.Resolver,
 		supportedUTXOChains:    toChainSet(cfg.SupportedUTXOChains),
 		evmMonitorAvailable:    cfg.EVMMonitorAvailable,
 		solanaMonitorAvailable: cfg.SolanaMonitorAvailable,
@@ -164,12 +165,17 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	if err != nil {
 		return nil, fmt.Errorf("generate order token: %w", err)
 	}
+	buyerPortalToken, err := generateBuyerPortalToken()
+	if err != nil {
+		return nil, fmt.Errorf("generate buyer portal token: %w", err)
+	}
 
 	expiry := defaultGuestOrderExpiry
 	if cfg.PaymentTimeout > 0 {
 		expiry = time.Duration(cfg.PaymentTimeout) * time.Minute
 	}
 	expiresAt := time.Now().Add(expiry)
+	buyerPortalExpiresAt := expiresAt.Add(defaultBuyerPortalTTL)
 
 	payResult, err := s.directPayment.GeneratePaymentAddress(ctx, PaymentAddressRequest{
 		CoinType:   coinType,
@@ -266,22 +272,25 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	}
 
 	order := models.GuestOrder{
-		OrderToken:        orderToken,
-		State:             models.GuestOrderAwaitingPayment,
-		PaymentCoin:       req.PaymentCoin,
-		PaymentAddress:    payResult.Address,
-		PaymentAmount:     paymentAmount,
-		PriceCurrency:     priceCurrencyCode,
-		PriceDivisibility: priceDivisibility,
-		Subtotal:          subtotalSmallest.Uint64(),
-		ShippingCost:      shippingCostSmallest.Uint64(),
-		TotalPrice:        totalSmallest.Uint64(),
-		SweepToAddress:    payResult.SweepTo,
-		ReferenceKey:      payResult.ReferenceKey,
-		AddressIndex:      payResult.AddressIndex,
-		RequiredConfs:     requiredConfsForCoin(coinType),
-		ExpiresAt:         expiresAt,
-		ContactEmail:      req.ContactEmail,
+		OrderToken:                orderToken,
+		State:                     models.GuestOrderAwaitingPayment,
+		PaymentCoin:               req.PaymentCoin,
+		PaymentAddress:            payResult.Address,
+		PaymentAmount:             paymentAmount,
+		PriceCurrency:             priceCurrencyCode,
+		PriceDivisibility:         priceDivisibility,
+		Subtotal:                  subtotalSmallest.Uint64(),
+		ShippingCost:              shippingCostSmallest.Uint64(),
+		TotalPrice:                totalSmallest.Uint64(),
+		SweepToAddress:            payResult.SweepTo,
+		ReferenceKey:              payResult.ReferenceKey,
+		AddressIndex:              payResult.AddressIndex,
+		RequiredConfs:             requiredConfsForCoin(coinType),
+		ExpiresAt:                 expiresAt,
+		ContactEmail:              req.ContactEmail,
+		BuyerPortalTokenHash:      hashBuyerPortalToken(buyerPortalToken),
+		BuyerPortalTokenExpiresAt: &buyerPortalExpiresAt,
+		BuyerPortalTokenVersion:   1,
 	}
 
 	if req.ShippingAddress != nil {
@@ -341,6 +350,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 
 	return &contracts.GuestOrderResponse{
 		OrderToken:        orderToken,
+		BuyerPortalToken:  buyerPortalToken,
 		PaymentAddress:    payResult.Address,
 		PaymentAmount:     order.PaymentAmount,
 		PaymentCoin:       req.PaymentCoin,
@@ -599,9 +609,8 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 // transitions into FUNDED. Subscribers (notably DigitalEntitlementAppService)
 // use this to create download grants and allocate license keys for digital
 // goods. The OrderID field carries the orderToken — DownloadGrant.OrderID
-// is varchar(255) and the public buyer-portal endpoint
-// (/v1/orders/{orderID}/digital-assets) uses orderID as a capability token,
-// matching the trust model already in place for escrow orders.
+// is varchar(255). Reading Buyer Portal secrets still requires the
+// independent buyerPortalToken issued at guest order creation.
 //
 // Fired outside the DB transaction so a rollback never leaves a phantom
 // event behind. eventBus may be nil during early init or in test setups
@@ -670,6 +679,7 @@ func (s *GuestOrderAppService) ListActiveOrders(_ context.Context) ([]*models.Gu
 //   - watcher detects payment in grace → calls HandlePaymentDetected
 //   - cleanup already flipped state to EXPIRED → HandlePaymentDetected rejects
 //     (state mismatch) → funds stranded
+//
 // RestoreWatches uses the same predicate, keeping cleanup and watcher's
 // notion of "still in flight" in sync.
 func (s *GuestOrderAppService) CleanupExpiredOrders(ctx context.Context) {
@@ -1165,6 +1175,19 @@ func generateOrderToken() (string, error) {
 		return "", err
 	}
 	return guestOrderTokenPrefix + hex.EncodeToString(b), nil
+}
+
+func generateBuyerPortalToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return buyerPortalTokenPrefix + hex.EncodeToString(b), nil
+}
+
+func hashBuyerPortalToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *GuestOrderAppService) loadGuestCheckoutConfig() (*models.GuestCheckoutConfig, error) {

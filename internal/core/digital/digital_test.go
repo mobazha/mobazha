@@ -3,11 +3,15 @@ package digital
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 	"time"
 
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -24,6 +28,24 @@ func newTestAssetService(t *testing.T) (*DigitalAssetAppService, *testDatabase) 
 	keys := newTestKeyProvider()
 	svc := NewDigitalAssetAppService(db, blob, keys)
 	return svc, db
+}
+
+func seedBuyerPortalAccess(t *testing.T, db *testDatabase, orderID string) string {
+	t.Helper()
+	token := "bpt_test_" + orderID
+	sum := sha256.Sum256([]byte(token))
+	expiresAt := time.Now().Add(time.Hour)
+	order := &models.GuestOrder{
+		OrderToken:                orderID,
+		State:                     models.GuestOrderFunded,
+		BuyerPortalTokenHash:      hex.EncodeToString(sum[:]),
+		BuyerPortalTokenExpiresAt: &expiresAt,
+		BuyerPortalTokenVersion:   1,
+		ExpiresAt:                 expiresAt,
+	}
+	order.TenantID = database.StandaloneTenantID
+	require.NoError(t, db.gormDB.Create(order).Error)
+	return token
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +162,22 @@ func TestAssetService_CreateAndRevealLink(t *testing.T) {
 	assert.Equal(t, url, revealed)
 }
 
+func TestAssetService_RejectsVariantSpecificAssetsInPhase1(t *testing.T) {
+	svc, _ := newTestAssetService(t)
+
+	_, err := svc.CreateLinkAsset("listing-link", "sku-blue", "https://example.com")
+	require.ErrorIs(t, err, contracts.ErrDigitalVariantUnsupported)
+
+	_, err = svc.CreateLicenseKeyAsset("listing-lic", "sku-blue", "app-test")
+	require.ErrorIs(t, err, contracts.ErrDigitalVariantUnsupported)
+
+	_, err = svc.ImportLicenseKeys("listing-lic", "sku-blue", "app-test", []string{"KEY-001"}, "perpetual", 1, time.Time{})
+	require.ErrorIs(t, err, contracts.ErrDigitalVariantUnsupported)
+
+	_, err = svc.UploadFileAssetStream(context.Background(), "listing-file", "sku-blue", "file.zip", "application/zip", bytes.NewReader([]byte("x")), 1)
+	require.ErrorIs(t, err, contracts.ErrDigitalVariantUnsupported)
+}
+
 // ---------------------------------------------------------------------------
 // 4. License Key Pool — import, allocate, validate, activate, deactivate
 // ---------------------------------------------------------------------------
@@ -148,22 +186,22 @@ func TestAssetService_ImportAndAllocateLicenseKeys(t *testing.T) {
 	svc, _ := newTestAssetService(t)
 
 	keys := []string{"KEY-001", "KEY-002", "KEY-003"}
-	imported, err := svc.ImportLicenseKeys("listing-lic", "v1", "app-test", keys, "perpetual", 3, time.Time{})
+	imported, err := svc.ImportLicenseKeys("listing-lic", "", "app-test", keys, "perpetual", 3, time.Time{})
 	require.NoError(t, err)
 	assert.Equal(t, 3, imported)
 
-	stats, err := svc.GetLicenseKeyPoolStats("listing-lic", "v1")
+	stats, err := svc.GetLicenseKeyPoolStats("listing-lic", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), stats.Available)
 	assert.Equal(t, int64(0), stats.Dispensed)
 	assert.Equal(t, int64(0), stats.Revoked)
 
-	lk, err := svc.AllocateLicenseKey("listing-lic", "v1", "order-1", "buyer-1")
+	lk, err := svc.AllocateLicenseKey("listing-lic", "", "order-1", "buyer-1")
 	require.NoError(t, err)
 	assert.Equal(t, models.LicenseKeyStatusDispensed, lk.Status)
 	assert.Equal(t, "order-1", lk.OrderID)
 
-	stats, err = svc.GetLicenseKeyPoolStats("listing-lic", "v1")
+	stats, err = svc.GetLicenseKeyPoolStats("listing-lic", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), stats.Available)
 	assert.Equal(t, int64(1), stats.Dispensed)
@@ -427,9 +465,8 @@ func TestEntitlement_OrderConfirmation_AllocatesLicenseKey(t *testing.T) {
 // when an order is funded with empty BuyerPeerID and PaymentMethod="DIRECT"
 // (the values produced by dbOrderQuerier.getGuestOrderMetadata), the
 // entitlement service still creates a download grant. The grant uses the
-// orderToken as OrderID — the buyer-portal endpoint
-// (/v1/orders/{orderID}/digital-assets) treats orderID as a capability
-// token, so this is the only thing the anonymous buyer needs.
+// orderToken as OrderID; the buyer-portal endpoint still requires the
+// independent buyerPortalToken to read the granted secrets.
 func TestEntitlement_GuestOrder_CreatesGrant(t *testing.T) {
 	entSvc, assetSvc, bus, orderQ := newTestEntitlementService(t)
 	orderQ.buyerPeerID = "" // anonymous guest
@@ -600,7 +637,8 @@ func TestEntitlement_Refund_RevokesAll(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAssetService_GetBuyerDigitalAssets_FileEntry(t *testing.T) {
-	svc, _ := newTestAssetService(t)
+	svc, db := newTestAssetService(t)
+	token := seedBuyerPortalAccess(t, db, "order-bp")
 
 	ctx := context.Background()
 	ai, err := svc.UploadFileAssetStream(ctx, "listing-bp", "", "report.pdf", "application/pdf", bytes.NewReader([]byte("data")), int64(len([]byte("data"))))
@@ -611,7 +649,7 @@ func TestAssetService_GetBuyerDigitalAssets_FileEntry(t *testing.T) {
 	_, err = svc.CreateDownloadGrant(asset, "order-bp", "buyer-bp", models.GrantStatusActive)
 	require.NoError(t, err)
 
-	entries, err := svc.GetBuyerDigitalAssets("order-bp", 3600)
+	entries, err := svc.GetBuyerDigitalAssets("order-bp", token, "", false, 3600)
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 
@@ -621,7 +659,8 @@ func TestAssetService_GetBuyerDigitalAssets_FileEntry(t *testing.T) {
 }
 
 func TestAssetService_GetBuyerDigitalAssets_LinkEntry(t *testing.T) {
-	svc, _ := newTestAssetService(t)
+	svc, db := newTestAssetService(t)
+	token := seedBuyerPortalAccess(t, db, "order-bpl")
 
 	url := "https://notion.so/template-123"
 	ai, err := svc.CreateLinkAsset("listing-bpl", "", url)
@@ -632,7 +671,7 @@ func TestAssetService_GetBuyerDigitalAssets_LinkEntry(t *testing.T) {
 	_, err = svc.CreateDownloadGrant(asset, "order-bpl", "buyer-bpl", models.GrantStatusActive)
 	require.NoError(t, err)
 
-	entries, err := svc.GetBuyerDigitalAssets("order-bpl", 3600)
+	entries, err := svc.GetBuyerDigitalAssets("order-bpl", token, "", false, 3600)
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 
@@ -640,8 +679,37 @@ func TestAssetService_GetBuyerDigitalAssets_LinkEntry(t *testing.T) {
 	assert.Equal(t, url, entries[0].DeliveryURL)
 }
 
-func TestAssetService_GetBuyerDigitalAssets_LicenseKeyEntry(t *testing.T) {
+func TestAssetService_GetBuyerDigitalAssets_AuthenticatedWithoutPortalToken(t *testing.T) {
 	svc, _ := newTestAssetService(t)
+
+	url := "https://example.com/authenticated-download"
+	ai, err := svc.CreateLinkAsset("listing-auth-bp", "", url)
+	require.NoError(t, err)
+	asset, err := svc.getAssetModelByID(ai.ID)
+	require.NoError(t, err)
+
+	_, err = svc.CreateDownloadGrant(asset, "order-auth-bp", "buyer-auth-bp", models.GrantStatusActive)
+	require.NoError(t, err)
+
+	_, err = svc.GetBuyerDigitalAssets("order-auth-bp", "", "", false, 3600)
+	require.ErrorIs(t, err, contracts.ErrBuyerPortalAccess)
+
+	entries, err := svc.GetBuyerDigitalAssets("order-auth-bp", "", "", true, 3600)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, url, entries[0].DeliveryURL)
+
+	entries, err = svc.GetBuyerDigitalAssets("order-auth-bp", "", "buyer-auth-bp", false, 3600)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+
+	_, err = svc.GetBuyerDigitalAssets("order-auth-bp", "", "other-buyer", false, 3600)
+	require.ErrorIs(t, err, contracts.ErrBuyerPortalAccess)
+}
+
+func TestAssetService_GetBuyerDigitalAssets_LicenseKeyEntry(t *testing.T) {
+	svc, db := newTestAssetService(t)
+	token := seedBuyerPortalAccess(t, db, "order-bpk")
 
 	_, err := svc.ImportLicenseKeys("listing-bpk", "", "app-bpk", []string{"BUYER-KEY-001"}, "perpetual", 2, time.Time{})
 	require.NoError(t, err)
@@ -656,7 +724,7 @@ func TestAssetService_GetBuyerDigitalAssets_LicenseKeyEntry(t *testing.T) {
 	_, err = svc.CreateDownloadGrant(&assetModels[0], "order-bpk", "buyer-bpk", models.GrantStatusActive)
 	require.NoError(t, err)
 
-	entries, err := svc.GetBuyerDigitalAssets("order-bpk", 3600)
+	entries, err := svc.GetBuyerDigitalAssets("order-bpk", token, "", false, 3600)
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 

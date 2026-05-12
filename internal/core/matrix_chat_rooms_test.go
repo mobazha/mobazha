@@ -351,6 +351,9 @@ func (tx matrixCredentialsTestTx) Save(interface{}) error { return nil }
 func (tx matrixCredentialsTestTx) Update(string, interface{}, map[string]interface{}, interface{}) error {
 	return nil
 }
+func (tx matrixCredentialsTestTx) UpdateColumns(map[string]interface{}, map[string]interface{}, interface{}) (int64, error) {
+	return 0, nil
+}
 func (tx matrixCredentialsTestTx) Delete(string, interface{}, map[string]interface{}, interface{}) error {
 	return nil
 }

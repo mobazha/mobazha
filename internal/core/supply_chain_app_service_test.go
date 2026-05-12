@@ -125,7 +125,7 @@ func (d *scTestDatabase) Update(fn func(database.Tx) error) error {
 }
 
 func (d *scTestDatabase) ComputePublicDataHash() (cid.Cid, error) { return cid.Undef, nil }
-func (d *scTestDatabase) Close() error                             { return nil }
+func (d *scTestDatabase) Close() error                            { return nil }
 
 type scTestTx struct{ db *gorm.DB }
 
@@ -141,6 +141,14 @@ func (t *scTestTx) Update(key string, value interface{}, where map[string]interf
 	}
 	return q.Update(key, value).Error
 }
+func (t *scTestTx) UpdateColumns(values map[string]interface{}, where map[string]interface{}, model interface{}) (int64, error) {
+	q := t.db.Model(model)
+	for k, v := range where {
+		q = q.Where(k, v)
+	}
+	res := q.UpdateColumns(values)
+	return res.RowsAffected, res.Error
+}
 func (t *scTestTx) Commit() error   { panic("managed tx") }
 func (t *scTestTx) Rollback() error { panic("managed tx") }
 func (t *scTestTx) Delete(key string, value interface{}, where map[string]interface{}, model interface{}) error {
@@ -155,20 +163,20 @@ func (t *scTestTx) Migrate(interface{}) error   { return nil }
 func (t *scTestTx) RegisterCommitHook(func())   {}
 
 // PublicData stubs
-func (t *scTestTx) GetProfile() (*models.Profile, error)              { return nil, nil }
-func (t *scTestTx) SetProfile(*models.Profile) error                  { return nil }
-func (t *scTestTx) GetFollowers() (models.Followers, error)           { return models.Followers{}, nil }
-func (t *scTestTx) SetFollowers(models.Followers) error               { return nil }
-func (t *scTestTx) GetFollowing() (models.Following, error)           { return models.Following{}, nil }
-func (t *scTestTx) SetFollowing(models.Following) error               { return nil }
-func (t *scTestTx) GetListing(string) (*pb.SignedListing, error)      { return nil, nil }
-func (t *scTestTx) SetListing(*pb.SignedListing) error                { return nil }
-func (t *scTestTx) GetEncryptedListing(string) ([]byte, error)        { return nil, nil }
-func (t *scTestTx) SetEncryptedListing(string, []byte) error          { return nil }
-func (t *scTestTx) DeleteListing(string) error                        { return nil }
-func (t *scTestTx) GetListingIndex() (models.ListingIndex, error)     { return nil, nil }
-func (t *scTestTx) SetListingIndex(models.ListingIndex) error         { return nil }
-func (t *scTestTx) GetRatingIndex() (models.RatingIndex, error)       { return nil, nil }
+func (t *scTestTx) GetProfile() (*models.Profile, error)                       { return nil, nil }
+func (t *scTestTx) SetProfile(*models.Profile) error                           { return nil }
+func (t *scTestTx) GetFollowers() (models.Followers, error)                    { return models.Followers{}, nil }
+func (t *scTestTx) SetFollowers(models.Followers) error                        { return nil }
+func (t *scTestTx) GetFollowing() (models.Following, error)                    { return models.Following{}, nil }
+func (t *scTestTx) SetFollowing(models.Following) error                        { return nil }
+func (t *scTestTx) GetListing(string) (*pb.SignedListing, error)               { return nil, nil }
+func (t *scTestTx) SetListing(*pb.SignedListing) error                         { return nil }
+func (t *scTestTx) GetEncryptedListing(string) ([]byte, error)                 { return nil, nil }
+func (t *scTestTx) SetEncryptedListing(string, []byte) error                   { return nil }
+func (t *scTestTx) DeleteListing(string) error                                 { return nil }
+func (t *scTestTx) GetListingIndex() (models.ListingIndex, error)              { return nil, nil }
+func (t *scTestTx) SetListingIndex(models.ListingIndex) error                  { return nil }
+func (t *scTestTx) GetRatingIndex() (models.RatingIndex, error)                { return nil, nil }
 func (t *scTestTx) SetRatingIndex(models.RatingIndex) error                    { return nil }
 func (t *scTestTx) SetRating(*pb.Rating) error                                 { return nil }
 func (t *scTestTx) GetPostIndex() ([]models.PostData, error)                   { return nil, nil }

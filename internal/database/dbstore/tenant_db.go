@@ -265,6 +265,21 @@ func (t *tenantTx) Update(key string, value interface{}, where map[string]interf
 	return db.UpdateColumn(key, value).Error
 }
 
+// UpdateColumns updates multiple columns with tenant scoping and returns the
+// affected row count. Use this for compare-and-swap style writes that need
+// RowsAffected without dropping down to tx.Read().Updates().
+func (t *tenantTx) UpdateColumns(values map[string]interface{}, where map[string]interface{}, model interface{}) (int64, error) {
+	if !t.isForWrites {
+		return 0, ErrReadOnly
+	}
+	db := t.rawTx.Where("tenant_id = ?", t.tenantID).Model(model)
+	for k, v := range where {
+		db = db.Where(k, v)
+	}
+	res := db.UpdateColumns(values)
+	return res.RowsAffected, res.Error
+}
+
 // Delete deletes records with tenant scoping.
 // Uses rawTx with explicit tenant WHERE to avoid session condition accumulation.
 func (t *tenantTx) Delete(key string, value interface{}, where map[string]interface{}, model interface{}) error {

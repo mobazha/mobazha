@@ -10,7 +10,9 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/storage"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
+	pkgdatabase "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"gorm.io/gorm"
 )
@@ -110,7 +112,11 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 	}
 
 	orders := &dbOrderQuerier{db: obNode.db}
-	entitlementSvc := digital.NewDigitalEntitlementAppService(obNode.nodeCtx, obNode.db, obNode.featureResolver, assetSvc, orders, obNode.eventBus)
+	digitalCtx := obNode.nodeCtx
+	if pkgconfig.TenantIDFromContext(digitalCtx) == "" {
+		digitalCtx = pkgconfig.ContextWithTenantID(digitalCtx, pkgdatabase.StandaloneTenantID)
+	}
+	entitlementSvc := digital.NewDigitalEntitlementAppService(digitalCtx, obNode.db, obNode.featureResolver, assetSvc, orders, obNode.eventBus)
 	if err := entitlementSvc.Start(); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Digital: entitlement start failed: %v", err)
 		return
@@ -128,12 +134,10 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 // contracts.OrderRepo and have OrderAppService implement it.
 //
 // VariantSKU is intentionally left blank in this adapter: resolving the SKU
-// requires the listing's variant table (selected options → SKU mapping),
-// which is not loaded here. DigitalAssetAppService.getAssetModelsByListing
-// already treats empty SKU as "any variant" (`variant_sku IN (?, '')`), so
-// listings without per-variant assets work correctly. Per-variant license
-// pools therefore depend on listings keeping a single asset row per SKU, or
-// future work to plumb the resolved SKU through OrderConfirmation events.
+// requires the listing's variant table (selected options -> SKU mapping),
+// which is not loaded here. Phase 1 digital asset writes reject non-empty
+// variantSku values, and DigitalAssetAppService.getAssetModelsByListing
+// treats empty SKU as universal assets only (`variant_sku = ”`).
 //
 // 清除条件: contracts.OrderRepo exposes GetOrderMetadata or OrderConfirmation
 // events carry the resolved (slug, variantSKU) pair directly.
@@ -212,9 +216,9 @@ func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadat
 // to match guest checkout's on-chain settlement model — DigitalEntitlement
 // uses this to pick the initial grant status (active, not protected).
 //
-// BuyerPeerID is intentionally empty: the orderToken itself is the only
-// capability the buyer has, mirroring the existing public buyer-portal
-// trust model (see huma_digital_asset_handlers.go::digital-assets-buyer-get).
+// BuyerPeerID is intentionally empty: anonymous guest buyers don't have a
+// peer identity. Buyer Portal reads are protected by the independent
+// buyerPortalToken issued with the GuestOrder, not by the order token alone.
 func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.OrderMetadata, error) {
 	var go_ models.GuestOrder
 	if err := q.db.View(func(tx database.Tx) error {
@@ -241,8 +245,8 @@ func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.Orde
 		meta.LineItems = append(meta.LineItems, digital.OrderLineItem{
 			ListingSlug: it.ListingSlug,
 			// TECHDEBT(TD-099): GuestOrderItem stores VariantHash, not
-			// VariantSKU. Resolving SKU requires the listing variant
-			// table; getAssetModelsByListing treats "" as "any variant".
+			// VariantSKU. Phase 1 rejects variant-specific digital
+			// assets, so empty SKU deliberately targets universal assets.
 			Quantity: qty,
 		})
 	}

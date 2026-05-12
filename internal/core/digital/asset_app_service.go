@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +19,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // DigitalAssetAppService manages digital asset CRUD, encrypted file storage,
@@ -62,6 +67,10 @@ func (s *DigitalAssetAppService) UploadFileAssetStream(
 	src io.Reader,
 	expectedSize int64,
 ) (*contracts.DigitalAssetInfo, error) {
+	if err := requirePhase1UniversalAsset(variantSKU); err != nil {
+		return nil, err
+	}
+
 	assetID := uuid.Must(uuid.NewV7()).String()
 	keyVersion := 1
 
@@ -130,6 +139,10 @@ func (s *DigitalAssetAppService) CreateLinkAsset(
 	variantSKU string,
 	url string,
 ) (*contracts.DigitalAssetInfo, error) {
+	if err := requirePhase1UniversalAsset(variantSKU); err != nil {
+		return nil, err
+	}
+
 	assetID := uuid.Must(uuid.NewV7()).String()
 	keyVersion := 1
 
@@ -163,6 +176,10 @@ func (s *DigitalAssetAppService) CreateLicenseKeyAsset(
 	variantSKU string,
 	appID string,
 ) (*contracts.DigitalAssetInfo, error) {
+	if err := requirePhase1UniversalAsset(variantSKU); err != nil {
+		return nil, err
+	}
+
 	assetID := uuid.Must(uuid.NewV7()).String()
 
 	asset := &models.DigitalAsset{
@@ -192,6 +209,9 @@ func (s *DigitalAssetAppService) ImportLicenseKeys(
 	maxActivations int,
 	expiresAt time.Time,
 ) (int, error) {
+	if err := requirePhase1UniversalAsset(variantSKU); err != nil {
+		return 0, err
+	}
 	if len(keys) == 0 {
 		return 0, nil
 	}
@@ -253,15 +273,22 @@ func (s *DigitalAssetAppService) ImportLicenseKeys(
 	return imported, err
 }
 
+func requirePhase1UniversalAsset(variantSKU string) error {
+	if strings.TrimSpace(variantSKU) != "" {
+		return contracts.ErrDigitalVariantUnsupported
+	}
+	return nil
+}
+
 // AllocateLicenseKey picks one available license key from the pool, marks it
 // dispensed, and returns it. Idempotent on (orderID, listingSlug, variantSKU):
 // if a key was already dispensed for the same order+SKU, the existing key is
 // returned without consuming another pool slot.
 //
-// Race protection: after save, we re-read the key inside the same tx to verify
-// our orderID won the claim. If another concurrent tx overwrote our claim
-// (possible under PostgreSQL READ COMMITTED), we retry with the next available
-// key, up to maxAllocRetries attempts.
+// Race protection: allocation uses a tenant-safe conditional UPDATE
+// (`status = available`) and checks RowsAffected. Under READ COMMITTED two
+// concurrent transactions may SELECT the same candidate, but only one UPDATE
+// can claim it; the loser retries.
 func (s *DigitalAssetAppService) AllocateLicenseKey(
 	listingSlug string,
 	variantSKU string,
@@ -283,27 +310,24 @@ func (s *DigitalAssetAppService) AllocateLicenseKey(
 				return fmt.Errorf("no available license key: %w", err)
 			}
 
-			// Atomic conditional UPDATE: only succeeds if the row is still
-			// 'available'. Under READ COMMITTED two concurrent transactions
-			// may SELECT the same candidate, but only one UPDATE will match
-			// (the loser gets RowsAffected=0 and retries with the next key).
-			//
-			// Uses tx.Read().Updates() for RowsAffected access. This is
-			// safe for UPDATEs because tx.Read() scopes with tenant_id
-			// WHERE and the row already exists (no TenantID injection needed).
 			now := time.Now()
-			res := tx.Read().Model(&models.DigitalLicenseKey{}).
-				Where("id = ? AND status = ?", candidate.ID, models.LicenseKeyStatusAvailable).
-				Updates(map[string]interface{}{
+			rows, err := tx.UpdateColumns(
+				map[string]interface{}{
 					"status":        models.LicenseKeyStatusDispensed,
 					"order_id":      orderID,
 					"buyer_peer_id": buyerPeerID,
 					"dispensed_at":  now,
-				})
-			if res.Error != nil {
-				return fmt.Errorf("conditional update: %w", res.Error)
+				},
+				map[string]interface{}{
+					"id = ?":     candidate.ID,
+					"status = ?": models.LicenseKeyStatusAvailable,
+				},
+				&models.DigitalLicenseKey{},
+			)
+			if err != nil {
+				return fmt.Errorf("conditional update: %w", err)
 			}
-			if res.RowsAffected == 0 {
+			if rows == 0 {
 				return fmt.Errorf("license key %s already claimed (retrying)", candidate.ID)
 			}
 
@@ -889,11 +913,9 @@ func (s *DigitalAssetAppService) ActivateLicense(
 		return nil, fmt.Errorf("license is %s", lk.Status)
 	}
 
-	// Existence check, activation count, and insert run inside the SAME write
-	// transaction. On SQLite this is serialized at the file/page level which
-	// prevents the prior count→insert race. On PostgreSQL the SELECT COUNT +
-	// INSERT pair is still racy without SELECT FOR UPDATE on the parent
-	// license row; flagged as TD-099 for the multi-tenant production rollout.
+	// Lock the parent license row on databases that support row-level locks.
+	// This serializes COUNT+INSERT per license on PostgreSQL/MySQL, preventing
+	// concurrent distinct fingerprints from exceeding MaxActivations.
 	now := time.Now()
 	var (
 		result        *contracts.LicenseActivationResult
@@ -901,6 +923,15 @@ func (s *DigitalAssetAppService) ActivateLicense(
 	)
 
 	if err := s.db.Update(func(tx database.Tx) error {
+		var lockedLicense models.DigitalLicenseKey
+		lockQ := withActivationParentLock(tx.Read()).Where("id = ?", lk.ID)
+		if err := lockQ.First(&lockedLicense).Error; err != nil {
+			return fmt.Errorf("lock license: %w", err)
+		}
+		if lockedLicense.Status != models.LicenseKeyStatusDispensed {
+			return fmt.Errorf("license is %s", lockedLicense.Status)
+		}
+
 		var existing models.LicenseActivation
 		err := tx.Read().
 			Where("license_id = ? AND fingerprint = ? AND is_active = ?", lk.ID, fingerprint, true).
@@ -921,15 +952,15 @@ func (s *DigitalAssetAppService) ActivateLicense(
 			return nil
 		}
 
-		if lk.MaxActivations > 0 {
+		if lockedLicense.MaxActivations > 0 {
 			var count int64
 			if e := tx.Read().Model(&models.LicenseActivation{}).
 				Where("license_id = ? AND is_active = ?", lk.ID, true).
 				Count(&count).Error; e != nil {
 				return fmt.Errorf("count activations: %w", e)
 			}
-			if count >= int64(lk.MaxActivations) {
-				return fmt.Errorf("%w (%d/%d)", contracts.ErrActivationLimit, count, lk.MaxActivations)
+			if count >= int64(lockedLicense.MaxActivations) {
+				return fmt.Errorf("%w (%d/%d)", contracts.ErrActivationLimit, count, lockedLicense.MaxActivations)
 			}
 		}
 
@@ -1009,6 +1040,49 @@ func (s *DigitalAssetAppService) findLicenseByPlainKey(
 	return &lk, nil
 }
 
+func withActivationParentLock(db *gorm.DB) *gorm.DB {
+	switch db.Dialector.Name() {
+	case "postgres", "mysql":
+		return db.Clauses(clause.Locking{Strength: "UPDATE"})
+	default:
+		return db
+	}
+}
+
+func (s *DigitalAssetAppService) requireBuyerPortalAccess(orderID, token string) error {
+	if token == "" {
+		return contracts.ErrBuyerPortalAccess
+	}
+
+	var order models.GuestOrder
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_token = ?", orderID).First(&order).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return contracts.ErrBuyerPortalAccess
+		}
+		return fmt.Errorf("load buyer portal access: %w", err)
+	}
+	if order.BuyerPortalTokenHash == "" {
+		return contracts.ErrBuyerPortalAccess
+	}
+	if order.BuyerPortalTokenExpiresAt != nil && time.Now().After(*order.BuyerPortalTokenExpiresAt) {
+		return contracts.ErrBuyerPortalAccess
+	}
+	sum := sha256.Sum256([]byte(token))
+	got := []byte(hex.EncodeToString(sum[:]))
+	want := []byte(order.BuyerPortalTokenHash)
+	// Constant-time compare keeps the hardening uniform with other secret
+	// comparisons (API tokens, CSRF, etc.) even though both sides are public
+	// SHA-256 hex strings of buyer-controlled input — codeguard rules require
+	// it for any auth secret comparison.
+	if subtle.ConstantTimeCompare(got, want) != 1 {
+		return contracts.ErrBuyerPortalAccess
+	}
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // Buyer Portal
 // ---------------------------------------------------------------------------
@@ -1018,14 +1092,28 @@ func (s *DigitalAssetAppService) findLicenseByPlainKey(
 // it decrypts and returns the allocated key; for link assets it decrypts the URL.
 func (s *DigitalAssetAppService) GetBuyerDigitalAssets(
 	orderID string,
+	buyerPortalToken string,
+	authenticatedBuyerPeerID string,
+	allowAdmin bool,
 	urlExpirySec int64,
 ) ([]contracts.BuyerAssetEntry, error) {
+	if buyerPortalToken != "" {
+		if err := s.requireBuyerPortalAccess(orderID, buyerPortalToken); err != nil {
+			return nil, err
+		}
+	}
+
 	grants, err := s.GetGrantsByOrder(orderID)
 	if err != nil {
 		return nil, fmt.Errorf("get grants: %w", err)
 	}
 	if len(grants) == 0 {
 		return nil, nil
+	}
+	if buyerPortalToken == "" && !allowAdmin {
+		if err := requireAuthenticatedBuyerAccess(grants, authenticatedBuyerPeerID); err != nil {
+			return nil, err
+		}
 	}
 
 	if urlExpirySec <= 0 {
@@ -1105,6 +1193,19 @@ func (s *DigitalAssetAppService) GetBuyerDigitalAssets(
 	}
 
 	return entries, nil
+}
+
+func requireAuthenticatedBuyerAccess(grants []models.DownloadGrant, buyerPeerID string) error {
+	buyerPeerID = strings.TrimSpace(buyerPeerID)
+	if buyerPeerID == "" {
+		return contracts.ErrBuyerPortalAccess
+	}
+	for _, grant := range grants {
+		if grant.BuyerPeerID == "" || grant.BuyerPeerID != buyerPeerID {
+			return contracts.ErrBuyerPortalAccess
+		}
+	}
+	return nil
 }
 
 func (s *DigitalAssetAppService) findLicenseKeysByOrder(orderID, assetID string) []models.DigitalLicenseKey {
@@ -1275,4 +1376,3 @@ func expiresAtFromAsset(asset *models.DigitalAsset) time.Time {
 	}
 	return time.Time{}
 }
-

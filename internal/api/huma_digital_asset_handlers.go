@@ -15,6 +15,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	pkgdatabase "github.com/mobazha/mobazha3.0/pkg/database"
 )
 
 func getDigitalAssetService(r *http.Request) (contracts.DigitalAssetService, bool) {
@@ -41,6 +42,9 @@ func digitalFeatureEnabled(ctx context.Context, r *http.Request, key string) boo
 	if res == nil {
 		return false
 	}
+	if pkgconfig.TenantIDFromContext(ctx) == "" {
+		ctx = pkgconfig.ContextWithTenantID(ctx, pkgdatabase.StandaloneTenantID)
+	}
 	return res.IsEnabled(ctx, key)
 }
 
@@ -57,34 +61,47 @@ type licenseActivateOutput struct {
 }
 
 func (g *Gateway) registerNodeHumaDigitalOperations(api huma.API) {
-	// Buyer portal — capability-based auth (no Bearer token required).
-	// The orderID itself acts as a capability token: it is a non-enumerable
-	// TECHDEBT(TD-102): orderID as capability token. Phase 1.1 will replace
-	// with signed buyer access token (HMAC over orderID+buyerPeerID+expiry).
-	// hash known only to the trade parties. This matches the trust model of
-	// digital-download (HMAC-signed URL) — both are "know the orderID = can
-	// access". Real buyers never have seller admin tokens, so gating this
-	// behind nodeAuthSecurity would lock them out entirely.
+	// Buyer portal — guest buyers do not log in, but digital secrets are
+	// protected by an independent buyerPortalToken issued when the guest
+	// order is created. The orderID/orderToken is only a resource ID.
 	huma.Register(api, huma.Operation{
 		OperationID: "digital-assets-buyer-get",
 		Method:      http.MethodGet,
 		Path:        "/v1/orders/{orderID}/digital-assets",
 		Summary:     "Get buyer digital assets for an order",
 		Description: "Returns all digital entitlements (files, license keys, links) granted to the buyer after order confirmation. " +
-			"Auth is capability-based: knowing the orderID grants access (same trust model as signed download URLs).",
+			"Guest checkout access requires the independent buyerPortalToken issued at order creation.",
 		Tags:     []string{"digital-assets"},
 		Security: []map[string][]string{},
 	}, func(ctx context.Context, in *struct {
-		OrderID      string `path:"orderID" doc:"Order ID." example:"QmOrder123"`
-		URLExpirySec int64  `query:"urlExpirySec" default:"3600" minimum:"60" maximum:"86400" doc:"Signed download URL expiry in seconds."`
+		OrderID                string `path:"orderID" doc:"Order ID." example:"QmOrder123"`
+		BuyerPortalTokenHeader string `header:"X-Buyer-Portal-Token" doc:"Independent buyer portal bearer token issued at guest order creation."`
+		URLExpirySec           int64  `query:"urlExpirySec" default:"3600" minimum:"60" maximum:"86400" doc:"Signed download URL expiry in seconds."`
 	}) (*buyerDigitalAssetsOutput, error) {
-		r := nodeBridgeRequest(ctx, http.MethodGet, "/v1/orders/"+in.OrderID+"/digital-assets", nil)
+		r := g.nodeBridgeRequestWithOptionalAuth(ctx, http.MethodGet, "/v1/orders/"+in.OrderID+"/digital-assets", nil)
 		svc, ok := getDigitalAssetService(r)
 		if !ok {
 			return nil, huma.Error501NotImplemented("digital asset subsystem not available")
 		}
-		entries, err := svc.GetBuyerDigitalAssets(in.OrderID, in.URLExpirySec)
+		identity := GetAuthIdentity(r.Context())
+		// nodeBridgeRequestWithOptionalAuth injects an "anonymous" IsAdmin
+		// identity on bare dev nodes (no admin password + no JWT validator
+		// configured) so admin tooling works without setup. Buyer portal
+		// secrets MUST NOT be reachable through this fallback — require a
+		// real authenticated principal (configured admin or JWT subject)
+		// before granting allowAdmin.
+		isAnonymousFallback := identity != nil && identity.UserID == "anonymous"
+		allowAdmin := identity != nil && identity.IsAdmin && !isAnonymousFallback
+		authenticatedBuyerPeerID := ""
+		if identity != nil && !identity.IsAdmin && !isAnonymousFallback {
+			authenticatedBuyerPeerID = identity.PeerID
+		}
+		buyerPortalToken := in.BuyerPortalTokenHeader
+		entries, err := svc.GetBuyerDigitalAssets(in.OrderID, buyerPortalToken, authenticatedBuyerPeerID, allowAdmin, in.URLExpirySec)
 		if err != nil {
+			if errors.Is(err, contracts.ErrBuyerPortalAccess) {
+				return nil, huma.Error403Forbidden("buyer portal token is invalid or expired")
+			}
 			return nil, huma.Error500InternalServerError("failed to retrieve digital assets", err)
 		}
 		return &buyerDigitalAssetsOutput{Body: entries}, nil
@@ -289,6 +306,9 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 		}
 		info, err := svc.CreateLinkAsset(in.Body.ListingSlug, in.Body.VariantSKU, in.Body.URL)
 		if err != nil {
+			if errors.Is(err, contracts.ErrDigitalVariantUnsupported) {
+				return nil, huma.Error400BadRequest("variant-specific digital assets are not supported in Phase 1")
+			}
 			log.Errorf("digital link asset creation failed: %v", err)
 			return nil, huma.Error500InternalServerError("failed to create link asset")
 		}
@@ -317,6 +337,9 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 		}
 		info, err := svc.CreateLicenseKeyAsset(in.Body.ListingSlug, in.Body.VariantSKU, in.Body.AppID)
 		if err != nil {
+			if errors.Is(err, contracts.ErrDigitalVariantUnsupported) {
+				return nil, huma.Error400BadRequest("variant-specific digital assets are not supported in Phase 1")
+			}
 			log.Errorf("digital license key asset creation failed: %v", err)
 			return nil, huma.Error500InternalServerError("failed to create license key asset")
 		}
@@ -461,6 +484,9 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 		n, err := svc.ImportLicenseKeys(in.Body.ListingSlug, in.Body.VariantSKU, in.Body.AppID,
 			in.Body.Keys, in.Body.LicenseType, in.Body.MaxActivations, exp)
 		if err != nil {
+			if errors.Is(err, contracts.ErrDigitalVariantUnsupported) {
+				return nil, huma.Error400BadRequest("variant-specific digital assets are not supported in Phase 1")
+			}
 			log.Errorf("digital license key import failed: %v", err)
 			return nil, huma.Error500InternalServerError("failed to import license keys")
 		}
@@ -547,4 +573,3 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 		return nil, nil
 	})
 }
-

@@ -10,16 +10,18 @@ import (
 // Sentinel errors returned by DigitalAssetService methods. Handlers use
 // errors.Is to map these to appropriate HTTP status codes.
 var (
-	ErrLicenseNotFound    = errors.New("license key not found")
-	ErrActivationLimit    = errors.New("activation limit reached")
-	ErrActivationNotFound = errors.New("activation not found")
+	ErrLicenseNotFound           = errors.New("license key not found")
+	ErrActivationLimit           = errors.New("activation limit reached")
+	ErrActivationNotFound        = errors.New("activation not found")
+	ErrBuyerPortalAccess         = errors.New("buyer portal access denied")
+	ErrDigitalVariantUnsupported = errors.New("variant-specific digital assets are not supported")
 )
 
 // DigitalAssetService exposes digital asset operations to the API layer.
 // Implemented by internal/core/digital.DigitalAssetAppService.
 type DigitalAssetService interface {
 	// Buyer-facing
-	GetBuyerDigitalAssets(orderID string, urlExpirySec int64) ([]BuyerAssetEntry, error)
+	GetBuyerDigitalAssets(orderID string, buyerPortalToken string, authenticatedBuyerPeerID string, allowAdmin bool, urlExpirySec int64) ([]BuyerAssetEntry, error)
 	// ServeDownload verifies a signed download URL, applies grant/expiry/quota
 	// checks, records the download, and returns a streaming reader for the
 	// decrypted file content. Caller must Close the returned Body.

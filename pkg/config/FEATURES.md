@@ -445,7 +445,7 @@
 - **Category**: payment
 - **Stability**: beta
 - **Default**: true
-- **Scopes**: PlatformGlobal, Tenant, NodeRuntime
+- **Scopes**: Tenant
 - **Client-visible**: yes
 - **Introduced in**: dg-1
 - **Consumers**:
@@ -457,8 +457,8 @@
 
 - **Category**: payment
 - **Stability**: beta
-- **Default**: true
-- **Scopes**: PlatformGlobal, Tenant, NodeRuntime
+- **Default**: false
+- **Scopes**: Tenant
 - **Client-visible**: yes
 - **Introduced in**: dg-1
 - **Consumers**:

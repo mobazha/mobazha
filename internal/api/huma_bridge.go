@@ -225,9 +225,9 @@ func nodeBridgeToHumaError(rr *httptest.ResponseRecorder) error {
 }
 
 // nodeBridgeRequestWithOptionalAuth is like nodeBridgeRequest but additionally
-// performs Basic Auth validation when admin credentials are configured and
-// injects an AuthIdentity if valid. Used for public endpoints that optionally
-// require auth (e.g. POST /v1/system/setup when password is already set).
+// performs best-effort node auth validation and injects an AuthIdentity if
+// credentials are valid. Used for public endpoints that optionally accept auth
+// alongside capability tokens (e.g. system setup, buyer digital assets).
 //
 // Security: applies rate-limit, AllowedIPs, and Cookie gate checks (mirroring
 // nodeHumaAuthMiddleware) to prevent brute-force attacks on the admin password
@@ -236,10 +236,12 @@ func nodeBridgeToHumaError(rr *httptest.ResponseRecorder) error {
 // Cookie gate is automatically skipped.
 //
 // Authorization header is already restored from originRequestMeta by
-// nodeBridgeRequest — this method adds security checks + inline credential check.
+// nodeBridgeRequest — this method adds security checks + inline credential
+// checks. Invalid credentials never fail the public route here; callers decide
+// whether absence of AuthIdentity is acceptable.
 func (g *Gateway) nodeBridgeRequestWithOptionalAuth(ctx context.Context, method, rawURL string, body io.Reader) *http.Request {
 	req := nodeBridgeRequest(ctx, method, rawURL, body)
-	if !g.auth.isConfigured() || GetAuthIdentity(req.Context()) != nil {
+	if GetAuthIdentity(req.Context()) != nil {
 		return req
 	}
 
@@ -265,7 +267,27 @@ func (g *Gateway) nodeBridgeRequestWithOptionalAuth(ctx context.Context, method,
 		}
 	}
 
-	if username, password, ok := req.BasicAuth(); ok {
+	authHeader := req.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		bearerVal := strings.TrimSpace(authHeader[7:])
+		if bearerVal != "" {
+			if identity, ok := g.tryAPITokenAuth(bearerVal); ok {
+				return req.WithContext(WithAuthIdentity(req.Context(), identity))
+			}
+			if identity, ok := g.tryJWTAuthWith(g.getJWTValidator(), req); ok {
+				return req.WithContext(WithAuthIdentity(req.Context(), identity))
+			}
+			if identity, ok := g.tryJWTSubjectWith(g.getJWTValidator(), req); ok {
+				return req.WithContext(WithAuthIdentity(req.Context(), identity))
+			}
+		}
+	}
+
+	if g.auth.isConfigured() {
+		username, password, ok := req.BasicAuth()
+		if !ok {
+			return req
+		}
 		matched, _ := g.auth.checkPassword(username, password)
 		if !matched {
 			if g.authLimiter != nil {
@@ -278,6 +300,13 @@ func (g *Gateway) nodeBridgeRequestWithOptionalAuth(ctx context.Context, method,
 		}
 		req = req.WithContext(WithAuthIdentity(req.Context(), &AuthIdentity{
 			UserID:  username,
+			IsAdmin: true,
+		}))
+	}
+	if !g.auth.isConfigured() && g.getJWTValidator() == nil {
+		return req.WithContext(WithAuthIdentity(req.Context(), &AuthIdentity{
+			UserID:  "anonymous",
+			Scopes:  nil,
 			IsAdmin: true,
 		}))
 	}

@@ -61,6 +61,7 @@ type GuestOrderItemRequest struct {
 // GuestOrderResponse is returned after order creation.
 type GuestOrderResponse struct {
 	OrderToken        string                  `json:"orderToken"`
+	BuyerPortalToken  string                  `json:"buyerPortalToken,omitempty"`
 	PaymentAddress    string                  `json:"paymentAddress"`
 	PaymentAmount     string                  `json:"paymentAmount"`
 	PaymentCoin       string                  `json:"paymentCoin"`

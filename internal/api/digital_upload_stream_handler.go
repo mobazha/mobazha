@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -132,6 +133,11 @@ func (g *Gateway) handlePOSTDigitalAssetUploadStream(w http.ResponseWriter, r *h
 		info, uploadErr := svc.UploadFileAssetStream(r.Context(), listingSlug, variantSKU, fileName, mimeType, bounded, -1)
 		_ = part.Close()
 		if uploadErr != nil {
+			if errors.Is(uploadErr, contracts.ErrDigitalVariantUnsupported) {
+				response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
+					"variant-specific digital assets are not supported in Phase 1")
+				return
+			}
 			if isMaxBytesError(uploadErr) {
 				response.Error(w, http.StatusRequestEntityTooLarge, response.CodeBadRequest,
 					"file exceeds maximum upload size of 1 GiB")

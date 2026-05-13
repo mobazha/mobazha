@@ -422,6 +422,70 @@ type PaymentRPCStatusEntry struct {
 	Error        string `json:"error,omitempty"`
 }
 
+// ExternalPaymentNodePoolProvider is implemented by nodes that expose the ExternalPayment
+// daemon node pool for admin / setup wizard management (PrivateDistribution only).
+//
+// All methods are safe to call when the pool is not configured (e.g. the
+// private_distribution is in legacy single-daemon mode or NodePool bootstrap failed) —
+// ExternalPaymentNodes returns an empty snapshot and mutating methods return
+// ErrExternalPaymentNodePoolUnavailable.
+type ExternalPaymentNodePoolProvider interface {
+	ExternalPaymentNodes(ctx context.Context) ExternalPaymentNodePoolSnapshot
+	AddExternalPaymentNode(ctx context.Context, req ExternalPaymentNodeAddRequest) (ExternalPaymentNodeInfo, error)
+	RemoveExternalPaymentNode(ctx context.Context, address string) error
+	SwitchExternalPaymentNode(ctx context.Context, address string) error
+}
+
+// ErrExternalPaymentNodePoolUnavailable signals that the private_distribution is not running with
+// a NodePool (legacy single-daemon mode, or bootstrap failed).
+var ErrExternalPaymentNodePoolUnavailable = errors.New("external_payment NodePool: not available on this node")
+
+// ExternalPaymentNodePoolSnapshot is the JSON envelope returned by
+// GET /v1/system/external_payment-nodes.
+type ExternalPaymentNodePoolSnapshot struct {
+	// Available indicates whether a NodePool is wired up for this node.
+	// When false, Active/Candidates are empty and write operations will
+	// return ErrExternalPaymentNodePoolUnavailable.
+	Available bool `json:"available"`
+
+	// Healthy is the NodePool.IsHealthy() verdict (active node bound,
+	// not Suspicious, fail-streak under threshold). Independent of
+	// candidate count.
+	Healthy bool `json:"healthy"`
+
+	// MonitorOn indicates the background MonitorLoop is running. False
+	// briefly during startup and after StopMonitor / lifecycle shutdown.
+	MonitorOn bool `json:"monitorOn"`
+
+	// Active is the daemon currently bound by wallet-rpc, if any.
+	Active *ExternalPaymentNodeInfo `json:"active,omitempty"`
+
+	// Candidates is the full pool snapshot in insertion order
+	// (seed-embedded → discovered → user-added). The Active node also
+	// appears here.
+	Candidates []ExternalPaymentNodeInfo `json:"candidates"`
+}
+
+// ExternalPaymentNodeInfo is the read-only snapshot of a pool candidate.
+type ExternalPaymentNodeInfo struct {
+	Address       string `json:"address"`
+	Operator      string `json:"operator,omitempty"`
+	Source        string `json:"source"` // seed-embedded / discovered / user-added
+	SuccessStreak int    `json:"successStreak"`
+	FailStreak    int    `json:"failStreak"`
+	Suspicious    bool   `json:"suspicious"`
+	LastChecked   string `json:"lastChecked,omitempty"` // RFC3339; empty if never checked
+}
+
+// ExternalPaymentNodeAddRequest is the body for POST /v1/system/external_payment-nodes.
+type ExternalPaymentNodeAddRequest struct {
+	// Address is the I2P / Tor / clearnet host:port of external_paymentd RPC, e.g.
+	// "node.example.b32.i2p:18089". Required.
+	Address string `json:"address"`
+	// Operator is a human-readable label (e.g. "ExternalPaymentWorld"). Optional.
+	Operator string `json:"operator,omitempty"`
+}
+
 // SchedulerHooks exposes per-node worker tick methods for the scheduler
 // (Phase AH-3). Both the SaaS shared scheduler and the standalone local
 // scheduler call these via type assertion on NodeService, avoiding changes

@@ -152,6 +152,27 @@ type Config struct {
 	// subaddress generation. Default 0.
 	EXTERNAL_PAYMENTAccountIndex uint32 `long:"external_paymentaccount" description:"ExternalPayment wallet account index (default 0)"`
 
+	// EXTERNAL_PAYMENTDaemonSeeds is an inline list of external_paymentd RPC endpoints used as the
+	// Tier 1 (embedded seed) bootstrap for the PrivateDistribution NodePool. Each entry is
+	// a "<host>:<port>" pair, typically <b32>.i2p:18089 for the I2P-Only
+	// white-label baseline. Repeatable via go-flags' comma separator (e.g.
+	// --external_paymentdaemonseeds=node1.i2p:18089,node2.i2p:18089).
+	//
+	// When both EXTERNAL_PAYMENTDaemonSeeds and EXTERNAL_PAYMENTSeedFile are provided, EXTERNAL_PAYMENTDaemonSeeds is
+	// appended on top of the YAML-loaded list.
+	//
+	// Only meaningful in the private_distribution build; the validator rejects it otherwise.
+	// See docs/privacy/PRIVATE_DISTRIBUTION_EXTERNAL_PAYMENTD_NETWORK_DESIGN.md §2.4 for the seed list
+	// schema.
+	EXTERNAL_PAYMENTDaemonSeeds []string `long:"external_paymentdaemonseeds" description:"Inline external_paymentd seed endpoints (comma-separated host:port; private_distribution only)"`
+
+	// EXTERNAL_PAYMENTSeedFile is the path to a YAML file describing the Tier 1 embedded
+	// seed list. The file is loaded at startup; its format is documented in
+	// docs/privacy/PRIVATE_DISTRIBUTION_EXTERNAL_PAYMENTD_NETWORK_DESIGN.md §2.4.
+	//
+	// Only meaningful in the private_distribution build; the validator rejects it otherwise.
+	EXTERNAL_PAYMENTSeedFile string `long:"external_paymentseedfile" description:"Path to YAML external_paymentd seed list (private_distribution only)"`
+
 	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.
 	// When set, the node uses this key instead of generating one from a mnemonic.
 	// This is used by mobazha_hosting to inject keys from KeyVault.

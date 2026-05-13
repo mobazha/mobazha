@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -198,6 +199,19 @@ type Order struct {
 	PaymentSentAcked      bool
 	PaymentSentSignature  string
 
+	// RefundAddress is the buyer-declared on-chain address for refunds (Phase EVM-ManagedEscrow v0.3.0, D-Hybrid-27).
+	// MUST be populated at order creation time when a crypto payment is selected.
+	// CEX direct-deposit scenarios: from_address observed on-chain is the exchange omnibus
+	// account and cannot be used as refund target — RefundAddress is the only authoritative source.
+	// DApp wallet scenarios: defaults to the paying EOA, but client SHOULD allow override.
+	RefundAddress string `gorm:"column:refund_address;type:text"`
+
+	// CancelFeeAmount stores the Gas Service Fee charged on Tier 1 chain cancel/refund
+	// paths (ETH/BSC), locked at order creation time with a 1.5x gas buffer (D-Hybrid-29).
+	// Stored as decimal string in smallest unit (wei). Empty / "0" on Tier 2 chains
+	// (L2/Polygon/Avalanche/Gnosis/Celo/Mantle) where the platform absorbs cancel gas.
+	CancelFeeAmount string `gorm:"column:cancel_fee_amount;type:text"`
+
 	OrderPaymentState `gorm:"embedded"`
 
 	SerializedOrderDecline []byte
@@ -263,6 +277,30 @@ type Order struct {
 	OrderLifecycle `gorm:"embedded"`
 
 	AfterSaleDispute AfterSaleDispute `gorm:"embedded" json:"afterSaleDispute"`
+}
+
+// GetCancelFeeAmount returns the locked cancel Gas Service Fee as a *big.Int (wei).
+// Returns big.NewInt(0) if the field is empty (Tier 2 chains absorbing the fee).
+// Returns the parsed value with `ok=true` for valid Tier 1 amounts.
+// Returns big.NewInt(0) with `ok=false` for malformed strings — callers MUST treat
+// `ok=false` as a hard validation error (the locked amount was corrupted).
+func (o *Order) GetCancelFeeAmount() (*big.Int, bool) {
+	s := strings.TrimSpace(o.CancelFeeAmount)
+	if s == "" {
+		return big.NewInt(0), true
+	}
+	v, ok := new(big.Int).SetString(s, 10)
+	if !ok || v.Sign() < 0 {
+		return big.NewInt(0), false
+	}
+	return v, true
+}
+
+// HasCancelFee returns true when this order locks a non-zero cancel fee
+// (Tier 1 chains: ETH/BSC). Tier 2 chains return false.
+func (o *Order) HasCancelFee() bool {
+	v, ok := o.GetCancelFeeAmount()
+	return ok && v.Sign() > 0
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {

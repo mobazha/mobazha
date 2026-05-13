@@ -570,6 +570,85 @@ type ExternalPaymentSweepAllResult struct {
 	Fees     []string `json:"fees"`
 }
 
+// ExternalPaymentWalletSetupProvider is implemented by nodes that expose the
+// first-run wallet provisioning surface for EXTERNAL_PAYMENT. It is admin-only and
+// available only on private_distribution builds with a working external_payment-wallet-rpc
+// sidecar; SaaS nodes return ErrExternalPaymentWalletUnavailable.
+//
+// Lifecycle from a fresh wallet-rpc process:
+//  1. GetEXTERNAL_PAYMENTWalletSetupStatus reports Exists=false
+//  2. CreateEXTERNAL_PAYMENTWallet (or RestoreEXTERNAL_PAYMENTWallet) provisions the wallet,
+//     persists local metadata, and returns the 25-word seed
+//  3. Frontend shows seed + backup quiz, then calls ConfirmEXTERNAL_PAYMENTWalletBackup
+//  4. On every subsequent boot, the node auto-opens the wallet using the
+//     metadata; GetEXTERNAL_PAYMENTWalletSetupStatus reports Exists=true.
+type ExternalPaymentWalletSetupProvider interface {
+	GetEXTERNAL_PAYMENTWalletSetupStatus(ctx context.Context) (ExternalPaymentWalletSetupStatus, error)
+	CreateEXTERNAL_PAYMENTWallet(ctx context.Context, req ExternalPaymentCreateWalletRequest) (ExternalPaymentCreateWalletResult, error)
+	RestoreEXTERNAL_PAYMENTWallet(ctx context.Context, req ExternalPaymentRestoreWalletRequest) (ExternalPaymentRestoreWalletResult, error)
+	ConfirmEXTERNAL_PAYMENTWalletBackup(ctx context.Context) error
+}
+
+// ExternalPaymentWalletSetupStatus is the response payload for
+// GET /v1/system/setup-wizard/external_payment-wallet.
+//
+// Exists reflects on-disk metadata (external_payment-wallet.json) — it does NOT round-
+// trip to wallet-rpc, so transient RPC outages don't make the wizard
+// reappear and prompt the operator to overwrite. WalletOpen is the
+// best-effort runtime signal that wallet-rpc currently has the wallet
+// loaded (true after a successful open_wallet at startup or right after
+// create/restore).
+type ExternalPaymentWalletSetupStatus struct {
+	Exists          bool   `json:"exists"`
+	WalletOpen      bool   `json:"walletOpen"`
+	Address         string `json:"address,omitempty"`
+	BackupConfirmed bool   `json:"backupConfirmed"`
+	CreatedAt       int64  `json:"createdAt,omitempty"`
+}
+
+// ExternalPaymentCreateWalletRequest is the body for the "create" action of
+// POST /v1/system/setup-wizard/external_payment-wallet. Language picks the seed
+// wordlist; the MVP supports only "English" to keep the backup
+// verification UI simple.
+type ExternalPaymentCreateWalletRequest struct {
+	Language string `json:"language,omitempty"`
+}
+
+// ExternalPaymentCreateWalletResult returns the new seed + address. The seed MUST
+// be displayed to the operator exactly once — the server never persists
+// it, and re-fetching after the wizard finishes would require querying
+// wallet-rpc with admin auth which we explicitly do not expose.
+type ExternalPaymentCreateWalletResult struct {
+	Mnemonic string `json:"mnemonic"`
+	Address  string `json:"address"`
+}
+
+// ExternalPaymentRestoreWalletRequest is the body for the "restore" action.
+// Seed is the 25-word deterministic seed in the wordlist of `Language`
+// (defaults to English). RestoreHeight tells wallet-rpc which block to
+// resume scanning from; 0 means scan from genesis (very slow). Operators
+// recovering a known wallet should provide the original creation height.
+type ExternalPaymentRestoreWalletRequest struct {
+	Seed          string `json:"seed"`
+	Language      string `json:"language,omitempty"`
+	RestoreHeight uint64 `json:"restoreHeight,omitempty"`
+}
+
+// ExternalPaymentRestoreWalletResult is returned by a successful restore. We do
+// NOT echo back the seed — the caller already has it — to minimise the
+// risk of accidentally logging it on the response path.
+type ExternalPaymentRestoreWalletResult struct {
+	Address string `json:"address"`
+}
+
+// ErrEXTERNAL_PAYMENTWalletAlreadyExists is returned when a create/restore attempt
+// would clobber an existing wallet. Handlers unwrap to HTTP 409 Conflict.
+var ErrEXTERNAL_PAYMENTWalletAlreadyExists = errors.New("external_payment wallet already exists")
+
+// ErrEXTERNAL_PAYMENTInvalidSeed wraps malformed seed input (wrong word count, empty).
+// Handlers unwrap to HTTP 400.
+var ErrEXTERNAL_PAYMENTInvalidSeed = errors.New("external_payment seed")
+
 // SchedulerHooks exposes per-node worker tick methods for the scheduler
 // (Phase AH-3). Both the SaaS shared scheduler and the standalone local
 // scheduler call these via type assertion on NodeService, avoiding changes

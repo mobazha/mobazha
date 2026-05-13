@@ -24,6 +24,17 @@ var nodeAuthSecurity = []map[string][]string{
 	{SecuritySchemeAPIToken: {}},
 }
 
+// adminOnlyAuthSecurity is used for first-run / lifecycle-critical
+// operations that must NOT be reachable via mbz_ API tokens — e.g. the
+// admin password setup, the EXTERNAL_PAYMENT wallet setup wizard, and other "operator
+// at the keyboard" actions. Excluding apiToken keeps OpenAPI honest:
+// machines that follow the spec won't waste a round-trip trying tokens
+// that the scope middleware would deny-by-default anyway.
+var adminOnlyAuthSecurity = []map[string][]string{
+	{SecuritySchemeBasicAuth: {}},
+	{SecuritySchemeBearerJWT: {}},
+}
+
 // HumaNodePingOutput is the smoke-test response.
 type HumaNodePingOutput struct {
 	Body struct {

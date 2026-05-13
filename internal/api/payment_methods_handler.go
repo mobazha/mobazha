@@ -33,6 +33,15 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// PrivateDistribution: inject supported coins (e.g. EXTERNAL_PAYMENT) that are served by
+	// wallet-rpc subaddress generation rather than ReceivingAccount rows.
+	for _, c := range private_distributionExtraCoins(r) {
+		if !seen[c] {
+			seen[c] = true
+			crypto = append(crypto, c)
+		}
+	}
+
 	type fiatEntry struct{}
 	var fiat any
 	if svc, ok := getFiatService(r); ok {

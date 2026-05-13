@@ -404,6 +404,24 @@ type NodeService interface {
 	SubscribeEvent(event any) (events.Subscription, error)
 }
 
+// PaymentRPCStatusProvider is implemented by nodes that can report local
+// payment sidecar availability (for example PrivateDistribution's external_payment-wallet-rpc).
+type PaymentRPCStatusProvider interface {
+	PaymentRPCStatus(ctx context.Context) PaymentRPCStatus
+}
+
+type PaymentRPCStatus struct {
+	EXTERNAL_PAYMENT *PaymentRPCStatusEntry `json:"external_payment,omitempty"`
+}
+
+type PaymentRPCStatusEntry struct {
+	Connected    bool   `json:"connected"`
+	Endpoint     string `json:"endpoint,omitempty"`
+	AccountIndex uint32 `json:"accountIndex,omitempty"`
+	BlockHeight  uint64 `json:"blockHeight,omitempty"`
+	Error        string `json:"error,omitempty"`
+}
+
 // SchedulerHooks exposes per-node worker tick methods for the scheduler
 // (Phase AH-3). Both the SaaS shared scheduler and the standalone local
 // scheduler call these via type assertion on NodeService, avoiding changes

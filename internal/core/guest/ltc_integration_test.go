@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package guest
 
 import (

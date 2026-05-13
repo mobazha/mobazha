@@ -253,7 +253,7 @@ func TestHandlePaymentDetected_EXTERNAL_PAYMENT_DirectConfirmed(t *testing.T) {
 
 func TestValidateCoinAvailability(t *testing.T) {
 	private_distributionSvc := &GuestOrderAppService{
-		supportedUTXOChains:    toChainSet([]iwallet.ChainType{iwallet.ChainLitecoin}),
+		supportedUTXOChains:    toChainSet(nil),
 		evmMonitorAvailable:    false,
 		solanaMonitorAvailable: false,
 	}
@@ -276,9 +276,10 @@ func TestValidateCoinAvailability(t *testing.T) {
 	solInfo, _ := iwallet.CoinInfoFromCoinType(solCoin)
 	tronInfo, _ := iwallet.CoinInfoFromCoinType(tronCoin)
 
-	t.Run("PrivateDistribution allows LTC", func(t *testing.T) {
+	t.Run("PrivateDistribution rejects LTC (EXTERNAL_PAYMENT-only)", func(t *testing.T) {
 		err := private_distributionSvc.validateCoinAvailability(ltcCoin, ltcInfo)
-		assert.NoError(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not configured")
 	})
 
 	t.Run("PrivateDistribution rejects BTC", func(t *testing.T) {

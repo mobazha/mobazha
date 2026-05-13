@@ -969,8 +969,8 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 			return errors.New("divisibility differs from expected value")
 		}
 		// Crypto-native pricing guard: private_distribution builds reject any pricing
-		// currency outside the supported payment coin set (LTC, EXTERNAL_PAYMENT). This
-		// is a server-side defense against API bypass of the UI restriction
+		// currency outside the supported set (see private_distribution_supported_coins.go).
+		// This is a server-side defense against API bypass of the UI restriction
 		// in BasicInfoSection. No-op on full builds.
 		if err := validatePrivateDistributionPricingCurrency(sl.Listing.Metadata.PricingCurrency.Code); err != nil {
 			return err

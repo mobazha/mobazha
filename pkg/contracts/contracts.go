@@ -486,6 +486,90 @@ type ExternalPaymentNodeAddRequest struct {
 	Operator string `json:"operator,omitempty"`
 }
 
+// ExternalPaymentWalletProvider is implemented by nodes that expose EXTERNAL_PAYMENT wallet-level
+// operations (transfer / sweep_all). Available only on private_distribution builds with
+// a working external_payment-wallet-rpc sidecar.
+type ExternalPaymentWalletProvider interface {
+	WithdrawEXTERNAL_PAYMENT(ctx context.Context, req ExternalPaymentWithdrawRequest) (ExternalPaymentWithdrawResult, error)
+	SweepAllEXTERNAL_PAYMENT(ctx context.Context, req ExternalPaymentSweepAllRequest) (ExternalPaymentSweepAllResult, error)
+}
+
+// ErrExternalPaymentWalletUnavailable signals that the private_distribution node has no
+// configured external_payment-wallet-rpc client (legacy boot without EXTERNAL_PAYMENT config,
+// or wallet RPC connection failed during startup).
+var ErrExternalPaymentWalletUnavailable = errors.New("external_payment wallet: RPC client not available on this node")
+
+// ErrEXTERNAL_PAYMENTInvalidAddress is wrapped by validation failures on the EXTERNAL_PAYMENT
+// destination address (empty / wrong length). Handlers unwrap with
+// errors.Is to map to HTTP 400. The wrapping error supplies the
+// human-readable reason; this sentinel only carries the prefix.
+var ErrEXTERNAL_PAYMENTInvalidAddress = errors.New("external_payment address")
+
+// ErrEXTERNAL_PAYMENTInvalidAmount is wrapped by validation failures on the EXTERNAL_PAYMENT
+// amount field (non-numeric, zero, overflow). Handlers unwrap with
+// errors.Is to map to HTTP 400.
+var ErrEXTERNAL_PAYMENTInvalidAmount = errors.New("external_payment amount")
+
+// ExternalPaymentWithdrawRequest is the body for POST /v1/wallet/external_payment/withdraw.
+//
+// Amount is a decimal string of piconero (1 EXTERNAL_PAYMENT = 10^12 piconero). It is a
+// string instead of uint64 because JavaScript Number's managed_escrow-integer range
+// (2^53 ≈ 9.007e15 piconero ≈ 9007 EXTERNAL_PAYMENT) is below the realistic EXTERNAL_PAYMENT balance
+// of a long-running private_distribution — using uint64 over the wire would silently
+// truncate large withdrawals. This matches the existing models.SpendRequest
+// convention for UTXO/EVM chains.
+//
+// Priority: 0=default (wallet decides), 1=unimportant, 2=normal,
+// 3=elevated, 4=priority. Higher priority => higher fee, faster inclusion.
+//
+// AccountIndex is a pointer so the wire can distinguish "unset" (use the
+// node's startup-flag default) from an explicit 0 (the primary account on
+// every standard ExternalPayment wallet). Most callers send a non-nil 0 or omit it
+// entirely; multi-account private_distributions may target specific indices.
+type ExternalPaymentWithdrawRequest struct {
+	Address      string  `json:"address"`
+	Amount       string  `json:"amount"`
+	Priority     uint32  `json:"priority,omitempty"`
+	AccountIndex *uint32 `json:"accountIndex,omitempty"`
+}
+
+// ExternalPaymentWithdrawResult is the response payload for a successful withdrawal.
+// Amount + Fee are decimal piconero strings (same rationale as the request).
+// TxKey lets the sender prove the payment off-chain to the recipient; the
+// frontend should surface it as "Save this key — only share with the
+// recipient if proof is needed".
+type ExternalPaymentWithdrawResult struct {
+	TxHash string `json:"txHash"`
+	TxKey  string `json:"txKey,omitempty"`
+	Amount string `json:"amount"`
+	Fee    string `json:"fee"`
+}
+
+// ExternalPaymentSweepAllRequest is the body for POST /v1/wallet/external_payment/sweep-all.
+//
+// SubaddrIndices, when non-empty, restricts the sweep to the listed
+// subaddress minor indices of AccountIndex. Empty means sweep all
+// subaddresses of the account.
+//
+// AccountIndex is a pointer for the same reason as ExternalPaymentWithdrawRequest.
+type ExternalPaymentSweepAllRequest struct {
+	Address        string   `json:"address"`
+	Priority       uint32   `json:"priority,omitempty"`
+	AccountIndex   *uint32  `json:"accountIndex,omitempty"`
+	SubaddrIndices []uint32 `json:"subaddrIndices,omitempty"`
+}
+
+// ExternalPaymentSweepAllResult lists the transactions produced by a sweep.
+// sweep_all commonly produces multiple transactions when the wallet
+// has many outputs; all parallel slices have the same length.
+// Amounts / Fees are decimal piconero strings.
+type ExternalPaymentSweepAllResult struct {
+	TxHashes []string `json:"txHashes"`
+	TxKeys   []string `json:"txKeys,omitempty"`
+	Amounts  []string `json:"amounts"`
+	Fees     []string `json:"fees"`
+}
+
 // SchedulerHooks exposes per-node worker tick methods for the scheduler
 // (Phase AH-3). Both the SaaS shared scheduler and the standalone local
 // scheduler call these via type assertion on NodeService, avoiding changes

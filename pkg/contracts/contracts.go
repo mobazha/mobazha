@@ -487,11 +487,33 @@ type ExternalPaymentNodeAddRequest struct {
 }
 
 // ExternalPaymentWalletProvider is implemented by nodes that expose EXTERNAL_PAYMENT wallet-level
-// operations (transfer / sweep_all). Available only on private_distribution builds with
-// a working external_payment-wallet-rpc sidecar.
+// operations (balance / transfer / sweep_all). Available only on private_distribution
+// builds with a working external_payment-wallet-rpc sidecar.
 type ExternalPaymentWalletProvider interface {
+	GetEXTERNAL_PAYMENTBalance(ctx context.Context, accountIndex *uint32) (ExternalPaymentBalance, error)
 	WithdrawEXTERNAL_PAYMENT(ctx context.Context, req ExternalPaymentWithdrawRequest) (ExternalPaymentWithdrawResult, error)
 	SweepAllEXTERNAL_PAYMENT(ctx context.Context, req ExternalPaymentSweepAllRequest) (ExternalPaymentSweepAllResult, error)
+}
+
+// ExternalPaymentBalance reports the account-level balance for the EXTERNAL_PAYMENT wallet.
+//
+// Balance is the total (locked + unlocked) and UnlockedBalance is the
+// portion that can be spent right now — ExternalPayment locks every incoming
+// output for 10 confirmations (~20 min) and temporarily locks change
+// outputs after sends. UI must withdraw against UnlockedBalance, never
+// Balance, or wallet-rpc will reject the transfer.
+//
+// Both fields are decimal piconero strings (same JS-Number rationale as
+// ExternalPaymentWithdrawRequest.Amount). BlocksToUnlock is the wallet-rpc hint
+// for the next-batch unlock countdown; 0 when nothing is pending.
+//
+// AccountIndex echoes which account this balance refers to so the
+// frontend doesn't have to track the request/response pairing itself.
+type ExternalPaymentBalance struct {
+	Balance         string `json:"balance"`
+	UnlockedBalance string `json:"unlockedBalance"`
+	BlocksToUnlock  uint64 `json:"blocksToUnlock,omitempty"`
+	AccountIndex    uint32 `json:"accountIndex"`
 }
 
 // ErrExternalPaymentWalletUnavailable signals that the private_distribution node has no

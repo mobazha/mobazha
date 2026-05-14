@@ -554,6 +554,10 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.LicenseActivation{},
 		&models.DownloadGrant{},
 		&models.DigitalDownloadLog{},
+		// Phase EVM-ManagedEscrow v0.3.0 — append-only fact table for the
+		// monitor-driven payment model. See
+		// docs/escrow/MONITOR_DRIVEN_PAYMENT.md (v2.0).
+		&models.PaymentObservation{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
@@ -785,6 +789,10 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		&models.LicenseActivation{},
 		&models.DownloadGrant{},
 		&models.DigitalDownloadLog{},
+		// Phase EVM-ManagedEscrow v0.3.0 — append-only fact table for the
+		// monitor-driven payment model. See
+		// docs/escrow/MONITOR_DRIVEN_PAYMENT.md (v2.0).
+		&models.PaymentObservation{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

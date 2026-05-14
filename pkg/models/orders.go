@@ -845,6 +845,29 @@ func (o *Order) PaymentSentMessage() (*pb.PaymentSent, error) {
 	return paymentSent, nil
 }
 
+// SetPaymentSent serializes the PaymentSent envelope into
+// SerializedPaymentSent using the package-level protojson marshaler.
+//
+// This is the only writer of SerializedPaymentSent that callers outside
+// pkg/models should use: it guarantees the bytes round-trip through
+// PaymentSentMessage() because both sides use the same protojson
+// configuration. Bypassing this method (for example by calling
+// proto.Marshal directly, which produces binary protobuf) would yield
+// bytes that PaymentSentMessage() rejects with "syntax error".
+//
+// The Monitor-Driven AggregatingVerifier (internal/core/payment) is the
+// primary caller for chain-observed payments; the legacy buyer-submitted
+// PutMessage(PAYMENT_SENT) path stays inside pkg/models and uses the
+// same marshaler directly.
+func (o *Order) SetPaymentSent(msg *pb.PaymentSent) error {
+	if msg == nil {
+		return errors.New("Order.SetPaymentSent: msg must not be nil")
+	}
+	out := marshaler.Format(msg)
+	o.SerializedPaymentSent = []byte(out)
+	return nil
+}
+
 // PaymentFinalizedMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) PaymentFinalizedMessage() (*pb.PaymentFinalized, error) {
 	if len(o.SerializedPaymentFinalized) == 0 {

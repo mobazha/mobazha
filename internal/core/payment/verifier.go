@@ -15,22 +15,10 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
-
-// paymentSentMarshaler matches the protojson convention used by
-// pkg/models.Order.PutMessage / PaymentSentMessage so the envelope we
-// write here round-trips through Order.PaymentSentMessage() — which
-// reads via the unexported protojson unmarshaler in pkg/models. If we
-// emitted binary protobuf instead, every consumer that calls
-// PaymentSentMessage() would see a syntax error.
-var paymentSentMarshaler = protojson.MarshalOptions{
-	EmitUnpopulated: true,
-	Indent:          "    ",
-}
 
 // AggregatingVerifier implements the Sprint 2A step 4 of the
 // Monitor-Driven Payment model (docs/escrow/MONITOR_DRIVEN_PAYMENT.md §5.2).
@@ -272,15 +260,20 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 			}
 
 			// First-time verification: build and freeze the envelope.
+			// We delegate the protojson marshal to Order.SetPaymentSent
+			// so the bytes round-trip through PaymentSentMessage() and
+			// stay configuration-aligned with the legacy
+			// PutMessage(PAYMENT_SENT) path inside pkg/models — there
+			// is exactly one protojson MarshalOptions definition for
+			// SerializedPaymentSent in the entire codebase, and it
+			// lives next to the matching unmarshaler.
 			ps, err := buildAggregatedPaymentSent(orderOpen, deduped, total, &order, v.clock())
 			if err != nil {
 				return fmt.Errorf("aggregating verifier: build PaymentSent for %s: %w", orderID, err)
 			}
-			ser, err := paymentSentMarshaler.Marshal(ps)
-			if err != nil {
+			if err := order.SetPaymentSent(ps); err != nil {
 				return fmt.Errorf("aggregating verifier: marshal PaymentSent for %s: %w", orderID, err)
 			}
-			order.SerializedPaymentSent = ser
 			order.MarkPaymentVerified()
 			emitVerified = true
 		}

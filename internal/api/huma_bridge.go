@@ -254,9 +254,9 @@ func (g *Gateway) nodeBridgeRequestWithOptionalAuth(ctx context.Context, method,
 		}
 	}
 
-	if g.authLimiter != nil && g.authLimiter.isBlocked(peerIP) {
-		return req
-	}
+	// No up-front isBlocked check — see AuthenticationMiddleware.
+	// Up-front blocking here would silently downgrade an authenticated
+	// request to anonymous, which surfaces as confusing 401/404s downstream.
 	if len(g.config.AllowedIPs) > 0 && !g.config.AllowedIPs[peerIP] {
 		return req
 	}

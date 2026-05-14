@@ -185,12 +185,9 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		// Use RemoteAddr directly (not proxy headers) to prevent XFF bypass.
 		peerIP := remoteIPFromHuma(ctx)
 
-		if g.authLimiter != nil && g.authLimiter.isBlocked(peerIP) {
-			ctx.SetHeader("Retry-After", "900")
-			huma.WriteErr(api, ctx, http.StatusTooManyRequests,
-				"Too many authentication failures. Try again later.")
-			return
-		}
+		// No up-front isBlocked check — see AuthenticationMiddleware.
+		// The limiter is enforced only after a credential failure
+		// below; valid credentials reset via resetIP.
 
 		if len(g.config.AllowedIPs) > 0 && !g.config.AllowedIPs[peerIP] {
 			huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
@@ -266,6 +263,14 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 			if !matched {
 				if g.authLimiter != nil {
 					g.authLimiter.recordFailure(peerIP)
+					// 429 once this failure tips the threshold; correct
+					// credentials in the matched branch reset via resetIP.
+					if g.authLimiter.isBlocked(peerIP) {
+						ctx.SetHeader("Retry-After", "900")
+						huma.WriteErr(api, ctx, http.StatusTooManyRequests,
+							"Too many authentication failures. Try again later.")
+						return
+					}
 				}
 				huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid credentials")
 				return

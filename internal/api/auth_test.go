@@ -286,6 +286,80 @@ func TestGateway_JWTAuth(t *testing.T) {
 		}
 	})
 
+	t.Run("CorrectBasicAuthSucceedsAfterPriorFailures", func(t *testing.T) {
+		// Regression: in Docker / NAT deployments multiple clients share
+		// one source IP. The previous design banned the IP up front, so
+		// even the real operator's correct password was rejected with
+		// 429 once any (e.g. SPA-init) request had 401'd 5 times. New
+		// behaviour: correct credentials always reset the counter.
+		// passwordHash below is sha256("letmein").
+		gateway.auth = authState{
+			username:     "alice",
+			passwordHash: "1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032",
+		}
+		gateway.authLimiter = newAuthRateLimiter()
+		defer func() {
+			gateway.auth = authState{}
+			gateway.authLimiter.stop()
+			gateway.authLimiter = nil
+		}()
+
+		// Burn through the failure budget with the wrong password.
+		for i := 0; i < authRateLimitMaxFailures; i++ {
+			req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+			req.Header.Set("X-Mobazha-Node", "test_user_id")
+			req.SetBasicAuth("alice", "wrong-password")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("priming failure %d: %v", i, err)
+			}
+			resp.Body.Close()
+		}
+
+		// Wrong password again -> now 429 (limiter has tipped).
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+		req.SetBasicAuth("alice", "wrong-password")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("post-budget wrong-cred request: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("expected 429 once budget burned, got %d", resp.StatusCode)
+		}
+
+		// Correct password should now succeed and reset the counter,
+		// even though the IP was technically "blocked". This is the
+		// key behavioural change.
+		req, _ = http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+		req.SetBasicAuth("alice", "letmein")
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("correct-cred request: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusTooManyRequests {
+			t.Fatalf("correct credentials should pass even after prior failures, got %d", resp.StatusCode)
+		}
+
+		// And a second correct request right after also succeeds —
+		// proves resetIP actually fired.
+		req, _ = http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+		req.SetBasicAuth("alice", "letmein")
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("follow-up correct-cred request: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+			// 404 is acceptable because the mockNode has no real profile.
+			t.Fatalf("follow-up correct-cred request unexpectedly rejected: %d", resp.StatusCode)
+		}
+	})
+
 	t.Run("ValidJWT_AdminPeerID_WithBasicAuthConfigured", func(t *testing.T) {
 		gateway.auth = authState{
 			username:     "alice",

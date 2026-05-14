@@ -107,12 +107,10 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if g.authLimiter != nil && g.authLimiter.isBlocked(remoteIP(r)) {
-			w.Header().Set("Retry-After", "900")
-			response.Error(w, http.StatusTooManyRequests, response.CodeRateLimited,
-				"Too many authentication failures. Try again later.")
-			return
-		}
+		// isBlocked is enforced only after a credential failure (below);
+		// up-front blocking locks out shared-IP deployments (PrivateDistribution / Docker /
+		// NAT) where a real operator can't recover after a few stray 401s.
+		// Correct credentials reset the counter via ResetAuthFailure().
 
 		if len(g.config.AllowedIPs) > 0 {
 			host, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -183,6 +181,14 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 			matched, upgradable := g.auth.checkPassword(username, password)
 			if !matched {
 				g.RecordAuthFailure(r)
+				// 429 once this failure tips the threshold; correct
+				// credentials in the matched branch reset the counter.
+				if g.authLimiter != nil && g.authLimiter.isBlocked(remoteIP(r)) {
+					w.Header().Set("Retry-After", "900")
+					response.Error(w, http.StatusTooManyRequests, response.CodeRateLimited,
+						"Too many authentication failures. Try again later.")
+					return
+				}
 				ErrorResponse(w, http.StatusUnauthorized, "Invalid credentials")
 				return
 			}

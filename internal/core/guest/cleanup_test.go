@@ -224,6 +224,60 @@ func TestAutoCompleteOrders_SkipsRecentlyShipped(t *testing.T) {
 		"orders within the auto-complete window must not be completed yet")
 }
 
+func TestAutoCompleteOrders_UsesDigitalGoodSnapshot(t *testing.T) {
+	db := newGuestTestDB(t)
+	svc := newCleanupSvc(db)
+
+	shippedSixDaysAgo := time.Now().Add(-6 * 24 * time.Hour)
+	seedGuestOrder(t, db, 1, models.GuestOrder{
+		OrderToken: "gst_digital_snapshot",
+		State:      models.GuestOrderShipped,
+		ShippedAt:  &shippedSixDaysAgo,
+		// Digital guest orders snapshot the store review window at creation.
+		// Six days after shipment should complete a 5-day digital order,
+		// even though the legacy guest default is 14 days.
+		AutoCompleteAfterShipDaysOverride: 5,
+	})
+
+	svc.AutoCompleteOrders(context.Background())
+
+	got := loadGuestOrder(t, db, "gst_digital_snapshot")
+	assert.Equal(t, models.GuestOrderCompleted, got.State)
+}
+
+func TestAutoCompleteOrders_SkipsDigitalSnapshotBeforeDeadline(t *testing.T) {
+	db := newGuestTestDB(t)
+	svc := newCleanupSvc(db)
+
+	shippedFourDaysAgo := time.Now().Add(-4 * 24 * time.Hour)
+	seedGuestOrder(t, db, 1, models.GuestOrder{
+		OrderToken:                        "gst_digital_recent",
+		State:                             models.GuestOrderShipped,
+		ShippedAt:                         &shippedFourDaysAgo,
+		AutoCompleteAfterShipDaysOverride: 5,
+	})
+
+	svc.AutoCompleteOrders(context.Background())
+
+	got := loadGuestOrder(t, db, "gst_digital_recent")
+	assert.Equal(t, models.GuestOrderShipped, got.State)
+}
+
+func TestDigitalGoodReviewWindowDays(t *testing.T) {
+	db := newGuestTestDB(t)
+	svc := newCleanupSvc(db)
+
+	assert.Equal(t, uint32(3), svc.digitalGoodReviewWindowDays())
+
+	require.NoError(t, db.gormDB.Create(&models.UserPreferences{
+		TenantMixin:                 models.TenantMixin{TenantID: testTenantID},
+		ID:                          1,
+		DigitalGoodReviewWindowDays: 7,
+	}).Error)
+
+	assert.Equal(t, uint32(7), svc.digitalGoodReviewWindowDays())
+}
+
 // ── releaseExpiredReservations ──────────────────────────────────
 
 func TestReleaseExpiredReservations_OnlyReleasesExpiredUnconfirmed(t *testing.T) {

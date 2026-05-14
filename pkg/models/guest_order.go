@@ -118,6 +118,11 @@ type GuestOrder struct {
 	ShippingCarrier string     `json:"shippingCarrier,omitempty"`
 	SellerNote      string     `json:"sellerNote,omitempty"`
 
+	// AutoCompleteAfterShipDaysOverride snapshots the seller's digital-good
+	// review window for guest checkout orders. 0 keeps the legacy guest
+	// auto-complete period for non-digital or pre-migration orders.
+	AutoCompleteAfterShipDaysOverride uint32 `gorm:"column:auto_complete_after_ship_days_override" json:"autoCompleteAfterShipDaysOverride,omitempty"`
+
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 

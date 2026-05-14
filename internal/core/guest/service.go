@@ -196,6 +196,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	}
 	itemStockLimits := make(map[inventoryBucketKey]int64)
 	itemBuckets := make([]inventoryBucketKey, 0, len(req.Items))
+	allDigitalGoods := true
 
 	for _, reqItem := range req.Items {
 		if reqItem.Quantity <= 0 {
@@ -211,6 +212,9 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		itemBuckets = append(itemBuckets, bucket)
 		if resolved.HasStockTracking {
 			itemStockLimits[bucket] = resolved.StockQty
+		}
+		if resolved.ContractType != pb.Listing_Metadata_DIGITAL_GOOD {
+			allDigitalGoods = false
 		}
 		if priceCurrencyCode == "" {
 			priceCurrencyCode = resolved.PriceCurrencyCode
@@ -291,6 +295,9 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		BuyerPortalTokenHash:      hashBuyerPortalToken(buyerPortalToken),
 		BuyerPortalTokenExpiresAt: &buyerPortalExpiresAt,
 		BuyerPortalTokenVersion:   1,
+	}
+	if allDigitalGoods {
+		order.AutoCompleteAfterShipDaysOverride = s.digitalGoodReviewWindowDays()
 	}
 
 	if req.ShippingAddress != nil {
@@ -707,13 +714,16 @@ func (s *GuestOrderAppService) CleanupExpiredOrders(ctx context.Context) {
 // AutoCompleteOrders transitions shipped orders past the auto-complete period.
 func (s *GuestOrderAppService) AutoCompleteOrders(ctx context.Context) {
 	var orders []models.GuestOrder
-	cutoff := time.Now().Add(-defaultAutoCompletePeriod)
+	now := time.Now()
 	_ = s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("state = ? AND shipped_at < ?",
-			int(models.GuestOrderShipped), cutoff).Find(&orders).Error
+		return tx.Read().Where("state = ? AND shipped_at IS NOT NULL",
+			int(models.GuestOrderShipped)).Find(&orders).Error
 	})
 
 	for _, order := range orders {
+		if order.ShippedAt == nil || now.Before(order.ShippedAt.Add(guestAutoCompletePeriod(&order))) {
+			continue
+		}
 		if err := s.transitionState(order.OrderToken,
 			models.GuestOrderShipped, models.GuestOrderCompleted,
 			func(tx database.Tx, o *models.GuestOrder) error {
@@ -724,6 +734,13 @@ func (s *GuestOrderAppService) AutoCompleteOrders(ctx context.Context) {
 			log.Warningf("auto-complete guest order %s: %v", redact.Token(order.OrderToken), err)
 		}
 	}
+}
+
+func guestAutoCompletePeriod(order *models.GuestOrder) time.Duration {
+	if order != nil && order.AutoCompleteAfterShipDaysOverride > 0 {
+		return time.Duration(order.AutoCompleteAfterShipDaysOverride) * 24 * time.Hour
+	}
+	return defaultAutoCompletePeriod
 }
 
 // RunGuestCleanupOnce executes a single pass of guest order maintenance.
@@ -890,6 +907,7 @@ type resolvedItem struct {
 	ListingTitle      string
 	PriceCurrencyCode string
 	PriceDivisibility uint32
+	ContractType      pb.Listing_Metadata_ContractType
 	VariantHash       string
 	HasStockTracking  bool
 	StockQty          int64
@@ -924,6 +942,7 @@ func (s *GuestOrderAppService) resolveItemPrice(item contracts.GuestOrderItemReq
 		UnitPrice:         basePrice,
 		PriceCurrencyCode: priceCurCode,
 		PriceDivisibility: uint32(priceCurDef.Divisibility),
+		ContractType:      listing.Metadata.GetContractType(),
 	}
 
 	hasSkus := len(listing.Item.Skus) > 0
@@ -1007,6 +1026,24 @@ func (s *GuestOrderAppService) resolveShippingCost(item contracts.GuestOrderItem
 	}
 	return nil, fmt.Errorf("%w: shipping service %q not available under option %q for listing %q",
 		contracts.ErrInvalidGuestRequest, item.ShippingService, item.ShippingOption, item.ListingSlug)
+}
+
+func (s *GuestOrderAppService) digitalGoodReviewWindowDays() uint32 {
+	policy := models.DefaultProtectionPolicy(pb.Listing_Metadata_DIGITAL_GOOD)
+	days := uint32(policy.AutoCompleteAfterShipDays)
+
+	var prefs models.UserPreferences
+	if s.db != nil {
+		err := s.db.View(func(tx database.Tx) error {
+			return tx.Read().First(&prefs).Error
+		})
+		if err == nil &&
+			prefs.DigitalGoodReviewWindowDays > days &&
+			prefs.DigitalGoodReviewWindowDays <= models.MaxDigitalGoodReviewWindowDays {
+			days = prefs.DigitalGoodReviewWindowDays
+		}
+	}
+	return days
 }
 
 func matchSku(listing *pb.Listing, options []map[string]string) *pb.Listing_Item_Sku {

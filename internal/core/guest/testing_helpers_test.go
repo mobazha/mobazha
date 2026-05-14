@@ -122,6 +122,7 @@ func newGuestTestDB(t *testing.T) *testDatabase {
 		&models.GuestOrderItem{},
 		&models.InventoryReservation{},
 		&models.SweepTask{},
+		&models.UserPreferences{},
 	))
 	return &testDatabase{gormDB: db}
 }

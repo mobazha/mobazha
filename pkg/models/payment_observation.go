@@ -2,6 +2,7 @@ package models
 
 import (
 	"math/big"
+	"sort"
 	"time"
 )
 
@@ -183,4 +184,122 @@ func (p *PaymentObservation) SetAmountBigInt(v *big.Int) {
 		return
 	}
 	p.Amount = v.String()
+}
+
+// Observer-priority constants for the dedupe rule.
+//
+// Lower number wins. The ordering encodes the trust hierarchy laid out in
+// MONITOR_DRIVEN_PAYMENT.md §3.2: monitor (we observed the chain
+// directly) outranks buyer_reported (peer told us about a tx), and
+// anything we don't recognise sorts last so unexpected sources can never
+// silently outrank a known one.
+const (
+	dedupePriorityMonitor       = 0
+	dedupePriorityBuyerReported = 1
+	dedupePriorityUnknown       = 2
+)
+
+func observerPriority(source string) int {
+	switch source {
+	case PaymentObservationSourceMonitor:
+		return dedupePriorityMonitor
+	case PaymentObservationSourceBuyerReported:
+		return dedupePriorityBuyerReported
+	default:
+		return dedupePriorityUnknown
+	}
+}
+
+// DedupePaymentObservations collapses a slice of PaymentObservation rows
+// to one row per (chain_namespace, chain_reference, tx_hash, event_index)
+// tuple. The winning row per tuple is selected by:
+//
+//  1. Lowest observer priority (monitor > buyer_reported > unknown).
+//  2. Earliest BlockTime as a tie-breaker.
+//  3. Lexicographically smallest ID for full determinism (UUIDv7 is
+//     monotonic, so this also tracks observation order).
+//
+// The function is the single source of truth for dedupe semantics and is
+// shared by:
+//
+//   - GormPaymentObservationRepo.ListDeduplicatedConfirmed (read path)
+//   - AggregatingVerifier.AggregateAndEmit (verification path)
+//
+// Keeping the rule in pkg/models (the package that owns PaymentObservation)
+// guarantees both call sites can never drift apart, which is the entire
+// reason §3.2 of the design doc treats "monitor outranks buyer_reported"
+// as an invariant: if the verifier and the audit repo ever disagreed on
+// dedupe, an order could appear "verified" via one path and "still
+// pending" via another.
+//
+// Behaviour notes:
+//
+//   - Pre-sort is not required; the function is order-insensitive. The
+//     output is sorted by (BlockTime ASC, ID ASC) for stable iteration in
+//     downstream sums.
+//   - Slices of length ≤ 1 are returned as-is — no allocation.
+//   - The §14.1 pessimistic worst case bounds a single order at ~4 rows
+//     (multiple deposits × dual observers); allocating one map entry per
+//     unique tuple is a constant cost dwarfed by the network round-trip
+//     to fetch the rows in the first place.
+func DedupePaymentObservations(rows []PaymentObservation) []PaymentObservation {
+	if len(rows) <= 1 {
+		return rows
+	}
+
+	type tupleKey struct {
+		ns, ref, tx string
+		idx         int
+	}
+
+	type candidate struct {
+		row       PaymentObservation
+		priority  int
+		blockUnix int64
+	}
+
+	best := make(map[tupleKey]candidate, len(rows))
+	for _, r := range rows {
+		key := tupleKey{
+			ns:  r.ChainNamespace,
+			ref: r.ChainReference,
+			tx:  r.TxHash,
+			idx: r.EventIndex,
+		}
+		c := candidate{
+			row:       r,
+			priority:  observerPriority(r.Source),
+			blockUnix: r.BlockTime.UnixNano(),
+		}
+		existing, ok := best[key]
+		if !ok || dedupeCandidateLess(c, existing) {
+			best[key] = c
+		}
+	}
+
+	out := make([]PaymentObservation, 0, len(best))
+	for _, c := range best {
+		out = append(out, c.row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].BlockTime.Equal(out[j].BlockTime) {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].BlockTime.Before(out[j].BlockTime)
+	})
+	return out
+}
+
+func dedupeCandidateLess(a, b struct {
+	row       PaymentObservation
+	priority  int
+	blockUnix int64
+}) bool {
+	if a.priority != b.priority {
+		return a.priority < b.priority
+	}
+	if a.blockUnix != b.blockUnix {
+		return a.blockUnix < b.blockUnix
+	}
+	return a.row.ID < b.row.ID
 }

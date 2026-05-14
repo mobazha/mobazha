@@ -415,6 +415,28 @@ type OrderAutoConfirmRequest struct {
 	PayoutAddress string `json:"payoutAddress"`
 }
 
+// PaymentVerified is the canonical "this order's chain payment has been
+// verified" signal emitted by the monitor-driven AggregatingVerifier when
+// confirmed observations sum to ≥ the expected amount.
+//
+// Internal-only: it is the trigger that downstream services (OrderAppService,
+// notifications) listen on to advance the order FSM and produce user-facing
+// notifications such as OrderFunded. It deliberately carries no order
+// metadata — subscribers re-load the order to see the freshly-saved
+// SerializedPaymentSent envelope, OverpaidAmount, TotalReceived and
+// PaymentVerificationStatus committed in the same DB transaction that
+// emitted this event.
+//
+// Idempotency contract: AggregatingVerifier only emits this event on the
+// first transition from pending → verified. Subsequent re-aggregations of
+// the same order (e.g. additional observation rows landing) update
+// TotalReceived / OverpaidAmount in place but do NOT re-emit, so
+// subscribers may treat receipt as a one-shot "go" signal per order.
+type PaymentVerified struct {
+	TenantID string `json:"tenantID,omitempty"`
+	OrderID  string `json:"orderID"`
+}
+
 // UTXOPaymentDetected is emitted by PaymentAppService when a buyer's UTXO
 // payment reaches the expected amount. OrderAppService subscribes and calls
 // ProcessOrderPayment. This replaces the direct cross-service method call.

@@ -15,31 +15,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// observerPriority ranks Source values when the aggregator must collapse
-// multiple rows that share the same (chain_namespace, chain_reference,
-// tx_hash, event_index) tuple. A lower number wins. Anything not listed
-// receives priorityUnknown so unexpected sources sort last instead of
-// silently outranking known ones.
-//
-// Authoritative ordering: monitor (chain-derived evidence) > buyer_reported
-// (peer envelope, must match chain). See MONITOR_DRIVEN_PAYMENT.md §3.2.
-const (
-	priorityMonitor       = 0
-	priorityBuyerReported = 1
-	priorityUnknown       = 2
-)
-
-func observerPriority(source string) int {
-	switch source {
-	case models.PaymentObservationSourceMonitor:
-		return priorityMonitor
-	case models.PaymentObservationSourceBuyerReported:
-		return priorityBuyerReported
-	default:
-		return priorityUnknown
-	}
-}
-
 // isUniqueViolationErr matches both the SQLite ("UNIQUE constraint failed")
 // and PostgreSQL ("duplicate key value violates unique constraint") wordings
 // used by tx.Save when a secondary UNIQUE index rejects the row. We do NOT
@@ -180,99 +155,7 @@ func (r *GormPaymentObservationRepo) ListDeduplicatedConfirmed(_ context.Context
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	return dedupeByEventTuple(rows), nil
-}
-
-// dedupeByEventTuple is the Go-side equivalent of:
-//
-//	SELECT DISTINCT ON (chain_namespace, chain_reference, tx_hash, event_index)
-//	  *
-//	FROM payment_observations
-//	ORDER BY chain_namespace, chain_reference, tx_hash, event_index,
-//	         CASE source WHEN 'monitor' THEN 0 ELSE 1 END,
-//	         block_time ASC;
-//
-// Behaviour notes:
-//
-//   - Pre-sort by (block_time ASC, id ASC) is the caller's responsibility
-//     (we do it in ListDeduplicatedConfirmed). dedupeByEventTuple then
-//     applies a priority sort and keeps the first row per tuple.
-//   - The function is exported package-internally (lowercase) to allow a
-//     unit test to validate the dedupe rule without spinning up a DB.
-//   - We allocate one map entry per unique tuple. Even with the §14.1
-//     pessimistic "4 rows per order" worst case the cost is constant.
-func dedupeByEventTuple(rows []models.PaymentObservation) []models.PaymentObservation {
-	if len(rows) <= 1 {
-		return rows
-	}
-
-	type tupleKey struct {
-		ns, ref, tx string
-		idx         int
-	}
-
-	type candidate struct {
-		row models.PaymentObservation
-		// Ordering tuple: lower priority wins; ties broken by earlier
-		// block time; further ties broken by lexicographically smaller
-		// ID for determinism (UUIDv7 is monotonic so this also tracks
-		// observation order).
-		priority   int
-		blockUnix  int64
-		idForOrder string
-	}
-
-	best := make(map[tupleKey]candidate, len(rows))
-	for _, r := range rows {
-		key := tupleKey{
-			ns:  r.ChainNamespace,
-			ref: r.ChainReference,
-			tx:  r.TxHash,
-			idx: r.EventIndex,
-		}
-		c := candidate{
-			row:        r,
-			priority:   observerPriority(r.Source),
-			blockUnix:  r.BlockTime.UnixNano(),
-			idForOrder: r.ID,
-		}
-		if existing, ok := best[key]; !ok || candidateLess(c, existing) {
-			best[key] = c
-		}
-	}
-
-	out := make([]models.PaymentObservation, 0, len(best))
-	for _, c := range best {
-		out = append(out, c.row)
-	}
-	// Sort the dedup'd output deterministically — callers that fold the
-	// rows into a sum see a stable iteration order across runs (helps tests
-	// and audit replay).
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].BlockTime.Equal(out[j].BlockTime) {
-			return out[i].ID < out[j].ID
-		}
-		return out[i].BlockTime.Before(out[j].BlockTime)
-	})
-	return out
-}
-
-// candidateLess reports whether a should win over b under the dedupe rule.
-// Pulled out so the unit test can pin the tie-breaker semantics without
-// having to construct full PaymentObservation values.
-func candidateLess(a, b struct {
-	row        models.PaymentObservation
-	priority   int
-	blockUnix  int64
-	idForOrder string
-}) bool {
-	if a.priority != b.priority {
-		return a.priority < b.priority
-	}
-	if a.blockUnix != b.blockUnix {
-		return a.blockUnix < b.blockUnix
-	}
-	return a.idForOrder < b.idForOrder
+	return models.DedupePaymentObservations(rows), nil
 }
 
 // ListByOrder returns every observation row for the order in deterministic

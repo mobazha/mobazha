@@ -1,0 +1,541 @@
+//go:build !private_distribution
+
+package payment
+
+import (
+	"context"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/ipfs/go-cid"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
+	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+)
+
+// ─────────────────────────────────────────────────────────────────────────
+// Minimal test infrastructure for the verifier
+// ─────────────────────────────────────────────────────────────────────────
+//
+// The verifier reaches through database.Database / database.Tx into the
+// underlying *gorm.DB to issue SELECT FOR UPDATE and direct queries
+// against payment_observations, so we can't reuse the repo fakes from
+// observation_dispatcher_test.go. Instead we wire a real in-memory
+// SQLite that AutoMigrates both Order and PaymentObservation, wrap it
+// in the smallest database.Database / database.Tx surface that satisfies
+// the verifier's call paths, and let GORM do the heavy lifting. This
+// gives us realistic dialect detection ("sqlite" → no FOR UPDATE) and
+// actual transactional semantics for the FSM-state guards we need to
+// exercise.
+
+type vTestDB struct {
+	gormDB *gorm.DB
+}
+
+func newVerifierTestDB(t *testing.T) *vTestDB {
+	t.Helper()
+	db, err := gorm.Open(sqlitedialect.Open(":memory:"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.Order{}, &models.PaymentObservation{}))
+	return &vTestDB{gormDB: db}
+}
+
+func (d *vTestDB) View(fn func(database.Tx) error) error {
+	return fn(&vTestTx{db: d.gormDB})
+}
+
+func (d *vTestDB) Update(fn func(database.Tx) error) error {
+	return d.gormDB.Transaction(func(tx *gorm.DB) error {
+		return fn(&vTestTx{db: tx})
+	})
+}
+
+func (d *vTestDB) ComputePublicDataHash() (cid.Cid, error) { return cid.Undef, nil }
+func (d *vTestDB) Close() error                            { return nil }
+
+type vTestTx struct{ db *gorm.DB }
+
+func (t *vTestTx) Read() *gorm.DB           { return t.db }
+func (t *vTestTx) Save(i interface{}) error { return t.db.Save(i).Error }
+func (t *vTestTx) Update(key string, value interface{}, where map[string]interface{}, model interface{}) error {
+	q := t.db.Model(model)
+	for k, v := range where {
+		q = q.Where(k, v)
+	}
+	return q.UpdateColumn(key, value).Error
+}
+func (t *vTestTx) UpdateColumns(values map[string]interface{}, where map[string]interface{}, model interface{}) (int64, error) {
+	q := t.db.Model(model)
+	for k, v := range where {
+		q = q.Where(k, v)
+	}
+	res := q.UpdateColumns(values)
+	return res.RowsAffected, res.Error
+}
+func (t *vTestTx) Commit() error   { panic("managed tx") }
+func (t *vTestTx) Rollback() error { panic("managed tx") }
+func (t *vTestTx) Delete(key string, value interface{}, where map[string]interface{}, model interface{}) error {
+	q := t.db.Where(key, value)
+	for k, v := range where {
+		q = q.Where(k, v)
+	}
+	return q.Delete(model).Error
+}
+func (t *vTestTx) DeleteAll(interface{}) error { return nil }
+func (t *vTestTx) Migrate(interface{}) error   { return nil }
+func (t *vTestTx) RegisterCommitHook(func())   {}
+
+// PublicData stubs — the verifier never touches PublicData but the
+// database.Tx interface requires them.
+func (t *vTestTx) GetProfile() (*models.Profile, error)                       { return nil, nil }
+func (t *vTestTx) SetProfile(*models.Profile) error                           { return nil }
+func (t *vTestTx) GetFollowers() (models.Followers, error)                    { return models.Followers{}, nil }
+func (t *vTestTx) SetFollowers(models.Followers) error                        { return nil }
+func (t *vTestTx) GetFollowing() (models.Following, error)                    { return models.Following{}, nil }
+func (t *vTestTx) SetFollowing(models.Following) error                        { return nil }
+func (t *vTestTx) GetListing(string) (*pb.SignedListing, error)               { return nil, nil }
+func (t *vTestTx) SetListing(*pb.SignedListing) error                         { return nil }
+func (t *vTestTx) GetEncryptedListing(string) ([]byte, error)                 { return nil, nil }
+func (t *vTestTx) SetEncryptedListing(string, []byte) error                   { return nil }
+func (t *vTestTx) DeleteListing(string) error                                 { return nil }
+func (t *vTestTx) GetListingIndex() (models.ListingIndex, error)              { return nil, nil }
+func (t *vTestTx) SetListingIndex(models.ListingIndex) error                  { return nil }
+func (t *vTestTx) GetRatingIndex() (models.RatingIndex, error)                { return nil, nil }
+func (t *vTestTx) SetRatingIndex(models.RatingIndex) error                    { return nil }
+func (t *vTestTx) SetRating(*pb.Rating) error                                 { return nil }
+func (t *vTestTx) GetPostIndex() ([]models.PostData, error)                   { return nil, nil }
+func (t *vTestTx) SetPostIndex([]models.PostData) error                       { return nil }
+func (t *vTestTx) AddPost(*postsPb.SignedPost) error                          { return nil }
+func (t *vTestTx) DeletePost(string) error                                    { return nil }
+func (t *vTestTx) PostExist(string) bool                                      { return false }
+func (t *vTestTx) GetPost(string) (*postsPb.SignedPost, error)                { return nil, nil }
+func (t *vTestTx) SetImage(models.Image) error                                { return nil }
+func (t *vTestTx) GetImageByName(models.ImageSize, string) ([]byte, error)    { return nil, nil }
+func (t *vTestTx) GetMediaByCID(string) ([]byte, string, error)               { return nil, "", nil }
+func (t *vTestTx) IndexMediaCID(string, string, string, string, string) error { return nil }
+func (t *vTestTx) SetUploadedFile(models.UploadedFile) error                  { return nil }
+func (t *vTestTx) SetIntroVideo(models.IntroVideo) error                      { return nil }
+
+// recordingBus captures every emitted event for assertion. The verifier
+// only ever emits events.PaymentVerified so we keep the buffer
+// deliberately untyped.
+type recordingBus struct {
+	emitted []interface{}
+}
+
+func (b *recordingBus) Subscribe(_ interface{}, _ ...events.SubscriptionOpt) (events.Subscription, error) {
+	return nil, nil
+}
+func (b *recordingBus) Emit(evt interface{}) { b.emitted = append(b.emitted, evt) }
+
+// seedOrder writes a minimal-but-valid Order row whose OrderOpen carries
+// the supplied expected amount in smallest units. The order starts in
+// "pending verification" state to mirror what the dispatcher would
+// observe in production.
+func seedOrder(t *testing.T, db *vTestDB, orderID, expectedAmount, refundAddress string) {
+	t.Helper()
+	oo := &pb.OrderOpen{
+		Amount:      expectedAmount,
+		PricingCoin: "USDC",
+		Chaincode:   "11223344aabbccdd",
+		BuyerID:     &pb.ID{PeerID: "buyer-peer"},
+	}
+	raw, err := protojson.Marshal(oo)
+	require.NoError(t, err)
+
+	order := &models.Order{
+		TenantMixin:         models.TenantMixin{TenantID: database.StandaloneTenantID},
+		ID:                  models.OrderID(orderID),
+		MyRole:              string(models.RoleVendor),
+		SerializedOrderOpen: raw,
+		RefundAddress:       refundAddress,
+	}
+	order.MarkPaymentVerificationPending()
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+}
+
+// insertObs writes an observation row directly via GORM. We bypass the
+// repo so test setup stays self-contained.
+func insertObs(t *testing.T, db *vTestDB, obs models.PaymentObservation) {
+	t.Helper()
+	if obs.TenantID == "" {
+		obs.TenantID = database.StandaloneTenantID
+	}
+	if obs.Status == "" {
+		obs.Status = models.PaymentObservationStatusConfirmed
+	}
+	if obs.BlockTime.IsZero() {
+		obs.BlockTime = time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC)
+	}
+	if obs.Source == "" {
+		obs.Source = models.PaymentObservationSourceMonitor
+	}
+	if obs.Observer == "" {
+		obs.Observer = "monitor:eip155-1:worker-A"
+	}
+	require.NoError(t, db.gormDB.Create(&obs).Error)
+}
+
+func loadOrder(t *testing.T, db *vTestDB, orderID string) *models.Order {
+	t.Helper()
+	var order models.Order
+	require.NoError(t, db.gormDB.Where("id = ?", orderID).First(&order).Error)
+	return &order
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Constructor
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestNewAggregatingVerifier_NilDB_Panics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("expected panic on nil db")
+		}
+	}()
+	NewAggregatingVerifier(nil, &recordingBus{})
+}
+
+func TestNewAggregatingVerifier_NilBus_Panics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("expected panic on nil bus")
+		}
+	}()
+	NewAggregatingVerifier(newVerifierTestDB(t), nil)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — input validation
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestAggregateAndEmit_BlankInputs_Reject(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	require.ErrorContains(t, v.AggregateAndEmit(context.Background(), "", "order-1"), "tenantID must be set")
+	require.ErrorContains(t, v.AggregateAndEmit(context.Background(), "tenant", "  "), "orderID must be set")
+	require.Empty(t, bus.emitted, "validation rejection must not emit events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — log-and-skip cases
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestAggregateAndEmit_UnknownOrder_NoOp(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "missing-order"))
+	require.Empty(t, bus.emitted, "unknown order must be a silent no-op")
+}
+
+func TestAggregateAndEmit_NoObservations_StaysPending(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+	require.Empty(t, bus.emitted, "no observations means no verification, no event")
+
+	got := loadOrder(t, db, "order-1")
+	require.True(t, got.IsPaymentVerificationPending())
+	require.Equal(t, "0", got.TotalReceived)
+	require.Empty(t, got.OverpaidAmount)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — partial / exact / over flows
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestAggregateAndEmit_Partial_TotalRecordedNoEmit(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-1",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-partial",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "300",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+	require.Empty(t, bus.emitted)
+
+	got := loadOrder(t, db, "order-1")
+	require.True(t, got.IsPaymentVerificationPending())
+	require.Equal(t, "300", got.TotalReceived)
+	require.Empty(t, got.OverpaidAmount)
+	require.Empty(t, got.SerializedPaymentSent, "partial path must not freeze envelope")
+}
+
+func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+	frozen := time.Date(2026, 5, 14, 12, 30, 0, 0, time.UTC)
+	v.SetClock(func() time.Time { return frozen })
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-1",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-1",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-1",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "400",
+	})
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-2",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-2",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-2",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "600",
+		BlockTime:      time.Date(2026, 5, 14, 12, 5, 0, 0, time.UTC),
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+
+	require.Len(t, bus.emitted, 1)
+	verified, ok := bus.emitted[0].(events.PaymentVerified)
+	require.True(t, ok, "expected PaymentVerified event")
+	require.Equal(t, database.StandaloneTenantID, verified.TenantID)
+	require.Equal(t, "order-1", verified.OrderID)
+
+	got := loadOrder(t, db, "order-1")
+	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, "1000", got.TotalReceived)
+	require.Empty(t, got.OverpaidAmount, "exact match leaves OverpaidAmount empty")
+	require.NotEmpty(t, got.SerializedPaymentSent)
+
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Equal(t, "1000", ps.Amount)
+	require.Equal(t, "USDC", ps.Coin)
+	require.Equal(t, "0xrefund", ps.RefundAddress)
+	// The latest observation is obs-2 (later block time), so its tx
+	// hash and payer address represent the envelope.
+	require.Equal(t, "0xtx-2", ps.TransactionID)
+	require.Equal(t, "0xpayer-2", ps.PayerAddress)
+	require.Equal(t, "0xmanagedescrow", ps.ToAddress)
+	require.Equal(t, "0xusdc", ps.PaymentTokenAddress)
+	require.Equal(t, pb.PaymentSent_DIRECT, ps.Method)
+	require.Equal(t, frozen.Unix(), ps.Timestamp.AsTime().Unix())
+}
+
+func TestAggregateAndEmit_Overpaid_RecordsSurplus(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-1",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-over",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "1500",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+
+	require.Len(t, bus.emitted, 1)
+	got := loadOrder(t, db, "order-1")
+	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, "1500", got.TotalReceived)
+	require.Equal(t, "500", got.OverpaidAmount)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — observation source priority
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestAggregateAndEmit_DedupesByObserverPriority(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+	// Two observations, same chain event, different observers. The
+	// monitor row must win and its 1000 is what counts toward the
+	// expected amount; if we accidentally summed both rows the total
+	// would be 2000 and we'd record an OverpaidAmount.
+	common := models.PaymentObservation{
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-shared",
+		EventIndex:     0,
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "1000",
+	}
+	monitor := common
+	monitor.ID = "obs-monitor"
+	monitor.Source = models.PaymentObservationSourceMonitor
+	monitor.Observer = "monitor:eip155-1:worker-A"
+	insertObs(t, db, monitor)
+
+	buyer := common
+	buyer.ID = "obs-buyer"
+	buyer.Source = models.PaymentObservationSourceBuyerReported
+	buyer.Observer = "buyer:peer-1"
+	insertObs(t, db, buyer)
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+
+	require.Len(t, bus.emitted, 1)
+	got := loadOrder(t, db, "order-1")
+	require.Equal(t, "1000", got.TotalReceived)
+	require.Empty(t, got.OverpaidAmount, "dedupe must collapse the two observers to one row")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — idempotency
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestAggregateAndEmit_AlreadyVerified_SkipsEmitButRefreshesTotals(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-1",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-1",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-1",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "1000",
+	})
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+	require.Len(t, bus.emitted, 1)
+
+	// Capture the envelope before the late deposit lands; we'll later
+	// assert that AggregateAndEmit did NOT rewrite it, since the
+	// envelope is the chain-of-trust target for downstream consumers.
+	before := loadOrder(t, db, "order-1")
+	frozenEnvelope := append([]byte(nil), before.SerializedPaymentSent...)
+
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-2",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-2",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-2",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "250",
+		BlockTime:      time.Date(2026, 5, 14, 13, 0, 0, 0, time.UTC),
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+	require.Len(t, bus.emitted, 1, "second pass must not re-emit PaymentVerified")
+
+	got := loadOrder(t, db, "order-1")
+	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, "1250", got.TotalReceived, "late deposit must update TotalReceived")
+	require.Equal(t, "250", got.OverpaidAmount, "late deposit becomes overpayment")
+	require.Equal(t, frozenEnvelope, got.SerializedPaymentSent, "envelope is frozen at first verification")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — bad data surfaces errors
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestAggregateAndEmit_InvalidExpectedAmount_Errors(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	// OrderOpen with a non-numeric amount.
+	oo := &pb.OrderOpen{Amount: "abc", PricingCoin: "USDC"}
+	raw, err := protojson.Marshal(oo)
+	require.NoError(t, err)
+	order := &models.Order{
+		TenantMixin:         models.TenantMixin{TenantID: database.StandaloneTenantID},
+		ID:                  "bad-amount-order",
+		MyRole:              string(models.RoleVendor),
+		SerializedOrderOpen: raw,
+	}
+	order.MarkPaymentVerificationPending()
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(order) }))
+
+	err = v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "bad-amount-order")
+	require.Error(t, err)
+	require.True(t, strings.Contains(err.Error(), "not a decimal integer"), err.Error())
+	require.Empty(t, bus.emitted)
+}
+
+func TestAggregateAndEmit_NegativeObservation_Errors(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-bad",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-bad",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "-100",
+	})
+
+	err := v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "negative amount")
+	require.Empty(t, bus.emitted)
+}

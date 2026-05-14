@@ -172,6 +172,24 @@ type OrderPaymentState struct {
 
 	PaymentVerificationFailedAt *time.Time `gorm:"column:payment_verification_failed_at"`
 
+	// TotalReceived is the running sum of confirmed-and-deduplicated
+	// PaymentObservation rows for this order, encoded as a decimal string in
+	// the smallest unit (wei / sat / atomic units / lamports). Empty string
+	// is read as zero. The AggregatingVerifier writes this column on every
+	// AggregateAndEmit pass so the dashboard / refund flow can show
+	// "you've paid 6 of 10 USDC" without re-running the dedupe.
+	//
+	// For full / over-paid orders this equals or exceeds the expected
+	// amount; for partial orders it reflects the in-flight subtotal.
+	TotalReceived string `gorm:"column:total_received;type:text"`
+
+	// OverpaidAmount is max(0, TotalReceived - expected) committed at
+	// verification time. It only carries a non-zero value when the buyer
+	// actually overpaid; the field is reset to "" on the partial path and
+	// stays at "" for exact matches. Refund / sweep flows read this value
+	// to decide whether to issue an excess refund (D-Hybrid-26).
+	OverpaidAmount string `gorm:"column:overpaid_amount;type:text"`
+
 	FiatPaymentState `gorm:"embedded"`
 }
 

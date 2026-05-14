@@ -135,11 +135,26 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 	// to prevent hijacking. During first-run setup (plaintext file still
 	// exists from EnsureStandaloneAuth), allow unauthenticated access so
 	// the embedded Setup Wizard can work.
+	//
+	// Fail closed on stat errors other than ErrNotExist (EACCES, EIO, ELOOP,
+	// ENOTDIR with non-existent ancestor, …) — we cannot prove we are still
+	// in the bootstrap window, so we must not allow an unauthenticated
+	// password rotation.
 	if g.auth.isConfigured() && GetAuthIdentity(r.Context()) == nil {
 		plainPath := AdminPasswordPlaintextPath(dataDir)
-		if _, err := os.Stat(plainPath); errors.Is(err, os.ErrNotExist) {
+		_, err := os.Stat(plainPath)
+		switch {
+		case err == nil:
+			// Bootstrap window: plaintext file still on disk; wizard may
+			// proceed without auth.
+		case errors.Is(err, os.ErrNotExist):
 			response.Error(w, http.StatusUnauthorized, response.CodeUnauthorized,
 				"Authentication required — admin password already configured")
+			return
+		default:
+			log.Errorf("standalone setup: stat %s failed: %v", plainPath, err)
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
+				"Cannot verify setup state")
 			return
 		}
 	}

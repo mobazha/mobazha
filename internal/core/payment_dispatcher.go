@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"errors"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -11,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -98,6 +100,65 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.orderService.SetReceiptVerifier(compositeVerifier)
 	}
 
+	n.registerManagedEscrowAdapterShadow()
+}
+
+// registerManagedEscrowAdapterShadow constructs ManagedEscrowAdapter instances for the
+// Ready EVM chains and registers them via Registry.RegisterV2 alongside
+// the canonical V1 EVMChainOps entries (Phase EVM-ManagedEscrow v0.3.0 — Sprint
+// 2 D17 shadow stage).
+//
+// Shadow registration is intentionally non-functional for live payment
+// paths: V1 ForCoin lookups remain canonical and the V2 lookup path has
+// no production caller today. Real Relayer / OwnerProvider /
+// NonceProvider land in a follow-up commit. Until then, accidental V2
+// invocations surface ErrRelayerNotConfigured (Submit/GasWallet) or
+// errManagedEscrowStubNotImplemented (SetupPayment/Confirm/Cancel/Complete/
+// DisputeRelease) instead of silently broadcasting; GetActionStatus is
+// the only surface fully wired here, against an in-memory store.
+//
+// Skipped when keyProvider or multiwallet is nil (unit tests that build
+// a stripped-down MobazhaNode); production builds always have both.
+func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
+	if n.keyProvider == nil || n.multiwallet == nil {
+		logger.LogInfoWithIDf(log, n.nodeID,
+			"ManagedEscrowAdapter shadow registration skipped (deps unavailable: keyProvider=%v multiwallet=%v)",
+			n.keyProvider != nil, n.multiwallet != nil)
+		return
+	}
+
+	store := adapters.NewMemoryActionStore()
+	deps := adapters.ManagedEscrowAdapterDeps{
+		Relayer:     managed_escrow.NoopRelayer(),
+		Keys:        n.keyProvider,
+		Multiwallet: n.multiwallet,
+		ActionStore: store,
+	}
+
+	shadow := make(map[iwallet.ChainType]*adapters.ManagedEscrowAdapter, len(evmChains))
+	for _, chain := range evmChains {
+		adapter, err := adapters.NewManagedEscrowAdapter(chain, deps)
+		if err != nil {
+			// Distinguish "chain not yet promoted to Ready" (expected
+			// while the matrix is phasing in) from "wiring bug" (action
+			// required) so operators can triage at a glance.
+			if errors.Is(err, adapters.ErrManagedEscrowChainNotReady) {
+				logger.LogInfoWithIDf(log, n.nodeID,
+					"ManagedEscrowAdapter shadow registration skipped for chain %s — not in Ready matrix yet (%v)", chain, err)
+			} else {
+				logger.LogErrorWithIDf(log, n.nodeID,
+					"ManagedEscrowAdapter shadow registration FAILED for chain %s: %v", chain, err)
+			}
+			continue
+		}
+		n.paymentRegistry.RegisterV2(chain, adapter)
+		shadow[chain] = adapter
+	}
+
+	n.managed_escrowActionStore = store
+	n.managedEscrowAdapters = shadow
+	logger.LogInfoWithIDf(log, n.nodeID,
+		"ManagedEscrowAdapter shadow registered for %d EVM chains (V1 path canonical)", len(shadow))
 }
 
 // ── Thin delegates for strategy callbacks ────────────────────────────────

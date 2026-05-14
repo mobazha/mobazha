@@ -1,8 +1,11 @@
 package core
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -273,5 +276,138 @@ func TestDispatchCancelablePayment_FiatIsNotDispatched(t *testing.T) {
 	cat := classifyCoin(iwallet.CtFiat)
 	if cat != categoryUnknown {
 		t.Errorf("Fiat should be 'unknown' in cancelable dispatch (uses webhook flow), got %s", cat)
+	}
+}
+
+// ── ManagedEscrowAdapter shadow registration (Sprint 2 D17) ──────────────────────
+//
+// Pin down the contract registerManagedEscrowAdapterShadow upholds while V1
+// EVMChainOps remains canonical: V1 ForCoin lookups untouched, V2
+// ForChainV2 returns the ManagedEscrowAdapter verbatim, GetActionStatus is wired
+// against an in-memory store, and missing deps skip registration cleanly.
+
+// nodeWithManagedEscrowShadowDeps builds a MobazhaNode with just the deps
+// registerManagedEscrowAdapterShadow needs (keyProvider, multiwallet).
+func nodeWithManagedEscrowShadowDeps() *MobazhaNode {
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-shadow"}}
+	n.keyProvider = &mockKeyProvider{}
+	n.multiwallet = &mockWalletOperator{}
+	return n
+}
+
+func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
+	n := nodeWithManagedEscrowShadowDeps()
+	n.registerPaymentStrategies()
+
+	if n.managed_escrowActionStore == nil {
+		t.Fatal("registerManagedEscrowAdapterShadow did not populate managed_escrowActionStore")
+	}
+	if got := len(n.managedEscrowAdapters); got != len(evmChains) {
+		t.Fatalf("managedEscrowAdapters has %d entries, want %d (one per evmChains)", got, len(evmChains))
+	}
+	for _, chain := range evmChains {
+		adapter, ok := n.managedEscrowAdapters[chain]
+		if !ok {
+			t.Errorf("managedEscrowAdapters missing chain %s", chain)
+			continue
+		}
+		if adapter == nil {
+			t.Errorf("managedEscrowAdapters[%s] is nil", chain)
+			continue
+		}
+		if adapter.Chain() != chain {
+			t.Errorf("managedEscrowAdapters[%s].Chain() = %s, want %s", chain, adapter.Chain(), chain)
+		}
+	}
+}
+
+func TestManagedEscrowAdapterShadow_V1PathRemainsCanonical(t *testing.T) {
+	n := nodeWithManagedEscrowShadowDeps()
+	n.registerPaymentStrategies()
+
+	// Asserting strategy.Model() == PaymentModelClientSigned pins down
+	// both "shadow did not hide V1" and "shadow did not promote a wrong
+	// strategy into the EVM slot" in one pass.
+	for _, coin := range []iwallet.CoinType{
+		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin,
+	} {
+		strategy, err := n.paymentRegistry.ForCoin(coin)
+		if err != nil {
+			t.Errorf("ForCoin(%s): %v", coin, err)
+			continue
+		}
+		if strategy == nil {
+			t.Errorf("ForCoin(%s) returned nil strategy", coin)
+			continue
+		}
+		if strategy.Model() != payment.PaymentModelClientSigned {
+			t.Errorf("ForCoin(%s).Model() = %s, want %s — V1 EVMChainOps should still be the canonical strategy",
+				coin, strategy.Model(), payment.PaymentModelClientSigned)
+		}
+	}
+}
+
+func TestManagedEscrowAdapterShadow_V2LookupReturnsManagedEscrowAdapter(t *testing.T) {
+	n := nodeWithManagedEscrowShadowDeps()
+	n.registerPaymentStrategies()
+
+	for chain, want := range n.managedEscrowAdapters {
+		got, err := n.paymentRegistry.ForChainV2(chain)
+		if err != nil {
+			t.Errorf("ForChainV2(%s): %v", chain, err)
+			continue
+		}
+		gotManagedEscrow, ok := got.(*adapters.ManagedEscrowAdapter)
+		if !ok {
+			t.Errorf("ForChainV2(%s) returned %T; expected *adapters.ManagedEscrowAdapter", chain, got)
+			continue
+		}
+		if gotManagedEscrow != want {
+			t.Errorf("ForChainV2(%s) returned different ManagedEscrowAdapter pointer than the one in managedEscrowAdapters map", chain)
+		}
+	}
+}
+
+func TestManagedEscrowAdapterShadow_GetActionStatusReportsActionNotFound(t *testing.T) {
+	n := nodeWithManagedEscrowShadowDeps()
+	n.registerPaymentStrategies()
+
+	// Loop every Ready EVM chain so a per-chain wiring regression
+	// cannot slip past on a chain we did not name explicitly.
+	for _, chain := range evmChains {
+		t.Run(string(chain), func(t *testing.T) {
+			adapter, ok := n.managedEscrowAdapters[chain]
+			if !ok {
+				t.Fatalf("expected ManagedEscrowAdapter for %s after shadow registration", chain)
+			}
+			_, err := adapter.GetActionStatus(context.Background(), "unknown-action-id")
+			if !errors.Is(err, payment.ErrActionNotFound) {
+				t.Fatalf("GetActionStatus(unknown) on %s = %v, want payment.ErrActionNotFound", chain, err)
+			}
+		})
+	}
+}
+
+func TestManagedEscrowAdapterShadow_SkippedWhenDepsMissing(t *testing.T) {
+	// Existing tests exercise the deps-missing path implicitly (bare
+	// MobazhaNode); make the invariant explicit so a future refactor
+	// cannot silently start requiring keyProvider/multiwallet here.
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-shadow-skipped"}}
+	n.registerPaymentStrategies()
+
+	if n.managed_escrowActionStore != nil {
+		t.Error("managed_escrowActionStore should be nil when shadow registration is skipped")
+	}
+	if n.managedEscrowAdapters != nil {
+		t.Errorf("managedEscrowAdapters should be nil when shadow registration is skipped, got %d entries", len(n.managedEscrowAdapters))
+	}
+
+	// V1 EVM strategies must still be present.
+	for _, coin := range []iwallet.CoinType{
+		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin,
+	} {
+		if _, err := n.paymentRegistry.ForCoin(coin); err != nil {
+			t.Errorf("ForCoin(%s) after shadow skip: %v", coin, err)
+		}
 	}
 }

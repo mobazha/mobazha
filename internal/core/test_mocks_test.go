@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"sync"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -15,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/media"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -138,6 +140,30 @@ func (m *mockKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error) {
 func (m *mockKeyProvider) DigitalContentMasterKey(version int) ([]byte, error) {
 	return make([]byte, 32), nil
 }
+
+// ── mockWalletOperator ──────────────────────────────────────────
+//
+// A no-op contracts.WalletOperator used when tests need to satisfy
+// the dependency surface (e.g., ManagedEscrowAdapter shadow registration in
+// registerPaymentStrategies) without standing up a real multiwallet.
+// Every wallet lookup returns errMockWalletUnsupported so any unintended
+// payment path fails loudly rather than silently no-oping.
+
+type mockWalletOperator struct{}
+
+var _ contracts.WalletOperator = (*mockWalletOperator)(nil)
+
+var errMockWalletUnsupported = errors.New("mockWalletOperator: wallet not supported")
+
+func (m *mockWalletOperator) WalletForCurrencyCode(_ string) (iwallet.Wallet, error) {
+	return nil, errMockWalletUnsupported
+}
+func (m *mockWalletOperator) WalletForChain(_ iwallet.ChainType) (iwallet.Wallet, bool) {
+	return nil, false
+}
+func (m *mockWalletOperator) SupportedChains() []iwallet.ChainType { return nil }
+func (m *mockWalletOperator) Start() error                         { return nil }
+func (m *mockWalletOperator) Close() error                         { return nil }
 
 // ── helpers ─────────────────────────────────────────────────────
 

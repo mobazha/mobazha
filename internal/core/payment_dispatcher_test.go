@@ -9,6 +9,7 @@ import (
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -301,6 +302,23 @@ func nodeWithManagedEscrowShadowDeps() *MobazhaNode {
 	return n
 }
 
+// readyEVMChains returns the subset of evmChains whose ManagedEscrowAdapter
+// shadow registration is expected to succeed. zkSync Era stays in
+// evmChains for the multiwallet/EVM-client wiring but its
+// chainMatrix Ready flag is false, so registerManagedEscrowAdapterShadow MUST
+// skip it (the V1 ClientSigned path remains canonical for it too;
+// the higher-level guard is exercised separately below).
+func readyEVMChains(t *testing.T) []iwallet.ChainType {
+	t.Helper()
+	out := make([]iwallet.ChainType, 0, len(evmChains))
+	for _, c := range evmChains {
+		if _, ok := managed_escrow.PolicyFor(c); ok {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
 	n := nodeWithManagedEscrowShadowDeps()
 	n.registerPaymentStrategies()
@@ -308,10 +326,11 @@ func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
 	if n.managed_escrowActionStore == nil {
 		t.Fatal("registerManagedEscrowAdapterShadow did not populate managed_escrowActionStore")
 	}
-	if got := len(n.managedEscrowAdapters); got != len(evmChains) {
-		t.Fatalf("managedEscrowAdapters has %d entries, want %d (one per evmChains)", got, len(evmChains))
+	want := readyEVMChains(t)
+	if got := len(n.managedEscrowAdapters); got != len(want) {
+		t.Fatalf("managedEscrowAdapters has %d entries, want %d (one per Ready=true EVM chain — zkSync Era is intentionally Ready=false)", got, len(want))
 	}
-	for _, chain := range evmChains {
+	for _, chain := range want {
 		adapter, ok := n.managedEscrowAdapters[chain]
 		if !ok {
 			t.Errorf("managedEscrowAdapters missing chain %s", chain)
@@ -323,6 +342,17 @@ func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
 		}
 		if adapter.Chain() != chain {
 			t.Errorf("managedEscrowAdapters[%s].Chain() = %s, want %s", chain, adapter.Chain(), chain)
+		}
+	}
+	// And the converse: not-Ready EVM chains MUST be absent so the
+	// ManagedEscrowAdapter cannot quietly serve a chain whose deployments row
+	// is missing.
+	for _, chain := range evmChains {
+		if _, ok := managed_escrow.PolicyFor(chain); ok {
+			continue
+		}
+		if _, registered := n.managedEscrowAdapters[chain]; registered {
+			t.Errorf("managedEscrowAdapters has Ready=false chain %s registered — shadow registration ignored chainMatrix gate", chain)
 		}
 	}
 }
@@ -378,9 +408,10 @@ func TestManagedEscrowAdapterShadow_GetActionStatusReportsActionNotFound(t *test
 	n := nodeWithManagedEscrowShadowDeps()
 	n.registerPaymentStrategies()
 
-	// Loop every Ready EVM chain so a per-chain wiring regression
-	// cannot slip past on a chain we did not name explicitly.
-	for _, chain := range evmChains {
+	// Loop every Ready=true EVM chain so a per-chain wiring regression
+	// cannot slip past on a chain we did not name explicitly. zkSync
+	// Era is intentionally skipped — see TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains.
+	for _, chain := range readyEVMChains(t) {
 		t.Run(string(chain), func(t *testing.T) {
 			adapter, ok := n.managedEscrowAdapters[chain]
 			if !ok {

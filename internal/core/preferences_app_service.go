@@ -46,6 +46,16 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 		return fmt.Errorf("%w: invalid moderator ID", coreiface.ErrBadRequest)
 	}
 
+	// DG-1.11: cap the per-store digital-good review window override.
+	// 0 = use ContractType default (3d). Values >0 are honoured by
+	// ResolvePolicyForOrder ONLY when they extend (>= default) the window.
+	// Reject anything above the protocol-wide ceiling to prevent abusive
+	// long holds that would erode buyer trust.
+	if prefs.DigitalGoodReviewWindowDays > models.MaxDigitalGoodReviewWindowDays {
+		return fmt.Errorf("%w: digitalGoodReviewWindowDays must be between 0 and %d",
+			coreiface.ErrBadRequest, models.MaxDigitalGoodReviewWindowDays)
+	}
+
 	shippingProfiles, err := prefs.GetShippingProfiles()
 	if err != nil {
 		return fmt.Errorf("%w: invalid shipping profiles", coreiface.ErrBadRequest)

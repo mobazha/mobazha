@@ -30,7 +30,18 @@ type UserPreferences struct {
 	EmailNotifications  string  `json:"emailNotifications"`
 	PrefCurrencies      []byte  `json:"preferredCurrencies"`
 	ChannelSubs         []byte  `json:"channelSubscriptions"`
+
+	// DigitalGoodReviewWindowDays is the seller's preferred buyer-protection
+	// window for DIGITAL_GOOD orders, in days. Range 1-7; 0 = use the
+	// ContractType default (currently 3d). Snapshotted into Order at
+	// creation time via ResolvePolicyForOrder (DG-1.11).
+	DigitalGoodReviewWindowDays uint32 `json:"digitalGoodReviewWindowDays"`
 }
+
+// MaxDigitalGoodReviewWindowDays caps the per-store buyer-protection override
+// for digital goods. Values above this are rejected by the preferences API to
+// prevent footgun configurations that erode buyer trust.
+const MaxDigitalGoodReviewWindowDays uint32 = 7
 
 type AddressEnablement struct {
 	Address string `json:"address"`
@@ -238,6 +249,8 @@ type prefsJSON struct {
 	EmailNotifications       string                       `json:"emailNotifications"`
 	PreferredCurrencies      []string                     `json:"preferredCurrencies"`
 	ChannelSubscriptions     []string                     `json:"channelSubscriptions"`
+
+	DigitalGoodReviewWindowDays uint32 `json:"digitalGoodReviewWindowDays"`
 }
 
 func (prefs *UserPreferences) GetShippingAddresses() ([]shippingAddress, error) {
@@ -540,6 +553,7 @@ func (prefs *UserPreferences) MarshalJSON() ([]byte, error) {
 	c0.EmailNotifications = prefs.EmailNotifications
 	c0.PreferredCurrencies, _ = prefs.PreferredCurrencies()
 	c0.ChannelSubscriptions, _ = prefs.ChannelSubscriptions()
+	c0.DigitalGoodReviewWindowDays = prefs.DigitalGoodReviewWindowDays
 
 	return json.Marshal(c0)
 }
@@ -601,6 +615,7 @@ func (prefs *UserPreferences) UnmarshalJSON(b []byte) error {
 		prefs.EmailNotifications = c0.EmailNotifications
 		prefs.PrefCurrencies = preferredCurrencies
 		prefs.ChannelSubs = channelSubscriptions
+		prefs.DigitalGoodReviewWindowDays = c0.DigitalGoodReviewWindowDays
 	}
 
 	return err

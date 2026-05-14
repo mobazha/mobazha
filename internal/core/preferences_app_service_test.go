@@ -109,6 +109,40 @@ func TestPreferencesAppService_SavePreferences_InvalidCurrency(t *testing.T) {
 	assert.Contains(t, err.Error(), "not valid")
 }
 
+// DG-1.11: digital-good review window override validation.
+func TestPreferencesAppService_SavePreferences_DigitalGoodReviewWindow(t *testing.T) {
+	tests := []struct {
+		name    string
+		days    uint32
+		wantErr bool
+	}{
+		{"zero uses default", 0, false},
+		{"valid lower bound", 1, false},
+		{"valid mid range", 5, false},
+		{"valid upper bound", 7, false},
+		{"exceeds ceiling", 8, true},
+		{"way out of range", 30, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := newTestPreferencesAppService(t)
+			prefs := &models.UserPreferences{
+				DigitalGoodReviewWindowDays: tc.days,
+			}
+			err := svc.SavePreferences(prefs, nil)
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "digitalGoodReviewWindowDays")
+			} else {
+				assert.NoError(t, err)
+				saved, gerr := svc.GetPreferences()
+				require.NoError(t, gerr)
+				assert.Equal(t, tc.days, saved.DigitalGoodReviewWindowDays)
+			}
+		})
+	}
+}
+
 // ── BlockNode / UnblockNode ─────────────────────────────────────
 
 func TestPreferencesAppService_BlockNode(t *testing.T) {

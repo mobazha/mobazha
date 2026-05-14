@@ -43,7 +43,7 @@ func (s *OrderAppService) ExtendProtection(orderID models.OrderID) (*models.Orde
 		return nil, ErrOrderNotInProtectionPeriod
 	}
 
-	policy := models.DefaultProtectionPolicy(order.ContractType())
+	policy := models.ResolvePolicyForOrder(&order)
 	if policy.ExtendProtectionDays <= 0 {
 		return nil, ErrProtectionNotExtendable
 	}

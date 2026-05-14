@@ -375,6 +375,113 @@ func TestComputeProtection_Shipped_NotExtended_Extendable(t *testing.T) {
 	}
 }
 
+// ── ResolvePolicyForOrder tests (DG-1.11) ────────────────────────────────
+
+// makeContractOrder builds an Order whose ContractType() returns the given
+// type by serialising a minimal OrderOpen into SerializedOrderOpen via the
+// package-shared protojson marshaler.
+func makeContractOrder(t *testing.T, ct pb.Listing_Metadata_ContractType, override uint32) *Order {
+	t.Helper()
+	orderOpen := &pb.OrderOpen{
+		Listings: []*pb.SignedListing{
+			{Listing: &pb.Listing{Metadata: &pb.Listing_Metadata{ContractType: ct}}},
+		},
+	}
+	serialized, err := marshaler.Marshal(orderOpen)
+	if err != nil {
+		t.Fatalf("marshal OrderOpen: %v", err)
+	}
+	return &Order{
+		SerializedOrderOpen: serialized,
+		OrderLifecycle:      OrderLifecycle{AutoCompleteAfterShipDaysOverride: override},
+	}
+}
+
+func TestResolvePolicyForOrder_NilOrder(t *testing.T) {
+	p := ResolvePolicyForOrder(nil)
+	expected := DefaultProtectionPolicy(pb.Listing_Metadata_PHYSICAL_GOOD)
+	if p.AutoCompleteAfterShipDays != expected.AutoCompleteAfterShipDays {
+		t.Errorf("nil order: AutoCompleteAfterShipDays = %d, want %d",
+			p.AutoCompleteAfterShipDays, expected.AutoCompleteAfterShipDays)
+	}
+}
+
+func TestResolvePolicyForOrder_DigitalGoodNoOverride(t *testing.T) {
+	o := makeContractOrder(t, pb.Listing_Metadata_DIGITAL_GOOD, 0)
+	p := ResolvePolicyForOrder(o)
+	if p.AutoCompleteAfterShipDays != 3 {
+		t.Errorf("AutoCompleteAfterShipDays = %d, want 3 (DIGITAL_GOOD default)", p.AutoCompleteAfterShipDays)
+	}
+}
+
+func TestResolvePolicyForOrder_DigitalGoodExtendOverride(t *testing.T) {
+	// Override is honoured only when it EXTENDS the buyer-protection window.
+	for _, override := range []uint32{4, 5, 7} {
+		o := makeContractOrder(t, pb.Listing_Metadata_DIGITAL_GOOD, override)
+		p := ResolvePolicyForOrder(o)
+		if p.AutoCompleteAfterShipDays != int(override) {
+			t.Errorf("override=%d: AutoCompleteAfterShipDays = %d, want %d",
+				override, p.AutoCompleteAfterShipDays, override)
+		}
+		// Other fields must remain at the DIGITAL_GOOD defaults — override
+		// should only touch AutoCompleteAfterShipDays.
+		if p.MaxShipDays != 3 {
+			t.Errorf("override=%d: MaxShipDays = %d, want 3", override, p.MaxShipDays)
+		}
+		if p.AfterSaleWindowDays != 7 {
+			t.Errorf("override=%d: AfterSaleWindowDays = %d, want 7", override, p.AfterSaleWindowDays)
+		}
+	}
+}
+
+func TestResolvePolicyForOrder_DigitalGoodShortenOverrideClampedToDefault(t *testing.T) {
+	// Trust safety: override cannot SHORTEN the buyer-protection window.
+	// A value below the ContractType default is silently clamped — buyers
+	// always get at least the default 3-day window.
+	for _, override := range []uint32{1, 2, 3} {
+		o := makeContractOrder(t, pb.Listing_Metadata_DIGITAL_GOOD, override)
+		p := ResolvePolicyForOrder(o)
+		if p.AutoCompleteAfterShipDays != 3 {
+			t.Errorf("override=%d: AutoCompleteAfterShipDays = %d, want 3 (clamped to default)",
+				override, p.AutoCompleteAfterShipDays)
+		}
+	}
+}
+
+func TestResolvePolicyForOrder_PhysicalGoodIgnoresOverride(t *testing.T) {
+	// Override snapshot should never apply to PHYSICAL_GOOD orders even if
+	// (somehow) populated — Phase 1.1 ships DIGITAL_GOOD only.
+	o := makeContractOrder(t, pb.Listing_Metadata_PHYSICAL_GOOD, 5)
+	p := ResolvePolicyForOrder(o)
+	if p.AutoCompleteAfterShipDays != 14 {
+		t.Errorf("PHYSICAL_GOOD with override: AutoCompleteAfterShipDays = %d, want 14",
+			p.AutoCompleteAfterShipDays)
+	}
+}
+
+func TestComputeProtection_DigitalGoodOverrideExtendsWindow(t *testing.T) {
+	shippedAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	o := makeContractOrder(t, pb.Listing_Metadata_DIGITAL_GOOD, 5) // 5d window (extended from default 3)
+	o.State = OrderState_SHIPPED
+	o.ShippedAt = &shippedAt
+
+	now := time.Date(2026, 3, 2, 12, 0, 0, 0, time.UTC) // 24h after shipment
+	info := o.ComputeProtection(now)
+	if info == nil {
+		t.Fatal("expected non-nil protection info")
+	}
+	if info.AutoCompleteAt == nil {
+		t.Fatal("expected non-nil AutoCompleteAt")
+	}
+	expectedDeadline := shippedAt.Add(5 * 24 * time.Hour) // 5 days, not 3
+	if !info.AutoCompleteAt.Equal(expectedDeadline) {
+		t.Errorf("AutoCompleteAt = %v, want %v", info.AutoCompleteAt, expectedDeadline)
+	}
+	if info.DaysRemaining != 4 {
+		t.Errorf("DaysRemaining = %d, want 4 (5d - 1d elapsed)", info.DaysRemaining)
+	}
+}
+
 func TestDaysUntil(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -43,7 +43,7 @@ func (s *OrderAppService) autoCompleteShippedOrders() {
 			continue
 		}
 
-		policy := models.DefaultProtectionPolicy(order.ContractType())
+		policy := models.ResolvePolicyForOrder(order)
 		totalDuration := policy.AutoCompleteDuration()
 		if order.ProtectionExtendedAt != nil {
 			totalDuration += time.Duration(policy.ExtendProtectionDays) * 24 * time.Hour
@@ -137,7 +137,7 @@ func (s *OrderAppService) autoRefundUnshippedOrders() {
 	for i := range orders {
 		order := &orders[i]
 
-		policy := models.DefaultProtectionPolicy(order.ContractType())
+		policy := models.ResolvePolicyForOrder(order)
 		deadline := order.PaidAt.Add(policy.MaxShipDuration())
 		if now.Before(deadline) {
 			continue
@@ -266,7 +266,7 @@ func (s *OrderAppService) emitAutoCompleteReminders(now time.Time) {
 		if !order.CanComplete() {
 			continue
 		}
-		policy := models.DefaultProtectionPolicy(order.ContractType())
+		policy := models.ResolvePolicyForOrder(order)
 		totalDuration := policy.AutoCompleteDuration()
 		if order.ProtectionExtendedAt != nil {
 			totalDuration += time.Duration(policy.ExtendProtectionDays) * 24 * time.Hour
@@ -296,7 +296,7 @@ func (s *OrderAppService) emitAutoRefundReminders(now time.Time) {
 
 	for i := range orders {
 		order := &orders[i]
-		policy := models.DefaultProtectionPolicy(order.ContractType())
+		policy := models.ResolvePolicyForOrder(order)
 		deadline := order.PaidAt.Add(policy.MaxShipDuration())
 
 		for _, reminderDay := range policy.ReminderBeforeDays {

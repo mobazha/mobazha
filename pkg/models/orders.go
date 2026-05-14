@@ -131,6 +131,14 @@ type OrderLifecycle struct {
 	// ProtectionExtendedAt records when the buyer extended the protection period.
 	// When set, autoCompleteAfterShipDays is increased by ExtendProtectionDays.
 	ProtectionExtendedAt *time.Time
+
+	// AutoCompleteAfterShipDaysOverride snapshots the seller's per-store
+	// review-window preference at order-creation time (DG-1.11). When >0, this
+	// value replaces ContractType-default AutoCompleteAfterShipDays in
+	// ResolvePolicyForOrder. Snapshot semantics ensure that mid-flight changes
+	// to UserPreferences cannot retroactively shorten or lengthen an existing
+	// order's buyer-protection window. 0 = use ContractType default.
+	AutoCompleteAfterShipDaysOverride uint32 `gorm:"column:auto_complete_after_ship_days_override"`
 }
 
 // FiatPaymentState groups fiat-provider specific payment state.

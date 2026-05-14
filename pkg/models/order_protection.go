@@ -79,6 +79,31 @@ func DefaultProtectionPolicy(ct pb.Listing_Metadata_ContractType) OrderProtectio
 	return defaultProtectionPolicies[pb.Listing_Metadata_PHYSICAL_GOOD]
 }
 
+// ResolvePolicyForOrder returns the effective buyer-protection policy for an
+// order, applying the per-store override snapshotted at order-creation time
+// (DG-1.11). Currently only DIGITAL_GOOD honours the override; other contract
+// types fall through to the ContractType default.
+//
+// Trust safety: the override is honoured only when it would EXTEND the
+// buyer-protection window beyond the ContractType default. A shorter
+// override is silently clamped to the default to avoid eroding buyer trust
+// (and to avoid bogus state if a UI ever populates a too-small value).
+//
+// For nil orders this delegates to DefaultProtectionPolicy(PHYSICAL_GOOD) so
+// callers in transient/test contexts don't crash.
+func ResolvePolicyForOrder(order *Order) OrderProtectionPolicy {
+	if order == nil {
+		return DefaultProtectionPolicy(pb.Listing_Metadata_PHYSICAL_GOOD)
+	}
+	policy := DefaultProtectionPolicy(order.ContractType())
+	if order.AutoCompleteAfterShipDaysOverride > 0 &&
+		order.ContractType() == pb.Listing_Metadata_DIGITAL_GOOD &&
+		int(order.AutoCompleteAfterShipDaysOverride) > policy.AutoCompleteAfterShipDays {
+		policy.AutoCompleteAfterShipDays = int(order.AutoCompleteAfterShipDaysOverride)
+	}
+	return policy
+}
+
 // Protection stage constants returned by ComputeProtection.
 const (
 	ProtectionStageEscrowed         = "ESCROWED"
@@ -103,7 +128,7 @@ type OrderProtectionInfo struct {
 // Returns nil for states where protection is not applicable (PENDING,
 // AWAITING_PAYMENT, AWAITING_PAYMENT_VERIFICATION, CANCELED, DECLINED, REFUNDED, etc.).
 func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
-	policy := DefaultProtectionPolicy(o.ContractType())
+	policy := ResolvePolicyForOrder(o)
 
 	switch o.State {
 	case OrderState_AWAITING_SHIPMENT:

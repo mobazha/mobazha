@@ -147,6 +147,29 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 		return nil, err
 	}
 
+	// DG-1.11: snapshot the seller's per-store digital-good review window into
+	// the Order so subsequent buyer-protection calculations use the policy in
+	// effect at order-creation time. Snapshot only when:
+	//   1. We are the vendor (the override lives in *our* UserPreferences); AND
+	//   2. The listing is a DIGITAL_GOOD; AND
+	//   3. The seller has actually configured a non-zero override.
+	// ResolvePolicyForOrder additionally clamps the override to >= the
+	// ContractType default to prevent shortening the buyer-protection window.
+	// Soft-fail: a missing/unreadable preferences row should not block the
+	// order — fall back to the ContractType default policy.
+	if order.Role() == models.RoleVendor &&
+		len(orderOpen.Listings) > 0 &&
+		orderOpen.Listings[0].Listing != nil &&
+		orderOpen.Listings[0].Listing.Metadata != nil &&
+		orderOpen.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_DIGITAL_GOOD {
+		var prefs models.UserPreferences
+		if err := dbtx.Read().First(&prefs).Error; err == nil {
+			if prefs.DigitalGoodReviewWindowDays > 0 {
+				order.AutoCompleteAfterShipDaysOverride = prefs.DigitalGoodReviewWindowDays
+			}
+		}
+	}
+
 	if order.Role() == models.RoleVendor {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_OPEN message from %s. OrderID: %s", senderPeer, order.ID)
 	} else if order.Role() == models.RoleBuyer {

@@ -1,4 +1,4 @@
-.PHONY: build build-private_distribution smoke-private_distribution smoke-private_distribution-da test test-invariants test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
+.PHONY: build build-private_distribution smoke-private_distribution smoke-private_distribution-da test test-invariants test-e2e-evm test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
 
 SYSTEM_GO := /usr/local/go/bin/go
 GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
@@ -22,6 +22,17 @@ test: ## 运行测试
 # 任何破坏这些性质的改动会在 CI 立即失败。
 test-invariants: ## 运行 DelegateCall 架构守护测试（pkg/managedescrow + adapters）
 	$(GO) test -tags '$(GO_TEST_TAGS)' -run 'Invariant|Inv2|DelegateCall|MultiSendCallOnly|AlwaysUsesMultiSend' \
+		./pkg/managedescrow/... ./internal/payment/adapters/...
+
+# Phase EVM-ManagedEscrow SP1-C — Anvil/Sepolia E2E smoke suite。
+# 在 go-ethereum simulated.Backend 上注入 ManagedEscrow v1.4.1 deployed bytecode，
+# 跑「真实 EVM 执行」回归。场景包括（v2 smoke 套件）：
+#   场景 1: predicted-on-paper == deployed-on-chain proxy address
+#   场景 2-4: 待补
+# build tag e2e_evm 隔离，默认 test 套不会拉 simulated 后端的 ~50MB 依赖。
+# bytecode fixture 见 pkg/managedescrow/testdata/bytecode/，刷新用 scripts/fetch-managed_escrow-bytecode.sh。
+test-e2e-evm: ## 运行 SP1-C EVM E2E smoke 套件（需要 e2e_evm build tag）
+	$(GO) test -tags '$(GO_TEST_TAGS) e2e_evm' -run 'E2E' \
 		./pkg/managedescrow/... ./internal/payment/adapters/...
 
 smoke-private_distribution: build-private_distribution ## 构建 private_distribution 并运行网络隔离 smoke test

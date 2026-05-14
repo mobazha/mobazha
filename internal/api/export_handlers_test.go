@@ -4,6 +4,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"io"
@@ -12,6 +13,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 // DG-1.10 unit tests cover the pure helpers (format negotiation, customer
@@ -59,10 +63,10 @@ func TestAggregateCustomers_DedupAndSort(t *testing.T) {
 	t3 := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 
 	sales := []saleExportRow{
-		{OrderID: "o1", BuyerID: "alice", BuyerName: "Alice", Timestamp: t1, ShippingCity: "Berlin", ShippingCountry: "DE"},
-		{OrderID: "o2", BuyerID: "alice", BuyerName: "Alice (renamed)", Timestamp: t3, ShippingCity: "Munich", ShippingCountry: "DE"},
-		{OrderID: "o3", BuyerID: "bob", BuyerName: "Bob", Timestamp: t2, ShippingCity: "Tokyo", ShippingCountry: "JP"},
-		{OrderID: "o4", BuyerID: "", BuyerName: "Anon", Timestamp: t2}, // skipped — no peerID
+		{OrderID: "o1", OrderType: "registered", BuyerID: "alice", BuyerName: "Alice", Timestamp: t1, ShippingCity: "Berlin", ShippingCountry: "DE"},
+		{OrderID: "o2", OrderType: "registered", BuyerID: "alice", BuyerName: "Alice (renamed)", Timestamp: t3, ShippingCity: "Munich", ShippingCountry: "DE"},
+		{OrderID: "o3", OrderType: "registered", BuyerID: "bob", BuyerName: "Bob", Timestamp: t2, ShippingCity: "Tokyo", ShippingCountry: "JP"},
+		{OrderID: "o4", OrderType: "registered", BuyerID: "", BuyerName: "Anon", Timestamp: t2}, // skipped — no peerID
 	}
 
 	got := aggregateCustomers(sales)
@@ -73,6 +77,12 @@ func TestAggregateCustomers_DedupAndSort(t *testing.T) {
 	// Alice has 2 orders → ranks first.
 	if got[0].BuyerID != "alice" {
 		t.Errorf("got[0].BuyerID = %q, want alice", got[0].BuyerID)
+	}
+	if got[0].CustomerType != "registered" {
+		t.Errorf("got[0].CustomerType = %q, want registered", got[0].CustomerType)
+	}
+	if got[0].CustomerKey != "alice" {
+		t.Errorf("got[0].CustomerKey = %q, want alice", got[0].CustomerKey)
 	}
 	if got[0].OrderCount != 2 {
 		t.Errorf("alice OrderCount = %d, want 2", got[0].OrderCount)
@@ -96,9 +106,138 @@ func TestAggregateCustomers_DedupAndSort(t *testing.T) {
 	}
 }
 
+// TestAggregateCustomers_GuestOrders verifies that anonymous orders
+// participate in the customer rollup — same email across multiple guest
+// orders should aggregate to one customer row, and emails are
+// case-insensitive (returning customers may capitalize differently).
+func TestAggregateCustomers_GuestOrders(t *testing.T) {
+	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	sales := []saleExportRow{
+		{OrderID: "guest:tok1", OrderType: "guest", ContactEmail: "Carol@example.com", BuyerName: "Carol", Timestamp: t1, ShippingCity: "Paris", ShippingCountry: "FR"},
+		{OrderID: "guest:tok2", OrderType: "guest", ContactEmail: "carol@example.com", BuyerName: "Carol Smith", Timestamp: t2, ShippingCity: "Lyon", ShippingCountry: "FR"},
+		{OrderID: "guest:tok3", OrderType: "guest", ContactEmail: "", Timestamp: t1}, // skipped — fully anonymous
+	}
+	got := aggregateCustomers(sales)
+	if len(got) != 1 {
+		t.Fatalf("got %d customers, want 1 (carol@ aggregated, blank-email skipped)", len(got))
+	}
+	if got[0].CustomerType != "guest" {
+		t.Errorf("CustomerType = %q, want guest", got[0].CustomerType)
+	}
+	if got[0].CustomerKey != "guest:carol@example.com" {
+		t.Errorf("CustomerKey = %q, want guest:carol@example.com", got[0].CustomerKey)
+	}
+	if got[0].BuyerID != "" {
+		t.Errorf("BuyerID = %q, want empty for guest", got[0].BuyerID)
+	}
+	if got[0].OrderCount != 2 {
+		t.Errorf("OrderCount = %d, want 2", got[0].OrderCount)
+	}
+	if got[0].Name != "Carol Smith" {
+		t.Errorf("Name = %q, want most-recent Carol Smith", got[0].Name)
+	}
+	if got[0].ShippingCity != "Lyon" {
+		t.Errorf("ShippingCity = %q, want Lyon (most-recent)", got[0].ShippingCity)
+	}
+}
+
+func TestCustomerKeyFor(t *testing.T) {
+	cases := []struct {
+		name     string
+		row      saleExportRow
+		wantKey  string
+		wantType string
+	}{
+		{"registered ok", saleExportRow{OrderType: "registered", BuyerID: "peer1"}, "peer1", "registered"},
+		{"registered no peerID", saleExportRow{OrderType: "registered"}, "", ""},
+		{"guest ok", saleExportRow{OrderType: "guest", ContactEmail: "x@y.com"}, "guest:x@y.com", "guest"},
+		{"guest case insensitive", saleExportRow{OrderType: "guest", ContactEmail: "  X@Y.COM  "}, "guest:x@y.com", "guest"},
+		{"guest no email", saleExportRow{OrderType: "guest"}, "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotKey, gotType := customerKeyFor(tc.row)
+			if gotKey != tc.wantKey || gotType != tc.wantType {
+				t.Errorf("customerKeyFor() = (%q, %q), want (%q, %q)", gotKey, gotType, tc.wantKey, tc.wantType)
+			}
+		})
+	}
+}
+
+func TestCollectGuestSalesRows_PaginatesPastFirstPage(t *testing.T) {
+	const total = 125
+	orders := make([]models.GuestOrder, total)
+	for i := range orders {
+		orders[i] = models.GuestOrder{
+			OrderToken:   "gst_page_" + string(rune('a'+(i%26))),
+			State:        models.GuestOrderCompleted,
+			ContactEmail: "buyer@example.com",
+			CreatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Minute),
+		}
+	}
+
+	var pages []int
+	svc := &mockGuestOrderService{
+		listGuestOrdersFunc: func(_ context.Context, filter contracts.GuestOrderFilter) ([]models.GuestOrder, int64, error) {
+			pages = append(pages, filter.Page)
+			if filter.PageSize != 100 {
+				t.Fatalf("PageSize = %d, want service max 100", filter.PageSize)
+			}
+			start := filter.Page * filter.PageSize
+			if start >= len(orders) {
+				return nil, int64(len(orders)), nil
+			}
+			end := start + filter.PageSize
+			if end > len(orders) {
+				end = len(orders)
+			}
+			return orders[start:end], int64(len(orders)), nil
+		},
+	}
+
+	rows, err := collectGuestSalesRows(context.Background(), svc)
+	if err != nil {
+		t.Fatalf("collectGuestSalesRows: %v", err)
+	}
+	if len(rows) != total {
+		t.Fatalf("got %d rows, want %d", len(rows), total)
+	}
+	if len(pages) != 2 || pages[0] != 0 || pages[1] != 1 {
+		t.Fatalf("pages = %v, want [0 1]", pages)
+	}
+}
+
+// TestDecodeGuestShippingAddress accepts the loose JSON shape that comes
+// from different frontend checkout flows (Stripe AddressElement vs custom).
+func TestDecodeGuestShippingAddress(t *testing.T) {
+	cases := []struct {
+		name                            string
+		raw                             string
+		wantName, wantCity, wantCountry string
+	}{
+		{"empty", "", "", "", ""},
+		{"invalid json", "{not-json", "", "", ""},
+		{"canonical fields", `{"name":"A","city":"B","country":"C"}`, "A", "B", "C"},
+		{"alias fields", `{"recipient":"A","locality":"B","countryCode":"C"}`, "A", "B", "C"},
+		{"snake_case country", `{"country_code":"DE"}`, "", "", "DE"},
+		{"missing fields", `{"foo":"bar"}`, "", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			n, c, cc := decodeGuestShippingAddress([]byte(tc.raw))
+			if n != tc.wantName || c != tc.wantCity || cc != tc.wantCountry {
+				t.Errorf("decode = (%q,%q,%q), want (%q,%q,%q)",
+					n, c, cc, tc.wantName, tc.wantCity, tc.wantCountry)
+			}
+		})
+	}
+}
+
 func TestWriteCustomersCSV_HeaderAndRows(t *testing.T) {
 	rows := []customerExportRow{
 		{
+			CustomerKey: "alice", CustomerType: "registered",
 			BuyerID: "alice", Name: "Alice", OrderCount: 2,
 			FirstPurchase:   time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 			LastPurchase:    time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
@@ -118,16 +257,17 @@ func TestWriteCustomersCSV_HeaderAndRows(t *testing.T) {
 		t.Fatalf("got %d rows, want 2 (header + 1 data)", len(all))
 	}
 	wantHeader := []string{
-		"buyer_id", "name", "order_count", "first_purchase",
-		"last_purchase", "shipping_city", "shipping_country",
+		"customer_key", "customer_type", "buyer_id", "contact_email", "name",
+		"order_count", "first_purchase", "last_purchase",
+		"shipping_city", "shipping_country",
 	}
 	for i, h := range wantHeader {
 		if all[0][i] != h {
 			t.Errorf("header[%d] = %q, want %q", i, all[0][i], h)
 		}
 	}
-	if all[1][0] != "alice" || all[1][2] != "2" {
-		t.Errorf("data row = %v, want alice with order_count=2", all[1])
+	if all[1][0] != "alice" || all[1][1] != "registered" {
+		t.Errorf("data row[0..1] = %v, want alice / registered", all[1][:2])
 	}
 }
 

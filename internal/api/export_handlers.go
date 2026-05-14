@@ -3,6 +3,7 @@
 package api
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -164,12 +166,14 @@ func writeListingsCSV(w http.ResponseWriter, rows []listingExportRow) {
 
 type saleExportRow struct {
 	OrderID         string    `json:"orderID"`
+	OrderType       string    `json:"orderType"` // "registered" | "guest"
 	Slug            string    `json:"slug"`
 	Title           string    `json:"title"`
 	Timestamp       time.Time `json:"timestamp"`
 	State           string    `json:"state"`
-	BuyerID         string    `json:"buyerID"`
-	BuyerName       string    `json:"buyerName"`
+	BuyerID         string    `json:"buyerID"`      // peerID for registered, empty for guest
+	BuyerName       string    `json:"buyerName"`    // display name or guest email
+	ContactEmail    string    `json:"contactEmail"` // guest checkout buyer email (anonymous orders)
 	ShippingName    string    `json:"shippingName"`
 	ShippingCity    string    `json:"shippingCity"`
 	ShippingCountry string    `json:"shippingCountry"`
@@ -203,8 +207,10 @@ func (g *Gateway) handleExportSales(w http.ResponseWriter, r *http.Request) {
 }
 
 // collectSalesRows reuses OrderService.GetSales with no state filter / no
-// limit so the entire seller history is exported. We exclude buyer avatars
-// — the export is intentionally lean and shippable as a CSV.
+// limit so the entire seller history is exported, then folds in any guest
+// checkout orders so the export honors the "Your store, your data, your
+// customers" portability promise. We exclude buyer avatars — the export is
+// intentionally lean and shippable as a CSV.
 func (g *Gateway) collectSalesRows(r *http.Request) ([]saleExportRow, error) {
 	orderSvc := getOrderService(r)
 	// limit=0 in OrderRepo means "no limit", per existing GetSales semantics.
@@ -234,6 +240,7 @@ func (g *Gateway) collectSalesRows(r *http.Request) ([]saleExportRow, error) {
 
 		row := saleExportRow{
 			OrderID:     order.ID.String(),
+			OrderType:   "registered",
 			State:       order.State.String(),
 			BuyerID:     buyerPeerID(open),
 			BuyerName:   buyerDisplayName(open),
@@ -261,10 +268,137 @@ func (g *Gateway) collectSalesRows(r *http.Request) ([]saleExportRow, error) {
 		rows = append(rows, row)
 	}
 
+	// Guest orders. The service returns nil when Guest Checkout is not
+	// enabled (PrivateDistribution / pre-PM-2 deployments) — we silently skip in that
+	// case so SaaS / Standalone exports always include guests when the
+	// feature is on.
+	if guestSvc := getGuestOrderService(r); guestSvc != nil {
+		guestRows, err := collectGuestSalesRows(r.Context(), guestSvc)
+		if err != nil {
+			return nil, fmt.Errorf("guest orders: %w", err)
+		}
+		rows = append(rows, guestRows...)
+	}
+
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i].Timestamp.After(rows[j].Timestamp)
 	})
 	return rows, nil
+}
+
+// collectGuestSalesRows pages through all guest orders for the current
+// tenant. We use a chunked pagination loop instead of "give me everything
+// in one call" because the GuestOrderFilter API does not expose an
+// "unlimited" sentinel — the smallest correct contract is a Page/PageSize
+// pair. Page size 100 matches the service-side maximum; larger values are
+// clamped by GuestOrderService and would make the caller stop too early.
+//
+// Hard cap at 1000 pages (= 100k orders) so a misconfigured filter can't
+// loop forever; legitimate stores that hit this should be using a
+// dedicated data-warehouse export.
+func collectGuestSalesRows(ctx context.Context, svc contracts.GuestOrderService) ([]saleExportRow, error) {
+	const pageSize = 100
+	const maxPages = 1000
+
+	var rows []saleExportRow
+	var seen int64
+	for page := 0; page < maxPages; page++ {
+		batch, total, err := svc.ListGuestOrders(ctx, contracts.GuestOrderFilter{
+			Page:     page,
+			PageSize: pageSize,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(batch) == 0 {
+			break
+		}
+		for i := range batch {
+			rows = append(rows, guestOrderToSaleRow(&batch[i]))
+		}
+		seen += int64(len(batch))
+		if total > 0 && seen >= total {
+			break
+		}
+		if len(batch) < pageSize {
+			break
+		}
+	}
+	return rows, nil
+}
+
+// guestOrderToSaleRow projects a GuestOrder into the export shape. Mirrors
+// the registered-order path: line item title from the first item (most
+// guest carts are single-item; multi-item carts still show the first as a
+// summary, same compromise the registered handler makes).
+//
+// Identity fields:
+//   - OrderID: prefixed with "guest:" so it never collides with a CID-
+//     style registered order ID and is easy to filter on in spreadsheets.
+//   - BuyerID: empty — guest orders are anonymous by design. The customer
+//     aggregation uses ContactEmail as the dedup key for guests.
+//   - BuyerName: best-effort — falls back to the parsed name on the
+//     shipping address, then to ContactEmail, so the row is never blank.
+func guestOrderToSaleRow(o *models.GuestOrder) saleExportRow {
+	row := saleExportRow{
+		OrderID:      "guest:" + o.OrderToken,
+		OrderType:    "guest",
+		State:        "GUEST_" + o.State.String(),
+		Timestamp:    o.CreatedAt,
+		ContactEmail: o.ContactEmail,
+		Currency:     o.PriceCurrency,
+		AmountMinor:  fmt.Sprintf("%d", o.TotalPrice),
+		PaymentCoin:  o.PaymentCoin,
+		Moderated:    false,
+	}
+	if len(o.Items) > 0 {
+		row.Slug = o.Items[0].ListingSlug
+		row.Title = o.Items[0].ListingTitle
+	}
+	name, city, country := decodeGuestShippingAddress(o.ShippingAddress)
+	row.ShippingName = name
+	row.ShippingCity = city
+	row.ShippingCountry = country
+	row.BuyerName = firstNonEmpty(name, o.ContactEmail)
+	return row
+}
+
+// decodeGuestShippingAddress best-effort extracts (name, city, country)
+// from the freeform JSON shipping address. The frontend may send slightly
+// different shapes (Stripe address vs custom), so we tolerate common
+// aliases (`name`/`recipient`, `city`/`locality`, `country`/`countryCode`).
+// Returns ("", "", "") when the field is empty or unparseable — the export
+// row remains valid; the seller just gets blank shipping columns for that
+// order, same as a missing shipping object on a registered sale.
+func decodeGuestShippingAddress(raw []byte) (name, city, country string) {
+	if len(raw) == 0 {
+		return "", "", ""
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return "", "", ""
+	}
+	pick := func(keys ...string) string {
+		for _, k := range keys {
+			if v, ok := m[k].(string); ok && v != "" {
+				return v
+			}
+		}
+		return ""
+	}
+	name = pick("name", "recipient", "fullName", "shipTo")
+	city = pick("city", "locality", "town")
+	country = pick("country", "countryCode", "country_code")
+	return
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func writeSalesCSV(w http.ResponseWriter, rows []saleExportRow) {
@@ -272,14 +406,16 @@ func writeSalesCSV(w http.ResponseWriter, rows []saleExportRow) {
 	defer cw.Flush()
 
 	_ = cw.Write([]string{
-		"order_id", "slug", "title", "timestamp", "state",
-		"buyer_id", "buyer_name", "shipping_name", "shipping_city", "shipping_country",
+		"order_id", "order_type", "slug", "title", "timestamp", "state",
+		"buyer_id", "buyer_name", "contact_email",
+		"shipping_name", "shipping_city", "shipping_country",
 		"currency", "amount_minor", "payment_coin", "moderated",
 	})
 	for _, r := range rows {
 		_ = cw.Write([]string{
-			r.OrderID, r.Slug, r.Title, formatTime(r.Timestamp), r.State,
-			r.BuyerID, r.BuyerName, r.ShippingName, r.ShippingCity, r.ShippingCountry,
+			r.OrderID, r.OrderType, r.Slug, r.Title, formatTime(r.Timestamp), r.State,
+			r.BuyerID, r.BuyerName, r.ContactEmail,
+			r.ShippingName, r.ShippingCity, r.ShippingCountry,
 			r.Currency, r.AmountMinor, r.PaymentCoin, boolStr(r.Moderated),
 		})
 	}
@@ -288,7 +424,15 @@ func writeSalesCSV(w http.ResponseWriter, rows []saleExportRow) {
 // ===== Customers export (aggregated from sales) =====
 
 type customerExportRow struct {
-	BuyerID         string    `json:"buyerID"`
+	// CustomerKey is the dedup key used for aggregation:
+	//   - registered: peerID
+	//   - guest:      "guest:" + lower(contactEmail)
+	// Exposed as a stable column so downstream tooling can join across
+	// orders/customers without reverse-engineering the mapping.
+	CustomerKey     string    `json:"customerKey"`
+	CustomerType    string    `json:"customerType"` // "registered" | "guest"
+	BuyerID         string    `json:"buyerID"`      // peerID for registered, empty for guest
+	ContactEmail    string    `json:"contactEmail"` // populated for guest customers
 	Name            string    `json:"name"`
 	OrderCount      int       `json:"orderCount"`
 	FirstPurchase   time.Time `json:"firstPurchase"`
@@ -321,29 +465,39 @@ func (g *Gateway) handleExportCustomers(w http.ResponseWriter, r *http.Request) 
 	writeCustomersCSV(w, rows)
 }
 
-// aggregateCustomers groups sales by buyer peerID. We deliberately use
-// peerID (not display name) as the dedup key because two distinct accounts
-// can share a name; peerID is the cryptographic identity.
+// aggregateCustomers groups sales into one row per customer. The dedup
+// key depends on the order type:
+//
+//   - registered: peerID (cryptographic identity — two display names can
+//     collide, peerID can't)
+//   - guest:      lower-cased contact email — anonymous orders have no
+//     identity, but a returning email reasonably represents the same
+//     customer for marketing / receipts. Guests without an email are
+//     skipped (they're truly anonymous; no portable identity to export).
 func aggregateCustomers(sales []saleExportRow) []customerExportRow {
 	if len(sales) == 0 {
 		return nil
 	}
-	byBuyer := make(map[string]*customerExportRow)
+	byKey := make(map[string]*customerExportRow)
 	for _, s := range sales {
-		if s.BuyerID == "" {
+		key, custType := customerKeyFor(s)
+		if key == "" {
 			continue
 		}
-		c, ok := byBuyer[s.BuyerID]
+		c, ok := byKey[key]
 		if !ok {
 			c = &customerExportRow{
+				CustomerKey:     key,
+				CustomerType:    custType,
 				BuyerID:         s.BuyerID,
+				ContactEmail:    s.ContactEmail,
 				Name:            s.BuyerName,
 				FirstPurchase:   s.Timestamp,
 				LastPurchase:    s.Timestamp,
 				ShippingCity:    s.ShippingCity,
 				ShippingCountry: s.ShippingCountry,
 			}
-			byBuyer[s.BuyerID] = c
+			byKey[key] = c
 		}
 		c.OrderCount++
 		if s.Timestamp.Before(c.FirstPurchase) {
@@ -361,11 +515,14 @@ func aggregateCustomers(sales []saleExportRow) []customerExportRow {
 			if s.BuyerName != "" {
 				c.Name = s.BuyerName
 			}
+			if s.ContactEmail != "" {
+				c.ContactEmail = s.ContactEmail
+			}
 		}
 	}
 
-	rows := make([]customerExportRow, 0, len(byBuyer))
-	for _, c := range byBuyer {
+	rows := make([]customerExportRow, 0, len(byKey))
+	for _, c := range byKey {
 		rows = append(rows, *c)
 	}
 	sort.Slice(rows, func(i, j int) bool {
@@ -377,17 +534,35 @@ func aggregateCustomers(sales []saleExportRow) []customerExportRow {
 	return rows
 }
 
+// customerKeyFor returns the aggregation key + type for a sale row. Empty
+// key means "skip this row" — used for fully-anonymous guests with no email.
+func customerKeyFor(s saleExportRow) (string, string) {
+	if s.OrderType == "guest" {
+		email := strings.ToLower(strings.TrimSpace(s.ContactEmail))
+		if email == "" {
+			return "", ""
+		}
+		return "guest:" + email, "guest"
+	}
+	if s.BuyerID == "" {
+		return "", ""
+	}
+	return s.BuyerID, "registered"
+}
+
 func writeCustomersCSV(w http.ResponseWriter, rows []customerExportRow) {
 	cw := csv.NewWriter(w)
 	defer cw.Flush()
 
 	_ = cw.Write([]string{
-		"buyer_id", "name", "order_count", "first_purchase", "last_purchase",
+		"customer_key", "customer_type", "buyer_id", "contact_email", "name",
+		"order_count", "first_purchase", "last_purchase",
 		"shipping_city", "shipping_country",
 	})
 	for _, r := range rows {
 		_ = cw.Write([]string{
-			r.BuyerID, r.Name, fmt.Sprintf("%d", r.OrderCount),
+			r.CustomerKey, r.CustomerType, r.BuyerID, r.ContactEmail, r.Name,
+			fmt.Sprintf("%d", r.OrderCount),
 			formatTime(r.FirstPurchase), formatTime(r.LastPurchase),
 			r.ShippingCity, r.ShippingCountry,
 		})

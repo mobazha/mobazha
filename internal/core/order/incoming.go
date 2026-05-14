@@ -60,6 +60,15 @@ func (s *OrderAppService) HandleIncomingOrderMessage(ctx context.Context, orderM
 
 	ppCtx, err := s.preProcess(ctx, orderMsg)
 	if err != nil {
+		// TD-025: persist failed message to ErroredMessages for observability.
+		// Without this hook, preProcess failures (chain RPC, fiat refund,
+		// escrow release, validation) propagate up but leave no durable
+		// trace on the order — P2P will retry, but operators have no way
+		// to inspect what failed without log scraping. Best-effort: any DB
+		// error here is logged but does not override the original error
+		// returned to the caller. preProcess only emits errors when the
+		// order already exists in DB (not-found cases return nil,nil).
+		s.recordPreProcessError(orderMsg, err)
 		return nil, models.Order{}, err
 	}
 
@@ -76,6 +85,33 @@ func (s *OrderAppService) HandleIncomingOrderMessage(ctx context.Context, orderM
 	})
 
 	return event, order, err
+}
+
+// recordPreProcessError attaches the failed incoming message to the order's
+// ErroredMessages list to provide a persistent audit trail when preProcess
+// I/O fails. Best-effort by design: returns no error and does not affect
+// the upstream error path — the caller still sees the original preProcess
+// error. DB failures are logged at INFO so they remain visible without
+// masking real-world transient issues.
+func (s *OrderAppService) recordPreProcessError(orderMsg *npb.OrderMessage, ppErr error) {
+	if orderMsg == nil {
+		return
+	}
+	dbErr := s.db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if loadErr := tx.Read().Where("id = ?", orderMsg.OrderID).First(&order).Error; loadErr != nil {
+			return loadErr
+		}
+		if putErr := order.PutErrorMessage(orderMsg); putErr != nil {
+			return putErr
+		}
+		return tx.Save(&order)
+	})
+	if dbErr != nil {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"[TD-025] failed to record preProcess error for order %s: %v (original error: %v)",
+			orderMsg.OrderID, dbErr, ppErr)
+	}
 }
 
 // preProcess performs external I/O before the deterministic ProcessMessage.

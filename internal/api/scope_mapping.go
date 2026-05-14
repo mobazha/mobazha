@@ -43,6 +43,15 @@ var routeScopeMap = []routeScope{
 	{"GET /v1/sales", contracts.ScopeOrdersRead},
 	{"POST /v1/sales", contracts.ScopeOrdersRead},
 
+	// Data exports (DG-1.10 — "Your store, your data" portability).
+	// Listings export reads the public catalogue and only needs listings
+	// scope; sales/customers expose buyer info and require orders scope.
+	// Specific entries come before any future broader prefix so deny-by-
+	// default routes API tokens correctly.
+	{"GET /v1/exports/listings", contracts.ScopeListingsRead},
+	{"GET /v1/exports/sales", contracts.ScopeOrdersRead},
+	{"GET /v1/exports/customers", contracts.ScopeOrdersRead},
+
 	// Purchases (buyer perspective)
 	{"GET /v1/purchases", contracts.ScopePurchasesRead},
 	{"POST /v1/purchases", contracts.ScopePurchasesRead},

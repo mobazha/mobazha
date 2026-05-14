@@ -2,7 +2,11 @@
 
 package api
 
-import "github.com/go-chi/chi/v5"
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+)
 
 // registerPreHumaRoutes mounts raw chi handlers that MUST be registered
 // before huma adds parameterized siblings on the same path prefix.
@@ -15,5 +19,25 @@ import "github.com/go-chi/chi/v5"
 func (g *Gateway) registerPreHumaRoutes(r chi.Router) {
 	if !g.config.PublicOnly {
 		g.registerDigitalAssetStreamRoute(r)
+		g.registerExportRoutes(r)
 	}
+}
+
+// registerExportRoutes mounts the seller data-portability endpoints
+// (DG-1.10). Registered here rather than via Huma because Huma's response
+// pipeline is JSON-centric — the CSV path needs to write text/csv
+// directly to ResponseWriter without the {data: ...} envelope. The auth
+// chain mirrors digital-asset upload-stream:
+//
+//	AuthenticationMiddleware → ScopeEnforcementMiddleware → handler
+//
+// so admin JWT/Basic accounts get full access, and API tokens are gated
+// by routeScopeMap (`/v1/exports/*` entries in scope_mapping.go).
+func (g *Gateway) registerExportRoutes(r chi.Router) {
+	wrap := func(h http.HandlerFunc) http.Handler {
+		return g.AuthenticationMiddleware(g.ScopeEnforcementMiddleware(h))
+	}
+	r.Method(http.MethodGet, "/v1/exports/listings", wrap(g.handleExportListings))
+	r.Method(http.MethodGet, "/v1/exports/sales", wrap(g.handleExportSales))
+	r.Method(http.MethodGet, "/v1/exports/customers", wrap(g.handleExportCustomers))
 }

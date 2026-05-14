@@ -143,7 +143,19 @@ func (b *recordingBus) Emit(evt interface{}) { b.emitted = append(b.emitted, evt
 // the supplied expected amount in smallest units. The order starts in
 // "pending verification" state to mirror what the dispatcher would
 // observe in production.
+//
+// Always seeded under database.StandaloneTenantID; cross-tenant tests
+// use seedOrderForTenant to drop into a different tenant slice.
 func seedOrder(t *testing.T, db *vTestDB, orderID, expectedAmount, refundAddress string) {
+	t.Helper()
+	seedOrderForTenant(t, db, database.StandaloneTenantID, orderID, expectedAmount, refundAddress)
+}
+
+// seedOrderForTenant is the multi-tenant flavour of seedOrder. It exists
+// so the cross-tenant isolation test can plant the same OrderID under
+// two distinct tenant slices and verify the verifier never crosses the
+// (tenant_id, id) primary-key boundary.
+func seedOrderForTenant(t *testing.T, db *vTestDB, tenantID, orderID, expectedAmount, refundAddress string) {
 	t.Helper()
 	oo := &pb.OrderOpen{
 		Amount:      expectedAmount,
@@ -155,7 +167,7 @@ func seedOrder(t *testing.T, db *vTestDB, orderID, expectedAmount, refundAddress
 	require.NoError(t, err)
 
 	order := &models.Order{
-		TenantMixin:         models.TenantMixin{TenantID: database.StandaloneTenantID},
+		TenantMixin:         models.TenantMixin{TenantID: tenantID},
 		ID:                  models.OrderID(orderID),
 		MyRole:              string(models.RoleVendor),
 		SerializedOrderOpen: raw,
@@ -166,6 +178,18 @@ func seedOrder(t *testing.T, db *vTestDB, orderID, expectedAmount, refundAddress
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		return tx.Save(order)
 	}))
+}
+
+// loadOrderForTenant reads back a specific (tenant, id) row. Used by
+// cross-tenant tests to assert that operations against tenant A never
+// mutate tenant B's slice.
+func loadOrderForTenant(t *testing.T, db *vTestDB, tenantID, orderID string) *models.Order {
+	t.Helper()
+	var order models.Order
+	require.NoError(t, db.gormDB.
+		Where("tenant_id = ? AND id = ?", tenantID, orderID).
+		First(&order).Error)
+	return &order
 }
 
 // insertObs writes an observation row directly via GORM. We bypass the
@@ -538,4 +562,214 @@ func TestAggregateAndEmit_NegativeObservation_Errors(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "negative amount")
 	require.Empty(t, bus.emitted)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — multi-tenant isolation
+// ─────────────────────────────────────────────────────────────────────────
+//
+// The Order primary key is (tenant_id, id). A SaaS deployment can host
+// multiple tenants whose OrderID generators occasionally collide — UUIDs
+// make it astronomically unlikely, but the WHERE clause should not
+// depend on probability for correctness. This test plants the SAME
+// orderID in two distinct tenant slices, drives the verifier on tenant
+// A, and asserts:
+//
+//   - Tenant A's order transitions to verified and emits PaymentVerified
+//     scoped to tenant A.
+//   - Tenant B's order is untouched (still pending, no envelope written,
+//     no overpaid amount, no PaymentVerified event for B).
+//
+// Without the (tenant_id, id) WHERE clause this test would fail because
+// the SELECT would resolve to whichever row SQLite encountered first.
+func TestAggregateAndEmit_CrossTenantIsolation(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	const sharedID = "order-shared"
+	const tenantA = "tenant-A"
+	const tenantB = "tenant-B"
+
+	seedOrderForTenant(t, db, tenantA, sharedID, "1000", "0xrefund-A")
+	seedOrderForTenant(t, db, tenantB, sharedID, "1000", "0xrefund-B")
+
+	// Only tenant A receives an observation that fully funds the order.
+	insertObs(t, db, models.PaymentObservation{
+		TenantID:       tenantA,
+		ID:             "obs-A",
+		OrderID:        sharedID,
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-A",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-A",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "1000",
+		Source:         models.PaymentObservationSourceMonitor,
+		Observer:       "monitor:eip155-1:tenantA",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), tenantA, sharedID))
+
+	// A is verified and the event carries tenant A.
+	require.Len(t, bus.emitted, 1)
+	verified, ok := bus.emitted[0].(events.PaymentVerified)
+	require.True(t, ok)
+	require.Equal(t, tenantA, verified.TenantID)
+	require.Equal(t, sharedID, verified.OrderID)
+
+	gotA := loadOrderForTenant(t, db, tenantA, sharedID)
+	require.True(t, gotA.IsPaymentVerified())
+	require.Equal(t, "1000", gotA.TotalReceived)
+	require.NotEmpty(t, gotA.SerializedPaymentSent)
+
+	// B is untouched: still pending, still no envelope, still no totals.
+	gotB := loadOrderForTenant(t, db, tenantB, sharedID)
+	require.True(t, gotB.IsPaymentVerificationPending())
+	require.Empty(t, gotB.TotalReceived)
+	require.Empty(t, gotB.OverpaidAmount)
+	require.Empty(t, gotB.SerializedPaymentSent)
+
+	// Driving the verifier for tenant B should be a silent no-op (B has
+	// no observations) and must not emit a second PaymentVerified.
+	require.NoError(t, v.AggregateAndEmit(context.Background(), tenantB, sharedID))
+	require.Len(t, bus.emitted, 1, "tenant B has no observations; no event")
+
+	gotB = loadOrderForTenant(t, db, tenantB, sharedID)
+	require.True(t, gotB.IsPaymentVerificationPending())
+	require.Equal(t, "0", gotB.TotalReceived,
+		"tenant B was driven through the verifier, so TotalReceived rolls forward to '0'")
+	require.Empty(t, gotB.SerializedPaymentSent)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — partial → partial accumulation
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Multi-deposit orders that don't yet reach the threshold need to roll
+// TotalReceived forward across re-aggregations so the buyer's UI ("you've
+// paid 6 of 10") never goes backwards. This test inserts two partial
+// observations split across two AggregateAndEmit calls and asserts the
+// running sum is preserved between passes.
+func TestAggregateAndEmit_PartialThenPartial_AccumulatesTotal(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+
+	// First partial deposit: 300 / 1000.
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-1",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-1",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-1",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "300",
+		BlockTime:      time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC),
+	})
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+
+	first := loadOrder(t, db, "order-1")
+	require.True(t, first.IsPaymentVerificationPending())
+	require.Equal(t, "300", first.TotalReceived)
+
+	// Second partial deposit: 250 added to the pile.
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-2",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-2",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-2",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "250",
+		BlockTime:      time.Date(2026, 5, 14, 12, 5, 0, 0, time.UTC),
+	})
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+
+	require.Empty(t, bus.emitted, "still under expected; no event yet")
+	second := loadOrder(t, db, "order-1")
+	require.True(t, second.IsPaymentVerificationPending())
+	require.Equal(t, "550", second.TotalReceived)
+	require.Empty(t, second.OverpaidAmount)
+	require.Empty(t, second.SerializedPaymentSent)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AggregateAndEmit — partial then full triggers a single emit
+// ─────────────────────────────────────────────────────────────────────────
+//
+// The most common multi-deposit success path: buyer pays a chunk now,
+// adds more later, the second pass crosses the threshold. We assert that:
+//
+//  1. The first AggregateAndEmit leaves the order in pending.
+//  2. The second AggregateAndEmit, after a top-up arrives, transitions
+//     to verified and emits exactly once.
+//  3. The PaymentSent envelope is built from the LATEST observation
+//     (BlockTime tie-break), not the first.
+func TestAggregateAndEmit_PartialThenFull_EmitsOnce(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+	frozen := time.Date(2026, 5, 14, 13, 0, 0, 0, time.UTC)
+	v.SetClock(func() time.Time { return frozen })
+
+	seedOrder(t, db, "order-1", "1000", "0xrefund")
+
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-partial",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-partial",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-1",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "400",
+		BlockTime:      time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC),
+	})
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+	require.Empty(t, bus.emitted, "partial pass must not emit")
+
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-topup",
+		OrderID:        "order-1",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-topup",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer-2",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "600",
+		BlockTime:      time.Date(2026, 5, 14, 12, 30, 0, 0, time.UTC),
+	})
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+
+	require.Len(t, bus.emitted, 1, "exactly one PaymentVerified after threshold crossed")
+	got := loadOrder(t, db, "order-1")
+	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, "1000", got.TotalReceived)
+	require.Empty(t, got.OverpaidAmount, "exact match leaves OverpaidAmount empty")
+	require.NotEmpty(t, got.SerializedPaymentSent)
+
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	// Envelope must point at the LATEST observation (the top-up) — its
+	// BlockTime is later, so buildAggregatedPaymentSent picks it as the
+	// representative tx.
+	require.Equal(t, "0xtx-topup", ps.TransactionID)
+	require.Equal(t, "0xpayer-2", ps.PayerAddress)
+	require.Equal(t, "1000", ps.Amount, "envelope amount is the aggregated total, not the latest tx")
+	require.Equal(t, frozen.Unix(), ps.Timestamp.AsTime().Unix())
 }

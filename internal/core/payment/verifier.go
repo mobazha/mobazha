@@ -48,27 +48,31 @@ var paymentSentMarshaler = protojson.MarshalOptions{
 //
 // The whole aggregate-and-emit cycle runs inside a single database.Tx:
 //
-//  1. SELECT the order row WITH a row-level lock (FOR UPDATE on PG, plain
-//     SELECT under SQLite's BEGIN IMMEDIATE which already serialises writes).
-//  2. SELECT confirmed observations for the order, scoped by tenant.
+//  1. SELECT the order row scoped by (tenant_id, id) WITH a row-level lock
+//     where the dialect supports it.
+//  2. SELECT confirmed observations for the order, also scoped by tenant.
 //  3. Compute the running sum + decide the verdict.
 //  4. UPDATE the order's payment_verification_status / serialized_payment_sent
 //     / total_received / overpaid_amount.
 //
 // Without the row-level lock two concurrent ObservationDispatcher.OnNewBlock
 // fan-outs that touch the same order could each see the same row count and
-// each emit PaymentVerified, double-firing downstream FSM transitions. The
-// FOR UPDATE clause forces the second worker to wait on the first one's
-// COMMIT, after which it re-loads the now-verified order and short-circuits
-// on the IsPaymentVerified() guard below.
+// each emit PaymentVerified, double-firing downstream FSM transitions. On
+// PostgreSQL/MySQL/SQL Server the FOR UPDATE clause forces the second
+// worker to wait on the first one's COMMIT, after which it re-loads the
+// now-verified order and short-circuits on the IsPaymentVerified() guard
+// below — that is the strict guarantee.
 //
-// SQLite-specific note: the GORM SQLite driver translates clause.Locking
-// into "FOR UPDATE", which SQLite parses but does NOT actually honour for
-// row-level locking — SQLite uses transaction-level locking via
-// BEGIN IMMEDIATE. Both behaviours are correct for our purposes:
-// PostgreSQL will block a competing reader at the row level; SQLite will
-// block at the transaction level. Either way only one verifier observes
-// the "still pending" state and the idempotency guard handles the rest.
+// SQLite-specific caveat: GORM's default `BEGIN` is DEFERRED, so two
+// concurrent verifiers can both SELECT the same pending row before either
+// of them upgrades the lock on first write. The first UPDATE wins; the
+// second receives SQLITE_BUSY and is retried — but in the rare interleaving
+// where both COMMIT, both will have observed `IsPaymentVerified() == false`
+// and both will emit. We treat SQLite as "best-effort serialisation" and
+// rely on (a) the standalone deployment running a single verifier worker
+// per process, and (b) the OrderAppService subscriber dedup'ing
+// PaymentVerified by status before triggering downstream side effects.
+// SaaS / production runs PostgreSQL where the strict guarantee holds.
 //
 // ─────────────────────────────────────────────────────────────────────────
 // Idempotency contract
@@ -168,18 +172,26 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 	var emitVerified bool
 
 	err := v.db.Update(func(tx database.Tx) error {
-		gdb := tx.Read()
+		// Bind the request context to every GORM call we issue from
+		// here so an upstream cancel (HTTP timeout, scheduler shutdown)
+		// propagates into the SELECT FOR UPDATE rather than wedging on
+		// a lock the operator can no longer interrupt.
+		gdb := tx.Read().WithContext(ctx)
 
-		// Step 1: lock the order row. The dialect check exists so SQLite
-		// in test mode does not log noisy "unsupported feature" warnings;
-		// when the dialector is "sqlite" we rely on BEGIN IMMEDIATE for
-		// the same write-serialisation guarantee.
+		// Step 1: lock the order row. We scope the WHERE on the full
+		// composite primary key (tenant_id, id) so a SaaS deployment
+		// can never accidentally lock or read a different tenant's
+		// order when OrderIDs collide across tenants. The dialect
+		// check skips clause.Locking on dialects that don't honour it
+		// (SQLite); see the type-level comment for the SQLite caveat.
 		var order models.Order
 		loader := gdb
 		if dialectSupportsRowLock(gdb) {
 			loader = gdb.Clauses(clause.Locking{Strength: "UPDATE"})
 		}
-		if err := loader.Where("id = ?", orderID).First(&order).Error; err != nil {
+		if err := loader.
+			Where("tenant_id = ? AND id = ?", tenantID, orderID).
+			First(&order).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil // unknown order — log-and-skip per §5.1.
 			}
@@ -289,19 +301,24 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 }
 
 // dialectSupportsRowLock reports whether the underlying SQL dialect
-// implements row-level locking (FOR UPDATE). We treat SQLite as "no" so
-// GORM does not emit a SQL fragment SQLite parses but ignores; every
-// other supported dialect (PostgreSQL, MySQL, SQL Server) honours the
-// clause natively.
+// honours `SELECT ... FOR UPDATE` row-level locking. We use a denylist
+// rather than an allowlist so PG-compatible dialects we haven't met yet
+// (CockroachDB, YugabyteDB, TiDB, Vitess, …) opt INTO locking by default;
+// silently degrading a production database to no-lock is the worst
+// failure mode.
+//
+// SQLite is the sole denied dialect: its driver parses FOR UPDATE but
+// only enforces transaction-level locking, so GORM emitting the clause
+// would be misleading without changing the actual semantics.
 func dialectSupportsRowLock(db *gorm.DB) bool {
 	if db == nil || db.Dialector == nil {
 		return false
 	}
 	switch db.Dialector.Name() {
-	case "postgres", "mysql", "sqlserver":
-		return true
-	default:
+	case "sqlite", "sqlite3":
 		return false
+	default:
+		return true
 	}
 }
 

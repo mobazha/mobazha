@@ -332,13 +332,20 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 			return
 		}
 
-		// Fully open node — synthesize admin identity
-		identity := &AuthIdentity{
-			UserID:  "anonymous",
-			Scopes:  nil,
-			IsAdmin: true,
-		}
-		next(huma.WithContext(ctx, WithAuthIdentity(ctx.Context(), identity)))
+		// SECURITY: when neither Basic Auth nor a JWT validator is
+		// configured, the node has no way to authenticate anyone — earlier
+		// code synthesized an "anonymous IsAdmin" identity to make bare
+		// dev nodes curl-friendly, which silently granted full admin to
+		// any caller on every owner-only route (Security: nodeAuthSecurity).
+		// On misconfigured production deployments this is a critical
+		// privilege escalation. Standalone nodes auto-generate admin
+		// credentials via EnsureStandaloneAuth, so legitimate self-hosted
+		// deployments never reach this branch; only intentionally bare
+		// configurations (DataDir empty, auth explicitly disabled) do, and
+		// those must explicitly opt in by setting AllowedIPs / configuring
+		// auth before exposing owner-only routes.
+		huma.WriteErr(api, ctx, http.StatusUnauthorized,
+			"Authentication required — configure an admin password or JWT validator")
 	}
 }
 

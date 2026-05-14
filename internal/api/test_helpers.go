@@ -89,6 +89,23 @@ func runAPITests(t *testing.T, tests apiTests) {
 		config: &GatewayConfig{},
 	}
 	outer := chi.NewMux()
+	// Test-only auth shim: handler-level tests in this file exercise the
+	// business logic of owner-only routes, not the auth pipeline. Inject a
+	// pre-resolved admin AuthIdentity (just like the SaaS SharedRouter does
+	// in production) so nodeHumaAuthMiddleware's "already authenticated"
+	// short-circuit (huma_middleware.go) takes effect and individual cases
+	// can focus on their own status code expectations. Auth coverage lives
+	// in TestGateway_AuthenticationMiddleware / TestGateway_JWTAuth /
+	// TestNodeBridgeRequestWithOptionalAuth_*.
+	outer.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := WithAuthIdentity(r.Context(), &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
 	outer.Mount("/", gateway.newV1Router(false, false))
 
 	ts := httptest.NewServer(outer)

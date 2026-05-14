@@ -303,13 +303,14 @@ func (g *Gateway) nodeBridgeRequestWithOptionalAuth(ctx context.Context, method,
 			IsAdmin: true,
 		}))
 	}
-	if !g.auth.isConfigured() && g.getJWTValidator() == nil {
-		return req.WithContext(WithAuthIdentity(req.Context(), &AuthIdentity{
-			UserID:  "anonymous",
-			Scopes:  nil,
-			IsAdmin: true,
-		}))
-	}
+	// SECURITY: do NOT inject a synthetic "anonymous IsAdmin" identity when
+	// neither Basic Auth nor a JWT validator is configured. Earlier code did
+	// so to make bare dev nodes more curl-friendly, but it silently granted
+	// full admin scope (Scopes == nil → HasScope always true) to any caller
+	// on every endpoint that uses this bridge. On production deployments
+	// with misconfigured auth, that becomes a critical privilege escalation
+	// for owner-only paths reachable via the bridge. Callers that need a
+	// genuinely public path must not rely on AuthIdentity being present.
 	return req
 }
 

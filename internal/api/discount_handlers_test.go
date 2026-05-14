@@ -155,6 +155,16 @@ func discountTestServer(t *testing.T, svc *mockDiscountService) (*httptest.Serve
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			// Inject a pre-resolved admin identity so the post-fix
+			// nodeHumaAuthMiddleware short-circuits on the "already
+			// authenticated" check (mirrors SaaS SharedRouter behavior).
+			// Auth pipeline coverage lives in
+			// TestNodeBridgeRequestWithOptionalAuth_* and
+			// TestGateway_AuthenticationMiddleware.
+			ctx = WithAuthIdentity(ctx, &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
@@ -680,6 +690,12 @@ func TestDiscountHandlers_NoProvider(t *testing.T) {
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			// Test-only admin identity: this test asserts 501 from
+			// missing DiscountProvider, not the auth pipeline.
+			ctx = WithAuthIdentity(ctx, &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})

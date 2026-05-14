@@ -84,16 +84,16 @@ func (g *Gateway) registerNodeHumaDigitalOperations(api huma.API) {
 			return nil, huma.Error501NotImplemented("digital asset subsystem not available")
 		}
 		identity := GetAuthIdentity(r.Context())
-		// nodeBridgeRequestWithOptionalAuth injects an "anonymous" IsAdmin
-		// identity on bare dev nodes (no admin password + no JWT validator
-		// configured) so admin tooling works without setup. Buyer portal
-		// secrets MUST NOT be reachable through this fallback — require a
-		// real authenticated principal (configured admin or JWT subject)
-		// before granting allowAdmin.
-		isAnonymousFallback := identity != nil && identity.UserID == "anonymous"
-		allowAdmin := identity != nil && identity.IsAdmin && !isAnonymousFallback
+		// Defense in depth: only a fully-authenticated admin (real Basic
+		// Auth / JWT, or mbz_ API token with admin scope) may bypass the
+		// buyerPortalToken check. The previous synthetic anonymous-admin
+		// fallback in nodeBridgeRequestWithOptionalAuth has been removed,
+		// but we keep the explicit UserID guard so any future reintroduction
+		// of a sentinel anonymous identity cannot silently re-open this path.
+		isAnonymousSentinel := identity != nil && identity.UserID == "anonymous"
+		allowAdmin := identity != nil && identity.IsAdmin && !isAnonymousSentinel
 		authenticatedBuyerPeerID := ""
-		if identity != nil && !identity.IsAdmin && !isAnonymousFallback {
+		if identity != nil && !identity.IsAdmin && !isAnonymousSentinel {
 			authenticatedBuyerPeerID = identity.PeerID
 		}
 		buyerPortalToken := in.BuyerPortalTokenHeader

@@ -127,6 +127,15 @@ func guestTestServer(t *testing.T, svc *mockGuestOrderService) *httptest.Server 
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			// Inject admin identity so the post-fix nodeHumaAuthMiddleware
+			// short-circuits the "already authenticated" check on
+			// owner-only routes (ship / settings / complete). Auth pipeline
+			// coverage lives in TestNodeBridgeRequestWithOptionalAuth_* +
+			// TestGateway_AuthenticationMiddleware.
+			ctx = WithAuthIdentity(ctx, &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
@@ -380,6 +389,15 @@ func TestShipGuestOrder_Valid(t *testing.T) {
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			// Inject admin identity so the post-fix nodeHumaAuthMiddleware
+			// short-circuits the "already authenticated" check on
+			// owner-only routes (ship / settings / complete). Auth pipeline
+			// coverage lives in TestNodeBridgeRequestWithOptionalAuth_* +
+			// TestGateway_AuthenticationMiddleware.
+			ctx = WithAuthIdentity(ctx, &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
@@ -429,6 +447,15 @@ func TestGETGuestCheckoutSettings(t *testing.T) {
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			// Inject admin identity so the post-fix nodeHumaAuthMiddleware
+			// short-circuits the "already authenticated" check on
+			// owner-only routes (ship / settings / complete). Auth pipeline
+			// coverage lives in TestNodeBridgeRequestWithOptionalAuth_* +
+			// TestGateway_AuthenticationMiddleware.
+			ctx = WithAuthIdentity(ctx, &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
@@ -478,6 +505,15 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			// Inject admin identity so the post-fix nodeHumaAuthMiddleware
+			// short-circuits the "already authenticated" check on
+			// owner-only routes (ship / settings / complete). Auth pipeline
+			// coverage lives in TestNodeBridgeRequestWithOptionalAuth_* +
+			// TestGateway_AuthenticationMiddleware.
+			ctx = WithAuthIdentity(ctx, &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
@@ -542,6 +578,15 @@ func TestCompleteGuestOrder_Valid(t *testing.T) {
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			// Inject admin identity so the post-fix nodeHumaAuthMiddleware
+			// short-circuits the "already authenticated" check on
+			// owner-only routes (ship / settings / complete). Auth pipeline
+			// coverage lives in TestNodeBridgeRequestWithOptionalAuth_* +
+			// TestGateway_AuthenticationMiddleware.
+			ctx = WithAuthIdentity(ctx, &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
@@ -573,6 +618,15 @@ func TestGuestOrder_NotImplemented(t *testing.T) {
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			// Inject admin identity so the post-fix nodeHumaAuthMiddleware
+			// short-circuits the "already authenticated" check on
+			// owner-only routes (ship / settings / complete). Auth pipeline
+			// coverage lives in TestNodeBridgeRequestWithOptionalAuth_* +
+			// TestGateway_AuthenticationMiddleware.
+			ctx = WithAuthIdentity(ctx, &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})

@@ -359,10 +359,20 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		initFiatSubsystem(obNode)
 		initSupplyChainSubsystem(obNode)
 		initShippingSubsystem(obNode)
-		initDigitalSubsystem(obNode)
 		obNode.applyOptions([]NodeOption{
 			WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
 		})
+		// Post-applyOptions wiring. Order matters minimally here, but
+		// these all depend on services produced by applyOptions:
+		//   - Digital: featureResolver (DigitalEntitlementAppService
+		//     captures it at construction; nil resolver makes the
+		//     auto-delivery flag fail closed forever).
+		//   - SupplyChain: orderService (SetOrderOps) + featureResolver
+		//     (StartFulfillmentMonitor gate). Running this before
+		//     applyOptions would unconditionally start the monitor and
+		//     silently drop the orderService link.
+		initDigitalSubsystem(obNode)
+		finalizeSupplyChainSubsystem(obNode)
 		infraOwned = true
 		return obNode, nil
 	}
@@ -612,7 +622,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	initFiatSubsystem(obNode)
 	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
-	initDigitalSubsystem(obNode)
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
 	initEventDispatcher(obNode, notifyWsFn)
@@ -705,6 +714,11 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	obNode.applyOptions([]NodeOption{
 		WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
 	})
+	// Post-applyOptions wiring (see CreateInfrastructureOnlyNode for
+	// rationale): Digital depends on featureResolver; SupplyChain depends
+	// on orderService + featureResolver.
+	initDigitalSubsystem(obNode)
+	finalizeSupplyChainSubsystem(obNode)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
 
@@ -1257,7 +1271,6 @@ func newLightweightNode(
 	initFiatSubsystem(obNode)
 	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
-	initDigitalSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 	initPlatformAIConfig(obNode, cfg)
 
@@ -1319,6 +1332,11 @@ func newLightweightNode(
 	obNode.applyOptions([]NodeOption{
 		WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
 	})
+	// Post-applyOptions wiring (see CreateInfrastructureOnlyNode for
+	// rationale): Digital depends on featureResolver; SupplyChain depends
+	// on orderService + featureResolver.
+	initDigitalSubsystem(obNode)
+	finalizeSupplyChainSubsystem(obNode)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
 
@@ -1349,6 +1367,18 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 // initSupplyChainSubsystem initializes the per-node supply chain subsystem:
 // migrates DB models, creates FulfillmentProviderRegistry and SupplyChainAppService.
 // Concrete providers are registered via ConnectProvider API (FF-1+).
+// initSupplyChainSubsystem constructs the SupplyChain registry + service so
+// that initListingService (invoked later inside applyOptions) can wire itself
+// to supplyChainService via SetListingOps. Late wiring that depends on
+// applyOptions products (orderService, featureResolver) lives in
+// finalizeSupplyChainSubsystem instead.
+//
+// Why this split: initListingService reads n.supplyChainService directly to
+// install onDeleteCleanup hooks and SetListingOps, so supplyChainService must
+// exist before applyOptions. But orderService / featureResolver are only
+// produced inside applyOptions (initOrderService / initFeatureResolver), so
+// wiring that depends on them must wait. Doing both in one place causes the
+// monitor to start unconditionally and SetOrderOps to silently receive nil.
 func initSupplyChainSubsystem(obNode *MobazhaNode) {
 	if err := database.MigrateFulfillmentModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "SupplyChain: failed to migrate models: %v", err)
@@ -1371,22 +1401,36 @@ func initSupplyChainSubsystem(obNode *MobazhaNode) {
 	if obNode.eventBus != nil && obNode.shutdown != nil {
 		obNode.supplyChainService.SetEventBus(obNode.eventBus, obNode.shutdown)
 	}
-	if obNode.orderService != nil {
-		obNode.supplyChainService.SetOrderOps(obNode.orderService)
-	}
 	if obNode.exchangeRates != nil {
 		obNode.supplyChainService.SetExchangeRates(obNode.exchangeRates)
 	}
-	// Feature gate SSOT is featureResolver (Platform → Tenant → Node scope stack).
-	// Previously this used featureManager.IsEnabled which only reads DefaultValue,
-	// silently disabling SupplyChain whenever Platform/Tenant flipped the flag.
-	// We pass a fresh background ctx because monitor startup is fire-and-forget.
+
+	logger.LogInfoWithID(log, obNode.nodeID, "Supply chain subsystem initialized (pre-applyOptions phase)")
+}
+
+// finalizeSupplyChainSubsystem performs late wiring that depends on services
+// produced inside applyOptions:
+//   - SetOrderOps requires orderService (initOrderService).
+//   - StartFulfillmentMonitor's feature gate consults featureResolver
+//     (initFeatureResolver, Platform→Tenant→Node scope stack).
+//
+// MUST be called after applyOptions. No-op if supplyChainService is nil.
+func finalizeSupplyChainSubsystem(obNode *MobazhaNode) {
+	if obNode == nil || obNode.supplyChainService == nil {
+		return
+	}
+	if obNode.orderService != nil {
+		obNode.supplyChainService.SetOrderOps(obNode.orderService)
+	}
+	// Previously this used featureManager.IsEnabled which only reads
+	// DefaultValue, silently disabling SupplyChain whenever Platform/Tenant
+	// flipped the flag. We use a fresh background ctx because monitor
+	// startup is fire-and-forget.
 	if obNode.featureResolver == nil ||
 		obNode.featureResolver.IsEnabled(context.Background(), pkgconfig.FeatureSupplyChainEnabled.Key) {
 		obNode.supplyChainService.StartFulfillmentMonitor()
 	}
-
-	logger.LogInfoWithID(log, obNode.nodeID, "Supply chain subsystem initialized")
+	logger.LogInfoWithID(log, obNode.nodeID, "Supply chain subsystem finalized (post-applyOptions phase)")
 }
 
 // initFiatSubsystem initializes the per-node fiat payment subsystem:
@@ -1403,9 +1447,10 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	obNode.fiatPaymentService.SetEventBus(obNode.eventBus)
 	obNode.fiatPaymentService.LoadAndRegisterProviders()
 
-	if obNode.orderService != nil {
-		obNode.orderService.SetFiatOps(obNode.fiatPaymentService)
-	}
+	// NOTE: orderService.SetFiatOps wiring is handled in
+	// wireServiceSetters() (called from applyOptions). Performing it here
+	// would be a no-op because orderService is initialized later, inside
+	// applyOptions → initOrderService.
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
 }

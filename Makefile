@@ -1,4 +1,4 @@
-.PHONY: build build-private_distribution smoke-private_distribution smoke-private_distribution-da test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
+.PHONY: build build-private_distribution smoke-private_distribution smoke-private_distribution-da test test-invariants test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
 
 SYSTEM_GO := /usr/local/go/bin/go
 GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
@@ -12,6 +12,17 @@ build-private_distribution: ## 构建 PrivateDistribution 精简版（CGO-free�
 
 test: ## 运行测试
 	$(GO) test -tags '$(GO_TEST_TAGS)' ./...
+
+# Phase EVM-ManagedEscrow SP1-B — DelegateCall 架构守护测试。
+# 覆盖 PENDING_RELAY_DESIGN §3.5 + §11.4 的三大不变量：
+#   Invariant 1: MultiSendCallOnly 拒绝 inner DELEGATECALL（含 0..255 全字节穷举）
+#   Invariant 2: outer DELEGATECALL 仅允许 canonical MultiSendCallOnly（含 trojan-target 目录）
+#   Invariant 3: 所有 Ready 链的 MSCO 地址被 IsCanonicalMultiSendCallOnly 识别
+# 以及 adapter 层 biconditional：CALL ⇔ recipient / DELEGATECALL ⇔ MSCO。
+# 任何破坏这些性质的改动会在 CI 立即失败。
+test-invariants: ## 运行 DelegateCall 架构守护测试（pkg/managedescrow + adapters）
+	$(GO) test -tags '$(GO_TEST_TAGS)' -run 'Invariant|Inv2|DelegateCall|MultiSendCallOnly|AlwaysUsesMultiSend' \
+		./pkg/managedescrow/... ./internal/payment/adapters/...
 
 smoke-private_distribution: build-private_distribution ## 构建 private_distribution 并运行网络隔离 smoke test
 	./scripts/private_distribution-network-smoke.sh ./mobazha-private_distribution 20

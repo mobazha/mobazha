@@ -727,8 +727,11 @@ func (s *GuestOrderAppService) AutoCompleteOrders(ctx context.Context) {
 		if err := s.transitionState(order.OrderToken,
 			models.GuestOrderShipped, models.GuestOrderCompleted,
 			func(tx database.Tx, o *models.GuestOrder) error {
-				now := time.Now()
-				o.CompletedAt = &now
+				// Use transaction-time clock for CompletedAt: large batches
+				// may take seconds-to-minutes; the outer `now` (line 717) is
+				// intentionally reserved for the cutoff comparison only.
+				completedAt := time.Now()
+				o.CompletedAt = &completedAt
 				return nil
 			}); err != nil {
 			log.Warningf("auto-complete guest order %s: %v", redact.Token(order.OrderToken), err)

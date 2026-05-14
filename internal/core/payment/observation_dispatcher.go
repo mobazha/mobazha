@@ -274,6 +274,111 @@ func (d *ObservationDispatcher) OnFundingEvent(ctx context.Context, evt FundingE
 		return fmt.Errorf("payment: TenantResolver returned empty tenant for order %s", evt.OrderID)
 	}
 
+	obs := buildObservation(
+		tenantID, evt,
+		models.PaymentObservationSourceMonitor,
+		d.monitorObserver(evt.ChainNamespace, evt.ChainReference),
+	)
+	return d.insertAndKick(ctx, obs)
+}
+
+// OnBuyerReportedPaymentSent records a buyer-reported PAYMENT_SENT
+// message as an independent payment_observations row (Source =
+// "buyer_reported", Observer = "buyer:<peerID>") and kicks the
+// aggregator. This is the Sprint 2A step 5 entry point that lets the
+// legacy buyer-submitted PaymentSent envelope feed the same fact table
+// the monitor path already uses, so AggregatingVerifier can DISTINCT-ON
+// across both observers without divergent data plumbing.
+//
+// Authoritative design: docs/escrow/MONITOR_DRIVEN_PAYMENT.md §5.3.
+//
+// Differences from OnFundingEvent:
+//
+//   - tenantID is supplied by the caller (the Order is already loaded
+//     in the message-processing transaction, so going through
+//     TenantResolver is unnecessary indirection — and would bias the
+//     observed tenant against whatever the Order row says, defeating
+//     the cross-tenant scoping guarantee from the verifier).
+//   - Observer is "buyer:<peerID>", which makes the row strictly less
+//     trusted than monitor rows in the DISTINCT-ON priority rule
+//     (see pkg/models.DedupePaymentObservations). When monitor +
+//     buyer report the same tx, the monitor row wins.
+//   - The dispatcher does NOT pull the tx from the chain itself.
+//     Caller is responsible for enriching FundingEvent with the
+//     verified on-chain fields (amount / from / to / blockNumber /
+//     blockTime) BEFORE calling this method. The DoD's "tx 验证失败
+//     拒消息" requirement is satisfied at the caller (typically
+//     processPaymentSentMessage's existing ValidatePayment +
+//     PVS preprocess step), not inside the dispatcher.
+//
+// Idempotency: same as OnFundingEvent — duplicate inserts on the
+// (tenant, chain, tx, eventIndex, observer) UNIQUE tuple collapse to
+// a silent no-op + skipped aggregator kick. The same buyer re-sending
+// the same PAYMENT_SENT message therefore costs one INSERT attempt
+// and one IndexLookup; no spurious aggregator fan-out.
+func (d *ObservationDispatcher) OnBuyerReportedPaymentSent(
+	ctx context.Context,
+	tenantID, buyerPeerID string,
+	evt FundingEvent,
+) error {
+	if strings.TrimSpace(tenantID) == "" {
+		return fmt.Errorf("%w: empty tenantID", ErrInvalidFundingEvent)
+	}
+	if strings.TrimSpace(buyerPeerID) == "" {
+		return fmt.Errorf("%w: empty buyerPeerID", ErrInvalidFundingEvent)
+	}
+	if err := evt.validate(); err != nil {
+		return err
+	}
+
+	obs := buildObservation(
+		tenantID, evt,
+		models.PaymentObservationSourceBuyerReported,
+		buyerObserver(buyerPeerID),
+	)
+	return d.insertAndKick(ctx, obs)
+}
+
+// insertAndKick is the shared "INSERT observation + (maybe) kick the
+// aggregator" tail used by both OnFundingEvent (monitor source) and
+// OnBuyerReportedPaymentSent (buyer_reported source). Centralising the
+// dedup-vs-aggregate logic prevents the two entry points from drifting
+// — the contract that "duplicate inserts skip the aggregator kick" is
+// invariant across observation sources and is asserted by the dispatcher
+// tests for both paths.
+func (d *ObservationDispatcher) insertAndKick(ctx context.Context, obs *models.PaymentObservation) error {
+	if err := d.repo.InsertObservation(ctx, obs); err != nil {
+		if errors.Is(err, contracts.ErrDuplicateObservation) {
+			// Same observer replaying the same event — already
+			// persisted. Skip the aggregator kick: a duplicate event by
+			// definition produces no new content for the aggregator to
+			// consider, and a kick here would hot-loop on storms of
+			// replayed buyer-reported PAYMENT_SENT messages.
+			return nil
+		}
+		return fmt.Errorf("payment: insert observation for order %s tx %s: %w",
+			obs.OrderID, obs.TxHash, err)
+	}
+
+	if err := d.aggregator.AggregateAndEmit(ctx, obs.TenantID, obs.OrderID); err != nil {
+		return fmt.Errorf("payment: aggregate after insert (order=%s tx=%s): %w",
+			obs.OrderID, obs.TxHash, err)
+	}
+	return nil
+}
+
+// buildObservation copies the chain-side fields from evt into a fresh
+// PaymentObservation row tagged with the supplied source/observer pair.
+// Centralising the field copy keeps OnFundingEvent and
+// OnBuyerReportedPaymentSent in lock-step: the two paths always produce
+// row shapes that differ only in (Source, Observer), which is exactly
+// the DISTINCT-ON axis the aggregator runs on.
+func buildObservation(
+	tenantID string,
+	evt FundingEvent,
+	source string,
+	observer string,
+) *models.PaymentObservation {
 	obs := &models.PaymentObservation{
 		ID:             uuid.NewString(),
 		TenantID:       tenantID,
@@ -289,26 +394,20 @@ func (d *ObservationDispatcher) OnFundingEvent(ctx context.Context, evt FundingE
 		BlockNumber:    evt.BlockNumber,
 		BlockTime:      evt.BlockTime,
 		Confirmations:  0,
-		Source:         models.PaymentObservationSourceMonitor,
-		Observer:       d.monitorObserver(evt.ChainNamespace, evt.ChainReference),
+		Source:         source,
+		Observer:       observer,
 		Status:         models.PaymentObservationStatusPending,
 	}
 	obs.SetAmountBigInt(evt.Amount)
+	return obs
+}
 
-	if err := d.repo.InsertObservation(ctx, obs); err != nil {
-		if errors.Is(err, contracts.ErrDuplicateObservation) {
-			// Same worker replaying the same event — already persisted.
-			// Skip the aggregator kick: a duplicate event by definition
-			// produces no new content for the aggregator to consider.
-			return nil
-		}
-		return fmt.Errorf("payment: insert observation for order %s tx %s: %w", evt.OrderID, evt.TxHash, err)
-	}
-
-	if err := d.aggregator.AggregateAndEmit(ctx, tenantID, evt.OrderID); err != nil {
-		return fmt.Errorf("payment: aggregate after insert (order=%s tx=%s): %w", evt.OrderID, evt.TxHash, err)
-	}
-	return nil
+// buyerObserver returns the observer string for a buyer-reported row.
+// Format documented on models.PaymentObservation.Observer; using the
+// "buyer:" prefix keeps the priority rule in
+// DedupePaymentObservations purely string-based.
+func buyerObserver(buyerPeerID string) string {
+	return "buyer:" + buyerPeerID
 }
 
 // OnNewBlock advances confirmations on a per-chain basis and re-aggregates

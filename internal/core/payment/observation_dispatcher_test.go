@@ -467,3 +467,226 @@ func TestObservationDispatcher_OnNewBlock_RejectsBlankChainArgs(t *testing.T) {
 	require.Error(t, d.OnNewBlock(context.Background(), "", "1", 100, 12))
 	require.Error(t, d.OnNewBlock(context.Background(), "eip155", "  ", 100, 12))
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// OnBuyerReportedPaymentSent — Sprint 2A step 5 (design §5.3)
+//
+// The buyer-reported entry point shares the INSERT + aggregator-kick
+// tail with OnFundingEvent (insertAndKick) and the FundingEvent shape
+// itself. The tests below assert the path-specific behaviours:
+//
+//   - Source = "buyer_reported" + Observer = "buyer:<peerID>" land in
+//     the row;
+//   - tenantID is supplied by the caller, not the TenantResolver
+//     (resolver MUST NOT be called on this path);
+//   - blank tenantID / blank buyerPeerID are rejected up front so a
+//     bug at the caller cannot poison the fact table with cross-tenant
+//     leakage;
+//   - duplicate inserts collapse + skip the aggregator (consistent with
+//     OnFundingEvent — the design contract is observer-agnostic);
+//   - monitor + buyer reporting the same tx produce two independent
+//     rows on the (tenant, chain, tx, eventIndex, observer) UNIQUE
+//     tuple, validating §5.3's "保留双源完整 evidence" guarantee.
+// ─────────────────────────────────────────────────────────────────────────
+
+// resolverGuard wraps fakeTenantResolver with a "must never be called"
+// assertion so OnBuyerReportedPaymentSent tests can prove the buyer
+// path bypasses the resolver entirely. A regression that re-introduces
+// a resolver lookup on this path would surface as an immediate test
+// failure here rather than as silent slow-down in production.
+type resolverGuard struct {
+	t *testing.T
+}
+
+func (g resolverGuard) ResolveTenant(_ context.Context, orderID string) (string, error) {
+	g.t.Fatalf("OnBuyerReportedPaymentSent must not call TenantResolver (orderID=%q)", orderID)
+	return "", nil
+}
+
+// newBuyerDispatcher mirrors newDispatcher but plugs in the resolver
+// guard above. The buyer path takes tenantID from the caller, so any
+// resolver hit is a regression.
+func newBuyerDispatcher(t *testing.T) (*ObservationDispatcher, *fakeObsRepo, *fakeAggregator) {
+	t.Helper()
+	repo := newFakeObsRepo()
+	agg := &fakeAggregator{}
+	d := NewObservationDispatcher(repo, agg, resolverGuard{t: t}, "worker-A").
+		withClock(func() time.Time { return time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC) })
+	return d, repo, agg
+}
+
+func TestObservationDispatcher_OnBuyerReportedPaymentSent_PersistsBuyerRow(t *testing.T) {
+	d, repo, agg := newBuyerDispatcher(t)
+
+	require.NoError(t,
+		d.OnBuyerReportedPaymentSent(
+			context.Background(),
+			"tenant-1",
+			"12D3KooWBuyer",
+			validFundingEvent(),
+		),
+	)
+
+	rows := repo.snapshot()
+	require.Len(t, rows, 1)
+	got := rows[0]
+
+	// Source / Observer differ from monitor path; everything else is
+	// identical to validFundingEvent's shape.
+	require.Equal(t, "tenant-1", got.TenantID)
+	require.Equal(t, "order-1", got.OrderID)
+	require.Equal(t, models.PaymentObservationSourceBuyerReported, got.Source)
+	require.Equal(t, "buyer:12D3KooWBuyer", got.Observer)
+	require.Equal(t, models.PaymentObservationStatusPending, got.Status)
+	require.Equal(t, "1000000000000000000", got.Amount)
+	require.NotEmpty(t, got.ID, "dispatcher must assign a UUID per row")
+
+	calls := agg.snapshot()
+	require.Equal(t,
+		[]contracts.OrderRef{{TenantID: "tenant-1", OrderID: "order-1"}},
+		calls,
+		"aggregator MUST be kicked once after a successful buyer-reported insert",
+	)
+}
+
+func TestObservationDispatcher_OnBuyerReportedPaymentSent_DuplicateSwallowsAndSkipsAggregator(t *testing.T) {
+	d, repo, agg := newBuyerDispatcher(t)
+
+	require.NoError(t, d.OnBuyerReportedPaymentSent(
+		context.Background(), "tenant-1", "12D3KooWBuyer", validFundingEvent()))
+	require.NoError(t, d.OnBuyerReportedPaymentSent(
+		context.Background(), "tenant-1", "12D3KooWBuyer", validFundingEvent()),
+		"same buyer re-sending same tx must be a silent no-op")
+
+	require.Len(t, repo.snapshot(), 1, "dedupe tuple collapsed in fake repo")
+	require.Len(t, agg.snapshot(), 1,
+		"aggregator MUST NOT be called on duplicate buyer-reported events — "+
+			"design §5.3 inherits the OnFundingEvent idempotency contract")
+}
+
+func TestObservationDispatcher_OnBuyerReportedPaymentSent_MonitorAndBuyerEachInsertIndependentRow(t *testing.T) {
+	// This is the §5.3 v2.0 invariant: same tx + same chain + same
+	// eventIndex but different observers ⇒ two rows survive in the
+	// fact table. The aggregator's DISTINCT ON later picks the
+	// monitor row as canonical, but both rows persist as evidence.
+	repo := newFakeObsRepo()
+	agg := &fakeAggregator{}
+	res := &fakeTenantResolver{tenants: map[string]string{"order-1": "tenant-1"}}
+	d := NewObservationDispatcher(repo, agg, res, "worker-A").
+		withClock(func() time.Time { return time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC) })
+
+	require.NoError(t, d.OnFundingEvent(context.Background(), validFundingEvent()))
+	require.NoError(t,
+		d.OnBuyerReportedPaymentSent(context.Background(), "tenant-1", "12D3KooWBuyer", validFundingEvent()),
+	)
+
+	rows := repo.snapshot()
+	require.Len(t, rows, 2,
+		"monitor + buyer reporting same tx must each produce one row")
+
+	// One row is the monitor's, one is the buyer's; pair them up
+	// by observer prefix rather than slice index so the test does
+	// not bake in fake-repo iteration order.
+	bySource := map[string]*models.PaymentObservation{}
+	for _, r := range rows {
+		bySource[r.Source] = r
+	}
+	monitorRow := bySource[models.PaymentObservationSourceMonitor]
+	buyerRow := bySource[models.PaymentObservationSourceBuyerReported]
+
+	require.NotNil(t, monitorRow, "monitor row must be present")
+	require.NotNil(t, buyerRow, "buyer row must be present")
+	require.Equal(t, "monitor:eip155:1:worker-A", monitorRow.Observer)
+	require.Equal(t, "buyer:12D3KooWBuyer", buyerRow.Observer)
+
+	// Same chain-side facts on both rows — DISTINCT ON priority
+	// later picks one as canonical without mutating either.
+	require.Equal(t, monitorRow.TxHash, buyerRow.TxHash)
+	require.Equal(t, monitorRow.EventIndex, buyerRow.EventIndex)
+	require.Equal(t, monitorRow.Amount, buyerRow.Amount)
+
+	require.Len(t, agg.snapshot(), 2,
+		"aggregator must be kicked once per independent insert (monitor + buyer)")
+}
+
+func TestObservationDispatcher_OnBuyerReportedPaymentSent_BlankTenantRejected(t *testing.T) {
+	d, repo, agg := newBuyerDispatcher(t)
+
+	for _, tenant := range []string{"", "   "} {
+		err := d.OnBuyerReportedPaymentSent(
+			context.Background(), tenant, "12D3KooWBuyer", validFundingEvent())
+		require.ErrorIs(t, err, ErrInvalidFundingEvent)
+		require.Contains(t, err.Error(), "empty tenantID")
+	}
+	require.Empty(t, repo.snapshot())
+	require.Empty(t, agg.snapshot())
+}
+
+func TestObservationDispatcher_OnBuyerReportedPaymentSent_BlankBuyerPeerIDRejected(t *testing.T) {
+	d, repo, agg := newBuyerDispatcher(t)
+
+	for _, peer := range []string{"", "  \t"} {
+		err := d.OnBuyerReportedPaymentSent(
+			context.Background(), "tenant-1", peer, validFundingEvent())
+		require.ErrorIs(t, err, ErrInvalidFundingEvent)
+		require.Contains(t, err.Error(), "empty buyerPeerID")
+	}
+	require.Empty(t, repo.snapshot())
+	require.Empty(t, agg.snapshot())
+}
+
+func TestObservationDispatcher_OnBuyerReportedPaymentSent_RejectsInvalidEvents(t *testing.T) {
+	// We don't re-table-test every FundingEvent.validate field
+	// (covered for monitor path); a representative subset proves the
+	// validation is invoked. The contract is "evt.validate is called
+	// AFTER tenantID/buyerPeerID guards" so reaching the field check
+	// requires both id strings to be valid.
+	cases := []struct {
+		name   string
+		mutate func(*FundingEvent)
+		expect string
+	}{
+		{"empty TxHash", func(e *FundingEvent) { e.TxHash = "" }, "empty TxHash"},
+		{"zero Amount", func(e *FundingEvent) { e.Amount = big.NewInt(0) }, "Amount must be > 0"},
+		{"zero BlockTime", func(e *FundingEvent) { e.BlockTime = time.Time{} }, "BlockTime must be set"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d, repo, agg := newBuyerDispatcher(t)
+			evt := validFundingEvent()
+			tc.mutate(&evt)
+
+			err := d.OnBuyerReportedPaymentSent(
+				context.Background(), "tenant-1", "12D3KooWBuyer", evt)
+			require.ErrorIs(t, err, ErrInvalidFundingEvent)
+			require.Contains(t, err.Error(), tc.expect)
+			require.Empty(t, repo.snapshot(), "rejected events must not persist")
+			require.Empty(t, agg.snapshot(), "rejected events must not trigger aggregator")
+		})
+	}
+}
+
+func TestObservationDispatcher_OnBuyerReportedPaymentSent_RepoErrorWrapped(t *testing.T) {
+	d, repo, agg := newBuyerDispatcher(t)
+	repo.insertErr = errors.New("database is locked")
+
+	err := d.OnBuyerReportedPaymentSent(
+		context.Background(), "tenant-1", "12D3KooWBuyer", validFundingEvent())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "insert observation for order order-1 tx 0xabc")
+	require.Contains(t, err.Error(), "database is locked")
+	require.Empty(t, agg.snapshot(), "aggregator must not run when insert fails")
+}
+
+func TestObservationDispatcher_OnBuyerReportedPaymentSent_AggregatorErrorPropagates(t *testing.T) {
+	d, repo, agg := newBuyerDispatcher(t)
+	agg.errAlways = errors.New("verifier offline")
+
+	err := d.OnBuyerReportedPaymentSent(
+		context.Background(), "tenant-1", "12D3KooWBuyer", validFundingEvent())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "aggregate after insert")
+	require.Contains(t, err.Error(), "verifier offline")
+	require.Len(t, repo.snapshot(), 1, "observation IS persisted even though aggregator fails")
+}

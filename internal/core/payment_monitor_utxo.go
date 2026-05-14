@@ -26,7 +26,6 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	}
 
 	if n.monitorService == nil {
-		_ = internalutxo.DefaultMonitorConfig
 		monitor, err := internalutxo.CreateMonitor(context.Background(), n.UsingWalletTestnet())
 		if err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Failed to create UTXO monitor: %v", err)

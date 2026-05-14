@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -23,7 +22,7 @@ import (
 
 // ========== Mock Payment Source for Testing ==========
 
-// mockUTXOPaymentSource is a mock implementation of utxo.PaymentSource for testing
+// mockUTXOPaymentSource is a mock implementation of pkgutxo.PaymentSource for testing
 type mockUTXOPaymentSource struct {
 	mu           sync.RWMutex
 	healthy      bool
@@ -189,7 +188,7 @@ func setupNodeWithMonitor(t *testing.T) (*MobazhaNode, *mockUTXOPaymentSource) {
 	mockSource := newMockUTXOPaymentSource(iwallet.ChainMock)
 
 	// Create monitor and add mock source
-	monitor := utxo.NewMonitor(utxo.DefaultMonitorConfig())
+	monitor := pkgutxo.NewMonitor(pkgutxo.DefaultMonitorConfig())
 	monitor.AddSource(iwallet.ChainMock, mockSource)
 	node.SetUTXOMonitor(monitor)
 	monitor.Start()
@@ -202,7 +201,7 @@ func setupNodeWithMonitor(t *testing.T) (*MobazhaNode, *mockUTXOPaymentSource) {
 
 // TestUTXOMonitor_StartStop tests monitor start and stop
 func TestUTXOMonitor_StartStop(t *testing.T) {
-	monitor := utxo.NewMonitor(&utxo.MonitorConfig{
+	monitor := pkgutxo.NewMonitor(&pkgutxo.MonitorConfig{
 		PollInterval: 100 * time.Millisecond,
 	})
 
@@ -219,14 +218,14 @@ func TestUTXOMonitor_StartStop(t *testing.T) {
 
 // TestUTXOMonitor_WatchAddress tests address watching
 func TestUTXOMonitor_WatchAddress(t *testing.T) {
-	monitor := utxo.NewMonitor(&utxo.MonitorConfig{
+	monitor := pkgutxo.NewMonitor(&pkgutxo.MonitorConfig{
 		PollInterval: 100 * time.Millisecond,
 	})
 
 	mockSource := newMockUTXOPaymentSource(iwallet.ChainMock)
 	monitor.AddSource(iwallet.ChainMock, mockSource)
 
-	wa := &utxo.WatchedAddress{
+	wa := &pkgutxo.WatchedAddress{
 		Address:        "test_address_123",
 		ChainType:      iwallet.ChainMock,
 		OrderID:        "order_123",
@@ -242,7 +241,7 @@ func TestUTXOMonitor_WatchAddress(t *testing.T) {
 
 // TestUTXOMonitor_PaymentDetection tests payment detection via polling
 func TestUTXOMonitor_PaymentDetection(t *testing.T) {
-	monitor := utxo.NewMonitor(&utxo.MonitorConfig{
+	monitor := pkgutxo.NewMonitor(&pkgutxo.MonitorConfig{
 		PollInterval: 50 * time.Millisecond,
 	})
 
@@ -252,7 +251,7 @@ func TestUTXOMonitor_PaymentDetection(t *testing.T) {
 	txChan := monitor.SubscribeTransactions()
 
 	address := "payment_address_456"
-	wa := &utxo.WatchedAddress{
+	wa := &pkgutxo.WatchedAddress{
 		Address:        address,
 		ChainType:      iwallet.ChainMock,
 		OrderID:        "order_456",
@@ -297,7 +296,7 @@ func TestMobazhaNode_StartUTXOMonitorWithMockSources(t *testing.T) {
 	mockSource := newMockUTXOPaymentSource(iwallet.ChainMock)
 
 	// Create monitor and add mock source
-	monitor := utxo.NewMonitor(utxo.DefaultMonitorConfig())
+	monitor := pkgutxo.NewMonitor(pkgutxo.DefaultMonitorConfig())
 	monitor.AddSource(iwallet.ChainMock, mockSource)
 	node.SetUTXOMonitor(monitor)
 	monitor.Start()

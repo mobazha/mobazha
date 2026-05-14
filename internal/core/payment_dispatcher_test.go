@@ -395,6 +395,11 @@ func TestManagedEscrowAdapterShadow_OwnerProviderInjectedWhenPaymentServiceAvail
 	// to errManagedEscrowStubNotImplemented. We use HasOwnerProvider() — the
 	// dispatcher-facing predicate — instead of reaching into unexported
 	// state, so the test stays decoupled from ManagedEscrowAdapter's internals.
+	//
+	// D18b additionally pins NonceProvider injection: it is wired
+	// unconditionally (multiwallet is the only required dep, already
+	// provided by nodeWithManagedEscrowShadowDeps), so it must be present here
+	// alongside the OwnerProvider.
 	n := nodeWithManagedEscrowShadowDeps()
 	// PaymentAppService is non-nil; its inner deps stay zero-valued
 	// because registerManagedEscrowAdapterShadow only checks pointer presence.
@@ -408,11 +413,8 @@ func TestManagedEscrowAdapterShadow_OwnerProviderInjectedWhenPaymentServiceAvail
 		if !adapter.HasOwnerProvider() {
 			t.Errorf("managedEscrowAdapters[%s] has no OwnerProvider; D18a injection regressed", chain)
 		}
-		// NonceProvider remains stubbed in this commit (D18a covers
-		// owners only); pin the inverted invariant so a future commit
-		// flipping it forces this test to be revisited deliberately.
-		if adapter.HasNonceProvider() {
-			t.Errorf("managedEscrowAdapters[%s] unexpectedly has NonceProvider; update test alongside D18b", chain)
+		if !adapter.HasNonceProvider() {
+			t.Errorf("managedEscrowAdapters[%s] has no NonceProvider; D18b injection regressed", chain)
 		}
 	}
 }
@@ -422,6 +424,12 @@ func TestManagedEscrowAdapterShadow_OwnerProviderNilWhenPaymentServiceMissing(t 
 	// (test-only path), OwnerProvider stays nil and SetupPayment
 	// continues to short-circuit. Document this explicitly so the
 	// test suite encodes the boundary on both sides.
+	//
+	// NonceProvider is independent of paymentService — D18b wires it
+	// from multiwallet, which IS present in nodeWithManagedEscrowShadowDeps —
+	// so it must still be wired even on this branch. Asserting both
+	// directions here keeps the two providers' wiring contracts
+	// distinct and pinned.
 	n := nodeWithManagedEscrowShadowDeps()
 	n.registerPaymentStrategies()
 
@@ -431,6 +439,9 @@ func TestManagedEscrowAdapterShadow_OwnerProviderNilWhenPaymentServiceMissing(t 
 	for chain, adapter := range n.managedEscrowAdapters {
 		if adapter.HasOwnerProvider() {
 			t.Errorf("managedEscrowAdapters[%s] has OwnerProvider despite paymentService=nil; D18a guard broken", chain)
+		}
+		if !adapter.HasNonceProvider() {
+			t.Errorf("managedEscrowAdapters[%s] has no NonceProvider despite multiwallet present; D18b wiring should not depend on paymentService", chain)
 		}
 	}
 }

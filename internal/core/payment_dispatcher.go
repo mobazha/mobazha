@@ -109,20 +109,29 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 // 2 shadow stage).
 //
 // V1 ForCoin lookups remain canonical and the V2 lookup path has no
-// production caller today. Sprint 2 D18a wires a real OwnerProvider
-// (when PaymentAppService is available) so SetupPayment can predict
-// ManagedEscrow addresses end-to-end; Relayer + NonceProvider remain stubbed
-// pending follow-up commits, so accidental V2 invocations surface
-// ErrRelayerNotConfigured (Submit/GasWallet) or errManagedEscrowStubNotImplemented
-// (Confirm/Cancel/Complete/DisputeRelease) instead of silently
-// broadcasting. GetActionStatus is fully wired against an in-memory
-// store, and SetupPayment is fully wired once OwnerProvider is set.
+// production caller today. Provider wiring lands in incremental commits:
 //
-// Skipped when keyProvider or multiwallet is nil (unit tests that build
-// a stripped-down MobazhaNode); production builds always have both.
-// OwnerProvider injection additionally requires paymentService — when
-// paymentService is nil (also a test-only path), SetupPayment continues
-// to short-circuit with errManagedEscrowStubNotImplemented.
+//   - D18a — OwnerProvider (paymentManagedEscrowOwnerProvider) so SetupPayment
+//     can predict ManagedEscrow addresses end-to-end. Wired when paymentService
+//     is non-nil.
+//   - D18b — NonceProvider (paymentManagedEscrowNonceProvider) so Confirm /
+//     Cancel / Complete / DisputeRelease can build deterministic
+//     execTransaction envelopes against the live ManagedEscrow nonce. Wired
+//     unconditionally because multiwallet is already required for
+//     shadow registration to begin.
+//   - D18c (pending) — Relayer (real SaaS Relay client / local-EOA
+//     relayer). Until D18c lands, Submit/GasWalletAddress on the
+//     adapter return ErrRelayerNotConfigured.
+//
+// Test-only paths that build a stripped MobazhaNode (no paymentService)
+// continue to leave OwnerProvider nil, so SetupPayment short-circuits
+// with errManagedEscrowStubNotImplemented as documented. NonceProvider is
+// wired in those tests too — a missing OwnerProvider trips the action
+// path before the nonce read is reached.
+//
+// Skipped entirely when keyProvider or multiwallet is nil (unit tests
+// that build a stripped-down MobazhaNode); production builds always
+// have both.
 func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	if n.keyProvider == nil || n.multiwallet == nil {
 		logger.LogInfoWithIDf(log, n.nodeID,
@@ -133,10 +142,11 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 
 	store := adapters.NewMemoryActionStore()
 	deps := adapters.ManagedEscrowAdapterDeps{
-		Relayer:     managed_escrow.NoopRelayer(),
-		Keys:        n.keyProvider,
-		Multiwallet: n.multiwallet,
-		ActionStore: store,
+		Relayer:       managed_escrow.NoopRelayer(),
+		Keys:          n.keyProvider,
+		Multiwallet:   n.multiwallet,
+		ActionStore:   store,
+		NonceProvider: &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet},
 	}
 	if n.paymentService != nil {
 		deps.OwnerProvider = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}

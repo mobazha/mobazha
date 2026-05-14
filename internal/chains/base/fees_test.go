@@ -7,18 +7,6 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-type mockExchangeRateProvider struct {
-	rate iwallet.Amount
-	err  error
-}
-
-func (m mockExchangeRateProvider) GetUSDRate(iwallet.CoinType) (iwallet.Amount, error) {
-	if m.err != nil {
-		return iwallet.NewAmount(0), m.err
-	}
-	return m.rate, nil
-}
-
 func TestHardCodedFeeProvider_GetFee(t *testing.T) {
 	tests := []struct {
 		feeLevel iwallet.FeeLevel
@@ -94,48 +82,6 @@ func TestAPIFeeProvider_GetFee(t *testing.T) {
 	defer httpmock.Deactivate()
 
 	fp := NewAPIFeeProvider(url, iwallet.NewAmount(200))
-
-	for i, test := range tests {
-		amt, err := fp.GetFee(test.feeLevel)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if amt.Cmp(test.expected) != 0 {
-			t.Errorf("Test %d: expected %s, got %s", i, test.expected, amt)
-		}
-	}
-}
-
-func TestExchangeRateFeeProvider_GetFee(t *testing.T) {
-	tests := []struct {
-		feeLevel iwallet.FeeLevel
-		expected iwallet.Amount
-	}{
-		{
-			feeLevel: iwallet.FlPriority,
-			expected: iwallet.NewAmount(60),
-		},
-		{
-			feeLevel: iwallet.FlNormal,
-			expected: iwallet.NewAmount(36),
-		},
-		{
-			feeLevel: iwallet.FlEconomic,
-			expected: iwallet.NewAmount(18),
-		},
-		{
-			feeLevel: iwallet.FLSuperEconomic,
-			expected: iwallet.NewAmount(12),
-		},
-		{
-			feeLevel: iwallet.FeeLevel(100),
-			expected: iwallet.NewAmount(100),
-		},
-	}
-
-	erp := mockExchangeRateProvider{rate: iwallet.NewAmount(55)}
-
-	fp := NewExchangeRateFeeProvider(iwallet.CoinType("crypto:zcash:mainnet:native"), 8, erp, 1500, iwallet.NewAmount(200), 5, 3, 1.5, 1)
 
 	for i, test := range tests {
 		amt, err := fp.GetFee(test.feeLevel)

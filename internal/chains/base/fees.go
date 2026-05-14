@@ -3,7 +3,6 @@ package base
 import (
 	"encoding/json"
 	"errors"
-	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -17,12 +16,6 @@ import (
 type FeeProvider interface {
 	// GetFee returns the appropriate fee for the given level.
 	GetFee(level iwallet.FeeLevel) (iwallet.Amount, error)
-}
-
-// ExchangeRateProvider converts a coin type to its USD rate (in cents).
-// It is used by ExchangeRateFeeProvider when fee targets are USD-based.
-type ExchangeRateProvider interface {
-	GetUSDRate(coinType iwallet.CoinType) (iwallet.Amount, error)
 }
 
 // HardCodedFeeProvider is a basic implementation of the FeeProvider interface
@@ -123,62 +116,4 @@ func (fp *APIFeeProvider) GetFee(level iwallet.FeeLevel) (iwallet.Amount, error)
 	fp.lastQueried = time.Now()
 
 	return fromCache()
-}
-
-// ExchangeRateFeeProvider is an implementation of the FeeProvider which targets a
-// specific USD exchange rate for the fees.
-type ExchangeRateFeeProvider struct {
-	targetMap          map[iwallet.FeeLevel]float64
-	maxFee             iwallet.Amount
-	erp                ExchangeRateProvider
-	coinType           iwallet.CoinType
-	divisibility       float64
-	avgTransactionSize float64
-}
-
-// NewExchangeRateFeeProvider returns a new ExchangeRateFeeProvider.
-func NewExchangeRateFeeProvider(coinType iwallet.CoinType, divisibility int, erp ExchangeRateProvider, avgTransactionSize int,
-	maxFeePerByte iwallet.Amount, PriorityUSDCents, NormalUSDCents, EconomicUSDCents, SuperEconomicUSDCents float64) FeeProvider {
-	return &ExchangeRateFeeProvider{
-		targetMap: map[iwallet.FeeLevel]float64{
-			iwallet.FlPriority:      PriorityUSDCents,
-			iwallet.FlNormal:        NormalUSDCents,
-			iwallet.FlEconomic:      EconomicUSDCents,
-			iwallet.FLSuperEconomic: SuperEconomicUSDCents,
-		},
-		maxFee:             maxFeePerByte,
-		erp:                erp,
-		coinType:           coinType,
-		divisibility:       math.Pow10(divisibility),
-		avgTransactionSize: float64(avgTransactionSize),
-	}
-}
-
-// GetFee returns the appropriate fee for the given level.
-func (fp *ExchangeRateFeeProvider) GetFee(level iwallet.FeeLevel) (iwallet.Amount, error) {
-	target, ok := fp.targetMap[level]
-	if !ok {
-		if int(level) < 0 {
-			return iwallet.NewAmount(0), errors.New("negative fee")
-		}
-		return iwallet.NewAmount(int(level)), nil
-	}
-
-	rateAmt, err := fp.erp.GetUSDRate(fp.coinType)
-	if err != nil {
-		return iwallet.NewAmount(0), err
-	}
-
-	rate := float64(rateAmt.Uint64())
-
-	feePerByte := (((target / 100) / rate) * fp.divisibility) / fp.avgTransactionSize
-	if feePerByte < 1 {
-		return iwallet.NewAmount(1), nil
-	}
-	feeAmt := iwallet.NewAmount(uint64(feePerByte))
-	if feeAmt.Cmp(fp.maxFee) > 0 {
-		return fp.maxFee, nil
-	}
-
-	return feeAmt, nil
 }

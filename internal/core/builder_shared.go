@@ -142,12 +142,12 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 // 清除条件: contracts.OrderRepo exposes GetOrderMetadata or OrderConfirmation
 // events carry the resolved (slug, variantSKU) pair directly.
 type dbOrderQuerier struct {
-	db database.Database
+	db pkgdatabase.Database
 }
 
 func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadata, error) {
 	var ord models.Order
-	err := q.db.View(func(tx database.Tx) error {
+	err := q.db.View(func(tx pkgdatabase.Tx) error {
 		return tx.Read().Where("id = ?", orderID).First(&ord).Error
 	})
 	if err != nil {
@@ -221,7 +221,7 @@ func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadat
 // buyerPortalToken issued with the GuestOrder, not by the order token alone.
 func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.OrderMetadata, error) {
 	var go_ models.GuestOrder
-	if err := q.db.View(func(tx database.Tx) error {
+	if err := q.db.View(func(tx pkgdatabase.Tx) error {
 		return tx.Read().Where("order_token = ?", orderToken).
 			Preload("Items").First(&go_).Error
 	}); err != nil {

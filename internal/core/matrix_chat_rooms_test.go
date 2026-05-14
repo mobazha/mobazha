@@ -4,9 +4,8 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-cid"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -415,4 +414,4 @@ func (tx matrixCredentialsTestTx) SetIntroVideo(models.IntroVideo) error     { r
 
 var _ database.Database = matrixCredentialsTestDB{}
 var _ database.Tx = matrixCredentialsTestTx{}
-var _ pkgdb.Database = matrixCredentialsTestDB{}
+var _ database.Database = matrixCredentialsTestDB{}

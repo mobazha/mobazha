@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
-	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/types/known/timestamppb"

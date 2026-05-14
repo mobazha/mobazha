@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -19,7 +19,7 @@ import (
 // ── mock netDBWriter ─────────────────────────────────────────────
 
 type mockNetDBWriter struct {
-	mu   sync.Mutex
+	mu    sync.Mutex
 	calls map[string]int
 	err   error // if set, all methods return this error
 }
@@ -41,16 +41,24 @@ func (m *mockNetDBWriter) count(method string) int {
 	return m.calls[method]
 }
 
-func (m *mockNetDBWriter) SetOwnProfile(_ *models.Profile) error          { return m.record("SetOwnProfile") }
-func (m *mockNetDBWriter) SetOwnListing(_ *pb.SignedListing) error        { return m.record("SetOwnListing") }
-func (m *mockNetDBWriter) SetOwnListingIndex(_ models.ListingIndex) error { return m.record("SetOwnListingIndex") }
-func (m *mockNetDBWriter) DeleteOwnListing(_ string) error                { return m.record("DeleteOwnListing") }
-func (m *mockNetDBWriter) SetOwnFollowing(_ models.Following) error       { return m.record("SetOwnFollowing") }
-func (m *mockNetDBWriter) SetOwnFollowers(_ models.Followers) error       { return m.record("SetOwnFollowers") }
+func (m *mockNetDBWriter) SetOwnProfile(_ *models.Profile) error   { return m.record("SetOwnProfile") }
+func (m *mockNetDBWriter) SetOwnListing(_ *pb.SignedListing) error { return m.record("SetOwnListing") }
+func (m *mockNetDBWriter) SetOwnListingIndex(_ models.ListingIndex) error {
+	return m.record("SetOwnListingIndex")
+}
+func (m *mockNetDBWriter) DeleteOwnListing(_ string) error { return m.record("DeleteOwnListing") }
+func (m *mockNetDBWriter) SetOwnFollowing(_ models.Following) error {
+	return m.record("SetOwnFollowing")
+}
+func (m *mockNetDBWriter) SetOwnFollowers(_ models.Followers) error {
+	return m.record("SetOwnFollowers")
+}
 func (m *mockNetDBWriter) SetOwnStoreMetadata(_ string, _ json.RawMessage) error {
 	return m.record("SetOwnStoreMetadata")
 }
-func (m *mockNetDBWriter) SetOwnRatingIndex(_ models.RatingIndex) error { return m.record("SetOwnRatingIndex") }
+func (m *mockNetDBWriter) SetOwnRatingIndex(_ models.RatingIndex) error {
+	return m.record("SetOwnRatingIndex")
+}
 func (m *mockNetDBWriter) SetOwnRating(_ string, _ json.RawMessage) error {
 	return m.record("SetOwnRating")
 }

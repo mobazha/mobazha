@@ -15,7 +15,6 @@ import (
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/config"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -24,7 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -462,7 +461,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 
 	for _, n := range nodes {
 		localPeerID := n.Identity()
-		n.SetCoTenantPublicData(func(targetPeer peer.ID) (pkgdb.PublicData, error) {
+		n.SetCoTenantPublicData(func(targetPeer peer.ID) (database.PublicData, error) {
 			if targetPeer == localPeerID {
 				return nil, fmt.Errorf("co-tenant: self")
 			}
@@ -560,12 +559,12 @@ func (mn *Mocknet) TearDown() error {
 	return nil
 }
 
-// dbViewPublicData adapts a database.Database into a pkgdb.PublicData for
+// dbViewPublicData adapts a database.Database into a database.PublicData for
 // the mocknet's coTenantPublicData wiring. Read methods open a View tx;
 // write methods are stubs (coTenantPublicData callers only read).
 type dbViewPublicData struct{ db database.Database }
 
-var _ pkgdb.PublicData = (*dbViewPublicData)(nil)
+var _ database.PublicData = (*dbViewPublicData)(nil)
 
 func (d *dbViewPublicData) GetProfile() (*models.Profile, error) {
 	var r *models.Profile

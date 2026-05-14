@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
+	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
@@ -118,7 +119,7 @@ func newFiatTestDB(t *testing.T) database.Database {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, database.MigrateFiatModels(db))
+	require.NoError(t, dbgorm.MigrateFiatModels(db))
 	return db
 }
 
@@ -939,7 +940,7 @@ func newFiatTestDBWithOrders(t *testing.T) database.Database {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, database.MigrateFiatModels(db))
+	require.NoError(t, dbgorm.MigrateFiatModels(db))
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		if err := tx.Migrate(&models.Order{}); err != nil {
 			return err

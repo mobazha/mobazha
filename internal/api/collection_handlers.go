@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -114,11 +114,11 @@ func (g *Gateway) handleUpdateCollection(w http.ResponseWriter, r *http.Request)
 	}
 
 	var patch struct {
-		Title       *string                    `json:"title"`
-		Description *string                    `json:"description"`
-		Image       *string                    `json:"image"`
+		Title       *string                     `json:"title"`
+		Description *string                     `json:"description"`
+		Image       *string                     `json:"image"`
 		SortOrder   *models.CollectionSortOrder `json:"sortOrder"`
-		Published   *bool                      `json:"published"`
+		Published   *bool                       `json:"published"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")

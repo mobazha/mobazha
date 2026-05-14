@@ -5,15 +5,14 @@ package core
 import (
 	"errors"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"gorm.io/gorm"
 )
 
 const maxWishlistItems = 200
-
 
 // WishlistAppService encapsulates wishlist business logic.
 type WishlistAppService struct {

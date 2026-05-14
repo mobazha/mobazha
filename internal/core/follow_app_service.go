@@ -9,10 +9,10 @@ import (
 	"os"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -22,7 +22,7 @@ import (
 )
 
 type FollowAppService struct {
-	db       database.Database
+	db        database.Database
 	messenger contracts.Messenger
 	eventBus  events.Bus
 	nodeID    string
@@ -32,7 +32,7 @@ type FollowAppService struct {
 }
 
 type FollowAppServiceConfig struct {
-	DB       database.Database
+	DB        database.Database
 	Messenger contracts.Messenger
 	EventBus  events.Bus
 	NodeID    string

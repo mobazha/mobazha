@@ -18,10 +18,10 @@ import (
 	"github.com/gosimple/slug"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/identity"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/identity"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
@@ -337,36 +337,36 @@ const (
 	PostMaximumTotalTags       = 50
 	PostMaximumTotalChannels   = 30
 	PostTagsMaxCharacters      = 256
-	PostChannelsMaxCharacters = 256
+	PostChannelsMaxCharacters  = 256
 	PostReferenceMaxCharacters = 256
 )
 
 // Errors
 var (
-	ErrPostUnknownValidationPanic    = errors.New("unexpected validation panic")
-	ErrPostSlugNotEmpty              = errors.New("slug must not be empty")
-	ErrPostSlugTooLong               = fmt.Errorf("slug is longer than the max of %d", SentenceMaxCharacters)
-	ErrPostSlugContainsSpaces        = errors.New("slugs cannot contain spaces")
-	ErrPostSlugContainsSlashes       = errors.New("slugs cannot contain file separators")
-	ErrPostInvalidType               = errors.New("invalid post type")
-	ErrPostStatusTooLong             = fmt.Errorf("status is longer than the max of %d", PostStatusMaxCharacters)
-	ErrPostBodyTooLong               = fmt.Errorf("post is longer than the max of %d characters", PostLongFormMaxCharacters)
-	ErrPostTagsTooMany               = fmt.Errorf("tags in the post is longer than the max of %d", PostMaximumTotalTags)
-	ErrPostTagsEmpty                 = errors.New("tags must not be empty")
-	ErrPostTagTooLong                = fmt.Errorf("tags must be less than max of %d characters", PostTagsMaxCharacters)
-	ErrPostChannelsTooMany           = fmt.Errorf("channels in the post is longer than the max of %d", PostMaximumTotalChannels)
-	ErrPostChannelTooLong            = fmt.Errorf("channels must be less than max of %d characters", PostChannelsMaxCharacters)
-	ErrPostReferenceEmpty            = errors.New("reference must not be empty")
-	ErrPostReferenceTooLong          = fmt.Errorf("reference is longer than the max of %d", PostReferenceMaxCharacters)
-	ErrPostReferenceContainsSpaces   = errors.New("reference cannot contain spaces")
-	ErrPostImagesTooMany             = fmt.Errorf("number of post images is greater than the max of %d", MaxListItems)
-	ErrPostImageTinyFormatInvalid    = errors.New("tiny image hashes must be properly formatted CID")
-	ErrPostImageSmallFormatInvalid   = errors.New("small image hashes must be properly formatted CID")
-	ErrPostImageMediumFormatInvalid  = errors.New("medium image hashes must be properly formatted CID")
-	ErrPostImageLargeFormatInvalid   = errors.New("large image hashes must be properly formatted CID")
+	ErrPostUnknownValidationPanic     = errors.New("unexpected validation panic")
+	ErrPostSlugNotEmpty               = errors.New("slug must not be empty")
+	ErrPostSlugTooLong                = fmt.Errorf("slug is longer than the max of %d", SentenceMaxCharacters)
+	ErrPostSlugContainsSpaces         = errors.New("slugs cannot contain spaces")
+	ErrPostSlugContainsSlashes        = errors.New("slugs cannot contain file separators")
+	ErrPostInvalidType                = errors.New("invalid post type")
+	ErrPostStatusTooLong              = fmt.Errorf("status is longer than the max of %d", PostStatusMaxCharacters)
+	ErrPostBodyTooLong                = fmt.Errorf("post is longer than the max of %d characters", PostLongFormMaxCharacters)
+	ErrPostTagsTooMany                = fmt.Errorf("tags in the post is longer than the max of %d", PostMaximumTotalTags)
+	ErrPostTagsEmpty                  = errors.New("tags must not be empty")
+	ErrPostTagTooLong                 = fmt.Errorf("tags must be less than max of %d characters", PostTagsMaxCharacters)
+	ErrPostChannelsTooMany            = fmt.Errorf("channels in the post is longer than the max of %d", PostMaximumTotalChannels)
+	ErrPostChannelTooLong             = fmt.Errorf("channels must be less than max of %d characters", PostChannelsMaxCharacters)
+	ErrPostReferenceEmpty             = errors.New("reference must not be empty")
+	ErrPostReferenceTooLong           = fmt.Errorf("reference is longer than the max of %d", PostReferenceMaxCharacters)
+	ErrPostReferenceContainsSpaces    = errors.New("reference cannot contain spaces")
+	ErrPostImagesTooMany              = fmt.Errorf("number of post images is greater than the max of %d", MaxListItems)
+	ErrPostImageTinyFormatInvalid     = errors.New("tiny image hashes must be properly formatted CID")
+	ErrPostImageSmallFormatInvalid    = errors.New("small image hashes must be properly formatted CID")
+	ErrPostImageMediumFormatInvalid   = errors.New("medium image hashes must be properly formatted CID")
+	ErrPostImageLargeFormatInvalid    = errors.New("large image hashes must be properly formatted CID")
 	ErrPostImageOriginalFormatInvalid = errors.New("original image hashes must be properly formatted CID")
-	ErrPostImageFilenameNil          = errors.New("image file names must not be nil")
-	ErrPostImageFilenameTooLong      = fmt.Errorf("image filename length must be less than the max of %d", FilenameMaxCharacters)
+	ErrPostImageFilenameNil           = errors.New("image file names must not be nil")
+	ErrPostImageFilenameTooLong       = fmt.Errorf("image filename length must be less than the max of %d", FilenameMaxCharacters)
 )
 
 // makeUnique returns a new slice of unique strings based on src which is not mutated

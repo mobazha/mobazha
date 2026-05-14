@@ -27,7 +27,7 @@ import (
 	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
 	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
-	"github.com/mobazha/mobazha3.0/internal/database"
+	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
@@ -44,6 +44,7 @@ import (
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/fulfillment"
@@ -1380,7 +1381,7 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 // wiring that depends on them must wait. Doing both in one place causes the
 // monitor to start unconditionally and SetOrderOps to silently receive nil.
 func initSupplyChainSubsystem(obNode *MobazhaNode) {
-	if err := database.MigrateFulfillmentModels(obNode.db); err != nil {
+	if err := dbgorm.MigrateFulfillmentModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "SupplyChain: failed to migrate models: %v", err)
 		return
 	}
@@ -1437,7 +1438,7 @@ func finalizeSupplyChainSubsystem(obNode *MobazhaNode) {
 // migrates DB models, creates FiatProviderRegistry and FiatPaymentAppService.
 // Providers are registered later by hosting (SaaS) or node config (standalone).
 func initFiatSubsystem(obNode *MobazhaNode) {
-	if err := database.MigrateFiatModels(obNode.db); err != nil {
+	if err := dbgorm.MigrateFiatModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Fiat: failed to migrate models: %v", err)
 		return
 	}

@@ -13,8 +13,8 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -673,9 +673,9 @@ func TestOrderComplete_RatingSupplement(t *testing.T) {
 				Identity: buyerPubkeyBytes,
 			},
 		},
-		BuyerSig:        buyerSig,
-		Overall: 4,
-		Review:  "good stuff",
+		BuyerSig: buyerSig,
+		Overall:  4,
+		Review:   "good stuff",
 	}
 	ser, err = proto.Marshal(ratingPB)
 	if err != nil {
@@ -802,13 +802,13 @@ func TestOrderComplete_SupplementRejectedWhenAlreadyRated(t *testing.T) {
 	}
 
 	ratingPB := &pb.Rating{
-		Timestamp:       timestamppb.Now(),
-		VendorSig:       vendorSig,
-		VendorID:        &pb.ID{PeerID: vendorPeerID, Pubkeys: &pb.ID_Pubkeys{Identity: pubkeyBytes}},
-		BuyerID:         &pb.ID{PeerID: buyer.String(), Pubkeys: &pb.ID_Pubkeys{Identity: buyerPubkeyBytes}},
-		BuyerSig:        buyerSig,
-		Overall: 5,
-		Review:  "great",
+		Timestamp: timestamppb.Now(),
+		VendorSig: vendorSig,
+		VendorID:  &pb.ID{PeerID: vendorPeerID, Pubkeys: &pb.ID_Pubkeys{Identity: pubkeyBytes}},
+		BuyerID:   &pb.ID{PeerID: buyer.String(), Pubkeys: &pb.ID_Pubkeys{Identity: buyerPubkeyBytes}},
+		BuyerSig:  buyerSig,
+		Overall:   5,
+		Review:    "great",
 	}
 	ser, err = proto.Marshal(ratingPB)
 	if err != nil {

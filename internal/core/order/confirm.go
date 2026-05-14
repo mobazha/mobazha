@@ -5,10 +5,10 @@ package order
 import (
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -198,7 +198,7 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 		if sh.PhysicalDelivery != nil {
 			item.Delivery = &pb.OrderShipment_ShippedItem_PhysicalDelivery_{
 				PhysicalDelivery: &pb.OrderShipment_ShippedItem_PhysicalDelivery{
-					Shipper:         sh.PhysicalDelivery.Shipper,
+					Shipper:        sh.PhysicalDelivery.Shipper,
 					TrackingNumber: sh.PhysicalDelivery.TrackingNumber,
 				},
 			}

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"gorm.io/gorm"
 )

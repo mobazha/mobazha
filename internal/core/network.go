@@ -13,10 +13,10 @@ import (
 
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -342,7 +342,6 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 	return nil
 }
 
-
 func (n *MobazhaNode) isSelfDefaultSNFServer() bool {
 	snfServers := repo.DefaultMainnetSNFServers
 	if n.testnet {
@@ -503,10 +502,10 @@ func (n *MobazhaNode) publishHandler() {
 	go func() {
 		for {
 			select {
-		case <-tick:
-			lastPublish = time.Now()
-			tick = time.After(republishInterval - time.Since(lastPublish))
-			go n.Publish(nil)
+			case <-tick:
+				lastPublish = time.Now()
+				tick = time.After(republishInterval - time.Since(lastPublish))
+				go n.Publish(nil)
 			case p := <-n.publishChan:
 				publishCancel()
 				publishCtx, publishCancel = context.WithCancel(context.Background())

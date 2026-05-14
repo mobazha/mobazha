@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
@@ -116,11 +116,11 @@ func validateEvent(evt *models.AnalyticsEvent) error {
 
 // VisitorSummary holds aggregate visitor metrics.
 type VisitorSummary struct {
-	TotalPageViews    int64 `json:"totalPageViews"`
-	TotalProductViews int64 `json:"totalProductViews"`
-	TotalAddToCart    int64 `json:"totalAddToCart"`
+	TotalPageViews     int64 `json:"totalPageViews"`
+	TotalProductViews  int64 `json:"totalProductViews"`
+	TotalAddToCart     int64 `json:"totalAddToCart"`
 	TotalCheckoutStart int64 `json:"totalCheckoutStart"`
-	UniqueVisitors    int64 `json:"uniqueVisitors"`
+	UniqueVisitors     int64 `json:"uniqueVisitors"`
 }
 
 // VisitorTrendPoint holds a single day's aggregated visitor data.

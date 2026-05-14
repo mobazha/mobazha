@@ -8,8 +8,7 @@ import (
 	"sync"
 
 	"github.com/ipfs/go-cid"
-	"github.com/mobazha/mobazha3.0/internal/database"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
@@ -48,14 +47,14 @@ type mediaCIDIndex struct {
 type TenantDB struct {
 	sharedDB   *gorm.DB
 	tenantID   string
-	publicData pkgdb.PublicData
+	publicData database.PublicData
 	mtx        sync.Mutex
 }
 
 // NewTenantDBWithPublicData creates a new TenantDB with a given PublicData
 // implementation. Both standalone (DBPublicData on local SQLite) and SaaS
 // (DBPublicData on shared PostgreSQL) use this constructor.
-func NewTenantDBWithPublicData(sharedDB *gorm.DB, tenantID string, pd pkgdb.PublicData) (database.Database, error) {
+func NewTenantDBWithPublicData(sharedDB *gorm.DB, tenantID string, pd database.PublicData) (database.Database, error) {
 	if tenantID == "" {
 		return nil, fmt.Errorf("tenantDB: tenantID must not be empty")
 	}
@@ -152,7 +151,7 @@ func (tdb *TenantDB) writeTx() *tenantTx {
 type tenantTx struct {
 	baseDB     *gorm.DB // base for creating fresh Read() sessions (sharedDB for reads, rawTx for writes)
 	rawTx      *gorm.DB // un-scoped tx for Commit/Rollback (write mode only)
-	publicData pkgdb.PublicData
+	publicData database.PublicData
 
 	tenantID string
 

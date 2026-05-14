@@ -8,7 +8,7 @@ import (
 	"time"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"golang.org/x/crypto/hkdf"
 )

@@ -10,7 +10,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -185,7 +185,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 	}{
 		{
 			// Normal case with valid addresses from payment + confirmation + dispute.
-			setup: setupNormal,
+			setup:         setupNormal,
 			expectedError: nil,
 			expectedEvent: &events.DisputeClose{
 				OrderID: orderID,
@@ -193,10 +193,10 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 					Tiny:  tinyImageHash,
 					Small: smallImageHash,
 				},
-				OtherPartyID:     buyerPeerID,
+				OtherPartyID:   buyerPeerID,
 				OtherPartyName: buyerHandle,
-				Buyer:            orderOpen.BuyerID.PeerID,
-				BuyerRefunded:    true,
+				Buyer:          orderOpen.BuyerID.PeerID,
+				BuyerRefunded:  true,
 			},
 		},
 		{
@@ -411,10 +411,10 @@ func TestValidateDisputeResolution_AddressCheck(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		order     *models.Order
-		release   *pb.DisputeClose_ModeratedEscrowRelease
-		wantErr   string
+		name    string
+		order   *models.Order
+		release *pb.DisputeClose_ModeratedEscrowRelease
+		wantErr string
 	}{
 		{
 			name: "valid — buyer from PayerAddress, vendor from OrderConfirmation",

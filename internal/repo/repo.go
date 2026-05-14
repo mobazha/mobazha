@@ -16,10 +16,9 @@ import (
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/mobazha/mobazha3.0/internal/common"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/internal/version"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/tyler-smith/go-bip39"
@@ -731,7 +730,7 @@ func completeV4PKMigration(tx database.Tx, backups []v4BackupTable) error {
 		sql := fmt.Sprintf(
 			"INSERT OR IGNORE INTO `%s` (`tenant_id`, %s) SELECT '%s', %s FROM `%s`",
 			b.tableName, colList,
-			pkgdb.StandaloneTenantID,
+			database.StandaloneTenantID,
 			colList, b.backupName,
 		)
 		if err := tx.Read().Exec(sql).Error; err != nil {

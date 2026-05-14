@@ -11,8 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/mobazha/mobazha3.0/internal/common"
-	"github.com/mobazha/mobazha3.0/internal/database"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -46,8 +45,8 @@ func NewSqliteDB(dataDir string) (database.Database, error) {
 		return nil, err
 	}
 	db.Exec("PRAGMA journal_mode=WAL")
-	pd := NewDBPublicData(db, pkgdb.StandaloneTenantID)
-	return NewTenantDBWithPublicData(db, pkgdb.StandaloneTenantID, pd)
+	pd := NewDBPublicData(db, database.StandaloneTenantID)
+	return NewTenantDBWithPublicData(db, database.StandaloneTenantID, pd)
 }
 
 var memDBCounter uint64
@@ -66,7 +65,6 @@ func NewMemoryDB(dataDir string) (database.Database, error) {
 	if err := db.AutoMigrate(&PublicDataRecord{}, &PublicMediaRecord{}); err != nil {
 		return nil, err
 	}
-	pd := NewDBPublicData(db, pkgdb.StandaloneTenantID)
-	return NewTenantDBWithPublicData(db, pkgdb.StandaloneTenantID, pd)
+	pd := NewDBPublicData(db, database.StandaloneTenantID)
+	return NewTenantDBWithPublicData(db, database.StandaloneTenantID, pd)
 }
-

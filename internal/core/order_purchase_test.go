@@ -13,9 +13,9 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/ipfs/go-cid"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
@@ -468,10 +468,10 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 								Value: "red",
 							},
 						},
-					Shipping: models.PurchaseShippingOption{
-						Name:    "Worldwide",
-						Service: "standard",
-					},
+						Shipping: models.PurchaseShippingOption{
+							Name:    "Worldwide",
+							Service: "standard",
+						},
 						Memo: "I want it fast!",
 					},
 				},
@@ -590,9 +590,9 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 					return errors.New("incorrect rating key in order")
 				}
 
-			if order.Amount == "" || order.Amount == "0" {
-				return errors.New("payment amount is zero or empty")
-			}
+				if order.Amount == "" || order.Amount == "0" {
+					return errors.New("payment amount is zero or empty")
+				}
 
 				return nil
 			},

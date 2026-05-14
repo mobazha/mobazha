@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )

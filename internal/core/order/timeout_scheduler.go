@@ -7,18 +7,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 const (
-	pendingWarnThreshold            = 7 * 24 * time.Hour  // 7d
-	pendingExpireThreshold          = 14 * 24 * time.Hour // 14d
+	pendingWarnThreshold         = 7 * 24 * time.Hour  // 7d
+	pendingExpireThreshold       = 14 * 24 * time.Hour // 14d
 	awaitingShipmentWarnThresh   = 14 * 24 * time.Hour // 14d
 	awaitingShipmentExpireThresh = 30 * 24 * time.Hour // 30d
-	disputedExpireThreshold         = 7 * 24 * time.Hour  // 7d
+	disputedExpireThreshold      = 7 * 24 * time.Hour  // 7d
 )
 
 // RunOrderTimeoutOnce executes a single pass of all order timeout checks.

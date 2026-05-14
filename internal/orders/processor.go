@@ -8,16 +8,16 @@ import (
 
 	"github.com/ipfs/go-cid"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -37,10 +37,10 @@ var (
 // Used by PaymentVerificationService (orchestration layer) to dispatch to the appropriate
 // chain adapter (EVM, Solana, UTXO noop) via PaymentRegistry.
 type DepositVerifyParams struct {
-	CoinType     iwallet.CoinType
-	TxHash       string
-	Script       string
-	ContractAddr string
+	CoinType      iwallet.CoinType
+	TxHash        string
+	Script        string
+	ContractAddr  string
 	PaymentAmount string
 }
 

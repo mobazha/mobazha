@@ -11,9 +11,9 @@ import (
 	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -278,4 +278,3 @@ func (s *ModerationAppService) queryAcceptedCurrencies() ([]string, error) {
 	}
 	return currencies, nil
 }
-

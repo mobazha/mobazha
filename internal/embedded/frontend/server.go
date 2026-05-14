@@ -33,16 +33,28 @@ type FeatureSnapshot struct {
 // /runtime-config.js so the SPA can apply partner theming without
 // rebuilding. Nil means "use Mobazha defaults".
 type BrandSnapshot struct {
-	Name          string `json:"name"`
-	ShortName     string `json:"shortName,omitempty"`
-	Tagline       string `json:"tagline,omitempty"`
-	Description   string `json:"description,omitempty"`
-	PrimaryColor  string `json:"primaryColor,omitempty"`
-	AccentColor   string `json:"accentColor,omitempty"`
-	LogoURL       string `json:"logoUrl,omitempty"`
-	FaviconURL    string `json:"faviconUrl,omitempty"`
-	PrivacyNotice string `json:"privacyNotice,omitempty"`
-	HidePoweredBy bool   `json:"hidePoweredBy,omitempty"`
+	Name          string           `json:"name"`
+	ShortName     string           `json:"shortName,omitempty"`
+	Tagline       string           `json:"tagline,omitempty"`
+	Description   string           `json:"description,omitempty"`
+	PrimaryColor  string           `json:"primaryColor,omitempty"`
+	AccentColor   string           `json:"accentColor,omitempty"`
+	LogoURL       string           `json:"logoUrl,omitempty"`
+	FaviconURL    string           `json:"faviconUrl,omitempty"`
+	PrivacyNotice string           `json:"privacyNotice,omitempty"`
+	HidePoweredBy bool             `json:"hidePoweredBy,omitempty"`
+	Network       *NetworkSnapshot `json:"network,omitempty"`
+}
+
+// NetworkSnapshot mirrors repo.NetworkFields for the SPA. Surfaced under
+// window.__RUNTIME_CONFIG__.brand.network so the frontend can hide /
+// reveal node-pool UI without an API round-trip. Nil means "all gates
+// closed" — the safe default for an unbranded build.
+type NetworkSnapshot struct {
+	AllowUserCustomNode     bool `json:"allowUserCustomNode,omitempty"`
+	ShowAdvancedDiagnostics bool `json:"showAdvancedDiagnostics,omitempty"`
+	ShowNodePoolUI          bool `json:"showNodePoolUI,omitempty"`
+	AllowDiscoverToggle     bool `json:"allowDiscoverToggle,omitempty"`
 }
 
 // ServerConfig configures the embedded frontend HTTP handler.

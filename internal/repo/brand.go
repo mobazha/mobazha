@@ -54,6 +54,48 @@ type BrandFields struct {
 	// HidePoweredBy, when true, removes the "Powered by Mobazha"
 	// attribution from the storefront footer.
 	HidePoweredBy bool `yaml:"hidePoweredBy,omitempty" json:"hidePoweredBy,omitempty"`
+
+	// Network controls UI visibility of network/node-pool features for
+	// white-label deployments (PrivateDistribution / Example / Example Market).
+	// All flags default to false (hide) so partners get the locked-down
+	// baseline by default; opt-in is explicit per partner.
+	//
+	// Protocol-layer decisions (i2pProxy/torProxy fallback) are NOT
+	// configured here — those live in the system layer. Brand only
+	// controls what the user sees and can edit. See
+	// PRIVATE_DISTRIBUTION_EXTERNAL_PAYMENTD_NETWORK_DESIGN.md §3.2 for rationale.
+	Network NetworkFields `yaml:"network,omitempty" json:"network,omitempty"`
+}
+
+// NetworkFields gates the network/node-pool UI surface for white-label
+// builds. Setting all fields to false yields the most locked-down UX
+// (Example baseline) — users see neither node lists nor diagnostics.
+// Each flag is independent so partners can opt in to advanced visibility
+// piecemeal without unlocking custom-node entry.
+type NetworkFields struct {
+	// AllowUserCustomNode lets the user paste their own external_paymentd RPC
+	// address into Settings → Network. Off by default — Example-style
+	// devices ship a curated pool only. Independent of ShowNodePoolUI:
+	// a partner may show the curated pool (read-only) without allowing
+	// custom entries.
+	AllowUserCustomNode bool `yaml:"allowUserCustomNode,omitempty" json:"allowUserCustomNode,omitempty"`
+
+	// ShowAdvancedDiagnostics surfaces per-node latency, height-lag,
+	// success/fail streak, and source (embedded / user / p2p-discovered)
+	// in the UI. Off by default — partners that want a "magic, just
+	// works" UX hide all of this.
+	ShowAdvancedDiagnostics bool `yaml:"showAdvancedDiagnostics,omitempty" json:"showAdvancedDiagnostics,omitempty"`
+
+	// ShowNodePoolUI exposes Settings → Network → ExternalPayment Nodes (the
+	// node pool management page). Off by default — without this the
+	// user has no per-node visibility; the system rotates silently.
+	ShowNodePoolUI bool `yaml:"showNodePoolUI,omitempty" json:"showNodePoolUI,omitempty"`
+
+	// AllowDiscoverToggle exposes the on/off switch for Tier 3 P2P
+	// self-discovery (`get_peer_list` polling). Off by default —
+	// discovery runs silently per the build's compiled defaults. Only
+	// general-purpose PrivateDistributions (not white-label) typically expose this.
+	AllowDiscoverToggle bool `yaml:"allowDiscoverToggle,omitempty" json:"allowDiscoverToggle,omitempty"`
 }
 
 // LoadBrandConfig reads <dataDir>/brand.yaml and returns the parsed

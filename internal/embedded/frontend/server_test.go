@@ -164,6 +164,66 @@ func TestSPAHandler_RuntimeConfig_FeaturesSnapshotInjection(t *testing.T) {
 	assert.False(t, hasEmpty, "empty-key features must be dropped by the handler")
 }
 
+func TestSPAHandler_RuntimeConfig_BrandNetworkSnapshot(t *testing.T) {
+	// White-label brand with the "Market Place" preset: surface
+	// diagnostics + node pool UI but keep custom node entry off.
+	brand := &BrandSnapshot{
+		Name: "Example Market",
+		Network: &NetworkSnapshot{
+			AllowUserCustomNode:     false,
+			ShowAdvancedDiagnostics: true,
+			ShowNodePoolUI:          true,
+			AllowDiscoverToggle:     true,
+		},
+	}
+	h := NewHandler(ServerConfig{PrivateDistributionMode: true, Brand: brand})
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/runtime-config.js")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	payload := parseRuntimeConfig(t, body)
+
+	brandObj, ok := payload["brand"].(map[string]any)
+	require.True(t, ok, "brand must serialize as a JSON object")
+	assert.Equal(t, "Example Market", brandObj["name"])
+
+	netObj, ok := brandObj["network"].(map[string]any)
+	require.True(t, ok, "brand.network must be present when any flag is set")
+	// AllowUserCustomNode=false → omitempty drops the field.
+	_, hasCustom := netObj["allowUserCustomNode"]
+	assert.False(t, hasCustom, "false flags must be omitted to keep the payload minimal")
+	assert.Equal(t, true, netObj["showAdvancedDiagnostics"])
+	assert.Equal(t, true, netObj["showNodePoolUI"])
+	assert.Equal(t, true, netObj["allowDiscoverToggle"])
+}
+
+func TestSPAHandler_RuntimeConfig_BrandWithoutNetworkSection(t *testing.T) {
+	// Branded build with NO network gates opted in: brand.network must
+	// be omitted entirely so an attacker can't distinguish "feature
+	// gated off" from "feature absent" by reading runtime-config.js.
+	brand := &BrandSnapshot{Name: "Example Market"}
+	h := NewHandler(ServerConfig{PrivateDistributionMode: true, Brand: brand})
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/runtime-config.js")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	payload := parseRuntimeConfig(t, body)
+
+	brandObj, ok := payload["brand"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Example Market", brandObj["name"])
+	_, hasNetwork := brandObj["network"]
+	assert.False(t, hasNetwork, "brand.network must not appear when no flags are set")
+}
+
 // parseRuntimeConfig strips the `window.__RUNTIME_CONFIG__=` prefix and
 // trailing `;` so tests can assert on structured JSON rather than raw bytes.
 func parseRuntimeConfig(t *testing.T, body []byte) map[string]any {

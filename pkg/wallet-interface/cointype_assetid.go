@@ -241,6 +241,26 @@ func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
 			return ChainBase, nil
 		case "1030":
 			return ChainConflux, nil
+		// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
+		// EIP-155 chain ids match chainMatrix (pkg/managedescrow/chains.go).
+		case "10":
+			return ChainOptimism, nil
+		case "100":
+			return ChainGnosis, nil
+		case "324":
+			return ChainZkSyncEra, nil
+		case "5000":
+			return ChainMantle, nil
+		case "42161":
+			return ChainArbitrum, nil
+		case "42220":
+			return ChainCelo, nil
+		case "43114":
+			return ChainAvalanche, nil
+		case "59144":
+			return ChainLinea, nil
+		case "534352":
+			return ChainScroll, nil
 		default:
 			return "", fmt.Errorf("unsupported eip155 chain_ref %q", id.ChainRef)
 		}

@@ -220,6 +220,25 @@ var defaultDefinitions = []Definition{
 	{Code: "MATIC", AssetID: "crypto:eip155:137:native", Pricing: pricingMeta("MATIC", "matic-network", PriceSource{Provider: "binance", ID: "MATICUSDT"}), DisplaySymbol: "MATIC", DisplayName: "Polygon", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
 	{Code: "MATICUSDT", AssetID: "crypto:eip155:137:erc20:0xc2132D05D31c914a87C6611C10748AEb04B58e8F", Pricing: pricingMetaUSDPegged("USDT", "tether"), DisplaySymbol: "USDT", DisplayName: "Tether USD on Polygon", Decimals: 6, Runtime: runtimeMeta(3*time.Second, 0)},
 	{Code: "MATICUSDC", AssetID: "crypto:eip155:137:erc20:0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", Pricing: pricingMetaUSDPegged("USDC", "usd-coin"), DisplaySymbol: "USDC", DisplayName: "USD Coin on Polygon", Decimals: 6, Runtime: runtimeMeta(3*time.Second, 0)},
+	// ── Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set ──
+	// Native coin types follow the BASEETH pattern: chains whose
+	// native gas token is ETH share the ETH pricing key; chains
+	// with a distinct gas token (AVAX / xDAI / CELO / MNT) own
+	// their pricing key. Stablecoin (USDT/USDC/etc.) entries are
+	// intentionally NOT registered here yet — they live on a
+	// per-listing backlog because each chain has multiple stablecoin
+	// canonical addresses and a half-finished list ships footguns.
+	// Bip44Code reuses 60 (ETH SLIP-0044) for every EVM L2, matching
+	// the convention already used by ETH/BSC/MATIC/BASE/CFX above.
+	{Code: "ARBETH", AssetID: "crypto:eip155:42161:native", Pricing: pricingMeta("ETH", "ethereum", PriceSource{Provider: "binance", ID: "ETHUSDT"}), DisplaySymbol: "ETH", DisplayName: "Ethereum on Arbitrum", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
+	{Code: "OPETH", AssetID: "crypto:eip155:10:native", Pricing: pricingMeta("ETH", "ethereum", PriceSource{Provider: "binance", ID: "ETHUSDT"}), DisplaySymbol: "ETH", DisplayName: "Ethereum on Optimism", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
+	{Code: "AVAX", AssetID: "crypto:eip155:43114:native", Pricing: pricingMeta("AVAX", "avalanche-2", PriceSource{Provider: "binance", ID: "AVAXUSDT"}), DisplaySymbol: "AVAX", DisplayName: "Avalanche", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
+	{Code: "XDAI", AssetID: "crypto:eip155:100:native", Pricing: pricingMetaUSDPegged("XDAI", "xdai"), DisplaySymbol: "xDAI", DisplayName: "xDai on Gnosis Chain", Decimals: 18, Runtime: runtimeMeta(5*time.Second, 60)},
+	{Code: "CELO", AssetID: "crypto:eip155:42220:native", Pricing: pricingMeta("CELO", "celo", PriceSource{Provider: "binance", ID: "CELOUSDT"}), DisplaySymbol: "CELO", DisplayName: "Celo", Decimals: 18, Runtime: runtimeMeta(5*time.Second, 60)},
+	{Code: "MNT", AssetID: "crypto:eip155:5000:native", Pricing: pricingMeta("MNT", "mantle", PriceSource{Provider: "binance", ID: "MNTUSDT"}), DisplaySymbol: "MNT", DisplayName: "Mantle", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
+	{Code: "ZKSETH", AssetID: "crypto:eip155:324:native", Pricing: pricingMeta("ETH", "ethereum", PriceSource{Provider: "binance", ID: "ETHUSDT"}), DisplaySymbol: "ETH", DisplayName: "Ethereum on zkSync Era", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
+	{Code: "SCRETH", AssetID: "crypto:eip155:534352:native", Pricing: pricingMeta("ETH", "ethereum", PriceSource{Provider: "binance", ID: "ETHUSDT"}), DisplaySymbol: "ETH", DisplayName: "Ethereum on Scroll", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
+	{Code: "LINETH", AssetID: "crypto:eip155:59144:native", Pricing: pricingMeta("ETH", "ethereum", PriceSource{Provider: "binance", ID: "ETHUSDT"}), DisplaySymbol: "ETH", DisplayName: "Ethereum on Linea", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
 	{Code: "SOL", AssetID: "crypto:solana:mainnet:native", Pricing: pricingMeta("SOL", "solana", PriceSource{Provider: "binance", ID: "SOLUSDT"}), DisplaySymbol: "SOL", DisplayName: "Solana", Decimals: 9, Runtime: runtimeMeta(400*time.Millisecond, 501)},
 	{Code: "SOLUSDT", AssetID: "crypto:solana:mainnet:spl:Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", Pricing: pricingMetaUSDPegged("USDT", "tether"), DisplaySymbol: "USDT", DisplayName: "Tether USD on Solana", Decimals: 6, Runtime: runtimeMeta(400*time.Millisecond, 0)},
 	{Code: "SOLUSDC", AssetID: "crypto:solana:mainnet:spl:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", Pricing: pricingMetaUSDPegged("USDC", "usd-coin"), DisplaySymbol: "USDC", DisplayName: "USD Coin on Solana", Decimals: 6, Runtime: runtimeMeta(400*time.Millisecond, 0)},

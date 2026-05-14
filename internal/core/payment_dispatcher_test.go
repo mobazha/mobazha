@@ -189,9 +189,14 @@ func TestRegistryDispatch_ChainCount(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	chains := n.paymentRegistry.Chains()
-	// Expected: UTXO (4) + EVM (4) + Solana (1) + TRON (1) = 10
-	if len(chains) != 10 {
-		t.Errorf("registry has %d chains, want 10 (4 UTXO + 4 EVM + 1 Solana + 1 TRON)", len(chains))
+	// Expected: UTXO (4) + EVM (13: ETH/BSC/Polygon/Base + 9 D-Hybrid-21
+	// promoted L2s) + Solana (1) + TRON (1) = 19. Sprint 1 D8 promoted
+	// the EVM L2 set (Arbitrum/Optimism/Avalanche/Gnosis/Celo/Mantle/
+	// zkSync/Scroll/Linea); zkSync ships as a placeholder ManagedEscrow row but
+	// the V1 strategy registration is unconditional — V1 paths fail
+	// closed via ErrV1ChainNotSupported on the per-chain Registry guard.
+	if len(chains) != 19 {
+		t.Errorf("registry has %d chains, want 19 (4 UTXO + 13 EVM + 1 Solana + 1 TRON)", len(chains))
 	}
 }
 

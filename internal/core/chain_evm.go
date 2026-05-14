@@ -12,12 +12,27 @@ import (
 )
 
 // evmChains lists the EVM chains that need shared client injection.
-// CFX (Conflux) is excluded for now — low usage and noisy RPC errors.
+// CFX (Conflux) is excluded — low usage and noisy RPC errors.
+//
+// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 promoted 9 additional chains.
+// They share the same shared-client pattern as the original four —
+// the only difference is their V1 ContractManager Registry slot is
+// empty (zero-address sentinel in pkg/evm/defaults.go), so V1 escrow
+// paths fail closed and orders MUST route via the V2 ManagedEscrowAdapter.
 var evmChains = []iwallet.ChainType{
 	iwallet.ChainBSC,
 	iwallet.ChainEthereum,
 	iwallet.ChainPolygon,
 	iwallet.ChainBase,
+	iwallet.ChainArbitrum,
+	iwallet.ChainOptimism,
+	iwallet.ChainAvalanche,
+	iwallet.ChainGnosis,
+	iwallet.ChainCelo,
+	iwallet.ChainMantle,
+	iwallet.ChainZkSyncEra,
+	iwallet.ChainScroll,
+	iwallet.ChainLinea,
 }
 
 // extractEVMConfigs converts multiwallet ChainAPIs to evm.EVMClientConfig slice.

@@ -24,9 +24,24 @@ const (
 	ChainPolygon     ChainType = "MATIC"
 	ChainBase        ChainType = "BASE"
 	ChainConflux     ChainType = "CFX"
-	ChainSolana      ChainType = "SOL"
-	ChainTRON        ChainType = "TRX"
-	ChainExternalPayment      ChainType = "EXTERNAL_PAYMENT"
+	// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted from chainMatrix
+	// not-ready bucket. These chains route through the V2 ManagedEscrowAdapter
+	// only; their V1 ContractManager Registry is intentionally absent
+	// (see pkg/evm/defaults.go zero-address sentinel + EVM client
+	// guard in internal/chains/evm/client.go). Order creation MUST
+	// fail closed on V1 paths until that registry is deployed.
+	ChainArbitrum  ChainType = "ARB"
+	ChainOptimism  ChainType = "OP"
+	ChainAvalanche ChainType = "AVAX"
+	ChainGnosis    ChainType = "XDAI"
+	ChainCelo      ChainType = "CELO"
+	ChainMantle    ChainType = "MNT"
+	ChainZkSyncEra ChainType = "ZKSYNC"
+	ChainScroll    ChainType = "SCRL"
+	ChainLinea     ChainType = "LINEA"
+	ChainSolana    ChainType = "SOL"
+	ChainTRON      ChainType = "TRX"
+	ChainExternalPayment    ChainType = "EXTERNAL_PAYMENT"
 
 	ChainFiat ChainType = "Fiat"
 )
@@ -46,6 +61,15 @@ func GetAllSupportedChainTypes() []ChainType {
 		ChainPolygon,
 		ChainBase,
 		ChainConflux,
+		ChainArbitrum,
+		ChainOptimism,
+		ChainAvalanche,
+		ChainGnosis,
+		ChainCelo,
+		ChainMantle,
+		ChainZkSyncEra,
+		ChainScroll,
+		ChainLinea,
 		ChainSolana,
 		ChainTRON,
 		ChainExternalPayment,
@@ -190,7 +214,14 @@ func (ct CoinInfo) BlockInterval() time.Duration {
 }
 
 func (ct CoinInfo) IsEthTypeChain() bool {
-	ethTypeChains := []ChainType{ChainEthereum, ChainBSC, ChainBase, ChainPolygon, ChainConflux}
+	ethTypeChains := []ChainType{
+		ChainEthereum, ChainBSC, ChainBase, ChainPolygon, ChainConflux,
+		// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
+		// All use SchemeEVMCreate2 except ChainZkSyncEra which uses
+		// SchemeZkSyncCreate2 (see pkg/managedescrow/address.go).
+		ChainArbitrum, ChainOptimism, ChainAvalanche, ChainGnosis,
+		ChainCelo, ChainMantle, ChainZkSyncEra, ChainScroll, ChainLinea,
+	}
 	return slices.Contains(ethTypeChains, ct.Chain)
 }
 

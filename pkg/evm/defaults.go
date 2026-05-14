@@ -52,7 +52,34 @@ var defaultEVMChains = []defaultEVMChainDef{
 		TestnetRpc:      "https://evmtestnet.confluxrpc.com",
 		TestnetRegistry: "0x93ecc969ff6C9e822F4AFD80acb59848eB9b9bf7",
 	},
+	// ── Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set ──
+	// V1 ContractManager Registry is intentionally zero-address.
+	// internal/chains/evm/client.go rejects GetRecommendedContractVersion
+	// when the registry slot is empty/zero so V1 paths fail closed
+	// (CHAIN_NOT_SUPPORTED). V2 ManagedEscrowAdapter shadow registration uses
+	// the same chain client without invoking the V1 registry binding.
+	// Public RPC endpoints sourced from chainlist.org; operators
+	// SHOULD override in standalone repo config for production load.
+	{Chain: iwallet.ChainArbitrum, MainnetRpc: "https://arb1.arbitrum.io/rpc", MainnetRegistry: zeroEVMRegistry},
+	{Chain: iwallet.ChainOptimism, MainnetRpc: "https://mainnet.optimism.io", MainnetRegistry: zeroEVMRegistry},
+	{Chain: iwallet.ChainAvalanche, MainnetRpc: "https://api.avax.network/ext/bc/C/rpc", MainnetRegistry: zeroEVMRegistry},
+	{Chain: iwallet.ChainGnosis, MainnetRpc: "https://rpc.gnosischain.com", MainnetRegistry: zeroEVMRegistry},
+	{Chain: iwallet.ChainCelo, MainnetRpc: "https://forno.celo.org", MainnetRegistry: zeroEVMRegistry},
+	{Chain: iwallet.ChainMantle, MainnetRpc: "https://rpc.mantle.xyz", MainnetRegistry: zeroEVMRegistry},
+	{Chain: iwallet.ChainZkSyncEra, MainnetRpc: "https://mainnet.era.zksync.io", MainnetRegistry: zeroEVMRegistry},
+	{Chain: iwallet.ChainScroll, MainnetRpc: "https://rpc.scroll.io", MainnetRegistry: zeroEVMRegistry},
+	{Chain: iwallet.ChainLinea, MainnetRpc: "https://rpc.linea.build", MainnetRegistry: zeroEVMRegistry},
 }
+
+// zeroEVMRegistry is the sentinel registry address marking a chain
+// whose V1 ContractManager Registry has NOT been deployed (Phase
+// EVM-ManagedEscrow v0.3.0 Sprint 1 D8 promoted set). The EVM client guard
+// in internal/chains/evm/client.go treats this exact value as a
+// V1-unsupported signal: any GetRecommendedContractVersion call
+// returns ErrChainNotSupported instead of triggering an empty
+// contract eth_call. The literal must stay verbatim — paste-typing
+// alternative all-zero formats (e.g. "0x0") would bypass the guard.
+const zeroEVMRegistry = "0x0000000000000000000000000000000000000000"
 
 // GetDefaultConfigs returns default EVM client configs for all supported EVM chains.
 // This is a standalone function — it does not depend on the factory being registered.

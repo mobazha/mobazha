@@ -115,7 +115,17 @@ func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 
 			multiwallet[chain] = w
 
-		case iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon, iwallet.ChainBase, iwallet.ChainConflux:
+		case iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon, iwallet.ChainBase, iwallet.ChainConflux,
+			// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
+			// Wallets construct successfully but their chain client's V1
+			// ContractManager Registry is intentionally not deployed
+			// (RegistryAddress zero-address sentinel in chain config).
+			// Order creation on V1 paths fails closed via the EVM client
+			// guard in internal/chains/evm/client.go; V2 ManagedEscrowAdapter
+			// shadow registration handles the V2 path.
+			iwallet.ChainArbitrum, iwallet.ChainOptimism, iwallet.ChainAvalanche,
+			iwallet.ChainGnosis, iwallet.ChainCelo, iwallet.ChainMantle,
+			iwallet.ChainZkSyncEra, iwallet.ChainScroll, iwallet.ChainLinea:
 			coinType, err := iwallet.RequireCanonicalNativeCoinType(chain)
 			if err != nil {
 				return nil, nil, err

@@ -29,7 +29,7 @@ func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 		Path:        "/v1/system/publish",
 		Summary:     "Publish store data",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/publish", http.NoBody)
 		rr := httptest.NewRecorder()
@@ -47,7 +47,7 @@ func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 		Path:        "/v1/system/cache",
 		Summary:     "Purge publishing cache",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodDelete, "/v1/system/cache", http.NoBody)
 		rr := httptest.NewRecorder()
@@ -65,7 +65,7 @@ func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 		Path:        "/v1/system/network",
 		Summary:     "Inspect network overlays and listening multiaddrs",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/network", nil)
 		rr := httptest.NewRecorder()
@@ -83,7 +83,7 @@ func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 		Path:        "/v1/system/network",
 		Summary:     "Change network overlays (standalone)",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/network", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -102,7 +102,7 @@ func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 		Path:        "/v1/system/domain",
 		Summary:     "Inspect store domain bindings",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/domain", nil)
 		rr := httptest.NewRecorder()
@@ -120,7 +120,7 @@ func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 		Path:        "/v1/system/domain",
 		Summary:     "Update store domain configuration",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/domain", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -139,7 +139,7 @@ func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 		Path:        "/v1/system/connect-platform",
 		Summary:     "Bind standalone store owner to SaaS identity",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/connect-platform", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")

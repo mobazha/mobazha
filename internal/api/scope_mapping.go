@@ -29,6 +29,15 @@ var routeScopeMap = []routeScope{
 	// Orders
 	{"GET /v1/orders", contracts.ScopeOrdersRead},
 	{"POST /v1/orders", contracts.ScopeOrdersManage},
+	// orders payment watch tear-down: an order management action that
+	// happens to use DELETE; without an explicit entry the deny-by-default
+	// branch in matchRouteScope would block tokens carrying ScopeOrdersManage.
+	{"DELETE /v1/orders", contracts.ScopeOrdersManage},
+
+	// Guest checkout (sellers receive guest orders; tokens with the orders
+	// scope are a legitimate use case — e.g. fulfillment automation).
+	{"GET /v1/guest/orders", contracts.ScopeOrdersRead},
+	{"PUT /v1/guest/orders", contracts.ScopeOrdersManage},
 
 	// Sales (seller view of orders)
 	{"GET /v1/sales", contracts.ScopeOrdersRead},
@@ -162,6 +171,11 @@ var routeScopeMap = []routeScope{
 
 	// Config (read-only)
 	{"GET /v1/config", contracts.ScopeSettingsRead},
+	// Feature flags catalogue: pure metadata, any authenticated identity
+	// (including low-privilege API tokens) needs to query "what is on?"
+	// to render correctly. Marked ScopeAny so the middleware skips the
+	// HasScope check while still requiring auth.
+	{"GET /v1/features", contracts.ScopeAny},
 
 	// Blocklist
 	{"PUT /v1/blocklist", contracts.ScopeProfilesWrite},

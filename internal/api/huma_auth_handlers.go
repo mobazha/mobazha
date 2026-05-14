@@ -49,7 +49,7 @@ func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 		Path:        "/v1/admin/password",
 		Summary:     "Rotate standalone admin password",
 		Tags:        []string{"auth"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/admin/password", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -68,7 +68,7 @@ func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 		Path:        "/v1/auth/tokens",
 		Summary:     "Mint local API token (standalone)",
 		Tags:        []string{"auth"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/auth/tokens", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -87,7 +87,7 @@ func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 		Path:        "/v1/auth/tokens",
 		Summary:     "List local API tokens (standalone)",
 		Tags:        []string{"auth"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/auth/tokens", nil)
 		rr := httptest.NewRecorder()
@@ -105,7 +105,7 @@ func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 		Path:        "/v1/auth/tokens/{tokenID}",
 		Summary:     "Revoke local API token by ID",
 		Tags:        []string{"auth"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *tokenIDPath) (*nodeNoContentOutput, error) {
 		raw := "/v1/auth/tokens/" + url.PathEscape(in.TokenID)
 		req := nodeBridgeRequestWithVars(ctx, http.MethodDelete, raw, nil, map[string]string{"tokenID": in.TokenID})

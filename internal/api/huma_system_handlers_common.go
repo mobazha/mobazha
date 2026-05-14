@@ -25,7 +25,10 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/config",
 		Summary:     "Get gateway configuration snapshot",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		// config-get is the gateway snapshot used by tooling; an entry in
+		// routeScopeMap (GET /v1/config -> ScopeSettingsRead) lets tokens
+		// read it, so nodeAuthSecurity is the correct declaration.
+		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/config", nil)
 		rr := httptest.NewRecorder()
@@ -43,7 +46,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/info",
 		Summary:     "Get system/network info snapshot",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/info", nil)
 		rr := httptest.NewRecorder()
@@ -61,7 +64,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/shutdown",
 		Summary:     "Shutdown standalone node process",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/shutdown", http.NoBody)
 		rr := httptest.NewRecorder()
@@ -79,7 +82,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/logs",
 		Summary:     "Tail recent node log lines",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/logs", nil)
 		rr := httptest.NewRecorder()
@@ -97,7 +100,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/update-trigger",
 		Summary:     "Ask launcher/native updater to action",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/update-trigger", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -116,7 +119,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/update-config",
 		Summary:     "Read auto-update configuration sidecar",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/update-config", nil)
 		rr := httptest.NewRecorder()
@@ -134,7 +137,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/update-config",
 		Summary:     "Write auto-update configuration sidecar",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPut, "/v1/system/update-config", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -153,7 +156,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/diagnostics",
 		Summary:     "Export structured diagnostics blob",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/diagnostics", nil)
 		rr := httptest.NewRecorder()
@@ -171,7 +174,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/health",
 		Summary:     "Node health and telemetry",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/health", nil)
 		rr := httptest.NewRecorder()
@@ -189,7 +192,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/doctor",
 		Summary:     "Run self-check diagnostics snapshot",
 		Tags:        []string{"system"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/doctor", nil)
 		rr := httptest.NewRecorder()
@@ -209,7 +212,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/mcp/capability",
 		Summary:     "Detect MCP client capabilities",
 		Tags:        []string{"system", "ai"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/mcp/capability", nil)
 		rr := httptest.NewRecorder()
@@ -227,7 +230,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/mcp/connect",
 		Summary:     "Auto-configure MCP client",
 		Tags:        []string{"system", "ai"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
 		body := in.Body
 		if len(body) == 0 {
@@ -258,7 +261,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/mcp/connect/{client}",
 		Summary:     "Auto-configure a specific MCP client",
 		Tags:        []string{"system", "ai"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *mcpClientJSON) (*nodeDataOutput, error) {
 		raw := "/v1/system/mcp/connect/" + url.PathEscape(in.Client)
 		body := in.Body
@@ -284,7 +287,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/mcp/clients",
 		Summary:     "List configured MCP clients",
 		Tags:        []string{"system", "ai"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/mcp/clients", nil)
 		rr := httptest.NewRecorder()
@@ -302,7 +305,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/mcp/disconnect",
 		Summary:     "Remove MCP integration",
 		Tags:        []string{"system", "ai"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/mcp/disconnect", http.NoBody)
 		rr := httptest.NewRecorder()
@@ -320,7 +323,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Path:        "/v1/system/mcp/disconnect/{client}",
 		Summary:     "Remove integration for one MCP client",
 		Tags:        []string{"system", "ai"},
-		Security:    nodeAuthSecurity,
+		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *mcpClientOnlyPath) (*nodeDataOutput, error) {
 		raw := "/v1/system/mcp/disconnect/" + url.PathEscape(in.Client)
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, raw, http.NoBody, map[string]string{

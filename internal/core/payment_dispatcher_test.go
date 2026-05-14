@@ -191,11 +191,12 @@ func TestRegistryDispatch_ChainCount(t *testing.T) {
 
 	chains := n.paymentRegistry.Chains()
 	// Expected: UTXO (4) + EVM (13: ETH/BSC/Polygon/Base + 9 D-Hybrid-21
-	// promoted L2s) + Solana (1) + TRON (1) = 19. Sprint 1 D8 promoted
-	// the EVM L2 set (Arbitrum/Optimism/Avalanche/Gnosis/Celo/Mantle/
-	// zkSync/Scroll/Linea); zkSync ships as a placeholder ManagedEscrow row but
-	// the V1 strategy registration is unconditional — V1 paths fail
-	// closed via ErrV1ChainNotSupported on the per-chain Registry guard.
+	// L2s wired in evmChains) + Solana (1) + TRON (1) = 19. Sprint 1 D8
+	// promoted 8 L2 ManagedEscrowAdapters (Arbitrum/Optimism/Avalanche/Gnosis/
+	// Celo/Mantle/Scroll/Linea) to chainMatrix Ready=true; zkSync Era
+	// stays Ready=false but the V1 strategy registration is
+	// unconditional in this loop — V1 paths fail closed via
+	// ErrV1ChainNotSupported on the per-chain Registry guard.
 	if len(chains) != 19 {
 		t.Errorf("registry has %d chains, want 19 (4 UTXO + 13 EVM + 1 Solana + 1 TRON)", len(chains))
 	}

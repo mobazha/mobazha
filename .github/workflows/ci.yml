@@ -104,3 +104,9 @@ jobs:
         run: |
           chmod +x scripts/private_distribution-network-smoke.sh
           ./scripts/private_distribution-network-smoke.sh ./mobazha-private_distribution 20
+
+      - name: Run digital-assets write smoke test (TD-104 regression)
+        working-directory: node
+        run: |
+          chmod +x scripts/private_distribution-digital-assets-smoke.sh
+          ./scripts/private_distribution-digital-assets-smoke.sh ./mobazha-private_distribution

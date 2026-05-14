@@ -23,9 +23,6 @@ func TestGenerateJson(t *testing.T) {
 			// "12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
 			// "12D3KooWC37TxYV9UGrcxwi3kmupGaDNC5YTo1BDL7TrWQHPfh5S",
 		},
-		ExchangeRateProviders: []string{
-			// "https://info.mobazha.org/api/ticker",
-		},
 		PlatformAddrs: map[iwallet.ChainType]string{
 			iwallet.ChainBitcoinCash: "ppaz03a9gc9r339wq9ctggf5st79zkjfxgle6qvuss",
 		},

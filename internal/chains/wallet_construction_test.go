@@ -9,6 +9,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/chains/solana"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo/zcash"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
 	pkgsolana "github.com/mobazha/mobazha3.0/pkg/solana"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -43,7 +44,16 @@ func TestNewLitecoinWallet_NilChainClient(t *testing.T) {
 }
 
 func TestNewZCashWallet_NilChainClient(t *testing.T) {
-	t.Skip("ZCash wallet needs NetConfig.GetExchangeRateProviders() — skip in unit test")
+	w, err := zcash.NewZCashWallet(&base.WalletConfig{
+		NodeID:  "test-node",
+		Testnet: true,
+	})
+	if err != nil {
+		t.Fatalf("NewZCashWallet failed: %v", err)
+	}
+	if w.ChainClient != nil {
+		t.Error("ChainClient should be nil")
+	}
 }
 
 func TestNewETHWallet_NilChainClient(t *testing.T) {

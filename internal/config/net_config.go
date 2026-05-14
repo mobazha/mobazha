@@ -13,9 +13,6 @@ type NetConfig struct {
 	BootstrapAddrs         []string `json:"bootstrapAddrs,omitempty"`
 	StoreAndForwardServers []string `json:"snfServers,omitempty"`
 
-	// ExchangeRateProviders API URL to use for exchange rates. Must conform to the BitcoinAverage format.
-	ExchangeRateProviders []string `json:"exchangeRateProviders,omitempty"`
-
 	PlatformAddrs     map[iwallet.ChainType]string `json:"platformAddrs,omitempty"`
 	platformAddrMutex sync.RWMutex                 `json:"-"`
 
@@ -70,18 +67,6 @@ func LoadNetConfig(endpoint string) (*NetConfig, error) {
 		config.Data = make(map[string]string)
 	}
 	return config, nil
-}
-
-// GetExchangeRateProviders returns the configured exchange rate provider URLs.
-// Deprecated: The main exchange rate system now uses CoinGecko directly (EXR-1a)
-// and Hub-and-Spoke for standalone sites (EXR-1b). This method is only used by
-// historical compatibility paths and can be removed once node configs stop
-// carrying ExchangeRateProviders.
-func (config *NetConfig) GetExchangeRateProviders() []string {
-	if len(config.ExchangeRateProviders) == 0 {
-		return []string{"https://app.mobazha.org/api/ticker"}
-	}
-	return config.ExchangeRateProviders
 }
 
 // GetNetDBEndpoint returns the endpoint for search index sync (NetDB).

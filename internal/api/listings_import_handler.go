@@ -1073,6 +1073,11 @@ type JSONListingInput struct {
 	Grams              uint32             `json:"grams"`
 	Variants []JSONVariantInput `json:"variants"`
 	Quantity           string             `json:"quantity"`
+	// Status mirrors pb.Listing.Status — "draft" / "published" / "private".
+	// Empty preserves the proto default ("published"). Used by the Gumroad
+	// importer (DG-1.9) to land all imports as drafts so creators review
+	// before publishing.
+	Status string `json:"status,omitempty"`
 
 	// RWA Token fields
 	RwaTokenAddress         string   `json:"rwaTokenAddress"`
@@ -1566,6 +1571,7 @@ func (g *Gateway) parseJSONListing(input JSONListingInput) (*pb.Listing, error) 
 
 	listing := &pb.Listing{
 		ShippingProfileId: input.ShippingProfileID,
+		Status:            input.Status,
 		Metadata: &pb.Listing_Metadata{
 			ContractType: contractType,
 			Format:       pb.Listing_Metadata_FIXED_PRICE,

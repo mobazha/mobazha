@@ -225,6 +225,7 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 		{"POST", "/v1/chat/rooms/room1/avatar"},
 		{"POST", "/v1/chat/media/upload"},
 		{"POST", "/v1/listings/import"},
+		{"POST", "/v1/listings/import/gumroad"},
 		{"POST", "/v1/media/files"},
 		// AH-1.6: Public discount helpers (migrated to Huma)
 		{"POST", "/v1/discounts/peer1/validate"},

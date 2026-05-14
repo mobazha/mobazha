@@ -141,6 +141,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"listings-update",
 		"listings-delete",
 		"listings-import-json",
+		"listings-import-gumroad",
 		"listings-index-by-peer-id",
 		"listings-index",
 		"listings-template",

@@ -141,14 +141,6 @@ type mockNode struct {
 	getPostsFunc      func(ctx context.Context, peerID peer.ID, useCache bool) ([]models.PostData, error)
 
 	updateOrderPaymentStatusFunc func(orderID models.OrderID, paymentIntentID, status string) error
-
-	// TECHDEBT(TD-089): legacy image handler stubs — kept for image_handlers_test.go compilation.
-	// 清除条件: image_handlers_test.go 迁移到 MediaService 接口后删除
-	getAvatarFunc       func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
-	getHeaderFunc       func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
-	setAvatarImageFunc  func(b64ImageData string, done chan struct{}) (models.ImageHashes, error)
-	setHeaderImageFunc  func(b64ImageData string, done chan struct{}) (models.ImageHashes, error)
-	setProductImageFunc func(b64ImageData string, filename string) (models.ImageHashes, error)
 }
 
 // Service accessors — mockNode returns itself for each sub-interface.

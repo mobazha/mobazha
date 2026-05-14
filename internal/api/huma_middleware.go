@@ -79,6 +79,30 @@ func clientIPFromContext(ctx context.Context) string {
 	return "unknown"
 }
 
+// operationAcceptsAPIToken reports whether the huma operation's declared
+// Security includes the apiToken scheme. Operations that omit apiToken
+// (e.g. those using adminOnlyAuthSecurity for seed/key export, wallet
+// setup wizards, or other "operator at the keyboard" actions) MUST refuse
+// mbz_ tokens at runtime — the OpenAPI declaration is otherwise advisory
+// only and a wallet:read token would be silently accepted by the broader
+// scope middleware (which uses prefix matching against routeScopeMap).
+//
+// This function is the single runtime gate that turns Operation.Security
+// into a real access decision. Without it, a token holding ScopeWalletRead
+// could read the 25-word seed via GET /v1/wallet/external_payment/secrets/mnemonic
+// because the route prefix-matches GET /v1/wallet → ScopeWalletRead.
+func operationAcceptsAPIToken(op *huma.Operation) bool {
+	if op == nil {
+		return false
+	}
+	for _, requirement := range op.Security {
+		if _, ok := requirement[SecuritySchemeAPIToken]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // enforceHumaScope checks API-token scopes against routeScopeMap for the
 // given huma operation. Admin identities (Scopes == nil) always pass.
 // Returns true if the request should be blocked (error already written).
@@ -209,6 +233,19 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			bearerVal := strings.TrimSpace(authHeader[7:])
 			if bearerVal != "" && apitoken.IsAPIToken(bearerVal) {
+				// Honor the operation's declared Security: if apiToken
+				// is not listed (e.g. adminOnlyAuthSecurity), refuse
+				// without even validating the token. This is what
+				// makes the spec a real access control instead of a
+				// documentation hint, and prevents wallet:read tokens
+				// from reaching seed/key export endpoints that happen
+				// to share a prefix with read-only wallet routes in
+				// routeScopeMap.
+				if !operationAcceptsAPIToken(op) {
+					huma.WriteErr(api, ctx, http.StatusUnauthorized,
+						"API tokens are not accepted for this operation; use Basic Auth or Bearer JWT")
+					return
+				}
 				identity, ok := g.tryAPITokenAuth(bearerVal)
 				if !ok {
 					huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid or expired API token")

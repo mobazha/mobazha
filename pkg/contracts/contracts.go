@@ -671,6 +671,142 @@ var ErrEXTERNAL_PAYMENTWalletAlreadyExists = errors.New("external_payment wallet
 // Handlers unwrap to HTTP 400.
 var ErrEXTERNAL_PAYMENTInvalidSeed = errors.New("external_payment seed")
 
+// ExternalPaymentSecretsProvider is implemented by nodes that expose the EXTERNAL_PAYMENT
+// wallet's user-sovereignty surface — the operations OP-MP-6 needs so
+// the merchant can re-derive a backup, restore on another machine, or
+// hand a view-only copy to a trusted bookkeeper.
+//
+// Both methods are admin-only and live behind the same security tier as
+// the wallet setup wizard (no apiToken). They MUST round-trip to
+// external_payment-wallet-rpc on every call — the server never caches the seed or
+// view key.
+//
+// Available only on private_distribution builds with a working external_payment-wallet-rpc
+// sidecar; SaaS / full nodes return ErrExternalPaymentWalletUnavailable.
+type ExternalPaymentSecretsProvider interface {
+	GetEXTERNAL_PAYMENTMnemonic(ctx context.Context) (ExternalPaymentMnemonicResult, error)
+	GetEXTERNAL_PAYMENTViewOnlyKeys(ctx context.Context) (ExternalPaymentViewOnlyKeysResult, error)
+}
+
+// ExternalPaymentMnemonicResult is the response payload for
+// GET /v1/wallet/external_payment/secrets/mnemonic.
+//
+// Mnemonic is the 25-word deterministic seed — the single source of
+// truth for the wallet. Anyone who sees it permanently controls the
+// funds. The frontend MUST display it inside an explicit "reveal" UX
+// (eye icon, click-to-show) and emit a warning that screenshots /
+// clipboard history / screen-share leaks compromise the wallet.
+//
+// CreatedAt + Address are echoed so the operator can sanity-check the
+// seed they're about to write down belongs to the wallet they think it
+// does. Both come from local metadata, not wallet-rpc.
+type ExternalPaymentMnemonicResult struct {
+	Mnemonic  string `json:"mnemonic"`
+	Address   string `json:"address,omitempty"`
+	CreatedAt int64  `json:"createdAt,omitempty"`
+}
+
+// ExternalPaymentViewOnlyKeysResult is the response payload for
+// GET /v1/wallet/external_payment/secrets/view-only.
+//
+// PrimaryAddress + PrivateViewKey + RestoreHeight is the canonical
+// view-only triplet: feed the three into a fresh wallet (CLI:
+// `external_payment-wallet-cli --generate-from-view-key`, GUI: "Restore wallet
+// from keys") and the new wallet sees every incoming payment without
+// being able to spend.
+//
+// CurrentHeight is captured server-side at the same moment the keys are
+// returned, so the receiver knows the absolute upper bound the audit
+// view is up to date with — without it the operator would have to
+// open another tool to determine the chain tip. RestoreHeight is the
+// historical scan-from anchor stored in external_payment-wallet.json (0 = scan from
+// genesis, very slow). The receiver should pick max(restoreHeight, 0)
+// for a comprehensive audit; for short-window auditing they may pass a
+// later height to skip historical re-scan.
+type ExternalPaymentViewOnlyKeysResult struct {
+	PrimaryAddress string `json:"primaryAddress"`
+	PrivateViewKey string `json:"privateViewKey"`
+	RestoreHeight  uint64 `json:"restoreHeight"`
+	CurrentHeight  uint64 `json:"currentHeight"`
+}
+
+// ExternalPaymentHistoryProvider is implemented by nodes that expose the EXTERNAL_PAYMENT
+// wallet's transaction history. Used by the OP-MP-6 history page so the
+// operator can audit incoming payments + outgoing withdrawals without
+// running a separate ExternalPayment CLI.
+//
+// Like ExternalPaymentWalletProvider, this is admin-only — incoming transfers
+// reveal subaddresses (which can be correlated to past orders) and
+// outgoing transfers reveal recipient addresses (the operator's payout
+// targets / counterparties). Anonymous reads are explicitly forbidden.
+//
+// Available only on private_distribution builds with a working external_payment-wallet-rpc
+// sidecar; SaaS / full nodes return ErrExternalPaymentWalletUnavailable.
+type ExternalPaymentHistoryProvider interface {
+	ListEXTERNAL_PAYMENTTransfers(ctx context.Context, req ListEXTERNAL_PAYMENTTransfersRequest) (ListEXTERNAL_PAYMENTTransfersResult, error)
+}
+
+// ListEXTERNAL_PAYMENTTransfersRequest is the body for GET /v1/wallet/external_payment/transfers.
+//
+// AccountIndex is a pointer for the same reason as ExternalPaymentWithdrawRequest:
+// nil means "use the node's startup default" so multi-account private_distributions
+// can rely on the same default everywhere. Most callers omit it.
+//
+// In/Out/Pool/Pending/Failed mirror the wallet-rpc get_transfers bucket
+// flags. The server MUST default unset flags to (In=true, Out=true)
+// because that's the natural "show me everything" view; explicit zeroes
+// from the client are honoured and may produce an empty list. At least
+// one bucket flag must end up true after defaulting; otherwise the
+// handler returns 400 (lifted from the underlying client guard).
+type ListEXTERNAL_PAYMENTTransfersRequest struct {
+	AccountIndex *uint32 `json:"accountIndex,omitempty"`
+	In           bool    `json:"in"`
+	Out          bool    `json:"out"`
+	Pool         bool    `json:"pool"`
+	Pending      bool    `json:"pending"`
+	Failed       bool    `json:"failed"`
+}
+
+// ListEXTERNAL_PAYMENTTransfersResult lists the matching transfers in wallet-rpc
+// order (in→out→pool→pending→failed). The frontend is responsible for
+// any user-driven sort (e.g. timestamp-desc) — keeping the wire format
+// stable means the contract test stays simple.
+//
+// AccountIndex echoes which account the response refers to so the
+// frontend doesn't have to track the request/response pairing itself.
+type ListEXTERNAL_PAYMENTTransfersResult struct {
+	Transfers    []EXTERNAL_PAYMENTTransferEntry `json:"transfers"`
+	AccountIndex uint32             `json:"accountIndex"`
+}
+
+// EXTERNAL_PAYMENTTransferEntry mirrors pkg/external_payment.TransferDetail but lives in the
+// public contracts package so the OpenAPI schema stays self-contained
+// (clients consuming the contract shouldn't have to import pkg/external_payment).
+//
+// Amount + Fee are decimal piconero strings, same rationale as
+// ExternalPaymentWithdrawRequest.Amount: a long-running private_distribution can accumulate
+// > 9007 EXTERNAL_PAYMENT, beyond JS Number managed_escrow-integer range. UI MUST format from
+// strings; never parse to Number for display.
+type EXTERNAL_PAYMENTTransferEntry struct {
+	TxHash        string                 `json:"txHash"`
+	Direction     string                 `json:"direction"` // in / out / pool / pending / failed
+	Amount        string                 `json:"amount"`    // piconero, decimal string
+	Fee           string                 `json:"fee"`       // piconero, decimal string; "0" for incoming
+	Height        uint64                 `json:"height"`    // 0 for pool/pending/failed
+	Confirmations uint64                 `json:"confirmations"`
+	Timestamp     int64                  `json:"timestamp"` // unix seconds; 0 if unknown
+	SubAddrIndex  uint32                 `json:"subAddrIndex"`
+	Destinations  []EXTERNAL_PAYMENTTransferRecipient `json:"destinations,omitempty"` // outgoing only
+	Note          string                 `json:"note,omitempty"`
+}
+
+// EXTERNAL_PAYMENTTransferRecipient is one destination leg of an outgoing transfer.
+// Amount is a decimal piconero string (same rationale as EXTERNAL_PAYMENTTransferEntry).
+type EXTERNAL_PAYMENTTransferRecipient struct {
+	Address string `json:"address"`
+	Amount  string `json:"amount"`
+}
+
 // SchedulerHooks exposes per-node worker tick methods for the scheduler
 // (Phase AH-3). Both the SaaS shared scheduler and the standalone local
 // scheduler call these via type assertion on NodeService, avoiding changes

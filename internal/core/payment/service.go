@@ -224,7 +224,7 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		return nil, iwallet.Address{}, nil, err
 	}
 
-	paymentMethod, moderatorAddress, requiredSignatures, err := s.getModeratorInfo(ctx, params.Moderator, params.CoinType)
+	paymentMethod, moderatorAddress, requiredSignatures, err := s.GetModeratorEscrowInfo(ctx, params.Moderator, params.CoinType)
 	if err != nil {
 		return nil, iwallet.Address{}, nil, err
 	}
@@ -359,8 +359,22 @@ func (s *PaymentAppService) GetOrderInfo(orderID models.OrderID, coinType iwalle
 	}, nil
 }
 
-// getModeratorInfo resolves moderator details for escrow setup.
-func (s *PaymentAppService) getModeratorInfo(ctx context.Context, moderatorID string, coinType iwallet.CoinType) (pb.PaymentSent_Method, string, int, error) {
+// GetModeratorEscrowInfo resolves moderator details for escrow setup. Returns
+// (paymentMethod, moderatorAddress, requiredSignatures, error). The paymentMethod
+// distinguishes CANCELABLE (1-of-2) vs MODERATED (2-of-3); moderatorAddress is
+// the chain-specific (EVM hex / Solana base58) address derived from the
+// moderator's profile pubkey; requiredSignatures matches the threshold (1 or 2).
+//
+// An empty moderatorID returns CANCELABLE / "" / 1 — callers MUST treat this
+// as the no-moderator path (ManagedEscrow 1-of-2). Profile fetch / pubkey decode errors
+// are surfaced verbatim so the dispatcher can classify them as 5xx.
+//
+// Exposed for the ManagedEscrowAdapter dispatcher (Sprint 2 D18a) which needs the same
+// moderator resolution as the legacy V1 escrow path. V1
+// BuildInitEscrowInstructions continues to call this method as well —
+// the rename keeps a single source of truth for moderator address derivation
+// across V1 and ManagedEscrow lifecycles.
+func (s *PaymentAppService) GetModeratorEscrowInfo(ctx context.Context, moderatorID string, coinType iwallet.CoinType) (pb.PaymentSent_Method, string, int, error) {
 	requiredSignatures := 2
 	paymentMethod := pb.PaymentSent_CANCELABLE
 

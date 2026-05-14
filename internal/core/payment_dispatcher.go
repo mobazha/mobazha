@@ -106,19 +106,23 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 // registerManagedEscrowAdapterShadow constructs ManagedEscrowAdapter instances for the
 // Ready EVM chains and registers them via Registry.RegisterV2 alongside
 // the canonical V1 EVMChainOps entries (Phase EVM-ManagedEscrow v0.3.0 — Sprint
-// 2 D17 shadow stage).
+// 2 shadow stage).
 //
-// Shadow registration is intentionally non-functional for live payment
-// paths: V1 ForCoin lookups remain canonical and the V2 lookup path has
-// no production caller today. Real Relayer / OwnerProvider /
-// NonceProvider land in a follow-up commit. Until then, accidental V2
-// invocations surface ErrRelayerNotConfigured (Submit/GasWallet) or
-// errManagedEscrowStubNotImplemented (SetupPayment/Confirm/Cancel/Complete/
-// DisputeRelease) instead of silently broadcasting; GetActionStatus is
-// the only surface fully wired here, against an in-memory store.
+// V1 ForCoin lookups remain canonical and the V2 lookup path has no
+// production caller today. Sprint 2 D18a wires a real OwnerProvider
+// (when PaymentAppService is available) so SetupPayment can predict
+// ManagedEscrow addresses end-to-end; Relayer + NonceProvider remain stubbed
+// pending follow-up commits, so accidental V2 invocations surface
+// ErrRelayerNotConfigured (Submit/GasWallet) or errManagedEscrowStubNotImplemented
+// (Confirm/Cancel/Complete/DisputeRelease) instead of silently
+// broadcasting. GetActionStatus is fully wired against an in-memory
+// store, and SetupPayment is fully wired once OwnerProvider is set.
 //
 // Skipped when keyProvider or multiwallet is nil (unit tests that build
 // a stripped-down MobazhaNode); production builds always have both.
+// OwnerProvider injection additionally requires paymentService — when
+// paymentService is nil (also a test-only path), SetupPayment continues
+// to short-circuit with errManagedEscrowStubNotImplemented.
 func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	if n.keyProvider == nil || n.multiwallet == nil {
 		logger.LogInfoWithIDf(log, n.nodeID,
@@ -133,6 +137,16 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		Keys:        n.keyProvider,
 		Multiwallet: n.multiwallet,
 		ActionStore: store,
+	}
+	if n.paymentService != nil {
+		deps.OwnerProvider = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}
+	} else {
+		// Test-only path: nodeWithManagedEscrowShadowDeps builds a stripped
+		// MobazhaNode without paymentService. Leaving OwnerProvider
+		// nil keeps SetupPayment short-circuiting to the documented
+		// errManagedEscrowStubNotImplemented path.
+		logger.LogInfoWithIDf(log, n.nodeID,
+			"ManagedEscrowAdapter shadow registration: paymentService unavailable; OwnerProvider left nil (SetupPayment will stub)")
 	}
 
 	shadow := make(map[iwallet.ChainType]*adapters.ManagedEscrowAdapter, len(evmChains))

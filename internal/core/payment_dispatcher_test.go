@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
@@ -385,6 +386,52 @@ func TestManagedEscrowAdapterShadow_GetActionStatusReportsActionNotFound(t *test
 				t.Fatalf("GetActionStatus(unknown) on %s = %v, want payment.ErrActionNotFound", chain, err)
 			}
 		})
+	}
+}
+
+func TestManagedEscrowAdapterShadow_OwnerProviderInjectedWhenPaymentServiceAvailable(t *testing.T) {
+	// D18a contract: when paymentService is wired, every ManagedEscrowAdapter
+	// gets a real OwnerProvider so SetupPayment no longer short-circuits
+	// to errManagedEscrowStubNotImplemented. We use HasOwnerProvider() — the
+	// dispatcher-facing predicate — instead of reaching into unexported
+	// state, so the test stays decoupled from ManagedEscrowAdapter's internals.
+	n := nodeWithManagedEscrowShadowDeps()
+	// PaymentAppService is non-nil; its inner deps stay zero-valued
+	// because registerManagedEscrowAdapterShadow only checks pointer presence.
+	n.paymentService = corepayment.NewPaymentAppService(corepayment.PaymentAppServiceConfig{NodeID: "test-shadow"})
+	n.registerPaymentStrategies()
+
+	if len(n.managedEscrowAdapters) == 0 {
+		t.Fatal("managedEscrowAdapters empty; shadow registration did not run with paymentService present")
+	}
+	for chain, adapter := range n.managedEscrowAdapters {
+		if !adapter.HasOwnerProvider() {
+			t.Errorf("managedEscrowAdapters[%s] has no OwnerProvider; D18a injection regressed", chain)
+		}
+		// NonceProvider remains stubbed in this commit (D18a covers
+		// owners only); pin the inverted invariant so a future commit
+		// flipping it forces this test to be revisited deliberately.
+		if adapter.HasNonceProvider() {
+			t.Errorf("managedEscrowAdapters[%s] unexpectedly has NonceProvider; update test alongside D18b", chain)
+		}
+	}
+}
+
+func TestManagedEscrowAdapterShadow_OwnerProviderNilWhenPaymentServiceMissing(t *testing.T) {
+	// Mirror image of the injection test: with paymentService nil
+	// (test-only path), OwnerProvider stays nil and SetupPayment
+	// continues to short-circuit. Document this explicitly so the
+	// test suite encodes the boundary on both sides.
+	n := nodeWithManagedEscrowShadowDeps()
+	n.registerPaymentStrategies()
+
+	if len(n.managedEscrowAdapters) == 0 {
+		t.Fatal("managedEscrowAdapters empty; deps-present shadow registration unexpectedly skipped")
+	}
+	for chain, adapter := range n.managedEscrowAdapters {
+		if adapter.HasOwnerProvider() {
+			t.Errorf("managedEscrowAdapters[%s] has OwnerProvider despite paymentService=nil; D18a guard broken", chain)
+		}
 	}
 }
 

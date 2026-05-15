@@ -864,6 +864,41 @@ func (s *ListingAppService) signListing(listing *pb.Listing) (*pb.SignedListing,
 	return &pb.SignedListing{Listing: listing, Signature: sig}, nil
 }
 
+func validateImageHashes(img *pb.Image) error {
+	if img == nil {
+		return nil
+	}
+	_, err := cid.Decode(img.Tiny)
+	if err != nil {
+		return errors.New("tiny image hashes must be properly formatted CID")
+	}
+	_, err = cid.Decode(img.Small)
+	if err != nil {
+		return errors.New("small image hashes must be properly formatted CID")
+	}
+	_, err = cid.Decode(img.Medium)
+	if err != nil {
+		return errors.New("medium image hashes must be properly formatted CID")
+	}
+	_, err = cid.Decode(img.Large)
+	if err != nil {
+		return errors.New("large image hashes must be properly formatted CID")
+	}
+	_, err = cid.Decode(img.Original)
+	if err != nil {
+		return errors.New("original image hashes must be properly formatted CID")
+	}
+	return nil
+}
+
+func hasAnyImageRef(img *pb.Image) bool {
+	if img == nil {
+		return false
+	}
+	return img.Filename != "" || img.Large != "" || img.Medium != "" ||
+		img.Small != "" || img.Tiny != "" || img.Original != ""
+}
+
 func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1016,25 +1051,8 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 		return coreiface.ErrTooManyItems{"item.images", strconv.Itoa(MaxListItems)}
 	}
 	for _, img := range sl.Listing.Item.Images {
-		_, err := cid.Decode(img.Tiny)
-		if err != nil {
-			return errors.New("tiny image hashes must be properly formatted CID")
-		}
-		_, err = cid.Decode(img.Small)
-		if err != nil {
-			return errors.New("small image hashes must be properly formatted CID")
-		}
-		_, err = cid.Decode(img.Medium)
-		if err != nil {
-			return errors.New("medium image hashes must be properly formatted CID")
-		}
-		_, err = cid.Decode(img.Large)
-		if err != nil {
-			return errors.New("large image hashes must be properly formatted CID")
-		}
-		_, err = cid.Decode(img.Original)
-		if err != nil {
-			return errors.New("original image hashes must be properly formatted CID")
+		if err := validateImageHashes(img); err != nil {
+			return err
 		}
 		if img.Filename == "" {
 			return errors.New("image file names must not be nil")
@@ -1079,28 +1097,9 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 			if len(variant.Name) > WordMaxCharacters {
 				return coreiface.ErrTooManyCharacters{"item.options.variants.name", strconv.Itoa(WordMaxCharacters)}
 			}
-			if variant.Image != nil && (variant.Image.Filename != "" ||
-				variant.Image.Large != "" || variant.Image.Medium != "" || variant.Image.Small != "" ||
-				variant.Image.Tiny != "" || variant.Image.Original != "") {
-				_, err := cid.Decode(variant.Image.Tiny)
-				if err != nil {
-					return errors.New("tiny image hashes must be properly formatted CID")
-				}
-				_, err = cid.Decode(variant.Image.Small)
-				if err != nil {
-					return errors.New("small image hashes must be properly formatted CID")
-				}
-				_, err = cid.Decode(variant.Image.Medium)
-				if err != nil {
-					return errors.New("medium image hashes must be properly formatted CID")
-				}
-				_, err = cid.Decode(variant.Image.Large)
-				if err != nil {
-					return errors.New("large image hashes must be properly formatted CID")
-				}
-				_, err = cid.Decode(variant.Image.Original)
-				if err != nil {
-					return errors.New("original image hashes must be properly formatted CID")
+			if hasAnyImageRef(variant.Image) {
+				if err := validateImageHashes(variant.Image); err != nil {
+					return err
 				}
 				if variant.Image.Filename == "" {
 					return coreiface.ErrMissingField("items.options.variants.image.file")
@@ -1300,6 +1299,20 @@ func (s *ListingAppService) validateListingDraft(sl *pb.SignedListing) error {
 	}
 	if sl.Listing.VendorID == nil {
 		return coreiface.ErrMissingField("vendorID")
+	}
+	for _, img := range sl.Listing.Item.Images {
+		if err := validateImageHashes(img); err != nil {
+			return err
+		}
+	}
+	for _, option := range sl.Listing.Item.Options {
+		for _, variant := range option.Variants {
+			if hasAnyImageRef(variant.Image) {
+				if err := validateImageHashes(variant.Image); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	return nil
 }

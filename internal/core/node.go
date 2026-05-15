@@ -216,11 +216,20 @@ func (n *MobazhaNode) SaveStoreConfig(cfg json.RawMessage) error {
 // getSetting reads a single key from the node_settings table.
 func (n *MobazhaNode) getSetting(key string) (string, error) {
 	var setting models.NodeSettings
+	var found bool
 	err := n.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("\"key\" = ?", key).First(&setting).Error
+		result := tx.Read().Where("\"key\" = ?", key).Limit(1).Find(&setting)
+		if result.Error != nil {
+			return result.Error
+		}
+		found = result.RowsAffected > 0
+		return nil
 	})
 	if err != nil {
 		return "", err
+	}
+	if !found {
+		return "", nil
 	}
 	return setting.Value, nil
 }

@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"io"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -63,6 +64,51 @@ func NewMediaAppService(cfg MediaAppServiceConfig) *MediaAppService {
 		publishFile:  cfg.PublishFile,
 		eventBus:     cfg.EventBus,
 	}
+}
+
+// MediaUploader is the subset of MediaAppService needed by services that
+// download external images and upload them into the local media pipeline.
+// Defined here (no build tag) so both full and private_distribution builds can reference it.
+type MediaUploader interface {
+	UploadMedia(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error)
+	// UploadFromURL downloads an image from an external URL and uploads it
+	// to the media pipeline, returning CID-based hashes.
+	UploadFromURL(ctx context.Context, url string) (*contracts.UploadResult, error)
+}
+
+// ── UploadFromURL ───────────────────────────────────────────────
+
+const maxURLDownloadBytes = 20 << 20 // 20 MB
+
+func (s *MediaAppService) UploadFromURL(ctx context.Context, imgURL string) (*contracts.UploadResult, error) {
+	dlCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, imgURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request for %s: %w", imgURL, err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download %s: %w", imgURL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download %s returned HTTP %d", imgURL, resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxURLDownloadBytes))
+	if err != nil {
+		return nil, fmt.Errorf("read body from %s: %w", imgURL, err)
+	}
+
+	filename := path.Base(imgURL)
+	if idx := strings.Index(filename, "?"); idx > 0 {
+		filename = filename[:idx]
+	}
+
+	return s.UploadMedia(ctx, data, filename, contracts.UploadOpts{Variants: true})
 }
 
 // ── UploadMedia ─────────────────────────────────────────────────

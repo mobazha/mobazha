@@ -16,6 +16,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -968,7 +970,8 @@ func TestUnlinkSyncedProduct_ProviderMismatch(t *testing.T) {
 // richCatalogProvider returns a product with multiple variants for import testing.
 type richCatalogProvider struct {
 	stubFulfillmentProvider
-	getProductFn func(ctx context.Context, productID string) (*contracts.CatalogProduct, error)
+	getProductFn          func(ctx context.Context, productID string) (*contracts.CatalogProduct, error)
+	getStoreSyncProductFn func(ctx context.Context, syncProductID string) (*contracts.StoreSyncProduct, error)
 }
 
 func (p *richCatalogProvider) ListCategories(_ context.Context) ([]contracts.CatalogCategory, error) {
@@ -998,6 +1001,26 @@ func (p *richCatalogProvider) GetProduct(ctx context.Context, productID string) 
 func (p *richCatalogProvider) GetVariant(_ context.Context, variantID string) (*contracts.CatalogVariant, error) {
 	return &contracts.CatalogVariant{ID: variantID}, nil
 }
+func (p *richCatalogProvider) ListStoreSyncProducts(_ context.Context, _ int, _ int) (*contracts.StoreSyncPage, error) {
+	return &contracts.StoreSyncPage{}, nil
+}
+func (p *richCatalogProvider) GetStoreSyncProduct(ctx context.Context, syncProductID string) (*contracts.StoreSyncProduct, error) {
+	if p.getStoreSyncProductFn != nil {
+		return p.getStoreSyncProductFn(ctx, syncProductID)
+	}
+	return &contracts.StoreSyncProduct{
+		ID:           syncProductID,
+		Name:         "Custom Tee",
+		ThumbnailURL: "https://img.example.com/sync-thumb.jpg",
+		VariantCount: 3,
+		SyncedCount:  3,
+		Variants: []contracts.StoreSyncVariant{
+			{ID: "sv-1", SyncProductID: syncProductID, RetailPrice: "12.00", Currency: "USD", Size: "S", Color: "Black", PreviewURL: "https://img.example.com/sync-s-black.jpg", InStock: true},
+			{ID: "sv-2", SyncProductID: syncProductID, RetailPrice: "12.00", Currency: "USD", Size: "M", Color: "Black", InStock: true},
+			{ID: "sv-3", SyncProductID: syncProductID, RetailPrice: "13.00", Currency: "USD", Size: "L", Color: "White", InStock: true},
+		},
+	}, nil
+}
 
 // mockListingOps captures SaveListing calls for testing.
 type mockListingOps struct {
@@ -1021,6 +1044,34 @@ func (m *mockListingOps) GetListingStatus(slug string) (string, error) {
 	return "published", m.err
 }
 
+type mockSupplyChainMediaOps struct {
+	uploadFromURLCount int
+	uploadFromURLs     []string
+	err                error
+}
+
+func (m *mockSupplyChainMediaOps) UploadMedia(_ context.Context, _ []byte, _ string, _ contracts.UploadOpts) (*contracts.UploadResult, error) {
+	return nil, nil
+}
+
+func (m *mockSupplyChainMediaOps) UploadFromURL(_ context.Context, url string) (*contracts.UploadResult, error) {
+	m.uploadFromURLCount++
+	m.uploadFromURLs = append(m.uploadFromURLs, url)
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &contracts.UploadResult{
+		Hashes: &models.ImageHashes{
+			Tiny:     fmt.Sprintf("tiny-cid-%d", m.uploadFromURLCount),
+			Small:    fmt.Sprintf("small-cid-%d", m.uploadFromURLCount),
+			Medium:   fmt.Sprintf("medium-cid-%d", m.uploadFromURLCount),
+			Large:    fmt.Sprintf("large-cid-%d", m.uploadFromURLCount),
+			Original: fmt.Sprintf("original-cid-%d", m.uploadFromURLCount),
+			Filename: fmt.Sprintf("image-%d.png", m.uploadFromURLCount),
+		},
+	}, nil
+}
+
 func TestImportProduct_HappyPath(t *testing.T) {
 	db := newSCTestDatabase(t)
 	reg := fulfillment.NewRegistry()
@@ -1031,8 +1082,10 @@ func TestImportProduct_HappyPath(t *testing.T) {
 	}
 
 	listingOps := &mockListingOps{}
+	mediaOps := &mockSupplyChainMediaOps{}
 	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
 	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
 
 	result, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
 		ProviderID:   "printful",
@@ -1072,6 +1125,12 @@ func TestImportProduct_HappyPath(t *testing.T) {
 	if len(listing.Item.Skus) != 3 {
 		t.Errorf("expected 3 SKUs, got %d", len(listing.Item.Skus))
 	}
+	if got := listing.Item.Images[0].Tiny; strings.HasPrefix(got, "http://") || strings.HasPrefix(got, "https://") {
+		t.Errorf("expected catalog image to be CID-backed, got %q", got)
+	}
+	if got := listing.Item.Skus[0].Images[0].Tiny; strings.HasPrefix(got, "http://") || strings.HasPrefix(got, "https://") {
+		t.Errorf("expected sku image to be CID-backed, got %q", got)
+	}
 	if len(listing.Item.Options) != 2 {
 		t.Errorf("expected 2 options (Size, Color), got %d", len(listing.Item.Options))
 	}
@@ -1108,8 +1167,10 @@ func TestImportProduct_FilterVariants(t *testing.T) {
 	}
 
 	listingOps := &mockListingOps{}
+	mediaOps := &mockSupplyChainMediaOps{}
 	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
 	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
 
 	result, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
 		ProviderID:   "printful",
@@ -1218,8 +1279,10 @@ func TestImportProduct_SaveListingError(t *testing.T) {
 	}
 
 	listingOps := &mockListingOps{err: errors.New("save failed")}
+	mediaOps := &mockSupplyChainMediaOps{}
 	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
 	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
 
 	_, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
 		ProviderID:   "printful",
@@ -1244,8 +1307,10 @@ func TestImportProduct_DefaultMarkup(t *testing.T) {
 	}
 
 	listingOps := &mockListingOps{}
+	mediaOps := &mockSupplyChainMediaOps{}
 	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
 	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
 
 	result, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
 		ProviderID: "printful",
@@ -1259,6 +1324,153 @@ func TestImportProduct_DefaultMarkup(t *testing.T) {
 	// With markup=1.0 and minCost=$8.25 → retail=825 cents
 	if result.RetailPrice != result.SupplierCost {
 		t.Errorf("with default markup, retail (%s) should equal supplier cost (%s)", result.RetailPrice, result.SupplierCost)
+	}
+}
+
+func TestImportProduct_DedupesRepeatedCatalogImageURLs(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{
+		stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"},
+		getProductFn: func(_ context.Context, productID string) (*contracts.CatalogProduct, error) {
+			sharedURL := "https://img.example.com/shared.jpg"
+			return &contracts.CatalogProduct{
+				ID:          productID,
+				Title:       "Shared Image Tee",
+				Description: "A tee using one repeated image.",
+				ImageURL:    sharedURL,
+				Images:      []string{sharedURL},
+				Currency:    "USD",
+				Variants: []contracts.CatalogVariant{
+					{ID: "4011", Title: "S / Black", Price: "8.25", Currency: "USD", InStock: true, Attributes: map[string]string{"Size": "S"}, ImageURL: sharedURL},
+					{ID: "4012", Title: "M / Black", Price: "8.25", Currency: "USD", InStock: true, Attributes: map[string]string{"Size": "M"}, ImageURL: sharedURL},
+				},
+			}, nil
+		},
+	}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	mediaOps := &mockSupplyChainMediaOps{}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
+
+	_, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID: "printful",
+		ProductID:  "shared-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if mediaOps.uploadFromURLCount != 1 {
+		t.Fatalf("expected repeated image URL to upload once, got %d", mediaOps.uploadFromURLCount)
+	}
+	if listingOps.savedListing == nil {
+		t.Fatal("SaveListing was not called")
+	}
+	if got := listingOps.savedListing.Item.Skus[0].Images[0].Tiny; strings.HasPrefix(got, "http://") || strings.HasPrefix(got, "https://") {
+		t.Fatalf("expected deduped sku image to be CID-backed, got %q", got)
+	}
+}
+
+func TestImportProduct_PrunesSingleValueCatalogOption(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{
+		stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"},
+		getProductFn: func(_ context.Context, productID string) (*contracts.CatalogProduct, error) {
+			return &contracts.CatalogProduct{
+				ID:          productID,
+				Title:       "Dad Hat",
+				Description: "Single-color hat",
+				ImageURL:    "https://img.example.com/hat.jpg",
+				Currency:    "USD",
+				Variants: []contracts.CatalogVariant{
+					{ID: "v-1", Title: "S / Black", Price: "8.25", Currency: "USD", InStock: true, Attributes: map[string]string{"Size": "S", "Color": "Black"}},
+					{ID: "v-2", Title: "M / Black", Price: "8.25", Currency: "USD", InStock: true, Attributes: map[string]string{"Size": "M", "Color": "Black"}},
+				},
+			}, nil
+		},
+	}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	mediaOps := &mockSupplyChainMediaOps{}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
+
+	_, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID: "printful",
+		ProductID:  "hat-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	require.NotNil(t, listingOps.savedListing)
+	require.Len(t, listingOps.savedListing.Item.Options, 1)
+	assert.Equal(t, "Size", listingOps.savedListing.Item.Options[0].Name)
+	require.Len(t, listingOps.savedListing.Item.Skus, 2)
+	for _, sku := range listingOps.savedListing.Item.Skus {
+		require.Len(t, sku.Selections, 1)
+		assert.Equal(t, "Size", sku.Selections[0].Option)
+	}
+}
+
+func TestImportProduct_PrunesSingleValueSyncOption(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{
+		stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"},
+		getStoreSyncProductFn: func(_ context.Context, syncProductID string) (*contracts.StoreSyncProduct, error) {
+			return &contracts.StoreSyncProduct{
+				ID:           syncProductID,
+				Name:         "Dad Hat",
+				ThumbnailURL: "https://img.example.com/hat-sync.jpg",
+				VariantCount: 2,
+				SyncedCount:  2,
+				Variants: []contracts.StoreSyncVariant{
+					{ID: "sv-1", SyncProductID: syncProductID, RetailPrice: "12.00", Currency: "USD", Size: "S", Color: "Black", InStock: true},
+					{ID: "sv-2", SyncProductID: syncProductID, RetailPrice: "12.00", Currency: "USD", Size: "M", Color: "Black", InStock: true},
+				},
+			}, nil
+		},
+	}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	mediaOps := &mockSupplyChainMediaOps{}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
+
+	_, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID:    "printful",
+		SyncProductID: "sync-hat-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	require.NotNil(t, listingOps.savedListing)
+	require.Len(t, listingOps.savedListing.Item.Options, 1)
+	assert.Equal(t, "size", listingOps.savedListing.Item.Options[0].Name)
+	require.Len(t, listingOps.savedListing.Item.Skus, 2)
+	for _, sku := range listingOps.savedListing.Item.Skus {
+		require.Len(t, sku.Selections, 1)
+		assert.Equal(t, "size", sku.Selections[0].Option)
 	}
 }
 

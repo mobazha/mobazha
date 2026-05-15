@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net/http"
 	"path"
 	"strconv"
 	"strings"
@@ -57,20 +56,19 @@ type SupplyChainListingOps interface {
 	GetListingStatus(slug string) (string, error)
 }
 
-// SupplyChainMediaOps is the subset of MediaAppService needed by ImportProduct
-// to download external images and upload them into the local media pipeline.
-type SupplyChainMediaOps interface {
-	UploadMedia(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error)
-}
+// SupplyChainMediaOps aliases MediaUploader for backward compatibility within
+// this file. MediaUploader is defined in media_app_service.go (no build tag)
+// so both full and private_distribution builds can reference it.
+type SupplyChainMediaOps = MediaUploader
 
 // SupplyChainAppService orchestrates supply chain operations:
 // provider management, catalog browsing, product import, and order bridging.
 // It implements contracts.SupplyChainService and contracts.SupplyChainChecker.
 type SupplyChainAppService struct {
-	registry   contracts.FulfillmentProviderRegistry
-	db         database.Database
-	nodeID     string
-	credKey    [32]byte // AES-256-GCM key for encrypting provider credentials at rest
+	registry contracts.FulfillmentProviderRegistry
+	db       database.Database
+	nodeID   string
+	credKey  [32]byte // AES-256-GCM key for encrypting provider credentials at rest
 
 	eventBus       events.Bus
 	shutdown       <-chan struct{}
@@ -195,9 +193,9 @@ func (s *SupplyChainAppService) RunSupplyChainPriceDriftOnce(ctx context.Context
 }
 
 const (
-	maxRetryAttempts    = 3
-	retryLeaseDuration  = 5 * time.Minute
-	retryBackoffBase    = 5 * time.Minute // attempt N delay = retryBackoffBase * 2^N
+	maxRetryAttempts   = 3
+	retryLeaseDuration = 5 * time.Minute
+	retryBackoffBase   = 5 * time.Minute // attempt N delay = retryBackoffBase * 2^N
 
 	reconcileStaleThreshold = 30 * time.Minute
 
@@ -1542,7 +1540,7 @@ func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contra
 		markup = 1.0
 	}
 
-	listing, supplierCost, retailPrice, buildErr := s.buildListingFromCatalog(product, variants, markup, params)
+	listing, supplierCost, retailPrice, buildErr := s.buildListingFromCatalog(ctx, product, variants, markup, params)
 	if buildErr != nil {
 		return nil, fmt.Errorf("build listing from catalog: %w", buildErr)
 	}
@@ -1598,6 +1596,7 @@ func (s *SupplyChainAppService) ImportProduct(ctx context.Context, params contra
 // gate later (cost=0 trivially passes the 80% rule). Reviewer P2 (2nd
 // pass): "导入阶段应该对任何选中 variant 的价格解析失败直接返回错误".
 func (s *SupplyChainAppService) buildListingFromCatalog(
+	ctx context.Context,
 	product *contracts.CatalogProduct,
 	variants []contracts.CatalogVariant,
 	markup float64,
@@ -1621,45 +1620,34 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 		currency = "USD"
 	}
 
+	imageCache := make(map[string]*pb.Image)
 	var images []*pb.Image
 	for _, url := range product.Images {
 		if url != "" {
-			images = append(images, &pb.Image{
-				Filename: url,
-				Large:    url,
-				Medium:   url,
-				Small:    url,
-				Tiny:     url,
-			})
+			img, err := s.importExternalImage(ctx, url, imageCache)
+			if err != nil {
+				return nil, "", "", fmt.Errorf("catalog product image %s: %w", url, err)
+			}
+			images = append(images, img)
 		}
 	}
 	if len(images) == 0 && product.ImageURL != "" {
-		images = []*pb.Image{{
-			Filename: product.ImageURL,
-			Large:    product.ImageURL,
-			Medium:   product.ImageURL,
-			Small:    product.ImageURL,
-			Tiny:     product.ImageURL,
-		}}
+		img, err := s.importExternalImage(ctx, product.ImageURL, imageCache)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("catalog product fallback image %s: %w", product.ImageURL, err)
+		}
+		images = []*pb.Image{img}
 	}
 
 	attrNames := collectOptionNames(variants)
-	var options []*pb.Listing_Item_Option
+	optionBuilder := newBuyerFacingOptionBuilder()
 	for _, attr := range attrNames {
-		seen := map[string]bool{}
-		var optVariants []*pb.Listing_Item_Option_Variant
 		for _, v := range variants {
-			val := v.Attributes[attr]
-			if val != "" && !seen[val] {
-				seen[val] = true
-				optVariants = append(optVariants, &pb.Listing_Item_Option_Variant{Name: val})
-			}
+			optionBuilder.add(attr, v.Attributes[attr])
 		}
-		options = append(options, &pb.Listing_Item_Option{
-			Name:     attr,
-			Variants: optVariants,
-		})
 	}
+	buyerFacingOptions := optionBuilder.build()
+	options := buyerFacingOptions.options
 
 	// Track cheapest variant in CENTS (not float dollars) so the listing-level
 	// snapshot in SyncedProductMapping.SupplierCost is exact.
@@ -1685,6 +1673,9 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 
 		var selections []*pb.Listing_Item_Sku_Selection
 		for _, attr := range attrNames {
+			if !buyerFacingOptions.kept[attr] {
+				continue
+			}
 			if val := v.Attributes[attr]; val != "" {
 				selections = append(selections, &pb.Listing_Item_Sku_Selection{
 					Option:  attr,
@@ -1705,13 +1696,11 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 			Price:      retailStr,
 		}
 		if v.ImageURL != "" {
-			sku.Images = []*pb.Image{{
-				Filename: v.ImageURL,
-				Large:    v.ImageURL,
-				Medium:   v.ImageURL,
-				Small:    v.ImageURL,
-				Tiny:     v.ImageURL,
-			}}
+			img, err := s.importExternalImage(ctx, v.ImageURL, imageCache)
+			if err != nil {
+				return nil, "", "", fmt.Errorf("catalog variant %q image %s: %w", v.ID, v.ImageURL, err)
+			}
+			sku.Images = []*pb.Image{img}
 		}
 		skus = append(skus, sku)
 	}
@@ -1820,12 +1809,15 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 		}
 	}
 
-	// Download external images and upload them through the media pipeline
-	// to get CID-based references. Falls back to raw URLs if media ops
-	// are not wired or download fails.
+	// Import external images through the media pipeline up front so newly
+	// imported drafts only contain CID-based image refs.
+	imageCache := make(map[string]*pb.Image)
 	images := make([]*pb.Image, 0, len(imageURLs))
 	for _, imgURL := range imageURLs {
-		img := s.downloadAndUploadImage(ctx, imgURL)
+		img, err := s.importExternalImage(ctx, imgURL, imageCache)
+		if err != nil {
+			return nil, fmt.Errorf("sync product image %s: %w", imgURL, err)
+		}
 		images = append(images, img)
 	}
 
@@ -1844,10 +1836,8 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 		}
 	}
 
-	var options []*pb.Listing_Item_Option
+	optionBuilder := newBuyerFacingOptionBuilder()
 	for _, attr := range attrNames {
-		seen := map[string]bool{}
-		var optVariants []*pb.Listing_Item_Option_Variant
 		for _, v := range variants {
 			var val string
 			switch attr {
@@ -1856,16 +1846,11 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 			case "color":
 				val = v.Color
 			}
-			if val != "" && !seen[val] {
-				seen[val] = true
-				optVariants = append(optVariants, &pb.Listing_Item_Option_Variant{Name: val})
-			}
+			optionBuilder.add(attr, val)
 		}
-		options = append(options, &pb.Listing_Item_Option{
-			Name:     attr,
-			Variants: optVariants,
-		})
 	}
+	buyerFacingOptions := optionBuilder.build()
+	options := buyerFacingOptions.options
 
 	// Build SKUs with pricing
 	currency := "USD"
@@ -1890,13 +1875,13 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 		retailStr := strconv.FormatUint(retailCents, 10)
 
 		var selections []*pb.Listing_Item_Sku_Selection
-		if v.Size != "" {
+		if buyerFacingOptions.kept["size"] && v.Size != "" {
 			selections = append(selections, &pb.Listing_Item_Sku_Selection{
 				Option:  "size",
 				Variant: v.Size,
 			})
 		}
-		if v.Color != "" {
+		if buyerFacingOptions.kept["color"] && v.Color != "" {
 			selections = append(selections, &pb.Listing_Item_Sku_Selection{
 				Option:  "color",
 				Variant: v.Color,
@@ -1915,13 +1900,11 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 			skuImg = v.ImageURL
 		}
 		if skuImg != "" {
-			sku.Images = []*pb.Image{{
-				Filename: skuImg,
-				Large:    skuImg,
-				Medium:   skuImg,
-				Small:    skuImg,
-				Tiny:     skuImg,
-			}}
+			img, err := s.importExternalImage(ctx, skuImg, imageCache)
+			if err != nil {
+				return nil, fmt.Errorf("sync variant %q image %s: %w", v.ID, skuImg, err)
+			}
+			sku.Images = []*pb.Image{img}
 		}
 		skus = append(skus, sku)
 	}
@@ -2070,6 +2053,66 @@ func collectOptionNames(variants []contracts.CatalogVariant) []string {
 		}
 	}
 	return names
+}
+
+type buyerFacingOptionSet struct {
+	options []*pb.Listing_Item_Option
+	kept    map[string]bool
+}
+
+type buyerFacingOptionBuilder struct {
+	optionOrder      []string
+	variantsByOption map[string][]string
+	seen             map[string]map[string]bool
+}
+
+func newBuyerFacingOptionBuilder() *buyerFacingOptionBuilder {
+	return &buyerFacingOptionBuilder{
+		variantsByOption: make(map[string][]string),
+		seen:             make(map[string]map[string]bool),
+	}
+}
+
+func (b *buyerFacingOptionBuilder) add(option, variant string) {
+	if option == "" || variant == "" {
+		return
+	}
+	if b.seen[option] == nil {
+		b.seen[option] = make(map[string]bool)
+		b.optionOrder = append(b.optionOrder, option)
+	}
+	if b.seen[option][variant] {
+		return
+	}
+	b.seen[option][variant] = true
+	b.variantsByOption[option] = append(b.variantsByOption[option], variant)
+}
+
+func (b *buyerFacingOptionBuilder) build() buyerFacingOptionSet {
+	result := buyerFacingOptionSet{
+		options: make([]*pb.Listing_Item_Option, 0, len(b.optionOrder)),
+		kept:    make(map[string]bool, len(b.optionOrder)),
+	}
+	for _, option := range b.optionOrder {
+		variants := b.variantsByOption[option]
+		// Supply-chain imports often surface dimensions that only have one value
+		// after filtering (for example Color=Black on every kept SKU). Those are
+		// fixed attributes, not buyer-facing options, so keep them out of
+		// listing.Item.Options and prune the matching SKU selections.
+		if len(variants) < 2 {
+			continue
+		}
+		pbVariants := make([]*pb.Listing_Item_Option_Variant, 0, len(variants))
+		for _, variant := range variants {
+			pbVariants = append(pbVariants, &pb.Listing_Item_Option_Variant{Name: variant})
+		}
+		result.options = append(result.options, &pb.Listing_Item_Option{
+			Name:     option,
+			Variants: pbVariants,
+		})
+		result.kept[option] = true
+	}
+	return result
 }
 
 // parseFloat is a best-effort float parser; returns 0 on error.
@@ -3469,56 +3512,28 @@ func titleCase(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-const maxImageDownloadBytes = 20 * 1024 * 1024 // 20 MB
-
-// downloadAndUploadImage fetches an external image URL and uploads it through
-// the media pipeline to obtain CID-based references. If mediaOps is nil or
-// the download/upload fails, it falls back to using the raw external URL.
-func (s *SupplyChainAppService) downloadAndUploadImage(ctx context.Context, imgURL string) *pb.Image {
-	fallback := &pb.Image{
-		Filename: imgURL, Large: imgURL, Medium: imgURL, Small: imgURL, Tiny: imgURL,
+// importExternalImage downloads an external supplier image through MediaUploader
+// and returns a CID-backed pb.Image. Within a single import request, identical
+// source URLs are uploaded once and then served from the in-memory cache.
+func (s *SupplyChainAppService) importExternalImage(ctx context.Context, imgURL string, cache map[string]*pb.Image) (*pb.Image, error) {
+	if imgURL == "" {
+		return nil, nil
 	}
-
+	if cached, ok := cache[imgURL]; ok {
+		return cloneSupplyChainImage(cached), nil
+	}
 	if s.mediaOps == nil {
-		return fallback
+		return nil, fmt.Errorf("supply chain media ops not wired")
 	}
 
-	reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, imgURL, nil)
+	result, err := s.mediaOps.UploadFromURL(ctx, imgURL)
 	if err != nil {
-		log.Warningf("supply chain: cannot create request for image %s: %v", imgURL, err)
-		return fallback
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Warningf("supply chain: failed to download image %s: %v", imgURL, err)
-		return fallback
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Warningf("supply chain: image %s returned status %d", imgURL, resp.StatusCode)
-		return fallback
-	}
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxImageDownloadBytes))
-	if err != nil {
-		log.Warningf("supply chain: failed to read image %s: %v", imgURL, err)
-		return fallback
+		return nil, fmt.Errorf("ingest image %s: %w", imgURL, err)
 	}
 
 	filename := path.Base(imgURL)
 	if idx := strings.Index(filename, "?"); idx > 0 {
 		filename = filename[:idx]
-	}
-
-	result, err := s.mediaOps.UploadMedia(ctx, data, filename, contracts.UploadOpts{Variants: true})
-	if err != nil {
-		log.Warningf("supply chain: failed to upload image %s: %v", imgURL, err)
-		return fallback
 	}
 
 	img := &pb.Image{Filename: filename}
@@ -3535,7 +3550,16 @@ func (s *SupplyChainAppService) downloadAndUploadImage(ctx context.Context, imgU
 		img.Large = result.Hash
 		img.Original = result.Hash
 	}
-	return img
+	cache[imgURL] = img
+	return cloneSupplyChainImage(img), nil
+}
+
+func cloneSupplyChainImage(img *pb.Image) *pb.Image {
+	if img == nil {
+		return nil
+	}
+	cloned := *img
+	return &cloned
 }
 
 // Compile-time interface checks.

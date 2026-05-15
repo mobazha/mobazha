@@ -35,25 +35,25 @@ const (
 
 // Column mappings for English template
 var columnsEN = map[string]int{
-	"title":              0,
-	"contractType":       1,
-	"price":              2,
-	"pricingCurrency":    3,
-	"description":        4,
-	"shortDescription":   5,
-	"productType":        6,
-	"tags":               7,
-	"condition":          8,
-	"nsfw":               9,
-	"images":             10,
-	"introVideo":         11,
-	"processingTime":     12,
-	"grams":              13,
-	"quantity":           14,
-	"brand":              15,
-	"weightUnit":         16,
-	"status":             17,
-	"regularPrice":       18,
+	"title":            0,
+	"contractType":     1,
+	"price":            2,
+	"pricingCurrency":  3,
+	"description":      4,
+	"shortDescription": 5,
+	"productType":      6,
+	"tags":             7,
+	"condition":        8,
+	"nsfw":             9,
+	"images":           10,
+	"introVideo":       11,
+	"processingTime":   12,
+	"grams":            13,
+	"quantity":         14,
+	"brand":            15,
+	"weightUnit":       16,
+	"status":           17,
+	"regularPrice":     18,
 }
 
 // Column mappings for Chinese template
@@ -944,20 +944,8 @@ func (g *Gateway) processListingVariants(listing *pb.Listing, productTitle strin
 		}
 	}
 
-	// Create options with their variants
-	for optName, variantSet := range optionVariants {
-		option := &pb.Listing_Item_Option{
-			Name: optName,
-		}
-
-		for variantName := range variantSet {
-			option.Variants = append(option.Variants, &pb.Listing_Item_Option_Variant{
-				Name: variantName,
-			})
-		}
-
-		listing.Item.Options = append(listing.Item.Options, option)
-	}
+	validOptions := buildImportListingOptions(optionVariants)
+	listing.Item.Options = append(listing.Item.Options, validOptions.options...)
 
 	// Create SKUs from variants
 	for _, v := range variants {
@@ -967,6 +955,9 @@ func (g *Gateway) processListingVariants(listing *pb.Listing, productTitle strin
 
 		var selections []*pb.Listing_Item_Sku_Selection
 		for _, sel := range v.Selections {
+			if !validOptions.kept[sel.Option] {
+				continue
+			}
 			selections = append(selections, &pb.Listing_Item_Sku_Selection{
 				Option:  sel.Option,
 				Variant: sel.Variant,
@@ -1055,24 +1046,24 @@ func (g *Gateway) convertPriceToInt(priceStr string, divisibility int) (string, 
 
 // JSONListingInput represents a single listing in JSON import format
 type JSONListingInput struct {
-	Slug               string             `json:"slug"`
-	ShippingProfileID  string             `json:"shippingProfileId"`
-	Title              string             `json:"title"`
-	ContractType       string             `json:"contractType"`
-	Price              string             `json:"price"`
-	PricingCurrency    string             `json:"pricingCurrency"`
-	Description        string             `json:"description"`
-	ShortDescription   string             `json:"shortDescription"`
-	ProductType        string             `json:"productType"`
-	Tags               []string           `json:"tags"`
-	Condition          string             `json:"condition"`
-	NSFW               bool               `json:"nsfw"`
-	Images             []string           `json:"images"`
-	IntroVideo         string             `json:"introVideo"`
-	ProcessingTime     string             `json:"processingTime"`
-	Grams              uint32             `json:"grams"`
-	Variants []JSONVariantInput `json:"variants"`
-	Quantity           string             `json:"quantity"`
+	Slug              string             `json:"slug"`
+	ShippingProfileID string             `json:"shippingProfileId"`
+	Title             string             `json:"title"`
+	ContractType      string             `json:"contractType"`
+	Price             string             `json:"price"`
+	PricingCurrency   string             `json:"pricingCurrency"`
+	Description       string             `json:"description"`
+	ShortDescription  string             `json:"shortDescription"`
+	ProductType       string             `json:"productType"`
+	Tags              []string           `json:"tags"`
+	Condition         string             `json:"condition"`
+	NSFW              bool               `json:"nsfw"`
+	Images            []string           `json:"images"`
+	IntroVideo        string             `json:"introVideo"`
+	ProcessingTime    string             `json:"processingTime"`
+	Grams             uint32             `json:"grams"`
+	Variants          []JSONVariantInput `json:"variants"`
+	Quantity          string             `json:"quantity"`
 	// Status mirrors pb.Listing.Status — "draft" / "published" / "private".
 	// Empty preserves the proto default ("published"). Used by the Gumroad
 	// importer (DG-1.9) to land all imports as drafts so creators review
@@ -1102,10 +1093,10 @@ type JSONVariantInput struct {
 // The "key" field is a local reference that listings use in shippingProfileId
 // to link to this profile (replaced with the real ID after creation).
 type JSONImportShippingProfile struct {
-	Key             string              `json:"key"`
-	Name            string              `json:"name"`
-	IsDefault       bool                `json:"isDefault"`
-	LocationGroups  json.RawMessage     `json:"locationGroups"`
+	Key            string          `json:"key"`
+	Name           string          `json:"name"`
+	IsDefault      bool            `json:"isDefault"`
+	LocationGroups json.RawMessage `json:"locationGroups"`
 }
 
 // JSONImportCollection is a collection to create during import.
@@ -1764,25 +1755,16 @@ func (g *Gateway) processJSONListingVariants(listing *pb.Listing, variants []JSO
 		}
 	}
 
-	// Create options with their variants
-	for optName, variantSet := range optionVariants {
-		option := &pb.Listing_Item_Option{
-			Name: optName,
-		}
-
-		for variantName := range variantSet {
-			option.Variants = append(option.Variants, &pb.Listing_Item_Option_Variant{
-				Name: variantName,
-			})
-		}
-
-		listing.Item.Options = append(listing.Item.Options, option)
-	}
+	validOptions := buildImportListingOptions(optionVariants)
+	listing.Item.Options = append(listing.Item.Options, validOptions.options...)
 
 	// Create SKUs from variants
 	for _, v := range variants {
 		var selections []*pb.Listing_Item_Sku_Selection
 		for optName, variantName := range v.Selections {
+			if !validOptions.kept[optName] {
+				continue
+			}
 			selections = append(selections, &pb.Listing_Item_Sku_Selection{
 				Option:  optName,
 				Variant: variantName,
@@ -1798,4 +1780,40 @@ func (g *Gateway) processJSONListingVariants(listing *pb.Listing, variants []JSO
 
 		listing.Item.Skus = append(listing.Item.Skus, sku)
 	}
+}
+
+type importListingOptions struct {
+	options []*pb.Listing_Item_Option
+	kept    map[string]bool
+}
+
+func buildImportListingOptions(optionVariants map[string]map[string]bool) importListingOptions {
+	result := importListingOptions{
+		options: make([]*pb.Listing_Item_Option, 0, len(optionVariants)),
+		kept:    make(map[string]bool, len(optionVariants)),
+	}
+
+	for optName, variantSet := range optionVariants {
+		// Listing validation requires each option to expose at least 2 distinct
+		// variants. Imports sometimes carry degenerate single-value options
+		// (for example Color=Black on every SKU); keep those out of the listing
+		// model and prune the corresponding SKU selections below.
+		if len(variantSet) < 2 {
+			continue
+		}
+
+		option := &pb.Listing_Item_Option{
+			Name: optName,
+		}
+		for variantName := range variantSet {
+			option.Variants = append(option.Variants, &pb.Listing_Item_Option_Variant{
+				Name: variantName,
+			})
+		}
+
+		result.options = append(result.options, option)
+		result.kept[optName] = true
+	}
+
+	return result
 }

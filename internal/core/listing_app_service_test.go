@@ -6,6 +6,8 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	mbznet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,4 +89,62 @@ func TestListingAppService_NewBanManager_Empty(t *testing.T) {
 	})
 	pid := mustPeerID(t, testVendorPeerID)
 	assert.False(t, svc.IsGlobalBanned(pid))
+}
+
+func TestValidateListingDraft_RejectsHTTPImageRefs(t *testing.T) {
+	svc := newTestListingAppService(t, ListingAppServiceConfig{})
+	sl := &pb.SignedListing{
+		Listing: &pb.Listing{
+			Slug:   "draft-with-http-image",
+			Status: models.ListingStatusDraft,
+			Item: &pb.Listing_Item{
+				Title: "Draft listing",
+				Images: []*pb.Image{{
+					Filename: "hoodie.png",
+					Tiny:     "https://cdn.example.com/tiny.png",
+					Small:    "https://cdn.example.com/small.png",
+					Medium:   "https://cdn.example.com/medium.png",
+					Large:    "https://cdn.example.com/large.png",
+					Original: "https://cdn.example.com/original.png",
+				}},
+			},
+			Metadata: &pb.Listing_Metadata{},
+			VendorID: &pb.ID{PeerID: testVendorPeerID},
+		},
+	}
+
+	err := svc.validateListingDraft(sl)
+	require.EqualError(t, err, "tiny image hashes must be properly formatted CID")
+}
+
+func TestValidateListingDraft_RejectsHTTPVariantImageRefs(t *testing.T) {
+	svc := newTestListingAppService(t, ListingAppServiceConfig{})
+	sl := &pb.SignedListing{
+		Listing: &pb.Listing{
+			Slug:   "draft-with-http-variant-image",
+			Status: models.ListingStatusDraft,
+			Item: &pb.Listing_Item{
+				Title: "Draft listing",
+				Options: []*pb.Listing_Item_Option{{
+					Name: "size",
+					Variants: []*pb.Listing_Item_Option_Variant{{
+						Name: "M",
+						Image: &pb.Image{
+							Filename: "variant.png",
+							Tiny:     "https://cdn.example.com/tiny.png",
+							Small:    "https://cdn.example.com/small.png",
+							Medium:   "https://cdn.example.com/medium.png",
+							Large:    "https://cdn.example.com/large.png",
+							Original: "https://cdn.example.com/original.png",
+						},
+					}},
+				}},
+			},
+			Metadata: &pb.Listing_Metadata{},
+			VendorID: &pb.ID{PeerID: testVendorPeerID},
+		},
+	}
+
+	err := svc.validateListingDraft(sl)
+	require.EqualError(t, err, "tiny image hashes must be properly formatted CID")
 }

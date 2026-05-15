@@ -1,6 +1,9 @@
 package relay
 
-import "context"
+import (
+	"context"
+	"math/big"
+)
 
 // ── EVM Relay ───────────────────────────────────────────────────────────
 
@@ -17,6 +20,15 @@ type EVMRelayResponse struct {
 	TxHash string
 }
 
+// EVMGasWalletStatus reports operational health of the relay's gas
+// wallet on a specific chain.
+type EVMGasWalletStatus struct {
+	Address string   // hex-encoded gas wallet EOA
+	Balance *big.Int // native-asset balance in wei
+	Healthy bool     // false when balance < threshold or RPC degraded
+	Reason  string   // non-empty when Healthy is false
+}
+
 // EVMRelayService 定义 EVM 交易中继服务接口
 // 支持两种模式：
 // - Hosting 模式：HostService 提供实现，直接调用
@@ -30,6 +42,24 @@ type EVMRelayService interface {
 
 	// IsAvailable 检查服务是否可用
 	IsAvailable() bool
+
+	// GetGasWalletAddress returns the hex-encoded gas wallet EOA for
+	// the given EVM chainID. ManagedEscrowAdapter calls this before signing a
+	// ManagedEscrowTx to lock the refundReceiver field.
+	GetGasWalletAddress(ctx context.Context, chainID uint64) (string, error)
+
+	// GetGasWalletStatus returns the operational health of the gas
+	// wallet on the given chain. Adapters consult it before quoting
+	// an order to decline orders on chains where relay cannot
+	// reliably broadcast.
+	GetGasWalletStatus(ctx context.Context, chainID uint64) (*EVMGasWalletStatus, error)
+
+	// ChainTypeForID resolves a numeric EVM chainID (e.g. 56) to the
+	// relay-service config key (e.g. "bsc"). Adapters that build an
+	// EVMRelayRequest from a ManagedEscrowTx (which carries chainID) use this
+	// to avoid hard-coding a parallel chainID→chainType map that would
+	// drift from hosting's RelayConfig over time.
+	ChainTypeForID(chainID uint64) (string, error)
 }
 
 // ── Solana Relay ────────────────────────────────────────────────────────
@@ -38,7 +68,7 @@ type EVMRelayService interface {
 // Instructions 的运行时类型为 []solana.Instruction（gagliardetto/solana-go），
 // 使用 any 避免在 pkg/ 层引入外部依赖。
 type SolanaRelayRequest struct {
-	Instructions any    // []solana.Instruction
+	Instructions any // []solana.Instruction
 	OrderID      string
 }
 

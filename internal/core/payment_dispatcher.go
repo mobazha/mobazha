@@ -119,9 +119,11 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 //     execTransaction envelopes against the live ManagedEscrow nonce. Wired
 //     unconditionally because multiwallet is already required for
 //     shadow registration to begin.
-//   - D18c (pending) — Relayer (real SaaS Relay client / local-EOA
-//     relayer). Until D18c lands, Submit/GasWalletAddress on the
-//     adapter return ErrRelayerNotConfigured.
+//   - D18c — Relayer. SaaS Relay client bridged from
+//     HostService.GetEVMRelayService() via adapters.NewRelayBridge.
+//     Standalone nodes without HostService fall back to NoopRelayer()
+//     (Submit returns ErrRelayerNotConfigured; standalone relay is
+//     earmarked for Phase S).
 //
 // Test-only paths that build a stripped MobazhaNode (no paymentService)
 // continue to leave OwnerProvider nil, so SetupPayment short-circuits
@@ -141,8 +143,14 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	}
 
 	store := adapters.NewMemoryActionStore()
+
+	var relayer managed_escrow.Relayer = managed_escrow.NoopRelayer()
+	if n.hostService != nil {
+		relayer = adapters.NewRelayBridge(n.hostService.GetEVMRelayService())
+	}
+
 	deps := adapters.ManagedEscrowAdapterDeps{
-		Relayer:       managed_escrow.NoopRelayer(),
+		Relayer:       relayer,
 		Keys:          n.keyProvider,
 		Multiwallet:   n.multiwallet,
 		ActionStore:   store,

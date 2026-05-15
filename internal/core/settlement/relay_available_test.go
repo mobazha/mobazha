@@ -19,6 +19,15 @@ func (m *mockEVMRelayAvailabilityService) Execute(_ context.Context, _ *relay.EV
 }
 func (m *mockEVMRelayAvailabilityService) GetSupportedChains() []string { return nil }
 func (m *mockEVMRelayAvailabilityService) IsAvailable() bool            { return m.available }
+func (m *mockEVMRelayAvailabilityService) GetGasWalletAddress(_ context.Context, _ uint64) (string, error) {
+	return "", nil
+}
+func (m *mockEVMRelayAvailabilityService) GetGasWalletStatus(_ context.Context, _ uint64) (*relay.EVMGasWalletStatus, error) {
+	return nil, nil
+}
+func (m *mockEVMRelayAvailabilityService) ChainTypeForID(_ uint64) (string, error) {
+	return "", nil
+}
 
 func TestSettlementService_IsEVMRelayAvailable(t *testing.T) {
 	tests := []struct {

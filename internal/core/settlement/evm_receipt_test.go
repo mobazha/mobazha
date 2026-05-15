@@ -47,6 +47,15 @@ func (m *mockRelayService) Execute(_ context.Context, _ *relay.EVMRelayRequest) 
 }
 
 func (m *mockRelayService) GetSupportedChains() []string { return []string{"ethereum"} }
+func (m *mockRelayService) GetGasWalletAddress(_ context.Context, _ uint64) (string, error) {
+	return "0x0000000000000000000000000000000000000001", nil
+}
+func (m *mockRelayService) GetGasWalletStatus(_ context.Context, _ uint64) (*relay.EVMGasWalletStatus, error) {
+	return &relay.EVMGasWalletStatus{Healthy: true}, nil
+}
+func (m *mockRelayService) ChainTypeForID(_ uint64) (string, error) {
+	return "ethereum", nil
+}
 
 // ── Tests: VerifyEVMConfirmReceipt (SettlementService) ──────────────────
 

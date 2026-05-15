@@ -133,6 +133,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	}
 	n.initProfileService()
 	n.initModerationService()
+	n.initMediaService()
 	n.initListingService()
 	n.initReceivingAccountService()
 	n.initPaymentService()
@@ -142,7 +143,6 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.wireServiceSetters()
 	n.initMatrixChatService()
 	n.initPreferencesService()
-	n.initMediaService()
 	n.initRatingsService()
 	n.initNotificationService()
 	n.initShoppingCartService()

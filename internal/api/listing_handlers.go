@@ -211,6 +211,19 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// Public endpoint (peerID in URL): hide draft listings from visitors.
+	// The self endpoint (/v1/listings/index without peerID) returns all
+	// statuses so the store owner can see their drafts in the admin view.
+	if peerIDStr != "" && len(listingIndex) > 0 {
+		filtered := make(models.ListingIndex, 0, len(listingIndex))
+		for _, l := range listingIndex {
+			if l.Status != models.ListingStatusDraft {
+				filtered = append(filtered, l)
+			}
+		}
+		listingIndex = filtered
+	}
+
 	// MS-Phase-2a · MS2a.5 — apply storefront price rule to the list-view
 	// DTOs. Runs last (after collection filter + rating enrichment) so the
 	// adjustment only happens on listings that will actually be rendered.

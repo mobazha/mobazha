@@ -1376,6 +1376,9 @@ func TestImportProduct_DedupesRepeatedCatalogImageURLs(t *testing.T) {
 	if got := listingOps.savedListing.Item.Skus[0].Images[0].Tiny; strings.HasPrefix(got, "http://") || strings.HasPrefix(got, "https://") {
 		t.Fatalf("expected deduped sku image to be CID-backed, got %q", got)
 	}
+	if got := listingOps.savedListing.Item.Skus[1].Images[0].Tiny; strings.HasPrefix(got, "http://") || strings.HasPrefix(got, "https://") {
+		t.Fatalf("expected second deduped sku image to be CID-backed, got %q", got)
+	}
 }
 
 func TestImportProduct_PrunesSingleValueCatalogOption(t *testing.T) {
@@ -1471,6 +1474,68 @@ func TestImportProduct_PrunesSingleValueSyncOption(t *testing.T) {
 	for _, sku := range listingOps.savedListing.Item.Skus {
 		require.Len(t, sku.Selections, 1)
 		assert.Equal(t, "size", sku.Selections[0].Option)
+	}
+}
+
+func TestImportProduct_ContinuesWhenCatalogImageImportFails(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"}}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	mediaOps := &mockSupplyChainMediaOps{err: errors.New("cdn unavailable")}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
+
+	result, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID: "printful",
+		ProductID:  "71",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	require.NotEmpty(t, result.ListingSlug)
+	require.NotNil(t, listingOps.savedListing)
+	assert.Empty(t, listingOps.savedListing.Item.Images)
+	for _, sku := range listingOps.savedListing.Item.Skus {
+		assert.Empty(t, sku.Images)
+	}
+}
+
+func TestImportProduct_ContinuesWhenSyncImageImportFails(t *testing.T) {
+	db := newSCTestDatabase(t)
+	reg := fulfillment.NewRegistry()
+
+	provider := &richCatalogProvider{stubFulfillmentProvider: stubFulfillmentProvider{id: "printful", provType: "pod"}}
+	if err := reg.Register(provider); err != nil {
+		t.Fatal(err)
+	}
+
+	listingOps := &mockListingOps{}
+	mediaOps := &mockSupplyChainMediaOps{err: errors.New("cdn unavailable")}
+	svc := NewSupplyChainAppService(reg, db, "test-node", testPrivKeyBytes)
+	svc.SetListingOps(listingOps)
+	svc.SetMediaOps(mediaOps)
+
+	result, err := svc.ImportProduct(context.Background(), contracts.ImportProductParams{
+		ProviderID:    "printful",
+		SyncProductID: "sync-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	require.NotEmpty(t, result.ListingSlug)
+	require.NotNil(t, listingOps.savedListing)
+	assert.Empty(t, listingOps.savedListing.Item.Images)
+	for _, sku := range listingOps.savedListing.Item.Skus {
+		assert.Empty(t, sku.Images)
 	}
 }
 

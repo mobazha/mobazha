@@ -1626,7 +1626,8 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 		if url != "" {
 			img, err := s.importExternalImage(ctx, url, imageCache)
 			if err != nil {
-				return nil, "", "", fmt.Errorf("catalog product image %s: %w", url, err)
+				logger.LogWarningWithIDf(log, s.nodeID, "SupplyChain: skipping catalog product image %s: %v", url, err)
+				continue
 			}
 			images = append(images, img)
 		}
@@ -1634,9 +1635,10 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 	if len(images) == 0 && product.ImageURL != "" {
 		img, err := s.importExternalImage(ctx, product.ImageURL, imageCache)
 		if err != nil {
-			return nil, "", "", fmt.Errorf("catalog product fallback image %s: %w", product.ImageURL, err)
+			logger.LogWarningWithIDf(log, s.nodeID, "SupplyChain: skipping catalog fallback image %s: %v", product.ImageURL, err)
+		} else {
+			images = []*pb.Image{img}
 		}
-		images = []*pb.Image{img}
 	}
 
 	attrNames := collectOptionNames(variants)
@@ -1698,9 +1700,10 @@ func (s *SupplyChainAppService) buildListingFromCatalog(
 		if v.ImageURL != "" {
 			img, err := s.importExternalImage(ctx, v.ImageURL, imageCache)
 			if err != nil {
-				return nil, "", "", fmt.Errorf("catalog variant %q image %s: %w", v.ID, v.ImageURL, err)
+				logger.LogWarningWithIDf(log, s.nodeID, "SupplyChain: skipping catalog variant %q image %s: %v", v.ID, v.ImageURL, err)
+			} else {
+				sku.Images = []*pb.Image{img}
 			}
-			sku.Images = []*pb.Image{img}
 		}
 		skus = append(skus, sku)
 	}
@@ -1816,7 +1819,8 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 	for _, imgURL := range imageURLs {
 		img, err := s.importExternalImage(ctx, imgURL, imageCache)
 		if err != nil {
-			return nil, fmt.Errorf("sync product image %s: %w", imgURL, err)
+			logger.LogWarningWithIDf(log, s.nodeID, "SupplyChain: skipping sync product image %s: %v", imgURL, err)
+			continue
 		}
 		images = append(images, img)
 	}
@@ -1902,9 +1906,10 @@ func (s *SupplyChainAppService) importFromSyncProduct(ctx context.Context, param
 		if skuImg != "" {
 			img, err := s.importExternalImage(ctx, skuImg, imageCache)
 			if err != nil {
-				return nil, fmt.Errorf("sync variant %q image %s: %w", v.ID, skuImg, err)
+				logger.LogWarningWithIDf(log, s.nodeID, "SupplyChain: skipping sync variant %q image %s: %v", v.ID, skuImg, err)
+			} else {
+				sku.Images = []*pb.Image{img}
 			}
-			sku.Images = []*pb.Image{img}
 		}
 		skus = append(skus, sku)
 	}

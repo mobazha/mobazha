@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	paymentmetrics "github.com/mobazha/mobazha3.0/pkg/payment"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
@@ -152,12 +153,19 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 	if orderID == "" {
 		return fmt.Errorf("aggregating verifier: orderID must be set")
 	}
+	start := time.Now()
+	defer func() {
+		paymentmetrics.ObservePaymentAggregationDuration(tenantID, time.Since(start))
+	}()
 
 	// emitVerified is captured by the closure and consulted AFTER the
 	// transaction commits. We never emit inside the closure: emitting
 	// before COMMIT would surface a verified-but-unrecorded event to
 	// subscribers if the transaction later rolled back.
-	var emitVerified bool
+	var (
+		emitVerified          bool
+		emitVerifiedNamespace string
+	)
 
 	err := v.db.Update(func(tx database.Tx) error {
 		// Bind the request context to every GORM call we issue from
@@ -276,6 +284,7 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 			}
 			order.MarkPaymentVerified()
 			emitVerified = true
+			emitVerifiedNamespace = deduped[0].ChainNamespace
 		}
 
 		if err := tx.Save(&order); err != nil {
@@ -289,6 +298,7 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 
 	if emitVerified {
 		v.bus.Emit(events.PaymentVerified{TenantID: tenantID, OrderID: orderID})
+		paymentmetrics.RecordPaymentAggregationEnvelopeEmitted(tenantID, emitVerifiedNamespace, orderID)
 	}
 	return nil
 }

@@ -131,6 +131,7 @@ type mockNode struct {
 	getUTXOPaymentInfoFunc          func(ctx context.Context, orderID string, moderator string, coinType iwallet.CoinType) (*models.PaymentData, error)
 	getTotalPaidToAddressFunc       func(order *models.Order) (uint64, error)
 	cancelPartialPaymentFunc        func(orderID string) (string, uint64, error)
+	setOrderRefundAddressFunc       func(ctx context.Context, orderID string, coin iwallet.CoinType, refundAddr string) error
 
 	addPostFunc       func(post *postsPb.Post, done chan<- struct{}) error
 	deletePostFunc    func(slug string, done chan<- struct{}) error
@@ -514,6 +515,12 @@ func (m *mockNode) GetTotalPaidToAddress(order *models.Order) (uint64, error) {
 }
 func (m *mockNode) CancelPartialPayment(orderID string) (string, uint64, error) {
 	return m.cancelPartialPaymentFunc(orderID)
+}
+func (m *mockNode) SetOrderRefundAddressForPayment(ctx context.Context, orderID string, coin iwallet.CoinType, refundAddr string) error {
+	if m.setOrderRefundAddressFunc != nil {
+		return m.setOrderRefundAddressFunc(ctx, orderID, coin, refundAddr)
+	}
+	return nil
 }
 func (m *mockNode) StopWatchingPayment(orderID string) error {
 	return nil // Mock implementation

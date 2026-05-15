@@ -123,7 +123,7 @@ func (g *Gateway) handlePOSTPurchase(w http.ResponseWriter, r *http.Request) {
 
 	orderID, amount, err := order.PurchaseListing(r.Context(), &data)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
+		orderActionErrorResponse(w, err)
 		return
 	}
 	type purchaseReturn struct {
@@ -197,6 +197,14 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		VerificationFailureReason string            `json:"verificationFailureReason,omitempty"`
 		VerificationFailedAt      *time.Time        `json:"verificationFailedAt,omitempty"`
 		FiatMetadata              map[string]string `json:"fiatMetadata,omitempty"`
+		// Progress carries the running "you've paid X of Y" card derived
+		// from OrderPaymentState.TotalReceived + OrderOpen.Amount. The
+		// AggregatingVerifier refreshes TotalReceived on every pass
+		// (Phase EVM-ManagedEscrow v0.3.0 §4.2), so the dashboard can render a
+		// live progress bar even before the order flips to "verified"
+		// and again afterwards if a late deposit lands. Omitted when
+		// there is no OrderOpen or no positive expected amount.
+		Progress *models.PaymentProgressInfo `json:"progress,omitempty"`
 	}
 
 	type OrderRespApi struct {
@@ -225,6 +233,7 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		PaymentState: paymentStateResp{
 			VerificationStatus: string(order.CurrentPaymentVerificationStatus()),
 			FiatMetadata:       fiatMeta,
+			Progress:           order.ComputePaymentProgress(),
 		},
 		Protection: order.ComputeProtection(time.Now()),
 	}

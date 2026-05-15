@@ -3,6 +3,7 @@
 package api
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -32,6 +33,10 @@ const (
 	UTXOPaymentWindowDuration = 15 * time.Minute
 )
 
+type paymentRefundAddressSetter interface {
+	SetOrderRefundAddressForPayment(ctx context.Context, orderID string, coin iwallet.CoinType, refundAddr string) error
+}
+
 // ============================================================================
 // 响应结构定义
 // ============================================================================
@@ -54,9 +59,9 @@ type UTXOPaymentInfoResponse struct {
 
 	// 币种切换检测相关字段
 	HasPartialPayment bool   `json:"hasPartialPayment,omitempty"` // 是否已有部分支付
-	PaidAmount        uint64 `json:"paidAmount,omitempty,string"`  // 已支付金额
-	PaidCoin          string `json:"paidCoin,omitempty"`           // 已支付的币种
-	PaidAddress       string `json:"paidAddress,omitempty"`        // 已支付的地址
+	PaidAmount        uint64 `json:"paidAmount,omitempty,string"` // 已支付金额
+	PaidCoin          string `json:"paidCoin,omitempty"`          // 已支付的币种
+	PaidAddress       string `json:"paidAddress,omitempty"`       // 已支付的地址
 }
 
 // RWATokenPaymentInfoResponse RWA Token 支付响应
@@ -128,6 +133,16 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
+	refundSetter, ok := orderSvc.(paymentRefundAddressSetter)
+	if !ok {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "refund address validation unavailable")
+		return
+	}
+	if err := models.ValidateRefundAddress(params.CoinType, params.RefundAddress); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+		return
+	}
+
 	// Server-side amount computation: orderOpen.Amount is the finalized total
 	// in pricingCoin's smallest unit (calculated at OrderOpen time). For cross-
 	// currency payments, convert that total to the payment currency. For same-
@@ -191,6 +206,16 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		}
 		log.Warningf("Failed to generate payment instructions for order %s: %v", params.OrderID, err)
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to generate payment instructions")
+		return
+	}
+
+	if err := refundSetter.SetOrderRefundAddressForPayment(r.Context(), params.OrderID, params.CoinType, params.RefundAddress); err != nil {
+		if errors.Is(err, coreiface.ErrBadRequest) || errors.Is(err, models.ErrRefundAddressRequired) || errors.Is(err, models.ErrRefundAddressInvalid) {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+			return
+		}
+		log.Warningf("SetOrderRefundAddressForPayment failed for order %s: %v", params.OrderID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to save refund address")
 		return
 	}
 

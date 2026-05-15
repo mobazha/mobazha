@@ -12,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	paymentmetrics "github.com/mobazha/mobazha3.0/pkg/payment"
 	"gorm.io/gorm"
 )
 
@@ -104,9 +105,22 @@ func (r *GormPaymentObservationRepo) InsertObservation(_ context.Context, obs *m
 		return tx.Save(obs)
 	})
 	if err == nil {
+		paymentmetrics.RecordPaymentObservationInserted(
+			obs.TenantID,
+			obs.ChainNamespace,
+			obs.ChainReference,
+			obs.Source,
+		)
+		r.refreshPendingMetric(obs.ChainNamespace, obs.ChainReference)
 		return nil
 	}
 	if isUniqueViolationErr(err) {
+		paymentmetrics.RecordPaymentObservationDuplicate(
+			obs.TenantID,
+			obs.ChainNamespace,
+			obs.Source,
+		)
+		r.refreshPendingMetric(obs.ChainNamespace, obs.ChainReference)
 		return contracts.ErrDuplicateObservation
 	}
 	return err
@@ -230,6 +244,7 @@ func (r *GormPaymentObservationRepo) RefreshConfirmations(
 	if threshold < 0 {
 		// No row can possibly satisfy the depth yet; this is a no-op but
 		// not an error — chain just started, scheduler will retry next tick.
+		r.refreshPendingMetric(chainNamespace, chainReference)
 		return nil, nil
 	}
 
@@ -299,5 +314,21 @@ func (r *GormPaymentObservationRepo) RefreshConfirmations(
 		}
 		return refs[i].OrderID < refs[j].OrderID
 	})
+	r.refreshPendingMetric(chainNamespace, chainReference)
 	return refs, nil
+}
+
+func (r *GormPaymentObservationRepo) refreshPendingMetric(chainNamespace, chainReference string) {
+	if r.raw == nil || chainNamespace == "" || chainReference == "" {
+		return
+	}
+	var count int64
+	if err := r.raw.
+		Model(&models.PaymentObservation{}).
+		Where("chain_namespace = ? AND chain_reference = ? AND status = ?",
+			chainNamespace, chainReference, models.PaymentObservationStatusPending).
+		Count(&count).Error; err != nil {
+		return
+	}
+	paymentmetrics.SetPaymentObservationsPendingCount(chainNamespace, chainReference, count)
 }

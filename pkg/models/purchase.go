@@ -102,6 +102,24 @@ type Purchase struct {
 	AlternateContactInfo string         `json:"alternateContactInfo"`
 	PricingCoin          string         `json:"pricingCoin"`
 	DiscountCodes        []string       `json:"discountCodes,omitempty"`
+
+	// RefundAddress is the buyer-declared on-chain address used for refunds
+	// when a crypto order is cancelled / disputed. Required by the
+	// Monitor-Driven Payment model (docs/escrow/MONITOR_DRIVEN_PAYMENT.md
+	// §P0-3) to handle CEX direct-pay scenarios where the on-chain
+	// `payment_observations.from_address` is an exchange omnibus wallet
+	// that must NEVER receive a refund.
+	//
+	// Format depends on PaymentCoin (set at SetupPayment time):
+	//   - Fiat orders: optional (refund routed through FiatProvider)
+	//   - EVM chains: hex address (0x...), EIP-55 mixed-case tolerated
+	//   - Solana: base58 32-byte public key
+	//   - UTXO: base58 / bech32 string
+	//
+	// Crypto orders must declare this before payment instructions are shown.
+	// Fiat orders leave it empty because refunds are handled by the payment
+	// provider rather than an on-chain refund target.
+	RefundAddress string `json:"refundAddress,omitempty"`
 }
 
 type PaymentData struct {
@@ -158,7 +176,7 @@ type PaymentData struct {
 
 	// 币种切换检测相关字段
 	HasPartialPayment bool   `json:"hasPartialPayment,omitempty"` // 是否已有部分支付（用于币种切换时提示）
-	PaidAmount        uint64 `json:"paidAmount,omitempty,string"`  // 已支付金额
+	PaidAmount        uint64 `json:"paidAmount,omitempty,string"` // 已支付金额
 	PaidCoin          string `json:"paidCoin,omitempty"`          // 已支付的币种
 	PaidAddress       string `json:"paidAddress,omitempty"`       // 已支付的地址
 

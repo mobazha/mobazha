@@ -32,7 +32,28 @@ import (
 )
 
 // PurchaseListing creates an order and sends it to the vendor.
+//
+// Monitor-Driven Payment (Sprint 2A Step 7 / P0-3): when the buyer declares a
+// RefundAddress on the Purchase request, we validate it against the pricing
+// coin's chain family and persist it onto the local Order row in the same
+// DB transaction that calls ProcessMessage. This makes Order.RefundAddress
+// available to the AggregatingVerifier before any PaymentSent message
+// arrives — essential for CEX direct-pay where there is no buyer-reported
+// envelope.
+//
+// Crypto orders must declare RefundAddress before payment instructions are
+// shown. Fiat orders are exempt because refunds route through the provider.
 func (s *OrderAppService) PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error) {
+	// Validate buyer-declared refund address up-front so we fail fast
+	// before any expensive listing fetch / discount resolution / signing.
+	// Validation uses the pricing coin's chain family as the heuristic —
+	// the actual payment coin is selected later at SetupPayment time, but
+	// the pricing coin is a sound predictor for which validation rules
+	// apply (EVM hex vs Solana base58 vs UTXO format).
+	if err = validatePurchaseRefundAddress(purchase); err != nil {
+		return
+	}
+
 	orderOpen, _, err := s.createOrder(ctx, purchase)
 	if err != nil {
 		return
@@ -83,6 +104,17 @@ func (s *OrderAppService) PurchaseListing(ctx context.Context, purchase *models.
 		if _, err = s.orderProcessor.ProcessMessage(tx, order); err != nil {
 			return err
 		}
+
+		// Persist buyer-declared RefundAddress onto the local Order row
+		// in the same transaction as ProcessMessage so the AggregatingVerifier
+		// (monitor-driven path) sees it before any PaymentSent arrives.
+		// See MONITOR_DRIVEN_PAYMENT.md §P0-3.
+		if strings.TrimSpace(purchase.RefundAddress) != "" {
+			if err = persistOrderRefundAddress(tx, order.OrderID, purchase.RefundAddress); err != nil {
+				return err
+			}
+		}
+
 		return s.messenger.ReliablySendMessage(tx, vendorPeerID, message, nil)
 	})
 	if err != nil {
@@ -379,6 +411,87 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 	order.RatingKeys = ratingKeys
 
 	return order, nil, nil
+}
+
+// validatePurchaseRefundAddress applies the chain-family format check to the
+// buyer-declared refund address. Crypto orders require a non-empty address;
+// fiat orders skip validation because provider refunds do not use on-chain
+// refund targets.
+//
+// Errors are wrapped with coreiface.ErrBadRequest so the HTTP handler maps
+// them to 400 rather than 500.
+func validatePurchaseRefundAddress(purchase *models.Purchase) error {
+	addr := strings.TrimSpace(purchase.RefundAddress)
+
+	// Use pricing coin as the chain-family heuristic. If pricing coin is
+	// empty (caller bug) we skip validation — createOrder will reject the
+	// purchase downstream with a clearer error.
+	pricingCoin := strings.TrimSpace(purchase.PricingCoin)
+	if pricingCoin == "" {
+		return nil
+	}
+	if isFiatPricingCoin(pricingCoin) {
+		purchase.RefundAddress = ""
+		return nil
+	}
+
+	if err := models.ValidateRefundAddress(iwallet.CoinType(pricingCoin), addr); err != nil {
+		// Double %w (Go 1.20+) so errors.Is matches both
+		// coreiface.ErrBadRequest (for HTTP 400 mapping) and the
+		// underlying ErrRefundAddressRequired / ErrRefundAddressInvalid
+		// (for fine-grained UI handling).
+		return fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+	}
+
+	// Normalize the trimmed value back onto the purchase so the same
+	// string lands in the DB row.
+	purchase.RefundAddress = addr
+	return nil
+}
+
+// SetOrderRefundAddressForPayment validates and persists the buyer-controlled
+// refund target against the actual payment coin selected at payment time.
+func (s *OrderAppService) SetOrderRefundAddressForPayment(ctx context.Context, orderID string, coin iwallet.CoinType, refundAddr string) error {
+	_ = ctx
+	addr := strings.TrimSpace(refundAddr)
+	if coin.IsFiatPayment() {
+		addr = ""
+	} else if err := models.ValidateRefundAddress(coin, addr); err != nil {
+		return fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+	}
+
+	return s.db.Update(func(tx database.Tx) error {
+		return persistOrderRefundAddress(tx, orderID, addr)
+	})
+}
+
+func isFiatPricingCoin(pricingCoin string) bool {
+	coin := iwallet.CoinType(strings.TrimSpace(pricingCoin))
+	if coin == iwallet.CtFiat || coin.IsFiatPayment() {
+		return true
+	}
+	switch strings.ToUpper(string(coin)) {
+	case "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CNY", "HKD", "SGD":
+		return true
+	default:
+		return false
+	}
+}
+
+// persistOrderRefundAddress sets Order.RefundAddress on the local row created
+// by ProcessMessage(ORDER_OPEN). Must be called inside the same DB transaction
+// to keep the row consistent — readers (AggregatingVerifier, dispute resolver)
+// assume the field is present once the order is visible.
+func persistOrderRefundAddress(tx database.Tx, orderID string, refundAddr string) error {
+	var dbOrder models.Order
+	if err := tx.Read().Where("id = ?", orderID).First(&dbOrder).Error; err != nil {
+		return fmt.Errorf("load order %s to set refund address: %w", orderID, err)
+	}
+	dbOrder.RefundAddress = strings.TrimSpace(refundAddr)
+	if err := tx.Save(&dbOrder); err != nil {
+		return fmt.Errorf("save order %s with refund address: %w", orderID, err)
+	}
+	return nil
 }
 
 func normalizeFiatProviderID(rawProvider string, fallbackProvider string) string {

@@ -612,6 +612,91 @@ func (o *Order) OrderOpenMessage() (*pb.OrderOpen, error) {
 	return orderOpen, nil
 }
 
+// PaymentProgressInfo summarizes the running tally of confirmed-and-deduplicated
+// payments toward an order's expected amount. The dashboard renders a
+// "you've paid X of Y" progress bar from these fields while the order sits
+// in PENDING / partial state (Phase EVM-ManagedEscrow v0.3.0 §4.2, D-Hybrid-19).
+//
+// All amounts are decimal strings in the smallest unit declared by
+// OrderOpen.Amount (wei / sat / atomic units / lamports for crypto; fiat
+// uses the divisibility from the order's currency definition). Percentage
+// is clamped to [0, 100] and computed server-side so every client renders
+// the same bar from the same numbers.
+type PaymentProgressInfo struct {
+	TotalReceived  string `json:"totalReceived"`
+	ExpectedAmount string `json:"expectedAmount"`
+	Percentage     int    `json:"percentage"`
+	// OverpaidAmount is populated only when the verifier has detected a
+	// genuine overpayment (TotalReceived > ExpectedAmount); the field is
+	// omitted on partial / exact paths so clients don't display a stale
+	// "you overpaid" hint from a previous aggregation cycle.
+	OverpaidAmount string `json:"overpaidAmount,omitempty"`
+}
+
+// ComputePaymentProgress derives the partial-payment progress card from
+// OrderPaymentState.TotalReceived and OrderOpen.Amount. Returns nil when
+// the order has no OrderOpen yet or when the expected amount cannot be
+// parsed as a positive big-int — in those cases there is nothing
+// meaningful to display and the JSON field should be omitted entirely.
+//
+// The percentage is min(100, total*100/expected) with big.Int math so
+// the calculation stays correct for the full 78-digit wei range. Callers
+// MUST NOT depend on PaymentVerificationStatus to decide whether to
+// render — the verifier rewrites TotalReceived on every pass (including
+// post-verified late deposits) and the dashboard wants to show that.
+func (o *Order) ComputePaymentProgress() *PaymentProgressInfo {
+	orderOpen, err := o.OrderOpenMessage()
+	if err != nil {
+		return nil
+	}
+	expectedStr := strings.TrimSpace(orderOpen.GetAmount())
+	if expectedStr == "" {
+		return nil
+	}
+	expected, ok := new(big.Int).SetString(expectedStr, 10)
+	if !ok || expected.Sign() <= 0 {
+		return nil
+	}
+
+	total := new(big.Int)
+	if t := strings.TrimSpace(o.TotalReceived); t != "" {
+		if parsed, ok := new(big.Int).SetString(t, 10); ok && parsed.Sign() >= 0 {
+			total.Set(parsed)
+		}
+	}
+
+	pct := 0
+	if total.Sign() > 0 {
+		scaled := new(big.Int).Mul(total, big.NewInt(100))
+		scaled.Quo(scaled, expected)
+		switch {
+		case scaled.Sign() < 0:
+			pct = 0
+		case scaled.Cmp(big.NewInt(100)) >= 0:
+			pct = 100
+		default:
+			pct = int(scaled.Int64())
+		}
+	}
+
+	overpaid := strings.TrimSpace(o.OverpaidAmount)
+	// Only surface OverpaidAmount when it parses to a positive big.Int —
+	// guards against a stale "0" or non-numeric leftover from earlier
+	// aggregator versions.
+	if overpaid != "" {
+		if v, ok := new(big.Int).SetString(overpaid, 10); !ok || v.Sign() <= 0 {
+			overpaid = ""
+		}
+	}
+
+	return &PaymentProgressInfo{
+		TotalReceived:  total.String(),
+		ExpectedAmount: expected.String(),
+		Percentage:     pct,
+		OverpaidAmount: overpaid,
+	}
+}
+
 func (o *Order) Chaincode() (string, error) {
 	orderOpen, err := o.OrderOpenMessage()
 	if err != nil {

@@ -93,6 +93,13 @@ func (w *WalletBase) SetChainClient(client iwallet.ChainClient) {
 	w.ChainClient = client
 }
 
+// GetChainClient exposes the injected chain client so higher-level
+// components can attach log subscribers without depending on concrete
+// wallet types.
+func (w *WalletBase) GetChainClient() iwallet.ChainClient {
+	return w.ChainClient
+}
+
 // ChainClientSetter is an interface for wallets that support replacing ChainClient
 type ChainClientSetter interface {
 	SetChainClient(client iwallet.ChainClient)

@@ -51,6 +51,21 @@ type TenantDB struct {
 	mtx        sync.Mutex
 }
 
+// TenantID returns the tenant scope carried by this Database wrapper.
+// Core runtime wiring uses it when a cross-cutting component needs both
+// the tenant-scoped database interface and the stable tenant identifier.
+func (tdb *TenantDB) TenantID() string {
+	return tdb.tenantID
+}
+
+// RawDB returns the underlying shared *gorm.DB. This is intentionally
+// narrow and only used by subsystems that must perform cross-tenant or
+// chain-global sweeps while still living alongside the tenant-scoped DB
+// abstraction.
+func (tdb *TenantDB) RawDB() *gorm.DB {
+	return tdb.sharedDB
+}
+
 // NewTenantDBWithPublicData creates a new TenantDB with a given PublicData
 // implementation. Both standalone (DBPublicData on local SQLite) and SaaS
 // (DBPublicData on shared PostgreSQL) use this constructor.

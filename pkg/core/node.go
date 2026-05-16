@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/repo"
+	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	"gorm.io/gorm"
 )
 
@@ -23,8 +24,28 @@ type MobazhaNode = core.MobazhaNode
 // to reference the concrete Gateway type without importing internal packages.
 type APIGateway = internalapi.Gateway
 
+// NodeOption is a functional option for MobazhaNode construction.
+// Re-exported from internal/core so that hosting packages can use it
+// without importing internal packages.
+type NodeOption = core.NodeOption
+
 func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService coreiface.HostService) (*MobazhaNode, error) {
 	return core.NewNode(ctx, cfg, nodeID, hostService)
+}
+
+// NewNodeWithOptions constructs a MobazhaNode with the given HostService
+// and applies functional options (e.g. WithManagedEscrowCapConfig) before Start().
+// Use this instead of NewNode when you need to inject optional dependencies.
+func NewNodeWithOptions(ctx context.Context, cfg *repo.Config, nodeID string,
+	hs coreiface.HostService, opts ...NodeOption) (*MobazhaNode, error) {
+	return core.NewNodeWithOptions(ctx, cfg, nodeID, hs, opts...)
+}
+
+// WithManagedEscrowCapConfig sets the EVM-ManagedEscrow grayscale routing config on a node.
+// Chains listed in cfg.ManagedEscrowChains activate the V2 ManagedEscrowAdapter escrow path.
+// Pass nil (or omit) to keep all EVM chains on the legacy V1 path.
+func WithManagedEscrowCapConfig(cfg *managed_escrow.ChainCapabilityConfig) NodeOption {
+	return core.WithManagedEscrowCapConfig(cfg)
 }
 
 // GetNodeManager returns the global NodeManagerIface instance.

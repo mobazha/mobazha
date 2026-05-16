@@ -28,6 +28,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/relay"
+	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -50,6 +51,20 @@ func WithKeyProvider(kp contracts.KeyProvider) NodeOption {
 func WithHostService(hs coreiface.HostService) NodeOption {
 	return func(n *MobazhaNode) {
 		n.hostService = hs
+	}
+}
+
+// WithManagedEscrowCapConfig sets the grayscale routing configuration for EVM-ManagedEscrow.
+// When cfg is non-nil and lists chains in ManagedEscrowChains, those chains activate
+// the V2 ManagedEscrowAdapter path (ForCoinV2) and are excluded from V1 ClientSigned
+// registration. Pass nil (default) to keep all EVM chains on the legacy V1
+// path — this is the safe production default until the operator is ready.
+//
+// Injection point: hosting builder calls this after reading HostingConfig
+// from app.yaml. Standalone nodes omit this option (nil default).
+func WithManagedEscrowCapConfig(cfg *managed_escrow.ChainCapabilityConfig) NodeOption {
+	return func(n *MobazhaNode) {
+		n.managed_escrowCapConfig = cfg
 	}
 }
 

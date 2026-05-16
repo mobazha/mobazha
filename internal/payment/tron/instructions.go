@@ -19,6 +19,18 @@ import (
 // BuildReleaseTransactionFn matches the signature used for dispute release.
 type BuildReleaseTransactionFn func(releaseInfo *pb.DisputeClose_ModeratedEscrowRelease, paymentSent *pb.PaymentSent) (iwallet.Transaction, error)
 
+func signWithEthereumKey(message []byte, key *btcec.PrivateKey) ([]byte, error) {
+	ecdsaKey, err := crypto.ToECDSA(key.Serialize())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert secp256k1 key for ethereum signing: %w", err)
+	}
+	sig, err := crypto.Sign(message, ecdsaKey)
+	if err != nil {
+		return nil, err
+	}
+	return sig, nil
+}
+
 // BuildEscrowReleaseParams builds TRON-specific escrow release parameters.
 // TRON uses the same Escrow.sol contract as EVM, so the signature message
 // format is identical. The key difference is that TRONMasterKey is used
@@ -50,7 +62,7 @@ func SignEscrowRelease(tos []iwallet.SpendInfo, redeemScript []byte, tronMasterK
 	if err != nil {
 		return nil, err
 	}
-	sig, err := crypto.Sign(message, tronMasterKey.ToECDSA())
+	sig, err := signWithEthereumKey(message, tronMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign escrow release: %w", err)
 	}
@@ -97,7 +109,7 @@ func BuildCancelableEscrowReleaseInstructions(
 	if err != nil {
 		return nil, fmt.Errorf("failed to build signature message: %w", err)
 	}
-	currentUserSignature, err := crypto.Sign(message, tronMasterKey.ToECDSA())
+	currentUserSignature, err := signWithEthereumKey(message, tronMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("error signing release: %w", err)
 	}
@@ -172,7 +184,7 @@ func BuildCompleteEscrowInstructions(
 	}
 
 	buyerPubKeyBytes := tronMasterKey.PubKey().SerializeCompressed()
-	buyerSig, err := crypto.Sign(message, tronMasterKey.ToECDSA())
+	buyerSig, err := signWithEthereumKey(message, tronMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message: %w", err)
 	}
@@ -239,7 +251,7 @@ func BuildDisputeReleaseInstructions(
 	}
 
 	ownKeyBytes := tronMasterKey.PubKey().SerializeCompressed()
-	ownSig, err := crypto.Sign(message, tronMasterKey.ToECDSA())
+	ownSig, err := signWithEthereumKey(message, tronMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate moderator signature: %w", err)
 	}

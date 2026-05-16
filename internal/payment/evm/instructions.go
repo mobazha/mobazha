@@ -18,6 +18,18 @@ import (
 
 type BuildReleaseTransactionFn func(releaseInfo *pb.DisputeClose_ModeratedEscrowRelease, paymentSent *pb.PaymentSent) (iwallet.Transaction, error)
 
+func signWithEthereumKey(message []byte, key *btcec.PrivateKey) ([]byte, error) {
+	ecdsaKey, err := crypto.ToECDSA(key.Serialize())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert secp256k1 key for ethereum signing: %w", err)
+	}
+	sig, err := crypto.Sign(message, ecdsaKey)
+	if err != nil {
+		return nil, err
+	}
+	return sig, nil
+}
+
 // BuildEscrowReleaseParams builds EVM-specific escrow release parameters
 // (receivers, amounts, signature message) from the given spend info and redeem script.
 func BuildEscrowReleaseParams(tos []iwallet.SpendInfo, redeemScript []byte) (receivers [][]byte, amounts []uint64, message []byte, err error) {
@@ -47,7 +59,7 @@ func SignEscrowRelease(tos []iwallet.SpendInfo, redeemScript []byte, ethMasterKe
 	if err != nil {
 		return nil, err
 	}
-	sig, err := crypto.Sign(message, ethMasterKey.ToECDSA())
+	sig, err := signWithEthereumKey(message, ethMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign escrow release: %w", err)
 	}
@@ -92,7 +104,7 @@ func BuildCancelableEscrowReleaseInstructions(
 	if err != nil {
 		return nil, fmt.Errorf("failed to build eth signature message: %w", err)
 	}
-	currentUserSignature, err := crypto.Sign(message, ethMasterKey.ToECDSA())
+	currentUserSignature, err := signWithEthereumKey(message, ethMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("error signing in createmultisig : %v", err)
 	}
@@ -166,7 +178,7 @@ func BuildCompleteEscrowInstructions(
 	}
 
 	buyerPubKeyBytes := ethMasterKey.PubKey().SerializeCompressed()
-	buyerSig, err := crypto.Sign(message, ethMasterKey.ToECDSA())
+	buyerSig, err := signWithEthereumKey(message, ethMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message: %w", err)
 	}
@@ -232,7 +244,7 @@ func BuildDisputeReleaseInstructions(
 	}
 
 	ownKeyBytes := ethMasterKey.PubKey().SerializeCompressed()
-	ownSig, err := crypto.Sign(message, ethMasterKey.ToECDSA())
+	ownSig, err := signWithEthereumKey(message, ethMasterKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate moderator signature: %w", err)
 	}

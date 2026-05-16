@@ -256,7 +256,7 @@ func TestSignEscrowRelease_ConsistentWithBuildParams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manualSig, err := crypto.Sign(message, ethKey.ToECDSA())
+	manualSig, err := signWithEthereumKey(message, ethKey)
 	if err != nil {
 		t.Fatal(err)
 	}

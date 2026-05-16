@@ -50,6 +50,13 @@ func NewProxy(client *http.Client) *Proxy {
 	return &Proxy{client: client}
 }
 
+func (p *Proxy) HTTPClient() *http.Client {
+	if p == nil {
+		return nil
+	}
+	return p.client
+}
+
 // callLLM dispatches to the correct provider backend and returns the raw text content.
 func (p *Proxy) callLLM(cfg Config, messages []chatMessage, maxTokens int, temperature float64, timeout time.Duration) (string, error) {
 	if IsAnthropicProvider(cfg.Provider) {
@@ -80,7 +87,9 @@ func (p *Proxy) doOpenAIRequest(cfg Config, messages []chatMessage, maxTokens in
 		return "", fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	if cfg.APIKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	}
 
 	client := p.clientWithTimeout(timeout)
 	resp, err := client.Do(httpReq)
@@ -144,7 +153,9 @@ func (p *Proxy) doAnthropicRequest(cfg Config, messages []chatMessage, maxTokens
 		return "", fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-api-key", cfg.APIKey)
+	if cfg.APIKey != "" {
+		httpReq.Header.Set("x-api-key", cfg.APIKey)
+	}
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
 	client := p.clientWithTimeout(timeout)
@@ -266,7 +277,7 @@ func extractErrorMessage(body []byte, statusCode int) string {
 // TestConnection sends a minimal request to verify the AI provider is reachable
 // and the API key is valid.
 func (p *Proxy) TestConnection(cfg Config) error {
-	if cfg.APIKey == "" {
+	if cfg.APIKey == "" && !IsTrustedLocalLLMEndpoint(cfg.EffectiveBaseURL()) {
 		return fmt.Errorf("API key is required")
 	}
 	if cfg.EffectiveBaseURL() == "" {
@@ -348,10 +359,48 @@ func validateImageURL(rawURL string) error {
 }
 
 func extractJSON(text string) string {
+	// 1. Fenced code block has highest priority (e.g. ```json ... ```)
 	m := fencedJSONRegexp.FindStringSubmatch(text)
 	if m != nil {
 		return strings.TrimSpace(m[1])
 	}
+
+	// 2. Scan for the first complete JSON object so we tolerate small LLMs
+	// that append extra explanation text after the JSON (e.g. llama3.2:1b).
+	start := strings.IndexByte(text, '{')
+	if start >= 0 {
+		depth := 0
+		inString := false
+		escaped := false
+		for i := start; i < len(text); i++ {
+			ch := text[i]
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' && inString {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = !inString
+				continue
+			}
+			if inString {
+				continue
+			}
+			switch ch {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					return strings.TrimSpace(text[start : i+1])
+				}
+			}
+		}
+	}
+
 	return strings.TrimSpace(text)
 }
 

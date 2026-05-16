@@ -2,6 +2,8 @@ package ai
 
 import (
 	"encoding/json"
+	"net"
+	"net/url"
 	"sync"
 )
 
@@ -272,7 +274,50 @@ func (mc *MultiConfig) UnmarshalJSON(data []byte) error {
 }
 
 func (c *Config) IsValid() bool {
-	return c.Enabled && c.APIKey != "" && c.EffectiveBaseURL() != ""
+	if !c.Enabled {
+		return false
+	}
+	effectiveURL := c.EffectiveBaseURL()
+	if effectiveURL == "" {
+		return false
+	}
+	// Generic config validity only treats loopback endpoints as key-less.
+	// Broader plain-HTTP trust decisions (e.g. Docker-internal Ollama in private_distribution
+	// mode) are handled by private_distribution-specific validation paths.
+	if IsLocalEndpointURL(effectiveURL) {
+		return true
+	}
+	return c.APIKey != ""
+}
+
+// IsPlainHTTPURL returns true when the URL uses the http scheme (not https).
+func IsPlainHTTPURL(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return parsed.Scheme == "http"
+}
+
+// IsTrustedLocalLLMEndpoint returns true for AI endpoints that private_distribution mode can
+// treat as local/trusted without requiring an API key.
+func IsTrustedLocalLLMEndpoint(rawURL string) bool {
+	return IsLocalEndpointURL(rawURL) || IsPlainHTTPURL(rawURL)
+}
+
+// IsLocalEndpointURL returns true for URLs whose host is a loopback address
+// (localhost, 127.0.0.x, ::1, etc.). Local LLM endpoints do not need API keys.
+func IsLocalEndpointURL(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (c *Config) EffectiveBaseURL() string {

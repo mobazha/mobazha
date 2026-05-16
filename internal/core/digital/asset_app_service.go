@@ -1304,7 +1304,9 @@ func (s *DigitalAssetAppService) ListLicenseKeys(
 		if variantSKU != "" {
 			q = q.Where("variant_sku = ?", variantSKU)
 		}
-		return q.Order("created_at DESC").Limit(limit).Offset(offset).Find(&keys).Error
+		// ID is UUIDv7 (time-ordered); ordering by ID is equivalent to ordering
+		// by insertion time without requiring a separate created_at column.
+		return q.Order("id DESC").Limit(limit).Offset(offset).Find(&keys).Error
 	})
 	if err != nil {
 		return nil, err

@@ -246,6 +246,8 @@ func TestConfig_IsValid(t *testing.T) {
 		{"provider default base URL", Config{Enabled: true, APIKey: "k", Provider: "anthropic"}, true},
 		{"disabled", Config{Enabled: false, APIKey: "k", BaseURL: "https://x.com/v1"}, false},
 		{"no key", Config{Enabled: true, BaseURL: "https://x.com/v1"}, false},
+		{"loopback without key", Config{Enabled: true, BaseURL: "http://127.0.0.1:11434/v1"}, true},
+		{"plain http without key is not generically valid", Config{Enabled: true, BaseURL: "http://ollama:11434/v1"}, false},
 		{"custom no base URL falls back to openai", Config{Enabled: true, APIKey: "k", Provider: "custom"}, true},
 		{"empty everything except enabled+key", Config{Enabled: true, APIKey: "k"}, true},
 	}
@@ -302,6 +304,26 @@ func TestProxy_TestConnection_NoKey(t *testing.T) {
 	err := proxy.TestConnection(cfg)
 	if err == nil || err.Error() != "API key is required" {
 		t.Errorf("expected 'API key is required', got %v", err)
+	}
+}
+
+func TestProxy_TestConnection_LocalNoKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if auth := r.Header.Get("Authorization"); auth != "" {
+			t.Fatalf("expected no authorization header for local keyless test, got %q", auth)
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"choices": []map[string]interface{}{
+				{"message": map[string]string{"content": "Hi"}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	proxy := NewProxy(server.Client())
+	cfg := Config{BaseURL: server.URL, Enabled: true, Model: "llama3.2"}
+	if err := proxy.TestConnection(cfg); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
 	}
 }
 

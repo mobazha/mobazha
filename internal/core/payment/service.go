@@ -184,17 +184,27 @@ func (s *PaymentAppService) SetPaymentRecorder(pr VerifiedPaymentRecorder) {
 // GeneratePaymentInstructions dispatches payment instruction generation to
 // the chain-specific strategy via the payment registry.
 func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, params models.InitializeEscrowData) (*payment.PaymentSetupResult, error) {
-	strategy, err := s.paymentRegistry.ForCoin(params.CoinType)
+	strategy, err := s.paymentRegistry.ForCoinV2(params.CoinType)
 	if err != nil {
 		return nil, fmt.Errorf("no chain escrow for coin %s: %w", params.CoinType, err)
 	}
-	return strategy.GeneratePaymentInstructions(ctx, payment.PaymentSetupParams{
+	result, err := strategy.SetupPayment(ctx, payment.PaymentSetupParams{
 		OrderID:      params.OrderID,
 		PayerAddress: params.PayerAddress,
 		Moderator:    params.Moderator,
 		CoinType:     params.CoinType,
 		Amount:       params.Amount,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &payment.PaymentSetupResult{
+		PaymentModel: strategy.Model(),
+		PaymentData:  result.PaymentData,
+		EscrowAddr:   result.EscrowAddr,
+		Instructions: result.Instructions,
+	}, nil
 }
 
 // BuildInitEscrowInstructions builds escrow initialization instructions for

@@ -6,8 +6,12 @@ import (
 	"crypto/rand"
 	"errors"
 	"sync"
+	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/media"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/multiformats/go-multihash"
 )
@@ -164,6 +169,102 @@ func (m *mockWalletOperator) WalletForChain(_ iwallet.ChainType) (iwallet.Wallet
 func (m *mockWalletOperator) SupportedChains() []iwallet.ChainType { return nil }
 func (m *mockWalletOperator) Start() error                         { return nil }
 func (m *mockWalletOperator) Close() error                         { return nil }
+
+type mockWalletOperatorWithChainWallets struct {
+	wallets map[iwallet.ChainType]iwallet.Wallet
+}
+
+var _ contracts.WalletOperator = (*mockWalletOperatorWithChainWallets)(nil)
+
+func (m *mockWalletOperatorWithChainWallets) WalletForCurrencyCode(code string) (iwallet.Wallet, error) {
+	return nil, errMockWalletUnsupported
+}
+func (m *mockWalletOperatorWithChainWallets) WalletForChain(chain iwallet.ChainType) (iwallet.Wallet, bool) {
+	wallet, ok := m.wallets[chain]
+	return wallet, ok
+}
+func (m *mockWalletOperatorWithChainWallets) SupportedChains() []iwallet.ChainType {
+	out := make([]iwallet.ChainType, 0, len(m.wallets))
+	for chain := range m.wallets {
+		out = append(out, chain)
+	}
+	return out
+}
+func (m *mockWalletOperatorWithChainWallets) Start() error { return nil }
+func (m *mockWalletOperatorWithChainWallets) Close() error { return nil }
+
+type mockEVMWallet struct {
+	chain      iwallet.ChainType
+	coin       iwallet.CoinType
+	testnet    bool
+	chainClient iwallet.ChainClient
+}
+
+var _ iwallet.Wallet = (*mockEVMWallet)(nil)
+
+func newMockEVMWallet(chain iwallet.ChainType, client iwallet.ChainClient) *mockEVMWallet {
+	coin, err := iwallet.RequireCanonicalNativeCoinType(chain)
+	if err != nil {
+		panic(err)
+	}
+	return &mockEVMWallet{
+		chain:       chain,
+		coin:        coin,
+		testnet:     true,
+		chainClient: client,
+	}
+}
+
+func (m *mockEVMWallet) WalletExists() bool { return true }
+func (m *mockEVMWallet) CreateWallet(_ hdkeychain.ExtendedKey, _ time.Time) error {
+	return nil
+}
+func (m *mockEVMWallet) OpenWallet() error  { return nil }
+func (m *mockEVMWallet) CloseWallet() error { return nil }
+func (m *mockEVMWallet) Begin() (iwallet.Tx, error) {
+	return nil, errMockWalletUnsupported
+}
+func (m *mockEVMWallet) BlockchainInfo() (iwallet.BlockInfo, error) {
+	return iwallet.BlockInfo{}, nil
+}
+func (m *mockEVMWallet) CoinCategory() iwallet.CoinCategory { return iwallet.CoinCategoryEthereum }
+func (m *mockEVMWallet) IsTestnet() bool                    { return m.testnet }
+func (m *mockEVMWallet) ValidateAddress(_ iwallet.Address) error {
+	return nil
+}
+func (m *mockEVMWallet) GetTransaction(id iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
+	return m.chainClient.GetTransaction(id, coinType)
+}
+func (m *mockEVMWallet) GetChainClient() iwallet.ChainClient { return m.chainClient }
+
+type mockManagedEscrowLogSubscriber struct {
+	subscribeCalls int
+}
+
+var _ managed_escrow.LogSubscriber = (*mockManagedEscrowLogSubscriber)(nil)
+var _ iwallet.ChainClient = (*mockManagedEscrowLogSubscriber)(nil)
+
+func (m *mockManagedEscrowLogSubscriber) SubscribeFilterLogs(_ context.Context, _ ethereum.FilterQuery, _ chan<- types.Log) (ethereum.Subscription, error) {
+	m.subscribeCalls++
+	return &mockEthSubscription{errCh: make(chan error)}, nil
+}
+func (m *mockManagedEscrowLogSubscriber) FilterLogs(_ context.Context, _ ethereum.FilterQuery) ([]types.Log, error) {
+	return nil, nil
+}
+func (m *mockManagedEscrowLogSubscriber) GetTransaction(_ iwallet.TransactionID, _ iwallet.CoinType) (*iwallet.Transaction, error) {
+	return nil, errMockWalletUnsupported
+}
+func (m *mockManagedEscrowLogSubscriber) EstimateFee(_ int) (map[iwallet.FeeLevel]iwallet.EstimateFeeRes, error) {
+	return nil, errMockWalletUnsupported
+}
+func (m *mockManagedEscrowLogSubscriber) Broadcast(_ []byte) error { return errMockWalletUnsupported }
+
+type mockEthSubscription struct {
+	errCh chan error
+}
+
+func (s *mockEthSubscription) Err() <-chan error { return s.errCh }
+func (s *mockEthSubscription) Unsubscribe()      {}
 
 // ── helpers ─────────────────────────────────────────────────────
 

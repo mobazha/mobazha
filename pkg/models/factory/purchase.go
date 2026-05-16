@@ -35,5 +35,6 @@ func NewPurchase() *models.Purchase {
 		},
 		AlternateContactInfo: "peter@protonmail.com",
 		PricingCoin:          "MCK",
+		RefundAddress:        "01ce26dc69094af9246ea7e7ce9970aff2b81cc9",
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -190,15 +191,11 @@ func TestRegistryDispatch_ChainCount(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	chains := n.paymentRegistry.Chains()
-	// Expected: UTXO (4) + EVM (13: ETH/BSC/Polygon/Base + 9 D-Hybrid-21
-	// L2s wired in evmChains) + Solana (1) + TRON (1) = 19. Sprint 1 D8
-	// promoted 8 L2 ManagedEscrowAdapters (Arbitrum/Optimism/Avalanche/Gnosis/
-	// Celo/Mantle/Scroll/Linea) to chainMatrix Ready=true; zkSync Era
-	// stays Ready=false but the V1 strategy registration is
-	// unconditional in this loop — V1 paths fail closed via
-	// ErrV1ChainNotSupported on the per-chain Registry guard.
-	if len(chains) != 19 {
-		t.Errorf("registry has %d chains, want 19 (4 UTXO + 13 EVM + 1 Solana + 1 TRON)", len(chains))
+	// With managed_escrowCapConfig=nil all Ready chains stay on the legacy V1 path.
+	// Ready EVM chains are 12 because zkSync Era remains Ready=false.
+	// Expected: UTXO (4) + EVM (12) + Solana (1) + TRON (1) = 18.
+	if len(chains) != 18 {
+		t.Errorf("registry has %d chains, want 18 (4 UTXO + 12 EVM + 1 Solana + 1 TRON)", len(chains))
 	}
 }
 
@@ -303,6 +300,35 @@ func nodeWithManagedEscrowShadowDeps() *MobazhaNode {
 	return n
 }
 
+func nodeWithManagedEscrowShadowMonitorDeps(t *testing.T) *MobazhaNode {
+	t.Helper()
+
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewMemoryDB: %v", err)
+	}
+
+	wallets := make(map[iwallet.ChainType]iwallet.Wallet)
+	for _, chain := range readyEVMChains(t) {
+		wallets[chain] = newMockEVMWallet(chain, &mockManagedEscrowLogSubscriber{})
+	}
+
+	n := &MobazhaNode{
+		identityFields: identityFields{
+			nodeID:  "test-shadow-monitor",
+			nodeCtx: context.Background(),
+		},
+		storageFields: storageFields{db: db},
+		networkFields: networkFields{eventBus: events.NewBus()},
+		walletFields: walletFields{
+			managed_escrowCapConfig: readyManagedEscrowCapConfig(t),
+		},
+	}
+	n.keyProvider = &mockKeyProvider{}
+	n.multiwallet = &mockWalletOperatorWithChainWallets{wallets: wallets}
+	return n
+}
+
 // readyEVMChains returns the subset of evmChains whose ManagedEscrowAdapter
 // shadow registration is expected to succeed. zkSync Era stays in
 // evmChains for the multiwallet/EVM-client wiring but its
@@ -320,8 +346,18 @@ func readyEVMChains(t *testing.T) []iwallet.ChainType {
 	return out
 }
 
+func readyManagedEscrowCapConfig(t *testing.T) *managed_escrow.ChainCapabilityConfig {
+	t.Helper()
+	chains := readyEVMChains(t)
+	managed_escrowChains := make([]string, 0, len(chains))
+	for _, chain := range chains {
+		managed_escrowChains = append(managed_escrowChains, string(chain))
+	}
+	return &managed_escrow.ChainCapabilityConfig{ManagedEscrowChains: managed_escrowChains}
+}
+
 func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
-	n := nodeWithManagedEscrowShadowDeps()
+	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
 
 	if n.managed_escrowActionStore == nil {
@@ -385,7 +421,7 @@ func TestManagedEscrowAdapterShadow_V1PathRemainsCanonical(t *testing.T) {
 }
 
 func TestManagedEscrowAdapterShadow_V2LookupReturnsManagedEscrowAdapter(t *testing.T) {
-	n := nodeWithManagedEscrowShadowDeps()
+	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
 
 	for chain, want := range n.managedEscrowAdapters {
@@ -405,8 +441,26 @@ func TestManagedEscrowAdapterShadow_V2LookupReturnsManagedEscrowAdapter(t *testi
 	}
 }
 
+func TestManagedEscrowAdapterShadow_RegistersManagedEscrowMonitorsWhenMonitorDepsAvailable(t *testing.T) {
+	n := nodeWithManagedEscrowShadowMonitorDeps(t)
+	n.registerPaymentStrategies()
+
+	want := readyEVMChains(t)
+	if got := len(n.managed_escrowMonitors); got != len(want) {
+		t.Fatalf("managed_escrowMonitors has %d entries, want %d", got, len(want))
+	}
+	for _, chain := range want {
+		if n.managed_escrowMonitors[chain] == nil {
+			t.Fatalf("managed_escrowMonitors[%s] is nil", chain)
+		}
+		if _, ok := n.managedEscrowAdapters[chain]; !ok {
+			t.Fatalf("managedEscrowAdapters[%s] missing despite monitor deps being available", chain)
+		}
+	}
+}
+
 func TestManagedEscrowAdapterShadow_GetActionStatusReportsActionNotFound(t *testing.T) {
-	n := nodeWithManagedEscrowShadowDeps()
+	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
 
 	// Loop every Ready=true EVM chain so a per-chain wiring regression
@@ -438,6 +492,7 @@ func TestManagedEscrowAdapterShadow_OwnerProviderInjectedWhenPaymentServiceAvail
 	// provided by nodeWithManagedEscrowShadowDeps), so it must be present here
 	// alongside the OwnerProvider.
 	n := nodeWithManagedEscrowShadowDeps()
+	n = nodeWithManagedEscrowShadowMonitorDeps(t)
 	// PaymentAppService is non-nil; its inner deps stay zero-valued
 	// because registerManagedEscrowAdapterShadow only checks pointer presence.
 	n.paymentService = corepayment.NewPaymentAppService(corepayment.PaymentAppServiceConfig{NodeID: "test-shadow"})
@@ -467,7 +522,7 @@ func TestManagedEscrowAdapterShadow_OwnerProviderNilWhenPaymentServiceMissing(t 
 	// so it must still be wired even on this branch. Asserting both
 	// directions here keeps the two providers' wiring contracts
 	// distinct and pinned.
-	n := nodeWithManagedEscrowShadowDeps()
+	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
 
 	if len(n.managedEscrowAdapters) == 0 {

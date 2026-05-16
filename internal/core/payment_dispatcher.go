@@ -5,7 +5,10 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -14,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 // ── Payment Strategy Registration ───────────────────────────────────────
@@ -48,6 +52,12 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	}
 
 	// ── EVM ─────────────────────────────────────────────────────
+	// ManagedEscrowEnabled chains are activated via the V2 RegisterV2 path in
+	// registerManagedEscrowAdapterShadow; they are intentionally excluded from
+	// the V1 Register loop so that ForCoin(managed_escrowEnabledChain) returns
+	// an error — callers must migrate to ForCoinV2 to use those chains.
+	// This makes the migration explicit and prevents silent fallback to
+	// the legacy ClientSigned path on ManagedEscrow-activated chains.
 	evmOps := &adapters.EVMChainOps{
 		Keys:            n.keyProvider,
 		Multiwallet:     n.multiwallet,
@@ -55,7 +65,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		OnAutoConfirm:   n.handleCancelablePaymentForEVM,
 	}
 	evmStrategy := adapters.NewClientSignedAdapter(evmOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
-	for _, chain := range evmChains {
+	for _, chain := range managed_escrow.LegacyChains(n.managed_escrowCapConfig) {
 		n.paymentRegistry.Register(chain, evmStrategy)
 	}
 
@@ -103,13 +113,19 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	n.registerManagedEscrowAdapterShadow()
 }
 
-// registerManagedEscrowAdapterShadow constructs ManagedEscrowAdapter instances for the
-// Ready EVM chains and registers them via Registry.RegisterV2 alongside
-// the canonical V1 EVMChainOps entries (Phase EVM-ManagedEscrow v0.3.0 — Sprint
-// 2 shadow stage).
+// registerManagedEscrowAdapterShadow constructs ManagedEscrowAdapter instances and
+// activates them as the canonical V2 escrow path for chains listed in
+// n.managed_escrowCapConfig.ManagedEscrowChains (Phase EVM-ManagedEscrow v0.3.0 — Sprint 3
+// grayscale routing).
 //
-// V1 ForCoin lookups remain canonical and the V2 lookup path has no
-// production caller today. Provider wiring lands in incremental commits:
+// Routing semantics (EVM_HYBRID_STRATEGY.md §5.5 D-Hybrid-23):
+//   - ManagedEscrow-enabled chains: ForCoinV2 returns ManagedEscrowAdapter; ForCoin (V1)
+//     has no entry for these chains (they were skipped in
+//     registerPaymentStrategies). Callers MUST use ForCoinV2.
+//   - Legacy chains (not in ManagedEscrowChains): ForCoin (V1) returns
+//     ClientSignedAdapter; ForCoinV2 is empty for them.
+//
+// Provider wiring lands in incremental commits:
 //
 //   - D18a — OwnerProvider (paymentManagedEscrowOwnerProvider) so SetupPayment
 //     can predict ManagedEscrow addresses end-to-end. Wired when paymentService
@@ -155,6 +171,7 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		Multiwallet:   n.multiwallet,
 		ActionStore:   store,
 		NonceProvider: &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet},
+		WalletTestnet: n.walletTestnet,
 	}
 	if n.paymentService != nil {
 		deps.OwnerProvider = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}
@@ -167,8 +184,17 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 			"ManagedEscrowAdapter shadow registration: paymentService unavailable; OwnerProvider left nil (SetupPayment will stub)")
 	}
 
-	shadow := make(map[iwallet.ChainType]*adapters.ManagedEscrowAdapter, len(evmChains))
-	for _, chain := range evmChains {
+	activeChains := managed_escrow.ManagedEscrowEnabledChains(n.managed_escrowCapConfig)
+	shadow := make(map[iwallet.ChainType]*adapters.ManagedEscrowAdapter, len(activeChains))
+	monitors := make(map[iwallet.ChainType]*managed_escrow.LiveMonitor, len(activeChains))
+	for _, chain := range activeChains {
+		monitor, err := n.buildManagedEscrowMonitor(chain)
+		if err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID,
+				"ManagedEscrowAdapter V2 activation FAILED for chain %s: monitor wiring: %v", chain, err)
+			continue
+		}
+		deps.Monitor = monitor
 		adapter, err := adapters.NewManagedEscrowAdapter(chain, deps)
 		if err != nil {
 			// Distinguish "chain not yet promoted to Ready" (expected
@@ -176,21 +202,109 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 			// required) so operators can triage at a glance.
 			if errors.Is(err, adapters.ErrManagedEscrowChainNotReady) {
 				logger.LogInfoWithIDf(log, n.nodeID,
-					"ManagedEscrowAdapter shadow registration skipped for chain %s — not in Ready matrix yet (%v)", chain, err)
+					"ManagedEscrowAdapter V2 activation skipped for chain %s — not in Ready matrix yet (%v)", chain, err)
 			} else {
 				logger.LogErrorWithIDf(log, n.nodeID,
-					"ManagedEscrowAdapter shadow registration FAILED for chain %s: %v", chain, err)
+					"ManagedEscrowAdapter V2 activation FAILED for chain %s: %v", chain, err)
 			}
 			continue
 		}
+
 		n.paymentRegistry.RegisterV2(chain, adapter)
 		shadow[chain] = adapter
+		monitors[chain] = monitor
 	}
 
 	n.managed_escrowActionStore = store
 	n.managedEscrowAdapters = shadow
-	logger.LogInfoWithIDf(log, n.nodeID,
-		"ManagedEscrowAdapter shadow registered for %d EVM chains (V1 path canonical)", len(shadow))
+	n.managed_escrowMonitors = monitors
+
+	// Publish grayscale routing decisions as startup metrics. This provides
+	// an audit trail in Grafana for "which chains were live on V2 at node start".
+	for chain, adapter := range shadow {
+		managed_escrow.SetManagedEscrowRoutingDecision(string(chain), adapter != nil)
+	}
+	// Chains on V1 legacy path also get a routing=0 gauge for completeness.
+	for _, chain := range managed_escrow.LegacyChains(n.managed_escrowCapConfig) {
+		managed_escrow.SetManagedEscrowRoutingDecision(string(chain), false)
+	}
+
+	if len(activeChains) == 0 {
+		logger.LogInfoWithIDf(log, n.nodeID,
+			"ManagedEscrowAdapter: no chains activated (managed_escrow_chains config empty — all EVM on V1 legacy path)")
+	} else {
+		logger.LogInfoWithIDf(log, n.nodeID,
+			"ManagedEscrowAdapter V2 activated for %d/%d EVM chains: %v", len(shadow), len(activeChains), shadow)
+	}
+}
+
+func (n *MobazhaNode) buildManagedEscrowMonitor(chain iwallet.ChainType) (*managed_escrow.LiveMonitor, error) {
+	if n.db == nil {
+		return nil, errors.New("database unavailable")
+	}
+	tenantDB, ok := n.db.(*dbstore.TenantDB)
+	if !ok {
+		return nil, fmt.Errorf("unsupported database type %T", n.db)
+	}
+	if n.eventBus == nil {
+		return nil, errors.New("event bus unavailable")
+	}
+
+	wallet, ok := n.multiwallet.WalletForChain(chain)
+	if !ok {
+		return nil, fmt.Errorf("wallet unavailable for chain %s", chain)
+	}
+	getter, ok := wallet.(interface{ GetChainClient() iwallet.ChainClient })
+	if !ok {
+		return nil, fmt.Errorf("wallet %T does not expose chain client", wallet)
+	}
+	client := getter.GetChainClient()
+	if client == nil {
+		return nil, fmt.Errorf("chain client not configured for %s", chain)
+	}
+	logClient, ok := client.(managed_escrow.LogSubscriber)
+	if !ok {
+		return nil, fmt.Errorf("chain client %T does not implement managed_escrow.LogSubscriber", client)
+	}
+
+	dispatcher := corepayment.NewObservationDispatcher(
+		NewGormPaymentObservationRepo(tenantDB, tenantDB.RawDB()),
+		corepayment.NewAggregatingVerifier(n.db, n.eventBus),
+		&managed_escrowOrderTenantResolver{db: n.db},
+		n.nodeID,
+	)
+	handler := corepayment.NewManagedEscrowEventHandler(dispatcher)
+
+	chainID, ok := managed_escrow.ChainIDFor(chain)
+	if !ok {
+		return nil, fmt.Errorf("missing ManagedEscrow chain id for %s", chain)
+	}
+
+	return managed_escrow.NewLiveMonitor(logClient, handler, managed_escrow.LiveMonitorConfig{
+		ChainID:            chainID,
+		ConfirmationDepth:  0,
+	}), nil
+}
+
+type managed_escrowOrderTenantResolver struct {
+	db database.Database
+}
+
+func (r *managed_escrowOrderTenantResolver) ResolveTenant(_ context.Context, orderID string) (string, error) {
+	var order models.Order
+	err := r.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&order).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", corepayment.ErrUnknownOrder
+		}
+		return "", err
+	}
+	if order.TenantID == "" {
+		return "", corepayment.ErrUnknownOrder
+	}
+	return order.TenantID, nil
 }
 
 // ── Thin delegates for strategy callbacks ────────────────────────────────

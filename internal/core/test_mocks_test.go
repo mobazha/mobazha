@@ -251,6 +251,9 @@ func (m *mockManagedEscrowLogSubscriber) SubscribeFilterLogs(_ context.Context, 
 func (m *mockManagedEscrowLogSubscriber) FilterLogs(_ context.Context, _ ethereum.FilterQuery) ([]types.Log, error) {
 	return nil, nil
 }
+func (m *mockManagedEscrowLogSubscriber) BlockNumber(_ context.Context) (uint64, error) {
+	return 0, nil
+}
 func (m *mockManagedEscrowLogSubscriber) GetTransaction(_ iwallet.TransactionID, _ iwallet.CoinType) (*iwallet.Transaction, error) {
 	return nil, errMockWalletUnsupported
 }

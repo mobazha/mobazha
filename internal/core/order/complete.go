@@ -71,12 +71,12 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 		return coinType, nil, fmt.Errorf("failed to get vendor: %w", err)
 	}
 
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
 		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
-	result, err := strategy.GetCompleteInstructions(context.Background(), payment.InstructionParams{
+	result, err := strategy.Complete(context.Background(), payment.ActionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		OrderData:     &order,
@@ -174,7 +174,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 		if err != nil {
 			return err
 		}
-		completionStrategy, csErr := s.paymentRegistry.ForCoin(coinType)
+		completionStrategy, csErr := s.paymentRegistry.ForCoinV2(coinType)
 		isClientSigned := csErr == nil && completionStrategy.Model() == payment.PaymentModelClientSigned
 		if isClientSigned {
 			release.Txid = txid.String()

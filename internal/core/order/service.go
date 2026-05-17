@@ -734,15 +734,6 @@ func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, ini
 		}, nil
 	}
 
-	refundStrategy, err := s.paymentRegistry.ForCoin(coinType)
-	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
-	}
-
-	if refundStrategy.Model() == payment.PaymentModelMonitored {
-		return coinType, nil, nil
-	}
-
 	toAddress := paymentSent.PayerAddress
 	return s.GetEscrowReleaseInstructions(orderID, initiatorAddress, toAddress)
 }
@@ -792,12 +783,12 @@ func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, i
 		return "", nil, err
 	}
 
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
 		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
-	result, err := strategy.GetCancelInstructions(context.Background(), payment.InstructionParams{
+	result, err := strategy.Cancel(context.Background(), payment.ActionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		PayoutAddr:    toAddress,
@@ -839,7 +830,12 @@ func (s *OrderAppService) buildRefundMessage(order *models.Order, wallet iwallet
 		return nil, nil, err
 	}
 
-	strategy, err := s.paymentRegistry.ForCoin(iwallet.CoinType(paymentSent.Coin))
+	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
 		return nil, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
@@ -1040,7 +1036,12 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 		return err
 	}
 
-	cancelStrategy, err := s.paymentRegistry.ForCoin(iwallet.CoinType(paymentSent.Coin))
+	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return err
+	}
+
+	cancelStrategy, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
 		return err
 	}

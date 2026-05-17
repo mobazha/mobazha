@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	ErrPaymentNotConfirmed  = errors.New("payment not yet confirmed on chain")
+	ErrPaymentNotConfirmed    = errors.New("payment not yet confirmed on chain")
 	ErrPaymentAddressMismatch = contracts.ErrPaymentAddressMismatch
-	ErrFiatPaymentNotReady  = errors.New("fiat payment not yet succeeded")
-	ErrFiatQueryUnavailable = errors.New("fiat payment query not configured")
+	ErrFiatPaymentNotReady    = errors.New("fiat payment not yet succeeded")
+	ErrFiatQueryUnavailable   = errors.New("fiat payment query not configured")
 )
 
 // PaymentVerificationService centralizes payment message validation and
@@ -81,7 +81,7 @@ func (s *PaymentVerificationService) ValidateMessage(
 	if s.registry == nil {
 		return fmt.Errorf("chain escrow registry not configured for %s", string(coinType))
 	}
-	strategy, err := s.registry.ForCoin(coinType)
+	strategy, err := s.registry.ForCoinV2(coinType)
 	if err != nil {
 		return fmt.Errorf("no chain escrow for %s: %w", string(coinType), err)
 	}
@@ -170,7 +170,7 @@ func (s *PaymentVerificationService) FetchAndVerify(
 		}
 
 		if s.registry != nil {
-			if strategy, sErr := s.registry.ForCoin(coinType); sErr == nil {
+			if strategy, sErr := s.registry.ForCoinV2(coinType); sErr == nil {
 				if vErr := strategy.VerifyDeposit(ctx, payment.DepositVerifyParams{
 					CoinType:      coinType,
 					TxHash:        paymentSent.TransactionID,

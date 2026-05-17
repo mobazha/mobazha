@@ -3,7 +3,6 @@
 package api
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -32,10 +31,6 @@ const (
 	// (see payment_app_service_utxo.go AddressMonitorDuration).
 	UTXOPaymentWindowDuration = 15 * time.Minute
 )
-
-type paymentRefundAddressSetter interface {
-	SetOrderRefundAddressForPayment(ctx context.Context, orderID string, coin iwallet.CoinType, refundAddr string) error
-}
 
 // ============================================================================
 // 响应结构定义
@@ -77,12 +72,34 @@ type EVMPaymentInfoResponse struct {
 	Instructions  any                 `json:"instructions"`
 }
 
+// ManagedEscrowPaymentInfoResponse is the payment setup response for ManagedEscrow EVM orders.
+//
+// ManagedEscrow uses address-monitored funding: the buyer transfers native ETH (or ERC-20)
+// directly to the predicted ManagedEscrow address. No client-side signing is required
+// during setup — signatures are collected at action time (Confirm / Cancel / Complete).
+//
+// Phase PS B2: replaces the legacy EVMPaymentInfoResponse for ManagedEscrow adapter results.
+// The legacy instructions endpoint continues to serve V1 EVM / Solana orders.
+type ManagedEscrowPaymentInfoResponse struct {
+	PaymentType    string                `json:"paymentType"`         // always "managed_escrow_address_monitored"
+	PaymentMethod  pb.PaymentSent_Method `json:"paymentMethod"`       // CANCELABLE or MODERATED
+	PaymentAddress string                `json:"paymentAddress"`      // predicted ManagedEscrow address (hex)
+	Amount         uint64                `json:"amount,string"`       // amount in wei (or token minimal units)
+	Coin           string                `json:"coin"`                // canonical coin type
+	ExpiresAt      time.Time             `json:"expiresAt"`           // funding window deadline
+	Moderator      string                `json:"moderator,omitempty"` // peerID (MODERATED only)
+}
+
 // ============================================================================
 // 主处理函数
 // ============================================================================
 
 // handleGetOrderPaymentInstructions 获取订单支付指令
 // 通过 ChainEscrow 分发，根据 PaymentModel 格式化响应
+//
+// Phase PS / B5: unified read model lives at GET /v1/orders/{orderID}/payment-session.
+// Crypto funding can also be provisioned via POST .../payment-session; this legacy JSON
+// body route remains for richer client-signed payloads and specialised responses (QR, URIs).
 func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
 	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
@@ -97,7 +114,8 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	}
 	params.OrderID = orderID
 
-	if err := params.CoinType.ValidateCanonicalPaymentCoin(); err != nil {
+	normalizedCoin, err := iwallet.NormalizePaymentCoinIngress(string(params.CoinType))
+	if err != nil {
 		responsePkg.Error(
 			w,
 			http.StatusBadRequest,
@@ -106,6 +124,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		)
 		return
 	}
+	params.CoinType = normalizedCoin
 
 	orderSvc := getOrderService(r)
 	walletSvc := getWalletService(r)
@@ -133,11 +152,6 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	refundSetter, ok := orderSvc.(paymentRefundAddressSetter)
-	if !ok {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "refund address validation unavailable")
-		return
-	}
 	if err := models.ValidateRefundAddress(params.CoinType, params.RefundAddress); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		return
@@ -209,7 +223,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := refundSetter.SetOrderRefundAddressForPayment(r.Context(), params.OrderID, params.CoinType, params.RefundAddress); err != nil {
+	if err := orderSvc.SetOrderRefundAddressForPayment(r.Context(), params.OrderID, params.CoinType, params.RefundAddress); err != nil {
 		if errors.Is(err, coreiface.ErrBadRequest) || errors.Is(err, models.ErrRefundAddressRequired) || errors.Is(err, models.ErrRefundAddressInvalid) {
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 			return
@@ -221,7 +235,13 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 
 	switch result.PaymentModel {
 	case payment.PaymentModelMonitored:
-		g.formatMonitoredPaymentResponse(w, params, result)
+		// Phase PS B2: ManagedEscrow EVM uses address-monitored funding (no Script/ScriptHash).
+		// UTXO chains still use the existing formatMonitoredPaymentResponse path.
+		if result.IsManagedEscrowOrder {
+			g.formatManagedEscrowPaymentResponse(w, result)
+		} else {
+			g.formatMonitoredPaymentResponse(w, params, result)
+		}
 	case payment.PaymentModelClientSigned:
 		g.formatClientSignedPaymentResponse(w, result)
 	default:
@@ -311,6 +331,32 @@ func (g *Gateway) formatClientSignedPaymentResponse(w http.ResponseWriter, resul
 		PaymentData:   paymentData,
 		EscrowAccount: result.EscrowAddr,
 		Instructions:  result.Instructions,
+	}
+	responsePkg.Success(w, response)
+}
+
+// formatManagedEscrowPaymentResponse formats the response for ManagedEscrow EVM address-monitored payments.
+//
+// Unlike UTXO monitored (which returns Script/ScriptHash for Electrum) and V1 EVM
+// client-signed (which returns contract call Instructions), ManagedEscrow only needs the
+// predicted address and amount — the buyer just transfers ETH to it.
+//
+// Phase PS B2.
+func (g *Gateway) formatManagedEscrowPaymentResponse(w http.ResponseWriter, result *payment.PaymentSetupResult) {
+	paymentData := result.PaymentData
+	if paymentData == nil || paymentData.ToAddress == "" {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for ManagedEscrow order: missing address")
+		return
+	}
+
+	response := ManagedEscrowPaymentInfoResponse{
+		PaymentType:    "managed_escrow_address_monitored",
+		PaymentMethod:  paymentData.Method,
+		PaymentAddress: paymentData.ToAddress,
+		Amount:         paymentData.Amount,
+		Coin:           string(paymentData.Coin),
+		ExpiresAt:      time.Now().Add(UTXOPaymentWindowDuration),
+		Moderator:      paymentData.Moderator,
 	}
 	responsePkg.Success(w, response)
 }

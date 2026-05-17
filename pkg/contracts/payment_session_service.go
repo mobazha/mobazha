@@ -31,6 +31,32 @@ type CreatePaymentSessionRequest struct {
 	// BuyerPeerID is the peer ID of the buying node, used for ownership
 	// checks and address derivation in certain escrow schemes.
 	BuyerPeerID string
+
+	// ── Crypto-only fields (canonical paymentCoin prefixed with "crypto:") ─────
+
+	// PayerAddress is the buyer pubkey or chain address forwarded into escrow setup.
+	PayerAddress string
+	// Moderator is the dispute moderator Libp2p peer ID (required when the order uses moderated escrow).
+	Moderator string
+
+	// ── Fiat-specific fields (only set when PaymentCoin starts with "fiat:") ──
+
+	// FiatAmountCents is the payment amount in the smallest currency unit
+	// (e.g. cents for USD, pence for GBP). Must be > 0 for fiat orders.
+	// The caller (API handler) converts the order total to fiat cents using
+	// the exchange rate; this service does not perform currency conversion.
+	FiatAmountCents int64
+
+	// FiatDescription is shown on the provider's payment page (optional).
+	FiatDescription string
+
+	// FiatReturnURL is the URL the buyer is redirected to after approving a
+	// PayPal order. Required for PayPal; ignored by Stripe.
+	FiatReturnURL string
+
+	// FiatCancelURL is the URL the buyer is redirected to if they cancel the
+	// PayPal approval. Required for PayPal; ignored by Stripe.
+	FiatCancelURL string
 }
 
 // PaymentSessionService creates, reads, and refreshes unified payment

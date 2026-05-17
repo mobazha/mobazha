@@ -1272,12 +1272,30 @@ func (s *GuestOrderAppService) validateAcceptedCoin(cfg *models.GuestCheckoutCon
 	if cfg.AcceptedCoins == "" {
 		return nil
 	}
+	reqNorm := normalizeGuestCoinForCompare(coin)
 	for _, c := range strings.Split(cfg.AcceptedCoins, ",") {
-		if strings.TrimSpace(c) == coin {
+		ac := strings.TrimSpace(c)
+		if ac == "" {
+			continue
+		}
+		if ac == strings.TrimSpace(coin) {
+			return nil
+		}
+		if normalizeGuestCoinForCompare(ac) == reqNorm {
 			return nil
 		}
 	}
 	return fmt.Errorf("%w: payment coin %q not accepted by seller", contracts.ErrInvalidGuestRequest, coin)
+}
+
+// normalizeGuestCoinForCompare maps legacy tickers (e.g. BTC) and canonical IDs
+// to a single comparable key so AcceptedCoins may list either form.
+func normalizeGuestCoinForCompare(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if ct, ok := iwallet.TryNormalizePaymentCoin(raw); ok {
+		return string(ct)
+	}
+	return raw
 }
 
 func (s *GuestOrderAppService) validateMaxOrderAmount(cfg *models.GuestCheckoutConfig, total *big.Int) error {
@@ -1330,13 +1348,18 @@ func (s *GuestOrderAppService) filterAvailableCoins(coinList string) string {
 			continue
 		}
 		coinType := iwallet.CoinType(coin)
+		displayCoin := coin
+		if ct, ok := iwallet.TryNormalizePaymentCoin(coin); ok {
+			coinType = ct
+			displayCoin = string(ct)
+		}
 		coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
 		if err != nil {
 			// Unknown / malformed coin code — omit.
 			continue
 		}
 		if err := s.validateCoinAvailability(coinType, coinInfo); err == nil {
-			available = append(available, coin)
+			available = append(available, displayCoin)
 		}
 	}
 	return strings.Join(available, ",")

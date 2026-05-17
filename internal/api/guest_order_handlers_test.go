@@ -269,6 +269,26 @@ func TestPOSTGuestOrder_MissingPaymentCoin(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// H-03b: POST /v1/guest/orders — ambiguous paymentCoin (non-canonical ticker) → 400
+// ---------------------------------------------------------------------------
+
+func TestPOSTGuestOrder_AmbiguousPaymentCoin(t *testing.T) {
+	svc := &mockGuestOrderService{}
+	ts := guestTestServer(t, svc)
+
+	body, _ := json.Marshal(contracts.CreateGuestOrderRequest{
+		Items: []contracts.GuestOrderItemRequest{
+			{ListingSlug: "test-item", Quantity: 1},
+		},
+		PaymentCoin: "USDC",
+	})
+
+	resp, respBody := guestDoReq(t, ts, "POST", "/v1/guest/orders", body)
+	guestAssertStatus(t, resp, http.StatusBadRequest)
+	guestAssertErrorCode(t, respBody, "BAD_REQUEST")
+}
+
+// ---------------------------------------------------------------------------
 // H-04: GET /v1/guest/orders/{token} — found → 200
 // ---------------------------------------------------------------------------
 

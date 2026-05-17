@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // getGuestOrderService extracts the GuestOrderService from the request's NodeService.
@@ -46,6 +47,13 @@ func (g *Gateway) handlePOSTGuestOrder(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "paymentCoin is required")
 		return
 	}
+
+	normalized, err := iwallet.NormalizePaymentCoinIngress(req.PaymentCoin)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
+		return
+	}
+	req.PaymentCoin = string(normalized)
 
 	resp, err := svc.CreateGuestOrder(r.Context(), req)
 	if err != nil {

@@ -1460,15 +1460,43 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
 }
 
-// initPaymentSessionSubsystem wires the unified PaymentSessionService (Phase PS / B1).
-// Phase B Step 1: projection-only — reads existing order, payment, and fiat metadata.
-// CryptoPaymentFacade and FiatPaymentFacade will be injected in Phase B Step 2/3.
+// initPaymentSessionSubsystem wires the unified PaymentSessionService (Phase PS / B1–B3).
+//
+// Phase B Step 1: projection-only.
+// Phase B Step 3 (B3): FiatPaymentFacade injected when fiatPaymentService is available.
+// CryptoPaymentFacade is wired whenever DB + Order + Wallet + exchange rate services exist.
 func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 	if obNode.db == nil {
 		logger.LogWarningWithID(log, obNode.nodeID, "PaymentSession: db not available — subsystem skipped")
 		return
 	}
-	obNode.paymentSessionService = corePmt.NewPaymentSessionService(obNode.db)
+
+	svc := corePmt.NewPaymentSessionService(obNode.db)
+
+	// Phase B3: inject FiatPaymentFacade when fiat payments are available.
+	if obNode.fiatPaymentService != nil {
+		fiatFacade := corePmt.NewFiatPaymentFacade(obNode.fiatPaymentService, obNode.db)
+		svc.SetFiatFacade(fiatFacade)
+		logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession: FiatPaymentFacade wired (B3)")
+	}
+
+	// CryptoPaymentFacade requires DB + OrderService + WalletService.
+	// ExchangeRate is passed via the adapter (obNode.ExchangeRate()) which wraps
+	// *wallet.ExchangeRateProvider and already guards the nil-provider case:
+	// GetRate/GetAllRates return an error (not a panic) when the underlying
+	// provider is nil.  Cross-currency orders will fail with an informative error
+	// if no rate service is configured, rather than panicking.
+	if obNode.db != nil && obNode.Order() != nil && obNode.Wallet() != nil {
+		svc.SetCryptoFacade(corePmt.NewCryptoPaymentFacade(
+			obNode.db,
+			obNode.Order(),
+			obNode.Wallet(),
+			obNode.ExchangeRate(),
+		))
+		logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession: CryptoPaymentFacade wired")
+	}
+
+	obNode.paymentSessionService = svc
 	logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession subsystem initialized")
 }
 

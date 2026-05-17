@@ -60,6 +60,7 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 
 	// Phase PS / B1: unified payment session read endpoint.
 	g.registerOrderPaymentSessionGet(api)
+	g.registerOrderPaymentSessionPost(api)
 
 	g.registerGuestOrdersListAuth(api)
 	g.registerGuestOrderShip(api)
@@ -874,13 +875,9 @@ func (g *Gateway) registerOrderPaymentSessionGet(api huma.API) {
 		Path:        "/v1/orders/{orderID}/payment-session",
 		Summary:     "Unified payment session view for an order",
 		Description: "Returns a PaymentSession projection built from existing order, payment, and " +
-			"fiat metadata. Phase B Step 1 (read-only projection) coverage: " +
-			"UTXO + ExternalPayment → settlementMode=address_monitored; " +
-			"legacy EVM / Solana / TRON → settlementMode=escrow_v1 (buyer must sign escrow contract instructions via local wallet); " +
-			"Stripe / PayPal → settlementMode=provider_checkout. " +
-			"ManagedEscrow v2 (address_monitored for EVM) is pending Phase B Step 2 (TECHDEBT TD-PSS-02) — " +
-			"until then, ManagedEscrow-backed EVM orders are indistinguishable from legacy EVM " +
-			"and will appear as escrow_v1.",
+			"fiat metadata. Settlement modes include address_monitored (UTXO, ExternalPayment, ManagedEscrow-backed EVM " +
+			"when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), " +
+			"and provider_checkout (Stripe/PayPal).",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
@@ -888,6 +885,39 @@ func (g *Gateway) registerOrderPaymentSessionGet(api huma.API) {
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"orderID": hi.OrderID})
 		rr := httptest.NewRecorder()
 		g.handleGETOrderPaymentSession(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerOrderPaymentSessionPost registers POST /v1/orders/{orderID}/payment-session.
+//
+// Phase PS / B5: provisions checkout via PaymentSessionService (canonical paymentCoin):
+// fiat (fiatAmountCents, etc.) and crypto (refundAddress, optional payerAddress/moderator).
+func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
+	type in struct {
+		OrderID string          `path:"orderID" doc:"Order ID."`
+		Body    json.RawMessage `json:",omitempty"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "orders-post-payment-session",
+		Method:      http.MethodPost,
+		Path:        "/v1/orders/{orderID}/payment-session",
+		Summary:     "Provision unified payment session",
+		Description: "Creates or idempotently returns a PaymentSession. Fiat: canonical " +
+			"paymentCoin fiat:{provider}:{currency}, fiatAmountCents (>0), and optional PayPal return/cancel URLs. " +
+			"Crypto: refundAddress plus optional payerAddress/moderator; delegates to escrow instruction generation.",
+		Tags:     []string{"orders", "payments"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/payment-session"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(hi.Body), map[string]string{"orderID": hi.OrderID})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePOSTOrderPaymentSession(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

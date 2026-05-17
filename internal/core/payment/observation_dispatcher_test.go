@@ -101,9 +101,9 @@ func dedupeKey(obs *models.PaymentObservation) string {
 // invokes the verifier after each successful insert, and that aggregator
 // errors propagate / are joined as documented.
 type fakeAggregator struct {
-	mu       sync.Mutex
-	calls    []contracts.OrderRef
-	errOnce  error
+	mu        sync.Mutex
+	calls     []contracts.OrderRef
+	errOnce   error
 	errAlways error
 }
 

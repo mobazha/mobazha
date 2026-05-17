@@ -243,13 +243,13 @@ func (e FundingEvent) validate() error {
 // OnFundingEvent records evt as a new payment_observations row and kicks
 // off a verifier re-aggregation for the affected order. The flow:
 //
-//	1. validate evt structurally;
-//	2. resolve tenantID via TenantResolver — unknown orders are silently
-//	   ignored (event was not for a Mobazha-managed ManagedEscrow);
-//	3. INSERT a row with Source = "monitor" and a per-worker Observer;
-//	4. duplicate inserts (UNIQUE on the dedupe tuple) collapse to a
-//	   silent no-op so chain RPC replay / worker restart is safe;
-//	5. invoke aggregator.AggregateAndEmit(tenantID, orderID).
+//  1. validate evt structurally;
+//  2. resolve tenantID via TenantResolver — unknown orders are silently
+//     ignored (event was not for a Mobazha-managed ManagedEscrow);
+//  3. INSERT a row with Source = "monitor" and a per-worker Observer;
+//  4. duplicate inserts (UNIQUE on the dedupe tuple) collapse to a
+//     silent no-op so chain RPC replay / worker restart is safe;
+//  5. invoke aggregator.AggregateAndEmit(tenantID, orderID).
 //
 // Aggregator errors propagate to the caller. Hosting MUST surface them
 // to its retry / DLQ pipeline; the observation is already persisted so

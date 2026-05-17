@@ -47,6 +47,7 @@ type projectOrderInput struct {
 	order       *models.Order
 	orderOpen   *pb.OrderOpen   // may be nil for orders not yet opened
 	paymentSent *pb.PaymentSent // may be nil for orders not yet paid
+	isManagedEscrowOrder bool            // true when order.PendingPaymentInfo has type="managed_escrow"
 	obsCount    int
 	lastObsAt   *time.Time
 }
@@ -64,7 +65,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	// Primary source: PaymentSent (already paid).
 	// Fallback: FiatMetadata (fiat order not yet paid) or PendingPaymentInfo
 	// (UTXO order with address set but PaymentSent not yet received).
-	paymentCoin, productMode, paymentSentKind := p.derivePaymentInfo(order, input.paymentSent)
+	paymentCoin, productMode, paymentSentKind := p.derivePaymentInfo(order, input.orderOpen, input.paymentSent)
 
 	// ── Expected amount (from OrderOpen) ─────────────────────────────────
 	expectedAmount := ""
@@ -73,7 +74,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	}
 
 	// ── Settlement mode & funding target ─────────────────────────────────
-	settlementMode, fundingTarget := p.deriveFundingTarget(order, paymentCoin, expectedAmount)
+	settlementMode, fundingTarget := p.deriveFundingTarget(order, paymentCoin, expectedAmount, input.isManagedEscrowOrder)
 
 	// ── Payment progress ──────────────────────────────────────────────────
 	progress := p.deriveProgress(order, expectedAmount, input.obsCount, input.lastObsAt)
@@ -132,6 +133,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 // present).
 func (p *PaymentSessionProjector) derivePaymentInfo(
 	order *models.Order,
+	orderOpen *pb.OrderOpen,
 	ps *pb.PaymentSent,
 ) (
 	paymentCoin string,
@@ -157,17 +159,20 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 		provider := fiatMeta["fiat_provider"]
 		if provider != "" {
 			currency := fiatMeta["fiat_currency"]
-			if currency != "" {
-				paymentCoin = "fiat:" + provider + ":" + currency
-			} else {
-				// Currency not yet stored (legacy rows created before fix2b).
-				// "fiat:{provider}" still triggers the provider_checkout path in
-				// deriveFundingTarget; the currency will be set after the next
-				// CreatePayment call writes fiat_currency to metadata.
-				paymentCoin = "fiat:" + provider
+			if currency == "" && orderOpen != nil {
+				currency = orderOpen.PricingCoin
 			}
-			// Fiat orders always use cancelable product mode at this stage.
-			return paymentCoin, payment.ProductModeCancelable, ""
+			if currency != "" {
+				paymentCoin = fmt.Sprintf("fiat:%s:%s",
+					strings.ToLower(strings.TrimSpace(provider)),
+					strings.ToUpper(strings.TrimSpace(currency)))
+				// Fiat orders always use cancelable product mode at this stage.
+				return paymentCoin, payment.ProductModeCancelable, ""
+			}
+			// Legacy rows with provider metadata but no currency context cannot be
+			// projected to a canonical fiat coin safely. Leave paymentCoin empty
+			// rather than leaking the invalid external shape "fiat:{provider}".
+			return "", payment.ProductModeCancelable, ""
 		}
 	}
 
@@ -185,55 +190,25 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 }
 
 // normalizeCoinBestEffort converts a coin code to canonical format where
-// possible. It is a best-effort helper used during projection; callers must
-// not rely on the output being fully canonical for multi-chain tokens.
+// possible. Delegates to iwallet.TryNormalizePaymentCoin (crypto:* via
+// assetid.Normalize, fiat casing, legacy native tickers).
 //
-// Strategy:
-//  1. Already canonical ("crypto:*" or "fiat:*") → return as-is.
-//  2. Matches a known legacy ticker that maps 1:1 to a native chain →
-//     use iwallet.CanonicalNativeCoinType to resolve to the canonical ID.
-//  3. Ambiguous multi-chain token (e.g. "USDC" without chain context) →
-//     pass through as-is. Chain context is not recorded in legacy order
-//     rows; full canonicalization requires Phase B4 ingress policy.
+// Ambiguous legacy symbols (e.g. "USDC" without chain) are returned trimmed
+// unchanged — historical order rows lack chain context.
 //
 // This function must not fail — it is called from a pure projection path.
+//
+// Phase PS B4: projection output is canonical whenever TryNormalizePaymentCoin
+// succeeds.
 func normalizeCoinBestEffort(coin string) string {
 	if coin == "" {
 		return ""
 	}
-	lower := strings.ToLower(strings.TrimSpace(coin))
-
-	// Already canonical crypto or fiat.
-	if strings.HasPrefix(lower, "crypto:") || strings.HasPrefix(lower, "fiat:") {
-		return coin
+	s := strings.TrimSpace(coin)
+	if ct, ok := iwallet.TryNormalizePaymentCoin(s); ok {
+		return string(ct)
 	}
-
-	// Well-known single-chain tickers: attempt canonical lookup via ChainType.
-	singleChainTicker := map[string]iwallet.ChainType{
-		"btc": iwallet.ChainBitcoin,
-		"bch": iwallet.ChainBitcoinCash,
-		"ltc": iwallet.ChainLitecoin,
-		"zec": iwallet.ChainZCash,
-		"external_payment": iwallet.ChainExternalPayment,
-		"eth": iwallet.ChainEthereum,
-		"bnb": iwallet.ChainBSC,
-		"sol": iwallet.ChainSolana,
-		"trx": iwallet.ChainTRON,
-		"matic": iwallet.ChainPolygon,
-		"base": iwallet.ChainBase,
-		"arb":  iwallet.ChainArbitrum,
-		"op":   iwallet.ChainOptimism,
-		"avax": iwallet.ChainAvalanche,
-	}
-	if chain, ok := singleChainTicker[lower]; ok {
-		if canonical, ok := iwallet.CanonicalNativeCoinType(chain); ok {
-			return string(canonical)
-		}
-	}
-
-	// Best-effort pass-through for ambiguous multi-chain tokens (USDC, USDT…).
-	// These cannot be canonicalized without knowing the originating chain.
-	return coin
+	return s
 }
 
 // settlementRail is the internal discriminator used by detectSettlementRail.
@@ -247,9 +222,9 @@ const (
 	// sign escrow instructions. Covers legacy EVM (V1 ContractManager) and
 	// Solana/TRON.
 	//
-	// TECHDEBT(TD-PSS-02): ManagedEscrow-backed EVM orders will become railAddressMonitored
-	// once an authoritative ManagedEscrow indicator is stored in Order/OrderOpen.
-	// Cleanup condition: EVM ManagedEscrow migration complete + managed_escrow_order flag in Order.
+	// Note: ManagedEscrow EVM orders are classified as railAddressMonitored upstream,
+	// before detectSettlementRail is called, via the isManagedEscrowOrder flag set in
+	// fetchProjectInput (Phase PS B2 resolved TD-PSS-02).
 	railClientSigned
 	// railUnknown: coin code not recognised; conservative fallback.
 	railUnknown
@@ -269,8 +244,8 @@ const (
 //     intrinsic chain context, conservatively classify as client-signed since all
 //     current EVM/Solana deployments use the legacy instructions path.
 //
-// Phase B4 Canonical Policy enforcement will reject non-canonical inputs at the
-// ingress layer, making the fallback branch unreachable for new orders.
+// Phase PS B4: canonical policy at API ingress reduces new orders hitting this
+// fallback; legacy rows may still carry ambiguous tickers until fully migrated.
 func detectSettlementRail(coinCode string) settlementRail {
 	if coinCode == "" {
 		return railUnknown
@@ -285,9 +260,9 @@ func detectSettlementRail(coinCode string) settlementRail {
 		if info.Chain.IsUTXOChain() || info.Chain == iwallet.ChainExternalPayment {
 			return railAddressMonitored
 		}
-		// EVM / Solana / TRON / unknown → client-signed (V1 legacy).
-		// TECHDEBT(TD-PSS-02): ManagedEscrow orders will become railAddressMonitored
-		// once an authoritative managed_escrow_order flag is stored in the Order model.
+		// EVM / Solana / TRON / unknown → client-signed (V1 legacy escrow).
+		// ManagedEscrow EVM orders are classified upstream via isManagedEscrowOrder flag before
+		// detectSettlementRail is reached (TD-PSS-02 resolved by Phase PS B2).
 		return railClientSigned
 	}
 
@@ -320,6 +295,7 @@ func detectSettlementRail(coinCode string) settlementRail {
 //
 //   - Fiat orders (paymentCoin starts with "fiat:"): provider_checkout.
 //   - UTXO / EXTERNAL_PAYMENT orders with a PaymentAddress: address_monitored.
+//   - ManagedEscrow EVM orders (isManagedEscrowOrder == true): address_monitored (predicted ManagedEscrow addr).
 //   - Legacy EVM / Solana / TRON orders with a PaymentAddress: escrow_v1
 //     (buyer must sign escrow contract instructions). The address is still
 //     reported in FundingTarget so the UI can display the escrow contract.
@@ -329,6 +305,7 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 	order *models.Order,
 	paymentCoin string,
 	expectedAmount string,
+	isManagedEscrowOrder bool,
 ) (payment.SettlementMode, payment.FundingTargetView) {
 	// Fiat path
 	if strings.HasPrefix(paymentCoin, "fiat:") {
@@ -343,6 +320,15 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 			AssetID: paymentCoin, // projector leaves canonical normalisation to the service layer
 			Amount:  expectedAmount,
 		}
+
+		// Phase PS B2: ManagedEscrow EVM orders are address-monitored — the predicted
+		// ManagedEscrow address is stored in PendingPaymentInfo with type="managed_escrow".
+		// isManagedEscrowOrder short-circuits before detectSettlementRail, which would
+		// otherwise classify EVM coins as railClientSigned (TD-PSS-02 cleanup).
+		if isManagedEscrowOrder {
+			return payment.SettlementModeAddressMonitored, target
+		}
+
 		rail := detectSettlementRail(paymentCoin)
 		switch rail {
 		case railAddressMonitored:
@@ -353,9 +339,8 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 			// escrow initialisation call. escrow_v1 signals this to the frontend.
 			return payment.SettlementModeEscrowV1, target
 		default:
-			// Unknown coin with an address: default to address_monitored for
-			// backward compat, but add a TECHDEBT note.
-			// TECHDEBT(TD-PSS-02): tighten once all coin types are classified.
+			// Unknown coin with an address: conservative fallback to address_monitored.
+			// Phase B4 canonical policy enforcement will make this branch unreachable.
 			return payment.SettlementModeAddressMonitored, target
 		}
 	}
@@ -373,6 +358,9 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 		Type:    payment.FundingTargetTypeAddress,
 		AssetID: paymentCoin,
 		Amount:  expectedAmount,
+	}
+	if isManagedEscrowOrder {
+		return payment.SettlementModeAddressMonitored, target
 	}
 	rail := detectSettlementRail(paymentCoin)
 	if rail == railAddressMonitored {
@@ -424,6 +412,11 @@ func (p *PaymentSessionProjector) deriveFiatFundingTarget(
 	if sessionID != "" {
 		providerData["sessionID"] = sessionID
 	}
+	if meta, err := order.GetFiatMetadata(); err == nil {
+		if shouldExposeFiatRecoveryMetadata(order.PaymentTransactionID, meta) {
+			mergeFiatRecoveryMetadata(providerData, meta)
+		}
+	}
 
 	if len(providerData) > 0 {
 		target.ProviderData = providerData
@@ -445,7 +438,23 @@ func (p *PaymentSessionProjector) deriveProgress(
 	}
 	remaining := remainingAmount(observed, expectedAmount)
 
-	fundingState := deriveFundingState(observed, expectedAmount, order.PaymentVerificationStatus)
+	// isFiatSessionActive is true only when a fiat provider session has been
+	// successfully created (fiat_session_id non-empty in FiatMetadata).
+	//
+	// We intentionally require fiat_session_id, NOT merely len(FiatMetadata) > 0,
+	// because FiatMetadata may contain only administrative keys (e.g. fiat_provider
+	// written before a successful CreatePayment call) without a real provider session.
+	// Using len > 0 would prematurely map such orders to ProviderProcessing when they
+	// are still in AwaitingFunds state.
+	//
+	// FiatPaymentAppService.CreatePayment writes fiat_provider, fiat_session_id,
+	// and fiat_currency atomically only when session.SessionID != ""; therefore
+	// fiat_session_id non-empty is the authoritative signal that checkout has begun.
+	var isFiatSessionActive bool
+	if meta, merr := order.GetFiatMetadata(); merr == nil {
+		isFiatSessionActive = meta["fiat_session_id"] != ""
+	}
+	fundingState := deriveFundingState(observed, expectedAmount, order.PaymentVerificationStatus, isFiatSessionActive)
 
 	return payment.PaymentProgressView{
 		ObservedAmount:   observed,
@@ -533,16 +542,38 @@ func deriveSessionStatus(
 
 // deriveFundingState maps observed vs required amounts and verification
 // status to a FundingState.
+//
+// isFiatSession must be true when a fiat provider session (Stripe / PayPal)
+// has been successfully created for the order (i.e. fiat_session_id is present
+// in FiatMetadata). Callers must NOT pass true merely because FiatMetadata is
+// non-empty; only a confirmed session justifies the ProviderProcessing state.
+//
+// Fiat state machine (isFiatSession == true):
+//
+//	status == ""       → ProviderProcessing (session open, buyer not yet approved)
+//	status == pending  → ProviderProcessing (authorized, not yet captured)
+//	status == verified → FullyFunded        (captured + webhook confirmed)
+//	status == failed   → ExpiredUnfunded    (provider-side failure)
+//
+// When isFiatSession == false the crypto path (on-chain amounts) is used.
 func deriveFundingState(
 	observed, expected string,
 	verificationStatus models.PaymentVerificationStatus,
+	isFiatSession bool,
 ) payment.FundingState {
-	// Provider-processing applies to fiat orders that are being authorised.
-	if verificationStatus == models.PaymentVerificationStatusPending && observed == "0" {
-		// Could be fiat authorization_pending — caller (fiat facade) should
-		// override this if it knows the provider state.
+	if isFiatSession {
+		switch verificationStatus {
+		case models.PaymentVerificationStatusVerified:
+			return payment.FundingStateFullyFunded
+		case models.PaymentVerificationStatusFailed:
+			return payment.FundingStateExpiredUnfunded
+		default:
+			// "" and "pending" both mean the session is open but funds not yet captured.
+			return payment.FundingStateProviderProcessing
+		}
 	}
 
+	// Crypto path: derive from on-chain observed amounts.
 	obs := parseBigInt(observed)
 	exp := parseBigInt(expected)
 	if exp == nil || exp.Sign() == 0 {
@@ -614,6 +645,12 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 	// PaymentSent (for payment coin, method)
 	if ps, err := order.PaymentSentMessage(); err == nil {
 		input.paymentSent = ps
+	}
+
+	// ManagedEscrow EVM indicator (Phase PS B2): set when ManagedEscrowAdapter.SetupPayment
+	// persisted PendingManagedEscrowPaymentInfo to Order.PendingPaymentInfo.
+	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
+		input.isManagedEscrowOrder = true
 	}
 
 	// Observation count + last observed timestamp

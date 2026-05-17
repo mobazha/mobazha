@@ -89,6 +89,9 @@ func (g *Gateway) handleGETFiatProviders(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) {
+	// Phase PS / B5: programmatic fiat provisioning with canonical paymentCoin is available via
+	// POST /v1/orders/{orderID}/payment-session (PaymentSessionService). This route remains the
+	// provider-scoped REST surface for Stripe/PayPal SDK compatibility (returns FiatProviderSession).
 	svc, ok := getFiatService(r)
 	if !ok {
 		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Fiat payments not available")

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -13,20 +14,11 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// ErrProvisioningNotImplemented is returned by CreateSession when the caller
-// requests provisioning (i.e. paymentCoin is specified and the order has no
-// existing payment setup) but the required facade (CryptoPaymentFacade or
-// FiatPaymentFacade) has not yet been wired in the current Phase B step.
-//
-// Callers should fall back to the existing payment initialisation path
-// (e.g. GET /v1/wallet/spend or POST /v1/fiat/payments) until Phase B
-// Step 2 and Step 3 are implemented.
-//
-// TECHDEBT(TD-PSS-01): remove once CryptoPaymentFacade and FiatPaymentFacade
-// are implemented (Phase B Step 2 + Step 3).
+// ErrProvisioningNotImplemented is returned when CreateSession needs live
+// provisioning but CryptoPaymentFacade is not wired (e.g. partial builds).
 var ErrProvisioningNotImplemented = errors.New(
-	"payment session: CreateSession: provisioning not yet implemented; " +
-		"use the existing payment initialisation path (TECHDEBT TD-PSS-01)",
+	"payment session: CreateSession: provisioning not wired for this deployment; " +
+		"use the existing payment initialisation path or enable PaymentSession facades",
 )
 
 // PaymentSessionServiceImpl implements contracts.PaymentSessionService.
@@ -47,16 +39,31 @@ var ErrProvisioningNotImplemented = errors.New(
 // Reference: PAYMENT_SESSION_SERVICE_SPEC.md §5 + §12
 type PaymentSessionServiceImpl struct {
 	projector *PaymentSessionProjector
-	// crypto    *CryptoPaymentFacade — injected in Phase B Step 2 (ManagedEscrow first)
-	// fiat      *FiatPaymentFacade   — injected in Phase B Step 3
+	fiat      *FiatPaymentFacade // injected via SetFiatFacade (Phase B3)
+	crypto    *CryptoPaymentFacade
 }
 
 // NewPaymentSessionService constructs the service.
-// Additional facade dependencies will be added in subsequent Phase B steps.
+// Inject fiat / crypto facades via Setters after construction.
 func NewPaymentSessionService(db database.Database) *PaymentSessionServiceImpl {
 	return &PaymentSessionServiceImpl{
 		projector: NewPaymentSessionProjector(db),
 	}
+}
+
+// SetFiatFacade injects the FiatPaymentFacade so CreateSession can provision
+// fiat payment sessions. Must be called during node initialisation before any
+// fiat CreateSession requests are handled.
+func (s *PaymentSessionServiceImpl) SetFiatFacade(f *FiatPaymentFacade) {
+	s.fiat = f
+}
+
+// SetCryptoFacade injects the CryptoPaymentFacade so CreateSession can provision
+// crypto payment addresses / instructions paths.
+//
+// Phase PS crypto closure.
+func (s *PaymentSessionServiceImpl) SetCryptoFacade(c *CryptoPaymentFacade) {
+	s.crypto = c
 }
 
 // Ensure PaymentSessionServiceImpl satisfies the contracts interface at
@@ -94,27 +101,21 @@ func (s *PaymentSessionServiceImpl) RefreshSession(
 
 // CreateSession provisions a payment session for an order.
 //
-// # Current Phase B Step 1 behaviour
+// # Idempotency rules
 //
-// When the order already has a payment set up (crypto funding address exists
-// or a fiat provider session was previously created), CreateSession behaves
-// as an idempotent re-read and returns the current projection — this is safe
-// for duplicate call / retry scenarios.
+// When the order already has a funded address (crypto) OR a fiat session with a
+// non-empty sessionID, and req.PaymentCoin matches the existing coin (or is
+// empty), CreateSession returns the current projection without re-provisioning.
 //
-// When provisioning is genuinely needed (no address, no fiat session) AND the
-// caller supplies a paymentCoin, this method returns ErrProvisioningNotImplemented
-// rather than silently returning an empty / half-baked view. The caller must
-// use the existing payment initialisation path until Phase B Step 2/3.
+// If req.PaymentCoin differs from the existing session coin, the method returns
+// ErrPaymentCoinMismatch — the caller must resolve the coin-switch explicitly
+// rather than silently receiving the wrong session.
 //
-// # Phase B Step 2 (ManagedEscrow / UTXO) + Step 3 (fiat) — not yet wired
+// # Routing
 //
-// Once CryptoPaymentFacade and FiatPaymentFacade are injected, CreateSession
-// will delegate to them based on req.PaymentCoin prefix:
-//   - "fiat:*"   → FiatPaymentFacade.CreateSession
-//   - "crypto:*" → CryptoPaymentFacade.Provision (ManagedEscrow address derivation / UTXO)
-//
-// TECHDEBT(TD-PSS-01): full provisioning deferred to Phase B Step 2 + Step 3.
-// Cleanup condition: CryptoPaymentFacade and FiatPaymentFacade implemented.
+// When provisioning is needed, CreateSession routes by coin prefix:
+//   - "fiat:*"   → FiatPaymentFacade (ErrFiatFacadeNotWired if not configured)
+//   - "crypto:*" → CryptoPaymentFacade (ErrProvisioningNotImplemented if not configured)
 func (s *PaymentSessionServiceImpl) CreateSession(
 	ctx context.Context,
 	req contracts.CreatePaymentSessionRequest,
@@ -123,10 +124,7 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		return nil, fmt.Errorf("payment session: CreateSession: orderID is required")
 	}
 
-	// Validate canonical paymentCoin per interface contract
-	// (pkg/contracts/payment_session_service.go §CreatePaymentSessionRequest).
-	// Non-canonical values are a programmer error — the API ingress layer must
-	// normalise before calling CreateSession.
+	// Validate canonical paymentCoin — programmer error if non-canonical reaches here.
 	if req.PaymentCoin != "" {
 		if err := iwallet.CoinType(req.PaymentCoin).ValidateCanonicalPaymentCoin(); err != nil {
 			return nil, fmt.Errorf("payment session: CreateSession: %w", err)
@@ -138,29 +136,63 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
 	}
 
-	// Idempotent re-read: the order already has a payment set up.
-	// FundingTarget.Address non-empty → crypto address provisioned.
-	// FundingTarget.ProviderData non-nil → fiat session exists.
+	// Determine whether a session has already been provisioned:
+	//   - Crypto: PaymentAddress is set (ManagedEscrow/UTXO address persisted after GeneratePaymentInstructions).
+	//   - Fiat:   sessionID key exists in ProviderData (written after CreatePayment returns).
+	//
+	// NOTE: ProviderData may contain only "providerID" (from coin metadata alone)
+	// without a "sessionID". We intentionally require sessionID to be present
+	// before treating the fiat session as already provisioned; otherwise a
+	// partially-populated view would block all subsequent CreatePayment calls.
 	alreadyProvisioned := view.FundingTarget.Address != "" ||
-		len(view.FundingTarget.ProviderData) > 0
+		fiatSessionIDFromView(view) != ""
+
+	if alreadyProvisioned && req.PaymentCoin != "" {
+		// Guard: if the caller requests a different coin, reject instead of
+		// silently returning a session for the wrong rail.
+		if view.PaymentCoin != "" && view.PaymentCoin != req.PaymentCoin {
+			return nil, fmt.Errorf("%w: existing=%q requested=%q",
+				ErrPaymentCoinMismatch, view.PaymentCoin, req.PaymentCoin)
+		}
+	}
 
 	if alreadyProvisioned {
 		return view, nil
 	}
 
-	// Provisioning is needed but the facades are not yet wired.
-	// Returning a half-baked view here would create a false-positive: the
-	// caller would believe a session was created when nothing was actually
-	// provisioned.  Return an explicit error so the caller falls back to
-	// the existing payment initialisation path.
-	//
-	// Exception: if the caller passes no paymentCoin it is requesting a
-	// read-only projection (e.g. to check current state), which is safe
-	// to return even when the order is not yet provisioned.
+	// Provisioning needed — route to the appropriate facade by coin prefix.
 	if req.PaymentCoin != "" {
-		return nil, ErrProvisioningNotImplemented
+		// Fiat orders: "fiat:{provider}:{currency}"
+		if strings.HasPrefix(req.PaymentCoin, "fiat:") {
+			if s.fiat == nil {
+				return nil, fmt.Errorf("%w: use POST /v1/fiat/{providerID}/payments", ErrFiatFacadeNotWired)
+			}
+			return s.fiat.CreateSession(ctx, req)
+		}
+
+		// Crypto orders (ManagedEscrow + UTXO): "crypto:{chain}:{token}"
+		if strings.HasPrefix(req.PaymentCoin, "crypto:") {
+			if s.crypto == nil {
+				return nil, ErrProvisioningNotImplemented
+			}
+			return s.crypto.CreateSession(ctx, req)
+		}
+
+		return nil, fmt.Errorf(
+			"payment session: CreateSession: unsupported payment coin prefix %q",
+			req.PaymentCoin)
 	}
 
 	// Read-only query with no paymentCoin — return best-effort projection.
 	return view, nil
+}
+
+// fiatSessionIDFromView extracts the "sessionID" key from FundingTarget.ProviderData.
+// Returns "" if absent, so callers can treat absence as "not yet provisioned".
+func fiatSessionIDFromView(view *payment.PaymentSession) string {
+	if view == nil {
+		return ""
+	}
+	sid, _ := view.FundingTarget.ProviderData["sessionID"].(string)
+	return sid
 }

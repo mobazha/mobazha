@@ -168,6 +168,12 @@ type PaymentSetupResult struct {
 	// PaymentModel indicates which payment paradigm this result follows.
 	PaymentModel PaymentModel
 
+	// IsManagedEscrowOrder is true when the strategy is a ManagedEscrow EVM adapter
+	// (Model == PaymentModelMonitored but the chain is EVM, not UTXO).
+	// Handlers use this to distinguish ManagedEscrow monitored from UTXO monitored
+	// response shapes — ManagedEscrow has no Script / ScriptHash fields.
+	IsManagedEscrowOrder bool
+
 	// PaymentData carries chain-specific payment data.
 	PaymentData *models.PaymentData
 

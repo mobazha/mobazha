@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -199,12 +200,54 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 		return nil, err
 	}
 
-	return &payment.PaymentSetupResult{
+	setupResult := &payment.PaymentSetupResult{
 		PaymentModel: strategy.Model(),
 		PaymentData:  result.PaymentData,
 		EscrowAddr:   result.EscrowAddr,
 		Instructions: result.Instructions,
-	}, nil
+	}
+
+	// Phase PS B2: ManagedEscrow EVM orders use address-monitored funding.
+	// Persist the predicted ManagedEscrow address into Order.PaymentAddress and
+	// PendingManagedEscrowPaymentInfo so the PaymentSessionProjector can classify
+	// this order as SettlementModeAddressMonitored immediately (without
+	// waiting for a PaymentSent message to arrive).
+	coinInfo, coinErr := iwallet.CoinInfoFromCoinType(params.CoinType)
+	if coinErr == nil &&
+		strategy.Model() == payment.PaymentModelMonitored &&
+		coinInfo.IsEthTypeChain() &&
+		result.PaymentData != nil &&
+		result.PaymentData.ToAddress != "" {
+
+		setupResult.IsManagedEscrowOrder = true
+		if persistErr := s.persistManagedEscrowPaymentAddress(params.OrderID, string(params.CoinType), result.PaymentData.ToAddress); persistErr != nil {
+			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist ManagedEscrow address for order %s: %v", params.OrderID, persistErr)
+			// Non-fatal: monitoring is already registered; the projector will
+			// fall back to escrow_v1 until the next call succeeds.
+		}
+	}
+
+	return setupResult, nil
+}
+
+// persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
+// and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
+// as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
+			return fmt.Errorf("load order: %w", err)
+		}
+		order.PaymentAddress = managed_escrowAddress
+		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+			Coin:    coin,
+			Address: managed_escrowAddress,
+		}); err != nil {
+			return fmt.Errorf("set pending managed escrow payment info: %w", err)
+		}
+		return tx.Save(&order)
+	})
 }
 
 // BuildInitEscrowInstructions builds escrow initialization instructions for

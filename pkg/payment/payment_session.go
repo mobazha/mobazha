@@ -76,13 +76,13 @@ const (
 type FundingState string
 
 const (
-	FundingStateAwaitingFunds       FundingState = "awaiting_funds"
-	FundingStatePartiallyFunded     FundingState = "partially_funded"
-	FundingStateFullyFunded         FundingState = "fully_funded"
-	FundingStateOverfunded          FundingState = "overfunded"
+	FundingStateAwaitingFunds        FundingState = "awaiting_funds"
+	FundingStatePartiallyFunded      FundingState = "partially_funded"
+	FundingStateFullyFunded          FundingState = "fully_funded"
+	FundingStateOverfunded           FundingState = "overfunded"
 	FundingStateAuthorizationPending FundingState = "authorization_pending"
-	FundingStateProviderProcessing  FundingState = "provider_processing"
-	FundingStateExpiredUnfunded     FundingState = "expired_unfunded"
+	FundingStateProviderProcessing   FundingState = "provider_processing"
+	FundingStateExpiredUnfunded      FundingState = "expired_unfunded"
 )
 
 // FundingTargetType classifies the kind of funding target the buyer must
@@ -104,10 +104,10 @@ const (
 type UserActionType string
 
 const (
-	UserActionWalletTransfer        UserActionType = "wallet_transfer"
-	UserActionTokenApprove          UserActionType = "token_approve"
-	UserActionSignManagedEscrowTx            UserActionType = "sign_managed_escrow_tx"
-	UserActionSignSquadsApproval    UserActionType = "sign_squads_approval"
+	UserActionWalletTransfer         UserActionType = "wallet_transfer"
+	UserActionTokenApprove           UserActionType = "token_approve"
+	UserActionSignManagedEscrowTx             UserActionType = "sign_managed_escrow_tx"
+	UserActionSignSquadsApproval     UserActionType = "sign_squads_approval"
 	UserActionBroadcastSignedPayload UserActionType = "broadcast_signed_payload"
 )
 
@@ -148,23 +148,13 @@ type FundingTargetView struct {
 	// NetworkFeeHints provides advisory fee information.
 	NetworkFeeHints *NetworkFeeHints `json:"networkFeeHints,omitempty"`
 	// ProviderData carries provider-specific metadata when Type=provider_session.
-	// The full set of keys specified in architecture doc §6.2 will be populated
-	// progressively across Phase B steps:
 	//
-	//   Phase B Step 1 (current): providerID, sessionID only.
-	//     providerID — extracted from "fiat:{provider}:{currency}" coin.
-	//     sessionID  — PaymentTransactionID (post-capture) or fiat_session_id
-	//                  (pre-capture, written by CreatePayment).
+	// Populated progressively; typical fiat provisioning keys include:
+	//   providerID, sessionID, captureMode, providerStatus, expiresAt, approveURL;
+	//   Stripe: checkoutMode (embedded), clientSecret, publishableKey, connectedAccountId;
+	//   PayPal: checkoutMode (redirect), orderID (PayPal Order), clientID.
 	//
-	//   Phase B Step 3 (FiatPaymentFacade wiring): adds checkout-recovery fields:
-	//     checkoutMode    — "embedded" | "redirect" | "manual"
-	//     publishableKey  — Stripe publishable key (Stripe only)
-	//     clientSecret    — Stripe PaymentIntent / SetupIntent secret (Stripe only)
-	//     orderID         — PayPal order ID (PayPal only)
-	//     clientID        — PayPal client ID (PayPal only)
-	//
-	// Consumers MUST NOT assume these fields are present in Phase B Step 1 responses.
-	// Check for key existence before using any value from ProviderData.
+	// Consumers MUST NOT assume any key is present; check before use.
 	ProviderData map[string]interface{} `json:"providerData,omitempty"`
 }
 
@@ -214,14 +204,14 @@ type WalletHints struct {
 //
 // Reference: UNIFIED_PAYMENT_SESSION_ARCHITECTURE.md §5.4 + §6.3
 type UserActionRequestView struct {
-	Type        UserActionType         `json:"type"`
-	Title       string                 `json:"title"`
-	Description string                 `json:"description,omitempty"`
-	WalletHints *WalletHints           `json:"walletHints,omitempty"`
+	Type        UserActionType `json:"type"`
+	Title       string         `json:"title"`
+	Description string         `json:"description,omitempty"`
+	WalletHints *WalletHints   `json:"walletHints,omitempty"`
 	// Payload carries the minimal data needed to execute the action
 	// (e.g. contract address, method, args for token_approve).
-	Payload     map[string]interface{} `json:"payload"`
-	ExpiresAt   *time.Time             `json:"expiresAt,omitempty"`
+	Payload   map[string]interface{} `json:"payload"`
+	ExpiresAt *time.Time             `json:"expiresAt,omitempty"`
 }
 
 // LegacyCompatibilityView carries backward-compat metadata consumed only
@@ -287,9 +277,9 @@ type PaymentSession struct {
 
 	ExpiresAt time.Time `json:"expiresAt"`
 
-	FundingTarget  FundingTargetView       `json:"fundingTarget"`
-	PaymentProgress PaymentProgressView    `json:"paymentProgress"`
-	Capabilities   SessionCapabilitiesView `json:"capabilities"`
+	FundingTarget   FundingTargetView       `json:"fundingTarget"`
+	PaymentProgress PaymentProgressView     `json:"paymentProgress"`
+	Capabilities    SessionCapabilitiesView `json:"capabilities"`
 
 	// UserActionRequest is non-nil only when the backend requires an
 	// explicit user wallet action to proceed.

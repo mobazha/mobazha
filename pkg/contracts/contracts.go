@@ -112,6 +112,10 @@ type OrderService interface {
 
 	// Request address from a remote peer
 	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
+
+	// SetOrderRefundAddressForPayment validates and persists the buyer-controlled
+	// crypto refund destination for an order once the payout coin is known.
+	SetOrderRefundAddressForPayment(ctx context.Context, orderID string, coin iwallet.CoinType, refundAddr string) error
 }
 
 // ListingService handles product listing management.

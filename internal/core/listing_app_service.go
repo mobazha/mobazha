@@ -164,7 +164,7 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 	isDraft := listing.Status == models.ListingStatusDraft
 	var resolvedProfileID string
 	var resolvedProfileVersion int
-	if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
+	if listing.Metadata != nil && listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
 		entity, resolveErr := s.resolveShippingProfile(listing)
 		if resolveErr != nil {
 			if !isDraft {

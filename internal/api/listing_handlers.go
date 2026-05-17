@@ -323,6 +323,7 @@ func (g *Gateway) handlePOSTListing(w http.ResponseWriter, r *http.Request) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		log.Errorf("handlePOSTListing: SaveListing error: %v", err)
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}

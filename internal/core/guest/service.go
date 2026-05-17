@@ -232,6 +232,8 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 			ListingHash:       reqItem.ListingHash,
 			ListingSlug:       reqItem.ListingSlug,
 			ListingTitle:      resolved.ListingTitle,
+			SellerPeerID:      s.nodeID,
+			Thumbnail:         resolved.Thumbnail,
 			Quantity:          reqItem.Quantity,
 			VariantHash:       resolved.VariantHash,
 			UnitPrice:         resolved.UnitPrice.Uint64(),
@@ -924,6 +926,7 @@ func (s *GuestOrderAppService) expireOrder(orderToken string, currentState model
 type resolvedItem struct {
 	UnitPrice         *big.Int
 	ListingTitle      string
+	Thumbnail         string
 	PriceCurrencyCode string
 	PriceDivisibility uint32
 	ContractType      pb.Listing_Metadata_ContractType
@@ -982,8 +985,10 @@ func (s *GuestOrderAppService) resolveItemPrice(item contracts.GuestOrderItemReq
 				return nil, fmt.Errorf("listing %q SKU has invalid quantity %q: %w",
 					item.ListingSlug, sku.Quantity, qErr)
 			}
-			out.HasStockTracking = true
-			if q > 0 {
+			// q < 0 (e.g. -1) means unlimited / inventory not tracked.
+			// Only enable stock tracking when quantity is 0 or positive.
+			if q >= 0 {
+				out.HasStockTracking = true
 				out.StockQty = q
 			}
 		}
@@ -993,6 +998,12 @@ func (s *GuestOrderAppService) resolveItemPrice(item contracts.GuestOrderItemReq
 	out.ListingTitle = listing.Item.Title
 	if out.ListingTitle == "" {
 		out.ListingTitle = item.ListingSlug
+	}
+	if len(listing.Item.Images) > 0 {
+		out.Thumbnail = listing.Item.Images[0].Tiny
+		if out.Thumbnail == "" {
+			out.Thumbnail = listing.Item.Images[0].Small
+		}
 	}
 	return out, nil
 }
@@ -1284,6 +1295,11 @@ func (s *GuestOrderAppService) validateMaxOrderAmount(cfg *models.GuestCheckoutC
 }
 
 // GetGuestCheckoutConfig returns the current guest checkout configuration.
+// The returned value includes a computed AvailableCoins field that contains
+// only the subset of AcceptedCoins serviceable by the running node right now
+// (e.g. EXTERNAL_PAYMENT is excluded when external_payment-wallet-rpc is not configured). Buyer-
+// facing UIs must use AvailableCoins; the admin settings editor should use
+// AcceptedCoins so the stored configuration is not silently mutated.
 func (s *GuestOrderAppService) GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error) {
 	var cfg models.GuestCheckoutConfig
 	err := s.db.View(func(tx database.Tx) error {
@@ -1295,7 +1311,35 @@ func (s *GuestOrderAppService) GetGuestCheckoutConfig(ctx context.Context) (*mod
 			PaymentTimeout: 60,
 		}, nil
 	}
+	cfg.AvailableCoins = s.filterAvailableCoins(cfg.AcceptedCoins)
 	return &cfg, nil
+}
+
+// filterAvailableCoins returns the comma-separated subset of coinList whose
+// coins are currently serviceable by the running node. Coins that would fail
+// validateCoinAvailability (e.g. EXTERNAL_PAYMENT when external_payment-wallet-rpc is absent) are
+// silently omitted so buyer-facing UIs never offer an unserviceable method.
+func (s *GuestOrderAppService) filterAvailableCoins(coinList string) string {
+	if coinList == "" {
+		return ""
+	}
+	var available []string
+	for _, raw := range strings.Split(coinList, ",") {
+		coin := strings.TrimSpace(raw)
+		if coin == "" {
+			continue
+		}
+		coinType := iwallet.CoinType(coin)
+		coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+		if err != nil {
+			// Unknown / malformed coin code — omit.
+			continue
+		}
+		if err := s.validateCoinAvailability(coinType, coinInfo); err == nil {
+			available = append(available, coin)
+		}
+	}
+	return strings.Join(available, ",")
 }
 
 // SaveGuestCheckoutConfig persists the guest checkout configuration.

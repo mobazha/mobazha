@@ -218,6 +218,8 @@ type GuestOrderItem struct {
 	ListingHash    string `json:"listingHash"`
 	ListingTitle   string `json:"listingTitle"`
 	ListingSlug    string `gorm:"index:idx_guest_item_variant" json:"listingSlug"`
+	SellerPeerID   string `json:"sellerPeerID"`
+	Thumbnail      string `json:"thumbnail,omitempty"`
 	Quantity       int    `json:"quantity"`
 	VariantOptions []byte `json:"-"`
 	// VariantHash is a stable hash of the buyer's variant options

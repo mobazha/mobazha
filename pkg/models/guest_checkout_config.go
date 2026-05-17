@@ -24,6 +24,14 @@ type GuestCheckoutConfig struct {
 	// submitting their address. The private key is NEVER stored here — it
 	// lives only in the Admin's browser and is used for in-browser decryption.
 	PGPPublicKey string `json:"pgpPublicKey,omitempty" gorm:"size:8192"`
+
+	// AvailableCoins is a computed, non-persisted field populated by
+	// GetGuestCheckoutConfig at query time. It reflects the subset of
+	// AcceptedCoins that are currently serviceable by the running node
+	// (e.g. EXTERNAL_PAYMENT is excluded when external_payment-wallet-rpc is not configured).
+	// Buyer-facing UIs should use this field; the admin settings editor
+	// should continue using AcceptedCoins so the stored config is preserved.
+	AvailableCoins string `json:"availableCoins" gorm:"-"`
 }
 
 func (GuestCheckoutConfig) TableName() string {

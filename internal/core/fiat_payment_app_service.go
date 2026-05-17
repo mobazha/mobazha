@@ -105,7 +105,7 @@ func (s *FiatPaymentAppService) EnabledProviders(ctx context.Context) ([]contrac
 	return result, nil
 }
 
-func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID string, params contracts.CreatePaymentParams) (*contracts.PaymentSession, error) {
+func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID string, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
 	provider, err := s.registry.ForProvider(providerID)
 	if err != nil {
 		return nil, err

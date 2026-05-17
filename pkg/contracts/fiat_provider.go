@@ -34,7 +34,7 @@ type FiatPaymentProvider interface {
 	// CreatePayment creates a payment session with the provider.
 	//   Stripe → creates a PaymentIntent, returns clientSecret
 	//   PayPal → creates an Order, returns orderID
-	CreatePayment(ctx context.Context, params CreatePaymentParams) (*PaymentSession, error)
+	CreatePayment(ctx context.Context, params CreatePaymentParams) (*FiatProviderSession, error)
 
 	// CapturePayment captures an authorized payment.
 	//   CaptureAutomatic (Stripe): no-op, returns current status
@@ -128,7 +128,7 @@ type FiatService interface {
 
 	// CreatePayment creates a payment session. Automatically resolves the seller's
 	// account ID from ReceivingAccount.
-	CreatePayment(ctx context.Context, providerID string, params CreatePaymentParams) (*PaymentSession, error)
+	CreatePayment(ctx context.Context, providerID string, params CreatePaymentParams) (*FiatProviderSession, error)
 
 	// CapturePayment captures an authorized payment (required for PayPal, no-op for Stripe).
 	CapturePayment(ctx context.Context, providerID string, sessionID string) (*PaymentResult, error)

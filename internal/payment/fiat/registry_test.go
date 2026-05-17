@@ -13,7 +13,7 @@ import (
 type stubProvider struct{ id string }
 
 func (s *stubProvider) ProviderID() string { return s.id }
-func (s *stubProvider) CreatePayment(_ context.Context, _ contracts.CreatePaymentParams) (*contracts.PaymentSession, error) {
+func (s *stubProvider) CreatePayment(_ context.Context, _ contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
 	return nil, nil
 }
 func (s *stubProvider) CapturePayment(_ context.Context, _ string) (*contracts.PaymentResult, error) {

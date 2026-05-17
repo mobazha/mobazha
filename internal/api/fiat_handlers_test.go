@@ -23,7 +23,7 @@ import (
 type mockFiatService struct {
 	enabledResult   []contracts.ProviderInfo
 	enabledErr      error
-	createResult    *contracts.PaymentSession
+	createResult    *contracts.FiatProviderSession
 	createErr       error
 	captureResult   *contracts.PaymentResult
 	captureErr      error
@@ -49,7 +49,7 @@ func (m *mockFiatService) EnabledProviders(_ context.Context) ([]contracts.Provi
 	return m.enabledResult, m.enabledErr
 }
 
-func (m *mockFiatService) CreatePayment(_ context.Context, _ string, _ contracts.CreatePaymentParams) (*contracts.PaymentSession, error) {
+func (m *mockFiatService) CreatePayment(_ context.Context, _ string, _ contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
 	return m.createResult, m.createErr
 }
 
@@ -173,7 +173,7 @@ func TestHandleGETFiatProviders_NotImplemented(t *testing.T) {
 
 func TestHandlePOSTFiatPayment_Success(t *testing.T) {
 	svc := &mockFiatService{
-		createResult: &contracts.PaymentSession{
+		createResult: &contracts.FiatProviderSession{
 			SessionID:   "sess_test",
 			CaptureMode: contracts.CaptureAutomatic,
 			ExpiresAt:   time.Now().Add(30 * time.Minute),

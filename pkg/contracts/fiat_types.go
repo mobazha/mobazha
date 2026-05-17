@@ -27,8 +27,9 @@ type CreatePaymentParams struct {
 	SellerAccountID string
 }
 
-// PaymentSession is returned by CreatePayment with provider-specific client data.
-type PaymentSession struct {
+// FiatProviderSession is returned by CreatePayment with provider-specific client
+// data for fiat payment providers (Stripe, PayPal, etc.).
+type FiatProviderSession struct {
 	SessionID   string      `json:"sessionID"`
 	CaptureMode CaptureMode `json:"captureMode"`
 	ExpiresAt   time.Time   `json:"expiresAt"`
@@ -184,13 +185,13 @@ type ProviderInfo struct {
 
 // ProviderConfigView is the API response for provider config (secrets masked).
 type ProviderConfigView struct {
-	ProviderID             string `json:"providerID"`
-	AccountID              string `json:"accountID,omitempty"`
-	PublicKey              string `json:"publicKey,omitempty"`
-	SecretKey              string `json:"secretKey"`               // masked: "sk_l****ive"
-	WebhookSecret          string `json:"webhookSecret,omitempty"` // masked: "****"
-	IsActive               bool   `json:"isActive"`
-	WebhookAutoConfigured  bool   `json:"webhookAutoConfigured"`
+	ProviderID            string `json:"providerID"`
+	AccountID             string `json:"accountID,omitempty"`
+	PublicKey             string `json:"publicKey,omitempty"`
+	SecretKey             string `json:"secretKey"`               // masked: "sk_l****ive"
+	WebhookSecret         string `json:"webhookSecret,omitempty"` // masked: "****"
+	IsActive              bool   `json:"isActive"`
+	WebhookAutoConfigured bool   `json:"webhookAutoConfigured"`
 }
 
 // ProviderConfigInput is the API request body for saving provider config.

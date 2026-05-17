@@ -25,7 +25,7 @@ type mockFiatProvider struct {
 	id            string
 	parseErr      error
 	parsedEvent   *contracts.WebhookEvent
-	createResult  *contracts.PaymentSession
+	createResult  *contracts.FiatProviderSession
 	createErr     error
 	captureResult *contracts.PaymentResult
 	captureErr    error
@@ -40,7 +40,7 @@ type mockFiatProvider struct {
 
 func (m *mockFiatProvider) ProviderID() string { return m.id }
 
-func (m *mockFiatProvider) CreatePayment(_ context.Context, _ contracts.CreatePaymentParams) (*contracts.PaymentSession, error) {
+func (m *mockFiatProvider) CreatePayment(_ context.Context, _ contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
 	return m.createResult, m.createErr
 }
 
@@ -358,7 +358,7 @@ func TestFiatService_CreatePayment_NoAccount(t *testing.T) {
 	reg := newMockFiatRegistry()
 	reg.Register(&mockFiatProvider{
 		id:           "stripe",
-		createResult: &contracts.PaymentSession{SessionID: "sess_1"},
+		createResult: &contracts.FiatProviderSession{SessionID: "sess_1"},
 	})
 
 	svc, _ := newFiatTestService(t, reg)
@@ -373,7 +373,7 @@ func TestFiatService_CreatePayment_Success(t *testing.T) {
 	reg := newMockFiatRegistry()
 	reg.Register(&mockFiatProvider{
 		id: "stripe",
-		createResult: &contracts.PaymentSession{
+		createResult: &contracts.FiatProviderSession{
 			SessionID: "sess_ok", CaptureMode: contracts.CaptureAutomatic,
 			ExpiresAt: time.Now().Add(30 * time.Minute), Status: "requires_payment_method",
 		},

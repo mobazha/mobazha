@@ -29,7 +29,7 @@ func NewProvider(cfg Config) *Provider {
 
 func (p *Provider) ProviderID() string { return providerID }
 
-func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePaymentParams) (*contracts.PaymentSession, error) {
+func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
 	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 
 	piParams := &gostripe.PaymentIntentParams{
@@ -68,7 +68,7 @@ func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePayme
 		sd.ConnectedAccountID = params.SellerAccountID
 	}
 
-	return &contracts.PaymentSession{
+	return &contracts.FiatProviderSession{
 		SessionID:   pi.ID,
 		CaptureMode: contracts.CaptureAutomatic,
 		ExpiresAt:   time.Now().Add(30 * time.Minute),

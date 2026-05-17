@@ -360,6 +360,11 @@ type GuestOrderService interface {
 
 	GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error)
 	SaveGuestCheckoutConfig(ctx context.Context, cfg *models.GuestCheckoutConfig) error
+
+	// GetAdminGuestOrder returns full order detail for the authenticated seller,
+	// including the raw ShippingAddress bytes (which may be PGP ciphertext).
+	// The public GetGuestOrderStatus endpoint must NOT expose this data.
+	GetAdminGuestOrder(ctx context.Context, token string) (*models.GuestOrder, error)
 }
 
 // NodeService is the top-level aggregate interface that combines all domain services.

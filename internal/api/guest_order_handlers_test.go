@@ -79,10 +79,10 @@ func (m *mockGuestOrderService) HandlePoolPayment(string, string, uint64) error 
 func (m *mockGuestOrderService) HandleLatePayment(string, string, string, uint64, uint64) error {
 	return nil
 }
-func (m *mockGuestOrderService) CleanupExpiredOrders(context.Context)       {}
-func (m *mockGuestOrderService) AutoCompleteOrders(context.Context)         {}
-func (m *mockGuestOrderService) RunGuestCleanupOnce()                       {}
-func (m *mockGuestOrderService) IsEnabled(context.Context) bool             { return true }
+func (m *mockGuestOrderService) CleanupExpiredOrders(context.Context) {}
+func (m *mockGuestOrderService) AutoCompleteOrders(context.Context)   {}
+func (m *mockGuestOrderService) RunGuestCleanupOnce()                 {}
+func (m *mockGuestOrderService) IsEnabled(context.Context) bool       { return true }
 
 func (m *mockGuestOrderService) GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error) {
 	if m.getGuestCheckoutCfgFunc != nil {
@@ -96,6 +96,10 @@ func (m *mockGuestOrderService) SaveGuestCheckoutConfig(ctx context.Context, cfg
 		return m.saveGuestCheckoutCfgFunc(ctx, cfg)
 	}
 	return nil
+}
+
+func (m *mockGuestOrderService) GetAdminGuestOrder(_ context.Context, _ string) (*models.GuestOrder, error) {
+	return nil, nil
 }
 
 // ---------------------------------------------------------------------------

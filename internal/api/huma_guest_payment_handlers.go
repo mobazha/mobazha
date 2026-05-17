@@ -157,6 +157,98 @@ func (g *Gateway) registerGuestOrderGetPublic(api huma.API) {
 	})
 }
 
+// registerGuestOrderAdminDetail exposes GET /v1/guest/orders/{token}/detail
+// for authenticated seller access (includes shipping address ciphertext).
+func (g *Gateway) registerGuestOrderAdminDetail(api huma.API) {
+	type in struct {
+		Token string `path:"token" doc:"Guest checkout token."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "guest-orders-admin-detail",
+		Method:      http.MethodGet,
+		Path:        "/v1/guest/orders/{token}/detail",
+		Summary:     "Admin: full guest order detail including encrypted shipping address",
+		Tags:        []string{"orders", "guest"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/guest/orders/" + url.PathEscape(hi.Token) + "/detail"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"token": hi.Token})
+		rr := httptest.NewRecorder()
+		g.handleGETAdminGuestOrderDetail(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerPGPKeyGet exposes GET /v1/settings/pgp-key (public — buyers call this
+// to retrieve the vendor's public key before encrypting their shipping address).
+func (g *Gateway) registerPGPKeyGet(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "settings-pgp-key-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/settings/pgp-key",
+		Summary:     "Get seller PGP public key (public)",
+		Tags:        []string{"settings"},
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/settings/pgp-key", nil)
+		rr := httptest.NewRecorder()
+		g.handleGETPGPPublicKey(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerPGPKeyPut exposes PUT /v1/settings/pgp-key (authenticated seller).
+func (g *Gateway) registerPGPKeyPut(api huma.API) {
+	type in struct {
+		Body json.RawMessage `json:",omitempty"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "settings-pgp-key-put",
+		Method:      http.MethodPut,
+		Path:        "/v1/settings/pgp-key",
+		Summary:     "Set seller PGP public key",
+		Tags:        []string{"settings"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPut, "/v1/settings/pgp-key", bytes.NewReader(hi.Body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePUTPGPPublicKey(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerPGPKeyDelete exposes DELETE /v1/settings/pgp-key (authenticated seller).
+func (g *Gateway) registerPGPKeyDelete(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "settings-pgp-key-delete",
+		Method:      http.MethodDelete,
+		Path:        "/v1/settings/pgp-key",
+		Summary:     "Remove seller PGP public key",
+		Tags:        []string{"settings"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeNoContentOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodDelete, "/v1/settings/pgp-key", nil)
+		rr := httptest.NewRecorder()
+		g.handleDELETEPGPPublicKey(rr, req)
+		if err := nodeBridgeNoContent(rr); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	})
+}
+
 func (g *Gateway) registerPaymentMethodsGet(api huma.API) {
 	type in struct {
 		PeerID string `path:"peerID" doc:"Storefront seller peer scope."`

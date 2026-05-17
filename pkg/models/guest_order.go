@@ -106,8 +106,12 @@ type GuestOrder struct {
 	PriceDivisibility uint32 `json:"priceDivisibility"`
 
 	// Buyer info (optional, no identity)
-	ShippingAddress []byte `json:"-"`
-	ContactEmail    string `json:"contactEmail,omitempty"`
+	// ShippingAddress holds either a JSON-encoded address struct (plaintext)
+	// or an OpenPGP ASCII-armor ciphertext (PM-3a). Inspect
+	// ShippingAddressEncrypted to distinguish the two cases.
+	ShippingAddress          []byte `json:"-"`
+	ShippingAddressEncrypted bool   `gorm:"column:shipping_address_encrypted" json:"-"`
+	ContactEmail             string `json:"contactEmail,omitempty"`
 
 	// Lifecycle
 	ExpiresAt       time.Time  `gorm:"index" json:"expiresAt"`
@@ -133,23 +137,49 @@ type GuestOrder struct {
 // TableName overrides the default GORM table name.
 func (GuestOrder) TableName() string { return "guest_orders" }
 
-// SetShippingAddress marshals the address struct to JSON bytes.
+// SetShippingAddress stores the buyer's shipping address.
+//
+// If addr is a string starting with "-----BEGIN PGP MESSAGE-----", it is
+// treated as an OpenPGP ASCII-armor ciphertext (PM-3a encrypted mode) and
+// stored verbatim with ShippingAddressEncrypted = true.
+//
+// Any other value is JSON-marshalled and stored as plaintext
+// (ShippingAddressEncrypted = false).
 func (o *GuestOrder) SetShippingAddress(addr interface{}) error {
+	if s, ok := addr.(string); ok {
+		if strings.HasPrefix(s, "-----BEGIN PGP MESSAGE-----") {
+			o.ShippingAddress = []byte(s)
+			o.ShippingAddressEncrypted = true
+			return nil
+		}
+		return fmt.Errorf("raw string address not allowed; submit a PGP-armored ciphertext or an address struct")
+	}
 	data, err := json.Marshal(addr)
 	if err != nil {
 		return fmt.Errorf("marshal shipping address: %w", err)
 	}
 	o.ShippingAddress = data
+	o.ShippingAddressEncrypted = false
 	return nil
 }
 
-// GetShippingAddress unmarshals the stored JSON into the target.
+// GetShippingAddress unmarshals the stored plaintext JSON into the target.
+// Returns ErrShippingAddressEncrypted if the address is PGP-encrypted;
+// callers that need the ciphertext should read ShippingAddress directly.
 func (o *GuestOrder) GetShippingAddress(target interface{}) error {
 	if o.ShippingAddress == nil {
 		return nil
 	}
+	if o.ShippingAddressEncrypted {
+		return ErrShippingAddressEncrypted
+	}
 	return json.Unmarshal(o.ShippingAddress, target)
 }
+
+// ErrShippingAddressEncrypted is returned when GetShippingAddress is called
+// on an order whose address is stored as PGP ciphertext. The caller must
+// read ShippingAddress directly and decrypt it in the Admin browser.
+var ErrShippingAddressEncrypted = fmt.Errorf("shipping address is PGP-encrypted; decrypt in Admin browser")
 
 // IsTerminal returns true if the order is in a final state.
 func (o *GuestOrder) IsTerminal() bool {

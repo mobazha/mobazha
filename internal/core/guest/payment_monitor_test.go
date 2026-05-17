@@ -101,6 +101,7 @@ func (r *recordingGuestService) HandlePoolPayment(orderToken, txHash string, amo
 	return nil
 }
 
+
 func (r *recordingGuestService) getPoolDetections() []poolDetection {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -154,6 +155,9 @@ func (r *recordingGuestService) GetGuestCheckoutConfig(context.Context) (*models
 func (r *recordingGuestService) IsEnabled(context.Context) bool { return true }
 func (r *recordingGuestService) SaveGuestCheckoutConfig(context.Context, *models.GuestCheckoutConfig) error {
 	return nil
+}
+func (r *recordingGuestService) GetAdminGuestOrder(_ context.Context, _ string) (*models.GuestOrder, error) {
+	return nil, nil
 }
 
 // --- tests ---

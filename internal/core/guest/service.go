@@ -660,6 +660,22 @@ func (s *GuestOrderAppService) ListGuestOrders(_ context.Context, filter contrac
 	return orders, total, err
 }
 
+// GetAdminGuestOrder returns full order detail for the authenticated seller,
+// including raw ShippingAddress bytes (may be PGP ciphertext — PM-3a).
+// The caller is responsible for restricting this to authenticated Admin paths.
+func (s *GuestOrderAppService) GetAdminGuestOrder(_ context.Context, token string) (*models.GuestOrder, error) {
+	var order models.GuestOrder
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_token = ?", token).
+			Preload("Items").
+			First(&order).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
 // ListActiveOrders returns all guest orders in monitoring-eligible states.
 func (s *GuestOrderAppService) ListActiveOrders(_ context.Context) ([]*models.GuestOrder, error) {
 	var orders []*models.GuestOrder

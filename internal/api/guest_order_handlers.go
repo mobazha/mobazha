@@ -219,6 +219,141 @@ func (g *Gateway) handlePUTGuestCheckoutSettings(w http.ResponseWriter, r *http.
 	response.Success(w, req)
 }
 
+// handleGETAdminGuestOrderDetail returns full order detail for the seller,
+// including raw shippingAddressCiphertext when the address is PGP-encrypted.
+// Must only be called from authenticated routes.
+// GET /v1/guest/orders/{token}/detail
+func (g *Gateway) handleGETAdminGuestOrderDetail(w http.ResponseWriter, r *http.Request) {
+	svc := getGuestOrderService(r)
+	if svc == nil {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
+			"Guest Checkout is not available")
+		return
+	}
+
+	token := chi.URLParam(r, "token")
+	if token == "" {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Order token is required")
+		return
+	}
+
+	order, err := svc.GetAdminGuestOrder(r.Context(), token)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Order not found")
+		} else {
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Failed to retrieve order")
+		}
+		return
+	}
+
+	type adminOrderDetail struct {
+		models.GuestOrder
+		// ShippingAddressCiphertext is populated when AddressEncrypted=true.
+		// It contains the raw OpenPGP ASCII-armor ciphertext for browser-side
+		// decryption. The plaintext is never sent over the wire.
+		ShippingAddressCiphertext string `json:"shippingAddressCiphertext,omitempty"`
+		// ShippingAddressPlaintext is populated when AddressEncrypted=false.
+		ShippingAddressPlaintext json.RawMessage `json:"shippingAddress,omitempty"`
+		AddressEncrypted         bool            `json:"addressEncrypted"`
+	}
+
+	detail := adminOrderDetail{
+		GuestOrder:       *order,
+		AddressEncrypted: order.ShippingAddressEncrypted,
+	}
+	if order.ShippingAddressEncrypted {
+		detail.ShippingAddressCiphertext = string(order.ShippingAddress)
+	} else if order.ShippingAddress != nil {
+		detail.ShippingAddressPlaintext = order.ShippingAddress
+	}
+
+	response.Success(w, detail)
+}
+
+// handleGETPGPPublicKey returns the seller's OpenPGP public key (public endpoint).
+// Buyers call this before encrypting their shipping address.
+// GET /v1/settings/pgp-key
+func (g *Gateway) handleGETPGPPublicKey(w http.ResponseWriter, r *http.Request) {
+	svc := getGuestOrderService(r)
+	if svc == nil {
+		response.Error(w, http.StatusNotFound, response.CodeNotFound, "PGP key not configured")
+		return
+	}
+
+	cfg, err := svc.GetGuestCheckoutConfig(r.Context())
+	if err != nil || cfg.PGPPublicKey == "" {
+		response.Error(w, http.StatusNotFound, response.CodeNotFound, "PGP key not configured")
+		return
+	}
+
+	response.Success(w, map[string]string{"publicKey": cfg.PGPPublicKey})
+}
+
+// handlePUTPGPPublicKey sets the seller's OpenPGP public key (authenticated).
+// PUT /v1/settings/pgp-key
+func (g *Gateway) handlePUTPGPPublicKey(w http.ResponseWriter, r *http.Request) {
+	svc := getGuestOrderService(r)
+	if svc == nil {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
+			"Guest Checkout is not available")
+		return
+	}
+
+	var req struct {
+		PublicKey string `json:"publicKey"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.PublicKey != "" && !strings.HasPrefix(req.PublicKey, "-----BEGIN PGP PUBLIC KEY") {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
+			"publicKey must be an OpenPGP ASCII-armor public key block")
+		return
+	}
+
+	cfg, err := svc.GetGuestCheckoutConfig(r.Context())
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+
+	cfg.PGPPublicKey = req.PublicKey
+	if err := svc.SaveGuestCheckoutConfig(r.Context(), cfg); err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+
+	response.Success(w, map[string]string{"publicKey": cfg.PGPPublicKey})
+}
+
+// handleDELETEPGPPublicKey removes the seller's OpenPGP public key (authenticated).
+// DELETE /v1/settings/pgp-key
+func (g *Gateway) handleDELETEPGPPublicKey(w http.ResponseWriter, r *http.Request) {
+	svc := getGuestOrderService(r)
+	if svc == nil {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
+			"Guest Checkout is not available")
+		return
+	}
+
+	cfg, err := svc.GetGuestCheckoutConfig(r.Context())
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+
+	cfg.PGPPublicKey = ""
+	if err := svc.SaveGuestCheckoutConfig(r.Context(), cfg); err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+
+	response.NoContent(w)
+}
+
 func parseIntQuery(r *http.Request, key string, defaultVal int) int {
 	s := r.URL.Query().Get(key)
 	if s == "" {

@@ -204,7 +204,6 @@ func (g *Gateway) registerNodeHumaSettingsAdminOperations(api huma.API) {
 		Path:        "/v1/settings/guest-checkout",
 		Summary:     "Get guest checkout settings",
 		Tags:        []string{"settings"},
-		Security:    nodeAuthSecurity,
 	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/settings/guest-checkout", nil)
 		rr := httptest.NewRecorder()

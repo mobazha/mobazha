@@ -19,6 +19,7 @@ func (g *Gateway) registerNodeHumaOrderPublicOperations(api huma.API) {
 	g.registerGuestOrderPostPublic(api)
 	g.registerGuestOrderGetPublic(api)
 	g.registerPaymentMethodsGet(api)
+	g.registerPGPKeyGet(api) // PM-3a: buyer fetches vendor public key to encrypt shipping address
 	g.registerAnalyticsShopEventsPost(api)
 }
 
@@ -60,6 +61,9 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 	g.registerGuestOrdersListAuth(api)
 	g.registerGuestOrderShip(api)
 	g.registerGuestOrderComplete(api)
+	g.registerGuestOrderAdminDetail(api) // PM-3a: admin detail with shipping address ciphertext
+	g.registerPGPKeyPut(api)             // PM-3a: set vendor PGP public key
+	g.registerPGPKeyDelete(api)          // PM-3a: remove vendor PGP public key
 
 	g.registerAnalyticsStatsGet(api)
 }

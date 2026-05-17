@@ -17,6 +17,13 @@ type GuestCheckoutConfig struct {
 	AcceptedCoins  string `json:"acceptedCoins"`  // comma-separated coin codes, e.g. "BTC,ETH,SOL"
 	MaxOrderAmount string `json:"maxOrderAmount"` // smallest-unit string; "0" = unlimited
 	PaymentTimeout int    `json:"paymentTimeout"` // minutes; 0 = use default (1440 = 24h)
+
+	// PGPPublicKey is the seller's OpenPGP ASCII armor public key used to
+	// encrypt buyer shipping addresses client-side (PM-3a). Empty means
+	// encryption is unavailable; buyers will see a plaintext-warning before
+	// submitting their address. The private key is NEVER stored here — it
+	// lives only in the Admin's browser and is used for in-browser decryption.
+	PGPPublicKey string `json:"pgpPublicKey,omitempty" gorm:"size:8192"`
 }
 
 func (GuestCheckoutConfig) TableName() string {

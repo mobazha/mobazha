@@ -58,6 +58,9 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 	g.registerOrderPaymentCancelPartialPost(api)
 	g.registerOrderPaymentWatchDelete(api)
 
+	// Phase PS / B1: unified payment session read endpoint.
+	g.registerOrderPaymentSessionGet(api)
+
 	g.registerGuestOrdersListAuth(api)
 	g.registerGuestOrderShip(api)
 	g.registerGuestOrderComplete(api)
@@ -848,6 +851,43 @@ func (g *Gateway) registerAnalyticsStatsGet(api huma.API) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, rawURL, nil)
 		rr := httptest.NewRecorder()
 		g.handleGETAnalyticsStats(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerOrderPaymentSessionGet registers GET /v1/orders/{orderID}/payment-session.
+//
+// Phase PS / B1: read-only projection — returns a unified PaymentSession view built
+// from existing order, payment, and fiat metadata (no new DB table required).
+// Create/refresh provisioning will be added in Phase B Step 2 + Step 3.
+func (g *Gateway) registerOrderPaymentSessionGet(api huma.API) {
+	type in struct {
+		OrderID string `path:"orderID" doc:"Order ID."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "orders-get-payment-session",
+		Method:      http.MethodGet,
+		Path:        "/v1/orders/{orderID}/payment-session",
+		Summary:     "Unified payment session view for an order",
+		Description: "Returns a PaymentSession projection built from existing order, payment, and " +
+			"fiat metadata. Phase B Step 1 (read-only projection) coverage: " +
+			"UTXO + ExternalPayment → settlementMode=address_monitored; " +
+			"legacy EVM / Solana / TRON → settlementMode=escrow_v1 (buyer must sign escrow contract instructions via local wallet); " +
+			"Stripe / PayPal → settlementMode=provider_checkout. " +
+			"ManagedEscrow v2 (address_monitored for EVM) is pending Phase B Step 2 (TECHDEBT TD-PSS-02) — " +
+			"until then, ManagedEscrow-backed EVM orders are indistinguishable from legacy EVM " +
+			"and will appear as escrow_v1.",
+		Tags:     []string{"orders", "payments"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/payment-session"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"orderID": hi.OrderID})
+		rr := httptest.NewRecorder()
+		g.handleGETOrderPaymentSession(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

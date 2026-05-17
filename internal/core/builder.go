@@ -27,6 +27,7 @@ import (
 	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
 	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
+	corePmt "github.com/mobazha/mobazha3.0/internal/core/payment"
 	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
@@ -373,6 +374,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		//     applyOptions would unconditionally start the monitor and
 		//     silently drop the orderService link.
 		initDigitalSubsystem(obNode)
+		initPaymentSessionSubsystem(obNode)
 		finalizeSupplyChainSubsystem(obNode)
 		infraOwned = true
 		return obNode, nil
@@ -719,6 +721,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	// rationale): Digital depends on featureResolver; SupplyChain depends
 	// on orderService + featureResolver.
 	initDigitalSubsystem(obNode)
+	initPaymentSessionSubsystem(obNode)
 	finalizeSupplyChainSubsystem(obNode)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
@@ -1337,6 +1340,7 @@ func newLightweightNode(
 	// rationale): Digital depends on featureResolver; SupplyChain depends
 	// on orderService + featureResolver.
 	initDigitalSubsystem(obNode)
+	initPaymentSessionSubsystem(obNode)
 	finalizeSupplyChainSubsystem(obNode)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
@@ -1454,6 +1458,18 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	// applyOptions → initOrderService.
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
+}
+
+// initPaymentSessionSubsystem wires the unified PaymentSessionService (Phase PS / B1).
+// Phase B Step 1: projection-only — reads existing order, payment, and fiat metadata.
+// CryptoPaymentFacade and FiatPaymentFacade will be injected in Phase B Step 2/3.
+func initPaymentSessionSubsystem(obNode *MobazhaNode) {
+	if obNode.db == nil {
+		logger.LogWarningWithID(log, obNode.nodeID, "PaymentSession: db not available — subsystem skipped")
+		return
+	}
+	obNode.paymentSessionService = corePmt.NewPaymentSessionService(obNode.db)
+	logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession subsystem initialized")
 }
 
 // initDiscountSubsystem moved to builder_shared.go (shared between full and private_distribution builds).

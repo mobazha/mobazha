@@ -160,6 +160,7 @@ func (m *mockNode) ShoppingCart() contracts.ShoppingCartService          { retur
 func (m *mockNode) Wishlist() contracts.WishlistService                  { return nil }
 func (m *mockNode) GuestOrder() contracts.GuestOrderService              { return nil }
 func (m *mockNode) ReceivingAccounts() contracts.ReceivingAccountService { return m }
+func (m *mockNode) PaymentSession() contracts.PaymentSessionService      { return nil }
 
 func (m *mockNode) RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error) {
 	return m.requestAddressFunc(ctx, to, coinType)

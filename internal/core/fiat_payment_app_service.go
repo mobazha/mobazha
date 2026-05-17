@@ -126,6 +126,10 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 		_ = s.orderRepo.MergeFiatMetadata(ctx, params.OrderID, map[string]string{
 			"fiat_provider":   providerID,
 			"fiat_session_id": session.SessionID,
+			// fiat_currency is stored so the PaymentSessionProjector can reconstruct
+			// the canonical paymentCoin ("fiat:{provider}:{currency}") for orders
+			// where PaymentSent has not yet been written (e.g. awaiting buyer action).
+			"fiat_currency": params.Currency,
 		})
 	}
 

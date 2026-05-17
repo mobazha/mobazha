@@ -393,6 +393,9 @@ type NodeService interface {
 	Wishlist() WishlistService
 	GuestOrder() GuestOrderService
 	ReceivingAccounts() ReceivingAccountService
+	// PaymentSession returns the unified payment session service (Phase PS / B1).
+	// Returns nil on private_distribution builds or when the subsystem is disabled.
+	PaymentSession() PaymentSessionService
 
 	// Cross-cutting methods (kept directly on NodeService)
 

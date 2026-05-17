@@ -244,6 +244,15 @@ func (n *MobazhaNode) DigitalAssets() contracts.DigitalAssetService {
 	return n.digitalAssetService
 }
 
+// PaymentSession returns the unified payment session service (Phase PS / B1).
+// Returns nil when the subsystem has not been initialised.
+func (n *MobazhaNode) PaymentSession() contracts.PaymentSessionService {
+	if n.paymentSessionService == nil {
+		return nil
+	}
+	return n.paymentSessionService
+}
+
 func (n *MobazhaNode) Order() contracts.OrderService {
 	if n.orderService == nil {
 		return nil

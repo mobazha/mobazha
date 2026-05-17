@@ -99,6 +99,7 @@ type appServices struct {
 	unifiedOrderView           *UnifiedOrderView
 	digitalAssetService        *digital.DigitalAssetAppService
 	digitalEntitlementService  *digital.DigitalEntitlementAppService
+	paymentSessionService      contracts.PaymentSessionService
 
 	// Feature flag resolver infrastructure (Phase FF-3).
 	// featureResolver is the SSOT for `isEnabled(ctx, key)` queries; it

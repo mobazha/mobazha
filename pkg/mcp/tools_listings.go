@@ -236,7 +236,7 @@ func makeListingsImportJSON(bf BridgeFactory) server.ToolHandlerFunc {
 		}
 
 		bridge := bf(req)
-		code, body, err := bridge.CallMultipart(ctx, "POST", "/v1/listings/import/json", "file", "import.zip", zipData)
+		code, body, err := bridge.CallMultipart(ctx, "POST", "/v1/listings/import", "file", "import.zip", zipData)
 		return HandleBridgeResult(code, body, err)
 	}
 }

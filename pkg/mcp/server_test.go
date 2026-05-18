@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"testing"
 
-	gomcp "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/client"
+	gomcp "github.com/mark3labs/mcp-go/mcp"
 )
 
 type mockBridge struct {
@@ -164,10 +164,10 @@ func TestResourcesRegisteredInStdioMode(t *testing.T) {
 	}
 
 	expectedURIs := map[string]bool{
-		"mobazha://store/me/summary":      false,
-		"mobazha://store/me/listings":     false,
+		"mobazha://store/me/summary":       false,
+		"mobazha://store/me/listings":      false,
 		"mobazha://store/me/orders/recent": false,
-		"mobazha://notifications/unread":  false,
+		"mobazha://notifications/unread":   false,
 	}
 
 	for _, res := range resourcesResult.Resources {
@@ -221,6 +221,27 @@ func TestSSEServerHasNoResources(t *testing.T) {
 
 	if len(resourcesResult.Resources) != 0 {
 		t.Errorf("SSE server should not have resources, got %d", len(resourcesResult.Resources))
+	}
+}
+
+func TestListingsImportJSONUsesMultipartImportEndpoint(t *testing.T) {
+	bridge := &mockBridge{}
+	handler := makeListingsImportJSON(StaticBridgeFactory(bridge))
+
+	req := gomcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"import_json": `[{"title":"Demo listing"}]`,
+	}
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected tool error: %v", result.Content)
+	}
+	if bridge.lastPath != "/v1/listings/import" {
+		t.Fatalf("CallMultipart path = %q, want /v1/listings/import", bridge.lastPath)
 	}
 }
 
@@ -384,15 +405,15 @@ func TestFilterToolsByScopes_NoScopes(t *testing.T) {
 	allowed := FilterToolsByScopes(scopes)
 
 	publicTools := map[string]bool{
-		"exchange_rates_get":          true,
-		"search_listings":             true,
-		"search_profiles":             true,
-		"shopping_search_demo":        true,
-		"shopping_get_detail":         true,
-		"shopping_prepare_checkout":   true,
-		"shopping_confirm_checkout":   true,
-		"shopping_order_status":       true,
-		"shopping_demo_order_status":  true,
+		"exchange_rates_get":         true,
+		"search_listings":            true,
+		"search_profiles":            true,
+		"shopping_search_demo":       true,
+		"shopping_get_detail":        true,
+		"shopping_prepare_checkout":  true,
+		"shopping_confirm_checkout":  true,
+		"shopping_order_status":      true,
+		"shopping_demo_order_status": true,
 	}
 	for _, name := range allowed {
 		if !publicTools[name] {

@@ -127,9 +127,10 @@ type ActionResult struct {
 	// instructions to the frontend.
 	Mode ActionMode
 
-	// ActionID is opaque and meaningful only in ActionModeSubmitted —
-	// it is the lookup key for GetActionStatus. Empty for
-	// instructions-required and completed modes.
+	// ActionID is the opaque lookup key for GetActionStatus.
+	// Submitted actions always populate it. Instructions-required flows
+	// may also pre-allocate one so the later relay submit can persist
+	// projections under a stable client-visible ID.
 	ActionID string
 
 	// Instructions carries the chain-specific payload the frontend must
@@ -148,6 +149,34 @@ type ActionResult struct {
 	PaymentData *models.PaymentData
 }
 
+// ActionOwnerSignature is a chain-agnostic carrier for a single owner
+// authorization over a settlement action hash. It lets order-message
+// producers embed backend-generated owner signatures without depending on
+// chain-specific wire details.
+type ActionOwnerSignature struct {
+	// From is the 0x-prefixed owner address that produced Signature.
+	From string
+
+	// Signature is the raw owner signature payload.
+	Signature []byte
+
+	// Index is the owner ordinal when the chain has a stable owner list.
+	// ManagedEscrow uses it as an audit hint; UTXO-style escrows may ignore it.
+	Index uint32
+}
+
+// ActionSigner is an optional V2 capability implemented by backends that can
+// produce a local owner signature for a specific settlement action without
+// broadcasting it yet. ManagedEscrow uses this for threshold>1 flows:
+//   - seller pre-signs "complete" into ORDER_SHIPMENT.ReleaseInfo
+//   - moderator pre-signs "dispute_release" into DISPUTE_CLOSE.ReleaseInfo
+//
+// The counterparty later aggregates that remote signature with its own local
+// signature and submits through Complete/DisputeRelease.
+type ActionSigner interface {
+	SignAction(ctx context.Context, action string, params ActionParams) ([]ActionOwnerSignature, error)
+}
+
 // ActionParams is the V2 input shape for confirm/cancel/complete/
 // dispute-release. It is a strict superset of V1's InstructionParams,
 // adding the policy and refund hints that ManagedEscrow-style adapters need
@@ -156,8 +185,10 @@ type ActionParams struct {
 	// OrderID identifies the order.
 	OrderID string
 
-	// InitiatorAddr is the wallet address of the caller (frontend
-	// user, or platform service for relayed actions).
+	// InitiatorAddr is the legacy wallet address hint of the caller.
+	// ClientSigned chains still use it as the frontend signer address.
+	// ManagedEscrow-backed chains must not rely on it for authorization or owner
+	// selection; the backend resolves the local node owner separately.
 	InitiatorAddr string
 
 	// PayoutAddr is the destination address for fund release.
@@ -208,6 +239,15 @@ type ActionStatus struct {
 	// LastError carries a human-readable description of the most
 	// recent failure (if any). Empty on success.
 	LastError string
+
+	// OrderID is populated when available from relay projections。
+	OrderID string `json:"orderId,omitempty"`
+
+	// SettlementAction echoes the adapter settlement step (confirm, …)。
+	SettlementAction string `json:"settlementAction,omitempty"`
+
+	// RelayTaskID mirrors hosting RelayService task id when returned。
+	RelayTaskID string `json:"relayTaskId,omitempty"`
 }
 
 // ── Errors ─────────────────────────────────────────────────────

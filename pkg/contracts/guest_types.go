@@ -123,17 +123,21 @@ type GuestOrderFilter struct {
 
 // OrderSummary is a normalized summary suitable for the seller's unified order list.
 type OrderSummary struct {
-	ID             string       `json:"id"`
-	Type           string       `json:"type"`
-	State          string       `json:"state"`
-	BuyerName      string       `json:"buyerName"`
-	Items          []ItemBrief  `json:"items"`
-	Total          PriceSummary `json:"total"`
-	PaymentCoin    string       `json:"paymentCoin"`
-	TrackingNumber string       `json:"trackingNumber,omitempty"`
-	SweepStatus    string       `json:"sweepStatus,omitempty"`
-	CreatedAt      time.Time    `json:"createdAt"`
-	UpdatedAt      time.Time    `json:"updatedAt"`
+	ID                 string       `json:"id"`
+	Type               string       `json:"type"`
+	State              string       `json:"state"`
+	BuyerName          string       `json:"buyerName"`
+	Items              []ItemBrief  `json:"items"`
+	Total              PriceSummary `json:"total"`
+	PaymentCoin        string       `json:"paymentCoin"`
+	SettlementAction   string       `json:"settlementAction,omitempty"`
+	SettlementActionID string       `json:"settlementActionId,omitempty"`
+	SettlementState    string       `json:"settlementState,omitempty"`
+	SettlementTxHash   string       `json:"settlementTxHash,omitempty"`
+	TrackingNumber     string       `json:"trackingNumber,omitempty"`
+	SweepStatus        string       `json:"sweepStatus,omitempty"`
+	CreatedAt          time.Time    `json:"createdAt"`
+	UpdatedAt          time.Time    `json:"updatedAt"`
 }
 
 // ItemBrief is a minimal item summary for the unified list.

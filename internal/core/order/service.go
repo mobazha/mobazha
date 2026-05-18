@@ -783,12 +783,12 @@ func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, i
 		return "", nil, err
 	}
 
-	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
+	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
 		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
-	result, err := strategy.Cancel(context.Background(), payment.ActionParams{
+	result, err := strategy.GetCancelInstructions(context.Background(), payment.InstructionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		PayoutAddr:    toAddress,
@@ -1215,12 +1215,12 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	)
 
 	coinType := iwallet.CoinType(paymentSent.Coin)
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategyV2, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
 		return nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
-	if strategy.Model() == payment.PaymentModelClientSigned {
+	if strategyV2.Model() == payment.PaymentModelClientSigned {
 		totalOut = iwallet.NewAmount(paymentSent.Amount).Sub(platformAmt)
 	} else {
 		spent := make(map[string]bool)
@@ -1258,6 +1258,42 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		})
 	}
 
+	release := &pb.EscrowRelease{
+		ToAddress:       txn.To[0].Address.String(),
+		ToAmount:        txn.To[0].Amount.String(),
+		PlatformAddress: platformAddr.String(),
+		PlatformAmount:  platformAmt.String(),
+		TransactionFee:  escrowReleaseFee.String(),
+	}
+
+	for _, from := range txn.From {
+		release.Outpoints = append(release.Outpoints, &pb.Outpoint{
+			FromID: from.ID,
+			Value:  from.Amount.String(),
+		})
+	}
+
+	if managed_escrowSigs, handled, err := s.signManagedEscrowActionRelease(context.Background(), coinType, "complete", payment.ActionParams{
+		OrderID:       order.ID.String(),
+		PaymentCoin:   paymentSent.Coin,
+		PaymentAmount: paymentSent.Amount,
+		Chaincode:     paymentSent.Chaincode,
+		Script:        paymentSent.Script,
+		OrderData:     order,
+		ReleaseInfo:   release,
+	}); handled {
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign ManagedEscrow complete action: %w", err)
+		}
+		release.EscrowSignatures = append(release.EscrowSignatures, managed_escrowSigs...)
+		return release, nil
+	}
+
+	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	if err != nil {
+		return nil, fmt.Errorf("no legacy chain escrow for coin %s: %w", paymentSent.Coin, err)
+	}
+
 	script, err := hex.DecodeString(paymentSent.Script)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode script: %w", err)
@@ -1276,21 +1312,6 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign escrow release: %w", err)
-	}
-
-	release := &pb.EscrowRelease{
-		ToAddress:       txn.To[0].Address.String(),
-		ToAmount:        txn.To[0].Amount.String(),
-		PlatformAddress: platformAddr.String(),
-		PlatformAmount:  platformAmt.String(),
-		TransactionFee:  escrowReleaseFee.String(),
-	}
-
-	for _, from := range txn.From {
-		release.Outpoints = append(release.Outpoints, &pb.Outpoint{
-			FromID: from.ID,
-			Value:  from.Amount.String(),
-		})
 	}
 
 	for _, sig := range sigs {
@@ -1313,6 +1334,9 @@ func (s *OrderAppService) GetOrder(orderID string) (*models.Order, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := s.attachSettlementActions(&order); err != nil {
+		return nil, err
+	}
 	s.db.Update(func(tx database.Tx) error {
 		return tx.Update("read", true, map[string]interface{}{"id = ?": orderID, "read = ?": false}, &models.Order{})
 	})
@@ -1328,6 +1352,68 @@ func (s *OrderAppService) GetOrderState(orderID models.OrderID) (models.OrderSta
 		return 0, err
 	}
 	return order.State, nil
+}
+
+func (s *OrderAppService) attachSettlementActions(order *models.Order) error {
+	if order == nil {
+		return nil
+	}
+	order.SettlementActions = nil
+	rows, err := s.loadSettlementActionRows([]string{order.ID.String()})
+	if err != nil {
+		return err
+	}
+	for _, row := range rows[order.ID.String()] {
+		order.SettlementActions = append(order.SettlementActions, row.Snapshot())
+	}
+	return nil
+}
+
+func (s *OrderAppService) attachSettlementActionsBatch(orders []models.Order) error {
+	if len(orders) == 0 {
+		return nil
+	}
+	orderIDs := make([]string, 0, len(orders))
+	for _, order := range orders {
+		orderIDs = append(orderIDs, order.ID.String())
+	}
+	rows, err := s.loadSettlementActionRows(orderIDs)
+	if err != nil {
+		return err
+	}
+	for i := range orders {
+		orders[i].SettlementActions = nil
+		for _, row := range rows[orders[i].ID.String()] {
+			orders[i].SettlementActions = append(orders[i].SettlementActions, row.Snapshot())
+		}
+	}
+	return nil
+}
+
+func (s *OrderAppService) loadSettlementActionRows(orderIDs []string) (map[string][]models.ManagedEscrowRelayAction, error) {
+	out := make(map[string][]models.ManagedEscrowRelayAction, len(orderIDs))
+	if s == nil || s.db == nil || len(orderIDs) == 0 {
+		return out, nil
+	}
+
+	var rows []models.ManagedEscrowRelayAction
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("order_id IN ?", orderIDs).
+			Order("updated_at desc").
+			Find(&rows).Error
+	}); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "managed_escrow_relay_actions") &&
+			(strings.Contains(strings.ToLower(err.Error()), "no such table") ||
+				strings.Contains(strings.ToLower(err.Error()), "does not exist")) {
+			return out, nil
+		}
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.OrderID] = append(out[row.OrderID], row)
+	}
+	return out, nil
 }
 
 func (s *OrderAppService) GetPurchases(stateFilter []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error) {
@@ -1363,6 +1449,9 @@ func (s *OrderAppService) GetPurchases(stateFilter []models.OrderState, searchTe
 		return dbtx.Find(&orders).Error
 	})
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, 0, err
+	}
+	if err := s.attachSettlementActionsBatch(orders); err != nil {
 		return nil, 0, err
 	}
 	return orders, int64(len(orders)), nil
@@ -1401,6 +1490,9 @@ func (s *OrderAppService) GetSales(stateFilter []models.OrderState, searchTerm s
 		return dbtx.Find(&orders).Error
 	})
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, 0, err
+	}
+	if err := s.attachSettlementActionsBatch(orders); err != nil {
 		return nil, 0, err
 	}
 	return orders, int64(len(orders)), nil

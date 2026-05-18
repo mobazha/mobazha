@@ -562,9 +562,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			storeAndForwardServers: cfg.StoreAndForwardServers,
 		},
 		walletFields: walletFields{
-			multiwallet:   &mw,
-			exchangeRates: erp,
-			relayAPIURL:   cfg.RelayAPIURL,
+			multiwallet:    &mw,
+			exchangeRates:  erp,
+			relayAPIURL:    cfg.RelayAPIURL,
+			relayAPIBearer: cfg.RelayAPIBearer,
 		},
 		chainFields: chainFields{
 			evmChainConfigs:   evmConfigs,
@@ -1219,9 +1220,10 @@ func newLightweightNode(
 			storeAndForwardServers: cfg.StoreAndForwardServers,
 		},
 		walletFields: walletFields{
-			multiwallet:   walletOp,
-			exchangeRates: erp,
-			relayAPIURL:   cfg.RelayAPIURL,
+			multiwallet:    walletOp,
+			exchangeRates:  erp,
+			relayAPIURL:    cfg.RelayAPIURL,
+			relayAPIBearer: cfg.RelayAPIBearer,
 		},
 		ipnsFields: ipnsFields{
 			netDB:     netDB,

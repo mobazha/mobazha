@@ -9,13 +9,10 @@ import (
 
 // Sprint 2 D16 — Action store for ManagedEscrowAdapter.GetActionStatus.
 //
-// Background. Sprint 2 D14/D15 ship every Confirm/Cancel/Complete/
-// DisputeRelease envelope as ActionModeInstructionsRequired with an
-// empty ActionID — the frontend signs and the relayer broadcasts. Once
-// D17 wires the relay submission path, the relayer persists each
-// ManagedEscrowTx as a row in `relay_tasks` (see PENDING_RELAY_DESIGN.md §3.1)
-// and returns the row id as the public ActionID. GetActionStatus
-// reads back from the same store.
+// Background. Backend-submitted ManagedEscrow actions persist relay projections
+// under an ActionID / ClientActionID before TxHash exists. GetActionStatus
+// reads back from the same store once relay submission or confirmation
+// updates arrive.
 //
 // D16 lands the read interface and an in-memory implementation so:
 //
@@ -64,6 +61,7 @@ type ActionRecord struct {
 	ChainID       uint64
 	State         string
 	TxHash        string
+	RelayTaskID   string
 	Confirmations int
 	LastError     string
 	CreatedAt     time.Time
@@ -89,6 +87,13 @@ type ActionStore interface {
 	// cancellation — production stores poll Postgres / SQLite over
 	// the same ctx the HTTP handler propagates.
 	Lookup(ctx context.Context, actionID string) (*ActionRecord, error)
+}
+
+// ActionRecorder persists ActionRecord projections after a successful relay
+// submission (RelayBridge). MemoryActionStore and ManagedEscrowRelayActionStore both
+// implement it via Put — the adapter read path stays ActionStore-only.
+type ActionRecorder interface {
+	Put(rec ActionRecord) error
 }
 
 // ErrActionRecordNotFound is the sentinel ActionStore implementations
@@ -216,4 +221,7 @@ func (s *MemoryActionStore) Reset() {
 }
 
 // satisfaction guard.
-var _ ActionStore = (*MemoryActionStore)(nil)
+var (
+	_ ActionStore    = (*MemoryActionStore)(nil)
+	_ ActionRecorder = (*MemoryActionStore)(nil)
+)

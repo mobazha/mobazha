@@ -71,12 +71,12 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 		return coinType, nil, fmt.Errorf("failed to get vendor: %w", err)
 	}
 
-	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
+	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
 		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
 
-	result, err := strategy.Complete(context.Background(), payment.ActionParams{
+	result, err := strategy.GetCompleteInstructions(context.Background(), payment.InstructionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		OrderData:     &order,
@@ -455,6 +455,13 @@ func (s *OrderAppService) releaseCompleteEscrowFunds(order *models.Order, wallet
 	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if release, tx, handled, err := s.submitManagedEscrowCompleteAction(context.Background(), order, coinType, paymentSent, releaseInfo); handled {
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to submit ManagedEscrow complete action: %w", err)
+		}
+		return release, tx, nil
 	}
 
 	txn := iwallet.Transaction{

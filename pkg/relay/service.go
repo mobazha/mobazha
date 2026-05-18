@@ -12,12 +12,22 @@ type EVMRelayRequest struct {
 	ChainType string // eth, bsc, polygon, etc.
 	To        string // 合约地址
 	Data      string // 调用数据（hex格式）
-	OrderID   string // 订单ID（用于日志追踪）
+	OrderID   string // Mobazha 订单 ID（用于日志追踪与会话对齐）
+
+	// SettlementAction echoes confirm|cancel|complete|dispute_release|relay_submit — hosting logs。
+	SettlementAction string
+
+	// ClientActionID correlates hosting ↔ node projections (poll key before tx lands).
+	ClientActionID string
 }
 
 // EVMRelayResponse 中继响应
 type EVMRelayResponse struct {
 	TxHash string
+
+	// TaskID is allocated at Execute start on the platform relay (HTTP or in-process)
+	// for log correlation and projections.
+	TaskID string
 }
 
 // EVMGasWalletStatus reports operational health of the relay's gas
@@ -59,6 +69,8 @@ type EVMRelayService interface {
 	// EVMRelayRequest from a ManagedEscrowTx (which carries chainID) use this
 	// to avoid hard-coding a parallel chainID→chainType map that would
 	// drift from hosting's RelayConfig over time.
+	// The HTTP standalone implementation prefers GET /platform/v1/relay/status
+	// evmChains when available, then falls back to a static map.
 	ChainTypeForID(chainID uint64) (string, error)
 }
 

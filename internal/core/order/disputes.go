@@ -524,7 +524,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	paymentSent := preferredContract.GetPaymentSent()
 	coinType := iwallet.CoinType(paymentSent.Coin)
 
-	disputeStrategy, err := s.paymentRegistry.ForCoin(coinType)
+	disputeStrategy, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
 		return fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
 	}
@@ -581,31 +581,56 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		return fmt.Errorf("failed to build release transaction: %w", err)
 	}
 
-	script, err := hex.DecodeString(paymentSent.Script)
+	orderData, err := orderDataWithPaymentSent(orderID, paymentSent)
 	if err != nil {
-		return fmt.Errorf("failed to decode payment script: %w", err)
+		return fmt.Errorf("failed to materialize dispute order data for ManagedEscrow signing: %w", err)
 	}
 
-	chainCode, err := hex.DecodeString(paymentSent.Chaincode)
-	if err != nil {
-		return fmt.Errorf("failed to decode payment chaincode: %w", err)
-	}
+	if managed_escrowSigs, handled, err := s.signManagedEscrowActionRelease(context.Background(), coinType, "dispute_release", payment.ActionParams{
+		OrderID:       orderID.String(),
+		PaymentCoin:   paymentSent.Coin,
+		PaymentAmount: paymentSent.Amount,
+		Chaincode:     paymentSent.Chaincode,
+		Script:        paymentSent.Script,
+		OrderData:     orderData,
+		ReleaseInfo:   &moderatedEscrowRelease,
+	}); handled {
+		if err != nil {
+			return fmt.Errorf("failed to sign ManagedEscrow dispute release action: %w", err)
+		}
+		moderatedEscrowRelease.EscrowSignatures = append(moderatedEscrowRelease.EscrowSignatures, managed_escrowSigs...)
+	} else {
+		legacyStrategy, err := s.paymentRegistry.ForCoin(coinType)
+		if err != nil {
+			return fmt.Errorf("no legacy chain escrow for coin %s: %w", paymentSent.Coin, err)
+		}
 
-	sigs, err := disputeStrategy.SignEscrowRelease(context.Background(), payment.SignEscrowParams{
-		Transaction: txn,
-		Script:      script,
-		ChainCode:   chainCode,
-		CoinCode:    paymentSent.Coin,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to sign escrow release: %w", err)
-	}
+		script, err := hex.DecodeString(paymentSent.Script)
+		if err != nil {
+			return fmt.Errorf("failed to decode payment script: %w", err)
+		}
 
-	for _, sig := range sigs {
-		moderatedEscrowRelease.EscrowSignatures = append(moderatedEscrowRelease.EscrowSignatures, &pb.Signature{
-			Signature: sig.Signature,
-			Index:     uint32(sig.Index),
+		chainCode, err := hex.DecodeString(paymentSent.Chaincode)
+		if err != nil {
+			return fmt.Errorf("failed to decode payment chaincode: %w", err)
+		}
+
+		sigs, err := legacyStrategy.SignEscrowRelease(context.Background(), payment.SignEscrowParams{
+			Transaction: txn,
+			Script:      script,
+			ChainCode:   chainCode,
+			CoinCode:    paymentSent.Coin,
 		})
+		if err != nil {
+			return fmt.Errorf("failed to sign escrow release: %w", err)
+		}
+
+		for _, sig := range sigs {
+			moderatedEscrowRelease.EscrowSignatures = append(moderatedEscrowRelease.EscrowSignatures, &pb.Signature{
+				Signature: sig.Signature,
+				Index:     uint32(sig.Index),
+			})
+		}
 	}
 
 	disputeClose := &pb.DisputeClose{
@@ -800,10 +825,18 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 		return fmt.Errorf("build dispute release tx: %w", err)
 	}
 
-	releaseStrategy, stratErr := s.paymentRegistry.ForCoin(iwallet.CoinType(paymentSent.Coin))
+	releaseStrategy, stratErr := s.v2StrategyForCoin(iwallet.CoinType(paymentSent.Coin))
 	isMonitored := stratErr == nil && releaseStrategy.Model() == payment.PaymentModelMonitored
 	isClientSigned := stratErr == nil && releaseStrategy.Model() == payment.PaymentModelClientSigned
-	if isMonitored {
+	if txidManagedEscrow, txManagedEscrow, handled, err := s.submitManagedEscrowDisputeReleaseAction(context.Background(), order, iwallet.CoinType(paymentSent.Coin), paymentSent, disputeClose.ReleaseInfo); handled {
+		if err != nil {
+			return err
+		}
+		txid = txidManagedEscrow
+		if txManagedEscrow != nil {
+			releaseTx = *txManagedEscrow
+		}
+	} else if isMonitored {
 		if err := s.signAndSendReleaseTransaction(&releaseTx, paymentSent, disputeClose); err != nil {
 			return err
 		}

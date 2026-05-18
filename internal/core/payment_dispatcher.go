@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
+	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
@@ -15,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha3.0/pkg/relay"
 	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"gorm.io/gorm"
@@ -135,11 +138,9 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 //     execTransaction envelopes against the live ManagedEscrow nonce. Wired
 //     unconditionally because multiwallet is already required for
 //     shadow registration to begin.
-//   - D18c — Relayer. SaaS Relay client bridged from
-//     HostService.GetEVMRelayService() via adapters.NewRelayBridge.
-//     Standalone nodes without HostService fall back to NoopRelayer()
-//     (Submit returns ErrRelayerNotConfigured; standalone relay is
-//     earmarked for Phase S).
+//   - D18c — Relayer. Hosted/SaaS: HostService.GetEVMRelayService() via
+//     adapters.NewRelayBridgeWithRecorder. Standalone: RelayAPIURL + Bearer from
+//     RelayAPIBearer, else pkg/relay.EnvPlatformRelayToken (same as Settlement HTTP).
 //
 // Test-only paths that build a stripped MobazhaNode (no paymentService)
 // continue to leave OwnerProvider nil, so SetupPayment short-circuits
@@ -158,11 +159,42 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		return
 	}
 
-	store := adapters.NewMemoryActionStore()
+	var store adapters.ActionStore
+	var recorder adapters.ActionRecorder
+
+	if n.db != nil {
+		if err := dbgorm.MigrateManagedEscrowRelayActionModels(n.db); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "ManagedEscrow relay actions: migrate failed (non-fatal): %v", err)
+		}
+		if sqlStore := NewManagedEscrowRelayActionStore(n.db); sqlStore != nil {
+			store = sqlStore
+			recorder = sqlStore
+		}
+	}
+	if store == nil {
+		mem := adapters.NewMemoryActionStore()
+		store = mem
+		recorder = mem
+	}
+
+	activeChainsEarly := managed_escrow.ManagedEscrowEnabledChains(n.managed_escrowCapConfig)
+	if len(activeChainsEarly) > 0 && n.db == nil {
+		logger.LogWarningWithIDf(log, n.nodeID,
+			"ManagedEscrowAdapter V2: database unavailable — skipping ManagedEscrow-enabled chains (on-chain observation requires persistence)")
+	}
+
+	var relaySvc relay.EVMRelayService
+	if n.hostService != nil {
+		relaySvc = n.hostService.GetEVMRelayService()
+	} else if u := strings.TrimSpace(n.relayAPIURL); u != "" {
+		tok := relay.BearerFromConfigOrEnv(n.relayAPIBearer)
+		relaySvc = relay.NewHTTPPlatformRelay(u, tok)
+		logger.LogInfoWithIDf(log, n.nodeID, "ManagedEscrow relay: using HTTP platform relay (RelayAPIURL)")
+	}
 
 	var relayer managed_escrow.Relayer = managed_escrow.NoopRelayer()
-	if n.hostService != nil {
-		relayer = adapters.NewRelayBridge(n.hostService.GetEVMRelayService())
+	if relaySvc != nil {
+		relayer = adapters.NewRelayBridgeWithRecorder(relaySvc, recorder)
 	}
 
 	deps := adapters.ManagedEscrowAdapterDeps{
@@ -170,6 +202,7 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		Keys:          n.keyProvider,
 		Multiwallet:   n.multiwallet,
 		ActionStore:   store,
+		OwnerSigner:   &paymentManagedEscrowOwnerSigner{keys: n.keyProvider},
 		NonceProvider: &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet},
 		WalletTestnet: n.walletTestnet,
 	}
@@ -184,10 +217,12 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 			"ManagedEscrowAdapter shadow registration: paymentService unavailable; OwnerProvider left nil (SetupPayment will stub)")
 	}
 
-	activeChains := managed_escrow.ManagedEscrowEnabledChains(n.managed_escrowCapConfig)
-	shadow := make(map[iwallet.ChainType]*adapters.ManagedEscrowAdapter, len(activeChains))
-	monitors := make(map[iwallet.ChainType]*managed_escrow.LiveMonitor, len(activeChains))
-	for _, chain := range activeChains {
+	shadow := make(map[iwallet.ChainType]*adapters.ManagedEscrowAdapter, len(activeChainsEarly))
+	monitors := make(map[iwallet.ChainType]*managed_escrow.LiveMonitor, len(activeChainsEarly))
+	for _, chain := range activeChainsEarly {
+		if n.db == nil {
+			continue
+		}
 		monitor, err := n.buildManagedEscrowMonitor(chain)
 		if err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID,
@@ -229,12 +264,12 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		managed_escrow.SetManagedEscrowRoutingDecision(string(chain), false)
 	}
 
-	if len(activeChains) == 0 {
+	if len(activeChainsEarly) == 0 {
 		logger.LogInfoWithIDf(log, n.nodeID,
 			"ManagedEscrowAdapter: no chains activated (managed_escrow_chains config empty — all EVM on V1 legacy path)")
 	} else {
 		logger.LogInfoWithIDf(log, n.nodeID,
-			"ManagedEscrowAdapter V2 activated for %d/%d EVM chains: %v", len(shadow), len(activeChains), shadow)
+			"ManagedEscrowAdapter V2 activated for %d/%d EVM chains: %v", len(shadow), len(activeChainsEarly), shadow)
 	}
 }
 
@@ -281,8 +316,8 @@ func (n *MobazhaNode) buildManagedEscrowMonitor(chain iwallet.ChainType) (*manag
 	}
 
 	return managed_escrow.NewLiveMonitor(logClient, handler, managed_escrow.LiveMonitorConfig{
-		ChainID:            chainID,
-		ConfirmationDepth:  0,
+		ChainID:           chainID,
+		ConfirmationDepth: 0,
 	}), nil
 }
 
@@ -370,14 +405,14 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 		return
 	}
 
-	strategy, err := n.paymentRegistry.ForCoin(coinType)
+	strategyV2, err := n.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
 		logger.LogWarningWithIDf(log, n.nodeID, "No chain escrow for coin %s (order %s): %v", event.Coin, event.OrderID, err)
 		return
 	}
 
 	go func() {
-		if err := strategy.AutoConfirm(context.Background(), event); err != nil {
+		if err := strategyV2.AutoConfirm(context.Background(), event); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "AutoConfirm failed for order %s (coin=%s): %v", event.OrderID, event.Coin, err)
 		}
 	}()

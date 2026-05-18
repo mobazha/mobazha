@@ -7,6 +7,11 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // --- mock implementations ---
@@ -72,15 +77,41 @@ func (m *mockGuestSvc) IsEnabled(ctx context.Context) bool { return true }
 
 func makeGuestOrder(token, email, coin string, state models.GuestOrderState, createdAt time.Time) models.GuestOrder {
 	return models.GuestOrder{
-		OrderToken:   token,
-		ContactEmail: email,
-		PaymentCoin:  coin,
+		OrderToken:    token,
+		ContactEmail:  email,
+		PaymentCoin:   coin,
 		PaymentAmount: "1000000",
-		State:        state,
-		CreatedAt:    createdAt,
+		State:         state,
+		CreatedAt:     createdAt,
 		Items: []models.GuestOrderItem{
 			{ListingTitle: "Item for " + token, Quantity: 1},
 		},
+	}
+}
+
+func testutilOrderOpenMessage(t *testing.T, createdAt time.Time) *npb.OrderMessage {
+	t.Helper()
+	msgAny, err := anypb.New(&pb.OrderOpen{
+		Timestamp:   timestamppb.New(createdAt),
+		Amount:      "1000",
+		PricingCoin: "USD",
+		BuyerID:     &pb.ID{Name: "Buyer"},
+		Listings: []*pb.SignedListing{{
+			Cid: "listing-1",
+			Listing: &pb.Listing{
+				Item: &pb.Listing_Item{Title: "Test Listing"},
+			},
+		}},
+		Items: []*pb.OrderOpen_Item{{
+			ListingHash: "listing-1",
+			Quantity:    "1",
+		}},
+	})
+	require.NoError(t, err)
+	return &npb.OrderMessage{
+		OrderID:     "std-1",
+		MessageType: npb.OrderMessage_ORDER_OPEN,
+		Message:     msgAny,
 	}
 }
 
@@ -88,13 +119,25 @@ func makeGuestOrder(token, email, coin string, state models.GuestOrderState, cre
 
 func TestUnifiedOrderView_MergesGuestAndStandard(t *testing.T) {
 	now := time.Now()
+	stdOrder := models.Order{
+		ID:    models.OrderID("std-1"),
+		State: models.OrderState_PENDING,
+		SettlementActions: []models.SettlementActionSnapshot{{
+			ActionID: "act-1",
+			Action:   "complete",
+			State:    "submitted",
+			TxHash:   "0xabc",
+		}},
+	}
+	require.NoError(t, stdOrder.SetPaymentSent(&pb.PaymentSent{Coin: "crypto:eip155:1:native"}))
+	require.NoError(t, stdOrder.PutMessage(testutilOrderOpenMessage(t, now)))
 	guestOrders := []models.GuestOrder{
 		makeGuestOrder("tok1", "a@b.com", "BTC", models.GuestOrderAwaitingPayment, now.Add(-1*time.Hour)),
 		makeGuestOrder("tok2", "c@d.com", "ETH", models.GuestOrderFunded, now.Add(-30*time.Minute)),
 	}
 
 	v := NewUnifiedOrderView(
-		&mockStandardFetcher{},
+		&mockStandardFetcher{orders: []models.Order{stdOrder}, total: 1},
 		&mockGuestSvc{orders: guestOrders, total: 2},
 		nil,
 	)
@@ -106,16 +149,35 @@ func TestUnifiedOrderView_MergesGuestAndStandard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(results) != 2 {
-		t.Fatalf("expected 2 orders, got %d", len(results))
+	if len(results) != 3 {
+		t.Fatalf("expected 3 orders, got %d", len(results))
 	}
 
 	if results[0].CreatedAt.Before(results[1].CreatedAt) {
 		t.Error("expected descending order by createdAt")
 	}
 
-	if meta.Total != 2 {
-		t.Errorf("expected total=2, got %d", meta.Total)
+	if meta.Total != 3 {
+		t.Errorf("expected total=3, got %d", meta.Total)
+	}
+
+	foundStandard := false
+	for _, result := range results {
+		if result.ID == "std-1" {
+			foundStandard = true
+			if result.SettlementAction != "complete" {
+				t.Fatalf("SettlementAction = %q, want complete", result.SettlementAction)
+			}
+			if result.SettlementActionID != "act-1" {
+				t.Fatalf("SettlementActionID = %q, want act-1", result.SettlementActionID)
+			}
+			if result.SettlementState != "submitted" {
+				t.Fatalf("SettlementState = %q, want submitted", result.SettlementState)
+			}
+		}
+	}
+	if !foundStandard {
+		t.Fatal("expected standard order in merged results")
 	}
 }
 

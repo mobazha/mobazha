@@ -4,15 +4,18 @@ package settlement
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -47,13 +50,24 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 		return "", payoutAddress, fmt.Errorf("payment registry not initialized")
 	}
 
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategyV2, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
 		return "", payoutAddress, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
-	switch strategy.Model() {
+	switch strategyV2.Model() {
 	case payment.PaymentModelMonitored:
+		coinInfo, cerr := iwallet.CoinInfoFromCoinType(coinType)
+		if cerr != nil {
+			return "", payoutAddress, cerr
+		}
+		// ManagedEscrow-backed EVM orders no longer share the legacy seller-confirm path.
+		// They require the unified settlement-action flow so the caller can
+		// obtain a pollable ActionID instead of forcing an implicit relay.
+		if coinInfo.IsEthTypeChain() {
+			return "", payoutAddress, fmt.Errorf("%w: ManagedEscrow-backed EVM orders must use POST /v1/orders/{orderID}/settlement-actions/confirm",
+				coreiface.ErrBadRequest)
+		}
 		return s.releaseMonitoredCancelableFunds(order, payoutAddress)
 	case payment.PaymentModelClientSigned:
 		coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
@@ -219,6 +233,9 @@ func (s *SettlementService) RelayInstructions(orderID string, coinType iwallet.C
 		}
 		txData, ok := instructions.(*ethWal.TransactionData)
 		if !ok {
+			if _, isMap := instructions.(map[string]any); isMap {
+				return "", fmt.Errorf("%w: ManagedEscrow-backed EVM instructions require the unified settlement-action submit flow", coreiface.ErrBadRequest)
+			}
 			return "", fmt.Errorf("invalid EVM transaction data type: %T", instructions)
 		}
 		return s.RelayEVMTransactionWithRetry(context.Background(), orderID, string(coinInfo.Chain), string(coinType), txData)
@@ -282,12 +299,21 @@ func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, 
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		PayoutAddr:    payoutAddress,
+		PaymentCoin:   paymentSent.Coin,
+		PaymentAmount: paymentSent.Amount,
+		Chaincode:     paymentSent.Chaincode,
+		Script:        paymentSent.Script,
+		OrderData:     &order,
 	})
 	if err != nil {
 		return coinType, nil, err
 	}
 
-	return coinType, result.Instructions, nil
+	instructions = nil
+	if result != nil {
+		instructions = result.Instructions
+	}
+	return coinType, instructions, nil
 }
 
 // ── EVM Relay Infrastructure ────────────────────────────────────────────
@@ -300,14 +326,17 @@ type RelayExecuteRequest struct {
 	OrderID   string `json:"orderId"`
 }
 
-// RelayExecuteResponse is the response structure from platform relay API.
+// RelayExecuteResponse is the inner payload of response.Success for platform relay.
 type RelayExecuteResponse struct {
 	Success bool   `json:"success"`
 	TxHash  string `json:"txHash,omitempty"`
 	Error   string `json:"error,omitempty"`
 }
 
-// RelayEVMTransaction sends a transaction to the platform relay service.
+type relayExecuteSuccessEnvelope struct {
+	Data RelayExecuteResponse `json:"data"`
+}
+
 func (s *SettlementService) RelayEVMTransaction(orderID, chainType string, txData *ethWal.TransactionData) (string, error) {
 	if s.evmRelayService != nil && s.evmRelayService.IsAvailable() {
 		logger.LogInfoWithIDf(log, s.nodeID, "Using HostService relay for order %s (direct call)", orderID)
@@ -339,14 +368,17 @@ func (s *SettlementService) relayEVMTransactionViaHTTP(orderID, chainType string
 		OrderID:   orderID,
 	}
 
-	var relayResp RelayExecuteResponse
-	resp, err := resty.New().
-		SetTimeout(30 * time.Second).
-		R().
-		SetBody(req).
-		SetResult(&relayResp).
-		Post(s.relayAPIURL + "/api/relay/execute")
+	base := strings.TrimRight(strings.TrimSpace(s.relayAPIURL), "/")
+	url := base + "/platform/v1/relay/execute"
 
+	rc := resty.New().SetTimeout(30*time.Second).R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(req)
+	if b := relay.BearerFromConfigOrEnv(s.relayAPIBearer); b != "" {
+		rc.SetHeader("Authorization", "Bearer "+b)
+	}
+
+	resp, err := rc.Post(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to send relay request: %w", err)
 	}
@@ -355,11 +387,18 @@ func (s *SettlementService) relayEVMTransactionViaHTTP(orderID, chainType string
 		return "", fmt.Errorf("relay request failed with status %d", resp.StatusCode())
 	}
 
-	if !relayResp.Success {
-		return "", fmt.Errorf("relay failed: %s", relayResp.Error)
+	var wrap relayExecuteSuccessEnvelope
+	if err := json.Unmarshal(resp.Body(), &wrap); err != nil {
+		return "", fmt.Errorf("relay response: %w", err)
+	}
+	if !wrap.Data.Success || wrap.Data.TxHash == "" {
+		if wrap.Data.Error != "" {
+			return "", fmt.Errorf("relay failed: %s", wrap.Data.Error)
+		}
+		return "", fmt.Errorf("relay failed: empty txHash")
 	}
 
-	return relayResp.TxHash, nil
+	return wrap.Data.TxHash, nil
 }
 
 // VerifyEVMConfirmReceipt delegates to the injected ReceiptVerifier.

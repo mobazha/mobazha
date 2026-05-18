@@ -34,6 +34,7 @@ func (s *stubNode) ShoppingCart() contracts.ShoppingCartService          { retur
 func (s *stubNode) Wishlist() contracts.WishlistService                  { return nil }
 func (s *stubNode) GuestOrder() contracts.GuestOrderService              { return nil }
 func (s *stubNode) ReceivingAccounts() contracts.ReceivingAccountService { return nil }
+func (s *stubNode) PaymentSession() contracts.PaymentSessionService      { return nil }
 func (s *stubNode) EventBus() events.Bus                                 { return nil }
 func (s *stubNode) Publish(_ chan<- struct{})                            {}
 func (s *stubNode) PingNode(_ context.Context, _ peer.ID) error          { return nil }

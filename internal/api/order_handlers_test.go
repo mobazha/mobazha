@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -73,4 +74,21 @@ func TestOrderHandlers(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestLatestSettlementSummary(t *testing.T) {
+	order := models.Order{
+		SettlementActions: []models.SettlementActionSnapshot{{
+			ActionID:  "act-1",
+			Action:    "complete",
+			State:     "submitted",
+			TxHash:    "0xabc",
+			UpdatedAt: time.Now(),
+		}},
+	}
+
+	action, actionID, state, txHash := latestSettlementSummary(order)
+	if action != "complete" || actionID != "act-1" || state != "submitted" || txHash != "0xabc" {
+		t.Fatalf("latestSettlementSummary() = %q, %q, %q, %q", action, actionID, state, txHash)
+	}
 }

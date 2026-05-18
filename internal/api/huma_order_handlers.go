@@ -61,6 +61,8 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 	// Phase PS / B1: unified payment session read endpoint.
 	g.registerOrderPaymentSessionGet(api)
 	g.registerOrderPaymentSessionPost(api)
+	g.registerOrderSettlementActionPost(api)
+	g.registerOrderSettlementActionStatusGet(api)
 
 	g.registerGuestOrdersListAuth(api)
 	g.registerGuestOrderShip(api)
@@ -918,6 +920,76 @@ func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handlePOSTOrderPaymentSession(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerOrderSettlementActionPost registers POST /v1/orders/{orderID}/settlement-actions/{action}.
+//
+// Unified settlement intents (confirm / cancel) via ChainEscrowV2 — complements legacy POST .../instructions/*.
+func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
+	type in struct {
+		OrderID string          `path:"orderID" doc:"Order ID."`
+		Action  string          `path:"action" doc:"Settlement intent: confirm or cancel."`
+		Body    json.RawMessage `json:",omitempty"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "orders-post-settlement-action",
+		Method:      http.MethodPost,
+		Path:        "/v1/orders/{orderID}/settlement-actions/{action}",
+		Summary:     "Execute backend settlement action (confirm / cancel)",
+		Description: "Runs backend-submitted ChainEscrowV2 Confirm or Cancel for crypto orders. " +
+			"Client-signed legacy chains must keep using the legacy instruction endpoints. " +
+			"Fiat orders return 400. Optional body: payoutAddress.",
+		Tags:     []string{"orders", "payments"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/settlement-actions/" + url.PathEscape(hi.Action)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(hi.Body), map[string]string{
+			"orderID": hi.OrderID,
+			"action":  hi.Action,
+		})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePOSTOrderSettlementAction(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerOrderSettlementActionStatusGet registers
+// GET /v1/orders/{orderID}/settlement-actions/{action}/status?actionId=...
+func (g *Gateway) registerOrderSettlementActionStatusGet(api huma.API) {
+	type in struct {
+		OrderID  string `path:"orderID" doc:"Order ID."`
+		Action   string `path:"action" doc:"Settlement intent: confirm or cancel."`
+		ActionID string `query:"actionId" required:"true" doc:"Opaque settlement action poll key returned by POST settlement-actions."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "orders-get-settlement-action-status",
+		Method:      http.MethodGet,
+		Path:        "/v1/orders/{orderID}/settlement-actions/{action}/status",
+		Summary:     "Read unified settlement action status",
+		Description: "Returns the latest status for a previously issued settlement action. " +
+			"ManagedEscrow-backed flows expose relay task correlation and confirmations through this endpoint.",
+		Tags:     []string{"orders", "payments"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/settlement-actions/" + url.PathEscape(hi.Action) +
+			"/status?actionId=" + url.QueryEscape(hi.ActionID)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{
+			"orderID": hi.OrderID,
+			"action":  hi.Action,
+		})
+		rr := httptest.NewRecorder()
+		g.handleGETOrderSettlementActionStatus(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

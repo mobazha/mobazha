@@ -43,6 +43,7 @@ type SettlementService struct {
 	evmRelayService    relay.EVMRelayService
 	solanaRelayService relay.SolanaRelayService
 	relayAPIURL        string
+	relayAPIBearer     string
 
 	// Receipt verification (abstracts away EVM-specific types)
 	receiptVerifier contracts.ReceiptVerifier
@@ -67,6 +68,7 @@ type SettlementServiceConfig struct {
 	EVMRelayService    relay.EVMRelayService
 	SolanaRelayService relay.SolanaRelayService
 	RelayAPIURL        string
+	RelayAPIBearer     string
 }
 
 // NewSettlementService constructs a SettlementService with the given dependencies.
@@ -84,6 +86,7 @@ func NewSettlementService(cfg SettlementServiceConfig) *SettlementService {
 		evmRelayService:    cfg.EVMRelayService,
 		solanaRelayService: cfg.SolanaRelayService,
 		relayAPIURL:        cfg.RelayAPIURL,
+		relayAPIBearer:     cfg.RelayAPIBearer,
 	}
 }
 

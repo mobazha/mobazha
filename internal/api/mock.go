@@ -35,6 +35,8 @@ type mockNode struct {
 	getCasesFunc                     func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
 	confirmOrderFunc                 func(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	getConfirmOrderInstructionsFunc  func(orderID models.OrderID, initiatorAddress string, payoutAddress string) (iwallet.CoinType, any, error)
+	executeSettlementActionFunc      func(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error)
+	getSettlementActionStatusFunc    func(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error)
 	getRefundOrderInstructionsFunc   func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	getCompleteOrderInstructionsFunc func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	shipOrderFunc                    func(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
@@ -206,6 +208,18 @@ func (m *mockNode) ConfirmOrder(orderID models.OrderID, txid iwallet.Transaction
 }
 func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (iwallet.CoinType, any, error) {
 	return m.getConfirmOrderInstructionsFunc(orderID, initiatorAddress, payoutAddress)
+}
+func (m *mockNode) ExecuteSettlementAction(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error) {
+	if m.executeSettlementActionFunc != nil {
+		return m.executeSettlementActionFunc(ctx, action, orderID, payoutAddr)
+	}
+	return nil, "", fmt.Errorf("ExecuteSettlementAction not stubbed in mockNode")
+}
+func (m *mockNode) GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error) {
+	if m.getSettlementActionStatusFunc != nil {
+		return m.getSettlementActionStatusFunc(ctx, action, orderID, actionID)
+	}
+	return nil, "", fmt.Errorf("GetSettlementActionStatus not stubbed in mockNode")
 }
 func (m *mockNode) GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 	return m.getCompleteOrderInstructionsFunc(orderID, initiatorAddress)

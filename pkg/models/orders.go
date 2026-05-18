@@ -260,6 +260,11 @@ type Order struct {
 	OrderCompleteSignature  string
 	OrderCompleteAcked      bool
 
+	// SettlementActions surfaces backend-submitted settlement action state
+	// (ManagedEscrow relay projections) on GET /orders responses. Read-only, never
+	// persisted on the order row itself.
+	SettlementActions []SettlementActionSnapshot `gorm:"-" json:"settlementActions,omitempty"`
+
 	SerializedDisputeOpen      []byte
 	DisputeOpenSignature       string
 	DisputeOpenOtherPartyAcked bool
@@ -714,9 +719,9 @@ func (o *Order) Chaincode() (string, error) {
 // PaymentSessionProjector to classify ManagedEscrow EVM orders as address_monitored
 // without waiting for PaymentSent.
 type PendingManagedEscrowPaymentInfo struct {
-	Type    string `json:"type"`            // always "managed_escrow"
-	Coin    string `json:"coin,omitempty"`  // canonical coin type (e.g. "crypto:eth:eth")
-	Address string `json:"address"`         // predicted ManagedEscrow address (hex, "0x…")
+	Type    string `json:"type"`           // always "managed_escrow"
+	Coin    string `json:"coin,omitempty"` // canonical coin type (e.g. "crypto:eth:eth")
+	Address string `json:"address"`        // predicted ManagedEscrow address (hex, "0x…")
 }
 
 // SetPendingManagedEscrowPaymentInfo stores ManagedEscrow EVM payment info in PendingPaymentInfo.

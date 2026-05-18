@@ -4,7 +4,9 @@ package order
 
 import (
 	"testing"
+	"time"
 
+	intdb "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -31,6 +33,7 @@ func newTestOrderAppService(t *testing.T, cfg OrderAppServiceConfig) *OrderAppSe
 	if cfg.NodeID == "" {
 		cfg.NodeID = "test-order-svc"
 	}
+	require.NoError(t, intdb.MigrateManagedEscrowRelayActionModels(cfg.DB))
 	return NewOrderAppService(cfg)
 }
 
@@ -91,6 +94,31 @@ func TestOrderAppService_GetOrder_Found(t *testing.T) {
 	order, err := svc.GetOrder("order-get-1")
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderID("order-get-1"), order.ID)
+}
+
+func TestOrderAppService_GetOrder_AttachesSettlementActions(t *testing.T) {
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+	seedOrder(t, svc, "order-get-safe", "buyer", models.OrderState_PENDING)
+	err := svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ManagedEscrowRelayAction{
+			ActionID:    "act-1",
+			OrderID:     "order-get-safe",
+			ActionKind:  "complete",
+			State:       "submitted",
+			TxHash:      "0xabc",
+			UpdatedAt:   time.Now().UTC(),
+			CreatedAt:   time.Now().UTC(),
+			RelayTaskID: "task-1",
+		})
+	})
+	require.NoError(t, err)
+
+	order, err := svc.GetOrder("order-get-safe")
+	require.NoError(t, err)
+	require.Len(t, order.SettlementActions, 1)
+	assert.Equal(t, "act-1", order.SettlementActions[0].ActionID)
+	assert.Equal(t, "complete", order.SettlementActions[0].Action)
+	assert.Equal(t, "submitted", order.SettlementActions[0].State)
 }
 
 // ── GetPurchases ────────────────────────────────────────────────────────

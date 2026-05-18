@@ -163,16 +163,29 @@ func convertStandardOrder(order models.Order) *contracts.OrderSummary {
 		ts = oo.Timestamp.AsTime()
 	}
 
+	var settlementAction, settlementActionID, settlementState, settlementTxHash string
+	if len(order.SettlementActions) > 0 {
+		latest := order.SettlementActions[0]
+		settlementAction = latest.Action
+		settlementActionID = latest.ActionID
+		settlementState = latest.State
+		settlementTxHash = latest.TxHash
+	}
+
 	return &contracts.OrderSummary{
-		ID:          order.ID.String(),
-		Type:        "standard",
-		State:       order.State.String(),
-		BuyerName:   buyerName,
-		Items:       items,
-		Total:       priceSummary,
-		PaymentCoin: paymentCoin,
-		CreatedAt:   ts,
-		UpdatedAt:   ts,
+		ID:                 order.ID.String(),
+		Type:               "standard",
+		State:              order.State.String(),
+		BuyerName:          buyerName,
+		Items:              items,
+		Total:              priceSummary,
+		PaymentCoin:        paymentCoin,
+		SettlementAction:   settlementAction,
+		SettlementActionID: settlementActionID,
+		SettlementState:    settlementState,
+		SettlementTxHash:   settlementTxHash,
+		CreatedAt:          ts,
+		UpdatedAt:          ts,
 	}
 }
 

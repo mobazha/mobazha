@@ -79,6 +79,13 @@ type OrderService interface {
 	RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error)
+	// ExecuteSettlementAction runs backend-driven settlement intents
+	// (confirm / cancel) via ChainEscrowV2. Client-signed legacy chains
+	// are intentionally excluded from this surface.
+	ExecuteSettlementAction(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error)
+	// GetSettlementActionStatus returns the latest known lifecycle state for a
+	// previously issued settlement action.
+	GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error)
 	GetRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
 	GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
@@ -828,6 +835,7 @@ type SchedulerHooks interface {
 	RunOutboxPollOnce(ctx context.Context)
 	RunOutboxCleanupOnce(ctx context.Context)
 	RunPaymentVerificationOnce(ctx context.Context)
+	RunManagedEscrowRelayConfirmationsOnce(ctx context.Context)
 	RunWebhookDeliveryOnce(ctx context.Context)
 	RunWebhookCleanupOnce(ctx context.Context)
 	RunAnalyticsCleanupOnce(ctx context.Context)

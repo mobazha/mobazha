@@ -110,6 +110,14 @@ func orderActionErrorResponse(w http.ResponseWriter, err error) {
 	}
 }
 
+func latestSettlementSummary(order models.Order) (action, actionID, state, txHash string) {
+	if len(order.SettlementActions) == 0 {
+		return "", "", "", ""
+	}
+	latest := order.SettlementActions[0]
+	return latest.Action, latest.ActionID, latest.State, latest.TxHash
+}
+
 func (g *Gateway) handlePOSTPurchase(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var data models.Purchase
@@ -208,14 +216,15 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type OrderRespApi struct {
-		Contract           *models.Order               `json:"contract,omitempty"`
-		State              string                      `json:"state,omitempty"`
-		Read               bool                        `json:"read,omitempty"`
-		UnreadChatMessages int64                       `json:"unreadChatMessages,omitempty"`
-		Funded             bool                        `json:"funded,omitempty"`
-		Completable        bool                        `json:"completable,omitempty"`
-		PaymentState       paymentStateResp            `json:"paymentState"`
-		Protection         *models.OrderProtectionInfo `json:"protection,omitempty"`
+		Contract           *models.Order                     `json:"contract,omitempty"`
+		State              string                            `json:"state,omitempty"`
+		Read               bool                              `json:"read,omitempty"`
+		SettlementActions  []models.SettlementActionSnapshot `json:"settlementActions,omitempty"`
+		UnreadChatMessages int64                             `json:"unreadChatMessages,omitempty"`
+		Funded             bool                              `json:"funded,omitempty"`
+		Completable        bool                              `json:"completable,omitempty"`
+		PaymentState       paymentStateResp                  `json:"paymentState"`
+		Protection         *models.OrderProtectionInfo       `json:"protection,omitempty"`
 	}
 
 	isFunded, _ := order.IsFunded()
@@ -227,6 +236,7 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	ret := OrderRespApi{
 		Contract:           order,
 		State:              order.State.String(),
+		SettlementActions:  order.SettlementActions,
 		UnreadChatMessages: unreadChatMsgCount,
 		Funded:             isFunded,
 		Completable:        order.CanComplete(),
@@ -306,6 +316,10 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 		State              string                      `json:"state"`
 		Read               bool                        `json:"read"`
 		Moderated          bool                        `json:"moderated"`
+		SettlementAction   string                      `json:"settlementAction,omitempty"`
+		SettlementActionID string                      `json:"settlementActionId,omitempty"`
+		SettlementState    string                      `json:"settlementState,omitempty"`
+		SettlementTxHash   string                      `json:"settlementTxHash,omitempty"`
 		UnreadChatMessages int                         `json:"unreadChatMessages"`
 		Protection         *models.OrderProtectionInfo `json:"protection,omitempty"`
 	}
@@ -361,6 +375,7 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 			Moderated:          isModerated,
 			Protection:         order.ComputeProtection(now),
 		}
+		info.SettlementAction, info.SettlementActionID, info.SettlementState, info.SettlementTxHash = latestSettlementSummary(order)
 
 		purchases = append(purchases, info)
 	}
@@ -436,6 +451,10 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 		State              string                      `json:"state"`
 		Read               bool                        `json:"read"`
 		Moderated          bool                        `json:"moderated"`
+		SettlementAction   string                      `json:"settlementAction,omitempty"`
+		SettlementActionID string                      `json:"settlementActionId,omitempty"`
+		SettlementState    string                      `json:"settlementState,omitempty"`
+		SettlementTxHash   string                      `json:"settlementTxHash,omitempty"`
 		UnreadChatMessages int                         `json:"unreadChatMessages"`
 		Protection         *models.OrderProtectionInfo `json:"protection,omitempty"`
 	}
@@ -491,6 +510,7 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 			Moderated:          isModerated,
 			Protection:         order.ComputeProtection(now),
 		}
+		info.SettlementAction, info.SettlementActionID, info.SettlementState, info.SettlementTxHash = latestSettlementSummary(order)
 
 		sales = append(sales, info)
 	}

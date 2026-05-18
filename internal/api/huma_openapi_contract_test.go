@@ -257,6 +257,8 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"orders-post-instructions-refund",
 		"orders-post-payment-cancel-partial",
 		"orders-post-payment-session",
+		"orders-get-settlement-action-status",
+		"orders-post-settlement-action",
 		"orders-post-payment",
 		"orders-post-rate",
 		"orders-post-refund",

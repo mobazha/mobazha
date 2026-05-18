@@ -746,6 +746,7 @@ func (n *MobazhaNode) initSettlementService() {
 		EVMRelayService:    evmRelay,
 		SolanaRelayService: solanaRelay,
 		RelayAPIURL:        n.relayAPIURL,
+		RelayAPIBearer:     n.relayAPIBearer,
 	})
 
 	if n.paymentService != nil {

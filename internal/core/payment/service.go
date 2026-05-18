@@ -220,7 +220,7 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 		result.PaymentData.ToAddress != "" {
 
 		setupResult.IsManagedEscrowOrder = true
-		if persistErr := s.persistManagedEscrowPaymentAddress(params.OrderID, string(params.CoinType), result.PaymentData.ToAddress); persistErr != nil {
+		if persistErr := s.persistManagedEscrowPaymentAddress(params.OrderID, string(params.CoinType), result.PaymentData.ToAddress, result.PaymentData.Amount); persistErr != nil {
 			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist ManagedEscrow address for order %s: %v", params.OrderID, persistErr)
 			// Non-fatal: monitoring is already registered; the projector will
 			// fall back to escrow_v1 until the next call succeeds.
@@ -233,7 +233,7 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 // persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
-func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string) error {
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64) error {
 	return s.db.Update(func(tx database.Tx) error {
 		var order models.Order
 		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
@@ -242,6 +242,7 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 		order.PaymentAddress = managed_escrowAddress
 		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
 			Coin:    coin,
+			Amount:  amount,
 			Address: managed_escrowAddress,
 		}); err != nil {
 			return fmt.Errorf("set pending managed escrow payment info: %w", err)

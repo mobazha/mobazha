@@ -77,7 +77,7 @@ func (g *Gateway) handleGETOrderPaymentSession(w http.ResponseWriter, r *http.Re
 // Body JSON (camelCase):
 //   - paymentCoin (required): canonical coin after ingress normalization;
 //     legacy native tickers are accepted and normalized server-side.
-//   - refundAddress (required for crypto); payerAddress / moderator forwarded to escrow setup where applicable.
+//   - refundAddress (optional for crypto); payerAddress / moderator forwarded to escrow setup where applicable.
 //   - fiatAmountCents, fiatDescription, fiatReturnURL, fiatCancelURL: required for
 //     fiat:{provider}:{currency} when provisioning a new provider checkout session.
 //
@@ -149,14 +149,6 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 		FiatDescription: payload.FiatDescription,
 		FiatReturnURL:   payload.FiatReturnURL,
 		FiatCancelURL:   payload.FiatCancelURL,
-	}
-
-	if strings.HasPrefix(strings.ToLower(req.PaymentCoin), "crypto:") {
-		if strings.TrimSpace(req.RefundAddress) == "" {
-			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation,
-				"refundAddress is required for crypto payment-session provisioning")
-			return
-		}
 	}
 
 	if strings.HasPrefix(strings.ToLower(req.PaymentCoin), "fiat:") && req.FiatAmountCents <= 0 {

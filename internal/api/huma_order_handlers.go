@@ -898,7 +898,7 @@ func (g *Gateway) registerOrderPaymentSessionGet(api huma.API) {
 // registerOrderPaymentSessionPost registers POST /v1/orders/{orderID}/payment-session.
 //
 // Phase PS / B5: provisions checkout via PaymentSessionService (canonical paymentCoin):
-// fiat (fiatAmountCents, etc.) and crypto (refundAddress, optional payerAddress/moderator).
+// fiat (fiatAmountCents, etc.) and crypto (optional refundAddress/payerAddress/moderator).
 func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 	type in struct {
 		OrderID string          `path:"orderID" doc:"Order ID."`
@@ -911,7 +911,7 @@ func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 		Summary:     "Provision unified payment session",
 		Description: "Creates or idempotently returns a PaymentSession. Fiat: canonical " +
 			"paymentCoin fiat:{provider}:{currency}, fiatAmountCents (>0), and optional PayPal return/cancel URLs. " +
-			"Crypto: refundAddress plus optional payerAddress/moderator; delegates to escrow instruction generation.",
+			"Crypto: optional refundAddress/payerAddress/moderator; address-monitored flows may auto-fill refunds after confirmation.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {

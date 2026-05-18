@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
@@ -41,7 +41,7 @@ var (
 	testBNBNativeCoin   = mustNativeCoin(iwallet.ChainBSC)
 	testMATICNativeCoin = mustNativeCoin(iwallet.ChainPolygon)
 	testBASENativeCoin  = mustNativeCoin(iwallet.ChainBase)
-	testSOLNativeCoin = mustNativeCoin(iwallet.ChainSolana)
+	testSOLNativeCoin   = mustNativeCoin(iwallet.ChainSolana)
 )
 
 func mustNativeCoin(chain iwallet.ChainType) iwallet.CoinType {
@@ -456,6 +456,67 @@ func TestManagedEscrowAdapterShadow_RegistersManagedEscrowMonitorsWhenMonitorDep
 		if _, ok := n.managedEscrowAdapters[chain]; !ok {
 			t.Fatalf("managedEscrowAdapters[%s] missing despite monitor deps being available", chain)
 		}
+	}
+}
+
+func TestRuntimeManagedEscrowChainID_UsesPublicTestnetIDs(t *testing.T) {
+	n := &MobazhaNode{modeFlags: modeFlags{walletTestnet: true}}
+
+	cases := []struct {
+		chain iwallet.ChainType
+		want  uint64
+	}{
+		{iwallet.ChainEthereum, 11155111},
+		{iwallet.ChainBSC, 97},
+		{iwallet.ChainPolygon, 80002},
+		{iwallet.ChainBase, 84532},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.chain), func(t *testing.T) {
+			if got := n.runtimeManagedEscrowChainID(tc.chain); got != tc.want {
+				t.Fatalf("runtimeManagedEscrowChainID(%s) = %d, want %d", tc.chain, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRuntimeManagedEscrowChainID_TestnetFailsClosedWithoutExplicitMapping(t *testing.T) {
+	n := &MobazhaNode{modeFlags: modeFlags{walletTestnet: true}}
+
+	if got := n.runtimeManagedEscrowChainID(iwallet.ChainOptimism); got != 0 {
+		t.Fatalf("runtimeManagedEscrowChainID(Optimism testnet) = %d, want 0 until explicit ManagedEscrow testnet support lands", got)
+	}
+}
+
+func TestRuntimeManagedEscrowChainID_UsesWalletRuntimeNetwork(t *testing.T) {
+	n := &MobazhaNode{
+		walletFields: walletFields{
+			multiwallet: &mockWalletOperatorWithChainWallets{wallets: map[iwallet.ChainType]iwallet.Wallet{
+				iwallet.ChainEthereum: newMockEVMWallet(iwallet.ChainEthereum, nil),
+			}},
+		},
+	}
+
+	if got := n.runtimeManagedEscrowChainID(iwallet.ChainEthereum); got != 11155111 {
+		t.Fatalf("runtimeManagedEscrowChainID(ETH) = %d, want Sepolia chain id", got)
+	}
+}
+
+func TestRuntimeManagedEscrowChainID_DefaultsToMainnetWithoutRuntimeTestnet(t *testing.T) {
+	n := &MobazhaNode{
+		walletFields: walletFields{
+			multiwallet: &mockWalletOperatorWithChainWallets{wallets: map[iwallet.ChainType]iwallet.Wallet{
+				iwallet.ChainEthereum: &mockEVMWallet{
+					chain:   iwallet.ChainEthereum,
+					coin:    testETHNativeCoin,
+					testnet: false,
+				},
+			}},
+		},
+	}
+
+	if got := n.runtimeManagedEscrowChainID(iwallet.ChainEthereum); got != 1 {
+		t.Fatalf("runtimeManagedEscrowChainID(ETH) = %d, want mainnet chain id", got)
 	}
 }
 

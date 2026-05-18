@@ -24,8 +24,10 @@ type CreatePaymentSessionRequest struct {
 	PaymentCoin string
 
 	// RefundAddress is the buyer's on-chain address to which funds are
-	// returned on cancel/refund/dispute-release. Required for crypto
-	// orders; should be empty for fiat orders (provider handles refunds).
+	// returned on cancel/refund/dispute-release. Optional for crypto
+	// orders: client-signed flows may provide it up front, while address-
+	// monitored flows can auto-fill it from chain observations after
+	// confirmation. Should be empty for fiat orders (provider handles refunds).
 	RefundAddress string
 
 	// BuyerPeerID is the peer ID of the buying node, used for ownership

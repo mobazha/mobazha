@@ -100,8 +100,9 @@ type PaymentObservation struct {
 
 	// Address fields are evidence-only. FromAddress can be empty when the
 	// chain does not expose it (or in CEX direct-pay scenarios where the
-	// observed sender is the CEX hot wallet). Refund routing MUST use
-	// Order.RefundAddress (D-Hybrid-27) and never derive from FromAddress.
+	// observed sender is the CEX hot wallet). Address-monitored payments may
+	// use it once to back-fill Order.RefundAddress when the order has no
+	// buyer-declared refund target.
 	FromAddress  string `gorm:"column:from_address;type:varchar(128)" json:"fromAddress,omitempty"`
 	ToAddress    string `gorm:"column:to_address;type:varchar(128);not null" json:"toAddress"`
 	TokenAddress string `gorm:"column:token_address;type:varchar(128)" json:"tokenAddress,omitempty"` // empty = native

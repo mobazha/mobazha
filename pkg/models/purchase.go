@@ -116,9 +116,9 @@ type Purchase struct {
 	//   - Solana: base58 32-byte public key
 	//   - UTXO: base58 / bech32 string
 	//
-	// Crypto orders must declare this before payment instructions are shown.
-	// Fiat orders leave it empty because refunds are handled by the payment
-	// provider rather than an on-chain refund target.
+	// Crypto orders may leave this empty at checkout; client-signed payment
+	// setup or address-monitored verification can fill it later. Fiat orders
+	// leave it empty because refunds are handled by the payment provider.
 	RefundAddress string `json:"refundAddress,omitempty"`
 }
 

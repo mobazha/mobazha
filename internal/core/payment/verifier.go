@@ -282,6 +282,13 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 			if err := order.SetPaymentSent(ps); err != nil {
 				return fmt.Errorf("aggregating verifier: marshal PaymentSent for %s: %w", orderID, err)
 			}
+			// Back-fill Order.RefundAddress only when the observations
+			// have one unambiguous sender. Multi-sender top-ups and
+			// balance-poll fallbacks must leave it empty for an explicit
+			// buyer/support override instead of guessing.
+			if order.RefundAddress == "" && ps.RefundAddress != "" {
+				order.RefundAddress = ps.RefundAddress
+			}
 			order.MarkPaymentVerified()
 			emitVerified = true
 			emitVerifiedNamespace = deduped[0].ChainNamespace
@@ -381,8 +388,9 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 //     matches the legacy single-PaymentSent semantics where the buyer
 //     submits the most recent funding tx.
 //   - PayerAddress: same source as TransactionID (FromAddress on the
-//     representative observation). Refund routing MUST still use
-//     Order.RefundAddress per D-Hybrid-27; this field is evidence-only.
+//     representative observation). Refund routing prefers Order.RefundAddress;
+//     when that is empty, the verifier only infers a refund target if all
+//     deduped observations have the same non-empty sender.
 //   - ToAddress: also taken from the representative row — this is the
 //     watched ManagedEscrow / smart-wallet / address the chain reported.
 //   - Amount: the aggregated total (NOT the representative row's
@@ -397,9 +405,9 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 //     payment paths (ManagedEscrow direct deposit, ERC-20 transfer to ManagedEscrow, etc.).
 //     CANCELABLE / MODERATED orders use the legacy PaymentSent path
 //     where the buyer's envelope dictates the method.
-//   - PaymentTokenAddress / PlatformAddr / RefundAddress / Chaincode:
-//     copied through from the order record so the envelope round-trips
-//     intact for downstream consumers.
+//   - PaymentTokenAddress / PlatformAddr / Chaincode: copied through from
+//     the order record so the envelope round-trips intact for downstream
+//     consumers.
 func buildAggregatedPaymentSent(
 	orderOpen *pb.OrderOpen,
 	rows []models.PaymentObservation,
@@ -435,6 +443,14 @@ func buildAggregatedPaymentSent(
 	chaincode := orderOpen.GetChaincode()
 	coin := orderOpen.GetPricingCoin()
 
+	// Use buyer-declared refund address when available. When absent, infer
+	// only from a single unambiguous observed sender; otherwise leave empty
+	// so downstream refund paths require an explicit override.
+	refundAddr := order.RefundAddress
+	if refundAddr == "" {
+		refundAddr = inferredRefundAddress(rows)
+	}
+
 	ps := &pb.PaymentSent{
 		TransactionID:       rep.TxHash,
 		Chaincode:           chaincode,
@@ -443,9 +459,27 @@ func buildAggregatedPaymentSent(
 		Amount:              total.String(),
 		Coin:                coin,
 		ToAddress:           rep.ToAddress,
-		RefundAddress:       order.RefundAddress,
+		RefundAddress:       refundAddr,
 		PaymentTokenAddress: rep.TokenAddress,
 		Timestamp:           timestamppb.New(now),
 	}
 	return ps, nil
+}
+
+func inferredRefundAddress(rows []models.PaymentObservation) string {
+	candidate := ""
+	for i := range rows {
+		addr := strings.TrimSpace(rows[i].FromAddress)
+		if addr == "" {
+			return ""
+		}
+		if candidate == "" {
+			candidate = addr
+			continue
+		}
+		if !strings.EqualFold(candidate, addr) {
+			return ""
+		}
+	}
+	return candidate
 }

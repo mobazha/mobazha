@@ -6,8 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
+	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	evmchain "github.com/mobazha/mobazha3.0/internal/chains/evm"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
@@ -219,6 +223,7 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 
 	shadow := make(map[iwallet.ChainType]*adapters.ManagedEscrowAdapter, len(activeChainsEarly))
 	monitors := make(map[iwallet.ChainType]*managed_escrow.LiveMonitor, len(activeChainsEarly))
+	runtimeChainIDs := make(map[iwallet.ChainType]uint64, len(activeChainsEarly))
 	for _, chain := range activeChainsEarly {
 		if n.db == nil {
 			continue
@@ -229,8 +234,11 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 				"ManagedEscrowAdapter V2 activation FAILED for chain %s: monitor wiring: %v", chain, err)
 			continue
 		}
-		deps.Monitor = monitor
-		adapter, err := adapters.NewManagedEscrowAdapter(chain, deps)
+		chainDeps := deps
+		chainDeps.Monitor = monitor
+		runtimeChainID := n.runtimeManagedEscrowChainID(chain)
+		chainDeps.ChainIDOverride = runtimeChainID
+		adapter, err := adapters.NewManagedEscrowAdapter(chain, chainDeps)
 		if err != nil {
 			// Distinguish "chain not yet promoted to Ready" (expected
 			// while the matrix is phasing in) from "wiring bug" (action
@@ -248,11 +256,13 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		n.paymentRegistry.RegisterV2(chain, adapter)
 		shadow[chain] = adapter
 		monitors[chain] = monitor
+		runtimeChainIDs[chain] = runtimeChainID
 	}
 
 	n.managed_escrowActionStore = store
 	n.managedEscrowAdapters = shadow
 	n.managed_escrowMonitors = monitors
+	n.rewatchPendingManagedEscrowPayments(monitors)
 
 	// Publish grayscale routing decisions as startup metrics. This provides
 	// an audit trail in Grafana for "which chains were live on V2 at node start".
@@ -269,9 +279,91 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 			"ManagedEscrowAdapter: no chains activated (managed_escrow_chains config empty — all EVM on V1 legacy path)")
 	} else {
 		logger.LogInfoWithIDf(log, n.nodeID,
-			"ManagedEscrowAdapter V2 activated for %d/%d EVM chains: %v", len(shadow), len(activeChainsEarly), shadow)
+			"ManagedEscrowAdapter V2 activated for %d/%d EVM chains: %v (runtime chainIDs: %v)", len(shadow), len(activeChainsEarly), shadow, runtimeChainIDs)
 	}
 }
+
+func (n *MobazhaNode) rewatchPendingManagedEscrowPayments(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {
+	if n.db == nil || len(monitors) == 0 {
+		return
+	}
+
+	var orders []models.Order
+	if err := n.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("payment_address <> ''").
+			Where("payment_verification_status <> ?", models.PaymentVerificationStatusVerified).
+			Find(&orders).Error
+	}); err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: failed to load pending ManagedEscrow watches: %v", err)
+		return
+	}
+
+	for i := range orders {
+		n.rewatchPendingManagedEscrowPayment(&orders[i], monitors)
+	}
+}
+
+func (n *MobazhaNode) rewatchPendingManagedEscrowPayment(order *models.Order, monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {
+	if order == nil {
+		return
+	}
+	info, err := order.GetPendingManagedEscrowPaymentInfo()
+	if err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: pending ManagedEscrow info invalid for order %s: %v", order.ID, err)
+		return
+	}
+	if info == nil || strings.TrimSpace(info.Address) == "" || strings.TrimSpace(info.Coin) == "" {
+		return
+	}
+	expected := new(big.Int).SetUint64(info.Amount)
+	if expected.Sign() == 0 {
+		orderOpen, err := order.OrderOpenMessage()
+		if err != nil {
+			logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: cannot restore watch for order %s without amount: %v", order.ID, err)
+			return
+		}
+		parsed, ok := new(big.Int).SetString(strings.TrimSpace(orderOpen.GetAmount()), 10)
+		if !ok || parsed.Sign() <= 0 {
+			logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: cannot restore watch for order %s with invalid amount %q", order.ID, orderOpen.GetAmount())
+			return
+		}
+		expected = parsed
+	}
+
+	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(info.Coin))
+	if err != nil || !coinInfo.IsEthTypeChain() {
+		return
+	}
+	monitor := monitors[coinInfo.Chain]
+	if monitor == nil {
+		return
+	}
+
+	asset := managed_escrow.AssetID{Type: managed_escrow.AssetNative}
+	if !coinInfo.IsNative {
+		contract := common.HexToAddress(coinInfo.ContractAddress(n.managed_escrowRuntimeUsesTestnet(coinInfo.Chain)))
+		if contract == (common.Address{}) {
+			logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: cannot restore ERC-20 watch for order %s without token contract", order.ID)
+			return
+		}
+		asset = managed_escrow.AssetID{Type: managed_escrow.AssetERC20, Contract: contract}
+	}
+
+	err = monitor.Watch(context.Background(), managed_escrow.WatchRequest{
+		OrderID:  order.ID.String(),
+		ManagedEscrow:     common.HexToAddress(info.Address),
+		ChainID:  n.runtimeManagedEscrowChainID(coinInfo.Chain),
+		Asset:    asset,
+		Expected: expected,
+		Deadline: time.Now().Add(defaultManagedEscrowRewatchFundingTimeout),
+	})
+	if err != nil && !errors.Is(err, managed_escrow.ErrOrderAlreadyWatched) {
+		logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: failed to restore watch for order %s: %v", order.ID, err)
+	}
+}
+
+const defaultManagedEscrowRewatchFundingTimeout = 48 * time.Hour
 
 func (n *MobazhaNode) buildManagedEscrowMonitor(chain iwallet.ChainType) (*managed_escrow.LiveMonitor, error) {
 	if n.db == nil {
@@ -310,8 +402,8 @@ func (n *MobazhaNode) buildManagedEscrowMonitor(chain iwallet.ChainType) (*manag
 	)
 	handler := corepayment.NewManagedEscrowEventHandler(dispatcher)
 
-	chainID, ok := managed_escrow.ChainIDFor(chain)
-	if !ok {
+	chainID := n.runtimeManagedEscrowChainID(chain)
+	if chainID == 0 {
 		return nil, fmt.Errorf("missing ManagedEscrow chain id for %s", chain)
 	}
 
@@ -319,6 +411,37 @@ func (n *MobazhaNode) buildManagedEscrowMonitor(chain iwallet.ChainType) (*manag
 		ChainID:           chainID,
 		ConfirmationDepth: 0,
 	}), nil
+}
+
+func (n *MobazhaNode) runtimeManagedEscrowChainID(chain iwallet.ChainType) uint64 {
+	chainID, ok := managed_escrow.ChainIDForNetwork(chain, n.managed_escrowRuntimeUsesTestnet(chain))
+	if !ok {
+		return 0
+	}
+	return chainID
+}
+
+func (n *MobazhaNode) managed_escrowRuntimeUsesTestnet(chain iwallet.ChainType) bool {
+	if n.walletTestnet {
+		return true
+	}
+	if n.multiwallet == nil {
+		return false
+	}
+	wallet, ok := n.multiwallet.WalletForChain(chain)
+	if !ok || wallet == nil {
+		return false
+	}
+	if wallet.IsTestnet() {
+		return true
+	}
+
+	evmWallet, ok := wallet.(*evmchain.ETHWallet)
+	if !ok || evmWallet == nil {
+		return false
+	}
+	client, ok := evmWallet.ChainClient.(*evmchain.EthClient)
+	return ok && client != nil && client.Testnet
 }
 
 type managed_escrowOrderTenantResolver struct {

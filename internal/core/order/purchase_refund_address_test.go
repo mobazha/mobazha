@@ -15,24 +15,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestValidatePurchaseRefundAddress_EmptyCryptoRejected verifies the P0
-// invariant: crypto orders must declare a refund wallet before payment
-// instructions are shown.
-func TestValidatePurchaseRefundAddress_EmptyCryptoRejected(t *testing.T) {
+// TestValidatePurchaseRefundAddress_EmptyCryptoAllowed verifies that crypto
+// orders may defer refund address collection until payment setup/confirmation.
+func TestValidatePurchaseRefundAddress_EmptyCryptoAllowed(t *testing.T) {
 	purchase := &models.Purchase{
 		PricingCoin:   "crypto:eip155:1:native",
 		RefundAddress: "",
 	}
-	err := validatePurchaseRefundAddress(purchase)
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, coreiface.ErrBadRequest), "expected ErrBadRequest, got %v", err)
-	assert.True(t, errors.Is(err, models.ErrRefundAddressRequired), "expected wrapped ErrRefundAddressRequired")
+	require.NoError(t, validatePurchaseRefundAddress(purchase))
+	assert.Empty(t, purchase.RefundAddress)
 
 	purchase.RefundAddress = "   \t\n  "
-	err = validatePurchaseRefundAddress(purchase)
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, coreiface.ErrBadRequest), "expected ErrBadRequest, got %v", err)
-	assert.True(t, errors.Is(err, models.ErrRefundAddressRequired), "expected wrapped ErrRefundAddressRequired")
+	require.NoError(t, validatePurchaseRefundAddress(purchase))
+	assert.Empty(t, purchase.RefundAddress)
 }
 
 // TestValidatePurchaseRefundAddress_EmptyPricingCoin verifies the caller-bug

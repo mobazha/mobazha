@@ -36,13 +36,9 @@ import (
 // Monitor-Driven Payment (Sprint 2A Step 7 / P0-3): when the buyer declares a
 // RefundAddress on the Purchase request, we validate it against the pricing
 // coin's chain family and persist it onto the local Order row in the same
-// DB transaction that calls ProcessMessage. This makes Order.RefundAddress
-// available to the AggregatingVerifier before any PaymentSent message
-// arrives — essential for CEX direct-pay where there is no buyer-reported
-// envelope.
-//
-// Crypto orders must declare RefundAddress before payment instructions are
-// shown. Fiat orders are exempt because refunds route through the provider.
+// DB transaction that calls ProcessMessage. If omitted, crypto flows can fill
+// it later from client-signed payerAddress or confirmed address-monitored
+// observations. Fiat orders are exempt because refunds route through the provider.
 func (s *OrderAppService) PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error) {
 	// Validate buyer-declared refund address up-front so we fail fast
 	// before any expensive listing fetch / discount resolution / signing.
@@ -414,9 +410,9 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 }
 
 // validatePurchaseRefundAddress applies the chain-family format check to the
-// buyer-declared refund address. Crypto orders require a non-empty address;
-// fiat orders skip validation because provider refunds do not use on-chain
-// refund targets.
+// buyer-declared refund address when present. Crypto orders may defer this
+// until payment setup/verification; fiat orders skip validation because
+// provider refunds do not use on-chain refund targets.
 //
 // Errors are wrapped with coreiface.ErrBadRequest so the HTTP handler maps
 // them to 400 rather than 500.
@@ -431,6 +427,17 @@ func validatePurchaseRefundAddress(purchase *models.Purchase) error {
 		return nil
 	}
 	if isFiatPricingCoin(pricingCoin) {
+		purchase.RefundAddress = ""
+		return nil
+	}
+
+	// Allow empty refund address for crypto orders. The buyer may not know
+	// their refund address at checkout time (e.g. ManagedEscrow/UTXO payments where
+	// the payer address is only known after the on-chain transaction).
+	// The address will be set later at payment time (client_signed passes
+	// payerAddress) or auto-detected from the chain observation when the
+	// AggregatingVerifier confirms the payment (see buildAggregatedPaymentSent).
+	if addr == "" {
 		purchase.RefundAddress = ""
 		return nil
 	}

@@ -225,11 +225,11 @@ type Order struct {
 	PaymentSentAcked      bool
 	PaymentSentSignature  string
 
-	// RefundAddress is the buyer-declared on-chain address for refunds (Phase EVM-ManagedEscrow v0.3.0, D-Hybrid-27).
-	// MUST be populated at order creation time when a crypto payment is selected.
-	// CEX direct-deposit scenarios: from_address observed on-chain is the exchange omnibus
-	// account and cannot be used as refund target — RefundAddress is the only authoritative source.
-	// DApp wallet scenarios: defaults to the paying EOA, but client SHOULD allow override.
+	// RefundAddress is the on-chain address for crypto refunds. It may be
+	// buyer-declared before payment, set from a client-signed payer address,
+	// or back-filled from a confirmed address-monitored payment observation.
+	// CEX direct-deposit scenarios can still require support/manual override
+	// because the observed sender may be an exchange omnibus account.
 	RefundAddress string `gorm:"column:refund_address;type:text"`
 
 	// CancelFeeAmount stores the Gas Service Fee charged on Tier 1 chain cancel/refund
@@ -721,7 +721,8 @@ func (o *Order) Chaincode() (string, error) {
 type PendingManagedEscrowPaymentInfo struct {
 	Type    string `json:"type"`           // always "managed_escrow"
 	Coin    string `json:"coin,omitempty"` // canonical coin type (e.g. "crypto:eth:eth")
-	Address string `json:"address"`        // predicted ManagedEscrow address (hex, "0x…")
+	Amount  uint64 `json:"amount,omitempty"`
+	Address string `json:"address"` // predicted ManagedEscrow address (hex, "0x…")
 }
 
 // SetPendingManagedEscrowPaymentInfo stores ManagedEscrow EVM payment info in PendingPaymentInfo.

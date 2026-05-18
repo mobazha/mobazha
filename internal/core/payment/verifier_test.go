@@ -382,6 +382,107 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 	require.Equal(t, frozen.Unix(), ps.Timestamp.AsTime().Unix())
 }
 
+func TestAggregateAndEmit_BackfillsRefundAddressFromUniqueObservedSender(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-empty-refund", "1000", "")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-empty-refund",
+		OrderID:        "order-empty-refund",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-refund",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "1000",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-empty-refund"))
+
+	got := loadOrder(t, db, "order-empty-refund")
+	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", got.RefundAddress)
+
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Equal(t, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ps.RefundAddress)
+	require.Equal(t, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ps.PayerAddress)
+}
+
+func TestAggregateAndEmit_DoesNotBackfillRefundAddressFromAmbiguousSenders(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-ambiguous-refund", "1000", "")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-ambiguous-1",
+		OrderID:        "order-ambiguous-refund",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-ambiguous-1",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "400",
+	})
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-ambiguous-2",
+		OrderID:        "order-ambiguous-refund",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-ambiguous-2",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "600",
+		BlockTime:      time.Date(2026, 5, 14, 12, 5, 0, 0, time.UTC),
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-ambiguous-refund"))
+
+	got := loadOrder(t, db, "order-ambiguous-refund")
+	require.True(t, got.IsPaymentVerified())
+	require.Empty(t, got.RefundAddress)
+
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Empty(t, ps.RefundAddress)
+	require.Equal(t, "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", ps.PayerAddress)
+}
+
+func TestAggregateAndEmit_DoesNotBackfillRefundAddressFromMissingSender(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-missing-sender", "1000", "")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-missing-sender",
+		OrderID:        "order-missing-sender",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-missing-sender",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "1000",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-missing-sender"))
+
+	got := loadOrder(t, db, "order-missing-sender")
+	require.True(t, got.IsPaymentVerified())
+	require.Empty(t, got.RefundAddress)
+
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Empty(t, ps.RefundAddress)
+	require.Empty(t, ps.PayerAddress)
+}
+
 func TestAggregateAndEmit_Overpaid_RecordsSurplus(t *testing.T) {
 	db := newVerifierTestDB(t)
 	bus := &recordingBus{}

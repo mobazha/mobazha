@@ -100,6 +100,47 @@ func TestHandlePOSTOrderPaymentSession_PaymentCoinMismatch(t *testing.T) {
 	}
 }
 
+func TestHandlePOSTOrderPaymentSession_CryptoAllowsEmptyRefundAddress(t *testing.T) {
+	called := false
+	svc := &mockPaymentSessionService{
+		createFunc: func(_ context.Context, req contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {
+			called = true
+			if req.PaymentCoin != "crypto:eip155:1:native" {
+				t.Fatalf("paymentCoin = %q", req.PaymentCoin)
+			}
+			if req.RefundAddress != "" {
+				t.Fatalf("refundAddress = %q, want empty", req.RefundAddress)
+			}
+			return &paypb.PaymentSession{
+				SessionID:      "ps_o1",
+				OrderID:        "o1",
+				PaymentCoin:    req.PaymentCoin,
+				SettlementMode: paypb.SettlementModeAddressMonitored,
+				Status:         paypb.SessionStatusAwaitingFunds,
+			}, nil
+		},
+	}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newPaymentSessionHandlerRequest(t,
+		http.MethodPost,
+		"/v1/orders/o1/payment-session",
+		map[string]interface{}{
+			"paymentCoin": "crypto:eip155:1:native",
+		},
+		map[string]string{"orderID": "o1"},
+		svc,
+	)
+
+	g.handlePOSTOrderPaymentSession(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+	}
+	if !called {
+		t.Fatal("CreateSession was not called")
+	}
+}
+
 func TestHandlePOSTOrderPaymentSession_FiatReturnsUnifiedSession(t *testing.T) {
 	svc := &mockPaymentSessionService{
 		createFunc: func(_ context.Context, req contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {

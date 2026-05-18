@@ -39,3 +39,41 @@ func TestBuildInitializeEscrowDataFromOrder_SameCurrencyUsesOrderOpenNumeric(t *
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestNormalizeCryptoRefundAddress_DefaultsToPayerAddress(t *testing.T) {
+	coin := iwallet.CoinType("crypto:eip155:1:native")
+	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {
+		t.Skip("canonical coin unavailable in build env")
+	}
+
+	got, err := normalizeCryptoRefundAddress(
+		coin,
+		"",
+		"  0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("refund address = %q", got)
+	}
+}
+
+func TestNormalizeCryptoRefundAddress_ExplicitRefundWins(t *testing.T) {
+	coin := iwallet.CoinType("crypto:eip155:1:native")
+	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {
+		t.Skip("canonical coin unavailable in build env")
+	}
+
+	got, err := normalizeCryptoRefundAddress(
+		coin,
+		"0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
+		t.Fatalf("refund address = %q", got)
+	}
+}

@@ -152,9 +152,14 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := models.ValidateRefundAddress(params.CoinType, params.RefundAddress); err != nil {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
-		return
+	// Validate refund address only when provided. For address-monitored
+	// payments (ManagedEscrow/UTXO QR-code flow) the buyer cannot know the payer
+	// address until the on-chain transaction is confirmed.
+	if trimmed := strings.TrimSpace(params.RefundAddress); trimmed != "" {
+		if err := models.ValidateRefundAddress(params.CoinType, trimmed); err != nil {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+			return
+		}
 	}
 
 	// Server-side amount computation: orderOpen.Amount is the finalized total
@@ -223,14 +228,21 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := orderSvc.SetOrderRefundAddressForPayment(r.Context(), params.OrderID, params.CoinType, params.RefundAddress); err != nil {
-		if errors.Is(err, coreiface.ErrBadRequest) || errors.Is(err, models.ErrRefundAddressRequired) || errors.Is(err, models.ErrRefundAddressInvalid) {
-			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+	// Persist refund address only when the buyer explicitly provided one
+	// (client_signed path where the wallet is connected). For address-
+	// monitored payments (ManagedEscrow/UTXO) the frontend cannot know the payer
+	// address upfront; the AggregatingVerifier auto-fills it from on-chain
+	// observations when the payment is confirmed.
+	if strings.TrimSpace(params.RefundAddress) != "" {
+		if err := orderSvc.SetOrderRefundAddressForPayment(r.Context(), params.OrderID, params.CoinType, params.RefundAddress); err != nil {
+			if errors.Is(err, coreiface.ErrBadRequest) || errors.Is(err, models.ErrRefundAddressRequired) || errors.Is(err, models.ErrRefundAddressInvalid) {
+				responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+				return
+			}
+			log.Warningf("SetOrderRefundAddressForPayment failed for order %s: %v", params.OrderID, err)
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to save refund address")
 			return
 		}
-		log.Warningf("SetOrderRefundAddressForPayment failed for order %s: %v", params.OrderID, err)
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to save refund address")
-		return
 	}
 
 	switch result.PaymentModel {

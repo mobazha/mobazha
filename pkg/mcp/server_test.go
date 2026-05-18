@@ -229,7 +229,13 @@ func TestSSEServerHasNoResources(t *testing.T) {
 func TestSSEServerRegistersAllTools(t *testing.T) {
 	bridge := &mockBridge{}
 	bf := StaticBridgeFactory(bridge)
-	opts := &ServerOptions{SearchURL: "http://test-search:8080"}
+	opts := &ServerOptions{
+		SearchURL:       "http://test-search:8080",
+		StoreGatewayURL: "http://test-store:4002",
+		Shopping: &ShoppingConfig{
+			DemoStorePeerID: "QmTestDemoStorePeerID",
+		},
+	}
 
 	s := NewAllToolsMobazhaServer(bf, opts)
 
@@ -281,7 +287,13 @@ func TestSSEServerRegistersAllTools(t *testing.T) {
 
 func TestAllToolsHaveScopeMapping(t *testing.T) {
 	bf := StaticBridgeFactory(&mockBridge{})
-	opts := &ServerOptions{SearchURL: "http://test-search:8080"}
+	opts := &ServerOptions{
+		SearchURL:       "http://test-search:8080",
+		StoreGatewayURL: "http://test-store:4002",
+		Shopping: &ShoppingConfig{
+			DemoStorePeerID: "QmTestDemoStorePeerID",
+		},
+	}
 	registrars := getAllToolRegistrars(bf, opts)
 	if len(registrars) == 0 {
 		t.Fatal("no tool registrars found")
@@ -352,6 +364,9 @@ func TestFilterToolsByScopes_LimitedScopes(t *testing.T) {
 	if !allowedSet["search_profiles"] {
 		t.Error("search_profiles should always be allowed (no scope required)")
 	}
+	if !allowedSet["shopping_search_demo"] {
+		t.Error("shopping_search_demo should always be allowed (no scope required)")
+	}
 	if allowedSet["orders_get_sales"] {
 		t.Error("orders_get_sales should NOT be allowed without orders:read")
 	}
@@ -369,9 +384,15 @@ func TestFilterToolsByScopes_NoScopes(t *testing.T) {
 	allowed := FilterToolsByScopes(scopes)
 
 	publicTools := map[string]bool{
-		"exchange_rates_get": true,
-		"search_listings":    true,
-		"search_profiles":    true,
+		"exchange_rates_get":          true,
+		"search_listings":             true,
+		"search_profiles":             true,
+		"shopping_search_demo":        true,
+		"shopping_get_detail":         true,
+		"shopping_prepare_checkout":   true,
+		"shopping_confirm_checkout":   true,
+		"shopping_order_status":       true,
+		"shopping_demo_order_status":  true,
 	}
 	for _, name := range allowed {
 		if !publicTools[name] {

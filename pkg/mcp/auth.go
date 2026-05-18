@@ -89,6 +89,14 @@ var toolScopeRequirement = map[string]string{
 	"exchange_rates_get":            "",
 	"search_listings":               "",
 	"search_profiles":               "",
+
+	// Shopping tools (Phase 0 — public, no auth required)
+	"shopping_search_demo":        "",
+	"shopping_get_detail":         "",
+	"shopping_prepare_checkout":   "",
+	"shopping_confirm_checkout":   "",
+	"shopping_order_status":       "",
+	"shopping_demo_order_status":  "",
 	"discounts_list":                string(contracts.ScopeDiscountsRead),
 	"collections_list":              string(contracts.ScopeCollectionsRead),
 	"settings_get_storefront":       string(contracts.ScopeSettingsRead),

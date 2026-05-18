@@ -34,6 +34,13 @@ type ServerOptions struct {
 	// internally. Pass an explicit cache only if multiple servers should share
 	// it.
 	IdentityCache *IdentityCache
+
+	// Shopping enables Phase 0 AI shopping tools. If nil, shopping tools are
+	// not registered. StoreGatewayURL is the base URL of the store node that
+	// handles guest checkout (e.g., "https://app.mobazha.org").
+	Shopping         *ShoppingConfig
+	StoreGatewayURL  string
+	QuoteTokenSecret []byte // HMAC secret for quote tokens; nil = random per-process
 }
 
 // NewMobazhaServer creates the MCP server with tools filtered by the given scopes.

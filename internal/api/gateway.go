@@ -210,7 +210,10 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			// Stdout audit logger gives standalone deployments visibility into
 			// MCP tool calls without requiring a database table. SaaS hosting
 			// uses DBAuditLogger; this is the standalone equivalent.
-			AuditLogger: mcppkg.NewStdoutAuditLogger(),
+			AuditLogger:      mcppkg.NewStdoutAuditLogger(),
+			Shopping:         mcppkg.LoadShoppingConfigFromEnv(),
+			StoreGatewayURL:  loopbackURL,
+			QuoteTokenSecret: mcppkg.LoadQuoteTokenSecretFromEnv(),
 		}
 		mcpHTTPServer := mcppkg.NewStreamableHTTPMobazhaServer(loopbackURL, nil, mcpOpts)
 		mcpWithBodyLimit := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

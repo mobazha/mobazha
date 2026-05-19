@@ -85,6 +85,8 @@ type PendingUTXOPaymentInfo struct {
 	Moderator       string `json:"moderator,omitempty"`       // Moderator peer ID (empty for CANCELABLE)
 	ModeratorPubkey string `json:"moderatorPubkey,omitempty"` // Moderator escrow pubkey hex
 	UnlockHours     uint32 `json:"unlockHours,omitempty"`     // Escrow timeout hours for MODERATED
+	// SettlementSpec is the ADR-010 payment route; legacy Moderator fields are fallback when absent.
+	SettlementSpec *PendingSettlementSpec `json:"settlementSpec,omitempty"`
 }
 
 // AfterSaleDispute groups app-level dispute fields for completed orders.
@@ -719,10 +721,13 @@ func (o *Order) Chaincode() (string, error) {
 // PaymentSessionProjector to classify ManagedEscrow EVM orders as address_monitored
 // without waiting for PaymentSent.
 type PendingManagedEscrowPaymentInfo struct {
-	Type    string `json:"type"`           // always "managed_escrow"
-	Coin    string `json:"coin,omitempty"` // canonical coin type (e.g. "crypto:eth:eth")
-	Amount  uint64 `json:"amount,omitempty"`
-	Address string `json:"address"` // predicted ManagedEscrow address (hex, "0x…")
+	Type      string `json:"type"`           // always "managed_escrow"
+	Coin      string `json:"coin,omitempty"` // canonical coin type (e.g. "crypto:eth:eth")
+	Amount    uint64 `json:"amount,omitempty"`
+	Address   string `json:"address"` // predicted ManagedEscrow address (hex, "0x…")
+	Moderated bool   `json:"moderated"`
+	// SettlementSpec is the ADR-010 payment route; legacy Moderated is fallback when absent.
+	SettlementSpec *PendingSettlementSpec `json:"settlementSpec,omitempty"`
 }
 
 // SetPendingManagedEscrowPaymentInfo stores ManagedEscrow EVM payment info in PendingPaymentInfo.
@@ -780,6 +785,12 @@ func (o *Order) SetPendingPaymentInfo(info *PendingUTXOPaymentInfo) error {
 // GetPendingPaymentInfo retrieves temporary UTXO payment info from JSON
 func (o *Order) GetPendingPaymentInfo() (*PendingUTXOPaymentInfo, error) {
 	if len(o.PendingPaymentInfo) == 0 {
+		return nil, nil
+	}
+	var hint struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(o.PendingPaymentInfo, &hint); err == nil && hint.Type != "" {
 		return nil, nil
 	}
 	var info PendingUTXOPaymentInfo

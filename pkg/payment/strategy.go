@@ -62,8 +62,16 @@ type ChainCapabilities struct {
 	// UTXO chains return false — escrow is backend-signed multisig.
 	HasClientSignedEscrow bool
 
-	// EscrowType classifies the escrow mechanism for UI/logging purposes.
-	// Values: "multisig" (UTXO), "smart-contract" (EVM/Solana/TRON).
+	// EscrowType classifies the adapter's broad escrow mechanism for
+	// UI/logging/capability inspection only.
+	//
+	// IMPORTANT: this is not the same concept as ADR-010 SettlementSpec.EscrowType.
+	// ChainCapabilities.EscrowType is a coarse adapter label
+	// ("multisig", "smart-contract"), while SettlementSpec.EscrowType is the
+	// per-order route triple used to recover payment semantics from persisted
+	// order intent.
+	//
+	// Values: "multisig" (UTXO), "smart-contract" (EVM/Solana/TRON/ManagedEscrow).
 	EscrowType string
 }
 

@@ -123,16 +123,18 @@ type Purchase struct {
 }
 
 type PaymentData struct {
-	OrderID          string                `json:"orderID"`
-	TransactionID    string                `json:"transactionID"`
-	Coin             iwallet.CoinType      `json:"coin"`
-	Method           pb.PaymentSent_Method `json:"method"`
-	ProviderID       string                `json:"providerID,omitempty"`
-	ContractAddress  string                `json:"contractAddress"`
-	PayerAddress     string                `json:"payerAddress"`
-	Moderator        string                `json:"moderator"`
-	ModeratorAddress string                `json:"moderatorAddress"`
-	Amount           uint64                `json:"amount,string"`
+	OrderID       string                `json:"orderID"`
+	TransactionID string                `json:"transactionID"`
+	Coin          iwallet.CoinType      `json:"coin"`
+	Method        pb.PaymentSent_Method `json:"method"`
+	// SettlementSpec is the ADR-010 route triple for this payment instruction.
+	SettlementSpec   *PendingSettlementSpec `json:"settlementSpec,omitempty"`
+	ProviderID       string                 `json:"providerID,omitempty"`
+	ContractAddress  string                 `json:"contractAddress"`
+	PayerAddress     string                 `json:"payerAddress"`
+	Moderator        string                 `json:"moderator"`
+	ModeratorAddress string                 `json:"moderatorAddress"`
+	Amount           uint64                 `json:"amount,string"`
 	/*
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])

@@ -315,6 +315,13 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		order.AutoCompleteAfterShipDaysOverride = s.digitalGoodReviewWindowDays()
 	}
 
+	if payResult.EVMManagedEscrowMetadata != nil {
+		payResult.EVMManagedEscrowMetadata.ExpectedPaymentAmount = paymentAmount
+		if err := order.SetEVMManagedEscrowMetadata(payResult.EVMManagedEscrowMetadata); err != nil {
+			return nil, fmt.Errorf("set guest managed EVM metadata: %w", err)
+		}
+	}
+
 	if req.ShippingAddress != nil {
 		if err := order.SetShippingAddress(req.ShippingAddress); err != nil {
 			return nil, fmt.Errorf("set shipping address: %w", err)

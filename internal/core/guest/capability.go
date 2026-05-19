@@ -24,8 +24,8 @@ type GuestPaymentCapability struct {
 	Err                error
 }
 
-// guestEVMSettlementEnabled gates buyer-visible EVM guest checkout until an
-// EVM sweep / settlement path is implemented (see GUEST_CHECKOUT_CRYPTO_CLOSURE_PLAN).
+// guestEVMSettlementEnabled gates buyer-visible EVM guest checkout until Phase 3
+// implements chosenEVMSettlementStrategy (ManagedEscrow/PaymentSession — see evm_settlement_strategy.go).
 const guestEVMSettlementEnabled = false
 
 // isSweepableUTXOChain reports whether guest auto-sweep can sign for the chain's

@@ -43,17 +43,20 @@ type PaymentAddressResult struct {
 	AddressIndex uint32
 	ReferenceKey string // Solana only: reference pubkey (base58)
 	SweepTo      string // seller receiving address (empty for Solana)
+	// EVMManagedEscrowMetadata is set for EVM guest orders using the ManagedEscrow funding path.
+	EVMManagedEscrowMetadata *models.GuestEVMManagedEscrowMetadata
 }
 
 // DirectPaymentService generates unique payment addresses for Guest Checkout orders.
-// For UTXO/EVM/TRON chains, it derives HD addresses from the node's BIP44 master key.
-// For Solana, it generates a one-time reference key while using the seller's address directly.
-// For ExternalPayment, it creates subaddresses via external_payment-wallet-rpc.
+// UTXO and TRON use HD derivation from the node's BIP-44 master key; EVM uses the
+// seller-owned 1/1 predicted ManagedEscrow adapter when wired. Solana uses a one-time reference
+// key against the seller address. ExternalPayment creates subaddresses via external_payment-wallet-rpc.
 type DirectPaymentService struct {
-	db           database.Database
-	keyDeriver   BIP44KeyDeriver
-	external_paymentSource external_payment.Source
-	external_paymentAccount   uint32
+	db             database.Database
+	keyDeriver     BIP44KeyDeriver
+	evmManagedEscrowFunding *EVMManagedEscrowFundingAdapter
+	external_paymentSource   external_payment.Source
+	external_paymentAccount     uint32
 }
 
 // NewDirectPaymentService creates a DirectPaymentService.
@@ -66,6 +69,11 @@ func NewDirectPaymentService(
 		db:         db,
 		keyDeriver: keyDeriver,
 	}
+}
+
+// SetEVMManagedEscrowFunding wires the Phase 3A ManagedEscrow funding adapter for EVM guest orders.
+func (s *DirectPaymentService) SetEVMManagedEscrowFunding(adapter *EVMManagedEscrowFundingAdapter) {
+	s.evmManagedEscrowFunding = adapter
 }
 
 // SetExternalPaymentSource injects the ExternalPayment wallet-rpc source for subaddress generation.
@@ -86,7 +94,9 @@ func (s *DirectPaymentService) GeneratePaymentAddress(ctx context.Context, req P
 	switch {
 	case coinInfo.Chain.IsUTXOChain():
 		return s.derivePaymentAddress(ctx, coinInfo.Chain, req)
-	case coinInfo.IsEthTypeChain() || coinInfo.Chain == iwallet.ChainTRON:
+	case coinInfo.IsEthTypeChain():
+		return s.generateEVMManagedEscrowFunding(ctx, req)
+	case coinInfo.Chain == iwallet.ChainTRON:
 		return s.derivePaymentAddress(ctx, coinInfo.Chain, req)
 	case coinInfo.Chain == iwallet.ChainSolana:
 		return s.generateSolanaReference(ctx, coinInfo.Chain, req)
@@ -97,7 +107,17 @@ func (s *DirectPaymentService) GeneratePaymentAddress(ctx context.Context, req P
 	}
 }
 
-// derivePaymentAddress handles UTXO, EVM, and TRON chains using node-managed HD derivation.
+func (s *DirectPaymentService) generateEVMManagedEscrowFunding(
+	ctx context.Context,
+	req PaymentAddressRequest,
+) (*PaymentAddressResult, error) {
+	if s.evmManagedEscrowFunding == nil {
+		return nil, fmt.Errorf("EVM guest checkout requires ManagedEscrow funding adapter (not configured)")
+	}
+	return s.evmManagedEscrowFunding.PrepareFundingTarget(ctx, req)
+}
+
+// derivePaymentAddress handles UTXO and TRON chains using node-managed HD derivation.
 func (s *DirectPaymentService) derivePaymentAddress(
 	ctx context.Context,
 	chainType iwallet.ChainType,

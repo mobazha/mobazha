@@ -60,7 +60,7 @@ func ParseGuestOrderState(s string) (GuestOrderState, bool) {
 }
 
 // GuestOrder represents an anonymous buyer's order on a standalone store.
-// Uses node-managed HD address derivation for payment; no P2P, no escrow.
+// UTXO/TRON use HD derivation; EVM uses seller-owned 1/1 predicted ManagedEscrow (when enabled).
 type GuestOrder struct {
 	TenantMixin
 	ID         int             `gorm:"primaryKey;autoIncrement:false" json:"id"`
@@ -85,7 +85,10 @@ type GuestOrder struct {
 	Confirmations  int    `json:"confirmations"`
 	RequiredConfs  int    `json:"requiredConfs"`
 	AddressIndex   uint32 `json:"-"`
-	ExternalPaymentTxHeight uint64 `json:"-"`
+	// EVMManagedEscrowMetadata holds JSON (models.GuestEVMManagedEscrowMetadata) for per-order
+	// predicted ManagedEscrow funding targets. Empty for UTXO/EXTERNAL_PAYMENT/Solana and legacy HD EVM.
+	EVMManagedEscrowMetadata []byte `gorm:"column:evm_managed_escrow_metadata;type:blob" json:"-"`
+	ExternalPaymentTxHeight  uint64 `json:"-"`
 
 	// Pool-stage tracking (currently only populated by ExternalPayment, where
 	// mempool transfers are visible via wallet-rpc). These fields are a

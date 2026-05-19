@@ -934,6 +934,13 @@ func (n *MobazhaNode) initGuestOrderService() {
 
 	keyDeriver := guest.NewNodeKeyDeriver(n.bip44Key, n.multiwallet)
 	n.directPaymentService = guest.NewDirectPaymentService(n.db, keyDeriver)
+	if n.keyProvider != nil {
+		n.directPaymentService.SetEVMManagedEscrowFunding(guest.NewEVMManagedEscrowFundingAdapter(guest.EVMManagedEscrowFundingConfig{
+			DB:          n.db,
+			SellerOwner: &guest.NodeEVMSellerOwnerResolver{Keys: n.keyProvider},
+			Testnet:     n.walletTestnet,
+		}))
+	}
 	n.autoSweepService = guest.NewAutoSweepService(n.db, keyDeriver, n.eventBus)
 
 	// Capability gating: GuestOrderAppService advertises and accepts only

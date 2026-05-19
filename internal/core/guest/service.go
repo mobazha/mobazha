@@ -48,18 +48,18 @@ type GuestListingQuery interface {
 
 // GuestOrderAppServiceConfig groups dependencies for GuestOrderAppService.
 type GuestOrderAppServiceConfig struct {
-	DB                     database.Database
-	DirectPayment          *DirectPaymentService
-	SweepService           *AutoSweepService
-	EventBus               events.Bus
-	NodeID                 string
-	Shutdown               <-chan struct{}
-	Listings               GuestListingQuery
-	ExchangeRates          wallet.ExchangeRateQuerier
-	Resolver               pkgconfig.ResolverInterface
-	SupportedUTXOChains    []iwallet.ChainType
+	DB                      database.Database
+	DirectPayment           *DirectPaymentService
+	SweepService            *AutoSweepService
+	EventBus                events.Bus
+	NodeID                  string
+	Shutdown                <-chan struct{}
+	Listings                GuestListingQuery
+	ExchangeRates           wallet.ExchangeRateQuerier
+	Resolver                pkgconfig.ResolverInterface
+	SupportedUTXOChains     []iwallet.ChainType
 	EVMObservationAvailable bool
-	SolanaMonitorAvailable bool
+	SolanaMonitorAvailable  bool
 	// ExternalPaymentAvailable is a closure that reports whether EXTERNAL_PAYMENT guest checkout
 	// can serve a request *right now*. It typically combines two signals:
 	//   1. operator configured the wallet-rpc endpoint
@@ -73,31 +73,31 @@ type GuestOrderAppServiceConfig struct {
 // GuestOrderAppService manages the Guest Order lifecycle:
 // creation, payment detection, confirmation, shipping, expiry, and auto-completion.
 type GuestOrderAppService struct {
-	db                     database.Database
-	directPayment          *DirectPaymentService
-	sweepService           *AutoSweepService
-	eventBus               events.Bus
-	nodeID                 string
-	shutdown               <-chan struct{}
-	watcher                PaymentWatcher
-	listings               GuestListingQuery
-	exchangeRates          wallet.ExchangeRateQuerier
-	resolver               pkgconfig.ResolverInterface
-	utxoMu                 sync.RWMutex
-	supportedUTXOChains    map[iwallet.ChainType]struct{}
-	evmObservationAvailable bool
+	db                         database.Database
+	directPayment              *DirectPaymentService
+	sweepService               *AutoSweepService
+	eventBus                   events.Bus
+	nodeID                     string
+	shutdown                   <-chan struct{}
+	watcher                    PaymentWatcher
+	listings                   GuestListingQuery
+	exchangeRates              wallet.ExchangeRateQuerier
+	resolver                   pkgconfig.ResolverInterface
+	utxoMu                     sync.RWMutex
+	supportedUTXOChains        map[iwallet.ChainType]struct{}
+	evmObservationAvailable    bool
 	evmRelayGasHealthyChains   map[iwallet.ChainType]struct{}
 	evmRelayGasUnhealthyReason map[iwallet.ChainType]string
-	solanaMonitorAvailable bool
-	utxoMonitor            UTXOMonitorReadiness
-	multiwallet            contracts.WalletOperator
-	evmManagedEscrowSettlement      *EVMManagedEscrowSettlementService
-	evmRuntimeMu           sync.RWMutex
-	evmManagedEscrowFundingReady    bool
-	evmManagedEscrowObservationReady bool
-	evmManagedEscrowSettlementReady bool
-	evmManagedEscrowRelayReady      bool
-	evmManagedEscrowMonitorChains   map[iwallet.ChainType]struct{}
+	solanaMonitorAvailable     bool
+	utxoMonitor                UTXOMonitorReadiness
+	multiwallet                contracts.WalletOperator
+	evmManagedEscrowSettlement          *EVMManagedEscrowSettlementService
+	evmRuntimeMu               sync.RWMutex
+	evmManagedEscrowFundingReady        bool
+	evmManagedEscrowObservationReady    bool
+	evmManagedEscrowSettlementReady     bool
+	evmManagedEscrowRelayReady          bool
+	evmManagedEscrowMonitorChains       map[iwallet.ChainType]struct{}
 	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
 	external_paymentAvailable func() bool
 }
@@ -116,19 +116,19 @@ func (s *GuestOrderAppService) SetEVMManagedEscrowSettlement(svc *EVMManagedEscr
 // NewGuestOrderAppService constructs the service.
 func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppService {
 	return &GuestOrderAppService{
-		db:                     cfg.DB,
-		directPayment:          cfg.DirectPayment,
-		sweepService:           cfg.SweepService,
-		eventBus:               cfg.EventBus,
-		nodeID:                 cfg.NodeID,
-		shutdown:               cfg.Shutdown,
-		listings:               cfg.Listings,
-		exchangeRates:          cfg.ExchangeRates,
-		resolver:               cfg.Resolver,
-		supportedUTXOChains:    toChainSet(cfg.SupportedUTXOChains),
+		db:                      cfg.DB,
+		directPayment:           cfg.DirectPayment,
+		sweepService:            cfg.SweepService,
+		eventBus:                cfg.EventBus,
+		nodeID:                  cfg.NodeID,
+		shutdown:                cfg.Shutdown,
+		listings:                cfg.Listings,
+		exchangeRates:           cfg.ExchangeRates,
+		resolver:                cfg.Resolver,
+		supportedUTXOChains:     toChainSet(cfg.SupportedUTXOChains),
 		evmObservationAvailable: cfg.EVMObservationAvailable,
-		solanaMonitorAvailable: cfg.SolanaMonitorAvailable,
-		external_paymentAvailable:        cfg.ExternalPaymentAvailable,
+		solanaMonitorAvailable:  cfg.SolanaMonitorAvailable,
+		external_paymentAvailable:         cfg.ExternalPaymentAvailable,
 	}
 }
 
@@ -438,6 +438,8 @@ func (s *GuestOrderAppService) GetGuestOrderStatus(_ context.Context, token stri
 		State:             order.State.String(),
 		PaymentAddress:    order.PaymentAddress,
 		PaymentAmount:     order.PaymentAmount,
+		TotalReceived:     order.TotalReceived,
+		OverpaidAmount:    order.OverpaidAmount,
 		PaymentCoin:       order.PaymentCoin,
 		ReferenceKey:      order.ReferenceKey,
 		Confirmations:     order.Confirmations,

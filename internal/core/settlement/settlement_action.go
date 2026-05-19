@@ -30,8 +30,8 @@ func (s *SettlementService) ExecuteSettlementAction(
 	payoutAddr string,
 ) (*payment.ActionResult, iwallet.CoinType, error) {
 	action = strings.ToLower(strings.TrimSpace(action))
-	if action != "confirm" && action != "cancel" && action != "complete" && action != "dispute_release" {
-		return nil, "", fmt.Errorf("%w: unsupported settlement action %q (supported: confirm, cancel, complete, dispute_release)",
+	if action != "confirm" && action != "cancel" {
+		return nil, "", fmt.Errorf("%w: unsupported settlement action %q (supported: confirm, cancel)",
 			coreiface.ErrBadRequest, action)
 	}
 

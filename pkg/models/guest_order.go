@@ -79,6 +79,8 @@ type GuestOrder struct {
 	PaymentCoin    string `gorm:"index" json:"paymentCoin"`
 	PaymentAddress string `gorm:"index" json:"paymentAddress"`
 	PaymentAmount  string `json:"paymentAmount"`
+	TotalReceived  string `gorm:"column:total_received;type:text" json:"totalReceived,omitempty"`
+	OverpaidAmount string `gorm:"column:overpaid_amount;type:text" json:"overpaidAmount,omitempty"`
 	SweepToAddress string `json:"-"`
 	ReferenceKey   string `json:"referenceKey,omitempty"`
 	PaymentTxHash  string `json:"paymentTxHash,omitempty"`

@@ -8,7 +8,9 @@ import (
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -50,6 +52,51 @@ func mustNativeCoin(chain iwallet.ChainType) iwallet.CoinType {
 		panic(err)
 	}
 	return coin
+}
+
+func TestManagedEscrowOrderTenantResolver_ResolveTenants_GuestOrder(t *testing.T) {
+	db := newTestDatabase(t)
+	if err := db.gormDB.AutoMigrate(&models.GuestOrder{}); err != nil {
+		t.Fatalf("AutoMigrate GuestOrder: %v", err)
+	}
+	orderToken := corepayment.GuestOrderTokenPrefix + "tenant_resolver"
+	if err := db.gormDB.Create(&models.GuestOrder{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-guest"},
+		OrderToken:  orderToken,
+		State:       models.GuestOrderAwaitingPayment,
+	}).Error; err != nil {
+		t.Fatalf("create guest order: %v", err)
+	}
+
+	tenants, err := (&managed_escrowOrderTenantResolver{db: db}).ResolveTenants(context.Background(), orderToken)
+	if err != nil {
+		t.Fatalf("ResolveTenants: %v", err)
+	}
+	if len(tenants) != 1 || tenants[0] != "tenant-guest" {
+		t.Fatalf("ResolveTenants = %#v, want [tenant-guest]", tenants)
+	}
+}
+
+func TestManagedEscrowOrderTenantResolver_ResolveTenants_GuestOrderStandaloneDefault(t *testing.T) {
+	db := newTestDatabase(t)
+	if err := db.gormDB.AutoMigrate(&models.GuestOrder{}); err != nil {
+		t.Fatalf("AutoMigrate GuestOrder: %v", err)
+	}
+	orderToken := corepayment.GuestOrderTokenPrefix + "tenant_default"
+	if err := db.gormDB.Create(&models.GuestOrder{
+		OrderToken: orderToken,
+		State:      models.GuestOrderAwaitingPayment,
+	}).Error; err != nil {
+		t.Fatalf("create guest order: %v", err)
+	}
+
+	tenants, err := (&managed_escrowOrderTenantResolver{db: db}).ResolveTenants(context.Background(), orderToken)
+	if err != nil {
+		t.Fatalf("ResolveTenants: %v", err)
+	}
+	if len(tenants) != 1 || tenants[0] != database.StandaloneTenantID {
+		t.Fatalf("ResolveTenants = %#v, want [%s]", tenants, database.StandaloneTenantID)
+	}
 }
 
 func classifyCoin(coin iwallet.CoinType) chainCategory {

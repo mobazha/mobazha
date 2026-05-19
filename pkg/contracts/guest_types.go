@@ -81,6 +81,8 @@ type GuestOrderStatusResponse struct {
 	State             string                  `json:"state"`
 	PaymentAddress    string                  `json:"paymentAddress"`
 	PaymentAmount     string                  `json:"paymentAmount"`
+	TotalReceived     string                  `json:"totalReceived,omitempty"`
+	OverpaidAmount    string                  `json:"overpaidAmount,omitempty"`
 	PaymentCoin       string                  `json:"paymentCoin"`
 	ReferenceKey      string                  `json:"referenceKey,omitempty"`
 	Confirmations     int                     `json:"confirmations"`

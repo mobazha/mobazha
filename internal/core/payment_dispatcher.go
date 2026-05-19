@@ -521,7 +521,15 @@ func (r *managed_escrowOrderTenantResolver) ResolveTenant(_ context.Context, ord
 	return order.TenantID, nil
 }
 
-func (r *managed_escrowOrderTenantResolver) ResolveTenants(_ context.Context, orderID string) ([]string, error) {
+func (r *managed_escrowOrderTenantResolver) ResolveTenants(ctx context.Context, orderID string) ([]string, error) {
+	if strings.HasPrefix(orderID, corepayment.GuestOrderTokenPrefix) {
+		tenantID, err := r.ResolveTenant(ctx, orderID)
+		if err != nil {
+			return nil, err
+		}
+		return []string{tenantID}, nil
+	}
+
 	var tenantIDs []string
 	if rawProvider, ok := r.db.(interface{ RawDB() *gorm.DB }); ok {
 		raw := rawProvider.RawDB()

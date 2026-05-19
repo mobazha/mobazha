@@ -167,138 +167,25 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 		emitVerifiedNamespace string
 	)
 
-	err := v.db.Update(func(tx database.Tx) error {
-		// Bind the request context to every GORM call we issue from
-		// here so an upstream cancel (HTTP timeout, scheduler shutdown)
-		// propagates into the SELECT FOR UPDATE rather than wedging on
-		// a lock the operator can no longer interrupt.
-		gdb := tx.Read().WithContext(ctx)
-
-		// Step 1: lock the order row. We scope the WHERE on the full
-		// composite primary key (tenant_id, id) so a SaaS deployment
-		// can never accidentally lock or read a different tenant's
-		// order when OrderIDs collide across tenants. The dialect
-		// check skips clause.Locking on dialects that don't honour it
-		// (SQLite); see the type-level comment for the SQLite caveat.
-		var order models.Order
-		loader := gdb
-		if dialectSupportsRowLock(gdb) {
-			loader = gdb.Clauses(clause.Locking{Strength: "UPDATE"})
+	var err error
+	if rawProvider, ok := v.db.(interface{ RawDB() *gorm.DB }); ok {
+		raw := rawProvider.RawDB()
+		if raw == nil {
+			return fmt.Errorf("aggregating verifier: raw DB unavailable")
 		}
-		if err := loader.
-			Where("tenant_id = ? AND id = ?", tenantID, orderID).
-			First(&order).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil // unknown order — log-and-skip per §5.1.
-			}
-			return fmt.Errorf("aggregating verifier: load order %s: %w", orderID, err)
-		}
-
-		// Idempotency guard: once an order is verified the envelope is
-		// frozen. We still rewrite TotalReceived / OverpaidAmount below
-		// so the dashboard reflects late-arriving deposits, but we do
-		// NOT re-emit and we do NOT rebuild SerializedPaymentSent.
-		alreadyVerified := order.IsPaymentVerified()
-
-		orderOpen, err := order.OrderOpenMessage()
-		if err != nil {
-			return fmt.Errorf("aggregating verifier: decode order_open for %s: %w", orderID, err)
-		}
-
-		expected, err := parseExpectedAmount(orderOpen)
-		if err != nil {
-			return fmt.Errorf("aggregating verifier: order %s: %w", orderID, err)
-		}
-
-		// Step 2: load every confirmed observation for the order. We
-		// scope by tenant_id explicitly to make the predicate visible
-		// in standalone mode (where tenantTx.Read() is a no-op) and
-		// to keep the SaaS query plan identical (the optimizer will
-		// collapse the duplicate predicate).
-		var rows []models.PaymentObservation
-		if err := gdb.
-			Where("tenant_id = ? AND order_id = ? AND status = ?",
-				tenantID, orderID, models.PaymentObservationStatusConfirmed).
-			Order("block_time ASC, id ASC").
-			Find(&rows).Error; err != nil {
-			return fmt.Errorf("aggregating verifier: load observations for %s: %w", orderID, err)
-		}
-
-		deduped := models.DedupePaymentObservations(rows)
-		total, err := sumObservations(deduped)
-		if err != nil {
-			return fmt.Errorf("aggregating verifier: order %s: %w", orderID, err)
-		}
-
-		// Refresh derived bookkeeping fields on every pass so the
-		// dashboard / refund flow always sees the latest dedup'd total
-		// regardless of verdict.
-		order.TotalReceived = total.String()
-
-		cmp := total.Cmp(expected)
-		switch {
-		case cmp < 0:
-			// Partial: record running total but stay in pending. We
-			// leave OverpaidAmount empty so the column never stores a
-			// stale value from a previous overpayment that's since
-			// been refunded.
-			if !alreadyVerified {
-				order.MarkPaymentVerificationPending()
-			}
-			order.OverpaidAmount = ""
-
-		default:
-			// total == expected (cmp == 0) OR total > expected (cmp > 0).
-			// Both transition the order to verified on the first call;
-			// subsequent calls only refresh the OverpaidAmount delta.
-			if cmp > 0 {
-				surplus := new(big.Int).Sub(total, expected)
-				order.OverpaidAmount = surplus.String()
-			} else {
-				order.OverpaidAmount = ""
-			}
-
-			if alreadyVerified {
-				// Already-verified path: do not rewrite the envelope
-				// and do not flip the verification status (it's already
-				// "verified"). We still saved TotalReceived /
-				// OverpaidAmount above, which is the entire reason the
-				// late-arrival re-aggregation runs at all.
-				break
-			}
-
-			// First-time verification: build and freeze the envelope.
-			// We delegate the protojson marshal to Order.SetPaymentSent
-			// so the bytes round-trip through PaymentSentMessage() and
-			// stay configuration-aligned with the legacy
-			// PutMessage(PAYMENT_SENT) path inside pkg/models — there
-			// is exactly one protojson MarshalOptions definition for
-			// SerializedPaymentSent in the entire codebase, and it
-			// lives next to the matching unmarshaler.
-			ps, err := buildAggregatedPaymentSent(orderOpen, deduped, total, &order, v.clock())
-			if err != nil {
-				return fmt.Errorf("aggregating verifier: build PaymentSent for %s: %w", orderID, err)
-			}
-			if err := order.SetPaymentSent(ps); err != nil {
-				return fmt.Errorf("aggregating verifier: marshal PaymentSent for %s: %w", orderID, err)
-			}
-			// Back-fill Order.RefundAddress only when the observations
-			// have one unambiguous sender. Multi-sender top-ups and
-			// balance-poll fallbacks must leave it empty for an explicit
-			// buyer/support override instead of guessing.
-			if order.RefundAddress == "" && ps.RefundAddress != "" {
-				order.RefundAddress = ps.RefundAddress
-			}
-			order.MarkPaymentVerified()
-			emitVerified = true
-			emitVerifiedNamespace = deduped[0].ChainNamespace
-		}
-
-		if err := tx.Save(&order); err != nil {
-			return fmt.Errorf("aggregating verifier: save order %s: %w", orderID, err)
-		}
-		return nil
-	})
+		err = raw.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			return v.aggregateWithGorm(ctx, tx, func(order *models.Order) error {
+				return tx.Save(order).Error
+			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace)
+		})
+	} else {
+		err = v.db.Update(func(tx database.Tx) error {
+			gdb := tx.Read().WithContext(ctx)
+			return v.aggregateWithGorm(ctx, gdb, func(order *models.Order) error {
+				return tx.Save(order)
+			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace)
+		})
+	}
 	if err != nil {
 		return err
 	}
@@ -306,6 +193,109 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 	if emitVerified {
 		v.bus.Emit(events.PaymentVerified{TenantID: tenantID, OrderID: orderID})
 		paymentmetrics.RecordPaymentAggregationEnvelopeEmitted(tenantID, emitVerifiedNamespace, orderID)
+	}
+	return nil
+}
+
+func (v *AggregatingVerifier) aggregateWithGorm(
+	ctx context.Context,
+	gdb *gorm.DB,
+	saveOrder func(*models.Order) error,
+	tenantID, orderID string,
+	emitVerified *bool,
+	emitVerifiedNamespace *string,
+) error {
+	gdb = gdb.WithContext(ctx)
+
+	// Step 1: lock the order row. We scope the WHERE on the full composite
+	// primary key (tenant_id, id) so a SaaS deployment can never accidentally
+	// lock or read a different tenant's order when OrderIDs collide across
+	// tenants.
+	var order models.Order
+	loader := gdb
+	if dialectSupportsRowLock(gdb) {
+		loader = gdb.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	if err := loader.
+		Where("tenant_id = ? AND id = ?", tenantID, orderID).
+		First(&order).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil // unknown order — log-and-skip per §5.1.
+		}
+		return fmt.Errorf("aggregating verifier: load order %s: %w", orderID, err)
+	}
+
+	alreadyVerified := order.IsPaymentVerified()
+
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return fmt.Errorf("aggregating verifier: decode order_open for %s: %w", orderID, err)
+	}
+
+	expected, err := parseExpectedAmount(&order, orderOpen)
+	if err != nil {
+		return fmt.Errorf("aggregating verifier: order %s: %w", orderID, err)
+	}
+
+	var rows []models.PaymentObservation
+	if err := gdb.
+		Where("tenant_id = ? AND order_id = ? AND status = ?",
+			tenantID, orderID, models.PaymentObservationStatusConfirmed).
+		Order("block_time ASC, id ASC").
+		Find(&rows).Error; err != nil {
+		return fmt.Errorf("aggregating verifier: load observations for %s: %w", orderID, err)
+	}
+
+	deduped := models.DedupePaymentObservations(rows)
+	total, err := sumObservations(deduped)
+	if err != nil {
+		return fmt.Errorf("aggregating verifier: order %s: %w", orderID, err)
+	}
+
+	order.TotalReceived = total.String()
+
+	cmp := total.Cmp(expected)
+	switch {
+	case cmp < 0:
+		if !alreadyVerified {
+			order.MarkPaymentVerificationPending()
+		}
+		order.OverpaidAmount = ""
+
+	default:
+		if cmp > 0 {
+			surplus := new(big.Int).Sub(total, expected)
+			order.OverpaidAmount = surplus.String()
+		} else {
+			order.OverpaidAmount = ""
+		}
+
+		if alreadyVerified {
+			promoteAfterVerification(&order, v.clock())
+			break
+		}
+
+		ps, err := buildAggregatedPaymentSent(orderOpen, deduped, total, &order, v.clock())
+		if err != nil {
+			return fmt.Errorf("aggregating verifier: build PaymentSent for %s: %w", orderID, err)
+		}
+		if err := order.SetPaymentSent(ps); err != nil {
+			return fmt.Errorf("aggregating verifier: marshal PaymentSent for %s: %w", orderID, err)
+		}
+		if order.RefundAddress == "" && ps.RefundAddress != "" {
+			order.RefundAddress = ps.RefundAddress
+		}
+		if order.PaymentAddress == "" && ps.ToAddress != "" {
+			order.PaymentAddress = ps.ToAddress
+		}
+		order.MarkPaymentVerified()
+		promoteAfterVerification(&order, v.clock())
+		*emitVerified = true
+		*emitVerifiedNamespace = deduped[0].ChainNamespace
+	}
+
+	if err := saveOrder(&order); err != nil {
+		return fmt.Errorf("aggregating verifier: save order %s: %w", orderID, err)
 	}
 	return nil
 }
@@ -332,27 +322,45 @@ func dialectSupportsRowLock(db *gorm.DB) bool {
 	}
 }
 
-// parseExpectedAmount extracts the order's expected payment in smallest
-// units. OrderOpen.Amount is the canonical source (it's the value the
-// buyer signed when opening the order) so the verifier's threshold is
-// always derived from the immutable opening message rather than from
-// any later fields the seller might have rewritten.
-func parseExpectedAmount(orderOpen *pb.OrderOpen) (*big.Int, error) {
+// parseExpectedAmount extracts the order's expected payment in smallest units.
+// Address-monitored routes use the locked pending payment intent; legacy rows
+// fall back to the signed OrderOpen amount.
+func parseExpectedAmount(order *models.Order, orderOpen *pb.OrderOpen) (*big.Int, error) {
 	if orderOpen == nil {
 		return nil, errors.New("order_open is nil")
 	}
-	raw := strings.TrimSpace(orderOpen.GetAmount())
+	raw := strings.TrimSpace(order.ExpectedPaymentAmountString())
 	if raw == "" {
-		return nil, errors.New("order_open.amount is empty")
+		raw = strings.TrimSpace(orderOpen.GetAmount())
+	}
+	if raw == "" {
+		return nil, errors.New("expected payment amount is empty")
 	}
 	v, ok := new(big.Int).SetString(raw, 10)
 	if !ok {
-		return nil, fmt.Errorf("order_open.amount %q is not a decimal integer", raw)
+		return nil, fmt.Errorf("expected payment amount %q is not a decimal integer", raw)
 	}
 	if v.Sign() <= 0 {
-		return nil, fmt.Errorf("order_open.amount %q must be positive", raw)
+		return nil, fmt.Errorf("expected payment amount %q must be positive", raw)
 	}
 	return v, nil
+}
+
+func promoteAfterVerification(order *models.Order, now time.Time) {
+	if order == nil {
+		return
+	}
+	if order.PaidAt == nil {
+		paidAt := now
+		order.PaidAt = &paidAt
+	}
+	switch order.State {
+	case models.OrderState_PENDING,
+		models.OrderState_AWAITING_PAYMENT,
+		models.OrderState_AWAITING_PAYMENT_VERIFICATION,
+		models.OrderState_PROCESSING_ERROR:
+		order.SetFSMState(models.OrderState_PENDING)
+	}
 }
 
 // sumObservations folds the dedup'd observation slice into a *big.Int.
@@ -383,24 +391,24 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 //
 // Field policy:
 //
-//   - TransactionID / event_index: we use the LATEST observation by block
-//     time (with ID as tie-breaker) as the representative tx. This
-//     matches the legacy single-PaymentSent semantics where the buyer
-//     submits the most recent funding tx.
-//   - PayerAddress: same source as TransactionID (FromAddress on the
-//     representative observation). Refund routing prefers Order.RefundAddress;
-//     when that is empty, the verifier only infers a refund target if all
-//     deduped observations have the same non-empty sender.
+//   - TransactionID: only populated from a real chain tx hash. Native ManagedEscrow
+//     balance polling may produce an internal observation id when no exact tx
+//     can be attributed; that id is valid for verification/dedupe but must not
+//     become a user-facing transaction hash.
+//   - PayerAddress: taken from the latest real chain tx when available;
+//     otherwise from the representative observation. Refund routing prefers
+//     Order.RefundAddress; when that is empty, the verifier only infers a
+//     refund target if all deduped observations have the same non-empty sender.
 //   - ToAddress: also taken from the representative row — this is the
 //     watched ManagedEscrow / smart-wallet / address the chain reported.
 //   - Amount: the aggregated total (NOT the representative row's
 //     amount). This is the value that crosses the verification
 //     threshold; the seller's order processor uses it as the canonical
 //     received amount.
-//   - Coin: pulled from OrderOpen.PricingCoin. The aggregator does not
-//     know how to re-derive a CoinType from chain_namespace alone for
-//     ERC-20 tokens, and OrderOpen.PricingCoin already pins the
-//     buyer-chosen settlement coin at order creation time.
+//   - Coin: pulled from the order's pending payment intent. OrderOpen.PricingCoin
+//     is the pricing asset for marketplace value, while address-monitored
+//     crypto flows lock the actual settlement asset in PendingPaymentInfo.
+//     Legacy rows without pending intent fall back to OrderOpen.PricingCoin.
 //   - Method and escrow fields: derived from the order's pending payment
 //     intent. Observations are chain facts; they must not decide whether
 //     an order is DIRECT, CANCELABLE, or MODERATED.
@@ -438,9 +446,13 @@ func buildAggregatedPaymentSent(
 			rep = c
 		}
 	}
+	txRep, hasChainTx := latestChainTxObservation(rows)
+	if hasChainTx {
+		rep = txRep
+	}
 
 	chaincode := orderOpen.GetChaincode()
-	coin := orderOpen.GetPricingCoin()
+	coin := pendingPaymentCoin(order, orderOpen)
 
 	// Use buyer-declared refund address when available. When absent, infer
 	// only from a single unambiguous observed sender; otherwise leave empty
@@ -452,8 +464,13 @@ func buildAggregatedPaymentSent(
 
 	intent := resolveAggregatedPaymentIntent(order, rows)
 
+	transactionID := ""
+	if hasChainTx {
+		transactionID = txRep.TxHash
+	}
+
 	ps := &pb.PaymentSent{
-		TransactionID:       rep.TxHash,
+		TransactionID:       transactionID,
 		Chaincode:           chaincode,
 		Method:              intent.method,
 		ContractAddress:     intent.contractAddress,
@@ -470,6 +487,23 @@ func buildAggregatedPaymentSent(
 		Timestamp:           timestamppb.New(now),
 	}
 	return ps, nil
+}
+
+func latestChainTxObservation(rows []models.PaymentObservation) (models.PaymentObservation, bool) {
+	var out models.PaymentObservation
+	found := false
+	for i := range rows {
+		if !rows[i].HasChainTxHash() {
+			continue
+		}
+		if !found ||
+			rows[i].BlockTime.After(out.BlockTime) ||
+			(rows[i].BlockTime.Equal(out.BlockTime) && rows[i].ID > out.ID) {
+			out = rows[i]
+			found = true
+		}
+	}
+	return out, found
 }
 
 type aggregatedPaymentIntent struct {

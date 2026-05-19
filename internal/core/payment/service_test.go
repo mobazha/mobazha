@@ -16,6 +16,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // ── test helpers ────────────────────────────────────────────────────────
@@ -191,6 +192,51 @@ func TestPaymentAppService_GeneratePaymentInstructions_Success(t *testing.T) {
 	assert.Equal(t, payment.PaymentModelClientSigned, result.PaymentModel)
 	assert.Equal(t, "0xabc", result.EscrowAddr)
 	assert.Equal(t, 1, strategy.genCallCount)
+}
+
+func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRows(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	rawProvider, ok := db.(interface{ RawDB() *gorm.DB })
+	require.True(t, ok)
+	raw := rawProvider.RawDB()
+	require.NotNil(t, raw)
+
+	require.NoError(t, raw.Create(&models.Order{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-buyer"},
+		ID:          models.OrderID("order-safe"),
+	}).Error)
+	require.NoError(t, raw.Create(&models.Order{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-vendor"},
+		ID:          models.OrderID("order-safe"),
+	}).Error)
+
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{DB: db})
+	require.NoError(t, svc.persistManagedEscrowPaymentAddress(
+		"order-safe",
+		"crypto:eip155:11155111:native",
+		"0xmanagedescrow",
+		1000,
+		false,
+	))
+
+	var orders []models.Order
+	require.NoError(t, raw.
+		Where("id = ?", "order-safe").
+		Order("tenant_id ASC").
+		Find(&orders).Error)
+	require.Len(t, orders, 2)
+	for i := range orders {
+		require.Equal(t, "0xmanagedescrow", orders[i].PaymentAddress)
+		info, err := orders[i].GetPendingManagedEscrowPaymentInfo()
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		require.Equal(t, uint64(1000), info.Amount)
+		require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
+		require.Equal(t, "0xmanagedescrow", info.Address)
+	}
 }
 
 func TestPaymentAppService_GeneratePaymentInstructions_NoCoinStrategy(t *testing.T) {

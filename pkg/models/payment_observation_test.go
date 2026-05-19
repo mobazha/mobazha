@@ -16,10 +16,10 @@ func TestPaymentObservation_AmountBigInt(t *testing.T) {
 	uint256Max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
 
 	tests := []struct {
-		name     string
-		stored   string
-		want     *big.Int
-		wantOK   bool
+		name   string
+		stored string
+		want   *big.Int
+		wantOK bool
 	}{
 		{name: "empty string is missing", stored: "", want: nil, wantOK: false},
 		{name: "zero", stored: "0", want: big.NewInt(0), wantOK: true},
@@ -58,10 +58,10 @@ func TestPaymentObservation_SetAmountBigInt_RoundTrip(t *testing.T) {
 		nil,
 		big.NewInt(0),
 		big.NewInt(1),
-		big.NewInt(100_000_000),                      // 1 BTC in sat
-		mustBig("1000000000000000000"),               // 1 ETH in wei
-		mustBig("123456789012345678901234567890"),    // > int64 range
-		uint256Max,                                    // overflow guard
+		big.NewInt(100_000_000),        // 1 BTC in sat
+		mustBig("1000000000000000000"), // 1 ETH in wei
+		mustBig("123456789012345678901234567890"), // > int64 range
+		uint256Max, // overflow guard
 	}
 
 	for _, want := range cases {
@@ -129,6 +129,8 @@ func TestPaymentObservation_KnownConstants(t *testing.T) {
 		{"event=external_payment_deposit", PaymentEventEXTERNAL_PAYMENTDeposit, "external_payment_deposit"},
 		{"event=utxo_funding", PaymentEventUTXOFunding, "utxo_funding"},
 		{"event=solana_transfer", PaymentEventSolanaTransfer, "solana_transfer"},
+		{"tx_hash_source=chain_tx", PaymentTxHashSourceChainTx, "chain_tx"},
+		{"tx_hash_source=balance_poll", PaymentTxHashSourceBalancePoll, "balance_poll"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -138,6 +140,26 @@ func TestPaymentObservation_KnownConstants(t *testing.T) {
 			// Defense-in-depth: detect accidental whitespace / case noise.
 			if tt.got != strings.TrimSpace(tt.got) || strings.ToLower(tt.got) != tt.got {
 				t.Fatalf("constant %q must be lowercase, no whitespace", tt.got)
+			}
+		})
+	}
+}
+
+func TestPaymentObservation_HasChainTxHash(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{"empty defaults to chain tx", "", true},
+		{"chain tx", PaymentTxHashSourceChainTx, true},
+		{"balance poll", PaymentTxHashSourceBalancePoll, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := PaymentObservation{TxHashSource: tt.source}.HasChainTxHash()
+			if got != tt.want {
+				t.Fatalf("HasChainTxHash = %v, want %v", got, tt.want)
 			}
 		})
 	}

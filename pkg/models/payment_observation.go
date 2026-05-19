@@ -86,11 +86,19 @@ type PaymentObservation struct {
 
 	// Transaction-level identity. TxHash holds whatever the chain natively
 	// uses (32-byte hex for EVM, 88-byte base58 for Solana, 32-byte hex for
-	// EXTERNAL_PAYMENT txid, 32-byte hex for UTXO). EventIndex disambiguates multiple
+	// EXTERNAL_PAYMENT txid, 32-byte hex for UTXO). When TxHashSource is "balance_poll",
+	// TxHash is an internal observation id and MUST NOT be surfaced as a chain
+	// transaction hash or explorer link. EventIndex disambiguates multiple
 	// events within a single tx (e.g. multiple ERC-20 Transfer logs); native
 	// transfers use 0.
 	TxHash     string `gorm:"column:tx_hash;type:varchar(128);not null;uniqueIndex:idx_payment_obs_dedupe,priority:4;index:idx_payment_obs_chain_tx,priority:3" json:"txHash"`
 	EventIndex int    `gorm:"column:event_index;not null;default:0;uniqueIndex:idx_payment_obs_dedupe,priority:5" json:"eventIndex"`
+
+	// TxHashSource distinguishes real chain transaction hashes from internal
+	// observation identities. Empty is treated as "chain_tx" for rows created
+	// before this field existed and for older tests that don't care about the
+	// distinction.
+	TxHashSource string `gorm:"column:tx_hash_source;type:varchar(32);not null;default:'chain_tx'" json:"txHashSource"`
 
 	// Event classification. Free-form string so future chains can add new
 	// event types without schema migrations. Established values today:
@@ -165,6 +173,32 @@ const (
 	PaymentEventUTXOFunding    = "utxo_funding"
 	PaymentEventSolanaTransfer = "solana_transfer"
 )
+
+// TxHashSource values.
+const (
+	PaymentTxHashSourceChainTx     = "chain_tx"
+	PaymentTxHashSourceBalancePoll = "balance_poll"
+)
+
+// NormalizePaymentTxHashSource returns the canonical source value. Empty
+// defaults to chain_tx so older rows remain explorer-safe unless a monitor
+// explicitly marked the hash as synthetic/internal.
+func NormalizePaymentTxHashSource(source string) string {
+	switch source {
+	case "", PaymentTxHashSourceChainTx:
+		return PaymentTxHashSourceChainTx
+	case PaymentTxHashSourceBalancePoll:
+		return PaymentTxHashSourceBalancePoll
+	default:
+		return source
+	}
+}
+
+// HasChainTxHash reports whether TxHash is a real chain transaction id that
+// can be shown to users and linked to an explorer.
+func (p PaymentObservation) HasChainTxHash() bool {
+	return NormalizePaymentTxHashSource(p.TxHashSource) == PaymentTxHashSourceChainTx
+}
 
 // AmountBigInt parses Amount as a 256-bit unsigned integer. Returns nil and
 // false if Amount is empty or not a valid decimal integer.

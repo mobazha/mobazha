@@ -36,21 +36,22 @@ func isUniqueViolationErr(err error) bool {
 //
 // It deliberately mixes two transactional surfaces:
 //
-//   - db (database.Database): tenant-scoped. Used by InsertObservation,
-//     ListDeduplicatedConfirmed and ListByOrder, all of which operate inside
+//   - db (database.Database): tenant-scoped. Used by
+//     ListDeduplicatedConfirmed and ListByOrder, both of which operate inside
 //     a single tenant's slice of the table. The underlying tenantTx adds
-//     WHERE tenant_id = ? to every query and stamps tenant_id on writes,
-//     so the SQL we issue is naturally guarded.
+//     WHERE tenant_id = ? to every query, so the SQL we issue is naturally
+//     guarded.
 //
-//   - raw (*gorm.DB): global. Used only by RefreshConfirmations, which
-//     drives "pending → confirmed" transitions from a chain head. Confirmation
-//     depth is a property of the chain, not of the tenant, so iterating
-//     tenants would be both wasteful and dependent on the caller knowing the
-//     full active-tenant set. The raw session lets us issue exactly one
-//     UPDATE per chain head event regardless of tenancy. The cross-tenant
-//     write is sound here because (a) the SET clause depends only on
-//     block_number and the bound chain head, never on tenant data, and
-//     (b) we still surface the affected (tenantID, orderID) tuples so
+//   - raw (*gorm.DB): global. Used by InsertObservation and
+//     RefreshConfirmations. InsertObservation must preserve the explicit
+//     TenantID chosen by the dispatcher because a single chain monitor event
+//     can fan out to buyer and vendor tenant rows for the same business
+//     order. RefreshConfirmations drives "pending → confirmed" transitions
+//     from a chain head. Confirmation depth is a property of the chain, not
+//     of the tenant, so iterating tenants would be both wasteful and
+//     dependent on the caller knowing the full active-tenant set. These
+//     cross-tenant writes are sound because they are bounded to
+//     append-only observations or chain-derived status transitions, and
 //     downstream aggregation runs back through tenant-scoped paths.
 //
 // This split is documented at the interface level (see
@@ -76,14 +77,14 @@ func NewGormPaymentObservationRepo(db database.Database, raw *gorm.DB) *GormPaym
 
 // InsertObservation appends a single observation row.
 //
-// The implementation funnels through tx.Save so multi-tenant DBs stamp
-// tenant_id correctly and SQLite's composite-PK UPSERT machinery stays in
-// effect for the (tenant_id, id) PK. Because the caller is required to
-// allocate a fresh UUID per call, the (tenant_id, id) tuple should never
-// collide; the only conflict that ever fires is the dedupe UNIQUE
-// (tenant_id, chain_namespace, chain_reference, tx_hash, event_index,
-// observer), which surfaces as a generic "UNIQUE constraint failed" error
-// that we translate to ErrDuplicateObservation.
+// The implementation writes through the raw DB handle so obs.TenantID is
+// preserved exactly. This is intentional: ManagedEscrow and shared chain monitors are
+// chain-global, while the order rows they update are tenant-scoped. A single
+// funding event may need to be materialized for both buyer and vendor tenants.
+// Because the caller allocates a fresh UUID per call, the (tenant_id, id)
+// tuple should never collide; the expected replay conflict is the dedupe
+// UNIQUE (tenant_id, chain_namespace, chain_reference, tx_hash, event_index,
+// observer), translated to ErrDuplicateObservation.
 //
 // Caller contract (see PaymentObservation godoc):
 //
@@ -95,15 +96,16 @@ func (r *GormPaymentObservationRepo) InsertObservation(_ context.Context, obs *m
 	if obs == nil {
 		return fmt.Errorf("payment observation: obs must not be nil")
 	}
+	if r.raw == nil {
+		return fmt.Errorf("payment observation: InsertObservation requires a raw *gorm.DB session")
+	}
 	if obs.ID == "" {
 		return fmt.Errorf("payment observation: ID must be set (UUID v7 expected)")
 	}
 	if obs.TenantID == "" {
 		return fmt.Errorf("payment observation: TenantID must be set")
 	}
-	err := r.db.Update(func(tx database.Tx) error {
-		return tx.Save(obs)
-	})
+	err := r.raw.Create(obs).Error
 	if err == nil {
 		paymentmetrics.RecordPaymentObservationInserted(
 			obs.TenantID,

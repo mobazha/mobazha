@@ -521,6 +521,42 @@ func (r *managed_escrowOrderTenantResolver) ResolveTenant(_ context.Context, ord
 	return order.TenantID, nil
 }
 
+func (r *managed_escrowOrderTenantResolver) ResolveTenants(_ context.Context, orderID string) ([]string, error) {
+	var tenantIDs []string
+	if rawProvider, ok := r.db.(interface{ RawDB() *gorm.DB }); ok {
+		raw := rawProvider.RawDB()
+		if raw == nil {
+			return nil, fmt.Errorf("raw DB unavailable")
+		}
+		if err := raw.
+			Model(&models.Order{}).
+			Where("id = ? AND tenant_id <> ''", orderID).
+			Distinct("tenant_id").
+			Pluck("tenant_id", &tenantIDs).Error; err != nil {
+			return nil, err
+		}
+		if len(tenantIDs) == 0 {
+			return nil, corepayment.ErrUnknownOrder
+		}
+		return tenantIDs, nil
+	}
+
+	err := r.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Model(&models.Order{}).
+			Where("id = ? AND tenant_id <> ''", orderID).
+			Distinct("tenant_id").
+			Pluck("tenant_id", &tenantIDs).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(tenantIDs) == 0 {
+		return nil, corepayment.ErrUnknownOrder
+	}
+	return tenantIDs, nil
+}
+
 func (n *MobazhaNode) wireGuestEVMManagedEscrowObservation(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {
 	if n.guestPaymentMonitor == nil || len(monitors) == 0 {
 		return

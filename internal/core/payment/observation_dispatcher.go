@@ -143,6 +143,14 @@ type TenantResolver interface {
 	ResolveTenant(ctx context.Context, orderID string) (tenantID string, err error)
 }
 
+// MultiTenantResolver is the SaaS-aware extension used when a single business
+// order is materialized into multiple tenant-scoped order rows (buyer + vendor).
+// Implementations return every tenant that owns the order ID so monitor-driven
+// funding can fan out to each mirrored order row.
+type MultiTenantResolver interface {
+	ResolveTenants(ctx context.Context, orderID string) ([]string, error)
+}
+
 // Sentinel errors surfaced by the dispatcher.
 var (
 	// ErrUnknownOrder is returned by TenantResolver implementations
@@ -175,9 +183,10 @@ type FundingEvent struct {
 	ChainNamespace string // e.g. "eip155", "solana", "external_payment", "bip122"
 	ChainReference string // e.g. "1" (mainnet ETH), "mainnet" (Solana)
 
-	TxHash     string
-	EventIndex int    // 0 for native receive; log index for ERC-20 Transfer; SPL ix index for SPL.
-	EventType  string // see PaymentEventManagedEscrowReceived / PaymentEventERC20Transfer / ...
+	TxHash       string
+	TxHashSource string // chain_tx (explorer-safe) or balance_poll (internal observation id)
+	EventIndex   int    // 0 for native receive; log index for ERC-20 Transfer; SPL ix index for SPL.
+	EventType    string // see PaymentEventManagedEscrowReceived / PaymentEventERC20Transfer / ...
 
 	// Address fields. ToAddress is the watched recipient (the ManagedEscrow);
 	// FromAddress is evidence-only and may be empty (CEX-direct-pay,
@@ -215,6 +224,11 @@ func (e FundingEvent) validate() error {
 	}
 	if strings.TrimSpace(e.TxHash) == "" {
 		return fmt.Errorf("%w: empty TxHash", ErrInvalidFundingEvent)
+	}
+	switch models.NormalizePaymentTxHashSource(e.TxHashSource) {
+	case models.PaymentTxHashSourceChainTx, models.PaymentTxHashSourceBalancePoll:
+	default:
+		return fmt.Errorf("%w: invalid TxHashSource %q", ErrInvalidFundingEvent, e.TxHashSource)
 	}
 	if e.EventIndex < 0 {
 		return fmt.Errorf("%w: negative EventIndex %d", ErrInvalidFundingEvent, e.EventIndex)
@@ -261,7 +275,7 @@ func (d *ObservationDispatcher) OnFundingEvent(ctx context.Context, evt FundingE
 		return err
 	}
 
-	tenantID, err := d.tenants.ResolveTenant(ctx, evt.OrderID)
+	tenantIDs, err := d.resolveTenants(ctx, evt.OrderID)
 	if err != nil {
 		if errors.Is(err, ErrUnknownOrder) {
 			// Not a Mobazha-managed ManagedEscrow — ignore the event so noise
@@ -270,16 +284,55 @@ func (d *ObservationDispatcher) OnFundingEvent(ctx context.Context, evt FundingE
 		}
 		return fmt.Errorf("payment: resolve tenant for order %s: %w", evt.OrderID, err)
 	}
-	if strings.TrimSpace(tenantID) == "" {
-		return fmt.Errorf("payment: TenantResolver returned empty tenant for order %s", evt.OrderID)
+
+	var errs []error
+	for _, tenantID := range tenantIDs {
+		obs := buildObservation(
+			tenantID, evt,
+			models.PaymentObservationSourceMonitor,
+			d.monitorObserver(evt.ChainNamespace, evt.ChainReference),
+		)
+		if err := d.insertAndKick(ctx, obs); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (d *ObservationDispatcher) resolveTenants(ctx context.Context, orderID string) ([]string, error) {
+	if multi, ok := d.tenants.(MultiTenantResolver); ok {
+		tenantIDs, err := multi.ResolveTenants(ctx, orderID)
+		if err != nil {
+			return nil, err
+		}
+		return normalizeTenantIDs(orderID, tenantIDs)
 	}
 
-	obs := buildObservation(
-		tenantID, evt,
-		models.PaymentObservationSourceMonitor,
-		d.monitorObserver(evt.ChainNamespace, evt.ChainReference),
-	)
-	return d.insertAndKick(ctx, obs)
+	tenantID, err := d.tenants.ResolveTenant(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	return normalizeTenantIDs(orderID, []string{tenantID})
+}
+
+func normalizeTenantIDs(orderID string, tenantIDs []string) ([]string, error) {
+	seen := make(map[string]struct{}, len(tenantIDs))
+	out := make([]string, 0, len(tenantIDs))
+	for _, tenantID := range tenantIDs {
+		tenantID = strings.TrimSpace(tenantID)
+		if tenantID == "" {
+			continue
+		}
+		if _, ok := seen[tenantID]; ok {
+			continue
+		}
+		seen[tenantID] = struct{}{}
+		out = append(out, tenantID)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("payment: TenantResolver returned empty tenant set for order %s", orderID)
+	}
+	return out, nil
 }
 
 // OnBuyerReportedPaymentSent records a buyer-reported PAYMENT_SENT
@@ -388,6 +441,7 @@ func buildObservation(
 		ChainNamespace: evt.ChainNamespace,
 		ChainReference: evt.ChainReference,
 		TxHash:         evt.TxHash,
+		TxHashSource:   models.NormalizePaymentTxHashSource(evt.TxHashSource),
 		EventIndex:     evt.EventIndex,
 		EventType:      evt.EventType,
 		FromAddress:    evt.FromAddress,

@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"errors"
-	"math"
 	"math/big"
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -29,21 +28,16 @@ func ConvertCurrencyAmount(value *models.CurrencyValue, paymentCurrency *models.
 		return value.Amount, err
 	}
 
-	rateFloat, ok := new(big.Float).SetString(rate.String())
-	if !ok {
-		return value.Amount, errors.New("error converting exchange rate to float")
+	rateInt := big.Int(rate)
+	if rateInt.Sign() <= 0 {
+		return value.Amount, errors.New("exchange rate must be positive")
 	}
 
-	div := new(big.Float).Quo(rateFloat, big.NewFloat(math.Pow10(int(value.Currency.Divisibility))))
-	div.Quo(big.NewFloat(1), div)
-
-	v, _ := div.Float64()
-
-	converted, err := value.ConvertTo(paymentCurrency, v)
-	if err != nil {
-		return value.Amount, err
-	}
-	return converted.Amount, nil
+	amount := big.Int(value.Amount)
+	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(paymentCurrency.Divisibility)), nil)
+	converted := new(big.Int).Mul(&amount, scale)
+	converted.Quo(converted, &rateInt)
+	return iwallet.NewAmount(converted), nil
 }
 
 // ConvertFiatAmount converts a fiat amount from one currency to another.

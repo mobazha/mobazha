@@ -132,6 +132,7 @@ func (a *fakeAggregator) snapshot() []contracts.OrderRef {
 // non-Mobazha funding" branch.
 type fakeTenantResolver struct {
 	tenants map[string]string
+	multi   map[string][]string
 	err     error
 }
 
@@ -143,6 +144,21 @@ func (r *fakeTenantResolver) ResolveTenant(_ context.Context, orderID string) (s
 		return t, nil
 	}
 	return "", ErrUnknownOrder
+}
+
+func (r *fakeTenantResolver) ResolveTenants(_ context.Context, orderID string) ([]string, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if tenantIDs, ok := r.multi[orderID]; ok {
+		out := make([]string, len(tenantIDs))
+		copy(out, tenantIDs)
+		return out, nil
+	}
+	if tenantID, ok := r.tenants[orderID]; ok {
+		return []string{tenantID}, nil
+	}
+	return nil, ErrUnknownOrder
 }
 
 // validFundingEvent returns a populated FundingEvent that all tests can
@@ -235,6 +251,7 @@ func TestObservationDispatcher_OnFundingEvent_PersistsObservationRow(t *testing.
 	require.Equal(t, "eip155", got.ChainNamespace)
 	require.Equal(t, "1", got.ChainReference)
 	require.Equal(t, "0xabc", got.TxHash)
+	require.Equal(t, models.PaymentTxHashSourceChainTx, got.TxHashSource)
 	require.Equal(t, 0, got.EventIndex)
 	require.Equal(t, models.PaymentEventManagedEscrowReceived, got.EventType)
 	require.Equal(t, "0xbeef", got.FromAddress)
@@ -250,6 +267,25 @@ func TestObservationDispatcher_OnFundingEvent_PersistsObservationRow(t *testing.
 
 	calls := agg.snapshot()
 	require.Equal(t, []contracts.OrderRef{{TenantID: "tenant-1", OrderID: "order-1"}}, calls)
+}
+
+func TestObservationDispatcher_OnFundingEvent_FansOutToAllTenants(t *testing.T) {
+	d, repo, agg, res := newDispatcher(t, nil)
+	res.multi = map[string][]string{
+		"order-1": {"tenant-buyer", "tenant-vendor", "tenant-buyer", ""},
+	}
+
+	require.NoError(t, d.OnFundingEvent(context.Background(), validFundingEvent()))
+
+	rows := repo.snapshot()
+	require.Len(t, rows, 2)
+	require.Equal(t, "tenant-buyer", rows[0].TenantID)
+	require.Equal(t, "tenant-vendor", rows[1].TenantID)
+
+	require.Equal(t, []contracts.OrderRef{
+		{TenantID: "tenant-buyer", OrderID: "order-1"},
+		{TenantID: "tenant-vendor", OrderID: "order-1"},
+	}, agg.snapshot())
 }
 
 func TestObservationDispatcher_OnFundingEvent_ERC20EventCarriesTokenContract(t *testing.T) {
@@ -334,6 +370,7 @@ func TestObservationDispatcher_OnFundingEvent_RejectsInvalidEvents(t *testing.T)
 		{"empty ChainNamespace", func(e *FundingEvent) { e.ChainNamespace = "" }, "empty ChainNamespace"},
 		{"empty ChainReference", func(e *FundingEvent) { e.ChainReference = "" }, "empty ChainReference"},
 		{"empty TxHash", func(e *FundingEvent) { e.TxHash = "" }, "empty TxHash"},
+		{"invalid TxHashSource", func(e *FundingEvent) { e.TxHashSource = "synthetic" }, "invalid TxHashSource"},
 		{"negative EventIndex", func(e *FundingEvent) { e.EventIndex = -1 }, "negative EventIndex"},
 		{"empty EventType", func(e *FundingEvent) { e.EventType = "" }, "empty EventType"},
 		{"empty ToAddress", func(e *FundingEvent) { e.ToAddress = "" }, "empty ToAddress"},
@@ -646,6 +683,7 @@ func TestObservationDispatcher_OnBuyerReportedPaymentSent_RejectsInvalidEvents(t
 		expect string
 	}{
 		{"empty TxHash", func(e *FundingEvent) { e.TxHash = "" }, "empty TxHash"},
+		{"invalid TxHashSource", func(e *FundingEvent) { e.TxHashSource = "synthetic" }, "invalid TxHashSource"},
 		{"zero Amount", func(e *FundingEvent) { e.Amount = big.NewInt(0) }, "Amount must be > 0"},
 		{"zero BlockTime", func(e *FundingEvent) { e.BlockTime = time.Time{} }, "BlockTime must be set"},
 	}

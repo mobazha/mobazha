@@ -135,6 +135,18 @@ func TestGormPaymentObservationRepo_InsertObservation_DistinctObserversCoexist(t
 	assert.Equal(t, int64(2), count)
 }
 
+func TestGormPaymentObservationRepo_InsertObservation_PreservesExplicitTenantID(t *testing.T) {
+	repo, db := newPaymentObservationTestRepo(t)
+
+	obs := makeObservation("obs-tenant-b")
+	obs.TenantID = "tenant-b"
+	require.NoError(t, repo.InsertObservation(context.Background(), obs))
+
+	var stored models.PaymentObservation
+	require.NoError(t, db.Where("id = ?", "obs-tenant-b").First(&stored).Error)
+	assert.Equal(t, "tenant-b", stored.TenantID)
+}
+
 func TestGormPaymentObservationRepo_InsertObservation_RejectsMissingFields(t *testing.T) {
 	// Defensive: an obs with empty TenantID or ID is a programming error
 	// (the caller must allocate a UUID and route the right tenant). The

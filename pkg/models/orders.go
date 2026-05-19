@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -624,11 +625,11 @@ func (o *Order) OrderOpenMessage() (*pb.OrderOpen, error) {
 // "you've paid X of Y" progress bar from these fields while the order sits
 // in PENDING / partial state (Phase EVM-ManagedEscrow v0.3.0 §4.2, D-Hybrid-19).
 //
-// All amounts are decimal strings in the smallest unit declared by
-// OrderOpen.Amount (wei / sat / atomic units / lamports for crypto; fiat
-// uses the divisibility from the order's currency definition). Percentage
-// is clamped to [0, 100] and computed server-side so every client renders
-// the same bar from the same numbers.
+// All amounts are decimal strings in the payment asset's smallest unit:
+// address-monitored flows use the locked PendingPaymentInfo amount, while
+// legacy flows fall back to OrderOpen.Amount. Percentage is clamped to [0, 100]
+// and computed server-side so every client renders the same bar from the same
+// numbers.
 type PaymentProgressInfo struct {
 	TotalReceived  string `json:"totalReceived"`
 	ExpectedAmount string `json:"expectedAmount"`
@@ -641,10 +642,10 @@ type PaymentProgressInfo struct {
 }
 
 // ComputePaymentProgress derives the partial-payment progress card from
-// OrderPaymentState.TotalReceived and OrderOpen.Amount. Returns nil when
-// the order has no OrderOpen yet or when the expected amount cannot be
-// parsed as a positive big-int — in those cases there is nothing
-// meaningful to display and the JSON field should be omitted entirely.
+// OrderPaymentState.TotalReceived and the expected funding amount. Returns nil
+// when the order has no OrderOpen yet or when the expected amount cannot be
+// parsed as a positive big-int — in those cases there is nothing meaningful to
+// display and the JSON field should be omitted entirely.
 //
 // The percentage is min(100, total*100/expected) with big.Int math so
 // the calculation stays correct for the full 78-digit wei range. Callers
@@ -652,11 +653,10 @@ type PaymentProgressInfo struct {
 // render — the verifier rewrites TotalReceived on every pass (including
 // post-verified late deposits) and the dashboard wants to show that.
 func (o *Order) ComputePaymentProgress() *PaymentProgressInfo {
-	orderOpen, err := o.OrderOpenMessage()
-	if err != nil {
+	if _, err := o.OrderOpenMessage(); err != nil {
 		return nil
 	}
-	expectedStr := strings.TrimSpace(orderOpen.GetAmount())
+	expectedStr := strings.TrimSpace(o.ExpectedPaymentAmountString())
 	if expectedStr == "" {
 		return nil
 	}
@@ -702,6 +702,27 @@ func (o *Order) ComputePaymentProgress() *PaymentProgressInfo {
 		Percentage:     pct,
 		OverpaidAmount: overpaid,
 	}
+}
+
+// ExpectedPaymentAmountString returns the expected funding amount in the
+// payment asset's smallest unit. Address-monitored crypto flows lock the
+// converted chain amount in PendingPaymentInfo; legacy flows fall back to the
+// signed OrderOpen amount.
+func (o *Order) ExpectedPaymentAmountString() string {
+	if o == nil {
+		return ""
+	}
+	if managed_escrowInfo, err := o.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil && managed_escrowInfo.Amount > 0 {
+		return strconv.FormatUint(managed_escrowInfo.Amount, 10)
+	}
+	if utxoInfo, err := o.GetPendingPaymentInfo(); err == nil && utxoInfo != nil && utxoInfo.Amount > 0 {
+		return strconv.FormatUint(utxoInfo.Amount, 10)
+	}
+	orderOpen, err := o.OrderOpenMessage()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(orderOpen.GetAmount())
 }
 
 func (o *Order) Chaincode() (string, error) {

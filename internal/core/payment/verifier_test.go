@@ -363,9 +363,12 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 
 	got := loadOrder(t, db, "order-1")
 	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, models.OrderState_PENDING, got.State)
+	require.Equal(t, "0xmanagedescrow", got.PaymentAddress)
 	require.Equal(t, "1000", got.TotalReceived)
 	require.Empty(t, got.OverpaidAmount, "exact match leaves OverpaidAmount empty")
 	require.NotEmpty(t, got.SerializedPaymentSent)
+	require.NotNil(t, got.PaidAt)
 
 	ps, err := got.PaymentSentMessage()
 	require.NoError(t, err)
@@ -380,6 +383,169 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 	require.Equal(t, "0xusdc", ps.PaymentTokenAddress)
 	require.Equal(t, pb.PaymentSent_DIRECT, ps.Method)
 	require.Equal(t, frozen.Unix(), ps.Timestamp.AsTime().Unix())
+}
+
+func TestAggregateAndEmit_SyntheticBalancePollVerifiesWithoutExplorerTx(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-balance-poll", "1000", "0xrefund")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-balance-poll",
+		OrderID:        "order-balance-poll",
+		ChainNamespace: "eip155",
+		ChainReference: "11155111",
+		TxHash:         "0xsyntheticbalancepollid",
+		TxHashSource:   models.PaymentTxHashSourceBalancePoll,
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "1000",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-balance-poll"))
+
+	got := loadOrder(t, db, "order-balance-poll")
+	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, "1000", got.TotalReceived)
+
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Empty(t, ps.TransactionID, "balance-poll ids are internal observation ids, not explorer-safe tx hashes")
+	require.Equal(t, "0xmanagedescrow", ps.ToAddress)
+	require.Equal(t, "1000", ps.Amount)
+}
+
+func TestAggregateAndEmit_MixedSyntheticAndChainTxPrefersChainTxForEnvelope(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-mixed", "1000", "0xrefund")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-chain",
+		OrderID:        "order-mixed",
+		ChainNamespace: "eip155",
+		ChainReference: "11155111",
+		TxHash:         "0xrealtx",
+		TxHashSource:   models.PaymentTxHashSourceChainTx,
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "400",
+	})
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-synthetic-later",
+		OrderID:        "order-mixed",
+		ChainNamespace: "eip155",
+		ChainReference: "11155111",
+		TxHash:         "0xsyntheticlater",
+		TxHashSource:   models.PaymentTxHashSourceBalancePoll,
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "600",
+		BlockTime:      time.Date(2026, 5, 14, 12, 10, 0, 0, time.UTC),
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-mixed"))
+
+	got := loadOrder(t, db, "order-mixed")
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Equal(t, "0xrealtx", ps.TransactionID)
+	require.Equal(t, "0xpayer", ps.PayerAddress)
+	require.Equal(t, "1000", ps.Amount)
+}
+
+func TestAggregateAndEmit_PendingManagedEscrowAmountOverridesOrderOpenAmount(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-managed_escrow-amount", "1500", "0xrefund")
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().
+			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, "order-managed_escrow-amount").
+			First(&order).Error; err != nil {
+			return err
+		}
+		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+			Coin:    "crypto:eip155:1:native",
+			Amount:  1000,
+			Address: "0xmanagedescrow",
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	}))
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-managed_escrow-amount",
+		OrderID:        "order-managed_escrow-amount",
+		ChainNamespace: "eip155",
+		ChainReference: "11155111",
+		TxHash:         "0xmanagedescrow",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "1000",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-managed_escrow-amount"))
+
+	got := loadOrder(t, db, "order-managed_escrow-amount")
+	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, "1000", got.TotalReceived)
+	require.Empty(t, got.OverpaidAmount, "OrderOpen.Amount is pricing amount, not ManagedEscrow wei")
+
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Equal(t, "1000", ps.Amount)
+	require.Equal(t, "crypto:eip155:1:native", ps.Coin)
+}
+
+func TestAggregateAndEmit_PendingUTXOCoinOverridesOrderOpenPricingCoin(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-utxo-coin", "1500", "btc-refund")
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().
+			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, "order-utxo-coin").
+			First(&order).Error; err != nil {
+			return err
+		}
+		if err := order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
+			Coin:   "BTC",
+			Amount: 1000,
+			Script: "5221...",
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	}))
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-utxo-coin",
+		OrderID:        "order-utxo-coin",
+		ChainNamespace: "bip122",
+		ChainReference: "000000000019d6689c085ae165831e93",
+		TxHash:         "btc-tx",
+		EventType:      models.PaymentEventUTXOFunding,
+		FromAddress:    "btc-payer",
+		ToAddress:      "p2sh-target",
+		Amount:         "1000",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-utxo-coin"))
+
+	got := loadOrder(t, db, "order-utxo-coin")
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Equal(t, "1000", ps.Amount)
+	require.Equal(t, "crypto:bip122:000000000019d6689c085ae165831e93:native", ps.Coin)
+	require.Equal(t, pb.PaymentSent_CANCELABLE, ps.Method)
 }
 
 func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesSettlementSpecWhenPresent(t *testing.T) {

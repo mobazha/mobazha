@@ -146,6 +146,32 @@ func TestComputePaymentProgress_ExactMatch_Clamps100(t *testing.T) {
 	}
 }
 
+func TestComputePaymentProgress_PendingManagedEscrowAmountOverridesOrderOpenAmount(t *testing.T) {
+	order := putOrderOpenWithAmount(t, "1500")
+	if err := order.SetPendingManagedEscrowPaymentInfo(&PendingManagedEscrowPaymentInfo{
+		Coin:    "crypto:eip155:1:native",
+		Amount:  1000,
+		Address: "0xmanagedescrow",
+	}); err != nil {
+		t.Fatalf("SetPendingManagedEscrowPaymentInfo failed: %v", err)
+	}
+	order.TotalReceived = "1000"
+
+	got := order.ComputePaymentProgress()
+	if got == nil {
+		t.Fatal("expected non-nil progress")
+	}
+	if got.ExpectedAmount != "1000" {
+		t.Errorf("expected pending ManagedEscrow amount to win, got %q", got.ExpectedAmount)
+	}
+	if got.Percentage != 100 {
+		t.Errorf("expected percentage=100, got %d", got.Percentage)
+	}
+	if got.OverpaidAmount != "" {
+		t.Errorf("exact pending ManagedEscrow match must not surface overpaid, got %q", got.OverpaidAmount)
+	}
+}
+
 func TestComputePaymentProgress_Overpaid_ExposesDelta(t *testing.T) {
 	order := putOrderOpenWithAmount(t, "1000")
 	order.TotalReceived = "1500"

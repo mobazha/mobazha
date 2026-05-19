@@ -23,6 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 // PeerProfileReader is the narrow interface PaymentAppService needs from the profile domain.
@@ -248,23 +249,57 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
 func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool) error {
+	info := &models.PendingManagedEscrowPaymentInfo{
+		Coin:           coin,
+		Amount:         amount,
+		Address:        managed_escrowAddress,
+		Moderated:      moderated,
+		SettlementSpec: payment.NewManagedEscrowSpec(moderated).ToPending(),
+	}
+	if rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB }); ok {
+		raw := rawProvider.RawDB()
+		if raw == nil {
+			return fmt.Errorf("load orders: raw DB unavailable")
+		}
+		return raw.Transaction(func(tx *gorm.DB) error {
+			var orders []models.Order
+			if err := tx.Where("id = ? AND tenant_id <> ''", orderID).Find(&orders).Error; err != nil {
+				return fmt.Errorf("load orders: %w", err)
+			}
+			if len(orders) == 0 {
+				return fmt.Errorf("load orders: order %s not found", orderID)
+			}
+			for i := range orders {
+				orders[i].PaymentAddress = managed_escrowAddress
+				if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
+					return fmt.Errorf("set pending managed escrow payment info: %w", err)
+				}
+				if err := tx.Save(&orders[i]).Error; err != nil {
+					return fmt.Errorf("save order %s tenant %s: %w", orderID, orders[i].TenantID, err)
+				}
+			}
+			return nil
+		})
+	}
+
 	return s.db.Update(func(tx database.Tx) error {
-		var order models.Order
-		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
-			return fmt.Errorf("load order: %w", err)
+		var orders []models.Order
+		if err := tx.Read().Where("id = ?", orderID).Find(&orders).Error; err != nil {
+			return fmt.Errorf("load orders: %w", err)
 		}
-		order.PaymentAddress = managed_escrowAddress
-		managed_escrowSpec := payment.NewManagedEscrowSpec(moderated)
-		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
-			Coin:           coin,
-			Amount:         amount,
-			Address:        managed_escrowAddress,
-			Moderated:      moderated,
-			SettlementSpec: managed_escrowSpec.ToPending(),
-		}); err != nil {
-			return fmt.Errorf("set pending managed escrow payment info: %w", err)
+		if len(orders) == 0 {
+			return fmt.Errorf("load orders: order %s not found", orderID)
 		}
-		return tx.Save(&order)
+		for i := range orders {
+			orders[i].PaymentAddress = managed_escrowAddress
+			if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
+				return fmt.Errorf("set pending managed escrow payment info: %w", err)
+			}
+			if err := tx.Save(&orders[i]); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

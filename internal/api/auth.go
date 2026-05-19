@@ -19,6 +19,8 @@ import (
 // AuthCookieName is the name for the authentication cookie
 const AuthCookieName = "Mobazha_Auth_Cookie"
 
+const websocketAuthTokenProtocolPrefix = "mbz.auth.b64."
+
 // authState holds the mutable authentication credentials.
 // The GatewayConfig Username/Password provide the initial values;
 // authState allows runtime changes (password change API) without
@@ -183,7 +185,11 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 		if g.auth.isConfigured() {
 			username, password, ok := r.BasicAuth()
 			if !ok {
-				if tokenParam := r.URL.Query().Get("token"); strings.HasPrefix(tokenParam, "basic:") {
+				tokenParam := tokenFromWebSocketProtocol(r)
+				if tokenParam == "" {
+					tokenParam = r.URL.Query().Get("token")
+				}
+				if strings.HasPrefix(tokenParam, "basic:") {
 					username, password, ok = parseBasicToken(tokenParam[6:])
 				}
 			}
@@ -238,7 +244,8 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 //
 // Token sources (checked in order):
 //  1. Authorization: Bearer <token> header
-//  2. ?token=<jwt> query parameter (WebSocket fallback — browsers cannot set
+//  2. Sec-WebSocket-Protocol mbz.auth.b64.* (WebSocket — keeps token out of URL/logs)
+//  3. ?token=<jwt> query parameter (WebSocket fallback — browsers cannot set
 //     headers on the WebSocket constructor)
 func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) (*AuthIdentity, bool) {
 	if jv == nil {
@@ -249,6 +256,8 @@ func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) (*AuthIdenti
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(authHeader, "Bearer ") {
 		tokenStr = strings.TrimSpace(authHeader[7:])
+	} else if wsToken := tokenFromWebSocketProtocol(r); wsToken != "" && !strings.HasPrefix(wsToken, "basic:") {
+		tokenStr = wsToken
 	} else if qp := r.URL.Query().Get("token"); qp != "" && !strings.HasPrefix(qp, "basic:") {
 		tokenStr = qp
 	}
@@ -357,6 +366,26 @@ func parseBasicToken(encoded string) (username, password string, ok bool) {
 		return "", "", false
 	}
 	return parts[0], parts[1], true
+}
+
+func tokenFromWebSocketProtocol(r *http.Request) string {
+	for _, raw := range r.Header.Values("Sec-WebSocket-Protocol") {
+		for _, protocol := range strings.Split(raw, ",") {
+			protocol = strings.TrimSpace(protocol)
+			if !strings.HasPrefix(protocol, websocketAuthTokenProtocolPrefix) {
+				continue
+			}
+			encoded := strings.TrimPrefix(protocol, websocketAuthTokenProtocolPrefix)
+			tokenBytes, err := base64.RawURLEncoding.DecodeString(encoded)
+			if err != nil {
+				tokenBytes, err = base64.URLEncoding.DecodeString(encoded)
+			}
+			if err == nil && len(tokenBytes) > 0 {
+				return string(tokenBytes)
+			}
+		}
+	}
+	return ""
 }
 
 type changePasswordRequest struct {

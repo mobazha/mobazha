@@ -72,6 +72,7 @@ func (s *GuestOrderAppService) evaluateEVMClosureReadiness(coinType iwallet.Coin
 	relayReady := s.evmManagedEscrowRelayReady
 	_, monitorOK := s.evmManagedEscrowMonitorChains[coinInfo.Chain]
 	_, relayGasOK := s.evmRelayGasHealthyChains[coinInfo.Chain]
+	relayGasReason := s.evmRelayGasUnhealthyReason[coinInfo.Chain]
 	s.evmRuntimeMu.RUnlock()
 
 	if !fundingReady {
@@ -86,8 +87,12 @@ func (s *GuestOrderAppService) evaluateEVMClosureReadiness(coinType iwallet.Coin
 	if !relayReady {
 		return fmt.Errorf("%w: EVM ManagedEscrow relay is not configured", contracts.ErrCoinUnavailable)
 	}
-	if relayReady && !relayGasOK {
-		return fmt.Errorf("%w: EVM ManagedEscrow relay gas wallet is not healthy for %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
+	if !relayGasOK {
+		if relayGasReason == "" {
+			relayGasReason = "relay gas wallet not healthy"
+		}
+		return fmt.Errorf("%w: EVM ManagedEscrow relay gas wallet is not healthy for %s: %s",
+			contracts.ErrCoinUnavailable, coinInfo.Chain, relayGasReason)
 	}
 	if !s.hasActiveReceivingAccount(coinInfo.Chain) {
 		return fmt.Errorf("%w: no active seller receiving account for %s", contracts.ErrCoinUnavailable, coinInfo.Chain)

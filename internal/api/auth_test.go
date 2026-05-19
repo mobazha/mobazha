@@ -3,6 +3,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -393,6 +394,29 @@ func TestGateway_JWTAuth(t *testing.T) {
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
 			// 404 is acceptable because the mockNode has no real profile.
 			t.Fatalf("follow-up correct-cred request unexpectedly rejected: %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("ValidJWT_WebSocketProtocol", func(t *testing.T) {
+		token := signToken(&JWTClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+			Properties: map[string]string{"peerID": localPeerID},
+		}, privKey)
+
+		encoded := base64.RawURLEncoding.EncodeToString([]byte(token))
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("Sec-WebSocket-Protocol", "mbz.auth.v1, mbz.auth.b64."+encoded)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			t.Errorf("Expected auth success via WebSocket protocol, got %d", resp.StatusCode)
 		}
 	})
 

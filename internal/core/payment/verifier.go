@@ -401,10 +401,9 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 //     know how to re-derive a CoinType from chain_namespace alone for
 //     ERC-20 tokens, and OrderOpen.PricingCoin already pins the
 //     buyer-chosen settlement coin at order creation time.
-//   - Method: DIRECT — the Monitor-Driven flow only fires for monitored
-//     payment paths (ManagedEscrow direct deposit, ERC-20 transfer to ManagedEscrow, etc.).
-//     CANCELABLE / MODERATED orders use the legacy PaymentSent path
-//     where the buyer's envelope dictates the method.
+//   - Method and escrow fields: derived from the order's pending payment
+//     intent. Observations are chain facts; they must not decide whether
+//     an order is DIRECT, CANCELABLE, or MODERATED.
 //   - PaymentTokenAddress / PlatformAddr / Chaincode: copied through from
 //     the order record so the envelope round-trips intact for downstream
 //     consumers.
@@ -451,19 +450,95 @@ func buildAggregatedPaymentSent(
 		refundAddr = inferredRefundAddress(rows)
 	}
 
+	intent := resolveAggregatedPaymentIntent(order, rows)
+
 	ps := &pb.PaymentSent{
 		TransactionID:       rep.TxHash,
 		Chaincode:           chaincode,
-		Method:              pb.PaymentSent_DIRECT,
+		Method:              intent.method,
+		ContractAddress:     intent.contractAddress,
 		PayerAddress:        rep.FromAddress,
+		Moderator:           intent.moderator,
+		ModeratorAddress:    intent.moderatorAddress,
 		Amount:              total.String(),
 		Coin:                coin,
 		ToAddress:           rep.ToAddress,
+		Script:              intent.script,
 		RefundAddress:       refundAddr,
+		EscrowTimeoutHours:  intent.escrowTimeoutHours,
 		PaymentTokenAddress: rep.TokenAddress,
 		Timestamp:           timestamppb.New(now),
 	}
 	return ps, nil
+}
+
+type aggregatedPaymentIntent struct {
+	method             pb.PaymentSent_Method
+	contractAddress    string
+	script             string
+	moderator          string
+	moderatorAddress   string
+	escrowTimeoutHours uint32
+}
+
+func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentObservation) aggregatedPaymentIntent {
+	intent := aggregatedPaymentIntent{method: pb.PaymentSent_DIRECT}
+
+	if order == nil {
+		return intent
+	}
+
+	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
+		if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingManagedEscrow(managed_escrowInfo); ok {
+			intent.method = spec.Method
+		} else if managed_escrowInfo.Moderated {
+			intent.method = pb.PaymentSent_MODERATED
+		} else {
+			intent.method = pb.PaymentSent_CANCELABLE
+		}
+		intent.contractAddress = managed_escrowInfo.Address
+		return intent
+	}
+
+	pendingInfo, err := order.GetPendingPaymentInfo()
+	if err == nil && pendingInfo != nil {
+		return utxoAggregatedPaymentIntent(pendingInfo)
+	}
+
+	if len(rows) == 0 || !isUTXOObservationNamespace(rows[0].ChainNamespace) {
+		return intent
+	}
+	return intent
+}
+
+func isUTXOObservationNamespace(namespace string) bool {
+	switch namespace {
+	case "bip122", "bitcoincash", "zcash":
+		return true
+	default:
+		return false
+	}
+}
+
+func utxoAggregatedPaymentIntent(pendingInfo *models.PendingUTXOPaymentInfo) aggregatedPaymentIntent {
+	intent := aggregatedPaymentIntent{method: pb.PaymentSent_DIRECT}
+	if pendingInfo == nil {
+		return intent
+	}
+	if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingUTXO(pendingInfo); ok {
+		intent.method = spec.Method
+	} else if pendingInfo.Moderator != "" {
+		intent.method = pb.PaymentSent_MODERATED
+	} else {
+		intent.method = pb.PaymentSent_CANCELABLE
+	}
+	if pendingInfo.Moderator != "" {
+		intent.moderator = pendingInfo.Moderator
+		intent.moderatorAddress = pendingInfo.ModeratorPubkey
+		intent.escrowTimeoutHours = pendingInfo.UnlockHours
+	}
+	intent.script = pendingInfo.Script
+	return intent
 }
 
 func inferredRefundAddress(rows []models.PaymentObservation) string {

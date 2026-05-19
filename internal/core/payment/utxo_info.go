@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -19,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pkpayment "github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -224,6 +226,8 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 
 	if moderator == "" {
 		paymentData.Method = pb.PaymentSent_CANCELABLE
+		cancelableSpec := pkpayment.NewUTXOSpec(false)
+		paymentData.SettlementSpec = cancelableSpec.ToPending()
 
 		keys, err := s.GetUTXOEscrowKeys(ctx, order, "")
 		if err != nil {
@@ -240,6 +244,8 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 		paymentData.Script = hex.EncodeToString(script)
 	} else {
 		paymentData.Method = pb.PaymentSent_MODERATED
+		moderatedSpec := pkpayment.NewUTXOSpec(true)
+		paymentData.SettlementSpec = moderatedSpec.ToPending()
 
 		keys, err := s.GetUTXOEscrowKeys(ctx, order, moderator)
 		if err != nil {
@@ -293,6 +299,7 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 
 		if err := s.db.Update(func(dbtx database.Tx) error {
 			order.PaymentAddress = paymentData.ToAddress
+			utxoSpec := pkpayment.NewUTXOSpec(strings.TrimSpace(paymentData.Moderator) != "")
 			if err := order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
 				Coin:            string(coinType),
 				Amount:          expectedAmount,
@@ -301,6 +308,7 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 				Moderator:       paymentData.Moderator,
 				ModeratorPubkey: paymentData.ModeratorAddress,
 				UnlockHours:     paymentData.UnlockHours,
+				SettlementSpec:  utxoSpec.ToPending(),
 			}); err != nil {
 				return err
 			}

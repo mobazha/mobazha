@@ -17,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"gorm.io/gorm"
 )
@@ -123,14 +124,18 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 	}
 
 	if s.orderRepo != nil && params.OrderID != "" && session.SessionID != "" {
-		_ = s.orderRepo.MergeFiatMetadata(ctx, params.OrderID, map[string]string{
+		meta := map[string]string{
 			"fiat_provider":   providerID,
 			"fiat_session_id": session.SessionID,
 			// fiat_currency is stored so the PaymentSessionProjector can reconstruct
 			// the canonical paymentCoin ("fiat:{provider}:{currency}") for orders
 			// where PaymentSent has not yet been written (e.g. awaiting buyer action).
 			"fiat_currency": params.Currency,
-		})
+		}
+		if specJSON, err := payment.FiatMetadataSettlementSpecJSON(); err == nil {
+			meta["settlement_spec"] = specJSON
+		}
+		_ = s.orderRepo.MergeFiatMetadata(ctx, params.OrderID, meta)
 	}
 
 	logger.LogInfoWithIDf(log, s.nodeID, "fiat payment created: provider=%s session=%s order=%s", providerID, session.SessionID, params.OrderID)

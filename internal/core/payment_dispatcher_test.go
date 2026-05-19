@@ -506,7 +506,7 @@ func TestRuntimeManagedEscrowChainID_UsesWalletRuntimeNetwork(t *testing.T) {
 	n := &MobazhaNode{
 		walletFields: walletFields{
 			multiwallet: &mockWalletOperatorWithChainWallets{wallets: map[iwallet.ChainType]iwallet.Wallet{
-				iwallet.ChainEthereum: newMockEVMWallet(iwallet.ChainEthereum, nil),
+				iwallet.ChainEthereum: newMockEVMWalletWithTestnet(iwallet.ChainEthereum, nil, true),
 			}},
 		},
 	}

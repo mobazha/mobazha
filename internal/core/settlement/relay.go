@@ -278,6 +278,10 @@ func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, 
 	}
 
 	coinType = iwallet.CoinType(paymentSent.Coin)
+	if !payment.UsesClientSignedPayMode(&order, paymentSent) {
+		logger.LogInfoWithIDf(log, s.nodeID, "%s uses address-monitored settlement flow, no instructions needed", orderID)
+		return coinType, nil, nil
+	}
 
 	if len(payoutAddress) == 0 {
 		toAddress, err := s.GetPayoutAddress(paymentSent.Coin)

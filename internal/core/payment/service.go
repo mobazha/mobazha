@@ -85,6 +85,13 @@ type PaymentAppService struct {
 	// OrderProcessor.RecordVerifiedPayment for the async verification path.
 	paymentRecorder VerifiedPaymentRecorder
 
+	// observationDispatcher is an optional append-only audit path for UTXO
+	// payments into the unified payment_observations table. When non-nil,
+	// HandleUTXOPayment writes a FundingEvent alongside the legacy order-field
+	// path. This enables unified multi-chain audit and the aggregating verifier
+	// to cover UTXO chains as well.
+	observationDispatcher *ObservationDispatcher
+
 	// paymentVerifiedHandler is called after a crypto payment is confirmed on-chain
 	// by the async verification loop. Only invoked for RoleVendor orders to relay
 	// verified payment to buyer (via SaaS direct call or P2P/SNF).
@@ -132,6 +139,12 @@ func NewPaymentAppService(cfg PaymentAppServiceConfig) *PaymentAppService {
 // SetEscrowOps injects the settlement port after construction (late wiring).
 func (s *PaymentAppService) SetEscrowOps(ops contracts.EscrowOperations) {
 	s.escrowOps = ops
+}
+
+// SetObservationDispatcher injects the unified ObservationDispatcher, enabling
+// UTXO payment events to be recorded in the payment_observations audit table.
+func (s *PaymentAppService) SetObservationDispatcher(d *ObservationDispatcher) {
+	s.observationDispatcher = d
 }
 
 // SetFiatPaymentQuery wires the fiat payment query dependency after construction
@@ -220,7 +233,8 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 		result.PaymentData.ToAddress != "" {
 
 		setupResult.IsManagedEscrowOrder = true
-		if persistErr := s.persistManagedEscrowPaymentAddress(params.OrderID, string(params.CoinType), result.PaymentData.ToAddress, result.PaymentData.Amount); persistErr != nil {
+		moderated := result.PaymentData.Method == pb.PaymentSent_MODERATED
+		if persistErr := s.persistManagedEscrowPaymentAddress(params.OrderID, string(params.CoinType), result.PaymentData.ToAddress, result.PaymentData.Amount, moderated); persistErr != nil {
 			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist ManagedEscrow address for order %s: %v", params.OrderID, persistErr)
 			// Non-fatal: monitoring is already registered; the projector will
 			// fall back to escrow_v1 until the next call succeeds.
@@ -233,17 +247,20 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 // persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
-func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64) error {
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool) error {
 	return s.db.Update(func(tx database.Tx) error {
 		var order models.Order
 		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
 			return fmt.Errorf("load order: %w", err)
 		}
 		order.PaymentAddress = managed_escrowAddress
+		managed_escrowSpec := payment.NewManagedEscrowSpec(moderated)
 		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
-			Coin:    coin,
-			Amount:  amount,
-			Address: managed_escrowAddress,
+			Coin:           coin,
+			Amount:         amount,
+			Address:        managed_escrowAddress,
+			Moderated:      moderated,
+			SettlementSpec: managed_escrowSpec.ToPending(),
 		}); err != nil {
 			return fmt.Errorf("set pending managed escrow payment info: %w", err)
 		}
@@ -333,10 +350,18 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		paymentTokenAddress = coinInfo.ContractAddress(wallet.IsTestnet())
 	}
 
+	var clientSpec payment.SettlementSpec
+	if coinInfo.Chain == iwallet.ChainSolana {
+		clientSpec = payment.NewClientSignedSolanaSpec(paymentMethod == pb.PaymentSent_MODERATED)
+	} else {
+		clientSpec = payment.NewClientSignedEVMSpec(paymentMethod == pb.PaymentSent_MODERATED)
+	}
+
 	paymentData := models.PaymentData{
 		OrderID:             params.OrderID,
 		Coin:                params.CoinType,
 		Method:              paymentMethod,
+		SettlementSpec:      clientSpec.ToPending(),
 		ContractAddress:     contractAddress.String(),
 		PayerAddress:        params.PayerAddress,
 		Moderator:           params.Moderator,
@@ -351,7 +376,33 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		PaymentTokenAddress: paymentTokenAddress,
 	}
 
+	if persistErr := s.persistClientSignedPaymentInfo(params.OrderID, &paymentData); persistErr != nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "BuildInitEscrowInstructions: failed to persist client-signed pending for order %s: %v", params.OrderID, persistErr)
+	}
+
 	return &paymentData, escrowAccount, instructions, nil
+}
+
+func (s *PaymentAppService) persistClientSignedPaymentInfo(orderID string, pd *models.PaymentData) error {
+	if pd == nil {
+		return nil
+	}
+	return s.db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
+			return fmt.Errorf("load order: %w", err)
+		}
+		order.PaymentAddress = pd.ToAddress
+		if err := order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+			Coin:           string(pd.Coin),
+			EscrowAddress:  pd.ToAddress,
+			Moderator:      pd.Moderator,
+			SettlementSpec: pd.SettlementSpec,
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	})
 }
 
 // GetOrderInfo retrieves order information needed for escrow setup.

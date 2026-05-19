@@ -3,12 +3,15 @@
 package payment
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -281,6 +284,9 @@ func (s *PaymentAppService) handleBuyerUTXOPayment(order *models.Order, tx *iwal
 		logger.LogErrorWithIDf(log, s.nodeID, "Error saving order %s after recording transaction: %v", order.ID, err)
 	}
 
+	// Audit-only: record in unified payment_observations without triggering aggregator.
+	s.dispatchUTXOObservation(order, tx, matchedAddress, coinType)
+
 	totalPaid, err := s.CalculateTotalPaidToAddress(order, matchedAddress)
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "Error calculating total paid for order %s: %v", order.ID, err)
@@ -499,4 +505,86 @@ func (s *PaymentAppService) cancelExcessPayment(order *models.Order, tx *iwallet
 		RefundedAmount: excessAmount.Uint64(),
 		Coin:           paymentSent.Coin,
 	})
+}
+
+// utxoObservationChainRef resolves chain namespace and reference for UTXO
+// payment_observations audit rows. Canonical crypto:* IDs are parsed directly;
+// legacy native tickers (btc, ltc, …) are normalized via TryNormalizePaymentCoin.
+func utxoObservationChainRef(coinType iwallet.CoinType) (namespace string, chainRef string, ok bool) {
+	if canon, normalized := iwallet.TryNormalizePaymentCoin(string(coinType)); normalized {
+		coinType = canon
+	}
+
+	parsed, err := assetid.Parse(string(coinType))
+	if err != nil {
+		return "", "", false
+	}
+	switch parsed.Namespace {
+	case assetid.NamespaceBIP122:
+		return string(assetid.NamespaceBIP122), parsed.ChainRef, true
+	case assetid.NamespaceBitcoinCash:
+		return string(assetid.NamespaceBitcoinCash), parsed.ChainRef, true
+	case assetid.NamespaceZCash:
+		return string(assetid.NamespaceZCash), parsed.ChainRef, true
+	default:
+		return "", "", false
+	}
+}
+
+// dispatchUTXOObservation writes the UTXO payment into payment_observations
+// via ObservationDispatcher (audit-only when aggregator is nil).
+func (s *PaymentAppService) dispatchUTXOObservation(order *models.Order, tx *iwallet.Transaction, matchedAddress string, coinType iwallet.CoinType) {
+	if s.observationDispatcher == nil {
+		return
+	}
+
+	chainNamespace, chainRef, ok := utxoObservationChainRef(coinType)
+	if !ok {
+		return
+	}
+
+	valueBigInt := big.Int(tx.Value)
+	if valueBigInt.Sign() <= 0 {
+		return
+	}
+	amount := new(big.Int).Set(&valueBigInt)
+
+	blockTime := tx.Timestamp
+	if blockTime.IsZero() {
+		blockTime = time.Now()
+	}
+	blockNumber := int64(tx.Height)
+	if blockNumber <= 0 {
+		blockNumber = 1
+	}
+
+	var fromAddr string
+	for _, from := range tx.From {
+		if from.Address.String() != "" {
+			fromAddr = from.Address.String()
+			break
+		}
+	}
+
+	evt := FundingEvent{
+		OrderID:        order.ID.String(),
+		ChainNamespace: chainNamespace,
+		ChainReference: chainRef,
+		TxHash:         string(tx.ID),
+		EventIndex:     0,
+		EventType:      models.PaymentEventUTXOFunding,
+		FromAddress:    fromAddr,
+		ToAddress:      matchedAddress,
+		Amount:         amount,
+		BlockNumber:    blockNumber,
+		BlockTime:      blockTime,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := s.observationDispatcher.OnFundingEvent(ctx, evt); err != nil {
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"UTXO observation dispatch failed (non-fatal) for order %s tx %s: %v", order.ID, tx.ID, err)
+	}
 }

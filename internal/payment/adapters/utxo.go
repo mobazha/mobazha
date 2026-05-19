@@ -10,7 +10,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -166,7 +165,7 @@ func (a *UTXOAutoConfirmAdapter) ValidatePaymentMessage(params payment.PaymentMe
 		return err
 	}
 
-	if paymentSent.Method != pb.PaymentSent_DIRECT {
+	if !payment.MethodIsDirect(paymentSent.Method) {
 		if err := utils.ValidatePaymentAmount(orderOpen.Amount, paymentSent.Amount); err != nil {
 			return err
 		}

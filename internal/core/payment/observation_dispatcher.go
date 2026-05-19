@@ -89,9 +89,9 @@ func NewObservationDispatcher(
 	if repo == nil {
 		panic("payment: NewObservationDispatcher requires a non-nil PaymentObservationRepo")
 	}
-	if aggregator == nil {
-		panic("payment: NewObservationDispatcher requires a non-nil PaymentAggregator")
-	}
+	// aggregator == nil is valid: audit-only mode (insert observations
+	// without triggering AggregateAndEmit). Used by UTXO path where the
+	// legacy verification pipeline is still the source of truth.
 	if tenants == nil {
 		panic("payment: NewObservationDispatcher requires a non-nil TenantResolver")
 	}
@@ -360,9 +360,11 @@ func (d *ObservationDispatcher) insertAndKick(ctx context.Context, obs *models.P
 			obs.OrderID, obs.TxHash, err)
 	}
 
-	if err := d.aggregator.AggregateAndEmit(ctx, obs.TenantID, obs.OrderID); err != nil {
-		return fmt.Errorf("payment: aggregate after insert (order=%s tx=%s): %w",
-			obs.OrderID, obs.TxHash, err)
+	if d.aggregator != nil {
+		if err := d.aggregator.AggregateAndEmit(ctx, obs.TenantID, obs.OrderID); err != nil {
+			return fmt.Errorf("payment: aggregate after insert (order=%s tx=%s): %w",
+				obs.OrderID, obs.TxHash, err)
+		}
 	}
 	return nil
 }
@@ -459,6 +461,9 @@ func (d *ObservationDispatcher) OnNewBlock(
 		return nil
 	}
 
+	if d.aggregator == nil {
+		return nil
+	}
 	var errs []error
 	for _, ref := range affected {
 		if err := d.aggregator.AggregateAndEmit(ctx, ref.TenantID, ref.OrderID); err != nil {

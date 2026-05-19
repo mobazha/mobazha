@@ -3,7 +3,6 @@
 package payment
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -47,7 +46,9 @@ type projectOrderInput struct {
 	order       *models.Order
 	orderOpen   *pb.OrderOpen   // may be nil for orders not yet opened
 	paymentSent *pb.PaymentSent // may be nil for orders not yet paid
-	isManagedEscrowOrder bool            // true when order.PendingPaymentInfo has type="managed_escrow"
+	isManagedEscrowOrder bool            // legacy fallback when settlement spec is absent
+	hasSpec     bool
+	spec        payment.SettlementSpec
 	obsCount    int
 	lastObsAt   *time.Time
 }
@@ -74,7 +75,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	}
 
 	// ── Settlement mode & funding target ─────────────────────────────────
-	settlementMode, fundingTarget := p.deriveFundingTarget(order, paymentCoin, expectedAmount, input.isManagedEscrowOrder)
+	settlementMode, fundingTarget := p.deriveFundingTarget(order, paymentCoin, expectedAmount, input)
 
 	// ── Payment progress ──────────────────────────────────────────────────
 	progress := p.deriveProgress(order, expectedAmount, input.obsCount, input.lastObsAt)
@@ -143,12 +144,13 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 	// ── 1. PaymentSent (primary) ──────────────────────────────────────────
 	if ps != nil {
 		paymentCoin = normalizeCoinBestEffort(ps.Coin)
+		productMode = payment.ProductModeFromMethod(ps.Method)
 		switch ps.Method {
 		case pb.PaymentSent_MODERATED:
-			productMode = payment.ProductModeModerated
 			paymentSentKind = "PAYMENT_SENT_MODERATED"
+		case pb.PaymentSent_DIRECT:
+			paymentSentKind = "PAYMENT_SENT_DIRECT"
 		default:
-			productMode = payment.ProductModeCancelable
 			paymentSentKind = "PAYMENT_SENT_CANCELABLE"
 		}
 		return paymentCoin, productMode, paymentSentKind
@@ -166,8 +168,7 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 				paymentCoin = fmt.Sprintf("fiat:%s:%s",
 					strings.ToLower(strings.TrimSpace(provider)),
 					strings.ToUpper(strings.TrimSpace(currency)))
-				// Fiat orders always use cancelable product mode at this stage.
-				return paymentCoin, payment.ProductModeCancelable, ""
+				return paymentCoin, payment.ProductModeFromMethod(pb.PaymentSent_FIAT), ""
 			}
 			// Legacy rows with provider metadata but no currency context cannot be
 			// projected to a canonical fiat coin safely. Leave paymentCoin empty
@@ -176,17 +177,29 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 		}
 	}
 
-	// ── 3. PendingPaymentInfo fallback (UTXO, address set, PaymentSent pending) ─
-	if len(order.PendingPaymentInfo) > 0 {
-		var pending struct {
-			Coin string `json:"Coin"`
-		}
-		if err := json.Unmarshal(order.PendingPaymentInfo, &pending); err == nil && pending.Coin != "" {
-			return normalizeCoinBestEffort(pending.Coin), payment.ProductModeCancelable, ""
-		}
+	// ── 3. PendingPaymentInfo / fiat metadata (pre-PaymentSent) ───────────
+	if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
+		coin := pendingPaymentCoin(order, orderOpen)
+		return coin, payment.ProductModeFromMethod(spec.Method), ""
 	}
 
 	return "", payment.ProductModeCancelable, ""
+}
+
+func pendingPaymentCoin(order *models.Order, orderOpen *pb.OrderOpen) string {
+	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil && managed_escrowInfo.Coin != "" {
+		return normalizeCoinBestEffort(managed_escrowInfo.Coin)
+	}
+	if csInfo, err := order.GetPendingClientSignedPaymentInfo(); err == nil && csInfo != nil && csInfo.Coin != "" {
+		return normalizeCoinBestEffort(csInfo.Coin)
+	}
+	if utxoInfo, err := order.GetPendingPaymentInfo(); err == nil && utxoInfo != nil && utxoInfo.Coin != "" {
+		return normalizeCoinBestEffort(utxoInfo.Coin)
+	}
+	if orderOpen != nil {
+		return normalizeCoinBestEffort(orderOpen.PricingCoin)
+	}
+	return ""
 }
 
 // normalizeCoinBestEffort converts a coin code to canonical format where
@@ -305,8 +318,12 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 	order *models.Order,
 	paymentCoin string,
 	expectedAmount string,
-	isManagedEscrowOrder bool,
+	input *projectOrderInput,
 ) (payment.SettlementMode, payment.FundingTargetView) {
+	isManagedEscrowOrder := input.isManagedEscrowOrder
+	if input.hasSpec && input.spec.UsesManagedEscrow() {
+		isManagedEscrowOrder = true
+	}
 	// Fiat path
 	if strings.HasPrefix(paymentCoin, "fiat:") {
 		return payment.SettlementModeProviderCheckout, p.deriveFiatFundingTarget(order, paymentCoin, expectedAmount)
@@ -321,10 +338,17 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 			Amount:  expectedAmount,
 		}
 
-		// Phase PS B2: ManagedEscrow EVM orders are address-monitored — the predicted
-		// ManagedEscrow address is stored in PendingPaymentInfo with type="managed_escrow".
-		// isManagedEscrowOrder short-circuits before detectSettlementRail, which would
-		// otherwise classify EVM coins as railClientSigned (TD-PSS-02 cleanup).
+		if input.hasSpec {
+			if mode := payment.SettlementModeFromPayMode(input.spec.PayMode); mode != "" {
+				return mode, target
+			}
+		} else if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
+			if mode := payment.SettlementModeFromPayMode(spec.PayMode); mode != "" {
+				return mode, target
+			}
+		}
+
+		// Legacy fallback when persisted settlement spec is absent.
 		if isManagedEscrowOrder {
 			return payment.SettlementModeAddressMonitored, target
 		}
@@ -358,6 +382,15 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 		Type:    payment.FundingTargetTypeAddress,
 		AssetID: paymentCoin,
 		Amount:  expectedAmount,
+	}
+	if input.hasSpec {
+		if mode := payment.SettlementModeFromPayMode(input.spec.PayMode); mode != "" {
+			return mode, target
+		}
+	} else if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
+		if mode := payment.SettlementModeFromPayMode(spec.PayMode); mode != "" {
+			return mode, target
+		}
 	}
 	if isManagedEscrowOrder {
 		return payment.SettlementModeAddressMonitored, target
@@ -647,10 +680,15 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 		input.paymentSent = ps
 	}
 
-	// ManagedEscrow EVM indicator (Phase PS B2): set when ManagedEscrowAdapter.SetupPayment
-	// persisted PendingManagedEscrowPaymentInfo to Order.PendingPaymentInfo.
-	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
-		input.isManagedEscrowOrder = true
+	if spec, ok := payment.ResolveSettlementSpecFromOrder(&order); ok {
+		input.hasSpec = true
+		input.spec = spec
+	}
+	// Legacy fallback when settlement spec is not persisted on the order.
+	if !input.hasSpec {
+		if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
+			input.isManagedEscrowOrder = true
+		}
 	}
 
 	// Observation count + last observed timestamp

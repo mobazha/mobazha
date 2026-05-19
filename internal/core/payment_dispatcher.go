@@ -229,21 +229,28 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		if n.db == nil {
 			continue
 		}
+
+		runtimeChainID := n.runtimeManagedEscrowChainID(chain)
+		chainDeps := deps
+		chainDeps.ChainIDOverride = runtimeChainID
+
+		// Skip chains without a runtime chainID mapping (expected for
+		// testnet where only a subset of chains have deployed contracts).
+		if runtimeChainID == 0 {
+			logger.LogInfoWithIDf(log, n.nodeID,
+				"ManagedEscrowAdapter V2 chain %s skipped: no runtime chainID (testnet subset)", chain)
+			continue
+		}
 		monitor, err := n.buildManagedEscrowMonitor(chain)
 		if err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID,
 				"ManagedEscrowAdapter V2 activation FAILED for chain %s: monitor wiring: %v", chain, err)
 			continue
 		}
-		chainDeps := deps
 		chainDeps.Monitor = monitor
-		runtimeChainID := n.runtimeManagedEscrowChainID(chain)
-		chainDeps.ChainIDOverride = runtimeChainID
+
 		adapter, err := adapters.NewManagedEscrowAdapter(chain, chainDeps)
 		if err != nil {
-			// Distinguish "chain not yet promoted to Ready" (expected
-			// while the matrix is phasing in) from "wiring bug" (action
-			// required) so operators can triage at a glance.
 			if errors.Is(err, adapters.ErrManagedEscrowChainNotReady) {
 				logger.LogInfoWithIDf(log, n.nodeID,
 					"ManagedEscrowAdapter V2 activation skipped for chain %s — not in Ready matrix yet (%v)", chain, err)
@@ -254,9 +261,9 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 			continue
 		}
 
+		monitors[chain] = monitor
 		n.paymentRegistry.RegisterV2(chain, adapter)
 		shadow[chain] = adapter
-		monitors[chain] = monitor
 		runtimeChainIDs[chain] = runtimeChainID
 	}
 
@@ -286,6 +293,23 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	} else {
 		logger.LogInfoWithIDf(log, n.nodeID,
 			"ManagedEscrowAdapter V2 activated for %d/%d EVM chains: %v (runtime chainIDs: %v)", len(shadow), len(activeChainsEarly), shadow, runtimeChainIDs)
+	}
+
+	// Wire ObservationDispatcher into PaymentAppService for UTXO audit path.
+	// Aggregator is nil (audit-only): observations are inserted for unified
+	// multi-chain audit, but the legacy UTXO verification pipeline remains
+	// the source of truth for order state transitions. This avoids competing
+	// with UTXOPaymentDetected → ProcessOrderPayment and hardcoding DIRECT.
+	if n.paymentService != nil && n.db != nil {
+		if tenantDB, ok := n.db.(*dbstore.TenantDB); ok {
+			utxoDispatcher := corepayment.NewObservationDispatcher(
+				NewGormPaymentObservationRepo(tenantDB, tenantDB.RawDB()),
+				nil, // audit-only: no aggregator
+				&managed_escrowOrderTenantResolver{db: n.db},
+				n.nodeID,
+			)
+			n.paymentService.SetObservationDispatcher(utxoDispatcher)
+		}
 	}
 }
 

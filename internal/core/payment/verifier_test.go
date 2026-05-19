@@ -382,6 +382,81 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 	require.Equal(t, frozen.Unix(), ps.Timestamp.AsTime().Unix())
 }
 
+func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesSettlementSpecWhenPresent(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Address:   "0xmanagedescrow",
+		Moderated: false,
+		SettlementSpec: &models.PendingSettlementSpec{
+			Method:     "MODERATED",
+			PayMode:    "address_monitored",
+			EscrowType: "managed_escrow",
+		},
+	}))
+
+	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
+		ChainNamespace: "eip155",
+	}})
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+}
+
+func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesPendingTrustModel(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Address:   "0xmanagedescrow",
+		Moderated: false,
+	}))
+
+	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
+		ChainNamespace: "eip155",
+	}})
+	require.Equal(t, pb.PaymentSent_CANCELABLE, intent.method)
+	require.Equal(t, "0xmanagedescrow", intent.contractAddress)
+
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Address:   "0xmanagedescrow",
+		Moderated: true,
+	}))
+	intent = resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
+		ChainNamespace: "eip155",
+	}})
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, "0xmanagedescrow", intent.contractAddress)
+}
+
+func TestResolveAggregatedPaymentIntent_UTXOUsesPendingEscrowFields(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
+		Script:          "5221...",
+		Moderator:       "moderator-peer",
+		ModeratorPubkey: "02abcdef",
+		UnlockHours:     72,
+	}))
+
+	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
+		ChainNamespace: "bip122",
+	}})
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, "5221...", intent.script)
+	require.Equal(t, "moderator-peer", intent.moderator)
+	require.Equal(t, "02abcdef", intent.moderatorAddress)
+	require.Equal(t, uint32(72), intent.escrowTimeoutHours)
+}
+
+func TestResolveAggregatedPaymentIntent_UTXOUsesPendingForBitcoinCashNamespace(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
+		Script:    "5221bch...",
+		Moderator: "moderator-peer",
+	}))
+
+	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
+		ChainNamespace: "bitcoincash",
+	}})
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, "5221bch...", intent.script)
+}
+
 func TestAggregateAndEmit_BackfillsRefundAddressFromUniqueObservedSender(t *testing.T) {
 	db := newVerifierTestDB(t)
 	bus := &recordingBus{}

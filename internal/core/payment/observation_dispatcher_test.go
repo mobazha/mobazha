@@ -194,12 +194,11 @@ func TestNewObservationDispatcher_NilRepoPanics(t *testing.T) {
 		})
 }
 
-func TestNewObservationDispatcher_NilAggregatorPanics(t *testing.T) {
-	require.PanicsWithValue(t,
-		"payment: NewObservationDispatcher requires a non-nil PaymentAggregator",
-		func() {
-			NewObservationDispatcher(newFakeObsRepo(), nil, &fakeTenantResolver{}, "w")
-		})
+func TestNewObservationDispatcher_NilAggregatorIsAuditOnly(t *testing.T) {
+	require.NotPanics(t, func() {
+		d := NewObservationDispatcher(newFakeObsRepo(), nil, &fakeTenantResolver{}, "w")
+		require.NotNil(t, d)
+	})
 }
 
 func TestNewObservationDispatcher_NilResolverPanics(t *testing.T) {

@@ -123,6 +123,69 @@ func TestMethodIsDirect(t *testing.T) {
 	require.False(t, MethodIsDirect(pb.PaymentSent_MODERATED))
 }
 
+func TestEffectivePaymentMethod_LegacyDirectWithEscrowFields(t *testing.T) {
+	ps := &pb.PaymentSent{
+		Method:          pb.PaymentSent_DIRECT,
+		ContractAddress: "0xmanagedescrow",
+		ToAddress:       "0xmanagedescrow",
+	}
+	require.Equal(t, pb.PaymentSent_CANCELABLE, EffectivePaymentMethod(ps))
+
+	ps.Moderator = "mod-peer"
+	ps.ModeratorAddress = "0xmod"
+	require.Equal(t, pb.PaymentSent_MODERATED, EffectivePaymentMethod(ps))
+
+	ps = &pb.PaymentSent{
+		Method: pb.PaymentSent_DIRECT,
+		Script: "5221...",
+	}
+	require.Equal(t, pb.PaymentSent_CANCELABLE, EffectivePaymentMethod(ps))
+}
+
+func TestEffectivePaymentMethod_DirectTokenTransferStaysDirect(t *testing.T) {
+	ps := &pb.PaymentSent{
+		Method:          pb.PaymentSent_DIRECT,
+		ContractAddress: "0xtoken",
+		ToAddress:       "0xmerchant",
+	}
+	require.Equal(t, pb.PaymentSent_DIRECT, EffectivePaymentMethod(ps))
+}
+
+func TestIsNonEscrowDirectPayment_PendingManagedEscrowOverridesLegacyDirectEnvelope(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Address:        "0xmanagedescrow",
+		SettlementSpec: NewManagedEscrowSpec(false).ToPending(),
+	}))
+	ps := &pb.PaymentSent{Method: pb.PaymentSent_DIRECT, ContractAddress: "0xmanagedescrow"}
+	require.False(t, IsNonEscrowDirectPayment(order, ps))
+}
+
+func TestResolvedPaymentMethod_PendingSpecOverridesLegacyDirectEnvelope(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Address:        "0xmanagedescrow",
+		SettlementSpec: NewManagedEscrowSpec(true).ToPending(),
+	}))
+	ps := &pb.PaymentSent{Method: pb.PaymentSent_DIRECT, ContractAddress: "0xmanagedescrow"}
+	require.Equal(t, pb.PaymentSent_MODERATED, ResolvedPaymentMethod(order, ps))
+}
+
+func TestResolvedPaymentMethod_PendingClientSignedOverridesDirectTokenLikeEnvelope(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+		Coin:           "crypto:eip155:1:native",
+		EscrowAddress:  "0xescrow",
+		SettlementSpec: NewClientSignedEVMSpec(false).ToPending(),
+	}))
+	ps := &pb.PaymentSent{
+		Method:          pb.PaymentSent_DIRECT,
+		ContractAddress: "0xtoken",
+		ToAddress:       "0xmerchant",
+	}
+	require.Equal(t, pb.PaymentSent_CANCELABLE, ResolvedPaymentMethod(order, ps))
+}
+
 func TestResolveSettlementSpecFromPending_ExplicitSpec(t *testing.T) {
 	explicit := NewManagedEscrowSpec(true).ToPending()
 	spec, ok := ResolveSettlementSpecFromPendingManagedEscrow(&models.PendingManagedEscrowPaymentInfo{

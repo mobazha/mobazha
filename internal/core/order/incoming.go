@@ -225,8 +225,9 @@ func (s *OrderAppService) preProcessOrderConfirmation(_ context.Context, orderMs
 	if err != nil {
 		return nil, nil
 	}
+	method := payment.ResolvedPaymentMethod(&order, paymentSent)
 
-	if !payment.MethodIsCancelable(paymentSent.Method) {
+	if !payment.MethodIsCancelable(method) {
 		return nil, nil
 	}
 
@@ -273,8 +274,9 @@ func (s *OrderAppService) preProcessOrderCancel(_ context.Context, orderMsg *npb
 	if err != nil {
 		return nil, nil
 	}
+	method := payment.ResolvedPaymentMethod(&order, paymentSent)
 
-	if !payment.MethodIsCancelable(paymentSent.Method) {
+	if !payment.MethodIsCancelable(method) {
 		return nil, nil
 	}
 
@@ -314,13 +316,14 @@ func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *
 	if err != nil {
 		return nil, nil
 	}
+	method := payment.ResolvedPaymentMethod(&order, paymentSent)
 
 	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, fmt.Errorf("invalid payment coin for order %s: %w", order.ID, err)
 	}
 
-	if payment.IsFiatPaymentRoute(paymentSent.Method, coinType) {
+	if payment.IsFiatPaymentRoute(method, coinType) {
 		if s.fiatOps != nil {
 			if _, err := s.refundFiatPayment(ctx, &order, paymentSent, "requested_by_customer"); err != nil && !errors.Is(err, contracts.ErrAlreadyRefunded) {
 				return nil, fmt.Errorf("fiat refund on decline failed for order %s: %w", order.ID, err)
@@ -330,7 +333,7 @@ func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *
 		return nil, nil
 	}
 
-	if order.CanCancel() && payment.MethodIsCancelable(paymentSent.Method) {
+	if order.CanCancel() && payment.MethodIsCancelable(method) {
 		if payment.UsesUTXOScriptEscrow(&order, paymentSent) {
 			result, err := s.ReleaseFromCancelableAddress(&order)
 			if err != nil {
@@ -378,7 +381,7 @@ func (s *OrderAppService) preProcessRefund(_ context.Context, orderMsg *npb.Orde
 		return nil, fmt.Errorf("invalid payment coin for order %s: %w", orderMsg.OrderID, err)
 	}
 
-	if refund.GetTransactionID() != "" && payment.MethodIsDirect(paymentSent.Method) {
+	if refund.GetTransactionID() != "" && payment.IsNonEscrowDirectPayment(&order, paymentSent) {
 		coinInfo, _ := coinType.CoinInfo()
 		tx, err := s.fetchOutgoingTx(paymentSent.Coin, refund.GetTransactionID(), order.PaymentAddress, &coinInfo)
 		if err != nil || tx == nil {
@@ -387,7 +390,7 @@ func (s *OrderAppService) preProcessRefund(_ context.Context, orderMsg *npb.Orde
 		return &PreProcessContext{OutgoingTx: tx}, nil
 	}
 
-	if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && payment.MethodIsModerated(paymentSent.Method) {
+	if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
 		wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 		if err != nil {
 			return nil, nil

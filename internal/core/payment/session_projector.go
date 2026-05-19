@@ -141,11 +141,16 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 	productMode payment.ProductMode,
 	paymentSentKind string,
 ) {
-	// ── 1. PaymentSent (primary) ──────────────────────────────────────────
+	// ── 1. PaymentSent present ───────────────────────────────────────────
 	if ps != nil {
 		paymentCoin = normalizeCoinBestEffort(ps.Coin)
-		productMode = payment.ProductModeFromMethod(ps.Method)
-		switch ps.Method {
+		method := payment.EffectivePaymentMethod(ps)
+		// Pending settlement intent outranks the frozen PaymentSent envelope (ADR-010).
+		if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
+			method = spec.Method
+		}
+		productMode = payment.ProductModeFromMethod(method)
+		switch method {
 		case pb.PaymentSent_MODERATED:
 			paymentSentKind = "PAYMENT_SENT_MODERATED"
 		case pb.PaymentSent_DIRECT:

@@ -192,11 +192,12 @@ func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, ch
 		return err
 	}
 
-	if payment.MethodIsModerated(paymentSent.Method) {
+	method := payment.EffectivePaymentMethod(paymentSent)
+	if payment.MethodIsModerated(method) {
 		return validateBTCEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, true)
-	} else if payment.MethodIsCancelable(paymentSent.Method) {
+	} else if payment.MethodIsCancelable(method) {
 		return validateBTCEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, false)
-	} else if !payment.MethodIsDirect(paymentSent.Method) {
+	} else if !payment.MethodIsDirect(method) {
 		return errors.New("invalid payment method")
 	}
 

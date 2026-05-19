@@ -258,6 +258,54 @@ func MethodIsDirect(method pb.PaymentSent_Method) bool {
 	return method == pb.PaymentSent_DIRECT
 }
 
+// EffectivePaymentMethod returns the business trust method for a PaymentSent envelope.
+// When Method is DIRECT but escrow fields are present (legacy mislabel), the method
+// is upgraded to CANCELABLE or MODERATED so downstream helpers do not treat ManagedEscrow /
+// UTXO / client-signed routes as unprotected direct pay.
+func EffectivePaymentMethod(ps *pb.PaymentSent) pb.PaymentSent_Method {
+	if ps == nil {
+		return pb.PaymentSent_DIRECT
+	}
+	if !MethodIsDirect(ps.Method) {
+		return ps.Method
+	}
+	if strings.TrimSpace(ps.Script) != "" {
+		if strings.TrimSpace(ps.Moderator) != "" || strings.TrimSpace(ps.ModeratorAddress) != "" {
+			return pb.PaymentSent_MODERATED
+		}
+		return pb.PaymentSent_CANCELABLE
+	}
+	contractAddress := strings.TrimSpace(ps.ContractAddress)
+	toAddress := strings.TrimSpace(ps.ToAddress)
+	if contractAddress != "" &&
+		(strings.TrimSpace(ps.Moderator) != "" ||
+			strings.TrimSpace(ps.ModeratorAddress) != "" ||
+			(strings.EqualFold(contractAddress, toAddress) && toAddress != "")) {
+		if strings.TrimSpace(ps.Moderator) != "" || strings.TrimSpace(ps.ModeratorAddress) != "" {
+			return pb.PaymentSent_MODERATED
+		}
+		return pb.PaymentSent_CANCELABLE
+	}
+	return pb.PaymentSent_DIRECT
+}
+
+// ResolvedPaymentMethod returns the business trust method for order actions.
+// Pending SettlementSpec wins over the frozen PaymentSent envelope; when pending
+// intent is absent, EffectivePaymentMethod recovers legacy DIRECT mislabels.
+func ResolvedPaymentMethod(order *models.Order, ps *pb.PaymentSent) pb.PaymentSent_Method {
+	if order != nil {
+		if spec, ok := ResolveSettlementSpecFromOrder(order); ok {
+			return spec.Method
+		}
+	}
+	return EffectivePaymentMethod(ps)
+}
+
+// IsNonEscrowDirectPayment reports whether the order has no escrow release path.
+func IsNonEscrowDirectPayment(order *models.Order, ps *pb.PaymentSent) bool {
+	return MethodIsDirect(ResolvedPaymentMethod(order, ps))
+}
+
 // MethodIsFiat reports fiat provider checkout semantics.
 func MethodIsFiat(method pb.PaymentSent_Method) bool {
 	return method == pb.PaymentSent_FIAT

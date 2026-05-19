@@ -388,7 +388,8 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 		}
 
 		coinType := iwallet.CoinType(paymentSent.Coin)
-		if payment.MethodIsFiat(paymentSent.Method) || (!payment.MethodIsCancelable(paymentSent.Method) && coinType.IsFiatPayment()) {
+		method := payment.ResolvedPaymentMethod(&order, paymentSent)
+		if payment.MethodIsFiat(method) || (!payment.MethodIsCancelable(method) && coinType.IsFiatPayment()) {
 			fiatRefundResult, err = s.refundFiatPayment(context.Background(), &order, paymentSent, "requested_by_customer")
 			if err != nil {
 				return err
@@ -448,7 +449,7 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 			return nil
 		}
 
-		if funded && paymentSent != nil && !payment.MethodIsCancelable(paymentSent.Method) {
+		if funded && paymentSent != nil && !payment.MethodIsCancelable(payment.ResolvedPaymentMethod(&order, paymentSent)) {
 			wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 			if err != nil {
 				return err
@@ -909,8 +910,9 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 		refundResp.Message = refundAny
 		return &refundBuildResult{Message: refundResp}, nil
 	} else {
+		method := payment.ResolvedPaymentMethod(order, paymentSent)
 		switch {
-		case payment.MethodIsDirect(paymentSent.Method):
+		case payment.MethodIsDirect(method):
 			wdbTx, err := wallet.Begin()
 			if err != nil {
 				return nil, err
@@ -949,7 +951,7 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 
 			refundResp.Message = refundAny
 			return &refundBuildResult{WalletTx: wdbTx, Message: refundResp}, nil
-		case payment.MethodIsCancelable(paymentSent.Method):
+		case payment.MethodIsCancelable(method):
 			if order.SerializedOrderConfirmation != nil {
 				return nil, errors.New("automatic refund not supported for confirmed CANCELABLE orders: funds were released to external wallet, please refund manually")
 			}
@@ -1022,7 +1024,7 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 
 			refundResp.Message = refundAny
 			return &refundBuildResult{Message: refundResp}, nil
-		case payment.MethodIsModerated(paymentSent.Method):
+		case payment.MethodIsModerated(method):
 			wdbTx, err := wallet.Begin()
 			if err != nil {
 				return nil, err
@@ -1210,7 +1212,7 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 		return nil, err
 	}
 
-	if !payment.MethodIsCancelable(paymentSent.Method) {
+	if !payment.MethodIsCancelable(payment.ResolvedPaymentMethod(order, paymentSent)) {
 		return nil, errors.New("order payment method is not CANCELABLE")
 	}
 

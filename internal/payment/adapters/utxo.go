@@ -165,7 +165,7 @@ func (a *UTXOAutoConfirmAdapter) ValidatePaymentMessage(params payment.PaymentMe
 		return err
 	}
 
-	if !payment.MethodIsDirect(paymentSent.Method) {
+	if !payment.MethodIsDirect(payment.EffectivePaymentMethod(paymentSent)) {
 		if err := utils.ValidatePaymentAmount(orderOpen.Amount, paymentSent.Amount); err != nil {
 			return err
 		}

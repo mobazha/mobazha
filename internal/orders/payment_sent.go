@@ -190,7 +190,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected and chain-verified: Order %s fully funded", order.ID)
 		}
 
-		if payment.MethodIsCancelable(paymentSent.Method) && order.IsPaymentVerified() {
+		if payment.MethodIsCancelable(payment.ResolvedPaymentMethod(order, paymentSent)) && order.IsPaymentVerified() {
 			var amount uint64
 			if verifiedTx != nil {
 				amount = uint64(verifiedTx.Value.Int64())

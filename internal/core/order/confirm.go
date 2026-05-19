@@ -47,7 +47,7 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 	}
 
 	paymentSent, err := order.PaymentSentMessage()
-	if err == nil && payment.MethodIsModerated(paymentSent.Method) && payoutAddress == "" {
+	if err == nil && payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) && payoutAddress == "" {
 		return fmt.Errorf("%w: payout address is required for MODERATED orders", coreiface.ErrBadRequest)
 	}
 
@@ -105,7 +105,7 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 			return err
 		}
 
-		if txid != "" && paymentSent != nil && payment.MethodIsCancelable(paymentSent.Method) {
+		if txid != "" && paymentSent != nil && payment.MethodIsCancelable(payment.ResolvedPaymentMethod(&order, paymentSent)) {
 			coinInfo, coinErr := iwallet.CoinType(paymentSent.Coin).CoinInfo()
 			if coinErr != nil {
 				logger.LogInfoWithIDf(log, s.nodeID, "Unknown coin %s for order %s, skipping outgoing tx record", paymentSent.Coin, orderID)
@@ -256,7 +256,7 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 		return fmt.Errorf("failed to get buyer: %w", err)
 	}
 
-	if payment.MethodIsModerated(paymentSent.Method) {
+	if payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
 		wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 		if err != nil {
 			return fmt.Errorf("failed to get wallet: %w", err)

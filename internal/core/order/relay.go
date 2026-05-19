@@ -78,7 +78,7 @@ func (s *OrderAppService) DeclineOrderViaRelay(orderID models.OrderID, reason st
 		return err
 	}
 
-	if payment.MethodIsCancelable(paymentSent.Method) {
+	if payment.MethodIsCancelable(payment.ResolvedPaymentMethod(&order, paymentSent)) {
 		return s.DeclineOrder(orderID, "", reason, done)
 	}
 

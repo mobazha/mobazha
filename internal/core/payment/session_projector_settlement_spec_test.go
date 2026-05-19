@@ -106,3 +106,22 @@ func TestDerivePaymentInfo_PaymentSentDirectUsesDirectProductMode(t *testing.T) 
 	require.Equal(t, pkpayment.ProductModeDirect, mode)
 	require.Equal(t, "PAYMENT_SENT_DIRECT", kind)
 }
+
+func TestDerivePaymentInfo_PendingManagedEscrowOverridesLegacyDirectPaymentSent(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:           "crypto:eip155:1:native",
+		Address:        "0xmanagedescrow",
+		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),
+	}))
+	ps := &pb.PaymentSent{
+		Coin:            "crypto:eip155:1:native",
+		Method:          pb.PaymentSent_DIRECT,
+		ContractAddress: "0xmanagedescrow",
+		ToAddress:       "0xmanagedescrow",
+	}
+	_, mode, kind := p.derivePaymentInfo(order, nil, ps)
+	require.Equal(t, pkpayment.ProductModeCancelable, mode)
+	require.Equal(t, "PAYMENT_SENT_CANCELABLE", kind)
+}

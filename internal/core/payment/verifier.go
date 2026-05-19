@@ -534,24 +534,29 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 		return intent
 	}
 
+	if csInfo, err := order.GetPendingClientSignedPaymentInfo(); err == nil && csInfo != nil {
+		if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingClientSigned(csInfo); ok {
+			intent.method = spec.Method
+		} else if strings.TrimSpace(csInfo.Moderator) != "" {
+			intent.method = pb.PaymentSent_MODERATED
+		} else {
+			intent.method = pb.PaymentSent_CANCELABLE
+		}
+		intent.contractAddress = csInfo.EscrowAddress
+		if strings.TrimSpace(csInfo.Moderator) != "" {
+			intent.moderator = csInfo.Moderator
+		}
+		return intent
+	}
+
 	pendingInfo, err := order.GetPendingPaymentInfo()
 	if err == nil && pendingInfo != nil {
 		return utxoAggregatedPaymentIntent(pendingInfo)
 	}
 
-	if len(rows) == 0 || !isUTXOObservationNamespace(rows[0].ChainNamespace) {
-		return intent
-	}
+	// No pending intent: observations are chain facts only. Default to DIRECT
+	// for unknown routes (legacy rows without SettlementSpec persistence).
 	return intent
-}
-
-func isUTXOObservationNamespace(namespace string) bool {
-	switch namespace {
-	case "bip122", "bitcoincash", "zcash":
-		return true
-	default:
-		return false
-	}
 }
 
 func utxoAggregatedPaymentIntent(pendingInfo *models.PendingUTXOPaymentInfo) aggregatedPaymentIntent {

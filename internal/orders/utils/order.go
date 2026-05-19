@@ -16,16 +16,17 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, te
 		Testnet: testnet,
 	}
 
-	if payment.MethodIsDirect(paymentSent.Method) {
+	method := payment.EffectivePaymentMethod(paymentSent)
+	if payment.MethodIsDirect(method) {
 		return iwallet.EscrowInfo{}, nil
 	}
-	switch paymentSent.Method {
-	case pb.PaymentSent_DIRECT:
-		return iwallet.EscrowInfo{}, nil
+	switch method {
 	case pb.PaymentSent_CANCELABLE:
 		escrowInfo.RequiredSignatures = 1
 	case pb.PaymentSent_MODERATED:
 		escrowInfo.RequiredSignatures = 2
+	default:
+		return iwallet.EscrowInfo{}, nil
 	}
 
 	escrowInfo.ContractAddress = paymentSent.ContractAddress

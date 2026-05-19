@@ -53,6 +53,10 @@ func Test_processPaymentSentMessage(t *testing.T) {
 	paymentSent.TransactionID = txs[0].ID.String()
 	paymentSent.ToAddress = txs[0].To[0].Address.String()
 	paymentSent.Method = pb.PaymentSent_DIRECT
+	paymentSent.ContractAddress = ""
+	paymentSent.Script = ""
+	paymentSent.Moderator = ""
+	paymentSent.ModeratorAddress = ""
 
 	paymentAny := &anypb.Any{}
 	if err := paymentAny.MarshalFrom(paymentSent); err != nil {

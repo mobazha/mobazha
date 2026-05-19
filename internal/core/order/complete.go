@@ -56,7 +56,7 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 		return "", nil, err
 	}
 
-	if !payment.MethodIsModerated(paymentSent.Method) {
+	if !payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
 		return coinType, nil, nil
 	}
 	if !orderRequiresClientSignedInstructions(&order, paymentSent) {
@@ -168,7 +168,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 	}
 
 	var releaseTx *iwallet.Transaction
-	if payment.MethodIsModerated(paymentSent.Method) {
+	if payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
 		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 		if err != nil {
 			return err

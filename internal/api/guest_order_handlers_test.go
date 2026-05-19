@@ -16,7 +16,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
@@ -98,6 +100,10 @@ func (m *mockGuestOrderService) SaveGuestCheckoutConfig(ctx context.Context, cfg
 	return nil
 }
 
+func (m *mockGuestOrderService) GetGuestCheckoutReadiness(context.Context) (*contracts.GuestCheckoutReadiness, error) {
+	return &contracts.GuestCheckoutReadiness{GuestCheckoutEnabled: true}, nil
+}
+
 func (m *mockGuestOrderService) GetAdminGuestOrder(_ context.Context, _ string) (*models.GuestOrder, error) {
 	return nil, nil
 }
@@ -108,11 +114,16 @@ func (m *mockGuestOrderService) GetAdminGuestOrder(_ context.Context, _ string) 
 
 type mockGuestNode struct {
 	mockNode
-	guestSvc *mockGuestOrderService
+	guestSvc     *mockGuestOrderService
+	featureStore pkgconfig.TenantFeatureStore
 }
 
 func (n *mockGuestNode) GuestOrder() contracts.GuestOrderService {
 	return n.guestSvc
+}
+
+func (n *mockGuestNode) TenantFeatureStore() pkgconfig.TenantFeatureStore {
+	return n.featureStore
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +133,11 @@ func (n *mockGuestNode) GuestOrder() contracts.GuestOrderService {
 func guestTestServer(t *testing.T, svc *mockGuestOrderService) *httptest.Server {
 	t.Helper()
 	node := &mockGuestNode{guestSvc: svc}
+	return guestTestServerWithNode(t, node)
+}
 
+func guestTestServerWithNode(t *testing.T, node contracts.NodeService) *httptest.Server {
+	t.Helper()
 	gateway := &Gateway{
 		config:            &GatewayConfig{},
 		guestOrderLimiter: newRateLimiter(1000, time.Hour), // generous limit for tests
@@ -670,4 +685,122 @@ func TestGuestOrder_NotImplemented(t *testing.T) {
 
 	resp2, _ := guestDoReq(t, ts, "GET", "/v1/guest/orders/tok_any", nil)
 	guestAssertStatus(t, resp2, http.StatusNotImplemented)
+}
+
+// ---------------------------------------------------------------------------
+// H-11: PUT /v1/settings/guest-checkout via real HTTP — frontend DTO format
+// Validates the Huma bridge correctly forwards the body through a real TCP
+// connection (closer to production SaaS path than httptest.NewRequest).
+// ---------------------------------------------------------------------------
+
+func TestPUTGuestCheckoutSettings_RealHTTP_FrontendDTO(t *testing.T) {
+	var saved *models.GuestCheckoutConfig
+	svc := &mockGuestOrderService{
+		saveGuestCheckoutCfgFunc: func(_ context.Context, cfg *models.GuestCheckoutConfig) error {
+			saved = cfg
+			return nil
+		},
+	}
+	ts := guestTestServer(t, svc)
+
+	// Simulate exactly what the frontend sends (GuestCheckoutSettingsDTO format)
+	payload := `{"enabled":true,"acceptedCoins":"ETH","paymentTimeout":120}`
+	resp, respBody := guestDoReq(t, ts, "PUT", "/v1/settings/guest-checkout", []byte(payload))
+	guestAssertStatus(t, resp, http.StatusOK)
+
+	if saved == nil {
+		t.Fatalf("config was not saved; response body: %s", string(respBody))
+	}
+	if !saved.Enabled {
+		t.Error("expected saved.Enabled=true")
+	}
+	if saved.AcceptedCoins != "ETH" {
+		t.Errorf("expected ETH, got %s", saved.AcceptedCoins)
+	}
+	if saved.PaymentTimeout != 120 {
+		t.Errorf("expected 120, got %d", saved.PaymentTimeout)
+	}
+}
+
+func TestPUTGuestCheckoutSettings_RealHTTP_UIStateDTO(t *testing.T) {
+	var saved *models.GuestCheckoutConfig
+	svc := &mockGuestOrderService{
+		saveGuestCheckoutCfgFunc: func(_ context.Context, cfg *models.GuestCheckoutConfig) error {
+			saved = cfg
+			return nil
+		},
+	}
+	ts := guestTestServer(t, svc)
+
+	payload := `{"enabled":true,"acceptedCoins":["ETH"," BTC ",""],"paymentTimeoutMinutes":120}`
+	resp, respBody := guestDoReq(t, ts, "PUT", "/v1/settings/guest-checkout", []byte(payload))
+	guestAssertStatus(t, resp, http.StatusOK)
+
+	if saved == nil {
+		t.Fatalf("config was not saved; response body: %s", string(respBody))
+	}
+	if !saved.Enabled {
+		t.Error("expected saved.Enabled=true")
+	}
+	if saved.AcceptedCoins != "ETH,BTC" {
+		t.Errorf("expected normalized ETH,BTC, got %s", saved.AcceptedCoins)
+	}
+	if saved.PaymentTimeout != 120 {
+		t.Errorf("expected 120, got %d", saved.PaymentTimeout)
+	}
+}
+
+func TestPUTGuestCheckoutSettings_IgnoresPGPPublicKey(t *testing.T) {
+	var saved *models.GuestCheckoutConfig
+	svc := &mockGuestOrderService{
+		saveGuestCheckoutCfgFunc: func(_ context.Context, cfg *models.GuestCheckoutConfig) error {
+			saved = cfg
+			return nil
+		},
+	}
+	ts := guestTestServer(t, svc)
+
+	payload := `{"enabled":true,"acceptedCoins":"ETH","paymentTimeout":120,"pgpPublicKey":"-----BEGIN PGP PUBLIC KEY BLOCK-----\nignored\n-----END PGP PUBLIC KEY BLOCK-----"}`
+	resp, respBody := guestDoReq(t, ts, "PUT", "/v1/settings/guest-checkout", []byte(payload))
+	guestAssertStatus(t, resp, http.StatusOK)
+
+	if saved == nil {
+		t.Fatalf("config was not saved; response body: %s", string(respBody))
+	}
+	if saved.PGPPublicKey != "" {
+		t.Fatalf("settings save path must not mutate PGP key, got %q", saved.PGPPublicKey)
+	}
+}
+
+func TestPUTGuestCheckoutSettings_SyncsTenantFeatureFlag(t *testing.T) {
+	var saved *models.GuestCheckoutConfig
+	store := newMemTenantStore()
+	svc := &mockGuestOrderService{
+		saveGuestCheckoutCfgFunc: func(_ context.Context, cfg *models.GuestCheckoutConfig) error {
+			saved = cfg
+			return nil
+		},
+	}
+	node := &mockGuestNode{guestSvc: svc, featureStore: store}
+	ts := guestTestServerWithNode(t, node)
+
+	payload := `{"enabled":true,"acceptedCoins":"ETH,LTC","paymentTimeout":120}`
+	resp, respBody := guestDoReq(t, ts, "PUT", "/v1/settings/guest-checkout", []byte(payload))
+	guestAssertStatus(t, resp, http.StatusOK)
+
+	if saved == nil {
+		t.Fatalf("config was not saved; response body: %s", string(respBody))
+	}
+	if store.lastSet.tenant != database.StandaloneTenantID {
+		t.Errorf("tenant mismatch: got %q, want %q", store.lastSet.tenant, database.StandaloneTenantID)
+	}
+	if store.lastSet.key != pkgconfig.FeatureGuestCheckoutEnabled.Key {
+		t.Errorf("key mismatch: got %q", store.lastSet.key)
+	}
+	if !store.lastSet.value {
+		t.Error("expected guestCheckout tenant feature to be enabled")
+	}
+	if store.lastSet.actor == "" {
+		t.Error("actor should not be empty")
+	}
 }

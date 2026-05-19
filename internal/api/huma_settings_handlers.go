@@ -235,6 +235,24 @@ func (g *Gateway) registerNodeHumaSettingsAdminOperations(api huma.API) {
 	})
 
 	huma.Register(api, huma.Operation{
+		OperationID: "settings-guest-checkout-readiness-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/settings/guest-checkout/readiness",
+		Summary:     "Get guest checkout UTXO readiness",
+		Tags:        []string{"settings"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/settings/guest-checkout/readiness", nil)
+		rr := httptest.NewRecorder()
+		g.handleGETGuestCheckoutReadiness(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "features-get",
 		Method:      http.MethodGet,
 		Path:        "/v1/features",

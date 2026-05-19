@@ -1,9 +1,12 @@
 package core
 
 import (
+	"context"
+	"math/big"
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
@@ -30,6 +33,15 @@ func (m *mockChainClient) EstimateFee(txsize int) (map[iwallet.FeeLevel]iwallet.
 	return nil, nil
 }
 func (m *mockChainClient) Broadcast(serializedTx []byte) error { return nil }
+
+type mockBalanceChainClient struct {
+	mockChainClient
+	balance *big.Int
+}
+
+func (m *mockBalanceChainClient) BalanceAt(context.Context, common.Address, *big.Int) (*big.Int, error) {
+	return new(big.Int).Set(m.balance), nil
+}
 
 // mockHostService implements coreiface.HostService with configurable EVM clients.
 type mockHostService struct {
@@ -94,7 +106,9 @@ func TestConfigureEVMWallets_InjectsSharedClients(t *testing.T) {
 		t.Fatal("BSC wallet ChainClient should be nil before injection")
 	}
 
-	configureEVMWallets("test-node", mw, hs)
+	if configured := configureEVMWallets("test-node", mw, hs); configured != 2 {
+		t.Fatalf("configured wallets = %d, want 2", configured)
+	}
 
 	// BSC and ETH should be injected
 	if bscWallet.ChainClient != bscClient {
@@ -111,9 +125,36 @@ func TestConfigureEVMWallets_InjectsSharedClients(t *testing.T) {
 
 func TestConfigureEVMWallets_NilInputs(t *testing.T) {
 	// Should not panic with nil HostService or nil walletProvider
-	configureEVMWallets("test", nil, nil)
-	configureEVMWallets("test", &mockWalletProvider{}, nil)
-	configureEVMWallets("test", nil, &mockHostService{})
+	if configured := configureEVMWallets("test", nil, nil); configured != 0 {
+		t.Fatalf("nil inputs configured %d wallets, want 0", configured)
+	}
+	if configured := configureEVMWallets("test", &mockWalletProvider{}, nil); configured != 0 {
+		t.Fatalf("nil host configured %d wallets, want 0", configured)
+	}
+	if configured := configureEVMWallets("test", nil, &mockHostService{}); configured != 0 {
+		t.Fatalf("nil wallet provider configured %d wallets, want 0", configured)
+	}
+}
+
+func TestHostEVMNativeBalanceChecker_UsesSharedClient(t *testing.T) {
+	want := big.NewInt(12345)
+	hs := &mockHostService{
+		evmClients: map[iwallet.ChainType]iwallet.ChainClient{
+			iwallet.ChainEthereum: &mockBalanceChainClient{
+				mockChainClient: mockChainClient{chain: iwallet.ChainEthereum},
+				balance:         want,
+			},
+		},
+	}
+	checker := &hostEVMNativeBalanceChecker{hostService: hs}
+
+	got, err := checker.GetAddressBalance(context.Background(), "crypto:eip155:1:native", "0x1111111111111111111111111111111111111111")
+	if err != nil {
+		t.Fatalf("GetAddressBalance: %v", err)
+	}
+	if got.Cmp(want) != 0 {
+		t.Fatalf("balance = %s, want %s", got, want)
+	}
 }
 
 // ── extractEVMConfigs tests ─────────────────────────────────────────────

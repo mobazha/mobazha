@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,11 +11,82 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
+
+type guestCheckoutSettingsInput struct {
+	Enabled               bool                  `json:"enabled"`
+	AcceptedCoins         guestCheckoutCoinList `json:"acceptedCoins"`
+	MaxOrderAmount        string                `json:"maxOrderAmount"`
+	PaymentTimeout        int                   `json:"paymentTimeout"`
+	PaymentTimeoutMinutes int                   `json:"paymentTimeoutMinutes"`
+}
+
+type guestCheckoutCoinList []string
+
+func (c *guestCheckoutCoinList) UnmarshalJSON(data []byte) error {
+	var list []string
+	if err := json.Unmarshal(data, &list); err == nil {
+		*c = normalizeGuestCheckoutCoins(list)
+		return nil
+	}
+
+	var csv string
+	if err := json.Unmarshal(data, &csv); err == nil {
+		*c = normalizeGuestCheckoutCoins(strings.Split(csv, ","))
+		return nil
+	}
+
+	if string(data) == "null" {
+		*c = nil
+		return nil
+	}
+
+	return errors.New("acceptedCoins must be a comma-separated string or string array")
+}
+
+func normalizeGuestCheckoutCoins(coins []string) []string {
+	normalized := make([]string, 0, len(coins))
+	for _, coin := range coins {
+		coin = strings.TrimSpace(coin)
+		if coin == "" {
+			continue
+		}
+		normalized = append(normalized, coin)
+	}
+	return normalized
+}
+
+func (in guestCheckoutSettingsInput) toModel() models.GuestCheckoutConfig {
+	timeout := in.PaymentTimeout
+	if timeout == 0 {
+		timeout = in.PaymentTimeoutMinutes
+	}
+	return models.GuestCheckoutConfig{
+		Enabled:        in.Enabled,
+		AcceptedCoins:  strings.Join(in.AcceptedCoins, ","),
+		MaxOrderAmount: in.MaxOrderAmount,
+		PaymentTimeout: timeout,
+	}
+}
+
+func syncGuestCheckoutFeatureSetting(ctx context.Context, node contracts.NodeService, enabled bool) error {
+	admin, ok := node.(contracts.FeatureAdminProvider)
+	if !ok || admin.TenantFeatureStore() == nil {
+		return nil
+	}
+
+	actorID, _ := pkgconfig.ActorFromContext(ctx)
+	if actorID == "" {
+		actorID = "admin"
+	}
+	return admin.TenantFeatureStore().Set(ctx, database.StandaloneTenantID, pkgconfig.FeatureGuestCheckoutEnabled.Key, enabled, actorID)
+}
 
 // getGuestOrderService extracts the GuestOrderService from the request's NodeService.
 // Returns nil if Guest Checkout is not enabled.
@@ -203,9 +275,9 @@ func (g *Gateway) handleGETGuestCheckoutSettings(w http.ResponseWriter, r *http.
 	response.Success(w, cfg)
 }
 
-// handlePUTGuestCheckoutSettings updates the guest checkout configuration.
-// PUT /v1/settings/guest-checkout
-func (g *Gateway) handlePUTGuestCheckoutSettings(w http.ResponseWriter, r *http.Request) {
+// handleGETGuestCheckoutReadiness returns UTXO monitor and sweep runtime health.
+// GET /v1/settings/guest-checkout/readiness
+func (g *Gateway) handleGETGuestCheckoutReadiness(w http.ResponseWriter, r *http.Request) {
 	svc := getGuestOrderService(r)
 	if svc == nil {
 		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
@@ -213,13 +285,39 @@ func (g *Gateway) handlePUTGuestCheckoutSettings(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var req models.GuestCheckoutConfig
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
+	report, err := svc.GetGuestCheckoutReadiness(r.Context())
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
 		return
 	}
 
+	response.Success(w, report)
+}
+
+// handlePUTGuestCheckoutSettings updates the guest checkout configuration.
+// PUT /v1/settings/guest-checkout
+func (g *Gateway) handlePUTGuestCheckoutSettings(w http.ResponseWriter, r *http.Request) {
+	node := getNodeService(r)
+	svc := node.GuestOrder()
+	if svc == nil {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
+			"Guest Checkout is not available")
+		return
+	}
+
+	var input guestCheckoutSettingsInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
+			"Invalid request body: "+err.Error())
+		return
+	}
+	req := input.toModel()
+
 	if err := svc.SaveGuestCheckoutConfig(r.Context(), &req); err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+	if err := syncGuestCheckoutFeatureSetting(withStandaloneFeatureContext(r), node, req.Enabled); err != nil {
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
 		return
 	}

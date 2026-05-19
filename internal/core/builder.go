@@ -362,7 +362,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		initSupplyChainSubsystem(obNode)
 		initShippingSubsystem(obNode)
 		obNode.applyOptions([]NodeOption{
-			WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
+			WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
 		})
 		// Post-applyOptions wiring. Order matters minimally here, but
 		// these all depend on services produced by applyOptions:
@@ -716,7 +716,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	obNode.applyOptions([]NodeOption{
-		WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
+		WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
 	})
 	// Post-applyOptions wiring (see CreateInfrastructureOnlyNode for
 	// rationale): Digital depends on featureResolver; SupplyChain depends
@@ -1336,7 +1336,7 @@ func newLightweightNode(
 	})
 
 	obNode.applyOptions([]NodeOption{
-		WithNodeFeatureProvider(NewConfigNodeFeatureProvider(cfg)),
+		WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
 	})
 	// Post-applyOptions wiring (see CreateInfrastructureOnlyNode for
 	// rationale): Digital depends on featureResolver; SupplyChain depends

@@ -68,6 +68,9 @@ func (m *mockGuestSvc) GetGuestCheckoutConfig(ctx context.Context) (*models.Gues
 func (m *mockGuestSvc) SaveGuestCheckoutConfig(ctx context.Context, cfg *models.GuestCheckoutConfig) error {
 	return nil
 }
+func (m *mockGuestSvc) GetGuestCheckoutReadiness(context.Context) (*contracts.GuestCheckoutReadiness, error) {
+	return &contracts.GuestCheckoutReadiness{}, nil
+}
 func (m *mockGuestSvc) GetAdminGuestOrder(ctx context.Context, token string) (*models.GuestOrder, error) {
 	return nil, nil
 }

@@ -27,10 +27,10 @@ type GuestCheckoutConfig struct {
 
 	// AvailableCoins is a computed, non-persisted field populated by
 	// GetGuestCheckoutConfig at query time. It reflects the subset of
-	// AcceptedCoins that are currently serviceable by the running node
-	// (e.g. EXTERNAL_PAYMENT is excluded when external_payment-wallet-rpc is not configured).
-	// Buyer-facing UIs should use this field; the admin settings editor
-	// should continue using AcceptedCoins so the stored config is preserved.
+	// AcceptedCoins that are buyer-visible on the running node because the
+	// guest checkout closure path is ready. Buyer-facing UIs should use this
+	// field; the admin settings editor should continue using AcceptedCoins so
+	// the stored config is preserved.
 	AvailableCoins string `json:"availableCoins" gorm:"-"`
 }
 

@@ -936,17 +936,12 @@ func (n *MobazhaNode) initGuestOrderService() {
 	n.directPaymentService = guest.NewDirectPaymentService(n.db, keyDeriver)
 	n.autoSweepService = guest.NewAutoSweepService(n.db, keyDeriver, n.eventBus)
 
-	// Capability gating: the GuestOrderAppService rejects orders whose chain
-	// has no monitoring path. In the full build the monitoring infrastructure
-	// is created from the same node config used to build the wallets and
-	// chain clients, so we derive availability from those:
-	//   - UTXO chains: each chain whose wallet is loaded in the multiwallet
-	//   - EVM/TRON:    presence of any EVM chain config (TRON config exposed
-	//                  through the same shared rpc layer)
-	//   - Solana:      presence of a Solana chain config
-	// This keeps full-build guest checkout fail-open by default for every
-	// chain the operator already configured, matching private_distribution's behaviour
-	// (which enables a chain once its Electrum endpoint connects).
+	// Capability gating: GuestOrderAppService advertises and accepts only
+	// coins whose anonymous checkout closure path is ready. UTXO chains are
+	// first narrowed to wallet-loaded, sweepable chains here; runtime health
+	// (monitor, sweep service, seller receiving account) is checked later by
+	// the service capability evaluator. EVM/Solana stay hidden until their
+	// settlement paths are implemented.
 	supportedUTXO := n.detectGuestUTXOChains()
 
 	// EVM/Solana guest checkout is disabled until concrete
@@ -971,6 +966,9 @@ func (n *MobazhaNode) initGuestOrderService() {
 		EVMMonitorAvailable:    guestEvmAvailable,
 		SolanaMonitorAvailable: guestSolanaAvailable,
 	})
+	if n.multiwallet != nil {
+		n.guestOrderService.SetMultiwallet(n.multiwallet)
+	}
 
 	n.guestPaymentMonitor = guest.NewGuestPaymentMonitor(n.db, n.guestOrderService, nil, nil)
 	n.guestPaymentMonitor.SetMultiwallet(n.multiwallet)

@@ -303,7 +303,7 @@ func TestValidateCoinAvailability(t *testing.T) {
 	t.Run("PrivateDistribution rejects TRON", func(t *testing.T) {
 		err := private_distributionSvc.validateCoinAvailability(tronCoin, tronInfo)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "EVM/TRON balance monitor not configured")
+		assert.Contains(t, err.Error(), "TRON balance monitor not configured")
 	})
 
 	t.Run("Full build allows BTC", func(t *testing.T) {
@@ -326,9 +326,10 @@ func TestValidateCoinAvailability(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("Full build allows TRON", func(t *testing.T) {
+	t.Run("Full build rejects TRON until implemented", func(t *testing.T) {
 		err := fullBuildSvc.validateCoinAvailability(tronCoin, tronInfo)
-		assert.NoError(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "TRON balance monitor not configured")
 	})
 
 	external_paymentCoin := iwallet.CoinType("crypto:external_payment:mainnet:native")

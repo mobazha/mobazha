@@ -63,7 +63,13 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	if n.guestPaymentMonitor != nil {
 		if mon, ok := n.monitorService.(*utxo.Monitor); ok {
 			n.guestPaymentMonitor.SetUTXOMonitor(mon)
+			if n.guestOrderService != nil {
+				n.guestOrderService.SetUTXOMonitor(mon)
+			}
 		}
+	}
+	if n.guestOrderService != nil {
+		n.guestOrderService.LogGuestUTXOReadinessSummary(context.Background(), n.nodeID)
 	}
 	if n.autoSweepService != nil {
 		n.autoSweepService.SetChainOps(n.monitorService)

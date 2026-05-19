@@ -371,6 +371,7 @@ type GuestOrderService interface {
 
 	GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error)
 	SaveGuestCheckoutConfig(ctx context.Context, cfg *models.GuestCheckoutConfig) error
+	GetGuestCheckoutReadiness(ctx context.Context) (*GuestCheckoutReadiness, error)
 
 	// GetAdminGuestOrder returns full order detail for the authenticated seller,
 	// including the raw ShippingAddress bytes (which may be PGP ciphertext).

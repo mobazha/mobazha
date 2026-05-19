@@ -156,6 +156,9 @@ func (r *recordingGuestService) IsEnabled(context.Context) bool { return true }
 func (r *recordingGuestService) SaveGuestCheckoutConfig(context.Context, *models.GuestCheckoutConfig) error {
 	return nil
 }
+func (r *recordingGuestService) GetGuestCheckoutReadiness(context.Context) (*contracts.GuestCheckoutReadiness, error) {
+	return &contracts.GuestCheckoutReadiness{}, nil
+}
 func (r *recordingGuestService) GetAdminGuestOrder(_ context.Context, _ string) (*models.GuestOrder, error) {
 	return nil, nil
 }

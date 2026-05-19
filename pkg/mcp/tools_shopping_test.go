@@ -50,14 +50,32 @@ var testShoppingConfig = ShoppingConfig{
 	DemoOrderToken:  "guest_demo_token_123",
 }
 
-const testPaymentCoin = "crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955"
+const testPaymentCoin = "crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native"
 
 func testListingResponse() []byte {
 	return []byte(`{"data":{"listing":{"slug":"test-sticker","item":{"title":"Test Sticker","price":"199"},"metadata":{"pricingCurrency":{"code":"USD","divisibility":2}}},"hash":"QmListingHash123"}}`)
 }
 
+// Listing JSON with neither "hash" nor "cid" (some proxies omit fingerprint; guest checkout resolves by slug).
+func testListingResponseNoFingerprint() []byte {
+	return []byte(`{"data":{"listing":{"slug":"test-sticker","item":{"title":"Test Sticker","price":"199"},"metadata":{"pricingCurrency":{"code":"USD","divisibility":2}}}}}`)
+}
+
 func testPaymentMethodsResponse() []byte {
-	return []byte(`{"data":{"crypto":["crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955","crypto:eip155:1:native"]}}`)
+	return []byte(`{"data":{"crypto":["crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native","crypto:eip155:1:native"]}}`)
+}
+
+func testGuestCheckoutSettingsResponse(availableCoins string) []byte {
+	return []byte(fmt.Sprintf(`{"data":{"enabled":true,"acceptedCoins":"ETH,LTC","availableCoins":%q}}`, availableCoins))
+}
+
+func withGuestCheckoutMock(responses map[string]mockResponse, availableCoins string) map[string]mockResponse {
+	out := make(map[string]mockResponse, len(responses)+1)
+	for key, value := range responses {
+		out[key] = value
+	}
+	out["GET /v1/settings/guest-checkout"] = mockResponse{200, testGuestCheckoutSettingsResponse(availableCoins)}
+	return out
 }
 
 func testSearchResponse() []byte {
@@ -65,7 +83,7 @@ func testSearchResponse() []byte {
 }
 
 func testGuestOrderResponse() []byte {
-	return []byte(`{"data":{"orderToken":"guest_abc123","paymentAddress":"0x1234567890abcdef","paymentAmount":"1990000","chainName":"BSC","paymentCoin":"crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955","expiresAt":"2026-05-19T12:00:00Z"}}`)
+	return []byte(`{"data":{"orderToken":"guest_abc123","paymentAddress":"ltc1qtestaddress","paymentAmount":"199000000","chainName":"Litecoin","paymentCoin":"crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native","expiresAt":"2026-05-19T12:00:00Z"}}`)
 }
 
 func testOrderStatusResponse() []byte {
@@ -364,10 +382,10 @@ func TestShoppingPrepareCheckout_RequiresParams(t *testing.T) {
 }
 
 func TestShoppingPrepareCheckout_ReturnsQuoteToken(t *testing.T) {
-	storeBridge := newMockShoppingBridge(map[string]mockResponse{
+	storeBridge := newMockShoppingBridge(withGuestCheckoutMock(map[string]mockResponse{
 		"GET /v1/listings/QmDemoStore123/test-sticker": {200, testListingResponse()},
 		"GET /v1/payment-methods/QmDemoStore123":       {200, testPaymentMethodsResponse()},
-	})
+	}, "LTC"))
 	signer := NewQuoteTokenSigner([]byte("test-secret-key-32-bytes-long!!"))
 	handler := makeShoppingPrepareCheckout(storeBridge, testShoppingConfig, signer)
 
@@ -411,10 +429,10 @@ func TestShoppingPrepareCheckout_RejectsOverMaxOrderAmount(t *testing.T) {
 	cfg := testShoppingConfig
 	cfg.MaxOrderAmount = 1.50
 
-	storeBridge := newMockShoppingBridge(map[string]mockResponse{
+	storeBridge := newMockShoppingBridge(withGuestCheckoutMock(map[string]mockResponse{
 		"GET /v1/listings/QmDemoStore123/test-sticker": {200, testListingResponse()},
 		"GET /v1/payment-methods/QmDemoStore123":       {200, testPaymentMethodsResponse()},
-	})
+	}, "LTC"))
 	signer := NewQuoteTokenSigner([]byte("test-secret-key-32-bytes-long!!"))
 	handler := makeShoppingPrepareCheckout(storeBridge, cfg, signer)
 
@@ -512,11 +530,11 @@ func TestShoppingConfirmCheckout_CreatesOrder(t *testing.T) {
 	}
 	token, _ := signer.Sign(payload)
 
-	storeBridge := newMockShoppingBridge(map[string]mockResponse{
+	storeBridge := newMockShoppingBridge(withGuestCheckoutMock(map[string]mockResponse{
 		"GET /v1/listings/QmDemoStore123/test-sticker": {200, testListingResponse()},
 		"GET /v1/payment-methods/QmDemoStore123":       {200, testPaymentMethodsResponse()},
 		"POST /v1/guest/orders":                        {201, testGuestOrderResponse()},
-	})
+	}, "LTC"))
 
 	handler := makeShoppingConfirmCheckout(storeBridge, testShoppingConfig, signer)
 	result, err := handler(context.Background(), makeToolRequest(map[string]interface{}{
@@ -542,8 +560,8 @@ func TestShoppingConfirmCheckout_CreatesOrder(t *testing.T) {
 			t.Errorf("expected %q in payment payload", key)
 		}
 	}
-	if parsed["amountDisplay"] != "1.99 USDT" {
-		t.Fatalf("amountDisplay = %v, want 1.99 USDT", parsed["amountDisplay"])
+	if parsed["amountDisplay"] != "1.99 LTC" {
+		t.Fatalf("amountDisplay = %v, want 1.99 LTC", parsed["amountDisplay"])
 	}
 	if !containsString(fmt.Sprint(parsed["paymentURI"]), "amount=1.99") {
 		t.Fatalf("paymentURI should use decimal amount, got %v", parsed["paymentURI"])
@@ -581,6 +599,61 @@ func TestShoppingConfirmCheckout_RejectsChangedListing(t *testing.T) {
 		if call == "POST /v1/guest/orders" {
 			t.Fatal("guest order should not be created when listing hash changes")
 		}
+	}
+}
+
+func TestShoppingConfirmCheckout_AllowsEmptyListingFingerprint(t *testing.T) {
+	signer := NewQuoteTokenSigner([]byte("test-secret-key-32-bytes-long!!"))
+
+	payload := &QuotePayload{
+		StorePeerID:  "QmDemoStore123",
+		Slug:         "test-sticker",
+		ListingHash:  "",
+		Quantity:     1,
+		CoinType:     testPaymentCoin,
+		MaxTotalSats: "199",
+	}
+	token, _ := signer.Sign(payload)
+
+	storeBridge := newMockShoppingBridge(withGuestCheckoutMock(map[string]mockResponse{
+		"GET /v1/listings/QmDemoStore123/test-sticker": {200, testListingResponseNoFingerprint()},
+		"GET /v1/payment-methods/QmDemoStore123":       {200, testPaymentMethodsResponse()},
+		"POST /v1/guest/orders":                        {201, testGuestOrderResponse()},
+	}, "LTC"))
+
+	handler := makeShoppingConfirmCheckout(storeBridge, testShoppingConfig, signer)
+	result, err := handler(context.Background(), makeToolRequest(map[string]interface{}{
+		"quote_token": token,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected tool error: %s", extractTextContent(result))
+	}
+}
+
+func TestShoppingPrepareCheckout_RejectsNonVisibleGuestCoin(t *testing.T) {
+	storeBridge := newMockShoppingBridge(withGuestCheckoutMock(map[string]mockResponse{
+		"GET /v1/listings/QmDemoStore123/test-sticker": {200, testListingResponse()},
+		"GET /v1/payment-methods/QmDemoStore123":       {200, testPaymentMethodsResponse()},
+	}, "LTC"))
+	signer := NewQuoteTokenSigner([]byte("test-secret-key-32-bytes-long!!"))
+	handler := makeShoppingPrepareCheckout(storeBridge, testShoppingConfig, signer)
+
+	result, err := handler(context.Background(), makeToolRequest(map[string]interface{}{
+		"slug": "test-sticker",
+		"coin": "crypto:eip155:1:native",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected tool error when ETH is not guest-checkout visible")
+	}
+	text := extractTextContent(result)
+	if !containsString(text, "ETH") {
+		t.Fatalf("expected ETH in error, got: %s", text)
 	}
 }
 

@@ -260,6 +260,9 @@ func makeShoppingPrepareCheckout(storeBridge Bridge, cfg ShoppingConfig, signer 
 				return gomcp.NewToolResultError(err.Error()), nil
 			}
 		}
+		if err := ensureGuestCheckoutCoinVisible(ctx, storeBridge, coin); err != nil {
+			return gomcp.NewToolResultError(err.Error()), nil
+		}
 
 		payload := &QuotePayload{
 			StorePeerID:    cfg.DemoStorePeerID,
@@ -338,7 +341,7 @@ func makeShoppingConfirmCheckout(storeBridge Bridge, cfg ShoppingConfig, signer 
 		}
 
 		listing := extractListingFields(listingBody)
-		if listing.Hash == "" || listing.Hash != quote.ListingHash {
+		if listing.Hash != quote.ListingHash {
 			return gomcp.NewToolResultError("The product changed after the quote was prepared. Please call shopping_prepare_checkout again."), nil
 		}
 
@@ -359,6 +362,9 @@ func makeShoppingConfirmCheckout(storeBridge Bridge, cfg ShoppingConfig, signer 
 			if err := ensureCoinSupported(pmBody, quote.CoinType); err != nil {
 				return gomcp.NewToolResultError(err.Error()), nil
 			}
+		}
+		if err := ensureGuestCheckoutCoinVisible(ctx, storeBridge, quote.CoinType); err != nil {
+			return gomcp.NewToolResultError(err.Error()), nil
 		}
 
 		// Build guest order request matching contracts.CreateGuestOrderRequest
@@ -481,6 +487,12 @@ func extractListingFields(body []byte) listingFields {
 
 	if hashRaw, ok := workingJSON["hash"]; ok {
 		json.Unmarshal(hashRaw, &result.Hash)
+	}
+	// SignedListing JSON uses "cid" (listing.proto); older/mock responses may use "hash" only.
+	if result.Hash == "" {
+		if cidRaw, ok := workingJSON["cid"]; ok {
+			json.Unmarshal(cidRaw, &result.Hash)
+		}
 	}
 
 	listingJSON := workingJSON
@@ -772,6 +784,91 @@ func ensureCoinSupported(body []byte, coin string) error {
 		return nil
 	}
 	return fmt.Errorf("The demo store does not currently accept %s for this checkout", target)
+}
+
+func ensureGuestCheckoutCoinVisible(ctx context.Context, bridge Bridge, coin string) error {
+	code, body, err := bridge.Call(ctx, "GET", "/v1/settings/guest-checkout", nil, nil)
+	if err != nil || code < 200 || code >= 300 {
+		return nil
+	}
+	return ensureCoinInGuestAvailableList(body, coin)
+}
+
+func ensureCoinInGuestAvailableList(body []byte, coin string) error {
+	available := extractGuestAvailableCoins(body)
+	if len(available) == 0 {
+		return nil
+	}
+	target := normalizeCoinForGuestCompare(coin)
+	if target == "" {
+		return fmt.Errorf("payment coin is required")
+	}
+	if available[target] {
+		return nil
+	}
+	return fmt.Errorf("Guest checkout is not available for %s on this store", guestCoinDisplayLabel(coin))
+}
+
+func normalizeCoinForGuestCompare(coin string) string {
+	coin = strings.TrimSpace(coin)
+	if ct, ok := iwallet.TryNormalizePaymentCoin(coin); ok {
+		return string(ct)
+	}
+	return strings.ToUpper(coin)
+}
+
+func guestCoinDisplayLabel(coin string) string {
+	coin = strings.TrimSpace(coin)
+	if ct, ok := iwallet.TryNormalizePaymentCoin(coin); ok {
+		if info, err := iwallet.CoinInfoFromCoinType(ct); err == nil && info.IsEthTypeChain() {
+			if coin != "" && !strings.HasPrefix(strings.ToLower(coin), "crypto:") {
+				return strings.ToUpper(coin)
+			}
+			if info.Chain == iwallet.ChainEthereum {
+				return "ETH"
+			}
+			return string(info.Chain)
+		}
+	}
+	if !strings.HasPrefix(strings.ToLower(coin), "crypto:") {
+		return strings.ToUpper(coin)
+	}
+	return coin
+}
+
+func extractGuestAvailableCoins(body []byte) map[string]bool {
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil
+	}
+	if data, ok := payload["data"].(map[string]interface{}); ok {
+		payload = data
+	}
+	raw, ok := payload["availableCoins"]
+	if !ok {
+		return nil
+	}
+	out := make(map[string]bool)
+	switch typed := raw.(type) {
+	case string:
+		for _, part := range strings.Split(typed, ",") {
+			if key := normalizeCoinForGuestCompare(part); key != "" {
+				out[key] = true
+			}
+		}
+	case []interface{}:
+		for _, item := range typed {
+			if s, ok := item.(string); ok {
+				if key := normalizeCoinForGuestCompare(s); key != "" {
+					out[key] = true
+				}
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func extractSupportedCoins(body []byte) map[string]bool {

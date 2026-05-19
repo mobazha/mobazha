@@ -3,9 +3,14 @@
 package core
 
 import (
-	"github.com/mobazha/mobazha3.0/internal/logger"
+	"context"
+	"fmt"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -89,7 +94,9 @@ func extractEVMConfigs(chainAPIs map[iwallet.ChainType]chains.APIUrls, testnet b
 func (n *MobazhaNode) startEVMChainClients() {
 	if n.hostService != nil {
 		// SaaS mode: use shared EVM clients from HostService
-		configureEVMWallets(n.nodeID, n.multiwallet, n.hostService)
+		if configureEVMWallets(n.nodeID, n.multiwallet, n.hostService) > 0 {
+			n.configureGuestEVMBalanceChecker()
+		}
 		return
 	}
 
@@ -139,9 +146,9 @@ func (n *MobazhaNode) startEVMChainClients() {
 //   - Supports GetRecommendedContractVersion() for dynamic escrow address lookup
 //   - Supports GetTransaction() for payment verification
 //   - Is shared across all SaaS tenant nodes (one per chain)
-func configureEVMWallets(nodeID string, mw walletProvider, hs coreiface.HostService) {
+func configureEVMWallets(nodeID string, mw walletProvider, hs coreiface.HostService) int {
 	if mw == nil || hs == nil {
-		return
+		return 0
 	}
 
 	configured := 0
@@ -166,6 +173,54 @@ func configureEVMWallets(nodeID string, mw walletProvider, hs coreiface.HostServ
 	if configured > 0 {
 		logger.LogInfoWithIDf(log, nodeID, "Configured %d EVM wallets with shared chain clients", configured)
 	}
+	return configured
+}
+
+func (n *MobazhaNode) configureGuestEVMBalanceChecker() {
+	if n.hostService == nil || n.guestPaymentMonitor == nil || n.guestOrderService == nil {
+		return
+	}
+	checker := &hostEVMNativeBalanceChecker{hostService: n.hostService}
+	n.guestPaymentMonitor.SetCheckers(checker, nil)
+	n.guestOrderService.SetEVMMonitorAvailable(true)
+	logger.LogInfoWithIDf(log, n.nodeID, "Configured guest checkout EVM balance checker")
+}
+
+type hostEVMNativeBalanceChecker struct {
+	hostService coreiface.HostService
+}
+
+type evmBalanceAtClient interface {
+	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
+}
+
+func (c *hostEVMNativeBalanceChecker) GetAddressBalance(ctx context.Context, chainKey string, address string) (*big.Int, error) {
+	if c == nil || c.hostService == nil {
+		return nil, fmt.Errorf("EVM host service not configured")
+	}
+	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(chainKey))
+	if err != nil {
+		return nil, err
+	}
+	if !coinInfo.IsEthTypeChain() {
+		return nil, fmt.Errorf("coin %q is not an EVM coin", chainKey)
+	}
+	if !coinInfo.IsNative {
+		return nil, fmt.Errorf("ERC20 guest balance checks are not configured for coin %q", chainKey)
+	}
+	if !common.IsHexAddress(address) {
+		return nil, fmt.Errorf("invalid EVM address %q", address)
+	}
+
+	client := c.hostService.GetEVMChainClient(coinInfo.Chain)
+	if client == nil {
+		return nil, fmt.Errorf("EVM chain client not configured for %s", coinInfo.Chain)
+	}
+	balancer, ok := client.(evmBalanceAtClient)
+	if !ok {
+		return nil, fmt.Errorf("EVM chain client for %s cannot query native balances", coinInfo.Chain)
+	}
+	return balancer.BalanceAt(ctx, common.HexToAddress(address), nil)
 }
 
 // walletProvider is the minimal interface needed by configureEVMWallets.

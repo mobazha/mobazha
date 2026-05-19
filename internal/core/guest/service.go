@@ -30,6 +30,7 @@ const (
 	defaultAutoCompletePeriod = 14 * 24 * time.Hour
 	guestOrderTokenPrefix     = "gst_"
 	buyerPortalTokenPrefix    = "bpt_"
+	guestOrderTokenBytes      = 30
 )
 
 // PaymentWatcher is implemented by GuestPaymentMonitor.
@@ -84,6 +85,8 @@ type GuestOrderAppService struct {
 	supportedUTXOChains    map[iwallet.ChainType]struct{}
 	evmMonitorAvailable    bool
 	solanaMonitorAvailable bool
+	utxoMonitor            UTXOMonitorReadiness
+	multiwallet            contracts.WalletOperator
 	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
 	external_paymentAvailable func() bool
 }
@@ -121,6 +124,12 @@ func (s *GuestOrderAppService) SetPaymentWatcher(w PaymentWatcher) {
 	s.watcher = w
 }
 
+// SetEVMMonitorAvailable enables or disables EVM-family guest checkout after
+// the node lifecycle has wired a concrete balance checker.
+func (s *GuestOrderAppService) SetEVMMonitorAvailable(available bool) {
+	s.evmMonitorAvailable = available
+}
+
 // EnableUTXOChain dynamically marks a UTXO chain as available for guest
 // checkout. ManagedEscrow for concurrent use.
 func (s *GuestOrderAppService) EnableUTXOChain(chain iwallet.ChainType) {
@@ -149,7 +158,8 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		return nil, contracts.ErrGuestCheckoutDisabled
 	}
 
-	coinType := iwallet.CoinType(req.PaymentCoin)
+	paymentCoin := normalizeGuestPaymentCoin(req.PaymentCoin)
+	coinType := iwallet.CoinType(paymentCoin)
 	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
 	if err != nil {
 		return nil, fmt.Errorf("unsupported payment coin %q: %w", req.PaymentCoin, err)
@@ -157,7 +167,10 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	if err := s.validateCoinAvailability(coinType, coinInfo); err != nil {
 		return nil, err
 	}
-	if err := s.validateAcceptedCoin(cfg, req.PaymentCoin); err != nil {
+	if err := s.validateAcceptedCoin(cfg, paymentCoin); err != nil {
+		return nil, err
+	}
+	if err := s.validateBuyerVisibleCoin(coinType, coinInfo, req.PaymentCoin); err != nil {
 		return nil, err
 	}
 
@@ -280,7 +293,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	order := models.GuestOrder{
 		OrderToken:                orderToken,
 		State:                     models.GuestOrderAwaitingPayment,
-		PaymentCoin:               req.PaymentCoin,
+		PaymentCoin:               paymentCoin,
 		PaymentAddress:            payResult.Address,
 		PaymentAmount:             paymentAmount,
 		PriceCurrency:             priceCurrencyCode,
@@ -341,7 +354,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 				VariantHash: items[i].VariantHash,
 				Quantity:    items[i].Quantity,
 				ReservedAt:  time.Now(),
-				ExpiresAt:   reservationExpiresAtForOrder(expiresAt, req.PaymentCoin),
+				ExpiresAt:   reservationExpiresAtForOrder(expiresAt, paymentCoin),
 			}
 			if err := tx.Save(&reservation); err != nil {
 				return fmt.Errorf("reserve inventory for %s: %w", items[i].ListingSlug, err)
@@ -362,7 +375,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		BuyerPortalToken:  buyerPortalToken,
 		PaymentAddress:    payResult.Address,
 		PaymentAmount:     order.PaymentAmount,
-		PaymentCoin:       req.PaymentCoin,
+		PaymentCoin:       paymentCoin,
 		ReferenceKey:      payResult.ReferenceKey,
 		ExpiresAt:         expiresAt,
 		Items:             items,
@@ -1195,12 +1208,15 @@ func (s *GuestOrderAppService) validateCoinAvailability(coinType iwallet.CoinTyp
 				contracts.ErrCoinUnavailable, coinInfo.Chain, coinType)
 		}
 		return nil
-	case coinInfo.IsEthTypeChain() || coinInfo.Chain == iwallet.ChainTRON:
+	case coinInfo.IsEthTypeChain():
 		if !s.evmMonitorAvailable {
 			return fmt.Errorf("%w: EVM/TRON balance monitor not configured (coin %q)",
 				contracts.ErrCoinUnavailable, coinType)
 		}
 		return nil
+	case coinInfo.Chain == iwallet.ChainTRON:
+		return fmt.Errorf("%w: TRON balance monitor not configured (coin %q)",
+			contracts.ErrCoinUnavailable, coinType)
 	case coinInfo.Chain == iwallet.ChainSolana:
 		if !s.solanaMonitorAvailable {
 			return fmt.Errorf("%w: Solana reference checker not configured (coin %q)",
@@ -1236,8 +1252,25 @@ func toChainSet(chains []iwallet.ChainType) map[iwallet.ChainType]struct{} {
 	return m
 }
 
+func normalizeGuestPaymentCoin(coin string) string {
+	trimmed := strings.TrimSpace(coin)
+	if trimmed == "" {
+		return ""
+	}
+	lower := strings.ToLower(trimmed)
+	if strings.HasPrefix(lower, "crypto:") || strings.HasPrefix(lower, "fiat:") {
+		return trimmed
+	}
+
+	upper := strings.ToUpper(trimmed)
+	if canonical, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainType(upper)); ok {
+		return string(canonical)
+	}
+	return upper
+}
+
 func generateOrderToken() (string, error) {
-	b := make([]byte, 32)
+	b := make([]byte, guestOrderTokenBytes)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
@@ -1333,10 +1366,9 @@ func (s *GuestOrderAppService) GetGuestCheckoutConfig(ctx context.Context) (*mod
 	return &cfg, nil
 }
 
-// filterAvailableCoins returns the comma-separated subset of coinList whose
-// coins are currently serviceable by the running node. Coins that would fail
-// validateCoinAvailability (e.g. EXTERNAL_PAYMENT when external_payment-wallet-rpc is absent) are
-// silently omitted so buyer-facing UIs never offer an unserviceable method.
+// filterAvailableCoins returns the comma-separated subset of coinList that is
+// buyer-visible on this node (full closure path). Coins that are configured in
+// AcceptedCoins but not settlement-ready (e.g. EVM before sweep) are omitted.
 func (s *GuestOrderAppService) filterAvailableCoins(coinList string) string {
 	if coinList == "" {
 		return ""
@@ -1351,14 +1383,12 @@ func (s *GuestOrderAppService) filterAvailableCoins(coinList string) string {
 		displayCoin := coin
 		if ct, ok := iwallet.TryNormalizePaymentCoin(coin); ok {
 			coinType = ct
-			displayCoin = string(ct)
 		}
 		coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
 		if err != nil {
-			// Unknown / malformed coin code — omit.
 			continue
 		}
-		if err := s.validateCoinAvailability(coinType, coinInfo); err == nil {
+		if cap := s.evaluateGuestPaymentCapability(coinType, coinInfo); cap.BuyerVisible {
 			available = append(available, displayCoin)
 		}
 	}

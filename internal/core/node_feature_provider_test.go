@@ -44,6 +44,15 @@ func TestConfigNodeFeatureProvider_NilReceiverManagedEscrow(t *testing.T) {
 	assert.Nil(t, p.WithReader("x", func(*repo.Config) bool { return true }))
 }
 
+func TestNewNodeFeatureProviderForConfig_SaaSModePassesNodeRuntime(t *testing.T) {
+	p := NewNodeFeatureProviderForConfig(&repo.Config{
+		SaaSMode:      true,
+		GuestCheckout: false,
+	})
+
+	assert.True(t, p.IsEnabled(context.Background(), config.FeatureGuestCheckoutEnabled.Key))
+}
+
 func TestConfigNodeFeatureProvider_WithReaderOverrides(t *testing.T) {
 	p := NewConfigNodeFeatureProvider(&repo.Config{})
 	p.WithReader("customFlag", func(c *repo.Config) bool { return true })

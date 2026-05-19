@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -75,6 +76,23 @@ func (t *sweepTestTx) Save(i interface{}) error {
 		cols = append(cols, clause.Column{Name: f.DBName})
 	}
 	return t.db.Clauses(clause.OnConflict{Columns: cols, UpdateAll: true}).Create(i).Error
+}
+
+func seedSweepGuestOrder(t *testing.T, db *sweepTestDB, id int, order models.GuestOrder) {
+	t.Helper()
+	order.ID = id
+	order.TenantID = testTenantID
+	if order.ExpiresAt.IsZero() {
+		order.ExpiresAt = time.Now().Add(time.Hour)
+	}
+	require.NoError(t, db.gormDB.Create(&order).Error)
+}
+
+func loadSweepGuestOrder(t *testing.T, db *sweepTestDB, token string) models.GuestOrder {
+	t.Helper()
+	var o models.GuestOrder
+	require.NoError(t, db.gormDB.Where("order_token = ?", token).First(&o).Error)
+	return o
 }
 
 func newSweepTestDB(t *testing.T) *sweepTestDB {

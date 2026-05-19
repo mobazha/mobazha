@@ -38,6 +38,18 @@ func NewConfigNodeFeatureProvider(cfg *repo.Config) *ConfigNodeFeatureProvider {
 	return p
 }
 
+// NewNodeFeatureProviderForConfig returns the node-runtime provider for a node
+// config. SaaS tenant nodes do not have a per-process CLI flag surface; their
+// guest checkout availability is governed by platform policy plus seller
+// settings, so the node layer must pass through instead of reading the
+// standalone-node GuestCheckout flag default.
+func NewNodeFeatureProviderForConfig(cfg *repo.Config) config.NodeFeatureProvider {
+	if cfg != nil && cfg.SaaSMode {
+		return config.AllowAllNodeProvider{}
+	}
+	return NewConfigNodeFeatureProvider(cfg)
+}
+
 // WithReader registers/overrides a reader for the given feature key. It
 // is safe to call before the provider is handed to the resolver.
 func (p *ConfigNodeFeatureProvider) WithReader(key string, fn func(*repo.Config) bool) *ConfigNodeFeatureProvider {

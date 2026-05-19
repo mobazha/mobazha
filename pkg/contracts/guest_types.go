@@ -119,6 +119,26 @@ type GuestOrderFilter struct {
 	PageSize int
 }
 
+// GuestUTXOChainReadiness is per-chain guest UTXO closure status for operators.
+type GuestUTXOChainReadiness struct {
+	Chain                  string `json:"chain"`
+	HealthySourceCount     int    `json:"healthySourceCount"`
+	WalletLoaded           bool   `json:"walletLoaded"`
+	ReceivingAccountActive bool   `json:"receivingAccountActive"`
+	BuyerVisible           bool   `json:"buyerVisible"`
+	Reason                 string `json:"reason,omitempty"`
+}
+
+// GuestCheckoutReadiness summarizes guest checkout runtime health.
+type GuestCheckoutReadiness struct {
+	GuestCheckoutEnabled bool                      `json:"guestCheckoutEnabled"`
+	WatchedAddressCount  int                       `json:"watchedAddressCount"`
+	SweepTasksPending    int                       `json:"sweepTasksPending"`
+	SweepTasksSubmitted  int                       `json:"sweepTasksSubmitted"`
+	SweepTasksFailed     int                       `json:"sweepTasksFailed"`
+	Chains               []GuestUTXOChainReadiness `json:"chains"`
+}
+
 // --- UnifiedOrderView types ---
 
 // OrderSummary is a normalized summary suitable for the seller's unified order list.

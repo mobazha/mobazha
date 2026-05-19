@@ -33,7 +33,7 @@ type BIP44KeyDeriver interface {
 type PaymentAddressRequest struct {
 	CoinType   iwallet.CoinType
 	Amount     string // smallest-unit string (satoshi/wei/lamports)
-	OrderToken string // "gst_" + 32-byte hex
+	OrderToken string // "gst_" + 30-byte hex (fits guest_orders.order_token varchar(64))
 	ExpiresAt  time.Time
 }
 

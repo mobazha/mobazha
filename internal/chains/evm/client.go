@@ -7,12 +7,14 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mobazha/ethereum-watcher/rpc"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 
 	contract "github.com/mobazha/mobazha3.0/internal/chains/evm/contract"
@@ -66,11 +68,19 @@ type EthClient struct {
 
 	*ethclient.Client
 	rpcUrl string
+	wsUrl  string
 	logger *logging.Logger
 
 	rpc *rpc.EthBlockChainRPCWithRetry
 
 	registry *contract.Registry
+
+	// wsClient is an optional separate WebSocket connection used for
+	// eth_subscribe (log subscriptions). When set, SubscribeFilterLogs
+	// uses this client instead of the primary HTTP-based Client. This
+	// allows ManagedEscrow LiveMonitor to use WSS for real-time events while
+	// the primary client handles RPC reads/writes over HTTPS.
+	wsClient *ethclient.Client
 
 	// escrowAddr is a pre-resolved escrow contract address.
 	// When set, GetRecommendedContractVersion() returns this address
@@ -102,6 +112,22 @@ func NewEthClient(coinType iwallet.CoinType, testnet bool, rpcUrl string, regist
 	}
 	client.Client = conn
 	client.rpc = retryRpc
+
+	// Optionally dial a separate WSS connection for log subscriptions.
+	// Failure is non-fatal: LiveMonitor will fallback to HTTP polling.
+	if client.wsUrl != "" {
+		wsConn, wsErr := ethclient.Dial(client.wsUrl)
+		if wsErr != nil {
+			if logger != nil {
+				logger.Warningf("[%s] WSS dial failed (non-fatal, will use HTTP polling): %v", coinType, wsErr)
+			}
+		} else {
+			client.wsClient = wsConn
+			if logger != nil {
+				logger.Infof("[%s] WSS connection established for log subscriptions: %s", coinType, redact.URL(client.wsUrl))
+			}
+		}
+	}
 
 	// Skip Registry if escrow address is pre-resolved
 	if client.escrowAddr != nil {
@@ -147,6 +173,47 @@ func WithEscrowAddress(addr string) EthClientOption {
 			a := common.HexToAddress(addr)
 			c.escrowAddr = &a
 		}
+	}
+}
+
+// WithWsURL configures a separate WebSocket connection for eth_subscribe.
+// When set, SubscribeFilterLogs uses the WSS endpoint for real-time log
+// subscriptions while the primary client handles HTTP RPC operations.
+// If dialing fails, the client is still usable (subscriptions fallback
+// to the primary connection or HTTP polling via LiveMonitor).
+func WithWsURL(wsURL string) EthClientOption {
+	return func(c *EthClient) {
+		if wsURL != "" {
+			c.wsUrl = wsURL
+		}
+	}
+}
+
+// SubscribeFilterLogs overrides the embedded ethclient.Client's method to
+// prefer the dedicated WSS connection when available. This enables ManagedEscrow
+// LiveMonitor to get real-time log events over WebSocket while the primary
+// HTTPS client handles balance queries, receipt lookups, and broadcasts.
+func (client *EthClient) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
+	if client.wsClient != nil {
+		sub, err := client.wsClient.SubscribeFilterLogs(ctx, q, ch)
+		if err == nil {
+			return sub, nil
+		}
+		if client.logger != nil {
+			client.logger.Warningf("[%s] WSS SubscribeFilterLogs failed, falling back to primary: %v", client.CoinType, err)
+		}
+	}
+	return client.Client.SubscribeFilterLogs(ctx, q, ch)
+}
+
+// Close releases both the primary HTTP/RPC and optional WSS connections.
+func (client *EthClient) Close() {
+	if client.wsClient != nil {
+		client.wsClient.Close()
+		client.wsClient = nil
+	}
+	if client.Client != nil {
+		client.Client.Close()
 	}
 }
 

@@ -15,9 +15,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/identity"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/identity"
 	"github.com/mobazha/mobazha3.0/pkg/media"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
@@ -61,8 +61,8 @@ func (m *mockMessenger) ReliablySendMessage(_ database.Tx, p peer.ID, msg *pb.Me
 
 func (m *mockMessenger) ProcessACK(_ database.Tx, _ *pb.AckMessage) error { return nil }
 func (m *mockMessenger) SendACK(_ string, _ peer.ID)                      {}
-func (m *mockMessenger) Start()                                            {}
-func (m *mockMessenger) Stop()                                             {}
+func (m *mockMessenger) Start()                                           {}
+func (m *mockMessenger) Stop()                                            {}
 
 // ── mockNetworkService ──────────────────────────────────────────
 
@@ -76,7 +76,7 @@ func (m *mockNetworkService) SendMessage(_ context.Context, _ peer.ID, _ *pb.Mes
 func (m *mockNetworkService) RegisterHandler(_ pb.Message_MessageType, _ func(peer.ID, *pb.Message) error) {
 }
 func (m *mockNetworkService) DeliverLocalMessage(_ peer.ID, _ *pb.Message) error { return nil }
-func (m *mockNetworkService) Close()                                              {}
+func (m *mockNetworkService) Close()                                             {}
 
 // ── mockSigner ──────────────────────────────────────────────────
 
@@ -194,15 +194,19 @@ func (m *mockWalletOperatorWithChainWallets) Start() error { return nil }
 func (m *mockWalletOperatorWithChainWallets) Close() error { return nil }
 
 type mockEVMWallet struct {
-	chain      iwallet.ChainType
-	coin       iwallet.CoinType
-	testnet    bool
+	chain       iwallet.ChainType
+	coin        iwallet.CoinType
+	testnet     bool
 	chainClient iwallet.ChainClient
 }
 
 var _ iwallet.Wallet = (*mockEVMWallet)(nil)
 
 func newMockEVMWallet(chain iwallet.ChainType, client iwallet.ChainClient) *mockEVMWallet {
+	return newMockEVMWalletWithTestnet(chain, client, false)
+}
+
+func newMockEVMWalletWithTestnet(chain iwallet.ChainType, client iwallet.ChainClient, testnet bool) *mockEVMWallet {
 	coin, err := iwallet.RequireCanonicalNativeCoinType(chain)
 	if err != nil {
 		panic(err)
@@ -210,7 +214,7 @@ func newMockEVMWallet(chain iwallet.ChainType, client iwallet.ChainClient) *mock
 	return &mockEVMWallet{
 		chain:       chain,
 		coin:        coin,
-		testnet:     true,
+		testnet:     testnet,
 		chainClient: client,
 	}
 }

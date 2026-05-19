@@ -6,6 +6,7 @@ package redact
 import (
 	"encoding/json"
 	"net"
+	"net/url"
 	"strings"
 )
 
@@ -45,20 +46,60 @@ func ServerAddr(addr string) string {
 	return host + ":***"
 }
 
+// URL masks query parameters and path-embedded API keys for safe logging.
+// It preserves scheme + host + path structure but replaces query values
+// (which commonly contain Alchemy/Infura/QuickNode API keys) with "***".
+// Path segments that look like API keys (32+ hex or alphanumeric) are
+// truncated to first 8 chars. Returns the original string on parse error.
+func URL(rawURL string) string {
+	if rawURL == "" {
+		return ""
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "<invalid-url>"
+	}
+
+	// Mask query parameters
+	if u.RawQuery != "" {
+		q := u.Query()
+		for k := range q {
+			q.Set(k, "***")
+		}
+		u.RawQuery = q.Encode()
+	}
+
+	// Mask long path segments that look like API keys
+	parts := strings.Split(u.Path, "/")
+	for i, part := range parts {
+		if len(part) >= 32 {
+			parts[i] = part[:8] + "..."
+		}
+	}
+	u.Path = strings.Join(parts, "/")
+
+	// Mask userinfo
+	if u.User != nil {
+		u.User = url.UserPassword("***", "***")
+	}
+
+	return u.String()
+}
+
 // sensitiveKeys is the shared registry of key names that hold secret values.
 // Keys are stored lowercase for case-insensitive matching.
 var sensitiveKeys = map[string]bool{
-	"password":          true,
-	"token":             true,
-	"apikey":            true,
-	"api_key":           true,
-	"mnemonic":          true,
-	"privatekey":        true,
-	"private_key":       true,
-	"secret":            true,
-	"secret_key":        true,
-	"secretkey":         true,
-	"admin_password":    true,
+	"password":           true,
+	"token":              true,
+	"apikey":             true,
+	"api_key":            true,
+	"mnemonic":           true,
+	"privatekey":         true,
+	"private_key":        true,
+	"secret":             true,
+	"secret_key":         true,
+	"secretkey":          true,
+	"admin_password":     true,
 	"standalone_api_key": true,
 }
 

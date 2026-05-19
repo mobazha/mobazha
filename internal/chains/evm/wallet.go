@@ -58,6 +58,16 @@ func (w *ETHWallet) postInit(masterKey *hdkeychain.ExtendedKey) error {
 	return nil
 }
 
+// CloseWallet releases the optional WSS subscription client before shutting down.
+func (w *ETHWallet) CloseWallet() error {
+	if w.ChainClient != nil {
+		if ec, ok := w.ChainClient.(*EthClient); ok {
+			ec.Close()
+		}
+	}
+	return w.WalletBase.CloseWallet()
+}
+
 func (w *ETHWallet) Balance() (unconfirmed iwallet.Amount, confirmed iwallet.Amount, err error) {
 	return iwallet.NewAmount(0), iwallet.NewAmount(0), errors.New("尚未实现")
 }

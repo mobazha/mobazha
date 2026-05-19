@@ -10,8 +10,10 @@ import (
 type defaultEVMChainDef struct {
 	Chain           iwallet.ChainType
 	MainnetRpc      string
+	MainnetWs       string // Optional WSS endpoint for eth_subscribe (ManagedEscrow LiveMonitor)
 	MainnetRegistry string
 	TestnetRpc      string
+	TestnetWs       string // Optional WSS endpoint for testnet
 	TestnetRegistry string
 }
 
@@ -88,9 +90,11 @@ func GetDefaultConfigs(testnet bool) []EVMClientConfig {
 	var configs []EVMClientConfig
 	for _, dc := range defaultEVMChains {
 		rpcURL := dc.MainnetRpc
+		wsURL := dc.MainnetWs
 		registryAddr := dc.MainnetRegistry
 		if testnet {
 			rpcURL = dc.TestnetRpc
+			wsURL = dc.TestnetWs
 			registryAddr = dc.TestnetRegistry
 		}
 		if rpcURL == "" {
@@ -99,6 +103,7 @@ func GetDefaultConfigs(testnet bool) []EVMClientConfig {
 		configs = append(configs, EVMClientConfig{
 			ChainType:       dc.Chain,
 			RpcURL:          rpcURL,
+			WsURL:           wsURL,
 			RegistryAddress: registryAddr,
 			Testnet:         testnet,
 		})

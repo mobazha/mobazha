@@ -8,7 +8,8 @@ import (
 // Each supported EVM chain (BSC, Ethereum, Polygon, Base, Conflux) needs its own config.
 type EVMClientConfig struct {
 	ChainType       iwallet.ChainType
-	RpcURL          string // HTTPS RPC endpoint
+	RpcURL          string // HTTPS RPC endpoint (balance, receipt, broadcast)
+	WsURL           string // Optional WSS endpoint for eth_subscribe (ManagedEscrow LiveMonitor prefers this)
 	RegistryAddress string // ContractManager contract address (for dynamic escrow lookup)
 	EscrowAddress   string // Optional pre-resolved escrow address (skips Registry query)
 	Testnet         bool
@@ -37,4 +38,3 @@ func NewSharedClient(cfg EVMClientConfig) (iwallet.ChainClient, error) {
 	}
 	return DefaultFactory.CreateClient(cfg)
 }
-

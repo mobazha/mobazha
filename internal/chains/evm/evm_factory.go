@@ -3,6 +3,7 @@ package evm
 import (
 	pkgevm "github.com/mobazha/mobazha3.0/pkg/evm"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -29,12 +30,15 @@ func (f *defaultEVMClientFactory) CreateClient(cfg pkgevm.EVMClientConfig) (iwal
 	if cfg.EscrowAddress != "" {
 		opts = append(opts, WithEscrowAddress(cfg.EscrowAddress))
 	}
+	if cfg.WsURL != "" {
+		opts = append(opts, WithWsURL(cfg.WsURL))
+	}
 
 	client, err := NewEthClient(coinType, cfg.Testnet, cfg.RpcURL, cfg.RegistryAddress, factoryLog, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	factoryLog.Infof("Created shared EVM client for %s (testnet=%v, rpc=%s)", cfg.ChainType, cfg.Testnet, cfg.RpcURL)
+	factoryLog.Infof("Created shared EVM client for %s (testnet=%v, rpc=%s, ws=%s)", cfg.ChainType, cfg.Testnet, redact.URL(cfg.RpcURL), redact.URL(cfg.WsURL))
 	return client, nil
 }

@@ -147,6 +147,12 @@ type ActionResult struct {
 	// PaymentData is the chain-agnostic payment descriptor consumed by
 	// the order state machine. Populated by SetupPayment.
 	PaymentData *models.PaymentData
+
+	// SubmittedTxHash is the relay/broadcast tx hash when Mode is
+	// ActionModeSubmitted and the adapter already knows the hash
+	// synchronously (e.g. ManagedEscrow relay). Callers should prefer this over
+	// polling GetActionStatus immediately after submit.
+	SubmittedTxHash string
 }
 
 // ActionOwnerSignature is a chain-agnostic carrier for a single owner

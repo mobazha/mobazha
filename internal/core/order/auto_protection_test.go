@@ -84,11 +84,14 @@ func TestIsInReminderWindow_ExactEnd(t *testing.T) {
 // --- isClientSignedModerated tests ---
 
 type stubStrategy struct {
-	model payment.PaymentModel
+	model        payment.PaymentModel
+	capabilities payment.ChainCapabilities
 }
 
-func (s *stubStrategy) Model() payment.PaymentModel        { return s.model }
-func (s *stubStrategy) Capabilities() payment.ChainCapabilities { return payment.ChainCapabilities{} }
+func (s *stubStrategy) Model() payment.PaymentModel { return s.model }
+func (s *stubStrategy) Capabilities() payment.ChainCapabilities {
+	return s.capabilities
+}
 func (s *stubStrategy) AutoConfirm(_ context.Context, _ *events.CancelablePaymentReady) error {
 	return nil
 }
@@ -145,7 +148,12 @@ func TestIsClientSignedModerated_CancelableReturnsFalse(t *testing.T) {
 
 func TestIsClientSignedModerated_ModeratedMonitoredReturnsFalse(t *testing.T) {
 	reg := payment.NewRegistry()
-	reg.Register(iwallet.ChainBitcoin, &stubStrategy{model: payment.PaymentModelMonitored})
+	reg.Register(iwallet.ChainBitcoin, &stubStrategy{
+		model: payment.PaymentModelMonitored,
+		capabilities: payment.ChainCapabilities{
+			EscrowType: "multisig",
+		},
+	})
 	svc := &OrderAppService{paymentRegistry: reg}
 
 	order := orderWithPaymentSent(t, pb.PaymentSent_MODERATED, "BTC")
@@ -156,7 +164,13 @@ func TestIsClientSignedModerated_ModeratedMonitoredReturnsFalse(t *testing.T) {
 
 func TestIsClientSignedModerated_ModeratedClientSignedReturnsTrue(t *testing.T) {
 	reg := payment.NewRegistry()
-	reg.Register(iwallet.ChainEthereum, &stubStrategy{model: payment.PaymentModelClientSigned})
+	reg.Register(iwallet.ChainEthereum, &stubStrategy{
+		model: payment.PaymentModelClientSigned,
+		capabilities: payment.ChainCapabilities{
+			HasClientSignedEscrow: true,
+			EscrowType:            "smart-contract",
+		},
+	})
 	svc := &OrderAppService{paymentRegistry: reg}
 
 	order := orderWithPaymentSent(t, pb.PaymentSent_MODERATED, "crypto:eip155:1:native")

@@ -7,11 +7,14 @@ import (
 	"time"
 
 	intdb "github.com/mobazha/mobazha3.0/internal/database"
+	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -76,6 +79,60 @@ func TestOrderAppService_SetRegistry(t *testing.T) {
 	reg := payment.NewRegistry()
 	svc.SetRegistry(reg)
 	assert.Same(t, reg, svc.paymentRegistry)
+}
+
+func TestOrderAppService_GetEscrowReleaseInstructions_ManagedEscrowReturnsNil(t *testing.T) {
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+
+	order, paymentSent := newManagedEscrowOrderForTests(t, iwallet.CoinType("crypto:eip155:11155111:native"))
+	paymentSent.Method = pb.PaymentSent_CANCELABLE
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:           paymentSent.Coin,
+		Address:        order.PaymentAddress,
+		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
+	}))
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	coinType, instructions, err := svc.GetEscrowReleaseInstructions(order.ID, "", paymentSent.PayerAddress)
+	require.NoError(t, err)
+	assert.Equal(t, iwallet.CoinType(paymentSent.Coin), coinType)
+	assert.Nil(t, instructions)
+}
+
+func TestOrderAppService_GetCompleteOrderInstructions_ManagedEscrowReturnsNil(t *testing.T) {
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+
+	order, paymentSent := newManagedEscrowOrderForTests(t, iwallet.CoinType("crypto:eip155:11155111:native"))
+	order.MyRole = string(models.RoleBuyer)
+	order.SetFSMState(models.OrderState_SHIPPED)
+	paymentSent.Method = pb.PaymentSent_MODERATED
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
+		Items: []*pb.OrderOpen_Item{{
+			ListingHash: "listing-1",
+		}},
+	})))
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+		Shipments: []*pb.OrderShipment_ShippedItem{{
+			ItemIndex: 0,
+		}},
+	})))
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:           paymentSent.Coin,
+		Address:        order.PaymentAddress,
+		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
+	}))
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	coinType, instructions, err := svc.GetCompleteOrderInstructions(order.ID, "")
+	require.NoError(t, err)
+	assert.Equal(t, iwallet.CoinType(paymentSent.Coin), coinType)
+	assert.Nil(t, instructions)
 }
 
 // ── GetOrder ────────────────────────────────────────────────────────────

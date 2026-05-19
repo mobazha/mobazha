@@ -382,7 +382,7 @@ func (s *OrderAppService) validateDisputeContract(from peer.ID, contract []byte,
 		return nil, errors.New("selected moderator does not match own peerID")
 	}
 
-	if paymentSent.Method != pb.PaymentSent_MODERATED {
+	if !payment.MethodIsModerated(paymentSent.Method) {
 		return nil, errors.New("order payment method is not type moderated")
 	}
 

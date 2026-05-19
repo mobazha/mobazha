@@ -9,7 +9,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -68,18 +67,14 @@ func (s *OrderAppService) autoCompleteShippedOrders() {
 // server-side because the escrow release requires an on-chain transaction from
 // the buyer's wallet. They rely on the contract's built-in timeout mechanism.
 func (s *OrderAppService) isClientSignedModerated(order *models.Order) bool {
-	if order.PaymentMethod() != pb.PaymentSent_MODERATED {
+	if !payment.MethodIsModerated(order.PaymentMethod()) {
 		return false
 	}
 	ps, err := order.PaymentSentMessage()
 	if err != nil {
 		return false
 	}
-	strategy, err := s.paymentRegistry.ForCoin(iwallet.CoinType(ps.Coin))
-	if err != nil {
-		return false
-	}
-	return strategy.Model() == payment.PaymentModelClientSigned
+	return s.hasClientSignedEscrow(iwallet.CoinType(ps.Coin))
 }
 
 func (s *OrderAppService) executeAutoComplete(order *models.Order) {
@@ -143,7 +138,7 @@ func (s *OrderAppService) autoRefundUnshippedOrders() {
 			continue
 		}
 
-		if order.PaymentMethod() == pb.PaymentSent_CANCELABLE {
+		if payment.MethodIsCancelable(order.PaymentMethod()) {
 			s.executeAutoCompleteUnshipped(order)
 		} else {
 			s.executeAutoCancel(order)

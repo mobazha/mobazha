@@ -14,6 +14,7 @@ import (
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -82,7 +83,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}
 
 	if transactionKnown {
-		preVerifiedFiat := paymentSent.Method == pb.PaymentSent_FIAT || coinType.IsFiatPayment()
+		preVerifiedFiat := payment.IsFiatPaymentRoute(paymentSent.Method, coinType)
 		// For crypto, a transaction already persisted on this order with
 		// block height means local on-chain verification has already happened.
 		knownConfirmedCrypto := !preVerifiedFiat && isKnownTxConfirmed(knownTx)
@@ -119,7 +120,7 @@ func (op *OrderProcessor) validatePaymentSent(coinType iwallet.CoinType, orderOp
 	if op.multiwallet == nil {
 		return nil
 	}
-	if coinType.IsFiatPayment() || paymentSent.Method == pb.PaymentSent_FIAT {
+	if payment.IsFiatPaymentRoute(paymentSent.Method, coinType) {
 		return nil
 	}
 	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
@@ -189,7 +190,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected and chain-verified: Order %s fully funded", order.ID)
 		}
 
-		if paymentSent.Method == pb.PaymentSent_CANCELABLE && order.IsPaymentVerified() {
+		if payment.MethodIsCancelable(paymentSent.Method) && order.IsPaymentVerified() {
 			var amount uint64
 			if verifiedTx != nil {
 				amount = uint64(verifiedTx.Value.Int64())

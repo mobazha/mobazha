@@ -12,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -46,7 +47,7 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 	}
 
 	paymentSent, err := order.PaymentSentMessage()
-	if err == nil && paymentSent.Method == pb.PaymentSent_MODERATED && payoutAddress == "" {
+	if err == nil && payment.MethodIsModerated(paymentSent.Method) && payoutAddress == "" {
 		return fmt.Errorf("%w: payout address is required for MODERATED orders", coreiface.ErrBadRequest)
 	}
 
@@ -104,7 +105,7 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 			return err
 		}
 
-		if txid != "" && paymentSent != nil && paymentSent.Method == pb.PaymentSent_CANCELABLE {
+		if txid != "" && paymentSent != nil && payment.MethodIsCancelable(paymentSent.Method) {
 			coinInfo, coinErr := iwallet.CoinType(paymentSent.Coin).CoinInfo()
 			if coinErr != nil {
 				logger.LogInfoWithIDf(log, s.nodeID, "Unknown coin %s for order %s, skipping outgoing tx record", paymentSent.Coin, orderID)
@@ -255,7 +256,7 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 		return fmt.Errorf("failed to get buyer: %w", err)
 	}
 
-	if paymentSent.Method == pb.PaymentSent_MODERATED {
+	if payment.MethodIsModerated(paymentSent.Method) {
 		wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 		if err != nil {
 			return fmt.Errorf("failed to get wallet: %w", err)

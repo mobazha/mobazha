@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -79,7 +80,7 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	if paymentSent.Moderator == "" || paymentSent.Method != pb.PaymentSent_MODERATED {
+	if paymentSent.Moderator == "" || !payment.MethodIsModerated(paymentSent.Method) {
 		return nil, errors.New("dispute opened processed for non-moderated order")
 	}
 

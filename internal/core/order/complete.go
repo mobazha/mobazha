@@ -26,8 +26,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// GetCompleteOrderInstructions returns chain-specific instructions for completing
-// an order (EVM/Solana). UTXO chains are handled backend-side and return nil.
+// GetCompleteOrderInstructions returns instructions only for client-signed
+// completion flows. Address-monitored routes (UTXO, ManagedEscrow) are handled entirely
+// by the backend action endpoint and therefore return nil instructions.
 func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
@@ -55,7 +56,10 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 		return "", nil, err
 	}
 
-	if paymentSent.Method != pb.PaymentSent_MODERATED {
+	if !payment.MethodIsModerated(paymentSent.Method) {
+		return coinType, nil, nil
+	}
+	if !orderRequiresClientSignedInstructions(&order, paymentSent) {
 		return coinType, nil, nil
 	}
 
@@ -164,7 +168,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 	}
 
 	var releaseTx *iwallet.Transaction
-	if paymentSent.Method == pb.PaymentSent_MODERATED {
+	if payment.MethodIsModerated(paymentSent.Method) {
 		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 		if err != nil {
 			return err
@@ -536,7 +540,7 @@ func (s *OrderAppService) releaseCompleteEscrowFunds(order *models.Order, wallet
 		})
 	}
 
-	if strategy.Model() == payment.PaymentModelClientSigned {
+	if strategy.Capabilities().HasClientSignedEscrow {
 		return release, nil, nil
 	}
 

@@ -8,7 +8,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -78,7 +78,7 @@ func (s *OrderAppService) DeclineOrderViaRelay(orderID models.OrderID, reason st
 		return err
 	}
 
-	if paymentSent.Method == pb.PaymentSent_CANCELABLE {
+	if payment.MethodIsCancelable(paymentSent.Method) {
 		return s.DeclineOrder(orderID, "", reason, done)
 	}
 

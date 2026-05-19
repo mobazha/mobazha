@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -225,7 +226,7 @@ func (s *OrderAppService) preProcessOrderConfirmation(_ context.Context, orderMs
 		return nil, nil
 	}
 
-	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+	if !payment.MethodIsCancelable(paymentSent.Method) {
 		return nil, nil
 	}
 
@@ -273,7 +274,7 @@ func (s *OrderAppService) preProcessOrderCancel(_ context.Context, orderMsg *npb
 		return nil, nil
 	}
 
-	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+	if !payment.MethodIsCancelable(paymentSent.Method) {
 		return nil, nil
 	}
 
@@ -319,7 +320,7 @@ func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *
 		return nil, fmt.Errorf("invalid payment coin for order %s: %w", order.ID, err)
 	}
 
-	if paymentSent.Method == pb.PaymentSent_FIAT || coinType.IsFiatPayment() {
+	if payment.IsFiatPaymentRoute(paymentSent.Method, coinType) {
 		if s.fiatOps != nil {
 			if _, err := s.refundFiatPayment(ctx, &order, paymentSent, "requested_by_customer"); err != nil && !errors.Is(err, contracts.ErrAlreadyRefunded) {
 				return nil, fmt.Errorf("fiat refund on decline failed for order %s: %w", order.ID, err)
@@ -329,13 +330,20 @@ func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *
 		return nil, nil
 	}
 
-	if !s.hasClientSignedEscrow(coinType) {
-		if order.CanCancel() && paymentSent.Method == pb.PaymentSent_CANCELABLE {
+	if order.CanCancel() && payment.MethodIsCancelable(paymentSent.Method) {
+		if payment.UsesUTXOScriptEscrow(&order, paymentSent) {
 			result, err := s.ReleaseFromCancelableAddress(&order)
 			if err != nil {
 				return nil, fmt.Errorf("UTXO cancelable release on decline failed for order %s: %w", order.ID, err)
 			}
 			result.WalletTx.Commit()
+			return &PreProcessContext{CancelableReleaseCommitted: true}, nil
+		}
+		_, _, handled, err := s.submitManagedEscrowCancelAction(ctx, &order, coinType, paymentSent, "")
+		if err != nil {
+			return nil, fmt.Errorf("safe cancelable release on decline failed for order %s: %w", order.ID, err)
+		}
+		if handled {
 			return &PreProcessContext{CancelableReleaseCommitted: true}, nil
 		}
 	}
@@ -370,7 +378,7 @@ func (s *OrderAppService) preProcessRefund(_ context.Context, orderMsg *npb.Orde
 		return nil, fmt.Errorf("invalid payment coin for order %s: %w", orderMsg.OrderID, err)
 	}
 
-	if refund.GetTransactionID() != "" && paymentSent.Method == pb.PaymentSent_DIRECT {
+	if refund.GetTransactionID() != "" && payment.MethodIsDirect(paymentSent.Method) {
 		coinInfo, _ := coinType.CoinInfo()
 		tx, err := s.fetchOutgoingTx(paymentSent.Coin, refund.GetTransactionID(), order.PaymentAddress, &coinInfo)
 		if err != nil || tx == nil {
@@ -379,7 +387,7 @@ func (s *OrderAppService) preProcessRefund(_ context.Context, orderMsg *npb.Orde
 		return &PreProcessContext{OutgoingTx: tx}, nil
 	}
 
-	if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && paymentSent.Method == pb.PaymentSent_MODERATED {
+	if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && payment.MethodIsModerated(paymentSent.Method) {
 		wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 		if err != nil {
 			return nil, nil

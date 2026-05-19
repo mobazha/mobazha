@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/proto"
 )
@@ -191,11 +192,11 @@ func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, ch
 		return err
 	}
 
-	if paymentSent.Method == pb.PaymentSent_MODERATED {
+	if payment.MethodIsModerated(paymentSent.Method) {
 		return validateBTCEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, true)
-	} else if paymentSent.Method == pb.PaymentSent_CANCELABLE {
+	} else if payment.MethodIsCancelable(paymentSent.Method) {
 		return validateBTCEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, false)
-	} else if paymentSent.Method != pb.PaymentSent_DIRECT {
+	} else if !payment.MethodIsDirect(paymentSent.Method) {
 		return errors.New("invalid payment method")
 	}
 

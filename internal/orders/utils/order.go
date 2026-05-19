@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -15,7 +16,7 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, te
 		Testnet: testnet,
 	}
 
-	if paymentSent.Method == pb.PaymentSent_DIRECT {
+	if payment.MethodIsDirect(paymentSent.Method) {
 		return iwallet.EscrowInfo{}, nil
 	}
 	switch paymentSent.Method {

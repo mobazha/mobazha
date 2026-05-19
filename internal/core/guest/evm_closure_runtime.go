@@ -32,9 +32,7 @@ func (s *GuestOrderAppService) SetEVMManagedEscrowClosureRuntime(cfg EVMManagedE
 	s.evmManagedEscrowMonitorChains = cloneChainSet(cfg.ManagedEscrowMonitorChains)
 	s.evmRelayGasHealthyChains = cloneChainSet(cfg.RelayGasHealthyChains)
 	s.evmRelayGasUnhealthyReason = cloneChainReasons(cfg.RelayGasUnhealthyReason)
-	if cfg.ObservationReady && len(s.evmManagedEscrowMonitorChains) > 0 {
-		s.evmObservationAvailable = true
-	}
+	s.evmObservationAvailable = cfg.ObservationReady && len(s.evmManagedEscrowMonitorChains) > 0
 }
 
 func cloneChainReasons(in map[iwallet.ChainType]string) map[iwallet.ChainType]string {

@@ -508,11 +508,13 @@ func (n *MobazhaNode) wireGuestEVMManagedEscrowSettlement() {
 	if n.db == nil || n.guestOrderService == nil || n.keyProvider == nil || n.multiwallet == nil || !managed_escrow.RelayerIsConfigured(n.managed_escrowRelayer) {
 		return
 	}
+	codeAndNonce := &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet}
 	svc := guest.NewEVMManagedEscrowSettlementService(guest.EVMManagedEscrowSettlementConfig{
 		DB:            n.db,
 		Relayer:       n.managed_escrowRelayer,
 		OwnerSigner:   &paymentManagedEscrowOwnerSigner{keys: n.keyProvider},
-		NonceProvider: &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet},
+		NonceProvider: codeAndNonce,
+		CodeProvider:  codeAndNonce,
 		WalletTestnet: n.walletTestnet,
 	})
 	n.guestOrderService.SetEVMManagedEscrowSettlement(svc)

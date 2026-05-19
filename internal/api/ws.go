@@ -72,6 +72,7 @@ var upgrader = &websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin:     func(r *http.Request) bool { return true },
+	Subprotocols:    []string{"mbz.auth.v1"},
 }
 
 type hub struct {

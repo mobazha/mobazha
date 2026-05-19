@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	evmchain "github.com/mobazha/mobazha3.0/internal/chains/evm"
+	"github.com/mobazha/mobazha3.0/internal/core/guest"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
@@ -260,9 +261,13 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	}
 
 	n.managed_escrowActionStore = store
+	n.managed_escrowRelayer = relayer
 	n.managedEscrowAdapters = shadow
 	n.managed_escrowMonitors = monitors
 	n.rewatchPendingManagedEscrowPayments(monitors)
+	n.rewatchGuestEVMManagedEscrowOrders(monitors)
+	n.wireGuestEVMManagedEscrowObservation(monitors)
+	n.wireGuestEVMManagedEscrowSettlement()
 
 	// Publish grayscale routing decisions as startup metrics. This provides
 	// an audit trail in Grafana for "which chains were live on V2 at node start".
@@ -394,9 +399,18 @@ func (n *MobazhaNode) buildManagedEscrowMonitor(chain iwallet.ChainType) (*manag
 		return nil, fmt.Errorf("chain client %T does not implement managed_escrow.LogSubscriber", client)
 	}
 
+	obsRepo := NewGormPaymentObservationRepo(tenantDB, tenantDB.RawDB())
+	p2pAggregator := corepayment.NewAggregatingVerifier(n.db, n.eventBus)
+	aggregator := corepayment.PaymentAggregator(p2pAggregator)
+	if n.guestOrderService != nil {
+		aggregator = corepayment.NewRoutingPaymentAggregator(
+			corepayment.NewGuestManagedEscrowPaymentAggregator(n.db, n.guestOrderService, obsRepo),
+			p2pAggregator,
+		)
+	}
 	dispatcher := corepayment.NewObservationDispatcher(
-		NewGormPaymentObservationRepo(tenantDB, tenantDB.RawDB()),
-		corepayment.NewAggregatingVerifier(n.db, n.eventBus),
+		obsRepo,
+		aggregator,
 		&managed_escrowOrderTenantResolver{db: n.db},
 		n.nodeID,
 	)
@@ -449,6 +463,23 @@ type managed_escrowOrderTenantResolver struct {
 }
 
 func (r *managed_escrowOrderTenantResolver) ResolveTenant(_ context.Context, orderID string) (string, error) {
+	if strings.HasPrefix(orderID, corepayment.GuestOrderTokenPrefix) {
+		var guest models.GuestOrder
+		err := r.db.View(func(tx database.Tx) error {
+			return tx.Read().Where("order_token = ?", orderID).First(&guest).Error
+		})
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return "", corepayment.ErrUnknownOrder
+			}
+			return "", err
+		}
+		if guest.TenantID == "" {
+			return database.StandaloneTenantID, nil
+		}
+		return guest.TenantID, nil
+	}
+
 	var order models.Order
 	err := r.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID).First(&order).Error
@@ -464,6 +495,66 @@ func (r *managed_escrowOrderTenantResolver) ResolveTenant(_ context.Context, ord
 	}
 	return order.TenantID, nil
 }
+
+func (n *MobazhaNode) wireGuestEVMManagedEscrowObservation(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {
+	if n.guestPaymentMonitor == nil || len(monitors) == 0 {
+		return
+	}
+	n.guestPaymentMonitor.SetEVMManagedEscrowWatch(guest.NewEVMManagedEscrowWatchRegistrarFromLive(monitors, n.walletTestnet))
+}
+
+func (n *MobazhaNode) wireGuestEVMManagedEscrowSettlement() {
+	if n.db == nil || n.guestOrderService == nil || n.keyProvider == nil || n.multiwallet == nil || n.managed_escrowRelayer == nil {
+		return
+	}
+	svc := guest.NewEVMManagedEscrowSettlementService(guest.EVMManagedEscrowSettlementConfig{
+		DB:            n.db,
+		Relayer:       n.managed_escrowRelayer,
+		OwnerSigner:   &paymentManagedEscrowOwnerSigner{keys: n.keyProvider},
+		NonceProvider: &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet},
+		WalletTestnet: n.walletTestnet,
+	})
+	n.guestOrderService.SetEVMManagedEscrowSettlement(svc)
+	go func() {
+		ctx := context.Background()
+		svc.RecoverPendingSettlements(ctx)
+		svc.RecoverConfirmedEntitlements(ctx)
+	}()
+}
+
+func (n *MobazhaNode) rewatchGuestEVMManagedEscrowOrders(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {
+	if n.db == nil || len(monitors) == 0 {
+		return
+	}
+	registrar := guest.NewEVMManagedEscrowWatchRegistrarFromLive(monitors, n.walletTestnet)
+	var orders []models.GuestOrder
+	if err := n.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("state IN ?", []int{
+				int(models.GuestOrderAwaitingPayment),
+				int(models.GuestOrderPaymentDetected),
+			}).
+			Where("evm_managed_escrow_metadata IS NOT NULL AND evm_managed_escrow_metadata <> ''").
+			Find(&orders).Error
+	}); err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "Guest EVM ManagedEscrow: failed to load pending watches: %v", err)
+		return
+	}
+	for i := range orders {
+		if !orders[i].HasEVMManagedEscrowFundingTarget() {
+			continue
+		}
+		if time.Now().After(orders[i].ExpiresAt.Add(evmGuestManagedEscrowRewatchGrace)) {
+			continue
+		}
+		if err := registrar.RegisterWatch(context.Background(), &orders[i]); err != nil {
+			logger.LogWarningWithIDf(log, n.nodeID,
+				"Guest EVM ManagedEscrow: failed to restore watch for %s: %v", orders[i].OrderToken, err)
+		}
+	}
+}
+
+const evmGuestManagedEscrowRewatchGrace = 1 * time.Hour
 
 // ── Thin delegates for strategy callbacks ────────────────────────────────
 // These delegate to SettlementService for money-out operations.

@@ -49,14 +49,15 @@ type SolanaReferenceChecker interface {
 // Each order in AWAITING_PAYMENT or PAYMENT_DETECTED state gets a goroutine
 // that periodically checks the payment address balance or reference key.
 type GuestPaymentMonitor struct {
-	db           database.Database
-	guestService contracts.GuestOrderService
-	balanceCheck ChainBalanceChecker
-	solanaCheck  SolanaReferenceChecker
+	db            database.Database
+	guestService  contracts.GuestOrderService
+	balanceCheck  ChainBalanceChecker
+	solanaCheck   SolanaReferenceChecker
 	utxoMonitor   *pkgutxo.Monitor
 	chainOps      pkgutxo.ChainOperations
 	multiwallet   contracts.WalletOperator
 	external_paymentMonitor *pkgexternal_payment.Monitor
+	evmManagedEscrowWatch  EVMManagedEscrowWatcher
 	gracePeriod   time.Duration
 	// confirmationInterval is the tick used by pollConfirmationsLoop.
 	// Defaults to confirmationPollInterval (30s); test-only setter shrinks it
@@ -125,6 +126,19 @@ func (m *GuestPaymentMonitor) SetMultiwallet(mw contracts.WalletOperator) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.multiwallet = mw
+}
+
+// EVMManagedEscrowWatcher registers guest EVM ManagedEscrow addresses with the chain ManagedEscrow monitor.
+type EVMManagedEscrowWatcher interface {
+	RegisterWatch(ctx context.Context, order *models.GuestOrder) error
+	StopWatch(orderToken string)
+}
+
+// SetEVMManagedEscrowWatch wires the ManagedEscrow live monitor bridge (Phase 3B).
+func (m *GuestPaymentMonitor) SetEVMManagedEscrowWatch(w EVMManagedEscrowWatcher) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.evmManagedEscrowWatch = w
 }
 
 // SetExternalPaymentMonitor injects the per-account ExternalPayment monitor that fans out
@@ -224,7 +238,29 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 	}
 
 	switch {
-	case coinInfo.IsEthTypeChain() || coinInfo.Chain == iwallet.ChainTRON:
+	case coinInfo.IsEthTypeChain():
+		if order.HasEVMManagedEscrowFundingTarget() {
+			if m.evmManagedEscrowWatch == nil {
+				log.Warningf("no EVM ManagedEscrow watch registrar for order %s — will retry on RestoreWatches", redact.Token(order.OrderToken))
+				return
+			}
+			token := order.OrderToken
+			if err := m.evmManagedEscrowWatch.RegisterWatch(context.Background(), order); err != nil {
+				log.Warningf("register EVM ManagedEscrow watch for %s: %v", redact.Token(token), err)
+				return
+			}
+			m.watches[token] = func() { m.evmManagedEscrowWatch.StopWatch(token) }
+			return
+		}
+		if m.balanceCheck != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			m.watches[order.OrderToken] = cancel
+			go m.pollEVMLoop(ctx, order)
+		} else {
+			log.Warningf("no EVM balance checker for coin %q (order %s) — will retry on RestoreWatches", coinType, redact.Token(order.OrderToken))
+		}
+
+	case coinInfo.Chain == iwallet.ChainTRON:
 		if m.balanceCheck != nil {
 			ctx, cancel := context.WithCancel(context.Background())
 			m.watches[order.OrderToken] = cancel
@@ -386,8 +422,8 @@ func (m *GuestPaymentMonitor) watchUTXOOrder(ctx context.Context, order *models.
 			switch status {
 			case pkgutxo.PaymentStatusNormal, pkgutxo.PaymentStatusOverpay:
 				if status == pkgutxo.PaymentStatusOverpay {
-				log.Warningf("overpayment for guest order %s: paid=%d expected=%d tx=%s",
-					redact.Token(order.OrderToken), paid, expectedAmount, txHash)
+					log.Warningf("overpayment for guest order %s: paid=%d expected=%d tx=%s",
+						redact.Token(order.OrderToken), paid, expectedAmount, txHash)
 				}
 				if err := m.guestService.HandlePaymentDetected(order.OrderToken, txHash, nil); err != nil {
 					log.Warningf("handle UTXO payment detected for %s: %v", redact.Token(order.OrderToken), err)
@@ -711,4 +747,3 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 		m.pollConfirmationsLoop(ctx, order.OrderToken, order.RequiredConfs, fetcher, deadline)
 	}
 }
-

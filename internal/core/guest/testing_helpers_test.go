@@ -71,8 +71,10 @@ func (t *testTx) Delete(key string, value interface{}, where map[string]interfac
 func (t *testTx) Commit() error               { panic("managed tx") }
 func (t *testTx) Rollback() error             { panic("managed tx") }
 func (t *testTx) DeleteAll(interface{}) error { return nil }
-func (t *testTx) Migrate(interface{}) error   { return nil }
-func (t *testTx) RegisterCommitHook(func())   {}
+func (t *testTx) Migrate(model interface{}) error {
+	return t.db.AutoMigrate(model)
+}
+func (t *testTx) RegisterCommitHook(func()) {}
 
 // PublicData stubs — not exercised by guest checkout tests.
 func (t *testTx) GetProfile() (*models.Profile, error)                       { return nil, nil }

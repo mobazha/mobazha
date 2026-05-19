@@ -346,6 +346,20 @@ func readyEVMChains(t *testing.T) []iwallet.ChainType {
 	return out
 }
 
+// shadowRegisteredEVMChains returns Ready EVM chains whose ManagedEscrowAdapter shadow
+// registration succeeds for n — mirrors runtimeManagedEscrowChainID fail-closed behavior
+// (testnet mock wallets only expose explicit public testnet chain ids).
+func shadowRegisteredEVMChains(t *testing.T, n *MobazhaNode) []iwallet.ChainType {
+	t.Helper()
+	out := make([]iwallet.ChainType, 0, len(evmChains))
+	for _, chain := range readyEVMChains(t) {
+		if n.runtimeManagedEscrowChainID(chain) != 0 {
+			out = append(out, chain)
+		}
+	}
+	return out
+}
+
 func readyManagedEscrowCapConfig(t *testing.T) *managed_escrow.ChainCapabilityConfig {
 	t.Helper()
 	chains := readyEVMChains(t)
@@ -363,9 +377,9 @@ func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
 	if n.managed_escrowActionStore == nil {
 		t.Fatal("registerManagedEscrowAdapterShadow did not populate managed_escrowActionStore")
 	}
-	want := readyEVMChains(t)
+	want := shadowRegisteredEVMChains(t, n)
 	if got := len(n.managedEscrowAdapters); got != len(want) {
-		t.Fatalf("managedEscrowAdapters has %d entries, want %d (one per Ready=true EVM chain — zkSync Era is intentionally Ready=false)", got, len(want))
+		t.Fatalf("managedEscrowAdapters has %d entries, want %d (runtime-supported Ready EVM chains — zkSync Era is Ready=false; testnet mocks only register explicit testnet mappings)", got, len(want))
 	}
 	for _, chain := range want {
 		adapter, ok := n.managedEscrowAdapters[chain]
@@ -445,7 +459,7 @@ func TestManagedEscrowAdapterShadow_RegistersManagedEscrowMonitorsWhenMonitorDep
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
 
-	want := readyEVMChains(t)
+	want := shadowRegisteredEVMChains(t, n)
 	if got := len(n.managed_escrowMonitors); got != len(want) {
 		t.Fatalf("managed_escrowMonitors has %d entries, want %d", got, len(want))
 	}
@@ -527,7 +541,7 @@ func TestManagedEscrowAdapterShadow_GetActionStatusReportsActionNotFound(t *test
 	// Loop every Ready=true EVM chain so a per-chain wiring regression
 	// cannot slip past on a chain we did not name explicitly. zkSync
 	// Era is intentionally skipped — see TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains.
-	for _, chain := range readyEVMChains(t) {
+	for _, chain := range shadowRegisteredEVMChains(t, n) {
 		t.Run(string(chain), func(t *testing.T) {
 			adapter, ok := n.managedEscrowAdapters[chain]
 			if !ok {

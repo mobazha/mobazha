@@ -28,9 +28,11 @@ const (
 	defaultGuestOrderExpiry   = 24 * time.Hour
 	defaultBuyerPortalTTL     = 90 * 24 * time.Hour
 	defaultAutoCompletePeriod = 14 * 24 * time.Hour
-	guestOrderTokenPrefix     = "gst_"
-	buyerPortalTokenPrefix    = "bpt_"
-	guestOrderTokenBytes      = 30
+	// OrderTokenPrefix is the guest order token prefix (gst_ + hex).
+	OrderTokenPrefix       = "gst_"
+	guestOrderTokenPrefix  = OrderTokenPrefix
+	buyerPortalTokenPrefix = "bpt_"
+	guestOrderTokenBytes   = 30
 )
 
 // PaymentWatcher is implemented by GuestPaymentMonitor.
@@ -87,8 +89,20 @@ type GuestOrderAppService struct {
 	solanaMonitorAvailable bool
 	utxoMonitor            UTXOMonitorReadiness
 	multiwallet            contracts.WalletOperator
+	evmManagedEscrowSettlement      *EVMManagedEscrowSettlementService
 	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
 	external_paymentAvailable func() bool
+}
+
+// SetEVMManagedEscrowSettlement wires Phase 3C ManagedEscrow relay settlement (after registerManagedEscrowAdapterShadow).
+func (s *GuestOrderAppService) SetEVMManagedEscrowSettlement(svc *EVMManagedEscrowSettlementService) {
+	if s == nil {
+		return
+	}
+	s.evmManagedEscrowSettlement = svc
+	if svc != nil {
+		svc.SetOnConfirmed(s.OnEVMManagedEscrowSettlementConfirmed)
+	}
 }
 
 // NewGuestOrderAppService constructs the service.
@@ -190,15 +204,6 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	expiresAt := time.Now().Add(expiry)
 	buyerPortalExpiresAt := expiresAt.Add(defaultBuyerPortalTTL)
 
-	payResult, err := s.directPayment.GeneratePaymentAddress(ctx, PaymentAddressRequest{
-		CoinType:   coinType,
-		OrderToken: orderToken,
-		ExpiresAt:  expiresAt,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("generate payment address: %w", err)
-	}
-
 	var items []models.GuestOrderItem
 	var subtotalSmallest = new(big.Int)
 	var priceCurrencyCode string
@@ -288,6 +293,16 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	paymentAmount, err := s.convertToPaymentCoin(totalSmallest, priceCurrencyCode, coinType)
 	if err != nil {
 		return nil, fmt.Errorf("convert to payment coin: %w", err)
+	}
+
+	payResult, err := s.directPayment.GeneratePaymentAddress(ctx, PaymentAddressRequest{
+		CoinType:   coinType,
+		Amount:     paymentAmount,
+		OrderToken: orderToken,
+		ExpiresAt:  expiresAt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generate payment address: %w", err)
 	}
 
 	order := models.GuestOrder{
@@ -525,7 +540,7 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 				log.Warningf("confirm reservation for %s: %v", redact.Token(orderToken), err)
 			}
 
-			if order.SweepToAddress != "" && s.sweepService != nil {
+			if shouldCreateGuestSweepTask(&order) && s.sweepService != nil {
 				if err := s.sweepService.CreateSweepTask(tx, &order); err != nil {
 					log.Warningf("create sweep task for %s (non-blocking): %v", redact.Token(orderToken), err)
 				}
@@ -535,9 +550,18 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 		return tx.Save(&order)
 	})
 	if err == nil && becameFunded {
-		s.emitGuestOrderFunded(orderToken)
+		s.afterGuestOrderFunded(orderToken)
 	}
 	return err
+}
+
+// shouldCreateGuestSweepTask returns false for EVM ManagedEscrow funding targets (Phase 3B–C:
+// settlement uses ManagedEscrow relay, not HD EOA sweep).
+func shouldCreateGuestSweepTask(order *models.GuestOrder) bool {
+	if order == nil || order.HasEVMManagedEscrowFundingTarget() {
+		return false
+	}
+	return order.SweepToAddress != ""
 }
 
 // HandlePoolPayment records a mempool-only payment observation.
@@ -620,7 +644,7 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 				log.Warningf("confirm reservation for %s: %v", redact.Token(orderToken), err)
 			}
 
-			if order.SweepToAddress != "" && s.sweepService != nil {
+			if shouldCreateGuestSweepTask(&order) && s.sweepService != nil {
 				if err := s.sweepService.CreateSweepTask(tx, &order); err != nil {
 					log.Warningf("create sweep task for %s (non-blocking): %v", redact.Token(orderToken), err)
 				}
@@ -629,9 +653,81 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 		return tx.Save(&order)
 	})
 	if err == nil && becameFunded {
-		s.emitGuestOrderFunded(orderToken)
+		s.afterGuestOrderFunded(orderToken)
 	}
 	return err
+}
+
+// afterGuestOrderFunded triggers EVM ManagedEscrow relay settlement or emits entitlement immediately.
+func (s *GuestOrderAppService) afterGuestOrderFunded(orderToken string) {
+	if s == nil {
+		return
+	}
+	requires, err := s.orderRequiresEVMManagedEscrowSettlementBeforeEntitlement(orderToken)
+	if err != nil {
+		log.Errorf("guest managed EVM settlement check for %s: %v; withholding entitlement",
+			redact.Token(orderToken), err)
+		return
+	}
+	if requires {
+		if s.evmManagedEscrowSettlement == nil {
+			log.Errorf("guest managed EVM settlement required for %s but service not configured; withholding entitlement",
+				redact.Token(orderToken))
+			return
+		}
+		go func(token string) {
+			if err := s.evmManagedEscrowSettlement.SubmitReleaseForOrder(context.Background(), token); err != nil {
+				log.Warningf("guest managed EVM settlement for %s: %v", redact.Token(token), err)
+			}
+		}(orderToken)
+		return
+	}
+	s.emitGuestOrderFunded(orderToken)
+}
+
+func (s *GuestOrderAppService) orderRequiresEVMManagedEscrowSettlementBeforeEntitlement(orderToken string) (bool, error) {
+	if s == nil || !guestEVMManagedEscrowSettlementActive {
+		return false, nil
+	}
+	if s.db == nil {
+		return false, fmt.Errorf("database not configured")
+	}
+	var order models.GuestOrder
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_token = ?", orderToken).Select("evm_managed_escrow_metadata").First(&order).Error
+	}); err != nil {
+		return false, fmt.Errorf("load order: %w", err)
+	}
+	return order.HasEVMManagedEscrowFundingTarget(), nil
+}
+
+// RecoverEVMManagedEscrowPendingSettlements retries relay release for FUNDED guest ManagedEscrow orders.
+// Called at startup and from the shared managed_escrow-relay-confirmations scheduler tick.
+func (s *GuestOrderAppService) RecoverEVMManagedEscrowPendingSettlements(ctx context.Context) {
+	if s == nil || s.evmManagedEscrowSettlement == nil {
+		return
+	}
+	s.evmManagedEscrowSettlement.RecoverPendingSettlements(ctx)
+}
+
+// OnEVMManagedEscrowSettlementConfirmed emits buyer entitlement after relay settlement confirms.
+func (s *GuestOrderAppService) OnEVMManagedEscrowSettlementConfirmed(orderToken string) {
+	if s == nil {
+		return
+	}
+	var order models.GuestOrder
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_token = ?", orderToken).First(&order).Error
+	}); err != nil {
+		log.Warningf("guest managed EVM settlement confirmed for missing order %s: %v", redact.Token(orderToken), err)
+		return
+	}
+	if order.State != models.GuestOrderFunded &&
+		order.State != models.GuestOrderShipped &&
+		order.State != models.GuestOrderCompleted {
+		return
+	}
+	s.emitGuestOrderFunded(orderToken)
 }
 
 // emitGuestOrderFunded fires events.OrderConfirmation when a guest order

@@ -58,7 +58,7 @@ type GuestOrderAppServiceConfig struct {
 	ExchangeRates          wallet.ExchangeRateQuerier
 	Resolver               pkgconfig.ResolverInterface
 	SupportedUTXOChains    []iwallet.ChainType
-	EVMMonitorAvailable    bool
+	EVMObservationAvailable bool
 	SolanaMonitorAvailable bool
 	// ExternalPaymentAvailable is a closure that reports whether EXTERNAL_PAYMENT guest checkout
 	// can serve a request *right now*. It typically combines two signals:
@@ -85,11 +85,19 @@ type GuestOrderAppService struct {
 	resolver               pkgconfig.ResolverInterface
 	utxoMu                 sync.RWMutex
 	supportedUTXOChains    map[iwallet.ChainType]struct{}
-	evmMonitorAvailable    bool
+	evmObservationAvailable bool
+	evmRelayGasHealthyChains   map[iwallet.ChainType]struct{}
+	evmRelayGasUnhealthyReason map[iwallet.ChainType]string
 	solanaMonitorAvailable bool
 	utxoMonitor            UTXOMonitorReadiness
 	multiwallet            contracts.WalletOperator
 	evmManagedEscrowSettlement      *EVMManagedEscrowSettlementService
+	evmRuntimeMu           sync.RWMutex
+	evmManagedEscrowFundingReady    bool
+	evmManagedEscrowObservationReady bool
+	evmManagedEscrowSettlementReady bool
+	evmManagedEscrowRelayReady      bool
+	evmManagedEscrowMonitorChains   map[iwallet.ChainType]struct{}
 	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
 	external_paymentAvailable func() bool
 }
@@ -118,7 +126,7 @@ func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppServi
 		exchangeRates:          cfg.ExchangeRates,
 		resolver:               cfg.Resolver,
 		supportedUTXOChains:    toChainSet(cfg.SupportedUTXOChains),
-		evmMonitorAvailable:    cfg.EVMMonitorAvailable,
+		evmObservationAvailable: cfg.EVMObservationAvailable,
 		solanaMonitorAvailable: cfg.SolanaMonitorAvailable,
 		external_paymentAvailable:        cfg.ExternalPaymentAvailable,
 	}
@@ -138,10 +146,10 @@ func (s *GuestOrderAppService) SetPaymentWatcher(w PaymentWatcher) {
 	s.watcher = w
 }
 
-// SetEVMMonitorAvailable enables or disables EVM-family guest checkout after
-// the node lifecycle has wired a concrete balance checker.
-func (s *GuestOrderAppService) SetEVMMonitorAvailable(available bool) {
-	s.evmMonitorAvailable = available
+// SetEVMObservationAvailable enables EVM guest ManagedEscrow observation after registerManagedEscrowAdapterShadow.
+// Legacy balance polling must not set this; use SetEVMManagedEscrowClosureRuntime instead.
+func (s *GuestOrderAppService) SetEVMObservationAvailable(available bool) {
+	s.evmObservationAvailable = available
 }
 
 // EnableUTXOChain dynamically marks a UTXO chain as available for guest
@@ -1312,8 +1320,8 @@ func (s *GuestOrderAppService) validateCoinAvailability(coinType iwallet.CoinTyp
 		}
 		return nil
 	case coinInfo.IsEthTypeChain():
-		if !s.evmMonitorAvailable {
-			return fmt.Errorf("%w: EVM/TRON balance monitor not configured (coin %q)",
+		if !s.evmObservationAvailable {
+			return fmt.Errorf("%w: EVM ManagedEscrow observation is not configured (coin %q)",
 				contracts.ErrCoinUnavailable, coinType)
 		}
 		return nil

@@ -268,6 +268,7 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	n.rewatchGuestEVMManagedEscrowOrders(monitors)
 	n.wireGuestEVMManagedEscrowObservation(monitors)
 	n.wireGuestEVMManagedEscrowSettlement()
+	n.configureGuestEVMManagedEscrowClosureRuntime(monitors)
 
 	// Publish grayscale routing decisions as startup metrics. This provides
 	// an audit trail in Grafana for "which chains were live on V2 at node start".
@@ -504,7 +505,7 @@ func (n *MobazhaNode) wireGuestEVMManagedEscrowObservation(monitors map[iwallet.
 }
 
 func (n *MobazhaNode) wireGuestEVMManagedEscrowSettlement() {
-	if n.db == nil || n.guestOrderService == nil || n.keyProvider == nil || n.multiwallet == nil || n.managed_escrowRelayer == nil {
+	if n.db == nil || n.guestOrderService == nil || n.keyProvider == nil || n.multiwallet == nil || !managed_escrow.RelayerIsConfigured(n.managed_escrowRelayer) {
 		return
 	}
 	svc := guest.NewEVMManagedEscrowSettlementService(guest.EVMManagedEscrowSettlementConfig{
@@ -520,6 +521,62 @@ func (n *MobazhaNode) wireGuestEVMManagedEscrowSettlement() {
 		svc.RecoverPendingSettlements(ctx)
 		svc.RecoverConfirmedEntitlements(ctx)
 	}()
+}
+
+func (n *MobazhaNode) configureGuestEVMManagedEscrowClosureRuntime(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {
+	if n.guestOrderService == nil {
+		return
+	}
+	chainSet := make(map[iwallet.ChainType]struct{}, len(monitors))
+	for chain := range monitors {
+		chainSet[chain] = struct{}{}
+	}
+	fundingReady := n.directPaymentService != nil && n.directPaymentService.HasEVMManagedEscrowFunding()
+	obsReady := len(monitors) > 0
+	relayReady := managed_escrow.RelayerIsConfigured(n.managed_escrowRelayer)
+	settleReady := relayReady && n.keyProvider != nil && n.multiwallet != nil && n.guestOrderService.HasEVMManagedEscrowSettlement()
+	relayGasHealthy, relayGasUnhealthy := n.probeGuestRelayGasHealthyChains(monitors)
+
+	n.guestOrderService.SetEVMManagedEscrowClosureRuntime(guest.EVMManagedEscrowClosureRuntime{
+		FundingReady:            fundingReady,
+		ObservationReady:        obsReady,
+		SettlementReady:         settleReady,
+		RelayReady:              relayReady,
+		ManagedEscrowMonitorChains:       chainSet,
+		RelayGasHealthyChains:   relayGasHealthy,
+		RelayGasUnhealthyReason: relayGasUnhealthy,
+	})
+}
+
+func (n *MobazhaNode) probeGuestRelayGasHealthyChains(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) (healthy map[iwallet.ChainType]struct{}, unhealthyReason map[iwallet.ChainType]string) {
+	if !managed_escrow.RelayerIsConfigured(n.managed_escrowRelayer) || len(monitors) == 0 {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	healthy = make(map[iwallet.ChainType]struct{}, len(monitors))
+	unhealthyReason = make(map[iwallet.ChainType]string, len(monitors))
+	for chain := range monitors {
+		status, err := n.managed_escrowRelayer.GasWalletStatus(ctx, n.runtimeManagedEscrowChainID(chain))
+		if err != nil {
+			unhealthyReason[chain] = err.Error()
+			logger.LogWarningWithIDf(log, n.nodeID,
+				"Guest EVM closure: relay gas wallet status for %s: %v", chain, err)
+			continue
+		}
+		if status.Healthy {
+			healthy[chain] = struct{}{}
+			continue
+		}
+		reason := status.Reason
+		if reason == "" {
+			reason = "relay gas wallet unhealthy"
+		}
+		unhealthyReason[chain] = reason
+		logger.LogWarningWithIDf(log, n.nodeID,
+			"Guest EVM closure: relay gas wallet unhealthy on %s: %s", chain, reason)
+	}
+	return healthy, unhealthyReason
 }
 
 func (n *MobazhaNode) rewatchGuestEVMManagedEscrowOrders(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {

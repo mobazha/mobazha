@@ -76,6 +76,11 @@ func (s *DirectPaymentService) SetEVMManagedEscrowFunding(adapter *EVMManagedEsc
 	s.evmManagedEscrowFunding = adapter
 }
 
+// HasEVMManagedEscrowFunding reports whether the ManagedEscrow funding path is wired.
+func (s *DirectPaymentService) HasEVMManagedEscrowFunding() bool {
+	return s != nil && s.evmManagedEscrowFunding != nil
+}
+
 // SetExternalPaymentSource injects the ExternalPayment wallet-rpc source for subaddress generation.
 // Pass the same Source the Monitor was built against to keep address generation
 // and payment detection bound to one wallet account.

@@ -129,6 +129,22 @@ type GuestUTXOChainReadiness struct {
 	Reason                 string `json:"reason,omitempty"`
 }
 
+// GuestEVMChainReadiness is per-chain guest EVM ManagedEscrow closure status for operators.
+type GuestEVMChainReadiness struct {
+	Chain                  string `json:"chain"`
+	Coin                   string `json:"coin"`
+	FundingReady           bool   `json:"fundingReady"`
+	ObservationReady       bool   `json:"observationReady"`
+	SettlementReady        bool   `json:"settlementReady"`
+	RelayReady             bool   `json:"relayReady"`
+	RelayGasHealthy        bool   `json:"relayGasHealthy"`
+	RelayGasReason         string `json:"relayGasReason,omitempty"`
+	ManagedEscrowMonitorActive      bool   `json:"managed_escrowMonitorActive"`
+	ReceivingAccountActive bool   `json:"receivingAccountActive"`
+	BuyerVisible           bool   `json:"buyerVisible"`
+	Reason                 string `json:"reason,omitempty"`
+}
+
 // GuestCheckoutReadiness summarizes guest checkout runtime health.
 type GuestCheckoutReadiness struct {
 	GuestCheckoutEnabled bool                      `json:"guestCheckoutEnabled"`
@@ -137,6 +153,7 @@ type GuestCheckoutReadiness struct {
 	SweepTasksSubmitted  int                       `json:"sweepTasksSubmitted"`
 	SweepTasksFailed     int                       `json:"sweepTasksFailed"`
 	Chains               []GuestUTXOChainReadiness `json:"chains"`
+	EVMChains            []GuestEVMChainReadiness  `json:"evmChains,omitempty"`
 }
 
 // --- UnifiedOrderView types ---

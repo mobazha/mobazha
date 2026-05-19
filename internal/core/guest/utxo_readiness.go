@@ -119,6 +119,7 @@ func (s *GuestOrderAppService) GetGuestCheckoutReadiness(ctx context.Context) (*
 		entry.Reason = cap.Reason
 		out.Chains = append(out.Chains, entry)
 	}
+	s.appendEVMReadiness(out)
 	return out, nil
 }
 

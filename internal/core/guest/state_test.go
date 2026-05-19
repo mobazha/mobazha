@@ -254,13 +254,13 @@ func TestHandlePaymentDetected_EXTERNAL_PAYMENT_DirectConfirmed(t *testing.T) {
 func TestValidateCoinAvailability(t *testing.T) {
 	private_distributionSvc := &GuestOrderAppService{
 		supportedUTXOChains:    toChainSet(nil),
-		evmMonitorAvailable:    false,
+		evmObservationAvailable: false,
 		solanaMonitorAvailable: false,
 	}
 
 	fullBuildSvc := &GuestOrderAppService{
 		supportedUTXOChains:    toChainSet([]iwallet.ChainType{iwallet.ChainBitcoin, iwallet.ChainLitecoin, iwallet.ChainBitcoinCash, iwallet.ChainZCash}),
-		evmMonitorAvailable:    true,
+		evmObservationAvailable: true,
 		solanaMonitorAvailable: true,
 	}
 
@@ -291,7 +291,7 @@ func TestValidateCoinAvailability(t *testing.T) {
 	t.Run("PrivateDistribution rejects ETH", func(t *testing.T) {
 		err := private_distributionSvc.validateCoinAvailability(ethCoin, ethInfo)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "EVM/TRON balance monitor not configured")
+		assert.Contains(t, err.Error(), "EVM ManagedEscrow observation is not configured")
 	})
 
 	t.Run("PrivateDistribution rejects SOL", func(t *testing.T) {

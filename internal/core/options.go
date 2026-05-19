@@ -951,11 +951,9 @@ func (n *MobazhaNode) initGuestOrderService() {
 	// settlement paths are implemented.
 	supportedUTXO := n.detectGuestUTXOChains()
 
-	// EVM/Solana guest checkout is disabled until concrete
-	// ChainBalanceChecker / SolanaReferenceChecker adapters are
-	// implemented and wired via SetCheckers in the lifecycle.
-	// Without working checkers, payments would be accepted but
-	// never detected — risking buyer fund loss.
+	// EVM guest checkout uses ManagedEscrow observation (Phase 3B), not balance polling.
+	// Buyer visibility is gated at runtime by SetEVMManagedEscrowClosureRuntime after
+	// registerManagedEscrowAdapterShadow wires monitors, relay, and funding.
 	guestEvmAvailable := false
 	guestSolanaAvailable := false
 
@@ -970,7 +968,7 @@ func (n *MobazhaNode) initGuestOrderService() {
 		ExchangeRates:          n.exchangeRates,
 		Resolver:               n.featureResolver,
 		SupportedUTXOChains:    supportedUTXO,
-		EVMMonitorAvailable:    guestEvmAvailable,
+		EVMObservationAvailable: guestEvmAvailable,
 		SolanaMonitorAvailable: guestSolanaAvailable,
 	})
 	if n.multiwallet != nil {

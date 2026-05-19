@@ -15,5 +15,5 @@ const (
 )
 
 // chosenEVMSettlementStrategy records the architecture decision for Phase 3 work.
-// guestEVMSettlementEnabled must remain false until the chosen strategy is implemented.
+// chosenEVMSettlementStrategy is implemented via Phase 3A–3C; buyer visibility is gated at runtime (Phase 3D).
 const chosenEVMSettlementStrategy = EVMSettlementManagedEscrowSession

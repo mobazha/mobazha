@@ -108,32 +108,84 @@ func TestFilterAvailableCoins_HidesLTCWhenMonitorUnhealthy(t *testing.T) {
 	}
 }
 
-func TestEvaluateGuestPaymentCapability_EVMHiddenUntilSettlement(t *testing.T) {
-	svc := &GuestOrderAppService{evmMonitorAvailable: true}
+func newEVMClosureTestService(t *testing.T, runtime EVMManagedEscrowClosureRuntime) *GuestOrderAppService {
+	t.Helper()
+	db := newGuestTestDB(t)
+	require.NoError(t, db.gormDB.AutoMigrate(&models.ReceivingAccount{}))
+	require.NoError(t, db.gormDB.Create(&models.ReceivingAccount{
+		TenantMixin: models.TenantMixin{TenantID: testTenantID},
+		ID:          1,
+		ChainType:   iwallet.ChainEthereum,
+		IsActive:    true,
+		Address:     "0x1111111111111111111111111111111111111111",
+	}).Error)
+	dp := NewDirectPaymentService(db, nil)
+	dp.SetEVMManagedEscrowFunding(&EVMManagedEscrowFundingAdapter{})
+	svc := &GuestOrderAppService{
+		db:                  db,
+		directPayment:       dp,
+		evmObservationAvailable: true,
+	}
+	svc.SetEVMManagedEscrowClosureRuntime(runtime)
+	return svc
+}
+
+func TestEvaluateGuestPaymentCapability_EVMHiddenWithoutClosureRuntime(t *testing.T) {
+	svc := newEVMClosureTestService(t, EVMManagedEscrowClosureRuntime{})
 	eth := iwallet.CoinType("crypto:eip155:1:native")
 	info, _ := iwallet.CoinInfoFromCoinType(eth)
 
 	cap := svc.evaluateGuestPaymentCapability(eth, info)
 	if cap.BuyerVisible {
-		t.Fatal("EVM must stay hidden until settlement is implemented")
+		t.Fatal("EVM must stay hidden until ManagedEscrow closure runtime is ready")
+	}
+	if !errors.Is(cap.Err, contracts.ErrCoinUnavailable) {
+		t.Fatalf("cap.Err = %v, want ErrCoinUnavailable", cap.Err)
 	}
 }
 
-func TestValidateBuyerVisibleCoin_ETHSettlementMessage(t *testing.T) {
-	svc := &GuestOrderAppService{evmMonitorAvailable: true}
+func TestEvaluateGuestPaymentCapability_EVMVisibleWhenClosureReady(t *testing.T) {
+	svc := newEVMClosureReadyTestService(t)
+	eth := iwallet.CoinType("crypto:eip155:1:native")
+	info, _ := iwallet.CoinInfoFromCoinType(eth)
+
+	cap := svc.evaluateGuestPaymentCapability(eth, info)
+	require.True(t, cap.BuyerVisible, "reason=%q err=%v", cap.Reason, cap.Err)
+	require.True(t, cap.CanSettleFunds)
+}
+
+func TestValidateBuyerVisibleCoin_ETHRequiresClosureRuntime(t *testing.T) {
+	svc := newEVMClosureTestService(t, EVMManagedEscrowClosureRuntime{})
 	eth := iwallet.CoinType("crypto:eip155:1:native")
 	info, _ := iwallet.CoinInfoFromCoinType(eth)
 
 	err := svc.validateBuyerVisibleCoin(eth, info, "ETH")
-	if err == nil {
-		t.Fatal("expected error for non-settlement-ready ETH")
-	}
-	if !errors.Is(err, contracts.ErrInvalidGuestRequest) {
-		t.Fatalf("errors.Is ErrInvalidGuestRequest = false: %v", err)
-	}
-	if got := err.Error(); got != `invalid guest order request: guest checkout for ETH is not settlement-ready` {
-		t.Fatalf("message = %q", got)
-	}
+	require.Error(t, err)
+	require.True(t, errors.Is(err, contracts.ErrCoinUnavailable) || errors.Is(err, contracts.ErrInvalidGuestRequest))
+}
+
+func newEVMClosureReadyTestService(t *testing.T) *GuestOrderAppService {
+	t.Helper()
+	svc := newEVMClosureTestService(t, EVMManagedEscrowClosureRuntime{
+		FundingReady:     true,
+		ObservationReady: true,
+		SettlementReady:  true,
+		RelayReady:       true,
+		ManagedEscrowMonitorChains: map[iwallet.ChainType]struct{}{
+			iwallet.ChainEthereum: {},
+		},
+		RelayGasHealthyChains: map[iwallet.ChainType]struct{}{
+			iwallet.ChainEthereum: {},
+		},
+	})
+	svc.SetEVMManagedEscrowSettlement(&EVMManagedEscrowSettlementService{})
+	return svc
+}
+
+func TestFilterAvailableCoins_IncludesETHWhenClosureReady(t *testing.T) {
+	svc := newEVMClosureReadyTestService(t)
+	got := svc.filterAvailableCoins("ETH,LTC")
+	require.Equal(t, "ETH", got)
 }
 
 func TestGetGuestCheckoutReadiness_ReportsChainHealth(t *testing.T) {
@@ -150,4 +202,27 @@ func TestGetGuestCheckoutReadiness_ReportsChainHealth(t *testing.T) {
 	require.True(t, report.Chains[0].ReceivingAccountActive)
 	require.True(t, report.Chains[0].BuyerVisible)
 	require.Equal(t, 4, report.WatchedAddressCount)
+}
+
+func TestGetGuestCheckoutReadiness_ReportsEVMClosure(t *testing.T) {
+	svc := newEVMClosureReadyTestService(t)
+
+	report, err := svc.GetGuestCheckoutReadiness(context.Background())
+	require.NoError(t, err)
+	require.NotEmpty(t, report.EVMChains)
+	found := false
+	for _, ch := range report.EVMChains {
+		if ch.Chain == string(iwallet.ChainEthereum) {
+			found = true
+			require.True(t, ch.FundingReady)
+			require.True(t, ch.ObservationReady)
+			require.True(t, ch.SettlementReady)
+			require.True(t, ch.RelayReady)
+			require.True(t, ch.RelayGasHealthy)
+			require.True(t, ch.ManagedEscrowMonitorActive)
+			require.True(t, ch.ReceivingAccountActive)
+			require.True(t, ch.BuyerVisible)
+		}
+	}
+	require.True(t, found, "expected ETH chain readiness entry")
 }

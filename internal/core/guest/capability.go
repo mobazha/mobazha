@@ -24,9 +24,8 @@ type GuestPaymentCapability struct {
 	Err                error
 }
 
-// guestEVMSettlementEnabled gates buyer-visible EVM guest checkout until Phase 3
-// implements chosenEVMSettlementStrategy (ManagedEscrow/PaymentSession — see evm_settlement_strategy.go).
-const guestEVMSettlementEnabled = false
+// guestEVMSettlementEnabled enables buyer-visible EVM when evaluateEVMClosureReadiness passes.
+const guestEVMSettlementEnabled = true
 
 // isSweepableUTXOChain reports whether guest auto-sweep can sign for the chain's
 // default address type (P2WPKH / BIP-143). Mirrors internal/core.isSweepableP2WPKHChain.
@@ -55,20 +54,20 @@ func (s *GuestOrderAppService) evaluateGuestPaymentCapability(coinType iwallet.C
 		return cap
 
 	case coinInfo.IsEthTypeChain():
-		if err := s.validateCoinAvailability(coinType, coinInfo); err != nil {
+		cap.CanAllocateAddress = true
+		cap.CanDetectPayment = true
+		cap.CanConfirmPayment = true
+		if !guestEVMSettlementEnabled {
+			cap.Reason = "EVM guest checkout settlement is disabled"
+			return cap
+		}
+		if err := s.evaluateEVMClosureReadiness(coinType, coinInfo); err != nil {
 			cap.Err = err
 			cap.Reason = err.Error()
 			return cap
 		}
-		cap.CanAllocateAddress = true
-		cap.CanDetectPayment = true
-		cap.CanConfirmPayment = true
-		if guestEVMSettlementEnabled {
-			cap.CanSettleFunds = true
-			cap.BuyerVisible = true
-			return cap
-		}
-		cap.Reason = "EVM guest checkout settlement is not implemented"
+		cap.CanSettleFunds = true
+		cap.BuyerVisible = true
 		return cap
 
 	case coinInfo.Chain == iwallet.ChainTRON:

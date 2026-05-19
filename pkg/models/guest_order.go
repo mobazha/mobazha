@@ -87,7 +87,7 @@ type GuestOrder struct {
 	AddressIndex   uint32 `json:"-"`
 	// EVMManagedEscrowMetadata holds JSON (models.GuestEVMManagedEscrowMetadata) for per-order
 	// predicted ManagedEscrow funding targets. Empty for UTXO/EXTERNAL_PAYMENT/Solana and legacy HD EVM.
-	EVMManagedEscrowMetadata []byte `gorm:"column:evm_managed_escrow_metadata;type:blob" json:"-"`
+	EVMManagedEscrowMetadata []byte `gorm:"column:evm_managed_escrow_metadata" json:"-"`
 	ExternalPaymentTxHeight  uint64 `json:"-"`
 
 	// Pool-stage tracking (currently only populated by ExternalPayment, where

@@ -82,7 +82,11 @@ func (s *OrderAppService) DeclineOrderViaRelay(orderID models.OrderID, reason st
 		return s.DeclineOrder(orderID, "", reason, done)
 	}
 
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(paymentSent.Coin))
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return err
+	}
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
 	if err != nil {
 		return err
 	}
@@ -95,7 +99,7 @@ func (s *OrderAppService) DeclineOrderViaRelay(orderID models.OrderID, reason st
 	if err != nil {
 		return fmt.Errorf("failed to get refund instructions for decline: %w", err)
 	}
-	return s.relayOrDirect(orderID, "decline", iwallet.CoinType(paymentSent.Coin), instructions,
+	return s.relayOrDirect(orderID, "decline", coinType, instructions,
 		func() error { return s.DeclineOrder(orderID, "", reason, done) },
 		func(txid iwallet.TransactionID) error { return s.DeclineOrder(orderID, txid, reason, done) },
 	)
@@ -116,7 +120,11 @@ func (s *OrderAppService) CancelOrderViaRelay(orderID models.OrderID, done chan 
 		return err
 	}
 
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(paymentSent.Coin))
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return err
+	}
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
 	if err != nil {
 		return err
 	}
@@ -129,7 +137,7 @@ func (s *OrderAppService) CancelOrderViaRelay(orderID models.OrderID, done chan 
 	if err != nil {
 		return fmt.Errorf("failed to get cancel instructions: %w", err)
 	}
-	return s.relayOrDirect(orderID, "cancel", iwallet.CoinType(paymentSent.Coin), instructions,
+	return s.relayOrDirect(orderID, "cancel", coinType, instructions,
 		func() error { return s.CancelOrder(orderID, "", done) },
 		func(txid iwallet.TransactionID) error { return s.CancelOrder(orderID, txid, done) },
 	)

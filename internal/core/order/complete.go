@@ -51,7 +51,7 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 		return "", nil, fmt.Errorf("failed to get payment sent message: %w", err)
 	}
 
-	coinType, err = canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err = payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return "", nil, err
 	}
@@ -77,7 +77,7 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
 	result, err := strategy.GetCompleteInstructions(context.Background(), payment.InstructionParams{
@@ -130,7 +130,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 	if err != nil {
 		return fmt.Errorf("payment sent message: %w", err)
 	}
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return fmt.Errorf("canonical payment coin: %w", err)
 	}
@@ -289,7 +289,7 @@ func (s *OrderAppService) RateOrder(orderID models.OrderID, ratings []models.Rat
 	if err != nil {
 		return fmt.Errorf("payment sent message: %w", err)
 	}
-	if _, err := canonicalPaymentCoinFromPaymentSent(paymentSent); err != nil {
+	if _, err := payment.SettlementCoinFromPaymentSent(paymentSent); err != nil {
 		return fmt.Errorf("canonical payment coin: %w", err)
 	}
 
@@ -456,7 +456,7 @@ func (s *OrderAppService) releaseCompleteEscrowFunds(order *models.Order, wallet
 		return nil, nil, fmt.Errorf("failed to get payment sent message: %w", err)
 	}
 
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -503,7 +503,7 @@ func (s *OrderAppService) releaseCompleteEscrowFunds(order *models.Order, wallet
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return nil, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return nil, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
 	buyerSigs, err := strategy.SignEscrowRelease(context.Background(), payment.SignEscrowParams{

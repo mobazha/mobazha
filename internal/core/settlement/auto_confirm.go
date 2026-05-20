@@ -9,6 +9,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -79,8 +80,13 @@ func (s *SettlementService) autoConfirmEVMCancelablePayment(order *models.Order,
 		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get PaymentSent for order %s: %v", order.ID, err)
 		return
 	}
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "Failed to resolve payment coin for order %s: %v", order.ID, err)
+		return
+	}
 
-	payoutAddress, err := s.GetPayoutAddress(paymentSent.Coin)
+	payoutAddress, err := s.GetPayoutAddress(string(coinType))
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get payout address for order %s: %v", order.ID, err)
 		return
@@ -111,7 +117,7 @@ func (s *SettlementService) autoConfirmEVMCancelablePayment(order *models.Order,
 			logger.LogErrorWithIDf(log, s.nodeID, "Invalid transaction data type for EVM chain order %s", order.ID)
 			return
 		}
-		txHash, err = s.RelayEVMTransactionWithRetry(context.Background(), order.ID.String(), chainType, paymentSent.Coin, txData)
+		txHash, err = s.RelayEVMTransactionWithRetry(context.Background(), order.ID.String(), chainType, string(coinType), txData)
 		if err != nil {
 			logger.LogErrorWithIDf(log, s.nodeID, "Failed to relay EVM transaction for order %s: %v", order.ID, err)
 			return
@@ -178,8 +184,13 @@ func (s *SettlementService) autoConfirmSolanaCancelablePayment(order *models.Ord
 		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get PaymentSent for order %s: %v", order.ID, err)
 		return
 	}
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "Failed to resolve payment coin for order %s: %v", order.ID, err)
+		return
+	}
 
-	payoutAddress, err := s.GetPayoutAddress(paymentSent.Coin)
+	payoutAddress, err := s.GetPayoutAddress(string(coinType))
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get payout address for order %s: %v", order.ID, err)
 		return

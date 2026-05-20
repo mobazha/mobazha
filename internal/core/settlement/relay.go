@@ -41,7 +41,7 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 		return "", payoutAddress, nil
 	}
 
-	coinType, err := order.GetPaymentCoinType()
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return "", payoutAddress, err
 	}
@@ -97,27 +97,31 @@ func (s *SettlementService) releaseMonitoredCancelableFunds(order *models.Order,
 		return "", "", errors.New("order payment method is not CANCELABLE")
 	}
 
-	coinType := iwallet.CoinType(paymentSent.Coin)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return "", "", err
+	}
+	coinCode := coinType.String()
 	var toAddress iwallet.Address
 
 	if payoutAddress != "" {
 		toAddress = iwallet.NewAddress(payoutAddress, coinType)
-		wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+		wallet, err := s.multiwallet.WalletForCurrencyCode(coinCode)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to get wallet for %s: %w", paymentSent.Coin, err)
+			return "", "", fmt.Errorf("failed to get wallet for %s: %w", coinCode, err)
 		}
 		if err := wallet.ValidateAddress(toAddress); err != nil {
 			return "", "", fmt.Errorf("invalid payout address %s: %w", payoutAddress, err)
 		}
 	} else {
-		toAddress, err = s.GetPayoutAddress(paymentSent.Coin)
+		toAddress, err = s.GetPayoutAddress(coinCode)
 		if err != nil {
 			return "", "", err
 		}
 	}
 
 	params := contracts.ReleaseFromCancelableParams{
-		CoinCode:       paymentSent.Coin,
+		CoinCode:       coinCode,
 		PaymentAddress: paymentSent.ToAddress,
 		ScriptHex:      paymentSent.Script,
 		ChaincodeHex:   paymentSent.Chaincode,
@@ -162,7 +166,11 @@ func (s *SettlementService) releaseViaRelay(order *models.Order, coinInfo *iwall
 	}
 
 	if payoutAddress == "" {
-		addr, err := s.GetPayoutAddress(paymentSent.Coin)
+		coinType, coinErr := payment.SettlementCoinFromPaymentSent(paymentSent)
+		if coinErr != nil {
+			return "", "", coinErr
+		}
+		addr, err := s.GetPayoutAddress(coinType.String())
 		if err != nil {
 			return "", "", fmt.Errorf("failed to get payout address: %w", err)
 		}
@@ -177,7 +185,11 @@ func (s *SettlementService) releaseViaRelay(order *models.Order, coinInfo *iwall
 		return "", "", errors.New("no instructions returned for client-signed CANCELABLE order")
 	}
 
-	txHashStr, err := s.RelayInstructions(string(order.ID), iwallet.CoinType(paymentSent.Coin), instructions)
+	coinType, coinErr := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if coinErr != nil {
+		return "", "", coinErr
+	}
+	txHashStr, err := s.RelayInstructions(string(order.ID), coinType, instructions)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to relay transaction: %w", err)
 	}
@@ -194,7 +206,11 @@ func (s *SettlementService) releaseSolanaViaRelay(order *models.Order, payoutAdd
 		return "", "", fmt.Errorf("solana relay release: failed to get PaymentSent message for order %s: %w", order.ID, err)
 	}
 	if payoutAddress == "" {
-		addr, err := s.GetPayoutAddress(paymentSent.Coin)
+		coinType, coinErr := payment.SettlementCoinFromPaymentSent(paymentSent)
+		if coinErr != nil {
+			return "", "", coinErr
+		}
+		addr, err := s.GetPayoutAddress(coinType.String())
 		if err != nil {
 			return "", "", fmt.Errorf("failed to get payout address: %w", err)
 		}
@@ -277,14 +293,17 @@ func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, 
 		return "", nil, nil
 	}
 
-	coinType = iwallet.CoinType(paymentSent.Coin)
+	coinType, err = payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return "", nil, err
+	}
 	if !payment.UsesClientSignedPayMode(&order, paymentSent) {
 		logger.LogInfoWithIDf(log, s.nodeID, "%s uses address-monitored settlement flow, no instructions needed", orderID)
 		return coinType, nil, nil
 	}
 
 	if len(payoutAddress) == 0 {
-		toAddress, err := s.GetPayoutAddress(paymentSent.Coin)
+		toAddress, err := s.GetPayoutAddress(coinType.String())
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to get payout address: %w", err)
 		}
@@ -296,14 +315,14 @@ func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, 
 	}
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
 	result, err := strategy.GetConfirmInstructions(context.Background(), payment.InstructionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		PayoutAddr:    payoutAddress,
-		PaymentCoin:   paymentSent.Coin,
+		PaymentCoin:   coinType.String(),
 		PaymentAmount: paymentSent.Amount,
 		Chaincode:     paymentSent.Chaincode,
 		Script:        paymentSent.Script,

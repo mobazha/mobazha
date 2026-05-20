@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -132,6 +133,9 @@ func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 
 	switch o.State {
 	case OrderState_AWAITING_SHIPMENT:
+		if o.hasReleasedCancelableSettlement() {
+			return nil
+		}
 		return &OrderProtectionInfo{
 			Stage:               ProtectionStageEscrowed,
 			DaysRemaining:       0,
@@ -204,6 +208,18 @@ func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 	default:
 		return nil
 	}
+}
+
+func (o *Order) hasReleasedCancelableSettlement() bool {
+	paymentSent, err := o.PaymentSentMessage()
+	if err != nil || paymentSent.GetMethod() != pb.PaymentSent_CANCELABLE {
+		return false
+	}
+	confirmation, err := o.OrderConfirmationMessage()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(confirmation.GetTransactionID()) != ""
 }
 
 // daysUntil returns the number of whole days remaining until deadline.

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func TestDefaultProtectionPolicy_PhysicalGood(t *testing.T) {
@@ -153,6 +154,22 @@ func TestComputeProtection_AwaitingShipment(t *testing.T) {
 	}
 	if info.AfterSaleWindowDays != 7 {
 		t.Errorf("afterSaleWindowDays = %d, want 7", info.AfterSaleWindowDays)
+	}
+}
+
+func TestComputeProtection_AwaitingShipmentCancelableReleased(t *testing.T) {
+	o := &Order{State: OrderState_AWAITING_SHIPMENT}
+	if err := o.SetPaymentSent(&pb.PaymentSent{Method: pb.PaymentSent_CANCELABLE, Coin: "crypto:eip155:1:native"}); err != nil {
+		t.Fatalf("SetPaymentSent: %v", err)
+	}
+	raw, err := protojson.Marshal(&pb.OrderConfirmation{TransactionID: "0xrelease"})
+	if err != nil {
+		t.Fatalf("marshal OrderConfirmation: %v", err)
+	}
+	o.SerializedOrderConfirmation = raw
+
+	if info := o.ComputeProtection(time.Now()); info != nil {
+		t.Fatalf("expected no buyer-protection hold after cancelable settlement release, got %+v", info)
 	}
 }
 
@@ -305,7 +322,7 @@ func TestComputeProtection_Shipped_Extended_WithTimestamp(t *testing.T) {
 	o := &Order{
 		State: OrderState_SHIPPED,
 		OrderLifecycle: OrderLifecycle{
-			ShippedAt:          &shippedAt,
+			ShippedAt:            &shippedAt,
 			ProtectionExtendedAt: &extendedAt,
 		},
 	}
@@ -340,7 +357,7 @@ func TestComputeProtection_Shipped_Extended_WithoutTimestamp(t *testing.T) {
 	o := &Order{
 		State: OrderState_SHIPPED,
 		OrderLifecycle: OrderLifecycle{
-			ShippedAt:          nil,
+			ShippedAt:            nil,
 			ProtectionExtendedAt: &extendedAt,
 		},
 	}

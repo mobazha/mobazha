@@ -96,7 +96,7 @@ func (s *OrderAppService) OpenDispute(orderID models.OrderID, reason string, evi
 	if err != nil {
 		return fmt.Errorf("payment sent message: %w", err)
 	}
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return fmt.Errorf("canonical payment coin: %w", err)
 	}
@@ -386,13 +386,16 @@ func (s *OrderAppService) validateDisputeContract(from peer.ID, contract []byte,
 		return nil, errors.New("order payment method is not type moderated")
 	}
 
-	coinType := iwallet.CoinType(paymentSent.Coin)
+	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
+	if !ok {
+		coinType = iwallet.CoinType(paymentSent.Coin)
+	}
 	if err := coinType.ValidateCanonicalPaymentCoin(); err != nil {
 		validationErrors = append(validationErrors, fmt.Errorf("invalid payment coin: %s", err.Error()))
 		return validationErrors, nil
 	}
 
-	wal, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+	wal, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 	if err != nil {
 		return nil, fmt.Errorf("cannot validate order. coin not supported by moderator. %w", err)
 	}
@@ -428,7 +431,7 @@ func (s *OrderAppService) validateDisputeContract(from peer.ID, contract []byte,
 	// (EVM/Solana escrow contract, UTXO multisig address) and the moderator should
 	// verify against the chain, not the self-reported message amounts.
 	pricingCoin := strings.ToUpper(strings.TrimSpace(orderOpen.PricingCoin))
-	paymentCoin, priceErr := iwallet.CoinType(paymentSent.Coin).PricingCurrencyCode()
+	paymentCoin, priceErr := coinType.PricingCurrencyCode()
 	if priceErr != nil {
 		validationErrors = append(validationErrors, fmt.Errorf("invalid payment coin: %s", priceErr.Error()))
 	} else {
@@ -522,25 +525,28 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	}
 
 	paymentSent := preferredContract.GetPaymentSent()
-	coinType := iwallet.CoinType(paymentSent.Coin)
+	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
+	if !ok {
+		coinType = iwallet.CoinType(paymentSent.Coin)
+	}
 
 	disputeStrategy, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
-		return fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
-	totalFee, err := disputeStrategy.EstimateEscrowFee(paymentSent.Coin, 2, 3, iwallet.FlNormal)
+	totalFee, err := disputeStrategy.EstimateEscrowFee(string(coinType), 2, 3, iwallet.FlNormal)
 	if err != nil {
 		return fmt.Errorf("failed to estimate escrow fee: %w", err)
 	}
 
 	totalOut = totalOut.Sub(totalFee)
 
-	modAddr, err := s.escrow.GetPayoutAddress(paymentSent.Coin)
+	modAddr, err := s.escrow.GetPayoutAddress(string(coinType))
 	if err != nil {
 		return err
 	}
-	modValue, err := s.moderators.GetModeratorFee(totalOut, paymentSent.Coin)
+	modValue, err := s.moderators.GetModeratorFee(totalOut, string(coinType))
 	if err != nil {
 		return fmt.Errorf("failed to get moderator fee: %w", err)
 	}
@@ -588,7 +594,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 
 	if managed_escrowSigs, handled, err := s.signManagedEscrowActionRelease(context.Background(), coinType, "dispute_release", payment.ActionParams{
 		OrderID:       orderID.String(),
-		PaymentCoin:   paymentSent.Coin,
+		PaymentCoin:   string(coinType),
 		PaymentAmount: paymentSent.Amount,
 		Chaincode:     paymentSent.Chaincode,
 		Script:        paymentSent.Script,
@@ -602,7 +608,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	} else {
 		legacyStrategy, err := s.paymentRegistry.ForCoin(coinType)
 		if err != nil {
-			return fmt.Errorf("no legacy chain escrow for coin %s: %w", paymentSent.Coin, err)
+			return fmt.Errorf("no legacy chain escrow for coin %s: %w", coinType, err)
 		}
 
 		script, err := hex.DecodeString(paymentSent.Script)
@@ -619,7 +625,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 			Transaction: txn,
 			Script:      script,
 			ChainCode:   chainCode,
-			CoinCode:    paymentSent.Coin,
+			CoinCode:    string(coinType),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to sign escrow release: %w", err)
@@ -705,7 +711,7 @@ func (s *OrderAppService) getOrderAndPaymentInfo(orderID models.OrderID) (*model
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to get payment sent message: %w", err)
 	}
-	if _, err := canonicalPaymentCoinFromPaymentSent(paymentSent); err != nil {
+	if _, err := payment.SettlementCoinFromPaymentSent(paymentSent); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -719,6 +725,10 @@ func (s *OrderAppService) getOrderAndPaymentInfo(orderID models.OrderID) (*model
 
 func (s *OrderAppService) BuildDisputeReleaseTransaction(releaseInfo *pb.DisputeClose_ModeratedEscrowRelease, paymentSent *pb.PaymentSent) (iwallet.Transaction, error) {
 	var txn iwallet.Transaction
+	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
+	if !ok {
+		coinType = iwallet.CoinType(normalizeCurrencyCode(paymentSent.Coin))
+	}
 
 	for _, output := range releaseInfo.Outpoints {
 		txn.From = append(txn.From, iwallet.SpendInfo{ID: output.FromID, Amount: iwallet.NewAmount(output.Value)})
@@ -726,21 +736,21 @@ func (s *OrderAppService) BuildDisputeReleaseTransaction(releaseInfo *pb.Dispute
 
 	if iwallet.NewAmount(releaseInfo.BuyerAmount).Cmp(iwallet.NewAmount(0)) > 0 {
 		txn.To = append(txn.To, iwallet.SpendInfo{
-			Address: iwallet.NewAddress(releaseInfo.BuyerAddress, iwallet.CoinType(normalizeCurrencyCode(paymentSent.Coin))),
+			Address: iwallet.NewAddress(releaseInfo.BuyerAddress, coinType),
 			Amount:  iwallet.NewAmount(releaseInfo.BuyerAmount),
 		})
 	}
 
 	if iwallet.NewAmount(releaseInfo.VendorAmount).Cmp(iwallet.NewAmount(0)) > 0 {
 		txn.To = append(txn.To, iwallet.SpendInfo{
-			Address: iwallet.NewAddress(releaseInfo.VendorAddress, iwallet.CoinType(normalizeCurrencyCode(paymentSent.Coin))),
+			Address: iwallet.NewAddress(releaseInfo.VendorAddress, coinType),
 			Amount:  iwallet.NewAmount(releaseInfo.VendorAmount),
 		})
 	}
 
 	if iwallet.NewAmount(releaseInfo.ModeratorAmount).Cmp(iwallet.NewAmount(0)) > 0 {
 		txn.To = append(txn.To, iwallet.SpendInfo{
-			Address: iwallet.NewAddress(releaseInfo.ModeratorAddress, iwallet.CoinType(normalizeCurrencyCode(paymentSent.Coin))),
+			Address: iwallet.NewAddress(releaseInfo.ModeratorAddress, coinType),
 			Amount:  iwallet.NewAmount(releaseInfo.ModeratorAmount),
 		})
 	}
@@ -759,9 +769,13 @@ func (s *OrderAppService) signAndSendReleaseTransaction(txn *iwallet.Transaction
 		return fmt.Errorf("failed to decode payment chaincode: %w", err)
 	}
 
-	wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
+	if !ok {
+		coinType = iwallet.CoinType(paymentSent.Coin)
+	}
+	wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 	if err != nil {
-		return fmt.Errorf("cannot validate order. coin not supported by moderator:%s, %w", paymentSent.Coin, err)
+		return fmt.Errorf("cannot validate order. coin not supported by moderator:%s, %w", coinType, err)
 	}
 
 	escrowMasterKey, err := s.keyProvider.EscrowMasterKey()
@@ -825,10 +839,14 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 		return fmt.Errorf("build dispute release tx: %w", err)
 	}
 
-	releaseStrategy, stratErr := s.v2StrategyForCoin(iwallet.CoinType(paymentSent.Coin))
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return err
+	}
+	releaseStrategy, stratErr := s.v2StrategyForCoin(coinType)
 	isMonitored := stratErr == nil && releaseStrategy.Model() == payment.PaymentModelMonitored
 	isClientSigned := stratErr == nil && releaseStrategy.Model() == payment.PaymentModelClientSigned
-	if txidManagedEscrow, txManagedEscrow, handled, err := s.submitManagedEscrowDisputeReleaseAction(context.Background(), order, iwallet.CoinType(paymentSent.Coin), paymentSent, disputeClose.ReleaseInfo); handled {
+	if txidManagedEscrow, txManagedEscrow, handled, err := s.submitManagedEscrowDisputeReleaseAction(context.Background(), order, coinType, paymentSent, disputeClose.ReleaseInfo); handled {
 		if err != nil {
 			return err
 		}
@@ -844,7 +862,7 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 	}
 	if isClientSigned && txid != "" {
 		if s.receiptVerifier != nil {
-			if err := s.receiptVerifier.VerifyTransactionReceipt(context.Background(), paymentSent.Coin, txid.String()); err != nil {
+			if err := s.receiptVerifier.VerifyTransactionReceipt(context.Background(), string(coinType), txid.String()); err != nil {
 				return fmt.Errorf("dispute release transaction verification failed for order %s: %w", orderID, err)
 			}
 		}
@@ -939,19 +957,19 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 	if err != nil {
 		return fmt.Errorf("payment sent message: %w", err)
 	}
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return fmt.Errorf("canonical payment coin: %w", err)
 	}
 
 	wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 	if err != nil {
-		return fmt.Errorf("cannot validate order. coin not supported by moderator:%s, %w", paymentSent.Coin, err)
+		return fmt.Errorf("cannot validate order. coin not supported by moderator:%s, %w", coinType, err)
 	}
 
 	escrowTimeoutWallet, walletSupportsEscrowTimeout := wallet.(iwallet.UTXOEscrowWithTimeout)
 	if !walletSupportsEscrowTimeout {
-		return fmt.Errorf("wallet cannot support escrow timeout, coin: %s", paymentSent.Coin)
+		return fmt.Errorf("wallet cannot support escrow timeout, coin: %s", coinType)
 	}
 
 	script, err := hex.DecodeString(paymentSent.Script)
@@ -1003,7 +1021,7 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 
 	totalOut = totalOut.Sub(totalFee)
 
-	payoutAddress, err := s.escrow.GetPayoutAddress(paymentSent.Coin)
+	payoutAddress, err := s.escrow.GetPayoutAddress(string(coinType))
 	if err != nil {
 		return err
 	}
@@ -1111,14 +1129,14 @@ func (s *OrderAppService) GetReleaseFundsInstructions(orderID models.OrderID, in
 		return "", nil, err
 	}
 
-	coinType, err = canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err = payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return "", nil, err
 	}
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
 	result, err := strategy.GetDisputeReleaseInstructions(context.Background(), payment.InstructionParams{

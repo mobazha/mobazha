@@ -106,10 +106,14 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 		}
 
 		if txid != "" && paymentSent != nil && payment.MethodIsCancelable(payment.ResolvedPaymentMethod(&order, paymentSent)) {
-			coinInfo, coinErr := iwallet.CoinType(paymentSent.Coin).CoinInfo()
+			coinType, coinErr := payment.SettlementCoinFromPaymentSent(paymentSent)
+			var coinInfo iwallet.CoinInfo
+			if coinErr == nil {
+				coinInfo, coinErr = coinType.CoinInfo()
+			}
 			if coinErr != nil {
 				logger.LogInfoWithIDf(log, s.nodeID, "Unknown coin %s for order %s, skipping outgoing tx record", paymentSent.Coin, orderID)
-			} else if outTx, fetchErr := s.fetchOutgoingTx(paymentSent.Coin, txid.String(), order.PaymentAddress, &coinInfo); fetchErr == nil && outTx != nil {
+			} else if outTx, fetchErr := s.fetchOutgoingTx(string(coinType), txid.String(), order.PaymentAddress, &coinInfo); fetchErr == nil && outTx != nil {
 				var freshOrder models.Order
 				if loadErr := tx.Read().Where("id = ?", orderID.String()).First(&freshOrder).Error; loadErr == nil {
 					if recordErr := s.orderProcessor.RecordOutgoingTransaction(tx, &freshOrder, *outTx); recordErr != nil {
@@ -257,31 +261,35 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 	}
 
 	if payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
-		wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+		coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+		if err != nil {
+			return err
+		}
+		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 		if err != nil {
 			return fmt.Errorf("failed to get wallet: %w", err)
 		}
 
-		paymentAddr := iwallet.NewAddress(shipments[0].ReceivingAccountAddress, iwallet.CoinType(paymentSent.Coin))
+		paymentAddr := iwallet.NewAddress(shipments[0].ReceivingAccountAddress, coinType)
 		if len(shipments[0].ReceivingAccountAddress) == 0 {
-			paymentAddr = iwallet.NewAddress(orderConfirmation.PayoutAddress, iwallet.CoinType(paymentSent.Coin))
+			paymentAddr = iwallet.NewAddress(orderConfirmation.PayoutAddress, coinType)
 		}
 
 		nOuts := 1
 		if iwallet.NewAmount(paymentSent.PlatformAmount).Cmp(iwallet.NewAmount(0)) > 0 {
 			nOuts = 2
 		}
-		feeStrat, stratErr := s.paymentRegistry.ForCoin(iwallet.CoinType(paymentSent.Coin))
+		feeStrat, stratErr := s.paymentRegistry.ForCoin(coinType)
 		fee := iwallet.NewAmount(0)
 		if stratErr == nil {
-			fee, err = feeStrat.EstimateEscrowFee(paymentSent.Coin, 2, nOuts, iwallet.FlNormal)
+			fee, err = feeStrat.EstimateEscrowFee(string(coinType), 2, nOuts, iwallet.FlNormal)
 			if err != nil {
 				return err
 			}
 		}
 
 		release, err := s.buildEscrowRelease(&order, wallet, paymentAddr, fee,
-			iwallet.NewAddress(paymentSent.PlatformAddr, iwallet.CoinType(paymentSent.Coin)),
+			iwallet.NewAddress(paymentSent.PlatformAddr, coinType),
 			iwallet.NewAmount(paymentSent.PlatformAmount))
 		if err != nil {
 			return err

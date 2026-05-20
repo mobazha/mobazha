@@ -52,7 +52,7 @@ func (s *SettlementService) ExecuteSettlementAction(
 		return nil, "", fmt.Errorf("%w: fiat orders use provider-specific refund APIs", coreiface.ErrBadRequest)
 	}
 
-	coinType, err := order.GetPaymentCoinType()
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, "", err
 	}
@@ -68,7 +68,7 @@ func (s *SettlementService) ExecuteSettlementAction(
 
 	params := payment.ActionParams{
 		OrderID:       orderID.String(),
-		PaymentCoin:   paymentSent.Coin,
+		PaymentCoin:   coinType.String(),
 		PaymentAmount: paymentSent.Amount,
 		Chaincode:     paymentSent.Chaincode,
 		Script:        paymentSent.Script,
@@ -87,7 +87,7 @@ func (s *SettlementService) ExecuteSettlementAction(
 		}
 		out := payoutAddr
 		if out == "" {
-			toAddress, gerr := s.GetPayoutAddress(paymentSent.Coin)
+			toAddress, gerr := s.GetPayoutAddress(coinType.String())
 			if gerr != nil {
 				return nil, coinType, fmt.Errorf("failed to get payout address: %w", gerr)
 			}
@@ -169,7 +169,7 @@ func (s *SettlementService) GetSettlementActionStatus(
 		return nil, "", fmt.Errorf("%w: fiat orders use provider-specific refund APIs", coreiface.ErrBadRequest)
 	}
 
-	coinType, err := order.GetPaymentCoinType()
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, "", err
 	}

@@ -166,7 +166,7 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 		return nil, nil
 	}
 
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, fmt.Errorf("payment validation failed for order %s: %w", orderMsg.OrderID, err)
 	}
@@ -231,20 +231,20 @@ func (s *OrderAppService) preProcessOrderConfirmation(_ context.Context, orderMs
 		return nil, nil
 	}
 
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, fmt.Errorf("invalid payment coin for order %s: %w", orderMsg.OrderID, err)
 	}
 
 	if s.receiptVerifier != nil && s.shouldVerifyReceipt(coinType) {
-		if verifyErr := s.receiptVerifier.VerifyTransactionReceipt(context.Background(), paymentSent.Coin, orderConf.TransactionID); verifyErr != nil {
+		if verifyErr := s.receiptVerifier.VerifyTransactionReceipt(context.Background(), string(coinType), orderConf.TransactionID); verifyErr != nil {
 			return nil, fmt.Errorf("receipt verification failed for order %s tx %s: %w",
 				orderMsg.OrderID, orderConf.TransactionID, verifyErr)
 		}
 	}
 
 	coinInfo, _ := coinType.CoinInfo()
-	tx, err := s.fetchOutgoingTx(paymentSent.Coin, orderConf.TransactionID, order.PaymentAddress, &coinInfo)
+	tx, err := s.fetchOutgoingTx(string(coinType), orderConf.TransactionID, order.PaymentAddress, &coinInfo)
 	if err != nil || tx == nil {
 		return nil, nil
 	}
@@ -280,13 +280,13 @@ func (s *OrderAppService) preProcessOrderCancel(_ context.Context, orderMsg *npb
 		return nil, nil
 	}
 
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, fmt.Errorf("invalid payment coin for order %s: %w", orderMsg.OrderID, err)
 	}
 
 	coinInfo, _ := coinType.CoinInfo()
-	tx, err := s.fetchOutgoingTx(paymentSent.Coin, orderCancel.TransactionID, order.PaymentAddress, &coinInfo)
+	tx, err := s.fetchOutgoingTx(string(coinType), orderCancel.TransactionID, order.PaymentAddress, &coinInfo)
 	if err != nil || tx == nil {
 		return nil, nil
 	}
@@ -318,7 +318,7 @@ func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *
 	}
 	method := payment.ResolvedPaymentMethod(&order, paymentSent)
 
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, fmt.Errorf("invalid payment coin for order %s: %w", order.ID, err)
 	}
@@ -376,14 +376,14 @@ func (s *OrderAppService) preProcessRefund(_ context.Context, orderMsg *npb.Orde
 		return nil, nil
 	}
 
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, fmt.Errorf("invalid payment coin for order %s: %w", orderMsg.OrderID, err)
 	}
 
 	if refund.GetTransactionID() != "" && payment.IsNonEscrowDirectPayment(&order, paymentSent) {
 		coinInfo, _ := coinType.CoinInfo()
-		tx, err := s.fetchOutgoingTx(paymentSent.Coin, refund.GetTransactionID(), order.PaymentAddress, &coinInfo)
+		tx, err := s.fetchOutgoingTx(string(coinType), refund.GetTransactionID(), order.PaymentAddress, &coinInfo)
 		if err != nil || tx == nil {
 			return nil, nil
 		}
@@ -391,7 +391,7 @@ func (s *OrderAppService) preProcessRefund(_ context.Context, orderMsg *npb.Orde
 	}
 
 	if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
-		wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 		if err != nil {
 			return nil, nil
 		}

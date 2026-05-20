@@ -101,6 +101,7 @@ func (g *Gateway) handlePOSTOrderSettlementAction(w http.ResponseWriter, r *http
 		Mode         string `json:"mode"`
 		ActionID     string `json:"actionId,omitempty"`
 		EscrowAddr   string `json:"escrowAddr,omitempty"`
+		TxHash       string `json:"txHash,omitempty"`
 		PaymentChain string `json:"paymentChain,omitempty"`
 		PaymentCoin  string `json:"paymentCoin,omitempty"`
 	}{
@@ -112,6 +113,7 @@ func (g *Gateway) handlePOSTOrderSettlementAction(w http.ResponseWriter, r *http
 		resp.Mode = string(result.Mode)
 		resp.ActionID = result.ActionID
 		resp.EscrowAddr = result.EscrowAddr
+		resp.TxHash = result.SubmittedTxHash
 	}
 
 	responsePkg.Success(w, resp)

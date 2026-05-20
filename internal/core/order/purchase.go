@@ -25,6 +25,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	paymentpkg "github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -572,10 +573,14 @@ func BuildPaymentSentProto(order *models.Order, pd *models.PaymentData) (*pb.Pay
 	if err != nil {
 		return nil, fmt.Errorf("get chaincode: %w", err)
 	}
+	coin, ok := paymentpkg.NormalizeSettlementPaymentCoin(string(pd.Coin))
+	if !ok {
+		return nil, fmt.Errorf("invalid payment coin %q: must be canonical crypto asset or provider-scoped fiat coin", pd.Coin)
+	}
 
 	return &pb.PaymentSent{
 		TransactionID:      pd.TransactionID,
-		Coin:               string(pd.Coin),
+		Coin:               string(coin),
 		Method:             pd.Method,
 		ContractAddress:    pd.ContractAddress,
 		PayerAddress:       pd.PayerAddress,

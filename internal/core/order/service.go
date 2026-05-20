@@ -387,7 +387,10 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 			return err
 		}
 
-		coinType := iwallet.CoinType(paymentSent.Coin)
+		coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+		if err != nil {
+			return err
+		}
 		method := payment.ResolvedPaymentMethod(&order, paymentSent)
 		if payment.MethodIsFiat(method) || (!payment.MethodIsCancelable(method) && coinType.IsFiatPayment()) {
 			fiatRefundResult, err = s.refundFiatPayment(context.Background(), &order, paymentSent, "requested_by_customer")
@@ -450,7 +453,11 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 		}
 
 		if funded && paymentSent != nil && !payment.MethodIsCancelable(payment.ResolvedPaymentMethod(&order, paymentSent)) {
-			wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+			coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+			if err != nil {
+				return err
+			}
+			wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 			if err != nil {
 				return err
 			}
@@ -535,7 +542,10 @@ func (s *OrderAppService) RefundOrder(orderID models.OrderID, txid iwallet.Trans
 		return err
 	}
 
-	coinType := iwallet.CoinType(paymentSent.Coin)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return err
+	}
 	method := payment.ResolvedPaymentMethod(&order, paymentSent)
 	if payment.IsFiatPaymentRoute(method, coinType) {
 		return s.refundFiatOrder(context.Background(), &order, paymentSent, done)
@@ -666,7 +676,11 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 	}
 
 	return s.db.Update(func(tx database.Tx) error {
-		wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+		coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+		if err != nil {
+			return err
+		}
+		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 		if err != nil {
 			return err
 		}
@@ -726,7 +740,7 @@ func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, ini
 		return "", nil, err
 	}
 
-	coinType, err = canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err = payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return "", nil, err
 	}
@@ -794,7 +808,7 @@ func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, i
 		return "", nil, err
 	}
 
-	coinType, err = canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err = payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return "", nil, err
 	}
@@ -804,14 +818,14 @@ func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, i
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
 	result, err := strategy.GetCancelInstructions(context.Background(), payment.InstructionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		PayoutAddr:    toAddress,
-		PaymentCoin:   paymentSent.Coin,
+		PaymentCoin:   string(coinType),
 		PaymentAmount: paymentSent.Amount,
 		Chaincode:     paymentSent.Chaincode,
 		Script:        paymentSent.Script,
@@ -877,8 +891,12 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 		return nil, err
 	}
 
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return nil, err
+	}
 	var (
-		refundAddress   = iwallet.NewAddress(paymentSent.RefundAddress, iwallet.CoinType(paymentSent.Coin))
+		refundAddress   = iwallet.NewAddress(paymentSent.RefundAddress, coinType)
 		prevRefundTotal = iwallet.NewAmount(0)
 		refundResp      = &npb.OrderMessage{
 			OrderID:     order.ID.String(),
@@ -886,14 +904,9 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 		}
 	)
 
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
-	if err != nil {
-		return nil, err
-	}
-
 	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
-		return nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 	if strategy.Capabilities().HasClientSignedEscrow {
 		refund := &pb.Refund{
@@ -969,7 +982,7 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 				}
 
 				params := ReleaseFromCancelableParams{
-					CoinCode:       paymentSent.Coin,
+					CoinCode:       string(coinType),
 					PaymentAddress: paymentSent.ToAddress,
 					ScriptHex:      paymentSent.Script,
 					ChaincodeHex:   paymentSent.Chaincode,
@@ -1031,14 +1044,14 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 			if err != nil {
 				return nil, err
 			}
-			escrowReleaseFee, err := strategy.EstimateEscrowFee(paymentSent.Coin, 2, 1, iwallet.FlPriority)
+			escrowReleaseFee, err := strategy.EstimateEscrowFee(string(coinType), 2, 1, iwallet.FlPriority)
 			if err != nil {
 				escrowReleaseFee = iwallet.NewAmount(paymentSent.EscrowReleaseFee)
 			}
 			escrowReleaseFee = escrowReleaseFee.Mul(iwallet.NewAmount(150)).Div(iwallet.NewAmount(100))
 
 			release, err := s.buildEscrowRelease(order, wallet,
-				iwallet.NewAddress(paymentSent.PayerAddress, iwallet.CoinType(paymentSent.Coin)),
+				iwallet.NewAddress(paymentSent.PayerAddress, coinType),
 				escrowReleaseFee,
 				iwallet.Address{}, iwallet.Amount{})
 			if err != nil {
@@ -1107,7 +1120,7 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 		return err
 	}
 
-	coinType, err := canonicalPaymentCoinFromPaymentSent(paymentSent)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return err
 	}
@@ -1224,16 +1237,19 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 
 	var toAddress iwallet.Address
 	finishType := iwallet.ORDER_FINISH_CANCEL
-	coinType := iwallet.CoinType(paymentSent.Coin)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return nil, err
+	}
 
 	if order.Role() == models.RoleVendor {
 		finishType = iwallet.ORDER_FINISH_COMPLETE
 
 		if len(optionalPayoutAddress) > 0 && optionalPayoutAddress[0] != "" {
 			toAddress = iwallet.NewAddress(optionalPayoutAddress[0], coinType)
-			wallet, err := s.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+			wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 			if err != nil {
-				return nil, fmt.Errorf("failed to get wallet for %s: %w", paymentSent.Coin, err)
+				return nil, fmt.Errorf("failed to get wallet for %s: %w", coinType, err)
 			}
 			if err := wallet.ValidateAddress(toAddress); err != nil {
 				return nil, fmt.Errorf("invalid payout address %s: %w", optionalPayoutAddress[0], err)
@@ -1242,7 +1258,7 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 			if s.escrow == nil {
 				return nil, fmt.Errorf("GetPayoutAddress callback not configured")
 			}
-			toAddress, err = s.escrow.GetPayoutAddress(paymentSent.Coin)
+			toAddress, err = s.escrow.GetPayoutAddress(string(coinType))
 			if err != nil {
 				return nil, err
 			}
@@ -1256,7 +1272,7 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 			if s.escrow == nil {
 				return nil, fmt.Errorf("GetPayoutAddress callback not configured")
 			}
-			toAddress, err = s.escrow.GetPayoutAddress(paymentSent.Coin)
+			toAddress, err = s.escrow.GetPayoutAddress(string(coinType))
 			if err != nil {
 				return nil, fmt.Errorf("no refund address available and failed to get payout address: %w", err)
 			}
@@ -1268,7 +1284,7 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 	}
 
 	params := ReleaseFromCancelableParams{
-		CoinCode:       paymentSent.Coin,
+		CoinCode:       string(coinType),
 		PaymentAddress: paymentSent.ToAddress,
 		ScriptHex:      paymentSent.Script,
 		ChaincodeHex:   paymentSent.Chaincode,
@@ -1304,10 +1320,13 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		totalOut = iwallet.NewAmount(0)
 	)
 
-	coinType := iwallet.CoinType(paymentSent.Coin)
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return nil, err
+	}
 	strategyV2, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
-		return nil, fmt.Errorf("no chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
 	if strategyV2.Model() == payment.PaymentModelClientSigned {
@@ -1365,7 +1384,7 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 
 	if managed_escrowSigs, handled, err := s.signManagedEscrowActionRelease(context.Background(), coinType, "complete", payment.ActionParams{
 		OrderID:       order.ID.String(),
-		PaymentCoin:   paymentSent.Coin,
+		PaymentCoin:   string(coinType),
 		PaymentAmount: paymentSent.Amount,
 		Chaincode:     paymentSent.Chaincode,
 		Script:        paymentSent.Script,
@@ -1381,7 +1400,7 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)
 	if err != nil {
-		return nil, fmt.Errorf("no legacy chain escrow for coin %s: %w", paymentSent.Coin, err)
+		return nil, fmt.Errorf("no legacy chain escrow for coin %s: %w", coinType, err)
 	}
 
 	script, err := hex.DecodeString(paymentSent.Script)
@@ -1398,7 +1417,7 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		Transaction: txn,
 		Script:      script,
 		ChainCode:   chainCode,
-		CoinCode:    paymentSent.Coin,
+		CoinCode:    string(coinType),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign escrow release: %w", err)

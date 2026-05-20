@@ -4,6 +4,7 @@ package payment
 
 import (
 	"context"
+	"math/big"
 	"strings"
 	"testing"
 	"time"
@@ -133,6 +134,8 @@ func (t *vTestTx) SetIntroVideo(models.IntroVideo) error                      { 
 type recordingBus struct {
 	emitted []interface{}
 }
+
+const testUSDCAsset = "crypto:eip155:1:erc20:0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
 func (b *recordingBus) Subscribe(_ interface{}, _ ...events.SubscriptionOpt) (events.Subscription, error) {
 	return nil, nil
@@ -335,7 +338,7 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 			return err
 		}
 		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
-			Coin:    "USDC",
+			Coin:    testUSDCAsset,
 			Amount:  1000,
 			Address: "0xmanagedescrow",
 			SettlementSpec: &models.PendingSettlementSpec{
@@ -394,7 +397,7 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 	ps, err := got.PaymentSentMessage()
 	require.NoError(t, err)
 	require.Equal(t, "1000", ps.Amount)
-	require.Equal(t, "USDC", ps.Coin)
+	require.Equal(t, testUSDCAsset, ps.Coin)
 	require.Equal(t, "0xrefund", ps.RefundAddress)
 	// The latest observation is obs-2 (later block time), so its tx
 	// hash and payer address represent the envelope.
@@ -524,6 +527,54 @@ func TestAggregateAndEmit_PendingManagedEscrowAmountOverridesOrderOpenAmount(t *
 	require.NoError(t, err)
 	require.Equal(t, "1000", ps.Amount)
 	require.Equal(t, "crypto:eip155:1:native", ps.Coin)
+}
+
+func TestBuildAggregatedPaymentSent_DerivesNativeCoinFromObservationWhenPricingIsFiat(t *testing.T) {
+	order := &models.Order{ID: models.OrderID("order-observed-native")}
+	orderOpen := &pb.OrderOpen{
+		PricingCoin: "USD",
+		Amount:      "1500",
+	}
+	rows := []models.PaymentObservation{{
+		ID:             "obs-native",
+		OrderID:        "order-observed-native",
+		ChainNamespace: "eip155",
+		ChainReference: "11155111",
+		TxHash:         "0xtx-native",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "1000",
+	}}
+
+	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+
+	require.NoError(t, err)
+	require.Equal(t, "crypto:eip155:1:native", ps.Coin)
+}
+
+func TestBuildAggregatedPaymentSent_DoesNotUsePricingCoinAsSettlementCoin(t *testing.T) {
+	order := &models.Order{ID: models.OrderID("order-no-pricing-fallback")}
+	orderOpen := &pb.OrderOpen{
+		PricingCoin: "USD",
+		Amount:      "1500",
+	}
+	rows := []models.PaymentObservation{{
+		ID:             "obs-unknown-chain",
+		OrderID:        "order-no-pricing-fallback",
+		ChainNamespace: "unknown",
+		ChainReference: "unknown",
+		TxHash:         "0xtx-unknown",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "1000",
+	}}
+
+	_, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot determine PaymentSent.Coin")
 }
 
 func TestAggregateAndEmit_PendingUTXOCoinOverridesOrderOpenPricingCoin(t *testing.T) {

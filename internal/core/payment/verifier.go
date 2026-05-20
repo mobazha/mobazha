@@ -405,10 +405,10 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 //     amount). This is the value that crosses the verification
 //     threshold; the seller's order processor uses it as the canonical
 //     received amount.
-//   - Coin: pulled from the order's pending payment intent. OrderOpen.PricingCoin
-//     is the pricing asset for marketplace value, while address-monitored
-//     crypto flows lock the actual settlement asset in PendingPaymentInfo.
-//     Legacy rows without pending intent fall back to OrderOpen.PricingCoin.
+//   - Coin: pulled from the order's pending payment intent. If legacy rows lack
+//     that intent, native chain observations can recover the settlement coin.
+//     The order pricing currency is intentionally never used because display
+//     currency and settlement asset are different domains.
 //   - Method and escrow fields: derived from the order's pending payment
 //     intent. Observations are chain facts; they must not decide whether
 //     an order is DIRECT, CANCELABLE, or MODERATED.
@@ -452,7 +452,10 @@ func buildAggregatedPaymentSent(
 	}
 
 	chaincode := orderOpen.GetChaincode()
-	coin := pendingPaymentCoin(order, orderOpen)
+	coin, err := aggregatedPaymentCoin(order, rep)
+	if err != nil {
+		return nil, err
+	}
 
 	// Use buyer-declared refund address when available. When absent, infer
 	// only from a single unambiguous observed sender; otherwise leave empty
@@ -487,6 +490,16 @@ func buildAggregatedPaymentSent(
 		Timestamp:           timestamppb.New(now),
 	}
 	return ps, nil
+}
+
+func aggregatedPaymentCoin(order *models.Order, rep models.PaymentObservation) (string, error) {
+	if coin, ok := paymentmetrics.PendingPaymentCoinFromOrder(order); ok {
+		return string(coin), nil
+	}
+	if coin, ok := paymentmetrics.PaymentCoinFromObservation(rep); ok {
+		return string(coin), nil
+	}
+	return "", fmt.Errorf("cannot determine PaymentSent.Coin from payment intent or chain observation")
 }
 
 func latestChainTxObservation(rows []models.PaymentObservation) (models.PaymentObservation, bool) {

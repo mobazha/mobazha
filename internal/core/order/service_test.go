@@ -98,7 +98,7 @@ func TestOrderAppService_GetEscrowReleaseInstructions_ManagedEscrowReturnsNil(t 
 
 	coinType, instructions, err := svc.GetEscrowReleaseInstructions(order.ID, "", paymentSent.PayerAddress)
 	require.NoError(t, err)
-	assert.Equal(t, iwallet.CoinType(paymentSent.Coin), coinType)
+	assert.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coinType)
 	assert.Nil(t, instructions)
 }
 
@@ -131,7 +131,7 @@ func TestOrderAppService_GetCompleteOrderInstructions_ManagedEscrowReturnsNil(t 
 
 	coinType, instructions, err := svc.GetCompleteOrderInstructions(order.ID, "")
 	require.NoError(t, err)
-	assert.Equal(t, iwallet.CoinType(paymentSent.Coin), coinType)
+	assert.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coinType)
 	assert.Nil(t, instructions)
 }
 

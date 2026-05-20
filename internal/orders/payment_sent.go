@@ -83,7 +83,8 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}
 
 	if transactionKnown {
-		preVerifiedFiat := payment.IsFiatPaymentRoute(paymentSent.Method, coinType)
+		method := payment.ResolvedPaymentMethod(order, paymentSent)
+		preVerifiedFiat := payment.IsFiatPaymentRoute(method, coinType)
 		// For crypto, a transaction already persisted on this order with
 		// block height means local on-chain verification has already happened.
 		knownConfirmedCrypto := !preVerifiedFiat && isKnownTxConfirmed(knownTx)

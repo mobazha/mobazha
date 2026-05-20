@@ -44,8 +44,8 @@ func TestDeriveFundingTarget_ManagedEscrowPendingUsesAddressMonitored(t *testing
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "0xmanagedescrow"}
 	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
-		Type:    "managed_escrow",
-		Address: "0xmanagedescrow",
+		Type:           "managed_escrow",
+		Address:        "0xmanagedescrow",
 		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),
 	}))
 
@@ -58,8 +58,8 @@ func TestDeriveFundingTarget_ClientSignedPendingUsesEscrowV1(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "0xescrow"}
 	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
-		Coin:          "crypto:eip155:1:native",
-		EscrowAddress: "0xescrow",
+		Coin:           "crypto:eip155:1:native",
+		EscrowAddress:  "0xescrow",
 		SettlementSpec: pkpayment.NewClientSignedEVMSpec(false).ToPending(),
 	}))
 
@@ -105,6 +105,23 @@ func TestDerivePaymentInfo_PaymentSentDirectUsesDirectProductMode(t *testing.T) 
 	_, mode, kind := p.derivePaymentInfo(&models.Order{}, nil, ps)
 	require.Equal(t, pkpayment.ProductModeDirect, mode)
 	require.Equal(t, "PAYMENT_SENT_DIRECT", kind)
+}
+
+func TestDerivePaymentInfo_FiatMetadataUsesSettlementSpecProductMode(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{}
+	specJSON, err := pkpayment.FiatMetadataSettlementSpecJSON()
+	require.NoError(t, err)
+	require.NoError(t, order.MergeFiatMetadata(map[string]string{
+		"fiat_provider":   "stripe",
+		"fiat_currency":   "USD",
+		"settlement_spec": specJSON,
+	}))
+
+	coin, mode, kind := p.derivePaymentInfo(order, nil, nil)
+	require.Equal(t, "fiat:stripe:USD", coin)
+	require.Equal(t, pkpayment.ProductModeCancelable, mode)
+	require.Empty(t, kind)
 }
 
 func TestDerivePaymentInfo_PendingManagedEscrowOverridesLegacyDirectPaymentSent(t *testing.T) {

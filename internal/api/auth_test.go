@@ -261,6 +261,42 @@ func TestGateway_JWTAuth(t *testing.T) {
 		}
 	})
 
+	t.Run("InvalidBearerToken_RateLimited", func(t *testing.T) {
+		gateway.auth = authState{
+			username:     "admin",
+			passwordHash: "1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032",
+		}
+		gateway.authLimiter = newAuthRateLimiter()
+		defer func() {
+			gateway.auth = authState{}
+			gateway.authLimiter.stop()
+			gateway.authLimiter = nil
+		}()
+
+		var resp *http.Response
+		for i := 0; i < authRateLimitMaxFailures; i++ {
+			req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+			req.Header.Set("Authorization", "Bearer not-a-valid-jwt")
+			req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+			var err error
+			resp, err = http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("invalid bearer request %d: %v", i, err)
+			}
+			resp.Body.Close()
+		}
+		if resp == nil {
+			t.Fatal("expected response from invalid Bearer request")
+		}
+		if resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("expected invalid Bearer attempts to hit auth rate limiter, got %d", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Retry-After"); got != "900" {
+			t.Fatalf("Retry-After = %q, want 900", got)
+		}
+	})
+
 	t.Run("NoValidator_JWTIgnored", func(t *testing.T) {
 		gateway.jwtValidator = nil
 		defer func() { gateway.jwtValidator = validator }()

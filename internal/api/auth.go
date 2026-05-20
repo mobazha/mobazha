@@ -138,15 +138,24 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			bearerVal := strings.TrimSpace(authHeader[7:])
 			if bearerVal == "" {
+				if g.recordAuthFailureAndRateLimited(r) {
+					writeAuthRateLimited(w)
+					return
+				}
 				ErrorResponse(w, http.StatusUnauthorized, "Empty Bearer token")
 				return
 			}
 			if apitoken.IsAPIToken(bearerVal) {
 				identity, ok := g.tryAPITokenAuth(bearerVal)
 				if !ok {
+					if g.recordAuthFailureAndRateLimited(r) {
+						writeAuthRateLimited(w)
+						return
+					}
 					ErrorResponse(w, http.StatusUnauthorized, "Invalid or expired API token")
 					return
 				}
+				g.ResetAuthFailure(r)
 				next.ServeHTTP(w, r.WithContext(WithAuthIdentity(r.Context(), identity)))
 				return
 			}
@@ -155,12 +164,17 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 
 		// 2) JWT Bearer (or ?token= query for WebSocket).
 		if identity, ok := g.tryJWTAuthWith(jv, r); ok {
+			g.ResetAuthFailure(r)
 			next.ServeHTTP(w, r.WithContext(WithAuthIdentity(r.Context(), identity)))
 			return
 		}
 
 		// If a Bearer token was present but neither mbz_ nor a valid JWT, reject.
 		if jv != nil && strings.HasPrefix(authHeader, "Bearer ") {
+			if g.recordAuthFailureAndRateLimited(r) {
+				writeAuthRateLimited(w)
+				return
+			}
 			ErrorResponse(w, http.StatusUnauthorized, "Invalid or expired token")
 			return
 		}
@@ -180,13 +194,8 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 
 			matched, upgradable := g.auth.checkPassword(username, password)
 			if !matched {
-				g.RecordAuthFailure(r)
-				// 429 once this failure tips the threshold; correct
-				// credentials in the matched branch reset the counter.
-				if g.authLimiter != nil && g.authLimiter.isBlocked(remoteIP(r)) {
-					w.Header().Set("Retry-After", "900")
-					response.Error(w, http.StatusTooManyRequests, response.CodeRateLimited,
-						"Too many authentication failures. Try again later.")
+				if g.recordAuthFailureAndRateLimited(r) {
+					writeAuthRateLimited(w)
 					return
 				}
 				ErrorResponse(w, http.StatusUnauthorized, "Invalid credentials")

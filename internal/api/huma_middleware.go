@@ -248,9 +248,14 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 				}
 				identity, ok := g.tryAPITokenAuth(bearerVal)
 				if !ok {
+					if g.recordHumaAuthFailureAndRateLimited(ctx) {
+						writeHumaAuthRateLimited(api, ctx)
+						return
+					}
 					huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid or expired API token")
 					return
 				}
+				g.resetHumaAuthFailure(ctx)
 				if enforceHumaScope(api, ctx, op, identity) {
 					return
 				}
@@ -269,10 +274,15 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 			}
 			if tokenStr != "" {
 				if identity, ok := g.tryJWTAuthWith(jv, buildMinimalRequest(authHeader, ctx)); ok {
+					g.resetHumaAuthFailure(ctx)
 					next(huma.WithContext(ctx, WithAuthIdentity(ctx.Context(), identity)))
 					return
 				}
 				// Bearer was present but invalid → hard fail
+				if g.recordHumaAuthFailureAndRateLimited(ctx) {
+					writeHumaAuthRateLimited(api, ctx)
+					return
+				}
 				huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid or expired token")
 				return
 			}
@@ -280,6 +290,10 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 
 		// If a Bearer token was present but neither mbz_ nor valid JWT, reject.
 		if jv != nil && strings.HasPrefix(authHeader, "Bearer ") {
+			if g.recordHumaAuthFailureAndRateLimited(ctx) {
+				writeHumaAuthRateLimited(api, ctx)
+				return
+			}
 			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid or expired token")
 			return
 		}
@@ -298,23 +312,14 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 			}
 			matched, upgradable := g.auth.checkPassword(username, password)
 			if !matched {
-				if g.authLimiter != nil {
-					g.authLimiter.recordFailure(peerIP)
-					// 429 once this failure tips the threshold; correct
-					// credentials in the matched branch reset via resetIP.
-					if g.authLimiter.isBlocked(peerIP) {
-						ctx.SetHeader("Retry-After", "900")
-						huma.WriteErr(api, ctx, http.StatusTooManyRequests,
-							"Too many authentication failures. Try again later.")
-						return
-					}
+				if g.recordHumaAuthFailureAndRateLimited(ctx) {
+					writeHumaAuthRateLimited(api, ctx)
+					return
 				}
 				huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid credentials")
 				return
 			}
-			if g.authLimiter != nil {
-				g.authLimiter.resetIP(peerIP)
-			}
+			g.resetHumaAuthFailure(ctx)
 			if upgradable {
 				go g.auth.upgradeHash(password)
 			}
@@ -347,6 +352,27 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		huma.WriteErr(api, ctx, http.StatusUnauthorized,
 			"Authentication required — configure an admin password or JWT validator")
 	}
+}
+
+func (g *Gateway) recordHumaAuthFailureAndRateLimited(ctx huma.Context) bool {
+	if g.authLimiter == nil {
+		return false
+	}
+	peerIP := remoteIPFromHuma(ctx)
+	g.authLimiter.recordFailure(peerIP)
+	return g.authLimiter.isBlocked(peerIP)
+}
+
+func (g *Gateway) resetHumaAuthFailure(ctx huma.Context) {
+	if g.authLimiter != nil {
+		g.authLimiter.resetIP(remoteIPFromHuma(ctx))
+	}
+}
+
+func writeHumaAuthRateLimited(api huma.API, ctx huma.Context) {
+	ctx.SetHeader("Retry-After", "900")
+	huma.WriteErr(api, ctx, http.StatusTooManyRequests,
+		"Too many authentication failures. Try again later.")
 }
 
 // parseBasicFromHuma extracts Basic Auth credentials from huma.Context.

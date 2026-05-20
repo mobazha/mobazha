@@ -612,6 +612,25 @@ func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesPendingTrustModel(t *te
 	require.Equal(t, "0xmanagedescrow", intent.contractAddress)
 }
 
+func TestResolveAggregatedPaymentIntent_UTXOUsesSettlementSpecWhenPresent(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
+		Script:    "5221...",
+		Moderator: "",
+		SettlementSpec: &models.PendingSettlementSpec{
+			Method:     "CANCELABLE",
+			PayMode:    "address_monitored",
+			EscrowType: "utxo_script",
+		},
+	}))
+
+	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
+		ChainNamespace: "bip122",
+	}})
+	require.Equal(t, pb.PaymentSent_CANCELABLE, intent.method)
+	require.Equal(t, "5221...", intent.script)
+}
+
 func TestResolveAggregatedPaymentIntent_UTXOUsesPendingEscrowFields(t *testing.T) {
 	order := &models.Order{}
 	require.NoError(t, order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{

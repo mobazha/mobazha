@@ -536,7 +536,8 @@ func (s *OrderAppService) RefundOrder(orderID models.OrderID, txid iwallet.Trans
 	}
 
 	coinType := iwallet.CoinType(paymentSent.Coin)
-	if payment.IsFiatPaymentRoute(paymentSent.Method, coinType) {
+	method := payment.ResolvedPaymentMethod(&order, paymentSent)
+	if payment.IsFiatPaymentRoute(method, coinType) {
 		return s.refundFiatOrder(context.Background(), &order, paymentSent, done)
 	}
 
@@ -730,7 +731,8 @@ func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, ini
 		return "", nil, err
 	}
 
-	if payment.IsFiatPaymentRoute(paymentSent.Method, coinType) {
+	method := payment.ResolvedPaymentMethod(&order, paymentSent)
+	if payment.IsFiatPaymentRoute(method, coinType) {
 		return coinType, &FiatRefundInstructions{
 			Provider: resolveFiatProvider(&order, paymentSent),
 			Message:  "Fiat refund will be processed automatically via the payment provider",

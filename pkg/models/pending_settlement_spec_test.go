@@ -33,6 +33,30 @@ func TestPendingManagedEscrowPaymentInfo_SettlementSpecJSONRoundTrip(t *testing.
 	require.Equal(t, got.SettlementSpec, decoded.SettlementSpec)
 }
 
+func TestPendingUTXOPaymentInfo_SettlementSpecJSONRoundTrip(t *testing.T) {
+	order := &Order{}
+	require.NoError(t, order.SetPendingPaymentInfo(&PendingUTXOPaymentInfo{
+		Coin:   "BTC",
+		Script: "5221...",
+		SettlementSpec: &PendingSettlementSpec{
+			Method:     "MODERATED",
+			PayMode:    "address_monitored",
+			EscrowType: "utxo_script",
+		},
+	}))
+
+	got, err := order.GetPendingPaymentInfo()
+	require.NoError(t, err)
+	require.NotNil(t, got.SettlementSpec)
+	require.Equal(t, "MODERATED", got.SettlementSpec.Method)
+
+	raw, err := json.Marshal(got)
+	require.NoError(t, err)
+	var decoded PendingUTXOPaymentInfo
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	require.Equal(t, got.SettlementSpec, decoded.SettlementSpec)
+}
+
 func TestPendingUTXOPaymentInfo_LegacyJSONWithoutSpec(t *testing.T) {
 	order := &Order{}
 	legacy := `{"coin":"BTC","moderator":"mod-peer","script":"ab12"}`

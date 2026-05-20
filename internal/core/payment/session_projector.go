@@ -165,6 +165,10 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 	if fiatMeta, err := order.GetFiatMetadata(); err == nil {
 		provider := fiatMeta["fiat_provider"]
 		if provider != "" {
+			productMode := payment.ProductModeFromMethod(pb.PaymentSent_FIAT)
+			if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
+				productMode = payment.ProductModeFromMethod(spec.Method)
+			}
 			currency := fiatMeta["fiat_currency"]
 			if currency == "" && orderOpen != nil {
 				currency = orderOpen.PricingCoin
@@ -173,12 +177,12 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 				paymentCoin = fmt.Sprintf("fiat:%s:%s",
 					strings.ToLower(strings.TrimSpace(provider)),
 					strings.ToUpper(strings.TrimSpace(currency)))
-				return paymentCoin, payment.ProductModeFromMethod(pb.PaymentSent_FIAT), ""
+				return paymentCoin, productMode, ""
 			}
 			// Legacy rows with provider metadata but no currency context cannot be
 			// projected to a canonical fiat coin safely. Leave paymentCoin empty
 			// rather than leaking the invalid external shape "fiat:{provider}".
-			return "", payment.ProductModeCancelable, ""
+			return "", productMode, ""
 		}
 	}
 

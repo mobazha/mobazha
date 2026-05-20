@@ -127,8 +127,23 @@ func (g *Gateway) RecordAuthFailure(r *http.Request) {
 	}
 }
 
+func (g *Gateway) recordAuthFailureAndRateLimited(r *http.Request) bool {
+	if g.authLimiter == nil {
+		return false
+	}
+	ip := remoteIP(r)
+	g.authLimiter.recordFailure(ip)
+	return g.authLimiter.isBlocked(ip)
+}
+
 func (g *Gateway) ResetAuthFailure(r *http.Request) {
 	if g.authLimiter != nil {
 		g.authLimiter.resetIP(remoteIP(r))
 	}
+}
+
+func writeAuthRateLimited(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "900")
+	response.Error(w, http.StatusTooManyRequests, response.CodeRateLimited,
+		"Too many authentication failures. Try again later.")
 }

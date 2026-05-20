@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/url"
+	"strings"
 	"sync"
 )
 
@@ -302,7 +303,17 @@ func IsPlainHTTPURL(rawURL string) bool {
 // IsTrustedLocalLLMEndpoint returns true for AI endpoints that private_distribution mode can
 // treat as local/trusted without requiring an API key.
 func IsTrustedLocalLLMEndpoint(rawURL string) bool {
-	return IsLocalEndpointURL(rawURL) || IsPlainHTTPURL(rawURL)
+	if IsLocalEndpointURL(rawURL) {
+		return true
+	}
+	if !IsPlainHTTPURL(rawURL) {
+		return false
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return isDockerInternalOrPrivateHost(parsed.Hostname())
 }
 
 // IsLocalEndpointURL returns true for URLs whose host is a loopback address
@@ -312,12 +323,32 @@ func IsLocalEndpointURL(rawURL string) bool {
 	if err != nil {
 		return false
 	}
-	host := parsed.Hostname()
+	host := strings.ToLower(parsed.Hostname())
 	if host == "localhost" {
 		return true
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+func isDockerInternalOrPrivateHost(host string) bool {
+	host = strings.TrimSpace(strings.ToLower(host))
+	if host == "" {
+		return false
+	}
+	switch host {
+	case "host.docker.internal",
+		"gateway.docker.internal",
+		"kubernetes.docker.internal",
+		"docker.for.mac.localhost",
+		"docker.for.win.localhost":
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
+	}
+	return !strings.Contains(host, ".")
 }
 
 func (c *Config) EffectiveBaseURL() string {

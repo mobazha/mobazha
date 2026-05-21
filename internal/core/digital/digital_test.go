@@ -526,6 +526,29 @@ func TestEntitlement_OrderConfirmation_DoesNotGrantLicenseAssetWithoutKeys(t *te
 	assert.Equal(t, 0, shipper.calls, "incomplete digital entitlement must not auto-ship")
 }
 
+func TestEntitlement_OrderConfirmation_GrantsPartiallyAllocatedLicenseAsset(t *testing.T) {
+	entSvc, assetSvc, bus, orderQ := newTestEntitlementService(t)
+	orderQ.lineItems = []OrderLineItem{
+		{ListingSlug: "listing-partial-lic", Quantity: 3},
+	}
+	shipper := &testOrderShipper{}
+	entSvc.SetShipper(shipper)
+
+	_, err := assetSvc.ImportLicenseKeys("listing-partial-lic", "", "app-partial", []string{"LIC-1", "LIC-2"}, "perpetual", 1, time.Time{})
+	require.NoError(t, err)
+
+	require.NoError(t, entSvc.Start())
+
+	bus.Emit(&events.OrderConfirmation{OrderID: "order-partial-lic"})
+	time.Sleep(100 * time.Millisecond)
+
+	grants, err := assetSvc.GetGrantsByOrder("order-partial-lic")
+	require.NoError(t, err)
+	require.Len(t, grants, 1, "partially allocated license assets should still expose delivered keys")
+	assert.Equal(t, int64(2), assetSvc.CountAllocatedKeys("order-partial-lic", "listing-partial-lic", ""))
+	assert.Equal(t, 0, shipper.calls, "partial license allocation must not auto-ship the whole line item")
+}
+
 func TestEntitlement_OrderConfirmation_AutoShipsEveryDigitalLineItem(t *testing.T) {
 	entSvc, assetSvc, bus, orderQ := newTestEntitlementService(t)
 	orderQ.lineItems = []OrderLineItem{

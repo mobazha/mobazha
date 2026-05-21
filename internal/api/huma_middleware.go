@@ -266,13 +266,15 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 
 		// 2) JWT Bearer
 		if jv != nil {
-			var tokenStr string
+			tokenPresent := false
 			if strings.HasPrefix(authHeader, "Bearer ") {
-				tokenStr = strings.TrimSpace(authHeader[7:])
+				tokenPresent = strings.TrimSpace(authHeader[7:]) != ""
+			} else if wsToken := tokenFromHumaWebSocketProtocol(ctx); wsToken != "" {
+				tokenPresent = true
 			} else if qp := ctx.Query("token"); qp != "" && !strings.HasPrefix(qp, "basic:") {
-				tokenStr = qp
+				tokenPresent = true
 			}
-			if tokenStr != "" {
+			if tokenPresent {
 				if identity, ok := g.tryJWTAuthWith(jv, buildMinimalRequest(authHeader, ctx)); ok {
 					g.resetHumaAuthFailure(ctx)
 					next(huma.WithContext(ctx, WithAuthIdentity(ctx.Context(), identity)))
@@ -385,12 +387,25 @@ func parseBasicFromHuma(ctx huma.Context) (string, string, bool) {
 	return parseBasicToken(auth[len(prefix):])
 }
 
+func tokenFromHumaWebSocketProtocol(ctx huma.Context) string {
+	protocol := ctx.Header("Sec-WebSocket-Protocol")
+	if protocol == "" {
+		return ""
+	}
+	r, _ := http.NewRequestWithContext(ctx.Context(), http.MethodGet, "/", nil)
+	r.Header.Set("Sec-WebSocket-Protocol", protocol)
+	return tokenFromWebSocketProtocol(r)
+}
+
 // buildMinimalRequest constructs a minimal *http.Request with the
-// Authorization header so tryJWTAuthWith can parse it.
+// auth-bearing headers/query so tryJWTAuthWith can parse it.
 func buildMinimalRequest(authHeader string, ctx huma.Context) *http.Request {
 	r, _ := http.NewRequestWithContext(ctx.Context(), http.MethodGet, "/", nil)
 	if authHeader != "" {
 		r.Header.Set("Authorization", authHeader)
+	}
+	if protocol := ctx.Header("Sec-WebSocket-Protocol"); protocol != "" {
+		r.Header.Set("Sec-WebSocket-Protocol", protocol)
 	}
 	if qp := ctx.Query("token"); qp != "" {
 		r.URL.RawQuery = "token=" + qp

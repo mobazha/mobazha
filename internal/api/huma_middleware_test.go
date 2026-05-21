@@ -1,9 +1,17 @@
 package api
 
 import (
+	"context"
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humachi"
+	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // TestOperationAcceptsAPIToken verifies that the runtime gate correctly
@@ -106,5 +114,64 @@ func TestAdminOnlyAuthSecurity_ConstantShape(t *testing.T) {
 	}
 	if !hasHuman {
 		t.Fatal("adminOnlyAuthSecurity must include basicAuth and/or bearerJWT")
+	}
+}
+
+func TestNodeHumaAuthMiddleware_JWTWebSocketProtocol(t *testing.T) {
+	const localPeerID = "QmLocalPeerID1234567890ABCDEF1234567890"
+
+	certPEM, privKey := generateTestRSACert()
+	validator, err := NewJWTValidator(certPEM, localPeerID, "")
+	if err != nil {
+		t.Fatalf("NewJWTValidator: %v", err)
+	}
+
+	gateway := &Gateway{
+		config:       &GatewayConfig{},
+		jwtValidator: validator,
+	}
+
+	r := chi.NewMux()
+	api := humachi.New(r, huma.DefaultConfig("test", "1.0.0"))
+	gateway.installNodeHumaMiddlewares(api)
+
+	type output struct {
+		Body struct {
+			OK bool `json:"ok"`
+		}
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "test-huma-ws-jwt",
+		Method:      http.MethodGet,
+		Path:        "/secure",
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*output, error) {
+		out := &output{}
+		out.Body.OK = true
+		return out, nil
+	})
+
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+
+	token := signToken(&JWTClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		Properties: map[string]string{"peerID": localPeerID},
+	}, privKey)
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(token))
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/secure", nil)
+	req.Header.Set("Sec-WebSocket-Protocol", "mbz.auth.v1, mbz.auth.b64."+encoded)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected Huma JWT auth via websocket protocol to pass, got %d", resp.StatusCode)
 	}
 }

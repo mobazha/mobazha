@@ -95,8 +95,10 @@ func (s *authState) isConfigured() bool {
 //
 //  3. Basic Auth (for direct admin access):
 //     Authorization: Basic <base64(user:pass)>
-//     Also supports ?token=basic:<base64> for WebSocket fallback. Yields an
-//     AuthIdentity with IsAdmin=true and Scopes=nil (full access).
+//     Also supports ?token=basic:<base64> for direct WebSocket fallback.
+//     Basic credentials are intentionally not accepted through
+//     Sec-WebSocket-Protocol; that channel is reserved for JWTs.
+//     Yields an AuthIdentity with IsAdmin=true and Scopes=nil (full access).
 //
 // On success, the AuthIdentity is attached to the request context so that
 // ScopeEnforcementMiddleware / RequireScope can make permission decisions.
@@ -185,10 +187,7 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 		if g.auth.isConfigured() {
 			username, password, ok := r.BasicAuth()
 			if !ok {
-				tokenParam := tokenFromWebSocketProtocol(r)
-				if tokenParam == "" {
-					tokenParam = r.URL.Query().Get("token")
-				}
+				tokenParam := r.URL.Query().Get("token")
 				if strings.HasPrefix(tokenParam, "basic:") {
 					username, password, ok = parseBasicToken(tokenParam[6:])
 				}
@@ -256,7 +255,7 @@ func (g *Gateway) tryJWTAuthWith(jv *JWTValidator, r *http.Request) (*AuthIdenti
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(authHeader, "Bearer ") {
 		tokenStr = strings.TrimSpace(authHeader[7:])
-	} else if wsToken := tokenFromWebSocketProtocol(r); wsToken != "" && !strings.HasPrefix(wsToken, "basic:") {
+	} else if wsToken := tokenFromWebSocketProtocol(r); wsToken != "" {
 		tokenStr = wsToken
 	} else if qp := r.URL.Query().Get("token"); qp != "" && !strings.HasPrefix(qp, "basic:") {
 		tokenStr = qp
@@ -381,7 +380,11 @@ func tokenFromWebSocketProtocol(r *http.Request) string {
 				tokenBytes, err = base64.URLEncoding.DecodeString(encoded)
 			}
 			if err == nil && len(tokenBytes) > 0 {
-				return string(tokenBytes)
+				token := string(tokenBytes)
+				if strings.HasPrefix(token, "basic:") {
+					continue
+				}
+				return token
 			}
 		}
 	}

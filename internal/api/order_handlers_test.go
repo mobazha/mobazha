@@ -121,6 +121,46 @@ func TestOrderHandlers(t *testing.T) {
 				return nil, nil
 			},
 		},
+		{
+			name:   "ship order applies receiving account as order-level payout",
+			path:   "/v1/orders/order-ship-accounts/ship",
+			method: http.MethodPost,
+			body: []byte(`{
+				"receivingAccountID": 1,
+				"shipments": [
+					{"itemIndex": 0, "physicalDelivery": {"shipper": "UPS", "trackingNumber": "A"}},
+					{"itemIndex": 1, "physicalDelivery": {"shipper": "UPS", "trackingNumber": "B"}}
+				]
+			}`),
+			setNodeMethods: func(n *mockNode) {
+				n.raGetByIDFunc = func(id int) (*models.ReceivingAccount, error) {
+					if id != 1 {
+						return nil, fmt.Errorf("missing account %d", id)
+					}
+					return &models.ReceivingAccount{ID: 1, Address: "addr-payout"}, nil
+				}
+				n.shipOrderFunc = func(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error {
+					if orderID != "order-ship-accounts" {
+						t.Fatalf("unexpected orderID %s", orderID)
+					}
+					if len(shipments) != 2 {
+						t.Fatalf("expected 2 shipments, got %d", len(shipments))
+					}
+					if shipments[0].ReceivingAccountAddress != "addr-payout" {
+						t.Fatalf("shipment 0 address = %q", shipments[0].ReceivingAccountAddress)
+					}
+					if shipments[1].ReceivingAccountAddress != "" {
+						t.Fatalf("shipment 1 address = %q", shipments[1].ReceivingAccountAddress)
+					}
+					close(done)
+					return nil
+				}
+			},
+			statusCode: http.StatusOK,
+			expectedResponse: func() ([]byte, error) {
+				return nil, nil
+			},
+		},
 	})
 }
 

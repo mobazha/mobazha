@@ -449,3 +449,59 @@ func TestGateway_JWTAuth(t *testing.T) {
 		}
 	})
 }
+
+func TestGateway_BasicTokenWebSocketProtocolIgnored(t *testing.T) {
+	gateway := &Gateway{
+		nodeManager: &mockNodeManager{
+			nodes: map[string]contracts.NodeService{
+				"test_peer_id": &mockNode{
+					getMyProfileFunc: func() (*models.Profile, error) { return nil, nil },
+				},
+			},
+		},
+		config: &GatewayConfig{},
+		auth: authState{
+			username:     "alice",
+			passwordHash: "1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032",
+		},
+	}
+
+	outer := chi.NewMux()
+	outer.Use(gateway.AuthenticationMiddleware)
+	outer.Mount("/", gateway.newV1Router(false, false))
+
+	ts := httptest.NewServer(outer)
+	defer ts.Close()
+
+	basicToken := "basic:" + base64.StdEncoding.EncodeToString([]byte("alice:letmein"))
+
+	t.Run("query fallback still works", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles?token="+basicToken, nil)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			t.Fatalf("basic query token should authenticate, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("websocket protocol is ignored for basic", func(t *testing.T) {
+		encoded := base64.RawURLEncoding.EncodeToString([]byte(basicToken))
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+		req.Header.Set("Sec-WebSocket-Protocol", "mbz.auth.v1, mbz.auth.b64."+encoded)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("basic websocket protocol token must not authenticate, got %d", resp.StatusCode)
+		}
+	})
+}

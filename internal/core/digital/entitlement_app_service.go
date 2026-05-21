@@ -197,7 +197,9 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 				}
 				if already+allocated < int64(qty) {
 					itemDelivered = false
-					continue
+					if already+allocated == 0 {
+						continue
+					}
 				}
 			}
 

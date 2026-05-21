@@ -1002,18 +1002,19 @@ func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request
 		shipments = append(shipments, buildShipment(param))
 	}
 
-	orderSvc := getOrderService(r)
-
 	if receivingAccountID >= 0 {
 		receivingAccount, err := getReceivingAccountService(r).GetByID(receivingAccountID)
 		if err != nil {
 			ErrorResponse(w, http.StatusBadRequest, "收款账户不存在或无效")
 			return
 		}
-		for i := range shipments {
-			shipments[i].ReceivingAccountAddress = receivingAccount.Address
-		}
+		// ReceivingAccountAddress is order-level payout input for escrow
+		// release. The core order service currently reads shipments[0] when
+		// building ReleaseInfo, so do not imply per-shipment split payout here.
+		shipments[0].ReceivingAccountAddress = receivingAccount.Address
 	}
+
+	orderSvc := getOrderService(r)
 
 	done := make(chan struct{})
 	err = orderSvc.ShipOrder(models.OrderID(orderID), shipments, done)

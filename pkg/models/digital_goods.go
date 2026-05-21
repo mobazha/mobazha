@@ -42,7 +42,7 @@ type DigitalAsset struct {
 	KeyVersion int `gorm:"column:key_version;default:1"`
 
 	// DeliveryData holds encrypted JSON config per AssetType (link URL, webhook config, etc.).
-	DeliveryData []byte `gorm:"column:delivery_data"`
+	DeliveryData []byte `gorm:"column:delivery_data;type:bytea"`
 
 	SortOrder    int `gorm:"column:sort_order;default:0"`
 	MaxDownloads int `gorm:"column:max_downloads;default:0"`
@@ -79,7 +79,7 @@ type DigitalLicenseKey struct {
 	ID          string `gorm:"primaryKey"`
 	ListingSlug string `gorm:"column:listing_slug;type:varchar(255);not null"`
 	VariantSKU  string `gorm:"column:variant_sku;type:varchar(255);not null;default:''"`
-	LicenseKey  []byte `gorm:"column:license_key"`
+	LicenseKey  []byte `gorm:"column:license_key;type:bytea"`
 	KeyVersion  int    `gorm:"column:key_version;default:1"`
 	LicenseHash string `gorm:"column:license_hash;type:varchar(128);not null"`
 
@@ -96,7 +96,7 @@ type DigitalLicenseKey struct {
 
 	MaxActivations int    `gorm:"column:max_activations;default:0"`
 	LicenseType    string `gorm:"column:license_type;type:varchar(32);default:'perpetual'"`
-	Metadata       []byte `gorm:"column:metadata"`
+	Metadata       []byte `gorm:"column:metadata;type:bytea"`
 }
 
 func (DigitalLicenseKey) TableName() string { return "digital_license_keys" }
@@ -194,7 +194,7 @@ type DownloadGrant struct {
 
 	// EntitlementSnapshot freezes the DigitalAsset definition at OrderConfirmation time.
 	// Prevents "content drift" — seller updating file/link after buyer paid.
-	AssetSnapshot []byte `gorm:"column:asset_snapshot"`
+	AssetSnapshot []byte `gorm:"column:asset_snapshot;type:bytea"`
 
 	// PreviousStatus stores the status before freeze, for correct restoration on dispute close.
 	PreviousStatus string `gorm:"column:previous_status;type:varchar(16)"`

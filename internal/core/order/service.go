@@ -1124,6 +1124,7 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 				escrowReleaseFee,
 				iwallet.Address{}, iwallet.Amount{})
 			if err != nil {
+				_ = wdbTx.Rollback()
 				return nil, fmt.Errorf("failed to build escrow release: %w", err)
 			}
 
@@ -1136,6 +1137,7 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 
 			refundAny := &anypb.Any{}
 			if err := refundAny.MarshalFrom(refund); err != nil {
+				_ = wdbTx.Rollback()
 				return nil, err
 			}
 

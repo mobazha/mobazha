@@ -66,6 +66,13 @@ func (tdb *TenantDB) RawDB() *gorm.DB {
 	return tdb.sharedDB
 }
 
+// ForTenant returns a new tenant-scoped Database view over the same shared
+// database. Cross-cutting sinks use this only when an event explicitly names
+// a different target tenant than the node currently dispatching it.
+func (tdb *TenantDB) ForTenant(tenantID string) (database.Database, error) {
+	return NewTenantDBWithPublicData(tdb.sharedDB, tenantID, NewDBPublicData(tdb.sharedDB, tenantID))
+}
+
 // NewTenantDBWithPublicData creates a new TenantDB with a given PublicData
 // implementation. Both standalone (DBPublicData on local SQLite) and SaaS
 // (DBPublicData on shared PostgreSQL) use this constructor.

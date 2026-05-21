@@ -31,6 +31,7 @@ type NewOrder struct {
 
 type OrderFunded struct {
 	Notification
+	TenantID    string       `json:"tenantID,omitempty"`
 	BuyerName   string       `json:"buyerName"`
 	BuyerID     string       `json:"buyerID"`
 	BuyerAvatar string       `json:"buyerAvatar,omitempty"`
@@ -44,6 +45,7 @@ type OrderFunded struct {
 
 type OrderPaymentReceived struct {
 	Notification
+	TenantID     string `json:"tenantID,omitempty"`
 	OrderID      string `json:"orderID"`
 	FundingTotal string `json:"fundingTotal"`
 	CoinType     string `json:"coinType"`
@@ -379,7 +381,7 @@ type OrderProtectionReminder struct {
 type AfterSaleDisputeOpened struct {
 	Notification
 	OrderID      string    `json:"orderID"`
-	Reason       string    `json:"reason"`      // e.g. "NOT_RECEIVED", "NOT_AS_DESCRIBED", "QUALITY_ISSUE", "OTHER"
+	Reason       string    `json:"reason"` // e.g. "NOT_RECEIVED", "NOT_AS_DESCRIBED", "QUALITY_ISSUE", "OTHER"
 	Description  string    `json:"description"`
 	BuyerName    string    `json:"buyerName"`
 	BuyerID      string    `json:"buyerID"`

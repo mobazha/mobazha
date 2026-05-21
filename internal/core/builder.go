@@ -627,8 +627,13 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
 
-	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
-	initEventDispatcher(obNode, notifyWsFn)
+	gw := sharedManager.GetHTTPGateway()
+	notifyWsFn := gw.NotifyWebsockets(nodeID)
+	notifyWsForTenant := func(tenantID string) func(any) error {
+		gw.EnsureHubForUser(tenantID)
+		return gw.NotifyWebsockets(tenantID)
+	}
+	initEventDispatcher(obNode, notifyWsFn, notifyWsForTenant)
 	initPlatformAIConfig(obNode, cfg)
 
 	// Create messenger with appropriate SNF client
@@ -1259,9 +1264,14 @@ func newLightweightNode(
 	// when available. In hosting mode, httpGateway is nil because the
 	// hosting project manages its own HTTP gateway and websocket hubs.
 	var notifyWsFn func(any) error
+	var notifyWsForTenant func(string) func(any) error
 	if gw := sharedManager.GetHTTPGateway(); gw != nil {
 		gw.EnsureHubForUser(nodeID)
 		notifyWsFn = gw.NotifyWebsockets(nodeID)
+		notifyWsForTenant = func(tenantID string) func(any) error {
+			gw.EnsureHubForUser(tenantID)
+			return gw.NotifyWebsockets(tenantID)
+		}
 	}
 
 	if err := MigrateNodeSettings(obNode.db); err != nil {
@@ -1277,7 +1287,7 @@ func newLightweightNode(
 	initFiatSubsystem(obNode)
 	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
-	initEventDispatcher(obNode, notifyWsFn)
+	initEventDispatcher(obNode, notifyWsFn, notifyWsForTenant)
 	initPlatformAIConfig(obNode, cfg)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
@@ -1509,8 +1519,12 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 
 // initEventDispatcher creates the unified EventDispatcher with NotificationSink,
 // WebhookSink, and ChannelNotificationSink. Provides error isolation between sinks.
-func initEventDispatcher(obNode *MobazhaNode, notifyWsFn func(any) error) {
-	notifSink := notifications.NewNotificationSink(obNode.db, notifyWsFn)
+func initEventDispatcher(
+	obNode *MobazhaNode,
+	notifyWsFn func(any) error,
+	notifyWsForTenant func(string) func(any) error,
+) {
+	notifSink := notifications.NewTenantAwareNotificationSink(obNode.db, notifyWsFn, notifyWsForTenant)
 	sinks := []events.EventSink{notifSink}
 
 	if obNode.webhookEngine != nil {

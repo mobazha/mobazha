@@ -42,13 +42,20 @@ type statusWrapper struct {
 	Status any `json:"status"`
 }
 
+type tenantRoutableDatabase interface {
+	database.Database
+	TenantID() string
+	ForTenant(tenantID string) (database.Database, error)
+}
+
 // NotificationSink is an EventSink that replaces the old Notifier for-select loop.
 // It handles two paths:
 //   - Persistent: events with Persistent=true → DB persist + WebSocket push
 //   - WebSocket-only: everything else → type-specific JSON wrapper + WebSocket push
 type NotificationSink struct {
-	db         database.Database
-	notifyFunc func(any) error
+	db              database.Database
+	notifyFunc      func(any) error
+	notifyForTenant func(string) func(any) error
 }
 
 // NewNotificationSink creates a new NotificationSink.
@@ -57,6 +64,18 @@ func NewNotificationSink(db database.Database, notifyFunc func(any) error) *Noti
 		notifyFunc = func(any) error { return nil }
 	}
 	return &NotificationSink{db: db, notifyFunc: notifyFunc}
+}
+
+// NewTenantAwareNotificationSink creates a sink that can route persistent
+// notifications to an explicit target tenant when the event carries TenantID.
+func NewTenantAwareNotificationSink(
+	db database.Database,
+	notifyFunc func(any) error,
+	notifyForTenant func(string) func(any) error,
+) *NotificationSink {
+	s := NewNotificationSink(db, notifyFunc)
+	s.notifyForTenant = notifyForTenant
+	return s
 }
 
 // Name implements events.EventSink.
@@ -80,6 +99,10 @@ func (s *NotificationSink) Handle(_ context.Context, meta events.EventMeta, even
 // handlePersistentNotification replicates the old Notifier's notification path:
 // assign ID + type on the embedded Notification struct, persist to DB, push via WebSocket.
 func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, event interface{}) error {
+	targetTenantID := extractTargetTenantID(event)
+	db := s.dbForTenant(targetTenantID)
+	notifyFunc := s.notifyFuncForTenant(targetTenantID)
+
 	r := make([]byte, 20)
 	if _, err := rand.Read(r); err != nil {
 		log.Errorf("Error generating notification ID: %s", err)
@@ -95,7 +118,7 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 		return err
 	}
 
-	err = s.db.Update(func(tx database.Tx) error {
+	err = db.Update(func(tx database.Tx) error {
 		return tx.Save(&models.NotificationRecord{
 			ID:           id,
 			Timestamp:    time.Now(),
@@ -109,9 +132,9 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 		return err
 	}
 
-	unread := s.getUnreadCount()
+	unread := s.getUnreadCount(db)
 
-	if err := s.notifyFunc(notificationPushMessage{
+	if err := notifyFunc(notificationPushMessage{
 		Type: "notification",
 		Data: notificationPushData{
 			Notification: event,
@@ -125,9 +148,9 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 }
 
 // getUnreadCount queries the unread notification count from DB.
-func (s *NotificationSink) getUnreadCount() int {
+func (s *NotificationSink) getUnreadCount(db database.Database) int {
 	var count int64
-	err := s.db.View(func(tx database.Tx) error {
+	err := db.View(func(tx database.Tx) error {
 		return tx.Read().Model(&models.NotificationRecord{}).Where("read = ?", false).Count(&count).Error
 	})
 	if err != nil {
@@ -135,6 +158,54 @@ func (s *NotificationSink) getUnreadCount() int {
 		return 0
 	}
 	return int(count)
+}
+
+func (s *NotificationSink) dbForTenant(tenantID string) database.Database {
+	if tenantID == "" {
+		return s.db
+	}
+	rdb, ok := s.db.(tenantRoutableDatabase)
+	if !ok {
+		return s.db
+	}
+	if rdb.TenantID() == tenantID {
+		return s.db
+	}
+	db, err := rdb.ForTenant(tenantID)
+	if err != nil {
+		log.Warningf("Error resolving notification DB for tenant %s: %s", tenantID, err)
+		return s.db
+	}
+	return db
+}
+
+func (s *NotificationSink) notifyFuncForTenant(tenantID string) func(any) error {
+	if tenantID == "" || s.notifyForTenant == nil {
+		return s.notifyFunc
+	}
+	notifyFunc := s.notifyForTenant(tenantID)
+	if notifyFunc == nil {
+		return s.notifyFunc
+	}
+	return notifyFunc
+}
+
+func extractTargetTenantID(event interface{}) string {
+	v := reflect.ValueOf(event)
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return ""
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return ""
+	}
+	field := v.FieldByName("TenantID")
+	if !field.IsValid() || field.Kind() != reflect.String {
+		return ""
+	}
+	return field.String()
 }
 
 // handleWebSocketOnly replicates the old Notifier's non-persistent paths

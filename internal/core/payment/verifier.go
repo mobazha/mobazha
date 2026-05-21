@@ -333,6 +333,7 @@ func paymentVerifiedBusinessEvents(order *models.Order, orderOpen *pb.OrderOpen,
 			fundingTotal = total.String()
 		}
 		return []interface{}{&events.OrderPaymentReceived{
+			TenantID:     order.TenantID,
 			OrderID:      order.ID.String(),
 			FundingTotal: fundingTotal,
 			CoinType:     ps.Coin,
@@ -383,6 +384,7 @@ func orderFundedEvent(order *models.Order, orderOpen *pb.OrderOpen) *events.Orde
 		buyerID = orderOpen.BuyerID.PeerID
 	}
 	funded := &events.OrderFunded{
+		TenantID:    order.TenantID,
 		BuyerName:   orderOpen.BuyerID.DisplayName(),
 		BuyerAvatar: orderOpen.BuyerID.DisplayAvatar(),
 		BuyerID:     buyerID,

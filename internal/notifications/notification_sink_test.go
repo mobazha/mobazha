@@ -42,6 +42,23 @@ func (db *mockDB) View(_ func(database.Tx) error) error {
 	return nil
 }
 
+type routableMockDB struct {
+	*mockDB
+	tenantID string
+	tenants  map[string]*routableMockDB
+}
+
+func (db *routableMockDB) TenantID() string {
+	return db.tenantID
+}
+
+func (db *routableMockDB) ForTenant(tenantID string) (database.Database, error) {
+	if tenant, ok := db.tenants[tenantID]; ok {
+		return tenant, nil
+	}
+	return db, nil
+}
+
 type notifyCapture struct {
 	mu       sync.Mutex
 	captured []interface{}
@@ -126,6 +143,59 @@ func TestNotificationSink_PersistentNotification(t *testing.T) {
 	}
 	if _, ok := data["notification"]; !ok {
 		t.Error("expected 'data' to contain 'notification' key")
+	}
+}
+
+func TestNotificationSink_PersistentNotificationRoutesExplicitTenant(t *testing.T) {
+	buyer := &routableMockDB{mockDB: &mockDB{}, tenantID: "buyer"}
+	seller := &routableMockDB{mockDB: &mockDB{}, tenantID: "seller"}
+	tenants := map[string]*routableMockDB{"buyer": buyer, "seller": seller}
+	buyer.tenants = tenants
+	seller.tenants = tenants
+
+	buyerCap := &notifyCapture{}
+	sellerCap := &notifyCapture{}
+	sink := NewTenantAwareNotificationSink(buyer, buyerCap.notify, func(tenantID string) func(any) error {
+		if tenantID == "seller" {
+			return sellerCap.notify
+		}
+		return buyerCap.notify
+	})
+
+	meta := events.EventMeta{Category: "order", Name: "order.funded", Persistent: true}
+	evt := &events.OrderFunded{TenantID: "seller", OrderID: "ord-1", Title: "Test"}
+
+	err := sink.Handle(context.Background(), meta, evt)
+	if err != nil {
+		t.Fatalf("Handle error: %v", err)
+	}
+
+	buyer.mu.Lock()
+	buyerSaved := len(buyer.saved)
+	buyer.mu.Unlock()
+	if buyerSaved != 0 {
+		t.Fatalf("expected buyer DB to receive 0 records, got %d", buyerSaved)
+	}
+
+	seller.mu.Lock()
+	sellerSaved := len(seller.saved)
+	seller.mu.Unlock()
+	if sellerSaved != 1 {
+		t.Fatalf("expected seller DB to receive 1 record, got %d", sellerSaved)
+	}
+
+	buyerCap.mu.Lock()
+	buyerPushes := len(buyerCap.captured)
+	buyerCap.mu.Unlock()
+	if buyerPushes != 0 {
+		t.Fatalf("expected buyer to receive 0 pushes, got %d", buyerPushes)
+	}
+
+	sellerCap.mu.Lock()
+	sellerPushes := len(sellerCap.captured)
+	sellerCap.mu.Unlock()
+	if sellerPushes != 1 {
+		t.Fatalf("expected seller to receive 1 push, got %d", sellerPushes)
 	}
 }
 

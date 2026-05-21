@@ -199,6 +199,44 @@ func TestNotificationSink_PersistentNotificationRoutesExplicitTenant(t *testing.
 	}
 }
 
+func TestNotificationSink_PersistentNotificationIgnoresTenantOnNonRoutableDB(t *testing.T) {
+	db := &mockDB{}
+	localCap := &notifyCapture{}
+	routedCap := &notifyCapture{}
+	sink := NewTenantAwareNotificationSink(db, localCap.notify, func(string) func(any) error {
+		return routedCap.notify
+	})
+
+	meta := events.EventMeta{Category: "order", Name: "order.funded", Persistent: true}
+	evt := &events.OrderFunded{TenantID: database.StandaloneTenantID, OrderID: "ord-1", Title: "Test"}
+
+	err := sink.Handle(context.Background(), meta, evt)
+	if err != nil {
+		t.Fatalf("Handle error: %v", err)
+	}
+
+	db.mu.Lock()
+	saved := len(db.saved)
+	db.mu.Unlock()
+	if saved != 1 {
+		t.Fatalf("expected local DB to receive 1 record, got %d", saved)
+	}
+
+	localCap.mu.Lock()
+	localPushes := len(localCap.captured)
+	localCap.mu.Unlock()
+	if localPushes != 1 {
+		t.Fatalf("expected local websocket to receive 1 push, got %d", localPushes)
+	}
+
+	routedCap.mu.Lock()
+	routedPushes := len(routedCap.captured)
+	routedCap.mu.Unlock()
+	if routedPushes != 0 {
+		t.Fatalf("expected tenant-routed websocket to receive 0 pushes, got %d", routedPushes)
+	}
+}
+
 func TestNotificationSink_WebSocketOnly_Cart(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(nil, cap.notify)

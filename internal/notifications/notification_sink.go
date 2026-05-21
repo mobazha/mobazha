@@ -99,7 +99,7 @@ func (s *NotificationSink) Handle(_ context.Context, meta events.EventMeta, even
 // handlePersistentNotification replicates the old Notifier's notification path:
 // assign ID + type on the embedded Notification struct, persist to DB, push via WebSocket.
 func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, event interface{}) error {
-	targetTenantID := extractTargetTenantID(event)
+	targetTenantID := s.routableTargetTenantID(event)
 	db := s.dbForTenant(targetTenantID)
 	notifyFunc := s.notifyFuncForTenant(targetTenantID)
 
@@ -158,6 +158,18 @@ func (s *NotificationSink) getUnreadCount(db database.Database) int {
 		return 0
 	}
 	return int(count)
+}
+
+func (s *NotificationSink) routableTargetTenantID(event interface{}) string {
+	tenantID := extractTargetTenantID(event)
+	if tenantID == "" {
+		return ""
+	}
+	rdb, ok := s.db.(tenantRoutableDatabase)
+	if !ok || rdb.TenantID() == tenantID {
+		return ""
+	}
+	return tenantID
 }
 
 func (s *NotificationSink) dbForTenant(tenantID string) database.Database {

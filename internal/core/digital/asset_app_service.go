@@ -29,6 +29,7 @@ type DigitalAssetAppService struct {
 	db     database.Database
 	blob   contracts.BlobStore
 	crypto *encryption.DigitalCrypto
+	orders OrderQuerier
 }
 
 // NewDigitalAssetAppService creates a new DigitalAssetAppService.
@@ -42,6 +43,12 @@ func NewDigitalAssetAppService(
 		blob:   blob,
 		crypto: encryption.NewDigitalCrypto(keys),
 	}
+}
+
+// SetOrderQuerier wires the order metadata reader used by the order-level
+// digital delivery status contract.
+func (s *DigitalAssetAppService) SetOrderQuerier(orders OrderQuerier) {
+	s.orders = orders
 }
 
 // UploadFileAssetStream encrypts a file streamed from `src` and stores the
@@ -1086,6 +1093,143 @@ func (s *DigitalAssetAppService) requireBuyerPortalAccess(orderID, token string)
 // ---------------------------------------------------------------------------
 // Buyer Portal
 // ---------------------------------------------------------------------------
+
+// GetDigitalDeliveryStatus returns an order-level delivery contract for UI
+// flows. It intentionally exposes counts and state only; buyer secrets still
+// require GetBuyerDigitalAssets.
+func (s *DigitalAssetAppService) GetDigitalDeliveryStatus(
+	orderID string,
+	buyerPortalToken string,
+	authenticatedPeerID string,
+	allowAdmin bool,
+) (*contracts.DigitalDeliveryStatus, error) {
+	if buyerPortalToken != "" {
+		if err := s.requireBuyerPortalAccess(orderID, buyerPortalToken); err != nil {
+			return nil, err
+		}
+	}
+
+	status := &contracts.DigitalDeliveryStatus{
+		OrderID: orderID,
+		Status:  contracts.DigitalDeliveryStatusPending,
+	}
+
+	var meta *OrderMetadata
+	if s.orders != nil {
+		var err error
+		meta, err = s.orders.GetOrderMetadata(orderID)
+		if err != nil {
+			return nil, fmt.Errorf("get order metadata: %w", err)
+		}
+	}
+
+	if meta != nil {
+		if meta.ContractType == "DIGITAL_GOOD" {
+			status.IsDigitalOrder = true
+		}
+		for _, item := range meta.LineItems {
+			if item.ListingSlug == "" {
+				continue
+			}
+			status.ListingSlugs = appendUnique(status.ListingSlugs, item.ListingSlug)
+		}
+	}
+
+	grants, err := s.GetGrantsByOrder(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("get grants: %w", err)
+	}
+	status.GrantCount = len(grants)
+	for _, grant := range grants {
+		if models.IsGrantAccessibleWithExpiry(grant.Status, grant.ExpiresAt) {
+			status.AccessibleGrantCount++
+		}
+	}
+
+	if buyerPortalToken == "" && !allowAdmin {
+		authenticatedPeerID = strings.TrimSpace(authenticatedPeerID)
+		if len(grants) > 0 {
+			allowed := false
+			for _, grant := range grants {
+				if grant.BuyerPeerID != "" && grant.BuyerPeerID == authenticatedPeerID {
+					allowed = true
+					break
+				}
+			}
+			if !allowed && meta != nil && strings.TrimSpace(meta.SellerPeerID) != "" && meta.SellerPeerID == authenticatedPeerID {
+				allowed = true
+			}
+			if !allowed {
+				return nil, contracts.ErrBuyerPortalAccess
+			}
+		} else if !orderMetadataAllowsPeer(meta, authenticatedPeerID) {
+			return nil, contracts.ErrBuyerPortalAccess
+		}
+	}
+
+	if meta != nil {
+		if meta.ContractType != "DIGITAL_GOOD" {
+			status.IsDigitalOrder = false
+			status.Status = contracts.DigitalDeliveryStatusNotDigital
+			return status, nil
+		}
+		status.IsDigitalOrder = true
+
+		for _, item := range meta.LineItems {
+			if item.ListingSlug == "" {
+				continue
+			}
+			assets, err := s.getAssetModelsByListing(item.ListingSlug, item.VariantSKU)
+			if err != nil {
+				return nil, fmt.Errorf("get assets for %s/%s: %w", item.ListingSlug, item.VariantSKU, err)
+			}
+			status.AssetCount += len(assets)
+		}
+		status.PreconfiguredAssetHint = status.AssetCount > 0
+	}
+
+	switch {
+	case status.GrantCount > 0 && status.AccessibleGrantCount == 0:
+		status.IsDigitalOrder = true
+		status.Status = contracts.DigitalDeliveryStatusRestricted
+		status.DeliveryURL = "/v1/orders/" + orderID + "/digital-assets"
+	case status.AccessibleGrantCount > 0:
+		status.IsDigitalOrder = true
+		status.Status = contracts.DigitalDeliveryStatusDelivered
+		status.DeliveryURL = "/v1/orders/" + orderID + "/digital-assets"
+	case status.IsDigitalOrder && status.AssetCount > 0:
+		status.Status = contracts.DigitalDeliveryStatusReady
+	case status.IsDigitalOrder:
+		status.Status = contracts.DigitalDeliveryStatusManualRequired
+		status.ManualFallbackAllowed = true
+		status.Reason = "no_preconfigured_assets"
+	case meta == nil && status.GrantCount > 0:
+		status.IsDigitalOrder = true
+		status.Status = contracts.DigitalDeliveryStatusDelivered
+		status.DeliveryURL = "/v1/orders/" + orderID + "/digital-assets"
+	default:
+		status.Reason = "order_metadata_unavailable"
+	}
+
+	return status, nil
+}
+
+func orderMetadataAllowsPeer(meta *OrderMetadata, peerID string) bool {
+	if meta == nil || peerID == "" {
+		return false
+	}
+	return (strings.TrimSpace(meta.BuyerPeerID) != "" && meta.BuyerPeerID == peerID) ||
+		(strings.TrimSpace(meta.SellerPeerID) != "" && meta.SellerPeerID == peerID)
+}
+
+func appendUnique(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
+}
 
 // GetBuyerDigitalAssets builds the Buyer Portal payload for an order.
 // For file assets it produces HMAC-signed download URLs; for license_key assets

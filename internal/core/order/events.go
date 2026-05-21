@@ -21,6 +21,7 @@ import (
 // decoupling, breaking the PaymentAppService → OrderAppService circular
 // dependency for fire-and-forget operations.
 func (s *OrderAppService) StartPaymentEventMonitor() {
+	go s.RepairMissingRatingSignatures(context.Background())
 	go s.subscribeAutoConfirmRequests()
 	go s.subscribeUTXOPaymentDetected()
 	go s.subscribeRwaInstantBuyCompleted()

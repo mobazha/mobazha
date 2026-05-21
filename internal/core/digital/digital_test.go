@@ -395,11 +395,163 @@ func newTestEntitlementService(t *testing.T) (
 		listingSlug:   "listing-ent",
 		variantSKU:    "",
 		buyerPeerID:   "buyer-peer",
+		sellerPeerID:  "seller-peer",
 		paymentMethod: "CANCELABLE",
 	}
+	assetSvc.SetOrderQuerier(orderQ)
 
 	entSvc := NewDigitalEntitlementAppService(context.Background(), db, features, assetSvc, orderQ, bus)
 	return entSvc, assetSvc, bus, orderQ
+}
+
+func TestAssetService_GetDigitalDeliveryStatus_ReadyWhenAssetsPreconfigured(t *testing.T) {
+	_, assetSvc, _, _ := newTestEntitlementService(t)
+
+	ctx := context.Background()
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "file.zip", "application/zip", bytes.NewReader([]byte("test")), int64(len([]byte("test"))))
+	require.NoError(t, err)
+
+	status, err := assetSvc.GetDigitalDeliveryStatus("order-ready-1", "", "", true)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.True(t, status.IsDigitalOrder)
+	assert.Equal(t, contracts.DigitalDeliveryStatusReady, status.Status)
+	assert.Equal(t, 1, status.AssetCount)
+	assert.Equal(t, 0, status.GrantCount)
+	assert.True(t, status.PreconfiguredAssetHint)
+	assert.False(t, status.ManualFallbackAllowed)
+	assert.Empty(t, status.DeliveryURL)
+}
+
+func TestAssetService_GetDigitalDeliveryStatus_ManualRequiredWhenNoAssets(t *testing.T) {
+	_, assetSvc, _, _ := newTestEntitlementService(t)
+
+	status, err := assetSvc.GetDigitalDeliveryStatus("order-manual-1", "", "", true)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.True(t, status.IsDigitalOrder)
+	assert.Equal(t, contracts.DigitalDeliveryStatusManualRequired, status.Status)
+	assert.Equal(t, 0, status.AssetCount)
+	assert.Equal(t, 0, status.GrantCount)
+	assert.True(t, status.ManualFallbackAllowed)
+	assert.Equal(t, "no_preconfigured_assets", status.Reason)
+	assert.Empty(t, status.DeliveryURL)
+}
+
+func TestAssetService_GetDigitalDeliveryStatus_RequiresAccessBeforeNotDigital(t *testing.T) {
+	_, assetSvc, _, orderQ := newTestEntitlementService(t)
+	orderQ.contractType = "PHYSICAL_GOOD"
+
+	_, err := assetSvc.GetDigitalDeliveryStatus("order-phys-private", "", "", false)
+	require.ErrorIs(t, err, contracts.ErrBuyerPortalAccess)
+
+	status, err := assetSvc.GetDigitalDeliveryStatus("order-phys-private", "", "", true)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.False(t, status.IsDigitalOrder)
+	assert.Equal(t, contracts.DigitalDeliveryStatusNotDigital, status.Status)
+}
+
+func TestAssetService_GetDigitalDeliveryStatus_AllowsSellerPeer(t *testing.T) {
+	_, assetSvc, _, _ := newTestEntitlementService(t)
+
+	status, err := assetSvc.GetDigitalDeliveryStatus("order-manual-1", "", "seller-peer", false)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.True(t, status.IsDigitalOrder)
+	assert.Equal(t, contracts.DigitalDeliveryStatusManualRequired, status.Status)
+
+	_, err = assetSvc.GetDigitalDeliveryStatus("order-manual-1", "", "stranger-peer", false)
+	require.ErrorIs(t, err, contracts.ErrBuyerPortalAccess)
+}
+
+func TestAssetService_GetDigitalDeliveryStatus_DeliveredAfterConfirmation(t *testing.T) {
+	entSvc, assetSvc, bus, _ := newTestEntitlementService(t)
+
+	ctx := context.Background()
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "file.zip", "application/zip", bytes.NewReader([]byte("test")), int64(len([]byte("test"))))
+	require.NoError(t, err)
+
+	require.NoError(t, entSvc.Start())
+
+	bus.Emit(&events.OrderConfirmation{OrderID: "order-delivered-1"})
+	time.Sleep(100 * time.Millisecond)
+
+	status, err := assetSvc.GetDigitalDeliveryStatus("order-delivered-1", "", "", true)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.True(t, status.IsDigitalOrder)
+	assert.Equal(t, contracts.DigitalDeliveryStatusDelivered, status.Status)
+	assert.Equal(t, 1, status.AssetCount)
+	assert.Equal(t, 1, status.GrantCount)
+	assert.Equal(t, 1, status.AccessibleGrantCount)
+	assert.Equal(t, "/v1/orders/order-delivered-1/digital-assets", status.DeliveryURL)
+}
+
+type testOrderShipper struct {
+	calls     int
+	orderID   models.OrderID
+	shipments []models.Shipment
+	err       error
+}
+
+func (s *testOrderShipper) ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error {
+	s.calls++
+	s.orderID = orderID
+	s.shipments = append([]models.Shipment(nil), shipments...)
+	if done != nil {
+		close(done)
+	}
+	return s.err
+}
+
+func TestEntitlement_OrderConfirmation_DoesNotGrantLicenseAssetWithoutKeys(t *testing.T) {
+	entSvc, assetSvc, bus, _ := newTestEntitlementService(t)
+	shipper := &testOrderShipper{}
+	entSvc.SetShipper(shipper)
+
+	_, err := assetSvc.CreateLicenseKeyAsset("listing-ent", "", "app-ent-empty")
+	require.NoError(t, err)
+
+	require.NoError(t, entSvc.Start())
+
+	bus.Emit(&events.OrderConfirmation{OrderID: "order-empty-lic"})
+	time.Sleep(100 * time.Millisecond)
+
+	grants, err := assetSvc.GetGrantsByOrder("order-empty-lic")
+	require.NoError(t, err)
+	assert.Empty(t, grants, "license-key asset without enough keys must not create a buyer-visible grant")
+	assert.Equal(t, 0, shipper.calls, "incomplete digital entitlement must not auto-ship")
+}
+
+func TestEntitlement_OrderConfirmation_AutoShipsEveryDigitalLineItem(t *testing.T) {
+	entSvc, assetSvc, bus, orderQ := newTestEntitlementService(t)
+	orderQ.lineItems = []OrderLineItem{
+		{ListingSlug: "listing-ent-a", Quantity: 1},
+		{ListingSlug: "listing-ent-b", Quantity: 1},
+	}
+	shipper := &testOrderShipper{}
+	entSvc.SetShipper(shipper)
+
+	_, err := assetSvc.CreateLinkAsset("listing-ent-a", "", "https://example.com/a")
+	require.NoError(t, err)
+	_, err = assetSvc.CreateLinkAsset("listing-ent-b", "", "https://example.com/b")
+	require.NoError(t, err)
+
+	require.NoError(t, entSvc.Start())
+
+	bus.Emit(&events.OrderConfirmation{OrderID: "order-multi-digital"})
+	time.Sleep(100 * time.Millisecond)
+
+	grants, err := assetSvc.GetGrantsByOrder("order-multi-digital")
+	require.NoError(t, err)
+	require.Len(t, grants, 2)
+	require.Equal(t, 1, shipper.calls)
+	require.Len(t, shipper.shipments, 2)
+	assert.Equal(t, 0, shipper.shipments[0].ItemIndex)
+	assert.Equal(t, 1, shipper.shipments[1].ItemIndex)
+	assert.NotNil(t, shipper.shipments[0].DigitalDelivery)
+	assert.NotNil(t, shipper.shipments[1].DigitalDelivery)
 }
 
 func TestEntitlement_OrderConfirmation_CreatesActiveGrant_CANCELABLE(t *testing.T) {

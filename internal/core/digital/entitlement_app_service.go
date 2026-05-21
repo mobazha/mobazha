@@ -10,6 +10,14 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
+// OrderShipper fulfills the ship-order step, advancing the order state and
+// notifying the buyer. Implemented by *order.OrderAppService (and by
+// contracts.NodeService, which MobazhaNode satisfies).
+// A nil shipper disables auto-ship (grants are still created).
+type OrderShipper interface {
+	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
+}
+
 // OrderLineItem represents one purchased item in a multi-line order.
 type OrderLineItem struct {
 	ListingSlug string
@@ -22,6 +30,7 @@ type OrderLineItem struct {
 type OrderMetadata struct {
 	ContractType  string
 	BuyerPeerID   string
+	SellerPeerID  string
 	PaymentMethod string
 	LineItems     []OrderLineItem
 }
@@ -36,7 +45,7 @@ type OrderQuerier interface {
 // manages digital asset entitlements (grants, license allocation).
 //
 // Event subscriptions:
-//   - OrderConfirmation → create grants + allocate license keys
+//   - OrderConfirmation → create grants + allocate license keys + auto-ShipOrder
 //   - DisputeOpen       → freeze grants + suspend licenses
 //   - DisputeClose      → restore or revoke based on outcome
 //   - Refund            → revoke all grants + licenses
@@ -47,6 +56,7 @@ type DigitalEntitlementAppService struct {
 	assets   *DigitalAssetAppService
 	orders   OrderQuerier
 	bus      events.Bus
+	shipper  OrderShipper // may be nil: auto-ship disabled, grants still created
 }
 
 // NewDigitalEntitlementAppService creates a new entitlement service.
@@ -68,6 +78,13 @@ func NewDigitalEntitlementAppService(
 		orders:   orders,
 		bus:      bus,
 	}
+}
+
+// SetShipper wires the auto-ship dependency. Must be called before Start().
+// If never called (or called with nil), grants are still created on
+// OrderConfirmation but the order state is not advanced to FULFILLED.
+func (s *DigitalEntitlementAppService) SetShipper(shipper OrderShipper) {
+	s.shipper = shipper
 }
 
 // Start subscribes to order events and processes them in background goroutines.
@@ -137,7 +154,9 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 
 	grantStatus := determineGrantStatus(meta.PaymentMethod)
 
-	for _, item := range meta.LineItems {
+	grantsCreated := 0
+	deliveredItems := make(map[int]bool)
+	for itemIndex, item := range meta.LineItems {
 		qty := item.Quantity
 		if qty == 0 {
 			qty = 1
@@ -148,21 +167,22 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 			log.Errorf("[digital-entitlement] get assets for %s/%s: %v", item.ListingSlug, item.VariantSKU, err)
 			continue
 		}
+		if len(assets) == 0 {
+			log.Errorf("[digital-entitlement] no configured digital assets for order %s item %d listing %s/%s",
+				confirm.OrderID, itemIndex, item.ListingSlug, item.VariantSKU)
+			continue
+		}
 
+		itemDelivered := true
 		for i := range assets {
 			asset := &assets[i]
 
 			// Files and links: one grant covers all seats (download is unlimited).
 			// License keys: allocate qty keys to match the purchased quantity.
-			_, grantErr := s.assets.CreateDownloadGrant(asset, confirm.OrderID, meta.BuyerPeerID, grantStatus)
-			if grantErr != nil {
-				log.Errorf("[digital-entitlement] create grant for asset %s: %v", asset.ID, grantErr)
-				continue
-			}
-
 			if asset.AssetType == models.AssetTypeLicenseKey {
 				already := s.assets.CountAllocatedKeys(confirm.OrderID, asset.ListingSlug, asset.VariantSKU)
 				remaining := int64(qty) - already
+				allocated := int64(0)
 				for seat := int64(0); seat < remaining; seat++ {
 					_, allocErr := s.assets.AllocateLicenseKey(
 						asset.ListingSlug, asset.VariantSKU,
@@ -173,8 +193,51 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 							asset.ID, already+seat+1, qty, allocErr)
 						break
 					}
+					allocated++
+				}
+				if already+allocated < int64(qty) {
+					itemDelivered = false
+					continue
 				}
 			}
+
+			_, grantErr := s.assets.CreateDownloadGrant(asset, confirm.OrderID, meta.BuyerPeerID, grantStatus)
+			if grantErr != nil {
+				log.Errorf("[digital-entitlement] create grant for asset %s: %v", asset.ID, grantErr)
+				itemDelivered = false
+				continue
+			}
+			grantsCreated++
+		}
+		if itemDelivered {
+			deliveredItems[itemIndex] = true
+		}
+	}
+
+	// Auto-ship: write Buyer Portal entry and advance order state to FULFILLED.
+	// The URL points to the seller-side digital assets endpoint; the buyer
+	// accesses the same data via GET /v1/orders/{orderID}/digital-assets.
+	// Non-fatal: if ShipOrder fails, grants are already live and the buyer
+	// can still access downloads via the portal. The order state will remain
+	// AWAITING_FULFILLMENT until the seller manually ships or retries.
+	if len(deliveredItems) == len(meta.LineItems) && grantsCreated > 0 && s.shipper != nil {
+		shipments := make([]models.Shipment, 0, len(deliveredItems))
+		for itemIndex := range meta.LineItems {
+			if deliveredItems[itemIndex] {
+				shipments = append(shipments, models.Shipment{
+					ItemIndex: itemIndex,
+					DigitalDelivery: &models.DigitalDelivery{
+						URL: "/v1/orders/" + confirm.OrderID + "/digital-assets",
+					},
+				})
+			}
+		}
+		if err := s.shipper.ShipOrder(models.OrderID(confirm.OrderID), shipments, nil); err != nil {
+			log.Errorf("[digital-entitlement] auto-ShipOrder order %s: %v — grants active, order state not advanced",
+				confirm.OrderID, err)
+		} else {
+			log.Infof("[digital-entitlement] auto-ShipOrder order %s: %d grants created, order advanced to FULFILLED",
+				confirm.OrderID, grantsCreated)
 		}
 	}
 

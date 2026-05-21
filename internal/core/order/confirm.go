@@ -3,6 +3,7 @@
 package order
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -153,6 +154,32 @@ func (s *OrderAppService) IsOrderShipped(orderID models.OrderID) (bool, error) {
 		return false, err
 	}
 	return order.SerializedOrderShipments != nil, nil
+}
+
+// EnsureRatingSignatures asks the vendor node to create and send rating
+// signatures for a verified order. It repairs payment verification paths that
+// bypassed PAYMENT_SENT processing and therefore missed the normal signature
+// emission hook.
+func (s *OrderAppService) EnsureRatingSignatures(ctx context.Context, orderID models.OrderID) error {
+	if err := s.acquireOrderLock(orderID); err != nil {
+		return fmt.Errorf("failed to acquire order lock for %s: %w", orderID, err)
+	}
+	defer s.releaseOrderLock(orderID)
+
+	return s.db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().WithContext(ctx).Where("id = ?", orderID.String()).First(&order).Error; err != nil {
+			return err
+		}
+		orderOpen, err := order.OrderOpenMessage()
+		if err != nil {
+			return err
+		}
+		if err := s.orderProcessor.EnsureRatingSignatures(tx, &order, orderOpen); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	})
 }
 
 // ShipOrder sends an order shipment to the remote peer and updates the order state.

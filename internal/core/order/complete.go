@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -149,7 +148,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 	if len(ratings) > 0 {
 		ratingSignatures, err := order.RatingSignaturesMessage()
 		if err != nil {
-			return err
+			return fmt.Errorf("rating signatures: %w", err)
 		}
 		chaincode, err := hex.DecodeString(paymentSent.Chaincode)
 		if err != nil {
@@ -158,7 +157,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 		peerID := s.peerID()
 		ratingPBs, err = s.processRatings(ratings, orderOpen, ratingSignatures, profile, includeIDInRating, chaincode, peerID.String())
 		if err != nil {
-			logger.LogErrorWithIDf(log, s.peerID().String(), "failed to process ratings: %v", err)
+			return fmt.Errorf("process ratings: %w", err)
 		}
 	}
 

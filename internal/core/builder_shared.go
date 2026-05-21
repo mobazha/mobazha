@@ -104,19 +104,30 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 	}
 
 	assetSvc := digital.NewDigitalAssetAppService(obNode.db, blob, obNode.keyProvider)
-	obNode.digitalAssetService = assetSvc
 
 	if obNode.eventBus == nil {
+		assetSvc.SetOrderQuerier(&dbOrderQuerier{db: obNode.db})
+		obNode.digitalAssetService = assetSvc
 		logger.LogInfoWithID(log, obNode.nodeID, "Digital asset subsystem initialized (entitlement disabled: no event bus)")
 		return
 	}
 
 	orders := &dbOrderQuerier{db: obNode.db}
+	assetSvc.SetOrderQuerier(orders)
+	obNode.digitalAssetService = assetSvc
 	digitalCtx := obNode.nodeCtx
 	if pkgconfig.TenantIDFromContext(digitalCtx) == "" {
 		digitalCtx = pkgconfig.ContextWithTenantID(digitalCtx, pkgdatabase.StandaloneTenantID)
 	}
 	entitlementSvc := digital.NewDigitalEntitlementAppService(digitalCtx, obNode.db, obNode.featureResolver, assetSvc, orders, obNode.eventBus)
+	// Wire the shipper so that auto-delivery also advances the order state
+	// to FULFILLED and notifies the buyer. obNode.Order() returns
+	// contracts.OrderService which satisfies digital.OrderShipper.
+	// Called before Start() so the shipper is visible to the event goroutines
+	// from the moment they begin processing.
+	if orderSvc := obNode.Order(); orderSvc != nil {
+		entitlementSvc.SetShipper(orderSvc)
+	}
 	if err := entitlementSvc.Start(); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Digital: entitlement start failed: %v", err)
 		return
@@ -178,6 +189,9 @@ func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadat
 		for _, sl := range oo.Listings {
 			if sl != nil && sl.Listing != nil && sl.Cid != "" {
 				cidToSlug[sl.Cid] = sl.Listing.Slug
+				if meta.SellerPeerID == "" && sl.Listing.VendorID != nil {
+					meta.SellerPeerID = sl.Listing.VendorID.PeerID
+				}
 			}
 		}
 
@@ -237,6 +251,9 @@ func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.Orde
 	for _, it := range go_.Items {
 		if it.ListingSlug == "" {
 			continue
+		}
+		if meta.SellerPeerID == "" {
+			meta.SellerPeerID = it.SellerPeerID
 		}
 		qty := uint32(it.Quantity)
 		if qty == 0 {

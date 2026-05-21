@@ -22,6 +22,7 @@ var (
 type DigitalAssetService interface {
 	// Buyer-facing
 	GetBuyerDigitalAssets(orderID string, buyerPortalToken string, authenticatedBuyerPeerID string, allowAdmin bool, urlExpirySec int64) ([]BuyerAssetEntry, error)
+	GetDigitalDeliveryStatus(orderID string, buyerPortalToken string, authenticatedPeerID string, allowAdmin bool) (*DigitalDeliveryStatus, error)
 	// ServeDownload verifies a signed download URL, applies grant/expiry/quota
 	// checks, records the download, and returns a streaming reader for the
 	// decrypted file content. Caller must Close the returned Body.
@@ -107,6 +108,32 @@ type BuyerLicenseEntry struct {
 	LicenseType    string `json:"licenseType,omitempty"`
 	Activations    int64  `json:"activations"`
 	MaxActivations int    `json:"maxActivations,omitempty"`
+}
+
+const (
+	DigitalDeliveryStatusNotDigital     = "not_digital"
+	DigitalDeliveryStatusReady          = "ready"
+	DigitalDeliveryStatusDelivered      = "delivered"
+	DigitalDeliveryStatusManualRequired = "manual_required"
+	DigitalDeliveryStatusPending        = "pending"
+	DigitalDeliveryStatusRestricted     = "restricted"
+)
+
+// DigitalDeliveryStatus is the order-level contract used by seller and buyer
+// order pages to decide whether digital delivery is automatic or requires a
+// manual fallback link.
+type DigitalDeliveryStatus struct {
+	OrderID                string   `json:"orderId"`
+	IsDigitalOrder         bool     `json:"isDigitalOrder"`
+	Status                 string   `json:"status"`
+	AssetCount             int      `json:"assetCount"`
+	GrantCount             int      `json:"grantCount"`
+	AccessibleGrantCount   int      `json:"accessibleGrantCount"`
+	DeliveryURL            string   `json:"deliveryURL,omitempty"`
+	ManualFallbackAllowed  bool     `json:"manualFallbackAllowed"`
+	Reason                 string   `json:"reason,omitempty"`
+	ListingSlugs           []string `json:"listingSlugs,omitempty"`
+	PreconfiguredAssetHint bool     `json:"preconfiguredAssetHint"`
 }
 
 // DigitalAssetInfo is the API-facing representation of a digital asset.

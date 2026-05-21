@@ -52,6 +52,10 @@ type buyerDigitalAssetsOutput struct {
 	Body []contracts.BuyerAssetEntry `doc:"List of digital entitlements for this order."`
 }
 
+type digitalDeliveryStatusOutput struct {
+	Body *contracts.DigitalDeliveryStatus `doc:"Order-level digital delivery status."`
+}
+
 type licenseValidateOutput struct {
 	Body *contracts.LicenseValidationResult
 }
@@ -105,6 +109,41 @@ func (g *Gateway) registerNodeHumaDigitalOperations(api huma.API) {
 			return nil, huma.Error500InternalServerError("failed to retrieve digital assets", err)
 		}
 		return &buyerDigitalAssetsOutput{Body: entries}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "digital-delivery-status-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/orders/{orderID}/digital-delivery",
+		Summary:     "Get digital delivery status for an order",
+		Description: "Returns the order-level digital delivery contract used by seller and buyer order pages. " +
+			"It exposes delivery state and counts only; digital secrets are returned by the buyer assets endpoint.",
+		Tags:     []string{"digital-assets"},
+		Security: []map[string][]string{},
+	}, func(ctx context.Context, in *struct {
+		OrderID                string `path:"orderID" doc:"Order ID." example:"QmOrder123"`
+		BuyerPortalTokenHeader string `header:"X-Buyer-Portal-Token" doc:"Independent buyer portal bearer token issued at guest order creation."`
+	}) (*digitalDeliveryStatusOutput, error) {
+		r := g.nodeBridgeRequestWithOptionalAuth(ctx, http.MethodGet, "/v1/orders/"+in.OrderID+"/digital-delivery", nil)
+		svc, ok := getDigitalAssetService(r)
+		if !ok {
+			return nil, huma.Error501NotImplemented("digital asset subsystem not available")
+		}
+		identity := GetAuthIdentity(r.Context())
+		isAnonymousSentinel := identity != nil && identity.UserID == "anonymous"
+		allowAdmin := identity != nil && identity.IsAdmin && !isAnonymousSentinel
+		authenticatedPeerID := ""
+		if identity != nil && !identity.IsAdmin && !isAnonymousSentinel {
+			authenticatedPeerID = identity.PeerID
+		}
+		status, err := svc.GetDigitalDeliveryStatus(in.OrderID, in.BuyerPortalTokenHeader, authenticatedPeerID, allowAdmin)
+		if err != nil {
+			if errors.Is(err, contracts.ErrBuyerPortalAccess) {
+				return nil, huma.Error403Forbidden("buyer portal token is invalid or expired")
+			}
+			return nil, huma.Error500InternalServerError("failed to retrieve digital delivery status", err)
+		}
+		return &digitalDeliveryStatusOutput{Body: status}, nil
 	})
 
 	// Digital file download — served as binary via the Huma bridge pattern

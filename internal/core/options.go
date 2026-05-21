@@ -285,6 +285,9 @@ func (n *MobazhaNode) wireServiceSetters() {
 	}
 	if n.paymentService != nil && n.orderService != nil {
 		n.paymentService.SetPaymentVerifiedHandler(func(orderID string, paymentSent *pb.PaymentSent) {
+			if err := n.orderService.EnsureRatingSignatures(context.Background(), models.OrderID(orderID)); err != nil {
+				logger.LogWarningWithIDf(log, n.nodeID, "payment verified: ensure rating signatures for order %s: %v", orderID, err)
+			}
 			amount, _ := strconv.ParseUint(paymentSent.Amount, 10, 64)
 			pd := &models.PaymentData{
 				OrderID:       orderID,
@@ -958,18 +961,18 @@ func (n *MobazhaNode) initGuestOrderService() {
 	guestSolanaAvailable := false
 
 	n.guestOrderService = guest.NewGuestOrderAppService(guest.GuestOrderAppServiceConfig{
-		DB:                     n.db,
-		DirectPayment:          n.directPaymentService,
-		SweepService:           n.autoSweepService,
-		EventBus:               n.eventBus,
-		NodeID:                 n.nodeID,
-		Shutdown:               n.shutdown,
-		Listings:               n.listingService,
-		ExchangeRates:          n.exchangeRates,
-		Resolver:               n.featureResolver,
-		SupportedUTXOChains:    supportedUTXO,
+		DB:                      n.db,
+		DirectPayment:           n.directPaymentService,
+		SweepService:            n.autoSweepService,
+		EventBus:                n.eventBus,
+		NodeID:                  n.nodeID,
+		Shutdown:                n.shutdown,
+		Listings:                n.listingService,
+		ExchangeRates:           n.exchangeRates,
+		Resolver:                n.featureResolver,
+		SupportedUTXOChains:     supportedUTXO,
 		EVMObservationAvailable: guestEvmAvailable,
-		SolanaMonitorAvailable: guestSolanaAvailable,
+		SolanaMonitorAvailable:  guestSolanaAvailable,
 	})
 	if n.multiwallet != nil {
 		n.guestOrderService.SetMultiwallet(n.multiwallet)

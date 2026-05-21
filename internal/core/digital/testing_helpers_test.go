@@ -271,16 +271,23 @@ type testOrderQuerier struct {
 	listingSlug   string
 	variantSKU    string
 	buyerPeerID   string
+	sellerPeerID  string
 	paymentMethod string
+	lineItems     []OrderLineItem
 }
 
 func (q *testOrderQuerier) GetOrderMetadata(_ string) (*OrderMetadata, error) {
+	lineItems := q.lineItems
+	if len(lineItems) == 0 {
+		lineItems = []OrderLineItem{
+			{ListingSlug: q.listingSlug, VariantSKU: q.variantSKU, Quantity: 1},
+		}
+	}
 	return &OrderMetadata{
 		ContractType:  q.contractType,
 		BuyerPeerID:   q.buyerPeerID,
+		SellerPeerID:  q.sellerPeerID,
 		PaymentMethod: q.paymentMethod,
-		LineItems: []OrderLineItem{
-			{ListingSlug: q.listingSlug, VariantSKU: q.variantSKU, Quantity: 1},
-		},
+		LineItems:     lineItems,
 	}, nil
 }

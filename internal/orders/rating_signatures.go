@@ -87,6 +87,30 @@ func (op *OrderProcessor) processRatingSignaturesMessage(dbtx database.Tx, order
 	return event, order.PutMessage(message)
 }
 
+// EnsureRatingSignatures creates and sends vendor rating signatures when the
+// order is funded and payment-verified. It is idempotent for already-signed
+// orders and is used by payment verification paths that do not reprocess a
+// PAYMENT_SENT message.
+func (op *OrderProcessor) EnsureRatingSignatures(dbtx database.Tx, order *models.Order, orderOpen *pb.OrderOpen) error {
+	if order == nil || orderOpen == nil {
+		return nil
+	}
+	if order.Role() != models.RoleVendor {
+		return nil
+	}
+	if len(order.SerializedRatingSignatures) > 0 {
+		return nil
+	}
+	funded, err := order.IsFunded()
+	if err != nil {
+		return err
+	}
+	if !funded || !order.IsPaymentVerified() {
+		return nil
+	}
+	return op.sendRatingSignatures(dbtx, order, orderOpen)
+}
+
 // sendRatingSignatures signs the buyer's rating keys and sends the signatures to the buyer. We want to do
 // this right after the order is funded.
 func (op *OrderProcessor) sendRatingSignatures(dbtx database.Tx, order *models.Order, orderOpen *pb.OrderOpen) error {

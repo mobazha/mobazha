@@ -159,7 +159,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 
 	case models.RoleVendor:
 		if funded && order.IsPaymentVerified() {
-			if err := op.sendRatingSignatures(dbtx, order, orderOpen); err != nil {
+			if err := op.EnsureRatingSignatures(dbtx, order, orderOpen); err != nil {
 				logger.LogInfoWithIDf(log, op.nodeID, "Error sending rating signatures: %s", err)
 			}
 

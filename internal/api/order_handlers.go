@@ -957,11 +957,14 @@ func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request
 		PhysicalDelivery       *models.PhysicalDelivery       `json:"physicalDelivery"`
 		DigitalDelivery        *models.DigitalDelivery        `json:"digitalDelivery"`
 		CryptocurrencyDelivery *models.CryptocurrencyDelivery `json:"cryptocurrencyDelivery"`
-		ReceivingAccountID     *int                           `json:"receivingAccountID,omitempty"`
+	}
+	type orderShipmentRequest struct {
+		Shipments          []orderShipment `json:"shipments"`
+		ReceivingAccountID *int            `json:"receivingAccountID,omitempty"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
-	var shipParam orderShipment
+	var shipParam orderShipmentRequest
 	err := decoder.Decode(&shipParam)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -972,13 +975,24 @@ func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request
 	if shipParam.ReceivingAccountID != nil {
 		receivingAccountID = *shipParam.ReceivingAccountID
 	}
+	if len(shipParam.Shipments) == 0 {
+		ErrorResponse(w, http.StatusBadRequest, "shipments is required")
+		return
+	}
 
-	shipment := models.Shipment{
-		ItemIndex:              0,
-		Note:                   shipParam.Note,
-		PhysicalDelivery:       shipParam.PhysicalDelivery,
-		DigitalDelivery:        shipParam.DigitalDelivery,
-		CryptocurrencyDelivery: shipParam.CryptocurrencyDelivery,
+	buildShipment := func(param orderShipment) models.Shipment {
+		return models.Shipment{
+			ItemIndex:              param.ItemIndex,
+			Note:                   param.Note,
+			PhysicalDelivery:       param.PhysicalDelivery,
+			DigitalDelivery:        param.DigitalDelivery,
+			CryptocurrencyDelivery: param.CryptocurrencyDelivery,
+		}
+	}
+
+	shipments := make([]models.Shipment, 0, len(shipParam.Shipments))
+	for _, param := range shipParam.Shipments {
+		shipments = append(shipments, buildShipment(param))
 	}
 
 	orderSvc := getOrderService(r)
@@ -989,11 +1003,13 @@ func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request
 			ErrorResponse(w, http.StatusBadRequest, "收款账户不存在或无效")
 			return
 		}
-		shipment.ReceivingAccountAddress = receivingAccount.Address
+		for i := range shipments {
+			shipments[i].ReceivingAccountAddress = receivingAccount.Address
+		}
 	}
 
 	done := make(chan struct{})
-	err = orderSvc.ShipOrder(models.OrderID(orderID), []models.Shipment{shipment}, done)
+	err = orderSvc.ShipOrder(models.OrderID(orderID), shipments, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

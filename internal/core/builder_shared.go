@@ -195,11 +195,21 @@ func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadat
 			}
 		}
 
-		for _, oi := range oo.Items {
+		for i, oi := range oo.Items {
 			if oi == nil {
 				continue
 			}
 			slug := cidToSlug[oi.ListingHash]
+			if slug == "" {
+				// Item.ListingHash is frozen at purchase time; SignedListing.Cid
+				// changes when the seller edits/republishes. Fall back when the
+				// order snapshot still carries the listing row.
+				if len(oo.Listings) == 1 && oo.Listings[0] != nil && oo.Listings[0].Listing != nil {
+					slug = oo.Listings[0].Listing.Slug
+				} else if i < len(oo.Listings) && oo.Listings[i] != nil && oo.Listings[i].Listing != nil {
+					slug = oo.Listings[i].Listing.Slug
+				}
+			}
 			if slug == "" {
 				continue
 			}

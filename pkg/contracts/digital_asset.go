@@ -137,6 +137,8 @@ type DigitalDeliveryStatus struct {
 }
 
 // DigitalAssetInfo is the API-facing representation of a digital asset.
+// For link-type assets, URL is populated with the decrypted plaintext URL
+// on seller-authenticated endpoints only.
 type DigitalAssetInfo struct {
 	ID           string    `json:"id"`
 	ListingSlug  string    `json:"listingSlug"`
@@ -145,6 +147,7 @@ type DigitalAssetInfo struct {
 	FileName     string    `json:"fileName,omitempty"`
 	FileSize     int64     `json:"fileSize,omitempty"`
 	MimeType     string    `json:"mimeType,omitempty"`
+	URL          string    `json:"url,omitempty"`
 	SortOrder    int       `json:"sortOrder"`
 	MaxDownloads int       `json:"maxDownloads"`
 	ExpiryHours  int       `json:"expiryHours"`
@@ -154,9 +157,10 @@ type DigitalAssetInfo struct {
 
 // AssetUpdateInput holds the mutable fields for UpdateAsset.
 type AssetUpdateInput struct {
-	MaxDownloads *int `json:"maxDownloads,omitempty"`
-	ExpiryHours  *int `json:"expiryHours,omitempty"`
-	SortOrder    *int `json:"sortOrder,omitempty"`
+	MaxDownloads *int    `json:"maxDownloads,omitempty"`
+	ExpiryHours  *int    `json:"expiryHours,omitempty"`
+	SortOrder    *int    `json:"sortOrder,omitempty"`
+	URL          *string `json:"url,omitempty"`
 }
 
 // LicenseKeyPoolStats summarises the key pool for a listing.

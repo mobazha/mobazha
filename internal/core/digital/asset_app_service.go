@@ -173,7 +173,9 @@ func (s *DigitalAssetAppService) CreateLinkAsset(
 		return nil, fmt.Errorf("save asset: %w", err)
 	}
 
-	return assetToInfo(asset), nil
+	info := assetToInfo(asset)
+	info.URL = url
+	return info, nil
 }
 
 // CreateLicenseKeyAsset creates a DigitalAsset of type "license_key" that
@@ -752,6 +754,7 @@ func (cc *combinedCloser) Close() error {
 }
 
 // GetAssetsByListing returns all digital assets for a listing+variant.
+// For link-type assets, the decrypted URL is included in the response.
 func (s *DigitalAssetAppService) GetAssetsByListing(
 	listingSlug string,
 	variantSKU string,
@@ -762,7 +765,9 @@ func (s *DigitalAssetAppService) GetAssetsByListing(
 	}
 	result := make([]contracts.DigitalAssetInfo, len(assets))
 	for i := range assets {
-		result[i] = *assetToInfo(&assets[i])
+		info := assetToInfo(&assets[i])
+		s.enrichLinkURL(info, &assets[i])
+		result[i] = *info
 	}
 	return result, nil
 }
@@ -1392,7 +1397,9 @@ func (s *DigitalAssetAppService) GetAssetByID(assetID string) (*contracts.Digita
 	if err != nil {
 		return nil, err
 	}
-	return assetToInfo(asset), nil
+	info := assetToInfo(asset)
+	s.enrichLinkURL(info, asset)
+	return info, nil
 }
 
 func (s *DigitalAssetAppService) getAssetModelByID(assetID string) (*models.DigitalAsset, error) {
@@ -1422,12 +1429,21 @@ func (s *DigitalAssetAppService) UpdateAsset(assetID string, updates contracts.A
 		if updates.SortOrder != nil {
 			asset.SortOrder = *updates.SortOrder
 		}
+		if updates.URL != nil && asset.AssetType == models.AssetTypeLink {
+			cipherURL, encErr := s.crypto.EncryptFile([]byte(*updates.URL), asset.ID, asset.KeyVersion)
+			if encErr != nil {
+				return fmt.Errorf("encrypt link: %w", encErr)
+			}
+			asset.DeliveryData = cipherURL
+		}
 		return tx.Save(&asset)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return assetToInfo(&asset), nil
+	info := assetToInfo(&asset)
+	s.enrichLinkURL(info, &asset)
+	return info, nil
 }
 
 // DeleteAsset removes a digital asset by ID.
@@ -1514,6 +1530,19 @@ func assetToInfo(a *models.DigitalAsset) *contracts.DigitalAssetInfo {
 		CreatedAt:    a.CreatedAt,
 		UpdatedAt:    a.UpdatedAt,
 	}
+}
+
+// enrichLinkURL decrypts the URL for link-type assets and sets it on the info struct.
+// Silently skips non-link assets or decryption failures.
+func (s *DigitalAssetAppService) enrichLinkURL(info *contracts.DigitalAssetInfo, asset *models.DigitalAsset) {
+	if asset.AssetType != models.AssetTypeLink || len(asset.DeliveryData) == 0 {
+		return
+	}
+	plainURL, err := s.crypto.DecryptFile(asset.DeliveryData, asset.ID, asset.KeyVersion)
+	if err != nil {
+		return
+	}
+	info.URL = string(plainURL)
 }
 
 func expiresAtFromAsset(asset *models.DigitalAsset) time.Time {

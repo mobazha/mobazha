@@ -6,9 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -884,6 +886,113 @@ func TestAssetService_GetBuyerDigitalAssets_LicenseKeyEntry(t *testing.T) {
 	require.Len(t, entries[0].LicenseKeys, 1)
 	assert.Equal(t, "BUYER-KEY-001", entries[0].LicenseKeys[0].LicenseKey)
 	_ = lk
+}
+
+func TestAssetService_GetBuyerDigitalAssets_FallsBackToCoTenantSeller(t *testing.T) {
+	const (
+		orderID    = "order-cotenant-digital"
+		buyerPeer  = "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi"
+		sellerPeer = "12D3KooWHHzSeKaY8xuZVzkLbKFfvNgPPeKhFBGrMbNbXRwuFCA5"
+	)
+
+	buyerSvc, _ := newTestAssetService(t)
+	buyerSvc.SetNodePeerID(buyerPeer)
+	buyerSvc.SetOrderQuerier(&testOrderQuerier{
+		contractType:  "DIGITAL_GOOD",
+		listingSlug:   "listing-cotenant",
+		buyerPeerID:   buyerPeer,
+		sellerPeerID:  sellerPeer,
+		paymentMethod: "CANCELABLE",
+	})
+
+	sellerSvc, _ := newTestAssetService(t)
+	sellerSvc.SetNodePeerID(sellerPeer)
+	sellerSvc.SetOrderQuerier(&testOrderQuerier{
+		contractType:  "DIGITAL_GOOD",
+		listingSlug:   "listing-cotenant",
+		buyerPeerID:   buyerPeer,
+		sellerPeerID:  sellerPeer,
+		paymentMethod: "CANCELABLE",
+	})
+	link, err := sellerSvc.CreateLinkAsset("listing-cotenant", "", "https://downloads.example/template")
+	require.NoError(t, err)
+	asset, err := sellerSvc.getAssetModelByID(link.ID)
+	require.NoError(t, err)
+	_, err = sellerSvc.CreateDownloadGrant(asset, orderID, buyerPeer, models.GrantStatusActive)
+	require.NoError(t, err)
+
+	sellerPID, err := peer.Decode(sellerPeer)
+	require.NoError(t, err)
+	buyerSvc.SetCoTenantDigitalAssets(func(pid peer.ID) (contracts.DigitalAssetService, error) {
+		if pid == sellerPID {
+			return sellerSvc, nil
+		}
+		return nil, contracts.ErrBuyerPortalAccess
+	})
+
+	entries, err := buyerSvc.GetBuyerDigitalAssets(orderID, "", buyerPeer, false, 3600)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "https://downloads.example/template", entries[0].DeliveryURL)
+
+	status, err := buyerSvc.GetDigitalDeliveryStatus(orderID, "", buyerPeer, false)
+	require.NoError(t, err)
+	assert.Equal(t, contracts.DigitalDeliveryStatusDelivered, status.Status)
+	assert.Equal(t, 1, status.AccessibleGrantCount)
+}
+
+func TestAssetService_ServeDownload_FallsBackToCoTenantSeller(t *testing.T) {
+	const (
+		orderID    = "order-cotenant-download"
+		buyerPeer  = "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi"
+		sellerPeer = "12D3KooWHHzSeKaY8xuZVzkLbKFfvNgPPeKhFBGrMbNbXRwuFCA5"
+	)
+
+	buyerSvc, _ := newTestAssetService(t)
+	buyerSvc.SetNodePeerID(buyerPeer)
+	buyerSvc.SetOrderQuerier(&testOrderQuerier{
+		contractType:  "DIGITAL_GOOD",
+		listingSlug:   "listing-file-cotenant",
+		buyerPeerID:   buyerPeer,
+		sellerPeerID:  sellerPeer,
+		paymentMethod: "CANCELABLE",
+	})
+
+	sellerSvc, _ := newTestAssetService(t)
+	plaintext := []byte("seller-owned file bytes")
+	file, err := sellerSvc.UploadFileAssetStream(context.Background(), "listing-file-cotenant", "", "bundle.zip", "application/zip", bytes.NewReader(plaintext), int64(len(plaintext)))
+	require.NoError(t, err)
+	asset, err := sellerSvc.getAssetModelByID(file.ID)
+	require.NoError(t, err)
+	grant, err := sellerSvc.CreateDownloadGrant(asset, orderID, buyerPeer, models.GrantStatusActive)
+	require.NoError(t, err)
+	expiryTs := time.Now().Add(time.Hour).Unix()
+	sig, err := sellerSvc.SignDownloadURL(orderID, grant, grant.AssetID, expiryTs, asset.KeyVersion)
+	require.NoError(t, err)
+
+	sellerPID, err := peer.Decode(sellerPeer)
+	require.NoError(t, err)
+	buyerSvc.SetCoTenantDigitalAssets(func(pid peer.ID) (contracts.DigitalAssetService, error) {
+		if pid == sellerPID {
+			return sellerSvc, nil
+		}
+		return nil, contracts.ErrBuyerPortalAccess
+	})
+
+	resp, err := buyerSvc.ServeDownload(context.Background(), contracts.DownloadRequest{
+		OrderID:      orderID,
+		GrantNonce:   grant.Nonce,
+		AssetID:      grant.AssetID,
+		ExpiryUnix:   expiryTs,
+		GrantVersion: grant.Version,
+		Signature:    sig,
+	})
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	got, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, plaintext, got)
+	assert.Equal(t, "bundle.zip", resp.FileName)
 }
 
 // ---------------------------------------------------------------------------

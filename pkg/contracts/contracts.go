@@ -37,6 +37,10 @@ import (
 // (standalone mode), callers fall through to the normal NetDB/IPNS path.
 type CoTenantPublicDataFn func(peerID peer.ID) (pkgdb.PublicData, error)
 
+// CoTenantDigitalAssetsFn resolves the digital asset service for a co-located
+// tenant on the same SaaS host. It is nil outside shared-host deployments.
+type CoTenantDigitalAssetsFn func(peerID peer.ID) (DigitalAssetService, error)
+
 // IdentityService provides node identity and lifecycle operations.
 type IdentityService interface {
 	// GetNodeID returns the unique identifier for this node/tenant.

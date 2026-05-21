@@ -104,6 +104,8 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 	}
 
 	assetSvc := digital.NewDigitalAssetAppService(obNode.db, blob, obNode.keyProvider)
+	assetSvc.SetNodePeerID(obNode.Identity().String())
+	assetSvc.SetCoTenantDigitalAssets(obNode.coTenantDigitalAssetsDeferred())
 
 	if obNode.eventBus == nil {
 		assetSvc.SetOrderQuerier(&dbOrderQuerier{db: obNode.db})

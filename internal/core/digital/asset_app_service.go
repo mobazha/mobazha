@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -26,10 +27,12 @@ import (
 // DigitalAssetAppService manages digital asset CRUD, encrypted file storage,
 // license key management, and download grant lifecycle.
 type DigitalAssetAppService struct {
-	db     database.Database
-	blob   contracts.BlobStore
-	crypto *encryption.DigitalCrypto
-	orders OrderQuerier
+	db                    database.Database
+	blob                  contracts.BlobStore
+	crypto                *encryption.DigitalCrypto
+	orders                OrderQuerier
+	nodePeerID            string
+	coTenantDigitalAssets contracts.CoTenantDigitalAssetsFn
 }
 
 // NewDigitalAssetAppService creates a new DigitalAssetAppService.
@@ -49,6 +52,17 @@ func NewDigitalAssetAppService(
 // digital delivery status contract.
 func (s *DigitalAssetAppService) SetOrderQuerier(orders OrderQuerier) {
 	s.orders = orders
+}
+
+// SetNodePeerID records the local node identity so buyer-side lookups can
+// avoid routing back to the same seller node when no local grant exists.
+func (s *DigitalAssetAppService) SetNodePeerID(peerID string) {
+	s.nodePeerID = strings.TrimSpace(peerID)
+}
+
+// SetCoTenantDigitalAssets wires the same-host SaaS digital asset resolver.
+func (s *DigitalAssetAppService) SetCoTenantDigitalAssets(fn contracts.CoTenantDigitalAssetsFn) {
+	s.coTenantDigitalAssets = fn
 }
 
 // UploadFileAssetStream encrypts a file streamed from `src` and stores the
@@ -620,6 +634,9 @@ func (s *DigitalAssetAppService) ServeDownload(
 	// reject *any* request that fails the HMAC check below.
 	grant, err := s.GetGrantByNonce(req.GrantNonce)
 	if err != nil {
+		if remote, ok := s.coTenantSellerDigitalAssets(req.OrderID); ok {
+			return remote.ServeDownload(ctx, req)
+		}
 		return nil, fmt.Errorf("grant not found")
 	}
 
@@ -1144,6 +1161,11 @@ func (s *DigitalAssetAppService) GetDigitalDeliveryStatus(
 	if err != nil {
 		return nil, fmt.Errorf("get grants: %w", err)
 	}
+	if len(grants) == 0 {
+		if remote, ok := s.coTenantSellerDigitalAssets(orderID); ok {
+			return remote.GetDigitalDeliveryStatus(orderID, buyerPortalToken, authenticatedPeerID, allowAdmin)
+		}
+	}
 	status.GrantCount = len(grants)
 	for _, grant := range grants {
 		if models.IsGrantAccessibleWithExpiry(grant.Status, grant.ExpiresAt) {
@@ -1227,6 +1249,29 @@ func orderMetadataAllowsPeer(meta *OrderMetadata, peerID string) bool {
 		(strings.TrimSpace(meta.SellerPeerID) != "" && meta.SellerPeerID == peerID)
 }
 
+func (s *DigitalAssetAppService) coTenantSellerDigitalAssets(orderID string) (contracts.DigitalAssetService, bool) {
+	if s.coTenantDigitalAssets == nil || s.orders == nil {
+		return nil, false
+	}
+	meta, err := s.orders.GetOrderMetadata(orderID)
+	if err != nil || meta == nil {
+		return nil, false
+	}
+	sellerPeerID := strings.TrimSpace(meta.SellerPeerID)
+	if sellerPeerID == "" || sellerPeerID == strings.TrimSpace(s.nodePeerID) {
+		return nil, false
+	}
+	sellerPeer, err := peer.Decode(sellerPeerID)
+	if err != nil {
+		return nil, false
+	}
+	remote, err := s.coTenantDigitalAssets(sellerPeer)
+	if err != nil || remote == nil {
+		return nil, false
+	}
+	return remote, true
+}
+
 func appendUnique(values []string, value string) []string {
 	for _, existing := range values {
 		if existing == value {
@@ -1257,6 +1302,9 @@ func (s *DigitalAssetAppService) GetBuyerDigitalAssets(
 		return nil, fmt.Errorf("get grants: %w", err)
 	}
 	if len(grants) == 0 {
+		if remote, ok := s.coTenantSellerDigitalAssets(orderID); ok {
+			return remote.GetBuyerDigitalAssets(orderID, buyerPortalToken, authenticatedBuyerPeerID, allowAdmin, urlExpirySec)
+		}
 		return nil, nil
 	}
 	if buyerPortalToken == "" && !allowAdmin {

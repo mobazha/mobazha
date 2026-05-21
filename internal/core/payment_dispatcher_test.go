@@ -99,6 +99,31 @@ func TestManagedEscrowOrderTenantResolver_ResolveTenants_GuestOrderStandaloneDef
 	}
 }
 
+func TestManagedEscrowOrderTenantResolver_ResolveTenants_OrderMirrors(t *testing.T) {
+	db := newTestDatabase(t)
+	orderID := "QmSharedManagedEscrowOrder"
+	for _, tenantID := range []string{"tenant-buyer", "tenant-vendor"} {
+		if err := db.gormDB.Create(&models.Order{
+			TenantMixin: models.TenantMixin{TenantID: tenantID},
+			ID:          models.OrderID(orderID),
+		}).Error; err != nil {
+			t.Fatalf("create mirrored order for %s: %v", tenantID, err)
+		}
+	}
+
+	tenants, err := (&managed_escrowOrderTenantResolver{db: db}).ResolveTenants(context.Background(), orderID)
+	if err != nil {
+		t.Fatalf("ResolveTenants: %v", err)
+	}
+	got := map[string]bool{}
+	for _, tenantID := range tenants {
+		got[tenantID] = true
+	}
+	if len(got) != 2 || !got["tenant-buyer"] || !got["tenant-vendor"] {
+		t.Fatalf("ResolveTenants = %#v, want both mirrored tenants", tenants)
+	}
+}
+
 func classifyCoin(coin iwallet.CoinType) chainCategory {
 	coinInfo, err := coin.CoinInfo()
 	if err != nil {

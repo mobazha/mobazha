@@ -152,6 +152,10 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	sellerConfirmSub, err := network.Nodes()[0].eventBus.Subscribe(&events.OrderConfirmation{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	confirmAck, err := network.Nodes()[0].eventBus.Subscribe(&events.MessageACK{})
 	if err != nil {
@@ -168,6 +172,12 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
+	select {
+	case <-sellerConfirmSub.Out():
+		sellerConfirmSub.Close()
+	case <-time.After(time.Second * 10):
+		t.Fatal("Timeout waiting on seller confirmation event")
+	}
 	select {
 	case <-confirmSub.Out():
 	case <-time.After(time.Second * 10):

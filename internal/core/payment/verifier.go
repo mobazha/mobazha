@@ -95,9 +95,10 @@ import (
 // references an order this node has never seen — see §5.1 of the design
 // doc, which prescribes "log-and-skip" for these).
 type AggregatingVerifier struct {
-	db    database.Database
-	bus   events.Bus
-	clock func() time.Time
+	db                     database.Database
+	bus                    events.Bus
+	clock                  func() time.Time
+	paymentVerifiedHandler func(orderID string, paymentSent *pb.PaymentSent)
 }
 
 // NewAggregatingVerifier wires the verifier with the tenant-scoped
@@ -133,6 +134,12 @@ func (v *AggregatingVerifier) SetClock(clock func() time.Time) {
 	v.clock = clock
 }
 
+// SetPaymentVerifiedHandler registers a callback invoked after a monitor-driven
+// crypto payment is confirmed and the surrounding DB transaction commits.
+func (v *AggregatingVerifier) SetPaymentVerifiedHandler(fn func(orderID string, paymentSent *pb.PaymentSent)) {
+	v.paymentVerifiedHandler = fn
+}
+
 // AggregateAndEmit recomputes the funded / partial / overpaid verdict for
 // the order from its current set of confirmed observations and persists
 // the result. See the AggregatingVerifier doc for the full contract.
@@ -165,6 +172,9 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 	var (
 		emitVerified          bool
 		emitVerifiedNamespace string
+		emitBusinessEvents    []interface{}
+		emitHandlerOrderID    string
+		emitHandlerPayment    *pb.PaymentSent
 	)
 
 	var err error
@@ -176,14 +186,14 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 		err = raw.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			return v.aggregateWithGorm(ctx, tx, func(order *models.Order) error {
 				return tx.Save(order).Error
-			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace)
+			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace, &emitBusinessEvents, &emitHandlerOrderID, &emitHandlerPayment)
 		})
 	} else {
 		err = v.db.Update(func(tx database.Tx) error {
 			gdb := tx.Read().WithContext(ctx)
 			return v.aggregateWithGorm(ctx, gdb, func(order *models.Order) error {
 				return tx.Save(order)
-			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace)
+			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace, &emitBusinessEvents, &emitHandlerOrderID, &emitHandlerPayment)
 		})
 	}
 	if err != nil {
@@ -192,6 +202,12 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 
 	if emitVerified {
 		v.bus.Emit(events.PaymentVerified{TenantID: tenantID, OrderID: orderID})
+		for _, evt := range emitBusinessEvents {
+			v.bus.Emit(evt)
+		}
+		if v.paymentVerifiedHandler != nil && emitHandlerPayment != nil && emitHandlerOrderID != "" {
+			go v.paymentVerifiedHandler(emitHandlerOrderID, emitHandlerPayment)
+		}
 		paymentmetrics.RecordPaymentAggregationEnvelopeEmitted(tenantID, emitVerifiedNamespace, orderID)
 	}
 	return nil
@@ -204,6 +220,9 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 	tenantID, orderID string,
 	emitVerified *bool,
 	emitVerifiedNamespace *string,
+	emitBusinessEvents *[]interface{},
+	emitHandlerOrderID *string,
+	emitHandlerPayment **pb.PaymentSent,
 ) error {
 	gdb = gdb.WithContext(ctx)
 
@@ -292,12 +311,98 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 		promoteAfterVerification(&order, v.clock())
 		*emitVerified = true
 		*emitVerifiedNamespace = deduped[0].ChainNamespace
+		*emitBusinessEvents = paymentVerifiedBusinessEvents(&order, orderOpen, ps, total)
+		*emitHandlerOrderID = order.ID.String()
+		*emitHandlerPayment = ps
 	}
 
 	if err := saveOrder(&order); err != nil {
 		return fmt.Errorf("aggregating verifier: save order %s: %w", orderID, err)
 	}
 	return nil
+}
+
+func paymentVerifiedBusinessEvents(order *models.Order, orderOpen *pb.OrderOpen, ps *pb.PaymentSent, total *big.Int) []interface{} {
+	if order == nil || ps == nil {
+		return nil
+	}
+	switch order.Role() {
+	case models.RoleBuyer:
+		fundingTotal := ""
+		if total != nil {
+			fundingTotal = total.String()
+		}
+		return []interface{}{&events.OrderPaymentReceived{
+			OrderID:      order.ID.String(),
+			FundingTotal: fundingTotal,
+			CoinType:     ps.Coin,
+		}}
+
+	case models.RoleVendor:
+		funded := orderFundedEvent(order, orderOpen)
+		if funded == nil {
+			return nil
+		}
+		out := []interface{}{funded}
+		switch ps.Method {
+		case pb.PaymentSent_CANCELABLE:
+			var amount uint64
+			if total != nil && total.IsUint64() {
+				amount = total.Uint64()
+			}
+			out = append(out, &events.CancelablePaymentReady{
+				OrderID:       order.ID.String(),
+				TransactionID: ps.TransactionID,
+				Coin:          ps.Coin,
+				Amount:        amount,
+			})
+		case pb.PaymentSent_RWA_INSTANT:
+			out = append(out, &events.RwaInstantBuyCompleted{
+				OrderID:       order.ID.String(),
+				TransactionID: ps.TransactionID,
+				Coin:          ps.Coin,
+			})
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func orderFundedEvent(order *models.Order, orderOpen *pb.OrderOpen) *events.OrderFunded {
+	if order == nil || orderOpen == nil || len(orderOpen.Listings) == 0 {
+		return nil
+	}
+	signed := orderOpen.Listings[0]
+	if signed == nil || signed.Listing == nil || signed.Listing.Metadata == nil || signed.Listing.Item == nil {
+		return nil
+	}
+	listing := signed.Listing
+	buyerID := ""
+	if orderOpen.BuyerID != nil {
+		buyerID = orderOpen.BuyerID.PeerID
+	}
+	funded := &events.OrderFunded{
+		BuyerName:   orderOpen.BuyerID.DisplayName(),
+		BuyerAvatar: orderOpen.BuyerID.DisplayAvatar(),
+		BuyerID:     buyerID,
+		ListingType: listing.Metadata.ContractType.String(),
+		OrderID:     order.ID.String(),
+		Price: events.ListingPrice{
+			Amount:        orderOpen.Amount,
+			CurrencyCode:  orderOpen.PricingCoin,
+			PriceModifier: listing.Item.CryptoListingPriceModifier,
+		},
+		Slug:  listing.Slug,
+		Title: listing.Item.Title,
+	}
+	if len(listing.Item.Images) > 0 && listing.Item.Images[0] != nil {
+		funded.Thumbnail = events.Thumbnail{
+			Tiny:  listing.Item.Images[0].Tiny,
+			Small: listing.Item.Images[0].Small,
+		}
+	}
+	return funded
 }
 
 // dialectSupportsRowLock reports whether the underlying SQL dialect

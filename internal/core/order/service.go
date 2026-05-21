@@ -316,6 +316,17 @@ func (s *OrderAppService) releaseOrderLock(orderID models.OrderID) {
 	}
 }
 
+func (s *OrderAppService) emitOrderProcessorEvents(evts ...interface{}) {
+	if s.eventBus == nil {
+		return
+	}
+	for _, evt := range evts {
+		if evt != nil {
+			s.eventBus.Emit(evt)
+		}
+	}
+}
+
 func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error {
 	if err := s.acquireOrderLock(orderID); err != nil {
 		return fmt.Errorf("failed to acquire order lock for %s: %w", orderID, err)
@@ -401,11 +412,13 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 		}
 	}
 
-	return s.db.Update(func(tx database.Tx) error {
-		_, err := s.orderProcessor.ProcessMessage(tx, &resp)
+	var localEvents []interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
+		evt, err := s.orderProcessor.ProcessMessage(tx, &resp)
 		if err != nil {
 			return err
 		}
+		localEvents = append(localEvents, evt)
 
 		if shouldSendFiatRefund {
 			refundMsg, err := s.buildFiatRefundMessage(&order, fiatRefundResult)
@@ -426,9 +439,11 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 			refundResp.MessageType = npb.Message_ORDER
 			refundResp.Payload = refundPayload
 
-			if _, err := s.orderProcessor.ProcessMessage(tx, refundMsg); err != nil {
+			evt, err = s.orderProcessor.ProcessMessage(tx, refundMsg)
+			if err != nil {
 				return err
 			}
+			localEvents = append(localEvents, evt)
 
 			var (
 				done1 = make(chan struct{})
@@ -482,11 +497,12 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 			refundResp.MessageType = npb.Message_ORDER
 			refundResp.Payload = refundPayload
 
-			_, err = s.orderProcessor.ProcessMessage(tx, refundResult.Message)
+			evt, err = s.orderProcessor.ProcessMessage(tx, refundResult.Message)
 			if err != nil {
 				refundResult.rollback()
 				return err
 			}
+			localEvents = append(localEvents, evt)
 
 			var (
 				done1 = make(chan struct{})
@@ -513,7 +529,11 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 		}
 
 		return s.messenger.ReliablySendMessage(tx, buyer, message, done)
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(localEvents...)
+	return nil
 }
 
 // ── RefundOrder ─────────────────────────────────────────────────
@@ -565,7 +585,8 @@ func (s *OrderAppService) refundFiatOrder(ctx context.Context, order *models.Ord
 		return err
 	}
 
-	return s.db.Update(func(tx database.Tx) error {
+	var refundEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
 		refundMsg, err := s.buildFiatRefundMessage(order, result)
 		if err != nil {
 			return err
@@ -583,11 +604,16 @@ func (s *OrderAppService) refundFiatOrder(ctx context.Context, order *models.Ord
 		message.MessageType = npb.Message_ORDER
 		message.Payload = refundPayload
 
-		if _, err := s.orderProcessor.ProcessMessage(tx, refundMsg); err != nil {
+		refundEvent, err = s.orderProcessor.ProcessMessage(tx, refundMsg)
+		if err != nil {
 			return err
 		}
 		return s.messenger.ReliablySendMessage(tx, buyer, message, done)
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(refundEvent)
+	return nil
 }
 
 func (s *OrderAppService) refundFiatPayment(
@@ -675,7 +701,8 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 		return err
 	}
 
-	return s.db.Update(func(tx database.Tx) error {
+	var refundEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
 		coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 		if err != nil {
 			return err
@@ -704,7 +731,7 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 		message.MessageType = npb.Message_ORDER
 		message.Payload = refundPayload
 
-		_, err = s.orderProcessor.ProcessMessage(tx, refundResult.Message)
+		refundEvent, err = s.orderProcessor.ProcessMessage(tx, refundResult.Message)
 		if err != nil {
 			refundResult.rollback()
 			return err
@@ -715,7 +742,11 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 		}
 
 		return refundResult.commit()
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(refundEvent)
+	return nil
 }
 
 // ── GetRefundOrderInstructions ──────────────────────────────────
@@ -1186,8 +1217,9 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 	message.MessageType = npb.Message_ORDER
 	message.Payload = payload
 
-	return s.db.Update(func(tx database.Tx) error {
-		_, err = s.orderProcessor.ProcessMessage(tx, resp)
+	var cancelEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
+		cancelEvent, err = s.orderProcessor.ProcessMessage(tx, resp)
 		if err != nil {
 			if wTx != nil {
 				wTx.Rollback()
@@ -1215,7 +1247,11 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 			return wTx.Commit()
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(cancelEvent)
+	return nil
 }
 
 // releaseFromCancelableAddress releases funds from a CANCELABLE address.

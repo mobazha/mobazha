@@ -135,6 +135,11 @@ type recordingBus struct {
 	emitted []interface{}
 }
 
+type verifiedHandlerCall struct {
+	orderID     string
+	paymentSent *pb.PaymentSent
+}
+
 const testUSDCAsset = "crypto:eip155:1:erc20:0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
 func (b *recordingBus) Subscribe(_ interface{}, _ ...events.SubscriptionOpt) (events.Subscription, error) {
@@ -175,6 +180,43 @@ func seedOrderForTenant(t *testing.T, db *vTestDB, tenantID, orderID, expectedAm
 		MyRole:              string(models.RoleVendor),
 		SerializedOrderOpen: raw,
 		RefundAddress:       refundAddress,
+	}
+	order.MarkPaymentVerificationPending()
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+}
+
+func seedOrderForRoleWithListing(t *testing.T, db *vTestDB, orderID, expectedAmount string, role models.OrderRole) {
+	t.Helper()
+	oo := &pb.OrderOpen{
+		Amount:      expectedAmount,
+		PricingCoin: "USDC",
+		Chaincode:   "11223344aabbccdd",
+		BuyerID:     &pb.ID{PeerID: "buyer-peer", Handle: "buyer"},
+		Listings: []*pb.SignedListing{{
+			Listing: &pb.Listing{
+				Slug: "deterministic-payment-listing",
+				Metadata: &pb.Listing_Metadata{
+					ContractType: pb.Listing_Metadata_PHYSICAL_GOOD,
+				},
+				Item: &pb.Listing_Item{
+					Title:                      "Deterministic Payment Listing",
+					CryptoListingPriceModifier: 0,
+				},
+			},
+		}},
+	}
+	raw, err := protojson.Marshal(oo)
+	require.NoError(t, err)
+
+	order := &models.Order{
+		TenantMixin:         models.TenantMixin{TenantID: database.StandaloneTenantID},
+		ID:                  models.OrderID(orderID),
+		MyRole:              string(role),
+		SerializedOrderOpen: raw,
+		RefundAddress:       "0xrefund",
 	}
 	order.MarkPaymentVerificationPending()
 
@@ -408,6 +450,138 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 	require.Equal(t, pb.PaymentSent_CANCELABLE, ps.Method)
 	require.Equal(t, "0xmanagedescrow", ps.ContractAddress)
 	require.Equal(t, frozen.Unix(), ps.Timestamp.AsTime().Unix())
+}
+
+func TestAggregateAndEmit_VendorVerifiedPaymentEmitsOrderFunded(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	handlerCalls := make(chan verifiedHandlerCall, 1)
+	v := NewAggregatingVerifier(db, bus)
+	v.SetPaymentVerifiedHandler(func(orderID string, paymentSent *pb.PaymentSent) {
+		handlerCalls <- verifiedHandlerCall{orderID: orderID, paymentSent: paymentSent}
+	})
+
+	seedOrderForRoleWithListing(t, db, "order-vendor-funded", "1000", models.RoleVendor)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().
+			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, "order-vendor-funded").
+			First(&order).Error; err != nil {
+			return err
+		}
+		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+			Coin:    testUSDCAsset,
+			Amount:  1000,
+			Address: "0xmanagedescrow",
+			SettlementSpec: &models.PendingSettlementSpec{
+				Method:     "CANCELABLE",
+				PayMode:    "address_monitored",
+				EscrowType: "managed_escrow",
+			},
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	}))
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-vendor-funded",
+		OrderID:        "order-vendor-funded",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-vendor-funded",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "1000",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-vendor-funded"))
+
+	require.Len(t, bus.emitted, 3)
+	_, ok := bus.emitted[0].(events.PaymentVerified)
+	require.True(t, ok, "first event remains the internal verification signal")
+	funded, ok := bus.emitted[1].(*events.OrderFunded)
+	require.True(t, ok, "vendor verification must emit order.funded for notifications/cache invalidation")
+	require.Equal(t, "order-vendor-funded", funded.OrderID)
+	require.Equal(t, "Deterministic Payment Listing", funded.Title)
+	require.Equal(t, "deterministic-payment-listing", funded.Slug)
+	ready, ok := bus.emitted[2].(*events.CancelablePaymentReady)
+	require.True(t, ok, "cancelable verified payments still trigger auto-confirm")
+	require.Equal(t, "order-vendor-funded", ready.OrderID)
+	require.Equal(t, uint64(1000), ready.Amount)
+	select {
+	case call := <-handlerCalls:
+		require.Equal(t, "order-vendor-funded", call.orderID)
+		require.NotNil(t, call.paymentSent)
+		require.Equal(t, "0xtx-vendor-funded", call.paymentSent.TransactionID)
+	case <-time.After(time.Second):
+		t.Fatal("vendor monitor verification did not call the cross-node payment verified handler")
+	}
+}
+
+func TestAggregateAndEmit_BuyerVerifiedPaymentEmitsPaymentReceived(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	handlerCalls := make(chan verifiedHandlerCall, 1)
+	v := NewAggregatingVerifier(db, bus)
+	v.SetPaymentVerifiedHandler(func(orderID string, paymentSent *pb.PaymentSent) {
+		handlerCalls <- verifiedHandlerCall{orderID: orderID, paymentSent: paymentSent}
+	})
+
+	seedOrderForRoleWithListing(t, db, "order-buyer-funded", "1000", models.RoleBuyer)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().
+			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, "order-buyer-funded").
+			First(&order).Error; err != nil {
+			return err
+		}
+		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+			Coin:    testUSDCAsset,
+			Amount:  1000,
+			Address: "0xmanagedescrow",
+			SettlementSpec: &models.PendingSettlementSpec{
+				Method:     "DIRECT",
+				PayMode:    "address_monitored",
+				EscrowType: "managed_escrow",
+			},
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	}))
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-buyer-funded",
+		OrderID:        "order-buyer-funded",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-buyer-funded",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "1000",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-buyer-funded"))
+
+	require.Len(t, bus.emitted, 2)
+	_, ok := bus.emitted[0].(events.PaymentVerified)
+	require.True(t, ok)
+	received, ok := bus.emitted[1].(*events.OrderPaymentReceived)
+	require.True(t, ok, "buyer verification must emit order.payment_received for notifications/cache invalidation")
+	require.Equal(t, "order-buyer-funded", received.OrderID)
+	require.Equal(t, "1000", received.FundingTotal)
+	require.Equal(t, testUSDCAsset, received.CoinType)
+	select {
+	case call := <-handlerCalls:
+		require.Equal(t, "order-buyer-funded", call.orderID)
+		require.NotNil(t, call.paymentSent)
+		require.Equal(t, "0xtx-buyer-funded", call.paymentSent.TransactionID)
+	case <-time.After(time.Second):
+		t.Fatal("buyer monitor verification did not call the cross-node payment verified handler")
+	}
 }
 
 func TestAggregateAndEmit_SyntheticBalancePollVerifiesWithoutExplorerTx(t *testing.T) {

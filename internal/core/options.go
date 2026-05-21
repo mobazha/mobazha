@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -284,20 +283,7 @@ func (n *MobazhaNode) wireServiceSetters() {
 		n.paymentService.SetPaymentRecorder(n.orderProcessor)
 	}
 	if n.paymentService != nil && n.orderService != nil {
-		n.paymentService.SetPaymentVerifiedHandler(func(orderID string, paymentSent *pb.PaymentSent) {
-			if err := n.orderService.EnsureRatingSignatures(context.Background(), models.OrderID(orderID)); err != nil {
-				logger.LogWarningWithIDf(log, n.nodeID, "payment verified: ensure rating signatures for order %s: %v", orderID, err)
-			}
-			amount, _ := strconv.ParseUint(paymentSent.Amount, 10, 64)
-			pd := &models.PaymentData{
-				OrderID:       orderID,
-				TransactionID: paymentSent.TransactionID,
-				Coin:          iwallet.CoinType(paymentSent.Coin),
-				Amount:        amount,
-				Method:        paymentSent.Method,
-			}
-			n.orderService.RelayPaymentToBuyer(context.Background(), orderID, pd)
-		})
+		n.paymentService.SetPaymentVerifiedHandler(n.handleCryptoPaymentVerified)
 	}
 	if n.fiatPaymentService != nil && n.orderService != nil {
 		n.fiatPaymentService.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {

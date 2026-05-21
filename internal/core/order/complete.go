@@ -199,7 +199,8 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 		}
 	}
 
-	return s.db.Update(func(tx database.Tx) error {
+	var completionEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
 		completeAny := &anypb.Any{}
 		if err := completeAny.MarshalFrom(completeMsg); err != nil {
 			return err
@@ -224,7 +225,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 		message.MessageType = npb.Message_ORDER
 		message.Payload = payload
 
-		_, err = s.orderProcessor.ProcessMessage(tx, m)
+		completionEvent, err = s.orderProcessor.ProcessMessage(tx, m)
 		if err != nil {
 			return err
 		}
@@ -236,7 +237,11 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 		}
 
 		return s.messenger.ReliablySendMessage(tx, vendor, message, done)
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(completionEvent)
+	return nil
 }
 
 // RateOrder submits ratings for an already-completed order that was completed
@@ -318,7 +323,8 @@ func (s *OrderAppService) RateOrder(orderID models.OrderID, ratings []models.Rat
 		Ratings:     ratingPBs,
 	}
 
-	return s.db.Update(func(tx database.Tx) error {
+	var completionEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
 		supplementAny := &anypb.Any{}
 		if err := supplementAny.MarshalFrom(supplementMsg); err != nil {
 			return err
@@ -343,13 +349,17 @@ func (s *OrderAppService) RateOrder(orderID models.OrderID, ratings []models.Rat
 		message.MessageType = npb.Message_ORDER
 		message.Payload = payload
 
-		_, err = s.orderProcessor.ProcessMessage(tx, m)
+		completionEvent, err = s.orderProcessor.ProcessMessage(tx, m)
 		if err != nil {
 			return err
 		}
 
 		return s.messenger.ReliablySendMessage(tx, vendor, message, done)
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(completionEvent)
+	return nil
 }
 
 func (s *OrderAppService) processRatings(ratings []models.Rating, orderOpen *pb.OrderOpen, ratingSignatures *pb.RatingSignatures, profile *models.Profile, includeIDInRating bool, chaincode []byte, peerIDStr string) ([]*pb.Rating, error) {

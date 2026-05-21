@@ -425,12 +425,15 @@ func (n *MobazhaNode) buildManagedEscrowMonitor(chain iwallet.ChainType) (*manag
 	}
 
 	obsRepo := NewGormPaymentObservationRepo(tenantDB, tenantDB.RawDB())
-	p2pAggregator := corepayment.NewAggregatingVerifier(n.db, n.eventBus)
-	aggregator := corepayment.PaymentAggregator(p2pAggregator)
+	orderAggregator := corepayment.NewAggregatingVerifier(n.db, n.eventBus)
+	if n.orderService != nil {
+		orderAggregator.SetPaymentVerifiedHandler(n.handleCryptoPaymentVerified)
+	}
+	aggregator := corepayment.PaymentAggregator(orderAggregator)
 	if n.guestOrderService != nil {
 		aggregator = corepayment.NewRoutingPaymentAggregator(
 			corepayment.NewGuestManagedEscrowPaymentAggregator(n.db, n.guestOrderService, obsRepo),
-			p2pAggregator,
+			orderAggregator,
 		)
 	}
 	dispatcher := corepayment.NewObservationDispatcher(

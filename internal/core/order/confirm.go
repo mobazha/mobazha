@@ -33,7 +33,12 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 	if err := s.acquireOrderLock(orderID); err != nil {
 		return fmt.Errorf("failed to acquire order lock for %s: %w", orderID, err)
 	}
-	defer s.releaseOrderLock(orderID)
+	lockHeld := true
+	defer func() {
+		if lockHeld {
+			s.releaseOrderLock(orderID)
+		}
+	}()
 
 	var order models.Order
 	err := s.db.View(func(tx database.Tx) error {
@@ -100,8 +105,9 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 	message.MessageType = npb.Message_ORDER
 	message.Payload = payload
 
-	return s.db.Update(func(tx database.Tx) error {
-		_, err = s.orderProcessor.ProcessMessage(tx, resp)
+	var confirmationEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
+		confirmationEvent, err = s.orderProcessor.ProcessMessage(tx, resp)
 		if err != nil {
 			return err
 		}
@@ -125,7 +131,16 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 		}
 
 		return s.messenger.ReliablySendMessage(tx, buyer, message, done)
-	})
+	}); err != nil {
+		return err
+	}
+
+	s.releaseOrderLock(orderID)
+	lockHeld = false
+	if confirmationEvent != nil && s.eventBus != nil {
+		s.eventBus.Emit(confirmationEvent)
+	}
+	return nil
 }
 
 // IsOrderConfirmed returns true if the order has an OrderConfirmation message,
@@ -348,12 +363,17 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 	message.MessageType = npb.Message_ORDER
 	message.Payload = payload
 
-	return s.db.Update(func(tx database.Tx) error {
-		_, err = s.orderProcessor.ProcessMessage(tx, resp)
+	var shipmentEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
+		shipmentEvent, err = s.orderProcessor.ProcessMessage(tx, resp)
 		if err != nil {
 			return err
 		}
 
 		return s.messenger.ReliablySendMessage(tx, buyer, message, done)
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(shipmentEvent)
+	return nil
 }

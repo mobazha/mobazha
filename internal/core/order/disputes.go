@@ -124,7 +124,8 @@ func (s *OrderAppService) OpenDispute(orderID models.OrderID, reason string, evi
 		EvidenceHashes: evidenceHashes,
 	}
 
-	return s.db.Update(func(tx database.Tx) error {
+	var disputeEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
 		disputeOpenAny := &anypb.Any{}
 		if err := disputeOpenAny.MarshalFrom(disputeOpen); err != nil {
 			return err
@@ -140,7 +141,7 @@ func (s *OrderAppService) OpenDispute(orderID models.OrderID, reason string, evi
 			return err
 		}
 
-		_, err = s.orderProcessor.ProcessMessage(tx, m)
+		disputeEvent, err = s.orderProcessor.ProcessMessage(tx, m)
 		if err != nil {
 			return err
 		}
@@ -174,7 +175,11 @@ func (s *OrderAppService) OpenDispute(orderID models.OrderID, reason string, evi
 			return err
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(disputeEvent)
+	return nil
 }
 
 // HandleDisputeMessage handles incoming dispute messages from the network.
@@ -916,8 +921,9 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 	message.MessageType = npb.Message_ORDER
 	message.Payload = payload
 
-	return s.db.Update(func(tx database.Tx) error {
-		_, err = s.orderProcessor.ProcessMessage(tx, m)
+	var disputeEvent interface{}
+	if err := s.db.Update(func(tx database.Tx) error {
+		disputeEvent, err = s.orderProcessor.ProcessMessage(tx, m)
 		if err != nil {
 			return err
 		}
@@ -927,7 +933,11 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 		}
 
 		return s.messenger.ReliablySendMessage(tx, to, message, done)
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(disputeEvent)
+	return nil
 }
 
 // ReleaseFundsAfterTimeout releases escrow funds after dispute timeout.
@@ -1089,8 +1099,9 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 	message.MessageType = npb.Message_ORDER
 	message.Payload = payload
 
-	return s.db.Update(func(dbtx database.Tx) error {
-		_, err = s.orderProcessor.ProcessMessage(dbtx, m)
+	var finalizedEvent interface{}
+	if err := s.db.Update(func(dbtx database.Tx) error {
+		finalizedEvent, err = s.orderProcessor.ProcessMessage(dbtx, m)
 		if err != nil {
 			return err
 		}
@@ -1100,7 +1111,11 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 		}
 
 		return s.messenger.ReliablySendMessage(dbtx, buyer, message, done)
-	})
+	}); err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(finalizedEvent)
+	return nil
 }
 
 func (s *OrderAppService) disputeIsTimeout(order *models.Order) (bool, error) {

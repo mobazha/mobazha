@@ -175,9 +175,14 @@ func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadat
 		return nil, err
 	}
 
+	paymentMethod := ""
+	if method, ok := ord.SettlementMethod(); ok {
+		paymentMethod = method.String()
+	}
+
 	meta := &digital.OrderMetadata{
 		ContractType:  ord.ContractType().String(),
-		PaymentMethod: ord.PaymentMethod().String(),
+		PaymentMethod: paymentMethod,
 	}
 
 	if oo, err := ord.OrderOpenMessage(); err == nil && oo != nil {

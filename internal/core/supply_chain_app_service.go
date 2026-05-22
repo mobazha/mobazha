@@ -1009,8 +1009,15 @@ func (s *SupplyChainAppService) handleOrderFunded(event *events.OrderFunded) {
 		return
 	}
 
+	method, ok := order.SettlementMethod()
+	if !ok {
+		logger.LogWarningWithIDf(log, s.nodeID,
+			"SupplyChain: skipping auto-fulfillment for order %s because PaymentSent settlement spec is missing", orderID)
+		return
+	}
+
 	// Skip MODERATED orders — they need manual multi-sig confirmation
-	if order.PaymentMethod() == pb.PaymentSent_MODERATED {
+	if method == pb.PaymentSent_MODERATED {
 		logger.LogInfoWithIDf(log, s.nodeID,
 			"SupplyChain: skipping auto-fulfillment for MODERATED order %s", orderID)
 		return

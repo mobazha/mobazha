@@ -26,10 +26,14 @@ func (f *orderServiceFacade) GetOrderInfo(orderID models.OrderID, coinType iwall
 	return f.payment.GetOrderInfo(orderID, coinType)
 }
 
+// GetConfirmOrderInstructions bridges the legacy client-signed confirm flow.
+// ManagedEscrow-backed EVM callers should use ExecuteSettlementAction instead.
 func (f *orderServiceFacade) GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	return f.settlement.GetConfirmOrderInstructions(orderID, initiatorAddress, payoutAddress)
 }
 
+// ExecuteSettlementAction is the default settlement surface for backend-
+// submitted routes such as ManagedEscrow-backed EVM.
 func (f *orderServiceFacade) ExecuteSettlementAction(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*paypkg.ActionResult, iwallet.CoinType, error) {
 	return f.settlement.ExecuteSettlementAction(ctx, action, orderID, payoutAddr)
 }

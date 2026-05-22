@@ -159,7 +159,10 @@ func TestComputeProtection_AwaitingShipment(t *testing.T) {
 
 func TestComputeProtection_AwaitingShipmentCancelableReleased(t *testing.T) {
 	o := &Order{State: OrderState_AWAITING_SHIPMENT}
-	if err := o.SetPaymentSent(&pb.PaymentSent{Method: pb.PaymentSent_CANCELABLE, Coin: "crypto:eip155:1:native"}); err != nil {
+	if err := o.SetPaymentSent(&pb.PaymentSent{
+		Coin:           "crypto:eip155:1:native",
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_CANCELABLE),
+	}); err != nil {
 		t.Fatalf("SetPaymentSent: %v", err)
 	}
 	raw, err := protojson.Marshal(&pb.OrderConfirmation{TransactionID: "0xrelease"})

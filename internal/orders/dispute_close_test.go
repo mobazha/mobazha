@@ -137,7 +137,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 	paymentSent := &pb.PaymentSent{
 		Coin:         iwallet.CtMock.String(),
 		Moderator:    "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
-		Method:       pb.PaymentSent_MODERATED,
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_MODERATED),
 		PayerAddress: buyerPayerAddr,
 	}
 
@@ -369,7 +369,7 @@ func TestValidateDisputeResolution_AddressCheck(t *testing.T) {
 		ps := &pb.PaymentSent{
 			Coin:          iwallet.CtMock.String(),
 			Moderator:     "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
-			Method:        pb.PaymentSent_MODERATED,
+			SettlementSpec: testPaymentSentSpec(pb.PaymentSent_MODERATED),
 			PayerAddress:  payerAddr,
 			RefundAddress: refundAddr,
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
@@ -633,15 +634,15 @@ func TestCheckOrderPendingPayment(t *testing.T) {
 		order.SetRole(models.RoleVendor)
 		_ = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 		_ = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-			Method: pb.PaymentSent_CANCELABLE,
-			Coin:   string(iwallet.CtMock),
+			SettlementSpec: payment.NewUTXOSpec(false).ToPaymentSent(),
+			Coin:           string(iwallet.CtMock),
 		}))
 
 		ps, err := order.PaymentSentMessage()
 		require.NoError(t, err)
 
 		// Vendor should check when: CANCELABLE + is vendor
-		shouldCheck := ps.Method == pb.PaymentSent_CANCELABLE && order.Role() == models.RoleVendor
+		shouldCheck := ps.GetSettlementSpec() != nil && ps.GetSettlementSpec().GetMethod() == pb.PaymentSent_CANCELABLE && order.Role() == models.RoleVendor
 		assert.True(t, shouldCheck)
 	})
 }

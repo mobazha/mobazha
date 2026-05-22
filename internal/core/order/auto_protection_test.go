@@ -129,11 +129,24 @@ func (s *stubStrategy) VerifyPreRelease(_ context.Context, _ payment.PreReleaseP
 func orderWithPaymentSent(t *testing.T, method pb.PaymentSent_Method, coin string) *models.Order {
 	t.Helper()
 	o := &models.Order{}
-	ps := &pb.PaymentSent{Method: method, Coin: coin}
+	ps := &pb.PaymentSent{SettlementSpec: testPaymentSentSpec(method), Coin: coin}
 	if err := o.PutMessage(utils.MustWrapOrderMessage(ps)); err != nil {
 		t.Fatalf("PutMessage: %v", err)
 	}
 	return o
+}
+
+func testPaymentSentSpec(method pb.PaymentSent_Method) *pb.PaymentSent_SettlementSpec {
+	switch method {
+	case pb.PaymentSent_FIAT:
+		return payment.NewFiatSpec().ToPaymentSent()
+	case pb.PaymentSent_MODERATED:
+		return payment.NewManagedEscrowSpec(true).ToPaymentSent()
+	case pb.PaymentSent_CANCELABLE:
+		return payment.NewManagedEscrowSpec(false).ToPaymentSent()
+	default:
+		return payment.NewDirectSpec().ToPaymentSent()
+	}
 }
 
 func TestIsClientSignedModerated_CancelableReturnsFalse(t *testing.T) {

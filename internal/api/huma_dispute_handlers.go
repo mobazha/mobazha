@@ -32,9 +32,12 @@ func (g *Gateway) registerDisputesInstructionsRelease(api huma.API) {
 		OperationID: "disputes-post-instructions-release",
 		Method:      http.MethodPost,
 		Path:        "/v1/disputes/{orderID}/instructions/release",
-		Summary:     "Get release-funds instructions for a dispute",
-		Tags:        []string{"disputes"},
-		Security:    nodeAuthSecurity,
+		Summary:     "Legacy dispute release instructions",
+		Description: "Compatibility endpoint for client-signed moderated dispute payouts. " +
+			"ManagedEscrow-backed moderated dispute resolution stays on the backend close/release path " +
+			"and should not use this instructions contract as its primary entrypoint.",
+		Tags:     []string{"disputes"},
+		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *disputeOrderBody) (*nodeDataOutput, error) {
 		rawURL := "/v1/disputes/" + url.PathEscape(hi.OrderID) + "/instructions/release"
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(hi.Body), map[string]string{"orderID": hi.OrderID})

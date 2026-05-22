@@ -48,7 +48,7 @@ func newVerifierTestDB(t *testing.T) *vTestDB {
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.Order{}, &models.PaymentObservation{}))
+	require.NoError(t, db.AutoMigrate(&models.Order{}, &models.PaymentObservation{}, &models.SharedPaymentIntent{}))
 	return &vTestDB{gormDB: db}
 }
 
@@ -440,16 +440,78 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "1000", ps.Amount)
 	require.Equal(t, testUSDCAsset, ps.Coin)
-	require.Equal(t, "0xrefund", ps.RefundAddress)
+	require.Empty(t, ps.RefundAddress, "monitor-only envelope must not capture buyer-local refund metadata")
+	require.Equal(t, "0xrefund", got.RefundAddress, "local order metadata remains available outside the shared envelope")
 	// The latest observation is obs-2 (later block time), so its tx
 	// hash and payer address represent the envelope.
 	require.Equal(t, "0xtx-2", ps.TransactionID)
 	require.Equal(t, "0xpayer-2", ps.PayerAddress)
 	require.Equal(t, "0xmanagedescrow", ps.ToAddress)
 	require.Equal(t, "0xusdc", ps.PaymentTokenAddress)
-	require.Equal(t, pb.PaymentSent_CANCELABLE, ps.Method)
+	require.Equal(t, pb.PaymentSent_CANCELABLE, ps.GetSettlementSpec().GetMethod())
 	require.Equal(t, "0xmanagedescrow", ps.ContractAddress)
-	require.Equal(t, frozen.Unix(), ps.Timestamp.AsTime().Unix())
+	require.Equal(t, int64(1778760300), ps.Timestamp.AsTime().Unix())
+}
+
+func TestBuildAggregatedPaymentSent_UsesDeterministicObservationTimestamp(t *testing.T) {
+	order := &models.Order{ID: models.OrderID("order-deterministic-ts")}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:      "crypto:eip155:1:native",
+		Amount:    1000,
+		Address:   "0xmanagedescrow",
+		Moderated: false,
+	}))
+	orderOpen := &pb.OrderOpen{Chaincode: "abcd"}
+	blockTime := time.Date(2026, 5, 14, 12, 30, 0, 0, time.UTC)
+	rows := []models.PaymentObservation{{
+		ID:             "obs-deterministic",
+		OrderID:        "order-deterministic-ts",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "1000",
+		BlockTime:      blockTime,
+	}}
+
+	psA, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+	psB, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Date(2031, 1, 1, 0, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+	require.Equal(t, blockTime.Unix(), psA.Timestamp.AsTime().Unix())
+	require.Equal(t, psA.Timestamp.AsTime().Unix(), psB.Timestamp.AsTime().Unix())
+}
+
+func TestBuildAggregatedPaymentSent_PrefersExistingSharedRefundAddress(t *testing.T) {
+	order := &models.Order{ID: models.OrderID("order-shared-refund"), RefundAddress: "0xbuyer-local-only"}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:      "crypto:eip155:1:native",
+		Amount:    1000,
+		Address:   "0xmanagedescrow",
+		Moderated: false,
+	}))
+	require.NoError(t, order.SetPaymentSent(&pb.PaymentSent{
+		RefundAddress: "0xshared-refund",
+	}))
+	orderOpen := &pb.OrderOpen{Chaincode: "abcd"}
+	rows := []models.PaymentObservation{{
+		ID:             "obs-shared-refund",
+		OrderID:        "order-shared-refund",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx",
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		Amount:         "1000",
+		BlockTime:      time.Date(2026, 5, 14, 12, 30, 0, 0, time.UTC),
+	}}
+
+	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, "0xshared-refund", ps.RefundAddress)
 }
 
 func TestAggregateAndEmit_VendorVerifiedPaymentEmitsOrderFunded(t *testing.T) {
@@ -794,7 +856,7 @@ func TestAggregateAndEmit_PendingUTXOCoinOverridesOrderOpenPricingCoin(t *testin
 	require.NoError(t, err)
 	require.Equal(t, "1000", ps.Amount)
 	require.Equal(t, "crypto:bip122:000000000019d6689c085ae165831e93:native", ps.Coin)
-	require.Equal(t, pb.PaymentSent_CANCELABLE, ps.Method)
+	require.Equal(t, pb.PaymentSent_CANCELABLE, ps.GetSettlementSpec().GetMethod())
 }
 
 func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesSettlementSpecWhenPresent(t *testing.T) {
@@ -812,7 +874,7 @@ func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesSettlementSpecWhenPrese
 	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "eip155",
 	}})
-	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
 }
 
 func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesPendingTrustModel(t *testing.T) {
@@ -825,18 +887,22 @@ func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesPendingTrustModel(t *te
 	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "eip155",
 	}})
-	require.Equal(t, pb.PaymentSent_CANCELABLE, intent.method)
+	require.Equal(t, pb.PaymentSent_CANCELABLE, intent.settlementSpec.Method)
 	require.Equal(t, "0xmanagedescrow", intent.contractAddress)
 
 	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
-		Address:   "0xmanagedescrow",
-		Moderated: true,
+		Address:          "0xmanagedescrow",
+		Moderated:        true,
+		Moderator:        "mod-peer",
+		ModeratorAddress: "0xmoderator",
 	}))
 	intent = resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "eip155",
 	}})
-	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
 	require.Equal(t, "0xmanagedescrow", intent.contractAddress)
+	require.Equal(t, "mod-peer", intent.moderator)
+	require.Equal(t, "0xmoderator", intent.moderatorAddress)
 }
 
 func TestResolveAggregatedPaymentIntent_UTXOUsesSettlementSpecWhenPresent(t *testing.T) {
@@ -854,7 +920,7 @@ func TestResolveAggregatedPaymentIntent_UTXOUsesSettlementSpecWhenPresent(t *tes
 	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "bip122",
 	}})
-	require.Equal(t, pb.PaymentSent_CANCELABLE, intent.method)
+	require.Equal(t, pb.PaymentSent_CANCELABLE, intent.settlementSpec.Method)
 	require.Equal(t, "5221...", intent.script)
 }
 
@@ -870,7 +936,7 @@ func TestResolveAggregatedPaymentIntent_UTXOUsesPendingEscrowFields(t *testing.T
 	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "bip122",
 	}})
-	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
 	require.Equal(t, "5221...", intent.script)
 	require.Equal(t, "moderator-peer", intent.moderator)
 	require.Equal(t, "02abcdef", intent.moderatorAddress)
@@ -887,7 +953,7 @@ func TestResolveAggregatedPaymentIntent_UTXOUsesPendingForBitcoinCashNamespace(t
 	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "bitcoincash",
 	}})
-	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
 	require.Equal(t, "5221bch...", intent.script)
 }
 
@@ -906,7 +972,7 @@ func TestResolveAggregatedPaymentIntent_ClientSignedUsesSettlementSpecWhenPresen
 	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "eip155",
 	}})
-	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
 	require.Equal(t, "0xescrow", intent.contractAddress)
 }
 
@@ -919,7 +985,7 @@ func TestResolveAggregatedPaymentIntent_ClientSignedFallsBackToModeratorField(t 
 	}))
 
 	intent := resolveAggregatedPaymentIntent(order, nil)
-	require.Equal(t, pb.PaymentSent_MODERATED, intent.method)
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
 	require.Equal(t, "mod-peer", intent.moderator)
 }
 
@@ -928,7 +994,7 @@ func TestResolveAggregatedPaymentIntent_NoPendingIntentFallsBackDirect(t *testin
 	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "eip155",
 	}})
-	require.Equal(t, pb.PaymentSent_DIRECT, intent.method)
+	require.Equal(t, pb.PaymentSent_DIRECT, intent.settlementSpec.Method)
 }
 
 func TestAggregateAndEmit_BackfillsRefundAddressFromUniqueObservedSender(t *testing.T) {
@@ -1294,6 +1360,66 @@ func TestAggregateAndEmit_CrossTenantIsolation(t *testing.T) {
 	require.Empty(t, gotB.SerializedPaymentSent)
 }
 
+func TestAggregateAndEmit_SharedPaymentIntentAlignsHostedEnvelope(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	const sharedID = "order-mirror-safe"
+	const tenantBuyer = "tenant-buyer"
+	const tenantVendor = "tenant-vendor"
+
+	seedOrderForTenant(t, db, tenantBuyer, sharedID, "1000", "0xbuyer-refund")
+	seedOrderForTenant(t, db, tenantVendor, sharedID, "1000", "")
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		intent := &models.SharedPaymentIntent{
+			OrderID:        models.OrderID(sharedID),
+			PaymentAddress: "0xmanagedescrow",
+			RefundAddress:  "0xbuyer-refund",
+		}
+		if err := intent.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+			Coin:    testUSDCAsset,
+			Amount:  1000,
+			Address: "0xmanagedescrow",
+			SettlementSpec: &models.PendingSettlementSpec{
+				Method:     "CANCELABLE",
+				PayMode:    "address_monitored",
+				EscrowType: "managed_escrow",
+			},
+		}); err != nil {
+			return err
+		}
+		return tx.Save(intent)
+	}))
+
+	insertObs(t, db, models.PaymentObservation{
+		TenantID:       tenantVendor,
+		ID:             "obs-mirror-safe",
+		OrderID:        sharedID,
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xmanagedescrow",
+		EventType:      models.PaymentEventERC20Transfer,
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xmanagedescrow",
+		TokenAddress:   "0xusdc",
+		Amount:         "1000",
+		Source:         models.PaymentObservationSourceMonitor,
+		Observer:       "monitor:eip155-1:tenantVendor",
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), tenantVendor, sharedID))
+
+	gotVendor := loadOrderForTenant(t, db, tenantVendor, sharedID)
+	ps, err := gotVendor.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Equal(t, pb.PaymentSent_CANCELABLE, ps.GetSettlementSpec().GetMethod())
+	require.Equal(t, "0xmanagedescrow", ps.ContractAddress)
+	require.Equal(t, "0xmanagedescrow", gotVendor.PaymentAddress)
+	require.Equal(t, "0xbuyer-refund", gotVendor.RefundAddress)
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // AggregateAndEmit — partial → partial accumulation
 // ─────────────────────────────────────────────────────────────────────────
@@ -1421,5 +1547,5 @@ func TestAggregateAndEmit_PartialThenFull_EmitsOnce(t *testing.T) {
 	require.Equal(t, "0xtx-topup", ps.TransactionID)
 	require.Equal(t, "0xpayer-2", ps.PayerAddress)
 	require.Equal(t, "1000", ps.Amount, "envelope amount is the aggregated total, not the latest tx")
-	require.Equal(t, frozen.Unix(), ps.Timestamp.AsTime().Unix())
+	require.Equal(t, int64(1778761800), ps.Timestamp.AsTime().Unix())
 }

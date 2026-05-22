@@ -64,14 +64,19 @@ func (s *PaymentVerificationService) ValidateMessage(
 	paymentSent *pb.PaymentSent,
 	escrowTimeoutHours uint32,
 ) error {
-	if paymentSent.Method == pb.PaymentSent_FIAT && !coinType.IsFiatPayment() {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		return fmt.Errorf("payment_sent missing settlement spec")
+	}
+	method := spec.GetMethod()
+	if method == pb.PaymentSent_FIAT && !coinType.IsFiatPayment() {
 		return fmt.Errorf("fiat payment method requires canonical fiat coin, got %q", paymentSent.Coin)
 	}
-	if paymentSent.Method != pb.PaymentSent_FIAT && coinType.IsFiatPayment() {
+	if method != pb.PaymentSent_FIAT && coinType.IsFiatPayment() {
 		return fmt.Errorf("crypto payment method cannot use fiat coin %q", paymentSent.Coin)
 	}
 
-	if paymentSent.Method == pb.PaymentSent_FIAT || coinType.IsFiatPayment() {
+	if method == pb.PaymentSent_FIAT || coinType.IsFiatPayment() {
 		return validateFiatPaymentMessage(orderOpen, paymentSent)
 	}
 	if err := coinType.ValidateCanonicalPaymentCoin(); err != nil {
@@ -131,21 +136,29 @@ func (s *PaymentVerificationService) FetchAndVerify(
 	paymentAddress string,
 ) (*contracts.VerifiedPayment, error) {
 	coinType := iwallet.CoinType(paymentSent.Coin)
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		return nil, fmt.Errorf("payment_sent missing settlement spec")
+	}
+	method := spec.GetMethod()
 
-	if paymentSent.Method == pb.PaymentSent_FIAT && !coinType.IsFiatPayment() {
+	if method == pb.PaymentSent_FIAT && !coinType.IsFiatPayment() {
 		return nil, fmt.Errorf("fiat payment method requires canonical fiat coin, got %q", paymentSent.Coin)
 	}
-	if paymentSent.Method != pb.PaymentSent_FIAT && coinType.IsFiatPayment() {
+	if method != pb.PaymentSent_FIAT && coinType.IsFiatPayment() {
 		return nil, fmt.Errorf("crypto payment method cannot use fiat coin %q", paymentSent.Coin)
 	}
 
-	isFiat := paymentSent.Method == pb.PaymentSent_FIAT || coinType.IsFiatPayment()
+	isFiat := method == pb.PaymentSent_FIAT || coinType.IsFiatPayment()
 	if isFiat && !isCanonicalFiatCoin(paymentSent.Coin) {
 		return nil, fmt.Errorf("fiat payment coin must use canonical format fiat:{provider}:{currency}, got %q", paymentSent.Coin)
 	}
 	if !isFiat {
 		if err := coinType.ValidateCanonicalPaymentCoin(); err != nil {
 			return nil, fmt.Errorf("invalid payment coin: %w", err)
+		}
+		if spec.GetEscrowType() == string(payment.EscrowTypeManagedEscrow) {
+			return s.verifyMonitorRelayedManagedEscrowPayment(ctx, coinType, paymentSent)
 		}
 	}
 
@@ -187,6 +200,44 @@ func (s *PaymentVerificationService) FetchAndVerify(
 	return &contracts.VerifiedPayment{
 		Transaction: *tx,
 		CoinType:    coinType,
+	}, nil
+}
+
+func (s *PaymentVerificationService) verifyMonitorRelayedManagedEscrowPayment(
+	ctx context.Context,
+	coinType iwallet.CoinType,
+	paymentSent *pb.PaymentSent,
+) (*contracts.VerifiedPayment, error) {
+	if paymentSent.TransactionID == "" {
+		return nil, fmt.Errorf("%w: ManagedEscrow payment is missing transaction ID", ErrPaymentNotConfirmed)
+	}
+	if s.registry == nil {
+		return nil, fmt.Errorf("chain escrow registry not configured for ManagedEscrow payment verification")
+	}
+	strategy, err := s.registry.ForCoinV2(coinType)
+	if err != nil {
+		return nil, fmt.Errorf("no chain escrow for %s: %w", string(coinType), err)
+	}
+	if err := strategy.VerifyDeposit(ctx, payment.DepositVerifyParams{
+		CoinType:      coinType,
+		TxHash:        paymentSent.TransactionID,
+		ContractAddr:  paymentSent.ContractAddress,
+		PaymentAmount: paymentSent.Amount,
+	}); err != nil {
+		return nil, fmt.Errorf("deposit verification failed: %w", err)
+	}
+
+	amount := iwallet.NewAmount(paymentSent.Amount)
+	return &contracts.VerifiedPayment{
+		Transaction: iwallet.Transaction{
+			ID:    iwallet.TransactionID(paymentSent.TransactionID),
+			Value: amount,
+			To: []iwallet.SpendInfo{{
+				Address: iwallet.NewAddress(paymentSent.ToAddress, coinType),
+				Amount:  amount,
+			}},
+		},
+		CoinType: coinType,
 	}, nil
 }
 

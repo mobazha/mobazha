@@ -187,7 +187,9 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, message *npb.OrderMes
 	if err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Error processing order message for order %s: %s", order.ID.String(), err)
 		if err1 := orderCopy.PutErrorMessage(message); err1 != nil {
-			dbtx.Save(&orderCopy)
+			logger.LogInfoWithIDf(log, op.nodeID, "Error saving errored message for order %s: %s", order.ID.String(), err1)
+		} else if saveErr := dbtx.Save(&orderCopy); saveErr != nil {
+			logger.LogInfoWithIDf(log, op.nodeID, "Error saving order with errored message for order %s: %s", order.ID.String(), saveErr)
 		}
 
 		return nil, err

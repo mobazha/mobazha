@@ -48,13 +48,18 @@ func TestBuildPaymentSentProto_FiatPayment(t *testing.T) {
 	ps, err := coreorder.BuildPaymentSentProto(order, pd)
 	require.NoError(t, err)
 	assert.Equal(t, "pi_test_123", ps.TransactionID)
-	assert.Equal(t, "fiat:stripe:usd", ps.Coin)
-	assert.Equal(t, pb.PaymentSent_FIAT, ps.Method)
+	assert.Equal(t, "fiat:stripe:USD", ps.Coin)
+	require.NotNil(t, ps.GetSettlementSpec())
+	assert.Equal(t, pb.PaymentSent_FIAT, ps.GetSettlementSpec().GetMethod())
 	assert.Equal(t, "999", ps.Amount)
 	assert.Equal(t, "abcdef1234", ps.Chaincode)
 	assert.Equal(t, "card", ps.PaymentMethod.Type)
 	assert.Equal(t, "visa", ps.PaymentMethod.Brand)
 	assert.Equal(t, "4242", ps.PaymentMethod.Last4)
+	require.NotNil(t, ps.SettlementSpec)
+	assert.Equal(t, pb.PaymentSent_FIAT, ps.SettlementSpec.Method)
+	assert.Equal(t, "provider", ps.SettlementSpec.PayMode)
+	assert.Equal(t, "fiat_provider", ps.SettlementSpec.EscrowType)
 }
 
 func TestBuildPaymentSentProto_CryptoPayment(t *testing.T) {
@@ -75,12 +80,18 @@ func TestBuildPaymentSentProto_CryptoPayment(t *testing.T) {
 	ps, err := coreorder.BuildPaymentSentProto(order, pd)
 	require.NoError(t, err)
 	assert.Equal(t, "0xabc123", ps.TransactionID)
-	assert.Equal(t, "ETH", ps.Coin)
-	assert.Equal(t, pb.PaymentSent_DIRECT, ps.Method)
+	assert.Equal(t, "crypto:eip155:1:native", ps.Coin)
+	require.NotNil(t, ps.GetSettlementSpec())
+	assert.Equal(t, pb.PaymentSent_DIRECT, ps.GetSettlementSpec().GetMethod())
 	assert.Equal(t, "0xContractAddr", ps.ContractAddress)
 	assert.Equal(t, "0xPayerAddr", ps.PayerAddress)
 	assert.Equal(t, "0xToAddr", ps.ToAddress)
 	assert.Equal(t, "deadbeef", ps.Chaincode)
+	assert.Nil(t, ps.PaymentMethod, "empty crypto payment metadata should not materialize an empty paymentMethod object")
+	require.NotNil(t, ps.SettlementSpec)
+	assert.Equal(t, pb.PaymentSent_DIRECT, ps.SettlementSpec.Method)
+	assert.Equal(t, "address_monitored", ps.SettlementSpec.PayMode)
+	assert.Equal(t, "none", ps.SettlementSpec.EscrowType)
 }
 
 func TestBuildPaymentSentProto_ByteIdentical(t *testing.T) {

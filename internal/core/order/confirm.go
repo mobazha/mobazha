@@ -53,8 +53,10 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 	}
 
 	paymentSent, err := order.PaymentSentMessage()
-	if err == nil && payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) && payoutAddress == "" {
-		return fmt.Errorf("%w: payout address is required for MODERATED orders", coreiface.ErrBadRequest)
+	if err == nil {
+		if method, ok := payment.ResolvedPaymentMethod(&order, paymentSent); ok && payment.MethodIsModerated(method) && payoutAddress == "" {
+			return fmt.Errorf("%w: payout address is required for MODERATED orders", coreiface.ErrBadRequest)
+		}
 	}
 
 	if txid == "" && s.escrow != nil {
@@ -112,19 +114,21 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 			return err
 		}
 
-		if txid != "" && paymentSent != nil && payment.MethodIsCancelable(payment.ResolvedPaymentMethod(&order, paymentSent)) {
-			coinType, coinErr := payment.SettlementCoinFromPaymentSent(paymentSent)
-			var coinInfo iwallet.CoinInfo
-			if coinErr == nil {
-				coinInfo, coinErr = coinType.CoinInfo()
-			}
-			if coinErr != nil {
-				logger.LogInfoWithIDf(log, s.nodeID, "Unknown coin %s for order %s, skipping outgoing tx record", paymentSent.Coin, orderID)
-			} else if outTx, fetchErr := s.fetchOutgoingTx(string(coinType), txid.String(), order.PaymentAddress, &coinInfo); fetchErr == nil && outTx != nil {
-				var freshOrder models.Order
-				if loadErr := tx.Read().Where("id = ?", orderID.String()).First(&freshOrder).Error; loadErr == nil {
-					if recordErr := s.orderProcessor.RecordOutgoingTransaction(tx, &freshOrder, *outTx); recordErr != nil {
-						logger.LogInfoWithIDf(log, s.nodeID, "Failed to record outgoing tx for order %s: %v", orderID, recordErr)
+		if txid != "" && paymentSent != nil {
+			if method, ok := payment.ResolvedPaymentMethod(&order, paymentSent); ok && payment.MethodIsCancelable(method) {
+				coinType, coinErr := payment.SettlementCoinFromPaymentSent(paymentSent)
+				var coinInfo iwallet.CoinInfo
+				if coinErr == nil {
+					coinInfo, coinErr = coinType.CoinInfo()
+				}
+				if coinErr != nil {
+					logger.LogInfoWithIDf(log, s.nodeID, "Unknown coin %s for order %s, skipping outgoing tx record", paymentSent.Coin, orderID)
+				} else if outTx, fetchErr := s.fetchOutgoingTx(string(coinType), txid.String(), order.PaymentAddress, &coinInfo); fetchErr == nil && outTx != nil {
+					var freshOrder models.Order
+					if loadErr := tx.Read().Where("id = ?", orderID.String()).First(&freshOrder).Error; loadErr == nil {
+						if recordErr := s.orderProcessor.RecordOutgoingTransaction(tx, &freshOrder, *outTx); recordErr != nil {
+							logger.LogInfoWithIDf(log, s.nodeID, "Failed to record outgoing tx for order %s: %v", orderID, recordErr)
+						}
 					}
 				}
 			}
@@ -302,7 +306,11 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 		return fmt.Errorf("failed to get buyer: %w", err)
 	}
 
-	if payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
+	method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+	if !ok {
+		return fmt.Errorf("payment settlement spec is missing")
+	}
+	if payment.MethodIsModerated(method) {
 		coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 		if err != nil {
 			return err

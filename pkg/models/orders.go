@@ -489,14 +489,16 @@ func (o *Order) ContractType() pb.Listing_Metadata_ContractType {
 	return oo.Listings[0].Listing.Metadata.ContractType
 }
 
-// PaymentMethod returns the payment method (DIRECT, CANCELABLE, MODERATED) from
-// the serialized PaymentSent message. Returns DIRECT on any parse error.
-func (o *Order) PaymentMethod() pb.PaymentSent_Method {
+// SettlementMethod returns the explicit settlement method recorded in
+// PaymentSent.SettlementSpec. The bool is false when PaymentSent is missing or
+// does not carry a settlement spec, so callers do not accidentally treat an
+// absent route as DIRECT.
+func (o *Order) SettlementMethod() (pb.PaymentSent_Method, bool) {
 	ps, err := o.PaymentSentMessage()
-	if err != nil {
-		return pb.PaymentSent_DIRECT
+	if err != nil || ps.SettlementSpec == nil {
+		return 0, false
 	}
-	return ps.Method
+	return ps.SettlementSpec.Method, true
 }
 
 // Timestamp returns the timestamp at which this order was opened.
@@ -627,9 +629,8 @@ func (o *Order) OrderOpenMessage() (*pb.OrderOpen, error) {
 //
 // All amounts are decimal strings in the payment asset's smallest unit:
 // address-monitored flows use the locked PendingPaymentInfo amount, while
-// legacy flows fall back to OrderOpen.Amount. Percentage is clamped to [0, 100]
-// and computed server-side so every client renders the same bar from the same
-// numbers.
+// direct order flows use OrderOpen.Amount. Percentage is clamped to [0, 100] and
+// computed server-side so every client renders the same bar from the same numbers.
 type PaymentProgressInfo struct {
 	TotalReceived  string `json:"totalReceived"`
 	ExpectedAmount string `json:"expectedAmount"`
@@ -706,14 +707,17 @@ func (o *Order) ComputePaymentProgress() *PaymentProgressInfo {
 
 // ExpectedPaymentAmountString returns the expected funding amount in the
 // payment asset's smallest unit. Address-monitored crypto flows lock the
-// converted chain amount in PendingPaymentInfo; legacy flows fall back to the
+// converted chain amount in PendingPaymentInfo; direct order flows use the
 // signed OrderOpen amount.
 func (o *Order) ExpectedPaymentAmountString() string {
 	if o == nil {
 		return ""
 	}
-	if managed_escrowInfo, err := o.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil && managed_escrowInfo.Amount > 0 {
-		return strconv.FormatUint(managed_escrowInfo.Amount, 10)
+	if managed_escrowInfo, err := o.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
+		if managed_escrowInfo.Amount > 0 {
+			return strconv.FormatUint(managed_escrowInfo.Amount, 10)
+		}
+		return ""
 	}
 	if utxoInfo, err := o.GetPendingPaymentInfo(); err == nil && utxoInfo != nil && utxoInfo.Amount > 0 {
 		return strconv.FormatUint(utxoInfo.Amount, 10)
@@ -742,11 +746,13 @@ func (o *Order) Chaincode() (string, error) {
 // PaymentSessionProjector to classify ManagedEscrow EVM orders as address_monitored
 // without waiting for PaymentSent.
 type PendingManagedEscrowPaymentInfo struct {
-	Type      string `json:"type"`           // always "managed_escrow"
-	Coin      string `json:"coin,omitempty"` // canonical coin type (e.g. "crypto:eth:eth")
-	Amount    uint64 `json:"amount,omitempty"`
-	Address   string `json:"address"` // predicted ManagedEscrow address (hex, "0x…")
-	Moderated bool   `json:"moderated"`
+	Type             string `json:"type"`           // always "managed_escrow"
+	Coin             string `json:"coin,omitempty"` // canonical coin type (e.g. "crypto:eth:eth")
+	Amount           uint64 `json:"amount,omitempty"`
+	Address          string `json:"address"` // predicted ManagedEscrow address (hex, "0x…")
+	Moderated        bool   `json:"moderated"`
+	Moderator        string `json:"moderator,omitempty"`
+	ModeratorAddress string `json:"moderatorAddress,omitempty"`
 	// SettlementSpec is the ADR-010 payment route; legacy Moderated is fallback when absent.
 	SettlementSpec *PendingSettlementSpec `json:"settlementSpec,omitempty"`
 }
@@ -768,7 +774,7 @@ func (o *Order) SetPendingManagedEscrowPaymentInfo(info *PendingManagedEscrowPay
 }
 
 // GetPendingManagedEscrowPaymentInfo retrieves ManagedEscrow EVM payment info from PendingPaymentInfo.
-// Returns (nil, nil) when the field is empty or belongs to a UTXO order.
+// Returns (nil, nil) when the field is empty or belongs to a non-ManagedEscrow order.
 func (o *Order) GetPendingManagedEscrowPaymentInfo() (*PendingManagedEscrowPaymentInfo, error) {
 	if len(o.PendingPaymentInfo) == 0 {
 		return nil, nil
@@ -777,7 +783,7 @@ func (o *Order) GetPendingManagedEscrowPaymentInfo() (*PendingManagedEscrowPayme
 		Type string `json:"type"`
 	}
 	if err := json.Unmarshal(o.PendingPaymentInfo, &hint); err != nil {
-		return nil, nil // not JSON we understand; treat as absent
+		return nil, fmt.Errorf("unmarshal pending payment info type: %w", err)
 	}
 	if hint.Type != "managed_escrow" {
 		return nil, nil // UTXO or other type

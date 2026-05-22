@@ -14,6 +14,7 @@ import (
 	evmchain "github.com/mobazha/mobazha3.0/internal/chains/evm"
 	"github.com/mobazha/mobazha3.0/internal/core/guest"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
+	"github.com/mobazha/mobazha3.0/internal/core/settlement"
 	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -207,6 +208,7 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		Keys:          n.keyProvider,
 		Multiwallet:   n.multiwallet,
 		ActionStore:   store,
+		AutoConfirmer: managed_escrowCancelableAutoConfirmer{settlement: n.settlementService},
 		OwnerSigner:   &paymentManagedEscrowOwnerSigner{keys: n.keyProvider},
 		NonceProvider: &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet},
 		WalletTestnet: n.walletTestnet,
@@ -263,6 +265,20 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 
 		monitors[chain] = monitor
 		n.paymentRegistry.RegisterV2(chain, adapter)
+		if nativeCoin, coinErr := iwallet.RequireCanonicalNativeCoinType(chain); coinErr == nil {
+			registered, regErr := n.paymentRegistry.ForCoinV2(nativeCoin)
+			if regErr != nil {
+				logger.LogErrorWithIDf(log, n.nodeID,
+					"ManagedEscrowAdapter V2 activation FAILED self-check for chain %s coin %s: %v", chain, nativeCoin, regErr)
+				continue
+			}
+			if registered != adapter {
+				logger.LogErrorWithIDf(log, n.nodeID,
+					"ManagedEscrowAdapter V2 activation FAILED self-check for chain %s coin %s: registry returned %T, want %T",
+					chain, nativeCoin, registered, adapter)
+				continue
+			}
+		}
 		shadow[chain] = adapter
 		runtimeChainIDs[chain] = runtimeChainID
 	}
@@ -348,17 +364,8 @@ func (n *MobazhaNode) rewatchPendingManagedEscrowPayment(order *models.Order, mo
 	}
 	expected := new(big.Int).SetUint64(info.Amount)
 	if expected.Sign() == 0 {
-		orderOpen, err := order.OrderOpenMessage()
-		if err != nil {
-			logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: cannot restore watch for order %s without amount: %v", order.ID, err)
-			return
-		}
-		parsed, ok := new(big.Int).SetString(strings.TrimSpace(orderOpen.GetAmount()), 10)
-		if !ok || parsed.Sign() <= 0 {
-			logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: cannot restore watch for order %s with invalid amount %q", order.ID, orderOpen.GetAmount())
-			return
-		}
-		expected = parsed
+		logger.LogWarningWithIDf(log, n.nodeID, "ManagedEscrowAdapter: cannot restore watch for order %s without pending ManagedEscrow amount", order.ID)
+		return
 	}
 
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(info.Coin))
@@ -760,6 +767,17 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 			logger.LogErrorWithIDf(log, n.nodeID, "AutoConfirm failed for order %s (coin=%s): %v", event.OrderID, event.Coin, err)
 		}
 	}()
+}
+
+type managed_escrowCancelableAutoConfirmer struct {
+	settlement *settlement.SettlementService
+}
+
+func (s managed_escrowCancelableAutoConfirmer) AutoConfirmManagedEscrowCancelable(ctx context.Context, event *events.CancelablePaymentReady, chain iwallet.ChainType) error {
+	if s.settlement == nil {
+		return nil
+	}
+	return s.settlement.AutoConfirmManagedEscrowCancelable(ctx, event, chain)
 }
 
 func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) bool {

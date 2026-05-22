@@ -165,7 +165,11 @@ func (a *UTXOAutoConfirmAdapter) ValidatePaymentMessage(params payment.PaymentMe
 		return err
 	}
 
-	if !payment.MethodIsDirect(payment.EffectivePaymentMethod(paymentSent)) {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		return fmt.Errorf("payment_sent missing settlement spec")
+	}
+	if !payment.MethodIsDirect(spec.GetMethod()) {
 		if err := utils.ValidatePaymentAmount(orderOpen.Amount, paymentSent.Amount); err != nil {
 			return err
 		}

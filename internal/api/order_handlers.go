@@ -338,7 +338,7 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 		paymentCoin := ""
 		isModerated := false
 		if err == nil {
-			isModerated = paymentSent.Method == pb.PaymentSent_MODERATED
+			isModerated = paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_MODERATED
 			paymentCoin = paymentSent.Coin
 		}
 
@@ -473,7 +473,7 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 		isModerated := false
 		paymentCoin := ""
 		if err == nil {
-			isModerated = paymentSent.Method == pb.PaymentSent_MODERATED
+			isModerated = paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_MODERATED
 			paymentCoin = paymentSent.Coin
 		}
 
@@ -812,6 +812,9 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// handleGETOrderConfirmationInstructions serves the legacy instructions surface
+// for client-signed confirm / decline flows. ManagedEscrow-backed EVM callers must use
+// /v1/orders/{orderID}/settlement-actions/{action} instead.
 func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, r *http.Request) {
 	type Params struct {
 		Decline          bool   `json:"decline"`
@@ -863,7 +866,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		coinType, instructions, err = orderSvc.GetConfirmOrderInstructions(models.OrderID(orderID), args.InitiatorAddress, args.PayoutAddress)
 	}
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 
@@ -874,6 +877,10 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 	}
 
 	if instructions == nil {
+		// Legacy endpoint compatibility: UTXO and other backend-handled routes
+		// still answer "hasInstructions=false" here. ManagedEscrow-backed EVM does not
+		// fall through to this branch because core now rejects that misuse with
+		// ErrBadRequest and points callers at settlement-actions.
 		response := ConfirmationResponse{
 			HasInstructions: false,
 		}
@@ -1074,6 +1081,9 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 }
 
 func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *http.Request) {
+	// Legacy instructions surface for client-signed moderated completion.
+	// ManagedEscrow-backed moderated completion stays on the backend-owned completion
+	// path and therefore does not use this endpoint as its primary contract.
 	g.handleOrderInstructions(w, r, func(orderSvc contracts.OrderService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 		return orderSvc.GetCompleteOrderInstructions(orderID, initiatorAddress)
 	})

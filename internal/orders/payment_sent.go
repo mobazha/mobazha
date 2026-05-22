@@ -83,8 +83,8 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}
 
 	if transactionKnown {
-		method := payment.ResolvedPaymentMethod(order, paymentSent)
-		preVerifiedFiat := payment.IsFiatPaymentRoute(method, coinType)
+		method, methodOK := payment.ResolvedPaymentMethod(order, paymentSent)
+		preVerifiedFiat := methodOK && payment.IsFiatPaymentRoute(method, coinType)
 		// For crypto, a transaction already persisted on this order with
 		// block height means local on-chain verification has already happened.
 		knownConfirmedCrypto := !preVerifiedFiat && isKnownTxConfirmed(knownTx)
@@ -118,10 +118,17 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 // Primary validation is now done by PVS in preProcessPaymentSent; when multiwallet
 // is nil (pure mode), this is a no-op since the orchestration layer has already validated.
 func (op *OrderProcessor) validatePaymentSent(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent) error {
+	specProto := paymentSent.GetSettlementSpec()
+	if specProto != nil && specProto.GetEscrowType() == string(payment.EscrowTypeManagedEscrow) {
+		return nil
+	}
 	if op.multiwallet == nil {
 		return nil
 	}
-	if payment.IsFiatPaymentRoute(paymentSent.Method, coinType) {
+	if specProto == nil {
+		return fmt.Errorf("payment_sent missing settlement spec")
+	}
+	if payment.IsFiatPaymentRoute(specProto.GetMethod(), coinType) {
 		return nil
 	}
 	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
@@ -191,7 +198,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected and chain-verified: Order %s fully funded", order.ID)
 		}
 
-		if payment.MethodIsCancelable(payment.ResolvedPaymentMethod(order, paymentSent)) && order.IsPaymentVerified() {
+		if method, ok := payment.ResolvedPaymentMethod(order, paymentSent); ok && payment.MethodIsCancelable(method) && order.IsPaymentVerified() {
 			var amount uint64
 			if verifiedTx != nil {
 				amount = uint64(verifiedTx.Value.Int64())
@@ -207,7 +214,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE payment chain-verified, ready for auto-confirm: order %s (coin=%s)", order.ID, paymentSent.Coin)
 		}
 
-		if paymentSent.Method == pb.PaymentSent_RWA_INSTANT && order.IsPaymentVerified() {
+		if paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_RWA_INSTANT && order.IsPaymentVerified() {
 			dbtx.RegisterCommitHook(func() {
 				op.bus.Emit(&events.RwaInstantBuyCompleted{
 					OrderID:       order.ID.String(),

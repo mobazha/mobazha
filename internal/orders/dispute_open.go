@@ -80,7 +80,8 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	if paymentSent.Moderator == "" || !payment.MethodIsModerated(payment.ResolvedPaymentMethod(order, paymentSent)) {
+	method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
+	if paymentSent.Moderator == "" || !ok || !payment.MethodIsModerated(method) {
 		return nil, errors.New("dispute opened processed for non-moderated order")
 	}
 

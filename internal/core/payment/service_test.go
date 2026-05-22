@@ -220,6 +220,8 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		"0xmanagedescrow",
 		1000,
 		false,
+		"",
+		"",
 	))
 
 	var orders []models.Order
@@ -237,6 +239,15 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
 		require.Equal(t, "0xmanagedescrow", info.Address)
 	}
+
+	var shared models.SharedPaymentIntent
+	require.NoError(t, raw.Where("order_id = ?", "order-safe").First(&shared).Error)
+	require.Equal(t, "0xmanagedescrow", shared.PaymentAddress)
+	info, err := shared.GetPendingManagedEscrowPaymentInfo()
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.Equal(t, uint64(1000), info.Amount)
+	require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
 }
 
 func TestPaymentAppService_GeneratePaymentInstructions_NoCoinStrategy(t *testing.T) {

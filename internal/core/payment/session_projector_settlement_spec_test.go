@@ -99,8 +99,8 @@ func TestDeriveFundingTarget_UTXOPendingUsesAddressMonitored(t *testing.T) {
 func TestDerivePaymentInfo_PaymentSentDirectUsesDirectProductMode(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	ps := &pb.PaymentSent{
-		Coin:   "BTC",
-		Method: pb.PaymentSent_DIRECT,
+		Coin:           "BTC",
+		SettlementSpec: pkpayment.NewDirectSpec().ToPaymentSent(),
 	}
 	_, mode, kind := p.derivePaymentInfo(&models.Order{}, nil, ps)
 	require.Equal(t, pkpayment.ProductModeDirect, mode)
@@ -124,7 +124,7 @@ func TestDerivePaymentInfo_FiatMetadataUsesSettlementSpecProductMode(t *testing.
 	require.Empty(t, kind)
 }
 
-func TestDerivePaymentInfo_PendingManagedEscrowOverridesLegacyDirectPaymentSent(t *testing.T) {
+func TestDerivePaymentInfo_PendingManagedEscrowOverridesPaymentSentEnvelope(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{}
 	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
@@ -134,9 +134,9 @@ func TestDerivePaymentInfo_PendingManagedEscrowOverridesLegacyDirectPaymentSent(
 	}))
 	ps := &pb.PaymentSent{
 		Coin:            "crypto:eip155:1:native",
-		Method:          pb.PaymentSent_DIRECT,
 		ContractAddress: "0xmanagedescrow",
 		ToAddress:       "0xmanagedescrow",
+		SettlementSpec:  pkpayment.NewDirectSpec().ToPaymentSent(),
 	}
 	_, mode, kind := p.derivePaymentInfo(order, nil, ps)
 	require.Equal(t, pkpayment.ProductModeCancelable, mode)

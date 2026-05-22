@@ -172,6 +172,21 @@ func TestComputePaymentProgress_PendingManagedEscrowAmountOverridesOrderOpenAmou
 	}
 }
 
+func TestComputePaymentProgress_PendingManagedEscrowRequiresLockedAmount(t *testing.T) {
+	order := putOrderOpenWithAmount(t, "1500")
+	if err := order.SetPendingManagedEscrowPaymentInfo(&PendingManagedEscrowPaymentInfo{
+		Coin:    "crypto:eip155:1:native",
+		Address: "0xmanagedescrow",
+	}); err != nil {
+		t.Fatalf("SetPendingManagedEscrowPaymentInfo failed: %v", err)
+	}
+	order.TotalReceived = "1500"
+
+	if got := order.ComputePaymentProgress(); got != nil {
+		t.Fatalf("expected nil progress when ManagedEscrow pending amount is missing, got %+v", got)
+	}
+}
+
 func TestComputePaymentProgress_Overpaid_ExposesDelta(t *testing.T) {
 	order := putOrderOpenWithAmount(t, "1000")
 	order.TotalReceived = "1500"

@@ -196,9 +196,12 @@ func (g *Gateway) registerOrdersInstructionComplete(api huma.API) {
 		OperationID: "orders-post-instructions-complete",
 		Method:      http.MethodPost,
 		Path:        "/v1/orders/{orderID}/instructions/complete",
-		Summary:     "Order completion payout instructions",
-		Tags:        []string{"orders"},
-		Security:    nodeAuthSecurity,
+		Summary:     "Legacy completion payout instructions",
+		Description: "Compatibility endpoint for client-signed moderated completion flows. " +
+			"ManagedEscrow-backed moderated completion stays on the backend-owned completion path " +
+			"and does not use this instructions contract as its primary entrypoint.",
+		Tags:     []string{"orders"},
+		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
 		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/instructions/complete"
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(hi.Body), map[string]string{"orderID": hi.OrderID})
@@ -930,7 +933,10 @@ func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 
 // registerOrderSettlementActionPost registers POST /v1/orders/{orderID}/settlement-actions/{action}.
 //
-// Unified settlement intents (confirm / cancel) via ChainEscrowV2 — complements legacy POST .../instructions/*.
+// Unified settlement intents (confirm / cancel) via ChainEscrowV2 — the
+// default backend settlement surface for ManagedEscrow-backed EVM and other
+// backend-submitted routes. Legacy POST .../instructions/* stays as the
+// compatibility path for client-signed chains only.
 func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 	type in struct {
 		OrderID string          `path:"orderID" doc:"Order ID."`
@@ -942,9 +948,9 @@ func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 		Method:      http.MethodPost,
 		Path:        "/v1/orders/{orderID}/settlement-actions/{action}",
 		Summary:     "Execute backend settlement action (confirm / cancel)",
-		Description: "Runs backend-submitted ChainEscrowV2 Confirm or Cancel for crypto orders. " +
-			"Client-signed legacy chains must keep using the legacy instruction endpoints. " +
-			"Fiat orders return 400. Optional body: payoutAddress.",
+		Description: "Runs the default backend-submitted settlement action flow for crypto orders, " +
+			"including ManagedEscrow-backed EVM. Client-signed legacy chains must keep using the legacy " +
+			"instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
@@ -977,7 +983,7 @@ func (g *Gateway) registerOrderSettlementActionStatusGet(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/v1/orders/{orderID}/settlement-actions/{action}/status",
 		Summary:     "Read unified settlement action status",
-		Description: "Returns the latest status for a previously issued settlement action. " +
+		Description: "Returns the latest status for a previously issued backend settlement action. " +
 			"ManagedEscrow-backed flows expose relay task correlation and confirmations through this endpoint.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,

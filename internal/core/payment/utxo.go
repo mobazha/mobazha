@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -72,7 +72,7 @@ func (s *PaymentAppService) CheckPendingPaymentsOnStartup() {
 func (s *PaymentAppService) checkOrderPendingPayment(order *models.Order) bool {
 	paymentSent, err := order.PaymentSentMessage()
 
-	if err == nil && paymentSent.Method == pb.PaymentSent_CANCELABLE && order.Role() == models.RoleVendor {
+	if spec := paymentSent.GetSettlementSpec(); err == nil && spec != nil && spec.GetMethod() == pb.PaymentSent_CANCELABLE && order.Role() == models.RoleVendor {
 		coinType := iwallet.CoinType(paymentSent.Coin)
 		coinInfo, coinErr := coinType.CoinInfo()
 		if coinErr != nil {
@@ -398,7 +398,12 @@ func (s *PaymentAppService) cancelExcessPayment(order *models.Order, tx *iwallet
 		return
 	}
 
-	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "Cannot auto-cancel excess payment for order %s without settlement spec", order.ID)
+		return
+	}
+	if spec.GetMethod() != pb.PaymentSent_CANCELABLE {
 		logger.LogWarningWithIDf(log, s.nodeID, "Cannot auto-cancel excess payment for non-CANCELABLE order %s", order.ID)
 		return
 	}

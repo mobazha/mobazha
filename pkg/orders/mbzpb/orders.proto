@@ -227,7 +227,8 @@ message Refund {
 message PaymentSent {
     string transactionID                = 1;
     string chaincode                    = 2; // Hex encoded
-    Method method                       = 3; // Direct, Cancelable, Moderated
+    reserved 3;
+    reserved "method";
     string contractAddress              = 4; // 合约地址
     string payerAddress                 = 5; // 支付者地址
     string moderator                    = 6; // 仲裁者（可选）, peerID
@@ -246,6 +247,7 @@ message PaymentSent {
     google.protobuf.Timestamp timestamp = 19;
     string paymentTokenAddress          = 20; // 支付代币合约地址（通用，适用于所有 Token 支付，ETH为零地址）
     string buyerReceiveAddress          = 21; // 买家接收 Token 的地址（支持多链地址格式，多商品共用）
+    SettlementSpec settlementSpec       = 22; // 显式结算路由，避免接收端从地址/脚本字段推导 ManagedEscrow / legacy 路径
 
     enum Method {
         DIRECT              = 0; // Address request
@@ -260,6 +262,12 @@ message PaymentSent {
         string type  = 1; // 支付方式类型
         string brand = 2; // 卡品牌（如果是信用卡支付）
         string last4 = 3; // 卡号后四位（如果是信用卡支付）
+    }
+
+    message SettlementSpec {
+        Method method      = 1; // trust semantics
+        string payMode     = 2; // address_monitored / client_signed / provider
+        string escrowType  = 3; // none / utxo_script / evm_contract / solana_program / safe / fiat_provider
     }
 }
 

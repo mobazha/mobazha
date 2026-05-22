@@ -73,19 +73,22 @@ Payment Registry（ChainType → ChainEscrow 映射）
 - EVM/Solana：`GetRefundOrderInstructions` → 获取退款指令 → 前端钱包签名
 - 发送 ORDER_REJECT + REFUND 消息给买家
 
-### 2.4 订单确认（`order_confirm.go`）
-- **入口**: `ConfirmOrder` / `GetConfirmOrderInstructions`
+### 2.4 订单确认（`order_confirm.go` / `settlement_action.go`）
+- **默认入口**: `ExecuteSettlementAction("confirm")`（后端提交型链路，含 ManagedEscrow-backed EVM）
+- **兼容入口**: `GetConfirmOrderInstructions`（仅 client-signed legacy）
 - 卖家确认订单并释放 CANCELABLE 资金
 - UTXO：`releaseFromCancelableAddress` → 后端签名广播
-- EVM：`GetConfirmOrderInstructions` → 构建指令 → 可选 Relay 中继
-- Solana：`GetConfirmOrderInstructions` → 构建指令 → 前端钱包签名
+- ManagedEscrow-backed EVM：`ExecuteSettlementAction("confirm")` → ManagedEscrow action submit / poll
+- Solana / legacy client-signed EVM：`GetConfirmOrderInstructions` → 构建指令 → 前端钱包签名或 Relay
 - 发送 ORDER_CONFIRMATION 消息给买家
 
-### 2.5 订单取消（`order_cancel.go`）
-- **入口**: `CancelOrder` / `GetEscrowReleaseInstructions`
+### 2.5 订单取消（`order_cancel.go` / `settlement_action.go`）
+- **默认入口**: `ExecuteSettlementAction("cancel")`（后端提交型链路，含 ManagedEscrow-backed EVM）
+- **兼容入口**: `GetEscrowReleaseInstructions`（仅 client-signed legacy）
 - 仅限 CANCELABLE 订单，买家发起
 - UTXO：后端自动释放回买家地址
-- EVM/Solana：前端获取指令后钱包签名
+- ManagedEscrow-backed EVM：`ExecuteSettlementAction("cancel")` → ManagedEscrow cancel action submit / poll
+- Solana / legacy client-signed EVM：前端获取指令后钱包签名
 - 发送 ORDER_CANCEL 消息给卖家
 
 ### 2.6 订单履行（`order_fulfillment.go`）
@@ -98,15 +101,20 @@ Payment Registry（ChainType → ChainEscrow 映射）
 - 可多次调用（部分履行 → 完全履行）
 
 ### 2.7 订单完成（`order_completion.go`）
-- **入口**: `CompleteOrder` / `GetCompleteOrderInstructions`
+- **默认入口**: `CompleteOrder`（含 ManagedEscrow-backed moderated 的后端提交/签名聚合路径）
+- **兼容入口**: `GetCompleteOrderInstructions`（仅 client-signed legacy）
 - 买家确认收货、评价商品
-- MODERATED 订单：`releaseCompleteEscrowFunds` 签名 escrow 释放
+- ManagedEscrow-backed moderated：`CompleteOrder` 内部聚合 owner signatures / submit ManagedEscrow complete action
+- Legacy EVM/Solana：`GetCompleteOrderInstructions` → 前端钱包签名
 - 发送 ORDER_COMPLETE（含评价 + EscrowRelease）给卖家
 
 ### 2.8 退款（`order_refund.go`）
 - **入口**: `RefundOrder` / `GetRefundOrderInstructions` / `RefundOrderViaRelay`
 - 卖家主动退款
-- **EVM/Solana**（所有支付方式，含 CANCELABLE 和 MODERATED）：
+- **ManagedEscrow-backed EVM CANCELABLE**：
+  - 默认走 `ExecuteSettlementAction("cancel")` / ManagedEscrow cancel action
+  - 不再通过 `GetRefundOrderInstructions` / `GetEscrowReleaseInstructions` 这类 legacy instructions 路径
+- **Legacy EVM/Solana**（client-signed）：
   - 路由：`GetRefundOrderInstructions` → `GetEscrowReleaseInstructions` → `GetCancelInstructions` → `BuildCancelableEscrowReleaseInstructions`
   - 该路径对 MODERATED 同样有效：智能合约的 **seller-refund 特殊路径** 允许卖家仅用自己的签名退款到买家地址（无需 2-of-3）
   - 合约验证逻辑：`destinations.length == 1 && destinations[0] == payerAddress && signature from seller` → 允许
@@ -131,7 +139,9 @@ Payment Registry（ChainType → ChainEscrow 映射）
 - **关闭争议**: `CloseDispute`（仲裁人）— 决定资金分配（买家/卖家/仲裁人三方）、签名释放
 - **接受裁决**: `ReleaseFunds` — 买家/卖家接受仲裁结果并执行释放
 - **超时释放**: `ReleaseFundsAfterTimeout` — 争议超时后，仅限 UTXO 链支持 escrow timeout
-- **入口（指令）**: `GetReleaseFundsInstructions`
+- **兼容指令入口**: `GetReleaseFundsInstructions`（仅 client-signed legacy）
+- ManagedEscrow-backed moderated：`CloseDispute` / `ReleaseFunds` 内部走 ManagedEscrow owner-signature / submit dispute release action
+- Legacy EVM/Solana：`GetReleaseFundsInstructions` → 前端钱包签名
 
 ## 3. Escrow 签名流程
 
@@ -173,17 +183,21 @@ UTXO:   escrowWallet.SignMultisigTransaction(txn, key, script) → chain-native
 
 | Node 方法 | 用途 | 对应文件 |
 |-----------|------|----------|
-| `GetConfirmOrderInstructions` | 确认 CANCELABLE 订单 | `order_confirm.go` |
-| `GetEscrowReleaseInstructions` | 取消 CANCELABLE 订单 | `order_cancel.go` |
-| `GetCompleteOrderInstructions` | 完成 MODERATED 订单 | `order_completion.go` |
-| `GetReleaseFundsInstructions` | 释放争议资金 | `order_disputes.go` |
-| `GetRefundOrderInstructions` | 退款/拒绝订单 | `order_reject.go` |
+| `ExecuteSettlementAction(confirm/cancel)` | 后端提交型 settlement（ManagedEscrow-backed EVM 默认入口） | `settlement_action.go` |
+| `GetConfirmOrderInstructions` | 确认 CANCELABLE 订单（legacy client-signed） | `order_confirm.go` |
+| `GetEscrowReleaseInstructions` | 取消 CANCELABLE 订单（legacy client-signed） | `order_cancel.go` |
+| `GetCompleteOrderInstructions` | 完成 MODERATED 订单（legacy client-signed） | `order_completion.go` |
+| `GetReleaseFundsInstructions` | 释放争议资金（legacy client-signed） | `order_disputes.go` |
+| `GetRefundOrderInstructions` | 退款/拒绝订单（legacy / fiat info） | `order_reject.go` |
 
 ### 4.2 ChainEscrow 接口方法
 
-每个方法通过 Registry 分发到对应 ChainEscrow，返回 `InstructionResult`：
+Legacy instructions 方法通过 Registry 分发到对应 ChainEscrow，返回 `InstructionResult`：
 - `nil` Instructions → 后端处理（UTXO）
 - 非 `nil` Instructions → 前端签名提交（EVM/Solana）
+
+ManagedEscrow-backed EVM 不再以 `InstructionResult` 作为默认动作返回值，而是通过
+`ChainEscrowV2` action 接口返回 `ActionResult` + `ActionID`。
 
 | ChainEscrow 方法 | 用途 | UTXO | EVM/Solana |
 |----------|------|------|------------|

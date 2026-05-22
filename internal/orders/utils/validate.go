@@ -192,7 +192,11 @@ func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, ch
 		return err
 	}
 
-	method := payment.EffectivePaymentMethod(paymentSent)
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		return errors.New("payment_sent missing settlement spec")
+	}
+	method := spec.GetMethod()
 	if payment.MethodIsModerated(method) {
 		return validateBTCEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, true)
 	} else if payment.MethodIsCancelable(method) {

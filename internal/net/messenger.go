@@ -210,6 +210,12 @@ func (m *Messenger) markMessageProcessed(messageID string) bool {
 	return false
 }
 
+func (m *Messenger) unmarkMessageProcessed(messageID string) {
+	m.recentlyProcessedMu.Lock()
+	defer m.recentlyProcessedMu.Unlock()
+	delete(m.recentlyProcessed, messageID)
+}
+
 // ReliablySendMessage persists the message to the database before sending, then continually retries
 // the send until it finally goes through.
 func (m *Messenger) ReliablySendMessage(tx database.Tx, peer peer.ID, message *pb.Message, done chan<- struct{}) error {
@@ -372,9 +378,12 @@ func (m *Messenger) Start() {
 			if ok {
 				if err := handler(p, pmes); err != nil {
 					logger.LogInfoWithIDf(log, m.NodeID, "Error processing %s message from %s: %s", pmes.MessageType.String(), p, err)
+					m.unmarkMessageProcessed(pmes.MessageID)
+					continue
 				}
 			} else {
 				logger.LogInfoWithIDf(log, m.NodeID, "No handler for decrypted message %s", pmes.MessageID)
+				m.unmarkMessageProcessed(pmes.MessageID)
 				continue
 			}
 
@@ -600,11 +609,15 @@ func (m *Messenger) downloadMessages() {
 			if ok {
 				if err := handler(mwp.p, mwp.m); err != nil {
 					logger.LogInfoWithIDf(log, m.NodeID, "Error processing %s message from %s: %s", mwp.m.MessageType.String(), mwp.p, err)
+					m.unmarkMessageProcessed(mwp.m.MessageID)
+					continue
 				} else {
 					processedCount++
 				}
 			} else {
 				logger.LogInfoWithIDf(log, m.NodeID, "No handler for decrypted message %s", mwp.m.MessageID)
+				m.unmarkMessageProcessed(mwp.m.MessageID)
+				continue
 			}
 
 			// ACK all encrypted copies of this message

@@ -307,9 +307,8 @@ func (n *MobazhaNode) handleAckMessage(from peer.ID, message *pb.Message) error 
 // locking, pre-processing I/O, deterministic ProcessMessage, and
 // post-processing within a single DB transaction.
 func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) error {
-	defer n.sendAckMessage(message.MessageID, from)
-
 	if n.isDuplicate(message) {
+		n.sendAckMessage(message.MessageID, from)
 		return nil
 	}
 
@@ -339,6 +338,7 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 	if event != nil {
 		n.eventBus.Emit(event)
 	}
+	n.sendAckMessage(message.MessageID, from)
 	return nil
 }
 

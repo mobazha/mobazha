@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -199,9 +200,13 @@ func (s *PaymentAppService) SetPaymentRecorder(pr VerifiedPaymentRecorder) {
 // GeneratePaymentInstructions dispatches payment instruction generation to
 // the chain-specific strategy via the payment registry.
 func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, params models.InitializeEscrowData) (*payment.PaymentSetupResult, error) {
+	if s.paymentRegistry == nil {
+		return nil, fmt.Errorf("payment registry not initialized for node %s", s.nodeID)
+	}
 	strategy, err := s.paymentRegistry.ForCoinV2(params.CoinType)
 	if err != nil {
-		return nil, fmt.Errorf("no chain escrow for coin %s: %w", params.CoinType, err)
+		return nil, fmt.Errorf("no chain escrow for coin %s on node %s (registry chains=%d): %w",
+			params.CoinType, s.nodeID, len(s.paymentRegistry.Chains()), err)
 	}
 	result, err := strategy.SetupPayment(ctx, payment.PaymentSetupParams{
 		OrderID:      params.OrderID,
@@ -235,7 +240,15 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 
 		setupResult.IsManagedEscrowOrder = true
 		moderated := result.PaymentData.Method == pb.PaymentSent_MODERATED
-		if persistErr := s.persistManagedEscrowPaymentAddress(params.OrderID, string(params.CoinType), result.PaymentData.ToAddress, result.PaymentData.Amount, moderated); persistErr != nil {
+		if persistErr := s.persistManagedEscrowPaymentAddress(
+			params.OrderID,
+			string(params.CoinType),
+			result.PaymentData.ToAddress,
+			result.PaymentData.Amount,
+			moderated,
+			result.PaymentData.Moderator,
+			result.PaymentData.ModeratorAddress,
+		); persistErr != nil {
 			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist ManagedEscrow address for order %s: %v", params.OrderID, persistErr)
 			// Non-fatal: monitoring is already registered; the projector will
 			// fall back to escrow_v1 until the next call succeeds.
@@ -248,13 +261,15 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 // persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
-func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool) error {
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool, moderator, moderatorAddress string) error {
 	info := &models.PendingManagedEscrowPaymentInfo{
-		Coin:           coin,
-		Amount:         amount,
-		Address:        managed_escrowAddress,
-		Moderated:      moderated,
-		SettlementSpec: payment.NewManagedEscrowSpec(moderated).ToPending(),
+		Coin:             coin,
+		Amount:           amount,
+		Address:          managed_escrowAddress,
+		Moderated:        moderated,
+		Moderator:        moderator,
+		ModeratorAddress: moderatorAddress,
+		SettlementSpec:   payment.NewManagedEscrowSpec(moderated).ToPending(),
 	}
 	if rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB }); ok {
 		raw := rawProvider.RawDB()
@@ -262,6 +277,9 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 			return fmt.Errorf("load orders: raw DB unavailable")
 		}
 		return raw.Transaction(func(tx *gorm.DB) error {
+			if err := paymentintent.UpsertSharedPaymentIntent(tx, orderID, managed_escrowAddress, "", info); err != nil {
+				return fmt.Errorf("save shared payment intent: %w", err)
+			}
 			var orders []models.Order
 			if err := tx.Where("id = ? AND tenant_id <> ''", orderID).Find(&orders).Error; err != nil {
 				return fmt.Errorf("load orders: %w", err)
@@ -283,6 +301,9 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 	}
 
 	return s.db.Update(func(tx database.Tx) error {
+		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), orderID, managed_escrowAddress, "", info); err != nil {
+			return fmt.Errorf("save shared payment intent: %w", err)
+		}
 		var orders []models.Order
 		if err := tx.Read().Where("id = ?", orderID).Find(&orders).Error; err != nil {
 			return fmt.Errorf("load orders: %w", err)
@@ -449,54 +470,7 @@ func (s *PaymentAppService) GetOrderInfo(orderID models.OrderID, coinType iwalle
 	if err != nil {
 		return nil, err
 	}
-
-	orderOpen, err := order.OrderOpenMessage()
-	if err != nil {
-		return nil, err
-	}
-
-	chaincode, err := hex.DecodeString(orderOpen.Chaincode)
-	if err != nil {
-		return nil, err
-	}
-	uniqueId := [20]byte(chaincode[:20])
-
-	unlockHours := 720 // 30 days
-	coinInfo, err := coinType.CoinInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	buyerAddress := ""
-	vendorAddress := ""
-	if coinInfo.Chain == iwallet.ChainSolana {
-		if len(orderOpen.BuyerID.Pubkeys.Solana) == solana.PublicKeyLength {
-			buyerAddress = solana.PublicKeyFromBytes(orderOpen.BuyerID.Pubkeys.Solana).String()
-		}
-		if len(orderOpen.Listings[0].Listing.VendorID.Pubkeys.Solana) == solana.PublicKeyLength {
-			vendorAddress = solana.PublicKeyFromBytes(orderOpen.Listings[0].Listing.VendorID.Pubkeys.Solana).String()
-		}
-	} else if coinInfo.IsEthTypeChain() {
-		buyerPubkey, err := iwallet.PubKeyBytesToEthAddress(orderOpen.BuyerID.Pubkeys.Eth)
-		if err != nil {
-			return nil, err
-		}
-		buyerAddress = buyerPubkey.String()
-		vendorPubkey, err := iwallet.PubKeyBytesToEthAddress(orderOpen.Listings[0].Listing.VendorID.Pubkeys.Eth)
-		if err != nil {
-			return nil, err
-		}
-		vendorAddress = vendorPubkey.String()
-	} else {
-		return nil, errors.New("invalid coin type")
-	}
-
-	return &models.OrderInfo{
-		BuyerAddress:  buyerAddress,
-		VendorAddress: vendorAddress,
-		UniqueId:      uniqueId,
-		UnlockHours:   unlockHours,
-	}, nil
+	return order.OrderInfoForCoin(coinType)
 }
 
 // GetModeratorEscrowInfo resolves moderator details for escrow setup. Returns

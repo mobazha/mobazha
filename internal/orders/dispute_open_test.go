@@ -111,7 +111,7 @@ func TestOrderProcessor_processDisputeOpenMessage(t *testing.T) {
 	paymentSent := &pb.PaymentSent{
 		Coin:      iwallet.CtMock.String(),
 		Moderator: "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
-		Method:    pb.PaymentSent_MODERATED,
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_MODERATED),
 	}
 
 	tests := []struct {

@@ -108,6 +108,15 @@ func (s SettlementSpec) ToPending() *models.PendingSettlementSpec {
 	}
 }
 
+// ToPaymentSent converts to the protobuf route carried by PaymentSent.
+func (s SettlementSpec) ToPaymentSent() *pb.PaymentSent_SettlementSpec {
+	return &pb.PaymentSent_SettlementSpec{
+		Method:     s.Method,
+		PayMode:    string(s.PayMode),
+		EscrowType: string(s.EscrowType),
+	}
+}
+
 // SettlementSpecFromPending parses a persisted pending spec.
 func SettlementSpecFromPending(p *models.PendingSettlementSpec) (SettlementSpec, error) {
 	if p == nil {
@@ -126,6 +135,21 @@ func SettlementSpecFromPending(p *models.PendingSettlementSpec) (SettlementSpec,
 		return SettlementSpec{}, err
 	}
 	return spec, nil
+}
+
+func settlementSpecFromPaymentSentProto(specProto *pb.PaymentSent_SettlementSpec) (SettlementSpec, bool) {
+	if specProto == nil {
+		return SettlementSpec{}, false
+	}
+	spec := SettlementSpec{
+		Method:     specProto.Method,
+		PayMode:    PayMode(strings.TrimSpace(specProto.PayMode)),
+		EscrowType: EscrowType(strings.TrimSpace(specProto.EscrowType)),
+	}
+	if err := spec.Validate(); err != nil {
+		return SettlementSpec{}, false
+	}
+	return spec, true
 }
 
 func parsePaymentMethod(name string) (pb.PaymentSent_Method, error) {
@@ -224,7 +248,7 @@ func ResolveSettlementSpecFromPendingUTXO(info *models.PendingUTXOPaymentInfo) (
 	return NewUTXOSpec(moderated), true
 }
 
-// ProductModeFromMethod maps PaymentSent.Method to session ProductMode.
+// ProductModeFromMethod maps settlement trust method to session ProductMode.
 func ProductModeFromMethod(method pb.PaymentSent_Method) ProductMode {
 	switch method {
 	case pb.PaymentSent_MODERATED:
@@ -258,52 +282,21 @@ func MethodIsDirect(method pb.PaymentSent_Method) bool {
 	return method == pb.PaymentSent_DIRECT
 }
 
-// EffectivePaymentMethod returns the business trust method for a PaymentSent envelope.
-// When Method is DIRECT but escrow fields are present (legacy mislabel), the method
-// is upgraded to CANCELABLE or MODERATED so downstream helpers do not treat ManagedEscrow /
-// UTXO / client-signed routes as unprotected direct pay.
-func EffectivePaymentMethod(ps *pb.PaymentSent) pb.PaymentSent_Method {
-	if ps == nil {
-		return pb.PaymentSent_DIRECT
-	}
-	if !MethodIsDirect(ps.Method) {
-		return ps.Method
-	}
-	if strings.TrimSpace(ps.Script) != "" {
-		if strings.TrimSpace(ps.Moderator) != "" || strings.TrimSpace(ps.ModeratorAddress) != "" {
-			return pb.PaymentSent_MODERATED
-		}
-		return pb.PaymentSent_CANCELABLE
-	}
-	contractAddress := strings.TrimSpace(ps.ContractAddress)
-	toAddress := strings.TrimSpace(ps.ToAddress)
-	if contractAddress != "" &&
-		(strings.TrimSpace(ps.Moderator) != "" ||
-			strings.TrimSpace(ps.ModeratorAddress) != "" ||
-			(strings.EqualFold(contractAddress, toAddress) && toAddress != "")) {
-		if strings.TrimSpace(ps.Moderator) != "" || strings.TrimSpace(ps.ModeratorAddress) != "" {
-			return pb.PaymentSent_MODERATED
-		}
-		return pb.PaymentSent_CANCELABLE
-	}
-	return pb.PaymentSent_DIRECT
-}
-
 // ResolvedPaymentMethod returns the business trust method for order actions.
-// Pending SettlementSpec wins over the frozen PaymentSent envelope; when pending
-// intent is absent, EffectivePaymentMethod recovers legacy DIRECT mislabels.
-func ResolvedPaymentMethod(order *models.Order, ps *pb.PaymentSent) pb.PaymentSent_Method {
-	if order != nil {
-		if spec, ok := ResolveSettlementSpecFromOrder(order); ok {
-			return spec.Method
-		}
+// Pending SettlementSpec wins while settlement intent is still carried on the
+// order; otherwise the frozen PaymentSent.SettlementSpec.Method is authoritative.
+func ResolvedPaymentMethod(order *models.Order, ps *pb.PaymentSent) (pb.PaymentSent_Method, bool) {
+	spec, ok := ResolveSettlementSpec(order, ps)
+	if !ok {
+		return 0, false
 	}
-	return EffectivePaymentMethod(ps)
+	return spec.Method, true
 }
 
 // IsNonEscrowDirectPayment reports whether the order has no escrow release path.
 func IsNonEscrowDirectPayment(order *models.Order, ps *pb.PaymentSent) bool {
-	return MethodIsDirect(ResolvedPaymentMethod(order, ps))
+	method, ok := ResolvedPaymentMethod(order, ps)
+	return ok && MethodIsDirect(method)
 }
 
 // MethodIsFiat reports fiat provider checkout semantics.
@@ -413,11 +406,10 @@ func ResolveSettlementSpec(order *models.Order, ps *pb.PaymentSent) (SettlementS
 	if ps == nil {
 		return SettlementSpec{}, false
 	}
-	pd := &models.PaymentData{
-		Method: ps.Method,
-		Coin:   iwallet.CoinType(ps.Coin),
+	if ps.GetSettlementSpec() != nil {
+		return settlementSpecFromPaymentSentProto(ps.GetSettlementSpec())
 	}
-	return SettlementSpecFromPaymentData(pd)
+	return SettlementSpec{}, false
 }
 
 // UsesAddressMonitoredPayMode reports whether funding is address-monitored (UTXO, ManagedEscrow, direct).

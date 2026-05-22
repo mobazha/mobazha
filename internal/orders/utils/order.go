@@ -16,7 +16,11 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, te
 		Testnet: testnet,
 	}
 
-	method := payment.EffectivePaymentMethod(paymentSent)
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		return iwallet.EscrowInfo{}, fmt.Errorf("payment_sent missing settlement spec")
+	}
+	method := spec.GetMethod()
 	if payment.MethodIsDirect(method) {
 		return iwallet.EscrowInfo{}, nil
 	}

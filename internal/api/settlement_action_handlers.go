@@ -19,7 +19,8 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// handlePOSTOrderSettlementAction executes a unified settlement intent via ChainEscrowV2.
+// handlePOSTOrderSettlementAction executes the default backend settlement
+// surface via ChainEscrowV2.
 //
 // POST /v1/orders/{orderID}/settlement-actions/{action}
 //
@@ -28,7 +29,9 @@ import (
 // Body JSON (optional, camelCase):
 //   - payoutAddress — vendor payout (confirm) or buyer refund override (cancel).
 //
-// Phase PS — aligns with UNIFIED_PAYMENT_SESSION_ARCHITECTURE §7.2 minimal surface.
+// This is the primary settlement entrypoint for backend-submitted routes such
+// as ManagedEscrow-backed EVM. Client-signed legacy chains stay on the instructions
+// endpoints.
 func (g *Gateway) handlePOSTOrderSettlementAction(w http.ResponseWriter, r *http.Request) {
 	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {

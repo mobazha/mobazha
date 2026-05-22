@@ -37,7 +37,8 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 	if err != nil {
 		return "", payoutAddress, nil
 	}
-	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil || spec.GetMethod() != pb.PaymentSent_CANCELABLE {
 		return "", payoutAddress, nil
 	}
 
@@ -93,7 +94,8 @@ func (s *SettlementService) releaseMonitoredCancelableFunds(order *models.Order,
 	if err != nil {
 		return "", "", err
 	}
-	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil || spec.GetMethod() != pb.PaymentSent_CANCELABLE {
 		return "", "", errors.New("order payment method is not CANCELABLE")
 	}
 
@@ -177,7 +179,7 @@ func (s *SettlementService) releaseViaRelay(order *models.Order, coinInfo *iwall
 		payoutAddress = addr.String()
 	}
 
-	_, instructions, err := s.GetConfirmOrderInstructions(models.OrderID(order.ID), "", payoutAddress)
+	_, instructions, err := s.GetLegacyConfirmOrderInstructions(models.OrderID(order.ID), "", payoutAddress)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get confirm order instructions: %w", err)
 	}
@@ -217,7 +219,7 @@ func (s *SettlementService) releaseSolanaViaRelay(order *models.Order, payoutAdd
 		payoutAddress = addr.String()
 	}
 
-	_, instructions, err := s.GetConfirmOrderInstructions(order.ID, "", payoutAddress)
+	_, instructions, err := s.GetLegacyConfirmOrderInstructions(order.ID, "", payoutAddress)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get confirm order instructions: %w", err)
 	}
@@ -269,8 +271,19 @@ func (s *SettlementService) RelayInstructions(orderID string, coinType iwallet.C
 
 // ── Confirm Order Instructions ──────────────────────────────────────────
 
-// GetConfirmOrderInstructions generates chain-specific instructions for confirming a CANCELABLE order.
+// GetConfirmOrderInstructions generates confirm instructions for legacy
+// client-signed CANCELABLE routes only.
+//
+// ManagedEscrow-backed EVM orders must not go through this entrypoint; they use
+// ExecuteSettlementAction("confirm") so the backend can submit and track a
+// ManagedEscrow action instead of emitting escrow_v1-style instructions.
 func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error) {
+	return s.GetLegacyConfirmOrderInstructions(orderID, initiatorAddress, payoutAddress)
+}
+
+// GetLegacyConfirmOrderInstructions is the internal legacy-only confirm
+// instruction surface for client-signed CANCELABLE routes.
+func (s *SettlementService) GetLegacyConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
@@ -288,7 +301,8 @@ func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, 
 		return "", nil, err
 	}
 
-	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil || spec.GetMethod() != pb.PaymentSent_CANCELABLE {
 		logger.LogInfoWithIDf(log, s.nodeID, "%s not a cancelable payment, no instructions needed", orderID)
 		return "", nil, nil
 	}
@@ -298,6 +312,10 @@ func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, 
 		return "", nil, err
 	}
 	if !payment.UsesClientSignedPayMode(&order, paymentSent) {
+		if spec, ok := payment.ResolveSettlementSpec(&order, paymentSent); ok && spec.UsesManagedEscrow() {
+			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed EVM confirm must use POST /v1/orders/{orderID}/settlement-actions/confirm",
+				coreiface.ErrBadRequest)
+		}
 		logger.LogInfoWithIDf(log, s.nodeID, "%s uses address-monitored settlement flow, no instructions needed", orderID)
 		return coinType, nil, nil
 	}

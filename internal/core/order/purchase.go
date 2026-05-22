@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -30,6 +31,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 // PurchaseListing creates an order and sends it to the vendor.
@@ -468,7 +470,23 @@ func (s *OrderAppService) SetOrderRefundAddressForPayment(ctx context.Context, o
 		return fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
 	}
 
+	if rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB }); ok {
+		raw := rawProvider.RawDB()
+		if raw == nil {
+			return fmt.Errorf("set refund address: raw DB unavailable")
+		}
+		return raw.Transaction(func(tx *gorm.DB) error {
+			if err := paymentintent.UpsertSharedPaymentIntent(tx, orderID, "", addr, nil); err != nil {
+				return fmt.Errorf("save shared refund address: %w", err)
+			}
+			return persistOrderRefundAddressGorm(tx, orderID, addr)
+		})
+	}
+
 	return s.db.Update(func(tx database.Tx) error {
+		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), orderID, "", addr, nil); err != nil {
+			return fmt.Errorf("save shared refund address: %w", err)
+		}
 		return persistOrderRefundAddress(tx, orderID, addr)
 	})
 }
@@ -497,6 +515,21 @@ func persistOrderRefundAddress(tx database.Tx, orderID string, refundAddr string
 	}
 	dbOrder.RefundAddress = strings.TrimSpace(refundAddr)
 	if err := tx.Save(&dbOrder); err != nil {
+		return fmt.Errorf("save order %s with refund address: %w", orderID, err)
+	}
+	return nil
+}
+
+func persistOrderRefundAddressGorm(gdb *gorm.DB, orderID string, refundAddr string) error {
+	if gdb == nil {
+		return fmt.Errorf("load order %s to set refund address: db unavailable", orderID)
+	}
+	var dbOrder models.Order
+	if err := gdb.Where("id = ?", orderID).First(&dbOrder).Error; err != nil {
+		return fmt.Errorf("load order %s to set refund address: %w", orderID, err)
+	}
+	dbOrder.RefundAddress = strings.TrimSpace(refundAddr)
+	if err := gdb.Save(&dbOrder).Error; err != nil {
 		return fmt.Errorf("save order %s with refund address: %w", orderID, err)
 	}
 	return nil
@@ -578,31 +611,44 @@ func BuildPaymentSentProto(order *models.Order, pd *models.PaymentData) (*pb.Pay
 		return nil, fmt.Errorf("invalid payment coin %q: must be canonical crypto asset or provider-scoped fiat coin", pd.Coin)
 	}
 
-	return &pb.PaymentSent{
-		TransactionID:      pd.TransactionID,
-		Coin:               string(coin),
-		Method:             pd.Method,
-		ContractAddress:    pd.ContractAddress,
-		PayerAddress:       pd.PayerAddress,
-		Moderator:          pd.Moderator,
-		ModeratorAddress:   pd.ModeratorAddress,
-		Amount:             strconv.FormatUint(pd.Amount, 10),
-		Chaincode:          chaincode,
-		ToAddress:          pd.ToAddress,
-		Script:             pd.Script,
-		EscrowTimeoutHours: pd.UnlockHours,
-		EscrowReleaseFee:   pd.EscrowReleaseFee,
-		PlatformAmount:     pd.PlatformAmount,
-		PlatformAddr:       pd.PlatformAddr,
-		RefundAddress:      pd.RefundAddress,
-		PaymentMethod: &pb.PaymentSent_PaymentMethod{
+	var paymentMethod *pb.PaymentSent_PaymentMethod
+	if pd.PaymentMethod.Type != "" || pd.PaymentMethod.Brand != "" || pd.PaymentMethod.Last4 != "" {
+		paymentMethod = &pb.PaymentSent_PaymentMethod{
 			Type:  pd.PaymentMethod.Type,
 			Brand: pd.PaymentMethod.Brand,
 			Last4: pd.PaymentMethod.Last4,
-		},
+		}
+	}
+
+	settlementSpec, ok := paymentpkg.SettlementSpecFromPaymentData(pd)
+	if !ok {
+		return nil, fmt.Errorf("resolve settlement spec for payment method %s coin %s", pd.Method.String(), pd.Coin)
+	}
+	if settlementSpec.Method != pd.Method {
+		return nil, fmt.Errorf("settlement spec method %s does not match payment method %s", settlementSpec.Method.String(), pd.Method.String())
+	}
+
+	return &pb.PaymentSent{
+		TransactionID:       pd.TransactionID,
+		Coin:                string(coin),
+		ContractAddress:     pd.ContractAddress,
+		PayerAddress:        pd.PayerAddress,
+		Moderator:           pd.Moderator,
+		ModeratorAddress:    pd.ModeratorAddress,
+		Amount:              strconv.FormatUint(pd.Amount, 10),
+		Chaincode:           chaincode,
+		ToAddress:           pd.ToAddress,
+		Script:              pd.Script,
+		EscrowTimeoutHours:  pd.UnlockHours,
+		EscrowReleaseFee:    pd.EscrowReleaseFee,
+		PlatformAmount:      pd.PlatformAmount,
+		PlatformAddr:        pd.PlatformAddr,
+		RefundAddress:       pd.RefundAddress,
+		PaymentMethod:       paymentMethod,
 		Timestamp:           timestamppb.New(pd.Timestamp),
 		PaymentTokenAddress: pd.PaymentTokenAddress,
 		BuyerReceiveAddress: pd.BuyerReceiveAddress,
+		SettlementSpec:      settlementSpec.ToPaymentSent(),
 	}, nil
 }
 

@@ -558,6 +558,7 @@ func autoMigrateDatabase(db database.Database) error {
 		// docs/escrow/MONITOR_DRIVEN_PAYMENT.md (v2.0).
 		&models.PaymentObservation{},
 		&models.ManagedEscrowRelayAction{},
+		&models.SharedPaymentIntent{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
@@ -794,6 +795,7 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		// docs/escrow/MONITOR_DRIVEN_PAYMENT.md (v2.0).
 		&models.PaymentObservation{},
 		&models.ManagedEscrowRelayAction{},
+		&models.SharedPaymentIntent{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

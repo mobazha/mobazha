@@ -67,7 +67,8 @@ func (s *OrderAppService) autoCompleteShippedOrders() {
 // server-side because the escrow release requires an on-chain transaction from
 // the buyer's wallet. They rely on the contract's built-in timeout mechanism.
 func (s *OrderAppService) isClientSignedModerated(order *models.Order) bool {
-	if !payment.MethodIsModerated(order.PaymentMethod()) {
+	method, ok := order.SettlementMethod()
+	if !ok || !payment.MethodIsModerated(method) {
 		return false
 	}
 	ps, err := order.PaymentSentMessage()
@@ -138,7 +139,13 @@ func (s *OrderAppService) autoRefundUnshippedOrders() {
 			continue
 		}
 
-		if payment.MethodIsCancelable(order.PaymentMethod()) {
+		method, ok := order.SettlementMethod()
+		if !ok {
+			logger.LogWarningWithIDf(log, s.nodeID,
+				"Auto-refund: skipping order %s because PaymentSent settlement spec is missing", order.ID)
+			continue
+		}
+		if payment.MethodIsCancelable(method) {
 			s.executeAutoCompleteUnshipped(order)
 		} else {
 			s.executeAutoCancel(order)

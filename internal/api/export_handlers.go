@@ -235,7 +235,7 @@ func (g *Gateway) collectSalesRows(r *http.Request) ([]saleExportRow, error) {
 		isModerated := false
 		if ps, err := order.PaymentSentMessage(); err == nil && ps != nil {
 			paymentCoin = ps.Coin
-			isModerated = ps.Method == pb.PaymentSent_MODERATED
+			isModerated = ps.GetSettlementSpec() != nil && ps.GetSettlementSpec().GetMethod() == pb.PaymentSent_MODERATED
 		}
 
 		row := saleExportRow{

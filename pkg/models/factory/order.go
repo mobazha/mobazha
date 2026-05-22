@@ -141,7 +141,7 @@ func NewOrder() (*pb.OrderOpen, *pb.PaymentSent, error) {
 	}
 	paymentSent := &pb.PaymentSent{
 		RefundAddress:    "01ce26dc69094af9246ea7e7ce9970aff2b81cc9",
-		Method:           pb.PaymentSent_CANCELABLE,
+		SettlementSpec:   &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_CANCELABLE, PayMode: "address_monitored", EscrowType: "utxo_script"},
 		Amount:           "4992221",
 		ToAddress:        addr.String(),
 		Coin:             "MCK",

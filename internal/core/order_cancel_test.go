@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -195,7 +196,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+	if paymentSent.GetSettlementSpec() == nil || paymentSent.GetSettlementSpec().GetMethod() != pb.PaymentSent_CANCELABLE {
 		t.Fatal("Expected CANCELABLE payment")
 	}
 
@@ -286,9 +287,9 @@ func TestMobazhaNode_releaseFromCancelableAddress(t *testing.T) {
 	}
 
 	paymentSent := &pb.PaymentSent{
-		Method:    pb.PaymentSent_CANCELABLE,
-		Coin:      iwallet.CtMock.String(),
-		ToAddress: "1234",
+		SettlementSpec: payment.NewUTXOSpec(false).ToPaymentSent(),
+		Coin:           iwallet.CtMock.String(),
+		ToAddress:      "1234",
 	}
 	if err := order.PutMessage(utils.MustWrapOrderMessage(paymentSent)); err != nil {
 		t.Fatal(err)

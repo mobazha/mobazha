@@ -212,7 +212,7 @@ func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 
 func (o *Order) hasReleasedCancelableSettlement() bool {
 	paymentSent, err := o.PaymentSentMessage()
-	if err != nil || paymentSent.GetMethod() != pb.PaymentSent_CANCELABLE {
+	if err != nil || paymentSent.GetSettlementSpec() == nil || paymentSent.GetSettlementSpec().Method != pb.PaymentSent_CANCELABLE {
 		return false
 	}
 	confirmation, err := o.OrderConfirmationMessage()

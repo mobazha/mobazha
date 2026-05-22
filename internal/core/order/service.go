@@ -402,7 +402,10 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 		if err != nil {
 			return err
 		}
-		method := payment.ResolvedPaymentMethod(&order, paymentSent)
+		method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+		if !ok {
+			return fmt.Errorf("payment settlement spec is missing")
+		}
 		if payment.MethodIsFiat(method) || (!payment.MethodIsCancelable(method) && coinType.IsFiatPayment()) {
 			fiatRefundResult, err = s.refundFiatPayment(context.Background(), &order, paymentSent, "requested_by_customer")
 			if err != nil {
@@ -467,65 +470,68 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 			return nil
 		}
 
-		if funded && paymentSent != nil && !payment.MethodIsCancelable(payment.ResolvedPaymentMethod(&order, paymentSent)) {
-			coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
-			if err != nil {
-				return err
+		if funded && paymentSent != nil {
+			method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+			if ok && !payment.MethodIsCancelable(method) {
+				coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+				if err != nil {
+					return err
+				}
+				wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
+				if err != nil {
+					return err
+				}
+
+				refundResult, err := s.prepareRefundMessage(&order, wallet, txid)
+				if err != nil {
+					return err
+				}
+
+				if err := utils.SignOrderMessage(refundResult.Message, s.signer); err != nil {
+					refundResult.rollback()
+					return err
+				}
+
+				refundPayload := &anypb.Any{}
+				if err := refundPayload.MarshalFrom(refundResult.Message); err != nil {
+					refundResult.rollback()
+					return err
+				}
+
+				refundResp := newMessageWithID()
+				refundResp.MessageType = npb.Message_ORDER
+				refundResp.Payload = refundPayload
+
+				evt, err = s.orderProcessor.ProcessMessage(tx, refundResult.Message)
+				if err != nil {
+					refundResult.rollback()
+					return err
+				}
+				localEvents = append(localEvents, evt)
+
+				var (
+					done1 = make(chan struct{})
+					done2 = make(chan struct{})
+				)
+
+				if err := s.messenger.ReliablySendMessage(tx, buyer, message, done1); err != nil {
+					refundResult.rollback()
+					return err
+				}
+
+				if err := s.messenger.ReliablySendMessage(tx, buyer, refundResp, done2); err != nil {
+					refundResult.rollback()
+					return err
+				}
+
+				go func() {
+					<-done1
+					<-done2
+					close(done)
+				}()
+
+				return refundResult.commit()
 			}
-			wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
-			if err != nil {
-				return err
-			}
-
-			refundResult, err := s.prepareRefundMessage(&order, wallet, txid)
-			if err != nil {
-				return err
-			}
-
-			if err := utils.SignOrderMessage(refundResult.Message, s.signer); err != nil {
-				refundResult.rollback()
-				return err
-			}
-
-			refundPayload := &anypb.Any{}
-			if err := refundPayload.MarshalFrom(refundResult.Message); err != nil {
-				refundResult.rollback()
-				return err
-			}
-
-			refundResp := newMessageWithID()
-			refundResp.MessageType = npb.Message_ORDER
-			refundResp.Payload = refundPayload
-
-			evt, err = s.orderProcessor.ProcessMessage(tx, refundResult.Message)
-			if err != nil {
-				refundResult.rollback()
-				return err
-			}
-			localEvents = append(localEvents, evt)
-
-			var (
-				done1 = make(chan struct{})
-				done2 = make(chan struct{})
-			)
-
-			if err := s.messenger.ReliablySendMessage(tx, buyer, message, done1); err != nil {
-				refundResult.rollback()
-				return err
-			}
-
-			if err := s.messenger.ReliablySendMessage(tx, buyer, refundResp, done2); err != nil {
-				refundResult.rollback()
-				return err
-			}
-
-			go func() {
-				<-done1
-				<-done2
-				close(done)
-			}()
-
-			return refundResult.commit()
 		}
 
 		return s.messenger.ReliablySendMessage(tx, buyer, message, done)
@@ -566,7 +572,10 @@ func (s *OrderAppService) RefundOrder(orderID models.OrderID, txid iwallet.Trans
 	if err != nil {
 		return err
 	}
-	method := payment.ResolvedPaymentMethod(&order, paymentSent)
+	method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+	if !ok {
+		return fmt.Errorf("payment settlement spec is missing")
+	}
 	if payment.IsFiatPaymentRoute(method, coinType) {
 		return s.refundFiatOrder(context.Background(), &order, paymentSent, done)
 	}
@@ -751,9 +760,20 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 
 // ── GetRefundOrderInstructions ──────────────────────────────────
 
-// GetRefundOrderInstructions returns chain-specific instructions for refunding an order.
-// Monitored (UTXO) chains return nil instructions — the frontend calls /v1/order/cancel.
+// GetRefundOrderInstructions returns legacy chain-specific refund
+// instructions.
+//
+// UTXO monitored routes still return nil instructions because the backend
+// finalizes those directly. ManagedEscrow-backed EVM routes are excluded and must use
+// ExecuteSettlementAction("cancel").
 func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
+	return s.GetLegacyRefundOrderInstructions(orderID, initiatorAddress)
+}
+
+// GetLegacyRefundOrderInstructions is the internal legacy-only refund
+// instructions surface retained for client-signed chains and fiat
+// informational responses. ManagedEscrow-backed EVM routes must use settlement-actions.
+func (s *OrderAppService) GetLegacyRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
@@ -776,7 +796,10 @@ func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, ini
 		return "", nil, err
 	}
 
-	method := payment.ResolvedPaymentMethod(&order, paymentSent)
+	method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+	if !ok {
+		return "", nil, fmt.Errorf("payment settlement spec is missing")
+	}
 	if payment.IsFiatPaymentRoute(method, coinType) {
 		return coinType, &FiatRefundInstructions{
 			Provider: resolveFiatProvider(&order, paymentSent),
@@ -785,7 +808,7 @@ func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, ini
 	}
 
 	toAddress := paymentSent.PayerAddress
-	return s.GetEscrowReleaseInstructions(orderID, initiatorAddress, toAddress)
+	return s.GetLegacyEscrowReleaseInstructions(orderID, initiatorAddress, toAddress)
 }
 
 // FiatRefundInstructions is returned by GetRefundOrderInstructions for fiat orders.
@@ -821,11 +844,19 @@ func orderRequiresClientSignedInstructions(order *models.Order, paymentSent *pb.
 	return ok && spec.IsClientSigned()
 }
 
-// GetEscrowReleaseInstructions delegates escrow release instruction generation
-// to the client-signed ChainEscrow implementation. Address-monitored routes
-// (UTXO, ManagedEscrow, DIRECT) return nil instructions and are handled entirely by the
-// backend action endpoint.
+// GetEscrowReleaseInstructions delegates release-instruction generation to the
+// legacy client-signed ChainEscrow implementation.
+//
+// Address-monitored UTXO routes still return nil instructions because the
+// backend handles them directly. ManagedEscrow-backed EVM routes are rejected and must
+// use backend settlement actions instead of escrow_v1-style instructions.
 func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, initiatorAddress string, toAddress string) (coinType iwallet.CoinType, instructions any, err error) {
+	return s.GetLegacyEscrowReleaseInstructions(orderID, initiatorAddress, toAddress)
+}
+
+// GetLegacyEscrowReleaseInstructions is the internal legacy-only cancel/refund
+// instruction surface for client-signed chains.
+func (s *OrderAppService) GetLegacyEscrowReleaseInstructions(orderID models.OrderID, initiatorAddress string, toAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
@@ -844,6 +875,10 @@ func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, i
 		return "", nil, err
 	}
 	if !orderRequiresClientSignedInstructions(&order, paymentSent) {
+		if spec, ok := payment.ResolveSettlementSpec(&order, paymentSent); ok && spec.UsesManagedEscrow() {
+			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed EVM refund/cancel must use POST /v1/orders/{orderID}/settlement-actions/cancel",
+				coreiface.ErrBadRequest)
+		}
 		return coinType, nil, nil
 	}
 
@@ -956,7 +991,10 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 		refundResp.Message = refundAny
 		return &refundBuildResult{Message: refundResp}, nil
 	} else {
-		method := payment.ResolvedPaymentMethod(order, paymentSent)
+		method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
+		if !ok {
+			return nil, fmt.Errorf("payment settlement spec is missing")
+		}
 		switch {
 		case payment.MethodIsDirect(method):
 			wdbTx, err := wallet.Begin()
@@ -1263,7 +1301,8 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 		return nil, err
 	}
 
-	if !payment.MethodIsCancelable(payment.ResolvedPaymentMethod(order, paymentSent)) {
+	method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
+	if !ok || !payment.MethodIsCancelable(method) {
 		return nil, errors.New("order payment method is not CANCELABLE")
 	}
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -245,6 +246,9 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 	}
 
 	alreadyVerified := order.IsPaymentVerified()
+	if err := hydrateSharedManagedEscrowMetadata(gdb, &order); err != nil {
+		return fmt.Errorf("aggregating verifier: hydrate shared metadata for %s: %w", orderID, err)
+	}
 
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
@@ -345,7 +349,11 @@ func paymentVerifiedBusinessEvents(order *models.Order, orderOpen *pb.OrderOpen,
 			return nil
 		}
 		out := []interface{}{funded}
-		switch ps.Method {
+		spec := ps.GetSettlementSpec()
+		if spec == nil {
+			return out
+		}
+		switch spec.GetMethod() {
 		case pb.PaymentSent_CANCELABLE:
 			var amount uint64
 			if total != nil && total.IsUint64() {
@@ -430,8 +438,8 @@ func dialectSupportsRowLock(db *gorm.DB) bool {
 }
 
 // parseExpectedAmount extracts the order's expected payment in smallest units.
-// Address-monitored routes use the locked pending payment intent; legacy rows
-// fall back to the signed OrderOpen amount.
+// Address-monitored routes use the locked pending payment intent; direct order
+// flows use the signed OrderOpen amount.
 func parseExpectedAmount(order *models.Order, orderOpen *pb.OrderOpen) (*big.Int, error) {
 	if orderOpen == nil {
 		return nil, errors.New("order_open is nil")
@@ -564,13 +572,13 @@ func buildAggregatedPaymentSent(
 		return nil, err
 	}
 
-	// Use buyer-declared refund address when available. When absent, infer
-	// only from a single unambiguous observed sender; otherwise leave empty
-	// so downstream refund paths require an explicit override.
-	refundAddr := order.RefundAddress
-	if refundAddr == "" {
-		refundAddr = inferredRefundAddress(rows)
-	}
+	// The aggregated PaymentSent envelope must be byte-identical across buyer
+	// and vendor mirrors. For monitor-only payments, Order.RefundAddress may be
+	// present only on the buyer mirror (buyer-declared API input), so we must
+	// not embed that tenant-local field into the shared envelope. Preserve a
+	// refund address only when it already lives in a peer-shared PaymentSent;
+	// otherwise infer from a single unambiguous observed sender.
+	refundAddr := aggregatedRefundAddress(order, rows)
 
 	intent := resolveAggregatedPaymentIntent(order, rows)
 
@@ -578,11 +586,14 @@ func buildAggregatedPaymentSent(
 	if hasChainTx {
 		transactionID = txRep.TxHash
 	}
+	eventTime := now
+	if !rep.BlockTime.IsZero() {
+		eventTime = rep.BlockTime.UTC()
+	}
 
 	ps := &pb.PaymentSent{
 		TransactionID:       transactionID,
 		Chaincode:           chaincode,
-		Method:              intent.method,
 		ContractAddress:     intent.contractAddress,
 		PayerAddress:        rep.FromAddress,
 		Moderator:           intent.moderator,
@@ -594,7 +605,8 @@ func buildAggregatedPaymentSent(
 		RefundAddress:       refundAddr,
 		EscrowTimeoutHours:  intent.escrowTimeoutHours,
 		PaymentTokenAddress: rep.TokenAddress,
-		Timestamp:           timestamppb.New(now),
+		Timestamp:           timestamppb.New(eventTime),
+		SettlementSpec:      intent.settlementSpec.ToPaymentSent(),
 	}
 	return ps, nil
 }
@@ -627,7 +639,7 @@ func latestChainTxObservation(rows []models.PaymentObservation) (models.PaymentO
 }
 
 type aggregatedPaymentIntent struct {
-	method             pb.PaymentSent_Method
+	settlementSpec     paymentmetrics.SettlementSpec
 	contractAddress    string
 	script             string
 	moderator          string
@@ -636,7 +648,9 @@ type aggregatedPaymentIntent struct {
 }
 
 func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentObservation) aggregatedPaymentIntent {
-	intent := aggregatedPaymentIntent{method: pb.PaymentSent_DIRECT}
+	intent := aggregatedPaymentIntent{
+		settlementSpec: paymentmetrics.NewDirectSpec(),
+	}
 
 	if order == nil {
 		return intent
@@ -644,23 +658,25 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 
 	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
 		if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingManagedEscrow(managed_escrowInfo); ok {
-			intent.method = spec.Method
+			intent.settlementSpec = spec
 		} else if managed_escrowInfo.Moderated {
-			intent.method = pb.PaymentSent_MODERATED
+			intent.settlementSpec = paymentmetrics.NewManagedEscrowSpec(true)
 		} else {
-			intent.method = pb.PaymentSent_CANCELABLE
+			intent.settlementSpec = paymentmetrics.NewManagedEscrowSpec(false)
 		}
 		intent.contractAddress = managed_escrowInfo.Address
+		intent.moderator = managed_escrowInfo.Moderator
+		intent.moderatorAddress = managed_escrowInfo.ModeratorAddress
 		return intent
 	}
 
 	if csInfo, err := order.GetPendingClientSignedPaymentInfo(); err == nil && csInfo != nil {
 		if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingClientSigned(csInfo); ok {
-			intent.method = spec.Method
+			intent.settlementSpec = spec
 		} else if strings.TrimSpace(csInfo.Moderator) != "" {
-			intent.method = pb.PaymentSent_MODERATED
+			intent.settlementSpec = paymentmetrics.NewClientSignedEVMSpec(true)
 		} else {
-			intent.method = pb.PaymentSent_CANCELABLE
+			intent.settlementSpec = paymentmetrics.NewClientSignedEVMSpec(false)
 		}
 		intent.contractAddress = csInfo.EscrowAddress
 		if strings.TrimSpace(csInfo.Moderator) != "" {
@@ -675,21 +691,23 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 	}
 
 	// No pending intent: observations are chain facts only. Default to DIRECT
-	// for unknown routes (legacy rows without SettlementSpec persistence).
+	// for address-monitored routes that do not carry escrow settlement intent.
 	return intent
 }
 
 func utxoAggregatedPaymentIntent(pendingInfo *models.PendingUTXOPaymentInfo) aggregatedPaymentIntent {
-	intent := aggregatedPaymentIntent{method: pb.PaymentSent_DIRECT}
+	intent := aggregatedPaymentIntent{
+		settlementSpec: paymentmetrics.NewDirectSpec(),
+	}
 	if pendingInfo == nil {
 		return intent
 	}
 	if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingUTXO(pendingInfo); ok {
-		intent.method = spec.Method
+		intent.settlementSpec = spec
 	} else if pendingInfo.Moderator != "" {
-		intent.method = pb.PaymentSent_MODERATED
+		intent.settlementSpec = paymentmetrics.NewUTXOSpec(true)
 	} else {
-		intent.method = pb.PaymentSent_CANCELABLE
+		intent.settlementSpec = paymentmetrics.NewUTXOSpec(false)
 	}
 	if pendingInfo.Moderator != "" {
 		intent.moderator = pendingInfo.Moderator
@@ -716,4 +734,34 @@ func inferredRefundAddress(rows []models.PaymentObservation) string {
 		}
 	}
 	return candidate
+}
+
+func aggregatedRefundAddress(order *models.Order, rows []models.PaymentObservation) string {
+	if order != nil {
+		if existing, err := order.PaymentSentMessage(); err == nil {
+			if addr := strings.TrimSpace(existing.RefundAddress); addr != "" {
+				return addr
+			}
+		}
+	}
+	return inferredRefundAddress(rows)
+}
+
+func hydrateSharedManagedEscrowMetadata(gdb *gorm.DB, order *models.Order) error {
+	if gdb == nil || order == nil || strings.TrimSpace(order.ID.String()) == "" {
+		return nil
+	}
+
+	if hasPendingManagedEscrowPaymentInfo(order) && strings.TrimSpace(order.PaymentAddress) != "" && strings.TrimSpace(order.RefundAddress) != "" {
+		return nil
+	}
+	return paymentintent.HydrateOrderFromSharedIntent(gdb, order)
+}
+
+func hasPendingManagedEscrowPaymentInfo(order *models.Order) bool {
+	if order == nil {
+		return false
+	}
+	info, err := order.GetPendingManagedEscrowPaymentInfo()
+	return err == nil && info != nil
 }

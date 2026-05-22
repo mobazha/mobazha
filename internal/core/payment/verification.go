@@ -208,7 +208,13 @@ func (s *PaymentAppService) emitVerifiedPaymentEvents(order *models.Order, payme
 	}
 	s.eventBus.Emit(fundedEvent)
 
-	switch paymentSent.Method {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "Payment verification: order %s missing settlement spec in PaymentSent", order.ID)
+		return
+	}
+
+	switch spec.GetMethod() {
 	case pb.PaymentSent_CANCELABLE:
 		var amount uint64
 		if tx != nil {

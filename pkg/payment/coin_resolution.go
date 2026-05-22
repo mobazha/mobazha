@@ -56,6 +56,9 @@ func NormalizeSettlementPaymentCoin(raw string) (iwallet.CoinType, bool) {
 	if coin, ok := iwallet.TryNormalizePaymentCoin(raw); ok {
 		return coin, true
 	}
+	if coin := iwallet.CoinType(strings.TrimSpace(raw)); coin.ValidateCanonicalPaymentCoin() == nil {
+		return coin, true
+	}
 
 	if len(parts) == 4 &&
 		strings.EqualFold(parts[0], "crypto") &&

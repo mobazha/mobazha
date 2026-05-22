@@ -3,12 +3,14 @@
 package order
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	intdb "github.com/mobazha/mobazha3.0/internal/database"
 	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -81,11 +83,11 @@ func TestOrderAppService_SetRegistry(t *testing.T) {
 	assert.Same(t, reg, svc.paymentRegistry)
 }
 
-func TestOrderAppService_GetEscrowReleaseInstructions_ManagedEscrowReturnsNil(t *testing.T) {
+func TestOrderAppService_GetEscrowReleaseInstructions_ManagedEscrowRejectsLegacyPath(t *testing.T) {
 	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
 
 	order, paymentSent := newManagedEscrowOrderForTests(t, iwallet.CoinType("crypto:eip155:11155111:native"))
-	paymentSent.Method = pb.PaymentSent_CANCELABLE
+	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	require.NoError(t, order.SetPaymentSent(paymentSent))
 	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
 		Coin:           paymentSent.Coin,
@@ -97,18 +99,52 @@ func TestOrderAppService_GetEscrowReleaseInstructions_ManagedEscrowReturnsNil(t 
 	}))
 
 	coinType, instructions, err := svc.GetEscrowReleaseInstructions(order.ID, "", paymentSent.PayerAddress)
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coinType)
 	assert.Nil(t, instructions)
+	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+	assert.Contains(t, err.Error(), "/settlement-actions/cancel")
 }
 
-func TestOrderAppService_GetCompleteOrderInstructions_ManagedEscrowReturnsNil(t *testing.T) {
+func TestOrderAppService_GetRefundOrderInstructions_ManagedEscrowRejectsLegacyPath(t *testing.T) {
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+
+	order, paymentSent := newManagedEscrowOrderForTests(t, iwallet.CoinType("crypto:eip155:11155111:native"))
+	order.MyRole = string(models.RoleBuyer)
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
+		BuyerID: &pb.ID{PeerID: "12D3KooWBuyer"},
+		Listings: []*pb.SignedListing{{
+			Listing: &pb.Listing{
+				Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_PHYSICAL_GOOD},
+			},
+		}},
+	})))
+	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:           paymentSent.Coin,
+		Address:        order.PaymentAddress,
+		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
+	}))
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	coinType, instructions, err := svc.GetRefundOrderInstructions(order.ID, "")
+	require.Error(t, err)
+	assert.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coinType)
+	assert.Nil(t, instructions)
+	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+	assert.Contains(t, err.Error(), "/settlement-actions/cancel")
+}
+
+func TestOrderAppService_GetCompleteOrderInstructions_ManagedEscrowRejectsLegacyPath(t *testing.T) {
 	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
 
 	order, paymentSent := newManagedEscrowOrderForTests(t, iwallet.CoinType("crypto:eip155:11155111:native"))
 	order.MyRole = string(models.RoleBuyer)
 	order.SetFSMState(models.OrderState_SHIPPED)
-	paymentSent.Method = pb.PaymentSent_MODERATED
+	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(true).ToPaymentSent()
 	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
 		Items: []*pb.OrderOpen_Item{{
 			ListingHash: "listing-1",
@@ -130,9 +166,43 @@ func TestOrderAppService_GetCompleteOrderInstructions_ManagedEscrowReturnsNil(t 
 	}))
 
 	coinType, instructions, err := svc.GetCompleteOrderInstructions(order.ID, "")
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coinType)
 	assert.Nil(t, instructions)
+	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+	assert.Contains(t, err.Error(), "/v1/orders/{orderID}/complete")
+}
+
+func TestOrderAppService_GetReleaseFundsInstructions_ManagedEscrowRejectsLegacyPath(t *testing.T) {
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+
+	order, paymentSent := newManagedEscrowOrderForTests(t, iwallet.CoinType("crypto:eip155:11155111:native"))
+	order.MyRole = string(models.RoleBuyer)
+	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(true).ToPaymentSent()
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
+		Items: []*pb.OrderOpen_Item{{
+			ListingHash: "listing-1",
+		}},
+	})))
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.DisputeClose{
+		Verdict: "resolved",
+	})))
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:           paymentSent.Coin,
+		Address:        order.PaymentAddress,
+		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
+	}))
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	coinType, instructions, err := svc.GetReleaseFundsInstructions(order.ID, "")
+	require.Error(t, err)
+	assert.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coinType)
+	assert.Nil(t, instructions)
+	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+	assert.Contains(t, err.Error(), "/v1/disputes/{orderID}/close")
 }
 
 // ── GetOrder ────────────────────────────────────────────────────────────

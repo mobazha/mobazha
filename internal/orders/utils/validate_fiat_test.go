@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,10 +18,10 @@ func makeOrder(amount, coin string) *pb.OrderOpen {
 
 func makePayment(amount, coin, txID string) *pb.PaymentSent {
 	return &pb.PaymentSent{
-		Amount:        amount,
-		Coin:          coin,
-		TransactionID: txID,
-		Method:        pb.PaymentSent_FIAT,
+		Amount:         amount,
+		Coin:           coin,
+		TransactionID:  txID,
+		SettlementSpec: payment.NewFiatSpec().ToPaymentSent(),
 	}
 }
 

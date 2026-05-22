@@ -192,6 +192,10 @@ func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request
 }
 
 func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *http.Request) {
+	// Legacy instructions surface for client-signed moderated dispute
+	// payouts. ManagedEscrow-backed moderated dispute resolution stays on the backend
+	// close/release path instead of using this endpoint as the primary
+	// contract.
 	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
@@ -212,7 +216,7 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 	node := getOrderService(r)
 	coinType, instructions, err := node.GetReleaseFundsInstructions(models.OrderID(orderID), params.InitiatorAddress)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)

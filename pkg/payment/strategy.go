@@ -168,6 +168,12 @@ type PaymentSetupParams struct {
 
 	// Amount is the payment amount in minimal units (satoshis, wei, lamports).
 	Amount uint64
+
+	// OrderData carries a caller-supplied order snapshot when the
+	// setup/action flow already has one materialized. ManagedEscrow-backed
+	// action re-resolution uses this to stay independent from whether
+	// the current node persists a local orders row for the order.
+	OrderData *models.Order
 }
 
 // PaymentSetupResult contains the result of payment instruction generation.

@@ -982,8 +982,8 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if paymentSentMsg.Method != pb.PaymentSent_CANCELABLE {
-		t.Errorf("Expected CANCELABLE payment method, got %s", paymentSentMsg.Method)
+	if paymentSentMsg.GetSettlementSpec() == nil || paymentSentMsg.GetSettlementSpec().GetMethod() != pb.PaymentSent_CANCELABLE {
+		t.Errorf("Expected CANCELABLE payment method, got %v", paymentSentMsg.GetSettlementSpec())
 	}
 
 	// Verify seller's order state
@@ -1147,8 +1147,8 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if paymentSentMsg.Method != pb.PaymentSent_CANCELABLE {
-		t.Fatalf("Expected CANCELABLE payment, got %s", paymentSentMsg.Method)
+	if paymentSentMsg.GetSettlementSpec() == nil || paymentSentMsg.GetSettlementSpec().GetMethod() != pb.PaymentSent_CANCELABLE {
+		t.Fatalf("Expected CANCELABLE payment, got %v", paymentSentMsg.GetSettlementSpec())
 	}
 
 	// ── Step 5: Buyer Cancels Order ──────────────────────────────
@@ -1503,8 +1503,8 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if paymentSentMsg.Method != pb.PaymentSent_MODERATED {
-		t.Errorf("Expected MODERATED payment method, got %s", paymentSentMsg.Method)
+	if paymentSentMsg.GetSettlementSpec() == nil || paymentSentMsg.GetSettlementSpec().GetMethod() != pb.PaymentSent_MODERATED {
+		t.Errorf("Expected MODERATED payment method, got %v", paymentSentMsg.GetSettlementSpec())
 	}
 	if paymentSentMsg.Moderator != moderatorPeerID {
 		t.Errorf("Expected moderator %s, got %s", moderatorPeerID, paymentSentMsg.Moderator)

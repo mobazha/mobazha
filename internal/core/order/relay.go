@@ -44,7 +44,7 @@ func (s *OrderAppService) relayOrDirect(
 
 // RefundOrderViaRelay refunds an order using the relay service.
 func (s *OrderAppService) RefundOrderViaRelay(orderID models.OrderID, done chan struct{}) error {
-	coinType, instructions, err := s.GetRefundOrderInstructions(orderID, "")
+	coinType, instructions, err := s.GetLegacyRefundOrderInstructions(orderID, "")
 	if err != nil {
 		return fmt.Errorf("failed to get refund instructions: %w", err)
 	}
@@ -78,7 +78,7 @@ func (s *OrderAppService) DeclineOrderViaRelay(orderID models.OrderID, reason st
 		return err
 	}
 
-	if payment.MethodIsCancelable(payment.ResolvedPaymentMethod(&order, paymentSent)) {
+	if method, ok := payment.ResolvedPaymentMethod(&order, paymentSent); ok && payment.MethodIsCancelable(method) {
 		return s.DeclineOrder(orderID, "", reason, done)
 	}
 
@@ -95,7 +95,7 @@ func (s *OrderAppService) DeclineOrderViaRelay(orderID models.OrderID, reason st
 		return s.DeclineOrder(orderID, "", reason, done)
 	}
 
-	_, instructions, err := s.GetRefundOrderInstructions(orderID, "")
+	_, instructions, err := s.GetLegacyRefundOrderInstructions(orderID, "")
 	if err != nil {
 		return fmt.Errorf("failed to get refund instructions for decline: %w", err)
 	}
@@ -133,7 +133,7 @@ func (s *OrderAppService) CancelOrderViaRelay(orderID models.OrderID, done chan 
 		return s.CancelOrder(orderID, "", done)
 	}
 
-	_, instructions, err := s.GetEscrowReleaseInstructions(orderID, "", paymentSent.PayerAddress)
+	_, instructions, err := s.GetLegacyEscrowReleaseInstructions(orderID, "", paymentSent.PayerAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get cancel instructions: %w", err)
 	}

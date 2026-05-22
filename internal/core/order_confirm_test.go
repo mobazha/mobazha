@@ -366,7 +366,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+	if paymentSent.GetSettlementSpec() == nil || paymentSent.GetSettlementSpec().GetMethod() != pb.PaymentSent_CANCELABLE {
 		t.Fatal("Expected CANCELABLE order")
 	}
 

@@ -50,7 +50,7 @@ func TestProcessOrderPayment_FiatKnownTxPromotesPending(t *testing.T) {
 	paymentSent := &pb.PaymentSent{
 		TransactionID: txID,
 		Coin:          "fiat:stripe:USD",
-		Method:        pb.PaymentSent_FIAT,
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_FIAT),
 		ToAddress:     toAddress,
 		Amount:        "100",
 		Timestamp:     timestamppb.Now(),
@@ -140,7 +140,7 @@ func TestProcessMessage_FiatKnownTxPromotesPending(t *testing.T) {
 	paymentSent := &pb.PaymentSent{
 		TransactionID: txID,
 		Coin:          "fiat:stripe:USD",
-		Method:        pb.PaymentSent_FIAT,
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_FIAT),
 		ToAddress:     toAddress,
 		Amount:        "100",
 		Timestamp:     timestamppb.Now(),
@@ -233,7 +233,7 @@ func TestProcessOrderPayment_CryptoKnownTxStaysAwaitingVerification(t *testing.T
 	paymentSent := &pb.PaymentSent{
 		TransactionID: txID,
 		Coin:          string(iwallet.CtMock),
-		Method:        pb.PaymentSent_DIRECT,
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 		ToAddress:     toAddress,
 		Amount:        "100",
 		Timestamp:     timestamppb.Now(),
@@ -323,7 +323,7 @@ func TestProcessOrderPayment_CryptoKnownConfirmedTxPromotesPending(t *testing.T)
 	paymentSent := &pb.PaymentSent{
 		TransactionID: txID,
 		Coin:          string(iwallet.CtMock),
-		Method:        pb.PaymentSent_DIRECT,
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 		ToAddress:     toAddress,
 		Amount:        "100",
 		Timestamp:     timestamppb.Now(),

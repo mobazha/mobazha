@@ -78,8 +78,9 @@ type EVMPaymentInfoResponse struct {
 // directly to the predicted ManagedEscrow address. No client-side signing is required
 // during setup — signatures are collected at action time (Confirm / Cancel / Complete).
 //
-// Phase PS B2: replaces the legacy EVMPaymentInfoResponse for ManagedEscrow adapter results.
-// The legacy instructions endpoint continues to serve V1 EVM / Solana orders.
+// Phase PS B2: replaces the legacy EVMPaymentInfoResponse for ManagedEscrow adapter
+// results. Legacy instructions endpoints remain only for client-signed flows
+// (legacy EVM / Solana / TRON), not as the default path for ManagedEscrow.
 type ManagedEscrowPaymentInfoResponse struct {
 	PaymentType    string                `json:"paymentType"`         // always "managed_escrow_address_monitored"
 	PaymentMethod  pb.PaymentSent_Method `json:"paymentMethod"`       // CANCELABLE or MODERATED

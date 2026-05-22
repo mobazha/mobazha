@@ -73,6 +73,54 @@ func TestOrderHandlers(t *testing.T) {
 				return nil, nil
 			},
 		},
+		{
+			name:   "legacy confirm instructions safe misuse returns 400",
+			path:   "/v1/orders/order-managed_escrow/instructions/confirm",
+			method: http.MethodPost,
+			body:   []byte(`{"payoutAddress":"0x1111111111111111111111111111111111111111"}`),
+			setNodeMethods: func(n *mockNode) {
+				rawOrderOpen, err := protojson.Marshal(&pb.OrderOpen{
+					Listings: []*pb.SignedListing{{
+						Listing: &pb.Listing{
+							Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_PHYSICAL_GOOD},
+						},
+					}},
+				})
+				if err != nil {
+					t.Fatalf("marshal order open: %v", err)
+				}
+				n.getOrderFunc = func(orderID string) (*models.Order, error) {
+					return &models.Order{
+						ID:                  models.OrderID(orderID),
+						SerializedOrderOpen: rawOrderOpen,
+					}, nil
+				}
+				n.getConfirmOrderInstructionsFunc = func(orderID models.OrderID, initiatorAddress string, payoutAddress string) (iwallet.CoinType, any, error) {
+					return iwallet.CoinType("crypto:eip155:1:native"), nil,
+						fmt.Errorf("%w: ManagedEscrow-backed EVM confirm must use POST /v1/orders/{orderID}/settlement-actions/confirm", coreiface.ErrBadRequest)
+				}
+			},
+			statusCode: http.StatusBadRequest,
+			expectedResponse: func() ([]byte, error) {
+				return nil, nil
+			},
+		},
+		{
+			name:   "legacy dispute release instructions safe misuse returns 400",
+			path:   "/v1/disputes/order-managed_escrow/instructions/release",
+			method: http.MethodPost,
+			body:   []byte(`{}`),
+			setNodeMethods: func(n *mockNode) {
+				n.getReleaseFundsInstructionsFunc = func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+					return iwallet.CoinType("crypto:eip155:1:native"), nil,
+						fmt.Errorf("%w: ManagedEscrow-backed moderated dispute payouts must use POST /v1/disputes/{orderID}/close or /v1/disputes/{orderID}/release", coreiface.ErrBadRequest)
+				}
+			},
+			statusCode: http.StatusBadRequest,
+			expectedResponse: func() ([]byte, error) {
+				return nil, nil
+			},
+		},
 	})
 }
 

@@ -82,6 +82,9 @@ type OrderService interface {
 	DeclineOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
+	// GetConfirmOrderInstructions is a legacy client-signed-only surface.
+	// ManagedEscrow-backed EVM and other backend-submitted settlement routes must use
+	// ExecuteSettlementAction instead of the old instructions flow.
 	GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	// ExecuteSettlementAction runs backend-driven settlement intents
 	// (confirm / cancel) via ChainEscrowV2. Client-signed legacy chains
@@ -90,8 +93,15 @@ type OrderService interface {
 	// GetSettlementActionStatus returns the latest known lifecycle state for a
 	// previously issued settlement action.
 	GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error)
+	// GetRefundOrderInstructions is a legacy instructions surface. It remains
+	// valid for client-signed chains and fiat informational responses only.
+	// ManagedEscrow-backed EVM refund/cancel flows must use ExecuteSettlementAction.
 	GetRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
+	// GetCompleteOrderInstructions is a legacy instructions surface for
+	// client-signed moderated completion flows only. ManagedEscrow-backed moderated
+	// completion stays on the backend-owned completion path instead of the
+	// old instructions contract.
 	GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	RateOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
@@ -117,6 +127,10 @@ type OrderService interface {
 	OpenDispute(orderID models.OrderID, reason string, evidenceHashes []string, done chan struct{}) error
 	OpenAfterSaleDispute(orderID models.OrderID, reason string, description string) error
 	CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
+	// GetReleaseFundsInstructions remains a legacy instruction endpoint for
+	// client-signed moderated payouts. ManagedEscrow-backed moderated payouts should
+	// flow through backend close/release handling and ManagedEscrow owner-signature
+	// paths instead of the old instructions contract.
 	GetReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ReleaseFundsAfterTimeout(orderID models.OrderID, done chan struct{}) error

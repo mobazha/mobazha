@@ -92,6 +92,45 @@ func TestSettlementSpecFromPaymentData_ClientSignedEVM(t *testing.T) {
 	require.Equal(t, NewClientSignedEVMSpec(false), spec)
 }
 
+func TestResolveSettlementSpec_PaymentSentManagedEscrowEnvelope(t *testing.T) {
+	ps := &pb.PaymentSent{
+		Coin:            "crypto:eip155:1:native",
+		ContractAddress: "0x1111111111111111111111111111111111111111",
+		ToAddress:       "0x1111111111111111111111111111111111111111",
+		SettlementSpec:  NewManagedEscrowSpec(false).ToPaymentSent(),
+	}
+
+	spec, ok := ResolveSettlementSpec(nil, ps)
+	require.True(t, ok)
+	require.Equal(t, NewManagedEscrowSpec(false), spec)
+}
+
+func TestResolveSettlementSpec_PaymentSentLegacyEVMEnvelope(t *testing.T) {
+	ps := &pb.PaymentSent{
+		Coin:            "crypto:eip155:1:native",
+		ContractAddress: "0x1111111111111111111111111111111111111111",
+		ToAddress:       "0x2222222222222222222222222222222222222222",
+		Script:          "5221",
+		SettlementSpec:  NewClientSignedEVMSpec(false).ToPaymentSent(),
+	}
+
+	spec, ok := ResolveSettlementSpec(nil, ps)
+	require.True(t, ok)
+	require.Equal(t, NewClientSignedEVMSpec(false), spec)
+}
+
+func TestResolveSettlementSpec_PaymentSentDoesNotInferManagedEscrowFromShape(t *testing.T) {
+	ps := &pb.PaymentSent{
+		Coin:            "crypto:eip155:1:native",
+		ContractAddress: "0x1111111111111111111111111111111111111111",
+		ToAddress:       "0x1111111111111111111111111111111111111111",
+	}
+
+	spec, ok := ResolveSettlementSpec(nil, ps)
+	require.False(t, ok)
+	require.Equal(t, SettlementSpec{}, spec)
+}
+
 func TestResolveSettlementSpecFromOrder_ClientSignedPending(t *testing.T) {
 	order := &models.Order{}
 	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
@@ -123,52 +162,55 @@ func TestMethodIsDirect(t *testing.T) {
 	require.False(t, MethodIsDirect(pb.PaymentSent_MODERATED))
 }
 
-func TestEffectivePaymentMethod_LegacyDirectWithEscrowFields(t *testing.T) {
+func TestPaymentSentSettlementSpec_UsesExplicitMethodWithoutFieldInference(t *testing.T) {
 	ps := &pb.PaymentSent{
-		Method:          pb.PaymentSent_DIRECT,
-		ContractAddress: "0xmanagedescrow",
-		ToAddress:       "0xmanagedescrow",
+		ContractAddress:  "0xmanagedescrow",
+		ToAddress:        "0xmanagedescrow",
+		Moderator:        "mod-peer",
+		ModeratorAddress: "0xmod",
+		Script:           "5221...",
+		SettlementSpec:   NewDirectSpec().ToPaymentSent(),
 	}
-	require.Equal(t, pb.PaymentSent_CANCELABLE, EffectivePaymentMethod(ps))
+	require.NotNil(t, ps.GetSettlementSpec())
+	require.Equal(t, pb.PaymentSent_DIRECT, ps.GetSettlementSpec().GetMethod())
 
-	ps.Moderator = "mod-peer"
-	ps.ModeratorAddress = "0xmod"
-	require.Equal(t, pb.PaymentSent_MODERATED, EffectivePaymentMethod(ps))
+	ps.SettlementSpec = NewManagedEscrowSpec(false).ToPaymentSent()
+	require.Equal(t, pb.PaymentSent_CANCELABLE, ps.GetSettlementSpec().GetMethod())
 
-	ps = &pb.PaymentSent{
-		Method: pb.PaymentSent_DIRECT,
-		Script: "5221...",
-	}
-	require.Equal(t, pb.PaymentSent_CANCELABLE, EffectivePaymentMethod(ps))
+	ps.SettlementSpec = NewManagedEscrowSpec(true).ToPaymentSent()
+	require.Equal(t, pb.PaymentSent_MODERATED, ps.GetSettlementSpec().GetMethod())
 }
 
-func TestEffectivePaymentMethod_DirectTokenTransferStaysDirect(t *testing.T) {
+func TestPaymentSentSettlementSpec_DirectTokenTransferStaysDirect(t *testing.T) {
 	ps := &pb.PaymentSent{
-		Method:          pb.PaymentSent_DIRECT,
 		ContractAddress: "0xtoken",
 		ToAddress:       "0xmerchant",
+		SettlementSpec:  NewDirectSpec().ToPaymentSent(),
 	}
-	require.Equal(t, pb.PaymentSent_DIRECT, EffectivePaymentMethod(ps))
+	require.NotNil(t, ps.GetSettlementSpec())
+	require.Equal(t, pb.PaymentSent_DIRECT, ps.GetSettlementSpec().GetMethod())
 }
 
-func TestIsNonEscrowDirectPayment_PendingManagedEscrowOverridesLegacyDirectEnvelope(t *testing.T) {
+func TestIsNonEscrowDirectPayment_PendingManagedEscrowSpecOverridesPaymentSentEnvelope(t *testing.T) {
 	order := &models.Order{}
 	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
 		Address:        "0xmanagedescrow",
 		SettlementSpec: NewManagedEscrowSpec(false).ToPending(),
 	}))
-	ps := &pb.PaymentSent{Method: pb.PaymentSent_DIRECT, ContractAddress: "0xmanagedescrow"}
+	ps := &pb.PaymentSent{ContractAddress: "0xmanagedescrow", SettlementSpec: NewDirectSpec().ToPaymentSent()}
 	require.False(t, IsNonEscrowDirectPayment(order, ps))
 }
 
-func TestResolvedPaymentMethod_PendingSpecOverridesLegacyDirectEnvelope(t *testing.T) {
+func TestResolvedPaymentMethod_PendingSpecOverridesPaymentSentEnvelope(t *testing.T) {
 	order := &models.Order{}
 	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
 		Address:        "0xmanagedescrow",
 		SettlementSpec: NewManagedEscrowSpec(true).ToPending(),
 	}))
-	ps := &pb.PaymentSent{Method: pb.PaymentSent_DIRECT, ContractAddress: "0xmanagedescrow"}
-	require.Equal(t, pb.PaymentSent_MODERATED, ResolvedPaymentMethod(order, ps))
+	ps := &pb.PaymentSent{ContractAddress: "0xmanagedescrow", SettlementSpec: NewDirectSpec().ToPaymentSent()}
+	method, ok := ResolvedPaymentMethod(order, ps)
+	require.True(t, ok)
+	require.Equal(t, pb.PaymentSent_MODERATED, method)
 }
 
 func TestResolvedPaymentMethod_PendingClientSignedOverridesDirectTokenLikeEnvelope(t *testing.T) {
@@ -179,11 +221,13 @@ func TestResolvedPaymentMethod_PendingClientSignedOverridesDirectTokenLikeEnvelo
 		SettlementSpec: NewClientSignedEVMSpec(false).ToPending(),
 	}))
 	ps := &pb.PaymentSent{
-		Method:          pb.PaymentSent_DIRECT,
 		ContractAddress: "0xtoken",
 		ToAddress:       "0xmerchant",
+		SettlementSpec:  NewDirectSpec().ToPaymentSent(),
 	}
-	require.Equal(t, pb.PaymentSent_CANCELABLE, ResolvedPaymentMethod(order, ps))
+	method, ok := ResolvedPaymentMethod(order, ps)
+	require.True(t, ok)
+	require.Equal(t, pb.PaymentSent_CANCELABLE, method)
 }
 
 func TestResolveSettlementSpecFromPending_ExplicitSpec(t *testing.T) {
@@ -198,8 +242,8 @@ func TestResolveSettlementSpecFromPending_ExplicitSpec(t *testing.T) {
 
 func TestUsesUTXOScriptEscrow_DistinguishesManagedEscrowFromAddressMonitored(t *testing.T) {
 	ps := &pb.PaymentSent{
-		Method: pb.PaymentSent_CANCELABLE,
-		Coin:   "crypto:eip155:11155111:native",
+		Coin:           "crypto:eip155:11155111:native",
+		SettlementSpec: NewManagedEscrowSpec(false).ToPaymentSent(),
 	}
 
 	managed_escrowOrder := &models.Order{}
@@ -212,8 +256,8 @@ func TestUsesUTXOScriptEscrow_DistinguishesManagedEscrowFromAddressMonitored(t *
 	require.False(t, UsesUTXOScriptEscrow(managed_escrowOrder, ps))
 
 	utxoPS := &pb.PaymentSent{
-		Method: pb.PaymentSent_CANCELABLE,
-		Coin:   "BTC",
+		Coin:           "BTC",
+		SettlementSpec: NewUTXOSpec(false).ToPaymentSent(),
 	}
 	utxoOrder := &models.Order{}
 	require.NoError(t, utxoOrder.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
@@ -227,8 +271,8 @@ func TestUsesUTXOScriptEscrow_DistinguishesManagedEscrowFromAddressMonitored(t *
 
 func TestUsesClientSignedPayMode_DistinguishesManagedEscrowFromLegacyContract(t *testing.T) {
 	managed_escrowPS := &pb.PaymentSent{
-		Method: pb.PaymentSent_CANCELABLE,
-		Coin:   "crypto:eip155:11155111:native",
+		Coin:           "crypto:eip155:11155111:native",
+		SettlementSpec: NewManagedEscrowSpec(false).ToPaymentSent(),
 	}
 	managed_escrowOrder := &models.Order{}
 	require.NoError(t, managed_escrowOrder.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
@@ -239,8 +283,8 @@ func TestUsesClientSignedPayMode_DistinguishesManagedEscrowFromLegacyContract(t 
 	require.False(t, UsesClientSignedPayMode(managed_escrowOrder, managed_escrowPS))
 
 	clientSignedPS := &pb.PaymentSent{
-		Method: pb.PaymentSent_CANCELABLE,
-		Coin:   "crypto:eip155:1:native",
+		Coin:           "crypto:eip155:1:native",
+		SettlementSpec: NewClientSignedEVMSpec(false).ToPaymentSent(),
 	}
 	clientSignedOrder := &models.Order{}
 	require.NoError(t, clientSignedOrder.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{

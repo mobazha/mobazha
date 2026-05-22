@@ -334,7 +334,7 @@ func TestAutoMigrateDatabaseManagedEscrow(t *testing.T) {
 	// Verify core tables exist by trying to query them
 	tablesToCheck := []string{
 		"keys", "outgoing_messages", "incoming_messages",
-		"orders", "user_preferences", "receiving_accounts",
+		"orders", "user_preferences", "receiving_accounts", "shared_payment_intents",
 	}
 	for _, table := range tablesToCheck {
 		var count int64

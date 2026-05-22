@@ -387,7 +387,8 @@ func (s *OrderAppService) validateDisputeContract(from peer.ID, contract []byte,
 		return nil, errors.New("selected moderator does not match own peerID")
 	}
 
-	if !payment.MethodIsModerated(payment.ResolvedPaymentMethod(nil, paymentSent)) {
+	method, ok := payment.ResolvedPaymentMethod(nil, paymentSent)
+	if !ok || !payment.MethodIsModerated(method) {
 		return nil, errors.New("order payment method is not type moderated")
 	}
 
@@ -530,6 +531,14 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	}
 
 	paymentSent := preferredContract.GetPaymentSent()
+	if spec := paymentSent.GetSettlementSpec(); spec != nil && len(txs) == 0 && spec.GetEscrowType() == string(payment.EscrowTypeManagedEscrow) {
+		// ManagedEscrow address-monitored orders do not always project legacy
+		// contract transaction rows into dispute case snapshots. In that
+		// route, PaymentSent.Amount is the canonical funded value and the
+		// ManagedEscrow release legs should be computed from it directly instead of
+		// silently collapsing to a zero-value dispute payout.
+		totalOut = iwallet.NewAmount(paymentSent.Amount)
+	}
 	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
 	if !ok {
 		coinType = iwallet.CoinType(paymentSent.Coin)
@@ -592,7 +601,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		return fmt.Errorf("failed to build release transaction: %w", err)
 	}
 
-	orderData, err := orderDataWithPaymentSent(orderID, paymentSent)
+	orderData, err := orderDataWithContract(orderID, orderOpen, paymentSent)
 	if err != nil {
 		return fmt.Errorf("failed to materialize dispute order data for ManagedEscrow signing: %w", err)
 	}
@@ -1137,8 +1146,16 @@ func (s *OrderAppService) disputeIsTimeout(order *models.Order) (bool, error) {
 	return time.Now().After(disputeExpiration), nil
 }
 
-// GetReleaseFundsInstructions returns chain-specific instructions for releasing dispute funds.
+// GetReleaseFundsInstructions preserves the legacy client-signed dispute
+// release surface.
 func (s *OrderAppService) GetReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
+	return s.GetLegacyReleaseFundsInstructions(orderID, initiatorAddress)
+}
+
+// GetLegacyReleaseFundsInstructions is the internal legacy-only dispute
+// release instructions path. ManagedEscrow-backed moderated payouts must stay on the
+// backend close/release flow instead of the old instruction contract.
+func (s *OrderAppService) GetLegacyReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	order, _, paymentSent, _, err := s.getOrderAndPaymentInfo(orderID)
 	if err != nil {
 		return "", nil, err
@@ -1147,6 +1164,15 @@ func (s *OrderAppService) GetReleaseFundsInstructions(orderID models.OrderID, in
 	coinType, err = payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return "", nil, err
+	}
+
+	if !orderRequiresClientSignedInstructions(order, paymentSent) {
+		spec, ok := payment.ResolveSettlementSpec(order, paymentSent)
+		if ok && spec.UsesManagedEscrow() {
+			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed moderated dispute payouts must use POST /v1/disputes/{orderID}/close or /v1/disputes/{orderID}/release",
+				coreiface.ErrBadRequest)
+		}
+		return coinType, nil, nil
 	}
 
 	strategy, err := s.paymentRegistry.ForCoin(coinType)

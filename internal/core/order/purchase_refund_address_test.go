@@ -13,6 +13,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // TestValidatePurchaseRefundAddress_EmptyCryptoAllowed verifies that crypto
@@ -181,6 +182,13 @@ func TestSetOrderRefundAddressForPayment_UsesActualPaymentCoin(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, refundAddr, got.RefundAddress)
+
+	var shared models.SharedPaymentIntent
+	err = svc.db.View(func(tx database.Tx) error {
+		return tx.Read().Session(&gorm.Session{NewDB: true}).Where("order_id = ?", orderID).First(&shared).Error
+	})
+	require.NoError(t, err)
+	assert.Equal(t, refundAddr, shared.RefundAddress)
 }
 
 func TestSetOrderRefundAddressForPayment_EmptyCryptoRejected(t *testing.T) {

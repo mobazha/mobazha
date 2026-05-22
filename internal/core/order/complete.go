@@ -25,10 +25,19 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// GetCompleteOrderInstructions returns instructions only for client-signed
-// completion flows. Address-monitored routes (UTXO, ManagedEscrow) are handled entirely
-// by the backend action endpoint and therefore return nil instructions.
+// GetCompleteOrderInstructions preserves the legacy client-signed
+// completion surface. Backend-owned completion routes such as ManagedEscrow-backed
+// moderated orders do not use this instructions contract.
 func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
+	return s.GetLegacyCompleteOrderInstructions(orderID, initiatorAddress)
+}
+
+// GetLegacyCompleteOrderInstructions is the internal legacy-only moderated
+// completion instructions path. Address-monitored UTXO routes are handled
+// without frontend instructions and therefore return nil here; ManagedEscrow-backed
+// moderated completion is a backend-owned action and must not fall through as
+// a legacy no-instructions response.
+func (s *OrderAppService) GetLegacyCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID.String()).Find(&order).Error
@@ -55,10 +64,18 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 		return "", nil, err
 	}
 
-	if !payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
+	method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+	if !ok {
+		return coinType, nil, fmt.Errorf("payment settlement spec is missing")
+	}
+	if !payment.MethodIsModerated(method) {
 		return coinType, nil, nil
 	}
 	if !orderRequiresClientSignedInstructions(&order, paymentSent) {
+		if spec, ok := payment.ResolveSettlementSpec(&order, paymentSent); ok && spec.UsesManagedEscrow() {
+			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed moderated completion must use POST /v1/orders/{orderID}/complete",
+				coreiface.ErrBadRequest)
+		}
 		return coinType, nil, nil
 	}
 
@@ -167,7 +184,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 	}
 
 	var releaseTx *iwallet.Transaction
-	if payment.MethodIsModerated(payment.ResolvedPaymentMethod(&order, paymentSent)) {
+	if method, ok := payment.ResolvedPaymentMethod(&order, paymentSent); ok && payment.MethodIsModerated(method) {
 		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
 		if err != nil {
 			return err

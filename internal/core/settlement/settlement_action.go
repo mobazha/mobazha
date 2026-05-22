@@ -48,7 +48,12 @@ func (s *SettlementService) ExecuteSettlementAction(
 		return nil, "", fmt.Errorf("%w: payment not recorded for this order", coreiface.ErrBadRequest)
 	}
 
-	if paymentSent.Method == pb.PaymentSent_FIAT || iwallet.CoinType(paymentSent.Coin).IsFiatPayment() {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		return nil, "", fmt.Errorf("%w: payment settlement spec is missing", coreiface.ErrBadRequest)
+	}
+	method := spec.GetMethod()
+	if method == pb.PaymentSent_FIAT || iwallet.CoinType(paymentSent.Coin).IsFiatPayment() {
 		return nil, "", fmt.Errorf("%w: fiat orders use provider-specific refund APIs", coreiface.ErrBadRequest)
 	}
 
@@ -81,7 +86,7 @@ func (s *SettlementService) ExecuteSettlementAction(
 			return nil, coinType, fmt.Errorf("%w: order cannot be confirmed in its current state",
 				coreiface.ErrBadRequest)
 		}
-		if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+		if method != pb.PaymentSent_CANCELABLE {
 			return nil, coinType, fmt.Errorf("%w: confirm settlement applies only to cancelable payments",
 				coreiface.ErrBadRequest)
 		}
@@ -165,7 +170,12 @@ func (s *SettlementService) GetSettlementActionStatus(
 		return nil, "", fmt.Errorf("%w: payment not recorded for this order", coreiface.ErrBadRequest)
 	}
 
-	if paymentSent.Method == pb.PaymentSent_FIAT || iwallet.CoinType(paymentSent.Coin).IsFiatPayment() {
+	spec := paymentSent.GetSettlementSpec()
+	if spec == nil {
+		return nil, "", fmt.Errorf("%w: payment settlement spec is missing", coreiface.ErrBadRequest)
+	}
+	method := spec.GetMethod()
+	if method == pb.PaymentSent_FIAT || iwallet.CoinType(paymentSent.Coin).IsFiatPayment() {
 		return nil, "", fmt.Errorf("%w: fiat orders use provider-specific refund APIs", coreiface.ErrBadRequest)
 	}
 

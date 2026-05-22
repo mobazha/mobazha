@@ -11,6 +11,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -111,19 +112,20 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		return errors.New("dispute resolution missing release info")
 	}
 
-	if len(releaseInfo.Outpoints) == 0 {
-		return errors.New("no tx input in dispute resolution")
-	}
-
-	if len(releaseInfo.EscrowSignatures) == 0 {
-		return errors.New("no moderator signature in dispute resolution")
-	}
-
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get payment sent message, order id: %s", order.ID)
 		logger.LogInfoWithID(log, op.nodeID, errMsg)
 		return errors.New(errMsg)
+	}
+	spec, specOK := payment.ResolveSettlementSpec(order, paymentSent)
+
+	if len(releaseInfo.Outpoints) == 0 && !(specOK && spec.UsesManagedEscrow()) {
+		return errors.New("no tx input in dispute resolution")
+	}
+
+	if len(releaseInfo.EscrowSignatures) == 0 {
+		return errors.New("no moderator signature in dispute resolution")
 	}
 
 	normalizedCoin := paymentSent.Coin

@@ -43,6 +43,13 @@ func TestNormalizeSettlementPaymentCoin_RejectsPricingCurrencyWithoutProvider(t 
 	require.False(t, ok)
 }
 
+func TestNormalizeSettlementPaymentCoin_AcceptsTestOnlyMockCoin(t *testing.T) {
+	coin, ok := NormalizeSettlementPaymentCoin("MCK")
+
+	require.True(t, ok)
+	require.Equal(t, iwallet.CtMock, coin)
+}
+
 func TestNormalizeSettlementPaymentCoin_MapsKnownEVMTestnetToCanonicalChain(t *testing.T) {
 	coin, ok := NormalizeSettlementPaymentCoin("crypto:eip155:11155111:native")
 

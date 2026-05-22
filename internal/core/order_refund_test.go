@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -435,7 +436,8 @@ func Test_buildRefundMessage(t *testing.T) {
 					return err
 				}
 				paymentSent.RefundAddress = "abc"
-				paymentSent.Method = pb.PaymentSent_DIRECT
+				paymentSent.SettlementSpec = payment.NewDirectSpec().ToPaymentSent()
+				paymentSent.Script = ""
 
 				if err := order.PutMessage(utils.MustWrapOrderMessage(orderOpen)); err != nil {
 					return err
@@ -457,7 +459,8 @@ func Test_buildRefundMessage(t *testing.T) {
 					return err
 				}
 				paymentSent.RefundAddress = "abc"
-				paymentSent.Method = pb.PaymentSent_DIRECT
+				paymentSent.SettlementSpec = payment.NewDirectSpec().ToPaymentSent()
+				paymentSent.Script = ""
 
 				err = order.PutTransaction(iwallet.Transaction{
 					ID: "123",
@@ -503,7 +506,7 @@ func Test_buildRefundMessage(t *testing.T) {
 				}
 				paymentSent.RefundAddress = "abc"
 				paymentSent.PayerAddress = "abc"
-				paymentSent.Method = pb.PaymentSent_MODERATED
+				paymentSent.SettlementSpec = payment.NewUTXOSpec(true).ToPaymentSent()
 
 				err = order.PutTransaction(iwallet.Transaction{
 					ID: "123",
@@ -554,7 +557,7 @@ func Test_buildRefundMessage(t *testing.T) {
 				}
 				paymentSent.RefundAddress = "abc"
 				paymentSent.PayerAddress = "abc"
-				paymentSent.Method = pb.PaymentSent_MODERATED
+				paymentSent.SettlementSpec = payment.NewUTXOSpec(true).ToPaymentSent()
 
 				err = order.PutTransaction(iwallet.Transaction{
 					ID: "123",

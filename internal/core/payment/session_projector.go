@@ -8,16 +8,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 // PaymentSessionProjector assembles a payment.PaymentSession from existing
-// order, payment and fiat metadata. No new DB table is required; all data
-// is sourced from models already written by the existing payment paths.
+// order, shared payment-intent, payment-observation, and fiat metadata.
 //
 // Design: UNIFIED_PAYMENT_SESSION_ARCHITECTURE.md §8 + PAYMENT_SESSION_SERVICE_SPEC.md §8
 //
@@ -144,11 +145,11 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 	// ── 1. PaymentSent present ───────────────────────────────────────────
 	if ps != nil {
 		paymentCoin = normalizeCoinBestEffort(ps.Coin)
-		method := payment.EffectivePaymentMethod(ps)
-		// Pending settlement intent outranks the frozen PaymentSent envelope (ADR-010).
-		if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
-			method = spec.Method
+		spec, ok := payment.ResolveSettlementSpec(order, ps)
+		if !ok {
+			return paymentCoin, productMode, paymentSentKind
 		}
+		method := spec.Method
 		productMode = payment.ProductModeFromMethod(method)
 		switch method {
 		case pb.PaymentSent_MODERATED:
@@ -678,6 +679,13 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 	}
 
 	input := &projectOrderInput{order: &order}
+	if rawProvider, ok := p.db.(interface{ RawDB() *gorm.DB }); ok {
+		if raw := rawProvider.RawDB(); raw != nil {
+			if err := paymentintent.HydrateOrderFromSharedIntent(raw, input.order); err != nil {
+				return nil, fmt.Errorf("payment session projector: hydrate shared intent %s: %w", orderID, err)
+			}
+		}
+	}
 
 	// OrderOpen (for expected amount, timestamp)
 	if oo, err := order.OrderOpenMessage(); err == nil {

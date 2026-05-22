@@ -14,6 +14,17 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func testPaymentSentSpec(method pb.PaymentSent_Method) *pb.PaymentSent_SettlementSpec {
+	switch method {
+	case pb.PaymentSent_FIAT:
+		return &pb.PaymentSent_SettlementSpec{Method: method, PayMode: "provider", EscrowType: "fiat_provider"}
+	case pb.PaymentSent_CANCELABLE, pb.PaymentSent_MODERATED:
+		return &pb.PaymentSent_SettlementSpec{Method: method, PayMode: "address_monitored", EscrowType: "utxo_script"}
+	default:
+		return &pb.PaymentSent_SettlementSpec{Method: method, PayMode: "address_monitored", EscrowType: "none"}
+	}
+}
+
 func TestOrder_Role(t *testing.T) {
 	var order Order
 
@@ -970,7 +981,7 @@ func TestOrder_CanDispute(t *testing.T) {
 				}
 
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 				if err != nil {
 					return err
@@ -1087,7 +1098,7 @@ func TestOrder_CanRefund(t *testing.T) {
 				}
 
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 			},
 			ourRole:   RoleVendor,
@@ -1111,7 +1122,7 @@ func TestOrder_CanRefund(t *testing.T) {
 				}
 
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 			},
 			ourRole:   RoleBuyer,
@@ -1135,7 +1146,7 @@ func TestOrder_CanRefund(t *testing.T) {
 				}
 
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_CANCELABLE,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_CANCELABLE),
 				}))
 			},
 			ourRole:   RoleVendor,
@@ -1151,7 +1162,7 @@ func TestOrder_CanRefund(t *testing.T) {
 				}
 
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 			},
 			ourRole:   RoleVendor,
@@ -1167,7 +1178,7 @@ func TestOrder_CanRefund(t *testing.T) {
 				}
 
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 			},
 			ourRole:   RoleVendor,
@@ -1183,7 +1194,7 @@ func TestOrder_CanRefund(t *testing.T) {
 				}
 
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 			},
 			ourRole:   RoleVendor,
@@ -1225,7 +1236,7 @@ func TestOrder_CanShip(t *testing.T) {
 					return err
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 				if err != nil {
 					return err
@@ -1250,7 +1261,7 @@ func TestOrder_CanShip(t *testing.T) {
 					return err
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 					Amount: iwallet.NewAmount(1).String(),
 				}))
 				if err != nil {
@@ -1276,7 +1287,7 @@ func TestOrder_CanShip(t *testing.T) {
 					return err
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 				if err != nil {
 					return err
@@ -1311,7 +1322,7 @@ func TestOrder_CanShip(t *testing.T) {
 					return err
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 				return err
 			},
@@ -1341,7 +1352,7 @@ func TestOrder_CanShip(t *testing.T) {
 					return err
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_CANCELABLE,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_CANCELABLE),
 				}))
 				return err
 			},
@@ -1363,7 +1374,7 @@ func TestOrder_CanShip(t *testing.T) {
 					return err
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 				if err != nil {
 					return err
@@ -1389,7 +1400,7 @@ func TestOrder_CanShip(t *testing.T) {
 					return err
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 				if err != nil {
 					return err
@@ -1415,7 +1426,7 @@ func TestOrder_CanShip(t *testing.T) {
 					return err
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 				if err != nil {
 					return err
@@ -1457,7 +1468,7 @@ func TestOrder_CanConfirm(t *testing.T) {
 					return err
 				}
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 			},
 			ourRole:    RoleVendor,
@@ -1480,7 +1491,7 @@ func TestOrder_CanConfirm(t *testing.T) {
 					return err
 				}
 				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-					Method: pb.PaymentSent_DIRECT,
+					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 				}))
 			},
 			ourRole:    RoleVendor,
@@ -1618,7 +1629,7 @@ func TestOrder_DeriveState_UnverifiedPaymentSent(t *testing.T) {
 			return nil, err
 		}
 		if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-			Method:        pb.PaymentSent_DIRECT,
+			SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 			ToAddress:     "addr1",
 			TransactionID: "tx1",
 			Amount:        "100",
@@ -1660,7 +1671,7 @@ func TestOrder_DeriveState_VerifiedPaymentWithoutMatchedTransactions(t *testing.
 		t.Fatal(err)
 	}
 	if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-		Method:        pb.PaymentSent_DIRECT,
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
 		ToAddress:     "addr-unmatched",
 		TransactionID: "tx-verified",
 		Amount:        "100",

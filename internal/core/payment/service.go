@@ -421,6 +421,14 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		platformFeeCollector = params.PayerAddress
 		rentCollector = params.PayerAddress
 	}
+	platformAuthority := ""
+	if coinInfo.Chain == iwallet.ChainSolana && s.keys != nil {
+		if solKey, keyErr := s.keys.SolanaMasterKey(); keyErr == nil && solKey != nil {
+			platformAuthority = solKey.PublicKey().String()
+			platformFeeCollector = platformAuthority
+			rentCollector = platformAuthority
+		}
+	}
 
 	paymentMethod, moderatorAddress, requiredSignatures, err := s.GetModeratorEscrowInfo(ctx, params.Moderator, params.CoinType)
 	if err != nil {
@@ -446,6 +454,7 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 	initParams := iwallet.EscrowInfo{
 		ContractAddress:      contractAddress.String(),
 		PayerAddress:         params.PayerAddress,
+		PlatformAuthority:    platformAuthority,
 		BuyerAddress:         orderInfo.BuyerAddress,
 		SellerAddress:        orderInfo.VendorAddress,
 		ModeratorAddress:     moderatorAddress,

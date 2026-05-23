@@ -655,15 +655,18 @@ func TestSolanaAnchorAdapter_SetupPaymentRelaysWithoutReturningInstructions(t *t
 	store := adapters.NewMemoryActionStore()
 	var relayedOrder string
 	var relayedInstructions any
+	signer := solana.NewWallet().PrivateKey
 	adapter := adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
 		Legacy: legacy,
-		Relayer: adapters.SolanaInstructionRelayerFunc(func(_ context.Context, orderID string, instructions any) (string, error) {
+		Relayer: adapters.SolanaInstructionRelayerFunc(func(_ context.Context, orderID string, action string, _ string, instructions any, _ any) (string, error) {
 			relayedOrder = orderID
 			relayedInstructions = instructions
+			require.Equal(t, "setup", action)
 			return "solana-tx-sig", nil
 		}),
 		Store:    store,
 		Recorder: store,
+		Keys:     &stubKeyProvider{solKey: &signer},
 	})
 
 	result, err := adapter.SetupPayment(context.Background(), payment.PaymentSetupParams{

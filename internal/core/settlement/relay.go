@@ -513,14 +513,28 @@ func (s *SettlementService) RelayEVMTransactionWithRetry(ctx context.Context, or
 // RelaySolanaTransaction sends Solana instructions to the platform relay service
 // for fee-payer signing and broadcasting.
 func (s *SettlementService) RelaySolanaTransaction(ctx context.Context, orderID string, instructions any) (string, error) {
+	return s.RelaySolanaTransactionWithSigners(ctx, orderID, "", "", instructions, nil)
+}
+
+func (s *SettlementService) RelaySolanaTransactionWithSigners(
+	ctx context.Context,
+	orderID string,
+	settlementAction string,
+	clientActionID string,
+	instructions any,
+	signers any,
+) (string, error) {
 	if !s.IsSolanaRelayAvailable() {
 		return "", fmt.Errorf("Solana relay service not available")
 	}
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Relaying Solana transaction for order %s via HostService relay", orderID)
 	resp, err := s.solanaRelayService.Execute(ctx, &relay.SolanaRelayRequest{
-		Instructions: instructions,
-		OrderID:      orderID,
+		Instructions:     instructions,
+		Signers:          signers,
+		OrderID:          orderID,
+		SettlementAction: settlementAction,
+		ClientActionID:   clientActionID,
 	})
 	if err != nil {
 		return "", fmt.Errorf("solana relay failed: %w", err)

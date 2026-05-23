@@ -77,11 +77,16 @@ type EVMRelayService interface {
 // ── Solana Relay ────────────────────────────────────────────────────────
 
 // SolanaRelayRequest 请求 Solana 中继代付 fee 并广播交易。
-// Instructions 的运行时类型为 []solana.Instruction（gagliardetto/solana-go），
+// Instructions 的运行时类型为 []solana.Instruction（gagliardetto/solana-go）。
+// Signers 的运行时类型为 []solana.PrivateKey，用于平台控制的额外签名。
 // 使用 any 避免在 pkg/ 层引入外部依赖。
 type SolanaRelayRequest struct {
 	Instructions any // []solana.Instruction
+	Signers      any // []solana.PrivateKey, optional platform-controlled signers
 	OrderID      string
+
+	SettlementAction string
+	ClientActionID   string
 }
 
 // SolanaRelayResponse Solana 中继响应

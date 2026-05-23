@@ -10,6 +10,7 @@ import (
 type EscrowInfo struct {
 	ContractAddress      string
 	PayerAddress         string
+	PlatformAuthority    string
 	BuyerAddress         string
 	SellerAddress        string
 	ModeratorAddress     string

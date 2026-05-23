@@ -91,13 +91,15 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	solActionStore := adapters.NewMemoryActionStore()
 	var solRelayer adapters.SolanaInstructionRelayer
 	if n.settlementService != nil {
-		solRelayer = adapters.SolanaInstructionRelayerFunc(n.settlementService.RelaySolanaTransaction)
+		solRelayer = adapters.SolanaInstructionRelayerFunc(n.settlementService.RelaySolanaTransactionWithSigners)
 	}
 	n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
 		Legacy:   solLegacy,
 		Relayer:  solRelayer,
 		Store:    solActionStore,
 		Recorder: solActionStore,
+		Keys:     n.keyProvider,
+		Wallets:  n.multiwallet,
 	}))
 
 	// ── TRON ──────────────────────────────────────────────────

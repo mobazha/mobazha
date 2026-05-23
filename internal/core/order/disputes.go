@@ -606,10 +606,10 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 
 	orderData, err := orderDataWithContract(orderID, orderOpen, paymentSent)
 	if err != nil {
-		return fmt.Errorf("failed to materialize dispute order data for ManagedEscrow signing: %w", err)
+		return fmt.Errorf("failed to materialize dispute order data for settlement signing: %w", err)
 	}
 
-	if managed_escrowSigs, handled, err := s.signManagedEscrowActionRelease(context.Background(), coinType, "dispute_release", payment.ActionParams{
+	if settlementSigs, handled, err := s.signSettlementActionRelease(context.Background(), coinType, "dispute_release", payment.ActionParams{
 		OrderID:       orderID.String(),
 		PaymentCoin:   string(coinType),
 		PaymentAmount: paymentSent.Amount,
@@ -619,9 +619,9 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		ReleaseInfo:   &moderatedEscrowRelease,
 	}); handled {
 		if err != nil {
-			return fmt.Errorf("failed to sign ManagedEscrow dispute release action: %w", err)
+			return fmt.Errorf("failed to sign settlement dispute release action: %w", err)
 		}
-		moderatedEscrowRelease.EscrowSignatures = append(moderatedEscrowRelease.EscrowSignatures, managed_escrowSigs...)
+		moderatedEscrowRelease.EscrowSignatures = append(moderatedEscrowRelease.EscrowSignatures, settlementSigs...)
 	} else {
 		legacyStrategy, err := s.paymentRegistry.ForCoin(coinType)
 		if err != nil {
@@ -863,13 +863,13 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 	releaseStrategy, stratErr := s.v2StrategyForCoin(coinType)
 	isMonitored := stratErr == nil && releaseStrategy.Model() == payment.PaymentModelMonitored
 	isClientSigned := stratErr == nil && releaseStrategy.Model() == payment.PaymentModelClientSigned
-	if txidManagedEscrow, txManagedEscrow, handled, err := s.submitManagedEscrowDisputeReleaseAction(context.Background(), order, coinType, paymentSent, disputeClose.ReleaseInfo); handled {
+	if txidSettlement, txSettlement, handled, err := s.submitSettlementDisputeReleaseAction(context.Background(), order, coinType, paymentSent, disputeClose.ReleaseInfo); handled {
 		if err != nil {
 			return err
 		}
-		txid = txidManagedEscrow
-		if txManagedEscrow != nil {
-			releaseTx = *txManagedEscrow
+		txid = txidSettlement
+		if txSettlement != nil {
+			releaseTx = *txSettlement
 		}
 	} else if isMonitored {
 		if err := s.signAndSendReleaseTransaction(&releaseTx, paymentSent, disputeClose); err != nil {

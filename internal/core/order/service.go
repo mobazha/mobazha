@@ -1100,20 +1100,20 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 				return &refundBuildResult{Message: refundResp}, nil
 			}
 
-			managed_escrowTxid, _, handled, err := s.submitManagedEscrowCancelAction(context.Background(), order, coinType, paymentSent, payoutAddr)
+			settlementTxid, _, handled, err := s.submitSettlementCancelAction(context.Background(), order, coinType, paymentSent, payoutAddr)
 			if err != nil {
-				return nil, fmt.Errorf("failed to release ManagedEscrow CANCELABLE escrow for refund: %w", err)
+				return nil, fmt.Errorf("failed to release settlement CANCELABLE escrow for refund: %w", err)
 			}
 			if !handled {
-				return nil, errors.New("automatic refund for unconfirmed CANCELABLE orders is only supported for UTXO script or ManagedEscrow escrow")
+				return nil, errors.New("automatic refund for unconfirmed CANCELABLE orders is only supported for UTXO script, ManagedEscrow, or Solana escrow")
 			}
-			if managed_escrowTxid == "" {
-				return nil, fmt.Errorf("safe cancelable refund for order %s returned no transaction id", order.ID)
+			if settlementTxid == "" {
+				return nil, fmt.Errorf("settlement cancelable refund for order %s returned no transaction id", order.ID)
 			}
 
 			refund := &pb.Refund{
 				RefundInfo: &pb.Refund_TransactionID{
-					TransactionID: managed_escrowTxid.String(),
+					TransactionID: settlementTxid.String(),
 				},
 				Amount:    paymentSent.Amount,
 				Timestamp: timestamppb.Now(),
@@ -1231,16 +1231,16 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 			releaseTx = result.Transaction
 			txid = releaseTx.ID
 		} else if txid == "" {
-			managed_escrowTxid, managed_escrowTx, handled, err := s.submitManagedEscrowCancelAction(context.Background(), &order, coinType, paymentSent, "")
+			settlementTxid, settlementTx, handled, err := s.submitSettlementCancelAction(context.Background(), &order, coinType, paymentSent, "")
 			if err != nil {
 				return err
 			}
 			if handled {
-				if managed_escrowTx != nil {
-					releaseTx = managed_escrowTx
+				if settlementTx != nil {
+					releaseTx = settlementTx
 				}
-				if managed_escrowTxid != "" {
-					txid = managed_escrowTxid
+				if settlementTxid != "" {
+					txid = settlementTxid
 				}
 			}
 		}
@@ -1479,7 +1479,7 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		})
 	}
 
-	if managed_escrowSigs, handled, err := s.signManagedEscrowActionRelease(context.Background(), coinType, "complete", payment.ActionParams{
+	if settlementSigs, handled, err := s.signSettlementActionRelease(context.Background(), coinType, "complete", payment.ActionParams{
 		OrderID:       order.ID.String(),
 		PaymentCoin:   string(coinType),
 		PaymentAmount: paymentSent.Amount,
@@ -1489,9 +1489,9 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		ReleaseInfo:   release,
 	}); handled {
 		if err != nil {
-			return nil, fmt.Errorf("failed to sign ManagedEscrow complete action: %w", err)
+			return nil, fmt.Errorf("failed to sign settlement complete action: %w", err)
 		}
-		release.EscrowSignatures = append(release.EscrowSignatures, managed_escrowSigs...)
+		release.EscrowSignatures = append(release.EscrowSignatures, settlementSigs...)
 		return release, nil
 	}
 

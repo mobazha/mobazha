@@ -360,9 +360,9 @@ func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *
 			result.WalletTx.Commit()
 			return &PreProcessContext{CancelableReleaseCommitted: true}, nil
 		}
-		_, _, handled, err := s.submitManagedEscrowCancelAction(ctx, &order, coinType, paymentSent, "")
+		_, _, handled, err := s.submitSettlementCancelAction(ctx, &order, coinType, paymentSent, "")
 		if err != nil {
-			return nil, fmt.Errorf("safe cancelable release on decline failed for order %s: %w", order.ID, err)
+			return nil, fmt.Errorf("settlement cancelable release on decline failed for order %s: %w", order.ID, err)
 		}
 		if handled {
 			return &PreProcessContext{CancelableReleaseCommitted: true}, nil

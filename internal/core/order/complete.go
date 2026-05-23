@@ -487,9 +487,9 @@ func (s *OrderAppService) releaseCompleteEscrowFunds(order *models.Order, wallet
 		return nil, nil, err
 	}
 
-	if release, tx, handled, err := s.submitManagedEscrowCompleteAction(context.Background(), order, coinType, paymentSent, releaseInfo); handled {
+	if release, tx, handled, err := s.submitSettlementCompleteAction(context.Background(), order, coinType, paymentSent, releaseInfo); handled {
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to submit ManagedEscrow complete action: %w", err)
+			return nil, nil, fmt.Errorf("failed to submit settlement complete action: %w", err)
 		}
 		return release, tx, nil
 	}

@@ -57,6 +57,8 @@ func (e *EscrowInfo) GetEthereumUsersInfo() (payer common.Address, buyer common.
 // ReleaseEscrowParams 释放参数
 type ReleaseEscrowParams struct {
 	InitiatorAddress string
+	SettlementKind   string
+	RentCollector    string
 	// PublicKeys与Signatures 一一对应
 	Message    []byte
 	PublicKeys [][]byte

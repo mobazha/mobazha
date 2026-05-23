@@ -27,6 +27,7 @@ const (
 	EscrowTypeUTXOScript    EscrowType = "utxo_script"
 	EscrowTypeEVMContract   EscrowType = "evm_contract"
 	EscrowTypeSolanaProgram EscrowType = "solana_program"
+	EscrowTypeSolanaEscrow  EscrowType = "solana_escrow"
 	EscrowTypeManagedEscrow          EscrowType = "managed_escrow"
 	EscrowTypeFiatProvider  EscrowType = "fiat_provider"
 )
@@ -58,6 +59,8 @@ func (s SettlementSpec) UsesManagedEscrow() bool { return s.EscrowType == Escrow
 
 func (s SettlementSpec) UsesUTXOScript() bool { return s.EscrowType == EscrowTypeUTXOScript }
 
+func (s SettlementSpec) UsesSolanaEscrow() bool { return s.EscrowType == EscrowTypeSolanaEscrow }
+
 func (s SettlementSpec) UsesLegacyContract() bool {
 	return s.EscrowType == EscrowTypeEVMContract || s.EscrowType == EscrowTypeSolanaProgram
 }
@@ -74,10 +77,10 @@ func (s SettlementSpec) Validate() error {
 		switch s.PayMode {
 		case PayModeAddressMonitored:
 			switch s.EscrowType {
-			case EscrowTypeUTXOScript, EscrowTypeManagedEscrow:
+			case EscrowTypeUTXOScript, EscrowTypeManagedEscrow, EscrowTypeSolanaEscrow:
 				return nil
 			default:
-				return fmt.Errorf("%s with address_monitored requires utxo_script or safe, got %s", s.Method, s.EscrowType)
+				return fmt.Errorf("%s with address_monitored requires utxo_script, safe, or solana_escrow, got %s", s.Method, s.EscrowType)
 			}
 		case PayModeClientSigned:
 			switch s.EscrowType {
@@ -195,6 +198,19 @@ func NewManagedEscrowSpec(moderated bool) SettlementSpec {
 		Method:     method,
 		PayMode:    PayModeAddressMonitored,
 		EscrowType: EscrowTypeManagedEscrow,
+	}
+}
+
+// NewSolanaEscrowSpec returns address-monitored Solana escrow spec.
+func NewSolanaEscrowSpec(moderated bool) SettlementSpec {
+	method := pb.PaymentSent_CANCELABLE
+	if moderated {
+		method = pb.PaymentSent_MODERATED
+	}
+	return SettlementSpec{
+		Method:     method,
+		PayMode:    PayModeAddressMonitored,
+		EscrowType: EscrowTypeSolanaEscrow,
 	}
 }
 
@@ -412,15 +428,16 @@ func ResolveSettlementSpec(order *models.Order, ps *pb.PaymentSent) (SettlementS
 	return SettlementSpec{}, false
 }
 
-// UsesAddressMonitoredPayMode reports whether funding is address-monitored (UTXO, ManagedEscrow, direct).
+// UsesAddressMonitoredPayMode reports whether funding is address-monitored
+// (UTXO, ManagedEscrow, Solana escrow, direct).
 func UsesAddressMonitoredPayMode(order *models.Order, ps *pb.PaymentSent) bool {
 	spec, ok := ResolveSettlementSpec(order, ps)
 	return ok && spec.IsAddressMonitored()
 }
 
 // UsesUTXOScriptEscrow reports whether the order is backed by a UTXO redeem script.
-// Address-monitored is not sufficient here: ManagedEscrow funding is monitored too, but
-// its release/refund path must go through ManagedEscrow actions rather than UTXO script spend.
+// Address-monitored is not sufficient here: ManagedEscrow and Solana escrow funding are
+// monitored too, but their release/refund paths do not use UTXO script spend.
 func UsesUTXOScriptEscrow(order *models.Order, ps *pb.PaymentSent) bool {
 	spec, ok := ResolveSettlementSpec(order, ps)
 	return ok && spec.UsesUTXOScript()

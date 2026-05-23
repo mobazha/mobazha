@@ -880,8 +880,8 @@ func (g *Gateway) registerOrderPaymentSessionGet(api huma.API) {
 		Path:        "/v1/orders/{orderID}/payment-session",
 		Summary:     "Unified payment session view for an order",
 		Description: "Returns a PaymentSession projection built from existing order, payment, and " +
-			"fiat metadata. Settlement modes include address_monitored (UTXO, ExternalPayment, ManagedEscrow-backed EVM " +
-			"when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), " +
+			"fiat metadata. Settlement modes include address_monitored (UTXO, ExternalPayment, ManagedEscrow-backed EVM, " +
+			"and Solana escrow when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), " +
 			"and provider_checkout (Stripe/PayPal).",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,

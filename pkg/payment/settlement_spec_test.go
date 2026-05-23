@@ -15,6 +15,8 @@ func TestSettlementSpec_Validate(t *testing.T) {
 		NewUTXOSpec(true),
 		NewManagedEscrowSpec(false),
 		NewManagedEscrowSpec(true),
+		NewSolanaEscrowSpec(false),
+		NewSolanaEscrowSpec(true),
 		NewClientSignedEVMSpec(false),
 		NewClientSignedEVMSpec(true),
 		NewClientSignedSolanaSpec(false),
@@ -43,6 +45,11 @@ func TestSettlementSpec_Helpers(t *testing.T) {
 	require.True(t, managed_escrow.IsAddressMonitored())
 	require.True(t, managed_escrow.UsesManagedEscrow())
 	require.False(t, managed_escrow.IsDirect())
+
+	solanaEscrow := NewSolanaEscrowSpec(false)
+	require.True(t, solanaEscrow.IsAddressMonitored())
+	require.True(t, solanaEscrow.UsesSolanaEscrow())
+	require.False(t, solanaEscrow.UsesLegacyContract())
 
 	evm := NewClientSignedEVMSpec(false)
 	require.True(t, evm.IsClientSigned())
@@ -141,6 +148,18 @@ func TestResolveSettlementSpecFromOrder_ClientSignedPending(t *testing.T) {
 	spec, ok := ResolveSettlementSpecFromOrder(order)
 	require.True(t, ok)
 	require.Equal(t, NewClientSignedEVMSpec(true), spec)
+}
+
+func TestResolveSettlementSpecFromPendingClientSigned_ExplicitSolanaEscrowSpec(t *testing.T) {
+	info := &models.PendingClientSignedPaymentInfo{
+		Coin:           "crypto:solana:native",
+		EscrowAddress:  "So11111111111111111111111111111111111111112",
+		SettlementSpec: NewSolanaEscrowSpec(true).ToPending(),
+	}
+
+	spec, ok := ResolveSettlementSpecFromPendingClientSigned(info)
+	require.True(t, ok)
+	require.Equal(t, NewSolanaEscrowSpec(true), spec)
 }
 
 func TestSettlementSpecFromFiatMetadata(t *testing.T) {

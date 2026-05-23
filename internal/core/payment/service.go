@@ -284,6 +284,16 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 			return nil, fmt.Errorf("persist ManagedEscrow payment intent for order %s: %w", params.OrderID, persistErr)
 		}
 	}
+	if coinErr == nil &&
+		strategy.Model() == payment.PaymentModelMonitored &&
+		coinInfo.Chain == iwallet.ChainSolana &&
+		result.PaymentData != nil &&
+		result.PaymentData.ToAddress != "" {
+
+		if persistErr := s.persistClientSignedPaymentInfo(params.OrderID, result.PaymentData); persistErr != nil {
+			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist Solana Anchor escrow for order %s: %v", params.OrderID, persistErr)
+		}
+	}
 
 	return setupResult, nil
 }
@@ -373,9 +383,8 @@ func (s *PaymentAppService) persistSharedPaymentPolicySnapshot(orderID, moderato
 }
 
 // BuildInitEscrowInstructions builds escrow initialization instructions for
-// ClientSigned chains (EVM and Solana). Resolves the chain wallet, constructs
-// EscrowInfo with buyer/vendor/moderator addresses, and delegates to the
-// wallet's EscrowProcessor to produce on-chain instructions for the frontend.
+// contract/program chains. EVM remains client-signed; Solana now builds Anchor
+// create instructions that the V2 adapter submits through the backend relay.
 func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
 	coinInfo, err := params.CoinType.CoinInfo()
 	if err != nil {
@@ -456,7 +465,7 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 
 	var clientSpec payment.SettlementSpec
 	if coinInfo.Chain == iwallet.ChainSolana {
-		clientSpec = payment.NewClientSignedSolanaSpec(paymentMethod == pb.PaymentSent_MODERATED)
+		clientSpec = payment.NewSolanaEscrowSpec(paymentMethod == pb.PaymentSent_MODERATED)
 	} else {
 		clientSpec = payment.NewClientSignedEVMSpec(paymentMethod == pb.PaymentSent_MODERATED)
 	}
@@ -480,8 +489,10 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		PaymentTokenAddress: paymentTokenAddress,
 	}
 
-	if persistErr := s.persistClientSignedPaymentInfo(params.OrderID, &paymentData); persistErr != nil {
-		logger.LogWarningWithIDf(log, s.nodeID, "BuildInitEscrowInstructions: failed to persist client-signed pending for order %s: %v", params.OrderID, persistErr)
+	if coinInfo.Chain != iwallet.ChainSolana {
+		if persistErr := s.persistClientSignedPaymentInfo(params.OrderID, &paymentData); persistErr != nil {
+			logger.LogWarningWithIDf(log, s.nodeID, "BuildInitEscrowInstructions: failed to persist client-signed pending for order %s: %v", params.OrderID, persistErr)
+		}
 	}
 
 	return &paymentData, escrowAccount, instructions, nil

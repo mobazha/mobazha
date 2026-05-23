@@ -260,6 +260,25 @@ func TestRegistryDispatch_SolanaRegistered(t *testing.T) {
 	}
 }
 
+func TestRegistryDispatch_SolanaForCoinV2UsesAnchorAdapter(t *testing.T) {
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
+	n.registerPaymentStrategies()
+
+	strategy, err := n.paymentRegistry.ForCoinV2(testSOLNativeCoin)
+	if err != nil {
+		t.Fatalf("ForCoinV2(SOL): unexpected error: %v", err)
+	}
+	if _, ok := strategy.(*adapters.SolanaAnchorAdapter); !ok {
+		t.Fatalf("ForCoinV2(SOL) returned %T, want *adapters.SolanaAnchorAdapter", strategy)
+	}
+	if strategy.Model() != payment.PaymentModelMonitored {
+		t.Errorf("solana V2 strategy.Model() = %s, want %s", strategy.Model(), payment.PaymentModelMonitored)
+	}
+	if strategy.Capabilities().HasClientSignedEscrow {
+		t.Error("solana V2 strategy must not advertise client-signed escrow")
+	}
+}
+
 func TestRegistryDispatch_ChainCount(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()

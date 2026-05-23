@@ -647,3 +647,56 @@ func TestClientSignedAdapter_FullPipeline_WithMockChainOps(t *testing.T) {
 		assert.Equal(t, "dispute-data", result.Instructions)
 	})
 }
+
+func TestSolanaAnchorAdapter_SetupPaymentRelaysWithoutReturningInstructions(t *testing.T) {
+	legacy := adapters.NewClientSignedAdapter(&stubChainOps{}, func(_ context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
+		return &models.PaymentData{OrderID: params.OrderID, Coin: params.CoinType}, iwallet.NewAddress("escrow111", params.CoinType), "anchor-create-ix", nil
+	}, nil)
+	store := adapters.NewMemoryActionStore()
+	var relayedOrder string
+	var relayedInstructions any
+	adapter := adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
+		Legacy: legacy,
+		Relayer: adapters.SolanaInstructionRelayerFunc(func(_ context.Context, orderID string, instructions any) (string, error) {
+			relayedOrder = orderID
+			relayedInstructions = instructions
+			return "solana-tx-sig", nil
+		}),
+		Store:    store,
+		Recorder: store,
+	})
+
+	result, err := adapter.SetupPayment(context.Background(), payment.PaymentSetupParams{
+		OrderID:  "order-1",
+		CoinType: iwallet.CoinType("crypto:solana:mainnet:native"),
+	})
+	require.NoError(t, err)
+	require.Equal(t, payment.ActionModeSubmitted, result.Mode)
+	require.Equal(t, "solana-tx-sig", result.ActionID)
+	require.Equal(t, "solana-tx-sig", result.SubmittedTxHash)
+	require.Nil(t, result.Instructions, "V2 setup must not leak frontend-signable instructions")
+	require.Equal(t, "order-1", relayedOrder)
+	require.Equal(t, "anchor-create-ix", relayedInstructions)
+
+	status, err := adapter.GetActionStatus(context.Background(), "solana-tx-sig")
+	require.NoError(t, err)
+	require.Equal(t, "submitted", status.State)
+	require.Equal(t, "setup", status.SettlementAction)
+	require.Equal(t, "solana-tx-sig", status.TxHash)
+}
+
+func TestSolanaAnchorAdapter_ActionsFailClosedInsteadOfReturningLegacyInstructions(t *testing.T) {
+	adapter := adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
+		Legacy: adapters.NewClientSignedAdapter(&stubChainOps{cancelReleaseResult: "legacy-cancel"}, nil, func(models.OrderID, string, string) (iwallet.CoinType, any, error) {
+			return iwallet.CoinType("crypto:solana:mainnet:native"), "legacy-confirm", nil
+		}),
+	})
+
+	confirm, err := adapter.Confirm(context.Background(), payment.ActionParams{OrderID: "order-1"})
+	require.Nil(t, confirm)
+	require.ErrorIs(t, err, payment.ErrUnsupportedAction)
+
+	cancel, err := adapter.Cancel(context.Background(), payment.ActionParams{OrderID: "order-1"})
+	require.Nil(t, cancel)
+	require.ErrorIs(t, err, payment.ErrUnsupportedAction)
+}

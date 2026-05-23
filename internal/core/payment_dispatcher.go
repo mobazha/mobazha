@@ -86,7 +86,19 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		OnAutoConfirm:   n.handleCancelablePaymentForSolana,
 		NodeID:          n.nodeID,
 	}
-	n.paymentRegistry.Register(iwallet.ChainSolana, adapters.NewClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions))
+	solLegacy := adapters.NewClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
+	n.paymentRegistry.Register(iwallet.ChainSolana, solLegacy)
+	solActionStore := adapters.NewMemoryActionStore()
+	var solRelayer adapters.SolanaInstructionRelayer
+	if n.settlementService != nil {
+		solRelayer = adapters.SolanaInstructionRelayerFunc(n.settlementService.RelaySolanaTransaction)
+	}
+	n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
+		Legacy:   solLegacy,
+		Relayer:  solRelayer,
+		Store:    solActionStore,
+		Recorder: solActionStore,
+	}))
 
 	// ── TRON ──────────────────────────────────────────────────
 	tronOps := &adapters.TRONChainOps{

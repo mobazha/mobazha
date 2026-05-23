@@ -18,7 +18,10 @@ import (
 // (Solana / TRON) where the frontend wallet signs and submits the tx,
 // but does not fit the ManagedEscrow v1.4.1 path: nodes do not hold private
 // keys for the SaaS Relay's gas wallet; the backend submits the
-// transaction itself after collecting ManagedEscrow owner signatures.
+// transaction itself after collecting ManagedEscrow owner signatures. Solana
+// Anchor follows the same V2 rule: the backend relays program
+// instructions instead of returning settlement instructions to the
+// frontend.
 //
 // V2 raises the abstraction one notch — callers express *intent*
 // ("cancel this order") and the adapter decides the model:
@@ -32,14 +35,14 @@ import (
 // The two interfaces coexist:
 //   - V1 implementations stay registered as today;
 //     Registry.ForCoinV2 wraps them via V1AsV2 transparently.
-//   - V2-native implementations (ManagedEscrowAdapter) register via
+//   - V2-native implementations (ManagedEscrowAdapter, SolanaAnchorAdapter) register via
 //     Registry.RegisterV2.
 //
 // Migration path (no in-flight orders to preserve, per D-Hybrid-23):
 //   - Sprint 0/1: introduce V2 + wrapper; existing V1 callers
 //     unaffected.
-//   - Sprint 2: migrate handlers to V2; Solana/TRON keep V1, are
-//     wrapped on read.
+//   - Sprint 2: migrate handlers to V2; TRON keeps V1 and is wrapped
+//     on read, while Solana Anchor registers as V2-native.
 //   - Sprint 3+: V1 may be removed when only V2 callers remain.
 //
 // V2 reuses every V1 shared method (signing, deposit verification,
@@ -106,8 +109,8 @@ const (
 	// ActionModeInstructionsRequired — the adapter cannot finalize the
 	// action without a frontend signature. Caller MUST forward
 	// Instructions to the user and follow up with the existing
-	// "submit signed tx" flow. Used by V1AsV2 wrapping ClientSigned
-	// chains (Solana, TRON, and EVM until ManagedEscrowAdapter ships).
+	// "submit signed tx" flow. Used by V1AsV2 wrapping legacy
+	// ClientSigned chains (TRON and non-ManagedEscrow EVM).
 	ActionModeInstructionsRequired ActionMode = "instructions_required"
 
 	// ActionModeSubmitted — the adapter has submitted (or queued) the

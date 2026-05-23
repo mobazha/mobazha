@@ -17,13 +17,12 @@ const (
 	SettlementModeProviderCheckout SettlementMode = "provider_checkout"
 	// SettlementModeEscrowV1 is used when the buyer's local wallet must
 	// sign and initiate an escrow contract call (legacy EVM ContractManager V1,
-	// Solana, TRON). The buyer sends funds directly to the escrow contract
+	// legacy Solana program flow, TRON). The buyer sends funds directly to the escrow contract
 	// address via their wallet — the backend does not monitor for incoming
 	// transfers.
 	//
-	// Migration path: once ManagedEscrow v2 is fully enabled (TECHDEBT TD-PSS-02),
-	// EVM orders will move to SettlementModeAddressMonitored and this mode
-	// will only cover Solana / TRON legacy orders.
+	// Migration path: once ManagedEscrow v2 and Solana Anchor v2 are fully enabled
+	// (TECHDEBT TD-PSS-02), this mode should only cover TRON legacy orders.
 	//
 	// Wire value: "escrow_v1"
 	SettlementModeEscrowV1 SettlementMode = "escrow_v1"

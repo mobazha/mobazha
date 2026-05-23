@@ -146,10 +146,14 @@ type PaymentData struct {
 	ToID               []byte    `json:"toID"` // 36 bytes
 	Script             string    `json:"script"`
 	UnlockHours        uint32    `json:"unlockHours"`
+	UnlockTime         int64     `json:"unlockTime,omitempty"`
+	FundingDeadline    int64     `json:"fundingDeadline,omitempty"`
 	EscrowReleaseFee   string    `json:"escrowReleaseFee"`
+	EscrowServiceFee   uint64    `json:"escrowServiceFee,omitempty,string"`
 	PlatformAmount     string    `json:"platformAmount"`
 	PlatformAddr       string    `json:"platformAddr"`
 	CancelFeeAmount    string    `json:"cancelFeeAmount,omitempty"`
+	RentCollector      string    `json:"rentCollector,omitempty"`
 	PlatformRewardAddr string    `json:"platformRewardAddr"`
 	RefundAddress      string    `json:"refundAddress"`
 	Timestamp          time.Time `json:"timestamp"`

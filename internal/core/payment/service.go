@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum/go-ethereum/common"
@@ -407,6 +408,19 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 	if err != nil {
 		return nil, iwallet.Address{}, nil, err
 	}
+	var unlockTime int64
+	var fundingDeadline int64
+	platformFeeCollector := ""
+	rentCollector := ""
+	if coinInfo.Chain == iwallet.ChainSolana {
+		now := time.Now().UTC()
+		unlockTime = now.Add(time.Duration(orderInfo.UnlockHours) * time.Hour).Unix()
+		fundingDeadline = unlockTime
+		// Until explicit Solana fee/rent collector config exists, the relay
+		// payer owns rent recovery and a zero service-fee collector slot.
+		platformFeeCollector = params.PayerAddress
+		rentCollector = params.PayerAddress
+	}
 
 	paymentMethod, moderatorAddress, requiredSignatures, err := s.GetModeratorEscrowInfo(ctx, params.Moderator, params.CoinType)
 	if err != nil {
@@ -430,17 +444,21 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 	}
 
 	initParams := iwallet.EscrowInfo{
-		ContractAddress:    contractAddress.String(),
-		PayerAddress:       params.PayerAddress,
-		BuyerAddress:       orderInfo.BuyerAddress,
-		SellerAddress:      orderInfo.VendorAddress,
-		ModeratorAddress:   moderatorAddress,
-		UniqueId:           orderInfo.UniqueId,
-		RequiredSignatures: uint8(requiredSignatures),
-		UnlockHours:        uint64(orderInfo.UnlockHours),
-		CoinType:           params.CoinType,
-		Amount:             params.Amount,
-		Testnet:            wallet.IsTestnet(),
+		ContractAddress:      contractAddress.String(),
+		PayerAddress:         params.PayerAddress,
+		BuyerAddress:         orderInfo.BuyerAddress,
+		SellerAddress:        orderInfo.VendorAddress,
+		ModeratorAddress:     moderatorAddress,
+		PlatformFeeCollector: platformFeeCollector,
+		RentCollector:        rentCollector,
+		UniqueId:             orderInfo.UniqueId,
+		RequiredSignatures:   uint8(requiredSignatures),
+		UnlockHours:          uint64(orderInfo.UnlockHours),
+		UnlockTime:           unlockTime,
+		FundingDeadline:      fundingDeadline,
+		CoinType:             params.CoinType,
+		Amount:               params.Amount,
+		Testnet:              wallet.IsTestnet(),
 	}
 
 	escrowAccount, instructions, script, err := escrowProcessor.BuildInitEscrowInstructions(initParams)
@@ -484,6 +502,10 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		ToAddress:           escrowAccount.String(),
 		ToID:                padOrTruncateBytes(escrowPubkeyBytes, 36),
 		UnlockHours:         uint32(orderInfo.UnlockHours),
+		UnlockTime:          unlockTime,
+		FundingDeadline:     fundingDeadline,
+		PlatformAddr:        platformFeeCollector,
+		RentCollector:       rentCollector,
 		RefundAddress:       params.PayerAddress,
 		Script:              hex.EncodeToString(script),
 		PaymentTokenAddress: paymentTokenAddress,
@@ -509,10 +531,15 @@ func (s *PaymentAppService) persistClientSignedPaymentInfo(orderID string, pd *m
 		}
 		order.PaymentAddress = pd.ToAddress
 		if err := order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
-			Coin:           string(pd.Coin),
-			EscrowAddress:  pd.ToAddress,
-			Moderator:      pd.Moderator,
-			SettlementSpec: pd.SettlementSpec,
+			Coin:                 string(pd.Coin),
+			EscrowAddress:        pd.ToAddress,
+			Moderator:            pd.Moderator,
+			PlatformFeeCollector: pd.PlatformAddr,
+			RentCollector:        pd.RentCollector,
+			UnlockTime:           pd.UnlockTime,
+			FundingDeadline:      pd.FundingDeadline,
+			EscrowServiceFee:     pd.EscrowServiceFee,
+			SettlementSpec:       pd.SettlementSpec,
 		}); err != nil {
 			return err
 		}

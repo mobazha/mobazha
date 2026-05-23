@@ -22,6 +22,12 @@ import (
 //   - "confirm" — cancelable payout / buyer acceptance path (delegates to ChainEscrowV2.Confirm).
 //   - "cancel" — cancel / refund-before-ship path (delegates to ChainEscrowV2.Cancel).
 //
+// Non-CANCELABLE methods return a completed no-op result for this minimal
+// confirm/cancel surface. Their business action still runs through the order
+// service: MODERATED completion and dispute release build their settlement
+// inside CompleteOrder / ReleaseFunds, while seller refunds build release info
+// in the refund/decline path.
+//
 // Fiat orders return ErrBadRequest — refunds remain on fiat provider APIs.
 func (s *SettlementService) ExecuteSettlementAction(
 	ctx context.Context,
@@ -87,8 +93,7 @@ func (s *SettlementService) ExecuteSettlementAction(
 				coreiface.ErrBadRequest)
 		}
 		if method != pb.PaymentSent_CANCELABLE {
-			return nil, coinType, fmt.Errorf("%w: confirm settlement applies only to cancelable payments",
-				coreiface.ErrBadRequest)
+			return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
 		}
 		out := payoutAddr
 		if out == "" {
@@ -106,6 +111,9 @@ func (s *SettlementService) ExecuteSettlementAction(
 		if !order.CanCancel() && !order.CanRefund() {
 			return nil, coinType, fmt.Errorf("%w: order cannot be cancelled or refunded in its current state",
 				coreiface.ErrBadRequest)
+		}
+		if method != pb.PaymentSent_CANCELABLE {
+			return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
 		}
 		out := payoutAddr
 		if out == "" {

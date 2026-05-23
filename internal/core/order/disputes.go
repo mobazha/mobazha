@@ -531,12 +531,12 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	}
 
 	paymentSent := preferredContract.GetPaymentSent()
-	if spec := paymentSent.GetSettlementSpec(); spec != nil && len(txs) == 0 && spec.GetEscrowType() == string(payment.EscrowTypeManagedEscrow) {
-		// ManagedEscrow address-monitored orders do not always project legacy
-		// contract transaction rows into dispute case snapshots. In that
-		// route, PaymentSent.Amount is the canonical funded value and the
-		// ManagedEscrow release legs should be computed from it directly instead of
-		// silently collapsing to a zero-value dispute payout.
+	settlementSpec, hasSettlementSpec := payment.ResolveSettlementSpec(nil, paymentSent)
+	usesBalanceEscrow := hasSettlementSpec && (settlementSpec.UsesManagedEscrow() || settlementSpec.UsesSolanaEscrow())
+	if len(txs) == 0 && usesBalanceEscrow {
+		// Address-monitored smart escrows do not always project legacy
+		// transaction rows into dispute case snapshots. In that route,
+		// PaymentSent.Amount is the canonical funded value.
 		totalOut = iwallet.NewAmount(paymentSent.Amount)
 	}
 	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
@@ -552,6 +552,9 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	totalFee, err := disputeStrategy.EstimateEscrowFee(string(coinType), 2, 3, iwallet.FlNormal)
 	if err != nil {
 		return fmt.Errorf("failed to estimate escrow fee: %w", err)
+	}
+	if hasSettlementSpec && settlementSpec.UsesSolanaEscrow() {
+		totalFee = iwallet.NewAmount(0)
 	}
 
 	totalOut = totalOut.Sub(totalFee)

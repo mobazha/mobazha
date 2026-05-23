@@ -1423,8 +1423,10 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	if err != nil {
 		return nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
+	settlementSpec, hasSettlementSpec := payment.ResolveSettlementSpec(order, paymentSent)
+	usesBalanceEscrow := strategyV2.Model() == payment.PaymentModelClientSigned || (hasSettlementSpec && settlementSpec.UsesSolanaEscrow())
 
-	if strategyV2.Model() == payment.PaymentModelClientSigned {
+	if usesBalanceEscrow {
 		totalOut = iwallet.NewAmount(paymentSent.Amount).Sub(platformAmt)
 	} else {
 		spent := make(map[string]bool)

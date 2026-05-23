@@ -79,6 +79,7 @@ func paymentDataFromVerifiedPaymentSent(orderID string, paymentSent *pb.PaymentS
 		EscrowReleaseFee:    paymentSent.EscrowReleaseFee,
 		PlatformAmount:      paymentSent.PlatformAmount,
 		PlatformAddr:        paymentSent.PlatformAddr,
+		CancelFeeAmount:     paymentSent.CancelFeeAmount,
 		RefundAddress:       paymentSent.RefundAddress,
 		PaymentTokenAddress: paymentSent.PaymentTokenAddress,
 		BuyerReceiveAddress: paymentSent.BuyerReceiveAddress,

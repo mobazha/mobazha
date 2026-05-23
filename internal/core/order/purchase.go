@@ -643,6 +643,7 @@ func BuildPaymentSentProto(order *models.Order, pd *models.PaymentData) (*pb.Pay
 		EscrowReleaseFee:    pd.EscrowReleaseFee,
 		PlatformAmount:      pd.PlatformAmount,
 		PlatformAddr:        pd.PlatformAddr,
+		CancelFeeAmount:     pd.CancelFeeAmount,
 		RefundAddress:       pd.RefundAddress,
 		PaymentMethod:       paymentMethod,
 		Timestamp:           timestamppb.New(pd.Timestamp),

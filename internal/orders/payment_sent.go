@@ -58,6 +58,9 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}
 
 	order.PaymentAddress = paymentSent.ToAddress
+	if paymentSent.CancelFeeAmount != "" {
+		order.CancelFeeAmount = paymentSent.CancelFeeAmount
+	}
 	order.MarkPaymentVerificationPending()
 
 	err = order.PutMessage(message)

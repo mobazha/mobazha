@@ -2,6 +2,7 @@ package wallet_interface
 
 import (
 	"fmt"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -81,7 +82,7 @@ func GetAllSupportedChainTypes() []ChainType {
 type CoinType string
 
 const (
-	CtMock   CoinType = CoinType(ChainMock)
+	CtMock CoinType = CoinType(ChainMock)
 	CtFiat CoinType = CoinType(ChainFiat)
 
 	// 测试用的 CoinType
@@ -200,9 +201,24 @@ func (ct CoinInfo) String() string {
 // ContractAddress 返回代币合约地址
 func (ct CoinInfo) ContractAddress(testnet bool) string {
 	if testnet {
+		if override := strings.TrimSpace(testnetContractOverrideEnv(ct)); override != "" {
+			return override
+		}
 		return ct.TestnetContract
 	}
 	return ct.Contract
+}
+
+func testnetContractOverrideEnv(ct CoinInfo) string {
+	if ct.IsNative || !ct.IsEthTypeChain() {
+		return ""
+	}
+	chain := strings.ToUpper(strings.TrimSpace(string(ct.Chain)))
+	symbol := strings.ToUpper(strings.TrimSpace(ct.Symbol))
+	if chain == "" || symbol == "" {
+		return ""
+	}
+	return os.Getenv(fmt.Sprintf("MOBAZHA_TESTNET_%s_%s_CONTRACT", chain, symbol))
 }
 
 // BlockInterval 返回链的出块间隔

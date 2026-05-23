@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ import (
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -109,6 +111,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			log.Infof("Failed to load net config from %s: %s, using defaults", endpoint, err)
 		}
 		netConfig.Testnet = cfg.Testnet
+		applyInjectedManagedEscrowPaymentConfig(netConfig, cfg)
 
 		if aiJSON := netConfig.GetAIProviders(); aiJSON != "" {
 			if err := ai.LoadRemoteProviders(aiJSON); err != nil {
@@ -222,6 +225,30 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		}
 	})
 	return SharedManagerInstance, nil
+}
+
+func applyInjectedManagedEscrowPaymentConfig(netConfig *mcfg.NetConfig, cfg *repo.Config) {
+	if netConfig == nil || cfg == nil {
+		return
+	}
+	if len(cfg.ManagedEscrowPlatformAddrs) > 0 {
+		for rawChain, addr := range cfg.ManagedEscrowPlatformAddrs {
+			chain := iwallet.ChainType(strings.TrimSpace(rawChain))
+			if !chain.IsValid() || strings.TrimSpace(addr) == "" {
+				continue
+			}
+			netConfig.SetPlatformAddr(chain, strings.TrimSpace(addr))
+		}
+	}
+	if len(cfg.ManagedEscrowReleaseFeeUSDCents) > 0 {
+		for rawChain, fee := range cfg.ManagedEscrowReleaseFeeUSDCents {
+			chain := iwallet.ChainType(strings.TrimSpace(rawChain))
+			if !chain.IsValid() {
+				continue
+			}
+			netConfig.SetConfig(mcfg.ManagedEscrowGasReleaseFeeUSDCentsKey(chain), strconv.FormatUint(fee, 10))
+		}
+	}
 }
 
 // InitSNFProxy initializes the shared SNF proxy using the default node's host.

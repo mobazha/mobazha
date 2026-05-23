@@ -7,11 +7,14 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	walletpkg "github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
@@ -222,6 +225,9 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		false,
 		"",
 		"",
+		"0",
+		"",
+		"0",
 	))
 
 	var orders []models.Order
@@ -238,6 +244,7 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		require.Equal(t, uint64(1000), info.Amount)
 		require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
 		require.Equal(t, "0xmanagedescrow", info.Address)
+		require.Equal(t, "0", orders[i].CancelFeeAmount)
 	}
 
 	var shared models.SharedPaymentIntent
@@ -248,6 +255,73 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 	require.NotNil(t, info)
 	require.Equal(t, uint64(1000), info.Amount)
 	require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
+}
+
+func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowGasFees(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	rawProvider, ok := db.(interface{ RawDB() *gorm.DB })
+	require.True(t, ok)
+	raw := rawProvider.RawDB()
+	require.NotNil(t, raw)
+	require.NoError(t, raw.Create(&models.Order{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-safe"},
+		ID:          models.OrderID("order-managed_escrow-fee"),
+	}).Error)
+
+	const (
+		platformAddr = "0x7777777777777777777777777777777777777777"
+		feeWei       = "2500000000000000" // $5 at $2,000/ETH
+	)
+	reg := payment.NewRegistry()
+	strategy := &testChainEscrow{
+		model: payment.PaymentModelMonitored,
+		genResult: &payment.PaymentSetupResult{
+			PaymentModel: payment.PaymentModelMonitored,
+			PaymentData: &models.PaymentData{
+				OrderID:   "order-managed_escrow-fee",
+				Coin:      iwallet.CoinType("crypto:eip155:1:native"),
+				Method:    pb.PaymentSent_CANCELABLE,
+				Amount:    1_000_000_000_000_000_000,
+				ToAddress: "0x1111111111111111111111111111111111111111",
+			},
+		},
+	}
+	reg.Register(iwallet.ChainEthereum, strategy)
+
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
+		DB:              db,
+		PaymentRegistry: reg,
+		ExchangeRates: walletpkg.NewFixedRateProvider("ETH", map[models.CurrencyCode]iwallet.Amount{
+			"USD": iwallet.NewAmount(200000),
+		}),
+		NetConfig: &config.NetConfig{
+			PlatformAddrs: map[iwallet.ChainType]string{iwallet.ChainEthereum: platformAddr},
+		},
+	})
+
+	result, err := svc.GeneratePaymentInstructions(context.Background(), models.InitializeEscrowData{
+		OrderID:  "order-managed_escrow-fee",
+		CoinType: iwallet.CoinType("crypto:eip155:1:native"),
+		Amount:   1_000_000_000_000_000_000,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.PaymentData)
+	require.Equal(t, feeWei, result.PaymentData.PlatformAmount)
+	require.Equal(t, platformAddr, result.PaymentData.PlatformAddr)
+	require.Equal(t, feeWei, result.PaymentData.CancelFeeAmount)
+
+	var order models.Order
+	require.NoError(t, raw.Where("id = ?", "order-managed_escrow-fee").First(&order).Error)
+	require.Equal(t, feeWei, order.CancelFeeAmount)
+	info, err := order.GetPendingManagedEscrowPaymentInfo()
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.Equal(t, feeWei, info.PlatformAmount)
+	require.Equal(t, platformAddr, info.PlatformAddr)
+	require.Equal(t, feeWei, info.CancelFeeAmount)
 }
 
 func TestPaymentAppService_GeneratePaymentInstructions_NoCoinStrategy(t *testing.T) {

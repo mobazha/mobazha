@@ -249,6 +249,11 @@ type Config struct {
 	PlatformAIModel      string `no-flag:"true"`
 	PlatformAIBaseURL    string `no-flag:"true"`
 	PlatformAIDailyLimit int    `no-flag:"true"` // per-tenant daily call limit (0 = unlimited)
+
+	// ManagedEscrow payment platform settings injected by hosting/platform-console.
+	// Keys are iwallet.ChainType strings (for example "ETH", "BSC").
+	ManagedEscrowPlatformAddrs      map[string]string `no-flag:"true"`
+	ManagedEscrowReleaseFeeUSDCents map[string]uint64 `no-flag:"true"`
 }
 
 // ParseElectrumServers parses the repeatable "chain=host:port" entries into a map.

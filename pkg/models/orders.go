@@ -753,6 +753,14 @@ type PendingManagedEscrowPaymentInfo struct {
 	Moderated        bool   `json:"moderated"`
 	Moderator        string `json:"moderator,omitempty"`
 	ModeratorAddress string `json:"moderatorAddress,omitempty"`
+	// PlatformAmount / PlatformAddr lock the ManagedEscrow release Gas Service Fee
+	// at payment-intent creation. Settlement actions consume these values
+	// verbatim and must not re-price gas later.
+	PlatformAmount string `json:"platformAmount,omitempty"`
+	PlatformAddr   string `json:"platformAddr,omitempty"`
+	// CancelFeeAmount is the Tier 1 cancel/refund fee locked alongside
+	// the payment intent. Tier 2 stores "0".
+	CancelFeeAmount string `json:"cancelFeeAmount,omitempty"`
 	// SettlementSpec is the ADR-010 payment route; legacy Moderated is fallback when absent.
 	SettlementSpec *PendingSettlementSpec `json:"settlementSpec,omitempty"`
 }

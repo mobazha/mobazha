@@ -129,7 +129,13 @@ func (n *MobazhaNode) startEVMChainClients() {
 			continue
 		}
 
-		setter.SetChainClient(client)
+		if ownershipSetter, ok := wallet.(interface {
+			SetChainClientWithOwnership(client iwallet.ChainClient, owned bool)
+		}); ok {
+			ownershipSetter.SetChainClientWithOwnership(client, true)
+		} else {
+			setter.SetChainClient(client)
+		}
 		configured++
 		logger.LogInfoWithIDf(log, n.nodeID, "Created standalone EVM client for %s (rpc=%s)", cfg.ChainType, cfg.RpcURL)
 	}
@@ -164,7 +170,13 @@ func configureEVMWallets(nodeID string, mw walletProvider, hs coreiface.HostServ
 		}
 
 		if setter, ok := wallet.(base.ChainClientSetter); ok {
-			setter.SetChainClient(client)
+			if ownershipSetter, ok := wallet.(interface {
+				SetChainClientWithOwnership(client iwallet.ChainClient, owned bool)
+			}); ok {
+				ownershipSetter.SetChainClientWithOwnership(client, false)
+			} else {
+				setter.SetChainClient(client)
+			}
 			configured++
 			logger.LogInfoWithIDf(log, nodeID, "Configured %s wallet with shared EVM client", chain)
 		}

@@ -703,6 +703,7 @@ func (n *MobazhaNode) initPaymentService() {
 
 		Keys:          n.keyProvider,
 		ExchangeRates: n.exchangeRates,
+		NetConfig:     n.netConfig,
 	})
 }
 

@@ -27,7 +27,8 @@ var _ = iwallet.EscrowProcessor(&ETHWallet{})
 // remaining functions for each interface.
 type ETHWallet struct { // nolint
 	base.WalletBase
-	testnet bool
+	testnet         bool
+	ownsChainClient bool
 }
 
 // NewETHWallet returns a new ETHWallet. This constructor
@@ -44,6 +45,7 @@ func NewETHWallet(coinType iwallet.CoinType, chainClient *EthClient, cfg *base.W
 	// downstream nil checks like `w.ChainClient == nil` to incorrectly fail.
 	if chainClient != nil {
 		w.ChainClient = chainClient
+		w.ownsChainClient = true
 	}
 	w.KeyStore = cfg.KeyStore
 	w.Logger = cfg.Logger
@@ -58,9 +60,23 @@ func (w *ETHWallet) postInit(masterKey *hdkeychain.ExtendedKey) error {
 	return nil
 }
 
+// SetChainClientWithOwnership injects the chain client and records whether
+// this wallet owns the client's lifecycle.
+func (w *ETHWallet) SetChainClientWithOwnership(client iwallet.ChainClient, owned bool) {
+	w.ChainClient = client
+	w.ownsChainClient = owned
+}
+
+// SetChainClient preserves the historical injection API while defaulting to
+// a borrowed lifecycle. Callers that construct a per-node standalone client
+// should use SetChainClientWithOwnership(..., true) explicitly.
+func (w *ETHWallet) SetChainClient(client iwallet.ChainClient) {
+	w.SetChainClientWithOwnership(client, false)
+}
+
 // CloseWallet releases the optional WSS subscription client before shutting down.
 func (w *ETHWallet) CloseWallet() error {
-	if w.ChainClient != nil {
+	if w.ownsChainClient && w.ChainClient != nil {
 		if ec, ok := w.ChainClient.(*EthClient); ok {
 			ec.Close()
 		}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -31,14 +32,37 @@ type NetConfig struct {
 var defaultMainnetPlatformAddrs = map[iwallet.ChainType]string{
 	iwallet.ChainBitcoin:     "bc1qq0qpv5l54v2a3vvwq2ygrrdn54pnv3x4rjxpxhlryghrxlmrzr0qds28qd",
 	iwallet.ChainEthereum:    "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainBSC:         "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
 	iwallet.ChainBitcoinCash: "ppaz03a9gc9r339wq9ctggf5st79zkjfxgle6qvuss",
 	iwallet.ChainLitecoin:    "MTRuWRh99NfdsyRL4oMUaB2NzMqKVKKRkK",
 	iwallet.ChainZCash:       "t1VNBTzKypFaAJH8A6uj4Fq67xyMcKhkmyf",
 	iwallet.ChainPolygon:     "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainBase:        "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainArbitrum:    "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainOptimism:    "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainAvalanche:   "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainGnosis:      "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainCelo:        "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainMantle:      "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainScroll:      "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainLinea:       "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
 	iwallet.ChainConflux:     "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
 }
 
-var defaultTestnetPlatformAddrs = map[iwallet.ChainType]string{}
+var defaultTestnetPlatformAddrs = map[iwallet.ChainType]string{
+	iwallet.ChainEthereum:  "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainBSC:       "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainPolygon:   "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainBase:      "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainArbitrum:  "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainOptimism:  "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainAvalanche: "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainGnosis:    "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainCelo:      "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainMantle:    "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainScroll:    "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainLinea:     "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+}
 
 func DefaultNetConfig() *NetConfig {
 	return &NetConfig{
@@ -101,6 +125,20 @@ func (config *NetConfig) GetConfig(key string) (string, bool) {
 	return val, ok
 }
 
+func (config *NetConfig) SetConfig(key, value string) {
+	config.dataMutex.Lock()
+	defer config.dataMutex.Unlock()
+
+	if config.Data == nil {
+		config.Data = make(map[string]string)
+	}
+	if value == "" {
+		delete(config.Data, key)
+		return
+	}
+	config.Data[key] = value
+}
+
 // GetCommission If not set or fail to parse, use default 1(1%)
 func (config *NetConfig) GetCommission() float64 {
 	val, ok := config.GetConfig("commission")
@@ -120,13 +158,50 @@ func (config *NetConfig) GetPlatformAddr(chainType iwallet.ChainType) string {
 	config.platformAddrMutex.RLock()
 	defer config.platformAddrMutex.RUnlock()
 
-	if len(config.PlatformAddrs) == 0 {
-		if config.Testnet {
-			return defaultTestnetPlatformAddrs[chainType]
-		}
-		return defaultMainnetPlatformAddrs[chainType]
+	if addr := config.PlatformAddrs[chainType]; addr != "" {
+		return addr
 	}
-	return config.PlatformAddrs[chainType]
+	return config.defaultPlatformAddr(chainType)
+}
+
+func (config *NetConfig) SetPlatformAddr(chainType iwallet.ChainType, addr string) {
+	config.platformAddrMutex.Lock()
+	defer config.platformAddrMutex.Unlock()
+
+	if config.PlatformAddrs == nil {
+		config.PlatformAddrs = make(map[iwallet.ChainType]string)
+	}
+	if addr == "" {
+		delete(config.PlatformAddrs, chainType)
+		return
+	}
+	config.PlatformAddrs[chainType] = addr
+}
+
+func (config *NetConfig) defaultPlatformAddr(chainType iwallet.ChainType) string {
+	if config.Testnet {
+		return defaultTestnetPlatformAddrs[chainType]
+	}
+	return defaultMainnetPlatformAddrs[chainType]
+}
+
+func ManagedEscrowGasReleaseFeeUSDCentsKey(chainType iwallet.ChainType) string {
+	return pkgconfig.ManagedEscrowGasReleaseFeeUSDCentsKey(chainType)
+}
+
+func (config *NetConfig) GetManagedEscrowGasReleaseFeeUSDCents(chainType iwallet.ChainType) (uint64, bool) {
+	if config == nil {
+		return 0, false
+	}
+	raw, ok := config.GetConfig(ManagedEscrowGasReleaseFeeUSDCentsKey(chainType))
+	if !ok || raw == "" {
+		return 0, false
+	}
+	fee, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return fee, true
 }
 
 func (config *NetConfig) GetCommissionInfo(coinType iwallet.CoinType) (iwallet.Address, float64) {

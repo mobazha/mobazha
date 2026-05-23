@@ -82,13 +82,17 @@ type EVMPaymentInfoResponse struct {
 // results. Legacy instructions endpoints remain only for client-signed flows
 // (legacy EVM / Solana / TRON), not as the default path for ManagedEscrow.
 type ManagedEscrowPaymentInfoResponse struct {
-	PaymentType    string                `json:"paymentType"`         // always "managed_escrow_address_monitored"
-	PaymentMethod  pb.PaymentSent_Method `json:"paymentMethod"`       // CANCELABLE or MODERATED
-	PaymentAddress string                `json:"paymentAddress"`      // predicted ManagedEscrow address (hex)
-	Amount         uint64                `json:"amount,string"`       // amount in wei (or token minimal units)
-	Coin           string                `json:"coin"`                // canonical coin type
-	ExpiresAt      time.Time             `json:"expiresAt"`           // funding window deadline
-	Moderator      string                `json:"moderator,omitempty"` // peerID (MODERATED only)
+	PaymentType         string                `json:"paymentType"`                   // always "managed_escrow_address_monitored"
+	PaymentMethod       pb.PaymentSent_Method `json:"paymentMethod"`                 // CANCELABLE or MODERATED
+	PaymentAddress      string                `json:"paymentAddress"`                // predicted ManagedEscrow address (hex)
+	PaymentTokenAddress string                `json:"paymentTokenAddress,omitempty"` // ERC20 token contract; zero/empty means native gas coin
+	Amount              uint64                `json:"amount,string"`                 // amount in wei (or token minimal units)
+	Coin                string                `json:"coin"`                          // canonical coin type
+	PlatformAmount      string                `json:"platformAmount,omitempty"`      // locked ManagedEscrow release gas service fee
+	PlatformAddr        string                `json:"platformAddr,omitempty"`        // platform fee collector
+	CancelFeeAmount     string                `json:"cancelFeeAmount,omitempty"`     // locked Tier 1 cancel fee; "0" on Tier 2
+	ExpiresAt           time.Time             `json:"expiresAt"`                     // funding window deadline
+	Moderator           string                `json:"moderator,omitempty"`           // peerID (MODERATED only)
 }
 
 // ============================================================================
@@ -363,13 +367,17 @@ func (g *Gateway) formatManagedEscrowPaymentResponse(w http.ResponseWriter, resu
 	}
 
 	response := ManagedEscrowPaymentInfoResponse{
-		PaymentType:    "managed_escrow_address_monitored",
-		PaymentMethod:  paymentData.Method,
-		PaymentAddress: paymentData.ToAddress,
-		Amount:         paymentData.Amount,
-		Coin:           string(paymentData.Coin),
-		ExpiresAt:      time.Now().Add(UTXOPaymentWindowDuration),
-		Moderator:      paymentData.Moderator,
+		PaymentType:         "managed_escrow_address_monitored",
+		PaymentMethod:       paymentData.Method,
+		PaymentAddress:      paymentData.ToAddress,
+		PaymentTokenAddress: paymentData.PaymentTokenAddress,
+		Amount:              paymentData.Amount,
+		Coin:                string(paymentData.Coin),
+		PlatformAmount:      paymentData.PlatformAmount,
+		PlatformAddr:        paymentData.PlatformAddr,
+		CancelFeeAmount:     paymentData.CancelFeeAmount,
+		ExpiresAt:           time.Now().Add(UTXOPaymentWindowDuration),
+		Moderator:           paymentData.Moderator,
 	}
 	responsePkg.Success(w, response)
 }

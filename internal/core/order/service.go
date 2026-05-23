@@ -1082,6 +1082,24 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 				return &refundBuildResult{WalletTx: releaseWTx, Message: refundResp}, nil
 			}
 
+			if refundTxID != "" {
+				refund := &pb.Refund{
+					RefundInfo: &pb.Refund_TransactionID{
+						TransactionID: refundTxID.String(),
+					},
+					Amount:    paymentSent.Amount,
+					Timestamp: timestamppb.Now(),
+				}
+
+				refundAny := &anypb.Any{}
+				if err := refundAny.MarshalFrom(refund); err != nil {
+					return nil, fmt.Errorf("failed to marshal refund: %w", err)
+				}
+
+				refundResp.Message = refundAny
+				return &refundBuildResult{Message: refundResp}, nil
+			}
+
 			managed_escrowTxid, _, handled, err := s.submitManagedEscrowCancelAction(context.Background(), order, coinType, paymentSent, payoutAddr)
 			if err != nil {
 				return nil, fmt.Errorf("failed to release ManagedEscrow CANCELABLE escrow for refund: %w", err)
@@ -1212,7 +1230,7 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 			wTx = result.WalletTx
 			releaseTx = result.Transaction
 			txid = releaseTx.ID
-		} else {
+		} else if txid == "" {
 			managed_escrowTxid, managed_escrowTx, handled, err := s.submitManagedEscrowCancelAction(context.Background(), &order, coinType, paymentSent, "")
 			if err != nil {
 				return err

@@ -149,6 +149,7 @@ type PaymentData struct {
 	EscrowReleaseFee   string    `json:"escrowReleaseFee"`
 	PlatformAmount     string    `json:"platformAmount"`
 	PlatformAddr       string    `json:"platformAddr"`
+	CancelFeeAmount    string    `json:"cancelFeeAmount,omitempty"`
 	PlatformRewardAddr string    `json:"platformRewardAddr"`
 	RefundAddress      string    `json:"refundAddress"`
 	Timestamp          time.Time `json:"timestamp"`

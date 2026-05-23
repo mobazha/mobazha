@@ -203,6 +203,7 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		relayer = adapters.NewRelayBridgeWithRecorder(relaySvc, recorder)
 	}
 
+	codeAndNonce := &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet}
 	deps := adapters.ManagedEscrowAdapterDeps{
 		Relayer:       relayer,
 		Keys:          n.keyProvider,
@@ -210,7 +211,8 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		ActionStore:   store,
 		AutoConfirmer: managed_escrowCancelableAutoConfirmer{settlement: n.settlementService},
 		OwnerSigner:   &paymentManagedEscrowOwnerSigner{keys: n.keyProvider},
-		NonceProvider: &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet},
+		NonceProvider: codeAndNonce,
+		CodeProvider:  codeAndNonce,
 		WalletTestnet: n.walletTestnet,
 	}
 	if n.paymentService != nil {

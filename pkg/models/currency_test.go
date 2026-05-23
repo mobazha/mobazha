@@ -149,21 +149,21 @@ func TestCurrencyDictionaryLookup_FiatCompoundCodes(t *testing.T) {
 	}
 
 	tests := []struct {
-		code        string
-		wantCode    CurrencyCode
-		wantDiv     uint
-		wantErr     bool
+		code     string
+		wantCode CurrencyCode
+		wantDiv  uint
+		wantErr  bool
 	}{
 		{"fiat:stripe:USD", "USD", 2, false},
 		{"fiat:paypal:USD", "USD", 2, false},
 		{"fiat:stripe:EUR", "EUR", 2, false},
 		{"FIAT:STRIPE:USD", "USD", 2, false},
 		{"Fiat:Stripe:usd", "USD", 2, false},
-		{"fiat:USD", "USD", 2, false},   // 2-segment format
-		{"fiat:EUR", "EUR", 2, false},   // 2-segment format
-		{"FIAT:USD", "USD", 2, false},   // 2-segment uppercase
+		{"fiat:USD", "USD", 2, false}, // 2-segment format
+		{"fiat:EUR", "EUR", 2, false}, // 2-segment format
+		{"FIAT:USD", "USD", 2, false}, // 2-segment uppercase
 		{"fiat:stripe:INVALID", "", 0, true},
-		{"fiat:INVALID", "", 0, true},   // 2-segment unknown currency
+		{"fiat:INVALID", "", 0, true}, // 2-segment unknown currency
 	}
 
 	for _, tt := range tests {
@@ -184,6 +184,34 @@ func TestCurrencyDictionaryLookup_FiatCompoundCodes(t *testing.T) {
 		if def.Divisibility != tt.wantDiv {
 			t.Errorf("Lookup(%q): divisibility = %d, want %d", tt.code, def.Divisibility, tt.wantDiv)
 		}
+	}
+}
+
+func TestCurrencyDictionaryLookup_CanonicalCryptoAssetIDUsesPricingCode(t *testing.T) {
+	dict := CurrencyDictionary{
+		"ETHUSDT": newCurrency("ETHUSDT"),
+	}
+
+	def, err := dict.Lookup("crypto:eip155:1:erc20:0xF36BFeE8fd7F1950c0129714Faf6d1e1F94a66AA")
+	if err != nil {
+		t.Fatalf("Lookup(canonical erc20): unexpected error: %v", err)
+	}
+	if def.Code != "ETHUSDT" {
+		t.Fatalf("Lookup(canonical erc20): code = %s, want ETHUSDT", def.Code)
+	}
+}
+
+func TestCurrencyDictionaryLookup_CanonicalNativeAssetIDUsesPricingCode(t *testing.T) {
+	dict := CurrencyDictionary{
+		"ETH": newCurrency("ETH"),
+	}
+
+	def, err := dict.Lookup("crypto:eip155:1:native")
+	if err != nil {
+		t.Fatalf("Lookup(canonical native): unexpected error: %v", err)
+	}
+	if def.Code != "ETH" {
+		t.Fatalf("Lookup(canonical native): code = %s, want ETH", def.Code)
 	}
 }
 

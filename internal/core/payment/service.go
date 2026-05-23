@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
@@ -80,6 +81,10 @@ type PaymentAppService struct {
 	// Exchange rates for UTXO order total calculation
 	exchangeRates *wallet.ExchangeRateProvider
 
+	// netConfig provides platform fee collector addresses used when ManagedEscrow
+	// payment intents lock Gas Service Fee amounts at setup time.
+	netConfig *config.NetConfig
+
 	// Receipt verification (injected; abstracts away EVM-specific types)
 	receiptVerifier contracts.ReceiptVerifier
 
@@ -120,6 +125,7 @@ type PaymentAppServiceConfig struct {
 	Keys contracts.KeyProvider
 
 	ExchangeRates *wallet.ExchangeRateProvider
+	NetConfig     *config.NetConfig
 }
 
 // NewPaymentAppService constructs a PaymentAppService with validated dependencies.
@@ -135,6 +141,7 @@ func NewPaymentAppService(cfg PaymentAppServiceConfig) *PaymentAppService {
 		escrowMasterPubKey: cfg.EscrowMasterPubKey,
 		keys:               cfg.Keys,
 		exchangeRates:      cfg.ExchangeRates,
+		netConfig:          cfg.NetConfig,
 	}
 }
 
@@ -238,6 +245,14 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 		result.PaymentData != nil &&
 		result.PaymentData.ToAddress != "" {
 
+		feeQuote, quoteErr := s.quoteManagedEscrowGasFees(params.CoinType, result.PaymentData.Amount)
+		if quoteErr != nil {
+			return nil, quoteErr
+		}
+		result.PaymentData.PlatformAmount = feeQuote.ReleaseFeeAmount
+		result.PaymentData.PlatformAddr = feeQuote.PlatformAddr
+		result.PaymentData.CancelFeeAmount = feeQuote.CancelFeeAmount
+
 		setupResult.IsManagedEscrowOrder = true
 		moderated := result.PaymentData.Method == pb.PaymentSent_MODERATED
 		if persistErr := s.persistManagedEscrowPaymentAddress(
@@ -248,10 +263,11 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 			moderated,
 			result.PaymentData.Moderator,
 			result.PaymentData.ModeratorAddress,
+			feeQuote.ReleaseFeeAmount,
+			feeQuote.PlatformAddr,
+			feeQuote.CancelFeeAmount,
 		); persistErr != nil {
-			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist ManagedEscrow address for order %s: %v", params.OrderID, persistErr)
-			// Non-fatal: monitoring is already registered; the projector will
-			// fall back to escrow_v1 until the next call succeeds.
+			return nil, fmt.Errorf("persist ManagedEscrow payment intent for order %s: %w", params.OrderID, persistErr)
 		}
 	}
 
@@ -261,7 +277,7 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 // persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
-func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool, moderator, moderatorAddress string) error {
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string) error {
 	info := &models.PendingManagedEscrowPaymentInfo{
 		Coin:             coin,
 		Amount:           amount,
@@ -269,6 +285,9 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 		Moderated:        moderated,
 		Moderator:        moderator,
 		ModeratorAddress: moderatorAddress,
+		PlatformAmount:   platformAmount,
+		PlatformAddr:     platformAddr,
+		CancelFeeAmount:  cancelFeeAmount,
 		SettlementSpec:   payment.NewManagedEscrowSpec(moderated).ToPending(),
 	}
 	if rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB }); ok {
@@ -289,6 +308,7 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 			}
 			for i := range orders {
 				orders[i].PaymentAddress = managed_escrowAddress
+				orders[i].CancelFeeAmount = cancelFeeAmount
 				if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
 					return fmt.Errorf("set pending managed escrow payment info: %w", err)
 				}
@@ -313,6 +333,7 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 		}
 		for i := range orders {
 			orders[i].PaymentAddress = managed_escrowAddress
+			orders[i].CancelFeeAmount = cancelFeeAmount
 			if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
 				return fmt.Errorf("set pending managed escrow payment info: %w", err)
 			}

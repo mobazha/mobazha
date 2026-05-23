@@ -34,6 +34,21 @@ func (m *mockChainClient) EstimateFee(txsize int) (map[iwallet.FeeLevel]iwallet.
 }
 func (m *mockChainClient) Broadcast(serializedTx []byte) error { return nil }
 
+type ownershipAwareMockWallet struct {
+	iwallet.Wallet
+	lastClient iwallet.ChainClient
+	lastOwned  bool
+}
+
+func (w *ownershipAwareMockWallet) SetChainClient(client iwallet.ChainClient) {
+	w.lastClient = client
+}
+
+func (w *ownershipAwareMockWallet) SetChainClientWithOwnership(client iwallet.ChainClient, owned bool) {
+	w.lastClient = client
+	w.lastOwned = owned
+}
+
 type mockBalanceChainClient struct {
 	mockChainClient
 	balance *big.Int
@@ -299,6 +314,31 @@ func TestStartEVMChainClients_SaaS_UsesHostService(t *testing.T) {
 	}
 	if baseWallet.ChainClient != baseClient {
 		t.Error("Base wallet should have shared client from HostService")
+	}
+}
+
+func TestConfigureEVMWallets_InjectsSharedClientsAsBorrowed(t *testing.T) {
+	borrowedWallet := &ownershipAwareMockWallet{}
+	bscClient := &mockChainClient{chain: iwallet.ChainBSC}
+	mw := &mockWalletProvider{
+		wallets: map[iwallet.ChainType]iwallet.Wallet{
+			iwallet.ChainBSC: borrowedWallet,
+		},
+	}
+	hs := &mockHostService{
+		evmClients: map[iwallet.ChainType]iwallet.ChainClient{
+			iwallet.ChainBSC: bscClient,
+		},
+	}
+
+	if configured := configureEVMWallets("test-node", mw, hs); configured != 1 {
+		t.Fatalf("configured wallets = %d, want 1", configured)
+	}
+	if borrowedWallet.lastClient != bscClient {
+		t.Fatal("expected shared client to be injected")
+	}
+	if borrowedWallet.lastOwned {
+		t.Fatal("shared SaaS client must be injected as borrowed, not owned")
 	}
 }
 

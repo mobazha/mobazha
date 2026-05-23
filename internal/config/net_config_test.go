@@ -71,3 +71,32 @@ func TestLoadNetConfig(t *testing.T) {
 		t.Errorf("expected 1 snf server, got %d", len(netConfig.StoreAndForwardServers))
 	}
 }
+
+func TestNetConfig_PlatformAddrOverrideFallsBackPerChain(t *testing.T) {
+	netConfig := DefaultNetConfig()
+	override := "0x1111111111111111111111111111111111111111"
+	netConfig.SetPlatformAddr(iwallet.ChainEthereum, override)
+
+	if got := netConfig.GetPlatformAddr(iwallet.ChainEthereum); got != override {
+		t.Fatalf("expected ETH override %s, got %s", override, got)
+	}
+	if got := netConfig.GetPlatformAddr(iwallet.ChainBSC); got == "" {
+		t.Fatal("expected BSC to fall back to default platform address")
+	}
+}
+
+func TestNetConfig_ManagedEscrowGasReleaseFeeConfig(t *testing.T) {
+	netConfig := DefaultNetConfig()
+	key := ManagedEscrowGasReleaseFeeUSDCentsKey(iwallet.ChainEthereum)
+	netConfig.SetConfig(key, "500")
+
+	fee, ok := netConfig.GetManagedEscrowGasReleaseFeeUSDCents(iwallet.ChainEthereum)
+	if !ok || fee != 500 {
+		t.Fatalf("expected ETH release fee 500, got fee=%d ok=%v", fee, ok)
+	}
+
+	netConfig.SetConfig(key, "")
+	if _, ok := netConfig.GetManagedEscrowGasReleaseFeeUSDCents(iwallet.ChainEthereum); ok {
+		t.Fatal("expected cleared release fee override to be absent")
+	}
+}

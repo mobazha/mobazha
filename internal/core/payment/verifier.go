@@ -605,6 +605,9 @@ func buildAggregatedPaymentSent(
 		RefundAddress:       refundAddr,
 		EscrowTimeoutHours:  intent.escrowTimeoutHours,
 		PaymentTokenAddress: rep.TokenAddress,
+		PlatformAmount:      intent.platformAmount,
+		PlatformAddr:        intent.platformAddr,
+		CancelFeeAmount:     intent.cancelFeeAmount,
 		Timestamp:           timestamppb.New(eventTime),
 		SettlementSpec:      intent.settlementSpec.ToPaymentSent(),
 	}
@@ -644,6 +647,9 @@ type aggregatedPaymentIntent struct {
 	script             string
 	moderator          string
 	moderatorAddress   string
+	platformAmount     string
+	platformAddr       string
+	cancelFeeAmount    string
 	escrowTimeoutHours uint32
 }
 
@@ -667,6 +673,9 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 		intent.contractAddress = managed_escrowInfo.Address
 		intent.moderator = managed_escrowInfo.Moderator
 		intent.moderatorAddress = managed_escrowInfo.ModeratorAddress
+		intent.platformAmount = managed_escrowInfo.PlatformAmount
+		intent.platformAddr = managed_escrowInfo.PlatformAddr
+		intent.cancelFeeAmount = managed_escrowInfo.CancelFeeAmount
 		return intent
 	}
 

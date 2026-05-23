@@ -75,7 +75,7 @@ type PaymentObservation struct {
 	TenantID string `gorm:"column:tenant_id;type:varchar(64);primaryKey;default:'';uniqueIndex:idx_payment_obs_dedupe,priority:1" json:"tenantId,omitempty"`
 	ID       string `gorm:"column:id;type:varchar(64);primaryKey" json:"id"` // UUID v7 (caller-provided)
 
-	OrderID string `gorm:"column:order_id;type:varchar(64);not null;index:idx_payment_obs_order,priority:2" json:"orderId"`
+	OrderID string `gorm:"column:order_id;type:varchar(64);not null;index:idx_payment_obs_order,priority:2" json:"orderID"`
 
 	// CAIP-2 chain identification. ChainNamespace is e.g. "eip155", "solana",
 	// "external_payment", "bip122". ChainReference is the chain instance id within that

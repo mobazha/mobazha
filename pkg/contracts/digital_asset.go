@@ -123,7 +123,7 @@ const (
 // order pages to decide whether digital delivery is automatic or requires a
 // manual fallback link.
 type DigitalDeliveryStatus struct {
-	OrderID                string   `json:"orderId"`
+	OrderID                string   `json:"orderID"`
 	IsDigitalOrder         bool     `json:"isDigitalOrder"`
 	Status                 string   `json:"status"`
 	AssetCount             int      `json:"assetCount"`

@@ -422,7 +422,7 @@ type ShippingEstimate struct {
 type FulfillmentWebhookEvent struct {
 	Type       FulfillmentWebhookType `json:"type"`
 	EventID    string                 `json:"eventId"`
-	OrderID    string                 `json:"orderId"`
+	OrderID    string                 `json:"orderID"`
 	ExternalID string                 `json:"externalId"`
 	Data       interface{}            `json:"data"`
 	Timestamp  time.Time              `json:"timestamp"`

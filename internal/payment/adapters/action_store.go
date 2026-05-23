@@ -90,7 +90,7 @@ type ActionStore interface {
 }
 
 // ActionRecorder persists ActionRecord projections after a successful relay
-// submission (RelayBridge). MemoryActionStore and ManagedEscrowRelayActionStore both
+// submission (RelayBridge). MemoryActionStore and SettlementActionStore both
 // implement it via Put — the adapter read path stays ActionStore-only.
 type ActionRecorder interface {
 	Put(rec ActionRecord) error

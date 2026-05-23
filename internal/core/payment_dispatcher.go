@@ -88,7 +88,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	}
 	solLegacy := adapters.NewClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
 	n.paymentRegistry.Register(iwallet.ChainSolana, solLegacy)
-	solActionStore := adapters.NewMemoryActionStore()
+	solActionStore, solActionRecorder := n.newSettlementActionStore("Solana Anchor")
 	var solRelayer adapters.SolanaInstructionRelayer
 	if n.settlementService != nil {
 		solRelayer = adapters.SolanaInstructionRelayerFunc(n.settlementService.RelaySolanaTransactionWithSigners)
@@ -97,7 +97,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		Legacy:   solLegacy,
 		Relayer:  solRelayer,
 		Store:    solActionStore,
-		Recorder: solActionStore,
+		Recorder: solActionRecorder,
 		Keys:     n.keyProvider,
 		Wallets:  n.multiwallet,
 	}))
@@ -182,20 +182,7 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	var store adapters.ActionStore
 	var recorder adapters.ActionRecorder
 
-	if n.db != nil {
-		if err := dbgorm.MigrateManagedEscrowRelayActionModels(n.db); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "ManagedEscrow relay actions: migrate failed (non-fatal): %v", err)
-		}
-		if sqlStore := NewManagedEscrowRelayActionStore(n.db); sqlStore != nil {
-			store = sqlStore
-			recorder = sqlStore
-		}
-	}
-	if store == nil {
-		mem := adapters.NewMemoryActionStore()
-		store = mem
-		recorder = mem
-	}
+	store, recorder = n.newSettlementActionStore("ManagedEscrowAdapter V2")
 
 	activeChainsEarly := managed_escrow.ManagedEscrowEnabledChains(n.managed_escrowCapConfig)
 	if len(activeChainsEarly) > 0 && n.db == nil {
@@ -343,6 +330,18 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 			n.paymentService.SetObservationDispatcher(utxoDispatcher)
 		}
 	}
+}
+
+func (n *MobazhaNode) newSettlementActionStore(component string) (adapters.ActionStore, adapters.ActionRecorder) {
+	if n != nil && n.db != nil {
+		if err := dbgorm.MigrateSettlementActionModels(n.db); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "%s settlement actions: migrate failed (non-fatal): %v", component, err)
+		} else if sqlStore := NewSettlementActionStore(n.db); sqlStore != nil {
+			return sqlStore, sqlStore
+		}
+	}
+	mem := adapters.NewMemoryActionStore()
+	return mem, mem
 }
 
 func (n *MobazhaNode) rewatchPendingManagedEscrowPayments(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {

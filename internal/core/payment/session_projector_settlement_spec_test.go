@@ -4,11 +4,13 @@ package payment
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	pkpayment "github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func testProjectInput(order *models.Order, legacyManagedEscrow bool) *projectOrderInput {
@@ -94,6 +96,63 @@ func TestDeriveFundingTarget_UTXOPendingUsesAddressMonitored(t *testing.T) {
 
 	mode, _ := p.deriveFundingTarget(order, "BTC", "50000", testProjectInput(order, false))
 	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
+}
+
+func TestProject_FormatsUTXOAmountsAsDecimalStrings(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{PaymentAddress: "bc1qtest"}
+	order.TotalReceived = "15058"
+	order.PaymentVerificationStatus = models.PaymentVerificationStatusPending
+	require.NoError(t, order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
+		Coin:           "crypto:bip122:000000000019d6689c085ae165831e93:native",
+		Script:         "ab",
+		SettlementSpec: pkpayment.NewUTXOSpec(true).ToPending(),
+	}))
+
+	session, err := p.Project(&projectOrderInput{
+		order: order,
+		orderOpen: &pb.OrderOpen{
+			Amount:      "30116",
+			Timestamp:   timestamppb.New(time.Now()),
+			PricingCoin: "USD",
+		},
+		hasSpec: true,
+		spec:    pkpayment.NewUTXOSpec(true),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "0.00030116", session.ExpectedAmount)
+	require.Equal(t, "0.00030116", session.FundingTarget.Amount)
+	require.Equal(t, "0.00015058", session.PaymentProgress.ObservedAmount)
+	require.Equal(t, "0.00030116", session.PaymentProgress.RequiredAmount)
+	require.Equal(t, "0.00015058", session.PaymentProgress.RemainingAmount)
+}
+
+func TestProject_FormatsManagedEscrowAmountsAsDecimalStrings(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{
+		PaymentAddress: "0xmanagedescrow",
+	}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Type:           "managed_escrow",
+		Address:        "0xmanagedescrow",
+		Coin:           "crypto:eip155:11155111:native",
+		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),
+	}))
+
+	session, err := p.Project(&projectOrderInput{
+		order: order,
+		orderOpen: &pb.OrderOpen{
+			Amount:      "7022669176100452",
+			Timestamp:   timestamppb.New(time.Now()),
+			PricingCoin: "USD",
+		},
+		hasSpec: true,
+		spec:    pkpayment.NewManagedEscrowSpec(false),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "0.007022669176100452", session.ExpectedAmount)
+	require.Equal(t, "0.007022669176100452", session.FundingTarget.Amount)
+	require.Equal(t, "0.007022669176100452", session.PaymentProgress.RequiredAmount)
 }
 
 func TestDerivePaymentInfo_PaymentSentDirectUsesDirectProductMode(t *testing.T) {

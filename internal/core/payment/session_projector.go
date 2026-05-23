@@ -70,16 +70,17 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	paymentCoin, productMode, paymentSentKind := p.derivePaymentInfo(order, input.orderOpen, input.paymentSent)
 
 	// ── Expected amount (from OrderOpen) ─────────────────────────────────
-	expectedAmount := ""
+	expectedAmountRaw := ""
 	if input.orderOpen != nil {
-		expectedAmount = input.orderOpen.Amount
+		expectedAmountRaw = input.orderOpen.Amount
 	}
+	expectedAmount := payment.FormatSessionAmount(expectedAmountRaw, paymentCoin)
 
 	// ── Settlement mode & funding target ─────────────────────────────────
 	settlementMode, fundingTarget := p.deriveFundingTarget(order, paymentCoin, expectedAmount, input)
 
 	// ── Payment progress ──────────────────────────────────────────────────
-	progress := p.deriveProgress(order, expectedAmount, input.obsCount, input.lastObsAt)
+	progress := p.deriveProgress(order, expectedAmountRaw, paymentCoin, input.obsCount, input.lastObsAt)
 
 	// ── Session status ────────────────────────────────────────────────────
 	status := deriveSessionStatus(order.PaymentVerificationStatus, progress.FundingState)
@@ -471,15 +472,16 @@ func (p *PaymentSessionProjector) deriveFiatFundingTarget(
 // observation metadata.
 func (p *PaymentSessionProjector) deriveProgress(
 	order *models.Order,
-	expectedAmount string,
+	expectedAmountRaw string,
+	paymentCoin string,
 	obsCount int,
 	lastObsAt *time.Time,
 ) payment.PaymentProgressView {
-	observed := order.TotalReceived
-	if observed == "" {
-		observed = "0"
+	observedRaw := order.TotalReceived
+	if observedRaw == "" {
+		observedRaw = "0"
 	}
-	remaining := remainingAmount(observed, expectedAmount)
+	remainingRaw := remainingAmount(observedRaw, expectedAmountRaw)
 
 	// isFiatSessionActive is true only when a fiat provider session has been
 	// successfully created (fiat_session_id non-empty in FiatMetadata).
@@ -497,12 +499,17 @@ func (p *PaymentSessionProjector) deriveProgress(
 	if meta, merr := order.GetFiatMetadata(); merr == nil {
 		isFiatSessionActive = meta["fiat_session_id"] != ""
 	}
-	fundingState := deriveFundingState(observed, expectedAmount, order.PaymentVerificationStatus, isFiatSessionActive)
+	fundingState := deriveFundingState(
+		observedRaw,
+		expectedAmountRaw,
+		order.PaymentVerificationStatus,
+		isFiatSessionActive,
+	)
 
 	return payment.PaymentProgressView{
-		ObservedAmount:   observed,
-		RequiredAmount:   expectedAmount,
-		RemainingAmount:  remaining,
+		ObservedAmount:   payment.FormatSessionAmount(observedRaw, paymentCoin),
+		RequiredAmount:   payment.FormatSessionAmount(expectedAmountRaw, paymentCoin),
+		RemainingAmount:  payment.FormatSessionAmount(remainingRaw, paymentCoin),
 		ObservationCount: obsCount,
 		LastObservedAt:   lastObsAt,
 		FundingState:     fundingState,

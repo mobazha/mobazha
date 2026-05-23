@@ -225,6 +225,7 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		Completable        bool                              `json:"completable,omitempty"`
 		PaymentState       paymentStateResp                  `json:"paymentState"`
 		Protection         *models.OrderProtectionInfo       `json:"protection,omitempty"`
+		AfterSaleDispute   *models.AfterSaleDispute          `json:"afterSaleDispute,omitempty"`
 	}
 
 	isFunded, _ := order.IsFunded()
@@ -246,6 +247,10 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 			Progress:           order.ComputePaymentProgress(),
 		},
 		Protection: order.ComputeProtection(time.Now()),
+	}
+	if order.AfterSaleDispute.Reason != "" || order.AfterSaleDispute.Description != "" || order.AfterSaleDispute.OpenedAt != nil {
+		dispute := order.AfterSaleDispute
+		ret.AfterSaleDispute = &dispute
 	}
 	if order.IsPaymentVerificationFailed() {
 		ret.PaymentState.VerificationFailureReason = order.PaymentVerificationFailureReason

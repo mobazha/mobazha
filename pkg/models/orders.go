@@ -85,7 +85,10 @@ type PendingUTXOPaymentInfo struct {
 	Script          string `json:"script,omitempty"`          // Hex encoded redeem script
 	Moderator       string `json:"moderator,omitempty"`       // Moderator peer ID (empty for CANCELABLE)
 	ModeratorPubkey string `json:"moderatorPubkey,omitempty"` // Moderator escrow pubkey hex
-	UnlockHours     uint32 `json:"unlockHours,omitempty"`     // Escrow timeout hours for MODERATED
+	// StorePolicyRevision snapshots the store policy revision used to accept
+	// Moderator at payment setup time.
+	StorePolicyRevision uint64 `json:"storePolicyRevision,omitempty"`
+	UnlockHours         uint32 `json:"unlockHours,omitempty"` // Escrow timeout hours for MODERATED
 	// SettlementSpec is the ADR-010 payment route; legacy Moderator fields are fallback when absent.
 	SettlementSpec *PendingSettlementSpec `json:"settlementSpec,omitempty"`
 }
@@ -763,6 +766,9 @@ type PendingManagedEscrowPaymentInfo struct {
 	Moderated        bool   `json:"moderated"`
 	Moderator        string `json:"moderator,omitempty"`
 	ModeratorAddress string `json:"moderatorAddress,omitempty"`
+	// StorePolicyRevision snapshots the store policy revision used to accept
+	// Moderator at payment setup time.
+	StorePolicyRevision uint64 `json:"storePolicyRevision,omitempty"`
 	// PlatformAmount / PlatformAddr lock the ManagedEscrow release Gas Service Fee
 	// at payment-intent creation. Settlement actions consume these values
 	// verbatim and must not re-price gas later.

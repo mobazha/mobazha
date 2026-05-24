@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -22,10 +23,11 @@ import (
 // populate crypto funding targets (ManagedEscrow, UTXO, monitored flows) behind
 // PaymentSessionService.CreateSession.
 type CryptoPaymentFacade struct {
-	projector *PaymentSessionProjector
-	orderSvc  contracts.OrderService
-	walletSvc contracts.WalletService
-	exchange  contracts.ExchangeRateService
+	projector   *PaymentSessionProjector
+	orderSvc    contracts.OrderService
+	walletSvc   contracts.WalletService
+	exchange    contracts.ExchangeRateService
+	storePolicy contracts.StorePolicyService
 }
 
 // NewCryptoPaymentFacade constructs CryptoPaymentFacade.
@@ -34,12 +36,14 @@ func NewCryptoPaymentFacade(
 	orderSvc contracts.OrderService,
 	walletSvc contracts.WalletService,
 	exchange contracts.ExchangeRateService,
+	storePolicy contracts.StorePolicyService,
 ) *CryptoPaymentFacade {
 	return &CryptoPaymentFacade{
-		projector: NewPaymentSessionProjector(db),
-		orderSvc:  orderSvc,
-		walletSvc: walletSvc,
-		exchange:  exchange,
+		projector:   NewPaymentSessionProjector(db),
+		orderSvc:    orderSvc,
+		walletSvc:   walletSvc,
+		exchange:    exchange,
+		storePolicy: storePolicy,
 	}
 }
 
@@ -76,11 +80,18 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, err
 	}
 
+	moderator := strings.TrimSpace(req.Moderator)
+	storePolicyRevision, err := c.validateStorePolicyModerator(ctx, moderator)
+	if err != nil {
+		return nil, err
+	}
+
 	initData, err := buildInitializeEscrowDataFromOrder(order, orderOpen, coin,
-		refundAddr, req.PayerAddress, req.Moderator, c.exchange)
+		refundAddr, req.PayerAddress, moderator, c.exchange)
 	if err != nil {
 		return nil, fmt.Errorf("crypto facade: build escrow params: %w", err)
 	}
+	initData.StorePolicyRevision = storePolicyRevision
 
 	result, err := c.walletSvc.GeneratePaymentInstructions(ctx, initData)
 	if err != nil {
@@ -106,6 +117,37 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("crypto facade: re-load order %s: %w", req.OrderID, err)
 	}
 	return c.projector.Project(input2)
+}
+
+func (c *CryptoPaymentFacade) validateStorePolicyModerator(ctx context.Context, moderatorID string) (uint64, error) {
+	if moderatorID == "" {
+		return 0, nil
+	}
+	if c.storePolicy == nil {
+		return 0, fmt.Errorf("%w: store policy service is not available", coreiface.ErrBadRequest)
+	}
+	moderatorPeerID, err := peer.Decode(moderatorID)
+	if err != nil {
+		return 0, fmt.Errorf("%w: invalid moderator ID", coreiface.ErrBadRequest)
+	}
+	policy, err := c.storePolicy.GetPolicy(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("get store policy: %w", err)
+	}
+	if policy == nil {
+		return 0, fmt.Errorf("%w: moderator is not in store policy", coreiface.ErrBadRequest)
+	}
+	canonicalModeratorID := moderatorPeerID.String()
+	for _, mod := range policy.Moderators {
+		if mod.PeerID != canonicalModeratorID {
+			continue
+		}
+		if !mod.Enabled {
+			return 0, fmt.Errorf("%w: moderator is disabled in store policy", coreiface.ErrBadRequest)
+		}
+		return policy.Revision, nil
+	}
+	return 0, fmt.Errorf("%w: moderator is not in store policy", coreiface.ErrBadRequest)
 }
 
 func normalizeCryptoRefundAddress(coin iwallet.CoinType, refundAddress, payerAddress string) (string, error) {

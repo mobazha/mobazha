@@ -163,6 +163,10 @@ type PaymentSetupParams struct {
 	// Moderator is the moderator's peer ID (empty for no moderator).
 	Moderator string
 
+	// StorePolicyRevision snapshots the seller policy revision used to
+	// validate Moderator during payment setup.
+	StorePolicyRevision uint64
+
 	// CoinType is the payment coin (e.g., "BTC", "ETH", "SOL").
 	CoinType iwallet.CoinType
 

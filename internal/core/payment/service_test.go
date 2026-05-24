@@ -228,6 +228,7 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		"0",
 		"",
 		"0",
+		42,
 	))
 
 	var orders []models.Order
@@ -244,6 +245,7 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		require.Equal(t, uint64(1000), info.Amount)
 		require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
 		require.Equal(t, "0xmanagedescrow", info.Address)
+		require.Equal(t, uint64(42), info.StorePolicyRevision)
 		require.Equal(t, "0", orders[i].CancelFeeAmount)
 	}
 
@@ -255,6 +257,7 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 	require.NotNil(t, info)
 	require.Equal(t, uint64(1000), info.Amount)
 	require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
+	require.Equal(t, uint64(42), info.StorePolicyRevision)
 }
 
 func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowGasFees(t *testing.T) {

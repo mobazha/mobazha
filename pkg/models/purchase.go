@@ -128,13 +128,14 @@ type PaymentData struct {
 	Coin          iwallet.CoinType      `json:"coin"`
 	Method        pb.PaymentSent_Method `json:"method"`
 	// SettlementSpec is the ADR-010 route triple for this payment instruction.
-	SettlementSpec   *PendingSettlementSpec `json:"settlementSpec,omitempty"`
-	ProviderID       string                 `json:"providerID,omitempty"`
-	ContractAddress  string                 `json:"contractAddress"`
-	PayerAddress     string                 `json:"payerAddress"`
-	Moderator        string                 `json:"moderator"`
-	ModeratorAddress string                 `json:"moderatorAddress"`
-	Amount           uint64                 `json:"amount,string"`
+	SettlementSpec      *PendingSettlementSpec `json:"settlementSpec,omitempty"`
+	ProviderID          string                 `json:"providerID,omitempty"`
+	ContractAddress     string                 `json:"contractAddress"`
+	PayerAddress        string                 `json:"payerAddress"`
+	Moderator           string                 `json:"moderator"`
+	ModeratorAddress    string                 `json:"moderatorAddress"`
+	StorePolicyRevision uint64                 `json:"storePolicyRevision,omitempty"`
+	Amount              uint64                 `json:"amount,string"`
 	/*
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])

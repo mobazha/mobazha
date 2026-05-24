@@ -3,12 +3,44 @@
 package payment
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	porderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
+
+const (
+	testStorePolicyPeerA = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"
+	testStorePolicyPeerB = "12D3KooWHHzSeKaY8xuZVzkLbKFfvNgPPeKhFBGrMbNbXRwuFCA5"
+)
+
+type fakeCryptoStorePolicy struct {
+	policy *models.StorePolicy
+}
+
+func (s fakeCryptoStorePolicy) GetPolicy(context.Context) (*models.StorePolicy, error) {
+	return s.policy, nil
+}
+
+func (s fakeCryptoStorePolicy) GetPublishedPolicy(context.Context) (*models.StorePolicyPublic, error) {
+	return nil, nil
+}
+
+func (s fakeCryptoStorePolicy) ReplaceModerators(context.Context, *uint64, []models.StorePolicyModeratorInput) (*models.StorePolicy, error) {
+	return nil, nil
+}
+
+func (s fakeCryptoStorePolicy) UpsertModerator(context.Context, *uint64, models.StorePolicyModeratorInput) (*models.StorePolicy, error) {
+	return nil, nil
+}
+
+func (s fakeCryptoStorePolicy) RemoveModerator(context.Context, *uint64, string) (*models.StorePolicy, error) {
+	return nil, nil
+}
 
 type noopRates struct{}
 
@@ -37,6 +69,43 @@ func TestBuildInitializeEscrowDataFromOrder_SameCurrencyUsesOrderOpenNumeric(t *
 	}
 	if got.Amount != 42 || got.RefundAddress != "0xrefund" || got.CoinType != coin {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestCryptoPaymentFacade_ValidateStorePolicyModeratorAcceptsEnabledModerator(t *testing.T) {
+	facade := &CryptoPaymentFacade{
+		storePolicy: fakeCryptoStorePolicy{policy: &models.StorePolicy{
+			Revision: 11,
+			Moderators: []models.StoreModerator{
+				{PeerID: testStorePolicyPeerA, Enabled: true},
+			},
+		}},
+	}
+
+	revision, err := facade.validateStorePolicyModerator(context.Background(), testStorePolicyPeerA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision != 11 {
+		t.Fatalf("revision = %d, want 11", revision)
+	}
+}
+
+func TestCryptoPaymentFacade_ValidateStorePolicyModeratorRejectsDisabledOrMissingModerator(t *testing.T) {
+	facade := &CryptoPaymentFacade{
+		storePolicy: fakeCryptoStorePolicy{policy: &models.StorePolicy{
+			Revision: 11,
+			Moderators: []models.StoreModerator{
+				{PeerID: testStorePolicyPeerA, Enabled: false},
+			},
+		}},
+	}
+
+	if _, err := facade.validateStorePolicyModerator(context.Background(), testStorePolicyPeerA); !errors.Is(err, coreiface.ErrBadRequest) {
+		t.Fatalf("disabled moderator error = %v, want ErrBadRequest", err)
+	}
+	if _, err := facade.validateStorePolicyModerator(context.Background(), testStorePolicyPeerB); !errors.Is(err, coreiface.ErrBadRequest) {
+		t.Fatalf("missing moderator error = %v, want ErrBadRequest", err)
 	}
 }
 

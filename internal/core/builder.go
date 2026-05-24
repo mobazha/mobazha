@@ -1507,6 +1507,7 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 			obNode.Order(),
 			obNode.Wallet(),
 			obNode.ExchangeRate(),
+			obNode.StorePolicy(),
 		))
 		logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession: CryptoPaymentFacade wired")
 	}

@@ -216,11 +216,12 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 			params.CoinType, s.nodeID, len(s.paymentRegistry.Chains()), err)
 	}
 	result, err := strategy.SetupPayment(ctx, payment.PaymentSetupParams{
-		OrderID:      params.OrderID,
-		PayerAddress: params.PayerAddress,
-		Moderator:    params.Moderator,
-		CoinType:     params.CoinType,
-		Amount:       params.Amount,
+		OrderID:             params.OrderID,
+		PayerAddress:        params.PayerAddress,
+		Moderator:           params.Moderator,
+		StorePolicyRevision: params.StorePolicyRevision,
+		CoinType:            params.CoinType,
+		Amount:              params.Amount,
 	})
 	if err != nil {
 		return nil, err
@@ -231,6 +232,9 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 		PaymentData:  result.PaymentData,
 		EscrowAddr:   result.EscrowAddr,
 		Instructions: result.Instructions,
+	}
+	if setupResult.PaymentData != nil {
+		setupResult.PaymentData.StorePolicyRevision = params.StorePolicyRevision
 	}
 
 	// Phase PS B2: ManagedEscrow EVM orders use address-monitored funding.
@@ -266,8 +270,17 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 			feeQuote.ReleaseFeeAmount,
 			feeQuote.PlatformAddr,
 			feeQuote.CancelFeeAmount,
+			params.StorePolicyRevision,
 		); persistErr != nil {
 			return nil, fmt.Errorf("persist ManagedEscrow payment intent for order %s: %w", params.OrderID, persistErr)
+		}
+	}
+
+	if params.StorePolicyRevision > 0 && setupResult.PaymentData != nil {
+		if coinInfo, coinErr := iwallet.CoinInfoFromCoinType(params.CoinType); coinErr == nil && coinInfo.Chain.IsUTXOChain() {
+			if persistErr := s.persistPendingUTXOStorePolicyRevision(params.OrderID, params.StorePolicyRevision); persistErr != nil {
+				return nil, fmt.Errorf("persist UTXO store policy revision for order %s: %w", params.OrderID, persistErr)
+			}
 		}
 	}
 
@@ -277,18 +290,19 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 // persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
-func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string) error {
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string, storePolicyRevision uint64) error {
 	info := &models.PendingManagedEscrowPaymentInfo{
-		Coin:             coin,
-		Amount:           amount,
-		Address:          managed_escrowAddress,
-		Moderated:        moderated,
-		Moderator:        moderator,
-		ModeratorAddress: moderatorAddress,
-		PlatformAmount:   platformAmount,
-		PlatformAddr:     platformAddr,
-		CancelFeeAmount:  cancelFeeAmount,
-		SettlementSpec:   payment.NewManagedEscrowSpec(moderated).ToPending(),
+		Coin:                coin,
+		Amount:              amount,
+		Address:             managed_escrowAddress,
+		Moderated:           moderated,
+		Moderator:           moderator,
+		ModeratorAddress:    moderatorAddress,
+		StorePolicyRevision: storePolicyRevision,
+		PlatformAmount:      platformAmount,
+		PlatformAddr:        platformAddr,
+		CancelFeeAmount:     cancelFeeAmount,
+		SettlementSpec:      payment.NewManagedEscrowSpec(moderated).ToPending(),
 	}
 	if rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB }); ok {
 		raw := rawProvider.RawDB()
@@ -336,6 +350,32 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 			orders[i].CancelFeeAmount = cancelFeeAmount
 			if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
 				return fmt.Errorf("set pending managed escrow payment info: %w", err)
+			}
+			if err := tx.Save(&orders[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (s *PaymentAppService) persistPendingUTXOStorePolicyRevision(orderID string, storePolicyRevision uint64) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var orders []models.Order
+		if err := tx.Read().Where("id = ?", orderID).Find(&orders).Error; err != nil {
+			return fmt.Errorf("load orders: %w", err)
+		}
+		for i := range orders {
+			info, err := orders[i].GetPendingPaymentInfo()
+			if err != nil {
+				return fmt.Errorf("get pending UTXO payment info: %w", err)
+			}
+			if info == nil {
+				continue
+			}
+			info.StorePolicyRevision = storePolicyRevision
+			if err := orders[i].SetPendingPaymentInfo(info); err != nil {
+				return err
 			}
 			if err := tx.Save(&orders[i]); err != nil {
 				return err
@@ -443,6 +483,7 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		PayerAddress:        params.PayerAddress,
 		Moderator:           params.Moderator,
 		ModeratorAddress:    moderatorAddress,
+		StorePolicyRevision: params.StorePolicyRevision,
 		Amount:              params.Amount,
 		FromID:              padOrTruncateBytes(payerBytes, 36),
 		ToAddress:           escrowAccount.String(),
@@ -471,10 +512,11 @@ func (s *PaymentAppService) persistClientSignedPaymentInfo(orderID string, pd *m
 		}
 		order.PaymentAddress = pd.ToAddress
 		if err := order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
-			Coin:           string(pd.Coin),
-			EscrowAddress:  pd.ToAddress,
-			Moderator:      pd.Moderator,
-			SettlementSpec: pd.SettlementSpec,
+			Coin:                string(pd.Coin),
+			EscrowAddress:       pd.ToAddress,
+			Moderator:           pd.Moderator,
+			StorePolicyRevision: pd.StorePolicyRevision,
+			SettlementSpec:      pd.SettlementSpec,
 		}); err != nil {
 			return err
 		}

@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package core
 
 import (
@@ -29,35 +31,35 @@ type mockPublicData struct {
 
 var _ pkgdb.PublicData = (*mockPublicData)(nil)
 
-func (m *mockPublicData) GetProfile() (*models.Profile, error)            { return m.profile, m.err }
-func (m *mockPublicData) SetProfile(*models.Profile) error                { return nil }
-func (m *mockPublicData) GetFollowers() (models.Followers, error)         { return m.followers, m.err }
-func (m *mockPublicData) SetFollowers(models.Followers) error             { return nil }
-func (m *mockPublicData) GetFollowing() (models.Following, error)         { return m.following, m.err }
-func (m *mockPublicData) SetFollowing(models.Following) error             { return nil }
-func (m *mockPublicData) GetListingIndex() (models.ListingIndex, error)   { return m.listingIndex, m.err }
-func (m *mockPublicData) SetListingIndex(models.ListingIndex) error       { return nil }
-func (m *mockPublicData) GetRatingIndex() (models.RatingIndex, error)     { return m.ratingIndex, m.err }
-func (m *mockPublicData) SetRatingIndex(models.RatingIndex) error         { return nil }
-func (m *mockPublicData) SetRating(*pb.Rating) error                      { return nil }
-func (m *mockPublicData) GetPostIndex() ([]models.PostData, error)        { return nil, nil }
-func (m *mockPublicData) SetPostIndex([]models.PostData) error            { return nil }
-func (m *mockPublicData) AddPost(*postsPb.SignedPost) error               { return nil }
-func (m *mockPublicData) DeletePost(string) error                         { return nil }
-func (m *mockPublicData) PostExist(string) bool                           { return false }
-func (m *mockPublicData) GetPost(string) (*postsPb.SignedPost, error)     { return nil, nil }
-func (m *mockPublicData) SetImage(models.Image) error                     { return nil }
+func (m *mockPublicData) GetProfile() (*models.Profile, error)          { return m.profile, m.err }
+func (m *mockPublicData) SetProfile(*models.Profile) error              { return nil }
+func (m *mockPublicData) GetFollowers() (models.Followers, error)       { return m.followers, m.err }
+func (m *mockPublicData) SetFollowers(models.Followers) error           { return nil }
+func (m *mockPublicData) GetFollowing() (models.Following, error)       { return m.following, m.err }
+func (m *mockPublicData) SetFollowing(models.Following) error           { return nil }
+func (m *mockPublicData) GetListingIndex() (models.ListingIndex, error) { return m.listingIndex, m.err }
+func (m *mockPublicData) SetListingIndex(models.ListingIndex) error     { return nil }
+func (m *mockPublicData) GetRatingIndex() (models.RatingIndex, error)   { return m.ratingIndex, m.err }
+func (m *mockPublicData) SetRatingIndex(models.RatingIndex) error       { return nil }
+func (m *mockPublicData) SetRating(*pb.Rating) error                    { return nil }
+func (m *mockPublicData) GetPostIndex() ([]models.PostData, error)      { return nil, nil }
+func (m *mockPublicData) SetPostIndex([]models.PostData) error          { return nil }
+func (m *mockPublicData) AddPost(*postsPb.SignedPost) error             { return nil }
+func (m *mockPublicData) DeletePost(string) error                       { return nil }
+func (m *mockPublicData) PostExist(string) bool                         { return false }
+func (m *mockPublicData) GetPost(string) (*postsPb.SignedPost, error)   { return nil, nil }
+func (m *mockPublicData) SetImage(models.Image) error                   { return nil }
 func (m *mockPublicData) GetImageByName(models.ImageSize, string) ([]byte, error) {
 	return nil, nil
 }
-func (m *mockPublicData) GetMediaByCID(string) ([]byte, string, error)    { return nil, "", nil }
+func (m *mockPublicData) GetMediaByCID(string) ([]byte, string, error)               { return nil, "", nil }
 func (m *mockPublicData) IndexMediaCID(string, string, string, string, string) error { return nil }
-func (m *mockPublicData) SetUploadedFile(models.UploadedFile) error       { return nil }
-func (m *mockPublicData) SetIntroVideo(models.IntroVideo) error           { return nil }
-func (m *mockPublicData) SetListing(*pb.SignedListing) error              { return nil }
-func (m *mockPublicData) GetEncryptedListing(string) ([]byte, error)      { return nil, nil }
-func (m *mockPublicData) SetEncryptedListing(string, []byte) error        { return nil }
-func (m *mockPublicData) DeleteListing(string) error                      { return nil }
+func (m *mockPublicData) SetUploadedFile(models.UploadedFile) error                  { return nil }
+func (m *mockPublicData) SetIntroVideo(models.IntroVideo) error                      { return nil }
+func (m *mockPublicData) SetListing(*pb.SignedListing) error                         { return nil }
+func (m *mockPublicData) GetEncryptedListing(string) ([]byte, error)                 { return nil, nil }
+func (m *mockPublicData) SetEncryptedListing(string, []byte) error                   { return nil }
+func (m *mockPublicData) DeleteListing(string) error                                 { return nil }
 
 func (m *mockPublicData) GetListing(slug string) (*pb.SignedListing, error) {
 	if m.err != nil {

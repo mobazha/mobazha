@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package core
 
 import (
@@ -29,24 +31,24 @@ func TestParseUSDDollarsToCents(t *testing.T) {
 		{"100", 10000, true},
 		{"0", 0, true},
 		// Fractional.
-		{"4.5", 450, true},     // single fractional digit padded → 50 cents
-		{"4.50", 450, true},    // two fractional digits
-		{"0.99", 99, true},     // sub-dollar
-		{"0.05", 5, true},      // small change
-		{".5", 50, true},       // bare fractional accepted as 50 cents
+		{"4.5", 450, true},  // single fractional digit padded → 50 cents
+		{"4.50", 450, true}, // two fractional digits
+		{"0.99", 99, true},  // sub-dollar
+		{"0.05", 5, true},   // small change
+		{".5", 50, true},    // bare fractional accepted as 50 cents
 		{"123.45", 12345, true},
 		// Whitespace tolerated.
 		{"  4.50  ", 450, true},
 		// Bad input — must reject.
 		{"", 0, false},
 		{"abc", 0, false},
-		{"4.5.0", 0, false},   // multiple decimals
-		{"4.567", 0, false},   // 3 fractional digits
-		{"-4.50", 0, false},   // negative
-		{"+4.50", 0, false},   // sign prefix
-		{"$4.50", 0, false},   // currency symbol
-		{"4,50", 0, false},    // comma separator
-		{"4.", 0, false},      // dangling dot
+		{"4.5.0", 0, false}, // multiple decimals
+		{"4.567", 0, false}, // 3 fractional digits
+		{"-4.50", 0, false}, // negative
+		{"+4.50", 0, false}, // sign prefix
+		{"$4.50", 0, false}, // currency symbol
+		{"4,50", 0, false},  // comma separator
+		{"4.", 0, false},    // dangling dot
 	}
 	for _, tc := range cases {
 		got, ok := parseUSDDollarsToCents(tc.in)

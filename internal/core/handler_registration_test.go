@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package core
 
 import (
@@ -22,9 +24,11 @@ func newSpyNetworkService() *spyNetworkService {
 func (s *spyNetworkService) RegisterHandler(mt pb.Message_MessageType, _ func(peer.ID, *pb.Message) error) {
 	s.registered[mt] = true
 }
-func (s *spyNetworkService) SendMessage(_ context.Context, _ peer.ID, _ *pb.Message) error { return nil }
-func (s *spyNetworkService) DeliverLocalMessage(_ peer.ID, _ *pb.Message) error             { return nil }
-func (s *spyNetworkService) Close()                                                         {}
+func (s *spyNetworkService) SendMessage(_ context.Context, _ peer.ID, _ *pb.Message) error {
+	return nil
+}
+func (s *spyNetworkService) DeliverLocalMessage(_ peer.ID, _ *pb.Message) error { return nil }
+func (s *spyNetworkService) Close()                                             {}
 
 func TestRegisterHandlers_CoversAllMessageTypes(t *testing.T) {
 	spy := newSpyNetworkService()

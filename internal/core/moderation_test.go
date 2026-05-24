@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package core
 
 import (
@@ -85,4 +87,3 @@ func TestMobazhaNode_GetModerators_DHT_Removed(t *testing.T) {
 		t.Fatalf("Expected 0 moderators from async DHT (removed), got %d", len(mods))
 	}
 }
-

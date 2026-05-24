@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package core
 
 import (
@@ -22,7 +24,7 @@ func TestParseBootstrapPeers_ValidAddrs(t *testing.T) {
 func TestParseBootstrapPeers_InvalidAddrsSkipped(t *testing.T) {
 	addrs := []string{
 		"not-a-multiaddr",
-		"/ip4/1.2.3.4/tcp/4001",  // missing peer ID
+		"/ip4/1.2.3.4/tcp/4001", // missing peer ID
 		"",
 		"/ip4/107.170.133.32/tcp/4001/p2p/QmUZRGLhcKXF1JyuaHgKm23LYUEEaZnDEMf6eHMuBCG1JG",
 	}

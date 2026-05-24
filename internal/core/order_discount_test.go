@@ -1,3 +1,5 @@
+//go:build !private_distribution
+
 package core
 
 import (
@@ -195,10 +197,10 @@ func newTestPurchase(listingHash string) *models.Purchase {
 					{Name: "size", Value: "large"},
 					{Name: "color", Value: "red"},
 				},
-			Shipping: models.PurchaseShippingOption{
-				Name:    "Worldwide",
-				Service: "standard",
-			},
+				Shipping: models.PurchaseShippingOption{
+					Name:    "Worldwide",
+					Service: "standard",
+				},
 				Memo: "test order",
 			},
 		},

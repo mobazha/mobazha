@@ -16,6 +16,9 @@ import (
 func TestNewNode(t *testing.T) {
 	dataDir := path.Join(os.TempDir(), "mobazha-test", "TestNewNode")
 	os.RemoveAll(dataDir)
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg := repo.Config{
 		DataDir:       dataDir,

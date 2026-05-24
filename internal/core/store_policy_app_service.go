@@ -36,9 +36,15 @@ func (s *StorePolicyAppService) GetPublishedPolicy(ctx context.Context) (*models
 	if err != nil {
 		return nil, err
 	}
+	moderators := make([]models.StoreModerator, 0, len(policy.Moderators))
+	for _, mod := range policy.Moderators {
+		if mod.Enabled {
+			moderators = append(moderators, mod)
+		}
+	}
 	return &models.StorePolicyPublic{
 		Revision:   policy.Revision,
-		Moderators: policy.Moderators,
+		Moderators: moderators,
 	}, nil
 }
 
@@ -60,6 +66,7 @@ func (s *StorePolicyAppService) UpsertModerator(ctx context.Context, expectedRev
 	for _, mod := range policy.Moderators {
 		next := models.StorePolicyModeratorInput{
 			PeerID:   mod.PeerID,
+			Enabled:  boolPtr(mod.Enabled),
 			Position: intPtr(mod.Position),
 		}
 		if mod.PeerID == input.PeerID {
@@ -91,6 +98,7 @@ func (s *StorePolicyAppService) RemoveModerator(ctx context.Context, expectedRev
 		}
 		inputs = append(inputs, models.StorePolicyModeratorInput{
 			PeerID:   mod.PeerID,
+			Enabled:  boolPtr(mod.Enabled),
 			Position: intPtr(mod.Position),
 		})
 	}
@@ -120,8 +128,13 @@ func normalizeStoreModerators(inputs []models.StorePolicyModeratorInput) ([]mode
 		if input.Position != nil {
 			position = *input.Position
 		}
+		enabled := true
+		if input.Enabled != nil {
+			enabled = *input.Enabled
+		}
 		mods = append(mods, models.StoreModerator{
 			PeerID:   peerID,
+			Enabled:  enabled,
 			Position: position,
 		})
 	}
@@ -135,3 +148,5 @@ func normalizeStoreModerators(inputs []models.StorePolicyModeratorInput) ([]mode
 }
 
 func intPtr(v int) *int { return &v }
+
+func boolPtr(v bool) *bool { return &v }

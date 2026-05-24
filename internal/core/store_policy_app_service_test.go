@@ -46,7 +46,27 @@ func TestStorePolicyAppService_ReplaceModeratorsNormalizesOrderAndIDs(t *testing
 	assert.Equal(t, uint64(1), policy.Revision)
 	require.Len(t, policy.Moderators, 2)
 	assert.Equal(t, storePolicyPeerA, policy.Moderators[0].PeerID)
+	assert.True(t, policy.Moderators[0].Enabled)
 	assert.Equal(t, storePolicyPeerB, policy.Moderators[1].PeerID)
+	assert.True(t, policy.Moderators[1].Enabled)
+}
+
+func TestStorePolicyAppService_GetPublishedPolicyFiltersDisabledModerators(t *testing.T) {
+	svc := NewStorePolicyAppService(&fakeStorePolicyStore{
+		policy: models.StorePolicy{
+			Revision: 7,
+			Moderators: []models.StoreModerator{
+				{PeerID: storePolicyPeerA, Enabled: true, Position: 0},
+				{PeerID: storePolicyPeerB, Enabled: false, Position: 1},
+			},
+		},
+	})
+
+	policy, err := svc.GetPublishedPolicy(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, uint64(7), policy.Revision)
+	require.Len(t, policy.Moderators, 1)
+	assert.Equal(t, storePolicyPeerA, policy.Moderators[0].PeerID)
 }
 
 func TestStorePolicyAppService_RejectsInvalidAndDuplicateModerators(t *testing.T) {
@@ -74,12 +94,34 @@ func TestStorePolicyAppService_RevisionConflict(t *testing.T) {
 	assert.ErrorIs(t, err, database.ErrStorePolicyConflict)
 }
 
+func TestStorePolicyAppService_UpsertModeratorPreservesExistingEnabledState(t *testing.T) {
+	store := &fakeStorePolicyStore{
+		policy: models.StorePolicy{
+			Revision: 2,
+			Moderators: []models.StoreModerator{
+				{PeerID: storePolicyPeerA, Enabled: false, Position: 0},
+			},
+		},
+	}
+	svc := NewStorePolicyAppService(store)
+	position := 3
+
+	policy, err := svc.UpsertModerator(context.Background(), nil, models.StorePolicyModeratorInput{
+		PeerID:   storePolicyPeerB,
+		Position: &position,
+	})
+	require.NoError(t, err)
+	require.Len(t, policy.Moderators, 2)
+	assert.Equal(t, storePolicyPeerA, policy.Moderators[0].PeerID)
+	assert.False(t, policy.Moderators[0].Enabled)
+}
+
 func TestStorePolicyAppService_RemoveMissingModeratorIsNoop(t *testing.T) {
 	store := &fakeStorePolicyStore{
 		policy: models.StorePolicy{
 			Revision: 4,
 			Moderators: []models.StoreModerator{
-				{PeerID: storePolicyPeerA, Position: 0},
+				{PeerID: storePolicyPeerA, Enabled: true, Position: 0},
 			},
 		},
 	}

@@ -2,6 +2,12 @@ package models
 
 import "time"
 
+// StorePolicyScopeModerators names the currently supported policy section.
+// Scope stays explicit so API and projection code can address future sections
+// such as refund, shipping, payment, and dispute policy without overloading
+// the moderator storage model.
+const StorePolicyScopeModerators = "moderators"
+
 // StorePolicy is the per-store commerce policy root.
 // Tenant scoping is handled by the database layer; standalone nodes use
 // database.StandaloneTenantID.
@@ -20,6 +26,7 @@ func (StorePolicy) TableName() string { return "store_policies" }
 type StoreModerator struct {
 	TenantID  string    `json:"-" gorm:"column:tenant_id;type:text;primaryKey;default:'_default'"`
 	PeerID    string    `json:"peerID" gorm:"column:peer_id;type:text;primaryKey"`
+	Enabled   bool      `json:"enabled" gorm:"not null"`
 	Position  int       `json:"position" gorm:"type:integer;not null;default:0"`
 	CreatedAt time.Time `json:"createdAt" gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time `json:"updatedAt" gorm:"column:updated_at;autoUpdateTime"`
@@ -29,6 +36,7 @@ func (StoreModerator) TableName() string { return "store_moderators" }
 
 type StorePolicyModeratorInput struct {
 	PeerID   string `json:"peerID"`
+	Enabled  *bool  `json:"enabled,omitempty"`
 	Position *int   `json:"position,omitempty"`
 }
 
@@ -40,6 +48,7 @@ type StorePolicyModeratorsRequest struct {
 type StorePolicyModeratorRequest struct {
 	ExpectedRevision *uint64 `json:"expectedRevision,omitempty"`
 	PeerID           string  `json:"peerID"`
+	Enabled          *bool   `json:"enabled,omitempty"`
 	Position         *int    `json:"position,omitempty"`
 }
 

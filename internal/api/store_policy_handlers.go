@@ -97,6 +97,7 @@ func (g *Gateway) handlePostStorePolicyModerator(w http.ResponseWriter, r *http.
 	}
 	policy, err := svc.UpsertModerator(r.Context(), req.ExpectedRevision, models.StorePolicyModeratorInput{
 		PeerID:   req.PeerID,
+		Enabled:  req.Enabled,
 		Position: req.Position,
 	})
 	if err != nil {

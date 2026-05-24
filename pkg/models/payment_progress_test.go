@@ -83,6 +83,28 @@ func TestComputePaymentProgress_EmptyTotalReceived_ReturnsZero(t *testing.T) {
 	}
 }
 
+func TestComputePaymentProgress_UsesPaymentSentAmountWhenPendingInfoIsGone(t *testing.T) {
+	order := putOrderOpenWithAmount(t, "11000000000000000")
+	order.TotalReceived = ""
+	if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+		Amount: "29838",
+		Coin:   "crypto:bip122:000000000019d6689c085ae165831e93:native",
+	})); err != nil {
+		t.Fatalf("PutMessage(PaymentSent) failed: %v", err)
+	}
+
+	got := order.ComputePaymentProgress()
+	if got == nil {
+		t.Fatal("expected non-nil progress")
+	}
+	if got.TotalReceived != "0" {
+		t.Errorf("expected totalReceived=0, got %q", got.TotalReceived)
+	}
+	if got.ExpectedAmount != "29838" {
+		t.Errorf("expected expectedAmount=29838, got %q", got.ExpectedAmount)
+	}
+}
+
 func TestComputePaymentProgress_PartialPayment_Computes50Percent(t *testing.T) {
 	order := putOrderOpenWithAmount(t, "1000")
 	order.TotalReceived = "500"

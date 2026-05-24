@@ -706,9 +706,14 @@ func (o *Order) ComputePaymentProgress() *PaymentProgressInfo {
 }
 
 // ExpectedPaymentAmountString returns the expected funding amount in the
-// payment asset's smallest unit. Address-monitored crypto flows lock the
-// converted chain amount in PendingPaymentInfo; direct order flows use the
-// signed OrderOpen amount.
+// payment asset's smallest unit.
+//
+// Resolution order:
+//  1. Locked pending ManagedEscrow amount
+//  2. Locked pending UTXO amount
+//  3. Immutable PaymentSent amount (for already-paid orders after pending
+//     metadata has been cleared)
+//  4. Signed OrderOpen amount
 func (o *Order) ExpectedPaymentAmountString() string {
 	if o == nil {
 		return ""
@@ -721,6 +726,11 @@ func (o *Order) ExpectedPaymentAmountString() string {
 	}
 	if utxoInfo, err := o.GetPendingPaymentInfo(); err == nil && utxoInfo != nil && utxoInfo.Amount > 0 {
 		return strconv.FormatUint(utxoInfo.Amount, 10)
+	}
+	if paymentSent, err := o.PaymentSentMessage(); err == nil && paymentSent != nil {
+		if amount := strings.TrimSpace(paymentSent.GetAmount()); amount != "" {
+			return amount
+		}
 	}
 	orderOpen, err := o.OrderOpenMessage()
 	if err != nil {

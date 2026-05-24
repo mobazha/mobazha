@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	testutil "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	pkpayment "github.com/mobazha/mobazha3.0/pkg/payment"
@@ -85,6 +86,21 @@ func TestDerivePaymentInfo_ClientSignedPendingUsesPendingCoin(t *testing.T) {
 	require.Empty(t, kind)
 }
 
+func TestDerivePaymentInfo_DoesNotGuessPaymentCoinFromPricingCoin(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{}
+	orderOpen := &pb.OrderOpen{PricingCoin: "USD"}
+	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+		EscrowAddress:  "0xescrow",
+		SettlementSpec: pkpayment.NewClientSignedEVMSpec(false).ToPending(),
+	}))
+
+	coin, mode, kind := p.derivePaymentInfo(order, orderOpen, nil)
+	require.Empty(t, coin)
+	require.Equal(t, pkpayment.ProductModeCancelable, mode)
+	require.Empty(t, kind)
+}
+
 func TestDeriveFundingTarget_UTXOPendingUsesAddressMonitored(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "bc1qtest"}
@@ -153,6 +169,36 @@ func TestProject_UsesLockedUTXOPendingAmountOverOrderOpenAmount(t *testing.T) {
 	require.Equal(t, "0.0003007", session.FundingTarget.Amount)
 	require.Equal(t, "0.0003007", session.PaymentProgress.RequiredAmount)
 	require.Equal(t, "0.0003007", session.PaymentProgress.RemainingAmount)
+}
+
+func TestProject_UsesPaymentSentAmountWhenAddressMonitoredOrderIsAlreadyPaid(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{PaymentAddress: "bc1qtest"}
+	paymentSent := &pb.PaymentSent{
+		Amount:         "29838",
+		Coin:           "crypto:bip122:000000000019d6689c085ae165831e93:native",
+		TransactionID:  "tx-1",
+		SettlementSpec: pkpayment.NewUTXOSpec(false).ToPaymentSent(),
+	}
+	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(paymentSent)))
+
+	session, err := p.Project(&projectOrderInput{
+		order: order,
+		orderOpen: &pb.OrderOpen{
+			Amount:      "11000000000000000",
+			Timestamp:   timestamppb.New(time.Now()),
+			PricingCoin: "ETH",
+		},
+		paymentSent: paymentSent,
+		hasSpec:     true,
+		spec:        pkpayment.NewUTXOSpec(false),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "0.00029838", session.ExpectedAmount)
+	require.Equal(t, "0.00029838", session.FundingTarget.Amount)
+	require.Equal(t, "0.00029838", session.PaymentProgress.ObservedAmount)
+	require.Equal(t, "0.00029838", session.PaymentProgress.RequiredAmount)
+	require.Equal(t, "0", session.PaymentProgress.RemainingAmount)
 }
 
 func TestProject_FormatsManagedEscrowAmountsAsDecimalStrings(t *testing.T) {

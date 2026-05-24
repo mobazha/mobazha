@@ -190,14 +190,14 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 
 	// ── 3. PendingPaymentInfo / fiat metadata (pre-PaymentSent) ───────────
 	if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
-		coin := pendingPaymentCoin(order, orderOpen)
+		coin := pendingPaymentCoin(order)
 		return coin, payment.ProductModeFromMethod(spec.Method), ""
 	}
 
 	return "", payment.ProductModeCancelable, ""
 }
 
-func pendingPaymentCoin(order *models.Order, orderOpen *pb.OrderOpen) string {
+func pendingPaymentCoin(order *models.Order) string {
 	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil && managed_escrowInfo.Coin != "" {
 		return normalizeCoinBestEffort(managed_escrowInfo.Coin)
 	}
@@ -206,9 +206,6 @@ func pendingPaymentCoin(order *models.Order, orderOpen *pb.OrderOpen) string {
 	}
 	if utxoInfo, err := order.GetPendingPaymentInfo(); err == nil && utxoInfo != nil && utxoInfo.Coin != "" {
 		return normalizeCoinBestEffort(utxoInfo.Coin)
-	}
-	if orderOpen != nil {
-		return normalizeCoinBestEffort(orderOpen.PricingCoin)
 	}
 	return ""
 }
@@ -478,7 +475,12 @@ func (p *PaymentSessionProjector) deriveProgress(
 	lastObsAt *time.Time,
 ) payment.PaymentProgressView {
 	observedRaw := order.TotalReceived
-	if observedRaw == "" {
+	if strings.TrimSpace(observedRaw) == "" {
+		if paymentSent, err := order.PaymentSentMessage(); err == nil && paymentSent != nil {
+			observedRaw = strings.TrimSpace(paymentSent.GetAmount())
+		}
+	}
+	if strings.TrimSpace(observedRaw) == "" {
 		observedRaw = "0"
 	}
 	remainingRaw := remainingAmount(observedRaw, expectedAmountRaw)

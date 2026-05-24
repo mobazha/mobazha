@@ -152,7 +152,7 @@ func (o *EVMChainOps) ValidatePaymentMessage(params payment.PaymentMessageParams
 		return nil
 	}
 
-	if err := validatePaymentAmountCrossCurrency(orderOpen, paymentSent); err != nil {
+	if err := validatePaymentMessageAmount(params); err != nil {
 		return err
 	}
 

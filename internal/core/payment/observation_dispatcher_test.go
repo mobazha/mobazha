@@ -269,6 +269,22 @@ func TestObservationDispatcher_OnFundingEvent_PersistsObservationRow(t *testing.
 	require.Equal(t, []contracts.OrderRef{{TenantID: "tenant-1", OrderID: "order-1"}}, calls)
 }
 
+func TestObservationDispatcher_OnFundingEvent_BoundsLongMonitorObserver(t *testing.T) {
+	d, repo, _, _ := newDispatcher(t, map[string]string{"order-1": "tenant-1"})
+	d.workerID = "24244e64-79d1-462c-8b48-7fbd67a37c85"
+
+	evt := validFundingEvent()
+	evt.ChainNamespace = "bip122"
+	evt.ChainReference = "000000000019d6689c085ae165831e93"
+
+	require.NoError(t, d.OnFundingEvent(context.Background(), evt))
+
+	rows := repo.snapshot()
+	require.Len(t, rows, 1)
+	require.LessOrEqual(t, len(rows[0].Observer), 64)
+	require.Regexp(t, `^monitor:[0-9a-f]{32}$`, rows[0].Observer)
+}
+
 func TestObservationDispatcher_OnFundingEvent_FansOutToAllTenants(t *testing.T) {
 	d, repo, agg, res := newDispatcher(t, nil)
 	res.multi = map[string][]string{

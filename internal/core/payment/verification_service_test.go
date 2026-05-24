@@ -29,8 +29,10 @@ func (q *recordingFiatQuery) GetPayment(_ context.Context, providerID string, pa
 }
 
 type recordingManagedEscrowVerifier struct {
-	verifyCalls int
-	lastParams  paymentpkg.DepositVerifyParams
+	verifyCalls       int
+	lastParams        paymentpkg.DepositVerifyParams
+	validateMsgCalls  int
+	lastMessageParams paymentpkg.PaymentMessageParams
 }
 
 func (*recordingManagedEscrowVerifier) Model() paymentpkg.PaymentModel {
@@ -71,7 +73,9 @@ func (v *recordingManagedEscrowVerifier) VerifyDeposit(_ context.Context, params
 	v.lastParams = params
 	return nil
 }
-func (*recordingManagedEscrowVerifier) ValidatePaymentMessage(paymentpkg.PaymentMessageParams) error {
+func (v *recordingManagedEscrowVerifier) ValidatePaymentMessage(params paymentpkg.PaymentMessageParams) error {
+	v.validateMsgCalls++
+	v.lastMessageParams = params
 	return nil
 }
 func (*recordingManagedEscrowVerifier) VerifyPreRelease(context.Context, paymentpkg.PreReleaseParams) error {
@@ -89,7 +93,10 @@ func TestPaymentVerificationService_ValidateMessage_FiatCanonicalCoin(t *testing
 		SettlementSpec: paymentpkg.NewFiatSpec().ToPaymentSent(),
 	}
 
-	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), orderOpen, paymentSent, 0)
+	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), paymentpkg.PaymentMessageParams{
+		OrderOpen:   orderOpen,
+		PaymentSent: paymentSent,
+	})
 	require.NoError(t, err)
 }
 
@@ -104,7 +111,10 @@ func TestPaymentVerificationService_ValidateMessage_RejectsLegacyStripeAlias(t *
 		SettlementSpec: paymentpkg.NewFiatSpec().ToPaymentSent(),
 	}
 
-	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), orderOpen, paymentSent, 0)
+	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), paymentpkg.PaymentMessageParams{
+		OrderOpen:   orderOpen,
+		PaymentSent: paymentSent,
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "canonical")
 }
@@ -120,7 +130,10 @@ func TestPaymentVerificationService_ValidateMessage_RejectsMissingProviderSegmen
 		SettlementSpec: paymentpkg.NewFiatSpec().ToPaymentSent(),
 	}
 
-	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), orderOpen, paymentSent, 0)
+	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), paymentpkg.PaymentMessageParams{
+		OrderOpen:   orderOpen,
+		PaymentSent: paymentSent,
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "canonical format")
 }
@@ -136,7 +149,10 @@ func TestPaymentVerificationService_ValidateMessage_RejectsLegacyCryptoCoin(t *t
 		SettlementSpec: paymentpkg.NewDirectSpec().ToPaymentSent(),
 	}
 
-	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), orderOpen, paymentSent, 0)
+	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), paymentpkg.PaymentMessageParams{
+		OrderOpen:   orderOpen,
+		PaymentSent: paymentSent,
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid payment coin")
 }
@@ -152,9 +168,38 @@ func TestPaymentVerificationService_ValidateMessage_RejectsFiatMethodMismatch(t 
 		SettlementSpec: paymentpkg.NewFiatSpec().ToPaymentSent(),
 	}
 
-	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), orderOpen, paymentSent, 0)
+	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), paymentpkg.PaymentMessageParams{
+		OrderOpen:   orderOpen,
+		PaymentSent: paymentSent,
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "requires canonical fiat coin")
+}
+
+func TestPaymentVerificationService_ValidateMessage_ForwardsLockedExpectedPayment(t *testing.T) {
+	registry := paymentpkg.NewRegistry()
+	verifier := &recordingManagedEscrowVerifier{}
+	registry.RegisterV2(iwallet.ChainEthereum, verifier)
+	svc := NewPaymentVerificationService(registry, nil, nil)
+
+	orderOpen := &pb.OrderOpen{PricingCoin: "USD", Amount: "4900"}
+	paymentSent := &pb.PaymentSent{
+		TransactionID:  "0xeth-payment",
+		Coin:           "crypto:eip155:1:native",
+		Amount:         "21000000000000000",
+		SettlementSpec: paymentpkg.NewDirectSpec().ToPaymentSent(),
+	}
+
+	err := svc.ValidateMessage(iwallet.CoinType(paymentSent.Coin), paymentpkg.PaymentMessageParams{
+		OrderOpen:             orderOpen,
+		PaymentSent:           paymentSent,
+		ExpectedPaymentAmount: "21000000000000000",
+		ExpectedPaymentCoin:   "crypto:eip155:1:native",
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, verifier.validateMsgCalls)
+	assert.Equal(t, "21000000000000000", verifier.lastMessageParams.ExpectedPaymentAmount)
+	assert.Equal(t, "crypto:eip155:1:native", verifier.lastMessageParams.ExpectedPaymentCoin)
 }
 
 func TestPaymentVerificationService_FetchAndVerify_CanonicalStripeCoinUsesFiatQuery(t *testing.T) {

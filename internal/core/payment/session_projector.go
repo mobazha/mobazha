@@ -69,11 +69,11 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	// (UTXO order with address set but PaymentSent not yet received).
 	paymentCoin, productMode, paymentSentKind := p.derivePaymentInfo(order, input.orderOpen, input.paymentSent)
 
-	// ── Expected amount (from OrderOpen) ─────────────────────────────────
-	expectedAmountRaw := ""
-	if input.orderOpen != nil {
-		expectedAmountRaw = input.orderOpen.Amount
-	}
+	// ── Expected amount ───────────────────────────────────────────────────
+	// Use the order's canonical expected-amount resolver so address-monitored
+	// rails (UTXO / ManagedEscrow) project only their locked pending amount instead of
+	// the signed listing amount from OrderOpen, which may be a different coin.
+	expectedAmountRaw := strings.TrimSpace(order.ExpectedPaymentAmountString())
 	expectedAmount := payment.FormatSessionAmount(expectedAmountRaw, paymentCoin)
 
 	// ── Settlement mode & funding target ─────────────────────────────────

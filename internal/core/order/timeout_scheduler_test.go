@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -109,6 +110,68 @@ func TestOrderTimeout_PendingStateIsNotExpired(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderState_PENDING, order.State)
 	assert.True(t, order.Open)
+	assert.Empty(t, bus.emitted)
+}
+
+func TestOrderTimeout_ExpiredOrderWithPaymentSentIsNotCanceled(t *testing.T) {
+	svc, db, bus := newTestOrderAppServiceForTimeout(t)
+
+	past := time.Now().Add(-10 * time.Minute)
+	insertTestOrder(t, db, "order-paid-late", models.OrderState_AWAITING_PAYMENT, true, &past)
+	err := db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().Where("id = ?", "order-paid-late").First(&order).Error; err != nil {
+			return err
+		}
+		if err := order.SetPaymentSent(&pb.PaymentSent{
+			TransactionID: "tx-paid-late",
+			Coin:          "crypto:bip122:000000000019d6689c085ae165831e93:native",
+			Amount:        "29838",
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.gormDB.Exec(
+		"UPDATE orders SET state = ?, open = ? WHERE id = ?",
+		int32(models.OrderState_AWAITING_PAYMENT), true, "order-paid-late",
+	).Error)
+
+	svc.expireTimedOutOrders()
+
+	var order models.Order
+	err = db.gormDB.Where("id = ?", "order-paid-late").First(&order).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderState_AWAITING_PAYMENT, order.State)
+	assert.True(t, order.Open)
+	assert.NotNil(t, order.SerializedPaymentSent)
+	assert.Empty(t, bus.emitted)
+}
+
+func TestOrderTimeout_VerifiedExpiredOrderIsNotCanceled(t *testing.T) {
+	svc, db, bus := newTestOrderAppServiceForTimeout(t)
+
+	past := time.Now().Add(-10 * time.Minute)
+	insertTestOrder(t, db, "order-verified-late", models.OrderState_AWAITING_PAYMENT, true, &past)
+	err := db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().Where("id = ?", "order-verified-late").First(&order).Error; err != nil {
+			return err
+		}
+		order.MarkPaymentVerified()
+		return tx.Save(&order)
+	})
+	require.NoError(t, err)
+
+	svc.expireTimedOutOrders()
+
+	var order models.Order
+	err = db.gormDB.Where("id = ?", "order-verified-late").First(&order).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderState_AWAITING_PAYMENT, order.State)
+	assert.True(t, order.Open)
+	assert.Equal(t, models.PaymentVerificationStatusVerified, order.CurrentPaymentVerificationStatus())
 	assert.Empty(t, bus.emitted)
 }
 

@@ -53,17 +53,24 @@ func (s *PaymentVerificationService) SetFiatPaymentQuery(fq FiatPaymentQuery) {
 	s.fiatPayment = fq
 }
 
-// ValidateMessage validates a PaymentSent message against OrderOpen using the
-// appropriate ChainEscrow. Purely computational — no network I/O.
+// ValidateMessage validates a PaymentSent message against OrderOpen and any
+// locked payment-intent expectations using the appropriate ChainEscrow. Purely
+// computational — no network I/O.
 //
 // Fiat payments are handled directly (not in Registry) via validateFiatPayment.
 // Crypto payments dispatch through registry → ChainEscrow.ValidatePaymentMessage.
 func (s *PaymentVerificationService) ValidateMessage(
 	coinType iwallet.CoinType,
-	orderOpen *pb.OrderOpen,
-	paymentSent *pb.PaymentSent,
-	escrowTimeoutHours uint32,
+	params payment.PaymentMessageParams,
 ) error {
+	orderOpen := params.OrderOpen
+	paymentSent := params.PaymentSent
+	if orderOpen == nil {
+		return fmt.Errorf("order_open is required")
+	}
+	if paymentSent == nil {
+		return fmt.Errorf("payment_sent is required")
+	}
 	spec := paymentSent.GetSettlementSpec()
 	if spec == nil {
 		return fmt.Errorf("payment_sent missing settlement spec")
@@ -91,11 +98,7 @@ func (s *PaymentVerificationService) ValidateMessage(
 		return fmt.Errorf("no chain escrow for %s: %w", string(coinType), err)
 	}
 
-	return strategy.ValidatePaymentMessage(payment.PaymentMessageParams{
-		OrderOpen:          orderOpen,
-		PaymentSent:        paymentSent,
-		EscrowTimeoutHours: escrowTimeoutHours,
-	})
+	return strategy.ValidatePaymentMessage(params)
 }
 
 // FetchTransaction fetches a confirmed transaction from chain or fiat provider.

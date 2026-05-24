@@ -105,6 +105,7 @@ func TestProject_FormatsUTXOAmountsAsDecimalStrings(t *testing.T) {
 	order.PaymentVerificationStatus = models.PaymentVerificationStatusPending
 	require.NoError(t, order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
 		Coin:           "crypto:bip122:000000000019d6689c085ae165831e93:native",
+		Amount:         30116,
 		Script:         "ab",
 		SettlementSpec: pkpayment.NewUTXOSpec(true).ToPending(),
 	}))
@@ -127,6 +128,33 @@ func TestProject_FormatsUTXOAmountsAsDecimalStrings(t *testing.T) {
 	require.Equal(t, "0.00015058", session.PaymentProgress.RemainingAmount)
 }
 
+func TestProject_UsesLockedUTXOPendingAmountOverOrderOpenAmount(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{PaymentAddress: "bc1qtest"}
+	require.NoError(t, order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
+		Coin:           "crypto:bip122:000000000019d6689c085ae165831e93:native",
+		Amount:         30070,
+		Script:         "ab",
+		SettlementSpec: pkpayment.NewUTXOSpec(false).ToPending(),
+	}))
+
+	session, err := p.Project(&projectOrderInput{
+		order: order,
+		orderOpen: &pb.OrderOpen{
+			Amount:      "110000000",
+			Timestamp:   timestamppb.New(time.Now()),
+			PricingCoin: "crypto:eip155:1:native",
+		},
+		hasSpec: true,
+		spec:    pkpayment.NewUTXOSpec(false),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "0.0003007", session.ExpectedAmount)
+	require.Equal(t, "0.0003007", session.FundingTarget.Amount)
+	require.Equal(t, "0.0003007", session.PaymentProgress.RequiredAmount)
+	require.Equal(t, "0.0003007", session.PaymentProgress.RemainingAmount)
+}
+
 func TestProject_FormatsManagedEscrowAmountsAsDecimalStrings(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{
@@ -136,6 +164,7 @@ func TestProject_FormatsManagedEscrowAmountsAsDecimalStrings(t *testing.T) {
 		Type:           "managed_escrow",
 		Address:        "0xmanagedescrow",
 		Coin:           "crypto:eip155:11155111:native",
+		Amount:         7022669176100452,
 		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),
 	}))
 
@@ -143,6 +172,33 @@ func TestProject_FormatsManagedEscrowAmountsAsDecimalStrings(t *testing.T) {
 		order: order,
 		orderOpen: &pb.OrderOpen{
 			Amount:      "7022669176100452",
+			Timestamp:   timestamppb.New(time.Now()),
+			PricingCoin: "USD",
+		},
+		hasSpec: true,
+		spec:    pkpayment.NewManagedEscrowSpec(false),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "0.007022669176100452", session.ExpectedAmount)
+	require.Equal(t, "0.007022669176100452", session.FundingTarget.Amount)
+	require.Equal(t, "0.007022669176100452", session.PaymentProgress.RequiredAmount)
+}
+
+func TestProject_UsesLockedManagedEscrowPendingAmountOverOrderOpenAmount(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{PaymentAddress: "0xmanagedescrow"}
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Type:           "managed_escrow",
+		Address:        "0xmanagedescrow",
+		Coin:           "crypto:eip155:11155111:native",
+		Amount:         7022669176100452,
+		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),
+	}))
+
+	session, err := p.Project(&projectOrderInput{
+		order: order,
+		orderOpen: &pb.OrderOpen{
+			Amount:      "11",
 			Timestamp:   timestamppb.New(time.Now()),
 			PricingCoin: "USD",
 		},

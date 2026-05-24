@@ -4,6 +4,8 @@ package payment
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -537,5 +539,10 @@ func (d *ObservationDispatcher) OnNewBlock(
 // aggregator's DISTINCT ON priority rule cleanly prefer monitor-source
 // rows over buyer_reported rows.
 func (d *ObservationDispatcher) monitorObserver(namespace, reference string) string {
-	return fmt.Sprintf("monitor:%s:%s:%s", namespace, reference, d.workerID)
+	observer := fmt.Sprintf("monitor:%s:%s:%s", namespace, reference, d.workerID)
+	if len(observer) <= 64 {
+		return observer
+	}
+	sum := sha256.Sum256([]byte(observer))
+	return "monitor:" + hex.EncodeToString(sum[:16])
 }

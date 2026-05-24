@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -28,9 +29,7 @@ type VerifiedPayment struct {
 type PaymentVerifier interface {
 	ValidateMessage(
 		coinType iwallet.CoinType,
-		orderOpen *pb.OrderOpen,
-		paymentSent *pb.PaymentSent,
-		escrowTimeoutHours uint32,
+		params payment.PaymentMessageParams,
 	) error
 
 	FetchTransaction(

@@ -68,15 +68,6 @@ func (s *SettlementService) ExecuteSettlementAction(
 		return nil, "", err
 	}
 
-	if s.paymentRegistry == nil {
-		return nil, coinType, fmt.Errorf("payment registry not initialized")
-	}
-
-	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
-	if err != nil {
-		return nil, coinType, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
-	}
-
 	params := payment.ActionParams{
 		OrderID:       orderID.String(),
 		PaymentCoin:   coinType.String(),
@@ -94,6 +85,10 @@ func (s *SettlementService) ExecuteSettlementAction(
 		}
 		if method != pb.PaymentSent_CANCELABLE {
 			return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
+		}
+		strategy, err := s.settlementActionStrategy(coinType)
+		if err != nil {
+			return nil, coinType, err
 		}
 		out := payoutAddr
 		if out == "" {
@@ -115,6 +110,10 @@ func (s *SettlementService) ExecuteSettlementAction(
 		if method != pb.PaymentSent_CANCELABLE {
 			return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
 		}
+		strategy, err := s.settlementActionStrategy(coinType)
+		if err != nil {
+			return nil, coinType, err
+		}
 		out := payoutAddr
 		if out == "" {
 			out = paymentSent.PayerAddress
@@ -126,6 +125,17 @@ func (s *SettlementService) ExecuteSettlementAction(
 	default:
 		return nil, coinType, fmt.Errorf("%w: unsupported settlement action", coreiface.ErrBadRequest)
 	}
+}
+
+func (s *SettlementService) settlementActionStrategy(coinType iwallet.CoinType) (payment.ChainEscrowV2, error) {
+	if s.paymentRegistry == nil {
+		return nil, fmt.Errorf("payment registry not initialized")
+	}
+	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
+	if err != nil {
+		return nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
+	}
+	return strategy, nil
 }
 
 func (s *SettlementService) normalizeSettlementActionResult(

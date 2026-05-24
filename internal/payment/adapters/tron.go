@@ -142,7 +142,7 @@ func (o *TRONChainOps) ValidatePaymentMessage(params payment.PaymentMessageParam
 		return nil
 	}
 
-	if err := validatePaymentAmountCrossCurrency(orderOpen, paymentSent); err != nil {
+	if err := validatePaymentMessageAmount(params); err != nil {
 		return err
 	}
 

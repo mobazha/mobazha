@@ -389,6 +389,14 @@ type PaymentMessageParams struct {
 	// PaymentSent is the payment sent message to validate.
 	PaymentSent *pb.PaymentSent
 
+	// ExpectedPaymentAmount is the locked payment amount in the payment coin's
+	// smallest unit. Address-monitored cross-currency routes must pass this
+	// from the payment intent instead of comparing against OrderOpen.Amount.
+	ExpectedPaymentAmount string
+
+	// ExpectedPaymentCoin is the canonical coin locked with ExpectedPaymentAmount.
+	ExpectedPaymentCoin string
+
 	// EscrowTimeoutHours is the configured escrow timeout.
 	EscrowTimeoutHours uint32
 }

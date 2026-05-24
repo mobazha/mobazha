@@ -307,6 +307,55 @@ func TestTenantDB_Delete(t *testing.T) {
 	}
 }
 
+func TestTenantDB_DeleteConditionExpression(t *testing.T) {
+	sharedDB := newTestSharedDB(t)
+	db := newTestTenantDB(t, sharedDB, "tenant-D")
+
+	old := time.Now().Add(-2 * time.Hour)
+	recent := time.Now()
+	err := db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.OutboxEvent{}); err != nil {
+			return err
+		}
+		if err := tx.Save(&models.OutboxEvent{
+			EventName:   "order.expired",
+			Payload:     []byte(`{}`),
+			DeliveredAt: &old,
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&models.OutboxEvent{
+			EventName:   "order.expired",
+			Payload:     []byte(`{}`),
+			DeliveredAt: &recent,
+		})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = db.Update(func(tx database.Tx) error {
+		return tx.Delete("delivered_at < ?", recent, nil, &models.OutboxEvent{})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var remaining []models.OutboxEvent
+	err = db.View(func(tx database.Tx) error {
+		return tx.Read().Find(&remaining).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remaining) != 1 {
+		t.Fatalf("expected 1 event remaining, got %d", len(remaining))
+	}
+	if remaining[0].DeliveredAt == nil || !remaining[0].DeliveredAt.Equal(recent) {
+		t.Fatalf("expected recent event to remain, got %#v", remaining[0].DeliveredAt)
+	}
+}
+
 func TestTenantDB_DeleteAll(t *testing.T) {
 	sharedDB := newTestSharedDB(t)
 	dbA := newTestTenantDB(t, sharedDB, "tenant-E")

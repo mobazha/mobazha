@@ -38,8 +38,13 @@ func (s *OrderAppService) expireTimedOutOrders() {
 	var orders []models.Order
 	err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().
-			Where("state = ? AND open = ? AND expires_at IS NOT NULL AND expires_at < ?",
-				int32(models.OrderState_AWAITING_PAYMENT), true, now).
+			Where(`state = ?
+				AND open = ?
+				AND expires_at IS NOT NULL
+				AND expires_at < ?
+				AND serialized_payment_sent IS NULL
+				AND COALESCE(payment_verification_status, '') <> ?`,
+				int32(models.OrderState_AWAITING_PAYMENT), true, now, string(models.PaymentVerificationStatusVerified)).
 			Find(&orders).Error
 	})
 	if err != nil {
@@ -69,6 +74,9 @@ func (s *OrderAppService) cancelExpiredOrder(order *models.Order) {
 			return err
 		}
 		if fresh.State != models.OrderState_AWAITING_PAYMENT || !fresh.Open {
+			return nil
+		}
+		if fresh.SerializedPaymentSent != nil || fresh.IsPaymentVerified() {
 			return nil
 		}
 		fresh.SetFSMState(models.OrderState_CANCELED)

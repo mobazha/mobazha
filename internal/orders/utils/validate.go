@@ -221,11 +221,14 @@ func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 	// contract already enforces the locked amount on-chain, so we only validate the
 	// amount for same-currency payments where both units match.
 	pricingCoin := strings.ToUpper(strings.TrimSpace(order.PricingCoin))
+	if pricingCoin == "" {
+		return errors.New("order pricing coin is required")
+	}
 	paymentCoin, err := iwallet.CoinType(paymentSent.Coin).PricingCurrencyCode()
 	if err != nil {
 		return fmt.Errorf("invalid payment coin: %w", err)
 	}
-	if pricingCoin == "" || pricingCoin == paymentCoin {
+	if pricingCoin == paymentCoin {
 		if err := ValidatePaymentAmount(order.Amount, paymentSent.Amount); err != nil {
 			return err
 		}

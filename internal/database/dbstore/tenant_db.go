@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/ipfs/go-cid"
@@ -310,6 +311,9 @@ func (t *tenantTx) Delete(key string, value interface{}, where map[string]interf
 	db := t.rawTx.Where("tenant_id = ?", t.tenantID).Model(model)
 	for k, v := range where {
 		db = db.Where(k, v)
+	}
+	if strings.Contains(key, "?") {
+		return db.Where(key, value).Delete(model).Error
 	}
 	return db.Where(fmt.Sprintf("%s = ?", key), value).Delete(model).Error
 }

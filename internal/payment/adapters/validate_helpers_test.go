@@ -9,15 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidatePaymentAmountCrossCurrency(t *testing.T) {
+func TestValidatePaymentMessageAmount(t *testing.T) {
 	tests := []struct {
-		name        string
-		pricingCoin string
-		paymentCoin string
-		orderAmt    string
-		paymentAmt  string
-		wantErr     bool
-		errContains string
+		name         string
+		pricingCoin  string
+		paymentCoin  string
+		orderAmt     string
+		paymentAmt   string
+		expectedAmt  string
+		expectedCoin string
+		wantErr      bool
+		errContains  string
 	}{
 		{
 			name:        "same currency ETH — exact match",
@@ -43,34 +45,63 @@ func TestValidatePaymentAmountCrossCurrency(t *testing.T) {
 			paymentAmt:  "2000000000000000000",
 		},
 		{
-			name:        "cross currency USD priced paid in ETH — skips comparison",
-			pricingCoin: "USD",
-			paymentCoin: "crypto:eip155:1:native",
-			orderAmt:    "4900",
-			paymentAmt:  "21000000000000000",
+			name:         "cross currency USD priced paid in ETH — validates locked amount",
+			pricingCoin:  "USD",
+			paymentCoin:  "crypto:eip155:1:native",
+			orderAmt:     "4900",
+			paymentAmt:   "21000000000000000",
+			expectedAmt:  "21000000000000000",
+			expectedCoin: "crypto:eip155:1:native",
 		},
 		{
-			name:        "cross currency USD priced paid in BCH — skips comparison",
-			pricingCoin: "USD",
-			paymentCoin: "crypto:bitcoincash:mainnet:native",
-			orderAmt:    "4900",
-			paymentAmt:  "100000",
+			name:         "cross currency USD priced paid in BCH — underpaid locked amount fails",
+			pricingCoin:  "USD",
+			paymentCoin:  "crypto:bitcoincash:mainnet:native",
+			orderAmt:     "4900",
+			paymentAmt:   "99999",
+			expectedAmt:  "100000",
+			expectedCoin: "crypto:bitcoincash:mainnet:native",
+			wantErr:      true,
+			errContains:  "less than order amount",
 		},
 		{
-			name:        "empty pricing coin — falls back to same-currency check",
+			name:        "cross currency without locked amount fails closed",
+			pricingCoin: "crypto:eip155:11155111:native",
+			paymentCoin: "crypto:bip122:000000000019d6689c085ae165831e93:native",
+			orderAmt:    "11000000000000000",
+			paymentAmt:  "29838",
+			wantErr:     true,
+			errContains: "locked expected payment amount is required",
+		},
+		{
+			name:        "empty pricing coin fails closed",
 			pricingCoin: "",
 			paymentCoin: "crypto:eip155:1:native",
 			orderAmt:    "1000",
 			paymentAmt:  "1000",
+			wantErr:     true,
+			errContains: "order pricing coin is required",
 		},
 		{
-			name:        "empty pricing coin — underpaid triggers error",
-			pricingCoin: "",
+			name:        "locked expected coin is required when expected amount is supplied",
+			pricingCoin: "USD",
 			paymentCoin: "crypto:eip155:1:native",
-			orderAmt:    "1000",
-			paymentAmt:  "500",
+			orderAmt:    "4900",
+			paymentAmt:  "21000000000000000",
+			expectedAmt: "21000000000000000",
 			wantErr:     true,
-			errContains: "less than order amount",
+			errContains: "expected payment coin is required",
+		},
+		{
+			name:         "locked expected coin mismatch fails",
+			pricingCoin:  "USD",
+			paymentCoin:  "crypto:eip155:1:native",
+			orderAmt:     "4900",
+			paymentAmt:   "21000000000000000",
+			expectedAmt:  "21000000000000000",
+			expectedCoin: "crypto:bip122:000000000019d6689c085ae165831e93:native",
+			wantErr:      true,
+			errContains:  "payment coin mismatch",
 		},
 		{
 			name:        "invalid payment coin format",
@@ -110,7 +141,12 @@ func TestValidatePaymentAmountCrossCurrency(t *testing.T) {
 				Amount: tt.paymentAmt,
 			}
 
-			err := validatePaymentAmountCrossCurrency(order, sent)
+			err := validatePaymentMessageAmount(payment.PaymentMessageParams{
+				OrderOpen:             order,
+				PaymentSent:           sent,
+				ExpectedPaymentAmount: tt.expectedAmt,
+				ExpectedPaymentCoin:   tt.expectedCoin,
+			})
 
 			if tt.wantErr {
 				require.Error(t, err)

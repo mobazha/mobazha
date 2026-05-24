@@ -168,7 +168,19 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 		return nil, fmt.Errorf("payment validation failed for order %s: %w", orderMsg.OrderID, err)
 	}
 
-	if err := s.paymentVerifier.ValidateMessage(coinType, orderOpen, paymentSent, paymentSent.EscrowTimeoutHours); err != nil {
+	expectedPaymentAmount := ""
+	expectedPaymentCoin := ""
+	if lockedCoin, ok := payment.PendingPaymentCoinFromOrder(&order); ok {
+		expectedPaymentCoin = string(lockedCoin)
+		expectedPaymentAmount = order.ExpectedPaymentAmountString()
+	}
+	if err := s.paymentVerifier.ValidateMessage(coinType, payment.PaymentMessageParams{
+		OrderOpen:             orderOpen,
+		PaymentSent:           paymentSent,
+		ExpectedPaymentAmount: expectedPaymentAmount,
+		ExpectedPaymentCoin:   expectedPaymentCoin,
+		EscrowTimeoutHours:    paymentSent.EscrowTimeoutHours,
+	}); err != nil {
 		return nil, fmt.Errorf("payment validation failed for order %s: %w", orderMsg.OrderID, err)
 	}
 

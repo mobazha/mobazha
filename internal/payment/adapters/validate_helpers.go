@@ -21,19 +21,54 @@ func assertPaymentMessageParams(params payment.PaymentMessageParams) (*pb.OrderO
 	return params.OrderOpen, params.PaymentSent, nil
 }
 
-// validatePaymentAmountCrossCurrency validates the payment amount against the
-// order amount, but only when both are in the same currency. For cross-currency
-// payments (e.g. USD-priced order paid in ETH), the amounts are in different
-// units and cannot be compared directly — the escrow contract enforces the
-// locked amount on-chain.
-func validatePaymentAmountCrossCurrency(order *pb.OrderOpen, paymentSent *pb.PaymentSent) error {
+// validatePaymentMessageAmount validates PaymentSent.Amount against a single
+// deterministic source. Address-monitored cross-currency routes must provide the
+// locked payment-intent amount; same-currency direct routes may compare against
+// OrderOpen.Amount because both values are in the same smallest unit.
+func validatePaymentMessageAmount(params payment.PaymentMessageParams) error {
+	order, paymentSent, err := assertPaymentMessageParams(params)
+	if err != nil {
+		return err
+	}
+
 	pricingCoin := strings.ToUpper(strings.TrimSpace(order.PricingCoin))
+	if pricingCoin == "" {
+		return errors.New("order pricing coin is required")
+	}
+
+	expectedAmount := strings.TrimSpace(params.ExpectedPaymentAmount)
+	expectedCoin := strings.TrimSpace(params.ExpectedPaymentCoin)
+	if expectedAmount != "" {
+		if err := validateExpectedPaymentCoin(expectedCoin, paymentSent.Coin); err != nil {
+			return err
+		}
+		return utils.ValidatePaymentAmount(expectedAmount, paymentSent.Amount)
+	}
+
 	paymentCoin, err := iwallet.CoinType(paymentSent.Coin).PricingCurrencyCode()
 	if err != nil {
 		return fmt.Errorf("invalid payment coin: %w", err)
 	}
-	if pricingCoin == "" || pricingCoin == paymentCoin {
+	if pricingCoin == paymentCoin {
 		return utils.ValidatePaymentAmount(order.Amount, paymentSent.Amount)
+	}
+	return fmt.Errorf("locked expected payment amount is required for cross-currency payment: pricing %s paid in %s", pricingCoin, paymentCoin)
+}
+
+func validateExpectedPaymentCoin(expectedCoin, actualCoin string) error {
+	if expectedCoin == "" {
+		return errors.New("expected payment coin is required")
+	}
+	expected, ok := payment.NormalizeSettlementPaymentCoin(expectedCoin)
+	if !ok {
+		return fmt.Errorf("invalid expected payment coin %q", expectedCoin)
+	}
+	actual, ok := payment.NormalizeSettlementPaymentCoin(actualCoin)
+	if !ok {
+		return fmt.Errorf("invalid payment coin %q", actualCoin)
+	}
+	if expected != actual {
+		return fmt.Errorf("payment coin mismatch: expected %s, got %s", expected, actual)
 	}
 	return nil
 }

@@ -223,6 +223,7 @@ type GuestOrderItem struct {
 	ListingHash    string `json:"listingHash"`
 	ListingTitle   string `json:"listingTitle"`
 	ListingSlug    string `gorm:"index:idx_guest_item_variant" json:"listingSlug"`
+	ContractType   string `gorm:"size:32" json:"contractType,omitempty"`
 	SellerPeerID   string `json:"sellerPeerID"`
 	Thumbnail      string `json:"thumbnail,omitempty"`
 	Quantity       int    `json:"quantity"`

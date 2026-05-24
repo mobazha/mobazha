@@ -258,6 +258,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 			ListingHash:       reqItem.ListingHash,
 			ListingSlug:       reqItem.ListingSlug,
 			ListingTitle:      resolved.ListingTitle,
+			ContractType:      resolved.ContractType.String(),
 			SellerPeerID:      s.nodeID,
 			Thumbnail:         resolved.Thumbnail,
 			Quantity:          reqItem.Quantity,

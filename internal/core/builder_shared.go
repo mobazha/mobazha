@@ -5,8 +5,10 @@ import (
 	"errors"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/mobazha/mobazha3.0/internal/core/digital"
+	guestcore "github.com/mobazha/mobazha3.0/internal/core/guest"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/storage"
@@ -122,13 +124,10 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 		digitalCtx = pkgconfig.ContextWithTenantID(digitalCtx, pkgdatabase.StandaloneTenantID)
 	}
 	entitlementSvc := digital.NewDigitalEntitlementAppService(digitalCtx, obNode.db, obNode.featureResolver, assetSvc, orders, obNode.eventBus)
-	// Wire the shipper so that auto-delivery also advances the order state
-	// to FULFILLED and notifies the buyer. obNode.Order() returns
-	// contracts.OrderService which satisfies digital.OrderShipper.
-	// Called before Start() so the shipper is visible to the event goroutines
-	// from the moment they begin processing.
-	if orderSvc := obNode.Order(); orderSvc != nil {
-		entitlementSvc.SetShipper(orderSvc)
+	// Wire the shipper so auto-delivery also advances order state. Full nodes
+	// use OrderService; private_distribution/guest checkout uses GuestOrderAppService.
+	if shipper := newDigitalOrderShipper(obNode.Order(), obNode.guestOrderService); shipper != nil {
+		entitlementSvc.SetShipper(shipper)
 	}
 	if err := entitlementSvc.Start(); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Digital: entitlement start failed: %v", err)
@@ -136,6 +135,36 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 	}
 	obNode.digitalEntitlementService = entitlementSvc
 	logger.LogInfoWithID(log, obNode.nodeID, "Digital subsystem initialized")
+}
+
+type guestDigitalOrderShipper interface {
+	ShipGuestOrder(ctx context.Context, token string, tracking, carrier string) error
+}
+
+type digitalOrderShipper struct {
+	order digital.OrderShipper
+	guest guestDigitalOrderShipper
+}
+
+func newDigitalOrderShipper(order digital.OrderShipper, guest guestDigitalOrderShipper) digital.OrderShipper {
+	if order == nil && guest == nil {
+		return nil
+	}
+	return &digitalOrderShipper{order: order, guest: guest}
+}
+
+func (s *digitalOrderShipper) ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error {
+	id := string(orderID)
+	if strings.HasPrefix(id, guestcore.OrderTokenPrefix) {
+		if s.guest == nil {
+			return errors.New("guest order shipper unavailable")
+		}
+		return s.guest.ShipGuestOrder(context.Background(), id, "", "digital")
+	}
+	if s.order == nil {
+		return errors.New("order shipper unavailable")
+	}
+	return s.order.ShipOrder(orderID, shipments, done)
 }
 
 // TECHDEBT(TD-099): dbOrderQuerier loads the Order GORM row and decodes the
@@ -260,12 +289,16 @@ func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.Orde
 	}
 
 	meta := &digital.OrderMetadata{
-		ContractType:  "DIGITAL_GOOD",
+		ContractType:  "PHYSICAL_GOOD",
 		PaymentMethod: "DIRECT",
 		BuyerPeerID:   "", // anonymous guest buyer
 	}
 
+	allExplicitDigital := len(go_.Items) > 0
 	for _, it := range go_.Items {
+		if it.ContractType != "DIGITAL_GOOD" {
+			allExplicitDigital = false
+		}
 		if it.ListingSlug == "" {
 			continue
 		}
@@ -283,6 +316,9 @@ func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.Orde
 			// assets, so empty SKU deliberately targets universal assets.
 			Quantity: qty,
 		})
+	}
+	if allExplicitDigital {
+		meta.ContractType = "DIGITAL_GOOD"
 	}
 
 	return meta, nil

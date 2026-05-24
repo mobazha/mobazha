@@ -216,16 +216,18 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type OrderRespApi struct {
-		Contract           *models.Order                     `json:"contract,omitempty"`
-		State              string                            `json:"state,omitempty"`
-		Read               bool                              `json:"read,omitempty"`
-		SettlementActions  []models.SettlementActionSnapshot `json:"settlementActions,omitempty"`
-		UnreadChatMessages int64                             `json:"unreadChatMessages,omitempty"`
-		Funded             bool                              `json:"funded,omitempty"`
-		Completable        bool                              `json:"completable,omitempty"`
-		PaymentState       paymentStateResp                  `json:"paymentState"`
-		Protection         *models.OrderProtectionInfo       `json:"protection,omitempty"`
-		AfterSaleDispute   *models.AfterSaleDispute          `json:"afterSaleDispute,omitempty"`
+		Contract            *models.Order                     `json:"contract,omitempty"`
+		State               string                            `json:"state,omitempty"`
+		Read                bool                              `json:"read,omitempty"`
+		SettlementActions   []models.SettlementActionSnapshot `json:"settlementActions,omitempty"`
+		UnreadChatMessages  int64                             `json:"unreadChatMessages,omitempty"`
+		Funded              bool                              `json:"funded,omitempty"`
+		Completable         bool                              `json:"completable,omitempty"`
+		PaymentState        paymentStateResp                  `json:"paymentState"`
+		Protection          *models.OrderProtectionInfo       `json:"protection,omitempty"`
+		AfterSaleDispute    *models.AfterSaleDispute          `json:"afterSaleDispute,omitempty"`
+		PricingBreakdown    *orderPricingBreakdownResp        `json:"pricingBreakdown,omitempty"`
+		SettlementBreakdown *orderSettlementBreakdownResp     `json:"settlementBreakdown,omitempty"`
 	}
 
 	isFunded, _ := order.IsFunded()
@@ -246,7 +248,9 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 			FiatMetadata:       fiatMeta,
 			Progress:           order.ComputePaymentProgress(),
 		},
-		Protection: order.ComputeProtection(time.Now()),
+		Protection:          order.ComputeProtection(time.Now()),
+		PricingBreakdown:    buildOrderPricingBreakdown(order, getExchangeRateService(r)),
+		SettlementBreakdown: buildOrderSettlementBreakdown(order),
 	}
 	if order.AfterSaleDispute.Reason != "" || order.AfterSaleDispute.Description != "" || order.AfterSaleDispute.OpenedAt != nil {
 		dispute := order.AfterSaleDispute

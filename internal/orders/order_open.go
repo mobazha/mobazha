@@ -340,13 +340,13 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 
 // CalculateOrderTotal calculates and returns the total for the order with all
 // the provided options. The result is in the order's PricingCoin currency.
-func CalculateOrderTotal(order *pb.OrderOpen, erp *wallet.ExchangeRateProvider) (models.OrderTotals, error) {
+func CalculateOrderTotal(order *pb.OrderOpen, erp wallet.ExchangeRateQuerier) (models.OrderTotals, error) {
 	return CalculateOrderTotalInCurrency(order, order.PricingCoin, erp)
 }
 
 // CalculateOrderTotalInCurrency calculates and returns the total for the order
 // converted to the specified target currency.
-func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode string, erp *wallet.ExchangeRateProvider) (models.OrderTotals, error) {
+func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode string, erp wallet.ExchangeRateQuerier) (models.OrderTotals, error) {
 	var (
 		orderTotal, subTotal, taxesTotal, discountsTotal iwallet.Amount
 		physicalGoods                                    = make(map[string]*pb.Listing)
@@ -725,7 +725,7 @@ func getShippingInfoFromProfile(order *pb.OrderOpen, listing *pb.Listing, item *
 	return info, nil
 }
 
-func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]*pb.Listing, paymentCurrency *models.Currency, erp *wallet.ExchangeRateProvider, eligibleSubtotal iwallet.Amount) (iwallet.Amount, error) {
+func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]*pb.Listing, paymentCurrency *models.Currency, erp wallet.ExchangeRateQuerier, eligibleSubtotal iwallet.Amount) (iwallet.Amount, error) {
 	type itemShipping struct {
 		quantity              string
 		shippingTaxPercentage float32
@@ -937,7 +937,7 @@ func parseRwaTokenQuantity(quantity string) (*big.Float, error) {
 
 // calculateRwaTokenItemTotal 计算RWA Token的商品总价
 // 支持小数数量，但返回整数金额
-func calculateRwaTokenItemTotal(listing *pb.Listing, item *pb.OrderOpen_Item, pricingCurrency *models.Currency, paymentCurrency *models.Currency, erp *wallet.ExchangeRateProvider) (iwallet.Amount, error) {
+func calculateRwaTokenItemTotal(listing *pb.Listing, item *pb.OrderOpen_Item, pricingCurrency *models.Currency, paymentCurrency *models.Currency, erp wallet.ExchangeRateQuerier) (iwallet.Amount, error) {
 	// 解析数量
 	quantity, err := parseRwaTokenQuantity(item.Quantity)
 	if err != nil {

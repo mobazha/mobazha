@@ -1495,17 +1495,17 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 		logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession: FiatPaymentFacade wired (B3)")
 	}
 
-	// CryptoPaymentFacade requires DB + OrderService + WalletService.
+	// CryptoPaymentFacade requires DB + OrderService + PaymentAppService.
 	// ExchangeRate is passed via the adapter (obNode.ExchangeRate()) which wraps
 	// *wallet.ExchangeRateProvider and already guards the nil-provider case:
 	// GetRate/GetAllRates return an error (not a panic) when the underlying
 	// provider is nil.  Cross-currency orders will fail with an informative error
 	// if no rate service is configured, rather than panicking.
-	if obNode.db != nil && obNode.Order() != nil && obNode.Wallet() != nil {
+	if obNode.db != nil && obNode.Order() != nil && obNode.paymentService != nil {
 		svc.SetCryptoFacade(corePmt.NewCryptoPaymentFacade(
 			obNode.db,
 			obNode.Order(),
-			obNode.Wallet(),
+			obNode.paymentService,
 			obNode.ExchangeRate(),
 			obNode.StorePolicy(),
 		))

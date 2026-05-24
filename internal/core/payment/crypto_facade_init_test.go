@@ -52,7 +52,7 @@ func (noopRates) GetRate(base models.CurrencyCode, to models.CurrencyCode, break
 	panic("unexpected GetRate — same-currency branch should skip conversion")
 }
 
-func TestBuildInitializeEscrowDataFromOrder_SameCurrencyUsesOrderOpenNumeric(t *testing.T) {
+func TestBuildPaymentSetupParamsFromOrder_SameCurrencyUsesOrderOpenNumeric(t *testing.T) {
 	coin := iwallet.CoinType("crypto:eip155:1:native")
 	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {
 		t.Skip("canonical coin unavailable in build env")
@@ -63,11 +63,11 @@ func TestBuildInitializeEscrowDataFromOrder_SameCurrencyUsesOrderOpenNumeric(t *
 		Amount:      "42",
 		PricingCoin: "ETH",
 	}
-	got, err := buildInitializeEscrowDataFromOrder(order, open, coin, "0xrefund", "", "", noopRates{})
+	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", noopRates{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Amount != 42 || got.RefundAddress != "0xrefund" || got.CoinType != coin {
+	if got.Amount != 42 || got.CoinType != coin {
 		t.Fatalf("%+v", got)
 	}
 }

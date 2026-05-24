@@ -12,13 +12,10 @@ type OrderInfo struct {
 }
 
 type InitializeEscrowData struct {
-	OrderID       string `json:"orderID"`
-	PayerAddress  string `json:"payerAddress"`  // payer pubkey bytes
-	RefundAddress string `json:"refundAddress"` // buyer-controlled refund target for crypto payments
-	Moderator     string `json:"moderator"`     // peerID
-	// StorePolicyRevision snapshots the seller store policy revision used to
-	// validate Moderator during payment setup.
-	StorePolicyRevision uint64           `json:"storePolicyRevision,omitempty"`
-	CoinType            iwallet.CoinType `json:"coinType"`
-	Amount              uint64           `json:"amount"`
+	OrderID       string           `json:"orderID"`
+	PayerAddress  string           `json:"payerAddress"`  // payer pubkey bytes
+	RefundAddress string           `json:"refundAddress"` // buyer-controlled refund target for crypto payments
+	Moderator     string           `json:"moderator"`     // peerID
+	CoinType      iwallet.CoinType `json:"coinType"`
+	Amount        uint64           `json:"amount"`
 }

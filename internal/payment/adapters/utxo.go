@@ -106,9 +106,6 @@ func (a *UTXOAutoConfirmAdapter) EstimateEscrowFee(coinCode string, nIn, nOut in
 // GeneratePaymentInstructions returns payment setup result via GetPaymentInfo.
 func (a *UTXOAutoConfirmAdapter) GeneratePaymentInstructions(ctx context.Context, params payment.PaymentSetupParams) (*payment.PaymentSetupResult, error) {
 	paymentData, err := a.GetPaymentInfo(ctx, params.OrderID, params.Moderator, params.CoinType)
-	if paymentData != nil {
-		paymentData.StorePolicyRevision = params.StorePolicyRevision
-	}
 	result := &payment.PaymentSetupResult{
 		PaymentModel: payment.PaymentModelMonitored,
 		PaymentData:  paymentData,

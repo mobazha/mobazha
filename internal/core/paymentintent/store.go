@@ -53,6 +53,37 @@ func UpsertSharedPaymentIntent(gdb *gorm.DB, orderID string, paymentAddress stri
 	}).Create(intent).Error
 }
 
+// UpsertSharedPaymentPolicySnapshot persists the StorePolicy decision used to
+// provision the shared payment intent. Empty moderator values are allowed for
+// cancelable orders; revision zero means no StorePolicy-backed moderator was
+// selected.
+func UpsertSharedPaymentPolicySnapshot(gdb *gorm.DB, orderID string, moderatorPeerID string, storePolicyRevision uint64) error {
+	if gdb == nil {
+		return fmt.Errorf("shared payment intent policy snapshot: db is nil")
+	}
+	gdb = gdb.Session(&gorm.Session{NewDB: true})
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return fmt.Errorf("shared payment intent policy snapshot: orderID is required")
+	}
+	if strings.TrimSpace(moderatorPeerID) == "" && storePolicyRevision == 0 {
+		return nil
+	}
+
+	intent := &models.SharedPaymentIntent{
+		OrderID:             models.OrderID(orderID),
+		ModeratorPeerID:     strings.TrimSpace(moderatorPeerID),
+		StorePolicyRevision: storePolicyRevision,
+	}
+	return gdb.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "order_id"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"moderator_peer_id":     intent.ModeratorPeerID,
+			"store_policy_revision": intent.StorePolicyRevision,
+		}),
+	}).Create(intent).Error
+}
+
 // LoadSharedPaymentIntent returns the tenant-less shared payment intent for an
 // order. A missing row is not an error.
 func LoadSharedPaymentIntent(gdb *gorm.DB, orderID string) (*models.SharedPaymentIntent, error) {

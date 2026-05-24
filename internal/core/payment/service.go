@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum/go-ethereum/common"
@@ -207,6 +208,19 @@ func (s *PaymentAppService) SetPaymentRecorder(pr VerifiedPaymentRecorder) {
 // GeneratePaymentInstructions dispatches payment instruction generation to
 // the chain-specific strategy via the payment registry.
 func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, params models.InitializeEscrowData) (*payment.PaymentSetupResult, error) {
+	return s.GeneratePaymentSetup(ctx, payment.PaymentSetupParams{
+		OrderID:      params.OrderID,
+		PayerAddress: params.PayerAddress,
+		Moderator:    params.Moderator,
+		CoinType:     params.CoinType,
+		Amount:       params.Amount,
+	})
+}
+
+// GeneratePaymentSetup is the canonical payment-session setup path. It accepts
+// PaymentSetupParams so policy snapshots and future session-level metadata stay
+// out of legacy chain DTOs such as InitializeEscrowData.
+func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params payment.PaymentSetupParams) (*payment.PaymentSetupResult, error) {
 	if s.paymentRegistry == nil {
 		return nil, fmt.Errorf("payment registry not initialized for node %s", s.nodeID)
 	}
@@ -215,14 +229,7 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 		return nil, fmt.Errorf("no chain escrow for coin %s on node %s (registry chains=%d): %w",
 			params.CoinType, s.nodeID, len(s.paymentRegistry.Chains()), err)
 	}
-	result, err := strategy.SetupPayment(ctx, payment.PaymentSetupParams{
-		OrderID:             params.OrderID,
-		PayerAddress:        params.PayerAddress,
-		Moderator:           params.Moderator,
-		StorePolicyRevision: params.StorePolicyRevision,
-		CoinType:            params.CoinType,
-		Amount:              params.Amount,
-	})
+	result, err := strategy.SetupPayment(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -233,8 +240,11 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 		EscrowAddr:   result.EscrowAddr,
 		Instructions: result.Instructions,
 	}
-	if setupResult.PaymentData != nil {
-		setupResult.PaymentData.StorePolicyRevision = params.StorePolicyRevision
+
+	if params.StorePolicyRevision > 0 || strings.TrimSpace(params.Moderator) != "" {
+		if persistErr := s.persistSharedPaymentPolicySnapshot(params.OrderID, params.Moderator, params.StorePolicyRevision); persistErr != nil {
+			return nil, fmt.Errorf("persist payment policy snapshot for order %s: %w", params.OrderID, persistErr)
+		}
 	}
 
 	// Phase PS B2: ManagedEscrow EVM orders use address-monitored funding.
@@ -270,17 +280,8 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 			feeQuote.ReleaseFeeAmount,
 			feeQuote.PlatformAddr,
 			feeQuote.CancelFeeAmount,
-			params.StorePolicyRevision,
 		); persistErr != nil {
 			return nil, fmt.Errorf("persist ManagedEscrow payment intent for order %s: %w", params.OrderID, persistErr)
-		}
-	}
-
-	if params.StorePolicyRevision > 0 && setupResult.PaymentData != nil {
-		if coinInfo, coinErr := iwallet.CoinInfoFromCoinType(params.CoinType); coinErr == nil && coinInfo.Chain.IsUTXOChain() {
-			if persistErr := s.persistPendingUTXOStorePolicyRevision(params.OrderID, params.StorePolicyRevision); persistErr != nil {
-				return nil, fmt.Errorf("persist UTXO store policy revision for order %s: %w", params.OrderID, persistErr)
-			}
 		}
 	}
 
@@ -290,19 +291,18 @@ func (s *PaymentAppService) GeneratePaymentInstructions(ctx context.Context, par
 // persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
-func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string, storePolicyRevision uint64) error {
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string) error {
 	info := &models.PendingManagedEscrowPaymentInfo{
-		Coin:                coin,
-		Amount:              amount,
-		Address:             managed_escrowAddress,
-		Moderated:           moderated,
-		Moderator:           moderator,
-		ModeratorAddress:    moderatorAddress,
-		StorePolicyRevision: storePolicyRevision,
-		PlatformAmount:      platformAmount,
-		PlatformAddr:        platformAddr,
-		CancelFeeAmount:     cancelFeeAmount,
-		SettlementSpec:      payment.NewManagedEscrowSpec(moderated).ToPending(),
+		Coin:             coin,
+		Amount:           amount,
+		Address:          managed_escrowAddress,
+		Moderated:        moderated,
+		Moderator:        moderator,
+		ModeratorAddress: moderatorAddress,
+		PlatformAmount:   platformAmount,
+		PlatformAddr:     platformAddr,
+		CancelFeeAmount:  cancelFeeAmount,
+		SettlementSpec:   payment.NewManagedEscrowSpec(moderated).ToPending(),
 	}
 	if rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB }); ok {
 		raw := rawProvider.RawDB()
@@ -359,29 +359,16 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 	})
 }
 
-func (s *PaymentAppService) persistPendingUTXOStorePolicyRevision(orderID string, storePolicyRevision uint64) error {
+func (s *PaymentAppService) persistSharedPaymentPolicySnapshot(orderID, moderatorPeerID string, storePolicyRevision uint64) error {
+	if rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB }); ok {
+		raw := rawProvider.RawDB()
+		if raw == nil {
+			return fmt.Errorf("shared payment policy snapshot: raw DB unavailable")
+		}
+		return paymentintent.UpsertSharedPaymentPolicySnapshot(raw, orderID, moderatorPeerID, storePolicyRevision)
+	}
 	return s.db.Update(func(tx database.Tx) error {
-		var orders []models.Order
-		if err := tx.Read().Where("id = ?", orderID).Find(&orders).Error; err != nil {
-			return fmt.Errorf("load orders: %w", err)
-		}
-		for i := range orders {
-			info, err := orders[i].GetPendingPaymentInfo()
-			if err != nil {
-				return fmt.Errorf("get pending UTXO payment info: %w", err)
-			}
-			if info == nil {
-				continue
-			}
-			info.StorePolicyRevision = storePolicyRevision
-			if err := orders[i].SetPendingPaymentInfo(info); err != nil {
-				return err
-			}
-			if err := tx.Save(&orders[i]); err != nil {
-				return err
-			}
-		}
-		return nil
+		return paymentintent.UpsertSharedPaymentPolicySnapshot(tx.Read(), orderID, moderatorPeerID, storePolicyRevision)
 	})
 }
 
@@ -483,7 +470,6 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		PayerAddress:        params.PayerAddress,
 		Moderator:           params.Moderator,
 		ModeratorAddress:    moderatorAddress,
-		StorePolicyRevision: params.StorePolicyRevision,
 		Amount:              params.Amount,
 		FromID:              padOrTruncateBytes(payerBytes, 36),
 		ToAddress:           escrowAccount.String(),
@@ -512,11 +498,10 @@ func (s *PaymentAppService) persistClientSignedPaymentInfo(orderID string, pd *m
 		}
 		order.PaymentAddress = pd.ToAddress
 		if err := order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
-			Coin:                string(pd.Coin),
-			EscrowAddress:       pd.ToAddress,
-			Moderator:           pd.Moderator,
-			StorePolicyRevision: pd.StorePolicyRevision,
-			SettlementSpec:      pd.SettlementSpec,
+			Coin:           string(pd.Coin),
+			EscrowAddress:  pd.ToAddress,
+			Moderator:      pd.Moderator,
+			SettlementSpec: pd.SettlementSpec,
 		}); err != nil {
 			return err
 		}

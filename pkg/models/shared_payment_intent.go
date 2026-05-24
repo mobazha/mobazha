@@ -24,6 +24,12 @@ type SharedPaymentIntent struct {
 	PaymentAddress string `gorm:"column:payment_address;type:text"`
 	RefundAddress  string `gorm:"column:refund_address;type:text"`
 
+	// ModeratorPeerID / StorePolicyRevision snapshot the store policy decision
+	// used when the payment intent was provisioned. They belong on the shared
+	// intent rather than listing snapshots or legacy chain-specific pending JSON.
+	ModeratorPeerID     string `gorm:"column:moderator_peer_id;type:text"`
+	StorePolicyRevision uint64 `gorm:"column:store_policy_revision;not null;default:0"`
+
 	// PendingPaymentInfo currently stores ManagedEscrow monitored-payment metadata using
 	// the same discriminator-based JSON format as Order.PendingPaymentInfo.
 	// Keeping the wire format aligned lets the projection be future-extended to

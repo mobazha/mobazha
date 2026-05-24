@@ -197,6 +197,44 @@ func TestPaymentAppService_GeneratePaymentInstructions_Success(t *testing.T) {
 	assert.Equal(t, 1, strategy.genCallCount)
 }
 
+func TestPaymentAppService_GeneratePaymentSetup_PersistsPolicySnapshot(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	rawProvider, ok := db.(interface{ RawDB() *gorm.DB })
+	require.True(t, ok)
+	raw := rawProvider.RawDB()
+	require.NotNil(t, raw)
+
+	reg := payment.NewRegistry()
+	strategy := &testChainEscrow{
+		model: payment.PaymentModelClientSigned,
+		genResult: &payment.PaymentSetupResult{
+			PaymentModel: payment.PaymentModelClientSigned,
+			PaymentData:  &models.PaymentData{OrderID: "order-policy-setup"},
+		},
+	}
+	reg.Register(iwallet.ChainEthereum, strategy)
+
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
+		DB:              db,
+		PaymentRegistry: reg,
+	})
+	_, err = svc.GeneratePaymentSetup(context.Background(), payment.PaymentSetupParams{
+		OrderID:             "order-policy-setup",
+		CoinType:            iwallet.CoinType("crypto:eip155:1:native"),
+		Moderator:           "mod-peer",
+		StorePolicyRevision: 42,
+	})
+	require.NoError(t, err)
+
+	var shared models.SharedPaymentIntent
+	require.NoError(t, raw.Where("order_id = ?", "order-policy-setup").First(&shared).Error)
+	require.Equal(t, "mod-peer", shared.ModeratorPeerID)
+	require.Equal(t, uint64(42), shared.StorePolicyRevision)
+}
+
 func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRows(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
@@ -228,7 +266,6 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		"0",
 		"",
 		"0",
-		42,
 	))
 
 	var orders []models.Order
@@ -245,7 +282,6 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		require.Equal(t, uint64(1000), info.Amount)
 		require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
 		require.Equal(t, "0xmanagedescrow", info.Address)
-		require.Equal(t, uint64(42), info.StorePolicyRevision)
 		require.Equal(t, "0", orders[i].CancelFeeAmount)
 	}
 
@@ -257,7 +293,25 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 	require.NotNil(t, info)
 	require.Equal(t, uint64(1000), info.Amount)
 	require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
-	require.Equal(t, uint64(42), info.StorePolicyRevision)
+}
+
+func TestPaymentAppService_PersistSharedPaymentPolicySnapshot(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	rawProvider, ok := db.(interface{ RawDB() *gorm.DB })
+	require.True(t, ok)
+	raw := rawProvider.RawDB()
+	require.NotNil(t, raw)
+
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{DB: db})
+	require.NoError(t, svc.persistSharedPaymentPolicySnapshot("order-policy", "mod-peer", 42))
+
+	var shared models.SharedPaymentIntent
+	require.NoError(t, raw.Where("order_id = ?", "order-policy").First(&shared).Error)
+	require.Equal(t, "mod-peer", shared.ModeratorPeerID)
+	require.Equal(t, uint64(42), shared.StorePolicyRevision)
 }
 
 func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowGasFees(t *testing.T) {

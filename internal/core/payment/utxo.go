@@ -326,20 +326,19 @@ func (s *PaymentAppService) handleBuyerUTXOPayment(order *models.Order, tx *iwal
 		}
 
 		paymentData := &models.PaymentData{
-			OrderID:             order.ID.String(),
-			TransactionID:       tx.ID.String(),
-			Coin:                coinType,
-			Method:              method,
-			Amount:              totalPaid.Uint64(),
-			ToAddress:           matchedAddress,
-			Timestamp:           tx.Timestamp,
-			Script:              pendingInfo.Script,
-			PayerAddress:        payerAddress,
-			RefundAddress:       payerAddress,
-			Moderator:           pendingInfo.Moderator,
-			ModeratorAddress:    pendingInfo.ModeratorPubkey,
-			StorePolicyRevision: pendingInfo.StorePolicyRevision,
-			UnlockHours:         pendingInfo.UnlockHours,
+			OrderID:          order.ID.String(),
+			TransactionID:    tx.ID.String(),
+			Coin:             coinType,
+			Method:           method,
+			Amount:           totalPaid.Uint64(),
+			ToAddress:        matchedAddress,
+			Timestamp:        tx.Timestamp,
+			Script:           pendingInfo.Script,
+			PayerAddress:     payerAddress,
+			RefundAddress:    payerAddress,
+			Moderator:        pendingInfo.Moderator,
+			ModeratorAddress: pendingInfo.ModeratorPubkey,
+			UnlockHours:      pendingInfo.UnlockHours,
 		}
 
 		s.eventBus.Emit(&events.UTXOPaymentDetected{

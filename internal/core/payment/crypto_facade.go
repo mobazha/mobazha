@@ -19,13 +19,19 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// CryptoPaymentFacade wraps WalletService.GeneratePaymentInstructions to
-// populate crypto funding targets (ManagedEscrow, UTXO, monitored flows) behind
+// CryptoPaymentSetupService is the canonical crypto setup port used by
+// PaymentSessionService. It keeps session-level metadata out of legacy chain DTOs.
+type CryptoPaymentSetupService interface {
+	GeneratePaymentSetup(ctx context.Context, params paypb.PaymentSetupParams) (*paypb.PaymentSetupResult, error)
+}
+
+// CryptoPaymentFacade wraps the canonical payment setup service to populate
+// crypto funding targets (ManagedEscrow, UTXO, monitored flows) behind
 // PaymentSessionService.CreateSession.
 type CryptoPaymentFacade struct {
 	projector   *PaymentSessionProjector
 	orderSvc    contracts.OrderService
-	walletSvc   contracts.WalletService
+	setupSvc    CryptoPaymentSetupService
 	exchange    contracts.ExchangeRateService
 	storePolicy contracts.StorePolicyService
 }
@@ -34,14 +40,14 @@ type CryptoPaymentFacade struct {
 func NewCryptoPaymentFacade(
 	db database.Database,
 	orderSvc contracts.OrderService,
-	walletSvc contracts.WalletService,
+	setupSvc CryptoPaymentSetupService,
 	exchange contracts.ExchangeRateService,
 	storePolicy contracts.StorePolicyService,
 ) *CryptoPaymentFacade {
 	return &CryptoPaymentFacade{
 		projector:   NewPaymentSessionProjector(db),
 		orderSvc:    orderSvc,
-		walletSvc:   walletSvc,
+		setupSvc:    setupSvc,
 		exchange:    exchange,
 		storePolicy: storePolicy,
 	}
@@ -86,14 +92,17 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, err
 	}
 
-	initData, err := buildInitializeEscrowDataFromOrder(order, orderOpen, coin,
-		refundAddr, req.PayerAddress, moderator, c.exchange)
+	setupParams, err := buildPaymentSetupParamsFromOrder(order, orderOpen, coin,
+		req.PayerAddress, moderator, c.exchange)
 	if err != nil {
 		return nil, fmt.Errorf("crypto facade: build escrow params: %w", err)
 	}
-	initData.StorePolicyRevision = storePolicyRevision
+	setupParams.StorePolicyRevision = storePolicyRevision
 
-	result, err := c.walletSvc.GeneratePaymentInstructions(ctx, initData)
+	if c.setupSvc == nil {
+		return nil, ErrProvisioningNotImplemented
+	}
+	result, err := c.setupSvc.GeneratePaymentSetup(ctx, setupParams)
 	if err != nil {
 		if result != nil && result.PaymentData != nil && errors.Is(err, coreiface.ErrCoinSwitchRequiresConfirmation) {
 			return nil, fmt.Errorf("%w", coreiface.ErrCoinSwitchRequiresConfirmation)
@@ -164,21 +173,21 @@ func normalizeCryptoRefundAddress(coin iwallet.CoinType, refundAddress, payerAdd
 	return refundAddr, nil
 }
 
-func buildInitializeEscrowDataFromOrder(
+func buildPaymentSetupParamsFromOrder(
 	order *models.Order,
 	orderOpen *porderpb.OrderOpen,
 	coin iwallet.CoinType,
-	refundAddress, payerAddress, moderator string,
+	payerAddress, moderator string,
 	ex contracts.ExchangeRateService,
-) (models.InitializeEscrowData, error) {
+) (paypb.PaymentSetupParams, error) {
 	if order == nil {
-		return models.InitializeEscrowData{}, errors.New("order is nil")
+		return paypb.PaymentSetupParams{}, errors.New("order is nil")
 	}
 	orderAmount := iwallet.NewAmount(orderOpen.Amount)
 	pricingCoin := strings.ToUpper(orderOpen.PricingCoin)
 	paymentCoinCode, err := coin.PricingCurrencyCode()
 	if err != nil {
-		return models.InitializeEscrowData{}, fmt.Errorf("coin type pricing code: %w", err)
+		return paypb.PaymentSetupParams{}, fmt.Errorf("coin type pricing code: %w", err)
 	}
 
 	var amt uint64
@@ -188,17 +197,17 @@ func buildInitializeEscrowDataFromOrder(
 		// (not a panic) when the underlying provider is nil, so errors propagate
 		// cleanly to the caller as ErrExchangeRateUnavailable-wrapped messages.
 		if ex == nil {
-			return models.InitializeEscrowData{}, fmt.Errorf(
+			return paypb.PaymentSetupParams{}, fmt.Errorf(
 				"%w: order priced in %s but payment coin is %s",
 				ErrExchangeRateUnavailable, pricingCoin, paymentCoinCode)
 		}
 		pricingCurrency, err := models.CurrencyDefinitions.Lookup(pricingCoin)
 		if err != nil {
-			return models.InitializeEscrowData{}, fmt.Errorf("unknown pricing currency %q: %w", pricingCoin, err)
+			return paypb.PaymentSetupParams{}, fmt.Errorf("unknown pricing currency %q: %w", pricingCoin, err)
 		}
 		paymentCurrency, err := models.CurrencyDefinitions.Lookup(paymentCoinCode)
 		if err != nil {
-			return models.InitializeEscrowData{}, fmt.Errorf("unknown payment currency %q: %w", paymentCoinCode, err)
+			return paypb.PaymentSetupParams{}, fmt.Errorf("unknown payment currency %q: %w", paymentCoinCode, err)
 		}
 		converted, err := wallet.ConvertCurrencyAmount(
 			&models.CurrencyValue{Amount: orderAmount, Currency: pricingCurrency},
@@ -206,19 +215,18 @@ func buildInitializeEscrowDataFromOrder(
 			ex,
 		)
 		if err != nil {
-			return models.InitializeEscrowData{}, fmt.Errorf("convert payment amount: %w", err)
+			return paypb.PaymentSetupParams{}, fmt.Errorf("convert payment amount: %w", err)
 		}
 		amt = converted.Uint64()
 	} else {
 		amt = orderAmount.Uint64()
 	}
 
-	return models.InitializeEscrowData{
-		OrderID:       order.ID.String(),
-		PayerAddress:  payerAddress,
-		RefundAddress: refundAddress,
-		Moderator:     moderator,
-		CoinType:      coin,
-		Amount:        amt,
+	return paypb.PaymentSetupParams{
+		OrderID:      order.ID.String(),
+		PayerAddress: payerAddress,
+		Moderator:    moderator,
+		CoinType:     coin,
+		Amount:       amt,
 	}, nil
 }

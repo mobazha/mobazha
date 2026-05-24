@@ -103,12 +103,11 @@ func (a *ClientSignedAdapter) EstimateEscrowFee(_ string, _, _ int, _ iwallet.Fe
 
 func (a *ClientSignedAdapter) GeneratePaymentInstructions(ctx context.Context, params payment.PaymentSetupParams) (*payment.PaymentSetupResult, error) {
 	initParams := models.InitializeEscrowData{
-		OrderID:             params.OrderID,
-		PayerAddress:        params.PayerAddress,
-		Moderator:           params.Moderator,
-		StorePolicyRevision: params.StorePolicyRevision,
-		CoinType:            params.CoinType,
-		Amount:              params.Amount,
+		OrderID:      params.OrderID,
+		PayerAddress: params.PayerAddress,
+		Moderator:    params.Moderator,
+		CoinType:     params.CoinType,
+		Amount:       params.Amount,
 	}
 	paymentData, escrowAccount, instructions, err := a.buildInitEscrow(ctx, initParams)
 	if err != nil {

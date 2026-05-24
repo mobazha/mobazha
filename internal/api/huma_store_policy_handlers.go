@@ -39,8 +39,7 @@ func (g *Gateway) registerNodeHumaStorePolicyAdminOperations(api huma.API) {
 		Body json.RawMessage `json:",omitempty"`
 	}
 	type moderatorPath struct {
-		PeerID string          `path:"peerID" doc:"Moderator peer ID."`
-		Body   json.RawMessage `json:",omitempty"`
+		PeerID string `path:"peerID" doc:"Moderator peer ID."`
 	}
 
 	huma.Register(api, huma.Operation{
@@ -126,8 +125,7 @@ func (g *Gateway) registerNodeHumaStorePolicyAdminOperations(api huma.API) {
 		Security:    nodeAuthSecurity,
 	}, func(ctx context.Context, in *moderatorPath) (*nodeDataOutput, error) {
 		rawURL := "/v1/store-policy/moderators/" + url.PathEscape(in.PeerID)
-		req := nodeBridgeRequestWithVars(ctx, http.MethodDelete, rawURL, bytes.NewReader(in.Body), map[string]string{"peerID": in.PeerID})
-		req.Header.Set("Content-Type", "application/json")
+		req := nodeBridgeRequestWithVars(ctx, http.MethodDelete, rawURL, nil, map[string]string{"peerID": in.PeerID})
 		rr := httptest.NewRecorder()
 		g.handleDeleteStorePolicyModerator(rr, req)
 		data, err := nodeBridgeSuccessData(rr)

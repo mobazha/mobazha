@@ -4,6 +4,8 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,11 +43,20 @@ func (i *storePolicyAPIIdentity) Identity() peer.ID { return i.peerID }
 
 type storePolicyAPIService struct {
 	contracts.StorePolicyService
-	public *models.StorePolicyPublic
+	public          *models.StorePolicyPublic
+	policy          *models.StorePolicy
+	removedPeerID   string
+	removeCallCount int
 }
 
 func (s *storePolicyAPIService) GetPublishedPolicy(context.Context) (*models.StorePolicyPublic, error) {
 	return s.public, nil
+}
+
+func (s *storePolicyAPIService) RemoveModerator(_ context.Context, _ *uint64, peerID string) (*models.StorePolicy, error) {
+	s.removedPeerID = peerID
+	s.removeCallCount++
+	return s.policy, nil
 }
 
 func newStorePolicyAPIRequest(t *testing.T, node contracts.NodeService, peerID string) *http.Request {
@@ -96,4 +107,53 @@ func TestStorePolicyPublicHandler_ReturnsLocalPolicyForMatchingPeerID(t *testing
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	assert.Contains(t, rr.Body.String(), storePolicyAPIPeerB)
+}
+
+func TestStorePolicyHumaDeleteModerator_AcceptsEmptyBody(t *testing.T) {
+	svc := &storePolicyAPIService{
+		policy: &models.StorePolicy{
+			Revision:   2,
+			Moderators: []models.StoreModerator{},
+		},
+	}
+	node := &storePolicyAPINode{policy: svc}
+	gateway := &Gateway{
+		nodeManager: &mockNodeManager{
+			nodes: map[string]contracts.NodeService{
+				"test_user_id": node,
+			},
+		},
+		config: &GatewayConfig{},
+	}
+	outer := chi.NewMux()
+	outer.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := WithAuthIdentity(r.Context(), &AuthIdentity{
+				UserID:  "test-admin",
+				IsAdmin: true,
+			})
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+	outer.Mount("/", gateway.newV1Router(false, false))
+	ts := httptest.NewServer(outer)
+	defer ts.Close()
+
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v1/store-policy/moderators/%s", ts.URL, storePolicyAPIPeerB), nil)
+	require.NoError(t, err)
+	req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+	res, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, storePolicyAPIPeerB, svc.removedPeerID)
+	assert.Equal(t, 1, svc.removeCallCount)
+
+	var body struct {
+		Data models.StorePolicy `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
+	assert.Equal(t, uint64(2), body.Data.Revision)
 }

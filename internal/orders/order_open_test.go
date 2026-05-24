@@ -808,21 +808,6 @@ func Test_validateOrderOpen(t *testing.T) {
 			},
 		},
 		{
-			// Listing serialization not found
-			order: func() (*pb.OrderOpen, error) {
-				order, _, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Listings[0].Listing.Moderators = append(order.Listings[0].Listing.Moderators, "invalid-moderator-id")
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
 			// Listing doesn't exist for order item
 			order: func() (*pb.OrderOpen, error) {
 				order, _, err := factory.NewOrder()

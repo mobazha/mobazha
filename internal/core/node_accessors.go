@@ -218,6 +218,14 @@ func (n *MobazhaNode) Collection() contracts.CollectionService {
 	return n.collectionService
 }
 
+// StorePolicyProvider implementation — per-node commerce policy subsystem.
+func (n *MobazhaNode) StorePolicy() contracts.StorePolicyService {
+	if n.storePolicyService == nil {
+		return nil
+	}
+	return n.storePolicyService
+}
+
 // DiscountStore exposes the underlying DiscountStore for cross-tenant wiring
 // (e.g., hosting constructs a DiscountEngine with the vendor's store).
 func (n *MobazhaNode) DiscountStore() contracts.DiscountStore {

@@ -34,7 +34,6 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	"google.golang.org/protobuf/encoding/protojson"
-	"gorm.io/gorm"
 )
 
 var _ contracts.ListingPublisher = (*ListingAppService)(nil)
@@ -181,24 +180,6 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 	}
 
 	err := s.db.Update(func(tx database.Tx) error {
-		var currentPrefs models.UserPreferences
-		err := tx.Read().First(&currentPrefs).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		if len(listing.Moderators) == 0 {
-			mods, err := currentPrefs.StoreModerators()
-			if err != nil {
-				return err
-			}
-			modStrs := make([]string, 0, len(mods))
-			for _, mod := range mods {
-				modStrs = append(modStrs, mod.String())
-			}
-			listing.Moderators = modStrs
-		}
-
 		cid, err := s.saveListingToDB(tx, listing)
 		if err != nil {
 			return err
@@ -1182,16 +1163,6 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 		}
 		if tax.Percentage == 0 || tax.Percentage > 100 {
 			return errors.New("tax percentage must be between 0 and 100")
-		}
-	}
-
-	if len(sl.Listing.Moderators) > MaxListItems {
-		return coreiface.ErrTooManyItems{"moderators", strconv.Itoa(MaxListItems)}
-	}
-	for _, moderator := range sl.Listing.Moderators {
-		_, err := peer.Decode(moderator)
-		if err != nil {
-			return errors.New("moderator IDs must be valid")
 		}
 	}
 

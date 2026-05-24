@@ -35,6 +35,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaProfilePublicOperations(api)
 	g.registerNodeHumaDiscountPublicOperations(api)
 	g.registerNodeHumaCollectionPublicOperations(api)
+	g.registerNodeHumaStorePolicyPublicOperations(api)
 	g.registerNodeHumaSystemPublicOperations(api)
 	g.registerNodeHumaMiscPublicOperations(api)
 	g.registerNodeHumaSocialPublicOperations(api)
@@ -49,6 +50,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaProfileAdminOperations(api)
 	g.registerNodeHumaDiscountAdminOperations(api)
 	g.registerNodeHumaCollectionAdminOperations(api)
+	g.registerNodeHumaStorePolicyAdminOperations(api)
 	g.registerNodeHumaSystemAdminOperations(api)
 	g.registerNodeHumaMiscAdminOperations(api)
 	g.registerNodeHumaSocialAdminOperations(api)
@@ -286,6 +288,12 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"collections-peer-published-get",
 		"collections-peer-published-id-get",
 		"collections-post",
+		"store-policy-get",
+		"store-policy-moderators-get",
+		"store-policy-moderators-peer-delete",
+		"store-policy-moderators-post",
+		"store-policy-moderators-put",
+		"store-policy-peer-published-get",
 		"discounts-applicable",
 		"discounts-calculate",
 		"discounts-get",

@@ -50,6 +50,19 @@ func initCollectionSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Collection subsystem initialized")
 }
 
+// initStorePolicySubsystem initializes the per-node store policy subsystem:
+// migrates policy models, creates StorePolicyStore, and wires StorePolicyAppService.
+// Shared between full and private_distribution builds (no build tags).
+func initStorePolicySubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateStorePolicyModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "StorePolicy: failed to migrate models: %v", err)
+		return
+	}
+	store := database.NewGormStorePolicyStore(obNode.db)
+	obNode.storePolicyService = NewStorePolicyAppService(store)
+	logger.LogInfoWithID(log, obNode.nodeID, "StorePolicy subsystem initialized")
+}
+
 // initShippingSubsystem initializes the per-node shipping subsystem:
 // migrates DB models, creates ShippingStore, and wires up ShippingAppService.
 // Shared between full and private_distribution builds (no build tags).

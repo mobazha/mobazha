@@ -112,6 +112,12 @@ var routeScopeMap = []routeScope{
 	{"PUT /v1/collections", contracts.ScopeCollectionsWrite},
 	{"DELETE /v1/collections", contracts.ScopeCollectionsWrite},
 
+	// Store policy
+	{"GET /v1/store-policy", contracts.ScopeSettingsRead},
+	{"POST /v1/store-policy", contracts.ScopeSettingsWrite},
+	{"PUT /v1/store-policy", contracts.ScopeSettingsWrite},
+	{"DELETE /v1/store-policy", contracts.ScopeSettingsWrite},
+
 	// Shipping
 	{"GET /v1/shipping", contracts.ScopeShippingRead},
 	{"POST /v1/shipping", contracts.ScopeShippingWrite},

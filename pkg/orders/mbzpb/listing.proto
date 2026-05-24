@@ -6,12 +6,14 @@ import "common.proto";
 import "google/protobuf/timestamp.proto";
 
 message Listing {
+    reserved 6;
+    reserved "moderators";
+
     string slug                             = 1;
     ID vendorID                             = 2;
     Metadata metadata                       = 3;
     Item item                               = 4;
     repeated Tax taxes                      = 5;
-    repeated string moderators              = 6;
     string status                           = 7;  // "draft", "published", "private". Default is "published".
     bool featured                           = 8;
     ShippingProfile shippingProfile         = 9;  // P2P/IPFS 发布时嵌入的配送档案快照

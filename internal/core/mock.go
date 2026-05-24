@@ -194,6 +194,7 @@ func MockNode() (*MobazhaNode, error) {
 
 	node.initProfileService()
 	node.initModerationService()
+	initStorePolicySubsystem(node)
 	initShippingSubsystem(node)
 	seedMockShippingProfile(node)
 	node.initListingService()
@@ -402,6 +403,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 
 		node.initProfileService()
 		node.initModerationService()
+		initStorePolicySubsystem(node)
 		initShippingSubsystem(node)
 		seedMockShippingProfile(node)
 		node.initListingService()

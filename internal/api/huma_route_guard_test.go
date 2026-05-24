@@ -67,6 +67,7 @@ var activatedHumaDomains = []string{
 	"/v1/discounts/",
 	"/v1/discounts",
 	"/v1/collections",
+	"/v1/store-policy",
 	"/v1/ai/",
 	"/v1/guest/",
 	"/v1/payment-methods/",
@@ -197,6 +198,11 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 		{"GET", "/v1/fulfillment/providers"},
 		// Collections
 		{"GET", "/v1/collections"},
+		// Store policy
+		{"GET", "/v1/store-policy"},
+		{"GET", "/v1/store-policy/moderators"},
+		{"PUT", "/v1/store-policy/moderators"},
+		{"GET", "/v1/store-policy/peer1/published"},
 		// Shipping
 		{"GET", "/v1/shipping/profiles"},
 		// Discounts

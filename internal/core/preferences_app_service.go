@@ -42,10 +42,6 @@ func (s *PreferencesAppService) GetPreferences() (*models.UserPreferences, error
 }
 
 func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, done chan struct{}) error {
-	if _, err := prefs.StoreModerators(); err != nil {
-		return fmt.Errorf("%w: invalid moderator ID", coreiface.ErrBadRequest)
-	}
-
 	// DG-1.11: cap the per-store digital-good review window override.
 	// 0 = use ContractType default (3d). Values >0 are honoured by
 	// ResolvePolicyForOrder ONLY when they extend (>= default) the window.

@@ -1545,27 +1545,6 @@ func Test_validateListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Too many moderators
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Moderators = []string{}
-				for i := 0; i < MaxListItems+1; i++ {
-					sl.Listing.Moderators = append(sl.Listing.Moderators, " ")
-				}
-			},
-			valid: false,
-		},
-		{
-			// Invalid moderator peer ID
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Moderators = []string{
-					"dafd",
-				}
-			},
-			valid: false,
-		},
-		{
 			// Vendor ID is nil
 			listing: factory.NewSignedListing(),
 			transform: func(sl *pb.SignedListing) {

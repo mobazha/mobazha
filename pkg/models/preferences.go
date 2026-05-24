@@ -23,7 +23,6 @@ type UserPreferences struct {
 	TermsAndConditions  string  `json:"termsAndConditions"`
 	RefundPolicy        string  `json:"refundPolicy"`
 	Blocked             []byte  `json:"blockedNodes"`
-	Mods                []byte  `json:"storeModerators"`
 	ExtPaymentAddresses []byte  `json:"externalPaymentAddresses"`
 	MisPaymentBuffer    float32 `json:"mispaymentBuffer"`
 	AutoConfirm         bool    `json:"autoConfirm"`
@@ -242,7 +241,6 @@ type prefsJSON struct {
 	TermsAndConditions       string                       `json:"termsAndConditions"`
 	RefundPolicy             string                       `json:"refundPolicy"`
 	BlockedNodes             []string                     `json:"blockedNodes"`
-	StoreModerators          []string                     `json:"storeModerators"`
 	ExternalPaymentAddresses map[string]AddressEnablement `json:"externalPaymentAddresses"`
 	MisPaymentBuffer         float32                      `json:"mispaymentBuffer"`
 	AutoConfirm              bool                         `json:"autoConfirm"`
@@ -391,25 +389,6 @@ func (prefs *UserPreferences) HasShippingProfiles() bool {
 	return len(profiles) > 0
 }
 
-// StoreModerators returns the moderator peer IDs.
-func (prefs *UserPreferences) StoreModerators() ([]peer.ID, error) {
-	var peerIDStrs []string
-	if prefs.Mods != nil {
-		if err := json.Unmarshal(prefs.Mods, &peerIDStrs); err != nil {
-			return nil, err
-		}
-	}
-	ret := make([]peer.ID, 0, len(peerIDStrs))
-	for _, s := range peerIDStrs {
-		pid, err := peer.Decode(s)
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, pid)
-	}
-	return ret, nil
-}
-
 func (prefs *UserPreferences) ExternalPaymentAddresses() (map[string]AddressEnablement, error) {
 	var enablements map[string]AddressEnablement
 	if prefs.ExtPaymentAddresses != nil {
@@ -542,10 +521,6 @@ func (prefs *UserPreferences) MarshalJSON() ([]byte, error) {
 	for _, blockedNode := range blocked {
 		c0.BlockedNodes = append(c0.BlockedNodes, blockedNode.String())
 	}
-	mods, _ := prefs.StoreModerators()
-	for _, mod := range mods {
-		c0.StoreModerators = append(c0.StoreModerators, mod.String())
-	}
 	extAddresses, _ := prefs.ExternalPaymentAddresses()
 	c0.ExternalPaymentAddresses = extAddresses
 	c0.MisPaymentBuffer = prefs.MisPaymentBuffer
@@ -580,10 +555,6 @@ func (prefs *UserPreferences) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			return err
 		}
-		storeModerators, err := json.Marshal(c0.StoreModerators)
-		if err != nil {
-			return err
-		}
 		extPaymentAddress, err := json.Marshal(c0.ExternalPaymentAddresses)
 		if err != nil {
 			return err
@@ -608,7 +579,6 @@ func (prefs *UserPreferences) UnmarshalJSON(b []byte) error {
 		prefs.TermsAndConditions = c0.TermsAndConditions
 		prefs.RefundPolicy = c0.RefundPolicy
 		prefs.Blocked = blockedNodes
-		prefs.Mods = storeModerators
 		prefs.ExtPaymentAddresses = extPaymentAddress
 		prefs.MisPaymentBuffer = c0.MisPaymentBuffer
 		prefs.AutoConfirm = c0.AutoConfirm

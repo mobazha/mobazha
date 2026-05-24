@@ -140,7 +140,6 @@ type ListingMetadata struct {
 	Language                string           `json:"language"`
 	AverageRating           float32          `json:"averageRating"`
 	RatingCount             uint32           `json:"ratingCount"`
-	ModeratorIDs            []string         `json:"moderators"`
 	CoinType                string           `json:"coinType"`
 	Status                  string           `json:"status,omitempty"`                  // See ListingStatus* constants
 	RwaTradeMode            int32            `json:"rwaTradeMode,omitempty"`            // RWA 交易模式: 0=即时, 1=需确认
@@ -234,7 +233,6 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		ShipsTo:                 shipsTo,
 		FreeShipping:            freeShipping,
 		Language:                listing.Metadata.Language,
-		ModeratorIDs:            listing.Moderators,
 		Status:                  status,
 		RwaTradeMode:            int32(listing.Metadata.RwaTradeMode),
 		RwaEscrowTimeoutSeconds: listing.Metadata.RwaEscrowTimeoutSeconds,

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
@@ -707,6 +708,7 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 	if err := paymentData.EnsureTransactionFields(); err != nil {
 		return fmt.Errorf("ensure payment transaction fields: %w", err)
 	}
+	hydratePaymentDataFromPendingInfo(order, paymentData)
 
 	paymentSent, err := BuildPaymentSentProto(order, paymentData)
 	if err != nil {
@@ -766,6 +768,7 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 	if !order.IsPaymentVerified() && s.paymentVerifier != nil && !iwallet.CoinType(paymentSent.Coin).IsFiatPayment() {
 		vp, verifyErr := s.paymentVerifier.FetchAndVerify(ctx, orderOpen, paymentSent, paymentSent.ToAddress)
 		if verifyErr == nil && vp != nil {
+			verifiedPersisted := false
 			if dbErr := s.db.Update(func(tx database.Tx) error {
 				if reloadErr := tx.Read().Where("id = ?", order.ID).First(order).Error; reloadErr != nil {
 					return reloadErr
@@ -775,11 +778,50 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 				logger.LogErrorWithIDf(log, s.nodeID,
 					"Immediate payment verification persist failed for order %s (async retry will cover): %v",
 					paymentData.OrderID, dbErr)
+			} else {
+				verifiedPersisted = true
+			}
+			if verifiedPersisted {
+				s.RelayPaymentToCounterparty(ctx, paymentData.OrderID, vendorPeerID, paymentData)
 			}
 		}
 	}
 
 	return nil
+}
+
+func hydratePaymentDataFromPendingInfo(order *models.Order, paymentData *models.PaymentData) {
+	if order == nil || paymentData == nil {
+		return
+	}
+	pending, err := order.GetPendingClientSignedPaymentInfo()
+	if err != nil || pending == nil {
+		return
+	}
+	if paymentData.UnlockTime == 0 {
+		paymentData.UnlockTime = pending.UnlockTime
+	}
+	if paymentData.FundingDeadline == 0 {
+		paymentData.FundingDeadline = pending.FundingDeadline
+	}
+	if paymentData.EscrowServiceFee == 0 {
+		paymentData.EscrowServiceFee = pending.EscrowServiceFee
+	}
+	if paymentData.PlatformAddr == "" {
+		paymentData.PlatformAddr = pending.PlatformFeeCollector
+	}
+	if paymentData.RentCollector == "" {
+		paymentData.RentCollector = pending.RentCollector
+	}
+	if paymentData.SettlementSpec == nil && pending.SettlementSpec != nil {
+		paymentData.SettlementSpec = pending.SettlementSpec
+	}
+	if paymentData.Script == "" {
+		data, err := json.Marshal(pending)
+		if err == nil {
+			paymentData.Script = hex.EncodeToString(data)
+		}
+	}
 }
 
 // MapToProtoDiscounts converts core AppliedDiscount results to proto format.

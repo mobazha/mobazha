@@ -17,6 +17,7 @@ import (
 	porderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	paypb "github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 // CryptoPaymentSetupService is the canonical crypto setup port used by
@@ -29,6 +30,7 @@ type CryptoPaymentSetupService interface {
 // crypto funding targets (ManagedEscrow, UTXO, monitored flows) behind
 // PaymentSessionService.CreateSession.
 type CryptoPaymentFacade struct {
+	db          database.Database
 	projector   *PaymentSessionProjector
 	orderSvc    contracts.OrderService
 	setupSvc    CryptoPaymentSetupService
@@ -45,6 +47,7 @@ func NewCryptoPaymentFacade(
 	storePolicy contracts.StorePolicyService,
 ) *CryptoPaymentFacade {
 	return &CryptoPaymentFacade{
+		db:          db,
 		projector:   NewPaymentSessionProjector(db),
 		orderSvc:    orderSvc,
 		setupSvc:    setupSvc,
@@ -87,13 +90,13 @@ func (c *CryptoPaymentFacade) CreateSession(
 	}
 
 	moderator := strings.TrimSpace(req.Moderator)
-	storePolicyRevision, err := c.validateStorePolicyModerator(ctx, moderator)
+	storePolicyRevision, err := c.validateStorePolicyModerator(ctx, req.OrderID, orderOpen, moderator)
 	if err != nil {
 		return nil, err
 	}
 
 	setupParams, err := buildPaymentSetupParamsFromOrder(order, orderOpen, coin,
-		req.PayerAddress, moderator, c.exchange)
+		req.PayerAddress, refundAddr, moderator, c.exchange)
 	if err != nil {
 		return nil, fmt.Errorf("crypto facade: build escrow params: %w", err)
 	}
@@ -128,25 +131,139 @@ func (c *CryptoPaymentFacade) CreateSession(
 	return c.projector.Project(input2)
 }
 
-func (c *CryptoPaymentFacade) validateStorePolicyModerator(ctx context.Context, moderatorID string) (uint64, error) {
+func (c *CryptoPaymentFacade) validateStorePolicyModerator(ctx context.Context, orderID string, orderOpen *porderpb.OrderOpen, moderatorID string) (uint64, error) {
 	if moderatorID == "" {
 		return 0, nil
-	}
-	if c.storePolicy == nil {
-		return 0, fmt.Errorf("%w: store policy service is not available", coreiface.ErrBadRequest)
 	}
 	moderatorPeerID, err := peer.Decode(moderatorID)
 	if err != nil {
 		return 0, fmt.Errorf("%w: invalid moderator ID", coreiface.ErrBadRequest)
 	}
+	if revision, ok, err := c.validateSellerStorePolicyModerator(ctx, orderID, orderOpen, moderatorPeerID.String()); ok {
+		return revision, err
+	}
+	if c.storePolicy == nil {
+		return 0, fmt.Errorf("%w: store policy service is not available", coreiface.ErrBadRequest)
+	}
 	policy, err := c.storePolicy.GetPolicy(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("get store policy: %w", err)
 	}
+	return validateStorePolicyContainsModerator(policy, moderatorPeerID.String())
+}
+
+type rawDBProvider interface {
+	RawDB() *gorm.DB
+}
+
+func (c *CryptoPaymentFacade) validateSellerStorePolicyModerator(ctx context.Context, orderID string, orderOpen *porderpb.OrderOpen, canonicalModeratorID string) (uint64, bool, error) {
+	rawProvider, ok := c.db.(rawDBProvider)
+	if !ok || rawProvider.RawDB() == nil {
+		return 0, false, nil
+	}
+	raw := rawProvider.RawDB().WithContext(ctx)
+
+	sellerTenantID, resolved, err := sellerTenantIDForStorePolicy(raw, orderID, orderOpen)
+	if err != nil {
+		return 0, true, err
+	}
+	if !resolved {
+		return 0, false, nil
+	}
+
+	var policy models.StorePolicy
+	err = raw.Where("tenant_id = ?", sellerTenantID).First(&policy).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, true, fmt.Errorf("%w: moderator is not in store policy", coreiface.ErrBadRequest)
+	}
+	if err != nil {
+		return 0, true, fmt.Errorf("get seller store policy: %w", err)
+	}
+	if err := raw.
+		Where("tenant_id = ?", sellerTenantID).
+		Order("position ASC, created_at ASC").
+		Find(&policy.Moderators).Error; err != nil {
+		return 0, true, fmt.Errorf("get seller store moderators: %w", err)
+	}
+	revision, err := validateStorePolicyContainsModerator(&policy, canonicalModeratorID)
+	return revision, true, err
+}
+
+func sellerTenantIDForStorePolicy(raw *gorm.DB, orderID string, orderOpen *porderpb.OrderOpen) (string, bool, error) {
+	orderID = strings.TrimSpace(orderID)
+	if orderID != "" {
+		var vendorOrder models.Order
+		err := raw.
+			Where("id = ? AND my_role = ?", orderID, string(models.RoleVendor)).
+			First(&vendorOrder).Error
+		if err == nil && vendorOrder.TenantID != "" {
+			return vendorOrder.TenantID, true, nil
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) && !isTableLookupUnavailable(err) {
+			return "", true, fmt.Errorf("get seller order for store policy: %w", err)
+		}
+	}
+
+	vendorPeerID, ok, err := sellerPeerIDFromOrderOpen(orderOpen)
+	if err != nil {
+		return "", true, err
+	}
+	if !ok {
+		return "", false, nil
+	}
+
+	var row struct {
+		AccountID string `gorm:"column:account_id"`
+	}
+	err = raw.
+		Table("account_peer_ids").
+		Select("account_id").
+		Where("peer_id = ?", vendorPeerID).
+		Take(&row).Error
+	if err == nil && strings.TrimSpace(row.AccountID) != "" {
+		return strings.TrimSpace(row.AccountID), true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) || isTableLookupUnavailable(err) {
+		return "", false, nil
+	}
+	return "", true, fmt.Errorf("resolve seller tenant for store policy: %w", err)
+}
+
+func sellerPeerIDFromOrderOpen(orderOpen *porderpb.OrderOpen) (string, bool, error) {
+	if orderOpen == nil {
+		return "", false, nil
+	}
+	for _, listing := range orderOpen.GetListings() {
+		if listing == nil || listing.GetListing() == nil || listing.GetListing().GetVendorID() == nil {
+			continue
+		}
+		vendorPeerID := strings.TrimSpace(listing.GetListing().GetVendorID().GetPeerID())
+		if vendorPeerID == "" {
+			continue
+		}
+		pid, err := peer.Decode(vendorPeerID)
+		if err != nil {
+			return "", false, fmt.Errorf("%w: invalid vendor peer ID", coreiface.ErrBadRequest)
+		}
+		return pid.String(), true, nil
+	}
+	return "", false, nil
+}
+
+func isTableLookupUnavailable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") ||
+		strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "unknown table")
+}
+
+func validateStorePolicyContainsModerator(policy *models.StorePolicy, canonicalModeratorID string) (uint64, error) {
 	if policy == nil {
 		return 0, fmt.Errorf("%w: moderator is not in store policy", coreiface.ErrBadRequest)
 	}
-	canonicalModeratorID := moderatorPeerID.String()
 	for _, mod := range policy.Moderators {
 		if mod.PeerID != canonicalModeratorID {
 			continue
@@ -177,7 +294,7 @@ func buildPaymentSetupParamsFromOrder(
 	order *models.Order,
 	orderOpen *porderpb.OrderOpen,
 	coin iwallet.CoinType,
-	payerAddress, moderator string,
+	payerAddress, refundAddress, moderator string,
 	ex contracts.ExchangeRateService,
 ) (paypb.PaymentSetupParams, error) {
 	if order == nil {
@@ -223,10 +340,11 @@ func buildPaymentSetupParamsFromOrder(
 	}
 
 	return paypb.PaymentSetupParams{
-		OrderID:      order.ID.String(),
-		PayerAddress: payerAddress,
-		Moderator:    moderator,
-		CoinType:     coin,
-		Amount:       amt,
+		OrderID:       order.ID.String(),
+		PayerAddress:  payerAddress,
+		RefundAddress: refundAddress,
+		Moderator:     moderator,
+		CoinType:      coin,
+		Amount:        amt,
 	}, nil
 }

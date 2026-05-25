@@ -158,6 +158,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			if err == nil {
 				dbtx.RegisterCommitHook(func() {
 					op.bus.Emit(&events.OrderPaymentReceived{
+						TenantID:     order.TenantID,
 						OrderID:      order.ID.String(),
 						FundingTotal: fundingTotal.String(),
 						CoinType:     paymentSent.Coin,
@@ -183,6 +184,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 					}
 				}
 				op.bus.Emit(&events.OrderFunded{
+					TenantID:    order.TenantID,
 					BuyerName:   orderOpen.BuyerID.DisplayName(),
 					BuyerAvatar: orderOpen.BuyerID.DisplayAvatar(),
 					BuyerID:     orderOpen.BuyerID.PeerID,

@@ -249,15 +249,19 @@ func (s *SettlementService) autoConfirmSolanaCancelablePayment(order *models.Ord
 		return
 	}
 
-	paymentSent, err := order.PaymentSentMessage()
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get PaymentSent for order %s: %v", order.ID, err)
+	coinType, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainSolana)
+	if !ok {
+		logger.LogErrorWithIDf(log, s.nodeID, "Failed to resolve canonical native SOL coin for auto-confirm order %s", order.ID)
 		return
 	}
-	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to resolve payment coin for order %s: %v", order.ID, err)
-		return
+	if paymentSent, err := order.PaymentSentMessage(); err == nil {
+		if resolved, rerr := payment.SettlementCoinFromPaymentSent(paymentSent); rerr == nil {
+			coinType = resolved
+		} else {
+			logger.LogWarningWithIDf(log, s.nodeID, "Failed to resolve Solana payment coin for order %s, using native SOL: %v", order.ID, rerr)
+		}
+	} else {
+		logger.LogWarningWithIDf(log, s.nodeID, "Failed to get PaymentSent for Solana order %s, using native SOL: %v", order.ID, err)
 	}
 
 	payoutAddress, err := s.GetPayoutAddress(string(coinType))
@@ -266,23 +270,27 @@ func (s *SettlementService) autoConfirmSolanaCancelablePayment(order *models.Ord
 		return
 	}
 
-	_, instructions, err := s.GetLegacyConfirmOrderInstructions(order.ID, "", payoutAddress.String())
+	if s.paymentRegistry == nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "Payment registry not initialized for Solana auto-confirm order %s", order.ID)
+		return
+	}
+	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get confirm order instructions for order %s: %v", order.ID, err)
+		logger.LogErrorWithIDf(log, s.nodeID, "No Solana V2 chain escrow for coin %s (order %s): %v", coinType, order.ID, err)
 		return
 	}
 
-	if instructions == nil {
-		logger.LogWarningWithIDf(log, s.nodeID, "No instructions returned for Solana order %s", order.ID)
-		return
-	}
-
-	txSig, err := s.RelaySolanaTransaction(context.Background(), order.ID.String(), instructions)
+	result, _, err := s.ExecuteSettlementAction(context.Background(), "confirm", order.ID, payoutAddress.String())
 	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to relay Solana transaction for order %s: %v", order.ID, err)
+		logger.LogErrorWithIDf(log, s.nodeID, "Solana settlement-action confirm failed for order %s: %v", order.ID, err)
 		return
 	}
 
+	txSig := settlementActionTxHash(context.Background(), strategy, result)
+	if txSig == "" {
+		logger.LogErrorWithIDf(log, s.nodeID, "Solana settlement-action confirm for order %s completed without tx hash", order.ID)
+		return
+	}
 	logger.LogInfoWithIDf(log, s.nodeID, "Successfully relayed Solana transaction for order %s, sig=%s", order.ID, txSig)
 
 	s.eventBus.Emit(&events.OrderAutoConfirmRequest{

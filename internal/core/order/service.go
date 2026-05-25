@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ipfs/go-cid"
@@ -179,6 +180,9 @@ func (s *OrderAppService) SetPaymentVerifier(pv contracts.PaymentVerifier) {
 func (s *OrderAppService) RelayPaymentToCounterparty(
 	ctx context.Context, orderID string, targetPeerID peer.ID, pd *models.PaymentData,
 ) {
+	if pd == nil {
+		return
+	}
 	order, err := s.fetchOrder(orderID)
 	if err != nil {
 		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: fetch order %s: %v", orderID, err)
@@ -218,10 +222,261 @@ func (s *OrderAppService) RelayPaymentToCounterparty(
 	netMessage.MessageType = npb.Message_ORDER
 	netMessage.Payload = payload
 
+	if s.deliverVerifiedPaymentToCoTenant(ctx, order, targetPeerID, message, pd) {
+		return
+	}
+
+	if s.messenger == nil {
+		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: messenger unavailable for order %s", orderID)
+		return
+	}
 	if err := s.db.Update(func(tx database.Tx) error {
 		return s.messenger.ReliablySendMessage(tx, targetPeerID, netMessage, nil)
 	}); err != nil {
 		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: send to %s for order %s: %v", targetPeerID, orderID, err)
+	}
+}
+
+type tenantDatabaseRouter interface {
+	ForTenant(tenantID string) (database.Database, error)
+}
+
+func (s *OrderAppService) deliverVerifiedPaymentToCoTenant(
+	ctx context.Context,
+	sourceOrder *models.Order,
+	targetPeerID peer.ID,
+	orderMessage *npb.OrderMessage,
+	pd *models.PaymentData,
+) bool {
+	if sourceOrder == nil || orderMessage == nil || pd == nil || s.orderProcessor == nil {
+		return false
+	}
+	rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB })
+	if !ok || rawProvider.RawDB() == nil {
+		return false
+	}
+	router, ok := s.db.(tenantDatabaseRouter)
+	if !ok {
+		return false
+	}
+
+	targetRole, ok := counterpartyRole(sourceOrder.Role())
+	if !ok {
+		return false
+	}
+
+	var targetOrder models.Order
+	err := rawProvider.RawDB().WithContext(ctx).
+		Where("id = ? AND my_role = ?", sourceOrder.ID, string(targetRole)).
+		First(&targetOrder).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false
+	}
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: lookup target order %s role %s: %v", sourceOrder.ID, targetRole, err)
+		return false
+	}
+	if targetOrder.TenantID == "" || targetOrder.TenantID == sourceOrder.TenantID {
+		return false
+	}
+	if !orderBelongsToPeer(&targetOrder, targetRole, targetPeerID) {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"RelayPayment co-tenant: target peer mismatch for order %s role %s tenant %s",
+			sourceOrder.ID, targetRole, targetOrder.TenantID)
+		return false
+	}
+
+	targetDB, err := router.ForTenant(targetOrder.TenantID)
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: route tenant %s for order %s: %v", targetOrder.TenantID, sourceOrder.ID, err)
+		return false
+	}
+
+	paymentData := *pd
+	if err := paymentData.EnsureTransactionFields(); err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: ensure tx fields for order %s: %v", sourceOrder.ID, err)
+		return false
+	}
+	paymentTx, err := paymentData.BuildTransaction()
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: build tx for order %s: %v", sourceOrder.ID, err)
+		return false
+	}
+
+	err = targetDB.Update(func(tx database.Tx) error {
+		var fresh models.Order
+		if err := tx.Read().Where("id = ?", sourceOrder.ID).First(&fresh).Error; err != nil {
+			return err
+		}
+		if err := s.orderProcessor.ProcessOrderPayment(tx, &fresh, orderMessage, paymentTx); err != nil {
+			return err
+		}
+		if fresh.IsPaymentVerified() {
+			return tx.Save(&fresh)
+		}
+		return s.orderProcessor.RecordVerifiedPayment(tx, &fresh, paymentTx)
+	})
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"RelayPayment co-tenant: deliver verified payment to tenant %s for order %s: %v",
+			targetOrder.TenantID, sourceOrder.ID, err)
+		return false
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"RelayPayment co-tenant: delivered verified payment to tenant %s for order %s",
+		targetOrder.TenantID, sourceOrder.ID)
+	return true
+}
+
+func counterpartyRole(role models.OrderRole) (models.OrderRole, bool) {
+	switch role {
+	case models.RoleBuyer:
+		return models.RoleVendor, true
+	case models.RoleVendor:
+		return models.RoleBuyer, true
+	default:
+		return models.RoleUnknown, false
+	}
+}
+
+func orderBelongsToPeer(order *models.Order, role models.OrderRole, targetPeerID peer.ID) bool {
+	if order == nil {
+		return false
+	}
+	var (
+		got peer.ID
+		err error
+	)
+	switch role {
+	case models.RoleBuyer:
+		got, err = order.Buyer()
+	case models.RoleVendor:
+		got, err = order.Vendor()
+	default:
+		return false
+	}
+	return err == nil && got == targetPeerID
+}
+
+func (s *OrderAppService) deliverOrderMessageToCoTenant(
+	ctx context.Context,
+	sourceOrder *models.Order,
+	targetRole models.OrderRole,
+	targetPeerID peer.ID,
+	orderMessage *npb.OrderMessage,
+	txToRecord *iwallet.Transaction,
+) bool {
+	if sourceOrder == nil || orderMessage == nil || s.orderProcessor == nil {
+		return false
+	}
+	rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB })
+	if !ok || rawProvider.RawDB() == nil {
+		return false
+	}
+	router, ok := s.db.(tenantDatabaseRouter)
+	if !ok {
+		return false
+	}
+
+	var targetOrder models.Order
+	err := rawProvider.RawDB().WithContext(ctx).
+		Where("id = ? AND my_role = ?", sourceOrder.ID, string(targetRole)).
+		First(&targetOrder).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false
+	}
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID, "Order co-tenant relay: lookup target order %s role %s: %v", sourceOrder.ID, targetRole, err)
+		return false
+	}
+	if targetOrder.TenantID == "" || targetOrder.TenantID == sourceOrder.TenantID {
+		return false
+	}
+	if !orderBelongsToPeer(&targetOrder, targetRole, targetPeerID) {
+		return false
+	}
+
+	targetDB, err := router.ForTenant(targetOrder.TenantID)
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID, "Order co-tenant relay: route tenant %s for order %s: %v", targetOrder.TenantID, sourceOrder.ID, err)
+		return false
+	}
+
+	var event interface{}
+	err = targetDB.Update(func(tx database.Tx) error {
+		if orderMessage.MessageType == npb.OrderMessage_ORDER_CANCEL {
+			if err := s.ensureCoTenantPaymentSent(tx, sourceOrder); err != nil {
+				return err
+			}
+		}
+		var processErr error
+		event, processErr = s.orderProcessor.ProcessMessage(tx, orderMessage)
+		if processErr != nil {
+			return processErr
+		}
+		if txToRecord != nil {
+			return saveTransactionToFreshOrder(tx, sourceOrder.ID, *txToRecord)
+		}
+		return nil
+	})
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"Order co-tenant relay: deliver message %s to tenant %s for order %s: %v",
+			orderMessage.MessageType, targetOrder.TenantID, sourceOrder.ID, err)
+		return false
+	}
+	s.emitOrderProcessorEvents(event)
+	return true
+}
+
+func (s *OrderAppService) ensureCoTenantPaymentSent(tx database.Tx, sourceOrder *models.Order) error {
+	var target models.Order
+	if err := tx.Read().Where("id = ?", sourceOrder.ID).First(&target).Error; err != nil {
+		return err
+	}
+	if target.SerializedPaymentSent != nil {
+		return nil
+	}
+
+	paymentSent, err := sourceOrder.PaymentSentMessage()
+	if err != nil {
+		return nil
+	}
+	orderAny, err := anypb.New(paymentSent)
+	if err != nil {
+		return err
+	}
+	message := &npb.OrderMessage{
+		OrderID:     sourceOrder.ID.String(),
+		MessageType: npb.OrderMessage_PAYMENT_SENT,
+		Message:     orderAny,
+	}
+	if err := utils.SignOrderMessage(message, s.signer); err != nil {
+		return err
+	}
+
+	paymentTx := transactionForPaymentSent(sourceOrder, paymentSent)
+	if err := s.orderProcessor.ProcessOrderPayment(tx, &target, message, paymentTx); err != nil {
+		return err
+	}
+	return tx.Save(&target)
+}
+
+func transactionForPaymentSent(order *models.Order, paymentSent *pb.PaymentSent) iwallet.Transaction {
+	if order != nil {
+		if txs, err := order.GetTransactions(); err == nil {
+			for i := range txs {
+				if txs[i].ID.String() == paymentSent.TransactionID {
+					return txs[i]
+				}
+			}
+		}
+	}
+	amount, _ := strconv.ParseUint(paymentSent.Amount, 10, 64)
+	return iwallet.Transaction{
+		ID:    iwallet.TransactionID(paymentSent.TransactionID),
+		Value: iwallet.NewAmount(amount),
 	}
 }
 
@@ -1222,7 +1477,9 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 	var wTx iwallet.Tx
 	var releaseTx *iwallet.Transaction
 	if cancelStrategy.Model() == payment.PaymentModelMonitored {
-		if payment.UsesUTXOScriptEscrow(&order, paymentSent) {
+		if txid != "" {
+			releaseTx = &iwallet.Transaction{ID: txid}
+		} else if payment.UsesUTXOScriptEscrow(&order, paymentSent) {
 			result, err := s.ReleaseFromCancelableAddress(&order)
 			if err != nil {
 				return err
@@ -1294,13 +1551,6 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 			}
 		}
 
-		if err := s.messenger.ReliablySendMessage(tx, vendor, message, done); err != nil {
-			if wTx != nil {
-				wTx.Rollback()
-			}
-			return err
-		}
-
 		if wTx != nil {
 			return wTx.Commit()
 		}
@@ -1309,6 +1559,21 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 		return err
 	}
 	s.emitOrderProcessorEvents(cancelEvent)
+
+	if s.deliverOrderMessageToCoTenant(context.Background(), &order, models.RoleVendor, vendor, resp, releaseTx) {
+		if done != nil {
+			close(done)
+		}
+		return nil
+	}
+	if s.messenger == nil {
+		return nil
+	}
+	if err := s.db.Update(func(tx database.Tx) error {
+		return s.messenger.ReliablySendMessage(tx, vendor, message, done)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 

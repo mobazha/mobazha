@@ -62,6 +62,10 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, te
 		}
 		escrowInfo.PayerAddress = payer.String()
 		escrowInfo.BuyerAddress = solana.PublicKeyFromBytes(buyerID.Pubkeys.Solana).String()
+		escrowInfo.RefundAddress = paymentSent.RefundAddress
+		if escrowInfo.RefundAddress == "" {
+			escrowInfo.RefundAddress = escrowInfo.BuyerAddress
+		}
 		escrowInfo.SellerAddress = solana.PublicKeyFromBytes(vendorID.Pubkeys.Solana).String()
 		escrowInfo.ModeratorAddress = paymentSent.ModeratorAddress
 	} else if coinInfo.IsEthTypeChain() {
@@ -72,6 +76,10 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, te
 			return iwallet.EscrowInfo{}, fmt.Errorf("failed to decode buyer address: %w", err)
 		}
 		escrowInfo.BuyerAddress = buyer.String()
+		escrowInfo.RefundAddress = paymentSent.RefundAddress
+		if escrowInfo.RefundAddress == "" {
+			escrowInfo.RefundAddress = escrowInfo.BuyerAddress
+		}
 		seller, err := iwallet.PubKeyBytesToEthAddress(vendorID.Pubkeys.Eth)
 		if err != nil {
 			return iwallet.EscrowInfo{}, fmt.Errorf("failed to decode seller address: %w", err)

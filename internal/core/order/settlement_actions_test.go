@@ -121,6 +121,8 @@ func newManagedEscrowOrderForTests(t *testing.T, coinType iwallet.CoinType) (*mo
 		Chaincode:    "abcd",
 		Script:       "beef",
 		PlatformAddr: "0x7777777777777777777777777777777777777777",
+		SettlementSpec: payment.NewManagedEscrowSpec(false).
+			ToPaymentSent(),
 	}
 	if err := order.SetPaymentSent(paymentSent); err != nil {
 		t.Fatalf("SetPaymentSent: %v", err)

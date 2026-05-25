@@ -91,7 +91,10 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	solActionStore, solActionRecorder := n.newSettlementActionStore("Solana Anchor")
 	var solRelayer adapters.SolanaInstructionRelayer
 	if n.settlementService != nil {
-		solRelayer = adapters.SolanaInstructionRelayerFunc(n.settlementService.RelaySolanaTransactionWithSigners)
+		solRelayer = adapters.NewSolanaInstructionRelayer(
+			n.settlementService.RelaySolanaTransactionWithSigners,
+			n.settlementService.SolanaRelayAuthorityAddress,
+		)
 	}
 	n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
 		Legacy:   solLegacy,

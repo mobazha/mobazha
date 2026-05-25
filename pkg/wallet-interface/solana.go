@@ -12,6 +12,7 @@ type EscrowInfo struct {
 	PayerAddress         string
 	PlatformAuthority    string
 	BuyerAddress         string
+	RefundAddress        string
 	SellerAddress        string
 	ModeratorAddress     string
 	PlatformFeeCollector string

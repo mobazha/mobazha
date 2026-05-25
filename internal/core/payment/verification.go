@@ -136,7 +136,7 @@ func (s *PaymentAppService) verifyOrderPayment(order *models.Order) {
 		s.emitVerifiedPaymentEvents(order, paymentSent, &vp.Transaction)
 	}
 
-	if s.paymentVerifiedHandler != nil && order.MyRole == string(models.RoleVendor) {
+	if s.paymentVerifiedHandler != nil && (order.MyRole == string(models.RoleBuyer) || order.MyRole == string(models.RoleVendor)) {
 		go s.paymentVerifiedHandler(order.ID.String(), paymentSent)
 	}
 }

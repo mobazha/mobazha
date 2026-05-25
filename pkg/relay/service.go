@@ -99,4 +99,5 @@ type SolanaRelayResponse struct {
 type SolanaRelayService interface {
 	Execute(ctx context.Context, req *SolanaRelayRequest) (*SolanaRelayResponse, error)
 	IsAvailable() bool
+	GetFeePayerAddress() string
 }

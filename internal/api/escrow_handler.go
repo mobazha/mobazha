@@ -95,6 +95,23 @@ type ManagedEscrowPaymentInfoResponse struct {
 	Moderator           string                `json:"moderator,omitempty"`           // peerID (MODERATED only)
 }
 
+// SolanaPaymentInfoResponse is the payment setup response for Solana Anchor
+// escrow. Setup is backend-submitted through the Solana relay, while buyer
+// funding is monitored at the escrow account address.
+type SolanaPaymentInfoResponse struct {
+	PaymentType    string                `json:"paymentType"`
+	PaymentMethod  pb.PaymentSent_Method `json:"paymentMethod"`
+	PaymentAddress string                `json:"paymentAddress"`
+	EscrowAccount  string                `json:"escrowAccount"`
+	Amount         uint64                `json:"amount,string"`
+	Coin           string                `json:"coin"`
+	ActionID       string                `json:"actionId,omitempty"`
+	TxHash         string                `json:"txHash,omitempty"`
+	PaymentData    *models.PaymentData   `json:"paymentData,omitempty"`
+	ExpiresAt      time.Time             `json:"expiresAt"`
+	Moderator      string                `json:"moderator,omitempty"`
+}
+
 // ============================================================================
 // 主处理函数
 // ============================================================================
@@ -256,6 +273,8 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		// UTXO chains still use the existing formatMonitoredPaymentResponse path.
 		if result.IsManagedEscrowOrder {
 			g.formatManagedEscrowPaymentResponse(w, result)
+		} else if result.IsSolanaEscrow {
+			g.formatSolanaPaymentResponse(w, result)
 		} else {
 			g.formatMonitoredPaymentResponse(w, params, result)
 		}
@@ -378,6 +397,29 @@ func (g *Gateway) formatManagedEscrowPaymentResponse(w http.ResponseWriter, resu
 		CancelFeeAmount:     paymentData.CancelFeeAmount,
 		ExpiresAt:           time.Now().Add(UTXOPaymentWindowDuration),
 		Moderator:           paymentData.Moderator,
+	}
+	responsePkg.Success(w, response)
+}
+
+func (g *Gateway) formatSolanaPaymentResponse(w http.ResponseWriter, result *payment.PaymentSetupResult) {
+	paymentData := result.PaymentData
+	if paymentData == nil || paymentData.ToAddress == "" {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for Solana order: missing address")
+		return
+	}
+
+	response := SolanaPaymentInfoResponse{
+		PaymentType:    "solana_address_monitored",
+		PaymentMethod:  paymentData.Method,
+		PaymentAddress: paymentData.ToAddress,
+		EscrowAccount:  result.EscrowAddr,
+		Amount:         paymentData.Amount,
+		Coin:           string(paymentData.Coin),
+		ActionID:       result.ActionID,
+		TxHash:         result.SubmittedTxHash,
+		PaymentData:    paymentData,
+		ExpiresAt:      time.Now().Add(UTXOPaymentWindowDuration),
+		Moderator:      paymentData.Moderator,
 	}
 	responsePkg.Success(w, response)
 }

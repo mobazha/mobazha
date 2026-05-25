@@ -160,6 +160,9 @@ type PaymentSetupParams struct {
 	// PayerAddress is the buyer's wallet address (format depends on chain).
 	PayerAddress string
 
+	// RefundAddress is the buyer-controlled address that receives refunds.
+	RefundAddress string
+
 	// Moderator is the moderator's peer ID (empty for no moderator).
 	Moderator string
 
@@ -192,6 +195,11 @@ type PaymentSetupResult struct {
 	// response shapes — ManagedEscrow has no Script / ScriptHash fields.
 	IsManagedEscrowOrder bool
 
+	// IsSolanaEscrow is true when the strategy is the Solana Anchor
+	// address-monitored escrow path. It is monitored like UTXO/ManagedEscrow, but its
+	// response shape is Solana-specific and must not be formatted as UTXO.
+	IsSolanaEscrow bool
+
 	// PaymentData carries chain-specific payment data.
 	PaymentData *models.PaymentData
 
@@ -202,6 +210,14 @@ type PaymentSetupResult struct {
 	// nil for Monitored (backend handles it), non-nil for ClientSigned.
 	// Retained as `any` — same polymorphism as InstructionResult.Instructions.
 	Instructions any
+
+	// ActionID is the opaque settlement/setup action key when setup was
+	// submitted by a backend relayer.
+	ActionID string
+
+	// SubmittedTxHash is the relay/broadcast tx hash when setup submitted a
+	// transaction synchronously.
+	SubmittedTxHash string
 }
 
 // ── ChainEscrow Interface ───────────────────────────────────

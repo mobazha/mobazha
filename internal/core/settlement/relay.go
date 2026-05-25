@@ -62,6 +62,24 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 		if cerr != nil {
 			return "", payoutAddress, cerr
 		}
+		if coinInfo.Chain == iwallet.ChainSolana && s.IsSolanaRelayAvailable() {
+			if payoutAddress == "" {
+				addr, err := s.GetPayoutAddress(coinType.String())
+				if err != nil {
+					return "", payoutAddress, fmt.Errorf("failed to get payout address: %w", err)
+				}
+				payoutAddress = addr.String()
+			}
+			result, _, err := s.ExecuteSettlementAction(context.Background(), "confirm", order.ID, payoutAddress)
+			if err != nil {
+				return "", payoutAddress, fmt.Errorf("failed to execute Solana settlement confirm: %w", err)
+			}
+			txHash := settlementActionTxHash(context.Background(), strategyV2, result)
+			if txHash == "" {
+				return "", payoutAddress, errors.New("Solana settlement confirm completed without tx hash")
+			}
+			return iwallet.TransactionID(txHash), payoutAddress, nil
+		}
 		// ManagedEscrow-backed EVM orders no longer share the legacy seller-confirm path.
 		// They require the unified settlement-action flow so the caller can
 		// obtain a pollable ActionID instead of forcing an implicit relay.
@@ -540,4 +558,11 @@ func (s *SettlementService) RelaySolanaTransactionWithSigners(
 		return "", fmt.Errorf("solana relay failed: %w", err)
 	}
 	return resp.TxSignature, nil
+}
+
+func (s *SettlementService) SolanaRelayAuthorityAddress() string {
+	if s == nil || s.solanaRelayService == nil {
+		return ""
+	}
+	return s.solanaRelayService.GetFeePayerAddress()
 }

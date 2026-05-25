@@ -7,10 +7,14 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	porderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -63,12 +67,43 @@ func TestBuildPaymentSetupParamsFromOrder_SameCurrencyUsesOrderOpenNumeric(t *te
 		Amount:      "42",
 		PricingCoin: "ETH",
 	}
-	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", noopRates{})
+	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", "", noopRates{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.Amount != 42 || got.CoinType != coin {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestBuildPaymentSetupParamsFromOrder_ForwardsRefundAddress(t *testing.T) {
+	coin := iwallet.CoinType("crypto:solana:mainnet:native")
+	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {
+		t.Skip("canonical coin unavailable in build env")
+	}
+
+	order := &models.Order{ID: models.OrderID("order.sol")}
+	open := &porderpb.OrderOpen{
+		Amount:      "42",
+		PricingCoin: "SOL",
+	}
+	got, err := buildPaymentSetupParamsFromOrder(
+		order,
+		open,
+		coin,
+		"payer-address",
+		"refund-address",
+		"",
+		noopRates{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PayerAddress != "payer-address" {
+		t.Fatalf("payer address = %q", got.PayerAddress)
+	}
+	if got.RefundAddress != "refund-address" {
+		t.Fatalf("refund address = %q", got.RefundAddress)
 	}
 }
 
@@ -82,7 +117,7 @@ func TestCryptoPaymentFacade_ValidateStorePolicyModeratorAcceptsEnabledModerator
 		}},
 	}
 
-	revision, err := facade.validateStorePolicyModerator(context.Background(), testStorePolicyPeerA)
+	revision, err := facade.validateStorePolicyModerator(context.Background(), "", nil, testStorePolicyPeerA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,11 +136,68 @@ func TestCryptoPaymentFacade_ValidateStorePolicyModeratorRejectsDisabledOrMissin
 		}},
 	}
 
-	if _, err := facade.validateStorePolicyModerator(context.Background(), testStorePolicyPeerA); !errors.Is(err, coreiface.ErrBadRequest) {
+	if _, err := facade.validateStorePolicyModerator(context.Background(), "", nil, testStorePolicyPeerA); !errors.Is(err, coreiface.ErrBadRequest) {
 		t.Fatalf("disabled moderator error = %v, want ErrBadRequest", err)
 	}
-	if _, err := facade.validateStorePolicyModerator(context.Background(), testStorePolicyPeerB); !errors.Is(err, coreiface.ErrBadRequest) {
+	if _, err := facade.validateStorePolicyModerator(context.Background(), "", nil, testStorePolicyPeerB); !errors.Is(err, coreiface.ErrBadRequest) {
 		t.Fatalf("missing moderator error = %v, want ErrBadRequest", err)
+	}
+}
+
+func TestCryptoPaymentFacade_ValidateStorePolicyModeratorResolvesSellerTenantFromOrderOpen(t *testing.T) {
+	shared, err := gorm.Open(sqlitedialect.Open(":memory:"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := shared.AutoMigrate(&models.StorePolicy{}, &models.StoreModerator{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := shared.Exec(`CREATE TABLE account_peer_ids (
+		account_id varchar(128) NOT NULL,
+		peer_id varchar(128) NOT NULL PRIMARY KEY
+	)`).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	const sellerTenantID = "tenant-seller"
+	const sellerPeerID = testStorePolicyPeerB
+	if err := shared.Exec(
+		"INSERT INTO account_peer_ids (account_id, peer_id) VALUES (?, ?)",
+		sellerTenantID,
+		sellerPeerID,
+	).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := shared.Create(&models.StorePolicy{TenantID: sellerTenantID, Revision: 7}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := shared.Create(&models.StoreModerator{
+		TenantID: sellerTenantID,
+		PeerID:   testStorePolicyPeerA,
+		Enabled:  true,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	buyerDB, err := dbstore.NewTenantDBWithPublicData(shared, "tenant-buyer", dbstore.NewDBPublicData(shared, "tenant-buyer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	facade := &CryptoPaymentFacade{db: buyerDB}
+	orderOpen := &porderpb.OrderOpen{
+		Listings: []*porderpb.SignedListing{
+			{Listing: &porderpb.Listing{VendorID: &porderpb.ID{PeerID: sellerPeerID}}},
+		},
+	}
+
+	revision, err := facade.validateStorePolicyModerator(context.Background(), "order-before-vendor-mirror", orderOpen, testStorePolicyPeerA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision != 7 {
+		t.Fatalf("revision = %d, want 7", revision)
 	}
 }
 

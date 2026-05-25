@@ -649,16 +649,17 @@ func TestClientSignedAdapter_FullPipeline_WithMockChainOps(t *testing.T) {
 }
 
 func TestSolanaAnchorAdapter_SetupPaymentRelaysWithoutReturningInstructions(t *testing.T) {
-	legacy := adapters.NewClientSignedAdapter(&stubChainOps{}, func(_ context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
+	signer := solana.NewWallet().PrivateKey
+	buildInitEscrow := func(_ context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
+		require.Equal(t, signer.PublicKey().String(), params.PayerAddress)
 		return &models.PaymentData{OrderID: params.OrderID, Coin: params.CoinType}, iwallet.NewAddress("escrow111", params.CoinType), "anchor-create-ix", nil
-	}, nil)
+	}
 	store := adapters.NewMemoryActionStore()
 	var relayedOrder string
 	var relayedActionID string
 	var relayedInstructions any
-	signer := solana.NewWallet().PrivateKey
 	adapter := adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
-		Legacy: legacy,
+		BuildInitEscrow: buildInitEscrow,
 		Relayer: adapters.SolanaInstructionRelayerFunc(func(_ context.Context, orderID string, action string, actionID string, instructions any, _ any) (string, error) {
 			relayedOrder = orderID
 			relayedActionID = actionID
@@ -693,7 +694,7 @@ func TestSolanaAnchorAdapter_SetupPaymentRelaysWithoutReturningInstructions(t *t
 
 func TestSolanaAnchorAdapter_ActionsFailClosedInsteadOfReturningLegacyInstructions(t *testing.T) {
 	adapter := adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
-		Legacy: adapters.NewClientSignedAdapter(&stubChainOps{cancelReleaseResult: "legacy-cancel"}, nil, func(models.OrderID, string, string) (iwallet.CoinType, any, error) {
+		Compat: adapters.NewClientSignedAdapter(&stubChainOps{cancelReleaseResult: "legacy-cancel"}, nil, func(models.OrderID, string, string) (iwallet.CoinType, any, error) {
 			return iwallet.CoinType("crypto:solana:mainnet:native"), "legacy-confirm", nil
 		}),
 	})

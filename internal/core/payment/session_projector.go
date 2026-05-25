@@ -47,9 +47,6 @@ type projectOrderInput struct {
 	order       *models.Order
 	orderOpen   *pb.OrderOpen   // may be nil for orders not yet opened
 	paymentSent *pb.PaymentSent // may be nil for orders not yet paid
-	isManagedEscrowOrder bool            // legacy fallback when settlement spec is absent
-	hasSpec     bool
-	spec        payment.SettlementSpec
 	obsCount    int
 	lastObsAt   *time.Time
 }
@@ -206,181 +203,32 @@ func normalizeCoinBestEffort(coin string) string {
 	return s
 }
 
-// settlementRail is the internal discriminator used by detectSettlementRail.
-type settlementRail int
-
-const (
-	// railAddressMonitored: backend generates an address and monitors it for
-	// incoming transfers. Covers UTXO chains (BTC / BCH / LTC / ZEC) and EXTERNAL_PAYMENT.
-	railAddressMonitored settlementRail = iota
-	// railClientSigned: buyer's local wallet must initiate the transfer and/or
-	// sign escrow instructions. Covers legacy EVM (V1 ContractManager) and
-	// Solana/TRON.
-	//
-	// Note: ManagedEscrow EVM orders are classified as railAddressMonitored upstream,
-	// before detectSettlementRail is called, via the isManagedEscrowOrder flag set in
-	// fetchProjectInput (Phase PS B2 resolved TD-PSS-02).
-	railClientSigned
-	// railUnknown: coin code not recognised; conservative fallback.
-	railUnknown
-)
-
-// detectSettlementRail classifies a canonical (or best-effort normalized) coin
-// into the appropriate settlement rail. Fiat coins must be resolved before
-// calling this function.
-//
-// Primary path: canonical "crypto:*" asset ID → resolved via CoinInfoFromCoinType
-// using ChainType.IsUTXOChain() / chain identity. No string-based chain list.
-//
-// Fallback path: non-canonical ticker strings are resolved in two steps:
-//  1. Try ChainType(ticker).IsValid() — covers all native chain tickers without
-//     maintaining a parallel hardcoded list here.
-//  2. For well-known multi-chain token symbols (USDC etc.) that carry no
-//     intrinsic chain context, conservatively classify as client-signed.
-//
-// Phase PS B4: canonical policy at API ingress reduces new orders hitting this
-// fallback; legacy rows may still carry ambiguous tickers until fully migrated.
-func detectSettlementRail(coinCode string) settlementRail {
-	if coinCode == "" {
-		return railUnknown
-	}
-
-	// Primary path: canonical crypto asset ID — use CoinInfo to classify.
-	if strings.HasPrefix(strings.ToLower(coinCode), "crypto:") {
-		info, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinCode))
-		if err != nil {
-			return railUnknown
-		}
-		if info.Chain.IsUTXOChain() || info.Chain == iwallet.ChainExternalPayment {
-			return railAddressMonitored
-		}
-		// EVM / Solana / TRON / unknown → client-signed (V1 legacy escrow).
-		// ManagedEscrow EVM orders are classified upstream via isManagedEscrowOrder flag before
-		// detectSettlementRail is reached (TD-PSS-02 resolved by Phase PS B2).
-		return railClientSigned
-	}
-
-	// Fallback for non-canonical pass-throughs (best-effort):
-	upper := strings.ToUpper(strings.TrimSpace(coinCode))
-
-	// Step 1: native chain tickers — delegate to ChainType methods instead of
-	// maintaining a parallel hardcoded list.
-	chain := iwallet.ChainType(upper)
-	if chain.IsValid() {
-		if chain.IsUTXOChain() || chain == iwallet.ChainExternalPayment {
-			return railAddressMonitored
-		}
-		// Valid non-UTXO, non-ExternalPayment chain (EVM / Solana / TRON etc.).
-		return railClientSigned
-	}
-
-	// Step 2: multi-chain token symbols carry no intrinsic chain context.
-	// Conservatively classify as client-signed; Phase B4 ingress policy will
-	// make this branch dead code for new orders.
-	switch upper {
-	case "USDC", "USDT", "DAI", "WETH", "WBTC":
-		return railClientSigned
-	default:
-		return railUnknown
-	}
-}
-
 // deriveFundingTarget decides the SettlementMode and builds a FundingTargetView.
 //
 //   - Fiat orders (paymentCoin starts with "fiat:"): provider_checkout.
-//   - UTXO / EXTERNAL_PAYMENT orders with a PaymentAddress: address_monitored.
-//   - ManagedEscrow EVM orders (isManagedEscrowOrder == true): address_monitored (predicted ManagedEscrow addr).
-//   - Legacy EVM / Solana / TRON orders with a PaymentAddress: escrow_v1
-//     (buyer must sign escrow contract instructions). The address is still
-//     reported in FundingTarget so the UI can display the escrow contract.
-//   - Any crypto order without a PaymentAddress: escrow_v1 placeholder
-//     (not yet provisioned; call CreateSession to provision).
+//   - Crypto orders: address_monitored. Client-signed funding has been retired
+//     from the product contract; any remaining legacy records are projected as
+//     address-monitored so the frontend never re-enters the old instructions UI.
 func (p *PaymentSessionProjector) deriveFundingTarget(
 	order *models.Order,
 	paymentCoin string,
 	expectedAmount string,
-	input *projectOrderInput,
+	_ *projectOrderInput,
 ) (payment.SettlementMode, payment.FundingTargetView) {
-	isManagedEscrowOrder := input.isManagedEscrowOrder
-	if input.hasSpec && input.spec.UsesManagedEscrow() {
-		isManagedEscrowOrder = true
-	}
 	// Fiat path
 	if strings.HasPrefix(paymentCoin, "fiat:") {
 		return payment.SettlementModeProviderCheckout, p.deriveFiatFundingTarget(order, paymentCoin, expectedAmount)
 	}
 
-	// Crypto path — address present: discriminate by rail type.
-	if order.PaymentAddress != "" {
-		target := payment.FundingTargetView{
-			Type:    payment.FundingTargetTypeAddress,
-			Address: order.PaymentAddress,
-			AssetID: paymentCoin, // projector leaves canonical normalisation to the service layer
-			Amount:  expectedAmount,
-		}
-
-		if input.hasSpec {
-			if mode := payment.SettlementModeFromPayMode(input.spec.PayMode); mode != "" {
-				return mode, target
-			}
-		} else if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
-			if mode := payment.SettlementModeFromPayMode(spec.PayMode); mode != "" {
-				return mode, target
-			}
-		}
-
-		// Legacy fallback when persisted settlement spec is absent.
-		if isManagedEscrowOrder {
-			return payment.SettlementModeAddressMonitored, target
-		}
-
-		rail := detectSettlementRail(paymentCoin)
-		switch rail {
-		case railAddressMonitored:
-			return payment.SettlementModeAddressMonitored, target
-		case railClientSigned:
-			// Legacy EVM/Solana/TRON: the address is the escrow contract; the
-			// buyer must use their local wallet to sign and submit the on-chain
-			// escrow initialisation call. escrow_v1 signals this to the frontend.
-			return payment.SettlementModeEscrowV1, target
-		default:
-			// Unknown coin with an address: conservative fallback to address_monitored.
-			// Phase B4 canonical policy enforcement will make this branch unreachable.
-			return payment.SettlementModeAddressMonitored, target
-		}
-	}
-
-	// Crypto path — address not yet provisioned (e.g. order opened but
-	// payment not set up). Return a placeholder FundingTargetView with an
-	// empty address; the actual mode is inferred from the coin's settlement
-	// rail and will be confirmed once CreateSession provisions the address.
-	//
-	// Clients MUST NOT treat an empty fundingTarget.address as actionable.
-	// Detect the unprovisioned state by:
-	//   session.Status == "awaiting_funds" && fundingTarget.address == ""
-	// and call POST /v1/orders/{orderID}/payment-session to provision.
+	// Crypto path. Empty address means the session still needs provisioning via
+	// POST /v1/orders/{orderID}/payment-session; it is not an actionable target.
 	target := payment.FundingTargetView{
 		Type:    payment.FundingTargetTypeAddress,
+		Address: order.PaymentAddress,
 		AssetID: paymentCoin,
 		Amount:  expectedAmount,
 	}
-	if input.hasSpec {
-		if mode := payment.SettlementModeFromPayMode(input.spec.PayMode); mode != "" {
-			return mode, target
-		}
-	} else if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
-		if mode := payment.SettlementModeFromPayMode(spec.PayMode); mode != "" {
-			return mode, target
-		}
-	}
-	if isManagedEscrowOrder {
-		return payment.SettlementModeAddressMonitored, target
-	}
-	rail := detectSettlementRail(paymentCoin)
-	if rail == railAddressMonitored {
-		return payment.SettlementModeAddressMonitored, target
-	}
-	return payment.SettlementModeEscrowV1, target
+	return payment.SettlementModeAddressMonitored, target
 }
 
 // deriveFiatFundingTarget builds a FundingTargetView for fiat provider sessions.
@@ -677,17 +525,6 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 	// PaymentSent (for payment coin, method)
 	if ps, err := order.PaymentSentMessage(); err == nil {
 		input.paymentSent = ps
-	}
-
-	if spec, ok := payment.ResolveSettlementSpecFromOrder(&order); ok {
-		input.hasSpec = true
-		input.spec = spec
-	}
-	// Legacy fallback when settlement spec is not persisted on the order.
-	if !input.hasSpec {
-		if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
-			input.isManagedEscrowOrder = true
-		}
 	}
 
 	// Observation count + last observed timestamp

@@ -86,8 +86,8 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		OnAutoConfirm:   n.handleCancelablePaymentForSolana,
 		NodeID:          n.nodeID,
 	}
-	solLegacy := adapters.NewClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
-	n.paymentRegistry.Register(iwallet.ChainSolana, solLegacy)
+	solCompat := adapters.NewSolanaLifecycleCompatAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
+	n.paymentRegistry.Register(iwallet.ChainSolana, solCompat)
 	solActionStore, solActionRecorder := n.newSettlementActionStore("Solana Anchor")
 	var solRelayer adapters.SolanaInstructionRelayer
 	if n.settlementService != nil {
@@ -97,12 +97,13 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		)
 	}
 	n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
-		Legacy:   solLegacy,
-		Relayer:  solRelayer,
-		Store:    solActionStore,
-		Recorder: solActionRecorder,
-		Keys:     n.keyProvider,
-		Wallets:  n.multiwallet,
+		BuildInitEscrow: n.paymentService.BuildInitEscrowInstructions,
+		Compat:          solCompat,
+		Relayer:         solRelayer,
+		Store:           solActionStore,
+		Recorder:        solActionRecorder,
+		Keys:            n.keyProvider,
+		Wallets:         n.multiwallet,
 	}))
 
 	// ── TRON ──────────────────────────────────────────────────

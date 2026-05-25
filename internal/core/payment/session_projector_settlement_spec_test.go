@@ -14,13 +14,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func testProjectInput(order *models.Order, legacyManagedEscrow bool) *projectOrderInput {
-	input := &projectOrderInput{order: order, isManagedEscrowOrder: legacyManagedEscrow}
-	if spec, ok := pkpayment.ResolveSettlementSpecFromOrder(order); ok {
-		input.hasSpec = true
-		input.spec = spec
-	}
-	return input
+func testProjectInput(order *models.Order) *projectOrderInput {
+	return &projectOrderInput{order: order}
 }
 
 func TestDerivePaymentInfo_ManagedEscrowPendingUsesSettlementSpecMethod(t *testing.T) {
@@ -51,12 +46,12 @@ func TestDeriveFundingTarget_ManagedEscrowPendingUsesAddressMonitored(t *testing
 		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),
 	}))
 
-	mode, target := p.deriveFundingTarget(order, "crypto:eth:eth", "1000", testProjectInput(order, false))
+	mode, target := p.deriveFundingTarget(order, "crypto:eth:eth", "1000", testProjectInput(order))
 	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
 	require.Equal(t, "0xmanagedescrow", target.Address)
 }
 
-func TestDeriveFundingTarget_LegacyContractPendingUsesEscrowV1(t *testing.T) {
+func TestDeriveFundingTarget_RetiredClientSignedPendingProjectsAsAddressMonitored(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "0xescrow"}
 	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
@@ -65,8 +60,27 @@ func TestDeriveFundingTarget_LegacyContractPendingUsesEscrowV1(t *testing.T) {
 		SettlementSpec: pkpayment.NewLegacyEVMContractSpec(false).ToPending(),
 	}))
 
-	mode, _ := p.deriveFundingTarget(order, "crypto:eip155:1:native", "1000", testProjectInput(order, false))
-	require.Equal(t, pkpayment.SettlementModeEscrowV1, mode)
+	mode, target := p.deriveFundingTarget(order, "crypto:eip155:1:native", "1000", testProjectInput(order))
+	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
+	require.Equal(t, "0xescrow", target.Address)
+}
+
+func TestDeriveFundingTarget_SolanaDefaultsToAddressMonitored(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{}
+
+	mode, target := p.deriveFundingTarget(order, "crypto:solana:mainnet:native", "1000", testProjectInput(order))
+	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
+	require.Empty(t, target.Address)
+}
+
+func TestDeriveFundingTarget_EVMWithoutAddressDefaultsToAddressMonitored(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{}
+
+	mode, target := p.deriveFundingTarget(order, "crypto:eip155:11155111:native", "1000", testProjectInput(order))
+	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
+	require.Empty(t, target.Address)
 }
 
 func TestDerivePaymentInfo_LegacyContractPendingUsesPendingCoin(t *testing.T) {
@@ -107,7 +121,7 @@ func TestDeriveFundingTarget_UTXOPendingUsesAddressMonitored(t *testing.T) {
 		SettlementSpec: pkpayment.NewUTXOSpec(true).ToPending(),
 	}))
 
-	mode, _ := p.deriveFundingTarget(order, "BTC", "50000", testProjectInput(order, false))
+	mode, _ := p.deriveFundingTarget(order, "BTC", "50000", testProjectInput(order))
 	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
 }
 
@@ -130,8 +144,6 @@ func TestProject_FormatsUTXOAmountsAsDecimalStrings(t *testing.T) {
 			Timestamp:   timestamppb.New(time.Now()),
 			PricingCoin: "USD",
 		},
-		hasSpec: true,
-		spec:    pkpayment.NewUTXOSpec(true),
 	})
 	require.NoError(t, err)
 	require.Equal(t, "0.00030116", session.ExpectedAmount)
@@ -158,8 +170,6 @@ func TestProject_UsesLockedUTXOPendingAmountOverOrderOpenAmount(t *testing.T) {
 			Timestamp:   timestamppb.New(time.Now()),
 			PricingCoin: "crypto:eip155:1:native",
 		},
-		hasSpec: true,
-		spec:    pkpayment.NewUTXOSpec(false),
 	})
 	require.NoError(t, err)
 	require.Equal(t, "0.0003007", session.ExpectedAmount)
@@ -187,8 +197,6 @@ func TestProject_UsesPaymentSentAmountWhenAddressMonitoredOrderIsAlreadyPaid(t *
 			PricingCoin: "ETH",
 		},
 		paymentSent: paymentSent,
-		hasSpec:     true,
-		spec:        pkpayment.NewUTXOSpec(false),
 	})
 	require.NoError(t, err)
 	require.Equal(t, "0.00029838", session.ExpectedAmount)
@@ -218,8 +226,6 @@ func TestProject_FormatsManagedEscrowAmountsAsDecimalStrings(t *testing.T) {
 			Timestamp:   timestamppb.New(time.Now()),
 			PricingCoin: "USD",
 		},
-		hasSpec: true,
-		spec:    pkpayment.NewManagedEscrowSpec(false),
 	})
 	require.NoError(t, err)
 	require.Equal(t, "0.007022669176100452", session.ExpectedAmount)
@@ -245,8 +251,6 @@ func TestProject_UsesLockedManagedEscrowPendingAmountOverOrderOpenAmount(t *test
 			Timestamp:   timestamppb.New(time.Now()),
 			PricingCoin: "USD",
 		},
-		hasSpec: true,
-		spec:    pkpayment.NewManagedEscrowSpec(false),
 	})
 	require.NoError(t, err)
 	require.Equal(t, "0.007022669176100452", session.ExpectedAmount)

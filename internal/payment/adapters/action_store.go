@@ -7,28 +7,7 @@ import (
 	"time"
 )
 
-// Sprint 2 D16 — Action store for ManagedEscrowAdapter.GetActionStatus.
-//
-// Background. Backend-submitted ManagedEscrow actions persist relay projections
-// under an ActionID / ClientActionID before TxHash exists. GetActionStatus
-// reads back from the same store once relay submission or confirmation
-// updates arrive.
-//
-// D16 lands the read interface and an in-memory implementation so:
-//
-//   1. ManagedEscrowAdapter.GetActionStatus is no longer a stub — it can serve
-//      a meaningful response the moment a store is wired in.
-//   2. D17 can substitute a Postgres / SQLite-backed store without
-//      touching adapter call sites.
-//   3. Standalone-only deployments and integration tests get a
-//      production-grade in-memory variant for free.
-//
-// The interface is intentionally narrow (Lookup only) — D16 does NOT
-// wire writes from the action methods. The relay submission path
-// (D17) handles inserts via a separate writer interface that the
-// adapter never sees.
-
-// ActionRecord is the canonical view of a tracked ManagedEscrowTx action — the
+// ActionRecord is the canonical view of a backend-submitted settlement action — the
 // projection that callers receive through GetActionStatus. It is a
 // strict superset of payment.ActionStatus (state/txHash/confirmations/
 // lastError) plus the metadata needed to correlate a record with the
@@ -36,16 +15,16 @@ import (
 //
 // Field rationale:
 //   - ActionID — opaque relay-task UUID; the public lookup key.
-//   - OrderID + Action + ChainID — diagnostic backlinks. We avoid
-//     leaking ManagedEscrowTx hash / signatures here because Lookup is hot on
-//     status-poll paths and the caller already has them indexed in
-//     the store row.
-//   - State — relay_tasks.status vocabulary: pending | submitting |
+//   - OrderID + Action + ChainID — diagnostic backlinks.
+//   - To + Data — internal durable relay intent. They let the reconciler
+//     resubmit a dropped transaction and are intentionally not exposed by
+//     payment.ActionStatus.
+//   - State — settlement action status vocabulary: pending | submitting |
 //     submitted | confirmed | failed | abandoned. We don't enum-type
 //     it because the store may add new states (e.g., "stalled" in
 //     v1.3) before the adapter does.
 //   - TxHash — the LATEST broadcast hash. May change across retries
-//     (relay re-broadcasts with bumped gas); always reflects the
+//     (core resubmits a dropped relay call); always reflects the
 //     most recent attempt the store has on file.
 //   - Confirmations — counted by the on-chain reader, not the store
 //     itself; PaymentMonitor (D-Hybrid-31) updates this field.
@@ -55,21 +34,25 @@ import (
 //   - CreatedAt / UpdatedAt — for staleness checks. Stored as
 //     time.Time (UTC); tests pass time.Time{} to express "unknown".
 type ActionRecord struct {
-	ActionID      string
-	OrderID       string
-	Action        string // confirm | cancel | complete | dispute_release
-	ChainID       uint64
-	State         string
-	TxHash        string
-	RelayTaskID   string
-	Confirmations int
-	LastError     string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ActionID        string
+	OrderID         string
+	Action          string // confirm | cancel | complete | dispute_release
+	ChainID         uint64
+	To              string
+	Data            string
+	State           string
+	TxHash          string
+	AttemptTxHashes string
+	RelayTaskID     string
+	Attempts        int
+	Confirmations   int
+	LastError       string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
-// ActionStore is the read-side contract ManagedEscrowAdapter consumes. The
-// production implementation (D17) sits on top of `relay_tasks`; the
+// ActionStore is the read-side contract settlement adapters consume. The
+// production implementation persists durable command-outbox projections; the
 // MemoryActionStore below serves tests and standalone deployments.
 //
 // Error contract:
@@ -89,8 +72,8 @@ type ActionStore interface {
 	Lookup(ctx context.Context, actionID string) (*ActionRecord, error)
 }
 
-// ActionRecorder persists ActionRecord projections after a successful relay
-// submission (RelayBridge). MemoryActionStore and SettlementActionStore both
+// ActionRecorder persists ActionRecord projections after a backend submitter
+// accepts an action. MemoryActionStore and SettlementActionStore both
 // implement it via Put — the adapter read path stays ActionStore-only.
 type ActionRecorder interface {
 	Put(rec ActionRecord) error
@@ -111,9 +94,8 @@ var ErrActionRecordNotFound = errors.New("action store: record not found")
 // MemoryActionStore — in-process implementation.
 //
 // Used by:
-//   - Sprint 2 D16 unit tests (this file's test sibling exercises
-//     the contract; managed_escrow_test.go uses it to drive GetActionStatus
-//     happy / not-found / cancellation paths).
+//   - Unit tests that exercise GetActionStatus happy / not-found /
+//     cancellation paths.
 //   - Standalone-mode deployments that opt out of relay persistence
 //     (a node operator who self-broadcasts and tracks status purely
 //     in memory; they accept that a node restart drops the records).
@@ -122,7 +104,7 @@ var ErrActionRecordNotFound = errors.New("action store: record not found")
 //
 // NOT safe to use as the production SaaS store — there is no durable
 // backing, no cross-process visibility, and no automatic eviction.
-// Wire a relay_tasks-backed implementation in D17.
+// Wire a durable SQL implementation for production use.
 // ────────────────────────────────────────────────────────────────
 
 // MemoryActionStore is a goroutine-safe map-backed ActionStore. The

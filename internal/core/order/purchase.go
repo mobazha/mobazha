@@ -656,6 +656,10 @@ func BuildPaymentSentProto(order *models.Order, pd *models.PaymentData) (*pb.Pay
 
 // ProcessOrderPayment handles the payment submission for an order.
 func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) (err error) {
+	if paymentData == nil {
+		return fmt.Errorf("payment data is required")
+	}
+
 	order, err := s.fetchOrder(paymentData.OrderID)
 	if err != nil {
 		return err
@@ -768,7 +772,6 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 	if !order.IsPaymentVerified() && s.paymentVerifier != nil && !iwallet.CoinType(paymentSent.Coin).IsFiatPayment() {
 		vp, verifyErr := s.paymentVerifier.FetchAndVerify(ctx, orderOpen, paymentSent, paymentSent.ToAddress)
 		if verifyErr == nil && vp != nil {
-			verifiedPersisted := false
 			if dbErr := s.db.Update(func(tx database.Tx) error {
 				if reloadErr := tx.Read().Where("id = ?", order.ID).First(order).Error; reloadErr != nil {
 					return reloadErr
@@ -776,14 +779,10 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 				return s.orderProcessor.RecordVerifiedPayment(tx, order, vp.Transaction)
 			}); dbErr != nil {
 				logger.LogErrorWithIDf(log, s.nodeID,
-					"Immediate payment verification persist failed for order %s (async retry will cover): %v",
+					"Immediate payment verification persist failed for order %s (async retry will cover locally; relaying verified payment to counterparty): %v",
 					paymentData.OrderID, dbErr)
-			} else {
-				verifiedPersisted = true
 			}
-			if verifiedPersisted {
-				s.RelayPaymentToCounterparty(ctx, paymentData.OrderID, vendorPeerID, paymentData)
-			}
+			s.RelayPaymentToCounterparty(ctx, paymentData.OrderID, vendorPeerID, paymentData)
 		}
 	}
 

@@ -136,9 +136,13 @@ func (s *PaymentAppService) verifyOrderPayment(order *models.Order) {
 		s.emitVerifiedPaymentEvents(order, paymentSent, &vp.Transaction)
 	}
 
-	if s.paymentVerifiedHandler != nil && (order.MyRole == string(models.RoleBuyer) || order.MyRole == string(models.RoleVendor)) {
+	if s.paymentVerifiedHandler != nil && shouldInvokeAsyncPaymentVerifiedHandler(order) {
 		go s.paymentVerifiedHandler(order.ID.String(), paymentSent)
 	}
+}
+
+func shouldInvokeAsyncPaymentVerifiedHandler(order *models.Order) bool {
+	return order != nil && (order.Role() == models.RoleBuyer || order.Role() == models.RoleVendor)
 }
 
 func (s *PaymentAppService) expireUnverifiedPayment(order *models.Order, reason string) {

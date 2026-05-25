@@ -3,8 +3,10 @@ package core
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -27,12 +29,6 @@ func NewSettlementActionStore(db pkgdb.Database) *SettlementActionStore {
 	return &SettlementActionStore{db: db}
 }
 
-// NewManagedEscrowRelayActionStore is kept as a compatibility alias for older tests and
-// callers while the projection model name is migrated to settlement actions.
-func NewManagedEscrowRelayActionStore(db pkgdb.Database) *SettlementActionStore {
-	return NewSettlementActionStore(db)
-}
-
 // Lookup implements adapters.ActionStore.
 func (s *SettlementActionStore) Lookup(ctx context.Context, actionID string) (*adapters.ActionRecord, error) {
 	if err := ctx.Err(); err != nil {
@@ -52,17 +48,21 @@ func (s *SettlementActionStore) Lookup(ctx context.Context, actionID string) (*a
 		return nil, err
 	}
 	out := &adapters.ActionRecord{
-		ActionID:      row.ActionID,
-		OrderID:       row.OrderID,
-		Action:        row.ActionKind,
-		ChainID:       row.ChainID,
-		State:         row.State,
-		TxHash:        row.TxHash,
-		RelayTaskID:   row.RelayTaskID,
-		Confirmations: row.Confirmations,
-		LastError:     row.LastError,
-		CreatedAt:     row.CreatedAt,
-		UpdatedAt:     row.UpdatedAt,
+		ActionID:        row.ActionID,
+		OrderID:         row.OrderID,
+		Action:          row.ActionKind,
+		ChainID:         row.ChainID,
+		To:              row.To,
+		Data:            row.Data,
+		State:           row.State,
+		TxHash:          row.TxHash,
+		AttemptTxHashes: row.AttemptTxHashes,
+		RelayTaskID:     row.RelayTaskID,
+		Attempts:        row.Attempts,
+		Confirmations:   row.Confirmations,
+		LastError:       row.LastError,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
 	}
 	return out, nil
 }
@@ -74,17 +74,21 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 	}
 	now := time.Now().UTC()
 	row := models.ManagedEscrowRelayAction{
-		ActionID:      rec.ActionID,
-		OrderID:       rec.OrderID,
-		ActionKind:    rec.Action,
-		ChainID:       rec.ChainID,
-		State:         rec.State,
-		TxHash:        rec.TxHash,
-		RelayTaskID:   rec.RelayTaskID,
-		Confirmations: rec.Confirmations,
-		LastError:     rec.LastError,
-		CreatedAt:     rec.CreatedAt,
-		UpdatedAt:     rec.UpdatedAt,
+		ActionID:        rec.ActionID,
+		OrderID:         rec.OrderID,
+		ActionKind:      rec.Action,
+		ChainID:         rec.ChainID,
+		To:              rec.To,
+		Data:            rec.Data,
+		State:           rec.State,
+		TxHash:          rec.TxHash,
+		AttemptTxHashes: rec.AttemptTxHashes,
+		RelayTaskID:     rec.RelayTaskID,
+		Attempts:        rec.Attempts,
+		Confirmations:   rec.Confirmations,
+		LastError:       rec.LastError,
+		CreatedAt:       rec.CreatedAt,
+		UpdatedAt:       rec.UpdatedAt,
 	}
 	var existing models.ManagedEscrowRelayAction
 	err := s.db.View(func(tx pkgdb.Tx) error {
@@ -98,6 +102,19 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		if rec.CreatedAt.IsZero() {
 			row.CreatedAt = existing.CreatedAt
 		}
+		if row.TxHash == "" {
+			row.TxHash = existing.TxHash
+		}
+		if row.To == "" {
+			row.To = existing.To
+		}
+		if row.Data == "" {
+			row.Data = existing.Data
+		}
+		if row.Attempts < existing.Attempts {
+			row.Attempts = existing.Attempts
+		}
+		row.AttemptTxHashes = mergeSettlementActionTxHashes(existing.AttemptTxHashes, row.AttemptTxHashes, existing.TxHash, row.TxHash)
 		return nil
 	})
 	if err != nil {
@@ -112,7 +129,157 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 	})
 }
 
+func (s *SettlementActionStore) ClaimRetry(row models.ManagedEscrowRelayAction, nextAttempt int) (string, bool, error) {
+	if s == nil || s.db == nil {
+		return "", false, nil
+	}
+	attemptTxHashes := mergeSettlementActionTxHashes(row.AttemptTxHashes, row.TxHash)
+	rows, err := s.updateActionColumns(
+		map[string]interface{}{
+			"attempt_tx_hashes": attemptTxHashes,
+			"attempts":          nextAttempt,
+			"last_error":        "relay retry in progress",
+			"updated_at":        time.Now().UTC(),
+		},
+		map[string]interface{}{
+			"action_id = ?": row.ActionID,
+			"state = ?":     row.State,
+			"tx_hash = ?":   row.TxHash,
+			"attempts = ?":  row.Attempts,
+		},
+	)
+	return attemptTxHashes, rows == 1, err
+}
+
+func (s *SettlementActionStore) DeferRetry(row models.ManagedEscrowRelayAction, reason string) error {
+	if s == nil || s.db == nil {
+		return nil
+	}
+	state := row.State
+	if state == "" {
+		state = "submitted"
+	}
+	_, err := s.updateActionColumns(
+		map[string]interface{}{
+			"state":      state,
+			"last_error": reason,
+			"updated_at": time.Now().UTC(),
+		},
+		map[string]interface{}{
+			"action_id = ?": row.ActionID,
+		},
+	)
+	return err
+}
+
+func (s *SettlementActionStore) RecordRetrySubmitted(row models.ManagedEscrowRelayAction, txHash, attemptTxHashes string, attempts int) error {
+	if s == nil || s.db == nil {
+		return nil
+	}
+	_, err := s.updateActionColumns(
+		map[string]interface{}{
+			"state":             "submitted",
+			"tx_hash":           txHash,
+			"attempt_tx_hashes": mergeSettlementActionTxHashes(attemptTxHashes, txHash),
+			"attempts":          attempts,
+			"confirmations":     0,
+			"last_error":        "",
+			"updated_at":        time.Now().UTC(),
+		},
+		map[string]interface{}{
+			"action_id = ?": row.ActionID,
+		},
+	)
+	return err
+}
+
+func (s *SettlementActionStore) MarkTerminal(row models.ManagedEscrowRelayAction, state, reason string) error {
+	return s.RecordStatus(row, SettlementActionStatusUpdate{
+		State:     state,
+		LastError: reason,
+	})
+}
+
+type SettlementActionStatusUpdate struct {
+	State         string
+	TxHash        string
+	Confirmations int
+	LastError     string
+}
+
+func (s *SettlementActionStore) RecordStatus(row models.ManagedEscrowRelayAction, update SettlementActionStatusUpdate) error {
+	if s == nil || s.db == nil {
+		return nil
+	}
+	values := map[string]interface{}{
+		"confirmations": update.Confirmations,
+		"last_error":    update.LastError,
+		"updated_at":    time.Now().UTC(),
+	}
+	if update.State != "" {
+		values["state"] = update.State
+	}
+	if update.TxHash != "" {
+		values["tx_hash"] = update.TxHash
+		values["attempt_tx_hashes"] = mergeSettlementActionTxHashes(row.AttemptTxHashes, row.TxHash, update.TxHash)
+	}
+	_, err := s.updateActionColumns(
+		values,
+		map[string]interface{}{
+			"action_id = ?": row.ActionID,
+		},
+	)
+	return err
+}
+
+func (s *SettlementActionStore) updateActionColumns(values, where map[string]interface{}) (int64, error) {
+	var rows int64
+	err := s.db.Update(func(tx pkgdb.Tx) error {
+		affected, err := tx.UpdateColumns(values, where, &models.ManagedEscrowRelayAction{})
+		if err != nil {
+			return err
+		}
+		rows = affected
+		return nil
+	})
+	return rows, err
+}
+
 var (
 	_ adapters.ActionStore    = (*SettlementActionStore)(nil)
 	_ adapters.ActionRecorder = (*SettlementActionStore)(nil)
 )
+
+func mergeSettlementActionTxHashes(parts ...string) string {
+	var out []string
+	seen := make(map[string]struct{})
+	add := func(raw string) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return
+		}
+		key := raw
+		value := raw
+		if common.IsHexHash(raw) {
+			hash := common.HexToHash(raw)
+			if hash == (common.Hash{}) {
+				return
+			}
+			key = strings.ToLower(hash.Hex())
+			value = hash.Hex()
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, value)
+	}
+	for _, part := range parts {
+		for _, raw := range strings.FieldsFunc(part, func(r rune) bool {
+			return r == ',' || r == '\n' || r == '\r' || r == '\t' || r == ' '
+		}) {
+			add(raw)
+		}
+	}
+	return strings.Join(out, "\n")
+}

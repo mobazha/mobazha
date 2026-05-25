@@ -654,12 +654,14 @@ func TestSolanaAnchorAdapter_SetupPaymentRelaysWithoutReturningInstructions(t *t
 	}, nil)
 	store := adapters.NewMemoryActionStore()
 	var relayedOrder string
+	var relayedActionID string
 	var relayedInstructions any
 	signer := solana.NewWallet().PrivateKey
 	adapter := adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
 		Legacy: legacy,
-		Relayer: adapters.SolanaInstructionRelayerFunc(func(_ context.Context, orderID string, action string, _ string, instructions any, _ any) (string, error) {
+		Relayer: adapters.SolanaInstructionRelayerFunc(func(_ context.Context, orderID string, action string, actionID string, instructions any, _ any) (string, error) {
 			relayedOrder = orderID
+			relayedActionID = actionID
 			relayedInstructions = instructions
 			require.Equal(t, "setup", action)
 			return "solana-tx-sig", nil
@@ -675,13 +677,14 @@ func TestSolanaAnchorAdapter_SetupPaymentRelaysWithoutReturningInstructions(t *t
 	})
 	require.NoError(t, err)
 	require.Equal(t, payment.ActionModeSubmitted, result.Mode)
-	require.Equal(t, "solana-tx-sig", result.ActionID)
+	require.Equal(t, "order-1:setup", result.ActionID)
 	require.Equal(t, "solana-tx-sig", result.SubmittedTxHash)
 	require.Nil(t, result.Instructions, "V2 setup must not leak frontend-signable instructions")
 	require.Equal(t, "order-1", relayedOrder)
+	require.Equal(t, "order-1:setup", relayedActionID)
 	require.Equal(t, "anchor-create-ix", relayedInstructions)
 
-	status, err := adapter.GetActionStatus(context.Background(), "solana-tx-sig")
+	status, err := adapter.GetActionStatus(context.Background(), "order-1:setup")
 	require.NoError(t, err)
 	require.Equal(t, "submitted", status.State)
 	require.Equal(t, "setup", status.SettlementAction)

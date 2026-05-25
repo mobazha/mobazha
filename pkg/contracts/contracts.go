@@ -854,7 +854,7 @@ type SchedulerHooks interface {
 	RunOutboxPollOnce(ctx context.Context)
 	RunOutboxCleanupOnce(ctx context.Context)
 	RunPaymentVerificationOnce(ctx context.Context)
-	RunManagedEscrowRelayConfirmationsOnce(ctx context.Context)
+	RunSettlementActionConfirmationsOnce(ctx context.Context)
 	RunWebhookDeliveryOnce(ctx context.Context)
 	RunWebhookCleanupOnce(ctx context.Context)
 	RunAnalyticsCleanupOnce(ctx context.Context)

@@ -181,6 +181,7 @@ func (s *OrderAppService) RelayPaymentToCounterparty(
 	ctx context.Context, orderID string, targetPeerID peer.ID, pd *models.PaymentData,
 ) {
 	if pd == nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "RelayPayment P2P: missing payment data for order %s", orderID)
 		return
 	}
 	order, err := s.fetchOrder(orderID)

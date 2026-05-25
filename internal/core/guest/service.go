@@ -713,7 +713,7 @@ func (s *GuestOrderAppService) orderRequiresEVMManagedEscrowSettlementBeforeEnti
 }
 
 // RecoverEVMManagedEscrowPendingSettlements retries relay release for FUNDED guest ManagedEscrow orders.
-// Called at startup and from the shared managed_escrow-relay-confirmations scheduler tick.
+// Called at startup and from the shared settlement-action-confirmations scheduler tick.
 func (s *GuestOrderAppService) RecoverEVMManagedEscrowPendingSettlements(ctx context.Context) {
 	if s == nil || s.evmManagedEscrowSettlement == nil {
 		return

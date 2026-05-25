@@ -3,10 +3,13 @@ package core
 import (
 	"context"
 	"testing"
+	"time"
 
 	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,12 +22,16 @@ func TestSettlementActionStore_PutLookupRoundTrip(t *testing.T) {
 	require.NotNil(t, s)
 
 	rec := adapters.ActionRecord{
-		ActionID: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-		OrderID:  "QmOrderTest",
-		Action:   "relay_submit",
-		ChainID:  56,
-		State:    "submitted",
-		TxHash:   "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		ActionID:        "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		OrderID:         "QmOrderTest",
+		Action:          "relay_submit",
+		ChainID:         56,
+		To:              "0x1111111111111111111111111111111111111111",
+		Data:            "0xdeadbeef",
+		State:           "submitted",
+		TxHash:          "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		AttemptTxHashes: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		Attempts:        2,
 	}
 	require.NoError(t, s.Put(rec))
 
@@ -34,4 +41,118 @@ func TestSettlementActionStore_PutLookupRoundTrip(t *testing.T) {
 	require.Equal(t, rec.State, got.State)
 	require.Equal(t, rec.ChainID, got.ChainID)
 	require.Equal(t, rec.TxHash, got.TxHash)
+	require.Equal(t, rec.AttemptTxHashes, got.AttemptTxHashes)
+	require.Equal(t, rec.To, got.To)
+	require.Equal(t, rec.Data, got.Data)
+	require.Equal(t, rec.Attempts, got.Attempts)
+}
+
+func TestSettlementActionStore_ClaimRetryUsesCASAndPreservesHashHistory(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
+
+	s := NewSettlementActionStore(db)
+	row := models.ManagedEscrowRelayAction{
+		ActionID:        "act-retry-claim",
+		OrderID:         "order-1",
+		ActionKind:      "confirm",
+		ChainID:         56,
+		To:              "0x1111111111111111111111111111111111111111",
+		Data:            "0xdeadbeef",
+		State:           "submitted",
+		TxHash:          "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		AttemptTxHashes: "",
+		Attempts:        1,
+		CreatedAt:       time.Now().UTC(),
+		UpdatedAt:       time.Now().UTC(),
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&row)
+	}))
+
+	history, claimed, err := s.ClaimRetry(row, 2)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	require.Contains(t, history, row.TxHash)
+
+	_, claimedAgain, err := s.ClaimRetry(row, 2)
+	require.NoError(t, err)
+	require.False(t, claimedAgain)
+
+	newHash := "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	require.NoError(t, s.RecordRetrySubmitted(row, newHash, history, 2))
+
+	got, err := s.Lookup(context.Background(), row.ActionID)
+	require.NoError(t, err)
+	require.Equal(t, "submitted", got.State)
+	require.Equal(t, newHash, got.TxHash)
+	require.Equal(t, 2, got.Attempts)
+	require.Contains(t, got.AttemptTxHashes, row.TxHash)
+	require.Contains(t, got.AttemptTxHashes, newHash)
+	require.Empty(t, got.LastError)
+}
+
+func TestSettlementActionStore_PreservesSolanaSignatureHistory(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
+
+	s := NewSettlementActionStore(db)
+	firstSig := "5j7sX3wYqW9p9hJmE2zZqY4q3YkX4tL8pQ9nS6uV1mN2"
+	secondSig := "3m9kP7wYqW9p9hJmE2zZqY4q3YkX4tL8pQ9nS6uV1mA4"
+	require.NoError(t, s.Put(adapters.ActionRecord{
+		ActionID:        "order-solana:confirm",
+		OrderID:         "order-solana",
+		Action:          "confirm",
+		State:           "submitted",
+		TxHash:          firstSig,
+		AttemptTxHashes: firstSig,
+		Attempts:        1,
+	}))
+	require.NoError(t, s.Put(adapters.ActionRecord{
+		ActionID:        "order-solana:confirm",
+		OrderID:         "order-solana",
+		Action:          "confirm",
+		State:           "submitted",
+		TxHash:          secondSig,
+		AttemptTxHashes: secondSig,
+		Attempts:        2,
+	}))
+
+	got, err := s.Lookup(context.Background(), "order-solana:confirm")
+	require.NoError(t, err)
+	require.Equal(t, secondSig, got.TxHash)
+	require.Equal(t, 2, got.Attempts)
+	require.Contains(t, got.AttemptTxHashes, firstSig)
+	require.Contains(t, got.AttemptTxHashes, secondSig)
+}
+
+func TestSettlementActionStore_PreservesDurableIntentAcrossRetryUpdates(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
+
+	s := NewSettlementActionStore(db)
+	require.NoError(t, s.Put(adapters.ActionRecord{
+		ActionID: "order-solana:complete",
+		OrderID:  "order-solana",
+		Action:   "complete",
+		State:    "submitting",
+		Data:     `{"releaseInfo":"{\"toAddress\":\"seller\"}"}`,
+		Attempts: 1,
+	}))
+	require.NoError(t, s.Put(adapters.ActionRecord{
+		ActionID: "order-solana:complete",
+		OrderID:  "order-solana",
+		Action:   "complete",
+		State:    "submitted",
+		TxHash:   "5j7sX3wYqW9p9hJmE2zZqY4q3YkX4tL8pQ9nS6uV1mN2",
+		Attempts: 2,
+	}))
+
+	got, err := s.Lookup(context.Background(), "order-solana:complete")
+	require.NoError(t, err)
+	require.Equal(t, `{"releaseInfo":"{\"toAddress\":\"seller\"}"}`, got.Data)
+	require.Equal(t, 2, got.Attempts)
 }

@@ -905,6 +905,7 @@ func (n *MobazhaNode) initNetDBSyncService() {
 		RatingsService:    n.ratingsService,
 		CollectionService: n.collectionService,
 		DiscountService:   n.discountService,
+		StorePolicy:       n.storePolicyService,
 	})
 }
 

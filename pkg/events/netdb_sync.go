@@ -37,6 +37,9 @@ type CollectionsChanged struct{}
 // DiscountsChanged signals that store discounts were modified.
 type DiscountsChanged struct{}
 
+// StorePolicyChanged signals that public store policy data was modified.
+type StorePolicyChanged struct{}
+
 // StorefrontChanged signals that the storefront branding config was saved.
 type StorefrontChanged struct {
 	Config json.RawMessage

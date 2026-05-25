@@ -48,6 +48,7 @@ type NetDBSyncService struct {
 	ratingsService    *RatingsAppService
 	collectionService *CollectionAppService
 	discountService   *DiscountAppService
+	storePolicy       contracts.StorePolicyService
 
 	cancel context.CancelFunc
 }
@@ -62,6 +63,7 @@ type NetDBSyncServiceConfig struct {
 	RatingsService    *RatingsAppService
 	CollectionService *CollectionAppService
 	DiscountService   *DiscountAppService
+	StorePolicy       contracts.StorePolicyService
 }
 
 func NewNetDBSyncService(cfg NetDBSyncServiceConfig) *NetDBSyncService {
@@ -74,6 +76,7 @@ func NewNetDBSyncService(cfg NetDBSyncServiceConfig) *NetDBSyncService {
 		ratingsService:    cfg.RatingsService,
 		collectionService: cfg.CollectionService,
 		discountService:   cfg.DiscountService,
+		storePolicy:       cfg.StorePolicy,
 	}
 }
 
@@ -96,6 +99,7 @@ func (s *NetDBSyncService) Start() {
 		&events.FollowersChanged{},
 		&events.CollectionsChanged{},
 		&events.DiscountsChanged{},
+		&events.StorePolicyChanged{},
 		&events.StorefrontChanged{},
 		&events.RatingsChanged{},
 	})
@@ -158,6 +162,8 @@ func (s *NetDBSyncService) Reconcile() {
 			s.pushCollections()
 		case "discounts":
 			s.pushDiscounts()
+		case "store_policy":
+			s.pushStorePolicy()
 		case "storefront":
 			s.pushStorefront()
 		case "ratings":
@@ -193,6 +199,8 @@ func (s *NetDBSyncService) dispatch(evt interface{}) {
 		s.pushCollections()
 	case *events.DiscountsChanged:
 		s.pushDiscounts()
+	case *events.StorePolicyChanged:
+		s.pushStorePolicy()
 	case *events.StorefrontChanged:
 		s.pushStorefrontData(e.Config)
 	case *events.RatingsChanged:
@@ -364,6 +372,29 @@ func (s *NetDBSyncService) pushDiscounts() {
 	}
 }
 
+func (s *NetDBSyncService) pushStorePolicy() {
+	if s.storePolicy == nil {
+		return
+	}
+	policy, err := s.storePolicy.GetPublishedPolicy(context.Background())
+	if err != nil {
+		s.markDirty("store_policy")
+		logger.LogDebugWithIDf(log, s.nodeID, "NetDBSync: GetPublishedPolicy: %v", err)
+		return
+	}
+	data, err := json.Marshal(policy)
+	if err != nil {
+		s.markDirty("store_policy")
+		return
+	}
+	if err := s.netDB.SetOwnStoreMetadata("store_policy", data); err != nil {
+		s.markDirty("store_policy")
+		logger.LogDebugWithIDf(log, s.nodeID, "NetDBSync: SetOwnStoreMetadata(store_policy): %v", err)
+	} else {
+		s.clearDirty("store_policy")
+	}
+}
+
 func (s *NetDBSyncService) pushStorefront() {
 	val, err := s.readSetting(models.SettingsKeyStoreConfig)
 	if err != nil || val == "" {
@@ -433,7 +464,7 @@ func (s *NetDBSyncService) clearDirty(key string) {
 }
 
 func (s *NetDBSyncService) allDirtyKeys() []string {
-	knownKeys := []string{"profile", "listing_index", "following", "followers", "collections", "discounts", "storefront", "ratings"}
+	knownKeys := []string{"profile", "listing_index", "following", "followers", "collections", "discounts", "store_policy", "storefront", "ratings"}
 	var dirty []string
 	for _, k := range knownKeys {
 		val, err := s.readSetting(netdbDirtyPrefix + k)

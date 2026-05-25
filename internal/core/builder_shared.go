@@ -59,7 +59,7 @@ func initStorePolicySubsystem(obNode *MobazhaNode) {
 		return
 	}
 	store := database.NewGormStorePolicyStore(obNode.db)
-	obNode.storePolicyService = NewStorePolicyAppService(store)
+	obNode.storePolicyService = NewStorePolicyAppService(store, obNode.eventBus)
 	logger.LogInfoWithID(log, obNode.nodeID, "StorePolicy subsystem initialized")
 }
 

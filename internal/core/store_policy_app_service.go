@@ -9,6 +9,7 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
@@ -16,12 +17,13 @@ const MaxStoreModerators = 20
 
 type StorePolicyAppService struct {
 	store contracts.StorePolicyStore
+	bus   events.Bus
 }
 
 var _ contracts.StorePolicyService = (*StorePolicyAppService)(nil)
 
-func NewStorePolicyAppService(store contracts.StorePolicyStore) *StorePolicyAppService {
-	return &StorePolicyAppService{store: store}
+func NewStorePolicyAppService(store contracts.StorePolicyStore, bus events.Bus) *StorePolicyAppService {
+	return &StorePolicyAppService{store: store, bus: bus}
 }
 
 func (s *StorePolicyAppService) GetPolicy(ctx context.Context) (*models.StorePolicy, error) {
@@ -53,7 +55,12 @@ func (s *StorePolicyAppService) ReplaceModerators(ctx context.Context, expectedR
 	if err != nil {
 		return nil, err
 	}
-	return s.store.ReplaceModerators(ctx, expectedRevision, mods)
+	policy, err := s.store.ReplaceModerators(ctx, expectedRevision, mods)
+	if err != nil {
+		return nil, err
+	}
+	s.emitStorePolicyChanged()
+	return policy, nil
 }
 
 func (s *StorePolicyAppService) UpsertModerator(ctx context.Context, expectedRevision *uint64, input models.StorePolicyModeratorInput) (*models.StorePolicy, error) {
@@ -150,3 +157,9 @@ func normalizeStoreModerators(inputs []models.StorePolicyModeratorInput) ([]mode
 func intPtr(v int) *int { return &v }
 
 func boolPtr(v bool) *bool { return &v }
+
+func (s *StorePolicyAppService) emitStorePolicyChanged() {
+	if s.bus != nil {
+		s.bus.Emit(&events.StorePolicyChanged{})
+	}
+}

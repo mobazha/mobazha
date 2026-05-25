@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,18 @@ const (
 
 type fakeStorePolicyStore struct {
 	policy models.StorePolicy
+}
+
+type recordingStorePolicyBus struct {
+	events []interface{}
+}
+
+func (b *recordingStorePolicyBus) Subscribe(interface{}, ...events.SubscriptionOpt) (events.Subscription, error) {
+	return nil, nil
+}
+
+func (b *recordingStorePolicyBus) Emit(evt interface{}) {
+	b.events = append(b.events, evt)
 }
 
 func (s *fakeStorePolicyStore) GetPolicy(context.Context) (*models.StorePolicy, error) {
@@ -35,7 +48,7 @@ func (s *fakeStorePolicyStore) ReplaceModerators(_ context.Context, expectedRevi
 func TestStorePolicyAppService_ReplaceModeratorsNormalizesOrderAndIDs(t *testing.T) {
 	svc := NewStorePolicyAppService(&fakeStorePolicyStore{
 		policy: models.StorePolicy{},
-	})
+	}, nil)
 	revision := uint64(0)
 
 	policy, err := svc.ReplaceModerators(context.Background(), &revision, []models.StorePolicyModeratorInput{
@@ -60,7 +73,7 @@ func TestStorePolicyAppService_GetPublishedPolicyFiltersDisabledModerators(t *te
 				{PeerID: storePolicyPeerB, Enabled: false, Position: 1},
 			},
 		},
-	})
+	}, nil)
 
 	policy, err := svc.GetPublishedPolicy(context.Background())
 	require.NoError(t, err)
@@ -72,7 +85,7 @@ func TestStorePolicyAppService_GetPublishedPolicyFiltersDisabledModerators(t *te
 func TestStorePolicyAppService_RejectsInvalidAndDuplicateModerators(t *testing.T) {
 	svc := NewStorePolicyAppService(&fakeStorePolicyStore{
 		policy: models.StorePolicy{Revision: 1},
-	})
+	}, nil)
 
 	_, err := svc.ReplaceModerators(context.Background(), nil, []models.StorePolicyModeratorInput{{PeerID: "not-a-peer"}})
 	require.Error(t, err)
@@ -87,7 +100,7 @@ func TestStorePolicyAppService_RejectsInvalidAndDuplicateModerators(t *testing.T
 func TestStorePolicyAppService_RevisionConflict(t *testing.T) {
 	svc := NewStorePolicyAppService(&fakeStorePolicyStore{
 		policy: models.StorePolicy{Revision: 3},
-	})
+	}, nil)
 	revision := uint64(2)
 
 	_, err := svc.ReplaceModerators(context.Background(), &revision, []models.StorePolicyModeratorInput{{PeerID: storePolicyPeerA}})
@@ -103,7 +116,7 @@ func TestStorePolicyAppService_UpsertModeratorPreservesExistingEnabledState(t *t
 			},
 		},
 	}
-	svc := NewStorePolicyAppService(store)
+	svc := NewStorePolicyAppService(store, nil)
 	position := 3
 
 	policy, err := svc.UpsertModerator(context.Background(), nil, models.StorePolicyModeratorInput{
@@ -125,11 +138,25 @@ func TestStorePolicyAppService_RemoveMissingModeratorIsNoop(t *testing.T) {
 			},
 		},
 	}
-	svc := NewStorePolicyAppService(store)
+	svc := NewStorePolicyAppService(store, nil)
 
 	policy, err := svc.RemoveModerator(context.Background(), nil, storePolicyPeerB)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(4), policy.Revision)
 	require.Len(t, policy.Moderators, 1)
 	assert.Equal(t, storePolicyPeerA, policy.Moderators[0].PeerID)
+}
+
+func TestStorePolicyAppService_ReplaceModeratorsEmitsStorePolicyChanged(t *testing.T) {
+	bus := &recordingStorePolicyBus{}
+	svc := NewStorePolicyAppService(&fakeStorePolicyStore{
+		policy: models.StorePolicy{},
+	}, bus)
+
+	_, err := svc.ReplaceModerators(context.Background(), nil, []models.StorePolicyModeratorInput{{PeerID: storePolicyPeerA}})
+	require.NoError(t, err)
+
+	require.Len(t, bus.events, 1)
+	_, ok := bus.events[0].(*events.StorePolicyChanged)
+	assert.True(t, ok)
 }

@@ -493,8 +493,9 @@ func (ndb *NetDB) SetOwnRating(vendorPeerID string, ratingJSON json.RawMessage) 
 	return nil
 }
 
-// SetOwnStoreMetadata pushes store metadata (collections, discounts, payment_methods, storefront)
-// to the search service for offline fallback.
+// SetOwnStoreMetadata pushes store metadata (collections, discounts,
+// payment_methods, store_policy, storefront) to the search service for offline
+// fallback.
 func (ndb *NetDB) SetOwnStoreMetadata(metadataType string, data json.RawMessage) error {
 	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own store metadata: %s", metadataType)
 

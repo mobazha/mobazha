@@ -3,6 +3,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"sync"
@@ -21,9 +22,11 @@ import (
 // ── mock netDBWriter ─────────────────────────────────────────────
 
 type mockNetDBWriter struct {
-	mu    sync.Mutex
-	calls map[string]int
-	err   error // if set, all methods return this error
+	mu            sync.Mutex
+	calls         map[string]int
+	metadataTypes []string
+	metadataData  []json.RawMessage
+	err           error // if set, all methods return this error
 }
 
 func newMockNetDBWriter() *mockNetDBWriter {
@@ -43,6 +46,12 @@ func (m *mockNetDBWriter) count(method string) int {
 	return m.calls[method]
 }
 
+func (m *mockNetDBWriter) metadataCall(index int) (string, json.RawMessage) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.metadataTypes[index], m.metadataData[index]
+}
+
 func (m *mockNetDBWriter) SetOwnProfile(_ *models.Profile) error   { return m.record("SetOwnProfile") }
 func (m *mockNetDBWriter) SetOwnListing(_ *pb.SignedListing) error { return m.record("SetOwnListing") }
 func (m *mockNetDBWriter) SetOwnListingIndex(_ models.ListingIndex) error {
@@ -55,7 +64,11 @@ func (m *mockNetDBWriter) SetOwnFollowing(_ models.Following) error {
 func (m *mockNetDBWriter) SetOwnFollowers(_ models.Followers) error {
 	return m.record("SetOwnFollowers")
 }
-func (m *mockNetDBWriter) SetOwnStoreMetadata(_ string, _ json.RawMessage) error {
+func (m *mockNetDBWriter) SetOwnStoreMetadata(metadataType string, data json.RawMessage) error {
+	m.mu.Lock()
+	m.metadataTypes = append(m.metadataTypes, metadataType)
+	m.metadataData = append(m.metadataData, append(json.RawMessage(nil), data...))
+	m.mu.Unlock()
 	return m.record("SetOwnStoreMetadata")
 }
 func (m *mockNetDBWriter) SetOwnRatingIndex(_ models.RatingIndex) error {
@@ -63,6 +76,31 @@ func (m *mockNetDBWriter) SetOwnRatingIndex(_ models.RatingIndex) error {
 }
 func (m *mockNetDBWriter) SetOwnRating(_ string, _ json.RawMessage) error {
 	return m.record("SetOwnRating")
+}
+
+type fakeSyncStorePolicy struct {
+	policy *models.StorePolicyPublic
+	err    error
+}
+
+func (s fakeSyncStorePolicy) GetPolicy(context.Context) (*models.StorePolicy, error) {
+	return nil, nil
+}
+
+func (s fakeSyncStorePolicy) GetPublishedPolicy(context.Context) (*models.StorePolicyPublic, error) {
+	return s.policy, s.err
+}
+
+func (s fakeSyncStorePolicy) ReplaceModerators(context.Context, *uint64, []models.StorePolicyModeratorInput) (*models.StorePolicy, error) {
+	return nil, nil
+}
+
+func (s fakeSyncStorePolicy) UpsertModerator(context.Context, *uint64, models.StorePolicyModeratorInput) (*models.StorePolicy, error) {
+	return nil, nil
+}
+
+func (s fakeSyncStorePolicy) RemoveModerator(context.Context, *uint64, string) (*models.StorePolicy, error) {
+	return nil, nil
 }
 
 // ── helpers ──────────────────────────────────────────────────────
@@ -170,6 +208,34 @@ func TestNetDBSync_Dispatch_StorefrontChanged(t *testing.T) {
 	svc.dispatch(&events.StorefrontChanged{Config: cfg})
 
 	assert.Equal(t, 1, writer.count("SetOwnStoreMetadata"))
+}
+
+func TestNetDBSync_Dispatch_StorePolicyChanged(t *testing.T) {
+	writer := newMockNetDBWriter()
+	db := newTestDB(t)
+	svc := NewNetDBSyncService(NetDBSyncServiceConfig{
+		NetDB:  writer,
+		DB:     db,
+		NodeID: "test-sync",
+		StorePolicy: fakeSyncStorePolicy{policy: &models.StorePolicyPublic{
+			Revision: 9,
+			Moderators: []models.StoreModerator{
+				{PeerID: storePolicyPeerA, Enabled: true, Position: 0},
+			},
+		}},
+	})
+
+	svc.dispatch(&events.StorePolicyChanged{})
+
+	require.Equal(t, 1, writer.count("SetOwnStoreMetadata"))
+	metadataType, data := writer.metadataCall(0)
+	assert.Equal(t, "store_policy", metadataType)
+
+	var policy models.StorePolicyPublic
+	require.NoError(t, json.Unmarshal(data, &policy))
+	assert.Equal(t, uint64(9), policy.Revision)
+	require.Len(t, policy.Moderators, 1)
+	assert.Equal(t, storePolicyPeerA, policy.Moderators[0].PeerID)
 }
 
 func TestNetDBSync_DirtyFlag_Cycle(t *testing.T) {

@@ -100,6 +100,7 @@ func init() {
 		{Category: "netdb", Name: "netdb.followers_changed", Sample: new(FollowersChanged)},
 		{Category: "netdb", Name: "netdb.collections_changed", Sample: new(CollectionsChanged)},
 		{Category: "netdb", Name: "netdb.discounts_changed", Sample: new(DiscountsChanged)},
+		{Category: "netdb", Name: "netdb.store_policy_changed", Sample: new(StorePolicyChanged)},
 		{Category: "netdb", Name: "netdb.storefront_changed", Sample: new(StorefrontChanged)},
 		{Category: "netdb", Name: "netdb.ratings_changed", Sample: new(RatingsChanged)},
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -149,10 +150,15 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 
 	if alreadyProvisioned && req.PaymentCoin != "" {
 		// Guard: if the caller requests a different coin, reject instead of
-		// silently returning a session for the wrong rail.
+		// silently returning a session for the wrong rail. The one allowed
+		// exception is an unfunded provider checkout (for example, Stripe was
+		// opened as the default and the buyer then chose Solana before paying).
 		if view.PaymentCoin != "" && view.PaymentCoin != req.PaymentCoin {
-			return nil, fmt.Errorf("%w: existing=%q requested=%q",
-				ErrPaymentCoinMismatch, view.PaymentCoin, req.PaymentCoin)
+			if !canReprovisionForCoinSwitch(view, req.PaymentCoin) {
+				return nil, fmt.Errorf("%w: existing=%q requested=%q",
+					ErrPaymentCoinMismatch, view.PaymentCoin, req.PaymentCoin)
+			}
+			alreadyProvisioned = false
 		}
 	}
 
@@ -195,4 +201,30 @@ func fiatSessionIDFromView(view *payment.PaymentSession) string {
 	}
 	sid, _ := view.FundingTarget.ProviderData["sessionID"].(string)
 	return sid
+}
+
+func canReprovisionForCoinSwitch(view *payment.PaymentSession, requestedCoin string) bool {
+	if view == nil {
+		return false
+	}
+	if !strings.HasPrefix(requestedCoin, "crypto:") {
+		return false
+	}
+	if view.SettlementMode != payment.SettlementModeProviderCheckout {
+		return false
+	}
+	if view.PaymentProgress.FundingState != payment.FundingStateProviderProcessing &&
+		view.PaymentProgress.FundingState != payment.FundingStateAwaitingFunds {
+		return false
+	}
+	return amountStringIsZero(view.PaymentProgress.ObservedAmount)
+}
+
+func amountStringIsZero(s string) bool {
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return true
+	}
+	rat, ok := new(big.Rat).SetString(trimmed)
+	return ok && rat.Sign() == 0
 }

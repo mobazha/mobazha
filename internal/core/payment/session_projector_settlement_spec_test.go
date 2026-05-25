@@ -284,6 +284,29 @@ func TestDerivePaymentInfo_FiatMetadataUsesSettlementSpecProductMode(t *testing.
 	require.Equal(t, pkpayment.ProductModeCancelable, mode)
 }
 
+func TestDerivePaymentInfo_CryptoPendingOverridesStaleFiatMetadata(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{PaymentAddress: "AyoATDTgoSU9PTDw7xgqQWh6Tnz4iMGNxhETbkK5i7G3"}
+	specJSON, err := pkpayment.FiatMetadataSettlementSpecJSON()
+	require.NoError(t, err)
+	require.NoError(t, order.MergeFiatMetadata(map[string]string{
+		"fiat_provider":    "stripe",
+		"fiat_currency":    "USD",
+		"fiat_session_id":  "pi_default_stripe",
+		"settlement_spec":  specJSON,
+		"stripe_intent_id": "pi_default_stripe",
+	}))
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
+		Coin:           "crypto:solana:mainnet:native",
+		EscrowAddress:  order.PaymentAddress,
+		SettlementSpec: pkpayment.NewSolanaEscrowSpec(false).ToPending(),
+	}))
+
+	coin, mode := p.derivePaymentInfo(order, nil, nil)
+	require.Equal(t, "crypto:solana:mainnet:native", coin)
+	require.Equal(t, pkpayment.ProductModeCancelable, mode)
+}
+
 func TestDerivePaymentInfo_PendingManagedEscrowOverridesPaymentSentEnvelope(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{}

@@ -134,7 +134,20 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 		return paymentCoin, payment.ProductModeFromMethod(spec.Method)
 	}
 
-	// ── 2. FiatMetadata fallback (fiat order, awaiting buyer action) ──────
+	// ── 2. PendingPaymentInfo (crypto address provisioned, not yet paid) ──
+	//
+	// A buyer may open a provider checkout first and then switch to a crypto
+	// address before paying. In that case FiatMetadata can remain as stale
+	// recovery data, but PaymentAddress + PendingPaymentInfo are the active
+	// funding target and must win the projection.
+	if strings.TrimSpace(order.PaymentAddress) != "" {
+		if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
+			coin := pendingPaymentCoin(order)
+			return coin, payment.ProductModeFromMethod(spec.Method)
+		}
+	}
+
+	// ── 3. FiatMetadata fallback (fiat order, awaiting buyer action) ──────
 	if fiatMeta, err := order.GetFiatMetadata(); err == nil {
 		provider := fiatMeta["fiat_provider"]
 		if provider != "" {
@@ -159,7 +172,7 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 		}
 	}
 
-	// ── 3. PendingPaymentInfo / fiat metadata (pre-PaymentSent) ───────────
+	// ── 4. PendingPaymentInfo / fiat metadata (pre-PaymentSent) ───────────
 	if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
 		coin := pendingPaymentCoin(order)
 		return coin, payment.ProductModeFromMethod(spec.Method)

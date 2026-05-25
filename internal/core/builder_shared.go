@@ -137,6 +137,7 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 		digitalCtx = pkgconfig.ContextWithTenantID(digitalCtx, pkgdatabase.StandaloneTenantID)
 	}
 	entitlementSvc := digital.NewDigitalEntitlementAppService(digitalCtx, obNode.db, obNode.featureResolver, assetSvc, orders, obNode.eventBus)
+	assetSvc.SetDigitalDeliveryRetrier(entitlementSvc.RetryDigitalDelivery)
 	// Wire the shipper so auto-delivery also advances order state. Full nodes
 	// use OrderService; private_distribution/guest checkout uses GuestOrderAppService.
 	if shipper := newDigitalOrderShipper(obNode.Order(), obNode.guestOrderService); shipper != nil {

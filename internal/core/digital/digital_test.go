@@ -490,6 +490,40 @@ func TestAssetService_GetDigitalDeliveryStatus_DeliveredAfterConfirmation(t *tes
 	assert.Equal(t, "/v1/orders/order-delivered-1/digital-assets", status.DeliveryURL)
 }
 
+func TestAssetService_RetryDigitalDelivery_CreatesGrantsForLateAssets(t *testing.T) {
+	entSvc, assetSvc, _, _ := newTestEntitlementService(t)
+	shipper := &testOrderShipper{}
+	entSvc.SetShipper(shipper)
+	assetSvc.SetDigitalDeliveryRetrier(entSvc.RetryDigitalDelivery)
+
+	ctx := context.Background()
+	_, err := assetSvc.UploadFileAssetStream(ctx, "listing-ent", "", "late.zip", "application/zip", bytes.NewReader([]byte("late")), int64(len([]byte("late"))))
+	require.NoError(t, err)
+
+	status, err := assetSvc.RetryDigitalDelivery("order-late-asset", "seller-peer", false)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.Equal(t, contracts.DigitalDeliveryStatusDelivered, status.Status)
+	assert.Equal(t, 1, status.GrantCount)
+	assert.Equal(t, 1, status.AccessibleGrantCount)
+	assert.Equal(t, "/v1/orders/order-late-asset/digital-assets", status.DeliveryURL)
+	require.Equal(t, 1, shipper.calls)
+	assert.Equal(t, models.OrderID("order-late-asset"), shipper.orderID)
+
+	status, err = assetSvc.RetryDigitalDelivery("order-late-asset", "seller-peer", false)
+	require.NoError(t, err)
+	assert.Equal(t, contracts.DigitalDeliveryStatusDelivered, status.Status)
+	assert.Equal(t, 1, shipper.calls, "delivered retry should not ship again")
+}
+
+func TestAssetService_RetryDigitalDelivery_RequiresSellerPeer(t *testing.T) {
+	entSvc, assetSvc, _, _ := newTestEntitlementService(t)
+	assetSvc.SetDigitalDeliveryRetrier(entSvc.RetryDigitalDelivery)
+
+	_, err := assetSvc.RetryDigitalDelivery("order-private", "buyer-peer", false)
+	require.ErrorIs(t, err, contracts.ErrBuyerPortalAccess)
+}
+
 type testOrderShipper struct {
 	calls     int
 	orderID   models.OrderID

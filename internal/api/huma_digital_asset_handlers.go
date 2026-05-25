@@ -323,6 +323,46 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 	// (registered as a raw chi handler in registerDigitalAssetStreamRoute) — Huma's
 	// JSON body model isn't suitable for hundred-MiB binary payloads.
 
+	// POST /v1/orders/{orderID}/digital-delivery/retry — recover grants after
+	// assets were configured after the original order confirmation event.
+	huma.Register(api, huma.Operation{
+		OperationID: "digital-delivery-retry",
+		Method:      http.MethodPost,
+		Path:        "/v1/orders/{orderID}/digital-delivery/retry",
+		Summary:     "Retry digital delivery for an order",
+		Description: "Replays automatic digital entitlement creation for a seller order. " +
+			"This is intended for recoverable cases where digital assets were added after payment confirmation.",
+		Tags:     []string{"digital-assets"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, in *struct {
+		OrderID string `path:"orderID" doc:"Order ID." example:"QmOrder123"`
+	}) (*digitalDeliveryStatusOutput, error) {
+		r := nodeBridgeRequest(ctx, http.MethodPost, "/v1/orders/"+in.OrderID+"/digital-delivery/retry", nil)
+		svc, ok := getDigitalAssetService(r)
+		if !ok {
+			return nil, huma.Error501NotImplemented("digital asset subsystem not available")
+		}
+		identity := GetAuthIdentity(r.Context())
+		authenticatedPeerID := ""
+		allowAdmin := identity != nil && identity.IsAdmin
+		if identity != nil && !identity.IsAdmin {
+			authenticatedPeerID = identity.PeerID
+		}
+		status, err := svc.RetryDigitalDelivery(in.OrderID, authenticatedPeerID, allowAdmin)
+		if err != nil {
+			switch {
+			case errors.Is(err, contracts.ErrBuyerPortalAccess):
+				return nil, huma.Error403Forbidden("seller access required")
+			case errors.Is(err, contracts.ErrDigitalDeliveryRetryUnavailable):
+				return nil, huma.Error501NotImplemented("digital delivery retry is not available")
+			default:
+				log.Errorf("digital delivery retry failed for order %s: %v", in.OrderID, err)
+				return nil, huma.Error500InternalServerError("failed to retry digital delivery")
+			}
+		}
+		return &digitalDeliveryStatusOutput{Body: status}, nil
+	})
+
 	// POST /v1/digital-assets/link — create link asset
 	huma.Register(api, huma.Operation{
 		OperationID: "digital-asset-create-link",

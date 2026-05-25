@@ -27,12 +27,13 @@ import (
 // DigitalAssetAppService manages digital asset CRUD, encrypted file storage,
 // license key management, and download grant lifecycle.
 type DigitalAssetAppService struct {
-	db                    database.Database
-	blob                  contracts.BlobStore
-	crypto                *encryption.DigitalCrypto
-	orders                OrderQuerier
-	nodePeerID            string
-	coTenantDigitalAssets contracts.CoTenantDigitalAssetsFn
+	db                     database.Database
+	blob                   contracts.BlobStore
+	crypto                 *encryption.DigitalCrypto
+	orders                 OrderQuerier
+	nodePeerID             string
+	coTenantDigitalAssets  contracts.CoTenantDigitalAssetsFn
+	digitalDeliveryRetrier func(orderID string) error
 }
 
 // NewDigitalAssetAppService creates a new DigitalAssetAppService.
@@ -63,6 +64,12 @@ func (s *DigitalAssetAppService) SetNodePeerID(peerID string) {
 // SetCoTenantDigitalAssets wires the same-host SaaS digital asset resolver.
 func (s *DigitalAssetAppService) SetCoTenantDigitalAssets(fn contracts.CoTenantDigitalAssetsFn) {
 	s.coTenantDigitalAssets = fn
+}
+
+// SetDigitalDeliveryRetrier wires the seller-triggered recovery path used
+// when assets were added after the order confirmation event already fired.
+func (s *DigitalAssetAppService) SetDigitalDeliveryRetrier(fn func(orderID string) error) {
+	s.digitalDeliveryRetrier = fn
 }
 
 // UploadFileAssetStream encrypts a file streamed from `src` and stores the
@@ -1239,6 +1246,46 @@ func (s *DigitalAssetAppService) GetDigitalDeliveryStatus(
 	}
 
 	return status, nil
+}
+
+// RetryDigitalDelivery lets the seller recover digital entitlements for an
+// order whose assets were configured after the original confirmation event.
+func (s *DigitalAssetAppService) RetryDigitalDelivery(
+	orderID string,
+	authenticatedPeerID string,
+	allowAdmin bool,
+) (*contracts.DigitalDeliveryStatus, error) {
+	var meta *OrderMetadata
+	if s.orders != nil {
+		var err error
+		meta, err = s.orders.GetOrderMetadata(orderID)
+		if err != nil {
+			return nil, fmt.Errorf("get order metadata: %w", err)
+		}
+	}
+	if !allowAdmin {
+		authenticatedPeerID = strings.TrimSpace(authenticatedPeerID)
+		if meta == nil || strings.TrimSpace(meta.SellerPeerID) == "" || meta.SellerPeerID != authenticatedPeerID {
+			return nil, contracts.ErrBuyerPortalAccess
+		}
+	}
+
+	status, err := s.GetDigitalDeliveryStatus(orderID, "", authenticatedPeerID, allowAdmin)
+	if err != nil {
+		return nil, err
+	}
+	if status.Status == contracts.DigitalDeliveryStatusDelivered ||
+		status.Status == contracts.DigitalDeliveryStatusNotDigital ||
+		status.Status == contracts.DigitalDeliveryStatusManualRequired {
+		return status, nil
+	}
+	if s.digitalDeliveryRetrier == nil {
+		return nil, contracts.ErrDigitalDeliveryRetryUnavailable
+	}
+	if err := s.digitalDeliveryRetrier(orderID); err != nil {
+		return nil, err
+	}
+	return s.GetDigitalDeliveryStatus(orderID, "", authenticatedPeerID, allowAdmin)
 }
 
 func orderMetadataAllowsPeer(meta *OrderMetadata, peerID string) bool {

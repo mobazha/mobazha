@@ -134,6 +134,17 @@ func (s *DigitalEntitlementAppService) listenConfirmations(sub events.Subscripti
 }
 
 func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.OrderConfirmation) error {
+	return s.deliverDigitalOrder(confirm.OrderID)
+}
+
+// RetryDigitalDelivery replays the automatic entitlement creation for a paid
+// digital order. It is safe to call repeatedly: download grants and license
+// allocations are keyed by order/listing/asset and remain idempotent.
+func (s *DigitalEntitlementAppService) RetryDigitalDelivery(orderID string) error {
+	return s.deliverDigitalOrder(orderID)
+}
+
+func (s *DigitalEntitlementAppService) deliverDigitalOrder(orderID string) error {
 	// Fail closed: if featureResolver is not yet wired (nil during early init),
 	// treat the feature as disabled. Callers must explicitly enable the beta
 	// feature via configuration.
@@ -141,7 +152,7 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 		return nil
 	}
 
-	meta, err := s.orders.GetOrderMetadata(confirm.OrderID)
+	meta, err := s.orders.GetOrderMetadata(orderID)
 	if err != nil {
 		return fmt.Errorf("get order metadata: %w", err)
 	}
@@ -169,7 +180,7 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 		}
 		if len(assets) == 0 {
 			log.Errorf("[digital-entitlement] no configured digital assets for order %s item %d listing %s/%s",
-				confirm.OrderID, itemIndex, item.ListingSlug, item.VariantSKU)
+				orderID, itemIndex, item.ListingSlug, item.VariantSKU)
 			continue
 		}
 
@@ -180,13 +191,13 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 			// Files and links: one grant covers all seats (download is unlimited).
 			// License keys: allocate qty keys to match the purchased quantity.
 			if asset.AssetType == models.AssetTypeLicenseKey {
-				already := s.assets.CountAllocatedKeys(confirm.OrderID, asset.ListingSlug, asset.VariantSKU)
+				already := s.assets.CountAllocatedKeys(orderID, asset.ListingSlug, asset.VariantSKU)
 				remaining := int64(qty) - already
 				allocated := int64(0)
 				for seat := int64(0); seat < remaining; seat++ {
 					_, allocErr := s.assets.AllocateLicenseKey(
 						asset.ListingSlug, asset.VariantSKU,
-						confirm.OrderID, meta.BuyerPeerID,
+						orderID, meta.BuyerPeerID,
 					)
 					if allocErr != nil {
 						log.Errorf("[digital-entitlement] allocate license for asset %s seat %d/%d: %v",
@@ -203,7 +214,7 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 				}
 			}
 
-			_, grantErr := s.assets.CreateDownloadGrant(asset, confirm.OrderID, meta.BuyerPeerID, grantStatus)
+			_, grantErr := s.assets.CreateDownloadGrant(asset, orderID, meta.BuyerPeerID, grantStatus)
 			if grantErr != nil {
 				log.Errorf("[digital-entitlement] create grant for asset %s: %v", asset.ID, grantErr)
 				itemDelivered = false
@@ -229,17 +240,17 @@ func (s *DigitalEntitlementAppService) handleOrderConfirmation(confirm *events.O
 				shipments = append(shipments, models.Shipment{
 					ItemIndex: itemIndex,
 					DigitalDelivery: &models.DigitalDelivery{
-						URL: "/v1/orders/" + confirm.OrderID + "/digital-assets",
+						URL: "/v1/orders/" + orderID + "/digital-assets",
 					},
 				})
 			}
 		}
-		if err := s.shipper.ShipOrder(models.OrderID(confirm.OrderID), shipments, nil); err != nil {
+		if err := s.shipper.ShipOrder(models.OrderID(orderID), shipments, nil); err != nil {
 			log.Errorf("[digital-entitlement] auto-ShipOrder order %s: %v — grants active, order state not advanced",
-				confirm.OrderID, err)
+				orderID, err)
 		} else {
 			log.Infof("[digital-entitlement] auto-ShipOrder order %s: %d grants created, order advanced to FULFILLED",
-				confirm.OrderID, grantsCreated)
+				orderID, grantsCreated)
 		}
 	}
 

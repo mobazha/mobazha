@@ -11,6 +11,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -39,6 +40,7 @@ var ErrProvisioningNotImplemented = errors.New(
 //
 // Reference: PAYMENT_SESSION_SERVICE_SPEC.md §5 + §12
 type PaymentSessionServiceImpl struct {
+	db        database.Database
 	projector *PaymentSessionProjector
 	fiat      *FiatPaymentFacade // injected via SetFiatFacade (Phase B3)
 	crypto    *CryptoPaymentFacade
@@ -48,6 +50,7 @@ type PaymentSessionServiceImpl struct {
 // Inject fiat / crypto facades via Setters after construction.
 func NewPaymentSessionService(db database.Database) *PaymentSessionServiceImpl {
 	return &PaymentSessionServiceImpl{
+		db:        db,
 		projector: NewPaymentSessionProjector(db),
 	}
 }
@@ -158,6 +161,9 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 				return nil, fmt.Errorf("%w: existing=%q requested=%q",
 					ErrPaymentCoinMismatch, view.PaymentCoin, req.PaymentCoin)
 			}
+			if err := s.clearUnfundedPaymentSessionState(ctx, req.OrderID); err != nil {
+				return nil, err
+			}
 			alreadyProvisioned = false
 		}
 	}
@@ -207,10 +213,11 @@ func canReprovisionForCoinSwitch(view *payment.PaymentSession, requestedCoin str
 	if view == nil {
 		return false
 	}
-	if !strings.HasPrefix(requestedCoin, "crypto:") {
+	if !strings.HasPrefix(requestedCoin, "crypto:") && !strings.HasPrefix(requestedCoin, "fiat:") {
 		return false
 	}
-	if view.SettlementMode != payment.SettlementModeProviderCheckout {
+	if view.SettlementMode != payment.SettlementModeProviderCheckout &&
+		view.SettlementMode != payment.SettlementModeAddressMonitored {
 		return false
 	}
 	if view.PaymentProgress.FundingState != payment.FundingStateProviderProcessing &&
@@ -227,4 +234,35 @@ func amountStringIsZero(s string) bool {
 	}
 	rat, ok := new(big.Rat).SetString(trimmed)
 	return ok && rat.Sign() == 0
+}
+
+func (s *PaymentSessionServiceImpl) clearUnfundedPaymentSessionState(_ context.Context, orderID string) error {
+	if s.db == nil {
+		return errors.New("payment session: cannot switch payment coin without database")
+	}
+	return s.db.Update(func(tx database.Tx) error {
+		rows, err := tx.UpdateColumns(
+			map[string]interface{}{
+				"payment_address":                     "",
+				"pending_payment_info":                []byte(nil),
+				"payment_transaction_id":              "",
+				"fiat_metadata":                       []byte(nil),
+				"payment_verification_status":         "",
+				"payment_verification_failure_reason": "",
+				"payment_verification_failed_at":      nil,
+				"total_received":                      "",
+				"overpaid_amount":                     "",
+				"cancel_fee_amount":                   "",
+			},
+			map[string]interface{}{"id = ?": orderID},
+			&models.Order{},
+		)
+		if err != nil {
+			return fmt.Errorf("payment session: clear stale payment state for coin switch: %w", err)
+		}
+		if rows == 0 {
+			return fmt.Errorf("payment session: clear stale payment state for coin switch: order %s not found", orderID)
+		}
+		return nil
+	})
 }

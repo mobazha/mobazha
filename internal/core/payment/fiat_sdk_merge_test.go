@@ -91,12 +91,12 @@ func TestDerivePaymentInfo_FiatFallsBackToOrderOpenPricingCoin(t *testing.T) {
 	}
 	open := &porderpb.OrderOpen{PricingCoin: "usd"}
 
-	coin, mode, kind := p.derivePaymentInfo(order, open, nil)
+	coin, mode := p.derivePaymentInfo(order, open, nil)
 	if coin != "fiat:paypal:USD" {
 		t.Fatalf("payment coin = %q", coin)
 	}
-	if mode != paypb.ProductModeCancelable || kind != "" {
-		t.Fatalf("mode=%v kind=%q", mode, kind)
+	if mode != paypb.ProductModeCancelable {
+		t.Fatalf("mode=%v", mode)
 	}
 }
 

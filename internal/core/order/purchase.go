@@ -794,7 +794,7 @@ func hydratePaymentDataFromPendingInfo(order *models.Order, paymentData *models.
 	if order == nil || paymentData == nil {
 		return
 	}
-	pending, err := order.GetPendingClientSignedPaymentInfo()
+	pending, err := order.GetPendingEscrowPaymentInfo()
 	if err != nil || pending == nil {
 		return
 	}

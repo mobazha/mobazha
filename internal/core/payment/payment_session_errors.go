@@ -15,8 +15,8 @@ var (
 		"payment session: FiatAmountCents must be greater than zero",
 	)
 
-	ErrRWAPaymentUseLegacyInstructions = errors.New(
-		`payment session: RWA token listings must use POST /v1/orders/{orderID}/instructions/payment`,
+	ErrRWAPaymentSessionUnsupported = errors.New(
+		"payment session: RWA token listings are not supported by payment-session provisioning yet",
 	)
 
 	// ErrPaymentCoinMismatch is returned when CreateSession is called with a

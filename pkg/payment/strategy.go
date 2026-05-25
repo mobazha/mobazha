@@ -183,8 +183,7 @@ type PaymentSetupParams struct {
 	OrderData *models.Order
 }
 
-// PaymentSetupResult contains the result of payment instruction generation.
-// The handler formats the JSON response differently based on PaymentModel.
+// PaymentSetupResult contains the result of payment setup generation.
 type PaymentSetupResult struct {
 	// PaymentModel indicates which payment paradigm this result follows.
 	PaymentModel PaymentModel
@@ -194,11 +193,6 @@ type PaymentSetupResult struct {
 	// Handlers use this to distinguish ManagedEscrow monitored from UTXO monitored
 	// response shapes — ManagedEscrow has no Script / ScriptHash fields.
 	IsManagedEscrowOrder bool
-
-	// IsSolanaEscrow is true when the strategy is the Solana Anchor
-	// address-monitored escrow path. It is monitored like UTXO/ManagedEscrow, but its
-	// response shape is Solana-specific and must not be formatted as UTXO.
-	IsSolanaEscrow bool
 
 	// PaymentData carries chain-specific payment data.
 	PaymentData *models.PaymentData
@@ -285,10 +279,9 @@ type ChainEscrow interface {
 
 	// ── Payment Setup ────────────────────────────────────
 
-	// GeneratePaymentInstructions generates initial payment instructions
-	// for the "order/payment" endpoint. This is the entry point for setting
-	// up a payment — it creates the escrow or payment address and returns
-	// data the frontend needs to execute the payment.
+	// GeneratePaymentInstructions provisions the initial chain-specific payment
+	// setup used by payment-session. It creates the escrow or payment address
+	// and returns data needed to project the funding target.
 	//
 	// Monitored (UTXO): returns payment address + script for monitoring.
 	// ClientSigned (EVM/Solana): returns escrow init instructions for frontend.

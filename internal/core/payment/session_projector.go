@@ -67,7 +67,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	// Primary source: PaymentSent (already paid).
 	// Fallback: FiatMetadata (fiat order not yet paid) or PendingPaymentInfo
 	// (UTXO order with address set but PaymentSent not yet received).
-	paymentCoin, productMode, paymentSentKind := p.derivePaymentInfo(order, input.orderOpen, input.paymentSent)
+	paymentCoin, productMode := p.derivePaymentInfo(order, input.orderOpen, input.paymentSent)
 
 	// ── Expected amount ───────────────────────────────────────────────────
 	// Use the order's canonical expected-amount resolver so address-monitored
@@ -91,37 +91,26 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	// ── Capabilities ──────────────────────────────────────────────────────
 	caps := p.deriveCapabilities(status, productMode, settlementMode)
 
-	// ── Legacy compatibility ───────────────────────────────────────────────
-	var legacyCompat *payment.LegacyCompatibilityView
-	if paymentSentKind != "" {
-		legacyCompat = &payment.LegacyCompatibilityView{
-			PaymentSentKind:               paymentSentKind,
-			InstructionsEndpointAvailable: true,
-		}
-	}
-
 	return &payment.PaymentSession{
-		SessionID:           sessionID,
-		OrderID:             order.ID.String(),
-		PaymentCoin:         paymentCoin,
-		SettlementMode:      settlementMode,
-		ProductMode:         productMode,
-		Status:              status,
-		ExpectedAmount:      expectedAmount,
-		RefundAddress:       order.RefundAddress,
-		ExpiresAt:           expiresAt,
-		FundingTarget:       fundingTarget,
-		PaymentProgress:     progress,
-		Capabilities:        caps,
-		UserActionRequest:   nil, // Phase B: no user action required for address_monitored
-		LegacyCompatibility: legacyCompat,
+		SessionID:         sessionID,
+		OrderID:           order.ID.String(),
+		PaymentCoin:       paymentCoin,
+		SettlementMode:    settlementMode,
+		ProductMode:       productMode,
+		Status:            status,
+		ExpectedAmount:    expectedAmount,
+		RefundAddress:     order.RefundAddress,
+		ExpiresAt:         expiresAt,
+		FundingTarget:     fundingTarget,
+		PaymentProgress:   progress,
+		Capabilities:      caps,
+		UserActionRequest: nil, // Phase B: no user action required for address_monitored
 	}, nil
 }
 
 // ── Private derivation helpers ────────────────────────────────────────────
 
-// derivePaymentInfo extracts canonical payment coin, product mode, and the
-// legacy paymentSentKind string.
+// derivePaymentInfo extracts canonical payment coin and product mode.
 //
 // Resolution order:
 //  1. PaymentSent (most authoritative — order already paid)
@@ -130,10 +119,6 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 //     (i.e. PaymentSent_FIAT is written only after the provider confirms).
 //  3. PendingPaymentInfo["Coin"] — for UTXO orders whose address is set
 //     but PaymentSent has not yet been received.
-//
-// paymentSentKind is the raw legacy string used to populate
-// LegacyCompatibility for old clients (non-empty only when PaymentSent is
-// present).
 func (p *PaymentSessionProjector) derivePaymentInfo(
 	order *models.Order,
 	orderOpen *pb.OrderOpen,
@@ -141,26 +126,15 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 ) (
 	paymentCoin string,
 	productMode payment.ProductMode,
-	paymentSentKind string,
 ) {
 	// ── 1. PaymentSent present ───────────────────────────────────────────
 	if ps != nil {
 		paymentCoin = normalizeCoinBestEffort(ps.Coin)
 		spec, ok := payment.ResolveSettlementSpec(order, ps)
 		if !ok {
-			return paymentCoin, productMode, paymentSentKind
+			return paymentCoin, productMode
 		}
-		method := spec.Method
-		productMode = payment.ProductModeFromMethod(method)
-		switch method {
-		case pb.PaymentSent_MODERATED:
-			paymentSentKind = "PAYMENT_SENT_MODERATED"
-		case pb.PaymentSent_DIRECT:
-			paymentSentKind = "PAYMENT_SENT_DIRECT"
-		default:
-			paymentSentKind = "PAYMENT_SENT_CANCELABLE"
-		}
-		return paymentCoin, productMode, paymentSentKind
+		return paymentCoin, payment.ProductModeFromMethod(spec.Method)
 	}
 
 	// ── 2. FiatMetadata fallback (fiat order, awaiting buyer action) ──────
@@ -179,30 +153,30 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 				paymentCoin = fmt.Sprintf("fiat:%s:%s",
 					strings.ToLower(strings.TrimSpace(provider)),
 					strings.ToUpper(strings.TrimSpace(currency)))
-				return paymentCoin, productMode, ""
+				return paymentCoin, productMode
 			}
 			// Legacy rows with provider metadata but no currency context cannot be
 			// projected to a canonical fiat coin safely. Leave paymentCoin empty
 			// rather than leaking the invalid external shape "fiat:{provider}".
-			return "", productMode, ""
+			return "", productMode
 		}
 	}
 
 	// ── 3. PendingPaymentInfo / fiat metadata (pre-PaymentSent) ───────────
 	if spec, ok := payment.ResolveSettlementSpecFromOrder(order); ok {
 		coin := pendingPaymentCoin(order)
-		return coin, payment.ProductModeFromMethod(spec.Method), ""
+		return coin, payment.ProductModeFromMethod(spec.Method)
 	}
 
-	return "", payment.ProductModeCancelable, ""
+	return "", payment.ProductModeCancelable
 }
 
 func pendingPaymentCoin(order *models.Order) string {
 	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil && managed_escrowInfo.Coin != "" {
 		return normalizeCoinBestEffort(managed_escrowInfo.Coin)
 	}
-	if csInfo, err := order.GetPendingClientSignedPaymentInfo(); err == nil && csInfo != nil && csInfo.Coin != "" {
-		return normalizeCoinBestEffort(csInfo.Coin)
+	if escrowInfo, err := order.GetPendingEscrowPaymentInfo(); err == nil && escrowInfo != nil && escrowInfo.Coin != "" {
+		return normalizeCoinBestEffort(escrowInfo.Coin)
 	}
 	if utxoInfo, err := order.GetPendingPaymentInfo(); err == nil && utxoInfo != nil && utxoInfo.Coin != "" {
 		return normalizeCoinBestEffort(utxoInfo.Coin)
@@ -262,8 +236,7 @@ const (
 //  1. Try ChainType(ticker).IsValid() — covers all native chain tickers without
 //     maintaining a parallel hardcoded list here.
 //  2. For well-known multi-chain token symbols (USDC etc.) that carry no
-//     intrinsic chain context, conservatively classify as client-signed since all
-//     current EVM/Solana deployments use the legacy instructions path.
+//     intrinsic chain context, conservatively classify as client-signed.
 //
 // Phase PS B4: canonical policy at API ingress reduces new orders hitting this
 // fallback; legacy rows may still carry ambiguous tickers until fully migrated.

@@ -9787,9 +9787,9 @@
         ]
       }
     },
-    "/v1/orders/{orderID}/instructions/payment": {
+    "/v1/orders/{orderID}/rwa-token/payment-info": {
       "post": {
-        "operationId": "orders-post-instructions-payment",
+        "operationId": "orders-post-rwa-token-payment-info",
         "parameters": [
           {
             "description": "Order ID.",
@@ -9843,7 +9843,8 @@
             "apiToken": []
           }
         ],
-        "summary": "Build payment funding instructions",
+        "description": "Returns buyer and vendor chain identity addresses for RWA token purchases.",
+        "summary": "Get RWA token identity payment info",
         "tags": [
           "orders"
         ]

@@ -94,7 +94,7 @@ type PaymentSessionService interface {
 	// CreateSession provisions a payment session for an order.
 	//
 	// For crypto orders (settlementMode=address_monitored or escrow_v1):
-	//   - Delegates to the existing setup/payment initialisation path.
+	//   - Delegates to the configured payment-session crypto facade.
 	//   - Returns a PaymentSession with the funding address, expected amount,
 	//     expiry, and the initial (zero) payment progress.
 	//

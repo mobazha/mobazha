@@ -214,8 +214,9 @@ func NewSolanaEscrowSpec(moderated bool) SettlementSpec {
 	}
 }
 
-// NewClientSignedEVMSpec returns legacy EVM contract escrow spec.
-func NewClientSignedEVMSpec(moderated bool) SettlementSpec {
+// NewLegacyEVMContractSpec returns the legacy frontend-signed EVM contract
+// escrow spec. ManagedEscrow escrow must use NewManagedEscrowSpec instead.
+func NewLegacyEVMContractSpec(moderated bool) SettlementSpec {
 	method := pb.PaymentSent_CANCELABLE
 	if moderated {
 		method = pb.PaymentSent_MODERATED
@@ -227,8 +228,9 @@ func NewClientSignedEVMSpec(moderated bool) SettlementSpec {
 	}
 }
 
-// NewClientSignedSolanaSpec returns Solana program escrow spec.
-func NewClientSignedSolanaSpec(moderated bool) SettlementSpec {
+// NewLegacySolanaProgramSpec returns the legacy frontend-signed Solana program
+// escrow spec. New Solana escrow funding must use NewSolanaEscrowSpec instead.
+func NewLegacySolanaProgramSpec(moderated bool) SettlementSpec {
 	method := pb.PaymentSent_CANCELABLE
 	if moderated {
 		method = pb.PaymentSent_MODERATED
@@ -335,8 +337,8 @@ func IsFiatPaymentRoute(method pb.PaymentSent_Method, coinType iwallet.CoinType)
 	return MethodIsFiat(method) || coinType.IsFiatPayment()
 }
 
-// ResolveSettlementSpecFromPendingClientSigned reads an explicit spec or derives from legacy fields.
-func ResolveSettlementSpecFromPendingClientSigned(info *models.PendingClientSignedPaymentInfo) (SettlementSpec, bool) {
+// ResolveSettlementSpecFromPendingEscrow reads an explicit escrow spec.
+func ResolveSettlementSpecFromPendingEscrow(info *models.PendingEscrowPaymentInfo) (SettlementSpec, bool) {
 	if info == nil {
 		return SettlementSpec{}, false
 	}
@@ -345,17 +347,6 @@ func ResolveSettlementSpecFromPendingClientSigned(info *models.PendingClientSign
 		if err == nil {
 			return spec, true
 		}
-	}
-	moderated := strings.TrimSpace(info.Moderator) != ""
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(info.Coin))
-	if err != nil {
-		return SettlementSpec{}, false
-	}
-	if coinInfo.Chain == iwallet.ChainSolana {
-		return NewClientSignedSolanaSpec(moderated), true
-	}
-	if coinInfo.IsEthTypeChain() {
-		return NewClientSignedEVMSpec(moderated), true
 	}
 	return SettlementSpec{}, false
 }
@@ -397,8 +388,8 @@ func ResolveSettlementSpecFromOrder(order *models.Order) (SettlementSpec, bool) 
 	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
 		return ResolveSettlementSpecFromPendingManagedEscrow(managed_escrowInfo)
 	}
-	if csInfo, err := order.GetPendingClientSignedPaymentInfo(); err == nil && csInfo != nil {
-		return ResolveSettlementSpecFromPendingClientSigned(csInfo)
+	if escrowInfo, err := order.GetPendingEscrowPaymentInfo(); err == nil && escrowInfo != nil {
+		return ResolveSettlementSpecFromPendingEscrow(escrowInfo)
 	}
 	if utxoInfo, err := order.GetPendingPaymentInfo(); err == nil && utxoInfo != nil {
 		return ResolveSettlementSpecFromPendingUTXO(utxoInfo)
@@ -466,19 +457,13 @@ func SettlementSpecFromPaymentData(pd *models.PaymentData) (SettlementSpec, bool
 	case pb.PaymentSent_DIRECT:
 		return NewDirectSpec(), true
 	}
-	moderated := pd.Method == pb.PaymentSent_MODERATED
 	coinInfo, err := pd.Coin.CoinInfo()
 	if err != nil {
 		return SettlementSpec{}, false
 	}
 	if coinInfo.Chain.IsUTXOChain() {
+		moderated := pd.Method == pb.PaymentSent_MODERATED
 		return NewUTXOSpec(moderated), true
-	}
-	if coinInfo.Chain == iwallet.ChainSolana {
-		return NewClientSignedSolanaSpec(moderated), true
-	}
-	if coinInfo.IsEthTypeChain() {
-		return NewClientSignedEVMSpec(moderated), true
 	}
 	return SettlementSpec{}, false
 }

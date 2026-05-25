@@ -581,6 +581,9 @@ func buildAggregatedPaymentSent(
 	refundAddr := aggregatedRefundAddress(order, rows)
 
 	intent := resolveAggregatedPaymentIntent(order, rows)
+	if !intent.settlementSpecOK {
+		return nil, fmt.Errorf("missing settlement spec for pending escrow payment intent")
+	}
 
 	transactionID := ""
 	if hasChainTx {
@@ -643,6 +646,7 @@ func latestChainTxObservation(rows []models.PaymentObservation) (models.PaymentO
 
 type aggregatedPaymentIntent struct {
 	settlementSpec     paymentmetrics.SettlementSpec
+	settlementSpecOK   bool
 	contractAddress    string
 	script             string
 	moderator          string
@@ -655,7 +659,8 @@ type aggregatedPaymentIntent struct {
 
 func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentObservation) aggregatedPaymentIntent {
 	intent := aggregatedPaymentIntent{
-		settlementSpec: paymentmetrics.NewDirectSpec(),
+		settlementSpec:   paymentmetrics.NewDirectSpec(),
+		settlementSpecOK: true,
 	}
 
 	if order == nil {
@@ -679,17 +684,15 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 		return intent
 	}
 
-	if csInfo, err := order.GetPendingClientSignedPaymentInfo(); err == nil && csInfo != nil {
-		if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingClientSigned(csInfo); ok {
+	if escrowInfo, err := order.GetPendingEscrowPaymentInfo(); err == nil && escrowInfo != nil {
+		if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingEscrow(escrowInfo); ok {
 			intent.settlementSpec = spec
-		} else if strings.TrimSpace(csInfo.Moderator) != "" {
-			intent.settlementSpec = paymentmetrics.NewClientSignedEVMSpec(true)
 		} else {
-			intent.settlementSpec = paymentmetrics.NewClientSignedEVMSpec(false)
+			intent.settlementSpecOK = false
 		}
-		intent.contractAddress = csInfo.EscrowAddress
-		if strings.TrimSpace(csInfo.Moderator) != "" {
-			intent.moderator = csInfo.Moderator
+		intent.contractAddress = escrowInfo.EscrowAddress
+		if strings.TrimSpace(escrowInfo.Moderator) != "" {
+			intent.moderator = escrowInfo.Moderator
 		}
 		return intent
 	}
@@ -706,7 +709,8 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 
 func utxoAggregatedPaymentIntent(pendingInfo *models.PendingUTXOPaymentInfo) aggregatedPaymentIntent {
 	intent := aggregatedPaymentIntent{
-		settlementSpec: paymentmetrics.NewDirectSpec(),
+		settlementSpec:   paymentmetrics.NewDirectSpec(),
+		settlementSpecOK: true,
 	}
 	if pendingInfo == nil {
 		return intent

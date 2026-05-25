@@ -18,7 +18,7 @@ import (
 // provisioning but CryptoPaymentFacade is not wired (e.g. partial builds).
 var ErrProvisioningNotImplemented = errors.New(
 	"payment session: CreateSession: provisioning not wired for this deployment; " +
-		"use the existing payment initialisation path or enable PaymentSession facades",
+		"enable PaymentSession facades",
 )
 
 // PaymentSessionServiceImpl implements contracts.PaymentSessionService.
@@ -59,7 +59,7 @@ func (s *PaymentSessionServiceImpl) SetFiatFacade(f *FiatPaymentFacade) {
 }
 
 // SetCryptoFacade injects the CryptoPaymentFacade so CreateSession can provision
-// crypto payment addresses / instructions paths.
+// crypto payment addresses.
 //
 // Phase PS crypto closure.
 func (s *PaymentSessionServiceImpl) SetCryptoFacade(c *CryptoPaymentFacade) {

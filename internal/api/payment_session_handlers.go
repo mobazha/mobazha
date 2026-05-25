@@ -59,7 +59,7 @@ func (g *Gateway) handleGETOrderPaymentSession(w http.ResponseWriter, r *http.Re
 			// Phase B Step 1: provisioning not yet wired — should not happen on GET,
 			// but guard defensively.
 			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
-				"payment session provisioning not yet available — use the existing payment initialisation path")
+				"payment session provisioning is not available on this node")
 		default:
 			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		}
@@ -165,7 +165,7 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 				"order not found: "+orderID)
 		case errors.Is(err, corePmt.ErrProvisioningNotImplemented):
 			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented,
-				"crypto payment session provisioning is not yet available on this node — use POST /v1/orders/{orderID}/instructions/payment")
+				"crypto payment session provisioning is not available on this node")
 		case errors.Is(err, corePmt.ErrFiatFacadeNotWired):
 			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
 				"fiat payment session provisioning is not available on this node")
@@ -179,7 +179,7 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 		case errors.Is(err, corePmt.ErrExchangeRateUnavailable):
 			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
 				"exchange rate service unavailable — cross-currency crypto payment cannot be calculated")
-		case errors.Is(err, corePmt.ErrRWAPaymentUseLegacyInstructions):
+		case errors.Is(err, corePmt.ErrRWAPaymentSessionUnsupported):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		case errors.Is(err, coreiface.ErrBadRequest):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())

@@ -294,8 +294,7 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 		result.PaymentData != nil &&
 		result.PaymentData.ToAddress != "" {
 
-		setupResult.IsSolanaEscrow = true
-		if persistErr := s.persistClientSignedPaymentInfo(params.OrderID, result.PaymentData); persistErr != nil {
+		if persistErr := s.persistEscrowPaymentInfo(params.OrderID, result.PaymentData); persistErr != nil {
 			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist Solana Anchor escrow for order %s: %v", params.OrderID, persistErr)
 		}
 	}
@@ -492,18 +491,18 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		paymentTokenAddress = coinInfo.ContractAddress(wallet.IsTestnet())
 	}
 
-	var clientSpec payment.SettlementSpec
+	var escrowSpec payment.SettlementSpec
 	if coinInfo.Chain == iwallet.ChainSolana {
-		clientSpec = payment.NewSolanaEscrowSpec(paymentMethod == pb.PaymentSent_MODERATED)
+		escrowSpec = payment.NewSolanaEscrowSpec(paymentMethod == pb.PaymentSent_MODERATED)
 	} else {
-		clientSpec = payment.NewClientSignedEVMSpec(paymentMethod == pb.PaymentSent_MODERATED)
+		escrowSpec = payment.NewLegacyEVMContractSpec(paymentMethod == pb.PaymentSent_MODERATED)
 	}
 
 	paymentData := models.PaymentData{
 		OrderID:             params.OrderID,
 		Coin:                params.CoinType,
 		Method:              paymentMethod,
-		SettlementSpec:      clientSpec.ToPending(),
+		SettlementSpec:      escrowSpec.ToPending(),
 		ContractAddress:     contractAddress.String(),
 		PayerAddress:        params.PayerAddress,
 		Moderator:           params.Moderator,
@@ -531,8 +530,8 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 		}
 	}
 
-	if persistErr := s.persistClientSignedPaymentInfo(params.OrderID, &paymentData); persistErr != nil {
-		logger.LogWarningWithIDf(log, s.nodeID, "BuildInitEscrowInstructions: failed to persist client-signed pending for order %s: %v", params.OrderID, persistErr)
+	if persistErr := s.persistEscrowPaymentInfo(params.OrderID, &paymentData); persistErr != nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "BuildInitEscrowInstructions: failed to persist escrow pending for order %s: %v", params.OrderID, persistErr)
 	}
 
 	return &paymentData, escrowAccount, instructions, nil
@@ -542,8 +541,8 @@ func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
 	if pd == nil {
 		return "", nil
 	}
-	data, err := json.Marshal(&models.PendingClientSignedPaymentInfo{
-		Type:                 "client_signed",
+	data, err := json.Marshal(&models.PendingEscrowPaymentInfo{
+		Type:                 "escrow",
 		Coin:                 string(pd.Coin),
 		EscrowAddress:        pd.ToAddress,
 		Moderator:            pd.Moderator,
@@ -560,7 +559,7 @@ func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
 	return hex.EncodeToString(data), nil
 }
 
-func (s *PaymentAppService) persistClientSignedPaymentInfo(orderID string, pd *models.PaymentData) error {
+func (s *PaymentAppService) persistEscrowPaymentInfo(orderID string, pd *models.PaymentData) error {
 	if pd == nil {
 		return nil
 	}
@@ -570,7 +569,7 @@ func (s *PaymentAppService) persistClientSignedPaymentInfo(orderID string, pd *m
 			return fmt.Errorf("load order: %w", err)
 		}
 		order.PaymentAddress = pd.ToAddress
-		if err := order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+		if err := order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 			Coin:                 string(pd.Coin),
 			EscrowAddress:        pd.ToAddress,
 			Moderator:            pd.Moderator,

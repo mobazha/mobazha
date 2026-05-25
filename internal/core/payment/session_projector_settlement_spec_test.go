@@ -37,10 +37,9 @@ func TestDerivePaymentInfo_ManagedEscrowPendingUsesSettlementSpecMethod(t *testi
 		Moderated: false,
 	}))
 
-	coin, mode, kind := p.derivePaymentInfo(order, nil, nil)
+	coin, mode := p.derivePaymentInfo(order, nil, nil)
 	require.Equal(t, "crypto:eth:eth", coin)
 	require.Equal(t, pkpayment.ProductModeModerated, mode)
-	require.Empty(t, kind)
 }
 
 func TestDeriveFundingTarget_ManagedEscrowPendingUsesAddressMonitored(t *testing.T) {
@@ -57,48 +56,46 @@ func TestDeriveFundingTarget_ManagedEscrowPendingUsesAddressMonitored(t *testing
 	require.Equal(t, "0xmanagedescrow", target.Address)
 }
 
-func TestDeriveFundingTarget_ClientSignedPendingUsesEscrowV1(t *testing.T) {
+func TestDeriveFundingTarget_LegacyContractPendingUsesEscrowV1(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "0xescrow"}
-	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 		Coin:           "crypto:eip155:1:native",
 		EscrowAddress:  "0xescrow",
-		SettlementSpec: pkpayment.NewClientSignedEVMSpec(false).ToPending(),
+		SettlementSpec: pkpayment.NewLegacyEVMContractSpec(false).ToPending(),
 	}))
 
 	mode, _ := p.deriveFundingTarget(order, "crypto:eip155:1:native", "1000", testProjectInput(order, false))
 	require.Equal(t, pkpayment.SettlementModeEscrowV1, mode)
 }
 
-func TestDerivePaymentInfo_ClientSignedPendingUsesPendingCoin(t *testing.T) {
+func TestDerivePaymentInfo_LegacyContractPendingUsesPendingCoin(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{}
 	orderOpen := &pb.OrderOpen{PricingCoin: "USD"}
-	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 		Coin:           "crypto:eip155:1:native",
 		EscrowAddress:  "0xescrow",
-		SettlementSpec: pkpayment.NewClientSignedEVMSpec(false).ToPending(),
+		SettlementSpec: pkpayment.NewLegacyEVMContractSpec(false).ToPending(),
 	}))
 
-	coin, mode, kind := p.derivePaymentInfo(order, orderOpen, nil)
+	coin, mode := p.derivePaymentInfo(order, orderOpen, nil)
 	require.Equal(t, "crypto:eip155:1:native", coin)
 	require.Equal(t, pkpayment.ProductModeCancelable, mode)
-	require.Empty(t, kind)
 }
 
 func TestDerivePaymentInfo_DoesNotGuessPaymentCoinFromPricingCoin(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{}
 	orderOpen := &pb.OrderOpen{PricingCoin: "USD"}
-	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 		EscrowAddress:  "0xescrow",
-		SettlementSpec: pkpayment.NewClientSignedEVMSpec(false).ToPending(),
+		SettlementSpec: pkpayment.NewLegacyEVMContractSpec(false).ToPending(),
 	}))
 
-	coin, mode, kind := p.derivePaymentInfo(order, orderOpen, nil)
+	coin, mode := p.derivePaymentInfo(order, orderOpen, nil)
 	require.Empty(t, coin)
 	require.Equal(t, pkpayment.ProductModeCancelable, mode)
-	require.Empty(t, kind)
 }
 
 func TestDeriveFundingTarget_UTXOPendingUsesAddressMonitored(t *testing.T) {
@@ -263,9 +260,8 @@ func TestDerivePaymentInfo_PaymentSentDirectUsesDirectProductMode(t *testing.T) 
 		Coin:           "BTC",
 		SettlementSpec: pkpayment.NewDirectSpec().ToPaymentSent(),
 	}
-	_, mode, kind := p.derivePaymentInfo(&models.Order{}, nil, ps)
+	_, mode := p.derivePaymentInfo(&models.Order{}, nil, ps)
 	require.Equal(t, pkpayment.ProductModeDirect, mode)
-	require.Equal(t, "PAYMENT_SENT_DIRECT", kind)
 }
 
 func TestDerivePaymentInfo_FiatMetadataUsesSettlementSpecProductMode(t *testing.T) {
@@ -279,10 +275,9 @@ func TestDerivePaymentInfo_FiatMetadataUsesSettlementSpecProductMode(t *testing.
 		"settlement_spec": specJSON,
 	}))
 
-	coin, mode, kind := p.derivePaymentInfo(order, nil, nil)
+	coin, mode := p.derivePaymentInfo(order, nil, nil)
 	require.Equal(t, "fiat:stripe:USD", coin)
 	require.Equal(t, pkpayment.ProductModeCancelable, mode)
-	require.Empty(t, kind)
 }
 
 func TestDerivePaymentInfo_PendingManagedEscrowOverridesPaymentSentEnvelope(t *testing.T) {
@@ -299,7 +294,6 @@ func TestDerivePaymentInfo_PendingManagedEscrowOverridesPaymentSentEnvelope(t *t
 		ToAddress:       "0xmanagedescrow",
 		SettlementSpec:  pkpayment.NewDirectSpec().ToPaymentSent(),
 	}
-	_, mode, kind := p.derivePaymentInfo(order, nil, ps)
+	_, mode := p.derivePaymentInfo(order, nil, ps)
 	require.Equal(t, pkpayment.ProductModeCancelable, mode)
-	require.Equal(t, "PAYMENT_SENT_CANCELABLE", kind)
 }

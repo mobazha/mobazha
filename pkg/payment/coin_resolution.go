@@ -89,8 +89,8 @@ func PendingPaymentCoinFromOrder(order *models.Order) (iwallet.CoinType, bool) {
 			return coin, true
 		}
 	}
-	if csInfo, err := order.GetPendingClientSignedPaymentInfo(); err == nil && csInfo != nil {
-		if coin, ok := NormalizeSettlementPaymentCoin(csInfo.Coin); ok {
+	if escrowInfo, err := order.GetPendingEscrowPaymentInfo(); err == nil && escrowInfo != nil {
+		if coin, ok := NormalizeSettlementPaymentCoin(escrowInfo.Coin); ok {
 			return coin, true
 		}
 	}

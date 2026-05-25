@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	paymentpkg "github.com/mobazha/mobazha3.0/pkg/payment"
@@ -34,14 +33,8 @@ func (n *MobazhaNode) handleCryptoPaymentVerified(orderID string, paymentSent *p
 		if err := n.orderService.EnsureRatingSignatures(context.Background(), models.OrderID(orderID)); err != nil {
 			logger.LogWarningWithIDf(log, n.nodeID, "payment verified: ensure rating signatures for order %s: %v", orderID, err)
 		}
-		if n.hasLocalOrderRole(orderID, models.RoleBuyer) {
-			return
-		}
 		n.orderService.RelayPaymentToBuyer(context.Background(), orderID, pd)
 	case models.RoleBuyer:
-		if n.hasLocalOrderRole(orderID, models.RoleVendor) {
-			return
-		}
 		vendorPeerID, err := order.Vendor()
 		if err != nil {
 			logger.LogWarningWithIDf(log, n.nodeID, "payment verified: resolve vendor for order %s: %v", orderID, err)
@@ -100,22 +93,4 @@ func paymentDataFromVerifiedPaymentSent(orderID string, paymentSent *pb.PaymentS
 		pd.PaymentMethod.Last4 = pm.Last4
 	}
 	return pd
-}
-
-func (n *MobazhaNode) hasLocalOrderRole(orderID string, role models.OrderRole) bool {
-	if n.db == nil {
-		return false
-	}
-	var count int64
-	err := n.db.View(func(tx database.Tx) error {
-		return tx.Read().
-			Model(&models.Order{}).
-			Where("id = ? AND my_role = ?", orderID, string(role)).
-			Count(&count).Error
-	})
-	if err != nil {
-		logger.LogWarningWithIDf(log, n.nodeID, "payment verified: check local %s order mirror for %s: %v", role, orderID, err)
-		return false
-	}
-	return count > 0
 }

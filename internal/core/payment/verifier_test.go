@@ -815,6 +815,33 @@ func TestBuildAggregatedPaymentSent_DoesNotUsePricingCoinAsSettlementCoin(t *tes
 	require.Contains(t, err.Error(), "cannot determine PaymentSent.Coin")
 }
 
+func TestBuildAggregatedPaymentSent_PendingEscrowRequiresSettlementSpec(t *testing.T) {
+	order := &models.Order{ID: models.OrderID("order-escrow-missing-spec")}
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
+		Coin:          "crypto:eip155:1:native",
+		EscrowAddress: "0xescrow",
+	}))
+	orderOpen := &pb.OrderOpen{
+		PricingCoin: "USD",
+		Amount:      "1500",
+	}
+	rows := []models.PaymentObservation{{
+		ID:             "obs-escrow",
+		OrderID:        "order-escrow-missing-spec",
+		ChainNamespace: "eip155",
+		ChainReference: "1",
+		TxHash:         "0xtx-escrow",
+		FromAddress:    "0xpayer",
+		ToAddress:      "0xescrow",
+		Amount:         "1000",
+	}}
+
+	_, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "missing settlement spec")
+}
+
 func TestAggregateAndEmit_PendingUTXOCoinOverridesOrderOpenPricingCoin(t *testing.T) {
 	db := newVerifierTestDB(t)
 	bus := &recordingBus{}
@@ -957,9 +984,9 @@ func TestResolveAggregatedPaymentIntent_UTXOUsesPendingForBitcoinCashNamespace(t
 	require.Equal(t, "5221bch...", intent.script)
 }
 
-func TestResolveAggregatedPaymentIntent_ClientSignedUsesSettlementSpecWhenPresent(t *testing.T) {
+func TestResolveAggregatedPaymentIntent_LegacyContractUsesSettlementSpecWhenPresent(t *testing.T) {
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 		Coin:          "ETH",
 		EscrowAddress: "0xescrow",
 		SettlementSpec: &models.PendingSettlementSpec{
@@ -976,16 +1003,17 @@ func TestResolveAggregatedPaymentIntent_ClientSignedUsesSettlementSpecWhenPresen
 	require.Equal(t, "0xescrow", intent.contractAddress)
 }
 
-func TestResolveAggregatedPaymentIntent_ClientSignedFallsBackToModeratorField(t *testing.T) {
+func TestResolveAggregatedPaymentIntent_EscrowWithoutSettlementSpecIsInvalid(t *testing.T) {
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 		Coin:          "ETH",
 		EscrowAddress: "0xescrow",
 		Moderator:     "mod-peer",
 	}))
 
 	intent := resolveAggregatedPaymentIntent(order, nil)
-	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
+	require.False(t, intent.settlementSpecOK)
+	require.Equal(t, "0xescrow", intent.contractAddress)
 	require.Equal(t, "mod-peer", intent.moderator)
 }
 

@@ -36,6 +36,8 @@ type CryptoPaymentFacade struct {
 	setupSvc    CryptoPaymentSetupService
 	exchange    contracts.ExchangeRateService
 	storePolicy contracts.StorePolicyService
+
+	sellerPolicyResolver sellerStorePolicyResolver
 }
 
 // NewCryptoPaymentFacade constructs CryptoPaymentFacade.
@@ -53,11 +55,14 @@ func NewCryptoPaymentFacade(
 		setupSvc:    setupSvc,
 		exchange:    exchange,
 		storePolicy: storePolicy,
+		sellerPolicyResolver: dbSellerStorePolicyResolver{
+			db: db,
+		},
 	}
 }
 
-// CreateSession provisions crypto payment instructions on the order and
-// returns the unified projection.
+// CreateSession provisions the crypto funding target on the order and returns
+// the unified projection.
 func (c *CryptoPaymentFacade) CreateSession(
 	ctx context.Context,
 	req contracts.CreatePaymentSessionRequest,
@@ -77,7 +82,7 @@ func (c *CryptoPaymentFacade) CreateSession(
 		orderOpen.Listings[0].Listing != nil &&
 		orderOpen.Listings[0].Listing.Metadata != nil &&
 		orderOpen.Listings[0].Listing.Metadata.ContractType == porderpb.Listing_Metadata_RWA_TOKEN {
-		return nil, fmt.Errorf("%w", ErrRWAPaymentUseLegacyInstructions)
+		return nil, fmt.Errorf("%w", ErrRWAPaymentSessionUnsupported)
 	}
 
 	// Validate refund address only when provided. If the client-signed path
@@ -139,8 +144,14 @@ func (c *CryptoPaymentFacade) validateStorePolicyModerator(ctx context.Context, 
 	if err != nil {
 		return 0, fmt.Errorf("%w: invalid moderator ID", coreiface.ErrBadRequest)
 	}
-	if revision, ok, err := c.validateSellerStorePolicyModerator(ctx, orderID, orderOpen, moderatorPeerID.String()); ok {
-		return revision, err
+	if resolver := c.resolvedSellerPolicyResolver(); resolver != nil {
+		policy, ok, err := resolver.SellerStorePolicy(ctx, orderID, orderOpen)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			return validateStorePolicyContainsModerator(policy, moderatorPeerID.String())
+		}
 	}
 	if c.storePolicy == nil {
 		return 0, fmt.Errorf("%w: store policy service is not available", coreiface.ErrBadRequest)
@@ -152,41 +163,58 @@ func (c *CryptoPaymentFacade) validateStorePolicyModerator(ctx context.Context, 
 	return validateStorePolicyContainsModerator(policy, moderatorPeerID.String())
 }
 
+type sellerStorePolicyResolver interface {
+	SellerStorePolicy(ctx context.Context, orderID string, orderOpen *porderpb.OrderOpen) (*models.StorePolicy, bool, error)
+}
+
 type rawDBProvider interface {
 	RawDB() *gorm.DB
 }
 
-func (c *CryptoPaymentFacade) validateSellerStorePolicyModerator(ctx context.Context, orderID string, orderOpen *porderpb.OrderOpen, canonicalModeratorID string) (uint64, bool, error) {
-	rawProvider, ok := c.db.(rawDBProvider)
+func (c *CryptoPaymentFacade) resolvedSellerPolicyResolver() sellerStorePolicyResolver {
+	if c.sellerPolicyResolver != nil {
+		return c.sellerPolicyResolver
+	}
+	if c.db == nil {
+		return nil
+	}
+	return dbSellerStorePolicyResolver{db: c.db}
+}
+
+type dbSellerStorePolicyResolver struct {
+	db database.Database
+}
+
+func (r dbSellerStorePolicyResolver) SellerStorePolicy(ctx context.Context, orderID string, orderOpen *porderpb.OrderOpen) (*models.StorePolicy, bool, error) {
+	rawProvider, ok := r.db.(rawDBProvider)
 	if !ok || rawProvider.RawDB() == nil {
-		return 0, false, nil
+		return nil, false, nil
 	}
 	raw := rawProvider.RawDB().WithContext(ctx)
 
 	sellerTenantID, resolved, err := sellerTenantIDForStorePolicy(raw, orderID, orderOpen)
 	if err != nil {
-		return 0, true, err
+		return nil, true, err
 	}
 	if !resolved {
-		return 0, false, nil
+		return nil, false, nil
 	}
 
 	var policy models.StorePolicy
 	err = raw.Where("tenant_id = ?", sellerTenantID).First(&policy).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, true, fmt.Errorf("%w: moderator is not in store policy", coreiface.ErrBadRequest)
+		return nil, true, fmt.Errorf("%w: moderator is not in store policy", coreiface.ErrBadRequest)
 	}
 	if err != nil {
-		return 0, true, fmt.Errorf("get seller store policy: %w", err)
+		return nil, true, fmt.Errorf("get seller store policy: %w", err)
 	}
 	if err := raw.
 		Where("tenant_id = ?", sellerTenantID).
 		Order("position ASC, created_at ASC").
 		Find(&policy.Moderators).Error; err != nil {
-		return 0, true, fmt.Errorf("get seller store moderators: %w", err)
+		return nil, true, fmt.Errorf("get seller store moderators: %w", err)
 	}
-	revision, err := validateStorePolicyContainsModerator(&policy, canonicalModeratorID)
-	return revision, true, err
+	return &policy, true, nil
 }
 
 func sellerTenantIDForStorePolicy(raw *gorm.DB, orderID string, orderOpen *porderpb.OrderOpen) (string, bool, error) {

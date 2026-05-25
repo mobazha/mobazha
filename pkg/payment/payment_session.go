@@ -44,8 +44,8 @@ const (
 	ProductModeCancelable ProductMode = "cancelable"
 	// ProductModeModerated means a third-party moderator can release funds.
 	ProductModeModerated ProductMode = "moderated"
-	// ProductModeDirect is a legacy/compat-only value. New payment sessions
-	// must not use this; it may only appear in LegacyCompatibility fields.
+	// ProductModeDirect is used for orders that explicitly settle without
+	// buyer protection.
 	ProductModeDirect ProductMode = "direct"
 )
 
@@ -213,19 +213,6 @@ type UserActionRequestView struct {
 	ExpiresAt *time.Time             `json:"expiresAt,omitempty"`
 }
 
-// LegacyCompatibilityView carries backward-compat metadata consumed only
-// by old clients. New code must not branch on these fields.
-//
-// Reference: UNIFIED_PAYMENT_SESSION_ARCHITECTURE.md §10
-type LegacyCompatibilityView struct {
-	// PaymentSentKind is the legacy PaymentSent.Kind string for old clients
-	// that still read it (e.g. "PAYMENT_SENT_CANCELABLE").
-	PaymentSentKind string `json:"paymentSentKind,omitempty"`
-	// InstructionsEndpointAvailable signals whether the deprecated
-	// /instructions/payment endpoint still serves this order.
-	InstructionsEndpointAvailable bool `json:"instructionsEndpointAvailable"`
-}
-
 // PaymentSession is the unified payment session projection that maps 1:1 to
 // the PaymentSessionResponse returned by the API layer.
 //
@@ -283,8 +270,4 @@ type PaymentSession struct {
 	// UserActionRequest is non-nil only when the backend requires an
 	// explicit user wallet action to proceed.
 	UserActionRequest *UserActionRequestView `json:"userActionRequest"`
-
-	// LegacyCompatibility is populated for sessions backed by legacy
-	// crypto orders. Nil for pure v2 sessions and fiat sessions.
-	LegacyCompatibility *LegacyCompatibilityView `json:"legacyCompatibility,omitempty"`
 }

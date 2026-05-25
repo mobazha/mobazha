@@ -3,61 +3,21 @@
 package api
 
 import (
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-)
-
-const (
-	// UTXOPaymentWindowDuration is the user-facing payment window for UTXO
-	// external wallet payments. Aligned with the 15-minute rate lock window
-	// (EXCHANGE_RATE_DESIGN.md §13) and industry standard (BitPay, BTCPay).
-	// The backend address monitor runs independently for 24h as a safety net
-	// (see payment_app_service_utxo.go AddressMonitorDuration).
-	UTXOPaymentWindowDuration = 15 * time.Minute
 )
 
 // ============================================================================
 // 响应结构定义
 // ============================================================================
-
-// UTXOPaymentInfoResponse 外部钱包支付响应（UTXO 链）
-type UTXOPaymentInfoResponse struct {
-	PaymentType    string                `json:"paymentType"`
-	PaymentMethod  pb.PaymentSent_Method `json:"paymentMethod"`  // CANCELABLE/MODERATED
-	PaymentAddress string                `json:"paymentAddress"` // 支付地址
-	PaymentURI     string                `json:"paymentURI"`     // BIP21 URI
-	Amount         uint64                `json:"amount,string"`  // 金额（satoshi）
-	Coin           string                `json:"coin"`           // 币种
-	ChainType      iwallet.ChainType     `json:"chainType"`      // 链类型
-	QRCodeData     string                `json:"qrCodeData"`     // 二维码数据
-	ScriptHash     string                `json:"scriptHash"`     // Electrum scripthash
-	Script         string                `json:"script"`         // 赎回脚本（多签需要）
-	Moderator      string                `json:"moderator"`      // 仲裁者（MODERATED）
-	UnlockHours    uint32                `json:"unlockHours"`    // 托管超时时间（MODERATED）
-	ExpiresAt      time.Time             `json:"expiresAt"`      // 过期时间
-
-	// 币种切换检测相关字段
-	HasPartialPayment bool   `json:"hasPartialPayment,omitempty"` // 是否已有部分支付
-	PaidAmount        uint64 `json:"paidAmount,omitempty,string"` // 已支付金额
-	PaidCoin          string `json:"paidCoin,omitempty"`          // 已支付的币种
-	PaidAddress       string `json:"paidAddress,omitempty"`       // 已支付的地址
-}
 
 // RWATokenPaymentInfoResponse RWA Token 支付响应
 type RWATokenPaymentInfoResponse struct {
@@ -65,64 +25,13 @@ type RWATokenPaymentInfoResponse struct {
 	VendorAddress string `json:"vendorAddress"`
 }
 
-// EVMPaymentInfoResponse 智能合约托管响应（EVM/Solana）
-type EVMPaymentInfoResponse struct {
-	PaymentData   *models.PaymentData `json:"paymentData"`
-	EscrowAccount string              `json:"escrowAccount"`
-	Instructions  any                 `json:"instructions"`
-}
-
-// ManagedEscrowPaymentInfoResponse is the payment setup response for ManagedEscrow EVM orders.
-//
-// ManagedEscrow uses address-monitored funding: the buyer transfers native ETH (or ERC-20)
-// directly to the predicted ManagedEscrow address. No client-side signing is required
-// during setup — signatures are collected at action time (Confirm / Cancel / Complete).
-//
-// Phase PS B2: replaces the legacy EVMPaymentInfoResponse for ManagedEscrow adapter
-// results. Legacy instructions endpoints remain only for client-signed flows
-// (legacy EVM / Solana / TRON), not as the default path for ManagedEscrow.
-type ManagedEscrowPaymentInfoResponse struct {
-	PaymentType         string                `json:"paymentType"`                   // always "managed_escrow_address_monitored"
-	PaymentMethod       pb.PaymentSent_Method `json:"paymentMethod"`                 // CANCELABLE or MODERATED
-	PaymentAddress      string                `json:"paymentAddress"`                // predicted ManagedEscrow address (hex)
-	PaymentTokenAddress string                `json:"paymentTokenAddress,omitempty"` // ERC20 token contract; zero/empty means native gas coin
-	Amount              uint64                `json:"amount,string"`                 // amount in wei (or token minimal units)
-	Coin                string                `json:"coin"`                          // canonical coin type
-	PlatformAmount      string                `json:"platformAmount,omitempty"`      // locked ManagedEscrow release gas service fee
-	PlatformAddr        string                `json:"platformAddr,omitempty"`        // platform fee collector
-	CancelFeeAmount     string                `json:"cancelFeeAmount,omitempty"`     // locked Tier 1 cancel fee; "0" on Tier 2
-	ExpiresAt           time.Time             `json:"expiresAt"`                     // funding window deadline
-	Moderator           string                `json:"moderator,omitempty"`           // peerID (MODERATED only)
-}
-
-// SolanaPaymentInfoResponse is the payment setup response for Solana Anchor
-// escrow. Setup is backend-submitted through the Solana relay, while buyer
-// funding is monitored at the escrow account address.
-type SolanaPaymentInfoResponse struct {
-	PaymentType    string                `json:"paymentType"`
-	PaymentMethod  pb.PaymentSent_Method `json:"paymentMethod"`
-	PaymentAddress string                `json:"paymentAddress"`
-	EscrowAccount  string                `json:"escrowAccount"`
-	Amount         uint64                `json:"amount,string"`
-	Coin           string                `json:"coin"`
-	ActionID       string                `json:"actionId,omitempty"`
-	TxHash         string                `json:"txHash,omitempty"`
-	PaymentData    *models.PaymentData   `json:"paymentData,omitempty"`
-	ExpiresAt      time.Time             `json:"expiresAt"`
-	Moderator      string                `json:"moderator,omitempty"`
-}
-
 // ============================================================================
 // 主处理函数
 // ============================================================================
 
-// handleGetOrderPaymentInstructions 获取订单支付指令
-// 通过 ChainEscrow 分发，根据 PaymentModel 格式化响应
-//
-// Phase PS / B5: unified read model lives at GET /v1/orders/{orderID}/payment-session.
-// Crypto funding can also be provisioned via POST .../payment-session; this legacy JSON
-// body route remains for richer client-signed payloads and specialised responses (QR, URIs).
-func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
+// handleGetRWATokenPaymentInfoRequest returns the buyer/vendor identity
+// addresses needed by RWA token purchase flows.
+func (g *Gateway) handleGetRWATokenPaymentInfoRequest(w http.ResponseWriter, r *http.Request) {
 	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
 		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
@@ -149,11 +58,9 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	params.CoinType = normalizedCoin
 
 	orderSvc := getOrderService(r)
-	walletSvc := getWalletService(r)
-
 	order, err := orderSvc.GetOrder(params.OrderID)
 	if err != nil {
-		log.Warningf("Failed to get order %s for payment instructions: %v", params.OrderID, err)
+		log.Warningf("Failed to get order %s for RWA token payment info: %v", params.OrderID, err)
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Order not found or unavailable")
 		return
 	}
@@ -174,116 +81,8 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Validate refund address only when provided. For address-monitored
-	// payments (ManagedEscrow/UTXO QR-code flow) the buyer cannot know the payer
-	// address until the on-chain transaction is confirmed.
-	if trimmed := strings.TrimSpace(params.RefundAddress); trimmed != "" {
-		if err := models.ValidateRefundAddress(params.CoinType, trimmed); err != nil {
-			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
-			return
-		}
-	}
-
-	// Server-side amount computation: orderOpen.Amount is the finalized total
-	// in pricingCoin's smallest unit (calculated at OrderOpen time). For cross-
-	// currency payments, convert that total to the payment currency. For same-
-	// currency, use directly. UTXO adapters compute amount internally.
-	orderAmount := iwallet.NewAmount(orderOpen.Amount)
-	pricingCoin := strings.ToUpper(orderOpen.PricingCoin)
-	paymentCoinCode, err := params.CoinType.PricingCurrencyCode()
-	if err != nil {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, fmt.Sprintf("invalid coinType: %v", err))
-		return
-	}
-	if pricingCoin != "" && pricingCoin != paymentCoinCode {
-		pricingCurrency, err := models.CurrencyDefinitions.Lookup(pricingCoin)
-		if err != nil {
-			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
-				fmt.Sprintf("unknown pricing currency: %s", pricingCoin))
-			return
-		}
-		paymentCurrency, err := models.CurrencyDefinitions.Lookup(paymentCoinCode)
-		if err != nil {
-			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
-				fmt.Sprintf("unknown payment currency: %s", paymentCoinCode))
-			return
-		}
-		ci, ok := getCoreIface(r)
-		if !ok {
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "exchange rates unavailable")
-			return
-		}
-		converted, err := wallet.ConvertCurrencyAmount(
-			&models.CurrencyValue{Amount: orderAmount, Currency: pricingCurrency},
-			paymentCurrency,
-			ci.ExchangeRates(),
-		)
-		if err != nil {
-			log.Warningf("Failed to convert payment amount from %s to %s: %v", pricingCoin, paymentCoinCode, err)
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to convert payment amount")
-			return
-		}
-		params.Amount = converted.Uint64()
-	} else {
-		params.Amount = orderAmount.Uint64()
-	}
-
-	result, err := walletSvc.GeneratePaymentInstructions(r.Context(), params)
-	if err != nil {
-		if result != nil && result.PaymentData != nil {
-			if paymentData := result.PaymentData; paymentData != nil {
-				if errors.Is(err, coreiface.ErrCoinSwitchRequiresConfirmation) {
-					response := UTXOPaymentInfoResponse{
-						PaymentType:       "external_wallet",
-						HasPartialPayment: paymentData.HasPartialPayment,
-						PaidAmount:        paymentData.PaidAmount,
-						PaidCoin:          paymentData.PaidCoin,
-						PaidAddress:       paymentData.PaidAddress,
-					}
-					responsePkg.StatusWithData(w, http.StatusConflict, response)
-					return
-				}
-			}
-		}
-		log.Warningf("Failed to generate payment instructions for order %s: %v", params.OrderID, err)
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to generate payment instructions")
-		return
-	}
-
-	// Persist refund address only when the buyer explicitly provided one
-	// (client_signed path where the wallet is connected). For address-
-	// monitored payments (ManagedEscrow/UTXO) the frontend cannot know the payer
-	// address upfront; the AggregatingVerifier auto-fills it from on-chain
-	// observations when the payment is confirmed.
-	if strings.TrimSpace(params.RefundAddress) != "" {
-		if err := orderSvc.SetOrderRefundAddressForPayment(r.Context(), params.OrderID, params.CoinType, params.RefundAddress); err != nil {
-			if errors.Is(err, coreiface.ErrBadRequest) || errors.Is(err, models.ErrRefundAddressRequired) || errors.Is(err, models.ErrRefundAddressInvalid) {
-				responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
-				return
-			}
-			log.Warningf("SetOrderRefundAddressForPayment failed for order %s: %v", params.OrderID, err)
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to save refund address")
-			return
-		}
-	}
-
-	switch result.PaymentModel {
-	case payment.PaymentModelMonitored:
-		// Phase PS B2: ManagedEscrow EVM uses address-monitored funding (no Script/ScriptHash).
-		// UTXO chains still use the existing formatMonitoredPaymentResponse path.
-		if result.IsManagedEscrowOrder {
-			g.formatManagedEscrowPaymentResponse(w, result)
-		} else if result.IsSolanaEscrow {
-			g.formatSolanaPaymentResponse(w, result)
-		} else {
-			g.formatMonitoredPaymentResponse(w, params, result)
-		}
-	case payment.PaymentModelClientSigned:
-		g.formatClientSignedPaymentResponse(w, result)
-	default:
-		log.Warningf("Unsupported payment model %s for order %s", result.PaymentModel, params.OrderID)
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Unsupported payment configuration")
-	}
+	responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+		"order is not an RWA token listing")
 }
 
 // ============================================================================
@@ -307,119 +106,6 @@ func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Re
 	response := RWATokenPaymentInfoResponse{
 		BuyerAddress:  orderInfo.BuyerAddress,
 		VendorAddress: orderInfo.VendorAddress,
-	}
-	responsePkg.Success(w, response)
-}
-
-// formatMonitoredPaymentResponse formats the response for Monitored (UTXO) payments.
-func (g *Gateway) formatMonitoredPaymentResponse(w http.ResponseWriter, params models.InitializeEscrowData, result *payment.PaymentSetupResult) {
-	paymentData := result.PaymentData
-	if paymentData == nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for monitored chain")
-		return
-	}
-
-	coinInfo, err := params.CoinType.CoinInfo()
-	if err != nil {
-		log.Warningf("Failed to get coin info for %s: %v", params.CoinType, err)
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to process coin type")
-		return
-	}
-
-	scriptPubKey, err := hex.DecodeString(paymentData.Script)
-	if err != nil {
-		log.Warningf("Failed to decode payment script: %v", err)
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to process payment script")
-		return
-	}
-
-	amountInCoin := float64(paymentData.Amount) / 1e8
-	paymentURI := utxo.GeneratePaymentURI(coinInfo.Chain, paymentData.ToAddress, amountInCoin)
-	scriptHash := utxo.AddressToScriptHash(scriptPubKey)
-
-	response := UTXOPaymentInfoResponse{
-		PaymentType:    "external_wallet",
-		PaymentMethod:  paymentData.Method,
-		PaymentAddress: paymentData.ToAddress,
-		PaymentURI:     paymentURI,
-		Amount:         paymentData.Amount,
-		Coin:           string(params.CoinType),
-		ChainType:      coinInfo.Chain,
-		QRCodeData:     paymentURI,
-		ScriptHash:     scriptHash,
-		Script:         paymentData.Script,
-		Moderator:      paymentData.Moderator,
-		UnlockHours:    paymentData.UnlockHours,
-		ExpiresAt:      time.Now().Add(UTXOPaymentWindowDuration),
-	}
-	responsePkg.Success(w, response)
-}
-
-// formatClientSignedPaymentResponse formats the response for ClientSigned (EVM/Solana) payments.
-func (g *Gateway) formatClientSignedPaymentResponse(w http.ResponseWriter, result *payment.PaymentSetupResult) {
-	paymentData := result.PaymentData
-	if paymentData == nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for client-signed chain")
-		return
-	}
-
-	response := EVMPaymentInfoResponse{
-		PaymentData:   paymentData,
-		EscrowAccount: result.EscrowAddr,
-		Instructions:  result.Instructions,
-	}
-	responsePkg.Success(w, response)
-}
-
-// formatManagedEscrowPaymentResponse formats the response for ManagedEscrow EVM address-monitored payments.
-//
-// Unlike UTXO monitored (which returns Script/ScriptHash for Electrum) and V1 EVM
-// client-signed (which returns contract call Instructions), ManagedEscrow only needs the
-// predicted address and amount — the buyer just transfers ETH to it.
-//
-// Phase PS B2.
-func (g *Gateway) formatManagedEscrowPaymentResponse(w http.ResponseWriter, result *payment.PaymentSetupResult) {
-	paymentData := result.PaymentData
-	if paymentData == nil || paymentData.ToAddress == "" {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for ManagedEscrow order: missing address")
-		return
-	}
-
-	response := ManagedEscrowPaymentInfoResponse{
-		PaymentType:         "managed_escrow_address_monitored",
-		PaymentMethod:       paymentData.Method,
-		PaymentAddress:      paymentData.ToAddress,
-		PaymentTokenAddress: paymentData.PaymentTokenAddress,
-		Amount:              paymentData.Amount,
-		Coin:                string(paymentData.Coin),
-		PlatformAmount:      paymentData.PlatformAmount,
-		PlatformAddr:        paymentData.PlatformAddr,
-		CancelFeeAmount:     paymentData.CancelFeeAmount,
-		ExpiresAt:           time.Now().Add(UTXOPaymentWindowDuration),
-		Moderator:           paymentData.Moderator,
-	}
-	responsePkg.Success(w, response)
-}
-
-func (g *Gateway) formatSolanaPaymentResponse(w http.ResponseWriter, result *payment.PaymentSetupResult) {
-	paymentData := result.PaymentData
-	if paymentData == nil || paymentData.ToAddress == "" {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for Solana order: missing address")
-		return
-	}
-
-	response := SolanaPaymentInfoResponse{
-		PaymentType:    "solana_address_monitored",
-		PaymentMethod:  paymentData.Method,
-		PaymentAddress: paymentData.ToAddress,
-		EscrowAccount:  result.EscrowAddr,
-		Amount:         paymentData.Amount,
-		Coin:           string(paymentData.Coin),
-		ActionID:       result.ActionID,
-		TxHash:         result.SubmittedTxHash,
-		PaymentData:    paymentData,
-		ExpiresAt:      time.Now().Add(UTXOPaymentWindowDuration),
-		Moderator:      paymentData.Moderator,
 	}
 	responsePkg.Success(w, response)
 }

@@ -26,7 +26,7 @@ func (g *Gateway) registerNodeHumaOrderPublicOperations(api huma.API) {
 // registerNodeHumaOrderAdminOperations registers authenticated order lifecycle,
 // checkout, and seller analytics ops.
 func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
-	g.registerOrdersInstructionPayment(api)
+	g.registerOrdersRWATokenPaymentInfo(api)
 	g.registerOrdersInstructionConfirm(api)
 	g.registerOrdersInstructionRefund(api)
 	g.registerOrdersInstructionComplete(api)
@@ -105,24 +105,25 @@ func salesSearchQueryVals(typeVal, state, search, sortBy, limit, page, pageSize 
 	return q
 }
 
-func (g *Gateway) registerOrdersInstructionPayment(api huma.API) {
+func (g *Gateway) registerOrdersRWATokenPaymentInfo(api huma.API) {
 	type in struct {
 		OrderID string          `path:"orderID" doc:"Order ID."`
 		Body    json.RawMessage `json:",omitempty"`
 	}
 	huma.Register(api, huma.Operation{
-		OperationID: "orders-post-instructions-payment",
+		OperationID: "orders-post-rwa-token-payment-info",
 		Method:      http.MethodPost,
-		Path:        "/v1/orders/{orderID}/instructions/payment",
-		Summary:     "Build payment funding instructions",
+		Path:        "/v1/orders/{orderID}/rwa-token/payment-info",
+		Summary:     "Get RWA token identity payment info",
+		Description: "Returns buyer and vendor chain identity addresses for RWA token purchases.",
 		Tags:        []string{"orders"},
 		Security:    nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
-		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/instructions/payment"
+		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/rwa-token/payment-info"
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(hi.Body), map[string]string{"orderID": hi.OrderID})
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
-		g.handleGetOrderPaymentInstructions(rr, req)
+		g.handleGetRWATokenPaymentInfoRequest(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

@@ -17,9 +17,9 @@ func TestSettlementSpec_Validate(t *testing.T) {
 		NewManagedEscrowSpec(true),
 		NewSolanaEscrowSpec(false),
 		NewSolanaEscrowSpec(true),
-		NewClientSignedEVMSpec(false),
-		NewClientSignedEVMSpec(true),
-		NewClientSignedSolanaSpec(false),
+		NewLegacyEVMContractSpec(false),
+		NewLegacyEVMContractSpec(true),
+		NewLegacySolanaProgramSpec(false),
 		NewFiatSpec(),
 	}
 	for _, spec := range valid {
@@ -51,7 +51,7 @@ func TestSettlementSpec_Helpers(t *testing.T) {
 	require.True(t, solanaEscrow.UsesSolanaEscrow())
 	require.False(t, solanaEscrow.UsesLegacyContract())
 
-	evm := NewClientSignedEVMSpec(false)
+	evm := NewLegacyEVMContractSpec(false)
 	require.True(t, evm.IsClientSigned())
 	require.True(t, evm.UsesLegacyContract())
 	require.False(t, evm.UsesManagedEscrow())
@@ -89,14 +89,19 @@ func TestResolveSettlementSpecFromOrder(t *testing.T) {
 	require.Equal(t, NewFiatSpec(), spec)
 }
 
-func TestSettlementSpecFromPaymentData_ClientSignedEVM(t *testing.T) {
+func TestSettlementSpecFromPaymentData_EVMRequiresExplicitSpec(t *testing.T) {
 	pd := &models.PaymentData{
 		Method: pb.PaymentSent_CANCELABLE,
 		Coin:   "crypto:eip155:1:native",
 	}
 	spec, ok := SettlementSpecFromPaymentData(pd)
+	require.False(t, ok)
+	require.Equal(t, SettlementSpec{}, spec)
+
+	pd.SettlementSpec = NewManagedEscrowSpec(false).ToPending()
+	spec, ok = SettlementSpecFromPaymentData(pd)
 	require.True(t, ok)
-	require.Equal(t, NewClientSignedEVMSpec(false), spec)
+	require.Equal(t, NewManagedEscrowSpec(false), spec)
 }
 
 func TestResolveSettlementSpec_PaymentSentManagedEscrowEnvelope(t *testing.T) {
@@ -118,12 +123,12 @@ func TestResolveSettlementSpec_PaymentSentLegacyEVMEnvelope(t *testing.T) {
 		ContractAddress: "0x1111111111111111111111111111111111111111",
 		ToAddress:       "0x2222222222222222222222222222222222222222",
 		Script:          "5221",
-		SettlementSpec:  NewClientSignedEVMSpec(false).ToPaymentSent(),
+		SettlementSpec:  NewLegacyEVMContractSpec(false).ToPaymentSent(),
 	}
 
 	spec, ok := ResolveSettlementSpec(nil, ps)
 	require.True(t, ok)
-	require.Equal(t, NewClientSignedEVMSpec(false), spec)
+	require.Equal(t, NewLegacyEVMContractSpec(false), spec)
 }
 
 func TestResolveSettlementSpec_PaymentSentDoesNotInferManagedEscrowFromShape(t *testing.T) {
@@ -138,28 +143,41 @@ func TestResolveSettlementSpec_PaymentSentDoesNotInferManagedEscrowFromShape(t *
 	require.Equal(t, SettlementSpec{}, spec)
 }
 
-func TestResolveSettlementSpecFromOrder_ClientSignedPending(t *testing.T) {
+func TestResolveSettlementSpecFromOrder_LegacyEVMContractPending(t *testing.T) {
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 		Coin:           "crypto:eip155:1:native",
 		EscrowAddress:  "0xescrow",
-		SettlementSpec: NewClientSignedEVMSpec(true).ToPending(),
+		SettlementSpec: NewLegacyEVMContractSpec(true).ToPending(),
 	}))
 	spec, ok := ResolveSettlementSpecFromOrder(order)
 	require.True(t, ok)
-	require.Equal(t, NewClientSignedEVMSpec(true), spec)
+	require.Equal(t, NewLegacyEVMContractSpec(true), spec)
 }
 
-func TestResolveSettlementSpecFromPendingClientSigned_ExplicitSolanaEscrowSpec(t *testing.T) {
-	info := &models.PendingClientSignedPaymentInfo{
+func TestResolveSettlementSpecFromPendingEscrow_ExplicitSolanaEscrowSpec(t *testing.T) {
+	info := &models.PendingEscrowPaymentInfo{
 		Coin:           "crypto:solana:native",
 		EscrowAddress:  "So11111111111111111111111111111111111111112",
 		SettlementSpec: NewSolanaEscrowSpec(true).ToPending(),
 	}
 
-	spec, ok := ResolveSettlementSpecFromPendingClientSigned(info)
+	spec, ok := ResolveSettlementSpecFromPendingEscrow(info)
 	require.True(t, ok)
 	require.Equal(t, NewSolanaEscrowSpec(true), spec)
+}
+
+func TestResolveSettlementSpecFromPendingEscrow_RequiresExplicitSpec(t *testing.T) {
+	info := &models.PendingEscrowPaymentInfo{
+		Coin:          "crypto:eip155:1:native",
+		EscrowAddress: "0xescrow",
+		Moderator:     "mod-peer",
+	}
+
+	spec, ok := ResolveSettlementSpecFromPendingEscrow(info)
+
+	require.False(t, ok)
+	require.Equal(t, SettlementSpec{}, spec)
 }
 
 func TestSettlementSpecFromFiatMetadata(t *testing.T) {
@@ -232,12 +250,12 @@ func TestResolvedPaymentMethod_PendingSpecOverridesPaymentSentEnvelope(t *testin
 	require.Equal(t, pb.PaymentSent_MODERATED, method)
 }
 
-func TestResolvedPaymentMethod_PendingClientSignedOverridesDirectTokenLikeEnvelope(t *testing.T) {
+func TestResolvedPaymentMethod_PendingEscrowOverridesDirectTokenLikeEnvelope(t *testing.T) {
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 		Coin:           "crypto:eip155:1:native",
 		EscrowAddress:  "0xescrow",
-		SettlementSpec: NewClientSignedEVMSpec(false).ToPending(),
+		SettlementSpec: NewLegacyEVMContractSpec(false).ToPending(),
 	}))
 	ps := &pb.PaymentSent{
 		ContractAddress: "0xtoken",
@@ -301,15 +319,15 @@ func TestUsesClientSignedPayMode_DistinguishesManagedEscrowFromLegacyContract(t 
 	}))
 	require.False(t, UsesClientSignedPayMode(managed_escrowOrder, managed_escrowPS))
 
-	clientSignedPS := &pb.PaymentSent{
+	legacyPS := &pb.PaymentSent{
 		Coin:           "crypto:eip155:1:native",
-		SettlementSpec: NewClientSignedEVMSpec(false).ToPaymentSent(),
+		SettlementSpec: NewLegacyEVMContractSpec(false).ToPaymentSent(),
 	}
-	clientSignedOrder := &models.Order{}
-	require.NoError(t, clientSignedOrder.SetPendingClientSignedPaymentInfo(&models.PendingClientSignedPaymentInfo{
-		Coin:           clientSignedPS.Coin,
+	legacyOrder := &models.Order{}
+	require.NoError(t, legacyOrder.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
+		Coin:           legacyPS.Coin,
 		EscrowAddress:  "0xlegacy",
-		SettlementSpec: NewClientSignedEVMSpec(false).ToPending(),
+		SettlementSpec: NewLegacyEVMContractSpec(false).ToPending(),
 	}))
-	require.True(t, UsesClientSignedPayMode(clientSignedOrder, clientSignedPS))
+	require.True(t, UsesClientSignedPayMode(legacyOrder, legacyPS))
 }

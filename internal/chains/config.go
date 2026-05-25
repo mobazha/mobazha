@@ -137,10 +137,10 @@ var Defaults = func(cfg *Config) error {
 			TestnetRegistryAddress: "0x93ecc969ff6C9e822F4AFD80acb59848eB9b9bf7",
 		},
 		iwallet.ChainSolana: {
-			MainnetRpc:             []string{"https://api.devnet.solana.com"},
-			MainnetRegistryAddress: "6LmWMjAMAfVdc8mpgPjHvFLa2sbcudiLiJT3bAGRYMMD",
-			TestnetRpc:             []string{"https://api.devnet.solana.com"},
-			TestnetRegistryAddress: "6LmWMjAMAfVdc8mpgPjHvFLa2sbcudiLiJT3bAGRYMMD",
+			MainnetRpc:           []string{"https://api.devnet.solana.com"},
+			MainnetEscrowAddress: "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX",
+			TestnetRpc:           []string{"https://api.devnet.solana.com"},
+			TestnetEscrowAddress: "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX",
 		},
 		iwallet.ChainTRON: {
 			MainnetRpc: []string{"https://api.trongrid.io", "https://api.tronstack.io"},

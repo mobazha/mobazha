@@ -161,6 +161,8 @@ func TestSolanaClientFactory_Registration(t *testing.T) {
 }
 
 func TestSolanaDefaultConfig(t *testing.T) {
+	const escrowProgramID = "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX"
+
 	cfg := pkgsolana.GetDefaultConfig(true)
 	if cfg == nil {
 		t.Fatal("GetDefaultConfig(testnet=true) returned nil")
@@ -168,8 +170,11 @@ func TestSolanaDefaultConfig(t *testing.T) {
 	if cfg.RpcURL == "" {
 		t.Error("RpcURL should not be empty")
 	}
-	if cfg.RegistryAddress == "" {
-		t.Error("RegistryAddress should not be empty")
+	if cfg.RegistryAddress != "" {
+		t.Errorf("RegistryAddress = %q, want empty to avoid legacy ContractManager path", cfg.RegistryAddress)
+	}
+	if cfg.EscrowAddress != escrowProgramID {
+		t.Errorf("EscrowAddress = %q, want %q", cfg.EscrowAddress, escrowProgramID)
 	}
 }
 

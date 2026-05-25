@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -12,12 +10,10 @@ import (
 )
 
 // newTestAuditDB returns an in-memory database with the audit-log
-// table pre-migrated. Reuses testDatabase from order_repo_gorm_test.go.
-func newTestAuditDB(t *testing.T) *testDatabase {
+// table pre-migrated and no full-node-only dependencies.
+func newTestAuditDB(t *testing.T) *featureTestDatabase {
 	t.Helper()
-	db := newTestDatabase(t)
-	require.NoError(t, db.gormDB.AutoMigrate(&models.FeatureFlagAuditLog{}))
-	return db
+	return newFeatureTestDatabase(t, &models.FeatureFlagAuditLog{})
 }
 
 func TestFeatureAuditLogStore_AppendAudit_PlatformScope(t *testing.T) {

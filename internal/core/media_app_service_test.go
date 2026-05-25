@@ -1,9 +1,11 @@
-//go:build !private_distribution
-
 package core
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"io"
+	"strings"
 	"testing"
 
 	cid "github.com/ipfs/go-cid"
@@ -15,6 +17,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const mediaTestJPGImageB64 = "/9j/4AAQSkZJRgABAQAAAQABAAD//gA7Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcgSlBFRyB2NjIpLCBxdWFsaXR5ID0gNjUK/9sAQwALCAgKCAcLCgkKDQwLDREcEhEPDxEiGRoUHCkkKyooJCcnLTJANy0wPTAnJzhMOT1DRUhJSCs2T1VORlRAR0hF/9sAQwEMDQ0RDxEhEhIhRS4nLkVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVF/8AAEQgAMgAyAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/aAAwDAQACEQMRAD8A840awhv5zFKWDYyMHrVvWtE/szynj3GJ+MnsaoWFw1ndxTr1Rskeor0+70uPXNBYQ4JkQSRH36iiXw3CO9meWxxNJIqICWY4AHeu5g8C232aMztL5pUFtpGM/lUXgPw+13qD3lwhEdscAEdX/wDrVseNddl0l4bSxcLcN8zHAOB6c1UnyJLqxRTlJ9kY83guzQcNN/30P8KwNY0W206AvufceFBPWvRtMtrw6RHLqUm+dxvOVA2j04rzjxJqAv8AUXEZ/cxHavv71M20+UcbNc3Q5/bRUu2igCVRXpfw51MXFtJp0rfPD88ee6nr+R/nXmq13fw40xpL6TUXyEiGxfcnrVwV7kSdrHo7C10ixnn2rFEu6R8cZPU15r4espfFviua/uQTbxvvbPT/AGVrX+IetMyQ6PakmSUhpAv6Cuh0DT4PC/hsGbCsE82ZvfHSs4O160umiLmtFTW73/rzMjx7rC6Zp32WFgJ7gY4/hXua8nbmtTXtWk1rVZruQnDHCL/dXtWW1TBPd7suVl7q6EeKKKKsgkt42nlSNBlmIAr1rTZINA0MAkBYU3MfU15joEsEN5588irs+6GPetfX9cW8iis7eVSjHLsDxRJ+7yx3YRV5XeyNjwlbPrviCbWL0bkjbcoPQt2H4Vf+IOsTyxpplrHIyt80rKpwfQU3R9W0vS9PitkvIBtHzHeOT3q+3ibTiP8Aj9g/77FE+R2itkEXK7m92eXm2uB1gk/74NRPDKoOY3H1U16RceI7FgcXkJ/4GKwdT1q2lgkVJ0YlSOGoco20CzONzRUe6igBq1KtFFAD6KKKAGmo26UUUAR0UUUAf//Z"
+
+func decodeMediaTestB64(t *testing.T, b64 string) []byte {
+	t.Helper()
+	reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(b64))
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, reader); err != nil && buf.Len() == 0 {
+		t.Fatalf("failed to decode base64: %v", err)
+	}
+	return buf.Bytes()
+}
 
 func newTestMediaAppService(t *testing.T, cfg MediaAppServiceConfig) *MediaAppService {
 	t.Helper()
@@ -92,7 +106,7 @@ func TestMediaAppService_SetProfileMedia_Avatar(t *testing.T) {
 		EventBus: bus,
 	})
 
-	imgBytes := decodeB64(t, jpgImageB64)
+	imgBytes := decodeMediaTestB64(t, mediaTestJPGImageB64)
 	result, err := svc.SetProfileMedia(context.Background(), contracts.SlotAvatar, imgBytes)
 	require.NoError(t, err)
 
@@ -131,7 +145,7 @@ func TestMediaAppService_SetProfileMedia_Header(t *testing.T) {
 		EventBus: bus,
 	})
 
-	imgBytes := decodeB64(t, jpgImageB64)
+	imgBytes := decodeMediaTestB64(t, mediaTestJPGImageB64)
 	result, err := svc.SetProfileMedia(context.Background(), contracts.SlotHeader, imgBytes)
 	require.NoError(t, err)
 
@@ -155,7 +169,7 @@ func TestMediaAppService_SetProfileMedia_InvalidImage(t *testing.T) {
 }
 
 func TestMediaAppService_SetProfileMedia_UnknownSlot(t *testing.T) {
-	imgBytes := decodeB64(t, jpgImageB64)
+	imgBytes := decodeMediaTestB64(t, mediaTestJPGImageB64)
 	svc := newTestMediaAppService(t, MediaAppServiceConfig{})
 
 	_, err := svc.SetProfileMedia(context.Background(), contracts.ProfileSlot("unknown"), imgBytes)

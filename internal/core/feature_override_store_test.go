@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -9,29 +7,13 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
-
-	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 )
 
 // newFeatureOverrideTestDB builds an in-memory SQLite DB with the
-// feature_overrides table migrated. It reuses testDatabase defined in
-// order_repo_gorm_test.go.
-//
-// Note: testTx.Save is a minimal gorm passthrough that does NOT inject
-// TenantID — that is fine here because the production TenantDB wrapper
-// handles injection and we exercise the store's CRUD semantics against
-// a single (empty) tenant scope. See feature_override_store.go for the
-// design rationale.
-func newFeatureOverrideTestDB(t *testing.T) *testDatabase {
+// feature_overrides table migrated and no full-node-only helpers.
+func newFeatureOverrideTestDB(t *testing.T) *featureTestDatabase {
 	t.Helper()
-	db, err := gorm.Open(sqlitedialect.Open(":memory:"), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
-	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.FeatureOverride{}))
-	return &testDatabase{gormDB: db}
+	return newFeatureTestDatabase(t, &models.FeatureOverride{})
 }
 
 func TestFeatureOverrideStore_GetMissingReturnsConfiguredFalse(t *testing.T) {

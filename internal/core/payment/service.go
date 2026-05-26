@@ -544,6 +544,7 @@ func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
 	data, err := json.Marshal(&models.PendingEscrowPaymentInfo{
 		Type:                 "escrow",
 		Coin:                 string(pd.Coin),
+		Amount:               pd.Amount,
 		EscrowAddress:        pd.ToAddress,
 		Moderator:            pd.Moderator,
 		PlatformFeeCollector: pd.PlatformAddr,
@@ -571,6 +572,7 @@ func (s *PaymentAppService) persistEscrowPaymentInfo(orderID string, pd *models.
 		order.PaymentAddress = pd.ToAddress
 		if err := order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 			Coin:                 string(pd.Coin),
+			Amount:               pd.Amount,
 			EscrowAddress:        pd.ToAddress,
 			Moderator:            pd.Moderator,
 			PlatformFeeCollector: pd.PlatformAddr,

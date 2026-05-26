@@ -710,10 +710,11 @@ func (o *Order) ComputePaymentProgress() *PaymentProgressInfo {
 //
 // Resolution order:
 //  1. Locked pending ManagedEscrow amount
-//  2. Locked pending UTXO amount
-//  3. Immutable PaymentSent amount (for already-paid orders after pending
+//  2. Locked pending escrow amount
+//  3. Locked pending UTXO amount
+//  4. Immutable PaymentSent amount (for already-paid orders after pending
 //     metadata has been cleared)
-//  4. Signed OrderOpen amount
+//  5. Signed OrderOpen amount
 func (o *Order) ExpectedPaymentAmountString() string {
 	if o == nil {
 		return ""
@@ -721,6 +722,12 @@ func (o *Order) ExpectedPaymentAmountString() string {
 	if managed_escrowInfo, err := o.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
 		if managed_escrowInfo.Amount > 0 {
 			return strconv.FormatUint(managed_escrowInfo.Amount, 10)
+		}
+		return ""
+	}
+	if escrowInfo, err := o.GetPendingEscrowPaymentInfo(); err == nil && escrowInfo != nil {
+		if escrowInfo.Amount > 0 {
+			return strconv.FormatUint(escrowInfo.Amount, 10)
 		}
 		return ""
 	}

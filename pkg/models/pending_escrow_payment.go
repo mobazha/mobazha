@@ -11,6 +11,7 @@ import (
 type PendingEscrowPaymentInfo struct {
 	Type                 string                 `json:"type"` // always "escrow"
 	Coin                 string                 `json:"coin,omitempty"`
+	Amount               uint64                 `json:"amount,omitempty"`
 	EscrowAddress        string                 `json:"escrowAddress,omitempty"`
 	Moderator            string                 `json:"moderator,omitempty"`
 	PlatformFeeCollector string                 `json:"platformFeeCollector,omitempty"`

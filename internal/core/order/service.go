@@ -1478,9 +1478,12 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 	var wTx iwallet.Tx
 	var releaseTx *iwallet.Transaction
 	if cancelStrategy.Model() == payment.PaymentModelMonitored {
-		if txid != "" {
+		switch {
+		case txid != "":
+			// The caller already performed the on-chain cancel and supplied
+			// the resulting txid; only record it with the ORDER_CANCEL message.
 			releaseTx = &iwallet.Transaction{ID: txid}
-		} else if payment.UsesUTXOScriptEscrow(&order, paymentSent) {
+		case payment.UsesUTXOScriptEscrow(&order, paymentSent):
 			result, err := s.ReleaseFromCancelableAddress(&order)
 			if err != nil {
 				return err
@@ -1488,7 +1491,7 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 			wTx = result.WalletTx
 			releaseTx = result.Transaction
 			txid = releaseTx.ID
-		} else if txid == "" {
+		default:
 			settlementTxid, settlementTx, handled, err := s.submitSettlementCancelAction(context.Background(), &order, coinType, paymentSent, "")
 			if err != nil {
 				return err

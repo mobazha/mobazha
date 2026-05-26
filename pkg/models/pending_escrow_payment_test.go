@@ -3,13 +3,16 @@ package models
 import (
 	"testing"
 
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func TestPendingEscrowPaymentInfo_RoundTrip(t *testing.T) {
 	order := &Order{}
 	require.NoError(t, order.SetPendingEscrowPaymentInfo(&PendingEscrowPaymentInfo{
 		Coin:          "crypto:eip155:1:native",
+		Amount:        290000000,
 		EscrowAddress: "0xescrow",
 		SettlementSpec: &PendingSettlementSpec{
 			Method:     "CANCELABLE",
@@ -21,10 +24,54 @@ func TestPendingEscrowPaymentInfo_RoundTrip(t *testing.T) {
 	got, err := order.GetPendingEscrowPaymentInfo()
 	require.NoError(t, err)
 	require.Equal(t, "escrow", got.Type)
+	require.EqualValues(t, 290000000, got.Amount)
 	require.Equal(t, "0xescrow", got.EscrowAddress)
 
 	// UTXO getter must not mis-read escrow JSON.
 	utxo, err := order.GetPendingPaymentInfo()
 	require.NoError(t, err)
 	require.Nil(t, utxo)
+}
+
+func TestExpectedPaymentAmountString_PendingEscrowAmountWinsOverOrderOpen(t *testing.T) {
+	rawOpen, err := (protojson.MarshalOptions{}).Marshal(&pb.OrderOpen{
+		Amount:      "2900",
+		PricingCoin: "USD",
+	})
+	require.NoError(t, err)
+
+	order := &Order{SerializedOrderOpen: rawOpen}
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&PendingEscrowPaymentInfo{
+		Coin:          "crypto:solana:mainnet:native",
+		Amount:        290000000,
+		EscrowAddress: "solana-escrow-address",
+		SettlementSpec: &PendingSettlementSpec{
+			Method:     "CANCELABLE",
+			PayMode:    "address_monitored",
+			EscrowType: "solana_escrow",
+		},
+	}))
+
+	require.Equal(t, "290000000", order.ExpectedPaymentAmountString())
+}
+
+func TestExpectedPaymentAmountString_PendingEscrowWithoutAmountDoesNotFallback(t *testing.T) {
+	rawOpen, err := (protojson.MarshalOptions{}).Marshal(&pb.OrderOpen{
+		Amount:      "2900",
+		PricingCoin: "USD",
+	})
+	require.NoError(t, err)
+
+	order := &Order{SerializedOrderOpen: rawOpen}
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&PendingEscrowPaymentInfo{
+		Coin:          "crypto:solana:mainnet:native",
+		EscrowAddress: "solana-escrow-address",
+		SettlementSpec: &PendingSettlementSpec{
+			Method:     "CANCELABLE",
+			PayMode:    "address_monitored",
+			EscrowType: "solana_escrow",
+		},
+	}))
+
+	require.Empty(t, order.ExpectedPaymentAmountString())
 }

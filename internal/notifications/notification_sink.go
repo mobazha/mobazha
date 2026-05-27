@@ -3,8 +3,10 @@ package notifications
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"time"
 
@@ -12,6 +14,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var log = logging.MustGetLogger("NOTF")
@@ -103,12 +107,15 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 	db := s.dbForTenant(targetTenantID)
 	notifyFunc := s.notifyFuncForTenant(targetTenantID)
 
-	r := make([]byte, 20)
-	if _, err := rand.Read(r); err != nil {
-		log.Errorf("Error generating notification ID: %s", err)
-		return err
+	id, deterministicID := deterministicNotificationID(meta, event)
+	if id == "" {
+		r := make([]byte, 20)
+		if _, err := rand.Read(r); err != nil {
+			log.Errorf("Error generating notification ID: %s", err)
+			return err
+		}
+		id = hex.EncodeToString(r)
 	}
-	id := hex.EncodeToString(r)
 
 	setNotificationFields(event, id, meta.Name)
 
@@ -118,7 +125,29 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 		return err
 	}
 
+	duplicate := false
 	err = db.Update(func(tx database.Tx) error {
+		if deterministicID {
+			var existing models.NotificationRecord
+			if err := tx.Read().Where("id = ?", id).First(&existing).Error; err == nil {
+				duplicate = true
+				return nil
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			inserted, err := insertNotificationIfAbsent(tx, db, &models.NotificationRecord{
+				ID:           id,
+				Timestamp:    time.Now(),
+				Read:         false,
+				Type:         meta.Name,
+				Notification: out,
+			})
+			if err != nil {
+				return err
+			}
+			duplicate = !inserted
+			return nil
+		}
 		return tx.Save(&models.NotificationRecord{
 			ID:           id,
 			Timestamp:    time.Now(),
@@ -130,6 +159,9 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 	if err != nil {
 		log.Errorf("Error saving notification to the database: %s", err)
 		return err
+	}
+	if duplicate {
+		return nil
 	}
 
 	unread := s.getUnreadCount(db)
@@ -145,6 +177,48 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 		return err
 	}
 	return nil
+}
+
+type tenantIDProvider interface {
+	TenantID() string
+}
+
+func insertNotificationIfAbsent(
+	tx database.Tx,
+	db database.Database,
+	record *models.NotificationRecord,
+) (bool, error) {
+	if scoped, ok := db.(tenantIDProvider); ok {
+		record.TenantID = scoped.TenantID()
+	}
+
+	// Tx has no insert-ignore primitive. Use GORM's atomic conflict handling,
+	// while setting TenantID explicitly to preserve tenant isolation on Create.
+	res := tx.Read().Clauses(clause.OnConflict{DoNothing: true}).Create(record)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}
+
+func deterministicNotificationID(meta events.EventMeta, event interface{}) (string, bool) {
+	if meta.Name != "order.confirmed" {
+		return "", false
+	}
+	orderID := ""
+	switch e := event.(type) {
+	case *events.OrderConfirmation:
+		orderID = e.OrderID
+	case events.OrderConfirmation:
+		orderID = e.OrderID
+	default:
+		return "", false
+	}
+	if orderID == "" {
+		return "", false
+	}
+	sum := sha1.Sum([]byte(meta.Name + ":" + orderID))
+	return "stable:" + hex.EncodeToString(sum[:]), true
 }
 
 // getUnreadCount queries the unread notification count from DB.

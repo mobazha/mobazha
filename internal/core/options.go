@@ -954,6 +954,7 @@ func (n *MobazhaNode) initGuestOrderService() {
 		SweepService:            n.autoSweepService,
 		EventBus:                n.eventBus,
 		NodeID:                  n.nodeID,
+		PeerID:                  n.peerID.String(),
 		Shutdown:                n.shutdown,
 		Listings:                n.listingService,
 		ExchangeRates:           n.exchangeRates,

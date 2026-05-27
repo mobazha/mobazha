@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -53,6 +54,7 @@ type GuestOrderAppServiceConfig struct {
 	SweepService            *AutoSweepService
 	EventBus                events.Bus
 	NodeID                  string
+	PeerID                  string
 	Shutdown                <-chan struct{}
 	Listings                GuestListingQuery
 	ExchangeRates           wallet.ExchangeRateQuerier
@@ -78,6 +80,7 @@ type GuestOrderAppService struct {
 	sweepService               *AutoSweepService
 	eventBus                   events.Bus
 	nodeID                     string
+	peerID                     string
 	shutdown                   <-chan struct{}
 	watcher                    PaymentWatcher
 	listings                   GuestListingQuery
@@ -121,6 +124,7 @@ func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppServi
 		sweepService:            cfg.SweepService,
 		eventBus:                cfg.EventBus,
 		nodeID:                  cfg.NodeID,
+		peerID:                  cfg.PeerID,
 		shutdown:                cfg.Shutdown,
 		listings:                cfg.Listings,
 		exchangeRates:           cfg.ExchangeRates,
@@ -223,6 +227,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	itemStockLimits := make(map[inventoryBucketKey]int64)
 	itemBuckets := make([]inventoryBucketKey, 0, len(req.Items))
 	allDigitalGoods := true
+	sellerPeerID := s.resolveSellerPeerID("", "")
 
 	for _, reqItem := range req.Items {
 		if reqItem.Quantity <= 0 {
@@ -259,7 +264,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 			ListingSlug:       reqItem.ListingSlug,
 			ListingTitle:      resolved.ListingTitle,
 			ContractType:      resolved.ContractType.String(),
-			SellerPeerID:      s.nodeID,
+			SellerPeerID:      sellerPeerID,
 			Thumbnail:         resolved.Thumbnail,
 			Quantity:          reqItem.Quantity,
 			VariantHash:       resolved.VariantHash,
@@ -428,6 +433,11 @@ func (s *GuestOrderAppService) GetGuestOrderStatus(_ context.Context, token stri
 	if err != nil {
 		return nil, fmt.Errorf("guest order not found: %w", err)
 	}
+	s.normalizeGuestOrderSellerPeerIDs(&order)
+	sellerPeerID := ""
+	if len(order.Items) > 0 {
+		sellerPeerID = order.Items[0].SellerPeerID
+	}
 
 	var chainBlockTimeSec uint32
 	if coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(order.PaymentCoin)); err == nil {
@@ -447,6 +457,7 @@ func (s *GuestOrderAppService) GetGuestOrderStatus(_ context.Context, token stri
 		RequiredConfs:     order.RequiredConfs,
 		ChainBlockTimeSec: chainBlockTimeSec,
 		TrackingNumber:    order.TrackingNumber,
+		SellerPeerID:      sellerPeerID,
 		Items:             order.Items,
 		ExpiresAt:         order.ExpiresAt,
 		CreatedAt:         order.CreatedAt,
@@ -462,6 +473,34 @@ func (s *GuestOrderAppService) GetGuestOrderStatus(_ context.Context, token stri
 		TotalPrice:        order.TotalPrice,
 		PaymentTxHash:     order.PaymentTxHash,
 	}, nil
+}
+
+func (s *GuestOrderAppService) normalizeGuestOrderSellerPeerIDs(order *models.GuestOrder) {
+	if order == nil {
+		return
+	}
+	for i := range order.Items {
+		order.Items[i].SellerPeerID = s.resolveSellerPeerID(order.TenantID, order.Items[i].SellerPeerID)
+	}
+}
+
+func (s *GuestOrderAppService) resolveSellerPeerID(_tenantID, fallback string) string {
+	if isValidPeerID(fallback) {
+		return fallback
+	}
+	if isValidPeerID(s.peerID) {
+		return s.peerID
+	}
+	return fallback
+}
+
+func isValidPeerID(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	_, err := peer.Decode(value)
+	return err == nil
 }
 
 // ShipGuestOrder marks a funded order as shipped.
@@ -757,7 +796,7 @@ func (s *GuestOrderAppService) emitGuestOrderFunded(orderToken string) {
 	}
 	s.eventBus.Emit(&events.OrderConfirmation{
 		OrderID:  orderToken,
-		VendorID: s.nodeID,
+		VendorID: s.resolveSellerPeerID("", s.nodeID),
 	})
 }
 

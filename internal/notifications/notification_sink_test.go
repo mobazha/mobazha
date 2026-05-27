@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -143,6 +144,122 @@ func TestNotificationSink_PersistentNotification(t *testing.T) {
 	}
 	if _, ok := data["notification"]; !ok {
 		t.Error("expected 'data' to contain 'notification' key")
+	}
+}
+
+func TestNotificationSink_OrderConfirmationReplayIsIdempotent(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := db.Update(func(tx database.Tx) error {
+		return tx.Migrate(&models.NotificationRecord{})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	cap := &notifyCapture{}
+	sink := NewNotificationSink(db, cap.notify)
+	meta := events.EventMeta{Category: "order", Name: "order.confirmed", Persistent: true}
+	first := &events.OrderConfirmation{OrderID: "gst_replayed", VendorID: "seller"}
+	if err := sink.Handle(context.Background(), meta, first); err != nil {
+		t.Fatalf("first Handle error: %v", err)
+	}
+	if first.ID == "" {
+		t.Fatal("expected stable notification ID to be set")
+	}
+
+	if err := db.Update(func(tx database.Tx) error {
+		return tx.Update("read", true, map[string]interface{}{"id = ?": first.ID}, &models.NotificationRecord{})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	second := &events.OrderConfirmation{OrderID: "gst_replayed", VendorID: "seller"}
+	if err := sink.Handle(context.Background(), meta, second); err != nil {
+		t.Fatalf("second Handle error: %v", err)
+	}
+	if second.ID != first.ID {
+		t.Fatalf("expected replay to use same notification ID, got %q want %q", second.ID, first.ID)
+	}
+
+	var records []models.NotificationRecord
+	if err := db.View(func(tx database.Tx) error {
+		return tx.Read().Find(&records).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected one persisted notification after replay, got %d", len(records))
+	}
+	if !records[0].Read {
+		t.Fatal("expected replay to preserve the existing read state")
+	}
+
+	cap.mu.Lock()
+	pushes := len(cap.captured)
+	cap.mu.Unlock()
+	if pushes != 1 {
+		t.Fatalf("expected one websocket push after replay, got %d", pushes)
+	}
+}
+
+func TestNotificationSink_OrderConfirmationConcurrentReplayIsIdempotent(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := db.Update(func(tx database.Tx) error {
+		return tx.Migrate(&models.NotificationRecord{})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	cap := &notifyCapture{}
+	sink := NewNotificationSink(db, cap.notify)
+	meta := events.EventMeta{Category: "order", Name: "order.confirmed", Persistent: true}
+
+	const workers = 8
+	errCh := make(chan error, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errCh <- sink.Handle(
+				context.Background(),
+				meta,
+				&events.OrderConfirmation{OrderID: "gst_concurrent_replay", VendorID: "seller"},
+			)
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("Handle error: %v", err)
+		}
+	}
+
+	var records []models.NotificationRecord
+	if err := db.View(func(tx database.Tx) error {
+		return tx.Read().Find(&records).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected one persisted notification after concurrent replay, got %d", len(records))
+	}
+
+	cap.mu.Lock()
+	pushes := len(cap.captured)
+	cap.mu.Unlock()
+	if pushes != 1 {
+		t.Fatalf("expected one websocket push after concurrent replay, got %d", pushes)
 	}
 }
 

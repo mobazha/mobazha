@@ -89,6 +89,7 @@ type GuestOrderStatusResponse struct {
 	RequiredConfs     int                     `json:"requiredConfs"`
 	ChainBlockTimeSec uint32                  `json:"chainBlockTimeSec,omitempty"`
 	TrackingNumber    string                  `json:"trackingNumber,omitempty"`
+	SellerPeerID      string                  `json:"sellerPeerID,omitempty"`
 	Items             []models.GuestOrderItem `json:"items"`
 	ExpiresAt         time.Time               `json:"expiresAt"`
 	CreatedAt         time.Time               `json:"createdAt"`

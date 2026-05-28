@@ -987,6 +987,26 @@ func TestResolveAggregatedPaymentIntent_UTXOUsesPendingForBitcoinCashNamespace(t
 func TestResolveAggregatedPaymentIntent_LegacyContractUsesSettlementSpecWhenPresent(t *testing.T) {
 	order := &models.Order{}
 	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
+		Coin:            "ETH",
+		ContractAddress: "0xcontract",
+		EscrowAddress:   "0xescrow",
+		SettlementSpec: &models.PendingSettlementSpec{
+			Method:     "MODERATED",
+			PayMode:    "client_signed",
+			EscrowType: "evm_contract",
+		},
+	}))
+
+	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
+		ChainNamespace: "eip155",
+	}})
+	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
+	require.Equal(t, "0xcontract", intent.contractAddress)
+}
+
+func TestResolveAggregatedPaymentIntent_EscrowFallsBackToEscrowAddressForLegacyRows(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
 		Coin:          "ETH",
 		EscrowAddress: "0xescrow",
 		SettlementSpec: &models.PendingSettlementSpec{
@@ -999,8 +1019,43 @@ func TestResolveAggregatedPaymentIntent_LegacyContractUsesSettlementSpecWhenPres
 	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
 		ChainNamespace: "eip155",
 	}})
-	require.Equal(t, pb.PaymentSent_MODERATED, intent.settlementSpec.Method)
 	require.Equal(t, "0xescrow", intent.contractAddress)
+}
+
+func TestBuildAggregatedPaymentSent_SolanaEscrowPreservesProgramID(t *testing.T) {
+	const programID = "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX"
+	const escrowAddress = "RT38nT6ABNLfotNxwseiNNKukCKAXpFkZctJGn4EbFe"
+	order := &models.Order{ID: models.OrderID("order-solana-escrow")}
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
+		Coin:            "crypto:solana:mainnet:native",
+		Amount:          1000,
+		ContractAddress: programID,
+		EscrowAddress:   escrowAddress,
+		SettlementSpec: &models.PendingSettlementSpec{
+			Method:     "CANCELABLE",
+			PayMode:    "address_monitored",
+			EscrowType: "solana_escrow",
+		},
+	}))
+	orderOpen := &pb.OrderOpen{Chaincode: "abcd", Amount: "1000"}
+	rows := []models.PaymentObservation{{
+		ID:             "obs-solana",
+		OrderID:        "order-solana-escrow",
+		ChainNamespace: "solana",
+		ChainReference: "devnet",
+		TxHash:         "5MB37D74PqcfycEhV6xYnkLTctcXgn2bYVgSxARJ9Ngf8sdKXosVarSwwhMyCUYC9QVDyaFJtC8YEK1uVwMwnUba",
+		EventType:      models.PaymentEventSolanaTransfer,
+		FromAddress:    "E1Cg7NbEpvRy7jjyyxAaCnEx7SssUFbxNGsfYVJNUJEn",
+		ToAddress:      escrowAddress,
+		Amount:         "1000",
+		BlockNumber:    1,
+		BlockTime:      time.Date(2026, 5, 28, 0, 29, 18, 0, time.UTC),
+	}}
+
+	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, programID, ps.ContractAddress)
+	require.Equal(t, escrowAddress, ps.ToAddress)
 }
 
 func TestResolveAggregatedPaymentIntent_EscrowWithoutSettlementSpecIsInvalid(t *testing.T) {

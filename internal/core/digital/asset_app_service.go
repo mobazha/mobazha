@@ -1202,6 +1202,11 @@ func (s *DigitalAssetAppService) GetDigitalDeliveryStatus(
 	}
 
 	if meta != nil {
+		if strings.TrimSpace(meta.ContractType) == "" {
+			status.Status = contracts.DigitalDeliveryStatusPending
+			status.Reason = "missing_contract_type"
+			return status, nil
+		}
 		if meta.ContractType != "DIGITAL_GOOD" {
 			status.IsDigitalOrder = false
 			status.Status = contracts.DigitalDeliveryStatusNotDigital

@@ -454,6 +454,18 @@ func TestAssetService_GetDigitalDeliveryStatus_RequiresAccessBeforeNotDigital(t 
 	assert.Equal(t, contracts.DigitalDeliveryStatusNotDigital, status.Status)
 }
 
+func TestAssetService_GetDigitalDeliveryStatus_MissingContractTypeIsExplicit(t *testing.T) {
+	_, assetSvc, _, orderQ := newTestEntitlementService(t)
+	orderQ.contractType = ""
+
+	status, err := assetSvc.GetDigitalDeliveryStatus("order-missing-contract-type", "", "", true)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.False(t, status.IsDigitalOrder)
+	assert.Equal(t, contracts.DigitalDeliveryStatusPending, status.Status)
+	assert.Equal(t, "missing_contract_type", status.Reason)
+}
+
 func TestAssetService_GetDigitalDeliveryStatus_AllowsSellerPeer(t *testing.T) {
 	_, assetSvc, _, _ := newTestEntitlementService(t)
 

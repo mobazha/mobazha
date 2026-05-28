@@ -303,16 +303,12 @@ func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.Orde
 	}
 
 	meta := &digital.OrderMetadata{
-		ContractType:  "PHYSICAL_GOOD",
+		ContractType:  guestcore.ContractTypeFromItems(go_.Items),
 		PaymentMethod: "DIRECT",
 		BuyerPeerID:   "", // anonymous guest buyer
 	}
 
-	allExplicitDigital := len(go_.Items) > 0
 	for _, it := range go_.Items {
-		if it.ContractType != "DIGITAL_GOOD" {
-			allExplicitDigital = false
-		}
 		if it.ListingSlug == "" {
 			continue
 		}
@@ -331,9 +327,5 @@ func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.Orde
 			Quantity: qty,
 		})
 	}
-	if allExplicitDigital {
-		meta.ContractType = "DIGITAL_GOOD"
-	}
-
 	return meta, nil
 }

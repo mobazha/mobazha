@@ -55,6 +55,41 @@ func TestGetGuestOrderStatusResolvesTenantSellerPeerID(t *testing.T) {
 	require.Equal(t, sellerPeerID, status.Items[0].SellerPeerID)
 }
 
+func TestGetGuestOrderStatus_IncludesFulfillmentFields(t *testing.T) {
+	db := newGuestTestDB(t)
+	const tenantID = "tenant-uuid"
+	fundedAt := time.Date(2026, 5, 18, 10, 0, 0, 0, time.UTC)
+	shippedAt := time.Date(2026, 5, 19, 12, 0, 0, 0, time.UTC)
+
+	order := models.GuestOrder{
+		TenantMixin:       models.TenantMixin{TenantID: tenantID},
+		ID:                2,
+		OrderToken:        "gst_status_fulfillment",
+		State:             models.GuestOrderShipped,
+		PaymentAddress:    "addr",
+		PaymentAmount:     "100",
+		PaymentCoin:       "crypto:eip155:1:native",
+		PriceCurrency:     "USD",
+		PriceDivisibility: 2,
+		ExpiresAt:         time.Now().Add(time.Hour),
+		TrackingNumber:    "1Z999",
+		ShippingCarrier:   "UPS",
+		FundedAt:          &fundedAt,
+		ShippedAt:         &shippedAt,
+	}
+	require.NoError(t, db.gormDB.Create(&order).Error)
+
+	svc := NewGuestOrderAppService(GuestOrderAppServiceConfig{DB: db})
+	status, err := svc.GetGuestOrderStatus(context.Background(), order.OrderToken)
+	require.NoError(t, err)
+	require.Equal(t, "1Z999", status.TrackingNumber)
+	require.Equal(t, "UPS", status.ShippingCarrier)
+	require.NotNil(t, status.FundedAt)
+	require.NotNil(t, status.ShippedAt)
+	require.Equal(t, fundedAt, *status.FundedAt)
+	require.Equal(t, shippedAt, *status.ShippedAt)
+}
+
 func TestResolveSellerPeerIDKeepsStandaloneFallback(t *testing.T) {
 	svc := NewGuestOrderAppService(GuestOrderAppServiceConfig{})
 	require.Equal(t, repo.DefaultNodeID, svc.resolveSellerPeerID(database.StandaloneTenantID, repo.DefaultNodeID))

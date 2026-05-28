@@ -249,6 +249,9 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 	if err := hydrateSharedManagedEscrowMetadata(gdb, &order); err != nil {
 		return fmt.Errorf("aggregating verifier: hydrate shared metadata for %s: %w", orderID, err)
 	}
+	if err := hydrateCotenantEscrowMetadata(gdb, &order); err != nil {
+		return fmt.Errorf("aggregating verifier: hydrate co-tenant escrow metadata for %s: %w", orderID, err)
+	}
 
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
@@ -469,6 +472,9 @@ func promoteAfterVerification(order *models.Order, now time.Time) {
 		paidAt := now
 		order.PaidAt = &paidAt
 	}
+	if recoverPaymentTimeoutCancellation(order) {
+		return
+	}
 	switch order.State {
 	case models.OrderState_PENDING,
 		models.OrderState_AWAITING_PAYMENT,
@@ -476,6 +482,22 @@ func promoteAfterVerification(order *models.Order, now time.Time) {
 		models.OrderState_PROCESSING_ERROR:
 		order.SetFSMState(models.OrderState_PENDING)
 	}
+}
+
+func recoverPaymentTimeoutCancellation(order *models.Order) bool {
+	if order == nil || order.State != models.OrderState_CANCELED {
+		return false
+	}
+	cancel, err := order.OrderCancelMessage()
+	if err != nil || cancel.GetReason() != "payment_timeout" {
+		return false
+	}
+	order.SerializedOrderCancel = nil
+	order.OrderCancelSignature = ""
+	order.OrderCancelAcked = false
+	order.Open = true
+	order.SetFSMState(models.OrderState_PENDING)
+	return true
 }
 
 // sumObservations folds the dedup'd observation slice into a *big.Int.
@@ -690,7 +712,10 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 		} else {
 			intent.settlementSpecOK = false
 		}
-		intent.contractAddress = escrowInfo.EscrowAddress
+		intent.contractAddress = strings.TrimSpace(escrowInfo.ContractAddress)
+		if intent.contractAddress == "" {
+			intent.contractAddress = escrowInfo.EscrowAddress
+		}
 		if strings.TrimSpace(escrowInfo.Moderator) != "" {
 			intent.moderator = escrowInfo.Moderator
 		}
@@ -771,10 +796,48 @@ func hydrateSharedManagedEscrowMetadata(gdb *gorm.DB, order *models.Order) error
 	return paymentintent.HydrateOrderFromSharedIntent(gdb, order)
 }
 
+func hydrateCotenantEscrowMetadata(gdb *gorm.DB, order *models.Order) error {
+	if gdb == nil || order == nil || strings.TrimSpace(order.ID.String()) == "" {
+		return nil
+	}
+	if hasPendingEscrowPaymentInfo(order) {
+		return nil
+	}
+
+	var peers []models.Order
+	if err := gdb.
+		Where("id = ? AND tenant_id <> ?", order.ID, order.TenantID).
+		Find(&peers).Error; err != nil {
+		return err
+	}
+	for i := range peers {
+		if !hasPendingEscrowPaymentInfo(&peers[i]) {
+			continue
+		}
+		order.PendingPaymentInfo = append(order.PendingPaymentInfo[:0], peers[i].PendingPaymentInfo...)
+		if strings.TrimSpace(order.PaymentAddress) == "" {
+			order.PaymentAddress = peers[i].PaymentAddress
+		}
+		if strings.TrimSpace(order.RefundAddress) == "" {
+			order.RefundAddress = peers[i].RefundAddress
+		}
+		return nil
+	}
+	return nil
+}
+
 func hasPendingManagedEscrowPaymentInfo(order *models.Order) bool {
 	if order == nil {
 		return false
 	}
 	info, err := order.GetPendingManagedEscrowPaymentInfo()
+	return err == nil && info != nil
+}
+
+func hasPendingEscrowPaymentInfo(order *models.Order) bool {
+	if order == nil {
+		return false
+	}
+	info, err := order.GetPendingEscrowPaymentInfo()
 	return err == nil && info != nil
 }

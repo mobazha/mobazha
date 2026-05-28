@@ -89,10 +89,15 @@ type GuestOrderStatusResponse struct {
 	RequiredConfs     int                     `json:"requiredConfs"`
 	ChainBlockTimeSec uint32                  `json:"chainBlockTimeSec,omitempty"`
 	TrackingNumber    string                  `json:"trackingNumber,omitempty"`
+	ShippingCarrier   string                  `json:"shippingCarrier,omitempty"`
 	SellerPeerID      string                  `json:"sellerPeerID,omitempty"`
 	Items             []models.GuestOrderItem `json:"items"`
 	ExpiresAt         time.Time               `json:"expiresAt"`
 	CreatedAt         time.Time               `json:"createdAt"`
+	UpdatedAt         time.Time               `json:"updatedAt"`
+	FundedAt          *time.Time              `json:"fundedAt,omitempty"`
+	ShippedAt         *time.Time              `json:"shippedAt,omitempty"`
+	CompletedAt       *time.Time              `json:"completedAt,omitempty"`
 	// Pool-stage UX hint (currently EXTERNAL_PAYMENT only). When PoolDetected is true,
 	// a mempool transfer has been observed but is not yet mined; the order
 	// is still in AWAITING_PAYMENT and may transition to PAYMENT_DETECTED

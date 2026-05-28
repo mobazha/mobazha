@@ -18,6 +18,41 @@ import (
 	pkgdatabase "github.com/mobazha/mobazha3.0/pkg/database"
 )
 
+func buyerPortalAccessErrorMessage(buyerPortalToken string) string {
+	if strings.TrimSpace(buyerPortalToken) != "" {
+		return "buyer portal token is invalid or expired"
+	}
+	return "not authorized to access digital delivery for this order"
+}
+
+// identityAllowsDigitalDeliveryAdmin reports whether the caller may access
+// seller-side digital delivery endpoints without matching order.SellerPeerID.
+//
+// Standalone Basic Auth sets IsAdmin=true. SaaS OAuth store-owner sessions
+// set Scopes=nil (full session) with IsAdmin=false — same convention as
+// ScopeEnforcementMiddleware and auth_identity.IsStoreOwnerSession.
+func identityAllowsDigitalDeliveryAdmin(identity *AuthIdentity) bool {
+	if identity == nil || identity.UserID == "anonymous" {
+		return false
+	}
+	if identity.IsAdmin {
+		return true
+	}
+	return !identity.IsAPIToken && identity.Scopes == nil
+}
+
+// digitalDeliveryAuthenticatedPeerID returns the authenticated peer for buyer/seller
+// access checks when admin bypass does not apply.
+func digitalDeliveryAuthenticatedPeerID(identity *AuthIdentity) string {
+	if identityAllowsDigitalDeliveryAdmin(identity) {
+		return ""
+	}
+	if identity == nil || identity.UserID == "anonymous" {
+		return ""
+	}
+	return identity.PeerID
+}
+
 func getDigitalAssetService(r *http.Request) (contracts.DigitalAssetService, bool) {
 	dp, ok := getNodeService(r).(contracts.DigitalAssetProvider)
 	if !ok {
@@ -88,23 +123,13 @@ func (g *Gateway) registerNodeHumaDigitalOperations(api huma.API) {
 			return nil, huma.Error501NotImplemented("digital asset subsystem not available")
 		}
 		identity := GetAuthIdentity(r.Context())
-		// Defense in depth: only a fully-authenticated admin (real Basic
-		// Auth / JWT, or mbz_ API token with admin scope) may bypass the
-		// buyerPortalToken check. The previous synthetic anonymous-admin
-		// fallback in nodeBridgeRequestWithOptionalAuth has been removed,
-		// but we keep the explicit UserID guard so any future reintroduction
-		// of a sentinel anonymous identity cannot silently re-open this path.
-		isAnonymousSentinel := identity != nil && identity.UserID == "anonymous"
-		allowAdmin := identity != nil && identity.IsAdmin && !isAnonymousSentinel
-		authenticatedBuyerPeerID := ""
-		if identity != nil && !identity.IsAdmin && !isAnonymousSentinel {
-			authenticatedBuyerPeerID = identity.PeerID
-		}
+		allowAdmin := identityAllowsDigitalDeliveryAdmin(identity)
+		authenticatedBuyerPeerID := digitalDeliveryAuthenticatedPeerID(identity)
 		buyerPortalToken := in.BuyerPortalTokenHeader
 		entries, err := svc.GetBuyerDigitalAssets(in.OrderID, buyerPortalToken, authenticatedBuyerPeerID, allowAdmin, in.URLExpirySec)
 		if err != nil {
 			if errors.Is(err, contracts.ErrBuyerPortalAccess) {
-				return nil, huma.Error403Forbidden("buyer portal token is invalid or expired")
+				return nil, huma.Error403Forbidden(buyerPortalAccessErrorMessage(in.BuyerPortalTokenHeader))
 			}
 			return nil, huma.Error500InternalServerError("failed to retrieve digital assets", err)
 		}
@@ -130,16 +155,12 @@ func (g *Gateway) registerNodeHumaDigitalOperations(api huma.API) {
 			return nil, huma.Error501NotImplemented("digital asset subsystem not available")
 		}
 		identity := GetAuthIdentity(r.Context())
-		isAnonymousSentinel := identity != nil && identity.UserID == "anonymous"
-		allowAdmin := identity != nil && identity.IsAdmin && !isAnonymousSentinel
-		authenticatedPeerID := ""
-		if identity != nil && !identity.IsAdmin && !isAnonymousSentinel {
-			authenticatedPeerID = identity.PeerID
-		}
+		allowAdmin := identityAllowsDigitalDeliveryAdmin(identity)
+		authenticatedPeerID := digitalDeliveryAuthenticatedPeerID(identity)
 		status, err := svc.GetDigitalDeliveryStatus(in.OrderID, in.BuyerPortalTokenHeader, authenticatedPeerID, allowAdmin)
 		if err != nil {
 			if errors.Is(err, contracts.ErrBuyerPortalAccess) {
-				return nil, huma.Error403Forbidden("buyer portal token is invalid or expired")
+				return nil, huma.Error403Forbidden(buyerPortalAccessErrorMessage(in.BuyerPortalTokenHeader))
 			}
 			return nil, huma.Error500InternalServerError("failed to retrieve digital delivery status", err)
 		}
@@ -343,11 +364,8 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 			return nil, huma.Error501NotImplemented("digital asset subsystem not available")
 		}
 		identity := GetAuthIdentity(r.Context())
-		authenticatedPeerID := ""
-		allowAdmin := identity != nil && identity.IsAdmin
-		if identity != nil && !identity.IsAdmin {
-			authenticatedPeerID = identity.PeerID
-		}
+		allowAdmin := identityAllowsDigitalDeliveryAdmin(identity)
+		authenticatedPeerID := digitalDeliveryAuthenticatedPeerID(identity)
 		status, err := svc.RetryDigitalDelivery(in.OrderID, authenticatedPeerID, allowAdmin)
 		if err != nil {
 			switch {

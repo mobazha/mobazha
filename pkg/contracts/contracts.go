@@ -853,6 +853,7 @@ type SchedulerHooks interface {
 	RunOrderTimeoutOnce(ctx context.Context)
 	RunOutboxPollOnce(ctx context.Context)
 	RunOutboxCleanupOnce(ctx context.Context)
+	RunPaymentReconcileScanOnce(ctx context.Context)
 	RunPaymentVerificationOnce(ctx context.Context)
 	RunSettlementActionConfirmationsOnce(ctx context.Context)
 	RunWebhookDeliveryOnce(ctx context.Context)

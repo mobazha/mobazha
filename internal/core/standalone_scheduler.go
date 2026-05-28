@@ -38,6 +38,7 @@ func (n *MobazhaNode) startStandaloneScheduler(ctx context.Context) {
 		"order-timeout":                   func(ctx context.Context) error { n.RunOrderTimeoutOnce(ctx); return nil },
 		"outbox-poll":                     func(ctx context.Context) error { n.RunOutboxPollOnce(ctx); return nil },
 		"outbox-cleanup":                  func(ctx context.Context) error { n.RunOutboxCleanupOnce(ctx); return nil },
+		"payment-reconcile-scan":          func(ctx context.Context) error { n.RunPaymentReconcileScanOnce(ctx); return nil },
 		"payment-verification":            func(ctx context.Context) error { n.RunPaymentVerificationOnce(ctx); return nil },
 		"settlement-action-confirmations": func(ctx context.Context) error { n.RunSettlementActionConfirmationsOnce(ctx); return nil },
 		"webhook-delivery":                func(ctx context.Context) error { n.RunWebhookDeliveryOnce(ctx); return nil },

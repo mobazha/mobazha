@@ -61,6 +61,7 @@ var Jobs = map[string]JobMeta{
 	"order-timeout":                   {Name: "order-timeout", Interval: 1 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 30 * time.Second},
 	"outbox-poll":                     {Name: "outbox-poll", Interval: 5 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 4 * time.Second},
 	"outbox-cleanup":                  {Name: "outbox-cleanup", Interval: 1 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"payment-reconcile-scan":          {Name: "payment-reconcile-scan", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
 	"payment-verification":            {Name: "payment-verification", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
 	"settlement-action-confirmations": {Name: "settlement-action-confirmations", Interval: 10 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 8 * time.Second},
 	"webhook-delivery":                {Name: "webhook-delivery", Interval: 5 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 4 * time.Second},

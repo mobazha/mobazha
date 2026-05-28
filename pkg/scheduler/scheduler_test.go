@@ -66,6 +66,27 @@ func newStubRegistry(ids ...string) *stubRegistry {
 
 // --- tests ---
 
+func TestJobs_PaymentReconcileScanIsSeparateFromVerification(t *testing.T) {
+	obs, ok := Jobs["payment-reconcile-scan"]
+	if !ok {
+		t.Fatal("payment-reconcile-scan job is not registered")
+	}
+	if obs.Name != "payment-reconcile-scan" {
+		t.Fatalf("reconcile job name = %q", obs.Name)
+	}
+	if obs.Interval != 30*time.Second {
+		t.Fatalf("reconcile interval = %s, want 30s", obs.Interval)
+	}
+
+	verify, ok := Jobs["payment-verification"]
+	if !ok {
+		t.Fatal("payment-verification job is not registered")
+	}
+	if verify.Name == obs.Name {
+		t.Fatal("payment reconcile scan and verification must remain separate scheduler jobs")
+	}
+}
+
 func TestNew_RequiresHolderID(t *testing.T) {
 	_, err := New(Config{})
 	if err != ErrHolderIDRequired {

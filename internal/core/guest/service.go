@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	ordercontracttype "github.com/mobazha/mobazha3.0/internal/core/contracttype"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -227,6 +228,8 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	itemStockLimits := make(map[inventoryBucketKey]int64)
 	itemBuckets := make([]inventoryBucketKey, 0, len(req.Items))
 	allDigitalGoods := true
+	var orderContractType pb.Listing_Metadata_ContractType
+	var hasOrderContractType bool
 	sellerPeerID := s.resolveSellerPeerID("", "")
 
 	for _, reqItem := range req.Items {
@@ -238,6 +241,18 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		resolved, err := s.resolveItemPrice(reqItem)
 		if err != nil {
 			return nil, fmt.Errorf("resolve price for %q: %w", reqItem.ListingSlug, err)
+		}
+		var sameType bool
+		orderContractType, hasOrderContractType, sameType = ordercontracttype.AddToSingleTypeOrder(
+			orderContractType,
+			hasOrderContractType,
+			resolved.ContractType,
+		)
+		if !sameType {
+			return nil, fmt.Errorf("%w: %s",
+				contracts.ErrInvalidGuestRequest,
+				ordercontracttype.MixedOrderTypeMessage(orderContractType, resolved.ContractType, reqItem.ListingSlug),
+			)
 		}
 		bucket := inventoryBucketKey{Slug: reqItem.ListingSlug, VariantHash: resolved.VariantHash}
 		itemBuckets = append(itemBuckets, bucket)

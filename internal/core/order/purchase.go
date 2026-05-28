@@ -17,6 +17,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	ordercontracttype "github.com/mobazha/mobazha3.0/internal/core/contracttype"
 	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -204,6 +205,8 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 
 	addedListings := make(map[string]bool)
 	vendors := make(map[string]bool)
+	var orderContractType pb.Listing_Metadata_ContractType
+	var hasOrderContractType bool
 	for _, item := range purchase.Items {
 		var options []*pb.OrderOpen_Item_Option
 
@@ -231,6 +234,18 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 
 		if listing.Listing.Metadata.ContractType == pb.Listing_Metadata_CLASSIFIED {
 			return nil, nil, fmt.Errorf("%w: classified listings cannot be purchased", coreiface.ErrBadRequest)
+		}
+		var sameType bool
+		orderContractType, hasOrderContractType, sameType = ordercontracttype.AddToSingleTypeOrder(
+			orderContractType,
+			hasOrderContractType,
+			listing.Listing.Metadata.ContractType,
+		)
+		if !sameType {
+			return nil, nil, fmt.Errorf("%w: %s",
+				coreiface.ErrBadRequest,
+				ordercontracttype.MixedOrderTypeMessage(orderContractType, listing.Listing.Metadata.ContractType, item.ListingHash),
+			)
 		}
 
 		vendors[listing.Listing.VendorID.PeerID] = true

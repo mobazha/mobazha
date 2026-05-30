@@ -609,7 +609,7 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 
 	// Observation progress includes pending rows so payment sessions can show
 	// mempool-detected funds without marking the order chain-verified.
-	observedAmountRaw, obsCount, lastObsAt, err := p.queryObservationProgress(orderID)
+	observedAmountRaw, obsCount, lastObsAt, err := p.queryObservationProgress(order.TenantID, orderID)
 	if err == nil {
 		input.observedAmountRaw = observedAmountRaw
 		input.obsCount = obsCount
@@ -621,13 +621,17 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 
 // queryObservationProgress returns deduplicated pending-or-confirmed observed
 // funds for UI progress. Verification still reads confirmed rows only.
-func (p *PaymentSessionProjector) queryObservationProgress(orderID string) (string, int, *time.Time, error) {
+func (p *PaymentSessionProjector) queryObservationProgress(tenantID, orderID string) (string, int, *time.Time, error) {
+	if tenantID == "" || orderID == "" {
+		return "", 0, nil, fmt.Errorf("payment session projector: tenantID and orderID must be set")
+	}
+
 	var rows []models.PaymentObservation
 	var lastBlockTime *time.Time
 
 	err := p.db.View(func(tx database.Tx) error {
 		return tx.Read().
-			Where("order_id = ? AND status IN ?", orderID, []string{
+			Where("tenant_id = ? AND order_id = ? AND status IN ?", tenantID, orderID, []string{
 				models.PaymentObservationStatusPending,
 				models.PaymentObservationStatusConfirmed,
 			}).

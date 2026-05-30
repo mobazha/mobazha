@@ -238,6 +238,57 @@ func TestProject_UsesPendingObservationAmountForPaymentProgress(t *testing.T) {
 	require.Equal(t, &observedAt, session.PaymentProgress.LastObservedAt)
 }
 
+func TestQueryObservationProgress_IsTenantScoped(t *testing.T) {
+	db := newVerifierTestDB(t)
+	p := NewPaymentSessionProjector(db)
+
+	firstSeen := time.Date(2026, 5, 30, 9, 0, 0, 0, time.UTC)
+	otherSeen := firstSeen.Add(time.Minute)
+	rows := []models.PaymentObservation{
+		testSessionObservation("obs-tenant-a", "tenant-a", "order-shared", "100", firstSeen, models.PaymentObservationStatusPending),
+		testSessionObservation("obs-tenant-b", "tenant-b", "order-shared", "900", otherSeen, models.PaymentObservationStatusPending),
+		testSessionObservation("obs-tenant-a-reverted", "tenant-a", "order-shared", "500", otherSeen, models.PaymentObservationStatusReverted),
+	}
+	require.NoError(t, db.gormDB.Create(&rows).Error)
+
+	total, count, lastSeen, err := p.queryObservationProgress("tenant-a", "order-shared")
+	require.NoError(t, err)
+	require.Equal(t, "100", total)
+	require.Equal(t, 1, count)
+	require.NotNil(t, lastSeen)
+	require.True(t, firstSeen.Equal(*lastSeen))
+}
+
+func TestQueryObservationProgress_RejectsMissingTenant(t *testing.T) {
+	p := NewPaymentSessionProjector(newVerifierTestDB(t))
+
+	_, _, _, err := p.queryObservationProgress("", "order-1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "tenantID and orderID must be set")
+}
+
+func testSessionObservation(id, tenantID, orderID, amount string, blockTime time.Time, status string) models.PaymentObservation {
+	return models.PaymentObservation{
+		TenantID:       tenantID,
+		ID:             id,
+		OrderID:        orderID,
+		ChainNamespace: "eip155",
+		ChainReference: "11155111",
+		TxHash:         id + "-tx",
+		EventIndex:     0,
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		FromAddress:    "0xfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed",
+		ToAddress:      "0x111122223333444455556666777788889999aaaa",
+		Amount:         amount,
+		BlockNumber:    123,
+		BlockTime:      blockTime,
+		Confirmations:  0,
+		Source:         models.PaymentObservationSourceMonitor,
+		Observer:       "monitor:" + id,
+		Status:         status,
+	}
+}
+
 func TestProject_UsesLockedUTXOPendingAmountOverOrderOpenAmount(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "bc1qtest"}

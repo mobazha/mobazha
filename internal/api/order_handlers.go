@@ -223,6 +223,10 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		UnreadChatMessages  int64                             `json:"unreadChatMessages,omitempty"`
 		Funded              bool                              `json:"funded,omitempty"`
 		Completable         bool                              `json:"completable,omitempty"`
+		PaidAt              *time.Time                        `json:"paidAt,omitempty"`
+		ShippedAt           *time.Time                        `json:"shippedAt,omitempty"`
+		CompletedAt         *time.Time                        `json:"completedAt,omitempty"`
+		LastStateChangeAt   *time.Time                        `json:"lastStateChangeAt,omitempty"`
 		PaymentState        paymentStateResp                  `json:"paymentState"`
 		Protection          *models.OrderProtectionInfo       `json:"protection,omitempty"`
 		AfterSaleDispute    *models.AfterSaleDispute          `json:"afterSaleDispute,omitempty"`
@@ -243,6 +247,10 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		UnreadChatMessages: unreadChatMsgCount,
 		Funded:             isFunded,
 		Completable:        order.CanComplete(),
+		PaidAt:             order.PaidAt,
+		ShippedAt:          order.ShippedAt,
+		CompletedAt:        order.CompletedAt,
+		LastStateChangeAt:  order.LastStateChangeAt,
 		PaymentState: paymentStateResp{
 			VerificationStatus: string(order.CurrentPaymentVerificationStatus()),
 			FiatMetadata:       fiatMeta,

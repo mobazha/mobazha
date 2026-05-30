@@ -265,8 +265,8 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 
 	var rows []models.PaymentObservation
 	if err := gdb.
-		Where("tenant_id = ? AND order_id = ? AND status = ?",
-			tenantID, orderID, models.PaymentObservationStatusConfirmed).
+		Where("tenant_id = ? AND order_id = ? AND status IN ?",
+			tenantID, orderID, observationStatusesForVerification(&order)).
 		Order("block_time ASC, id ASC").
 		Find(&rows).Error; err != nil {
 		return fmt.Errorf("aggregating verifier: load observations for %s: %w", orderID, err)
@@ -363,6 +363,7 @@ func paymentVerifiedBusinessEvents(order *models.Order, orderOpen *pb.OrderOpen,
 				amount = total.Uint64()
 			}
 			out = append(out, &events.CancelablePaymentReady{
+				TenantID:      order.TenantID,
 				OrderID:       order.ID.String(),
 				TransactionID: ps.TransactionID,
 				Coin:          ps.Coin,
@@ -800,7 +801,7 @@ func hydrateCotenantEscrowMetadata(gdb *gorm.DB, order *models.Order) error {
 	if gdb == nil || order == nil || strings.TrimSpace(order.ID.String()) == "" {
 		return nil
 	}
-	if hasPendingEscrowPaymentInfo(order) {
+	if hasPendingEscrowOrUTXOPaymentInfo(order) {
 		return nil
 	}
 
@@ -811,7 +812,7 @@ func hydrateCotenantEscrowMetadata(gdb *gorm.DB, order *models.Order) error {
 		return err
 	}
 	for i := range peers {
-		if !hasPendingEscrowPaymentInfo(&peers[i]) {
+		if !hasPendingEscrowOrUTXOPaymentInfo(&peers[i]) {
 			continue
 		}
 		order.PendingPaymentInfo = append(order.PendingPaymentInfo[:0], peers[i].PendingPaymentInfo...)
@@ -826,6 +827,25 @@ func hydrateCotenantEscrowMetadata(gdb *gorm.DB, order *models.Order) error {
 	return nil
 }
 
+func observationStatusesForVerification(order *models.Order) []string {
+	statuses := []string{models.PaymentObservationStatusConfirmed}
+	if utxoPendingAcceptsMempool(order) {
+		statuses = append(statuses, models.PaymentObservationStatusPending)
+	}
+	return statuses
+}
+
+func utxoPendingAcceptsMempool(order *models.Order) bool {
+	if order == nil {
+		return false
+	}
+	info, err := order.GetPendingPaymentInfo()
+	if err != nil || info == nil {
+		return false
+	}
+	return models.NormalizePaymentConfirmationPolicy(info.ConfirmationPolicy) == models.PaymentConfirmationPolicyMempoolAccepted
+}
+
 func hasPendingManagedEscrowPaymentInfo(order *models.Order) bool {
 	if order == nil {
 		return false
@@ -834,10 +854,13 @@ func hasPendingManagedEscrowPaymentInfo(order *models.Order) bool {
 	return err == nil && info != nil
 }
 
-func hasPendingEscrowPaymentInfo(order *models.Order) bool {
+func hasPendingEscrowOrUTXOPaymentInfo(order *models.Order) bool {
 	if order == nil {
 		return false
 	}
-	info, err := order.GetPendingEscrowPaymentInfo()
+	if info, err := order.GetPendingEscrowPaymentInfo(); err == nil && info != nil {
+		return true
+	}
+	info, err := order.GetPendingPaymentInfo()
 	return err == nil && info != nil
 }

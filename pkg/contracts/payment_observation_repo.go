@@ -71,6 +71,12 @@ type PaymentObservationRepo interface {
 	// the repo).
 	InsertObservation(ctx context.Context, obs *models.PaymentObservation) error
 
+	// PromoteObservationBlock advances block metadata on an existing row keyed
+	// by the observation dedupe tuple when the same chain event is later
+	// observed with a higher block_number (mempool → confirmed inclusion).
+	// Returns true when a row was updated.
+	PromoteObservationBlock(ctx context.Context, obs *models.PaymentObservation) (bool, error)
+
 	// ListDeduplicatedConfirmed returns confirmed observations for the order,
 	// deduplicated to one row per (chain_namespace, chain_reference, tx_hash,
 	// event_index) tuple.
@@ -104,7 +110,7 @@ type PaymentObservationRepo interface {
 	// requiredConfirmations is expressed as the additive depth (e.g. 12 for
 	// ETH/BSC, 2 for L2s); the underlying SQL is
 	//
-	//   block_number <= currentBlockNumber - requiredConfirmations
+	//   block_number > 0 AND block_number <= currentBlockNumber - requiredConfirmations
 	//
 	// so a row included at block N is confirmed once the chain head reaches
 	// N + requiredConfirmations.

@@ -139,37 +139,37 @@ func TestZCashWallet_EstimateEscrowFee(t *testing.T) {
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(5940),
+			expected:  iwallet.NewAmount(7410),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(7920),
+			expected:  iwallet.NewAmount(9880),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(9900),
+			expected:  iwallet.NewAmount(12350),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(9960),
+			expected:  iwallet.NewAmount(11730),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(13280),
+			expected:  iwallet.NewAmount(15640),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(16600),
+			expected:  iwallet.NewAmount(19550),
 		},
 	}
 
@@ -178,7 +178,7 @@ func TestZCashWallet_EstimateEscrowFee(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, test := range tests {
-		fee, err := w.EstimateEscrowFee(test.threshold, test.nOuts, test.level)
+		fee, err := w.EstimateEscrowFee(1, test.threshold, test.nOuts, test.level)
 		if err != nil {
 			t.Errorf("Test %d: error %s", i, err)
 		}

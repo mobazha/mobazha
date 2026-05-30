@@ -110,37 +110,37 @@ func TestLitecoinWallet_EstimateEscrowFee(t *testing.T) {
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(5490),
+			expected:  iwallet.NewAmount(3690),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(7320),
+			expected:  iwallet.NewAmount(4920),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(9150),
+			expected:  iwallet.NewAmount(6150),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(9510),
+			expected:  iwallet.NewAmount(5520),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(12680),
+			expected:  iwallet.NewAmount(7360),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(15850),
+			expected:  iwallet.NewAmount(9200),
 		},
 	}
 
@@ -149,7 +149,7 @@ func TestLitecoinWallet_EstimateEscrowFee(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, test := range tests {
-		fee, err := w.EstimateEscrowFee(test.threshold, test.nOuts, test.level)
+		fee, err := w.EstimateEscrowFee(1, test.threshold, test.nOuts, test.level)
 		if err != nil {
 			t.Errorf("Test %d: error %s", i, err)
 		}

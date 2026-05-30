@@ -118,6 +118,13 @@ func (d *ObservationDispatcher) withClock(clock func() time.Time) *ObservationDi
 	return d
 }
 
+// HasAggregator reports whether observation inserts trigger payment aggregation.
+// When false the dispatcher is audit-only and UTXO checkout must use the legacy
+// buyer-node path to advance orders.
+func (d *ObservationDispatcher) HasAggregator() bool {
+	return d != nil && d.aggregator != nil
+}
+
 // PaymentAggregator is the verifier interface invoked after each
 // successful observation insert. Sprint 2A step 4 will provide the
 // production implementation backed by VerificationService.AggregateAndEmit;
@@ -205,7 +212,7 @@ type FundingEvent struct {
 	// because they cannot represent a real funding contribution.
 	Amount *big.Int
 
-	BlockNumber int64
+	BlockNumber int64     // inclusion height; 0 = mempool / unconfirmed
 	BlockTime   time.Time
 }
 
@@ -247,8 +254,8 @@ func (e FundingEvent) validate() error {
 	if e.Amount.Sign() <= 0 {
 		return fmt.Errorf("%w: Amount must be > 0 (got %s)", ErrInvalidFundingEvent, e.Amount.String())
 	}
-	if e.BlockNumber <= 0 {
-		return fmt.Errorf("%w: BlockNumber must be > 0 (got %d)", ErrInvalidFundingEvent, e.BlockNumber)
+	if e.BlockNumber < 0 {
+		return fmt.Errorf("%w: BlockNumber must be ≥ 0 (got %d)", ErrInvalidFundingEvent, e.BlockNumber)
 	}
 	if e.BlockTime.IsZero() {
 		return fmt.Errorf("%w: BlockTime must be set", ErrInvalidFundingEvent)
@@ -402,17 +409,23 @@ func (d *ObservationDispatcher) OnBuyerReportedPaymentSent(
 // invariant across observation sources and is asserted by the dispatcher
 // tests for both paths.
 func (d *ObservationDispatcher) insertAndKick(ctx context.Context, obs *models.PaymentObservation) error {
-	if err := d.repo.InsertObservation(ctx, obs); err != nil {
+	err := d.repo.InsertObservation(ctx, obs)
+	if err != nil {
 		if errors.Is(err, contracts.ErrDuplicateObservation) {
-			// Same observer replaying the same event — already
-			// persisted. Skip the aggregator kick: a duplicate event by
-			// definition produces no new content for the aggregator to
-			// consider, and a kick here would hot-loop on storms of
-			// replayed buyer-reported PAYMENT_SENT messages.
-			return nil
+			promoted, promoteErr := d.repo.PromoteObservationBlock(ctx, obs)
+			if promoteErr != nil {
+				return fmt.Errorf("payment: promote observation block for order %s tx %s: %w",
+					obs.OrderID, obs.TxHash, promoteErr)
+			}
+			if !promoted {
+				// Same observer replaying the same event — already persisted.
+				return nil
+			}
+			// Fall through to aggregator kick after mempool → confirmed promotion.
+		} else {
+			return fmt.Errorf("payment: insert observation for order %s tx %s: %w",
+				obs.OrderID, obs.TxHash, err)
 		}
-		return fmt.Errorf("payment: insert observation for order %s tx %s: %w",
-			obs.OrderID, obs.TxHash, err)
 	}
 
 	if d.aggregator != nil {

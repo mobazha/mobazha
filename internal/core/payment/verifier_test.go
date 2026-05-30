@@ -188,6 +188,33 @@ func seedOrderForTenant(t *testing.T, db *vTestDB, tenantID, orderID, expectedAm
 	}))
 }
 
+func seedPendingUTXOInfo(t *testing.T, db *vTestDB, orderID, confirmationPolicy string) {
+	t.Helper()
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().
+			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, orderID).
+			First(&order).Error; err != nil {
+			return err
+		}
+		order.PaymentAddress = "bch-escrow"
+		if err := order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
+			Coin:               "crypto:bitcoincash:mainnet:native",
+			Amount:             1000,
+			Script:             "ab",
+			ConfirmationPolicy: confirmationPolicy,
+			SettlementSpec: &models.PendingSettlementSpec{
+				Method:     "CANCELABLE",
+				PayMode:    "address_monitored",
+				EscrowType: "utxo",
+			},
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	}))
+}
+
 func seedOrderForRoleWithListing(t *testing.T, db *vTestDB, orderID, expectedAmount string, role models.OrderRole) {
 	t.Helper()
 	oo := &pb.OrderOpen{
@@ -329,6 +356,71 @@ func TestAggregateAndEmit_NoObservations_StaysPending(t *testing.T) {
 	require.True(t, got.IsPaymentVerificationPending())
 	require.Equal(t, "0", got.TotalReceived)
 	require.Empty(t, got.OverpaidAmount)
+}
+
+func TestAggregateAndEmit_PendingUTXODefaultPolicyDoesNotVerify(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "bch-refund")
+	seedPendingUTXOInfo(t, db, "order-1", models.PaymentConfirmationPolicyChainConfirmed)
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-pending",
+		OrderID:        "order-1",
+		ChainNamespace: "bitcoincash",
+		ChainReference: "mainnet",
+		TxHash:         "bch-tx-pending",
+		EventType:      models.PaymentEventUTXOFunding,
+		FromAddress:    "bch-payer",
+		ToAddress:      "bch-escrow",
+		Amount:         "1000",
+		Status:         models.PaymentObservationStatusPending,
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+	require.Empty(t, bus.emitted)
+
+	got := loadOrder(t, db, "order-1")
+	require.True(t, got.IsPaymentVerificationPending())
+	require.Equal(t, "0", got.TotalReceived)
+	require.Empty(t, got.SerializedPaymentSent)
+}
+
+func TestAggregateAndEmit_PendingUTXOMempoolAcceptedPolicyVerifies(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-1", "1000", "bch-refund")
+	seedPendingUTXOInfo(t, db, "order-1", models.PaymentConfirmationPolicyMempoolAccepted)
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-pending",
+		OrderID:        "order-1",
+		ChainNamespace: "bitcoincash",
+		ChainReference: "mainnet",
+		TxHash:         "bch-tx-pending",
+		EventType:      models.PaymentEventUTXOFunding,
+		FromAddress:    "bch-payer",
+		ToAddress:      "bch-escrow",
+		Amount:         "1000",
+		Status:         models.PaymentObservationStatusPending,
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
+	require.Len(t, bus.emitted, 1)
+
+	got := loadOrder(t, db, "order-1")
+	require.True(t, got.IsPaymentVerified())
+	require.Equal(t, models.OrderState_PENDING, got.State)
+	require.Equal(t, "1000", got.TotalReceived)
+	require.NotEmpty(t, got.SerializedPaymentSent)
+
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Equal(t, "bch-tx-pending", ps.TransactionID)
+	require.Equal(t, "bch-escrow", ps.ToAddress)
+	require.Equal(t, "crypto:bitcoincash:mainnet:native", ps.Coin)
 }
 
 // ─────────────────────────────────────────────────────────────────────────

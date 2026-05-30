@@ -374,21 +374,32 @@ func (s *Source) BroadcastTransaction(ctx context.Context, txHex string) (string
 // Returns fee in satoshis per byte
 func (s *Source) EstimateFee(ctx context.Context, numBlocks int) (uint64, error) {
 	fee, err := s.client.EstimateFee(ctx, numBlocks)
-	if err != nil {
-		return 0, err
+	if err != nil || fee < 0 {
+		relayFee, relayErr := s.client.GetRelayFee(ctx)
+		if relayErr != nil {
+			if err != nil {
+				return 0, err
+			}
+			return 0, fmt.Errorf("server cannot estimate fee (returned %f)", fee)
+		}
+		return feeBTCPerKBToSatPerVB(relayFee), nil
 	}
-	// Electrum returns -1 when it cannot estimate the fee
-	// This commonly happens on testnet or when the server has insufficient data
-	if fee < 0 {
-		return 0, fmt.Errorf("server cannot estimate fee (returned %f)", fee)
+
+	satPerVB := feeBTCPerKBToSatPerVB(fee)
+	if relayFee, err := s.client.GetRelayFee(ctx); err == nil {
+		if relaySatPerVB := feeBTCPerKBToSatPerVB(relayFee); relaySatPerVB > satPerVB {
+			satPerVB = relaySatPerVB
+		}
 	}
-	// Electrum returns BTC/kB, convert to sat/vB
-	// fee * 1e8 / 1000 = fee * 1e5
-	satPerVB := uint64(fee * 1e5)
+	return satPerVB, nil
+}
+
+func feeBTCPerKBToSatPerVB(fee float64) uint64 {
+	satPerVB := uint64(math.Ceil(fee * 1e5))
 	if satPerVB < 1 {
 		satPerVB = 1
 	}
-	return satPerVB, nil
+	return satPerVB
 }
 
 // ListUnspent returns unspent outputs for a scriptPubKey. The Electrum-specific

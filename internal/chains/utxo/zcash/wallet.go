@@ -14,13 +14,13 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
-	"github.com/btcsuite/btcwallet/wallet/txsizes"
 	mbwire "github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/minio/blake2b-simd"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -141,16 +141,8 @@ func (w *ZCashWallet) IsDust(iaddr iwallet.Address, amount iwallet.Amount) bool 
 // this assumes only one input. If there are more inputs Mobazha will
 // will add 50% of the returned fee for each additional input. This is a
 // crude fee calculating but it simplifies things quite a bit.
-func (w *ZCashWallet) EstimateEscrowFee(threshold int, nOuts int, level iwallet.FeeLevel) (iwallet.Amount, error) {
-	var (
-		redeemScriptSize = 4 + (threshold+1)*34
-	)
-
-	// 8 additional bytes are for version and locktime
-	// 15 trailing bytes are zcash tx metadata
-	size := 8 + wire.VarIntSerializeSize(1) +
-		wire.VarIntSerializeSize(uint64(nOuts)) + 1 +
-		threshold*66 + txsizes.P2PKHOutputSize*nOuts + redeemScriptSize + 15
+func (w *ZCashWallet) EstimateEscrowFee(nInputs int, threshold int, nOuts int, level iwallet.FeeLevel) (iwallet.Amount, error) {
+	size := chainutxo.EstimateP2SHECDSAMultisigSpendSize(nInputs, threshold, nOuts, 15)
 
 	resp, err := w.ChainClient.EstimateFee(size)
 	if err != nil {

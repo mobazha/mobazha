@@ -19,6 +19,10 @@ var (
 		"payment session: RWA token listings are not supported by payment-session provisioning yet",
 	)
 
+	ErrPaymentCoinDisabled = errors.New(
+		"payment session: requested payment coin is not enabled",
+	)
+
 	// ErrPaymentCoinMismatch is returned when CreateSession is called with a
 	// paymentCoin that differs from the coin already provisioned for the order.
 	// Callers must explicitly handle this as a coin-switch case rather than

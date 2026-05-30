@@ -138,6 +138,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	}
 
 	n.registerManagedEscrowAdapterShadow()
+	n.registerUTXOObservationDispatcher()
 }
 
 // registerManagedEscrowAdapterShadow constructs ManagedEscrowAdapter instances and
@@ -318,16 +319,20 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 			"ManagedEscrowAdapter V2 activated for %d/%d EVM chains: %v (runtime chainIDs: %v)", len(shadow), len(activeChainsEarly), shadow, runtimeChainIDs)
 	}
 
-	// Wire ObservationDispatcher into PaymentAppService for UTXO audit path.
-	// Aggregator is nil (audit-only): observations are inserted for unified
-	// multi-chain audit, but the legacy UTXO verification pipeline remains
-	// the source of truth for order state transitions. This avoids competing
-	// with UTXOPaymentDetected → ProcessOrderPayment and hardcoding DIRECT.
+}
+
+// registerUTXOObservationDispatcher wires address-monitored UTXO payments into
+// the unified observation path used by payment-session checkout.
+func (n *MobazhaNode) registerUTXOObservationDispatcher() {
 	if n.paymentService != nil && n.db != nil {
 		if tenantDB, ok := n.db.(*dbstore.TenantDB); ok {
+			aggregator := corepayment.NewAggregatingVerifier(n.db, n.eventBus)
+			if n.orderService != nil {
+				aggregator.SetPaymentVerifiedHandler(n.handleCryptoPaymentVerified)
+			}
 			utxoDispatcher := corepayment.NewObservationDispatcher(
 				NewGormPaymentObservationRepo(tenantDB, tenantDB.RawDB()),
-				nil, // audit-only: no aggregator
+				aggregator,
 				&managed_escrowOrderTenantResolver{db: n.db},
 				n.nodeID,
 			)
@@ -764,6 +769,12 @@ func (n *MobazhaNode) startCancelablePaymentMonitor() {
 func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentReady) {
 	coinType := iwallet.CoinType(event.Coin)
 
+	if !cancelablePaymentEventTargetsNode(event.TenantID, n.nodeID) {
+		logger.LogDebugWithIDf(log, n.nodeID,
+			"Skipping cancelable payment event for tenant %s order %s", event.TenantID, event.OrderID)
+		return
+	}
+
 	if n.paymentRegistry == nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Payment registry not initialized, cannot dispatch order %s", event.OrderID)
 		return
@@ -786,6 +797,10 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 			logger.LogErrorWithIDf(log, n.nodeID, "AutoConfirm failed for order %s (coin=%s): %v", event.OrderID, event.Coin, err)
 		}
 	}()
+}
+
+func cancelablePaymentEventTargetsNode(eventTenantID, nodeID string) bool {
+	return eventTenantID == "" || eventTenantID == nodeID
 }
 
 type managed_escrowCancelableAutoConfirmer struct {

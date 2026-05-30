@@ -512,6 +512,46 @@ func TestGormPaymentObservationRepo_RefreshConfirmations_RejectsInvalidArgs(t *t
 	require.Error(t, err)
 }
 
+func TestGormPaymentObservationRepo_RefreshConfirmations_DoesNotConfirmMempoolRows(t *testing.T) {
+	// Mempool rows use block_number=0 and must never be promoted by a deep
+	// chain head sweep — only real inclusion heights qualify.
+	repo, db := newPaymentObservationTestRepo(t)
+
+	o := makeObservation("obs-mempool")
+	o.BlockNumber = 0
+	o.Status = models.PaymentObservationStatusPending
+	require.NoError(t, db.Create(o).Error)
+
+	refs, err := repo.RefreshConfirmations(context.Background(), "eip155", "1", 800000, 1)
+	require.NoError(t, err)
+	assert.Empty(t, refs)
+
+	var stored models.PaymentObservation
+	require.NoError(t, db.Where("id = ?", "obs-mempool").First(&stored).Error)
+	assert.Equal(t, models.PaymentObservationStatusPending, stored.Status)
+}
+
+func TestGormPaymentObservationRepo_PromoteObservationBlock_UpgradesMempoolInclusion(t *testing.T) {
+	repo, db := newPaymentObservationTestRepo(t)
+
+	o := makeObservation("obs-mempool")
+	o.BlockNumber = 0
+	o.Status = models.PaymentObservationStatusPending
+	require.NoError(t, db.Create(o).Error)
+
+	upgrade := *o
+	upgrade.BlockNumber = 500000
+	upgrade.BlockTime = time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
+
+	promoted, err := repo.PromoteObservationBlock(context.Background(), &upgrade)
+	require.NoError(t, err)
+	require.True(t, promoted)
+
+	var stored models.PaymentObservation
+	require.NoError(t, db.Where("id = ?", "obs-mempool").First(&stored).Error)
+	assert.Equal(t, int64(500000), stored.BlockNumber)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Sequential dedupe-stress: simulate the worker-loop pattern of a chain
 // monitor that walks through a list of observed events, retrying on RPC

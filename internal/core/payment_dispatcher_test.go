@@ -366,6 +366,29 @@ func TestDispatchCancelablePayment_UnknownCoinSafety(t *testing.T) {
 	}
 }
 
+func TestCancelablePaymentEventTargetsNode(t *testing.T) {
+	tests := []struct {
+		name          string
+		eventTenantID string
+		nodeID        string
+		want          bool
+	}{
+		{name: "standalone-empty-tenant", eventTenantID: "", nodeID: "peer-node", want: true},
+		{name: "matching-tenant", eventTenantID: "tenant-a", nodeID: "tenant-a", want: true},
+		{name: "foreign-tenant", eventTenantID: "tenant-b", nodeID: "tenant-a", want: false},
+		{name: "scoped-event-requires-node-identity", eventTenantID: "tenant-a", nodeID: "", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cancelablePaymentEventTargetsNode(tt.eventTenantID, tt.nodeID); got != tt.want {
+				t.Fatalf("cancelablePaymentEventTargetsNode(%q, %q) = %v, want %v",
+					tt.eventTenantID, tt.nodeID, got, tt.want)
+			}
+		})
+	}
+}
+
 // ── Fiat: should NOT reach cancelable dispatch ──────────────────────────
 // Fiat payments use webhook-based confirmation, not the cancelable payment
 // pipeline. This test documents this intentional design.

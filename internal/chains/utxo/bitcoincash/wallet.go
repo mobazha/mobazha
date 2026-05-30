@@ -17,8 +17,8 @@ import (
 	"github.com/gcash/bchutil"
 	"github.com/gcash/bchutil/txsort"
 	"github.com/gcash/bchwallet/wallet/txrules"
-	"github.com/gcash/bchwallet/wallet/txsizes"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -90,21 +90,17 @@ func (w *BitcoinCashWallet) IsDust(iaddr iwallet.Address, amount iwallet.Amount)
 // this assumes only one input. If there are more inputs Mobazha will
 // will add 50% of the returned fee for each additional input. This is a
 // crude fee calculating but it simplifies things quite a bit.
-func (w *BitcoinCashWallet) EstimateEscrowFee(threshold int, nOuts int, level iwallet.FeeLevel) (iwallet.Amount, error) {
-	var (
-		redeemScriptSize = 4 + (threshold+1)*34
-	)
-
-	// 8 additional bytes are for version and locktime
-	size := 8 + wire.VarIntSerializeSize(1) +
-		wire.VarIntSerializeSize(uint64(nOuts)) + 1 +
-		threshold*66 + txsizes.P2PKHOutputSize*nOuts + redeemScriptSize
-
-	fpb, err := w.GetFeePerByte(level)
+func (w *BitcoinCashWallet) EstimateEscrowFee(nInputs int, threshold int, nOuts int, level iwallet.FeeLevel) (iwallet.Amount, error) {
+	size := chainutxo.EstimateP2SHSchnorrMultisigSpendSize(nInputs, threshold, nOuts, 0)
+	resp, err := w.ChainClient.EstimateFee(size)
 	if err != nil {
 		return iwallet.NewAmount(0), err
 	}
-	return fpb.Mul(iwallet.NewAmount(size)), nil
+	fee, ok := resp[level]
+	if !ok {
+		return iwallet.NewAmount(0), fmt.Errorf("fee estimate missing level %v", level)
+	}
+	return fee.FeePerTx, nil
 }
 
 // GetFeePerByte returns the current fee per byte for the given fee level. There
@@ -116,7 +112,11 @@ func (w *BitcoinCashWallet) GetFeePerByte(feeLevel iwallet.FeeLevel) (iwallet.Am
 	if err != nil {
 		return iwallet.NewAmount(0), err
 	}
-	return resp[feeLevel].FeePerTx, nil
+	fee, ok := resp[feeLevel]
+	if !ok {
+		return iwallet.NewAmount(0), fmt.Errorf("fee estimate missing level %v", feeLevel)
+	}
+	return fee.FeePerTx, nil
 }
 
 // CreateMultisigAddress creates a new threshold multisig address using the

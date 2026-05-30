@@ -98,7 +98,7 @@ func (a *UTXOAutoConfirmAdapter) EstimateEscrowFee(coinCode string, nIn, nOut in
 		return iwallet.Amount{}, fmt.Errorf("wallet for %s does not support escrow", coinCode)
 	}
 
-	return escrowWallet.EstimateEscrowFee(nIn, nOut, feeLevel)
+	return escrowWallet.EstimateEscrowFee(nIn, 2, nOut, feeLevel)
 }
 
 // ── UTXO Payment Setup ──────────────────────────────────────────

@@ -225,6 +225,7 @@ func (s *PaymentAppService) emitVerifiedPaymentEvents(order *models.Order, payme
 			amount = uint64(tx.Value.Int64())
 		}
 		s.eventBus.Emit(&events.CancelablePaymentReady{
+			TenantID:      order.TenantID,
 			OrderID:       order.ID.String(),
 			TransactionID: paymentSent.TransactionID,
 			Coin:          paymentSent.Coin,

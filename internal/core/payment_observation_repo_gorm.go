@@ -128,6 +128,38 @@ func (r *GormPaymentObservationRepo) InsertObservation(_ context.Context, obs *m
 	return err
 }
 
+// PromoteObservationBlock updates block_number (and block_time) when the same
+// observer later sees the tx included in a block. Rows with block_number=0
+// (mempool) are promoted; replays with a higher inclusion height also advance.
+func (r *GormPaymentObservationRepo) PromoteObservationBlock(_ context.Context, obs *models.PaymentObservation) (bool, error) {
+	if obs == nil {
+		return false, fmt.Errorf("payment observation: obs must not be nil")
+	}
+	if r.raw == nil {
+		return false, fmt.Errorf("payment observation: PromoteObservationBlock requires a raw *gorm.DB session")
+	}
+	if obs.TenantID == "" || obs.BlockNumber <= 0 {
+		return false, nil
+	}
+
+	res := r.raw.Model(&models.PaymentObservation{}).
+		Where(
+			"tenant_id = ? AND chain_namespace = ? AND chain_reference = ? AND tx_hash = ? AND event_index = ? AND observer = ? AND block_number < ?",
+			obs.TenantID, obs.ChainNamespace, obs.ChainReference, obs.TxHash, obs.EventIndex, obs.Observer, obs.BlockNumber,
+		).
+		Updates(map[string]interface{}{
+			"block_number": obs.BlockNumber,
+			"block_time":   obs.BlockTime,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	if res.RowsAffected > 0 {
+		r.refreshPendingMetric(obs.ChainNamespace, obs.ChainReference)
+	}
+	return res.RowsAffected > 0, nil
+}
+
 // ListDeduplicatedConfirmed pulls all confirmed rows for the order and
 // reduces them to one per (chain_namespace, chain_reference, tx_hash,
 // event_index) tuple, applying the priority rule documented on the
@@ -265,7 +297,7 @@ func (r *GormPaymentObservationRepo) RefreshConfirmations(
 		if err := tx.
 			Model(&models.PaymentObservation{}).
 			Distinct("tenant_id", "order_id").
-			Where("chain_namespace = ? AND chain_reference = ? AND status = ? AND block_number <= ?",
+			Where("chain_namespace = ? AND chain_reference = ? AND status = ? AND block_number > 0 AND block_number <= ?",
 				chainNamespace, chainReference, models.PaymentObservationStatusPending, threshold).
 			Find(&tuples).Error; err != nil {
 			return fmt.Errorf("snapshot pending tuples: %w", err)
@@ -279,7 +311,7 @@ func (r *GormPaymentObservationRepo) RefreshConfirmations(
 		// but useless for downstream UX.
 		updateRes := tx.
 			Model(&models.PaymentObservation{}).
-			Where("chain_namespace = ? AND chain_reference = ? AND status = ? AND block_number <= ?",
+			Where("chain_namespace = ? AND chain_reference = ? AND status = ? AND block_number > 0 AND block_number <= ?",
 				chainNamespace, chainReference, models.PaymentObservationStatusPending, threshold).
 			Updates(map[string]interface{}{
 				"status":        models.PaymentObservationStatusConfirmed,

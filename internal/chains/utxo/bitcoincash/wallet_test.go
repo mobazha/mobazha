@@ -13,6 +13,7 @@ import (
 	"github.com/gcash/bchd/wire"
 	"github.com/gcash/bchutil"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -107,37 +108,37 @@ func TestBitcoinCashWallet_EstimateEscrowFee(t *testing.T) {
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(5490),
+			expected:  iwallet.NewAmount(6720),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(7320),
+			expected:  iwallet.NewAmount(8960),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(9150),
+			expected:  iwallet.NewAmount(11200),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(9510),
+			expected:  iwallet.NewAmount(10740),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(12680),
+			expected:  iwallet.NewAmount(14320),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(15850),
+			expected:  iwallet.NewAmount(17900),
 		},
 	}
 
@@ -146,7 +147,7 @@ func TestBitcoinCashWallet_EstimateEscrowFee(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, test := range tests {
-		fee, err := w.EstimateEscrowFee(test.threshold, test.nOuts, test.level)
+		fee, err := w.EstimateEscrowFee(1, test.threshold, test.nOuts, test.level)
 		if err != nil {
 			t.Errorf("Test %d: error %s", i, err)
 		}
@@ -276,6 +277,9 @@ func TestBitcoinCashWallet_Multisig1of2(t *testing.T) {
 		t.Fatal("Expected broadcasted transaction")
 	}
 	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
+	if got, wantMax := len(txBytes), chainutxo.EstimateP2SHSchnorrMultisigSpendSize(1, 1, 1, 0); got > wantMax {
+		t.Fatalf("serialized tx size %d exceeds estimated size %d", got, wantMax)
+	}
 
 	scriptAddr, err := bchutil.NewAddressScriptHash(redeemScript, w.params())
 	if err != nil {

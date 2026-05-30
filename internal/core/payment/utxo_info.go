@@ -295,20 +295,25 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 
 	coinInfo, err = coinType.CoinInfo()
 	if err == nil && coinInfo.Chain.IsUTXOChain() {
-		scriptPubKey := computeP2WSHScriptPubKey(paymentData.Script)
+		scriptPubKey, err := scriptPubKeyForUTXOPaymentAddress(wal, paymentData.ToAddress, paymentData.Script)
+		if err != nil {
+			return nil, fmt.Errorf("compute payment address scriptPubKey: %w", err)
+		}
+		confirmationPolicy := ResolveUtxoConfirmationPolicy(s.db)
 
 		if err := s.db.Update(func(dbtx database.Tx) error {
 			order.PaymentAddress = paymentData.ToAddress
 			utxoSpec := pkpayment.NewUTXOSpec(strings.TrimSpace(paymentData.Moderator) != "")
 			if err := order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
-				Coin:            string(coinType),
-				Amount:          expectedAmount,
-				ScriptPubKey:    scriptPubKey,
-				Script:          paymentData.Script,
-				Moderator:       paymentData.Moderator,
-				ModeratorPubkey: paymentData.ModeratorAddress,
-				UnlockHours:     paymentData.UnlockHours,
-				SettlementSpec:  utxoSpec.ToPending(),
+				Coin:               string(coinType),
+				Amount:             expectedAmount,
+				ScriptPubKey:       scriptPubKey,
+				Script:             paymentData.Script,
+				Moderator:          paymentData.Moderator,
+				ModeratorPubkey:    paymentData.ModeratorAddress,
+				UnlockHours:        paymentData.UnlockHours,
+				ConfirmationPolicy: confirmationPolicy,
+				SettlementSpec:     utxoSpec.ToPending(),
 			}); err != nil {
 				return err
 			}
@@ -325,6 +330,17 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 	}
 
 	return paymentData, nil
+}
+
+func scriptPubKeyForUTXOPaymentAddress(wal iwallet.Wallet, address string, witnessScriptHex string) ([]byte, error) {
+	if utils, ok := wal.(iwallet.UTXOAddressUtilities); ok {
+		return utils.AddressToScriptPubKey(address)
+	}
+	scriptPubKey := computeP2WSHScriptPubKey(witnessScriptHex)
+	if len(scriptPubKey) == 0 {
+		return nil, fmt.Errorf("wallet %T does not expose UTXO address utilities", wal)
+	}
+	return scriptPubKey, nil
 }
 
 // computeP2WSHScriptPubKey computes the scriptPubKey for a P2WSH address from the witness script.

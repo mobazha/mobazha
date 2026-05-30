@@ -30,6 +30,7 @@ func (f *defaultMonitorFactory) CreateMonitor(ctx context.Context, testnet bool)
 	chains := []iwallet.ChainType{
 		iwallet.ChainBitcoin,
 		iwallet.ChainLitecoin,
+		iwallet.ChainBitcoinCash,
 	}
 
 	for _, chain := range chains {
@@ -92,6 +93,7 @@ func (f *defaultMonitorFactory) CreateMonitorWithOverrides(ctx context.Context, 
 	defaultChains := []iwallet.ChainType{
 		iwallet.ChainBitcoin,
 		iwallet.ChainLitecoin,
+		iwallet.ChainBitcoinCash,
 	}
 
 	seen := make(map[iwallet.ChainType]bool, len(defaultChains)+len(overrides))

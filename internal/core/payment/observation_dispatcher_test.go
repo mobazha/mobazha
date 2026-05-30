@@ -61,12 +61,42 @@ func (r *fakeObsRepo) InsertObservation(_ context.Context, obs *models.PaymentOb
 	return nil
 }
 
+func (r *fakeObsRepo) PromoteObservationBlock(_ context.Context, obs *models.PaymentObservation) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if obs == nil || obs.BlockNumber <= 0 {
+		return false, nil
+	}
+	key := dedupeKey(obs)
+	if _, ok := r.seen[key]; !ok {
+		return false, nil
+	}
+	for _, row := range r.inserted {
+		if dedupeKey(row) != key {
+			continue
+		}
+		if row.BlockNumber >= obs.BlockNumber {
+			return false, nil
+		}
+		row.BlockNumber = obs.BlockNumber
+		row.BlockTime = obs.BlockTime
+		return true, nil
+	}
+	return false, nil
+}
+
 func (r *fakeObsRepo) ListDeduplicatedConfirmed(_ context.Context, _, _ string) ([]models.PaymentObservation, error) {
 	return nil, errors.New("fakeObsRepo.ListDeduplicatedConfirmed not used in dispatcher tests")
 }
 
 func (r *fakeObsRepo) ListByOrder(_ context.Context, _, _ string) ([]models.PaymentObservation, error) {
-	return nil, errors.New("fakeObsRepo.ListByOrder not used in dispatcher tests")
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]models.PaymentObservation, 0, len(r.inserted))
+	for _, row := range r.inserted {
+		out = append(out, *row)
+	}
+	return out, nil
 }
 
 func (r *fakeObsRepo) RefreshConfirmations(_ context.Context, _, _ string, _ int64, _ int) ([]contracts.OrderRef, error) {
@@ -337,6 +367,36 @@ func TestObservationDispatcher_OnFundingEvent_DuplicateInsertSwallowsAndSkipsAgg
 		"aggregator MUST NOT be called for duplicate observations — design §5.1 idempotency contract")
 }
 
+func TestObservationDispatcher_OnFundingEvent_AcceptsMempoolBlockNumber(t *testing.T) {
+	d, repo, _, _ := newDispatcher(t, map[string]string{"order-1": "tenant-1"})
+
+	evt := validFundingEvent()
+	evt.BlockNumber = 0
+
+	require.NoError(t, d.OnFundingEvent(context.Background(), evt))
+
+	rows := repo.snapshot()
+	require.Len(t, rows, 1)
+	require.Equal(t, int64(0), rows[0].BlockNumber)
+}
+
+func TestObservationDispatcher_OnFundingEvent_MempoolThenConfirmedPromotesAndKicksAggregator(t *testing.T) {
+	d, repo, agg, _ := newDispatcher(t, map[string]string{"order-1": "tenant-1"})
+
+	mempool := validFundingEvent()
+	mempool.BlockNumber = 0
+	require.NoError(t, d.OnFundingEvent(context.Background(), mempool))
+
+	confirmed := validFundingEvent()
+	confirmed.BlockNumber = 500000
+	require.NoError(t, d.OnFundingEvent(context.Background(), confirmed))
+
+	rows := repo.snapshot()
+	require.Len(t, rows, 1)
+	require.Equal(t, int64(500000), rows[0].BlockNumber)
+	require.Len(t, agg.snapshot(), 2, "promotion after mempool inclusion must re-kick aggregator")
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // OnFundingEvent — unknown order
 // ─────────────────────────────────────────────────────────────────────────
@@ -393,7 +453,7 @@ func TestObservationDispatcher_OnFundingEvent_RejectsInvalidEvents(t *testing.T)
 		{"nil Amount", func(e *FundingEvent) { e.Amount = nil }, "nil Amount"},
 		{"zero Amount", func(e *FundingEvent) { e.Amount = big.NewInt(0) }, "Amount must be > 0"},
 		{"negative Amount", func(e *FundingEvent) { e.Amount = big.NewInt(-5) }, "Amount must be > 0"},
-		{"zero BlockNumber", func(e *FundingEvent) { e.BlockNumber = 0 }, "BlockNumber must be > 0"},
+		{"negative BlockNumber", func(e *FundingEvent) { e.BlockNumber = -1 }, "BlockNumber must be ≥ 0"},
 		{"zero BlockTime", func(e *FundingEvent) { e.BlockTime = time.Time{} }, "BlockTime must be set"},
 	}
 

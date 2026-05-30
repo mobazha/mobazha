@@ -88,6 +88,7 @@ type ChainEscrowV2 interface {
 	SignEscrowRelease(ctx context.Context, params SignEscrowParams) ([]iwallet.EscrowSignature, error)
 
 	// EstimateEscrowFee returns the estimated fee for an escrow release.
+	// nIn is the number of escrow UTXOs consumed by the release transaction.
 	EstimateEscrowFee(coinCode string, nIn, nOut int, feeLevel iwallet.FeeLevel) (iwallet.Amount, error)
 
 	// VerifyDeposit checks that the buyer's deposit is valid on-chain.

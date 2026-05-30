@@ -133,6 +133,9 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		if err := iwallet.CoinType(req.PaymentCoin).ValidateCanonicalPaymentCoin(); err != nil {
 			return nil, fmt.Errorf("payment session: CreateSession: %w", err)
 		}
+		if !iwallet.IsPaymentCoinEnabled(req.PaymentCoin) {
+			return nil, fmt.Errorf("%w: %q", ErrPaymentCoinDisabled, req.PaymentCoin)
+		}
 	}
 
 	view, err := s.GetSession(ctx, req.OrderID)

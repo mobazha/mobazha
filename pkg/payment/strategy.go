@@ -272,6 +272,7 @@ type ChainEscrow interface {
 	// EstimateEscrowFee returns the estimated fee for an escrow release.
 	//
 	// UTXO: calculates based on nIn/nOut via escrowWallet.EstimateEscrowFee.
+	// nIn is the number of escrow UTXOs consumed by the release transaction.
 	// EVM/Solana: returns 0 (fees are paid separately on-chain by the signer).
 	//
 	// coinCode is needed to resolve the correct chain wallet (e.g. "BTC", "LTC").

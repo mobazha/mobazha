@@ -251,6 +251,9 @@ type PaymentSession struct {
 	SettlementMode SettlementMode `json:"settlementMode"`
 	ProductMode    ProductMode    `json:"productMode"`
 	Status         SessionStatus  `json:"status"`
+	// ConfirmationPolicy describes whether address-monitored crypto sessions
+	// wait for chain confirmation or accept mempool detection for progression.
+	ConfirmationPolicy string `json:"confirmationPolicy,omitempty"`
 
 	// ExpectedAmount is the decimal string in the smallest human unit
 	// (same encoding as FundingTargetView.Amount).

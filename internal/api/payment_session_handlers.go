@@ -181,6 +181,8 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 				"exchange rate service unavailable — cross-currency crypto payment cannot be calculated")
 		case errors.Is(err, corePmt.ErrRWAPaymentSessionUnsupported):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+		case errors.Is(err, corePmt.ErrPaymentCoinDisabled):
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		case errors.Is(err, coreiface.ErrBadRequest):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		default:

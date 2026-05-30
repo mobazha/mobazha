@@ -44,11 +44,12 @@ func NewPaymentSessionProjector(db database.Database) *PaymentSessionProjector {
 // projectOrderInput is the pre-fetched set of data needed to build a view.
 // Fetched once per call to avoid repeated DB round-trips.
 type projectOrderInput struct {
-	order       *models.Order
-	orderOpen   *pb.OrderOpen   // may be nil for orders not yet opened
-	paymentSent *pb.PaymentSent // may be nil for orders not yet paid
-	obsCount    int
-	lastObsAt   *time.Time
+	order             *models.Order
+	orderOpen         *pb.OrderOpen   // may be nil for orders not yet opened
+	paymentSent       *pb.PaymentSent // may be nil for orders not yet paid
+	observedAmountRaw string
+	obsCount          int
+	lastObsAt         *time.Time
 }
 
 // Project builds a payment.PaymentSession for the given order.
@@ -77,7 +78,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	settlementMode, fundingTarget := p.deriveFundingTarget(order, paymentCoin, expectedAmount, input)
 
 	// ── Payment progress ──────────────────────────────────────────────────
-	progress := p.deriveProgress(order, expectedAmountRaw, paymentCoin, input.obsCount, input.lastObsAt)
+	progress := p.deriveProgress(order, expectedAmountRaw, paymentCoin, input.observedAmountRaw, input.obsCount, input.lastObsAt)
 
 	// ── Session status ────────────────────────────────────────────────────
 	status := deriveSessionStatus(order.PaymentVerificationStatus, progress.FundingState)
@@ -89,19 +90,20 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	caps := p.deriveCapabilities(status, productMode, settlementMode)
 
 	return &payment.PaymentSession{
-		SessionID:         sessionID,
-		OrderID:           order.ID.String(),
-		PaymentCoin:       paymentCoin,
-		SettlementMode:    settlementMode,
-		ProductMode:       productMode,
-		Status:            status,
-		ExpectedAmount:    expectedAmount,
-		RefundAddress:     order.RefundAddress,
-		ExpiresAt:         expiresAt,
-		FundingTarget:     fundingTarget,
-		PaymentProgress:   progress,
-		Capabilities:      caps,
-		UserActionRequest: nil, // Phase B: no user action required for address_monitored
+		SessionID:          sessionID,
+		OrderID:            order.ID.String(),
+		PaymentCoin:        paymentCoin,
+		SettlementMode:     settlementMode,
+		ProductMode:        productMode,
+		Status:             status,
+		ConfirmationPolicy: p.deriveConfirmationPolicy(order),
+		ExpectedAmount:     expectedAmount,
+		RefundAddress:      order.RefundAddress,
+		ExpiresAt:          expiresAt,
+		FundingTarget:      fundingTarget,
+		PaymentProgress:    progress,
+		Capabilities:       caps,
+		UserActionRequest:  nil, // Phase B: no user action required for address_monitored
 	}, nil
 }
 
@@ -216,6 +218,17 @@ func normalizeCoinBestEffort(coin string) string {
 	return s
 }
 
+func (p *PaymentSessionProjector) deriveConfirmationPolicy(order *models.Order) string {
+	if order == nil {
+		return ""
+	}
+	info, err := order.GetPendingPaymentInfo()
+	if err != nil || info == nil {
+		return ""
+	}
+	return models.NormalizePaymentConfirmationPolicy(info.ConfirmationPolicy)
+}
+
 // deriveFundingTarget decides the SettlementMode and builds a FundingTargetView.
 //
 //   - Fiat orders (paymentCoin starts with "fiat:"): provider_checkout.
@@ -236,12 +249,62 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 	// Crypto path. Empty address means the session still needs provisioning via
 	// POST /v1/orders/{orderID}/payment-session; it is not an actionable target.
 	target := payment.FundingTargetView{
-		Type:    payment.FundingTargetTypeAddress,
-		Address: order.PaymentAddress,
-		AssetID: paymentCoin,
-		Amount:  expectedAmount,
+		Type:      payment.FundingTargetTypeAddress,
+		Address:   order.PaymentAddress,
+		AssetID:   paymentCoin,
+		Amount:    expectedAmount,
+		QRPayload: buildAddressQRPayload(paymentCoin, order.PaymentAddress, expectedAmount),
 	}
 	return payment.SettlementModeAddressMonitored, target
+}
+
+func buildAddressQRPayload(paymentCoin, address, amount string) string {
+	scheme := paymentURIScheme(paymentCoin)
+	if scheme == "" {
+		return ""
+	}
+
+	addr := strings.TrimSpace(address)
+	if addr == "" {
+		return ""
+	}
+
+	payload := addr
+	if !strings.HasPrefix(strings.ToLower(addr), scheme+":") {
+		payload = scheme + ":" + addr
+	}
+
+	amt := strings.TrimSpace(amount)
+	if !isPositiveDecimal(amt) {
+		return payload
+	}
+	if strings.Contains(payload, "?") {
+		return payload + "&amount=" + amt
+	}
+	return payload + "?amount=" + amt
+}
+
+func paymentURIScheme(paymentCoin string) string {
+	switch coin := strings.ToLower(strings.TrimSpace(paymentCoin)); {
+	case coin == "btc", strings.HasPrefix(coin, "crypto:bip122:000000000019d6689c085ae165831e93:"), strings.HasPrefix(coin, "crypto:bitcoin:"):
+		return "bitcoin"
+	case coin == "ltc", strings.HasPrefix(coin, "crypto:bip122:12a765e31ffd4059bada1e25190f6e98:"), strings.HasPrefix(coin, "crypto:litecoin:"):
+		return "litecoin"
+	case coin == "bch", strings.HasPrefix(coin, "crypto:bitcoincash:"):
+		return "bitcoincash"
+	case coin == "zec", strings.HasPrefix(coin, "crypto:zcash:"):
+		return "zcash"
+	default:
+		return ""
+	}
+}
+
+func isPositiveDecimal(amount string) bool {
+	if amount == "" {
+		return false
+	}
+	v, ok := new(big.Rat).SetString(amount)
+	return ok && v.Sign() > 0
 }
 
 // deriveFiatFundingTarget builds a FundingTargetView for fiat provider sessions.
@@ -305,10 +368,14 @@ func (p *PaymentSessionProjector) deriveProgress(
 	order *models.Order,
 	expectedAmountRaw string,
 	paymentCoin string,
+	observedAmountRaw string,
 	obsCount int,
 	lastObsAt *time.Time,
 ) payment.PaymentProgressView {
-	observedRaw := order.TotalReceived
+	observedRaw := strings.TrimSpace(observedAmountRaw)
+	if observedRaw == "" {
+		observedRaw = order.TotalReceived
+	}
 	if strings.TrimSpace(observedRaw) == "" {
 		if paymentSent, err := order.PaymentSentMessage(); err == nil && paymentSent != nil {
 			observedRaw = strings.TrimSpace(paymentSent.GetAmount())
@@ -540,9 +607,11 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 		input.paymentSent = ps
 	}
 
-	// Observation count + last observed timestamp
-	obsCount, lastObsAt, err := p.queryObservationMeta(orderID)
+	// Observation progress includes pending rows so payment sessions can show
+	// mempool-detected funds without marking the order chain-verified.
+	observedAmountRaw, obsCount, lastObsAt, err := p.queryObservationProgress(orderID)
 	if err == nil {
+		input.observedAmountRaw = observedAmountRaw
 		input.obsCount = obsCount
 		input.lastObsAt = lastObsAt
 	}
@@ -550,34 +619,34 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 	return input, nil
 }
 
-// queryObservationMeta returns the count of confirmed observations and the
-// most recent block time for the given order.
-func (p *PaymentSessionProjector) queryObservationMeta(orderID string) (int, *time.Time, error) {
-	var count int64
+// queryObservationProgress returns deduplicated pending-or-confirmed observed
+// funds for UI progress. Verification still reads confirmed rows only.
+func (p *PaymentSessionProjector) queryObservationProgress(orderID string) (string, int, *time.Time, error) {
+	var rows []models.PaymentObservation
 	var lastBlockTime *time.Time
 
 	err := p.db.View(func(tx database.Tx) error {
-		// Count confirmed observations
-		if err := tx.Read().
-			Model(&models.PaymentObservation{}).
-			Where("order_id = ? AND status = ?", orderID, models.PaymentObservationStatusConfirmed).
-			Count(&count).Error; err != nil {
-			return err
-		}
-
-		// Fetch most recent block time
-		var obs models.PaymentObservation
-		if err := tx.Read().
-			Where("order_id = ? AND status = ?", orderID, models.PaymentObservationStatusConfirmed).
-			Order("block_time DESC").
-			First(&obs).Error; err == nil {
-			t := obs.BlockTime
-			lastBlockTime = &t
-		}
-		return nil
+		return tx.Read().
+			Where("order_id = ? AND status IN ?", orderID, []string{
+				models.PaymentObservationStatusPending,
+				models.PaymentObservationStatusConfirmed,
+			}).
+			Order("block_time ASC, id ASC").
+			Find(&rows).Error
 	})
 	if err != nil {
-		return 0, nil, err
+		return "", 0, nil, err
 	}
-	return int(count), lastBlockTime, nil
+	rows = models.DedupePaymentObservations(rows)
+	total, err := sumObservations(rows)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	for i := range rows {
+		t := rows[i].BlockTime
+		if lastBlockTime == nil || t.After(*lastBlockTime) {
+			lastBlockTime = &t
+		}
+	}
+	return total.String(), len(rows), lastBlockTime, nil
 }

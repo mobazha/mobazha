@@ -210,6 +210,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			}
 			dbtx.RegisterCommitHook(func() {
 				op.bus.Emit(&events.CancelablePaymentReady{
+					TenantID:      order.TenantID,
 					OrderID:       order.ID.String(),
 					TransactionID: paymentSent.TransactionID,
 					Coin:          paymentSent.Coin,

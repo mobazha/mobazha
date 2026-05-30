@@ -100,6 +100,30 @@ func TestHandlePOSTOrderPaymentSession_PaymentCoinMismatch(t *testing.T) {
 	}
 }
 
+func TestHandlePOSTOrderPaymentSession_PaymentCoinDisabled(t *testing.T) {
+	svc := &mockPaymentSessionService{
+		createFunc: func(_ context.Context, _ contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {
+			return nil, corePmt.ErrPaymentCoinDisabled
+		},
+	}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newPaymentSessionHandlerRequest(t,
+		http.MethodPost,
+		"/v1/orders/o1/payment-session",
+		map[string]interface{}{
+			"paymentCoin": "crypto:zcash:mainnet:native",
+		},
+		map[string]string{"orderID": "o1"},
+		svc,
+	)
+
+	g.handlePOSTOrderPaymentSession(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestHandlePOSTOrderPaymentSession_CryptoAllowsEmptyRefundAddress(t *testing.T) {
 	called := false
 	svc := &mockPaymentSessionService{

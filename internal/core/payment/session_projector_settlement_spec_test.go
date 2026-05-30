@@ -125,6 +125,57 @@ func TestDeriveFundingTarget_UTXOPendingUsesAddressMonitored(t *testing.T) {
 	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
 }
 
+func TestDeriveFundingTarget_BCHIncludesAmountInQRPayload(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{PaymentAddress: "ppu9yncdpjgwmq8h5khefmkhrat6pdp08sqsjd0mrc"}
+
+	mode, target := p.deriveFundingTarget(order,
+		"crypto:bitcoincash:mainnet:native",
+		"0.00016522",
+		testProjectInput(order),
+	)
+
+	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
+	require.Equal(t, "bitcoincash:ppu9yncdpjgwmq8h5khefmkhrat6pdp08sqsjd0mrc?amount=0.00016522", target.QRPayload)
+}
+
+func TestDeriveFundingTarget_UTXOQRPayloadUsesCoinScheme(t *testing.T) {
+	tests := []struct {
+		name string
+		coin string
+		addr string
+		want string
+	}{
+		{
+			name: "btc",
+			coin: "crypto:bip122:000000000019d6689c085ae165831e93:native",
+			addr: "bc1qtest",
+			want: "bitcoin:bc1qtest?amount=0.001",
+		},
+		{
+			name: "ltc",
+			coin: "crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native",
+			addr: "ltc1qtest",
+			want: "litecoin:ltc1qtest?amount=0.001",
+		},
+		{
+			name: "zec",
+			coin: "crypto:zcash:mainnet:native",
+			addr: "t1test",
+			want: "zcash:t1test?amount=0.001",
+		},
+	}
+
+	p := &PaymentSessionProjector{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			order := &models.Order{PaymentAddress: tt.addr}
+			_, target := p.deriveFundingTarget(order, tt.coin, "0.001", testProjectInput(order))
+			require.Equal(t, tt.want, target.QRPayload)
+		})
+	}
+}
+
 func TestProject_FormatsUTXOAmountsAsDecimalStrings(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "bc1qtest"}
@@ -151,6 +202,40 @@ func TestProject_FormatsUTXOAmountsAsDecimalStrings(t *testing.T) {
 	require.Equal(t, "0.00015058", session.PaymentProgress.ObservedAmount)
 	require.Equal(t, "0.00030116", session.PaymentProgress.RequiredAmount)
 	require.Equal(t, "0.00015058", session.PaymentProgress.RemainingAmount)
+}
+
+func TestProject_UsesPendingObservationAmountForPaymentProgress(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{PaymentAddress: "bitcoincash:qtest"}
+	order.PaymentVerificationStatus = models.PaymentVerificationStatusPending
+	require.NoError(t, order.SetPendingPaymentInfo(&models.PendingUTXOPaymentInfo{
+		Coin:               "crypto:bitcoincash:mainnet:native",
+		Amount:             16414,
+		Script:             "ab",
+		ConfirmationPolicy: models.PaymentConfirmationPolicyMempoolAccepted,
+		SettlementSpec:     pkpayment.NewUTXOSpec(true).ToPending(),
+	}))
+
+	observedAt := time.Date(2026, 5, 29, 5, 57, 38, 0, time.UTC)
+	session, err := p.Project(&projectOrderInput{
+		order:             order,
+		observedAmountRaw: "16414",
+		obsCount:          1,
+		lastObsAt:         &observedAt,
+		orderOpen: &pb.OrderOpen{
+			Amount:      "16414",
+			Timestamp:   timestamppb.New(time.Now()),
+			PricingCoin: "USD",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, pkpayment.SessionStatusFundedPendingVerification, session.Status)
+	require.Equal(t, models.PaymentConfirmationPolicyMempoolAccepted, session.ConfirmationPolicy)
+	require.Equal(t, "0.00016414", session.PaymentProgress.ObservedAmount)
+	require.Equal(t, "0.00016414", session.PaymentProgress.RequiredAmount)
+	require.Equal(t, "0", session.PaymentProgress.RemainingAmount)
+	require.Equal(t, 1, session.PaymentProgress.ObservationCount)
+	require.Equal(t, &observedAt, session.PaymentProgress.LastObservedAt)
 }
 
 func TestProject_UsesLockedUTXOPendingAmountOverOrderOpenAmount(t *testing.T) {

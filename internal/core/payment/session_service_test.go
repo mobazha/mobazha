@@ -4,6 +4,7 @@ package payment
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -23,6 +24,25 @@ func TestPaymentSessionServiceImpl_CreateSession_RejectsNonCanonicalPaymentCoin(
 	}
 	msg := strings.ToLower(err.Error())
 	if !strings.Contains(msg, "canonical") && !strings.Contains(msg, "payment coin") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestPaymentSessionServiceImpl_CreateSession_RejectsProductDisabledZEC(t *testing.T) {
+	svc := NewPaymentSessionService(nil)
+
+	_, err := svc.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
+		OrderID:     "any-order-id",
+		PaymentCoin: "crypto:zcash:mainnet:native",
+	})
+	if err == nil {
+		t.Fatal("expected error for product-disabled ZEC")
+	}
+	if !errors.Is(err, ErrPaymentCoinDisabled) {
+		t.Fatalf("error = %v, want ErrPaymentCoinDisabled", err)
+	}
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "not enabled") || !strings.Contains(msg, "zcash") {
 		t.Fatalf("unexpected error message: %v", err)
 	}
 }

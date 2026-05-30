@@ -1469,12 +1469,17 @@ func (s *GuestOrderAppService) loadGuestCheckoutConfig() (*models.GuestCheckoutC
 		return tx.Read().First(&cfg).Error
 	})
 	if err != nil {
-		return &models.GuestCheckoutConfig{Enabled: true}, nil
+		return &models.GuestCheckoutConfig{
+			Enabled: true,
+		}, nil
 	}
 	return &cfg, nil
 }
 
 func (s *GuestOrderAppService) validateAcceptedCoin(cfg *models.GuestCheckoutConfig, coin string) error {
+	if !iwallet.IsPaymentCoinEnabled(coin) {
+		return fmt.Errorf("%w: payment coin %q is not enabled", contracts.ErrInvalidGuestRequest, coin)
+	}
 	if cfg.AcceptedCoins == "" {
 		return nil
 	}
@@ -1559,6 +1564,9 @@ func (s *GuestOrderAppService) filterAvailableCoins(coinList string) string {
 		}
 		coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
 		if err != nil {
+			continue
+		}
+		if !iwallet.IsPaymentCoinEnabled(coin) {
 			continue
 		}
 		if cap := s.evaluateGuestPaymentCapability(coinType, coinInfo); cap.BuyerVisible {

@@ -121,10 +121,7 @@ type Spender interface {
 // be selectable for either escrow payments or offline payments.
 type UTXOEscrow interface {
 	// EstimateEscrowFee estimates the fee to release the funds from escrow.
-	// this assumes only one input. If there are more inputs Mobazha will
-	// add 50% of the returned fee for each additional input. This is a
-	// crude fee calculating but it simplifies things quite a bit.
-	EstimateEscrowFee(threshold int, nOuts int, level FeeLevel) (Amount, error)
+	EstimateEscrowFee(nInputs int, threshold int, nOuts int, level FeeLevel) (Amount, error)
 
 	// CreateMultisigAddress creates a new threshold multisig address using the
 	// provided pubkeys and the threshold. The multisig address is returned along

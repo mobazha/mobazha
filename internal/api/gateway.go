@@ -458,6 +458,22 @@ func getCoreIface(r *http.Request) (coreiface.CoreIface, bool) {
 	return ci, ok
 }
 
+// getNodeDB returns the tenant-scoped database for the resolved node.
+// Prefer this over getCoreIface when only DB access is needed — SaaS nodes
+// are stored as contracts.NodeService but still expose DB() on the concrete type.
+func getNodeDB(r *http.Request) (database.Database, bool) {
+	if ci, ok := getCoreIface(r); ok {
+		return ci.DB(), true
+	}
+	type dbProvider interface {
+		DB() database.Database
+	}
+	if dp, ok := getNodeService(r).(dbProvider); ok {
+		return dp.DB(), true
+	}
+	return nil, false
+}
+
 // NodeSelectionMiddleware adds middleware for node selection
 func (g *Gateway) NodeSelectionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

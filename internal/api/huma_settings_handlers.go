@@ -235,6 +235,43 @@ func (g *Gateway) registerNodeHumaSettingsAdminOperations(api huma.API) {
 	})
 
 	huma.Register(api, huma.Operation{
+		OperationID: "settings-payment-policy-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/settings/payment-policy",
+		Summary:     "Get store payment policy",
+		Tags:        []string{"settings"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/settings/payment-policy", nil)
+		rr := httptest.NewRecorder()
+		g.handleGETStorePaymentPolicy(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "settings-payment-policy-put",
+		Method:      http.MethodPut,
+		Path:        "/v1/settings/payment-policy",
+		Summary:     "Update store payment policy",
+		Tags:        []string{"settings"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, in *jsonBody) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPut, "/v1/settings/payment-policy", bytes.NewReader(in.Body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePUTStorePaymentPolicy(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "settings-guest-checkout-readiness-get",
 		Method:      http.MethodGet,
 		Path:        "/v1/settings/guest-checkout/readiness",

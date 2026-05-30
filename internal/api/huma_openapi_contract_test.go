@@ -329,6 +329,8 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"settings-feature-put",
 		"settings-guest-checkout-get",
 		"settings-guest-checkout-put",
+		"settings-payment-policy-get",
+		"settings-payment-policy-put",
 		"settings-storefront-get",
 		"settings-storefront-public-get",
 		"settings-storefront-put",

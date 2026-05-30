@@ -242,15 +242,9 @@ func (p *PaymentData) BuildTransaction() (iwallet.Transaction, error) {
 
 	txID := iwallet.TransactionID(p.TransactionID)
 
-	// Auto-generate ToID (outpoint) if not provided
-	// Format: 32 bytes txid + 4 bytes output index (big-endian)
+	// Auto-generate ToID (outpoint) if not provided.
 	if len(toID) == 0 {
-		txidBytes, err := hex.DecodeString(string(txID))
-		if err == nil && len(txidBytes) >= 32 {
-			idx := make([]byte, 4)
-			binary.BigEndian.PutUint32(idx, 0)
-			toID = append(txidBytes[:32], idx...)
-		}
+		toID = buildPaymentDataOutpointID(txID, p.Coin, 0)
 	}
 
 	tx := iwallet.Transaction{
@@ -274,6 +268,25 @@ func (p *PaymentData) BuildTransaction() (iwallet.Transaction, error) {
 		Height:    p.BlockHeight,
 	}
 	return tx, nil
+}
+
+func buildPaymentDataOutpointID(txID iwallet.TransactionID, coin iwallet.CoinType, outputIndex uint32) []byte {
+	txidBytes, err := hex.DecodeString(string(txID))
+	if err != nil || len(txidBytes) < 32 {
+		return nil
+	}
+
+	txidBytes = append([]byte(nil), txidBytes[:32]...)
+	idx := make([]byte, 4)
+	if coinInfo, err := coin.CoinInfo(); err == nil && coinInfo.Chain.IsUTXOChain() {
+		for i, j := 0, len(txidBytes)-1; i < j; i, j = i+1, j-1 {
+			txidBytes[i], txidBytes[j] = txidBytes[j], txidBytes[i]
+		}
+		binary.LittleEndian.PutUint32(idx, outputIndex)
+	} else {
+		binary.BigEndian.PutUint32(idx, outputIndex)
+	}
+	return append(txidBytes, idx...)
 }
 
 // DiscountDetail describes a single applied discount for API responses.

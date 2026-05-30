@@ -142,6 +142,26 @@ func TestCoinType_ValidateCanonicalPaymentCoin(t *testing.T) {
 	}
 }
 
+func TestIsPaymentCoinEnabled(t *testing.T) {
+	tests := []struct {
+		coin     string
+		expected bool
+	}{
+		{"", true},
+		{"BCH", true},
+		{"crypto:bitcoincash:mainnet:native", true},
+		{"ZEC", false},
+		{"crypto:zcash:mainnet:native", false},
+		{" crypto:ZCASH:mainnet:native ", false},
+	}
+	for _, tt := range tests {
+		got := IsPaymentCoinEnabled(tt.coin)
+		if got != tt.expected {
+			t.Fatalf("IsPaymentCoinEnabled(%q)=%v, want %v", tt.coin, got, tt.expected)
+		}
+	}
+}
+
 func TestCanonicalNativeCoinType(t *testing.T) {
 	tests := []struct {
 		chain    ChainType

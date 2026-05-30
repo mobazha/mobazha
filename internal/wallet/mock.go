@@ -507,7 +507,6 @@ func (w *MockWallet) ValidateAddress(addr iwallet.Address) error {
 	return nil
 }
 
-
 func (w *MockWallet) newAddress() (iwallet.Address, error) {
 	b := make([]byte, 20)
 	rand.Read(b)
@@ -922,10 +921,7 @@ func (w *MockWallet) WatchAddress(tx iwallet.Tx, addrs ...iwallet.AddressEx) err
 }
 
 // EstimateEscrowFee estimates the fee to release the funds from escrow.
-// this assumes only one input. If there are more inputs Mobazha will
-// will add 50% of the returned fee for each additional input. This is a
-// crude fee calculating but it simplifies things quite a bit.
-func (w *MockWallet) EstimateEscrowFee(threshold int, nOuts int, feeLevel iwallet.FeeLevel) (iwallet.Amount, error) {
+func (w *MockWallet) EstimateEscrowFee(nInputs int, threshold int, nOuts int, feeLevel iwallet.FeeLevel) (iwallet.Amount, error) {
 	var (
 		fee                   iwallet.Amount
 		feePerAdditionalInput iwallet.Amount
@@ -941,7 +937,7 @@ func (w *MockWallet) EstimateEscrowFee(threshold int, nOuts int, feeLevel iwalle
 		fee = iwallet.NewAmount(750)
 		feePerAdditionalInput = iwallet.NewAmount(300)
 	}
-	for i := 0; i < threshold; i++ {
+	for i := 1; i < nInputs; i++ {
 		fee = fee.Add(feePerAdditionalInput)
 	}
 	return fee, nil

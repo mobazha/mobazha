@@ -2,8 +2,6 @@ package models
 
 import (
 	"encoding/base64"
-	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -79,15 +77,41 @@ const (
 // PendingUTXOPaymentInfo stores all temporary payment info for UTXO chains
 // This is stored as JSON in Order.PendingPaymentInfo and cleared/updated when switching payment method
 type PendingUTXOPaymentInfo struct {
-	Coin            string `json:"coin,omitempty"`            // Payment coin type (BTC, LTC, etc)
-	Amount          uint64 `json:"amount,omitempty"`          // Locked expected amount in satoshis
-	ScriptPubKey    []byte `json:"scriptPubKey,omitempty"`    // ScriptPubKey for Electrum subscription
-	Script          string `json:"script,omitempty"`          // Hex encoded redeem script
-	Moderator       string `json:"moderator,omitempty"`       // Moderator peer ID (empty for CANCELABLE)
-	ModeratorPubkey string `json:"moderatorPubkey,omitempty"` // Moderator escrow pubkey hex
-	UnlockHours     uint32 `json:"unlockHours,omitempty"`     // Escrow timeout hours for MODERATED
+	Coin               string `json:"coin,omitempty"`               // Payment coin type (BTC, LTC, etc)
+	Amount             uint64 `json:"amount,omitempty"`             // Locked expected amount in satoshis
+	ScriptPubKey       []byte `json:"scriptPubKey,omitempty"`       // ScriptPubKey for Electrum subscription
+	Script             string `json:"script,omitempty"`             // Hex encoded redeem script
+	Moderator          string `json:"moderator,omitempty"`          // Moderator peer ID (empty for CANCELABLE)
+	ModeratorPubkey    string `json:"moderatorPubkey,omitempty"`    // Moderator escrow pubkey hex
+	UnlockHours        uint32 `json:"unlockHours,omitempty"`        // Escrow timeout hours for MODERATED
+	ConfirmationPolicy string `json:"confirmationPolicy,omitempty"` // chain_confirmed (default) or mempool_accepted
 	// SettlementSpec is the ADR-010 payment route; legacy Moderator fields are fallback when absent.
 	SettlementSpec *PendingSettlementSpec `json:"settlementSpec,omitempty"`
+}
+
+const (
+	PaymentConfirmationPolicyChainConfirmed  = "chain_confirmed"
+	PaymentConfirmationPolicyMempoolAccepted = "mempool_accepted"
+)
+
+func NormalizePaymentConfirmationPolicy(policy string) string {
+	switch strings.TrimSpace(policy) {
+	case PaymentConfirmationPolicyMempoolAccepted:
+		return PaymentConfirmationPolicyMempoolAccepted
+	default:
+		return PaymentConfirmationPolicyChainConfirmed
+	}
+}
+
+// ValidatePaymentConfirmationPolicy rejects non-empty unknown values.
+// Empty input is valid and normalizes to chain_confirmed.
+func ValidatePaymentConfirmationPolicy(policy string) error {
+	switch strings.TrimSpace(policy) {
+	case "", PaymentConfirmationPolicyChainConfirmed, PaymentConfirmationPolicyMempoolAccepted:
+		return nil
+	default:
+		return fmt.Errorf("invalid utxoConfirmationPolicy: %q", policy)
+	}
 }
 
 // AfterSaleDispute groups app-level dispute fields for completed orders.
@@ -1909,18 +1933,8 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 				fromID = to.ID
 			}
 		}
-
-		// Fallback: if fromID is empty but we have a valid transaction,
-		// construct a synthetic outpoint from the transaction ID.
-		// This handles cases where the transaction was created via API
-		// (ProcessOrderPayment) without proper UTXO outpoint data.
 		if len(fromID) == 0 && tx.ID != "" {
-			txidBytes, decErr := hex.DecodeString(string(tx.ID))
-			if decErr == nil && len(txidBytes) >= 32 {
-				idx := make([]byte, 4)
-				binary.BigEndian.PutUint32(idx, 0)
-				fromID = append(txidBytes[:32], idx...)
-			}
+			fromID = legacyPaymentOutpointFromTx(o, tx.ID)
 		}
 
 		transactions = append(transactions, &pb.Contract_Transaction{
@@ -1952,4 +1966,17 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 		contract.DisputeOpenModeratorAcked = o.DisputeOpenModeratorAcked
 	}
 	return &contract, nil
+}
+
+// legacyPaymentOutpointFromTx synthesizes a payment outpoint when legacy transactions
+// were persisted without To[].ID (e.g. API-only payment recording before observation wiring).
+// Uses the same coin-aware encoding as PaymentData.BuildTransaction.
+func legacyPaymentOutpointFromTx(o *Order, txID iwallet.TransactionID) []byte {
+	coin, err := o.GetPaymentCoinType()
+	if err != nil || coin == "" {
+		if info, infoErr := o.GetPendingPaymentInfo(); infoErr == nil && info != nil && info.Coin != "" {
+			coin = iwallet.CoinType(info.Coin)
+		}
+	}
+	return buildPaymentDataOutpointID(txID, coin, 0)
 }

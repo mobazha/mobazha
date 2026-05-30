@@ -94,6 +94,8 @@ type OrderAppService struct {
 	fiatOps         contracts.FiatPaymentOperations
 	receiptVerifier contracts.ReceiptVerifier
 	paymentVerifier contracts.PaymentVerifier
+
+	coTenantVerifiedPayment contracts.CoTenantVerifiedPaymentFn
 }
 
 // OrderAppServiceConfig groups the dependencies for constructing OrderAppService.
@@ -121,6 +123,7 @@ type OrderAppServiceConfig struct {
 
 	DiscountResolver           DiscountResolverFunc
 	DiscountRedemptionRecorder DiscountRedemptionRecorderFunc
+	CoTenantVerifiedPayment    contracts.CoTenantVerifiedPaymentFn
 }
 
 // NewOrderAppService constructs an OrderAppService with the given dependencies.
@@ -147,6 +150,7 @@ func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {
 		profiles:                   cfg.Profiles,
 		discountResolver:           cfg.DiscountResolver,
 		discountRedemptionRecorder: cfg.DiscountRedemptionRecorder,
+		coTenantVerifiedPayment:    cfg.CoTenantVerifiedPayment,
 	}
 }
 
@@ -170,6 +174,10 @@ func (s *OrderAppService) SetReceiptVerifier(rv contracts.ReceiptVerifier) {
 // PAYMENT_SENT messages (FetchAndVerify, ValidateMessage).
 func (s *OrderAppService) SetPaymentVerifier(pv contracts.PaymentVerifier) {
 	s.paymentVerifier = pv
+}
+
+func (s *OrderAppService) SetCoTenantVerifiedPayment(fn contracts.CoTenantVerifiedPaymentFn) {
+	s.coTenantVerifiedPayment = fn
 }
 
 // RelayPaymentToCounterparty notifies a counterparty about a payment event
@@ -249,15 +257,11 @@ func (s *OrderAppService) deliverVerifiedPaymentToCoTenant(
 	orderMessage *npb.OrderMessage,
 	pd *models.PaymentData,
 ) bool {
-	if sourceOrder == nil || orderMessage == nil || pd == nil || s.orderProcessor == nil {
+	if sourceOrder == nil || orderMessage == nil || pd == nil || s.coTenantVerifiedPayment == nil {
 		return false
 	}
 	rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB })
 	if !ok || rawProvider.RawDB() == nil {
-		return false
-	}
-	router, ok := s.db.(tenantDatabaseRouter)
-	if !ok {
 		return false
 	}
 
@@ -287,12 +291,6 @@ func (s *OrderAppService) deliverVerifiedPaymentToCoTenant(
 		return false
 	}
 
-	targetDB, err := router.ForTenant(targetOrder.TenantID)
-	if err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: route tenant %s for order %s: %v", targetOrder.TenantID, sourceOrder.ID, err)
-		return false
-	}
-
 	paymentData := *pd
 	if err := paymentData.EnsureTransactionFields(); err != nil {
 		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: ensure tx fields for order %s: %v", sourceOrder.ID, err)
@@ -304,30 +302,17 @@ func (s *OrderAppService) deliverVerifiedPaymentToCoTenant(
 		return false
 	}
 
-	err = targetDB.Update(func(tx database.Tx) error {
-		var fresh models.Order
-		if err := tx.Read().Where("id = ?", sourceOrder.ID).First(&fresh).Error; err != nil {
-			return err
-		}
-		if err := s.orderProcessor.ProcessOrderPayment(tx, &fresh, orderMessage, paymentTx); err != nil {
-			return err
-		}
-		if fresh.IsPaymentVerified() {
-			return tx.Save(&fresh)
-		}
-		return s.orderProcessor.RecordVerifiedPayment(tx, &fresh, paymentTx)
-	})
-	if err != nil {
+	if s.coTenantVerifiedPayment(ctx, targetOrder.TenantID, orderMessage, paymentTx) {
 		logger.LogInfoWithIDf(log, s.nodeID,
-			"RelayPayment co-tenant: deliver verified payment to tenant %s for order %s: %v",
-			targetOrder.TenantID, sourceOrder.ID, err)
-		return false
+			"RelayPayment co-tenant: delivered verified payment to tenant %s for order %s",
+			targetOrder.TenantID, sourceOrder.ID)
+		return true
 	}
 
 	logger.LogInfoWithIDf(log, s.nodeID,
-		"RelayPayment co-tenant: delivered verified payment to tenant %s for order %s",
+		"RelayPayment co-tenant: target tenant processor unavailable for tenant %s order %s",
 		targetOrder.TenantID, sourceOrder.ID)
-	return true
+	return false
 }
 
 func counterpartyRole(role models.OrderRole) (models.OrderRole, bool) {
@@ -485,6 +470,47 @@ func transactionForPaymentSent(order *models.Order, paymentSent *pb.PaymentSent)
 // of late-bound dependencies (e.g., fiatRefundOnDeclineFunc injected after registry init).
 func (s *OrderAppService) OrderProcessor() *orders.OrderProcessor {
 	return s.orderProcessor
+}
+
+func (s *OrderAppService) ProcessVerifiedPaymentMessage(ctx context.Context, orderMsg *npb.OrderMessage, paymentTx iwallet.Transaction) error {
+	if orderMsg == nil {
+		return fmt.Errorf("order message is required")
+	}
+	if s.orderProcessor == nil {
+		return fmt.Errorf("order processor is not configured")
+	}
+
+	var event interface{}
+	err := s.db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&order).Error; err != nil {
+			return err
+		}
+		if err := order.PutTransaction(paymentTx); err != nil && !models.IsDuplicateTransactionError(err) {
+			return err
+		}
+		if err := tx.Save(&order); err != nil {
+			return err
+		}
+		var processErr error
+		event, processErr = s.orderProcessor.ProcessMessage(tx, orderMsg)
+		if processErr != nil {
+			return processErr
+		}
+		if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&order).Error; err != nil {
+			return err
+		}
+		if order.IsPaymentVerified() {
+			return tx.Save(&order)
+		}
+		return s.orderProcessor.RecordVerifiedPayment(tx, &order, paymentTx)
+	})
+	if err != nil {
+		return err
+	}
+	s.emitOrderProcessorEvents(event)
+	_ = ctx
+	return nil
 }
 
 // RelayPaymentToBuyer is a convenience method that fetches the order,
@@ -1387,7 +1413,7 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 			if err != nil {
 				return nil, err
 			}
-			escrowReleaseFee, err := strategy.EstimateEscrowFee(string(coinType), 2, 1, iwallet.FlPriority)
+			escrowReleaseFee, err := strategy.EstimateEscrowFee(string(coinType), countEscrowReleaseInputs(order, paymentSent), 1, iwallet.FlPriority)
 			if err != nil {
 				escrowReleaseFee = iwallet.NewAmount(paymentSent.EscrowReleaseFee)
 			}
@@ -1797,6 +1823,34 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	}
 
 	return release, nil
+}
+
+func countEscrowReleaseInputs(order *models.Order, paymentSent *pb.PaymentSent) int {
+	if order == nil || paymentSent == nil || paymentSent.ToAddress == "" {
+		return 1
+	}
+	txs, err := order.GetTransactions()
+	if err != nil {
+		return 1
+	}
+	spent := make(map[string]bool)
+	for _, tx := range txs {
+		for _, from := range tx.From {
+			spent[hex.EncodeToString(from.ID)] = true
+		}
+	}
+	nInputs := 0
+	for _, tx := range txs {
+		for _, toSpend := range tx.To {
+			if !spent[hex.EncodeToString(toSpend.ID)] && toSpend.Address.String() == paymentSent.ToAddress {
+				nInputs++
+			}
+		}
+	}
+	if nInputs < 1 {
+		return 1
+	}
+	return nInputs
 }
 
 // ── Order Queries ───────────────────────────────────────────────

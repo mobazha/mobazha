@@ -35,19 +35,42 @@ func (s *SettlementService) ExecuteSettlementAction(
 	orderID models.OrderID,
 	payoutAddr string,
 ) (*payment.ActionResult, iwallet.CoinType, error) {
-	action = strings.ToLower(strings.TrimSpace(action))
-	if action != "confirm" && action != "cancel" {
-		return nil, "", fmt.Errorf("%w: unsupported settlement action %q (supported: confirm, cancel)",
-			coreiface.ErrBadRequest, action)
+	normalizedAction, err := normalizeSettlementAction(action)
+	if err != nil {
+		return nil, "", err
 	}
 
 	var order models.Order
-	err := s.db.View(func(tx database.Tx) error {
+	err = s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
 	})
 	if err != nil {
 		return nil, "", err
 	}
+
+	return s.executeSettlementActionForOrder(ctx, normalizedAction, &order, payoutAddr)
+}
+
+func normalizeSettlementAction(action string) (string, error) {
+	action = strings.ToLower(strings.TrimSpace(action))
+	if action != "confirm" && action != "cancel" {
+		return "", fmt.Errorf("%w: unsupported settlement action %q (supported: confirm, cancel)",
+			coreiface.ErrBadRequest, action)
+	}
+	return action, nil
+}
+
+func (s *SettlementService) executeSettlementActionForOrder(
+	ctx context.Context,
+	action string,
+	order *models.Order,
+	payoutAddr string,
+) (*payment.ActionResult, iwallet.CoinType, error) {
+	normalizedAction, err := normalizeSettlementAction(action)
+	if err != nil {
+		return nil, "", err
+	}
+	action = normalizedAction
 
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
@@ -69,12 +92,12 @@ func (s *SettlementService) ExecuteSettlementAction(
 	}
 
 	params := payment.ActionParams{
-		OrderID:       orderID.String(),
+		OrderID:       order.ID.String(),
 		PaymentCoin:   coinType.String(),
 		PaymentAmount: paymentSent.Amount,
 		Chaincode:     paymentSent.Chaincode,
 		Script:        paymentSent.Script,
-		OrderData:     &order,
+		OrderData:     order,
 	}
 
 	switch action {

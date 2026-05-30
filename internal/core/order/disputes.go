@@ -549,7 +549,11 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		return fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
-	totalFee, err := disputeStrategy.EstimateEscrowFee(string(coinType), 2, 3, iwallet.FlNormal)
+	nInputs := len(txs)
+	if nInputs < 1 {
+		nInputs = 1
+	}
+	totalFee, err := disputeStrategy.EstimateEscrowFee(string(coinType), nInputs, 3, iwallet.FlNormal)
 	if err != nil {
 		return fmt.Errorf("failed to estimate escrow fee: %w", err)
 	}
@@ -1036,7 +1040,7 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 		return errors.New("failed to get escrowWallet")
 	}
 
-	totalFee, err := escrowWallet.EstimateEscrowFee(1, 1, iwallet.FlNormal)
+	totalFee, err := escrowWallet.EstimateEscrowFee(len(txn.From), 1, 1, iwallet.FlNormal)
 	if err != nil {
 		return errors.New("failed to estimate escrow fee")
 	}

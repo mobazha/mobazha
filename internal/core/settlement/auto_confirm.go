@@ -162,12 +162,12 @@ func settlementActionTxHash(ctx context.Context, strategy payment.ChainEscrowV2,
 func (s *SettlementService) AutoConfirmManagedEscrowCancelable(ctx context.Context, event *events.CancelablePaymentReady, chain iwallet.ChainType) error {
 	logger.LogInfoWithIDf(log, s.nodeID, "Handling ManagedEscrow CANCELABLE payment ready event for order %s (chain=%s)", event.OrderID, chain)
 
-	order, err := s.fetchOrderByID(event.OrderID)
+	order, err := s.fetchVendorOrderByTenant(event.OrderID, event.TenantID)
 	if err != nil {
 		return fmt.Errorf("failed to get order %s for ManagedEscrow CANCELABLE auto-confirm: %w", event.OrderID, err)
 	}
 
-	unlock := s.TryLockAutoConfirm(order.ID.String())
+	unlock := s.TryLockAutoConfirm(order.TenantID + ":" + order.ID.String())
 	if unlock == nil {
 		return nil
 	}
@@ -194,7 +194,7 @@ func (s *SettlementService) AutoConfirmManagedEscrowCancelable(ctx context.Conte
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Auto-confirming ManagedEscrow-backed EVM CANCELABLE payment for order %s via settlement action", order.ID)
 
-	result, _, err := s.ExecuteSettlementAction(ctx, "confirm", order.ID, payoutAddress.String())
+	result, _, err := s.executeSettlementActionForOrder(ctx, "confirm", order, payoutAddress.String())
 	if err != nil {
 		return fmt.Errorf("managed settlement-action confirm for order %s: %w", order.ID, err)
 	}
@@ -205,6 +205,7 @@ func (s *SettlementService) AutoConfirmManagedEscrowCancelable(ctx context.Conte
 	}
 
 	s.eventBus.Emit(&events.OrderAutoConfirmRequest{
+		TenantID:      order.TenantID,
 		OrderID:       order.ID.String(),
 		TxID:          txHash,
 		PayoutAddress: payoutAddress.String(),

@@ -51,6 +51,12 @@ func (s *OrderAppService) subscribeAutoConfirmRequests() {
 }
 
 func (s *OrderAppService) handleAutoConfirmRequest(event *events.OrderAutoConfirmRequest) {
+	if !autoConfirmRequestTargetsNode(event.TenantID, s.nodeID, s.dbTenantID()) {
+		logger.LogDebugWithIDf(log, s.nodeID,
+			"Skipping auto-confirm request for tenant %s order %s", event.TenantID, event.OrderID)
+		return
+	}
+
 	err := s.ConfirmOrder(
 		models.OrderID(event.OrderID),
 		iwallet.TransactionID(event.TxID),
@@ -62,6 +68,27 @@ func (s *OrderAppService) handleAutoConfirmRequest(event *events.OrderAutoConfir
 		return
 	}
 	logger.LogInfoWithIDf(log, s.nodeID, "Successfully auto-confirmed order %s via event", event.OrderID)
+}
+
+func autoConfirmRequestTargetsNode(eventTenantID, nodeID, localTenantID string) bool {
+	switch eventTenantID {
+	case "":
+		return true
+	case nodeID, localTenantID:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *OrderAppService) dbTenantID() string {
+	type tenantIDGetter interface {
+		TenantID() string
+	}
+	if db, ok := s.db.(tenantIDGetter); ok {
+		return db.TenantID()
+	}
+	return ""
 }
 
 func (s *OrderAppService) subscribeUTXOPaymentDetected() {

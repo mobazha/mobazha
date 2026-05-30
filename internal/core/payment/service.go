@@ -95,11 +95,9 @@ type PaymentAppService struct {
 	// OrderProcessor.RecordVerifiedPayment for the async verification path.
 	paymentRecorder VerifiedPaymentRecorder
 
-	// observationDispatcher is an optional append-only audit path for UTXO
-	// payments into the unified payment_observations table. When non-nil,
-	// HandleUTXOPayment writes a FundingEvent alongside the legacy order-field
-	// path. This enables unified multi-chain audit and the aggregating verifier
-	// to cover UTXO chains as well.
+	// observationDispatcher routes UTXO funding events into payment_observations.
+	// When it has an aggregator, HandleUTXOPayment relies on monitor-driven
+	// verification and skips the legacy buyer-node FSM path.
 	observationDispatcher *ObservationDispatcher
 
 	// paymentVerifiedHandler is called after a crypto payment is confirmed on-chain
@@ -273,9 +271,11 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 
 		setupResult.IsManagedEscrowOrder = true
 		moderated := result.PaymentData.Method == pb.PaymentSent_MODERATED
+		lockedPaymentCoin := effectiveManagedEscrowPaymentCoin(params.CoinType, coinInfo, s.isTestnet())
+		result.PaymentData.Coin = iwallet.CoinType(lockedPaymentCoin)
 		if persistErr := s.persistManagedEscrowPaymentAddress(
 			params.OrderID,
-			string(params.CoinType),
+			lockedPaymentCoin,
 			result.PaymentData.ToAddress,
 			result.PaymentData.Amount,
 			moderated,
@@ -371,6 +371,29 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 		}
 		return nil
 	})
+}
+
+func (s *PaymentAppService) isTestnet() bool {
+	return s.netConfig != nil && s.netConfig.Testnet
+}
+
+func effectiveManagedEscrowPaymentCoin(coin iwallet.CoinType, coinInfo iwallet.CoinInfo, testnet bool) string {
+	out := string(coin)
+	if coinInfo.IsNative || !coinInfo.IsEthTypeChain() {
+		return out
+	}
+	contract := strings.TrimSpace(coinInfo.ContractAddress(testnet))
+	if contract == "" {
+		return out
+	}
+	parts := strings.Split(out, ":")
+	for i := 0; i < len(parts)-1; i++ {
+		if strings.EqualFold(parts[i], "erc20") && strings.HasPrefix(parts[i+1], "0x") {
+			parts[i+1] = contract
+			return strings.Join(parts, ":")
+		}
+	}
+	return out
 }
 
 func (s *PaymentAppService) persistSharedPaymentPolicySnapshot(orderID, moderatorPeerID string, storePolicyRevision uint64) error {

@@ -79,7 +79,7 @@ type stubUTXOEscrow struct {
 	signErr     error
 }
 
-func (s *stubUTXOEscrow) EstimateEscrowFee(_, _ int, _ iwallet.FeeLevel) (iwallet.Amount, error) {
+func (s *stubUTXOEscrow) EstimateEscrowFee(_, _, _ int, _ iwallet.FeeLevel) (iwallet.Amount, error) {
 	return s.estimateFee, s.estimateErr
 }
 func (s *stubUTXOEscrow) SignMultisigTransaction(_ iwallet.Transaction, _ btcec.PrivateKey, _ []byte) ([]iwallet.EscrowSignature, error) {

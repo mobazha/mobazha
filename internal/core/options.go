@@ -621,6 +621,7 @@ func (n *MobazhaNode) initOrderService() {
 
 		DiscountResolver:           n.buildDiscountResolver(),
 		DiscountRedemptionRecorder: n.buildDiscountRecorder(),
+		CoTenantVerifiedPayment:    n.coTenantVerifiedPayment,
 	})
 }
 

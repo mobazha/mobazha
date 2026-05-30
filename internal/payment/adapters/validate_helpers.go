@@ -31,7 +31,7 @@ func validatePaymentMessageAmount(params payment.PaymentMessageParams) error {
 		return err
 	}
 
-	pricingCoin := strings.ToUpper(strings.TrimSpace(order.PricingCoin))
+	pricingCoin := normalizedPricingCurrencyCode(order.PricingCoin)
 	if pricingCoin == "" {
 		return errors.New("order pricing coin is required")
 	}
@@ -53,6 +53,19 @@ func validatePaymentMessageAmount(params payment.PaymentMessageParams) error {
 		return utils.ValidatePaymentAmount(order.Amount, paymentSent.Amount)
 	}
 	return fmt.Errorf("locked expected payment amount is required for cross-currency payment: pricing %s paid in %s", pricingCoin, paymentCoin)
+}
+
+func normalizedPricingCurrencyCode(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if normalized, ok := payment.NormalizeSettlementPaymentCoin(trimmed); ok {
+		if code, err := iwallet.CoinType(normalized).PricingCurrencyCode(); err == nil {
+			return code
+		}
+	}
+	return strings.ToUpper(trimmed)
 }
 
 func validateExpectedPaymentCoin(expectedCoin, actualCoin string) error {

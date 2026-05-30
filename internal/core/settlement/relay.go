@@ -154,8 +154,8 @@ func (s *SettlementService) releaseMonitoredCancelableFunds(order *models.Order,
 		return "", "", fmt.Errorf("failed to release CANCELABLE payment: %w", err)
 	}
 
-	if err := wTx.Commit(); err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to commit wallet transaction for order %s: %v (on-chain tx already broadcast)", order.ID, err)
+	if err := commitCancelableReleaseWalletTx(wTx, order.ID); err != nil {
+		return "", "", err
 	}
 
 	actualAddr := toAddress.String()
@@ -175,6 +175,13 @@ func (s *SettlementService) releaseMonitoredCancelableFunds(order *models.Order,
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Successfully released monitored CANCELABLE payment for order %s (txid=%s)", order.ID, txid)
 	return txid, actualAddr, nil
+}
+
+func commitCancelableReleaseWalletTx(wTx iwallet.Tx, orderID models.OrderID) error {
+	if err := wTx.Commit(); err != nil {
+		return fmt.Errorf("failed to broadcast/commit CANCELABLE release transaction for order %s: %w", orderID, err)
+	}
+	return nil
 }
 
 func (s *SettlementService) releaseViaRelay(order *models.Order, coinInfo *iwallet.CoinInfo, payoutAddress string) (iwallet.TransactionID, string, error) {

@@ -332,7 +332,7 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 		feeStrat, stratErr := s.paymentRegistry.ForCoin(coinType)
 		fee := iwallet.NewAmount(0)
 		if stratErr == nil {
-			fee, err = feeStrat.EstimateEscrowFee(string(coinType), 2, nOuts, iwallet.FlNormal)
+			fee, err = feeStrat.EstimateEscrowFee(string(coinType), countEscrowReleaseInputs(&order, paymentSent), nOuts, iwallet.FlNormal)
 			if err != nil {
 				return err
 			}

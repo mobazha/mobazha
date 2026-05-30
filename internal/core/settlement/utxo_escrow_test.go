@@ -21,14 +21,14 @@ type mockUTXOMonitor struct {
 	addressTxsErr    error
 }
 
-func (m *mockUTXOMonitor) Start()                                                              {}
-func (m *mockUTXOMonitor) Stop()                                                               {}
-func (m *mockUTXOMonitor) WatchAddress(wa *utxo.WatchedAddress) error                          { return nil }
-func (m *mockUTXOMonitor) UnwatchAddress(address string) error                                 { return nil }
+func (m *mockUTXOMonitor) Start()                                     {}
+func (m *mockUTXOMonitor) Stop()                                      {}
+func (m *mockUTXOMonitor) WatchAddress(wa *utxo.WatchedAddress) error { return nil }
+func (m *mockUTXOMonitor) UnwatchAddress(address string) error        { return nil }
 func (m *mockUTXOMonitor) RegisterNodeCallback(string, func(iwallet.Transaction, *utxo.WatchedAddress)) error {
 	return nil
 }
-func (m *mockUTXOMonitor) UnregisterNode(string)                                            {}
+func (m *mockUTXOMonitor) UnregisterNode(string) {}
 func (m *mockUTXOMonitor) GetTransaction(iwallet.ChainType, string) (*iwallet.Transaction, error) {
 	return nil, nil
 }

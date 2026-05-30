@@ -24,6 +24,8 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -39,7 +41,7 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 	sellerDB := tenantDB(t, shared, "tenant-seller")
 
 	buyerSigner, buyerPeerID := testSigner(t)
-	_, sellerPeerID := testSigner(t)
+	sellerSigner, sellerPeerID := testSigner(t)
 	bus := events.NewBus()
 	op := orders.NewOrderProcessor(&orders.Config{
 		NodeID:    "relay-test",
@@ -55,6 +57,7 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 		EventBus:       bus,
 		NodeID:         "relay-test",
 	})
+	wireCoTenantVerifiedPayment(t, svc, "tenant-seller", sellerDB, sellerSigner)
 
 	orderID := "cotenant-solana-payment"
 	open := signedOrderOpen(t, buyerPeerID, sellerPeerID)
@@ -81,6 +84,81 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 	require.Equal(t, models.OrderState_PENDING, sellerOrder.State)
 }
 
+func TestPreProcessPaymentSent_HydratesIncomingManagedEscrowIntentBeforeValidation(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.Order{}); err != nil {
+			return err
+		}
+		return tx.Migrate(&models.SharedPaymentIntent{})
+	}))
+
+	orderID := "incoming-managed_escrow-intent"
+	orderOpenAny, err := anypb.New(&pb.OrderOpen{
+		Timestamp:   timestamppb.Now(),
+		Amount:      "1000",
+		PricingCoin: "USD",
+	})
+	require.NoError(t, err)
+	order := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: database.StandaloneTenantID},
+		ID:          models.OrderID(orderID),
+	}
+	order.SetRole(models.RoleVendor)
+	require.NoError(t, order.PutMessage(&npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_ORDER_OPEN,
+		Message:     orderOpenAny,
+	}))
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(order) }))
+
+	paymentSent := &pb.PaymentSent{
+		TransactionID:      "0xmanagedescrow",
+		ContractAddress:    "0x2222222222222222222222222222222222222222",
+		ToAddress:          "0x2222222222222222222222222222222222222222",
+		Amount:             "21000000000000000",
+		Coin:               "crypto:eip155:1:native",
+		RefundAddress:      "0x3333333333333333333333333333333333333333",
+		CancelFeeAmount:    "100",
+		PlatformAmount:     "200",
+		PlatformAddr:       "0x4444444444444444444444444444444444444444",
+		SettlementSpec:     paymentpkg.NewManagedEscrowSpec(false).ToPaymentSent(),
+		EscrowTimeoutHours: 1,
+	}
+	paymentSentAny, err := anypb.New(paymentSent)
+	require.NoError(t, err)
+
+	verifier := &capturingPaymentVerifier{}
+	svc := &OrderAppService{
+		db:              db,
+		nodeID:          "incoming-managed_escrow-test",
+		paymentVerifier: verifier,
+	}
+
+	ppCtx, err := svc.preProcessPaymentSent(context.Background(), &npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_PAYMENT_SENT,
+		Message:     paymentSentAny,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, ppCtx)
+	require.Equal(t, "21000000000000000", verifier.params.ExpectedPaymentAmount)
+	require.Equal(t, "crypto:eip155:1:native", verifier.params.ExpectedPaymentCoin)
+
+	var stored models.Order
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&stored).Error
+	}))
+	info, err := stored.GetPendingManagedEscrowPaymentInfo()
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.Equal(t, "0x2222222222222222222222222222222222222222", info.Address)
+	require.Equal(t, uint64(21000000000000000), info.Amount)
+	require.Equal(t, "100", info.CancelFeeAmount)
+	require.Equal(t, "0x3333333333333333333333333333333333333333", stored.RefundAddress)
+}
+
 func TestProcessOrderPayment_RelaysVerifiedPaymentWhenPersistFails(t *testing.T) {
 	shared, err := gorm.Open(sqlitedialect.Open(":memory:"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -92,7 +170,7 @@ func TestProcessOrderPayment_RelaysVerifiedPaymentWhenPersistFails(t *testing.T)
 	sellerDB := tenantDB(t, shared, "tenant-seller")
 
 	buyerSigner, buyerPeerID := testSigner(t)
-	_, sellerPeerID := testSigner(t)
+	sellerSigner, sellerPeerID := testSigner(t)
 	bus := events.NewBus()
 	orderID := "cotenant-verified-persist-fails"
 	open := signedOrderOpen(t, buyerPeerID, sellerPeerID)
@@ -119,6 +197,7 @@ func TestProcessOrderPayment_RelaysVerifiedPaymentWhenPersistFails(t *testing.T)
 		EventBus:       bus,
 		NodeID:         "relay-test",
 	})
+	wireCoTenantVerifiedPayment(t, svc, "tenant-seller", sellerDB, sellerSigner)
 	tx := iwallet.Transaction{
 		ID:     iwallet.TransactionID(strings.Repeat("b", 64)),
 		Value:  iwallet.NewAmount(1_000_000),
@@ -147,6 +226,37 @@ func TestProcessOrderPayment_RelaysVerifiedPaymentWhenPersistFails(t *testing.T)
 	require.NotNil(t, sellerOrder.SerializedPaymentSent)
 	require.True(t, sellerOrder.IsPaymentVerified())
 	require.Equal(t, models.OrderState_PENDING, sellerOrder.State)
+}
+
+func wireCoTenantVerifiedPayment(
+	t *testing.T,
+	source *OrderAppService,
+	targetTenant string,
+	targetDB database.Database,
+	targetSigner contracts.Signer,
+) {
+	t.Helper()
+	bus := events.NewBus()
+	op := orders.NewOrderProcessor(&orders.Config{
+		NodeID:    targetTenant,
+		Db:        targetDB,
+		Signer:    targetSigner,
+		Messenger: noopMessenger{},
+		EventBus:  bus,
+	})
+	target := NewOrderAppService(OrderAppServiceConfig{
+		DB:             targetDB,
+		Signer:         targetSigner,
+		OrderProcessor: op,
+		EventBus:       bus,
+		NodeID:         targetTenant,
+	})
+	source.SetCoTenantVerifiedPayment(func(ctx context.Context, tenantID string, orderMsg *npb.OrderMessage, tx iwallet.Transaction) bool {
+		if tenantID != targetTenant {
+			return false
+		}
+		return target.ProcessVerifiedPaymentMessage(ctx, orderMsg, tx) == nil
+	})
 }
 
 type noopMessenger struct{}
@@ -196,6 +306,23 @@ func (v *verifiedPaymentVerifier) FetchTransaction(context.Context, iwallet.Coin
 
 func (v *verifiedPaymentVerifier) FetchAndVerify(context.Context, *pb.OrderOpen, *pb.PaymentSent, string) (*contracts.VerifiedPayment, error) {
 	return &contracts.VerifiedPayment{Transaction: v.tx, CoinType: iwallet.CoinType("crypto:solana:mainnet:native")}, nil
+}
+
+type capturingPaymentVerifier struct {
+	params paymentpkg.PaymentMessageParams
+}
+
+func (v *capturingPaymentVerifier) ValidateMessage(_ iwallet.CoinType, params paymentpkg.PaymentMessageParams) error {
+	v.params = params
+	return nil
+}
+
+func (v *capturingPaymentVerifier) FetchTransaction(context.Context, iwallet.CoinType, string, string) (*iwallet.Transaction, error) {
+	return &iwallet.Transaction{}, nil
+}
+
+func (v *capturingPaymentVerifier) FetchAndVerify(context.Context, *pb.OrderOpen, *pb.PaymentSent, string) (*contracts.VerifiedPayment, error) {
+	return &contracts.VerifiedPayment{Transaction: iwallet.Transaction{}, CoinType: iwallet.CoinType("crypto:eip155:1:native")}, nil
 }
 
 func tenantDB(t *testing.T, shared *gorm.DB, tenantID string) database.Database {

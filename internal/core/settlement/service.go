@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/relay"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 // SettlementService encapsulates all money-out operations: escrow release,
@@ -138,6 +139,31 @@ func (s *SettlementService) fetchOrderByID(orderID string) (*models.Order, error
 	var order models.Order
 	err := s.db.View(func(dbtx database.Tx) error {
 		return dbtx.Read().Where("id = ?", orderID).First(&order).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+func (s *SettlementService) fetchVendorOrderByTenant(orderID string, tenantID string) (*models.Order, error) {
+	var order models.Order
+	if rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB }); ok {
+		raw := rawProvider.RawDB()
+		if raw == nil {
+			return nil, fmt.Errorf("raw DB unavailable")
+		}
+		err := raw.Where("tenant_id = ? AND id = ? AND my_role = ?", tenantID, orderID, string(models.RoleVendor)).
+			First(&order).Error
+		if err != nil {
+			return nil, err
+		}
+		return &order, nil
+	}
+	err := s.db.View(func(dbtx database.Tx) error {
+		return dbtx.Read().
+			Where("tenant_id = ? AND id = ? AND my_role = ?", tenantID, orderID, string(models.RoleVendor)).
+			First(&order).Error
 	})
 	if err != nil {
 		return nil, err

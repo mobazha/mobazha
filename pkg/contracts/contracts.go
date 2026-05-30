@@ -24,6 +24,7 @@ import (
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
@@ -40,6 +41,10 @@ type CoTenantPublicDataFn func(peerID peer.ID) (pkgdb.PublicData, error)
 // CoTenantDigitalAssetsFn resolves the digital asset service for a co-located
 // tenant on the same SaaS host. It is nil outside shared-host deployments.
 type CoTenantDigitalAssetsFn func(peerID peer.ID) (DigitalAssetService, error)
+
+// CoTenantVerifiedPaymentFn routes a verified PAYMENT_SENT message to the
+// target tenant's own order service on the same SaaS host.
+type CoTenantVerifiedPaymentFn func(ctx context.Context, tenantID string, orderMsg *npb.OrderMessage, tx iwallet.Transaction) bool
 
 // IdentityService provides node identity and lifecycle operations.
 type IdentityService interface {

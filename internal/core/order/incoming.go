@@ -6,7 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
+	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -163,6 +166,10 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 		return nil, nil
 	}
 
+	if err := s.ensureIncomingManagedEscrowPaymentIntent(&order, paymentSent); err != nil {
+		return nil, fmt.Errorf("payment validation failed for order %s: %w", orderMsg.OrderID, err)
+	}
+
 	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, fmt.Errorf("payment validation failed for order %s: %w", orderMsg.OrderID, err)
@@ -208,6 +215,92 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 	}
 
 	return &PreProcessContext{VerifiedPayment: vp}, nil
+}
+
+func (s *OrderAppService) ensureIncomingManagedEscrowPaymentIntent(order *models.Order, paymentSent *pb.PaymentSent) error {
+	if order == nil || paymentSent == nil {
+		return nil
+	}
+	spec, ok := payment.ResolveSettlementSpec(nil, paymentSent)
+	if !ok || !spec.UsesManagedEscrow() {
+		return nil
+	}
+	if existing, err := order.GetPendingManagedEscrowPaymentInfo(); err != nil {
+		return err
+	} else if existing != nil {
+		return nil
+	}
+
+	info, refundAddress, err := pendingManagedEscrowPaymentInfoFromPaymentSent(paymentSent, spec)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Update(func(tx database.Tx) error {
+		var current models.Order
+		if err := tx.Read().Where("id = ?", order.ID.String()).First(&current).Error; err != nil {
+			return err
+		}
+		if existing, err := current.GetPendingManagedEscrowPaymentInfo(); err != nil {
+			return err
+		} else if existing != nil {
+			*order = current
+			return nil
+		}
+
+		current.PaymentAddress = info.Address
+		current.CancelFeeAmount = info.CancelFeeAmount
+		if refundAddress != "" {
+			current.RefundAddress = refundAddress
+		}
+		if err := current.SetPendingManagedEscrowPaymentInfo(info); err != nil {
+			return err
+		}
+		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), current.ID.String(), info.Address, refundAddress, info); err != nil {
+			return err
+		}
+		if err := tx.Save(&current); err != nil {
+			return err
+		}
+		*order = current
+		return nil
+	})
+}
+
+func pendingManagedEscrowPaymentInfoFromPaymentSent(paymentSent *pb.PaymentSent, spec payment.SettlementSpec) (*models.PendingManagedEscrowPaymentInfo, string, error) {
+	coin := strings.TrimSpace(paymentSent.Coin)
+	if coin == "" {
+		return nil, "", errors.New("managed escrow payment coin is required")
+	}
+	normalizedCoin, ok := payment.NormalizeSettlementPaymentCoin(coin)
+	if !ok {
+		return nil, "", fmt.Errorf("invalid managed escrow payment coin %q", coin)
+	}
+	amount, err := strconv.ParseUint(strings.TrimSpace(paymentSent.Amount), 10, 64)
+	if err != nil || amount == 0 {
+		return nil, "", fmt.Errorf("managed escrow payment amount %q is invalid", paymentSent.Amount)
+	}
+	managed_escrowAddress := strings.TrimSpace(paymentSent.ContractAddress)
+	if managed_escrowAddress == "" {
+		managed_escrowAddress = strings.TrimSpace(paymentSent.ToAddress)
+	}
+	if managed_escrowAddress == "" {
+		return nil, "", errors.New("managed escrow payment address is required")
+	}
+
+	info := &models.PendingManagedEscrowPaymentInfo{
+		Coin:             string(normalizedCoin),
+		Amount:           amount,
+		Address:          managed_escrowAddress,
+		Moderated:        payment.MethodIsModerated(spec.Method),
+		Moderator:        strings.TrimSpace(paymentSent.Moderator),
+		ModeratorAddress: strings.TrimSpace(paymentSent.ModeratorAddress),
+		PlatformAmount:   strings.TrimSpace(paymentSent.PlatformAmount),
+		PlatformAddr:     strings.TrimSpace(paymentSent.PlatformAddr),
+		CancelFeeAmount:  strings.TrimSpace(paymentSent.CancelFeeAmount),
+		SettlementSpec:   spec.ToPending(),
+	}
+	return info, strings.TrimSpace(paymentSent.RefundAddress), nil
 }
 
 // preProcessOrderConfirmation fetches the chain transaction and optionally verifies

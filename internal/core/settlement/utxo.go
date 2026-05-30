@@ -67,11 +67,10 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 		return nil, nil, fmt.Errorf("UTXO chain verification failed: %w", err)
 	}
 
-	escrowFee, err := escrowWallet.EstimateEscrowFee(1, 1, iwallet.FlNormal)
+	escrowFee, err := escrowWallet.EstimateEscrowFee(len(txn.From), 1, 1, iwallet.FlNormal)
 	if err != nil {
 		return nil, nil, err
 	}
-	escrowFee = escrowFee.Add(escrowFee.Div(iwallet.NewAmount(2)).Mul(iwallet.NewAmount(len(txn.From) - 1)))
 
 	if escrowFee.Cmp(totalOut) >= 0 {
 		return nil, nil, fmt.Errorf("insufficient funds: total input %s is less than or equal to fee %s", totalOut.String(), escrowFee.String())
@@ -264,6 +263,10 @@ func (s *SettlementService) CancelPartialPayment(orderID string) (txid string, r
 
 	oldPaymentAddress := order.PaymentAddress
 
+	if err := wTx.Commit(); err != nil {
+		return "", 0, fmt.Errorf("commit transaction failed: %v", err)
+	}
+
 	if err := s.db.Update(func(dbtx database.Tx) error {
 		if releaseTx != nil {
 			if err := order.PutTransaction(*releaseTx); err != nil && !models.IsDuplicateTransactionError(err) {
@@ -274,12 +277,7 @@ func (s *SettlementService) CancelPartialPayment(orderID string) (txid string, r
 		order.ClearPendingPaymentInfo()
 		return dbtx.Save(order)
 	}); err != nil {
-		wTx.Rollback()
 		return "", 0, fmt.Errorf("save order failed: %v", err)
-	}
-
-	if err := wTx.Commit(); err != nil {
-		return "", 0, fmt.Errorf("commit transaction failed: %v", err)
 	}
 
 	if oldPaymentAddress != "" && s.monitorService != nil {

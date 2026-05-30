@@ -769,7 +769,7 @@ func (n *MobazhaNode) startCancelablePaymentMonitor() {
 func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentReady) {
 	coinType := iwallet.CoinType(event.Coin)
 
-	if !cancelablePaymentEventTargetsNode(event.TenantID, n.nodeID) {
+	if !cancelablePaymentEventTargetsNode(event.TenantID, n.nodeID, n.localTenantID()) {
 		logger.LogDebugWithIDf(log, n.nodeID,
 			"Skipping cancelable payment event for tenant %s order %s", event.TenantID, event.OrderID)
 		return
@@ -799,8 +799,27 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 	}()
 }
 
-func cancelablePaymentEventTargetsNode(eventTenantID, nodeID string) bool {
-	return eventTenantID == "" || eventTenantID == nodeID
+func (n *MobazhaNode) localTenantID() string {
+	type tenantIDGetter interface {
+		TenantID() string
+	}
+	if n != nil {
+		if db, ok := n.db.(tenantIDGetter); ok {
+			return db.TenantID()
+		}
+	}
+	return ""
+}
+
+func cancelablePaymentEventTargetsNode(eventTenantID, nodeID, localTenantID string) bool {
+	switch eventTenantID {
+	case "":
+		return true
+	case nodeID, localTenantID:
+		return true
+	default:
+		return false
+	}
 }
 
 type managed_escrowCancelableAutoConfirmer struct {

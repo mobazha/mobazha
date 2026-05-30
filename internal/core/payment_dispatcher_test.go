@@ -371,19 +371,21 @@ func TestCancelablePaymentEventTargetsNode(t *testing.T) {
 		name          string
 		eventTenantID string
 		nodeID        string
+		localTenantID string
 		want          bool
 	}{
 		{name: "standalone-empty-tenant", eventTenantID: "", nodeID: "peer-node", want: true},
-		{name: "matching-tenant", eventTenantID: "tenant-a", nodeID: "tenant-a", want: true},
-		{name: "foreign-tenant", eventTenantID: "tenant-b", nodeID: "tenant-a", want: false},
-		{name: "scoped-event-requires-node-identity", eventTenantID: "tenant-a", nodeID: "", want: false},
+		{name: "matching-node-id", eventTenantID: "tenant-a", nodeID: "tenant-a", want: true},
+		{name: "matching-local-tenant", eventTenantID: "tenant-a", nodeID: "peer-node", localTenantID: "tenant-a", want: true},
+		{name: "foreign-tenant", eventTenantID: "tenant-b", nodeID: "tenant-a", localTenantID: "tenant-c", want: false},
+		{name: "scoped-event-requires-local-identity", eventTenantID: "tenant-a", nodeID: "", localTenantID: "", want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := cancelablePaymentEventTargetsNode(tt.eventTenantID, tt.nodeID); got != tt.want {
-				t.Fatalf("cancelablePaymentEventTargetsNode(%q, %q) = %v, want %v",
-					tt.eventTenantID, tt.nodeID, got, tt.want)
+			if got := cancelablePaymentEventTargetsNode(tt.eventTenantID, tt.nodeID, tt.localTenantID); got != tt.want {
+				t.Fatalf("cancelablePaymentEventTargetsNode(%q, %q, %q) = %v, want %v",
+					tt.eventTenantID, tt.nodeID, tt.localTenantID, got, tt.want)
 			}
 		})
 	}

@@ -58,7 +58,7 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 
 	switch strategyV2.Model() {
 	case payment.PaymentModelMonitored:
-		coinInfo, cerr := iwallet.CoinInfoFromCoinType(coinType)
+		coinInfo, cerr := payment.SettlementCoinInfoForCoin(coinType)
 		if cerr != nil {
 			return "", payoutAddress, cerr
 		}
@@ -89,7 +89,7 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 		}
 		return s.releaseMonitoredCancelableFunds(order, payoutAddress)
 	case payment.PaymentModelClientSigned:
-		coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+		coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
 		if err != nil {
 			return "", payoutAddress, err
 		}
@@ -265,7 +265,7 @@ func (s *SettlementService) releaseSolanaViaRelay(order *models.Order, payoutAdd
 
 // RelayInstructions dispatches instructions to the appropriate relay service.
 func (s *SettlementService) RelayInstructions(orderID string, coinType iwallet.CoinType, instructions any) (string, error) {
-	coinInfo, err := coinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
 	if err != nil {
 		return "", fmt.Errorf("failed to get coin info: %w", err)
 	}

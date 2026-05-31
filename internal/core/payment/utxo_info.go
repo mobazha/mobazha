@@ -203,7 +203,7 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 		expectedAmount = totals.Total.Uint64()
 	}
 
-	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	coinInfo, err := pkpayment.SettlementCoinInfoForCoin(coinType)
 	if err != nil {
 		return nil, fmt.Errorf("invalid payment coin %s: %w", coinType, err)
 	}
@@ -293,7 +293,7 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 		paymentData.UnlockHours = escrowTimeoutHours
 	}
 
-	coinInfo, err = coinType.CoinInfo()
+	coinInfo, err = pkpayment.SettlementCoinInfoForCoin(coinType)
 	if err == nil && coinInfo.Chain.IsUTXOChain() {
 		scriptPubKey, err := scriptPubKeyForUTXOPaymentAddress(wal, paymentData.ToAddress, paymentData.Script)
 		if err != nil {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // FormatSessionAmount formats a persisted smallest-unit amount for the
@@ -85,6 +86,9 @@ func SessionAmountDecimals(paymentCoin string) (int, bool) {
 	if coin, ok := NormalizeSettlementPaymentCoin(trimmed); ok {
 		if def, err := assetid.DefaultRegistry().Lookup(string(coin)); err == nil {
 			return int(def.Decimals), true
+		}
+		if info, err := iwallet.CoinInfoFromCoinType(coin); err == nil && info.Decimals > 0 {
+			return int(info.Decimals), true
 		}
 	}
 

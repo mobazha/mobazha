@@ -85,7 +85,7 @@ func (o *TRONChainOps) BuildDisputeRelease(order *models.Order, initiator string
 
 // VerifyDeposit checks the buyer's TRON deposit on-chain.
 func (o *TRONChainOps) VerifyDeposit(ctx context.Context, params payment.DepositVerifyParams) error {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(params.CoinType)
+	coinInfo, err := payment.SettlementCoinInfoForCoin(params.CoinType)
 	if err != nil || coinInfo.Chain != iwallet.ChainTRON {
 		return nil
 	}
@@ -147,7 +147,7 @@ func (o *TRONChainOps) ValidatePaymentMessage(params payment.PaymentMessageParam
 	}
 
 	coinType := iwallet.CoinType(paymentSent.Coin)
-	coinInfo, err := coinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
 	if err != nil {
 		return fmt.Errorf("unknown coin %s: %w", paymentSent.Coin, err)
 	}

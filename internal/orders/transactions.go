@@ -29,6 +29,8 @@ func (op *OrderProcessor) RecordOutgoingTransaction(dbtx database.Tx, order *mod
 // responsibility belongs to the orchestration layer which calls
 // RecordVerifiedPayment after a successful FetchAndVerify.
 func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Order, orderMessage *npb.OrderMessage, tx iwallet.Transaction) error {
+	normalizeAwaitingPaymentBeforePaymentSent(order)
+
 	err := order.PutTransaction(tx)
 	if models.IsDuplicateTransactionError(err) {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received duplicate transaction %s", tx.ID.String())

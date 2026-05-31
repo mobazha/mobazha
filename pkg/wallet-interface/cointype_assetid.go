@@ -187,24 +187,28 @@ func lookupCanonicalAssetDefinition(ct CoinType) (assetid.Definition, bool, erro
 }
 
 func coinInfoFromCanonicalAssetID(coinType CoinType) (CoinInfo, error) {
-	def, isCanonical, err := lookupCanonicalAssetDefinition(coinType)
+	normalized, err := assetid.Normalize(string(coinType))
 	if err != nil {
 		return CoinInfo{}, fmt.Errorf("invalid canonical asset id %q: %w", coinType, err)
 	}
-	if !isCanonical {
-		return CoinInfo{}, fmt.Errorf("coin %q is not canonical asset id", coinType)
-	}
 
-	parsed, err := assetid.Parse(def.AssetID)
+	parsed, err := assetid.Parse(normalized)
 	if err != nil {
-		return CoinInfo{}, fmt.Errorf("parse canonical asset id %q: %w", def.AssetID, err)
+		return CoinInfo{}, fmt.Errorf("parse canonical asset id %q: %w", normalized, err)
 	}
-
 	chain, err := chainTypeFromAssetID(parsed)
 	if err != nil {
 		return CoinInfo{}, err
 	}
 
+	if def, err := canonicalAssetRegistry.Lookup(normalized); err == nil {
+		return coinInfoFromAssetDefinition(def, parsed, chain), nil
+	}
+
+	return runtimeCoinInfoFromAssetID(parsed, chain), nil
+}
+
+func coinInfoFromAssetDefinition(def assetid.Definition, parsed assetid.ID, chain ChainType) CoinInfo {
 	info := CoinInfo{
 		Chain:       chain,
 		Symbol:      def.DisplaySymbol,
@@ -215,7 +219,45 @@ func coinInfoFromCanonicalAssetID(coinType CoinType) (CoinInfo, error) {
 	if !parsed.IsNative() {
 		info.Contract = parsed.AssetRef
 	}
-	return info, nil
+	return info
+}
+
+func runtimeCoinInfoFromAssetID(parsed assetid.ID, chain ChainType) CoinInfo {
+	info := CoinInfo{
+		Chain:       chain,
+		Symbol:      strings.ToUpper(string(parsed.Standard)),
+		IsNative:    parsed.IsNative(),
+		Description: "Runtime " + string(parsed.Standard) + " asset",
+	}
+	if parsed.IsNative() {
+		info.Symbol = string(chain)
+		info.Description = "Runtime native asset"
+		if canonicalNative, ok := CanonicalNativeCoinType(chain); ok {
+			if def, _, err := lookupCanonicalAssetDefinition(canonicalNative); err == nil {
+				info.Symbol = def.DisplaySymbol
+				info.Decimals = def.Decimals
+				info.Description = def.DisplayName
+			}
+		}
+	} else {
+		info.Contract = parsed.AssetRef
+		info.TestnetContract = parsed.AssetRef
+		info.Decimals = runtimeAssetDefaultDecimals(parsed.Standard)
+	}
+	return info
+}
+
+func runtimeAssetDefaultDecimals(standard assetid.Standard) uint8 {
+	switch standard {
+	case assetid.StandardERC20:
+		return 18
+	case assetid.StandardTRC20:
+		return 6
+	case assetid.StandardSPL:
+		return 9
+	default:
+		return 0
+	}
 }
 
 func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
@@ -265,12 +307,12 @@ func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
 			return "", fmt.Errorf("unsupported eip155 chain_ref %q", id.ChainRef)
 		}
 	case assetid.NamespaceTRON:
-		if id.ChainRef != "mainnet" {
+		if id.ChainRef != "mainnet" && id.ChainRef != "shasta" && id.ChainRef != "nile" {
 			return "", fmt.Errorf("unsupported tron chain_ref %q", id.ChainRef)
 		}
 		return ChainTRON, nil
 	case assetid.NamespaceSolana:
-		if id.ChainRef != "mainnet" {
+		if id.ChainRef != "mainnet" && id.ChainRef != "devnet" && id.ChainRef != "testnet" {
 			return "", fmt.Errorf("unsupported solana chain_ref %q", id.ChainRef)
 		}
 		return ChainSolana, nil

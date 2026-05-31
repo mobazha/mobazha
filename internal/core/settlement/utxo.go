@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -134,7 +135,7 @@ func (s *SettlementService) verifyUTXOsOnChain(coinCode string, paymentAddress s
 	}
 
 	coinType := iwallet.CoinType(coinCode)
-	coinInfo, err := coinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
 	if err != nil || !coinInfo.Chain.IsUTXOChain() {
 		return nil
 	}

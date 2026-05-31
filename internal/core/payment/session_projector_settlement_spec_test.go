@@ -222,6 +222,9 @@ func TestProject_UsesPendingObservationAmountForPaymentProgress(t *testing.T) {
 		observedAmountRaw: "16414",
 		obsCount:          1,
 		lastObsAt:         &observedAt,
+		observations: []models.PaymentObservation{
+			testSessionObservation("obs-bch-pending", "", "", "16414", observedAt, models.PaymentObservationStatusPending),
+		},
 		orderOpen: &pb.OrderOpen{
 			Amount:      "16414",
 			Timestamp:   timestamppb.New(time.Now()),
@@ -236,6 +239,72 @@ func TestProject_UsesPendingObservationAmountForPaymentProgress(t *testing.T) {
 	require.Equal(t, "0", session.PaymentProgress.RemainingAmount)
 	require.Equal(t, 1, session.PaymentProgress.ObservationCount)
 	require.Equal(t, &observedAt, session.PaymentProgress.LastObservedAt)
+	require.Len(t, session.PaymentProgress.Observations, 1)
+	require.Equal(t, "obs-bch-pending-tx", session.PaymentProgress.Observations[0].TxHash)
+	require.Equal(t, "0.00016414", session.PaymentProgress.Observations[0].Amount)
+}
+
+func TestProject_UsesPaymentSentFundingFactsForPaymentProgress(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	order := &models.Order{ID: models.OrderID("order-facts"), PaymentAddress: "0xmanagedescrow"}
+	order.PaymentVerificationStatus = models.PaymentVerificationStatusVerified
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:           "crypto:eip155:1:native",
+		Address:        "0xmanagedescrow",
+		Amount:         1000,
+		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),
+	}))
+	observedAt := time.Date(2026, 5, 31, 8, 0, 0, 0, time.UTC)
+	paymentSent := &pb.PaymentSent{
+		TransactionID:  "0xtx-2",
+		Coin:           "crypto:eip155:1:native",
+		Amount:         "1000",
+		ToAddress:      "0xmanagedescrow",
+		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPaymentSent(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{
+			{
+				Id:             "fact-1",
+				ChainNamespace: "eip155",
+				ChainReference: "1",
+				TxHash:         "0xtx-1",
+				TxHashSource:   models.PaymentTxHashSourceChainTx,
+				EventType:      models.PaymentEventManagedEscrowReceived,
+				ToAddress:      "0xmanagedescrow",
+				Amount:         "400",
+				Status:         models.PaymentObservationStatusConfirmed,
+				ObservedAt:     timestamppb.New(observedAt),
+			},
+			{
+				Id:             "fact-2",
+				ChainNamespace: "eip155",
+				ChainReference: "1",
+				TxHash:         "0xtx-2",
+				TxHashSource:   models.PaymentTxHashSourceChainTx,
+				EventType:      models.PaymentEventManagedEscrowReceived,
+				ToAddress:      "0xmanagedescrow",
+				Amount:         "600",
+				Status:         models.PaymentObservationStatusConfirmed,
+				ObservedAt:     timestamppb.New(observedAt.Add(time.Minute)),
+			},
+		},
+	}
+	session, err := p.Project(&projectOrderInput{
+		order:       order,
+		paymentSent: paymentSent,
+		orderOpen: &pb.OrderOpen{
+			Amount:      "1000",
+			Timestamp:   timestamppb.New(time.Now()),
+			PricingCoin: "USD",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "0.000000000000001", session.PaymentProgress.ObservedAmount)
+	require.Equal(t, 2, session.PaymentProgress.ObservationCount)
+	require.Len(t, session.PaymentProgress.Observations, 2)
+	require.Equal(t, "0xtx-1", session.PaymentProgress.Observations[0].TxHash)
+	require.Equal(t, "0.0000000000000004", session.PaymentProgress.Observations[0].Amount)
+	require.Equal(t, "0xtx-2", session.PaymentProgress.Observations[1].TxHash)
+	require.Equal(t, "0.0000000000000006", session.PaymentProgress.Observations[1].Amount)
 }
 
 func TestQueryObservationProgress_IsTenantScoped(t *testing.T) {
@@ -251,10 +320,12 @@ func TestQueryObservationProgress_IsTenantScoped(t *testing.T) {
 	}
 	require.NoError(t, db.gormDB.Create(&rows).Error)
 
-	total, count, lastSeen, err := p.queryObservationProgress("tenant-a", "order-shared")
+	total, count, lastSeen, observations, err := p.queryObservationProgress("tenant-a", "order-shared")
 	require.NoError(t, err)
 	require.Equal(t, "100", total)
 	require.Equal(t, 1, count)
+	require.Len(t, observations, 1)
+	require.Equal(t, "obs-tenant-a", observations[0].ID)
 	require.NotNil(t, lastSeen)
 	require.True(t, firstSeen.Equal(*lastSeen))
 }
@@ -262,7 +333,7 @@ func TestQueryObservationProgress_IsTenantScoped(t *testing.T) {
 func TestQueryObservationProgress_RejectsMissingTenant(t *testing.T) {
 	p := NewPaymentSessionProjector(newVerifierTestDB(t))
 
-	_, _, _, err := p.queryObservationProgress("", "order-1")
+	_, _, _, _, err := p.queryObservationProgress("", "order-1")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "tenantID and orderID must be set")
 }

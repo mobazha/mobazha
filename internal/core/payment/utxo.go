@@ -4,6 +4,7 @@ package payment
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	settlementpayment "github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"gorm.io/gorm"
@@ -75,7 +77,7 @@ func (s *PaymentAppService) checkOrderPendingPayment(order *models.Order) bool {
 
 	if spec := paymentSent.GetSettlementSpec(); err == nil && spec != nil && spec.GetMethod() == pb.PaymentSent_CANCELABLE && order.Role() == models.RoleVendor {
 		coinType := iwallet.CoinType(paymentSent.Coin)
-		coinInfo, coinErr := coinType.CoinInfo()
+		coinInfo, coinErr := settlementpayment.SettlementCoinInfoForCoin(coinType)
 		if coinErr != nil {
 			return false
 		}
@@ -83,8 +85,9 @@ func (s *PaymentAppService) checkOrderPendingPayment(order *models.Order) bool {
 		if coinInfo.Chain.IsUTXOChain() || coinInfo.IsEthTypeChain() {
 			logger.LogInfoWithIDf(log, s.nodeID, "Emitting CancelablePaymentReady for pending order %s (chain=%s)", order.ID, coinInfo.Chain)
 			s.eventBus.Emit(&events.CancelablePaymentReady{
-				OrderID: order.ID.String(),
-				Coin:    string(coinType),
+				TenantID: order.TenantID,
+				OrderID:  order.ID.String(),
+				Coin:     string(coinType),
 			})
 			return true
 		}
@@ -98,7 +101,7 @@ func (s *PaymentAppService) checkOrderPendingPayment(order *models.Order) bool {
 		pendingInfo != nil && pendingInfo.Coin != "" {
 
 		coinType := iwallet.CoinType(pendingInfo.Coin)
-		coinInfo, coinErr := coinType.CoinInfo()
+		coinInfo, coinErr := settlementpayment.SettlementCoinInfoForCoin(coinType)
 		if coinErr != nil || !coinInfo.Chain.IsUTXOChain() {
 			return false
 		}
@@ -255,41 +258,23 @@ func (s *PaymentAppService) HandleUTXOPayment(tx iwallet.Transaction, wa *utxo.W
 		}
 	}
 
-	// Monitor-driven path: persist the chain fact and let AggregatingVerifier
-	// advance PaymentSession / PaymentSent. Seller-side guest checkout and
-	// buyer-side nodes with an observation aggregator both use this path.
+	// Persist the chain fact and let AggregatingVerifier advance
+	// PaymentSession / PaymentSent. UTXO funding does not have a parallel
+	// buyer-side verification path.
 	s.dispatchUTXOObservation(&order, &tx, wa.Address, coinType)
 
 	if order.Role() != models.RoleBuyer {
 		return
 	}
 
-	if s.utxoUsesMonitorDrivenVerifier() {
-		var freshOrder models.Order
-		if err := s.db.View(func(dbtx database.Tx) error {
-			return dbtx.Read().Where("id = ?", order.ID).First(&freshOrder).Error
-		}); err != nil {
-			logger.LogErrorWithIDf(log, s.nodeID, "Error reloading order %s after UTXO observation: %v", order.ID, err)
-			return
-		}
-		s.handleBuyerUTXOExcessPayment(&freshOrder, &tx)
-		return
-	}
-
-	// Legacy fallback for nodes without an observation aggregator (tests or
-	// pre-PS wiring): buyer node records txs locally and emits UTXOPaymentDetected.
 	var freshOrder models.Order
 	if err := s.db.View(func(dbtx database.Tx) error {
 		return dbtx.Read().Where("id = ?", order.ID).First(&freshOrder).Error
 	}); err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Error reloading order %s before legacy UTXO path: %v", order.ID, err)
+		logger.LogErrorWithIDf(log, s.nodeID, "Error reloading order %s after UTXO observation: %v", order.ID, err)
 		return
 	}
-	s.handleBuyerUTXOPayment(&freshOrder, &tx, wa.Address, coinType)
-}
-
-func (s *PaymentAppService) utxoUsesMonitorDrivenVerifier() bool {
-	return s.observationDispatcher != nil && s.observationDispatcher.HasAggregator()
+	s.handleBuyerUTXOExcessPayment(&freshOrder, &tx)
 }
 
 func (s *PaymentAppService) handleBuyerUTXOExcessPayment(order *models.Order, tx *iwallet.Transaction) {
@@ -349,147 +334,6 @@ func (s *PaymentAppService) buyerUTXOPaymentContributedToPaymentSent(order *mode
 		}
 	}
 	return false, nil
-}
-
-func (s *PaymentAppService) handleBuyerUTXOPayment(order *models.Order, tx *iwallet.Transaction, matchedAddress string, coinType iwallet.CoinType) {
-	existingTxs, err := order.GetTransactions()
-	if err == nil {
-		for _, existingTx := range existingTxs {
-			if existingTx.ID == tx.ID {
-				logger.LogDebugWithIDf(log, s.nodeID, "Ignoring duplicate transaction notification for order %s: txid=%s", order.ID, tx.ID)
-				return
-			}
-		}
-	}
-
-	if existingPaymentSent, _ := order.PaymentSentMessage(); existingPaymentSent != nil {
-		if existingPaymentSent.TransactionID == tx.ID.String() {
-			logger.LogDebugWithIDf(log, s.nodeID, "Ignoring re-detection of PaymentSent transaction for order %s: txid=%s", order.ID, tx.ID)
-			return
-		}
-		s.handleBuyerUTXOExcessPayment(order, tx)
-		return
-	}
-
-	if err := s.db.Update(func(dbtx database.Tx) error {
-		return updateFreshOrder(dbtx, order.ID, func(o *models.Order) error {
-			if err := o.PutTransaction(*tx); err != nil {
-				if models.IsDuplicateTransactionError(err) {
-					return nil
-				}
-				return err
-			}
-			return nil
-		})
-	}); err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Error saving order %s after recording transaction: %v", order.ID, err)
-		return
-	}
-	if err := order.PutTransaction(*tx); err != nil && !models.IsDuplicateTransactionError(err) {
-		logger.LogErrorWithIDf(log, s.nodeID, "Error syncing transaction on order %s after save: %v", order.ID, err)
-		return
-	}
-
-	totalPaid, err := s.CalculateTotalPaidToAddress(order, matchedAddress)
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Error calculating total paid for order %s: %v", order.ID, err)
-		return
-	}
-
-	pendingInfo, err := order.GetPendingPaymentInfo()
-	if err != nil || pendingInfo == nil || pendingInfo.Amount == 0 {
-		logger.LogWarningWithIDf(log, s.nodeID, "Order %s has no pending payment info", order.ID)
-		return
-	}
-
-	expectedAmount := iwallet.NewAmount(pendingInfo.Amount)
-
-	logger.LogInfoWithIDf(log, s.nodeID, "Order %s payment status: paid=%s, expected=%s", order.ID, totalPaid.String(), expectedAmount.String())
-
-	if totalPaid.Cmp(expectedAmount) >= 0 {
-		if pendingInfo.Script == "" {
-			logger.LogErrorWithIDf(log, s.nodeID, "No pending payment script stored for order %s", order.ID)
-			return
-		}
-
-		var payerAddress string
-		for _, from := range tx.From {
-			if from.Address.String() != "" {
-				payerAddress = from.Address.String()
-				break
-			}
-		}
-		if payerAddress == "" {
-			logger.LogWarningWithIDf(log, s.nodeID, "Could not extract payer address for order %s", order.ID)
-		}
-
-		method := pb.PaymentSent_CANCELABLE
-		if pendingInfo.Moderator != "" {
-			method = pb.PaymentSent_MODERATED
-		}
-
-		paymentData := &models.PaymentData{
-			OrderID:          order.ID.String(),
-			TransactionID:    tx.ID.String(),
-			Coin:             coinType,
-			Method:           method,
-			Amount:           totalPaid.Uint64(),
-			ToAddress:        matchedAddress,
-			Timestamp:        tx.Timestamp,
-			Script:           pendingInfo.Script,
-			PayerAddress:     payerAddress,
-			RefundAddress:    payerAddress,
-			Moderator:        pendingInfo.Moderator,
-			ModeratorAddress: pendingInfo.ModeratorPubkey,
-			UnlockHours:      pendingInfo.UnlockHours,
-		}
-
-		s.eventBus.Emit(&events.UTXOPaymentDetected{
-			OrderID:          paymentData.OrderID,
-			TransactionID:    paymentData.TransactionID,
-			Coin:             string(paymentData.Coin),
-			Method:           int32(paymentData.Method),
-			Amount:           paymentData.Amount,
-			ToAddress:        paymentData.ToAddress,
-			Timestamp:        paymentData.Timestamp.Unix(),
-			Script:           paymentData.Script,
-			PayerAddress:     paymentData.PayerAddress,
-			RefundAddress:    paymentData.RefundAddress,
-			Moderator:        paymentData.Moderator,
-			ModeratorAddress: paymentData.ModeratorAddress,
-			UnlockHours:      paymentData.UnlockHours,
-		})
-		logger.LogInfoWithIDf(log, s.nodeID, "Emitted UTXOPaymentDetected for order %s (total paid: %s, method: %s)", order.ID, totalPaid.String(), method.String())
-
-		if s.monitorService != nil && matchedAddress != "" {
-			if err := s.monitorService.UnwatchAddress(matchedAddress); err != nil {
-				logger.LogWarningWithIDf(log, s.nodeID, "Failed to unwatch address after PaymentSent for order %s: %v", order.ID, err)
-			} else {
-				logger.LogInfoWithIDf(log, s.nodeID, "Stopped watching address after PaymentSent for order %s", order.ID)
-			}
-		}
-
-		if err := s.db.Update(func(dbtx database.Tx) error {
-			return updateFreshOrder(dbtx, order.ID, func(o *models.Order) error {
-				o.ClearPendingPaymentInfo()
-				return nil
-			})
-		}); err != nil {
-			logger.LogWarningWithIDf(log, s.nodeID, "Failed to clear pending payment info for order %s: %v", order.ID, err)
-		}
-	} else {
-		remaining := expectedAmount.Sub(totalPaid)
-
-		s.eventBus.Emit(&events.PartialPaymentReceived{
-			OrderID:         order.ID.String(),
-			PaidAmount:      totalPaid.Uint64(),
-			ExpectedAmount:  expectedAmount.Uint64(),
-			RemainingAmount: remaining.Uint64(),
-			Coin:            string(coinType),
-			PaymentAddress:  matchedAddress,
-		})
-		logger.LogInfoWithIDf(log, s.nodeID, "Order %s partial payment received: paid=%s, remaining=%s", order.ID, totalPaid.String(), remaining.String())
-	}
 }
 
 func (s *PaymentAppService) cancelExcessPayment(order *models.Order, tx *iwallet.Transaction) {
@@ -640,9 +484,10 @@ func utxoObservationChainRef(coinType iwallet.CoinType) (namespace string, chain
 }
 
 // dispatchUTXOObservation writes the UTXO payment into payment_observations
-// via ObservationDispatcher (audit-only when aggregator is nil).
+// via ObservationDispatcher.
 func (s *PaymentAppService) dispatchUTXOObservation(order *models.Order, tx *iwallet.Transaction, matchedAddress string, coinType iwallet.CoinType) {
 	if s.observationDispatcher == nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "UTXO observation dispatcher is not configured for order %s tx %s", order.ID, tx.ID)
 		return
 	}
 
@@ -651,11 +496,10 @@ func (s *PaymentAppService) dispatchUTXOObservation(order *models.Order, tx *iwa
 		return
 	}
 
-	paidToAddress := amountPaidToAddress(tx, matchedAddress)
-	if paidToAddress == 0 {
+	outputs := paymentOutputsForAddress(tx, matchedAddress)
+	if len(outputs) == 0 {
 		return
 	}
-	amount := new(big.Int).SetUint64(paidToAddress)
 
 	blockTime := tx.Timestamp
 	if blockTime.IsZero() {
@@ -672,26 +516,28 @@ func (s *PaymentAppService) dispatchUTXOObservation(order *models.Order, tx *iwa
 		}
 	}
 
-	evt := FundingEvent{
-		OrderID:        order.ID.String(),
-		ChainNamespace: chainNamespace,
-		ChainReference: chainRef,
-		TxHash:         string(tx.ID),
-		EventIndex:     0,
-		EventType:      models.PaymentEventUTXOFunding,
-		FromAddress:    fromAddr,
-		ToAddress:      matchedAddress,
-		Amount:         amount,
-		BlockNumber:    blockNumber,
-		BlockTime:      blockTime,
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := s.observationDispatcher.OnFundingEvent(ctx, evt); err != nil {
-		logger.LogWarningWithIDf(log, s.nodeID,
-			"UTXO observation dispatch failed (non-fatal) for order %s tx %s: %v", order.ID, tx.ID, err)
+	for _, output := range outputs {
+		evt := FundingEvent{
+			OrderID:        order.ID.String(),
+			ChainNamespace: chainNamespace,
+			ChainReference: chainRef,
+			TxHash:         string(tx.ID),
+			EventIndex:     output.eventIndex,
+			EventType:      models.PaymentEventUTXOFunding,
+			FromAddress:    fromAddr,
+			ToAddress:      matchedAddress,
+			Amount:         new(big.Int).SetUint64(output.spend.Amount.Uint64()),
+			BlockNumber:    blockNumber,
+			BlockTime:      blockTime,
+		}
+
+		if err := s.observationDispatcher.OnFundingEvent(ctx, evt); err != nil {
+			logger.LogWarningWithIDf(log, s.nodeID,
+				"UTXO observation dispatch failed (non-fatal) for order %s tx %s output %d: %v", order.ID, tx.ID, output.eventIndex, err)
+		}
 	}
 	if knownConfirmed {
 		if err := s.observationDispatcher.OnNewBlock(ctx, chainNamespace, chainRef, blockNumber, 0); err != nil {
@@ -699,6 +545,36 @@ func (s *PaymentAppService) dispatchUTXOObservation(order *models.Order, tx *iwa
 				"UTXO observation confirmation refresh failed (non-fatal) for order %s tx %s: %v", order.ID, tx.ID, err)
 		}
 	}
+}
+
+type utxoPaymentOutput struct {
+	eventIndex int
+	spend      iwallet.SpendInfo
+}
+
+func paymentOutputsForAddress(tx *iwallet.Transaction, address string) []utxoPaymentOutput {
+	if tx == nil {
+		return nil
+	}
+	var out []utxoPaymentOutput
+	for i, spend := range tx.To {
+		if !sameUTXOAddress(spend.Address.String(), address) {
+			continue
+		}
+		eventIndex := i
+		if idx, ok := outputIndexFromOutpointID(spend.ID); ok {
+			eventIndex = int(idx)
+		}
+		out = append(out, utxoPaymentOutput{eventIndex: eventIndex, spend: spend})
+	}
+	return out
+}
+
+func outputIndexFromOutpointID(id []byte) (uint32, bool) {
+	if len(id) < 36 {
+		return 0, false
+	}
+	return binary.LittleEndian.Uint32(id[len(id)-4:]), true
 }
 
 func amountPaidToAddress(tx *iwallet.Transaction, address string) uint64 {

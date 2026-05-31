@@ -12,6 +12,17 @@ import (
 // OrderInfoForCoin derives the chain-specific escrow owner metadata
 // from the serialized order snapshot, without requiring a DB lookup.
 func (o *Order) OrderInfoForCoin(coinType iwallet.CoinType) (*OrderInfo, error) {
+	coinInfo, err := coinType.CoinInfo()
+	if err != nil {
+		return nil, err
+	}
+	return o.OrderInfoForCoinInfo(coinInfo)
+}
+
+// OrderInfoForCoinInfo derives chain-specific escrow owner metadata from
+// already-resolved coin metadata. Runtime settlement assets that are valid for
+// routing but are not hard-coded canonical CoinTypes can use this path.
+func (o *Order) OrderInfoForCoinInfo(coinInfo iwallet.CoinInfo) (*OrderInfo, error) {
 	if o == nil {
 		return nil, errors.New("order is nil")
 	}
@@ -43,11 +54,6 @@ func (o *Order) OrderInfoForCoin(coinType iwallet.CoinType) (*OrderInfo, error) 
 		return nil, fmt.Errorf("order chaincode length %d < 20", len(chaincode))
 	}
 	uniqueID := [20]byte(chaincode[:20])
-
-	coinInfo, err := coinType.CoinInfo()
-	if err != nil {
-		return nil, err
-	}
 
 	buyerAddress := ""
 	vendorAddress := ""

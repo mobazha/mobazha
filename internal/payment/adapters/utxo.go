@@ -189,7 +189,7 @@ func (a *UTXOAutoConfirmAdapter) VerifyPreRelease(_ context.Context, params paym
 		return nil
 	}
 
-	coinInfo, err := params.CoinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(params.CoinType)
 	if err != nil || !coinInfo.Chain.IsUTXOChain() {
 		return nil
 	}

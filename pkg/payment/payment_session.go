@@ -162,12 +162,37 @@ type FundingTargetView struct {
 //
 // Reference: UNIFIED_PAYMENT_SESSION_ARCHITECTURE.md §5.5
 type PaymentProgressView struct {
-	ObservedAmount   string       `json:"observedAmount"`
-	RequiredAmount   string       `json:"requiredAmount"`
-	RemainingAmount  string       `json:"remainingAmount"`
-	ObservationCount int          `json:"observationCount"`
-	LastObservedAt   *time.Time   `json:"lastObservedAt,omitempty"`
-	FundingState     FundingState `json:"fundingState"`
+	ObservedAmount   string                `json:"observedAmount"`
+	RequiredAmount   string                `json:"requiredAmount"`
+	RemainingAmount  string                `json:"remainingAmount"`
+	ObservationCount int                   `json:"observationCount"`
+	LastObservedAt   *time.Time            `json:"lastObservedAt,omitempty"`
+	FundingState     FundingState          `json:"fundingState"`
+	Observations     []ObservedPaymentView `json:"observations,omitempty"`
+}
+
+// ObservedPaymentView is one deduplicated inbound funding fact contributing
+// to PaymentProgressView. It is additive API surface for multi-payment
+// visibility; verification remains owned by PaymentObservation aggregation.
+type ObservedPaymentView struct {
+	ID             string     `json:"id"`
+	TxHash         string     `json:"txHash,omitempty"`
+	TxHashSource   string     `json:"txHashSource,omitempty"`
+	HasChainTxHash bool       `json:"hasChainTxHash"`
+	EventIndex     int        `json:"eventIndex"`
+	EventType      string     `json:"eventType"`
+	Amount         string     `json:"amount"`
+	RawAmount      string     `json:"rawAmount"`
+	ChainNamespace string     `json:"chainNamespace"`
+	ChainReference string     `json:"chainReference"`
+	FromAddress    string     `json:"fromAddress,omitempty"`
+	ToAddress      string     `json:"toAddress"`
+	TokenAddress   string     `json:"tokenAddress,omitempty"`
+	BlockNumber    int64      `json:"blockNumber"`
+	Confirmations  int        `json:"confirmations"`
+	Status         string     `json:"status"`
+	Source         string     `json:"source"`
+	ObservedAt     *time.Time `json:"observedAt,omitempty"`
 }
 
 // SessionCapabilitiesView lists which settlement actions are currently

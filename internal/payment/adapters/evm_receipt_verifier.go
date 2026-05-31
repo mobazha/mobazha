@@ -37,7 +37,7 @@ func NewEVMReceiptVerifier(mw contracts.WalletOperator) *EVMReceiptVerifier {
 // getReceiptFetcher resolves the EVMReceiptFetcher for the given coin.
 // Returns errNotEVMChain for non-EVM coins (callers treat as noop).
 func (v *EVMReceiptVerifier) getReceiptFetcher(coinCode string) (evm.EVMReceiptFetcher, error) {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinCode))
+	coinInfo, err := payment.SettlementCoinInfoForCoin(iwallet.CoinType(coinCode))
 	if err != nil || !coinInfo.IsEthTypeChain() {
 		return nil, errNotEVMChain
 	}

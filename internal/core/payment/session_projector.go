@@ -50,6 +50,7 @@ type projectOrderInput struct {
 	observedAmountRaw string
 	obsCount          int
 	lastObsAt         *time.Time
+	observations      []models.PaymentObservation
 }
 
 // Project builds a payment.PaymentSession for the given order.
@@ -78,7 +79,8 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	settlementMode, fundingTarget := p.deriveFundingTarget(order, paymentCoin, expectedAmount, input)
 
 	// ── Payment progress ──────────────────────────────────────────────────
-	progress := p.deriveProgress(order, expectedAmountRaw, paymentCoin, input.observedAmountRaw, input.obsCount, input.lastObsAt)
+	progressRows, observedAmountRaw, obsCount, lastObsAt := progressObservationSnapshot(order, input)
+	progress := p.deriveProgress(order, expectedAmountRaw, paymentCoin, observedAmountRaw, obsCount, lastObsAt, progressRows)
 
 	// ── Session status ────────────────────────────────────────────────────
 	status := deriveSessionStatus(order.PaymentVerificationStatus, progress.FundingState)
@@ -371,6 +373,7 @@ func (p *PaymentSessionProjector) deriveProgress(
 	observedAmountRaw string,
 	obsCount int,
 	lastObsAt *time.Time,
+	observations []models.PaymentObservation,
 ) payment.PaymentProgressView {
 	observedRaw := strings.TrimSpace(observedAmountRaw)
 	if observedRaw == "" {
@@ -416,7 +419,139 @@ func (p *PaymentSessionProjector) deriveProgress(
 		ObservationCount: obsCount,
 		LastObservedAt:   lastObsAt,
 		FundingState:     fundingState,
+		Observations:     paymentObservationViews(observations, paymentCoin),
 	}
+}
+
+func paymentObservationViews(rows []models.PaymentObservation, paymentCoin string) []payment.ObservedPaymentView {
+	if len(rows) == 0 {
+		return nil
+	}
+	views := make([]payment.ObservedPaymentView, 0, len(rows))
+	for i := range rows {
+		row := rows[i]
+		var observedAt *time.Time
+		if !row.BlockTime.IsZero() {
+			t := row.BlockTime
+			observedAt = &t
+		} else if !row.CreatedAt.IsZero() {
+			t := row.CreatedAt
+			observedAt = &t
+		}
+		views = append(views, payment.ObservedPaymentView{
+			ID:             row.ID,
+			TxHash:         row.TxHash,
+			TxHashSource:   models.NormalizePaymentTxHashSource(row.TxHashSource),
+			HasChainTxHash: row.HasChainTxHash(),
+			EventIndex:     row.EventIndex,
+			EventType:      row.EventType,
+			Amount:         payment.FormatSessionAmount(row.Amount, paymentCoin),
+			RawAmount:      row.Amount,
+			ChainNamespace: row.ChainNamespace,
+			ChainReference: row.ChainReference,
+			FromAddress:    row.FromAddress,
+			ToAddress:      row.ToAddress,
+			TokenAddress:   row.TokenAddress,
+			BlockNumber:    row.BlockNumber,
+			Confirmations:  row.Confirmations,
+			Status:         row.Status,
+			Source:         row.Source,
+			ObservedAt:     observedAt,
+		})
+	}
+	return views
+}
+
+func progressObservationSnapshot(order *models.Order, input *projectOrderInput) ([]models.PaymentObservation, string, int, *time.Time) {
+	if input == nil {
+		return nil, "", 0, nil
+	}
+	rows := append([]models.PaymentObservation(nil), input.observations...)
+	if order != nil {
+		rows = append(rows, paymentSentFundingFactRows(order, input.paymentSent)...)
+	}
+	if len(rows) == 0 {
+		return nil, input.observedAmountRaw, input.obsCount, input.lastObsAt
+	}
+	rows = models.DedupePaymentObservations(rows)
+	total, err := sumObservations(rows)
+	if err != nil {
+		return input.observations, input.observedAmountRaw, input.obsCount, input.lastObsAt
+	}
+	var lastSeen *time.Time
+	for i := range rows {
+		t := rows[i].BlockTime
+		if !t.IsZero() && (lastSeen == nil || t.After(*lastSeen)) {
+			copy := t
+			lastSeen = &copy
+		}
+	}
+	if lastSeen == nil {
+		lastSeen = input.lastObsAt
+	}
+	return rows, total.String(), len(rows), lastSeen
+}
+
+func paymentSentFundingFactRows(order *models.Order, paymentSent *pb.PaymentSent) []models.PaymentObservation {
+	if order == nil {
+		return nil
+	}
+	ps := paymentSent
+	if ps == nil {
+		var err error
+		ps, err = order.PaymentSentMessage()
+		if err != nil {
+			return nil
+		}
+	}
+	if len(ps.GetFundingFacts()) == 0 {
+		return nil
+	}
+	rows := make([]models.PaymentObservation, 0, len(ps.GetFundingFacts()))
+	for i, fact := range ps.GetFundingFacts() {
+		if fact == nil {
+			continue
+		}
+		id := strings.TrimSpace(fact.GetId())
+		if id == "" {
+			id = fmt.Sprintf("paymentsent:%s:%d", fact.GetTxHash(), fact.GetEventIndex())
+		}
+		blockTime := time.Time{}
+		if fact.GetObservedAt() != nil {
+			blockTime = fact.GetObservedAt().AsTime()
+		}
+		source := strings.TrimSpace(fact.GetSource())
+		if source == "" {
+			source = models.PaymentObservationSourceBuyerReported
+		}
+		status := strings.TrimSpace(fact.GetStatus())
+		if status == "" {
+			status = models.PaymentObservationStatusConfirmed
+		}
+		txHashSource := models.NormalizePaymentTxHashSource(fact.GetTxHashSource())
+		rows = append(rows, models.PaymentObservation{
+			TenantID:       order.TenantID,
+			ID:             id,
+			OrderID:        order.ID.String(),
+			ChainNamespace: fact.GetChainNamespace(),
+			ChainReference: fact.GetChainReference(),
+			TxHash:         fact.GetTxHash(),
+			EventIndex:     int(fact.GetEventIndex()),
+			TxHashSource:   txHashSource,
+			EventType:      fact.GetEventType(),
+			FromAddress:    fact.GetFromAddress(),
+			ToAddress:      fact.GetToAddress(),
+			TokenAddress:   fact.GetTokenAddress(),
+			Amount:         fact.GetAmount(),
+			BlockNumber:    fact.GetBlockNumber(),
+			BlockTime:      blockTime,
+			Confirmations:  int(fact.GetConfirmations()),
+			Status:         status,
+			Source:         source,
+			Observer:       fmt.Sprintf("paymentsent:%d", i),
+		})
+	}
+	return rows
 }
 
 // deriveExpiry calculates the session expiry from OrderOpen's funding timeout
@@ -609,11 +744,12 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 
 	// Observation progress includes pending rows so payment sessions can show
 	// mempool-detected funds without marking the order chain-verified.
-	observedAmountRaw, obsCount, lastObsAt, err := p.queryObservationProgress(order.TenantID, orderID)
+	observedAmountRaw, obsCount, lastObsAt, observations, err := p.queryObservationProgress(order.TenantID, orderID)
 	if err == nil {
 		input.observedAmountRaw = observedAmountRaw
 		input.obsCount = obsCount
 		input.lastObsAt = lastObsAt
+		input.observations = observations
 	}
 
 	return input, nil
@@ -621,9 +757,9 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 
 // queryObservationProgress returns deduplicated pending-or-confirmed observed
 // funds for UI progress. Verification still reads confirmed rows only.
-func (p *PaymentSessionProjector) queryObservationProgress(tenantID, orderID string) (string, int, *time.Time, error) {
+func (p *PaymentSessionProjector) queryObservationProgress(tenantID, orderID string) (string, int, *time.Time, []models.PaymentObservation, error) {
 	if tenantID == "" || orderID == "" {
-		return "", 0, nil, fmt.Errorf("payment session projector: tenantID and orderID must be set")
+		return "", 0, nil, nil, fmt.Errorf("payment session projector: tenantID and orderID must be set")
 	}
 
 	var rows []models.PaymentObservation
@@ -639,12 +775,12 @@ func (p *PaymentSessionProjector) queryObservationProgress(tenantID, orderID str
 			Find(&rows).Error
 	})
 	if err != nil {
-		return "", 0, nil, err
+		return "", 0, nil, nil, err
 	}
 	rows = models.DedupePaymentObservations(rows)
 	total, err := sumObservations(rows)
 	if err != nil {
-		return "", 0, nil, err
+		return "", 0, nil, nil, err
 	}
 	for i := range rows {
 		t := rows[i].BlockTime
@@ -652,5 +788,5 @@ func (p *PaymentSessionProjector) queryObservationProgress(tenantID, orderID str
 			lastBlockTime = &t
 		}
 	}
-	return total.String(), len(rows), lastBlockTime, nil
+	return total.String(), len(rows), lastBlockTime, rows, nil
 }

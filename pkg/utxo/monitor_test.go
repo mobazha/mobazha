@@ -886,6 +886,62 @@ func TestMonitorHandleTransaction(t *testing.T) {
 	}
 }
 
+func TestMonitorHandleTransaction_ReemitsConfirmedDuplicateWithoutDoubleCounting(t *testing.T) {
+	m := NewMonitor(nil)
+
+	callbacks := 0
+	var statuses []PaymentStatus
+	wa := &WatchedAddress{
+		Address:        "test_addr",
+		ChainType:      iwallet.ChainBitcoin,
+		OrderID:        "order123",
+		ExpectedAmount: 100000,
+		ExpiresAt:      time.Now().Add(1 * time.Hour),
+		OnPayment: func(tx *iwallet.Transaction, status PaymentStatus) {
+			callbacks++
+			statuses = append(statuses, status)
+		},
+	}
+	baseTx := &iwallet.Transaction{
+		ID:    "txid123",
+		Value: iwallet.NewAmount(49_999_998_350),
+		To: []iwallet.SpendInfo{
+			{
+				Address: iwallet.NewAddress("test_addr", iwallet.CoinType("BTC")),
+				Amount:  iwallet.NewAmount(100000),
+			},
+			{
+				Address: iwallet.NewAddress("change_addr", iwallet.CoinType("BTC")),
+				Amount:  iwallet.NewAmount(49_999_898_350),
+			},
+		},
+		Height: 0,
+	}
+
+	m.handleTransaction(wa, baseTx)
+
+	confirmed := *baseTx
+	confirmed.Height = 7
+	m.handleTransaction(wa, &confirmed)
+	m.handleTransaction(wa, &confirmed)
+
+	confirmedAtLaterHeight := confirmed
+	confirmedAtLaterHeight.Height = 8
+	m.handleTransaction(wa, &confirmedAtLaterHeight)
+
+	if callbacks != 2 {
+		t.Fatalf("callbacks = %d, want 2 (mempool + first confirmed update)", callbacks)
+	}
+	if wa.TotalPaid.Load() != 100000 {
+		t.Fatalf("TotalPaid = %d, want 100000 without duplicate confirmation counting", wa.TotalPaid.Load())
+	}
+	for i, status := range statuses {
+		if status != PaymentStatusNormal {
+			t.Fatalf("status[%d] = %s, want normal", i, status)
+		}
+	}
+}
+
 func TestMonitorPollAddress(t *testing.T) {
 	m := NewMonitor(nil)
 

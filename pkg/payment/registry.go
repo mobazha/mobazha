@@ -100,11 +100,11 @@ func (r *Registry) ForChain(chain iwallet.ChainType) (ChainEscrow, error) {
 //
 // Example: ForCoin("crypto:eip155:56:native") → CoinInfo.Chain == ChainBSC → ForChain(ChainBSC)
 func (r *Registry) ForCoin(coin iwallet.CoinType) (ChainEscrow, error) {
-	info, err := coin.CoinInfo()
+	chain, err := SettlementChainForCoin(coin)
 	if err != nil {
 		return nil, fmt.Errorf("unknown coin %s: %w", coin, err)
 	}
-	return r.ForChain(info.Chain)
+	return r.ForChain(chain)
 }
 
 // Chains returns all chain types that have a registered ChainEscrow implementation.
@@ -175,9 +175,9 @@ func (r *Registry) ForChainV2(chain iwallet.ChainType) (ChainEscrowV2, error) {
 // when needed. This is the V2 counterpart to ForCoin and the primary
 // entry point for action-centric callers.
 func (r *Registry) ForCoinV2(coin iwallet.CoinType) (ChainEscrowV2, error) {
-	info, err := coin.CoinInfo()
+	chain, err := SettlementChainForCoin(coin)
 	if err != nil {
 		return nil, fmt.Errorf("unknown coin %s: %w", coin, err)
 	}
-	return r.ForChainV2(info.Chain)
+	return r.ForChainV2(chain)
 }

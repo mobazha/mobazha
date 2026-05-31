@@ -408,7 +408,13 @@ func TestAggregateAndEmit_PendingUTXOMempoolAcceptedPolicyVerifies(t *testing.T)
 	})
 
 	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
-	require.Len(t, bus.emitted, 1)
+	require.Len(t, bus.emitted, 2)
+	_, ok := bus.emitted[0].(events.PaymentVerified)
+	require.True(t, ok, "first event remains the internal verification signal")
+	ready, ok := bus.emitted[1].(*events.CancelablePaymentReady)
+	require.True(t, ok, "UTXO cancelable payment should emit auto-confirm event")
+	require.Equal(t, "order-1", ready.OrderID)
+	require.Equal(t, uint64(1000), ready.Amount)
 
 	got := loadOrder(t, db, "order-1")
 	require.True(t, got.IsPaymentVerified())
@@ -421,6 +427,9 @@ func TestAggregateAndEmit_PendingUTXOMempoolAcceptedPolicyVerifies(t *testing.T)
 	require.Equal(t, "bch-tx-pending", ps.TransactionID)
 	require.Equal(t, "bch-escrow", ps.ToAddress)
 	require.Equal(t, "crypto:bitcoincash:mainnet:native", ps.Coin)
+	require.Equal(t, models.PaymentConfirmationPolicyMempoolAccepted, ps.ConfirmationPolicy)
+	require.Len(t, ps.FundingFacts, 1)
+	require.Equal(t, models.PaymentObservationStatusPending, ps.FundingFacts[0].Status)
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -513,11 +522,15 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 
 	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-1"))
 
-	require.Len(t, bus.emitted, 1)
+	require.Len(t, bus.emitted, 2)
 	verified, ok := bus.emitted[0].(events.PaymentVerified)
 	require.True(t, ok, "expected PaymentVerified event")
 	require.Equal(t, database.StandaloneTenantID, verified.TenantID)
 	require.Equal(t, "order-1", verified.OrderID)
+	ready, ok := bus.emitted[1].(*events.CancelablePaymentReady)
+	require.True(t, ok, "vendor cancelable payment should emit auto-confirm event")
+	require.Equal(t, "order-1", ready.OrderID)
+	require.Equal(t, uint64(1000), ready.Amount)
 
 	got := loadOrder(t, db, "order-1")
 	require.True(t, got.IsPaymentVerified())
@@ -673,6 +686,38 @@ func TestAggregateAndEmit_VendorVerifiedPaymentEmitsOrderFunded(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("vendor monitor verification did not call the cross-node payment verified handler")
 	}
+}
+
+func TestAggregateAndEmit_VendorCancelableEmitsReadyWithoutFundedNotification(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	seedOrder(t, db, "order-vendor-ready-no-listing", "1000", "btc-refund")
+	seedPendingUTXOInfo(t, db, "order-vendor-ready-no-listing", "mempool_accepted")
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-vendor-ready-no-listing",
+		OrderID:        "order-vendor-ready-no-listing",
+		ChainNamespace: "bip122",
+		ChainReference: "000000000019d6689c085ae165831e93",
+		TxHash:         "btc-ready-tx",
+		EventType:      models.PaymentEventUTXOFunding,
+		FromAddress:    "btc-payer",
+		ToAddress:      "bch-escrow",
+		Amount:         "1000",
+		Status:         models.PaymentObservationStatusConfirmed,
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-vendor-ready-no-listing"))
+
+	require.Len(t, bus.emitted, 2)
+	_, ok := bus.emitted[0].(events.PaymentVerified)
+	require.True(t, ok, "first event remains the internal verification signal")
+	ready, ok := bus.emitted[1].(*events.CancelablePaymentReady)
+	require.True(t, ok, "financial auto-confirm event must not depend on listing notification payload")
+	require.Equal(t, "order-vendor-ready-no-listing", ready.OrderID)
+	require.Equal(t, uint64(1000), ready.Amount)
+	require.Equal(t, "btc-ready-tx", ready.TransactionID)
 }
 
 func TestAggregateAndEmit_BuyerVerifiedPaymentEmitsPaymentReceived(t *testing.T) {
@@ -1723,4 +1768,11 @@ func TestAggregateAndEmit_PartialThenFull_EmitsOnce(t *testing.T) {
 	require.Equal(t, "0xpayer-2", ps.PayerAddress)
 	require.Equal(t, "1000", ps.Amount, "envelope amount is the aggregated total, not the latest tx")
 	require.Equal(t, int64(1778761800), ps.Timestamp.AsTime().Unix())
+	require.Len(t, ps.FundingFacts, 2)
+	require.Equal(t, "obs-partial", ps.FundingFacts[0].Id)
+	require.Equal(t, "0xtx-partial", ps.FundingFacts[0].TxHash)
+	require.Equal(t, "400", ps.FundingFacts[0].Amount)
+	require.Equal(t, "obs-topup", ps.FundingFacts[1].Id)
+	require.Equal(t, "0xtx-topup", ps.FundingFacts[1].TxHash)
+	require.Equal(t, "600", ps.FundingFacts[1].Amount)
 }

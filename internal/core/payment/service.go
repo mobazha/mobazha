@@ -95,9 +95,8 @@ type PaymentAppService struct {
 	// OrderProcessor.RecordVerifiedPayment for the async verification path.
 	paymentRecorder VerifiedPaymentRecorder
 
-	// observationDispatcher routes UTXO funding events into payment_observations.
-	// When it has an aggregator, HandleUTXOPayment relies on monitor-driven
-	// verification and skips the legacy buyer-node FSM path.
+	// observationDispatcher routes UTXO funding events into payment_observations
+	// and triggers the aggregator that owns payment verification.
 	observationDispatcher *ObservationDispatcher
 
 	// paymentVerifiedHandler is called after a crypto payment is confirmed on-chain
@@ -254,7 +253,7 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 	// PendingManagedEscrowPaymentInfo so the PaymentSessionProjector can classify
 	// this order as SettlementModeAddressMonitored immediately (without
 	// waiting for a PaymentSent message to arrive).
-	coinInfo, coinErr := iwallet.CoinInfoFromCoinType(params.CoinType)
+	coinInfo, coinErr := payment.SettlementCoinInfoForCoin(params.CoinType)
 	if coinErr == nil &&
 		strategy.Model() == payment.PaymentModelMonitored &&
 		coinInfo.IsEthTypeChain() &&
@@ -413,7 +412,7 @@ func (s *PaymentAppService) persistSharedPaymentPolicySnapshot(orderID, moderato
 // contract/program chains. EVM remains client-signed; Solana now builds Anchor
 // create instructions that the V2 adapter submits through the backend relay.
 func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
-	coinInfo, err := params.CoinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(params.CoinType)
 	if err != nil {
 		return nil, iwallet.Address{}, nil, err
 	}
@@ -622,7 +621,11 @@ func (s *PaymentAppService) GetOrderInfo(orderID models.OrderID, coinType iwalle
 	if err != nil {
 		return nil, err
 	}
-	return order.OrderInfoForCoin(coinType)
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
+	if err != nil {
+		return nil, err
+	}
+	return order.OrderInfoForCoinInfo(coinInfo)
 }
 
 // GetModeratorEscrowInfo resolves moderator details for escrow setup. Returns
@@ -661,7 +664,7 @@ func (s *PaymentAppService) GetModeratorEscrowInfo(ctx context.Context, moderato
 
 	paymentMethod = pb.PaymentSent_MODERATED
 
-	coinInfo, err := coinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
 	if err != nil {
 		return paymentMethod, "", 0, fmt.Errorf("get coin info: %s", err.Error())
 	}

@@ -36,7 +36,7 @@ type EVMChainOps struct {
 // AutoConfirm delegates to OnAutoConfirm callback with chain type.
 func (o *EVMChainOps) AutoConfirm(event *events.CancelablePaymentReady) error {
 	coinType := iwallet.CoinType(event.Coin)
-	coinInfo, err := coinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
 	if err != nil {
 		return fmt.Errorf("unknown coin %s: %w", event.Coin, err)
 	}
@@ -87,7 +87,7 @@ func (o *EVMChainOps) BuildDisputeRelease(order *models.Order, initiator string)
 // VerifyDeposit checks the buyer's EVM deposit on-chain:
 // receipt status, Funded event, escrow hash match, and minimum amount.
 func (o *EVMChainOps) VerifyDeposit(ctx context.Context, params payment.DepositVerifyParams) error {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(params.CoinType)
+	coinInfo, err := payment.SettlementCoinInfoForCoin(params.CoinType)
 	if err != nil || !coinInfo.IsEthTypeChain() {
 		return nil
 	}
@@ -157,7 +157,7 @@ func (o *EVMChainOps) ValidatePaymentMessage(params payment.PaymentMessageParams
 	}
 
 	coinType := iwallet.CoinType(paymentSent.Coin)
-	coinInfo, err := coinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
 	if err != nil {
 		return fmt.Errorf("unknown coin %s: %w", paymentSent.Coin, err)
 	}

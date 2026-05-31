@@ -91,9 +91,9 @@ func NewObservationDispatcher(
 	if repo == nil {
 		panic("payment: NewObservationDispatcher requires a non-nil PaymentObservationRepo")
 	}
-	// aggregator == nil is valid: audit-only mode (insert observations
-	// without triggering AggregateAndEmit). Used by UTXO path where the
-	// legacy verification pipeline is still the source of truth.
+	if aggregator == nil {
+		panic("payment: NewObservationDispatcher requires a non-nil PaymentAggregator")
+	}
 	if tenants == nil {
 		panic("payment: NewObservationDispatcher requires a non-nil TenantResolver")
 	}
@@ -119,8 +119,6 @@ func (d *ObservationDispatcher) withClock(clock func() time.Time) *ObservationDi
 }
 
 // HasAggregator reports whether observation inserts trigger payment aggregation.
-// When false the dispatcher is audit-only and UTXO checkout must use the legacy
-// buyer-node path to advance orders.
 func (d *ObservationDispatcher) HasAggregator() bool {
 	return d != nil && d.aggregator != nil
 }
@@ -212,7 +210,7 @@ type FundingEvent struct {
 	// because they cannot represent a real funding contribution.
 	Amount *big.Int
 
-	BlockNumber int64     // inclusion height; 0 = mempool / unconfirmed
+	BlockNumber int64 // inclusion height; 0 = mempool / unconfirmed
 	BlockTime   time.Time
 }
 

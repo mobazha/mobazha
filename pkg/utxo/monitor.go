@@ -123,15 +123,22 @@ type Monitor struct {
 	nodeCallbacksMu sync.RWMutex
 
 	// Transaction deduplication cache
-	// Key: "address:txid", Value: timestamp of first seen
-	// Used to prevent duplicate notifications when multiple sources detect same transaction
-	seenTxs   map[string]time.Time
+	// Key: "address:txid". A confirmed version of a previously mempool-seen
+	// transaction must still be delivered so order/payment aggregation can move
+	// from pending to confirmed without double-counting the payment amount.
+	seenTxs   map[string]seenTxState
 	seenTxsMu sync.RWMutex
 
 	// Source health tracking: key = "chainType:sourceIndex", value = was healthy last check.
 	// Used to detect unhealthy→healthy transitions and re-subscribe watched addresses.
 	sourceHealthPrev   map[string]bool
 	sourceHealthPrevMu sync.Mutex
+}
+
+type seenTxState struct {
+	firstSeen time.Time
+	height    uint64
+	confirmed bool
 }
 
 // MonitorConfig holds configuration for the transaction monitor
@@ -172,7 +179,7 @@ func NewMonitor(config *MonitorConfig) *Monitor {
 		shutdown:            make(chan struct{}),
 		subscribers:         make([]chan iwallet.Transaction, 0),
 		nodeCallbacks:       make(map[string]func(tx iwallet.Transaction, wa *WatchedAddress)),
-		seenTxs:             make(map[string]time.Time),
+		seenTxs:             make(map[string]seenTxState),
 		sourceHealthPrev:    make(map[string]bool),
 	}
 }
@@ -584,16 +591,32 @@ func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction)
 	dedupeKey := wa.Address + ":" + string(tx.ID)
 
 	m.seenTxsMu.Lock()
-	if _, seen := m.seenTxs[dedupeKey]; seen {
-		m.seenTxsMu.Unlock()
-		log.Debugf("Skipping duplicate transaction %s for address %s", tx.ID, wa.Address)
-		return
+	state, seen := m.seenTxs[dedupeKey]
+	alreadyCounted := false
+	if seen {
+		if tx.Height == 0 || state.confirmed {
+			m.seenTxsMu.Unlock()
+			log.Debugf("Skipping duplicate transaction %s for address %s", tx.ID, wa.Address)
+			return
+		}
+		state.height = tx.Height
+		state.confirmed = true
+		m.seenTxs[dedupeKey] = state
+		alreadyCounted = true
+	} else {
+		now := time.Now()
+		m.seenTxs[dedupeKey] = seenTxState{
+			firstSeen: now,
+			height:    tx.Height,
+			confirmed: tx.Height > 0,
+		}
 	}
-	m.seenTxs[dedupeKey] = time.Now()
 	m.seenTxsMu.Unlock()
 
 	txPaid := AmountPaidTo(tx, wa.Address)
-	wa.TotalPaid.Add(txPaid)
+	if !alreadyCounted {
+		wa.TotalPaid.Add(txPaid)
+	}
 
 	status := m.determinePaymentStatus(wa, tx)
 

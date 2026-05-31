@@ -104,6 +104,21 @@ func TestRegistry_ForCoin_TokensResolveToPlatformChain(t *testing.T) {
 	}
 }
 
+func TestRegistry_ForCoin_RuntimeManagedEscrowERC20ResolvesToPlatformChain(t *testing.T) {
+	r := payment.NewRegistry()
+	ethStrategy := &mockStrategy{model: payment.PaymentModelClientSigned}
+
+	r.Register(iwallet.ChainEthereum, ethStrategy)
+
+	got, err := r.ForCoin(iwallet.CoinType("crypto:eip155:1:erc20:0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0"))
+	if err != nil {
+		t.Fatalf("ForCoin(runtime ManagedEscrow ERC20): unexpected error: %v", err)
+	}
+	if got != ethStrategy {
+		t.Fatalf("ForCoin(runtime ManagedEscrow ERC20) returned wrong strategy")
+	}
+}
+
 func TestRegistry_ForCoin_CanonicalAssetID_ResolvesChain(t *testing.T) {
 	r := payment.NewRegistry()
 	bscStrategy := &mockStrategy{model: payment.PaymentModelClientSigned}

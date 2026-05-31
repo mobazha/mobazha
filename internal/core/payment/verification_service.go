@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -160,6 +162,9 @@ func (s *PaymentVerificationService) FetchAndVerify(
 		if err := coinType.ValidateCanonicalPaymentCoin(); err != nil {
 			return nil, fmt.Errorf("invalid payment coin: %w", err)
 		}
+		if len(paymentSent.GetFundingFacts()) > 0 {
+			return s.verifyFundingFacts(ctx, coinType, paymentSent, paymentAddress)
+		}
 		if spec.GetEscrowType() == string(payment.EscrowTypeManagedEscrow) {
 			return s.verifyMonitorRelayedManagedEscrowPayment(ctx, coinType, paymentSent)
 		}
@@ -204,6 +209,183 @@ func (s *PaymentVerificationService) FetchAndVerify(
 		Transaction: *tx,
 		CoinType:    coinType,
 	}, nil
+}
+
+func (s *PaymentVerificationService) verifyFundingFacts(
+	ctx context.Context,
+	coinType iwallet.CoinType,
+	paymentSent *pb.PaymentSent,
+	paymentAddress string,
+) (*contracts.VerifiedPayment, error) {
+	facts := paymentSent.GetFundingFacts()
+	if len(facts) == 0 {
+		return nil, fmt.Errorf("%w: no funding facts", ErrPaymentNotConfirmed)
+	}
+
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
+	if err != nil {
+		return nil, fmt.Errorf("resolve settlement coin: %w", err)
+	}
+	expected, ok := new(big.Int).SetString(strings.TrimSpace(paymentSent.Amount), 10)
+	if !ok || expected.Sign() <= 0 {
+		return nil, fmt.Errorf("invalid payment amount: %q", paymentSent.Amount)
+	}
+
+	total := big.NewInt(0)
+	aggregate := iwallet.Transaction{
+		ID: iwallet.TransactionID(paymentSent.TransactionID),
+	}
+	seen := make(map[string]struct{}, len(facts))
+	for _, fact := range facts {
+		spend, err := s.verifyFundingFact(ctx, coinType, coinInfo, paymentSent, paymentAddress, fact)
+		if err != nil {
+			return nil, err
+		}
+		key := fundingFactKey(fact)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		if aggregate.ID.String() == "" {
+			aggregate.ID = iwallet.TransactionID(fact.GetTxHash())
+		}
+		aggregate.To = append(aggregate.To, spend)
+		spendAmount, ok := new(big.Int).SetString(spend.Amount.String(), 10)
+		if !ok {
+			return nil, fmt.Errorf("invalid verified funding amount %q", spend.Amount.String())
+		}
+		total = total.Add(total, spendAmount)
+	}
+	if total.Cmp(expected) < 0 {
+		return nil, fmt.Errorf("%w: funding facts total %s is less than payment amount %s", ErrPaymentNotConfirmed, total.String(), expected.String())
+	}
+	aggregate.Value = iwallet.NewAmount(total.String())
+	return &contracts.VerifiedPayment{
+		Transaction: aggregate,
+		CoinType:    coinType,
+	}, nil
+}
+
+func (s *PaymentVerificationService) verifyFundingFact(
+	ctx context.Context,
+	coinType iwallet.CoinType,
+	coinInfo iwallet.CoinInfo,
+	paymentSent *pb.PaymentSent,
+	paymentAddress string,
+	fact *pb.PaymentSent_FundingFact,
+) (iwallet.SpendInfo, error) {
+	if fact == nil {
+		return iwallet.SpendInfo{}, fmt.Errorf("%w: empty funding fact", ErrPaymentNotConfirmed)
+	}
+	txHash := strings.TrimSpace(fact.GetTxHash())
+	if txHash == "" || models.NormalizePaymentTxHashSource(fact.GetTxHashSource()) != models.PaymentTxHashSourceChainTx {
+		return iwallet.SpendInfo{}, fmt.Errorf("%w: funding fact %s has no chain transaction hash", ErrPaymentNotConfirmed, fact.GetId())
+	}
+	status := strings.TrimSpace(fact.GetStatus())
+	if !fundingFactStatusAllowed(status, paymentSent.GetConfirmationPolicy()) {
+		return iwallet.SpendInfo{}, fmt.Errorf("%w: funding fact %s is %s", ErrPaymentNotConfirmed, fact.GetId(), status)
+	}
+	amount, ok := new(big.Int).SetString(strings.TrimSpace(fact.GetAmount()), 10)
+	if !ok || amount.Sign() <= 0 {
+		return iwallet.SpendInfo{}, fmt.Errorf("invalid funding fact amount %q", fact.GetAmount())
+	}
+	toAddress := strings.TrimSpace(fact.GetToAddress())
+	if toAddress == "" {
+		toAddress = strings.TrimSpace(paymentSent.ToAddress)
+	}
+	if paymentAddress != "" && !strings.EqualFold(toAddress, paymentAddress) {
+		return iwallet.SpendInfo{}, fmt.Errorf("%w: funding fact %s pays to %s (expected %s)", ErrPaymentAddressMismatch, fact.GetId(), toAddress, paymentAddress)
+	}
+
+	if coinInfo.Chain.IsUTXOChain() {
+		tx, err := s.FetchTransaction(ctx, coinType, txHash, "")
+		if err != nil {
+			return iwallet.SpendInfo{}, err
+		}
+		return spendFromTransactionFundingFact(tx, fact, toAddress, amount)
+	}
+	if coinInfo.Chain == iwallet.ChainSolana {
+		tx, err := s.FetchTransaction(ctx, coinType, txHash, "")
+		if err != nil {
+			return iwallet.SpendInfo{}, err
+		}
+		return spendFromTransactionFundingFact(tx, fact, toAddress, amount)
+	}
+
+	if s.registry == nil {
+		return iwallet.SpendInfo{}, fmt.Errorf("chain escrow registry not configured for funding fact %s", fact.GetId())
+	}
+	strategy, err := s.registry.ForCoinV2(coinType)
+	if err != nil {
+		return iwallet.SpendInfo{}, fmt.Errorf("no chain escrow for funding fact %s coin %s: %w", fact.GetId(), string(coinType), err)
+	}
+	if err := strategy.VerifyDeposit(ctx, payment.DepositVerifyParams{
+		CoinType:      coinType,
+		TxHash:        txHash,
+		Script:        paymentSent.Script,
+		ContractAddr:  paymentSent.ContractAddress,
+		PaymentAmount: amount.String(),
+	}); err != nil {
+		return iwallet.SpendInfo{}, fmt.Errorf("deposit verification failed for funding fact %s: %w", fact.GetId(), err)
+	}
+
+	return iwallet.SpendInfo{
+		ID:      []byte(txHash),
+		Address: iwallet.NewAddress(toAddress, coinType),
+		Amount:  iwallet.NewAmount(amount.String()),
+	}, nil
+}
+
+func fundingFactStatusAllowed(status, confirmationPolicy string) bool {
+	switch status {
+	case "", models.PaymentObservationStatusConfirmed:
+		return true
+	case models.PaymentObservationStatusPending:
+		return models.NormalizePaymentConfirmationPolicy(confirmationPolicy) == models.PaymentConfirmationPolicyMempoolAccepted
+	default:
+		return false
+	}
+}
+
+func spendFromTransactionFundingFact(
+	tx *iwallet.Transaction,
+	fact *pb.PaymentSent_FundingFact,
+	toAddress string,
+	amount *big.Int,
+) (iwallet.SpendInfo, error) {
+	if tx == nil {
+		return iwallet.SpendInfo{}, fmt.Errorf("%w: funding fact %s transaction is missing", ErrPaymentNotConfirmed, fact.GetId())
+	}
+	if idx := int(fact.GetEventIndex()); idx >= 0 && idx < len(tx.To) {
+		out := tx.To[idx]
+		if fundingFactOutputMatches(out, toAddress, amount) {
+			return out, nil
+		}
+	}
+	for _, out := range tx.To {
+		if fundingFactOutputMatches(out, toAddress, amount) {
+			return out, nil
+		}
+	}
+	return iwallet.SpendInfo{}, fmt.Errorf("%w: tx %s has no output %d paying %s amount %s for funding fact %s",
+		ErrPaymentAddressMismatch, tx.ID, fact.GetEventIndex(), toAddress, amount.String(), fact.GetId())
+}
+
+func fundingFactOutputMatches(out iwallet.SpendInfo, toAddress string, amount *big.Int) bool {
+	outAmount, ok := new(big.Int).SetString(out.Amount.String(), 10)
+	return ok && strings.EqualFold(out.Address.String(), toAddress) && outAmount.Cmp(amount) == 0 && len(out.ID) > 0
+}
+
+func fundingFactKey(fact *pb.PaymentSent_FundingFact) string {
+	if fact == nil {
+		return ""
+	}
+	return strings.Join([]string{
+		fact.GetChainNamespace(),
+		fact.GetChainReference(),
+		fact.GetTxHash(),
+		fmt.Sprintf("%d", fact.GetEventIndex()),
+	}, ":")
 }
 
 func (s *PaymentVerificationService) verifyMonitorRelayedManagedEscrowPayment(

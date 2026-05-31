@@ -21,7 +21,7 @@ import (
 func (s *SettlementService) HandleCancelablePaymentForUTXO(event *events.CancelablePaymentReady) {
 	logger.LogInfoWithIDf(log, s.nodeID, "Handling UTXO CANCELABLE payment ready event for order %s", event.OrderID)
 
-	order, err := s.fetchOrderByID(event.OrderID)
+	order, err := s.fetchOrderForCancelablePaymentEvent(event)
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get order %s for UTXO CANCELABLE auto-confirm: %v", event.OrderID, err)
 		return
@@ -36,10 +36,21 @@ func (s *SettlementService) HandleCancelablePaymentForUTXO(event *events.Cancela
 	logger.LogInfoWithIDf(log, s.nodeID, "Auto-confirming UTXO CANCELABLE payment for order %s", order.ID)
 
 	s.eventBus.Emit(&events.OrderAutoConfirmRequest{
-		OrderID: order.ID.String(),
+		TenantID: event.TenantID,
+		OrderID:  order.ID.String(),
 	})
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Emitted OrderAutoConfirmRequest for UTXO CANCELABLE order %s", order.ID)
+}
+
+func (s *SettlementService) fetchOrderForCancelablePaymentEvent(event *events.CancelablePaymentReady) (*models.Order, error) {
+	if event == nil {
+		return nil, fmt.Errorf("cancelable payment event is nil")
+	}
+	if event.TenantID != "" {
+		return s.fetchVendorOrderByTenant(event.OrderID, event.TenantID)
+	}
+	return s.fetchOrderByID(event.OrderID)
 }
 
 // ── EVM Auto-Confirm ────────────────────────────────────────────────────
@@ -104,7 +115,7 @@ func (s *SettlementService) autoConfirmEVMCancelablePayment(order *models.Order,
 		return
 	}
 
-	coinInfo, err := coinType.CoinInfo()
+	coinInfo, err := payment.SettlementCoinInfoForCoin(coinType)
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get coin info for %s: %v", coinType, err)
 		return

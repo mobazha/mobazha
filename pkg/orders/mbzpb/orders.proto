@@ -225,6 +225,10 @@ message Refund {
 }
 
 message PaymentSent {
+    // Legacy representative transaction hash only. Do not use this field as
+    // payment verification authority: monitored crypto payments may be funded
+    // by multiple txs/logs/outputs, and verification is owned by
+    // PaymentObservation aggregation / PaymentSession.paymentProgress.
     string transactionID                = 1;
     string chaincode                    = 2; // Hex encoded
     reserved 3;
@@ -249,6 +253,14 @@ message PaymentSent {
     string buyerReceiveAddress          = 21; // 买家接收 Token 的地址（支持多链地址格式，多商品共用）
     SettlementSpec settlementSpec       = 22; // 显式结算路由，避免接收端从地址/脚本字段推导 ManagedEscrow / legacy 路径
     string cancelFeeAmount              = 23; // 创建支付意图时锁定的 ManagedEscrow Tier 1 cancel/refund 平台费
+    // Deduplicated funding facts that contributed to this payment. This is the
+    // cross-node verification surface for monitored crypto payments; receivers
+    // should verify these facts against chain data instead of treating
+    // transactionID as authoritative.
+    repeated FundingFact fundingFacts   = 24;
+    // Confirmation policy used by the node that aggregated fundingFacts.
+    // Empty means chain_confirmed for backwards compatibility.
+    string confirmationPolicy            = 25;
 
     enum Method {
         DIRECT              = 0; // Address request
@@ -269,6 +281,25 @@ message PaymentSent {
         Method method      = 1; // trust semantics
         string payMode     = 2; // address_monitored / client_signed / provider
         string escrowType  = 3; // none / utxo_script / evm_contract / solana_program / safe / fiat_provider
+    }
+
+    message FundingFact {
+        string id                         = 1;
+        string chainNamespace             = 2;
+        string chainReference             = 3;
+        string txHash                     = 4;
+        string txHashSource               = 5;
+        int32 eventIndex                  = 6;
+        string eventType                  = 7;
+        string fromAddress                = 8;
+        string toAddress                  = 9;
+        string tokenAddress               = 10;
+        string amount                     = 11;
+        int64 blockNumber                 = 12;
+        int32 confirmations               = 13;
+        string status                     = 14;
+        string source                     = 15;
+        google.protobuf.Timestamp observedAt = 16;
     }
 }
 

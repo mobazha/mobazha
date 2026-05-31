@@ -65,6 +65,65 @@ func TestCoinInfoFromCoinType_InvalidCanonicalAssetID(t *testing.T) {
 	}
 }
 
+func TestCoinInfoFromCoinType_RuntimeCanonicalAssets(t *testing.T) {
+	const splMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
+	tests := []struct {
+		name         string
+		coin         CoinType
+		wantChain    ChainType
+		wantNative   bool
+		wantContract string
+		wantDecimals uint8
+	}{
+		{
+			name:         "erc20",
+			coin:         "crypto:eip155:1:erc20:0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
+			wantChain:    ChainEthereum,
+			wantContract: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+			wantDecimals: 18,
+		},
+		{
+			name:         "solana native devnet",
+			coin:         "crypto:solana:devnet:native",
+			wantChain:    ChainSolana,
+			wantNative:   true,
+			wantDecimals: 9,
+		},
+		{
+			name:         "spl devnet",
+			coin:         CoinType("crypto:solana:devnet:spl:" + splMint),
+			wantChain:    ChainSolana,
+			wantContract: splMint,
+			wantDecimals: 9,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info, err := CoinInfoFromCoinType(tt.coin)
+			if err != nil {
+				t.Fatalf("CoinInfoFromCoinType(%s): %v", tt.coin, err)
+			}
+			if info.Chain != tt.wantChain {
+				t.Fatalf("chain = %s, want %s", info.Chain, tt.wantChain)
+			}
+			if info.IsNative != tt.wantNative {
+				t.Fatalf("IsNative = %v, want %v", info.IsNative, tt.wantNative)
+			}
+			if info.Contract != tt.wantContract {
+				t.Fatalf("contract = %s, want %s", info.Contract, tt.wantContract)
+			}
+			if info.TestnetContract != tt.wantContract && !tt.wantNative {
+				t.Fatalf("testnet contract = %s, want %s", info.TestnetContract, tt.wantContract)
+			}
+			if info.Decimals != tt.wantDecimals {
+				t.Fatalf("decimals = %d, want %d", info.Decimals, tt.wantDecimals)
+			}
+		})
+	}
+}
+
 func TestCoinType_PricingCurrencyCode(t *testing.T) {
 	tests := []struct {
 		coin     CoinType

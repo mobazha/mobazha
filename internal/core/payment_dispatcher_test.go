@@ -378,6 +378,7 @@ func TestCancelablePaymentEventTargetsNode(t *testing.T) {
 		{name: "matching-node-id", eventTenantID: "tenant-a", nodeID: "tenant-a", want: true},
 		{name: "matching-local-tenant", eventTenantID: "tenant-a", nodeID: "peer-node", localTenantID: "tenant-a", want: true},
 		{name: "foreign-tenant", eventTenantID: "tenant-b", nodeID: "tenant-a", localTenantID: "tenant-c", want: false},
+		{name: "platform-runtime-handles-tenant-event", eventTenantID: "tenant-a", nodeID: "platform-node", localTenantID: "", want: true},
 		{name: "scoped-event-requires-local-identity", eventTenantID: "tenant-a", nodeID: "", localTenantID: "", want: false},
 	}
 

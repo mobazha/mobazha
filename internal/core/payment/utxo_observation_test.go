@@ -68,24 +68,8 @@ func TestUtxoObservationChainRef_CanonicalAndLegacy(t *testing.T) {
 func TestObservationDispatcher_HasAggregator(t *testing.T) {
 	t.Parallel()
 
-	auditOnly := NewObservationDispatcher(newFakeObsRepo(), nil, &fakeTenantResolver{}, "worker")
-	require.False(t, auditOnly.HasAggregator())
-
 	withAgg := NewObservationDispatcher(newFakeObsRepo(), &fakeAggregator{}, &fakeTenantResolver{}, "worker")
 	require.True(t, withAgg.HasAggregator())
-}
-
-func TestPaymentAppService_UTXOUsesMonitorDrivenVerifier(t *testing.T) {
-	t.Parallel()
-
-	svc := &PaymentAppService{}
-	require.False(t, svc.utxoUsesMonitorDrivenVerifier())
-
-	svc.SetObservationDispatcher(NewObservationDispatcher(newFakeObsRepo(), nil, &fakeTenantResolver{}, "worker"))
-	require.False(t, svc.utxoUsesMonitorDrivenVerifier())
-
-	svc.SetObservationDispatcher(NewObservationDispatcher(newFakeObsRepo(), &fakeAggregator{}, &fakeTenantResolver{}, "worker"))
-	require.True(t, svc.utxoUsesMonitorDrivenVerifier())
 }
 
 func TestBuyerUTXOPaymentContributedToPaymentSent(t *testing.T) {

@@ -28,6 +28,12 @@ func TestFormatSessionAmount(t *testing.T) {
 			want:        "15.99",
 		},
 		{
+			name:        "runtime erc20 standard decimals",
+			rawAmount:   "1100000000000000000",
+			paymentCoin: "crypto:eip155:1:erc20:0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
+			want:        "1.1",
+		},
+		{
 			name:        "unknown coin leaves raw amount unchanged",
 			rawAmount:   "12345",
 			paymentCoin: "crypto:unknown",
@@ -79,6 +85,12 @@ func TestSessionAmountDecimals(t *testing.T) {
 			name:        "fiat provider code",
 			paymentCoin: "fiat:stripe:USD",
 			want:        2,
+			wantOK:      true,
+		},
+		{
+			name:        "runtime spl standard decimals",
+			paymentCoin: "crypto:solana:devnet:spl:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+			want:        9,
 			wantOK:      true,
 		},
 		{

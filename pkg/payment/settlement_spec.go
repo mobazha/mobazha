@@ -457,7 +457,7 @@ func SettlementSpecFromPaymentData(pd *models.PaymentData) (SettlementSpec, bool
 	case pb.PaymentSent_DIRECT:
 		return NewDirectSpec(), true
 	}
-	coinInfo, err := pd.Coin.CoinInfo()
+	coinInfo, err := SettlementCoinInfoForCoin(pd.Coin)
 	if err != nil {
 		return SettlementSpec{}, false
 	}

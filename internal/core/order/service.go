@@ -188,6 +188,18 @@ func (s *OrderAppService) SetCoTenantVerifiedPayment(fn contracts.CoTenantVerifi
 func (s *OrderAppService) RelayPaymentToCounterparty(
 	ctx context.Context, orderID string, targetPeerID peer.ID, pd *models.PaymentData,
 ) {
+	s.relayPaymentToCounterparty(ctx, orderID, targetPeerID, pd, nil)
+}
+
+func (s *OrderAppService) RelayPaymentToCounterpartyWithTransaction(
+	ctx context.Context, orderID string, targetPeerID peer.ID, pd *models.PaymentData, paymentTx *iwallet.Transaction,
+) {
+	s.relayPaymentToCounterparty(ctx, orderID, targetPeerID, pd, paymentTx)
+}
+
+func (s *OrderAppService) relayPaymentToCounterparty(
+	ctx context.Context, orderID string, targetPeerID peer.ID, pd *models.PaymentData, paymentTx *iwallet.Transaction,
+) {
 	if pd == nil {
 		logger.LogWarningWithIDf(log, s.nodeID, "RelayPayment P2P: missing payment data for order %s", orderID)
 		return
@@ -198,7 +210,7 @@ func (s *OrderAppService) RelayPaymentToCounterparty(
 		return
 	}
 
-	paymentSent, err := BuildPaymentSentProto(order, pd)
+	paymentSent, err := paymentSentForCounterpartyRelay(order, pd)
 	if err != nil {
 		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: build proto for order %s: %v", orderID, err)
 		return
@@ -231,7 +243,7 @@ func (s *OrderAppService) RelayPaymentToCounterparty(
 	netMessage.MessageType = npb.Message_ORDER
 	netMessage.Payload = payload
 
-	if s.deliverVerifiedPaymentToCoTenant(ctx, order, targetPeerID, message, pd) {
+	if s.deliverVerifiedPaymentToCoTenant(ctx, order, targetPeerID, message, pd, paymentTx) {
 		return
 	}
 
@@ -246,6 +258,18 @@ func (s *OrderAppService) RelayPaymentToCounterparty(
 	}
 }
 
+func paymentSentForCounterpartyRelay(order *models.Order, pd *models.PaymentData) (*pb.PaymentSent, error) {
+	if order == nil {
+		return nil, fmt.Errorf("order is required")
+	}
+	if existing, err := order.PaymentSentMessage(); err == nil {
+		return existing, nil
+	} else if !models.IsMessageNotExistError(err) {
+		return nil, err
+	}
+	return BuildPaymentSentProto(order, pd)
+}
+
 type tenantDatabaseRouter interface {
 	ForTenant(tenantID string) (database.Database, error)
 }
@@ -256,6 +280,7 @@ func (s *OrderAppService) deliverVerifiedPaymentToCoTenant(
 	targetPeerID peer.ID,
 	orderMessage *npb.OrderMessage,
 	pd *models.PaymentData,
+	verifiedTx *iwallet.Transaction,
 ) bool {
 	if sourceOrder == nil || orderMessage == nil || pd == nil || s.coTenantVerifiedPayment == nil {
 		return false
@@ -291,15 +316,21 @@ func (s *OrderAppService) deliverVerifiedPaymentToCoTenant(
 		return false
 	}
 
-	paymentData := *pd
-	if err := paymentData.EnsureTransactionFields(); err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: ensure tx fields for order %s: %v", sourceOrder.ID, err)
-		return false
-	}
-	paymentTx, err := paymentData.BuildTransaction()
-	if err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: build tx for order %s: %v", sourceOrder.ID, err)
-		return false
+	var paymentTx iwallet.Transaction
+	if verifiedTx != nil {
+		paymentTx = *verifiedTx
+	} else {
+		paymentData := *pd
+		if err := paymentData.EnsureTransactionFields(); err != nil {
+			logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: ensure tx fields for order %s: %v", sourceOrder.ID, err)
+			return false
+		}
+		var err error
+		paymentTx, err = paymentData.BuildTransaction()
+		if err != nil {
+			logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment co-tenant: build tx for order %s: %v", sourceOrder.ID, err)
+			return false
+		}
 	}
 
 	if s.coTenantVerifiedPayment(ctx, targetOrder.TenantID, orderMessage, paymentTx) {
@@ -480,35 +511,22 @@ func (s *OrderAppService) ProcessVerifiedPaymentMessage(ctx context.Context, ord
 		return fmt.Errorf("order processor is not configured")
 	}
 
-	var event interface{}
 	err := s.db.Update(func(tx database.Tx) error {
 		var order models.Order
 		if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&order).Error; err != nil {
 			return err
 		}
-		if err := order.PutTransaction(paymentTx); err != nil && !models.IsDuplicateTransactionError(err) {
+		if err := s.orderProcessor.ProcessOrderPayment(tx, &order, orderMsg, paymentTx); err != nil {
 			return err
 		}
-		if err := tx.Save(&order); err != nil {
+		if err := s.orderProcessor.RecordVerifiedPayment(tx, &order, paymentTx); err != nil {
 			return err
 		}
-		var processErr error
-		event, processErr = s.orderProcessor.ProcessMessage(tx, orderMsg)
-		if processErr != nil {
-			return processErr
-		}
-		if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&order).Error; err != nil {
-			return err
-		}
-		if order.IsPaymentVerified() {
-			return tx.Save(&order)
-		}
-		return s.orderProcessor.RecordVerifiedPayment(tx, &order, paymentTx)
+		return nil
 	})
 	if err != nil {
 		return err
 	}
-	s.emitOrderProcessorEvents(event)
 	_ = ctx
 	return nil
 }

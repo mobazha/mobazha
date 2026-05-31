@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -41,7 +42,7 @@ func NewReceiptVerifierRegistryFromMap(verifiers map[iwallet.ChainType]contracts
 }
 
 func (r *ReceiptVerifierRegistry) resolveVerifier(coinCode string) contracts.ReceiptVerifier {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinCode))
+	coinInfo, err := payment.SettlementCoinInfoForCoin(iwallet.CoinType(coinCode))
 	if err != nil {
 		return nil
 	}

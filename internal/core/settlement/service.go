@@ -110,16 +110,16 @@ func (s *SettlementService) SetMonitorService(m utxo.UTXOMonitorService) {
 
 // GetPayoutAddress returns the active receiving account address for the given coin type.
 func (s *SettlementService) GetPayoutAddress(coinType string) (iwallet.Address, error) {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinType))
+	chain, err := payment.SettlementChainForCoin(iwallet.CoinType(coinType))
 	if err != nil {
 		return iwallet.Address{}, fmt.Errorf("failed to get coin info: %v", err)
 	}
-	account, err := s.getActiveReceivingAccount(coinInfo.Chain)
+	account, err := s.getActiveReceivingAccount(chain)
 	if err == nil && account != nil {
 		logger.LogInfoWithIDf(log, s.nodeID, "Using active receiving account for payout: %s", account.Address)
 		return iwallet.NewAddress(account.Address, iwallet.CoinType(coinType)), nil
 	}
-	return iwallet.Address{}, fmt.Errorf("no active receiving account for chain %s: %w", coinInfo.Chain, err)
+	return iwallet.Address{}, fmt.Errorf("no active receiving account for chain %s: %w", chain, err)
 }
 
 // ── Private helpers ─────────────────────────────────────────────────────

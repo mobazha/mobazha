@@ -347,11 +347,10 @@ func paymentVerifiedBusinessEvents(order *models.Order, orderOpen *pb.OrderOpen,
 		}}
 
 	case models.RoleVendor:
-		funded := orderFundedEvent(order, orderOpen)
-		if funded == nil {
-			return nil
+		var out []interface{}
+		if funded := orderFundedEvent(order, orderOpen); funded != nil {
+			out = append(out, funded)
 		}
-		out := []interface{}{funded}
 		spec := ps.GetSettlementSpec()
 		if spec == nil {
 			return out
@@ -391,14 +390,16 @@ func orderFundedEvent(order *models.Order, orderOpen *pb.OrderOpen) *events.Orde
 		return nil
 	}
 	listing := signed.Listing
-	buyerID := ""
+	buyerID, buyerName, buyerAvatar := "", "", ""
 	if orderOpen.BuyerID != nil {
 		buyerID = orderOpen.BuyerID.PeerID
+		buyerName = orderOpen.BuyerID.DisplayName()
+		buyerAvatar = orderOpen.BuyerID.DisplayAvatar()
 	}
 	funded := &events.OrderFunded{
 		TenantID:    order.TenantID,
-		BuyerName:   orderOpen.BuyerID.DisplayName(),
-		BuyerAvatar: orderOpen.BuyerID.DisplayAvatar(),
+		BuyerName:   buyerName,
+		BuyerAvatar: buyerAvatar,
 		BuyerID:     buyerID,
 		ListingType: listing.Metadata.ContractType.String(),
 		OrderID:     order.ID.String(),
@@ -521,11 +522,9 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 }
 
 // buildAggregatedPaymentSent reconstructs the legacy PaymentSent envelope
-// from the dedup'd observation rows and the order context. Downstream
-// code (internal/orders/payment_sent.go, external auditors, dispute
-// flows) treats SerializedPaymentSent as the source of truth for chain
-// movements, so we have to populate every field a manually-submitted
-// PaymentSent message would carry.
+// from the dedup'd observation rows and the order context. The authoritative
+// chain facts remain PaymentObservation rows; SerializedPaymentSent is a
+// compatibility envelope for legacy order messages and event consumers.
 //
 // Field policy:
 //
@@ -636,8 +635,56 @@ func buildAggregatedPaymentSent(
 		CancelFeeAmount:     intent.cancelFeeAmount,
 		Timestamp:           timestamppb.New(eventTime),
 		SettlementSpec:      intent.settlementSpec.ToPaymentSent(),
+		FundingFacts:        fundingFactsFromObservations(rows),
+		ConfirmationPolicy:  paymentSentConfirmationPolicy(order),
 	}
 	return ps, nil
+}
+
+func paymentSentConfirmationPolicy(order *models.Order) string {
+	if order == nil {
+		return ""
+	}
+	info, err := order.GetPendingPaymentInfo()
+	if err != nil || info == nil {
+		return ""
+	}
+	return models.NormalizePaymentConfirmationPolicy(info.ConfirmationPolicy)
+}
+
+func fundingFactsFromObservations(rows []models.PaymentObservation) []*pb.PaymentSent_FundingFact {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]*pb.PaymentSent_FundingFact, 0, len(rows))
+	for i := range rows {
+		row := rows[i]
+		var observedAt *timestamppb.Timestamp
+		if !row.BlockTime.IsZero() {
+			observedAt = timestamppb.New(row.BlockTime.UTC())
+		} else if !row.CreatedAt.IsZero() {
+			observedAt = timestamppb.New(row.CreatedAt.UTC())
+		}
+		out = append(out, &pb.PaymentSent_FundingFact{
+			Id:             row.ID,
+			ChainNamespace: row.ChainNamespace,
+			ChainReference: row.ChainReference,
+			TxHash:         row.TxHash,
+			TxHashSource:   models.NormalizePaymentTxHashSource(row.TxHashSource),
+			EventIndex:     int32(row.EventIndex),
+			EventType:      row.EventType,
+			FromAddress:    row.FromAddress,
+			ToAddress:      row.ToAddress,
+			TokenAddress:   row.TokenAddress,
+			Amount:         row.Amount,
+			BlockNumber:    row.BlockNumber,
+			Confirmations:  int32(row.Confirmations),
+			Status:         row.Status,
+			Source:         row.Source,
+			ObservedAt:     observedAt,
+		})
+	}
+	return out
 }
 
 func aggregatedPaymentCoin(order *models.Order, rep models.PaymentObservation) (string, error) {

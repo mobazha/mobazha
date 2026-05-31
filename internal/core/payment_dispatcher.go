@@ -818,7 +818,7 @@ func cancelablePaymentEventTargetsNode(eventTenantID, nodeID, localTenantID stri
 	case nodeID, localTenantID:
 		return true
 	default:
-		return false
+		return nodeID != "" && localTenantID == ""
 	}
 }
 

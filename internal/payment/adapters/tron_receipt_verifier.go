@@ -32,7 +32,7 @@ func NewTRONReceiptVerifier(mw contracts.WalletOperator) *TRONReceiptVerifier {
 }
 
 func (v *TRONReceiptVerifier) getClient(coinCode string) (*tronchain.TronClient, error) {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinCode))
+	coinInfo, err := payment.SettlementCoinInfoForCoin(iwallet.CoinType(coinCode))
 	if err != nil || coinInfo.Chain != iwallet.ChainTRON {
 		return nil, errNotTronChain
 	}

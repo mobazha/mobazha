@@ -64,7 +64,7 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 	seedTenantOrder(t, buyerDB, orderID, models.RoleBuyer, open)
 	seedTenantOrder(t, sellerDB, orderID, models.RoleVendor, open)
 
-	svc.RelayPaymentToCounterparty(context.Background(), orderID, sellerPeerID, &models.PaymentData{
+	pd := &models.PaymentData{
 		OrderID:       orderID,
 		TransactionID: strings.Repeat("a", 64),
 		Coin:          iwallet.CoinType("crypto:solana:mainnet:native"),
@@ -73,7 +73,31 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 		PayerAddress:  "payer-solana-address",
 		ToAddress:     "escrow-solana-address",
 		Timestamp:     time.Now().UTC(),
-	})
+	}
+	storedPaymentSent, err := BuildPaymentSentProto(mustFetchTenantOrder(t, buyerDB, orderID), pd)
+	require.NoError(t, err)
+	storedPaymentSent.FundingFacts = []*pb.PaymentSent_FundingFact{{
+		Id:             "solana-fact-1",
+		ChainNamespace: "solana",
+		ChainReference: "mainnet",
+		TxHash:         pd.TransactionID,
+		TxHashSource:   models.PaymentTxHashSourceChainTx,
+		EventIndex:     0,
+		EventType:      models.PaymentEventSolanaTransfer,
+		ToAddress:      pd.ToAddress,
+		Amount:         "1000000",
+		Status:         models.PaymentObservationStatusConfirmed,
+	}}
+	require.NoError(t, buyerDB.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
+			return err
+		}
+		require.NoError(t, order.SetPaymentSent(storedPaymentSent))
+		return tx.Save(&order)
+	}))
+
+	svc.RelayPaymentToCounterparty(context.Background(), orderID, sellerPeerID, pd)
 
 	var sellerOrder models.Order
 	require.NoError(t, sellerDB.View(func(tx database.Tx) error {
@@ -82,6 +106,10 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 	require.NotNil(t, sellerOrder.SerializedPaymentSent)
 	require.True(t, sellerOrder.IsPaymentVerified())
 	require.Equal(t, models.OrderState_PENDING, sellerOrder.State)
+	relayedPaymentSent, err := sellerOrder.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Len(t, relayedPaymentSent.GetFundingFacts(), 1)
+	require.Equal(t, "solana-fact-1", relayedPaymentSent.GetFundingFacts()[0].GetId())
 }
 
 func TestPreProcessPaymentSent_HydratesIncomingManagedEscrowIntentBeforeValidation(t *testing.T) {
@@ -198,21 +226,36 @@ func TestProcessOrderPayment_RelaysVerifiedPaymentWhenPersistFails(t *testing.T)
 		NodeID:         "relay-test",
 	})
 	wireCoTenantVerifiedPayment(t, svc, "tenant-seller", sellerDB, sellerSigner)
+	paymentAddress := "bcrt1qverifiedpaymentaddress"
+	firstToID := append([]byte(strings.Repeat("x", 32)), 1, 0, 0, 0)
+	secondToID := append([]byte(strings.Repeat("y", 32)), 2, 0, 0, 0)
 	tx := iwallet.Transaction{
-		ID:     iwallet.TransactionID(strings.Repeat("b", 64)),
-		Value:  iwallet.NewAmount(1_000_000),
-		Height: 1,
+		ID:    iwallet.TransactionID(strings.Repeat("b", 64)),
+		Value: iwallet.NewAmount(1_000_000),
+		To: []iwallet.SpendInfo{
+			{
+				ID:      firstToID,
+				Address: iwallet.NewAddress(paymentAddress, iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native")),
+				Amount:  iwallet.NewAmount(400_000),
+			},
+			{
+				ID:      secondToID,
+				Address: iwallet.NewAddress(paymentAddress, iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native")),
+				Amount:  iwallet.NewAmount(600_000),
+			},
+		},
+		Height: 7,
 	}
 	svc.SetPaymentVerifier(&verifiedPaymentVerifier{tx: tx})
 
 	err = svc.ProcessOrderPayment(context.Background(), &models.PaymentData{
 		OrderID:        orderID,
 		TransactionID:  tx.ID.String(),
-		Coin:           iwallet.CoinType("crypto:solana:mainnet:native"),
+		Coin:           iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native"),
 		Method:         pb.PaymentSent_DIRECT,
 		Amount:         1_000_000,
-		PayerAddress:   "payer-solana-address",
-		ToAddress:      "escrow-solana-address",
+		PayerAddress:   "payer-btc-address",
+		ToAddress:      paymentAddress,
 		Timestamp:      time.Now().UTC(),
 		SettlementSpec: paymentpkg.NewDirectSpec().ToPending(),
 	})
@@ -226,6 +269,13 @@ func TestProcessOrderPayment_RelaysVerifiedPaymentWhenPersistFails(t *testing.T)
 	require.NotNil(t, sellerOrder.SerializedPaymentSent)
 	require.True(t, sellerOrder.IsPaymentVerified())
 	require.Equal(t, models.OrderState_PENDING, sellerOrder.State)
+	txs, err := sellerOrder.GetTransactions()
+	require.NoError(t, err)
+	require.Len(t, txs, 1)
+	require.Len(t, txs[0].To, 2)
+	require.Equal(t, firstToID, txs[0].To[0].ID)
+	require.Equal(t, secondToID, txs[0].To[1].ID)
+	require.Equal(t, uint64(7), txs[0].Height)
 }
 
 func wireCoTenantVerifiedPayment(
@@ -375,4 +425,13 @@ func seedTenantOrder(t *testing.T, db database.Database, orderID string, role mo
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		return tx.Save(order)
 	}))
+}
+
+func mustFetchTenantOrder(t *testing.T, db database.Database, orderID string) *models.Order {
+	t.Helper()
+	var order models.Order
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&order).Error
+	}))
+	return &order
 }

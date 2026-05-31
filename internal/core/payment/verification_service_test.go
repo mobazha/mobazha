@@ -4,10 +4,15 @@ package payment
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"testing"
+	"time"
 
+	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	paymentpkg "github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -22,6 +27,51 @@ type recordingFiatQuery struct {
 	err            error
 }
 
+type fundingFactWalletOperator struct {
+	wallet iwallet.Wallet
+}
+
+func (o fundingFactWalletOperator) WalletForCurrencyCode(string) (iwallet.Wallet, error) {
+	return o.wallet, nil
+}
+func (fundingFactWalletOperator) SupportedChains() []iwallet.ChainType { return nil }
+func (o fundingFactWalletOperator) WalletForChain(iwallet.ChainType) (iwallet.Wallet, bool) {
+	return o.wallet, true
+}
+func (fundingFactWalletOperator) Start() error { return nil }
+func (fundingFactWalletOperator) Close() error { return nil }
+
+type fundingFactWallet struct {
+	txs map[iwallet.TransactionID]iwallet.Transaction
+}
+
+func (w fundingFactWallet) WalletExists() bool { return true }
+func (w fundingFactWallet) CreateWallet(hd.ExtendedKey, time.Time) error {
+	return nil
+}
+func (w fundingFactWallet) OpenWallet() error  { return nil }
+func (w fundingFactWallet) CloseWallet() error { return nil }
+func (w fundingFactWallet) Begin() (iwallet.Tx, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (w fundingFactWallet) BlockchainInfo() (iwallet.BlockInfo, error) {
+	return iwallet.BlockInfo{}, nil
+}
+func (w fundingFactWallet) CoinCategory() iwallet.CoinCategory {
+	return iwallet.CoinCategoryBitcoin
+}
+func (w fundingFactWallet) IsTestnet() bool { return true }
+func (w fundingFactWallet) ValidateAddress(iwallet.Address) error {
+	return nil
+}
+func (w fundingFactWallet) GetTransaction(id iwallet.TransactionID, _ iwallet.CoinType) (*iwallet.Transaction, error) {
+	tx, ok := w.txs[id]
+	if !ok {
+		return nil, fmt.Errorf("missing tx %s", id)
+	}
+	return &tx, nil
+}
+
 func (q *recordingFiatQuery) GetPayment(_ context.Context, providerID string, paymentID string) (*contracts.PaymentDetail, error) {
 	q.lastProviderID = providerID
 	q.lastPaymentID = paymentID
@@ -31,6 +81,7 @@ func (q *recordingFiatQuery) GetPayment(_ context.Context, providerID string, pa
 type recordingManagedEscrowVerifier struct {
 	verifyCalls       int
 	lastParams        paymentpkg.DepositVerifyParams
+	params            []paymentpkg.DepositVerifyParams
 	validateMsgCalls  int
 	lastMessageParams paymentpkg.PaymentMessageParams
 }
@@ -71,6 +122,7 @@ func (*recordingManagedEscrowVerifier) EstimateEscrowFee(string, int, int, iwall
 func (v *recordingManagedEscrowVerifier) VerifyDeposit(_ context.Context, params paymentpkg.DepositVerifyParams) error {
 	v.verifyCalls++
 	v.lastParams = params
+	v.params = append(v.params, params)
 	return nil
 }
 func (v *recordingManagedEscrowVerifier) ValidatePaymentMessage(params paymentpkg.PaymentMessageParams) error {
@@ -293,4 +345,257 @@ func TestPaymentVerificationService_FetchAndVerify_MonitorRelayedManagedEscrowPa
 
 	_, err := svc.FetchAndVerify(context.Background(), &pb.OrderOpen{}, paymentSent, paymentSent.ToAddress)
 	require.ErrorIs(t, err, ErrPaymentNotConfirmed)
+}
+
+func TestPaymentVerificationService_FetchAndVerify_FundingFactsVerifyIndividually(t *testing.T) {
+	registry := paymentpkg.NewRegistry()
+	verifier := &recordingManagedEscrowVerifier{}
+	registry.RegisterV2(iwallet.ChainEthereum, verifier)
+	svc := NewPaymentVerificationService(registry, nil, nil)
+
+	paymentSent := &pb.PaymentSent{
+		TransactionID:   "0xtx-topup",
+		Coin:            "crypto:eip155:1:native",
+		ContractAddress: "0x1111111111111111111111111111111111111111",
+		ToAddress:       "0x1111111111111111111111111111111111111111",
+		Amount:          "1000",
+		SettlementSpec:  paymentpkg.NewManagedEscrowSpec(false).ToPaymentSent(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{
+			{
+				Id:             "obs-1",
+				ChainNamespace: "eip155",
+				ChainReference: "1",
+				TxHash:         "0xtx-partial",
+				TxHashSource:   "chain_tx",
+				EventIndex:     0,
+				ToAddress:      "0x1111111111111111111111111111111111111111",
+				Amount:         "400",
+				Status:         "confirmed",
+			},
+			{
+				Id:             "obs-2",
+				ChainNamespace: "eip155",
+				ChainReference: "1",
+				TxHash:         "0xtx-topup",
+				TxHashSource:   "chain_tx",
+				EventIndex:     0,
+				ToAddress:      "0x1111111111111111111111111111111111111111",
+				Amount:         "600",
+				Status:         "confirmed",
+			},
+		},
+	}
+
+	vp, err := svc.FetchAndVerify(context.Background(), &pb.OrderOpen{}, paymentSent, paymentSent.ToAddress)
+	require.NoError(t, err)
+	require.NotNil(t, vp)
+	require.Equal(t, iwallet.TransactionID("0xtx-topup"), vp.Transaction.ID)
+	require.Equal(t, int64(1000), vp.Transaction.Value.Int64())
+	require.Len(t, vp.Transaction.To, 2)
+	require.Equal(t, int64(400), vp.Transaction.To[0].Amount.Int64())
+	require.Equal(t, int64(600), vp.Transaction.To[1].Amount.Int64())
+	require.Equal(t, 2, verifier.verifyCalls)
+	require.Len(t, verifier.params, 2)
+	require.Equal(t, "0xtx-partial", verifier.params[0].TxHash)
+	require.Equal(t, "400", verifier.params[0].PaymentAmount)
+	require.Equal(t, "0xtx-topup", verifier.params[1].TxHash)
+	require.Equal(t, "600", verifier.params[1].PaymentAmount)
+}
+
+func TestPaymentVerificationService_FetchAndVerify_UTXOFundingFactsPreserveOutpoints(t *testing.T) {
+	coin := iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native")
+	paymentAddress := "bcrt1qfundingfacts"
+	outpointA, err := hex.DecodeString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01000000")
+	require.NoError(t, err)
+	outpointB, err := hex.DecodeString("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb02000000")
+	require.NoError(t, err)
+
+	wallet := fundingFactWallet{txs: map[iwallet.TransactionID]iwallet.Transaction{
+		"btc-tx-a": {
+			ID: iwallet.TransactionID("btc-tx-a"),
+			To: []iwallet.SpendInfo{
+				{
+					ID:      outpointA,
+					Address: iwallet.NewAddress(paymentAddress, coin),
+					Amount:  iwallet.NewAmount(400),
+				},
+			},
+		},
+		"btc-tx-b": {
+			ID: iwallet.TransactionID("btc-tx-b"),
+			To: []iwallet.SpendInfo{
+				{
+					ID:      []byte("change"),
+					Address: iwallet.NewAddress("change-address", coin),
+					Amount:  iwallet.NewAmount(100),
+				},
+				{
+					ID:      outpointB,
+					Address: iwallet.NewAddress(paymentAddress, coin),
+					Amount:  iwallet.NewAmount(600),
+				},
+			},
+		},
+	}}
+	svc := NewPaymentVerificationService(nil, fundingFactWalletOperator{wallet: wallet}, nil)
+	paymentSent := &pb.PaymentSent{
+		TransactionID:  "btc-tx-b",
+		Coin:           string(coin),
+		ToAddress:      paymentAddress,
+		Amount:         "1000",
+		SettlementSpec: paymentpkg.NewUTXOSpec(false).ToPaymentSent(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{
+			{
+				Id:             "btc-obs-a",
+				ChainNamespace: "bip122",
+				ChainReference: "000000000019d6689c085ae165831e93",
+				TxHash:         "btc-tx-a",
+				TxHashSource:   "chain_tx",
+				EventIndex:     0,
+				EventType:      "utxo_funding",
+				ToAddress:      paymentAddress,
+				Amount:         "400",
+				Status:         "confirmed",
+			},
+			{
+				Id:             "btc-obs-b",
+				ChainNamespace: "bip122",
+				ChainReference: "000000000019d6689c085ae165831e93",
+				TxHash:         "btc-tx-b",
+				TxHashSource:   "chain_tx",
+				EventIndex:     1,
+				EventType:      "utxo_funding",
+				ToAddress:      paymentAddress,
+				Amount:         "600",
+				Status:         "confirmed",
+			},
+		},
+	}
+
+	vp, err := svc.FetchAndVerify(context.Background(), &pb.OrderOpen{}, paymentSent, paymentAddress)
+	require.NoError(t, err)
+	require.Equal(t, iwallet.TransactionID("btc-tx-b"), vp.Transaction.ID)
+	require.Equal(t, int64(1000), vp.Transaction.Value.Int64())
+	require.Len(t, vp.Transaction.To, 2)
+	require.Equal(t, outpointA, vp.Transaction.To[0].ID)
+	require.Equal(t, outpointB, vp.Transaction.To[1].ID)
+}
+
+func TestPaymentVerificationService_FetchAndVerify_PendingFundingFactsRequireMempoolPolicy(t *testing.T) {
+	coin := iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native")
+	paymentAddress := "bcrt1qpendingfacts"
+	outpoint, err := hex.DecodeString("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc00000000")
+	require.NoError(t, err)
+
+	wallet := fundingFactWallet{txs: map[iwallet.TransactionID]iwallet.Transaction{
+		"btc-tx-pending": {
+			ID: iwallet.TransactionID("btc-tx-pending"),
+			To: []iwallet.SpendInfo{{
+				ID:      outpoint,
+				Address: iwallet.NewAddress(paymentAddress, coin),
+				Amount:  iwallet.NewAmount(1000),
+			}},
+		},
+	}}
+	svc := NewPaymentVerificationService(nil, fundingFactWalletOperator{wallet: wallet}, nil)
+	paymentSent := &pb.PaymentSent{
+		TransactionID:  "btc-tx-pending",
+		Coin:           string(coin),
+		ToAddress:      paymentAddress,
+		Amount:         "1000",
+		SettlementSpec: paymentpkg.NewUTXOSpec(false).ToPaymentSent(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{{
+			Id:             "btc-obs-pending",
+			ChainNamespace: "bip122",
+			ChainReference: "000000000019d6689c085ae165831e93",
+			TxHash:         "btc-tx-pending",
+			TxHashSource:   "chain_tx",
+			EventIndex:     0,
+			EventType:      "utxo_funding",
+			ToAddress:      paymentAddress,
+			Amount:         "1000",
+			Status:         models.PaymentObservationStatusPending,
+		}},
+	}
+
+	_, err = svc.FetchAndVerify(context.Background(), &pb.OrderOpen{}, paymentSent, paymentAddress)
+	require.ErrorIs(t, err, ErrPaymentNotConfirmed)
+
+	paymentSent.ConfirmationPolicy = models.PaymentConfirmationPolicyMempoolAccepted
+	vp, err := svc.FetchAndVerify(context.Background(), &pb.OrderOpen{}, paymentSent, paymentAddress)
+	require.NoError(t, err)
+	require.Equal(t, int64(1000), vp.Transaction.Value.Int64())
+	require.Equal(t, outpoint, vp.Transaction.To[0].ID)
+}
+
+func TestPaymentVerificationService_FetchAndVerify_SolanaFundingFactsVerifyOutputs(t *testing.T) {
+	coin := iwallet.CoinType("crypto:solana:mainnet:spl:Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB")
+	paymentAddress := "solana-escrow-address"
+	wallet := fundingFactWallet{txs: map[iwallet.TransactionID]iwallet.Transaction{
+		"sol-tx-a": {
+			ID: iwallet.TransactionID("sol-tx-a"),
+			To: []iwallet.SpendInfo{{
+				ID:      []byte("sol-tx-a:0"),
+				Address: iwallet.NewAddress(paymentAddress, coin),
+				Amount:  iwallet.NewAmount(400),
+			}},
+		},
+		"sol-tx-b": {
+			ID: iwallet.TransactionID("sol-tx-b"),
+			To: []iwallet.SpendInfo{
+				{
+					ID:      []byte("sol-tx-b:0"),
+					Address: iwallet.NewAddress("other-solana-address", coin),
+					Amount:  iwallet.NewAmount(100),
+				},
+				{
+					ID:      []byte("sol-tx-b:1"),
+					Address: iwallet.NewAddress(paymentAddress, coin),
+					Amount:  iwallet.NewAmount(600),
+				},
+			},
+		},
+	}}
+	svc := NewPaymentVerificationService(nil, fundingFactWalletOperator{wallet: wallet}, nil)
+	paymentSent := &pb.PaymentSent{
+		TransactionID:  "sol-tx-b",
+		Coin:           string(coin),
+		ToAddress:      paymentAddress,
+		Amount:         "1000",
+		SettlementSpec: paymentpkg.NewSolanaEscrowSpec(false).ToPaymentSent(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{
+			{
+				Id:             "sol-obs-a",
+				ChainNamespace: "solana",
+				ChainReference: "mainnet",
+				TxHash:         "sol-tx-a",
+				TxHashSource:   "chain_tx",
+				EventIndex:     0,
+				EventType:      models.PaymentEventSolanaTransfer,
+				ToAddress:      paymentAddress,
+				Amount:         "400",
+				Status:         "confirmed",
+			},
+			{
+				Id:             "sol-obs-b",
+				ChainNamespace: "solana",
+				ChainReference: "mainnet",
+				TxHash:         "sol-tx-b",
+				TxHashSource:   "chain_tx",
+				EventIndex:     1,
+				EventType:      models.PaymentEventSolanaTransfer,
+				ToAddress:      paymentAddress,
+				Amount:         "600",
+				Status:         "confirmed",
+			},
+		},
+	}
+
+	vp, err := svc.FetchAndVerify(context.Background(), &pb.OrderOpen{}, paymentSent, paymentAddress)
+	require.NoError(t, err)
+	require.Equal(t, iwallet.TransactionID("sol-tx-b"), vp.Transaction.ID)
+	require.Equal(t, int64(1000), vp.Transaction.Value.Int64())
+	require.Len(t, vp.Transaction.To, 2)
+	require.Equal(t, []byte("sol-tx-a:0"), vp.Transaction.To[0].ID)
+	require.Equal(t, []byte("sol-tx-b:1"), vp.Transaction.To[1].ID)
 }

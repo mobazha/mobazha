@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/mobazha/mobazha3.0/pkg/assetid"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
@@ -53,6 +55,10 @@ func NormalizeSettlementPaymentCoin(raw string) (iwallet.CoinType, bool) {
 		}
 	}
 
+	if normalized, err := assetid.Normalize(strings.TrimSpace(raw)); err == nil {
+		return iwallet.CoinType(normalized), true
+	}
+
 	if coin, ok := iwallet.TryNormalizePaymentCoin(raw); ok {
 		return coin, true
 	}
@@ -74,6 +80,65 @@ func NormalizeSettlementPaymentCoin(raw string) (iwallet.CoinType, bool) {
 	}
 
 	return "", false
+}
+
+// SettlementChainForCoin returns the chain family used for settlement routing.
+// It accepts canonical payment coins and runtime asset IDs whose token contract
+// or mint comes from local deployment state or store payment sessions.
+func SettlementChainForCoin(coin iwallet.CoinType) (iwallet.ChainType, error) {
+	info, err := SettlementCoinInfoForCoin(coin)
+	if err != nil {
+		return "", err
+	}
+	return info.Chain, nil
+}
+
+// SettlementCoinInfoForCoin returns chain metadata for settlement routing. In
+// addition to registered payment coins, it accepts runtime crypto asset IDs so
+// order/payment flows can carry the exact token contract or mint selected by a
+// store payment session without requiring a hard-coded wallet-interface catalog
+// entry.
+func SettlementCoinInfoForCoin(coin iwallet.CoinType) (iwallet.CoinInfo, error) {
+	normalized, ok := NormalizeSettlementPaymentCoin(coin.String())
+	if !ok {
+		return iwallet.CoinInfo{}, fmt.Errorf("invalid settlement payment coin %q", coin)
+	}
+	if info, err := normalized.CoinInfo(); err == nil {
+		return info, nil
+	}
+	if runtimeCoin, chain, ok := runtimeEIP155ERC20Coin(normalized.String()); ok {
+		parts := strings.Split(runtimeCoin.String(), ":")
+		contract := common.HexToAddress(parts[4]).Hex()
+		return iwallet.CoinInfo{
+			Chain:           chain,
+			Symbol:          "ERC20",
+			IsNative:        false,
+			Contract:        contract,
+			TestnetContract: contract,
+			Description:     "Runtime ERC-20",
+		}, nil
+	}
+	return iwallet.CoinInfo{}, fmt.Errorf("unsupported settlement payment coin %q", coin)
+}
+
+func runtimeEIP155ERC20Coin(raw string) (iwallet.CoinType, iwallet.ChainType, bool) {
+	parts := strings.Split(strings.TrimSpace(raw), ":")
+	if len(parts) != 5 ||
+		!strings.EqualFold(parts[0], "crypto") ||
+		!strings.EqualFold(parts[1], "eip155") ||
+		!strings.EqualFold(parts[3], "erc20") {
+		return "", "", false
+	}
+	chainID, err := strconv.ParseUint(parts[2], 10, 64)
+	if err != nil {
+		return "", "", false
+	}
+	chain, ok := managed_escrow.ChainTypeForChainID(chainID)
+	if !ok || !common.IsHexAddress(parts[4]) {
+		return "", "", false
+	}
+	coin := iwallet.CoinType(fmt.Sprintf("crypto:eip155:%d:erc20:%s", chainID, common.HexToAddress(parts[4]).Hex()))
+	return coin, chain, true
 }
 
 // PendingPaymentCoinFromOrder returns the coin locked in the payment intent.

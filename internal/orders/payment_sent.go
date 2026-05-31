@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -16,6 +17,8 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
@@ -24,7 +27,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	dup, err := isDuplicate(paymentSent, order.SerializedPaymentSent)
+	dup, persistedPaymentSent, err := isDuplicatePaymentSent(paymentSent, order.SerializedPaymentSent)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +35,10 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate PAYMENT_SENT message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
-		return nil, nil
+		if persistedPaymentSent != nil {
+			paymentSent = persistedPaymentSent
+		}
+		return op.processDuplicatePaymentSent(dbtx, order, paymentSent)
 	}
 
 	orderOpen, err := order.OrderOpenMessage()
@@ -73,26 +79,15 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	transactionKnown := false
-	var knownTx *iwallet.Transaction
-	for i := range txs {
-		tx := &txs[i]
-		if tx.ID.String() == paymentSent.TransactionID {
-			logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s but already know about transaction", order.ID)
-			transactionKnown = true
-			knownTx = tx
-			break
-		}
-	}
-
-	if transactionKnown {
+	knownTx := knownTransactionForPaymentSent(txs, paymentSent)
+	var verifiedTxForEvents *iwallet.Transaction
+	if knownTx != nil {
+		logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s but already know about transaction", order.ID)
 		method, methodOK := payment.ResolvedPaymentMethod(order, paymentSent)
-		preVerifiedFiat := methodOK && payment.IsFiatPaymentRoute(method, coinType)
-		// For crypto, a transaction already persisted on this order with
-		// block height means local on-chain verification has already happened.
-		knownConfirmedCrypto := !preVerifiedFiat && isKnownTxConfirmed(knownTx)
-		if preVerifiedFiat || knownConfirmedCrypto {
+		knownVerified := methodOK && isKnownTxVerifiedForRoute(paymentSent, method, coinType, knownTx)
+		if knownVerified {
 			order.MarkPaymentVerified()
+			verifiedTxForEvents = knownTx
 			// Keep FSM and verification gate semantically aligned:
 			// once payment is verified, order should leave
 			// AWAITING_PAYMENT_VERIFICATION immediately.
@@ -107,7 +102,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	// layer: preProcessPaymentSent + postProcessPaymentSentInTx. When the tx
 	// is not yet on-chain, the async verification loop retries later.
 
-	op.emitPaymentSentEvents(dbtx, order, orderOpen, paymentSent, nil)
+	op.emitPaymentSentEvents(dbtx, order, orderOpen, paymentSent, verifiedTxForEvents)
 
 	logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s", order.ID)
 
@@ -115,6 +110,105 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		OrderID: order.ID.String(),
 		Txid:    paymentSent.TransactionID,
 	}, nil
+}
+
+func isDuplicatePaymentSent(incoming *pb.PaymentSent, serialized []byte) (bool, *pb.PaymentSent, error) {
+	if len(serialized) == 0 {
+		return false, nil, nil
+	}
+	dup, err := isDuplicate(incoming, serialized)
+	if err != nil || dup {
+		return dup, nil, err
+	}
+	persisted := new(pb.PaymentSent)
+	if err := protojson.Unmarshal(serialized, persisted); err != nil {
+		return false, nil, err
+	}
+	if !isCompatiblePaymentSentDuplicate(incoming, persisted) {
+		return false, nil, nil
+	}
+	return true, persisted, nil
+}
+
+func isCompatiblePaymentSentDuplicate(incoming, persisted *pb.PaymentSent) bool {
+	if incoming == nil || persisted == nil {
+		return false
+	}
+	if incoming.Coin != persisted.Coin ||
+		incoming.ToAddress != persisted.ToAddress ||
+		incoming.ContractAddress != persisted.ContractAddress ||
+		incoming.Script != persisted.Script ||
+		incoming.Chaincode != persisted.Chaincode ||
+		incoming.Moderator != persisted.Moderator ||
+		incoming.ModeratorAddress != persisted.ModeratorAddress ||
+		incoming.PaymentTokenAddress != persisted.PaymentTokenAddress ||
+		incoming.BuyerReceiveAddress != persisted.BuyerReceiveAddress ||
+		incoming.CancelFeeAmount != persisted.CancelFeeAmount ||
+		incoming.PlatformAmount != persisted.PlatformAmount ||
+		incoming.PlatformAddr != persisted.PlatformAddr ||
+		incoming.EscrowReleaseFee != persisted.EscrowReleaseFee ||
+		incoming.EscrowTimeoutHours != persisted.EscrowTimeoutHours {
+		return false
+	}
+	if incoming.RefundAddress != "" && persisted.RefundAddress != "" && incoming.RefundAddress != persisted.RefundAddress {
+		return false
+	}
+	if incoming.ConfirmationPolicy != "" && persisted.ConfirmationPolicy != "" &&
+		models.NormalizePaymentConfirmationPolicy(incoming.ConfirmationPolicy) != models.NormalizePaymentConfirmationPolicy(persisted.ConfirmationPolicy) {
+		return false
+	}
+	if !proto.Equal(incoming.GetPaymentMethod(), persisted.GetPaymentMethod()) ||
+		!proto.Equal(incoming.GetSettlementSpec(), persisted.GetSettlementSpec()) {
+		return false
+	}
+	if incoming.TransactionID != "" && incoming.TransactionID == persisted.TransactionID {
+		return incoming.Amount == persisted.Amount || incoming.Amount == "" || persisted.Amount == ""
+	}
+	if paymentSentContainsFundingFact(persisted, incoming.TransactionID, incoming.Amount) {
+		return true
+	}
+	if paymentSentContainsFundingFact(incoming, persisted.TransactionID, persisted.Amount) {
+		return true
+	}
+	return false
+}
+
+func paymentSentContainsFundingFact(ps *pb.PaymentSent, txHash, amount string) bool {
+	if ps == nil || txHash == "" {
+		return false
+	}
+	for _, fact := range ps.GetFundingFacts() {
+		if fact.GetTxHash() != txHash {
+			continue
+		}
+		return amount == "" || fact.GetAmount() == "" || fact.GetAmount() == amount
+	}
+	return false
+}
+
+func (op *OrderProcessor) processDuplicatePaymentSent(
+	dbtx database.Tx,
+	order *models.Order,
+	paymentSent *pb.PaymentSent,
+) (interface{}, error) {
+	if order == nil || paymentSent == nil {
+		return nil, nil
+	}
+	if order.IsPaymentVerified() {
+		return nil, nil
+	}
+
+	txs, err := order.GetTransactions()
+	if err != nil && !models.IsMessageNotExistError(err) {
+		return nil, err
+	}
+	knownTx := knownTransactionForPaymentSent(txs, paymentSent)
+	method, methodOK := payment.ResolvedPaymentMethod(order, paymentSent)
+	coinType := iwallet.CoinType(paymentSent.Coin)
+	if !methodOK || !isKnownTxVerifiedForRoute(paymentSent, method, coinType, knownTx) {
+		return nil, nil
+	}
+	return nil, op.RecordVerifiedPayment(dbtx, order, *knownTx)
 }
 
 // validatePaymentSent validates a PaymentSent message against the OrderOpen.
@@ -204,10 +298,7 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 		}
 
 		if method, ok := payment.ResolvedPaymentMethod(order, paymentSent); ok && payment.MethodIsCancelable(method) && order.IsPaymentVerified() {
-			var amount uint64
-			if verifiedTx != nil {
-				amount = uint64(verifiedTx.Value.Int64())
-			}
+			amount := parsePaymentSentEventAmount(paymentSent)
 			dbtx.RegisterCommitHook(func() {
 				op.bus.Emit(&events.CancelablePaymentReady{
 					TenantID:      order.TenantID,
@@ -249,16 +340,33 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 	order *models.Order,
 	tx iwallet.Transaction,
 ) error {
+	alreadyVerified := order.IsPaymentVerified()
 	if err := order.PutTransaction(tx); err != nil {
 		if !models.IsDuplicateTransactionError(err) {
 			return err
 		}
+		if err := order.UpdateTransaction(tx); err != nil {
+			return err
+		}
+	}
+	if alreadyVerified {
+		return dbtx.Save(order)
 	}
 	order.MarkPaymentVerified()
 	if order.PaidAt == nil {
 		now := time.Now()
 		order.PaidAt = &now
 	}
+
+	paymentSent, err := order.PaymentSentMessage()
+	if err != nil {
+		normalizeAwaitingPaymentBeforePaymentSent(order)
+		if order.State != models.OrderState_AWAITING_PAYMENT {
+			order.SetFSMState(order.State)
+		}
+		return dbtx.Save(order)
+	}
+
 	op.advanceToPendingAfterVerification(order)
 
 	// Replay parked messages that were waiting for payment verification.
@@ -267,17 +375,22 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 	// Now that we've advanced to PENDING, they can be processed.
 	op.replayParkedMessages(dbtx, order)
 
-	paymentSent, err := order.PaymentSentMessage()
-	if err != nil {
-		return nil
-	}
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
-		return nil
+		return dbtx.Save(order)
 	}
 
 	op.emitPaymentSentEvents(dbtx, order, orderOpen, paymentSent, &tx)
 	return dbtx.Save(order)
+}
+
+func normalizeAwaitingPaymentBeforePaymentSent(order *models.Order) {
+	if order == nil {
+		return
+	}
+	if order.SerializedPaymentSent == nil && order.State == models.OrderState_PENDING {
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+	}
 }
 
 func (op *OrderProcessor) advanceToPendingAfterVerification(order *models.Order) {
@@ -336,4 +449,68 @@ func isKnownTxConfirmed(tx *iwallet.Transaction) bool {
 		return true
 	}
 	return tx.BlockInfo != nil && tx.BlockInfo.Height > 0
+}
+
+func knownTransactionForPaymentSent(txs []iwallet.Transaction, paymentSent *pb.PaymentSent) *iwallet.Transaction {
+	if paymentSent == nil {
+		return nil
+	}
+	for i := range txs {
+		if paymentSentContainsTransaction(paymentSent, txs[i].ID.String()) {
+			return &txs[i]
+		}
+	}
+	return nil
+}
+
+func paymentSentContainsTransaction(paymentSent *pb.PaymentSent, txID string) bool {
+	if paymentSent == nil || txID == "" {
+		return false
+	}
+	if paymentSent.TransactionID == txID {
+		return true
+	}
+	return paymentSentContainsFundingFact(paymentSent, txID, "")
+}
+
+func isKnownTxVerifiedForRoute(
+	paymentSent *pb.PaymentSent,
+	method pb.PaymentSent_Method,
+	coinType iwallet.CoinType,
+	tx *iwallet.Transaction,
+) bool {
+	if tx == nil || paymentSent == nil {
+		return false
+	}
+	if payment.IsFiatPaymentRoute(method, coinType) {
+		return true
+	}
+	if isKnownTxConfirmed(tx) {
+		return true
+	}
+	return paymentSentAllowsPendingKnownTx(paymentSent, tx.ID.String())
+}
+
+func paymentSentAllowsPendingKnownTx(paymentSent *pb.PaymentSent, txID string) bool {
+	if paymentSent == nil || txID == "" ||
+		models.NormalizePaymentConfirmationPolicy(paymentSent.GetConfirmationPolicy()) != models.PaymentConfirmationPolicyMempoolAccepted {
+		return false
+	}
+	for _, fact := range paymentSent.GetFundingFacts() {
+		if fact.GetTxHash() == txID && fact.GetStatus() == models.PaymentObservationStatusPending {
+			return true
+		}
+	}
+	return false
+}
+
+func parsePaymentSentEventAmount(paymentSent *pb.PaymentSent) uint64 {
+	if paymentSent == nil {
+		return 0
+	}
+	amount, err := strconv.ParseUint(paymentSent.Amount, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return amount
 }

@@ -57,7 +57,13 @@ func (s *OrderAppService) handleAutoConfirmRequest(event *events.OrderAutoConfir
 		return
 	}
 
-	err := s.ConfirmOrder(
+	service, err := s.scopedServiceForAutoConfirm(event.TenantID)
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "Failed to route auto-confirm order %s for tenant %s: %v", event.OrderID, event.TenantID, err)
+		return
+	}
+
+	err = service.ConfirmOrder(
 		models.OrderID(event.OrderID),
 		iwallet.TransactionID(event.TxID),
 		event.PayoutAddress,
@@ -77,8 +83,29 @@ func autoConfirmRequestTargetsNode(eventTenantID, nodeID, localTenantID string) 
 	case nodeID, localTenantID:
 		return true
 	default:
-		return false
+		// A hosting platform process may have no single local tenant DB scope.
+		// In that runtime, accept tenant-scoped events only when this process
+		// has a concrete node identity; scopedServiceForAutoConfirm must then
+		// route the write to the tenant DB or fail closed.
+		return nodeID != "" && localTenantID == ""
 	}
+}
+
+func (s *OrderAppService) scopedServiceForAutoConfirm(tenantID string) (*OrderAppService, error) {
+	if tenantID == "" || tenantID == s.dbTenantID() {
+		return s, nil
+	}
+	router, ok := s.db.(tenantDatabaseRouter)
+	if !ok {
+		return nil, fmt.Errorf("tenant router unavailable")
+	}
+	targetDB, err := router.ForTenant(tenantID)
+	if err != nil {
+		return nil, err
+	}
+	scoped := *s
+	scoped.db = targetDB
+	return &scoped, nil
 }
 
 func (s *OrderAppService) dbTenantID() string {
@@ -122,6 +149,7 @@ func (s *OrderAppService) handleUTXOPaymentDetected(event *events.UTXOPaymentDet
 		Method:           pb.PaymentSent_Method(event.Method),
 		Amount:           event.Amount,
 		ToAddress:        event.ToAddress,
+		ToID:             append([]byte(nil), event.ToID...),
 		Timestamp:        time.Unix(event.Timestamp, 0),
 		Script:           event.Script,
 		PayerAddress:     event.PayerAddress,

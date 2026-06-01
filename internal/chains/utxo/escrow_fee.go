@@ -8,6 +8,7 @@ const (
 	compressedPubKeySize     = 33
 	pushOpcodeSize           = 1
 	witnessMarkerFlagSize    = 2
+	p2wshRelaySafetyVBytes   = 10
 )
 
 // EstimateP2WSHMultisigSpendVSize estimates the virtual size of a native
@@ -28,6 +29,14 @@ func EstimateP2WSHMultisigSpendVSize(nInputs int, threshold int, nOuts int) int 
 		p2pkhOutputSize*nOuts
 
 	return weightToVSize(baseSize*4 + witnessMarkerFlagSize + witnessPerInput*nInputs)
+}
+
+// EstimateP2WSHMultisigSpendRelayVSize adds a small relay-policy allowance on
+// top of the structural P2WSH estimate. The extra bytes cover real-world
+// serialization variance such as destination script type and DER signature
+// length so fee locks do not sit just below min relay fee.
+func EstimateP2WSHMultisigSpendRelayVSize(nInputs int, threshold int, nOuts int) int {
+	return EstimateP2WSHMultisigSpendVSize(nInputs, threshold, nOuts) + p2wshRelaySafetyVBytes
 }
 
 // EstimateP2SHMultisigSpendSize estimates the serialized size of a legacy P2SH

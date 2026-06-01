@@ -787,6 +787,7 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 	if !order.IsPaymentVerified() && s.paymentVerifier != nil && !iwallet.CoinType(paymentSent.Coin).IsFiatPayment() {
 		vp, verifyErr := s.paymentVerifier.FetchAndVerify(ctx, orderOpen, paymentSent, paymentSent.ToAddress)
 		if verifyErr == nil && vp != nil {
+			hydratePaymentDataFromVerifiedTransaction(paymentData, vp.Transaction)
 			if dbErr := s.db.Update(func(tx database.Tx) error {
 				if reloadErr := tx.Read().Where("id = ?", order.ID).First(order).Error; reloadErr != nil {
 					return reloadErr
@@ -797,7 +798,7 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 					"Immediate payment verification persist failed for order %s (async retry will cover locally; relaying verified payment to counterparty): %v",
 					paymentData.OrderID, dbErr)
 			}
-			s.RelayPaymentToCounterparty(ctx, paymentData.OrderID, vendorPeerID, paymentData)
+			s.RelayPaymentToCounterpartyWithTransaction(ctx, paymentData.OrderID, vendorPeerID, paymentData, &vp.Transaction)
 		}
 	}
 
@@ -835,6 +836,34 @@ func hydratePaymentDataFromPendingInfo(order *models.Order, paymentData *models.
 		if err == nil {
 			paymentData.Script = hex.EncodeToString(data)
 		}
+	}
+}
+
+func hydratePaymentDataFromVerifiedTransaction(paymentData *models.PaymentData, tx iwallet.Transaction) {
+	if paymentData == nil {
+		return
+	}
+	if tx.ID.String() != "" {
+		paymentData.TransactionID = tx.ID.String()
+	}
+	if tx.Height > 0 {
+		paymentData.BlockHeight = tx.Height
+	}
+	if paymentData.ToAddress == "" || len(paymentData.ToID) > 0 {
+		return
+	}
+
+	var match iwallet.SpendInfo
+	matches := 0
+	for _, out := range tx.To {
+		if out.Address.String() != paymentData.ToAddress || len(out.ID) == 0 {
+			continue
+		}
+		match = out
+		matches++
+	}
+	if matches == 1 {
+		paymentData.ToID = append([]byte(nil), match.ID...)
 	}
 }
 

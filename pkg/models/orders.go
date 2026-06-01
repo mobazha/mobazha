@@ -217,6 +217,12 @@ type OrderPaymentState struct {
 	// to decide whether to issue an excess refund (D-Hybrid-26).
 	OverpaidAmount string `gorm:"column:overpaid_amount;type:text"`
 
+	// PaymentSettlementSignaledAt records that this verified vendor payment
+	// has emitted its settlement-side trigger (CancelablePaymentReady or
+	// RwaInstantBuyCompleted). It is a durable idempotency guard for repeated
+	// verification passes, height updates, and transaction refreshes.
+	PaymentSettlementSignaledAt *time.Time `gorm:"column:payment_settlement_signaled_at"`
+
 	FiatPaymentState `gorm:"embedded"`
 }
 

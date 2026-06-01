@@ -216,37 +216,37 @@ func TestBitcoinWallet_EstimateEscrowFee(t *testing.T) {
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(3690),
+			expected:  iwallet.NewAmount(3990),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(4920),
+			expected:  iwallet.NewAmount(5320),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(6150),
+			expected:  iwallet.NewAmount(6650),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(5520),
+			expected:  iwallet.NewAmount(5820),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(7360),
+			expected:  iwallet.NewAmount(7760),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(9200),
+			expected:  iwallet.NewAmount(9700),
 		},
 	}
 

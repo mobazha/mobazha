@@ -2,6 +2,7 @@ package orders
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -694,7 +695,7 @@ func TestProcessOrderPayment_NormalizesPendingWithoutPaymentSent(t *testing.T) {
 	}
 }
 
-func TestProcessOrderPayment_DuplicatePaymentSentWithConfirmedTxPromotesPending(t *testing.T) {
+func TestProcessOrderPayment_DuplicatePaymentSentWithConfirmedTxDoesNotVerify(t *testing.T) {
 	op, teardown, err := newMockOrderProcessor()
 	if err != nil {
 		t.Fatal(err)
@@ -778,11 +779,11 @@ func TestProcessOrderPayment_DuplicatePaymentSentWithConfirmedTxPromotesPending(
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !stored.IsPaymentVerified() {
-		t.Fatal("expected duplicate PAYMENT_SENT with confirmed tx to mark payment verified")
+	if stored.IsPaymentVerified() {
+		t.Fatal("duplicate PAYMENT_SENT must not mark payment verified; verified recording belongs to RecordVerifiedPayment")
 	}
 	if stored.State != models.OrderState_PENDING {
-		t.Fatalf("expected state PENDING after duplicate verified PAYMENT_SENT, got %s", stored.State)
+		t.Fatalf("expected duplicate PAYMENT_SENT to leave state PENDING, got %s", stored.State)
 	}
 }
 
@@ -878,7 +879,7 @@ func TestProcessOrderPayment_DuplicateAddressMonitoredVerifiedPendingPaymentSent
 	}
 }
 
-func TestProcessOrderPayment_DuplicatePaymentSentPromotesMempoolAcceptedFundingFact(t *testing.T) {
+func TestProcessOrderPayment_DuplicatePaymentSentAcceptsPersistedFundingFactsAsNoOp(t *testing.T) {
 	op, teardown, err := newMockOrderProcessor()
 	if err != nil {
 		t.Fatal(err)
@@ -981,18 +982,8 @@ func TestProcessOrderPayment_DuplicatePaymentSentPromotesMempoolAcceptedFundingF
 
 	select {
 	case evt := <-sub.Out():
-		ready, ok := evt.(*events.CancelablePaymentReady)
-		if !ok {
-			t.Fatalf("unexpected event type %T", evt)
-		}
-		if ready.TransactionID != firstTxID {
-			t.Fatalf("event txid = %s, want persisted representative tx %s", ready.TransactionID, firstTxID)
-		}
-		if ready.Amount != 1000 {
-			t.Fatalf("event amount = %d, want persisted aggregate amount 1000", ready.Amount)
-		}
+		t.Fatalf("compatible duplicate PAYMENT_SENT emitted unexpected event %T", evt)
 	default:
-		t.Fatal("expected compatible duplicate funding fact to emit CancelablePaymentReady")
 	}
 
 	var stored models.Order
@@ -1001,8 +992,8 @@ func TestProcessOrderPayment_DuplicatePaymentSentPromotesMempoolAcceptedFundingF
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !stored.IsPaymentVerified() {
-		t.Fatal("expected mempool-accepted funding fact to mark payment verified")
+	if stored.IsPaymentVerified() {
+		t.Fatal("duplicate PAYMENT_SENT must remain an idempotent message no-op; verification belongs to PVS/RecordVerifiedPayment")
 	}
 }
 
@@ -1117,5 +1108,126 @@ func TestRecordVerifiedPayment_ReplacesProvisionalTransaction(t *testing.T) {
 	}
 	if txs[0].Height != verifiedTx.Height {
 		t.Fatalf("stored height = %d, want %d", txs[0].Height, verifiedTx.Height)
+	}
+}
+
+func TestRecordVerifiedPayment_AlreadyVerifiedVendorRecoversCancelableReady(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	op.stateValidator = &mockStateBridge{}
+	op.multiwallet = nil
+
+	sub, err := op.bus.Subscribe(&events.CancelablePaymentReady{}, events.BufSize(4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Close()
+
+	orderID := "tx-already-verified-recovers-ready-1"
+	orderOpen, _, err := factory.NewOrder()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		txID      = "tx_already_verified_recovery_123"
+		toAddress = "mock_dest_addr_recovery"
+	)
+	paymentSent := &pb.PaymentSent{
+		TransactionID:  txID,
+		Coin:           string(iwallet.CtMock),
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_CANCELABLE),
+		ToAddress:      toAddress,
+		Amount:         "100",
+		Timestamp:      timestamppb.Now(),
+	}
+	msg := &npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_PAYMENT_SENT,
+		Message:     mustBuildAny(paymentSent),
+	}
+	if err := utils.SignOrderMessage(msg, op.signer); err != nil {
+		t.Fatal(err)
+	}
+
+	order := &models.Order{
+		ID:             models.OrderID(orderID),
+		MyRole:         string(models.RoleVendor),
+		PaymentAddress: toAddress,
+	}
+	order.SetFSMState(models.OrderState_PENDING)
+	order.MarkPaymentVerified()
+	if err := order.PutMessage(&npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_ORDER_OPEN,
+		Signature:   []byte("sig"),
+		Message:     mustBuildAny(orderOpen),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(msg); err != nil {
+		t.Fatal(err)
+	}
+
+	verifiedTx := iwallet.Transaction{
+		ID:     iwallet.TransactionID(txID),
+		Height: 12345,
+		To: []iwallet.SpendInfo{{
+			Address: iwallet.NewAddress(toAddress, iwallet.CoinType(iwallet.CtMock)),
+			Amount:  iwallet.NewAmount(100),
+		}},
+		Value: iwallet.NewAmount(100),
+	}
+
+	if err := op.db.Update(func(dbtx database.Tx) error {
+		if err := dbtx.Save(order); err != nil {
+			return err
+		}
+		return op.RecordVerifiedPayment(dbtx, order, verifiedTx)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case evt := <-sub.Out():
+		ready, ok := evt.(*events.CancelablePaymentReady)
+		if !ok {
+			t.Fatalf("expected CancelablePaymentReady, got %T", evt)
+		}
+		if ready.OrderID != orderID || ready.TransactionID != txID || ready.Amount != 100 {
+			t.Fatalf("unexpected ready event: %+v", ready)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for recovered CancelablePaymentReady")
+	}
+
+	var stored models.Order
+	if err := op.db.View(func(dbtx database.Tx) error {
+		return dbtx.Read().Where("id = ?", orderID).First(&stored).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if stored.PaymentSettlementSignaledAt == nil {
+		t.Fatal("PaymentSettlementSignaledAt was not persisted")
+	}
+
+	if err := op.db.Update(func(dbtx database.Tx) error {
+		var fresh models.Order
+		if err := dbtx.Read().Where("id = ?", orderID).First(&fresh).Error; err != nil {
+			return err
+		}
+		return op.RecordVerifiedPayment(dbtx, &fresh, verifiedTx)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case evt := <-sub.Out():
+		t.Fatalf("repeated RecordVerifiedPayment emitted unexpected event %T", evt)
+	default:
 	}
 }

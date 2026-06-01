@@ -27,7 +27,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	dup, persistedPaymentSent, err := isDuplicatePaymentSent(paymentSent, order.SerializedPaymentSent)
+	dup, _, err := isDuplicatePaymentSent(paymentSent, order.SerializedPaymentSent)
 	if err != nil {
 		return nil, err
 	}
@@ -35,10 +35,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate PAYMENT_SENT message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
-		if persistedPaymentSent != nil {
-			paymentSent = persistedPaymentSent
-		}
-		return op.processDuplicatePaymentSent(dbtx, order, paymentSent)
+		return nil, nil
 	}
 
 	orderOpen, err := order.OrderOpenMessage()
@@ -186,31 +183,6 @@ func paymentSentContainsFundingFact(ps *pb.PaymentSent, txHash, amount string) b
 	return false
 }
 
-func (op *OrderProcessor) processDuplicatePaymentSent(
-	dbtx database.Tx,
-	order *models.Order,
-	paymentSent *pb.PaymentSent,
-) (interface{}, error) {
-	if order == nil || paymentSent == nil {
-		return nil, nil
-	}
-	if order.IsPaymentVerified() {
-		return nil, nil
-	}
-
-	txs, err := order.GetTransactions()
-	if err != nil && !models.IsMessageNotExistError(err) {
-		return nil, err
-	}
-	knownTx := knownTransactionForPaymentSent(txs, paymentSent)
-	method, methodOK := payment.ResolvedPaymentMethod(order, paymentSent)
-	coinType := iwallet.CoinType(paymentSent.Coin)
-	if !methodOK || !isKnownTxVerifiedForRoute(paymentSent, method, coinType, knownTx) {
-		return nil, nil
-	}
-	return nil, op.RecordVerifiedPayment(dbtx, order, *knownTx)
-}
-
 // validatePaymentSent validates a PaymentSent message against the OrderOpen.
 // Primary validation is now done by PVS in preProcessPaymentSent; when multiwallet
 // is nil (pure mode), this is a no-op since the orchestration layer has already validated.
@@ -298,6 +270,9 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 		}
 
 		if method, ok := payment.ResolvedPaymentMethod(order, paymentSent); ok && payment.MethodIsCancelable(method) && order.IsPaymentVerified() {
+			if !markPaymentSettlementSignaled(order) {
+				return
+			}
 			amount := parsePaymentSentEventAmount(paymentSent)
 			dbtx.RegisterCommitHook(func() {
 				op.bus.Emit(&events.CancelablePaymentReady{
@@ -312,6 +287,9 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 		}
 
 		if paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_RWA_INSTANT && order.IsPaymentVerified() {
+			if !markPaymentSettlementSignaled(order) {
+				return
+			}
 			dbtx.RegisterCommitHook(func() {
 				op.bus.Emit(&events.RwaInstantBuyCompleted{
 					OrderID:       order.ID.String(),
@@ -350,6 +328,12 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 		}
 	}
 	if alreadyVerified {
+		paymentSent, err := order.PaymentSentMessage()
+		if err == nil {
+			op.emitVerifiedPaymentSettlementRecovery(dbtx, order, paymentSent)
+		} else if !models.IsMessageNotExistError(err) {
+			return err
+		}
 		return dbtx.Save(order)
 	}
 	order.MarkPaymentVerified()
@@ -382,6 +366,75 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 
 	op.emitPaymentSentEvents(dbtx, order, orderOpen, paymentSent, &tx)
 	return dbtx.Save(order)
+}
+
+func (op *OrderProcessor) emitVerifiedPaymentSettlementRecovery(
+	dbtx database.Tx,
+	order *models.Order,
+	paymentSent *pb.PaymentSent,
+) {
+	if order == nil || paymentSent == nil ||
+		order.Role() != models.RoleVendor ||
+		!order.IsPaymentVerified() ||
+		order.State != models.OrderState_PENDING {
+		return
+	}
+	if orderOpen, err := order.OrderOpenMessage(); err == nil {
+		if err := op.EnsureRatingSignatures(dbtx, order, orderOpen); err != nil {
+			logger.LogInfoWithIDf(log, op.nodeID,
+				"Error recovering rating signatures for verified order %s: %s",
+				order.ID, err)
+		}
+	}
+	coinType := iwallet.CoinType(paymentSent.Coin)
+	method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
+	if ok && payment.MethodIsCancelable(method) {
+		if !markPaymentSettlementSignaled(order) {
+			return
+		}
+		amount := parsePaymentSentEventAmount(paymentSent)
+		dbtx.RegisterCommitHook(func() {
+			op.bus.Emit(&events.CancelablePaymentReady{
+				TenantID:      order.TenantID,
+				OrderID:       order.ID.String(),
+				TransactionID: paymentSent.TransactionID,
+				Coin:          paymentSent.Coin,
+				Amount:        amount,
+			})
+		})
+		logger.LogInfoWithIDf(log, op.nodeID,
+			"Recovered CANCELABLE payment ready event for verified order %s (coin=%s)",
+			order.ID, paymentSent.Coin)
+		return
+	}
+	if payment.IsFiatPaymentRoute(method, coinType) {
+		return
+	}
+	if paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_RWA_INSTANT {
+		if !markPaymentSettlementSignaled(order) {
+			return
+		}
+		dbtx.RegisterCommitHook(func() {
+			op.bus.Emit(&events.RwaInstantBuyCompleted{
+				OrderID:       order.ID.String(),
+				TransactionID: paymentSent.TransactionID,
+				Coin:          paymentSent.Coin,
+			})
+		})
+		logger.LogInfoWithIDf(log, op.nodeID,
+			"Recovered RWA instant completion event for verified order %s",
+			order.ID)
+	}
+}
+
+func markPaymentSettlementSignaled(order *models.Order) bool {
+	if order == nil || order.PaymentSettlementSignaledAt != nil ||
+		len(order.SerializedOrderConfirmation) > 0 {
+		return false
+	}
+	now := time.Now()
+	order.PaymentSettlementSignaledAt = &now
+	return true
 }
 
 func normalizeAwaitingPaymentBeforePaymentSent(order *models.Order) {

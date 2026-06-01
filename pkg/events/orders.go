@@ -451,6 +451,7 @@ type UTXOPaymentDetected struct {
 	Method           int32  `json:"method"`
 	Amount           uint64 `json:"amount"`
 	ToAddress        string `json:"toAddress"`
+	ToID             []byte `json:"toID,omitempty"`
 	Timestamp        int64  `json:"timestamp"`
 	Script           string `json:"script"`
 	PayerAddress     string `json:"payerAddress"`

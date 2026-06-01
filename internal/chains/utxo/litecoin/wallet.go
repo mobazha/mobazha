@@ -99,7 +99,7 @@ func (w *LitecoinWallet) IsDust(iaddr iwallet.Address, amount iwallet.Amount) bo
 // will add 50% of the returned fee for each additional input. This is a
 // crude fee calculating but it simplifies things quite a bit.
 func (w *LitecoinWallet) EstimateEscrowFee(nInputs int, threshold int, nOuts int, level iwallet.FeeLevel) (iwallet.Amount, error) {
-	size := chainutxo.EstimateP2WSHMultisigSpendVSize(nInputs, threshold, nOuts)
+	size := chainutxo.EstimateP2WSHMultisigSpendRelayVSize(nInputs, threshold, nOuts)
 
 	resp, err := w.ChainClient.EstimateFee(size)
 	if err != nil {

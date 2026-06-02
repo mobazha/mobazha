@@ -850,6 +850,10 @@ func (s *OrderAppService) signAndSendReleaseTransaction(txn *iwallet.Transaction
 
 // ReleaseFunds releases funds from dispute escrow.
 func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
+	if err := s.requireDisputeReleaseParticipant(orderID); err != nil {
+		return err
+	}
+
 	order, _, paymentSent, disputeClose, err := s.getOrderAndPaymentInfo(orderID)
 	if err != nil {
 		return fmt.Errorf("get order payment info for %s: %w", orderID, err)
@@ -954,6 +958,24 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 	}
 	s.emitOrderProcessorEvents(disputeEvent)
 	return nil
+}
+
+func (s *OrderAppService) requireDisputeReleaseParticipant(orderID models.OrderID) error {
+	var order models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Select("id", "my_role").Where("id = ?", orderID.String()).First(&order).Error
+	}); err != nil {
+		return fmt.Errorf("failed to get order role: %w", err)
+	}
+
+	switch order.Role() {
+	case models.RoleBuyer, models.RoleVendor:
+		return nil
+	case models.RoleModerator:
+		return fmt.Errorf("%w: moderator must resolve disputes via close dispute, not release funds", coreiface.ErrBadRequest)
+	default:
+		return fmt.Errorf("%w: dispute release requires buyer or vendor role, got %s", coreiface.ErrBadRequest, order.Role())
+	}
 }
 
 // ReleaseFundsAfterTimeout releases escrow funds after dispute timeout.

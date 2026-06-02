@@ -192,7 +192,7 @@ func TestCurrencyDictionaryLookup_CanonicalCryptoAssetIDUsesPricingCode(t *testi
 		"ETHUSDT": newCurrency("ETHUSDT"),
 	}
 
-	def, err := dict.Lookup("crypto:eip155:1:erc20:0xF36BFeE8fd7F1950c0129714Faf6d1e1F94a66AA")
+	def, err := dict.Lookup("crypto:eip155:1:erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7")
 	if err != nil {
 		t.Fatalf("Lookup(canonical erc20): unexpected error: %v", err)
 	}

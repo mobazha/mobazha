@@ -330,7 +330,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowGasFees
 
 	const (
 		platformAddr = "0x7777777777777777777777777777777777777777"
-		feeWei       = "2500000000000000" // $5 at $2,000/ETH
+		feeWei       = "250000000000000" // $0.50 at $2,000/ETH
 	)
 	reg := payment.NewRegistry()
 	strategy := &testChainEscrow{

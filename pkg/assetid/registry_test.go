@@ -104,6 +104,31 @@ func TestDefaultRegistryLookup(t *testing.T) {
 	if def.Pricing.PeggedTo != "USD" {
 		t.Fatalf("unexpected pegged to: %s", def.Pricing.PeggedTo)
 	}
+
+	ethUSDT, err := r.Lookup("crypto:eip155:1:erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7")
+	if err != nil {
+		t.Fatalf("lookup ETHUSDT failed: %v", err)
+	}
+	if ethUSDT.AssetID != "crypto:eip155:1:erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7" {
+		t.Fatalf("ETHUSDT asset id = %s, want official Ethereum mainnet USDT contract", ethUSDT.AssetID)
+	}
+
+	for _, tc := range []struct {
+		name    string
+		assetID string
+	}{
+		{name: "BSCUSDT", assetID: "crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955"},
+		{name: "BSCUSDC", assetID: "crypto:eip155:56:erc20:0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"},
+	} {
+		stablecoin, err := r.Lookup(tc.assetID)
+		if err != nil {
+			t.Fatalf("lookup %s failed: %v", tc.name, err)
+		}
+		if stablecoin.Decimals != 18 {
+			t.Fatalf("%s decimals = %d, want 18", tc.name, stablecoin.Decimals)
+		}
+	}
+
 	priceID, ok := def.PriceIDForProvider("coingecko")
 	if !ok {
 		t.Fatal("expected coingecko price source")

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 // ActionRecord is the canonical view of a backend-submitted settlement action — the
@@ -47,6 +49,11 @@ type ActionRecord struct {
 	Attempts        int
 	Confirmations   int
 	LastError       string
+	SettlementCoin  string
+	GrossAmount     string
+	PlannedLines    []models.SettlementPayoutLine
+	ObservedLines   []models.SettlementPayoutLine
+	ConfirmedAt     *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -172,6 +179,21 @@ func (s *MemoryActionStore) Put(rec ActionRecord) error {
 		// rather than recreating the row).
 		if rec.CreatedAt.IsZero() {
 			rec.CreatedAt = existing.CreatedAt
+		}
+		if rec.SettlementCoin == "" {
+			rec.SettlementCoin = existing.SettlementCoin
+		}
+		if rec.GrossAmount == "" {
+			rec.GrossAmount = existing.GrossAmount
+		}
+		if len(rec.PlannedLines) == 0 {
+			rec.PlannedLines = existing.PlannedLines
+		}
+		if len(rec.ObservedLines) == 0 {
+			rec.ObservedLines = existing.ObservedLines
+		}
+		if rec.ConfirmedAt == nil {
+			rec.ConfirmedAt = existing.ConfirmedAt
 		}
 	}
 	now := time.Now().UTC()

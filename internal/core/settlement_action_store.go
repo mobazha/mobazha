@@ -61,6 +61,11 @@ func (s *SettlementActionStore) Lookup(ctx context.Context, actionID string) (*a
 		Attempts:        row.Attempts,
 		Confirmations:   row.Confirmations,
 		LastError:       row.LastError,
+		SettlementCoin:  row.SettlementCoin,
+		GrossAmount:     row.GrossAmount,
+		PlannedLines:    models.DecodeSettlementPayoutLines(row.PlannedLines),
+		ObservedLines:   models.DecodeSettlementPayoutLines(row.ObservedLines),
+		ConfirmedAt:     row.ConfirmedAt,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 	}
@@ -87,6 +92,11 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		Attempts:        rec.Attempts,
 		Confirmations:   rec.Confirmations,
 		LastError:       rec.LastError,
+		SettlementCoin:  rec.SettlementCoin,
+		GrossAmount:     rec.GrossAmount,
+		PlannedLines:    models.EncodeSettlementPayoutLines(rec.PlannedLines),
+		ObservedLines:   models.EncodeSettlementPayoutLines(rec.ObservedLines),
+		ConfirmedAt:     rec.ConfirmedAt,
 		CreatedAt:       rec.CreatedAt,
 		UpdatedAt:       rec.UpdatedAt,
 	}
@@ -113,6 +123,21 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		}
 		if row.Attempts < existing.Attempts {
 			row.Attempts = existing.Attempts
+		}
+		if row.SettlementCoin == "" {
+			row.SettlementCoin = existing.SettlementCoin
+		}
+		if row.GrossAmount == "" {
+			row.GrossAmount = existing.GrossAmount
+		}
+		if len(row.PlannedLines) == 0 {
+			row.PlannedLines = existing.PlannedLines
+		}
+		if len(row.ObservedLines) == 0 {
+			row.ObservedLines = existing.ObservedLines
+		}
+		if row.ConfirmedAt == nil {
+			row.ConfirmedAt = existing.ConfirmedAt
 		}
 		row.AttemptTxHashes = mergeSettlementActionTxHashes(existing.AttemptTxHashes, row.AttemptTxHashes, existing.TxHash, row.TxHash)
 		return nil
@@ -205,6 +230,7 @@ type SettlementActionStatusUpdate struct {
 	TxHash        string
 	Confirmations int
 	LastError     string
+	ObservedLines []models.SettlementPayoutLine
 }
 
 func (s *SettlementActionStore) RecordStatus(row models.ManagedEscrowRelayAction, update SettlementActionStatusUpdate) error {
@@ -222,6 +248,15 @@ func (s *SettlementActionStore) RecordStatus(row models.ManagedEscrowRelayAction
 	if update.TxHash != "" {
 		values["tx_hash"] = update.TxHash
 		values["attempt_tx_hashes"] = mergeSettlementActionTxHashes(row.AttemptTxHashes, row.TxHash, update.TxHash)
+	}
+	if strings.EqualFold(update.State, "confirmed") {
+		now := time.Now().UTC()
+		values["confirmed_at"] = now
+		if len(update.ObservedLines) > 0 {
+			values["observed_lines"] = models.EncodeSettlementPayoutLines(update.ObservedLines)
+		} else if len(row.ObservedLines) == 0 && len(row.PlannedLines) > 0 {
+			values["observed_lines"] = row.PlannedLines
+		}
 	}
 	_, err := s.updateActionColumns(
 		values,

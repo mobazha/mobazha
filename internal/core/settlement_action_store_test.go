@@ -32,6 +32,19 @@ func TestSettlementActionStore_PutLookupRoundTrip(t *testing.T) {
 		TxHash:          "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 		AttemptTxHashes: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 		Attempts:        2,
+		SettlementCoin:  "crypto:eip155:1:erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7",
+		GrossAmount:     "292929",
+		PlannedLines: []models.SettlementPayoutLine{{
+			Type:    "seller",
+			Amount:  "141414",
+			Address: "0xb9a2226c9da66db8210edfc51ede121e977e2e39",
+			Coin:    "crypto:eip155:1:erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7",
+		}, {
+			Type:    "platform",
+			Amount:  "151515",
+			Address: "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+			Coin:    "crypto:eip155:1:erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7",
+		}},
 	}
 	require.NoError(t, s.Put(rec))
 
@@ -45,6 +58,56 @@ func TestSettlementActionStore_PutLookupRoundTrip(t *testing.T) {
 	require.Equal(t, rec.To, got.To)
 	require.Equal(t, rec.Data, got.Data)
 	require.Equal(t, rec.Attempts, got.Attempts)
+	require.Equal(t, rec.SettlementCoin, got.SettlementCoin)
+	require.Equal(t, rec.GrossAmount, got.GrossAmount)
+	require.Equal(t, rec.PlannedLines, got.PlannedLines)
+}
+
+func TestSettlementActionStore_RecordStatusConfirmedCopiesObservedLines(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
+
+	s := NewSettlementActionStore(db)
+	row := models.ManagedEscrowRelayAction{
+		ActionID:       "act-confirm-lines",
+		OrderID:        "order-1",
+		ActionKind:     "confirm",
+		State:          "submitted",
+		TxHash:         "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		SettlementCoin: "USDT",
+		GrossAmount:    "292929",
+		PlannedLines: models.EncodeSettlementPayoutLines([]models.SettlementPayoutLine{{
+			Type:    "seller",
+			Amount:  "141414",
+			Address: "seller",
+			Coin:    "USDT",
+		}, {
+			Type:    "platform",
+			Amount:  "151515",
+			Address: "platform",
+			Coin:    "USDT",
+		}}),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&row)
+	}))
+
+	require.NoError(t, s.RecordStatus(row, SettlementActionStatusUpdate{
+		State:         "confirmed",
+		TxHash:        row.TxHash,
+		Confirmations: 2,
+	}))
+
+	got, err := s.Lookup(context.Background(), row.ActionID)
+	require.NoError(t, err)
+	require.Equal(t, "confirmed", got.State)
+	require.NotNil(t, got.ConfirmedAt)
+	require.Len(t, got.ObservedLines, 2)
+	require.Equal(t, "141414", got.ObservedLines[0].Amount)
+	require.Equal(t, "151515", got.ObservedLines[1].Amount)
 }
 
 func TestSettlementActionStore_ClaimRetryUsesCASAndPreservesHashHistory(t *testing.T) {

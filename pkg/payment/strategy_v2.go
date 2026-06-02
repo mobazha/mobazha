@@ -157,6 +157,12 @@ type ActionResult struct {
 	// synchronously (e.g. ManagedEscrow relay). Callers should prefer this over
 	// polling GetActionStatus immediately after submit.
 	SubmittedTxHash string
+
+	// SettlementCoin/GrossAmount/PlannedLines describe the chain-neutral
+	// settlement outcome the submitted action is expected to produce.
+	SettlementCoin string
+	GrossAmount    string
+	PlannedLines   []models.SettlementPayoutLine
 }
 
 // ActionOwnerSignature is a chain-agnostic carrier for a single owner
@@ -258,6 +264,11 @@ type ActionStatus struct {
 
 	// RelayTaskID mirrors hosting RelayService task id when returned。
 	RelayTaskID string `json:"relayTaskId,omitempty"`
+
+	SettlementCoin string                        `json:"settlementCoin,omitempty"`
+	GrossAmount    string                        `json:"grossAmount,omitempty"`
+	PlannedLines   []models.SettlementPayoutLine `json:"plannedLines,omitempty"`
+	ObservedLines  []models.SettlementPayoutLine `json:"observedLines,omitempty"`
 }
 
 // ── Errors ─────────────────────────────────────────────────────

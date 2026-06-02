@@ -4,6 +4,7 @@ package api
 
 import (
 	"math/big"
+	"strings"
 
 	ordercalc "github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -70,6 +71,9 @@ func buildOrderSettlementBreakdown(order *models.Order) *orderSettlementBreakdow
 		return nil
 	}
 	currency := settlementCurrency(order)
+	if breakdown := settlementFromConfirmedAction(order.SettlementActions, currency); breakdown != nil {
+		return breakdown
+	}
 	if orderComplete, err := order.OrderCompleteMessage(); err == nil && orderComplete.GetReleaseInfo() != nil {
 		return settlementFromEscrowRelease("complete", "seller", currency, orderComplete.GetReleaseInfo())
 	}
@@ -154,6 +158,67 @@ func settlementFromDisputeRelease(currency string, release *pb.DisputeClose_Mode
 	return out
 }
 
+func settlementFromConfirmedAction(actions []models.SettlementActionSnapshot, fallbackCurrency string) *orderSettlementBreakdownResp {
+	action, lines := latestConfirmedSettlementLines(actions)
+	if action == nil || len(lines) == 0 {
+		return nil
+	}
+	currency := strings.TrimSpace(action.SettlementCoin)
+	if currency == "" {
+		currency = fallbackCurrency
+	}
+	out := &orderSettlementBreakdownResp{
+		Source:         "settlement_action",
+		Currency:       currency,
+		EscrowedAmount: strings.TrimSpace(action.GrossAmount),
+		TxHash:         strings.TrimSpace(action.TxHash),
+	}
+	for _, line := range lines {
+		out.addLine(line.Type, line.Amount, line.Address)
+		out.applySettlementLine(line)
+	}
+	if out.EscrowedAmount == "" {
+		out.EscrowedAmount = sumSettlementLines(lines)
+	}
+	return out
+}
+
+func latestConfirmedSettlementLines(actions []models.SettlementActionSnapshot) (*models.SettlementActionSnapshot, []models.SettlementPayoutLine) {
+	var selected *models.SettlementActionSnapshot
+	var selectedLines []models.SettlementPayoutLine
+	for _, action := range actions {
+		name := strings.TrimSpace(action.SettlementAction)
+		if name == "" {
+			name = action.Action
+		}
+		if !isSettlementActionName(name) || !strings.EqualFold(strings.TrimSpace(action.State), "confirmed") {
+			continue
+		}
+		lines := action.ObservedLines
+		if len(lines) == 0 {
+			lines = action.PlannedLines
+		}
+		if len(lines) == 0 {
+			continue
+		}
+		if selected == nil || action.UpdatedAt.After(selected.UpdatedAt) {
+			current := action
+			selected = &current
+			selectedLines = lines
+		}
+	}
+	return selected, selectedLines
+}
+
+func isSettlementActionName(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "confirm", "cancel", "complete", "dispute_release":
+		return true
+	default:
+		return false
+	}
+}
+
 func (b *orderSettlementBreakdownResp) addLine(lineType, amount, address string) {
 	if b == nil || amount == "" || amount == "0" {
 		return
@@ -163,6 +228,54 @@ func (b *orderSettlementBreakdownResp) addLine(lineType, amount, address string)
 		Amount:  amount,
 		Address: address,
 	})
+}
+
+func (b *orderSettlementBreakdownResp) applySettlementLine(line models.SettlementPayoutLine) {
+	if b == nil {
+		return
+	}
+	switch strings.ToLower(strings.TrimSpace(line.Type)) {
+	case "seller", "vendor":
+		b.SellerAmount = addAmountStrings(b.SellerAmount, line.Amount)
+		if b.SellerAddress == "" {
+			b.SellerAddress = line.Address
+		}
+	case "buyer":
+		b.BuyerAmount = addAmountStrings(b.BuyerAmount, line.Amount)
+		if b.BuyerAddress == "" {
+			b.BuyerAddress = line.Address
+		}
+	case "moderator":
+		b.ModeratorAmount = addAmountStrings(b.ModeratorAmount, line.Amount)
+		if b.ModeratorAddress == "" {
+			b.ModeratorAddress = line.Address
+		}
+	case "platform":
+		b.PlatformAmount = addAmountStrings(b.PlatformAmount, line.Amount)
+		if b.PlatformAddress == "" {
+			b.PlatformAddress = line.Address
+		}
+	case "network_fee", "transaction_fee":
+		b.TransactionFee = addAmountStrings(b.TransactionFee, line.Amount)
+	}
+}
+
+func sumSettlementLines(lines []models.SettlementPayoutLine) string {
+	total := big.NewInt(0)
+	for _, line := range lines {
+		addDecimalString(total, line.Amount)
+	}
+	return total.String()
+}
+
+func addAmountStrings(left, right string) string {
+	total := big.NewInt(0)
+	addDecimalString(total, left)
+	addDecimalString(total, right)
+	if total.Sign() == 0 {
+		return ""
+	}
+	return total.String()
 }
 
 func escrowedAmountFromOutpoints(outpoints []*pb.Outpoint, fallbackParts ...string) string {

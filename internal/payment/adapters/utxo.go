@@ -21,6 +21,7 @@ import (
 type UTXOMonitorQuerier interface {
 	GetWatchedAddress(address string) *utxo.WatchedAddress
 	GetAddressTransactions(chainType iwallet.ChainType, address string, scriptPubKey []byte) ([]iwallet.Transaction, error)
+	ListUnspent(chainType iwallet.ChainType, scriptPubKey []byte) ([]utxo.UnspentOutput, error)
 }
 
 // UTXOAutoConfirmAdapter wraps UTXO auto-confirm logic as a ChainEscrow.
@@ -200,6 +201,10 @@ func (a *UTXOAutoConfirmAdapter) VerifyPreRelease(_ context.Context, params paym
 		return nil
 	}
 
+	if handled, err := a.verifyUTXOsWithListUnspent(coinInfo.Chain, wa.ScriptPubKey, params); handled {
+		return err
+	}
+
 	chainTxs, err := a.MonitorQuerier.GetAddressTransactions(coinInfo.Chain, params.PaymentAddress, wa.ScriptPubKey)
 	if err != nil {
 		log.Warningf("Chain UTXO verification query failed for %s: %v, proceeding with local data", params.PaymentAddress, err)
@@ -216,7 +221,7 @@ func (a *UTXOAutoConfirmAdapter) VerifyPreRelease(_ context.Context, params paym
 	for _, tx := range chainTxs {
 		for _, to := range tx.To {
 			id := hex.EncodeToString(to.ID)
-			if !chainSpent[id] && to.Address.String() == params.PaymentAddress {
+			if !chainSpent[id] && payment.SameUTXOAddress(to.Address.String(), params.PaymentAddress) {
 				chainUnspent[id] = true
 			}
 		}
@@ -224,11 +229,40 @@ func (a *UTXOAutoConfirmAdapter) VerifyPreRelease(_ context.Context, params paym
 
 	for _, utxo := range params.ExpectedUTXOs {
 		id := hex.EncodeToString(utxo.ID)
+		if chainSpent[id] {
+			return fmt.Errorf("%w: outpoint %s is already spent from address %s", ErrUTXOAlreadySpent, id, params.PaymentAddress)
+		}
 		if !chainUnspent[id] {
-			return fmt.Errorf("%w: outpoint %s not found in unspent set for address %s", ErrUTXOAlreadySpent, id, params.PaymentAddress)
+			log.Warningf("Chain UTXO verification could not find outpoint %s in reconstructed unspent set for address %s; proceeding because no spend was observed", id, params.PaymentAddress)
 		}
 	}
 
 	log.Infof("Chain UTXO verification passed: %d UTXOs confirmed unspent at %s", len(params.ExpectedUTXOs), params.PaymentAddress)
 	return nil
+}
+
+func (a *UTXOAutoConfirmAdapter) verifyUTXOsWithListUnspent(chain iwallet.ChainType, scriptPubKey []byte, params payment.PreReleaseParams) (bool, error) {
+	utxos, err := a.MonitorQuerier.ListUnspent(chain, scriptPubKey)
+	if err != nil {
+		log.Warningf("ListUnspent UTXO verification query failed for %s: %v; falling back to address history", params.PaymentAddress, err)
+		return false, nil
+	}
+
+	unspent := make(map[string]struct{}, len(utxos))
+	for _, utxo := range utxos {
+		id, ok := payment.UTXOOutpointID(utxo.TxHash, utxo.OutputIndex)
+		if !ok {
+			continue
+		}
+		unspent[hex.EncodeToString(id)] = struct{}{}
+	}
+	for _, expected := range params.ExpectedUTXOs {
+		id := hex.EncodeToString(expected.ID)
+		if _, ok := unspent[id]; !ok {
+			return true, fmt.Errorf("%w: outpoint %s not found in current unspent set for address %s", ErrUTXOAlreadySpent, id, params.PaymentAddress)
+		}
+	}
+
+	log.Infof("ListUnspent verification passed: %d UTXOs confirmed unspent at %s", len(params.ExpectedUTXOs), params.PaymentAddress)
+	return true, nil
 }

@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
+	"github.com/mobazha/mobazha3.0/libs/store-and-forward/pb"
 )
 
 const (
@@ -92,6 +94,77 @@ func Test_ProxyRegistration(t *testing.T) {
 	servers := localClient.GetRegisteredServers()
 	if len(servers) != 1 || servers[0] != serverHost.ID() {
 		t.Fatalf("Expected LocalClient to be registered with server, got %v", servers)
+	}
+}
+
+func Test_ProxyAckDoesNotDowngradeRegistrationTTL(t *testing.T) {
+	mn := mocknet.New()
+
+	serverHost, err := mn.GenPeer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxyHost, err := mn.GenPeer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mn.LinkAll(); err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(context.Background(), serverHost,
+		ServerProtocols(testServerProtocol),
+		ClientProtocols(testClientProtocol),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	proxy, err := NewSNFProxy(context.Background(), &ProxyConfig{
+		TransportHost:        proxyHost,
+		Servers:              []peer.ID{serverHost.ID()},
+		ServerProtocol:       testServerProtocol,
+		ClientProtocol:       testClientProtocol,
+		RegistrationDuration: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientSK, _, err := newPeer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientID, err := peer.IDFromPrivateKey(clientSK)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	localClient, err := proxy.RegisterNode(clientID, clientSK)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+	if err := localClient.AckMessage(context.Background(), []byte("already-processed-message")); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	record, err := server.ds.Get(server.ctx, registrationKey(clientID))
+	if err != nil {
+		t.Fatalf("expected registration for client after ACK: %v", err)
+	}
+	reg := new(pb.Message_Registration)
+	if err := proto.Unmarshal(record, reg); err != nil {
+		t.Fatal(err)
+	}
+	expiry, err := timestampTime(reg.Expiry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if remaining := time.Until(expiry); remaining < 50*time.Minute {
+		t.Fatalf("ACK downgraded registration TTL to %v; want durable registration", remaining)
 	}
 }
 

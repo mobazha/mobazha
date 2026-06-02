@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	ctxio "github.com/jbenet/go-context/io"
@@ -256,6 +255,25 @@ func (svr *Server) handleRegisterWithSession(w msgio.Writer, pmes *pb.Message, f
 	if err != nil {
 		return "", err
 	}
+	newExpiry, err := timestampTime(regMsg.Expiry)
+	if err != nil {
+		return "", err
+	}
+
+	// REGISTER both creates a durable registration and authenticates proxied
+	// sessions. Do not let a short-lived session proof overwrite a longer-lived
+	// registration, or peers that advertise this SNF server can become
+	// unreachable minutes after handling a message ACK.
+	if existing, getErr := svr.ds.Get(svr.ctx, registrationKey(clientID)); getErr == nil {
+		existingReg := new(pb.Message_Registration)
+		if err := proto.Unmarshal(existing, existingReg); err == nil {
+			if existingExpiry, err := timestampTime(existingReg.Expiry); err == nil && existingExpiry.After(newExpiry) {
+				ser = existing
+			}
+		}
+	} else if !errors.Is(getErr, datastore.ErrNotFound) {
+		return "", getErr
+	}
 
 	// Store registration using the actual client identity
 	err = svr.ds.Put(svr.ctx, registrationKey(clientID), ser)
@@ -311,7 +329,7 @@ func (svr *Server) handleProveRegistrationMessage(w msgio.Writer, pmes *pb.Messa
 	if err != nil {
 		return err
 	}
-	expiry, err := ptypes.Timestamp(reg.Expiry)
+	expiry, err := timestampTime(reg.Expiry)
 	if err != nil {
 		return err
 	}
@@ -438,7 +456,7 @@ func (svr *Server) handleGetMessagesWithSession(w msgio.Writer, pmes *pb.Message
 	if err != nil {
 		return "", err
 	}
-	expiry, err := ptypes.Timestamp(reg.Expiry)
+	expiry, err := timestampTime(reg.Expiry)
 	if err != nil {
 		return "", err
 	}
@@ -513,7 +531,7 @@ func (svr *Server) handleAckMessage(w msgio.Writer, pmes *pb.Message, peer peer.
 	if err != nil {
 		return err
 	}
-	expiry, err := ptypes.Timestamp(reg.Expiry)
+	expiry, err := timestampTime(reg.Expiry)
 	if err != nil {
 		return err
 	}
@@ -565,7 +583,7 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 	if err != nil {
 		return err
 	}
-	expiry, err := ptypes.Timestamp(reg.Expiry)
+	expiry, err := timestampTime(reg.Expiry)
 	if err != nil {
 		return err
 	}

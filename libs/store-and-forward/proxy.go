@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	ctxio "github.com/jbenet/go-context/io"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -372,34 +371,11 @@ func (c *LocalClient) registerWithServer(server peer.ID) {
 	r := msgio.NewVarintReaderSize(contextReader, inet.MessageSizeMax)
 	w := msgio.NewVarintWriter(s)
 
-	// Create registration with this client's peer ID and signature
-	ts := timestamppb.New(time.Now().Add(c.proxy.registrationDuration))
-
-	// Include public key for proxy mode identity verification
-	pubKeyBytes, err := crypto.MarshalPublicKey(c.privateKey.GetPublic())
+	reg, err := c.createRegistration(server, c.proxy.registrationDuration)
 	if err != nil {
-		log.Errorf("LocalClient %s: failed to marshal public key: %v", c.peerID.ShortString(), err)
+		log.Errorf("LocalClient %s: registration create error: %v", c.peerID.ShortString(), err)
 		return
 	}
-
-	reg := &pb.Message_Registration{
-		Expiry: ts,
-		Server: []byte(server),
-		Pubkey: pubKeyBytes, // Include pubkey BEFORE signing
-	}
-
-	ser, err := proto.Marshal(reg)
-	if err != nil {
-		log.Errorf("LocalClient %s: registration marshal error: %v", c.peerID.ShortString(), err)
-		return
-	}
-
-	sig, err := c.privateKey.Sign(ser)
-	if err != nil {
-		log.Errorf("LocalClient %s: registration sign error: %v", c.peerID.ShortString(), err)
-		return
-	}
-	reg.Signature = sig
 
 	err = writeMsgWithTimeout(w, &pb.Message{
 		Type: pb.Message_REGISTER,
@@ -582,7 +558,7 @@ func (c *LocalClient) SendMessage(ctx context.Context, to, server peer.ID, pubke
 			return ErrNotRegistered
 		}
 
-		expiry, err := ptypes.Timestamp(reg.Expiry)
+		expiry, err := timestampTime(reg.Expiry)
 		if err != nil {
 			return err
 		}
@@ -670,9 +646,10 @@ func (c *LocalClient) AckMessage(ctx context.Context, messageID []byte) error {
 			r := msgio.NewVarintReaderSize(contextReader, inet.MessageSizeMax)
 			w := msgio.NewVarintWriter(s)
 
-			// In proxy mode, we need to establish identity first
-			// Send a REGISTER message to authenticate this session
-			reg, err := c.createIdentityProof(srv)
+			// In proxy mode, REGISTER authenticates this stream and is also
+			// persisted by the server. Use the normal registration TTL so an ACK
+			// cannot downgrade a durable registration to a short identity proof.
+			reg, err := c.createRegistration(srv, c.proxy.registrationDuration)
 			if err != nil {
 				log.Debugf("LocalClient %s: failed to create identity proof for ACK: %v", c.peerID.ShortString(), err)
 				return
@@ -730,9 +707,8 @@ func (c *LocalClient) GetRegisteredServers() []peer.ID {
 	return servers
 }
 
-// createIdentityProof creates a signed registration message to prove identity in proxy mode
-func (c *LocalClient) createIdentityProof(server peer.ID) (*pb.Message_Registration, error) {
-	ts := timestamppb.New(time.Now().Add(time.Minute * 5)) // Short-lived proof
+func (c *LocalClient) createRegistration(server peer.ID, ttl time.Duration) (*pb.Message_Registration, error) {
+	ts := timestamppb.New(time.Now().Add(ttl))
 	reg := &pb.Message_Registration{
 		Expiry: ts,
 		Server: []byte(server),
@@ -757,6 +733,13 @@ func (c *LocalClient) createIdentityProof(server peer.ID) (*pb.Message_Registrat
 	reg.Signature = sig
 
 	return reg, nil
+}
+
+// createIdentityProof creates a short-lived signed registration-shaped proof
+// for requests such as GET_MESSAGES that verify identity without persisting a
+// new durable registration.
+func (c *LocalClient) createIdentityProof(server peer.ID) (*pb.Message_Registration, error) {
+	return c.createRegistration(server, time.Minute*5)
 }
 
 // Error definitions

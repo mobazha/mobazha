@@ -229,21 +229,30 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, message *npb.OrderMes
 }
 
 // ProcessACK loads the order from the database and sets the ACK for the message type.
-func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage) error {
+// paymentReadyNewly is true when ORDER_OPEN ACK marks the buyer order payment-ready
+// for the first time; paymentReadyOrderID is set in that case.
+func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage) (paymentReadyNewly bool, paymentReadyOrderID string, err error) {
 	message := new(npb.Message)
 	if err := proto.Unmarshal(om.SerializedMessage, message); err != nil {
-		return err
+		return false, "", err
 	}
 
 	orderMessage := new(npb.OrderMessage)
 	if err := message.Payload.UnmarshalTo(orderMessage); err != nil {
-		return err
+		return false, "", err
 	}
 
 	var key string
 	switch orderMessage.MessageType {
 	case npb.OrderMessage_ORDER_OPEN:
-		key = "order_open_acked"
+		newly, markErr := database.MarkOrderOpenPaymentReady(tx, orderMessage.OrderID)
+		if markErr != nil {
+			return false, "", markErr
+		}
+		if newly {
+			return true, orderMessage.OrderID, nil
+		}
+		return false, "", nil
 	case npb.OrderMessage_ORDER_DECLINE:
 		key = "order_decline_acked"
 	case npb.OrderMessage_ORDER_CANCEL:
@@ -275,9 +284,9 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 	case npb.OrderMessage_PAYMENT_FINALIZED:
 		key = "payment_finalized_acked"
 	default:
-		return fmt.Errorf("unknown order message type")
+		return false, "", fmt.Errorf("unknown order message type")
 	}
-	return tx.Update(key, true, map[string]interface{}{"id = ?": orderMessage.OrderID}, &models.Order{})
+	return false, "", tx.Update(key, true, map[string]interface{}{"id = ?": orderMessage.OrderID}, &models.Order{})
 }
 
 // fsmTransitionResult holds the pre-computed FSM transition for a message.

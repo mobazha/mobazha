@@ -105,10 +105,12 @@ func (m *mockFiatService) HandleOnboardingCallback(_ context.Context, _ string, 
 // contracts.FiatPaymentProviderAccessor for handler test context injection.
 type mockNodeWithFiat struct {
 	contracts.NodeService
-	fiatSvc contracts.FiatService
+	fiatSvc  contracts.FiatService
+	orderSvc contracts.OrderService
 }
 
-func (m *mockNodeWithFiat) Fiat() contracts.FiatService { return m.fiatSvc }
+func (m *mockNodeWithFiat) Fiat() contracts.FiatService   { return m.fiatSvc }
+func (m *mockNodeWithFiat) Order() contracts.OrderService { return m.orderSvc }
 
 // newFiatHandlerRequest creates an http.Request with the mock node injected in context
 // and optional chi URL params.

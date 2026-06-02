@@ -297,6 +297,14 @@ type RwaInstantBuyCompleted struct {
 	Coin          string `json:"coin"`
 }
 
+// OrderPaymentReady is emitted when the seller has processed ORDER_OPEN and the
+// buyer-side order transitions to payment-ready. WebSocket-only; drives the
+// payment page to refresh payment-session without waiting for the poll interval.
+type OrderPaymentReady struct {
+	TenantID string `json:"tenantID,omitempty"`
+	OrderID  string `json:"orderID"`
+}
+
 // PartialPaymentReceived is emitted when buyer's payment is less than expected
 // Frontend should refresh QR code to show remaining amount
 type PartialPaymentReceived struct {

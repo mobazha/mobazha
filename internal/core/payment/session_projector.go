@@ -91,7 +91,9 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	// ── Capabilities ──────────────────────────────────────────────────────
 	caps := p.deriveCapabilities(status, productMode, settlementMode)
 
-	return &payment.PaymentSession{
+	readiness := payment.DerivePaymentReadiness(order, expiresAt)
+
+	session := &payment.PaymentSession{
 		SessionID:          sessionID,
 		OrderID:            order.ID.String(),
 		PaymentCoin:        paymentCoin,
@@ -105,8 +107,11 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		FundingTarget:      fundingTarget,
 		PaymentProgress:    progress,
 		Capabilities:       caps,
+		PaymentReadiness:   readiness,
 		UserActionRequest:  nil, // Phase B: no user action required for address_monitored
-	}, nil
+	}
+	payment.ApplyBuyerPaymentReadinessGate(session)
+	return session, nil
 }
 
 // ── Private derivation helpers ────────────────────────────────────────────

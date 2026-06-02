@@ -64,6 +64,10 @@ func (g *Gateway) handleGetRWATokenPaymentInfoRequest(w http.ResponseWriter, r *
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Order not found or unavailable")
 		return
 	}
+	if models.BuyerAwaitingPaymentReadiness(order) {
+		responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "Payment is not ready yet; waiting for seller to receive the order")
+		return
+	}
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
 		log.Warningf("Failed to parse order open message for %s: %v", params.OrderID, err)

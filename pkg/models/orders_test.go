@@ -1218,8 +1218,8 @@ func TestOrder_CanRefund(t *testing.T) {
 
 func TestOrder_CanShip(t *testing.T) {
 	tests := []struct {
-		setup      func(order *Order) error
-		ourRole    OrderRole
+		setup   func(order *Order) error
+		ourRole OrderRole
 		canShip bool
 	}{
 		{
@@ -1244,7 +1244,7 @@ func TestOrder_CanShip(t *testing.T) {
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderConfirmation{}))
 				return err
 			},
-			ourRole:    RoleVendor,
+			ourRole: RoleVendor,
 			canShip: true,
 		},
 		{
@@ -1262,7 +1262,7 @@ func TestOrder_CanShip(t *testing.T) {
 				}
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
 					SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
-					Amount: iwallet.NewAmount(1).String(),
+					Amount:         iwallet.NewAmount(1).String(),
 				}))
 				if err != nil {
 					return err
@@ -1270,7 +1270,7 @@ func TestOrder_CanShip(t *testing.T) {
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderConfirmation{}))
 				return err
 			},
-			ourRole:    RoleVendor,
+			ourRole: RoleVendor,
 			canShip: false,
 		},
 		{
@@ -1305,7 +1305,7 @@ func TestOrder_CanShip(t *testing.T) {
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderConfirmation{}))
 				return err
 			},
-			ourRole:    RoleVendor,
+			ourRole: RoleVendor,
 			canShip: false,
 		},
 		{
@@ -1326,7 +1326,7 @@ func TestOrder_CanShip(t *testing.T) {
 				}))
 				return err
 			},
-			ourRole:    RoleBuyer,
+			ourRole: RoleBuyer,
 			canShip: false,
 		},
 		{
@@ -1334,7 +1334,7 @@ func TestOrder_CanShip(t *testing.T) {
 			setup: func(order *Order) error {
 				return nil
 			},
-			ourRole:    RoleVendor,
+			ourRole: RoleVendor,
 			canShip: false,
 		},
 		{
@@ -1356,7 +1356,7 @@ func TestOrder_CanShip(t *testing.T) {
 				}))
 				return err
 			},
-			ourRole:    RoleVendor,
+			ourRole: RoleVendor,
 			canShip: false,
 		},
 		{
@@ -1382,7 +1382,7 @@ func TestOrder_CanShip(t *testing.T) {
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderConfirmation{}))
 				return err
 			},
-			ourRole:    RoleVendor,
+			ourRole: RoleVendor,
 			canShip: false,
 		},
 		{
@@ -1408,7 +1408,7 @@ func TestOrder_CanShip(t *testing.T) {
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderConfirmation{}))
 				return err
 			},
-			ourRole:    RoleVendor,
+			ourRole: RoleVendor,
 			canShip: false,
 		},
 		{
@@ -1434,7 +1434,7 @@ func TestOrder_CanShip(t *testing.T) {
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderConfirmation{}))
 				return err
 			},
-			ourRole:    RoleVendor,
+			ourRole: RoleVendor,
 			canShip: false,
 		},
 	}
@@ -1630,10 +1630,10 @@ func TestOrder_DeriveState_UnverifiedPaymentSent(t *testing.T) {
 		}
 		if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
 			SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
-			ToAddress:     "addr1",
-			TransactionID: "tx1",
-			Amount:        "100",
-			Coin:          string(iwallet.CtMock),
+			ToAddress:      "addr1",
+			TransactionID:  "tx1",
+			Amount:         "100",
+			Coin:           string(iwallet.CtMock),
 		})); err != nil {
 			return nil, err
 		}
@@ -1672,10 +1672,10 @@ func TestOrder_DeriveState_VerifiedPaymentWithoutMatchedTransactions(t *testing.
 	}
 	if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
 		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_DIRECT),
-		ToAddress:     "addr-unmatched",
-		TransactionID: "tx-verified",
-		Amount:        "100",
-		Coin:          string(iwallet.CtMock),
+		ToAddress:      "addr-unmatched",
+		TransactionID:  "tx-verified",
+		Amount:         "100",
+		Coin:           string(iwallet.CtMock),
 	})); err != nil {
 		t.Fatal(err)
 	}
@@ -2010,7 +2010,7 @@ func TestOrder_IsFunded(t *testing.T) {
 
 func TestOrder_IsShipped(t *testing.T) {
 	tests := []struct {
-		setup       func(order *Order) error
+		setup     func(order *Order) error
 		isShipped bool
 	}{
 		// Shipped
@@ -2208,6 +2208,52 @@ func TestOrder_FundingTotal(t *testing.T) {
 					return err
 				}
 				return nil
+			},
+			total: iwallet.NewAmount(0),
+		},
+		// Funding facts without cached transactions
+		{
+			setup: func(order *Order) error {
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:             "1000",
+					ToAddress:          "aaaaaa",
+					ConfirmationPolicy: PaymentConfirmationPolicyChainConfirmed,
+					FundingFacts: []*pb.PaymentSent_FundingFact{{
+						Id:           "obs-1",
+						TxHash:       "tx-1",
+						TxHashSource: PaymentTxHashSourceChainTx,
+						ToAddress:    "aaaaaa",
+						Amount:       "1000",
+						Status:       PaymentObservationStatusConfirmed,
+					}},
+				}))
+			},
+			total: iwallet.NewAmount(1000),
+		},
+		// Pending funding facts only count for mempool-accepted policy
+		{
+			setup: func(order *Order) error {
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:             "1000",
+					ToAddress:          "aaaaaa",
+					ConfirmationPolicy: PaymentConfirmationPolicyChainConfirmed,
+					FundingFacts: []*pb.PaymentSent_FundingFact{{
+						Id:           "obs-pending",
+						TxHash:       "tx-pending",
+						TxHashSource: PaymentTxHashSourceChainTx,
+						ToAddress:    "aaaaaa",
+						Amount:       "1000",
+						Status:       PaymentObservationStatusPending,
+					}},
+				}))
 			},
 			total: iwallet.NewAmount(0),
 		},

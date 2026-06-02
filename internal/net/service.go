@@ -20,12 +20,12 @@ import (
 
 var log = logging.MustGetLogger("NET")
 
-// LocalDeliverer 定义本地直达消息投递接口，由宿主实现（如 HostService）
-// 返回 true 表示已完成本地直达投递（无须走网络路径）。
-// 注意：该接口不引入对 internal/core 或 internal/net 的依赖循环。
-// 实现方可通过 MobazhaNode.NetService().DeliverLocalMessage 完成投递。
+// LocalDeliverer is implemented by the hosting process to deliver messages
+// between nodes that live in the same process. It is intentionally limited to
+// in-process delivery; standalone/NAT peers continue through the regular
+// libp2p/SNF messenger path.
 type LocalDeliverer interface {
-	DeliverToLocal(target peer.ID, from peer.ID, msg *pb.Message) bool
+	DeliverToLocal(target peer.ID, from peer.ID, msg *pb.Message) (handled bool, err error)
 }
 
 // Compile-time check: *NetworkService implements contracts.NetworkService.
@@ -50,7 +50,7 @@ type NetworkService struct {
 
 	protocolID protocol.ID
 
-	// 可选的本地直达投递器（同进程本机节点快路径）
+	// Optional same-process delivery before regular libp2p.
 	localDeliverer LocalDeliverer
 }
 
@@ -96,7 +96,7 @@ func (ns *NetworkService) RegisterHandler(messageType pb.Message_MessageType, ha
 	ns.handlers[messageType] = handler
 }
 
-// SetLocalDeliverer 设置同进程本机节点本地直达投递器
+// SetLocalDeliverer configures an in-process delivery adapter.
 func (ns *NetworkService) SetLocalDeliverer(ld LocalDeliverer) {
 	ns.localDeliverer = ld
 }
@@ -169,14 +169,17 @@ func (ns *NetworkService) handleNewMessage(s inet.Stream) {
 }
 
 func (ns *NetworkService) SendMessage(ctx context.Context, peerID peer.ID, message *pb.Message) error {
-	// 优先尝试同进程本机节点本地直达
 	if ns.localDeliverer != nil {
 		from := ns.host.ID()
-		if ns.localDeliverer.DeliverToLocal(peerID, from, message) {
+		handled, err := ns.localDeliverer.DeliverToLocal(peerID, from, message)
+		if handled {
+			if err != nil {
+				return err
+			}
 			logger.LogDebugWithIDf(log, ns.nodeID, "Message %s delivered locally to %s", message.MessageID, peerID)
 			return nil
 		}
-		logger.LogDebugWithIDf(log, ns.nodeID, "Local delivery failed for %s, falling back to network", peerID)
+		logger.LogDebugWithIDf(log, ns.nodeID, "Local delivery unavailable for %s, falling back to network", peerID)
 	}
 
 	ms, err := ns.messageSenderForPeer(ctx, peerID)

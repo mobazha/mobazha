@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -36,30 +37,12 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 		return nil, nil, errors.New("wallet does not support escrow")
 	}
 
-	txs, err := order.GetTransactions()
+	txs, err := s.transactionsForCancelableRelease(wallet, order, params)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var (
-		txn      iwallet.Transaction
-		totalOut = iwallet.NewAmount(0)
-	)
-	spent := make(map[string]bool)
-	for _, tx := range txs {
-		for _, from := range tx.From {
-			spent[hex.EncodeToString(from.ID)] = true
-		}
-	}
-	for _, tx := range txs {
-		for _, to := range tx.To {
-			if !spent[hex.EncodeToString(to.ID)] && to.Address.String() == params.PaymentAddress {
-				txn.From = append(txn.From, to)
-				totalOut = totalOut.Add(to.Amount)
-			}
-		}
-	}
-
+	txn, totalOut := collectCancelableReleaseInputs(txs, params.PaymentAddress)
 	if len(txn.From) == 0 {
 		return nil, nil, errors.New("payment address is empty")
 	}
@@ -126,6 +109,50 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 	return dbTx, &txn, nil
 }
 
+func (s *SettlementService) transactionsForCancelableRelease(
+	wallet iwallet.Wallet,
+	order *models.Order,
+	params contracts.ReleaseFromCancelableParams,
+) ([]iwallet.Transaction, error) {
+	paymentSent, err := order.PaymentSentMessage()
+	if err != nil {
+		return nil, err
+	}
+	if len(paymentSent.GetFundingFacts()) == 0 {
+		return nil, fmt.Errorf("UTXO settlement requires PaymentSent funding facts")
+	}
+
+	return s.resolveUTXOFundingTransactionsFromPaymentSent(wallet, order, paymentSent, params)
+}
+
+func collectCancelableReleaseInputs(txs []iwallet.Transaction, paymentAddress string) (iwallet.Transaction, iwallet.Amount) {
+	return payment.CollectUnspentOutputsForAddress(txs, paymentAddress)
+}
+
+func (s *SettlementService) resolveUTXOFundingTransactionsFromPaymentSent(
+	wallet iwallet.Wallet,
+	order *models.Order,
+	paymentSent *pb.PaymentSent,
+	params contracts.ReleaseFromCancelableParams,
+) ([]iwallet.Transaction, error) {
+	txs, err := payment.ResolveUTXOFundingTransactionsFromPaymentSent(wallet, iwallet.CoinType(params.CoinCode), paymentSent, params.PaymentAddress)
+	if err != nil {
+		return nil, err
+	}
+	for _, tx := range txs {
+		if err := order.PutTransaction(tx); err != nil {
+			if !models.IsDuplicateTransactionError(err) {
+				return nil, err
+			}
+			if err := order.UpdateTransaction(tx); err != nil {
+				return nil, err
+			}
+		}
+	}
+	logger.LogInfoWithIDf(log, s.nodeID, "Resolved %d UTXO funding transaction(s) from PaymentSent funding facts for order %s", len(txs), order.ID)
+	return txs, nil
+}
+
 // verifyUTXOsOnChain queries the chain to verify that expected UTXOs are still unspent.
 // Best-effort: if the monitor is unavailable, the address is not watched, or the chain
 // query fails, verification is skipped and the caller proceeds with local data.
@@ -146,6 +173,10 @@ func (s *SettlementService) verifyUTXOsOnChain(coinCode string, paymentAddress s
 		return nil
 	}
 
+	if handled, err := s.verifyUTXOsWithListUnspent(coinInfo.Chain, paymentAddress, wa.ScriptPubKey, expectedUTXOs); handled {
+		return err
+	}
+
 	chainTxs, err := s.monitorService.GetAddressTransactions(coinInfo.Chain, paymentAddress, wa.ScriptPubKey)
 	if err != nil {
 		logger.LogWarningWithIDf(log, s.nodeID, "Chain UTXO verification query failed for %s: %v, proceeding with local data", paymentAddress, err)
@@ -162,7 +193,7 @@ func (s *SettlementService) verifyUTXOsOnChain(coinCode string, paymentAddress s
 	for _, tx := range chainTxs {
 		for _, to := range tx.To {
 			id := hex.EncodeToString(to.ID)
-			if !chainSpent[id] && to.Address.String() == paymentAddress {
+			if !chainSpent[id] && payment.SameUTXOAddress(to.Address.String(), paymentAddress) {
 				chainUnspent[id] = true
 			}
 		}
@@ -170,13 +201,47 @@ func (s *SettlementService) verifyUTXOsOnChain(coinCode string, paymentAddress s
 
 	for _, utxo := range expectedUTXOs {
 		id := hex.EncodeToString(utxo.ID)
+		if chainSpent[id] {
+			return fmt.Errorf("%w: outpoint %s is already spent from address %s", contracts.ErrUTXOAlreadySpent, id, paymentAddress)
+		}
 		if !chainUnspent[id] {
-			return fmt.Errorf("%w: outpoint %s not found in unspent set for address %s", contracts.ErrUTXOAlreadySpent, id, paymentAddress)
+			logger.LogWarningWithIDf(log, s.nodeID, "Chain UTXO verification could not find outpoint %s in reconstructed unspent set for address %s; proceeding because no spend was observed", id, paymentAddress)
 		}
 	}
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Chain UTXO verification passed: %d UTXOs confirmed unspent at %s", len(expectedUTXOs), paymentAddress)
 	return nil
+}
+
+func (s *SettlementService) verifyUTXOsWithListUnspent(
+	chain iwallet.ChainType,
+	paymentAddress string,
+	scriptPubKey []byte,
+	expectedUTXOs []iwallet.SpendInfo,
+) (bool, error) {
+	utxos, err := s.monitorService.ListUnspent(chain, scriptPubKey)
+	if err != nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "ListUnspent UTXO verification query failed for %s: %v; falling back to address history", paymentAddress, err)
+		return false, nil
+	}
+
+	unspent := make(map[string]struct{}, len(utxos))
+	for _, utxo := range utxos {
+		id, ok := payment.UTXOOutpointID(utxo.TxHash, utxo.OutputIndex)
+		if !ok {
+			continue
+		}
+		unspent[hex.EncodeToString(id)] = struct{}{}
+	}
+	for _, expected := range expectedUTXOs {
+		id := hex.EncodeToString(expected.ID)
+		if _, ok := unspent[id]; !ok {
+			return true, fmt.Errorf("%w: outpoint %s not found in current unspent set for address %s", contracts.ErrUTXOAlreadySpent, id, paymentAddress)
+		}
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID, "ListUnspent verification passed: %d UTXOs confirmed unspent at %s", len(expectedUTXOs), paymentAddress)
+	return true, nil
 }
 
 // ── Partial Payment Release ─────────────────────────────────────────────

@@ -73,6 +73,13 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("crypto facade: load order %s: %w", req.OrderID, err)
 	}
 	order := input.order
+	if models.BuyerAwaitingPaymentReadiness(order) {
+		session, projErr := c.projector.Project(input)
+		if projErr != nil {
+			return nil, projErr
+		}
+		return session, nil
+	}
 	orderOpen := input.orderOpen
 	if orderOpen == nil {
 		return nil, fmt.Errorf("crypto facade: order open unavailable for order %s", req.OrderID)

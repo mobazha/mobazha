@@ -42,6 +42,15 @@ type partialPaymentWrapper struct {
 	PartialPayment any `json:"partialPaymentReceived"`
 }
 
+type paymentReadinessPushMessage struct {
+	Type string                      `json:"type"`
+	Data paymentReadinessPushPayload `json:"data"`
+}
+
+type paymentReadinessPushPayload struct {
+	PaymentReadiness any `json:"paymentReadiness"`
+}
+
 type statusWrapper struct {
 	Status any `json:"status"`
 }
@@ -340,6 +349,12 @@ func wrapForWebSocket(meta events.EventMeta, event interface{}) interface{} {
 	case "payment":
 		if meta.Name == "payment.partial" {
 			return partialPaymentWrapper{event}
+		}
+		if meta.Name == "payment.readiness" {
+			return paymentReadinessPushMessage{
+				Type: "paymentReadiness",
+				Data: paymentReadinessPushPayload{PaymentReadiness: event},
+			}
 		}
 		return nil
 	default:

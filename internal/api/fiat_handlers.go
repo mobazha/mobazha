@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -119,6 +120,19 @@ func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) 
 	if req.OrderID == "" || req.Currency == "" || req.Amount <= 0 {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "orderID, currency (non-empty) and amount (>0) are required")
 		return
+	}
+
+	orderSvc := getOrderService(r)
+	if orderSvc != nil {
+		order, orderErr := orderSvc.GetOrder(req.OrderID)
+		if orderErr != nil {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Order not found")
+			return
+		}
+		if models.BuyerAwaitingPaymentReadiness(order) {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "Payment is not ready yet; waiting for seller to receive the order")
+			return
+		}
 	}
 
 	params := contracts.CreatePaymentParams{

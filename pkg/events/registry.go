@@ -82,6 +82,7 @@ func init() {
 		{Category: "payment", Name: "payment.expired", Persistent: true, Sample: new(PaymentExpiredNotification)},
 		{Category: "payment", Name: "payment.cancelled", Persistent: true, Sample: new(PaymentCancelledByBuyer)},
 		{Category: "payment", Name: "payment.partial", Sample: new(PartialPaymentReceived)},
+		{Category: "payment", Name: "payment.readiness", Sample: new(OrderPaymentReady)},
 
 		// ── Internal domain events (non-persistent, no WebSocket push) ──
 		{Category: "internal", Name: "internal.order_auto_confirm", Sample: new(OrderAutoConfirmRequest)},

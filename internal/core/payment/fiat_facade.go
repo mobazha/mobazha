@@ -77,6 +77,14 @@ func (f *FiatPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("%w (got %d)", ErrInvalidFiatAmountCents, req.FiatAmountCents)
 	}
 
+	input, err := f.projector.fetchProjectInput(req.OrderID)
+	if err != nil {
+		return nil, fmt.Errorf("fiat facade: load order %s: %w", req.OrderID, err)
+	}
+	if models.BuyerAwaitingPaymentReadiness(input.order) {
+		return f.projector.Project(input)
+	}
+
 	providerID, currency, err := parseFiatCoin(req.PaymentCoin)
 	if err != nil {
 		return nil, fmt.Errorf("fiat facade: %w", err)
@@ -99,7 +107,7 @@ func (f *FiatPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("fiat facade: persist recovery metadata for order %s: %w", req.OrderID, err)
 	}
 
-	input, err := f.projector.fetchProjectInput(req.OrderID)
+	input, err = f.projector.fetchProjectInput(req.OrderID)
 	if err != nil {
 		return nil, fmt.Errorf("fiat facade: project session for order %s after create: %w", req.OrderID, err)
 	}

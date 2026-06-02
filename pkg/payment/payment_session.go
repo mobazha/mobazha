@@ -295,6 +295,10 @@ type PaymentSession struct {
 	PaymentProgress PaymentProgressView     `json:"paymentProgress"`
 	Capabilities    SessionCapabilitiesView `json:"capabilities"`
 
+	// PaymentReadiness is the seller-receipt gate for buyer-side sessions.
+	// When status != ready_to_pay, FundingTarget must not expose payable data.
+	PaymentReadiness PaymentReadinessView `json:"paymentReadiness"`
+
 	// UserActionRequest is non-nil only when the backend requires an
 	// explicit user wallet action to proceed.
 	UserActionRequest *UserActionRequestView `json:"userActionRequest"`

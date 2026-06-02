@@ -8,6 +8,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/libp2p/go-msgio"
 	"github.com/mobazha/mobazha3.0/libs/store-and-forward/pb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var ReadWriteTimeout = time.Second * 30
@@ -55,4 +56,14 @@ func readMsgWithTimeout(r msgio.Reader, msg proto.Message) error {
 	case <-ctx.Done():
 		return errors.New("read message timeout")
 	}
+}
+
+func timestampTime(ts *timestamppb.Timestamp) (time.Time, error) {
+	if ts == nil {
+		return time.Time{}, errors.New("nil timestamp")
+	}
+	if err := ts.CheckValid(); err != nil {
+		return time.Time{}, err
+	}
+	return ts.AsTime(), nil
 }

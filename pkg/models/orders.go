@@ -253,6 +253,7 @@ type Order struct {
 	SerializedOrderOpen []byte
 	OrderOpenSignature  string
 	OrderOpenAcked      bool
+	PaymentReadyAt      *time.Time `gorm:"column:payment_ready_at"`
 
 	SerializedPaymentSent []byte
 	PaymentSentAcked      bool
@@ -1815,7 +1816,36 @@ func (o *Order) FundingTotal() (iwallet.Amount, error) {
 			}
 		}
 	}
+	if totalPaid.Cmp(iwallet.NewAmount(0)) > 0 {
+		return totalPaid, nil
+	}
+	for _, fact := range paymentSent.GetFundingFacts() {
+		if fact == nil {
+			continue
+		}
+		if fact.GetToAddress() != "" && fact.GetToAddress() != paymentAddress {
+			continue
+		}
+		if !FundingFactStatusCountsTowardTotal(fact.GetStatus(), paymentSent.GetConfirmationPolicy()) {
+			continue
+		}
+		amount := iwallet.NewAmount(fact.GetAmount())
+		if amount.Cmp(iwallet.NewAmount(0)) > 0 {
+			totalPaid = totalPaid.Add(amount)
+		}
+	}
 	return totalPaid, nil
+}
+
+func FundingFactStatusCountsTowardTotal(status, confirmationPolicy string) bool {
+	switch strings.TrimSpace(status) {
+	case "", PaymentObservationStatusConfirmed:
+		return true
+	case PaymentObservationStatusPending:
+		return NormalizePaymentConfirmationPolicy(confirmationPolicy) == PaymentConfirmationPolicyMempoolAccepted
+	default:
+		return false
+	}
 }
 
 // MarshalBinary returns a serialized protobuf format.

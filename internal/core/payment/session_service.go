@@ -143,6 +143,10 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
 	}
 
+	if view.PaymentReadiness.Status != payment.PaymentReadinessReadyToPay {
+		return view, nil
+	}
+
 	// Determine whether a session has already been provisioned:
 	//   - Crypto: PaymentAddress is set (ManagedEscrow/UTXO address persisted after GeneratePaymentInstructions).
 	//   - Fiat:   sessionID key exists in ProviderData (written after CreatePayment returns).

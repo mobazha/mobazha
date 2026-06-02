@@ -1713,11 +1713,6 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 }
 
 func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet.Wallet, to iwallet.Address, escrowReleaseFee iwallet.Amount, platformAddr iwallet.Address, platformAmt iwallet.Amount) (*pb.EscrowRelease, error) {
-	txs, err := order.GetTransactions()
-	if err != nil {
-		return nil, err
-	}
-
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		return nil, err
@@ -1737,25 +1732,18 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		return nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 	settlementSpec, hasSettlementSpec := payment.ResolveSettlementSpec(order, paymentSent)
-	usesBalanceEscrow := strategyV2.Model() == payment.PaymentModelClientSigned || (hasSettlementSpec && settlementSpec.UsesSolanaEscrow())
+	usesBalanceEscrow := strategyV2.Model() == payment.PaymentModelClientSigned ||
+		(hasSettlementSpec && (settlementSpec.UsesManagedEscrow() || settlementSpec.UsesSolanaEscrow()))
 
 	if usesBalanceEscrow {
 		totalOut = iwallet.NewAmount(paymentSent.Amount).Sub(platformAmt)
 	} else {
-		spent := make(map[string]bool)
-		for _, tx := range txs {
-			for _, from := range tx.From {
-				spent[hex.EncodeToString(from.ID)] = true
-			}
+		txs, err := transactionsForEscrowRelease(order, wallet, coinType, paymentSent)
+		if err != nil {
+			return nil, err
 		}
-		for _, tx := range txs {
-			for _, toSpend := range tx.To {
-				if !spent[hex.EncodeToString(toSpend.ID)] && toSpend.Address.String() == paymentSent.ToAddress {
-					txn.From = append(txn.From, iwallet.SpendInfo{ID: toSpend.ID, Amount: toSpend.Amount})
-					totalOut = totalOut.Add(toSpend.Amount)
-				}
-			}
-		}
+
+		txn, totalOut = payment.CollectUnspentOutputsForAddress(txs, paymentSent.ToAddress)
 
 		totalOut = totalOut.Sub(escrowReleaseFee)
 
@@ -1843,9 +1831,35 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	return release, nil
 }
 
+func transactionsForEscrowRelease(
+	order *models.Order,
+	wallet iwallet.Wallet,
+	coinType iwallet.CoinType,
+	paymentSent *pb.PaymentSent,
+) ([]iwallet.Transaction, error) {
+	txs, err := payment.ResolveUTXOFundingTransactionsFromPaymentSent(wallet, coinType, paymentSent, paymentSent.GetToAddress())
+	if err != nil {
+		return nil, err
+	}
+	for _, tx := range txs {
+		if err := order.PutTransaction(tx); err != nil {
+			if !models.IsDuplicateTransactionError(err) {
+				return nil, err
+			}
+			if err := order.UpdateTransaction(tx); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return txs, nil
+}
+
 func countEscrowReleaseInputs(order *models.Order, paymentSent *pb.PaymentSent) int {
 	if order == nil || paymentSent == nil || paymentSent.ToAddress == "" {
 		return 1
+	}
+	if nInputs := payment.CountUsableUTXOFundingFacts(paymentSent); nInputs > 0 {
+		return nInputs
 	}
 	txs, err := order.GetTransactions()
 	if err != nil {
@@ -1860,7 +1874,7 @@ func countEscrowReleaseInputs(order *models.Order, paymentSent *pb.PaymentSent) 
 	nInputs := 0
 	for _, tx := range txs {
 		for _, toSpend := range tx.To {
-			if !spent[hex.EncodeToString(toSpend.ID)] && toSpend.Address.String() == paymentSent.ToAddress {
+			if !spent[hex.EncodeToString(toSpend.ID)] && payment.SameUTXOAddress(toSpend.Address.String(), paymentSent.ToAddress) {
 				nInputs++
 			}
 		}

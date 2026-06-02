@@ -279,14 +279,18 @@ func (n *MobazhaNode) handleAckMessage(from peer.ID, message *pb.Message) error 
 		return err
 	}
 
+	var paymentReadyNewly bool
+	var paymentReadyOrderID string
 	err := n.db.Update(func(tx database.Tx) error {
 		var outgoingMessage models.OutgoingMessage
 		if err := tx.Read().Where("id = ?", ack.AckedMessageID).First(&outgoingMessage).Error; err != nil {
 			return err
 		}
 		if outgoingMessage.MessageType == pb.Message_ORDER.String() || outgoingMessage.MessageType == pb.Message_DISPUTE.String() {
-			if err := n.orderProcessor.ProcessACK(tx, &outgoingMessage); err != nil {
-				return err
+			var ackErr error
+			paymentReadyNewly, paymentReadyOrderID, ackErr = n.orderProcessor.ProcessACK(tx, &outgoingMessage)
+			if ackErr != nil {
+				return ackErr
 			}
 		}
 		if err := n.messenger.ProcessACK(tx, ack); err != nil {
@@ -299,6 +303,12 @@ func (n *MobazhaNode) handleAckMessage(from peer.ID, message *pb.Message) error 
 	}
 
 	n.eventBus.Emit(&events.MessageACK{MessageID: ack.AckedMessageID})
+	if paymentReadyNewly && paymentReadyOrderID != "" {
+		n.eventBus.Emit(&events.OrderPaymentReady{
+			OrderID:  paymentReadyOrderID,
+			TenantID: n.nodeID,
+		})
+	}
 	return nil
 }
 

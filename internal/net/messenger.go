@@ -219,6 +219,15 @@ func (m *Messenger) unmarkMessageProcessed(messageID string) {
 // ReliablySendMessage persists the message to the database before sending, then continually retries
 // the send until it finally goes through.
 func (m *Messenger) ReliablySendMessage(tx database.Tx, peer peer.ID, message *pb.Message, done chan<- struct{}) error {
+	ser, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	if len(ser) > inet.MessageSizeMax {
+		return errors.New("message exceeds max message size")
+	}
+
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
 
@@ -232,18 +241,6 @@ func (m *Messenger) ReliablySendMessage(tx database.Tx, peer peer.ID, message *p
 		}
 	}()
 
-	ser, err := proto.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	if len(ser) > inet.MessageSizeMax {
-		return errors.New("message exceeds max message size")
-	}
-
-	// Before we do anything save the message to the database. This way
-	// we can retry sending the message until we know for sure that it
-	// has been delivered.
 	err = tx.Save(&models.OutgoingMessage{
 		ID:                message.MessageID,
 		Recipient:         peer.String(),

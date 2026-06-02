@@ -39,6 +39,29 @@ func (refundBuildStubWallet) CreateWallet(hd.ExtendedKey, time.Time) error { ret
 func (refundBuildStubWallet) OpenWallet() error                            { return nil }
 func (refundBuildStubWallet) CloseWallet() error                           { return nil }
 
+type fundingBuildWallet struct {
+	txs map[iwallet.TransactionID]iwallet.Transaction
+}
+
+func (w fundingBuildWallet) Begin() (iwallet.Tx, error) { return noopWalletTx{}, nil }
+func (w fundingBuildWallet) BlockchainInfo() (iwallet.BlockInfo, error) {
+	return iwallet.BlockInfo{}, nil
+}
+func (w fundingBuildWallet) CoinCategory() iwallet.CoinCategory    { return iwallet.CoinCategoryBitcoin }
+func (w fundingBuildWallet) IsTestnet() bool                       { return true }
+func (w fundingBuildWallet) ValidateAddress(iwallet.Address) error { return nil }
+func (w fundingBuildWallet) GetTransaction(id iwallet.TransactionID, _ iwallet.CoinType) (*iwallet.Transaction, error) {
+	tx, ok := w.txs[id]
+	if !ok {
+		return nil, nil
+	}
+	return &tx, nil
+}
+func (w fundingBuildWallet) WalletExists() bool                           { return true }
+func (w fundingBuildWallet) CreateWallet(hd.ExtendedKey, time.Time) error { return nil }
+func (w fundingBuildWallet) OpenWallet() error                            { return nil }
+func (w fundingBuildWallet) CloseWallet() error                           { return nil }
+
 type fakeManagedEscrowStrategy struct {
 	model           payment.PaymentModel
 	signatures      []payment.ActionOwnerSignature
@@ -139,6 +162,73 @@ func newManagedEscrowOrderForTests(t *testing.T, coinType iwallet.CoinType) (*mo
 		t.Fatalf("PutTransaction: %v", err)
 	}
 	return order, paymentSent
+}
+
+func TestBuildEscrowRelease_UsesFundingFactsForUTXOModerated(t *testing.T) {
+	t.Parallel()
+
+	const (
+		txID           = "moderated-funding-tx"
+		paymentAddress = "bitcoincash:qpayment"
+	)
+	coinType := iwallet.CoinType("BCH")
+	reg := payment.NewRegistry()
+	strategy := &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored}
+	reg.RegisterV2(iwallet.ChainBitcoinCash, strategy)
+
+	order := &models.Order{
+		ID:             models.OrderID("utxo-moderated-order"),
+		PaymentAddress: paymentAddress,
+	}
+	paymentSent := &pb.PaymentSent{
+		Coin:               string(coinType),
+		ToAddress:          paymentAddress,
+		Amount:             "100",
+		ConfirmationPolicy: models.PaymentConfirmationPolicyChainConfirmed,
+		SettlementSpec:     payment.NewUTXOSpec(true).ToPaymentSent(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{{
+			Id:           "obs-1",
+			TxHash:       txID,
+			TxHashSource: models.PaymentTxHashSourceChainTx,
+			EventIndex:   0,
+			ToAddress:    paymentAddress,
+			Amount:       "100",
+			Status:       models.PaymentObservationStatusConfirmed,
+		}},
+	}
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+
+	wallet := fundingBuildWallet{txs: map[iwallet.TransactionID]iwallet.Transaction{
+		iwallet.TransactionID(txID): {
+			ID: iwallet.TransactionID(txID),
+			To: []iwallet.SpendInfo{{
+				ID:      []byte{0x01},
+				Address: iwallet.NewAddress(paymentAddress, coinType),
+				Amount:  iwallet.NewAmount(100),
+			}},
+		},
+	}}
+	svc := &OrderAppService{paymentRegistry: reg}
+
+	release, err := svc.buildEscrowRelease(
+		order,
+		wallet,
+		iwallet.NewAddress("bitcoincash:qvendor", coinType),
+		iwallet.NewAmount(5),
+		iwallet.NewAddress("bitcoincash:qplatform", coinType),
+		iwallet.NewAmount(10),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "85", release.GetToAmount())
+	require.Equal(t, "10", release.GetPlatformAmount())
+	require.Len(t, release.GetOutpoints(), 1)
+	require.Equal(t, []byte{0x01}, release.GetOutpoints()[0].GetFromID())
+	require.Equal(t, 1, countEscrowReleaseInputs(order, paymentSent))
+
+	stored, err := order.GetTransactions()
+	require.NoError(t, err)
+	require.Len(t, stored, 1)
+	require.Equal(t, iwallet.TransactionID(txID), stored[0].ID)
 }
 
 func TestBuildEscrowRelease_UsesSettlementActionSigner(t *testing.T) {

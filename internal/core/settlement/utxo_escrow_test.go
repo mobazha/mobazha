@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
@@ -16,9 +17,12 @@ import (
 // ── Mock UTXOMonitorService for verifyUTXOsOnChain tests ────────────────
 
 type mockUTXOMonitor struct {
-	watchedAddresses map[string]*utxo.WatchedAddress
-	addressTxs       map[string][]iwallet.Transaction
-	addressTxsErr    error
+	watchedAddresses      map[string]*utxo.WatchedAddress
+	addressTxs            map[string][]iwallet.Transaction
+	addressTxsErr         error
+	listUnspent           []utxo.UnspentOutput
+	listUnspentErr        error
+	listUnspentConfigured bool
 }
 
 func (m *mockUTXOMonitor) Start()                                     {}
@@ -38,7 +42,13 @@ func (m *mockUTXOMonitor) BroadcastTransaction(iwallet.ChainType, string) (strin
 }
 func (m *mockUTXOMonitor) IsHealthy(iwallet.ChainType) bool { return true }
 func (m *mockUTXOMonitor) ListUnspent(iwallet.ChainType, []byte) ([]utxo.UnspentOutput, error) {
-	return nil, nil
+	if !m.listUnspentConfigured {
+		return nil, errors.New("ListUnspent not configured")
+	}
+	if m.listUnspentErr != nil {
+		return nil, m.listUnspentErr
+	}
+	return m.listUnspent, nil
 }
 func (m *mockUTXOMonitor) GetTxConfirmations(iwallet.ChainType, string) (int, error) {
 	return 0, nil
@@ -115,6 +125,99 @@ func TestVerifyUTXOsOnChain_UTXOsConfirmedUnspent(t *testing.T) {
 				{
 					To: []iwallet.SpendInfo{
 						{ID: utxoID, Address: iwallet.NewAddress("1addr", "BTC"), Amount: iwallet.NewAmount(50000)},
+					},
+				},
+			},
+		},
+	}
+	svc := newTestSettlementServiceForUTXO(mon)
+
+	expected := []iwallet.SpendInfo{{ID: utxoID, Address: iwallet.NewAddress("1addr", "BTC"), Amount: iwallet.NewAmount(50000)}}
+	err := svc.verifyUTXOsOnChain(testBTCCanonical, "1addr", expected)
+	assert.NoError(t, err)
+}
+
+func TestVerifyUTXOsOnChain_ListUnspentConfirmedUnspent(t *testing.T) {
+	const txHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	utxoID, ok := payment.UTXOOutpointID(txHash, 1)
+	require.True(t, ok)
+
+	mon := &mockUTXOMonitor{
+		watchedAddresses: map[string]*utxo.WatchedAddress{
+			"1addr": {Address: "1addr", ScriptPubKey: []byte{0xaa}, ChainType: iwallet.ChainBitcoin},
+		},
+		listUnspentConfigured: true,
+		listUnspent: []utxo.UnspentOutput{{
+			TxHash:      txHash,
+			OutputIndex: 1,
+			Value:       50000,
+		}},
+	}
+	svc := newTestSettlementServiceForUTXO(mon)
+
+	expected := []iwallet.SpendInfo{{ID: utxoID, Address: iwallet.NewAddress("1addr", "BTC"), Amount: iwallet.NewAmount(50000)}}
+	err := svc.verifyUTXOsOnChain(testBTCCanonical, "1addr", expected)
+	assert.NoError(t, err)
+}
+
+func TestVerifyUTXOsOnChain_ListUnspentMissingBlocksRelease(t *testing.T) {
+	const txHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	utxoID, ok := payment.UTXOOutpointID(txHash, 1)
+	require.True(t, ok)
+
+	mon := &mockUTXOMonitor{
+		watchedAddresses: map[string]*utxo.WatchedAddress{
+			"1addr": {Address: "1addr", ScriptPubKey: []byte{0xaa}, ChainType: iwallet.ChainBitcoin},
+		},
+		listUnspentConfigured: true,
+		listUnspent: []utxo.UnspentOutput{{
+			TxHash:      txHash,
+			OutputIndex: 0,
+			Value:       50000,
+		}},
+	}
+	svc := newTestSettlementServiceForUTXO(mon)
+
+	expected := []iwallet.SpendInfo{{ID: utxoID, Address: iwallet.NewAddress("1addr", "BTC"), Amount: iwallet.NewAmount(50000)}}
+	err := svc.verifyUTXOsOnChain(testBTCCanonical, "1addr", expected)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, contracts.ErrUTXOAlreadySpent)
+}
+
+func TestVerifyUTXOsOnChain_UTXOAddressPrefixDifference(t *testing.T) {
+	utxoID := []byte{0x01, 0x02}
+	mon := &mockUTXOMonitor{
+		watchedAddresses: map[string]*utxo.WatchedAddress{
+			"pp0cn2dcd83": {Address: "pp0cn2dcd83", ScriptPubKey: []byte{0xaa}, ChainType: iwallet.ChainBitcoinCash},
+		},
+		addressTxs: map[string][]iwallet.Transaction{
+			"pp0cn2dcd83": {
+				{
+					To: []iwallet.SpendInfo{
+						{ID: utxoID, Address: iwallet.NewAddress("bitcoincash:pp0cn2dcd83", "BCH"), Amount: iwallet.NewAmount(50000)},
+					},
+				},
+			},
+		},
+	}
+	svc := newTestSettlementServiceForUTXO(mon)
+
+	expected := []iwallet.SpendInfo{{ID: utxoID, Address: iwallet.NewAddress("pp0cn2dcd83", "BCH"), Amount: iwallet.NewAmount(50000)}}
+	err := svc.verifyUTXOsOnChain("crypto:bitcoincash:mainnet:native", "pp0cn2dcd83", expected)
+	assert.NoError(t, err)
+}
+
+func TestVerifyUTXOsOnChain_UTXONotFoundButNoSpendObservedIsBestEffort(t *testing.T) {
+	utxoID := []byte{0x01, 0x02}
+	mon := &mockUTXOMonitor{
+		watchedAddresses: map[string]*utxo.WatchedAddress{
+			"1addr": {Address: "1addr", ScriptPubKey: []byte{0xaa}, ChainType: iwallet.ChainBitcoin},
+		},
+		addressTxs: map[string][]iwallet.Transaction{
+			"1addr": {
+				{
+					To: []iwallet.SpendInfo{
+						{ID: []byte{0x03}, Address: iwallet.NewAddress("1addr", "BTC"), Amount: iwallet.NewAmount(50000)},
 					},
 				},
 			},

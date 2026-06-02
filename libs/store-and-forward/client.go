@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	ctxio "github.com/jbenet/go-context/io"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -257,7 +256,7 @@ func (cli *Client) SendMessage(ctx context.Context, to, server peer.ID, pubkey c
 			return fmt.Errorf("server %s returned invalid registration", server)
 		}
 
-		expiry, err := ptypes.Timestamp(reg.Expiry)
+		expiry, err := timestampTime(reg.Expiry)
 		if err != nil {
 			return err
 		}

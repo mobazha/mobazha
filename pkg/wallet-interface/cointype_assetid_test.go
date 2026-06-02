@@ -23,8 +23,8 @@ func TestCoinInfoFromCoinType_CanonicalAssetID(t *testing.T) {
 	if info.Symbol != "USDT" {
 		t.Fatalf("symbol = %s, want USDT", info.Symbol)
 	}
-	if info.Decimals != 6 {
-		t.Fatalf("decimals = %d, want 6", info.Decimals)
+	if info.Decimals != 18 {
+		t.Fatalf("decimals = %d, want 18", info.Decimals)
 	}
 	if !strings.EqualFold(info.Contract, "0x55d398326f99059ff775485246999027b3197955") {
 		t.Fatalf("contract = %s", info.Contract)

@@ -60,6 +60,7 @@ func (DigitalAsset) TableName() string { return "digital_assets" }
 
 const (
 	LicenseKeyStatusAvailable = "available"
+	LicenseKeyStatusReserved  = "reserved"
 	LicenseKeyStatusDispensed = "dispensed"
 	LicenseKeyStatusSuspended = "suspended"
 	LicenseKeyStatusRevoked   = "revoked"
@@ -89,6 +90,7 @@ type DigitalLicenseKey struct {
 
 	Status      string    `gorm:"column:status;type:varchar(16);not null;default:'available'"`
 	OrderID     string    `gorm:"column:order_id;type:varchar(255)"`
+	OrderType   string    `gorm:"column:order_type;type:varchar(32);not null;default:''"`
 	BuyerPeerID string    `gorm:"column:buyer_peer_id;type:varchar(255)"`
 	DispensedAt time.Time `gorm:"column:dispensed_at"`
 	RevokedAt   time.Time `gorm:"column:revoked_at"`
@@ -167,13 +169,14 @@ func IsGrantAccessibleWithExpiry(status string, expiresAt time.Time) bool {
 // Created on OrderConfirmation; frozen on DisputeOpen; revoked on Refund/DisputeClose (buyer wins).
 //
 // Status state machine:
-//   create → active:    CANCELABLE / FIAT / zero-amount DIRECT
-//   create → protected: MODERATED (funds still in 2-of-3 escrow)
-//   active → frozen:    DisputeOpen / AfterSaleDisputeOpened
-//   protected → frozen: DisputeOpen (MODERATED order)
-//   frozen → revoked:   Refund / DisputeClose buyer wins
-//   frozen → active:    DisputeClose seller wins (was active)
-//   frozen → protected: DisputeClose seller wins (was MODERATED)
+//
+//	create → active:    CANCELABLE / FIAT / zero-amount DIRECT
+//	create → protected: MODERATED (funds still in 2-of-3 escrow)
+//	active → frozen:    DisputeOpen / AfterSaleDisputeOpened
+//	protected → frozen: DisputeOpen (MODERATED order)
+//	frozen → revoked:   Refund / DisputeClose buyer wins
+//	frozen → active:    DisputeClose seller wins (was active)
+//	frozen → protected: DisputeClose seller wins (was MODERATED)
 type DownloadGrant struct {
 	// TenantID is redefined here (rather than via TenantMixin) so it can be
 	// part of the idempotency composite uniqueIndex below.

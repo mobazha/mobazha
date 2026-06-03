@@ -1,0 +1,147 @@
+package digital
+
+import (
+	"fmt"
+
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+)
+
+// LicenseKeyPoolSupplyLinesForOrderItems resolves order line items whose
+// scarcity is controlled by a DigitalLicenseKey pool. It is intentionally
+// narrower than full digital supply resolution: file/link-only assets are left
+// for UnlimitedDigitalProvider work.
+func (s *DigitalAssetAppService) LicenseKeyPoolSupplyLinesForOrderItems(items []OrderLineItem) ([]contracts.SupplyLine, error) {
+	if s == nil || len(items) == 0 {
+		return nil, nil
+	}
+
+	lines := make([]contracts.SupplyLine, 0, len(items))
+	for itemIndex, item := range items {
+		if item.ListingSlug == "" {
+			continue
+		}
+		assets, err := s.getAssetModelsByListing(item.ListingSlug, item.VariantSKU)
+		if err != nil {
+			return nil, fmt.Errorf("resolve digital supply assets for %s/%s: %w", item.ListingSlug, item.VariantSKU, err)
+		}
+		licenseAsset, ok := firstLicenseKeyAsset(assets)
+		if !ok {
+			continue
+		}
+		qty := int(item.Quantity)
+		if qty == 0 {
+			qty = 1
+		}
+		lines = append(lines, contracts.SupplyLine{
+			LineID:      fmt.Sprintf("digital:%d:%s:%s:license_key_pool", itemIndex, item.ListingSlug, licenseAsset.VariantSKU),
+			ListingSlug: item.ListingSlug,
+			VariantSKU:  licenseAsset.VariantSKU,
+			Quantity:    qty,
+			SupplyKind:  contracts.SupplyKindLicenseKeyPool,
+		})
+	}
+	return lines, nil
+}
+
+// UnlimitedDigitalSupplyLinesForOrderItems resolves non-scarce file/link
+// digital assets. If a line has a license-key asset, the license pool controls
+// scarcity and this resolver intentionally skips the item.
+func (s *DigitalAssetAppService) UnlimitedDigitalSupplyLinesForOrderItems(items []OrderLineItem) ([]contracts.SupplyLine, error) {
+	if s == nil || len(items) == 0 {
+		return nil, nil
+	}
+
+	lines := make([]contracts.SupplyLine, 0, len(items))
+	for itemIndex, item := range items {
+		if item.ListingSlug == "" {
+			continue
+		}
+		assets, err := s.getAssetModelsByListing(item.ListingSlug, item.VariantSKU)
+		if err != nil {
+			return nil, fmt.Errorf("resolve unlimited digital assets for %s/%s: %w", item.ListingSlug, item.VariantSKU, err)
+		}
+		if _, ok := firstLicenseKeyAsset(assets); ok {
+			continue
+		}
+		asset, ok := firstUnlimitedDigitalAsset(assets)
+		if !ok {
+			continue
+		}
+		qty := int(item.Quantity)
+		if qty == 0 {
+			qty = 1
+		}
+		lines = append(lines, contracts.SupplyLine{
+			LineID:      fmt.Sprintf("digital:%d:%s:%s:unlimited_digital", itemIndex, item.ListingSlug, asset.VariantSKU),
+			ListingSlug: item.ListingSlug,
+			VariantSKU:  asset.VariantSKU,
+			Quantity:    qty,
+			SupplyKind:  contracts.SupplyKindUnlimitedDigital,
+		})
+	}
+	return lines, nil
+}
+
+// SupplyAvailabilityLinesForOrderItems resolves currently supported digital
+// supply lines in order-item order. Scarce license keys win over unlimited
+// file/link delivery when both are configured for the same item.
+func (s *DigitalAssetAppService) SupplyAvailabilityLinesForOrderItems(items []OrderLineItem) ([]contracts.SupplyLine, error) {
+	if s == nil || len(items) == 0 {
+		return nil, nil
+	}
+
+	lines := make([]contracts.SupplyLine, 0, len(items))
+	for itemIndex, item := range items {
+		if item.ListingSlug == "" {
+			continue
+		}
+		assets, err := s.getAssetModelsByListing(item.ListingSlug, item.VariantSKU)
+		if err != nil {
+			return nil, fmt.Errorf("resolve digital supply assets for %s/%s: %w", item.ListingSlug, item.VariantSKU, err)
+		}
+		qty := int(item.Quantity)
+		if qty == 0 {
+			qty = 1
+		}
+		if asset, ok := firstLicenseKeyAsset(assets); ok {
+			lines = append(lines, contracts.SupplyLine{
+				LineID:      fmt.Sprintf("digital:%d:%s:%s:license_key_pool", itemIndex, item.ListingSlug, asset.VariantSKU),
+				ListingSlug: item.ListingSlug,
+				VariantSKU:  asset.VariantSKU,
+				Quantity:    qty,
+				SupplyKind:  contracts.SupplyKindLicenseKeyPool,
+			})
+			continue
+		}
+		if asset, ok := firstUnlimitedDigitalAsset(assets); ok {
+			lines = append(lines, contracts.SupplyLine{
+				LineID:      fmt.Sprintf("digital:%d:%s:%s:unlimited_digital", itemIndex, item.ListingSlug, asset.VariantSKU),
+				ListingSlug: item.ListingSlug,
+				VariantSKU:  asset.VariantSKU,
+				Quantity:    qty,
+				SupplyKind:  contracts.SupplyKindUnlimitedDigital,
+			})
+		}
+	}
+	return lines, nil
+}
+
+func firstLicenseKeyAsset(assets []models.DigitalAsset) (models.DigitalAsset, bool) {
+	for _, asset := range assets {
+		if asset.AssetType == models.AssetTypeLicenseKey {
+			return asset, true
+		}
+	}
+	return models.DigitalAsset{}, false
+}
+
+func firstUnlimitedDigitalAsset(assets []models.DigitalAsset) (models.DigitalAsset, bool) {
+	for _, asset := range assets {
+		switch asset.AssetType {
+		case models.AssetTypeFile, models.AssetTypeLink:
+			return asset, true
+		}
+	}
+	return models.DigitalAsset{}, false
+}

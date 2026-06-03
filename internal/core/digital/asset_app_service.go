@@ -345,6 +345,7 @@ func (s *DigitalAssetAppService) AllocateLicenseKey(
 				map[string]interface{}{
 					"status":        models.LicenseKeyStatusDispensed,
 					"order_id":      orderID,
+					"order_type":    models.OrderTypeStandard,
 					"buyer_peer_id": buyerPeerID,
 					"dispensed_at":  now,
 				},
@@ -393,12 +394,14 @@ func (s *DigitalAssetAppService) CountAllocatedKeys(orderID, listingSlug, varian
 }
 
 // GetLicenseKeyPoolStats returns counts of available/dispensed/revoked keys.
+// Total includes all keys in the pool, including reserved keys that are not
+// buyer-visible and do not fit older public count buckets.
 // Each count uses a fresh query chain to avoid GORM WHERE-clause leakage.
 func (s *DigitalAssetAppService) GetLicenseKeyPoolStats(
 	listingSlug string,
 	variantSKU string,
 ) (*contracts.LicenseKeyPoolStats, error) {
-	var available, dispensed, revoked int64
+	var available, dispensed, revoked, total int64
 	err := s.db.View(func(tx database.Tx) error {
 		baseWhere := "listing_slug = ? AND variant_sku = ? AND status = ?"
 
@@ -417,6 +420,11 @@ func (s *DigitalAssetAppService) GetLicenseKeyPoolStats(
 			Count(&revoked).Error; e != nil {
 			return e
 		}
+		if e := tx.Read().Model(&models.DigitalLicenseKey{}).
+			Where("listing_slug = ? AND variant_sku = ?", listingSlug, variantSKU).
+			Count(&total).Error; e != nil {
+			return e
+		}
 		return nil
 	})
 	if err != nil {
@@ -426,7 +434,7 @@ func (s *DigitalAssetAppService) GetLicenseKeyPoolStats(
 		Available: available,
 		Dispensed: dispensed,
 		Revoked:   revoked,
-		Total:     available + dispensed + revoked,
+		Total:     total,
 	}, nil
 }
 

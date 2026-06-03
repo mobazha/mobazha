@@ -221,6 +221,115 @@ func TestProcessPaymentSentMessage_ManagedEscrowEnvelopeSkipsLegacyEscrowValidat
 	}
 }
 
+func TestProcessPaymentSentMessage_BalancePollFundingFactDuplicate(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	managed_escrowAddress := "0x213B0Ed1555B1A63C58C53367C1Cc8bB6d1b705f"
+	base := &pb.PaymentSent{
+		Coin:                "crypto:eip155:1:native",
+		SettlementSpec:      &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_MODERATED, PayMode: "address_monitored", EscrowType: "managed_escrow"},
+		ContractAddress:     managed_escrowAddress,
+		ToAddress:           managed_escrowAddress,
+		Amount:              "15549097616162482",
+		CancelFeeAmount:     "268087889933835",
+		PlatformAmount:      "268087889933835",
+		PlatformAddr:        "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+		Moderator:           "12D3KooWEhH3ysRPHJEWjgwEU4ZKjeU9UCDVL1X5kwszT1HhZ32i",
+		ModeratorAddress:    "0x06081D22A1ff59aFD7484e1Bb9e735754e6e2361",
+		PaymentTokenAddress: "",
+	}
+	persisted := protoClonePaymentSent(base)
+	persisted.FundingFacts = []*pb.PaymentSent_FundingFact{
+		balancePollFact("local-observation-id", managed_escrowAddress, "15549097616162482"),
+	}
+	incoming := protoClonePaymentSent(base)
+	incoming.FundingFacts = []*pb.PaymentSent_FundingFact{
+		balancePollFact("relayed-observation-id", managed_escrowAddress, "15549097616162482"),
+	}
+
+	order := &models.Order{ID: "balance-poll-duplicate"}
+	if err := order.SetPaymentSent(persisted); err != nil {
+		t.Fatal(err)
+	}
+	orderMsg := &npb.OrderMessage{
+		OrderID:     order.ID.String(),
+		MessageType: npb.OrderMessage_PAYMENT_SENT,
+		Message:     mustBuildAny(incoming),
+	}
+
+	err = op.db.Update(func(tx database.Tx) error {
+		event, err := op.processPaymentSentMessage(tx, order, orderMsg)
+		if err != nil {
+			return err
+		}
+		if event != nil {
+			return fmt.Errorf("expected duplicate message to produce no event, got %T", event)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPaymentSentFundingFactDuplicatePreservesCaseSensitiveChains(t *testing.T) {
+	base := &pb.PaymentSent{
+		Coin:           "crypto:solana:mainnet:native",
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_MODERATED),
+		ToAddress:      "SolanaEscrowAddressAa",
+		Amount:         "1000",
+		FundingFacts: []*pb.PaymentSent_FundingFact{{
+			ChainNamespace: "solana",
+			ChainReference: "mainnet",
+			TxHash:         "AbCdSolanaTxHash",
+			TxHashSource:   models.PaymentTxHashSourceChainTx,
+			EventIndex:     0,
+			EventType:      models.PaymentEventSolanaTransfer,
+			ToAddress:      "SolanaEscrowAddressAa",
+			Amount:         "1000",
+		}},
+	}
+	changedCase := protoClonePaymentSent(base)
+	changedCase.FundingFacts = []*pb.PaymentSent_FundingFact{{
+		ChainNamespace: "solana",
+		ChainReference: "mainnet",
+		TxHash:         "abcdsolanatxhash",
+		TxHashSource:   models.PaymentTxHashSourceChainTx,
+		EventIndex:     0,
+		EventType:      models.PaymentEventSolanaTransfer,
+		ToAddress:      "solanaescrowaddressaa",
+		Amount:         "1000",
+	}}
+
+	if isCompatiblePaymentSentDuplicate(changedCase, base) {
+		t.Fatal("case-sensitive funding facts must not be treated as duplicate")
+	}
+}
+
+func protoClonePaymentSent(ps *pb.PaymentSent) *pb.PaymentSent {
+	out := *ps
+	return &out
+}
+
+func balancePollFact(id, toAddress, amount string) *pb.PaymentSent_FundingFact {
+	return &pb.PaymentSent_FundingFact{
+		Id:             id,
+		ChainNamespace: "eip155",
+		ChainReference: "11155111",
+		TxHash:         "0x91feed2e73f685b81d69cca5c341aef8f3556b8d49357c01d5c71ace023eb9b2",
+		TxHashSource:   models.PaymentTxHashSourceBalancePoll,
+		EventIndex:     0,
+		EventType:      models.PaymentEventManagedEscrowReceived,
+		ToAddress:      toAddress,
+		Amount:         amount,
+		Status:         models.PaymentObservationStatusConfirmed,
+	}
+}
+
 func TestProcessMessage_ErrorRecordsErroredMessageWhenTransactionCommits(t *testing.T) {
 	op, teardown, err := newMockOrderProcessor()
 	if err != nil {
@@ -249,11 +358,11 @@ func TestProcessMessage_ErrorRecordsErroredMessageWhenTransactionCommits(t *test
 	}
 
 	paymentSent := &pb.PaymentSent{
-		TransactionID: "bad-tx",
-		Coin:          "not-canonical",
+		TransactionID:  "bad-tx",
+		Coin:           "not-canonical",
 		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_CANCELABLE),
-		ToAddress:     "bad-address",
-		Amount:        "1000",
+		ToAddress:      "bad-address",
+		Amount:         "1000",
 	}
 	orderMsg := &npb.OrderMessage{
 		OrderID:     orderID,

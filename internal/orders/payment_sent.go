@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -167,6 +168,9 @@ func isCompatiblePaymentSentDuplicate(incoming, persisted *pb.PaymentSent) bool 
 	if paymentSentContainsFundingFact(incoming, persisted.TransactionID, persisted.Amount) {
 		return true
 	}
+	if paymentSentFundingFactsEqual(incoming, persisted) {
+		return true
+	}
 	return false
 }
 
@@ -181,6 +185,51 @@ func paymentSentContainsFundingFact(ps *pb.PaymentSent, txHash, amount string) b
 		return amount == "" || fact.GetAmount() == "" || fact.GetAmount() == amount
 	}
 	return false
+}
+
+func paymentSentFundingFactsEqual(a, b *pb.PaymentSent) bool {
+	aFacts := canonicalPaymentSentFundingFacts(a.GetFundingFacts())
+	bFacts := canonicalPaymentSentFundingFacts(b.GetFundingFacts())
+	if len(aFacts) == 0 || len(aFacts) != len(bFacts) {
+		return false
+	}
+	for key := range aFacts {
+		if _, ok := bFacts[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func canonicalPaymentSentFundingFacts(facts []*pb.PaymentSent_FundingFact) map[string]struct{} {
+	out := make(map[string]struct{}, len(facts))
+	for _, fact := range facts {
+		if fact == nil {
+			continue
+		}
+		chainNamespace := strings.TrimSpace(fact.GetChainNamespace())
+		key := strings.Join([]string{
+			strings.ToLower(chainNamespace),
+			strings.TrimSpace(fact.GetChainReference()),
+			canonicalPaymentSentFundingFactValue(chainNamespace, fact.GetTxHash()),
+			models.NormalizePaymentTxHashSource(fact.GetTxHashSource()),
+			strconv.FormatInt(int64(fact.GetEventIndex()), 10),
+			strings.TrimSpace(fact.GetEventType()),
+			canonicalPaymentSentFundingFactValue(chainNamespace, fact.GetToAddress()),
+			canonicalPaymentSentFundingFactValue(chainNamespace, fact.GetTokenAddress()),
+			strings.TrimSpace(fact.GetAmount()),
+		}, "\x00")
+		out[key] = struct{}{}
+	}
+	return out
+}
+
+func canonicalPaymentSentFundingFactValue(chainNamespace, value string) string {
+	value = strings.TrimSpace(value)
+	if strings.EqualFold(strings.TrimSpace(chainNamespace), "eip155") {
+		return strings.ToLower(value)
+	}
+	return value
 }
 
 // validatePaymentSent validates a PaymentSent message against the OrderOpen.

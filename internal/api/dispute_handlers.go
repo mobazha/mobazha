@@ -90,7 +90,7 @@ func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request)
 	done := make(chan struct{})
 	err = node.CloseDispute(models.OrderID(orderID), d.BuyerPercentage, d.VendorPercentage, d.Resolution, done)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 

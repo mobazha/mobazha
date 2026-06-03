@@ -85,7 +85,11 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 		otherPartyAvatar = orderOpen.BuyerID.DisplayAvatar()
 	}
 
-	buyerRefunded := !isZeroAmount(disputeClose.ReleaseInfo.BuyerAmount)
+	// BuyerRefunded drives digital entitlement revoke on dispute close: only when
+	// the buyer receives the full escrow share (vendor gets nothing). Split
+	// payouts restore frozen grants; seller-only payouts keep BuyerRefunded false
+	// (existing entitlement listener behavior).
+	buyerRefunded := buyerReceivesFullDisputeRefund(disputeClose.ReleaseInfo)
 
 	event := &events.DisputeClose{
 		OrderID: order.ID.String(),
@@ -215,4 +219,14 @@ func validatePayoutAmountsNonNegative(r *pb.DisputeClose_ModeratedEscrowRelease)
 		}
 	}
 	return nil
+}
+
+// buyerReceivesFullDisputeRefund is true when the moderator awards the entire
+// escrow payout to the buyer (vendor amount is zero). Used for entitlement
+// revoke — split rulings must not set BuyerRefunded.
+func buyerReceivesFullDisputeRefund(releaseInfo *pb.DisputeClose_ModeratedEscrowRelease) bool {
+	if releaseInfo == nil {
+		return false
+	}
+	return !isZeroAmount(releaseInfo.BuyerAmount) && isZeroAmount(releaseInfo.VendorAmount)
 }

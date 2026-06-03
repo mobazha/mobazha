@@ -496,7 +496,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	}
 
 	if disputeCase.SerializedDisputeClose != nil {
-		return errors.New("the dispute has already been closed")
+		return fmt.Errorf("%w: the dispute has already been closed", coreiface.ErrBadRequest)
 	}
 
 	if disputeCase.SerializedVendorContract == nil && vendorPercentage > 0 {

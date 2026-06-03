@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -60,6 +61,7 @@ type GuestOrderAppServiceConfig struct {
 	Listings                GuestListingQuery
 	ExchangeRates           wallet.ExchangeRateQuerier
 	Resolver                pkgconfig.ResolverInterface
+	SupplyAvailability      contracts.SupplyAvailabilityService
 	SupportedUTXOChains     []iwallet.ChainType
 	EVMObservationAvailable bool
 	SolanaMonitorAvailable  bool
@@ -87,6 +89,7 @@ type GuestOrderAppService struct {
 	listings                   GuestListingQuery
 	exchangeRates              wallet.ExchangeRateQuerier
 	resolver                   pkgconfig.ResolverInterface
+	supplyAvailability         contracts.SupplyAvailabilityService
 	utxoMu                     sync.RWMutex
 	supportedUTXOChains        map[iwallet.ChainType]struct{}
 	evmObservationAvailable    bool
@@ -130,6 +133,7 @@ func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppServi
 		listings:                cfg.Listings,
 		exchangeRates:           cfg.ExchangeRates,
 		resolver:                cfg.Resolver,
+		supplyAvailability:      cfg.SupplyAvailability,
 		supportedUTXOChains:     toChainSet(cfg.SupportedUTXOChains),
 		evmObservationAvailable: cfg.EVMObservationAvailable,
 		solanaMonitorAvailable:  cfg.SolanaMonitorAvailable,
@@ -169,6 +173,11 @@ func (s *GuestOrderAppService) EnableUTXOChain(chain iwallet.ChainType) {
 }
 
 // --- Core API ---
+
+type guestInventoryBucketKey struct {
+	Slug        string
+	VariantHash string
+}
 
 // CreateGuestOrder validates items, reserves inventory, generates a payment address,
 // and creates the order in a single transaction.
@@ -221,12 +230,8 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	var subtotalSmallest = new(big.Int)
 	var priceCurrencyCode string
 	var priceDivisibility uint32
-	type inventoryBucketKey struct {
-		Slug        string
-		VariantHash string
-	}
-	itemStockLimits := make(map[inventoryBucketKey]int64)
-	itemBuckets := make([]inventoryBucketKey, 0, len(req.Items))
+	itemStockLimits := make(map[guestInventoryBucketKey]int64)
+	itemBuckets := make([]guestInventoryBucketKey, 0, len(req.Items))
 	allDigitalGoods := true
 	var orderContractType pb.Listing_Metadata_ContractType
 	var hasOrderContractType bool
@@ -254,7 +259,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 				ordercontracttype.MixedOrderTypeMessage(orderContractType, resolved.ContractType, reqItem.ListingSlug),
 			)
 		}
-		bucket := inventoryBucketKey{Slug: reqItem.ListingSlug, VariantHash: resolved.VariantHash}
+		bucket := guestInventoryBucketKey{Slug: reqItem.ListingSlug, VariantHash: resolved.VariantHash}
 		itemBuckets = append(itemBuckets, bucket)
 		if resolved.HasStockTracking {
 			itemStockLimits[bucket] = resolved.StockQty
@@ -319,6 +324,8 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		return nil, err
 	}
 
+	s.quoteSupplyAvailabilityShadow(ctx, orderToken, items, itemBuckets, itemStockLimits)
+
 	paymentAmount, err := s.convertToPaymentCoin(totalSmallest, priceCurrencyCode, coinType)
 	if err != nil {
 		return nil, fmt.Errorf("convert to payment coin: %w", err)
@@ -380,36 +387,10 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 			if err := tx.Save(&items[i]); err != nil {
 				return fmt.Errorf("save guest order item: %w", err)
 			}
+		}
 
-			bucket := itemBuckets[i]
-			if stockLimit, tracked := itemStockLimits[bucket]; tracked {
-				reserved, rErr := s.reservedQuantity(tx, bucket.Slug, bucket.VariantHash)
-				if rErr != nil {
-					return fmt.Errorf("check reserved quantity for %s: %w", bucket.Slug, rErr)
-				}
-				if reserved+int64(items[i].Quantity) > stockLimit {
-					available := stockLimit - reserved
-					if available < 0 {
-						available = 0
-					}
-					return fmt.Errorf("%w for %q (variant %q): available %d, requested %d",
-						contracts.ErrInsufficientStock, bucket.Slug, bucket.VariantHash,
-						available, items[i].Quantity)
-				}
-			}
-
-			reservation := models.InventoryReservation{
-				OrderRef:    orderToken,
-				OrderType:   models.OrderTypeGuest,
-				ListingSlug: items[i].ListingSlug,
-				VariantHash: items[i].VariantHash,
-				Quantity:    items[i].Quantity,
-				ReservedAt:  time.Now(),
-				ExpiresAt:   reservationExpiresAtForOrder(expiresAt, paymentCoin),
-			}
-			if err := tx.Save(&reservation); err != nil {
-				return fmt.Errorf("reserve inventory for %s: %w", items[i].ListingSlug, err)
-			}
+		if err := s.reserveGuestSupplyInTx(ctx, tx, orderToken, paymentCoin, expiresAt, items, itemBuckets, itemStockLimits); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -606,7 +587,7 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 			order.FundedAt = &now
 			becameFunded = true
 
-			if err := s.confirmReservation(tx, order.OrderToken); err != nil {
+			if err := s.commitGuestSupplyInTx(context.Background(), tx, order.OrderToken); err != nil {
 				log.Warningf("confirm reservation for %s: %v", redact.Token(orderToken), err)
 			}
 
@@ -710,7 +691,7 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 			order.FundedAt = &now
 			becameFunded = true
 
-			if err := s.confirmReservation(tx, order.OrderToken); err != nil {
+			if err := s.commitGuestSupplyInTx(context.Background(), tx, order.OrderToken); err != nil {
 				log.Warningf("confirm reservation for %s: %v", redact.Token(orderToken), err)
 			}
 
@@ -992,6 +973,296 @@ func (s *GuestOrderAppService) transitionState(
 
 // --- Inventory helpers ---
 
+type transactionalSupplyAvailabilityService interface {
+	ReserveOrderTx(context.Context, database.Tx, contracts.ReserveOrderSupplyRequest) (*contracts.ReserveOrderSupplyResult, error)
+	CommitOrderTx(context.Context, database.Tx, string, string) error
+	ReleaseOrderTx(context.Context, database.Tx, string, string, string) error
+}
+
+func (s *GuestOrderAppService) reserveGuestSupplyInTx(
+	ctx context.Context,
+	tx database.Tx,
+	orderToken string,
+	paymentCoin string,
+	orderExpiresAt time.Time,
+	items []models.GuestOrderItem,
+	itemBuckets []guestInventoryBucketKey,
+	itemStockLimits map[guestInventoryBucketKey]int64,
+) error {
+	if txService, ok := s.authoritativeSupplyAvailabilityTxService(ctx); ok {
+		externalMappings, err := guestExternalSupplyMappingsForItemsInTx(tx, items)
+		if err != nil {
+			return fmt.Errorf("resolve guest external supply mappings: %w", err)
+		}
+		lines := guestSupplyLinesForItemsWithExternalMappings(items, itemBuckets, itemStockLimits, externalMappings)
+		reservableLines, manualActionLines := contracts.PartitionReservableSupplyLines(lines)
+		for _, line := range manualActionLines {
+			log.Infof("guest order %s external supply line %s for listing %s requires manual action; no external hold created",
+				redact.Token(orderToken), line.LineID, line.ListingSlug)
+		}
+		if len(reservableLines) == 0 {
+			return nil
+		}
+		_, err = txService.ReserveOrderTx(ctx, tx, contracts.ReserveOrderSupplyRequest{
+			OrderRef:  orderToken,
+			OrderType: models.OrderTypeGuest,
+			Lines:     reservableLines,
+			ExpiresAt: reservationExpiresAtForOrder(orderExpiresAt, paymentCoin),
+		})
+		if errors.Is(err, contracts.ErrSupplyUnavailable) {
+			return fmt.Errorf("%w: %w", contracts.ErrInsufficientStock, err)
+		}
+		if err != nil {
+			return fmt.Errorf("reserve guest supply: %w", err)
+		}
+		return nil
+	}
+
+	for i := range items {
+		if err := s.reserveGuestInventoryLineInTx(tx, orderToken, paymentCoin, orderExpiresAt, items[i], itemBuckets[i], itemStockLimits); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *GuestOrderAppService) authoritativeSupplyAvailabilityTxService(ctx context.Context) (transactionalSupplyAvailabilityService, bool) {
+	if s == nil || s.supplyAvailability == nil || s.resolver == nil {
+		return nil, false
+	}
+	if !s.resolver.IsEnabled(ctx, pkgconfig.FeatureSupplyAvailabilityEnabled.Key) {
+		return nil, false
+	}
+	txService, ok := s.supplyAvailability.(transactionalSupplyAvailabilityService)
+	if !ok {
+		log.Warningf("supplyAvailabilityEnabled is true but service does not support transactional reserve; using legacy guest inventory reservation")
+		return nil, false
+	}
+	return txService, true
+}
+
+func (s *GuestOrderAppService) commitGuestSupplyInTx(ctx context.Context, tx database.Tx, orderToken string) error {
+	if txService, ok := s.authoritativeSupplyAvailabilityTxService(ctx); ok {
+		return txService.CommitOrderTx(ctx, tx, orderToken, models.OrderTypeGuest)
+	}
+	return s.confirmReservation(tx, orderToken)
+}
+
+func (s *GuestOrderAppService) releaseGuestSupplyInTx(ctx context.Context, tx database.Tx, orderToken string, reason string) error {
+	if txService, ok := s.authoritativeSupplyAvailabilityTxService(ctx); ok {
+		return txService.ReleaseOrderTx(ctx, tx, orderToken, models.OrderTypeGuest, reason)
+	}
+	return s.releaseGuestReservationsInTx(tx, orderToken)
+}
+
+func (s *GuestOrderAppService) reserveGuestInventoryLineInTx(
+	tx database.Tx,
+	orderToken string,
+	paymentCoin string,
+	orderExpiresAt time.Time,
+	item models.GuestOrderItem,
+	bucket guestInventoryBucketKey,
+	itemStockLimits map[guestInventoryBucketKey]int64,
+) error {
+	if stockLimit, tracked := itemStockLimits[bucket]; tracked {
+		reserved, rErr := s.reservedQuantity(tx, bucket.Slug, bucket.VariantHash)
+		if rErr != nil {
+			return fmt.Errorf("check reserved quantity for %s: %w", bucket.Slug, rErr)
+		}
+		if reserved+int64(item.Quantity) > stockLimit {
+			available := stockLimit - reserved
+			if available < 0 {
+				available = 0
+			}
+			return fmt.Errorf("%w for %q (variant %q): available %d, requested %d",
+				contracts.ErrInsufficientStock, bucket.Slug, bucket.VariantHash,
+				available, item.Quantity)
+		}
+	}
+
+	reservation := models.InventoryReservation{
+		OrderRef:    orderToken,
+		OrderType:   models.OrderTypeGuest,
+		ListingSlug: item.ListingSlug,
+		VariantHash: item.VariantHash,
+		Quantity:    item.Quantity,
+		ReservedAt:  time.Now(),
+		ExpiresAt:   reservationExpiresAtForOrder(orderExpiresAt, paymentCoin),
+	}
+	if err := tx.Save(&reservation); err != nil {
+		return fmt.Errorf("reserve inventory for %s: %w", item.ListingSlug, err)
+	}
+	return nil
+}
+
+func (s *GuestOrderAppService) quoteSupplyAvailabilityShadow(
+	ctx context.Context,
+	orderToken string,
+	items []models.GuestOrderItem,
+	itemBuckets []guestInventoryBucketKey,
+	itemStockLimits map[guestInventoryBucketKey]int64,
+) {
+	if s == nil || s.supplyAvailability == nil {
+		return
+	}
+	if s.resolver != nil && !s.resolver.IsEnabled(ctx, pkgconfig.FeatureSupplyAvailabilityEnabled.Key) {
+		return
+	}
+	externalMappings, err := s.guestExternalSupplyMappingsForItems(items)
+	if err != nil {
+		log.Warningf("guest order supply availability shadow external mapping lookup failed for %s: %v", redact.Token(orderToken), err)
+		return
+	}
+	lines := guestSupplyLinesForItemsWithExternalMappings(items, itemBuckets, itemStockLimits, externalMappings)
+	if len(lines) == 0 {
+		return
+	}
+	result, err := s.supplyAvailability.Quote(ctx, contracts.SupplyQuoteRequest{
+		OrderRef:  orderToken,
+		OrderType: models.OrderTypeGuest,
+		Lines:     lines,
+	})
+	if err != nil {
+		log.Warningf("guest order supply availability shadow quote failed for %s: %v", redact.Token(orderToken), err)
+		return
+	}
+	if result == nil {
+		log.Warningf("guest order supply availability shadow quote returned nil for %s", redact.Token(orderToken))
+		return
+	}
+	if !result.CanSell || result.ManualActionRequired {
+		log.Warningf("guest order supply availability shadow quote mismatch for %s: canSell=%t manualActionRequired=%t reason=%q",
+			redact.Token(orderToken), result.CanSell, result.ManualActionRequired, result.Reason)
+	}
+}
+
+func guestSupplyLinesForItems(
+	items []models.GuestOrderItem,
+	itemBuckets []guestInventoryBucketKey,
+	itemStockLimits map[guestInventoryBucketKey]int64,
+) []contracts.SupplyLine {
+	return guestSupplyLinesForItemsWithExternalMappings(items, itemBuckets, itemStockLimits, nil)
+}
+
+func guestSupplyLinesForItemsWithExternalMappings(
+	items []models.GuestOrderItem,
+	itemBuckets []guestInventoryBucketKey,
+	itemStockLimits map[guestInventoryBucketKey]int64,
+	externalMappings map[string]models.SyncedProductMapping,
+) []contracts.SupplyLine {
+	if len(items) == 0 {
+		return nil
+	}
+	lines := make([]contracts.SupplyLine, 0, len(items))
+	for i := range items {
+		bucket := guestInventoryBucketKey{
+			Slug:        items[i].ListingSlug,
+			VariantHash: items[i].VariantHash,
+		}
+		if i < len(itemBuckets) {
+			bucket = itemBuckets[i]
+		}
+		if mapping, ok := externalMappings[items[i].ListingSlug]; ok {
+			lines = append(lines, contracts.SupplyLine{
+				LineID:      fmt.Sprintf("%s:%d:external", items[i].OrderToken, i),
+				ListingSlug: items[i].ListingSlug,
+				Quantity:    items[i].Quantity,
+				SupplyKind:  contracts.SupplyKindExternalSupply,
+				ProviderID:  mapping.ProviderID,
+				ProviderRef: guestExternalProviderRef(mapping),
+			})
+			continue
+		}
+		stockLimit, tracked := itemStockLimits[bucket]
+		lines = append(lines, contracts.SupplyLine{
+			LineID:       fmt.Sprintf("%s:%d", items[i].OrderToken, i),
+			ListingSlug:  bucket.Slug,
+			VariantHash:  bucket.VariantHash,
+			Quantity:     items[i].Quantity,
+			SupplyKind:   contracts.SupplyKindSkuQuantity,
+			StockTracked: tracked,
+			StockLimit:   stockLimit,
+		})
+	}
+	return lines
+}
+
+func (s *GuestOrderAppService) guestExternalSupplyMappingsForItems(items []models.GuestOrderItem) (map[string]models.SyncedProductMapping, error) {
+	if s == nil || s.db == nil || len(items) == 0 {
+		return nil, nil
+	}
+	var mappings map[string]models.SyncedProductMapping
+	err := s.db.View(func(tx database.Tx) error {
+		var err error
+		mappings, err = guestExternalSupplyMappingsForItemsInTx(tx, items)
+		return err
+	})
+	return mappings, err
+}
+
+func guestExternalSupplyMappingsForItemsInTx(tx database.Tx, items []models.GuestOrderItem) (map[string]models.SyncedProductMapping, error) {
+	if tx == nil || len(items) == 0 {
+		return nil, nil
+	}
+	slugs := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		if item.ListingSlug == "" {
+			continue
+		}
+		if item.ContractType != "" && item.ContractType != pb.Listing_Metadata_PHYSICAL_GOOD.String() {
+			continue
+		}
+		if _, ok := seen[item.ListingSlug]; ok {
+			continue
+		}
+		seen[item.ListingSlug] = struct{}{}
+		slugs = append(slugs, item.ListingSlug)
+	}
+	if len(slugs) == 0 {
+		return nil, nil
+	}
+
+	var rows []models.SyncedProductMapping
+	err := tx.Read().
+		Where("listing_slug IN ?", slugs).
+		Order("last_sync_at DESC").
+		Find(&rows).Error
+	if isMissingGuestExternalSupplyMappingTable(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	mappings := make(map[string]models.SyncedProductMapping, len(rows))
+	for _, row := range rows {
+		if _, exists := mappings[row.ListingSlug]; exists {
+			continue
+		}
+		mappings[row.ListingSlug] = row
+	}
+	return mappings, nil
+}
+
+func isMissingGuestExternalSupplyMappingTable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "synced_product_mappings") &&
+		(strings.Contains(msg, "no such table") || strings.Contains(msg, "does not exist"))
+}
+
+func guestExternalProviderRef(mapping models.SyncedProductMapping) string {
+	if mapping.SyncProductID != "" {
+		return mapping.SyncProductID
+	}
+	if mapping.ExternalID != "" {
+		return mapping.ExternalID
+	}
+	return mapping.ID
+}
+
 func (s *GuestOrderAppService) reservedQuantity(tx database.Tx, listingSlug, variantHash string) (int64, error) {
 	var total int64
 	err := tx.Read().Model(&models.InventoryReservation{}).
@@ -1070,6 +1341,22 @@ func (s *GuestOrderAppService) confirmReservation(tx database.Tx, orderToken str
 	return nil
 }
 
+func (s *GuestOrderAppService) releaseGuestReservationsInTx(tx database.Tx, orderToken string) error {
+	now := time.Now()
+	var reservations []models.InventoryReservation
+	if err := tx.Read().Where("order_ref = ? AND order_type = ? AND released_at IS NULL",
+		orderToken, models.OrderTypeGuest).Find(&reservations).Error; err != nil {
+		return err
+	}
+	for i := range reservations {
+		reservations[i].ReleasedAt = &now
+		if err := tx.Save(&reservations[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *GuestOrderAppService) releaseExpiredReservations(_ context.Context) {
 	now := time.Now()
 	_ = s.db.Update(func(tx database.Tx) error {
@@ -1091,19 +1378,7 @@ func (s *GuestOrderAppService) releaseExpiredReservations(_ context.Context) {
 func (s *GuestOrderAppService) expireOrder(orderToken string, currentState models.GuestOrderState) error {
 	return s.transitionState(orderToken, currentState, models.GuestOrderExpired,
 		func(tx database.Tx, order *models.GuestOrder) error {
-			now := time.Now()
-			var reservations []models.InventoryReservation
-			if err := tx.Read().Where("order_ref = ? AND order_type = ? AND released_at IS NULL",
-				orderToken, models.OrderTypeGuest).Find(&reservations).Error; err != nil {
-				return err
-			}
-			for i := range reservations {
-				reservations[i].ReleasedAt = &now
-				if err := tx.Save(&reservations[i]); err != nil {
-					return err
-				}
-			}
-			return nil
+			return s.releaseGuestSupplyInTx(context.Background(), tx, orderToken, "expired")
 		})
 }
 

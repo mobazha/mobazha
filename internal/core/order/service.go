@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -96,6 +97,8 @@ type OrderAppService struct {
 	paymentVerifier contracts.PaymentVerifier
 
 	coTenantVerifiedPayment contracts.CoTenantVerifiedPaymentFn
+	resolver                pkgconfig.ResolverInterface
+	supplyAvailability      contracts.SupplyAvailabilityService
 }
 
 // OrderAppServiceConfig groups the dependencies for constructing OrderAppService.
@@ -124,6 +127,8 @@ type OrderAppServiceConfig struct {
 	DiscountResolver           DiscountResolverFunc
 	DiscountRedemptionRecorder DiscountRedemptionRecorderFunc
 	CoTenantVerifiedPayment    contracts.CoTenantVerifiedPaymentFn
+	Resolver                   pkgconfig.ResolverInterface
+	SupplyAvailability         contracts.SupplyAvailabilityService
 }
 
 // NewOrderAppService constructs an OrderAppService with the given dependencies.
@@ -151,6 +156,8 @@ func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {
 		discountResolver:           cfg.DiscountResolver,
 		discountRedemptionRecorder: cfg.DiscountRedemptionRecorder,
 		coTenantVerifiedPayment:    cfg.CoTenantVerifiedPayment,
+		resolver:                   cfg.Resolver,
+		supplyAvailability:         cfg.SupplyAvailability,
 	}
 }
 

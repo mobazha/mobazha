@@ -4,13 +4,19 @@ package order
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -18,6 +24,8 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 // PreProcessContext carries the results of pre-processing I/O performed
@@ -564,6 +572,29 @@ func (s *OrderAppService) postProcessOutgoingTxInTx(tx database.Tx, orderMsg *np
 // postProcessInTx performs post-processing within the DB transaction after
 // ProcessMessage succeeds. Dispatches to message-type-specific handlers.
 func (s *OrderAppService) postProcessInTx(tx database.Tx, orderMsg *npb.OrderMessage, ppCtx *PreProcessContext, order *models.Order) error {
+	switch orderMsg.MessageType {
+	case npb.OrderMessage_ORDER_OPEN:
+		return s.postProcessOrderOpenInTx(tx, orderMsg)
+	case npb.OrderMessage_ORDER_CONFIRMATION:
+		if err := s.commitStandardOrderSupplyInTx(tx, orderMsg.OrderID); err != nil {
+			return err
+		}
+		if ppCtx != nil {
+			return s.postProcessOutgoingTxInTx(tx, orderMsg, ppCtx, order)
+		}
+		return nil
+	case npb.OrderMessage_ORDER_CANCEL:
+		if err := s.releaseStandardOrderSupplyInTx(tx, orderMsg.OrderID, "cancelled"); err != nil {
+			return err
+		}
+		if ppCtx != nil {
+			return s.postProcessOutgoingTxInTx(tx, orderMsg, ppCtx, order)
+		}
+		return nil
+	case npb.OrderMessage_ORDER_DECLINE:
+		return s.releaseStandardOrderSupplyInTx(tx, orderMsg.OrderID, "declined")
+	}
+
 	if ppCtx == nil {
 		return nil
 	}
@@ -571,11 +602,289 @@ func (s *OrderAppService) postProcessInTx(tx database.Tx, orderMsg *npb.OrderMes
 	switch orderMsg.MessageType {
 	case npb.OrderMessage_PAYMENT_SENT:
 		return s.postProcessPaymentSentInTx(tx, orderMsg, ppCtx, order)
-	case npb.OrderMessage_ORDER_CONFIRMATION, npb.OrderMessage_ORDER_CANCEL, npb.OrderMessage_REFUND:
+	case npb.OrderMessage_REFUND:
 		return s.postProcessOutgoingTxInTx(tx, orderMsg, ppCtx, order)
 	default:
 		return nil
 	}
+}
+
+type orderTransactionalSupplyAvailabilityService interface {
+	ReserveOrderTx(context.Context, database.Tx, contracts.ReserveOrderSupplyRequest) (*contracts.ReserveOrderSupplyResult, error)
+	CommitOrderTx(context.Context, database.Tx, string, string) error
+	ReleaseOrderTx(context.Context, database.Tx, string, string, string) error
+}
+
+func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb.OrderMessage) error {
+	txService, ok := s.authoritativeSupplyAvailabilityTxService(context.Background())
+	if !ok {
+		return nil
+	}
+
+	var stored models.Order
+	if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&stored).Error; err != nil {
+		return err
+	}
+	if stored.Role() != models.RoleVendor {
+		return nil
+	}
+	if !stored.Open || len(stored.SerializedOrderDecline) > 0 || len(stored.SerializedOrderCancel) > 0 {
+		return nil
+	}
+
+	orderOpen := new(pb.OrderOpen)
+	if err := orderMsg.Message.UnmarshalTo(orderOpen); err != nil {
+		return err
+	}
+	lines, err := standardOrderSupplyLinesFromOrderOpen(tx, orderMsg.OrderID, orderOpen)
+	if err != nil {
+		return err
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	reservableLines, manualActionLines := contracts.PartitionReservableSupplyLines(lines)
+	for _, line := range manualActionLines {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"standard order %s external supply line %s for listing %s requires manual action; no external hold created",
+			orderMsg.OrderID, line.LineID, line.ListingSlug,
+		)
+	}
+	if len(reservableLines) == 0 {
+		return nil
+	}
+
+	expiresAt := time.Now().Add(time.Hour)
+	if stored.ExpiresAt != nil && !stored.ExpiresAt.IsZero() {
+		expiresAt = *stored.ExpiresAt
+	}
+	if _, err := txService.ReserveOrderTx(context.Background(), tx, contracts.ReserveOrderSupplyRequest{
+		OrderRef:  orderMsg.OrderID,
+		OrderType: models.OrderTypeStandard,
+		Lines:     reservableLines,
+		ExpiresAt: expiresAt,
+	}); err != nil {
+		return fmt.Errorf("reserve standard order supply: %w", err)
+	}
+	return nil
+}
+
+func (s *OrderAppService) commitStandardOrderSupplyInTx(tx database.Tx, orderID string) error {
+	txService, ok := s.authoritativeSupplyAvailabilityTxService(context.Background())
+	if !ok {
+		return nil
+	}
+	if ok, err := standardOrderIsVendorInTx(tx, orderID); err != nil || !ok {
+		return err
+	}
+	if err := txService.CommitOrderTx(context.Background(), tx, orderID, models.OrderTypeStandard); err != nil {
+		return fmt.Errorf("commit standard order supply: %w", err)
+	}
+	return nil
+}
+
+func (s *OrderAppService) releaseStandardOrderSupplyInTx(tx database.Tx, orderID string, reason string) error {
+	txService, ok := s.authoritativeSupplyAvailabilityTxService(context.Background())
+	if !ok {
+		return nil
+	}
+	if ok, err := standardOrderIsVendorInTx(tx, orderID); err != nil || !ok {
+		return err
+	}
+	if err := txService.ReleaseOrderTx(context.Background(), tx, orderID, models.OrderTypeStandard, reason); err != nil {
+		return fmt.Errorf("release standard order supply: %w", err)
+	}
+	return nil
+}
+
+func (s *OrderAppService) authoritativeSupplyAvailabilityTxService(ctx context.Context) (orderTransactionalSupplyAvailabilityService, bool) {
+	if s == nil || s.supplyAvailability == nil || s.resolver == nil {
+		return nil, false
+	}
+	if !s.resolver.IsEnabled(ctx, pkgconfig.FeatureSupplyAvailabilityEnabled.Key) {
+		return nil, false
+	}
+	txService, ok := s.supplyAvailability.(orderTransactionalSupplyAvailabilityService)
+	if !ok {
+		logger.LogInfoWithIDf(log, s.nodeID, "supplyAvailabilityEnabled is true but order service does not support transactional order supply operations; skipping standard order supply integration")
+		return nil, false
+	}
+	return txService, true
+}
+
+func standardOrderIsVendorInTx(tx database.Tx, orderID string) (bool, error) {
+	var stored models.Order
+	if err := tx.Read().Where("id = ?", orderID).First(&stored).Error; err != nil {
+		return false, err
+	}
+	return stored.Role() == models.RoleVendor, nil
+}
+
+func standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, orderOpen *pb.OrderOpen) ([]contracts.SupplyLine, error) {
+	if orderOpen == nil || len(orderOpen.Items) == 0 {
+		return nil, nil
+	}
+	lines := make([]contracts.SupplyLine, 0, len(orderOpen.Items))
+	for i, item := range orderOpen.Items {
+		listing, err := extractOrderOpenListing(item.ListingHash, orderOpen.Listings)
+		if err != nil {
+			return nil, err
+		}
+		if listing.Metadata == nil || listing.Metadata.ContractType != pb.Listing_Metadata_PHYSICAL_GOOD {
+			continue
+		}
+		qty, err := strconv.Atoi(strings.TrimSpace(item.Quantity))
+		if err != nil || qty <= 0 {
+			return nil, fmt.Errorf("item %d quantity must be a positive integer", i)
+		}
+		externalLine, err := standardOrderExternalSupplyLineInTx(tx, orderID, i, listing.Slug, qty)
+		if err != nil {
+			return nil, err
+		}
+		if externalLine != nil {
+			lines = append(lines, *externalLine)
+			continue
+		}
+		localListing, err := tx.GetListing(listing.Slug)
+		if err != nil {
+			return nil, fmt.Errorf("load local listing %q for supply reserve: %w", listing.Slug, err)
+		}
+		if localListing == nil || localListing.Listing == nil || localListing.Listing.Item == nil {
+			return nil, fmt.Errorf("local listing %q is incomplete", listing.Slug)
+		}
+		sku, err := selectedStandardOrderSku(localListing.Listing, item.Options)
+		if err != nil {
+			return nil, fmt.Errorf("select sku for %q: %w", listing.Slug, err)
+		}
+		if sku == nil || strings.TrimSpace(sku.Quantity) == "" {
+			continue
+		}
+		stockLimit, err := strconv.ParseInt(strings.TrimSpace(sku.Quantity), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse sku quantity for %q: %w", listing.Slug, err)
+		}
+		if stockLimit < 0 {
+			return nil, fmt.Errorf("sku quantity for %q cannot be negative", listing.Slug)
+		}
+		lines = append(lines, contracts.SupplyLine{
+			LineID:       fmt.Sprintf("%s:%d", orderID, i),
+			ListingSlug:  listing.Slug,
+			VariantHash:  standardOrderVariantHashFromSku(sku),
+			Quantity:     qty,
+			SupplyKind:   contracts.SupplyKindSkuQuantity,
+			StockTracked: true,
+			StockLimit:   stockLimit,
+		})
+	}
+	return lines, nil
+}
+
+func standardOrderExternalSupplyLineInTx(tx database.Tx, orderID string, itemIndex int, listingSlug string, quantity int) (*contracts.SupplyLine, error) {
+	var mapping models.SyncedProductMapping
+	err := tx.Read().
+		Where("listing_slug = ?", listingSlug).
+		Order("last_sync_at DESC").
+		First(&mapping).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if isMissingExternalSupplyMappingTable(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load external supply mapping for %q: %w", listingSlug, err)
+	}
+	return &contracts.SupplyLine{
+		LineID:      fmt.Sprintf("%s:%d:external", orderID, itemIndex),
+		ListingSlug: listingSlug,
+		Quantity:    quantity,
+		SupplyKind:  contracts.SupplyKindExternalSupply,
+		ProviderID:  mapping.ProviderID,
+		ProviderRef: standardOrderExternalProviderRef(mapping),
+	}, nil
+}
+
+func isMissingExternalSupplyMappingTable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "synced_product_mappings") &&
+		(strings.Contains(msg, "no such table") || strings.Contains(msg, "does not exist"))
+}
+
+func standardOrderExternalProviderRef(mapping models.SyncedProductMapping) string {
+	if mapping.SyncProductID != "" {
+		return mapping.SyncProductID
+	}
+	if mapping.ExternalID != "" {
+		return mapping.ExternalID
+	}
+	return mapping.ID
+}
+
+func extractOrderOpenListing(listingHash string, listings []*pb.SignedListing) (*pb.Listing, error) {
+	for _, sl := range listings {
+		if sl == nil || sl.Listing == nil {
+			continue
+		}
+		ser, err := proto.Marshal(sl)
+		if err != nil {
+			return nil, err
+		}
+		hash, err := utils.MultihashSha256(ser)
+		if err != nil {
+			return nil, err
+		}
+		if hash.B58String() == listingHash {
+			return sl.Listing, nil
+		}
+	}
+	return nil, fmt.Errorf("listing not found in order for item %s", listingHash)
+}
+
+func selectedStandardOrderSku(listing *pb.Listing, options []*pb.OrderOpen_Item_Option) (*pb.Listing_Item_Sku, error) {
+	if listing == nil || listing.Item == nil || len(listing.Item.Options) == 0 {
+		return nil, nil
+	}
+	opts := make(map[string]string)
+	for _, option := range options {
+		opts[strings.ToLower(option.Name)] = strings.ToLower(option.Value)
+	}
+	for _, sku := range listing.Item.Skus {
+		matches := true
+		for _, sel := range sku.Selections {
+			if opts[strings.ToLower(sel.Option)] != strings.ToLower(sel.Variant) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return sku, nil
+		}
+	}
+	return nil, errors.New("selected sku not found in listing")
+}
+
+func standardOrderVariantHashFromSku(sku *pb.Listing_Item_Sku) string {
+	if sku == nil || len(sku.Selections) == 0 {
+		return ""
+	}
+	pairs := make([]string, 0, len(sku.Selections))
+	for _, sel := range sku.Selections {
+		k := strings.ToLower(strings.TrimSpace(sel.Option))
+		v := strings.ToLower(strings.TrimSpace(sel.Variant))
+		if k == "" {
+			continue
+		}
+		pairs = append(pairs, k+"="+v)
+	}
+	if len(pairs) == 0 {
+		return ""
+	}
+	sort.Strings(pairs)
+	sum := sha256.Sum256([]byte(strings.Join(pairs, "\x00")))
+	return hex.EncodeToString(sum[:8])
 }
 
 // postProcessPaymentSentInTx records the verified payment after ProcessMessage

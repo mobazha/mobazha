@@ -54,15 +54,15 @@ func TestLookupEvent_AllRegistered(t *testing.T) {
 
 func TestEventsByCategory_Order(t *testing.T) {
 	samples := EventsByCategory("order")
-	if len(samples) != 15 {
-		t.Errorf("expected 15 order events, got %d", len(samples))
+	if len(samples) != 16 {
+		t.Errorf("expected 16 order events, got %d", len(samples))
 	}
 }
 
 func TestEventsByCategory_Multiple(t *testing.T) {
 	samples := EventsByCategory("order", "dispute")
-	if len(samples) != 22 {
-		t.Errorf("expected 22 events for order+dispute, got %d", len(samples))
+	if len(samples) != 23 {
+		t.Errorf("expected 23 events for order+dispute, got %d", len(samples))
 	}
 }
 
@@ -112,6 +112,7 @@ func TestPersistentConsistency(t *testing.T) {
 		"order.confirmed":        true,
 		"order.shipped":          true,
 		"order.completed":        true,
+		"order.rated":            true,
 		"order.cancelled":        true,
 		"order.declined":         true,
 		"order.refunded":         true,

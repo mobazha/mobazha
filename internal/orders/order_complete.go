@@ -114,7 +114,22 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 
 	if isRatingSupplement {
 		logger.LogInfoWithIDf(log, op.nodeID, "Processed rating supplement for completed order %s", order.ID)
-		return nil, order.PutMessage(message)
+		if err := order.PutMessage(message); err != nil {
+			return nil, err
+		}
+		if order.Role() == models.RoleVendor {
+			return &events.OrderRated{
+				OrderID: order.ID.String(),
+				Thumbnail: events.Thumbnail{
+					Tiny:  orderOpen.Listings[0].Listing.Item.Images[0].Tiny,
+					Small: orderOpen.Listings[0].Listing.Item.Images[0].Small,
+				},
+				BuyerName:   orderOpen.BuyerID.DisplayName(),
+				BuyerAvatar: orderOpen.BuyerID.DisplayAvatar(),
+				BuyerID:     orderOpen.BuyerID.PeerID,
+			}, nil
+		}
+		return nil, nil
 	}
 
 	if order.Role() == models.RoleVendor {

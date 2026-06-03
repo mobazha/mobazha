@@ -177,6 +177,17 @@ type OrderCompletion struct {
 	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
 }
 
+// OrderRated is emitted when a buyer submits ratings after order completion
+// (rating supplement ORDER_COMPLETE). Sellers receive this to refresh order detail.
+type OrderRated struct {
+	Notification
+	OrderID     string    `json:"orderID"`
+	Thumbnail   Thumbnail `json:"thumbnail"`
+	BuyerName   string    `json:"buyerName"`
+	BuyerID     string    `json:"buyerID"`
+	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
+}
+
 type DisputeOpen struct {
 	Notification
 	OrderID        string    `json:"orderID"`

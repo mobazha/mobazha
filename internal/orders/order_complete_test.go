@@ -703,8 +703,12 @@ func TestOrderComplete_RatingSupplement(t *testing.T) {
 		if err != nil {
 			return fmt.Errorf("step 2: unexpected error: %s", err)
 		}
-		if event != nil {
-			return fmt.Errorf("step 2: expected nil event for supplement, got %T", event)
+		rated, ok := event.(*events.OrderRated)
+		if !ok || rated == nil {
+			return fmt.Errorf("step 2: expected OrderRated event for vendor supplement, got %T", event)
+		}
+		if rated.OrderID != orderID {
+			return fmt.Errorf("step 2: expected orderID %s, got %s", orderID, rated.OrderID)
 		}
 		return nil
 	})

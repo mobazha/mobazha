@@ -68,6 +68,11 @@ func formatEmailEvent(meta events.EventMeta, event interface{}, storeURL string)
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
 		actionURL = orderActionURL(storeURL, e.OrderID)
 
+	case *events.OrderRated:
+		subject = fmt.Sprintf("Order Rated: %s", truncateID(e.OrderID))
+		rows = append(rows, emailRow{"Order ID", e.OrderID})
+		actionURL = orderActionURL(storeURL, e.OrderID)
+
 	case *events.OrderCancel:
 		subject = fmt.Sprintf("Order Cancelled: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})

@@ -88,6 +88,7 @@ type appServices struct {
 	fiatPaymentService         *FiatPaymentAppService
 	supplyChainRegistry        contracts.FulfillmentProviderRegistry
 	supplyChainService         *SupplyChainAppService
+	supplyAvailabilityService  contracts.SupplyAvailabilityService
 	shippingService            *ShippingAppService
 	analyticsService           *AnalyticsAppService
 	paymentVerificationService *payment.PaymentVerificationService

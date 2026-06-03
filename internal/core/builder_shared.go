@@ -50,6 +50,33 @@ func initCollectionSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Collection subsystem initialized")
 }
 
+// initSupplyAvailabilitySubsystem wires the provider-neutral supply boundary.
+// It is intentionally schema-free for SA-1: SKU availability reuses the
+// existing InventoryReservation table, and checkout only consumes shadow Quote
+// while supplyAvailabilityEnabled remains experimental.
+func initSupplyAvailabilitySubsystem(obNode *MobazhaNode) {
+	if obNode == nil || obNode.db == nil {
+		return
+	}
+	svc, err := NewSupplyAvailabilityAppService(supplyAvailabilityProvidersForNode(obNode)...)
+	if err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Supply availability: failed to initialize: %v", err)
+		return
+	}
+	obNode.supplyAvailabilityService = svc
+	logger.LogInfoWithID(log, obNode.nodeID, "Supply availability subsystem initialized")
+}
+
+func supplyAvailabilityProvidersForNode(obNode *MobazhaNode) []pkgcontracts.SupplyProvider {
+	providers := []pkgcontracts.SupplyProvider{
+		NewSkuQuantityProvider(obNode.db),
+	}
+	if obNode.supplyChainRegistry != nil {
+		providers = append(providers, NewExternalSupplyProvider(obNode.db, obNode.supplyChainRegistry))
+	}
+	return providers
+}
+
 // initStorePolicySubsystem initializes the per-node store policy subsystem:
 // migrates policy models, creates StorePolicyStore, and wires StorePolicyAppService.
 // Shared between full and private_distribution builds (no build tags).

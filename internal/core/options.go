@@ -111,18 +111,19 @@ func WithNodeFeatureProvider(p pkgconfig.NodeFeatureProvider) NodeOption {
 //	 3   │ listingService       │                                         │
 //	 4   │ paymentService       │ profileService (PeerProfileReader)       │ fiatPaymentService, settlement
 //	4.5  │ settlementService    │ paymentService (UTXOKeyDeriver)          │ paymentRegistry, receiptVerifier, supplyChainChecker, monitorService
-//	 5   │ orderService         │ settlementService (EscrowOperations)     │
+//	 5   │ featureResolver      │ platform/tenant/node providers           │
+//	 6   │ orderService         │ settlementService (EscrowOperations)     │
 //	     │                      │ listingService (ListingQuery)            │
 //	     │                      │ moderationService (ModeratorQuery)       │
-//	 6   │ chatService          │                                         │
-//	 7   │ matrixService        │                                         │
-//	 8   │ preferencesService   │                                         │
-//	 9   │ mediaService         │                                         │
-//	10   │ ratingsService       │                                         │
-//	11   │ notificationService  │                                         │
-//	12   │ shoppingCartService  │                                         │
-//	13   │ followService        │                                         │
-//	14   │ postsService         │                                         │
+//	 7   │ chatService          │                                         │
+//	 8   │ matrixService        │                                         │
+//	 9   │ preferencesService   │                                         │
+//	10   │ mediaService         │                                         │
+//	11   │ ratingsService       │                                         │
+//	12   │ notificationService  │                                         │
+//	13   │ shoppingCartService  │                                         │
+//	14   │ followService        │                                         │
+//	15   │ postsService         │                                         │
 //
 // ADDING A NEW APP SERVICE — Standard Procedure:
 //  1. Create init method: func (n *MobazhaNode) initXxxService()
@@ -153,6 +154,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initPaymentService()
 	n.initSettlementService()
 	n.initPaymentVerificationService()
+	n.initFeatureResolver()
 	n.initOrderService()
 	n.wireServiceSetters()
 	n.initMatrixChatService()
@@ -165,7 +167,6 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initPostsService()
 	n.initAnalyticsService()
 	n.initNetDBSyncService()
-	n.initFeatureResolver()
 	n.initGuestOrderService()
 }
 
@@ -597,6 +598,9 @@ func (n *MobazhaNode) initOrderService() {
 	if n.infrastructureOnly {
 		return
 	}
+	if n.supplyAvailabilityService == nil {
+		initSupplyAvailabilitySubsystem(n)
+	}
 
 	n.orderService = coreorder.NewOrderAppService(coreorder.OrderAppServiceConfig{
 		DB:             n.db,
@@ -622,6 +626,8 @@ func (n *MobazhaNode) initOrderService() {
 		DiscountResolver:           n.buildDiscountResolver(),
 		DiscountRedemptionRecorder: n.buildDiscountRecorder(),
 		CoTenantVerifiedPayment:    n.coTenantVerifiedPayment,
+		Resolver:                   n.featureResolver,
+		SupplyAvailability:         n.supplyAvailabilityService,
 	})
 }
 
@@ -934,6 +940,9 @@ func (n *MobazhaNode) initGuestOrderService() {
 		}))
 	}
 	n.autoSweepService = guest.NewAutoSweepService(n.db, keyDeriver, n.eventBus)
+	if n.supplyAvailabilityService == nil {
+		initSupplyAvailabilitySubsystem(n)
+	}
 
 	// Capability gating: GuestOrderAppService advertises and accepts only
 	// coins whose anonymous checkout closure path is ready. UTXO chains are
@@ -960,6 +969,7 @@ func (n *MobazhaNode) initGuestOrderService() {
 		Listings:                n.listingService,
 		ExchangeRates:           n.exchangeRates,
 		Resolver:                n.featureResolver,
+		SupplyAvailability:      n.supplyAvailabilityService,
 		SupportedUTXOChains:     supportedUTXO,
 		EVMObservationAvailable: guestEvmAvailable,
 		SolanaMonitorAvailable:  guestSolanaAvailable,

@@ -44,6 +44,28 @@ func TestDigitalAssetService_LicenseKeySupplyResolutionUsesLicenseAssetVariant(t
 	require.Equal(t, "", lines[0].VariantSKU, "provider must query the universal license key pool")
 }
 
+func TestDigitalAssetService_LicenseKeySupplyResolutionPrefersExactVariant(t *testing.T) {
+	assetSvc, db := newTestAssetService(t)
+	_, err := assetSvc.ImportLicenseKeys("listing-variant", "", "app-universal", []string{"UNIVERSAL-1"}, "perpetual", 1, time.Time{})
+	require.NoError(t, err)
+	_, err = assetSvc.ImportLicenseKeys("listing-variant", "sku-blue", "app-blue", []string{"BLUE-1"}, "perpetual", 1, time.Time{})
+	require.NoError(t, err)
+
+	lines, err := assetSvc.SupplyAvailabilityLinesForOrderItems([]OrderLineItem{
+		{ListingSlug: "listing-variant", VariantSKU: "sku-blue", Quantity: 1},
+	})
+	require.NoError(t, err)
+	require.Len(t, lines, 1)
+	require.Equal(t, contracts.SupplyKindLicenseKeyPool, lines[0].SupplyKind)
+	require.Equal(t, "sku-blue", lines[0].VariantSKU)
+
+	provider := NewLicenseKeyPoolProvider(db)
+	availability, err := provider.GetAvailability(context.Background(), contracts.AvailabilityRequest{Line: lines[0]})
+	require.NoError(t, err)
+	require.True(t, availability.Available)
+	require.Equal(t, int64(1), availability.AvailableQuantity)
+}
+
 func TestDigitalAssetService_LicenseKeySupplyResolutionTreatsZeroQuantityAsOne(t *testing.T) {
 	assetSvc, _ := newTestAssetService(t)
 	_, err := assetSvc.ImportLicenseKeys("listing-default-qty", "", "app-default", []string{"KEY-1"}, "perpetual", 1, time.Time{})
@@ -164,22 +186,29 @@ func TestDigitalAssetService_SupplyAvailabilityLinesForOrderItemsCombinesDigital
 		{ListingSlug: "listing-mixed-combined", Quantity: 1},
 	})
 	require.NoError(t, err)
-	require.Len(t, lines, 3)
+	require.Len(t, lines, 4)
 	require.Equal(t, contracts.SupplyKindUnlimitedDigital, lines[0].SupplyKind)
 	require.Equal(t, "listing-link-combined", lines[0].ListingSlug)
 	require.Equal(t, 1, lines[0].Quantity)
-	require.Equal(t, contracts.SupplyKindLicenseKeyPool, lines[1].SupplyKind)
-	require.Equal(t, "listing-license-combined", lines[1].ListingSlug)
-	require.Equal(t, "", lines[1].VariantSKU)
-	require.Equal(t, contracts.SupplyKindLicenseKeyPool, lines[2].SupplyKind, "license key pool controls scarcity for mixed assets")
+	require.Equal(t, contracts.SupplyKindUnlimitedDigital, lines[1].SupplyKind)
+	require.Equal(t, "listing-missing-combined", lines[1].ListingSlug)
+	require.Equal(t, "digital_asset_missing", lines[1].Metadata["manualActionReason"])
+	require.Equal(t, contracts.SupplyKindLicenseKeyPool, lines[2].SupplyKind)
+	require.Equal(t, "listing-license-combined", lines[2].ListingSlug)
+	require.Equal(t, "", lines[2].VariantSKU)
+	require.Equal(t, contracts.SupplyKindLicenseKeyPool, lines[3].SupplyKind, "license key pool controls scarcity for mixed assets")
 
 	unlimitedProvider := NewUnlimitedDigitalProvider(db)
 	availability, err := unlimitedProvider.GetAvailability(context.Background(), contracts.AvailabilityRequest{Line: lines[0]})
 	require.NoError(t, err)
 	require.True(t, availability.Unlimited)
+	availability, err = unlimitedProvider.GetAvailability(context.Background(), contracts.AvailabilityRequest{Line: lines[1]})
+	require.NoError(t, err)
+	require.True(t, availability.ManualActionRequired)
+	require.Equal(t, contracts.SupplyAvailabilityManualActionRequired, availability.Status)
 
 	licenseProvider := NewLicenseKeyPoolProvider(db)
-	availability, err = licenseProvider.GetAvailability(context.Background(), contracts.AvailabilityRequest{Line: lines[1]})
+	availability, err = licenseProvider.GetAvailability(context.Background(), contracts.AvailabilityRequest{Line: lines[2]})
 	require.NoError(t, err)
 	require.True(t, availability.Available)
 }

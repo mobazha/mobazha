@@ -232,6 +232,7 @@ type GuestOrderItem struct {
 	// (empty for listings without SKUs). Used in conjunction with
 	// ListingSlug to scope inventory reservations per variant.
 	VariantHash       string `gorm:"index:idx_guest_item_variant" json:"variantHash,omitempty"`
+	VariantSKU        string `gorm:"column:variant_sku;size:255" json:"variantSku,omitempty"`
 	UnitPrice         uint64 `json:"unitPrice"`
 	ItemTotal         uint64 `json:"itemTotal"`
 	PriceCurrency     string `json:"priceCurrency"`

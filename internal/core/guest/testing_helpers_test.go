@@ -1,6 +1,7 @@
 package guest
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -41,7 +42,24 @@ type testTx struct {
 
 func (t *testTx) Read() *gorm.DB { return t.db }
 
-func (t *testTx) Save(i interface{}) error { return t.db.Save(i).Error }
+func (t *testTx) Save(i interface{}) error {
+	injectTestTenantID(i)
+	return t.db.Save(i).Error
+}
+
+func injectTestTenantID(i interface{}) {
+	v := reflect.ValueOf(i)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return
+	}
+	f := v.FieldByName("TenantID")
+	if f.IsValid() && f.CanSet() && f.String() == "" {
+		f.SetString(database.StandaloneTenantID)
+	}
+}
 
 func (t *testTx) Update(key string, value interface{}, where map[string]interface{}, model interface{}) error {
 	q := t.db.Model(model)

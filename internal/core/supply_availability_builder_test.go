@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSupplyAvailabilityProvidersForNodeSkuOnlyWithoutSupplyChainRegistry(t *testing.T) {
+func TestSupplyAvailabilityProvidersForNodeIncludesBaseProvidersWithoutSupplyChainRegistry(t *testing.T) {
 	db := newFeatureTestDatabase(t, &models.InventoryReservation{})
 	providers := supplyAvailabilityProvidersForNode(&MobazhaNode{
 		storageFields: storageFields{db: db},
@@ -17,6 +17,8 @@ func TestSupplyAvailabilityProvidersForNodeSkuOnlyWithoutSupplyChainRegistry(t *
 
 	require.Equal(t, []contracts.SupplyKind{
 		contracts.SupplyKindSkuQuantity,
+		contracts.SupplyKindLicenseKeyPool,
+		contracts.SupplyKindUnlimitedDigital,
 	}, supplyProviderKinds(providers))
 }
 
@@ -31,6 +33,8 @@ func TestSupplyAvailabilityProvidersForNodeIncludesExternalWhenSupplyChainRegist
 
 	require.Equal(t, []contracts.SupplyKind{
 		contracts.SupplyKindSkuQuantity,
+		contracts.SupplyKindLicenseKeyPool,
+		contracts.SupplyKindUnlimitedDigital,
 		contracts.SupplyKindExternalSupply,
 	}, supplyProviderKinds(providers))
 }
@@ -49,6 +53,8 @@ func TestInitSupplyAvailabilitySubsystemRegistersExternalProviderWhenAvailable(t
 	service, ok := node.supplyAvailabilityService.(*SupplyAvailabilityAppService)
 	require.True(t, ok)
 	require.Contains(t, service.providers, contracts.SupplyKindSkuQuantity)
+	require.Contains(t, service.providers, contracts.SupplyKindLicenseKeyPool)
+	require.Contains(t, service.providers, contracts.SupplyKindUnlimitedDigital)
 	require.Contains(t, service.providers, contracts.SupplyKindExternalSupply)
 }
 

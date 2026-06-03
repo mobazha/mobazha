@@ -3,10 +3,14 @@ package guest
 import (
 	"context"
 	"errors"
+	"io"
 	"strconv"
 	"testing"
 	"time"
 
+	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/gagliardetto/solana-go"
+	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -92,6 +96,122 @@ func TestGuestSupplyLinesForItemsPrefersExternalMapping(t *testing.T) {
 	require.Empty(t, lines[0].VariantHash)
 }
 
+func TestGuestSupplyLinesUsesDigitalResolverForDigitalGoods(t *testing.T) {
+	resolver := &recordingGuestDigitalSupplyLineResolver{
+		lines: []contracts.SupplyLine{{
+			LineID:      "digital:0:ebook:unlimited_digital",
+			ListingSlug: "ebook",
+			Quantity:    2,
+			SupplyKind:  contracts.SupplyKindUnlimitedDigital,
+		}},
+	}
+	svc := &GuestOrderAppService{
+		digitalSupplyLines: resolver,
+		resolver:           alwaysEnabledResolver{},
+	}
+
+	lines, err := svc.supplyAvailabilityLinesForGuestItems(context.Background(),
+		[]models.GuestOrderItem{{
+			OrderToken:   "gst_test",
+			ListingSlug:  "ebook",
+			ContractType: pb.Listing_Metadata_DIGITAL_GOOD.String(),
+			VariantSKU:   "sku-blue",
+			Quantity:     2,
+		}},
+		[]guestInventoryBucketKey{{Slug: "ebook"}},
+		map[guestInventoryBucketKey]int64{},
+		nil,
+	)
+	require.NoError(t, err)
+	require.Len(t, resolver.items, 1)
+	require.Equal(t, "ebook", resolver.items[0][0].ListingSlug)
+	require.Equal(t, "sku-blue", resolver.items[0][0].VariantSKU)
+	require.Equal(t, uint32(2), resolver.items[0][0].Quantity)
+	require.Equal(t, resolver.lines, lines)
+}
+
+func TestResolveItemPriceSnapshotsVariantSKU(t *testing.T) {
+	svc := &GuestOrderAppService{
+		listings: &stubGuestListings{
+			bySlug: map[string]*pb.SignedListing{
+				"ebook": guestListingWithSku("ebook", "Color", "Blue", "3", "1200"),
+			},
+		},
+	}
+	svc.listings.(*stubGuestListings).bySlug["ebook"].Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	svc.listings.(*stubGuestListings).bySlug["ebook"].Listing.Item.Skus[0].ProductID = "sku-blue"
+
+	resolved, err := svc.resolveItemPrice(contracts.GuestOrderItemRequest{
+		ListingSlug: "ebook",
+		Quantity:    1,
+		Options: []map[string]string{
+			{"Color": "Blue"},
+		},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, resolved.VariantHash)
+	require.Equal(t, "sku-blue", resolved.VariantSKU)
+}
+
+func TestGuestSupplyLinesSkipsDigitalGoodsWithoutResolver(t *testing.T) {
+	svc := &GuestOrderAppService{}
+
+	lines, err := svc.supplyAvailabilityLinesForGuestItems(context.Background(),
+		[]models.GuestOrderItem{{
+			OrderToken:   "gst_test",
+			ListingSlug:  "ebook",
+			ContractType: pb.Listing_Metadata_DIGITAL_GOOD.String(),
+			Quantity:     1,
+		}},
+		[]guestInventoryBucketKey{{Slug: "ebook"}},
+		map[guestInventoryBucketKey]int64{},
+		nil,
+	)
+	require.NoError(t, err)
+	require.Empty(t, lines)
+}
+
+func TestGuestSupplyLinesFailsDigitalGoodsWithoutResolverWhenRequired(t *testing.T) {
+	svc := &GuestOrderAppService{
+		resolver:           alwaysEnabledResolver{},
+		supplyAvailability: &recordingSupplyAvailability{},
+	}
+
+	_, err := svc.supplyAvailabilityLinesForGuestItems(context.Background(),
+		[]models.GuestOrderItem{{
+			OrderToken:   "gst_test",
+			ListingSlug:  "ebook",
+			ContractType: pb.Listing_Metadata_DIGITAL_GOOD.String(),
+			Quantity:     1,
+		}},
+		[]guestInventoryBucketKey{{Slug: "ebook"}},
+		map[guestInventoryBucketKey]int64{},
+		nil,
+	)
+	require.ErrorContains(t, err, "digital supply resolver unavailable")
+}
+
+func TestGuestSupplyLinesReturnsDigitalResolverError(t *testing.T) {
+	resolver := &recordingGuestDigitalSupplyLineResolver{err: errors.New("digital resolver offline")}
+	svc := &GuestOrderAppService{
+		digitalSupplyLines: resolver,
+		resolver:           alwaysEnabledResolver{},
+	}
+
+	_, err := svc.supplyAvailabilityLinesForGuestItems(context.Background(),
+		[]models.GuestOrderItem{{
+			OrderToken:   "gst_test",
+			ListingSlug:  "ebook",
+			ContractType: pb.Listing_Metadata_DIGITAL_GOOD.String(),
+			Quantity:     1,
+		}},
+		[]guestInventoryBucketKey{{Slug: "ebook"}},
+		map[guestInventoryBucketKey]int64{},
+		nil,
+	)
+	require.ErrorContains(t, err, "digital resolver offline")
+}
+
 func TestQuoteSupplyAvailabilityShadowPassesGuestOrderLines(t *testing.T) {
 	recorder := &recordingSupplyAvailability{
 		quoteResult: &contracts.SupplyQuoteResult{CanSell: true},
@@ -122,6 +242,164 @@ func TestQuoteSupplyAvailabilityShadowPassesGuestOrderLines(t *testing.T) {
 	require.Equal(t, int64(5), req.Lines[0].StockLimit)
 }
 
+func TestQuoteGuestOrderSupplyReturnsUnknownWhenFeatureDisabled(t *testing.T) {
+	svc := &GuestOrderAppService{
+		resolver: guestCheckoutOnlyResolver{},
+		listings: &stubGuestListings{
+			bySlug: map[string]*pb.SignedListing{
+				"camera": guestListingWithSku("camera", "Color", "Red", "3", "1200"),
+			},
+		},
+	}
+	svc.db = newGuestQuoteConfigDB(t)
+
+	resp, err := svc.QuoteGuestOrderSupply(context.Background(), contracts.QuoteGuestOrderSupplyRequest{
+		Items: []contracts.GuestOrderItemRequest{{
+			ListingSlug: "camera",
+			Quantity:    1,
+			Options:     []map[string]string{{"Color": "Red"}},
+		}},
+	})
+	require.NoError(t, err)
+	require.True(t, resp.CanSell)
+	require.Equal(t, "supply_availability_disabled", resp.Reason)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, contracts.SupplyAvailabilityUnknown, resp.Items[0].Status)
+}
+
+func TestQuoteGuestOrderSupplyReturnsBuyerManagedEscrowAvailability(t *testing.T) {
+	recorder := &recordingSupplyAvailability{
+		quoteResult: &contracts.SupplyQuoteResult{
+			CanSell: true,
+			Results: []contracts.AvailabilityResult{{
+				LineID:            "guest_quote:0",
+				SupplyKind:        contracts.SupplyKindSkuQuantity,
+				Status:            contracts.SupplyAvailabilityLowStock,
+				Available:         true,
+				AvailableQuantity: 2,
+				ProviderID:        "internal-provider",
+				ProviderRef:       "private-ref",
+			}},
+		},
+	}
+	svc := &GuestOrderAppService{
+		resolver:           alwaysEnabledResolver{},
+		supplyAvailability: recorder,
+		listings: &stubGuestListings{
+			bySlug: map[string]*pb.SignedListing{
+				"camera": guestListingWithSku("camera", "Color", "Red", "3", "1200"),
+			},
+		},
+	}
+	svc.db = newGuestQuoteConfigDB(t)
+
+	resp, err := svc.QuoteGuestOrderSupply(context.Background(), contracts.QuoteGuestOrderSupplyRequest{
+		Items: []contracts.GuestOrderItemRequest{{
+			ListingSlug: "camera",
+			Quantity:    1,
+			Options:     []map[string]string{{"Color": "Red"}},
+		}},
+	})
+	require.NoError(t, err)
+	require.True(t, resp.CanSell)
+	require.Len(t, recorder.quoteRequests, 1)
+	require.Len(t, recorder.quoteRequests[0].Lines, 1)
+	require.Equal(t, contracts.SupplyKindSkuQuantity, recorder.quoteRequests[0].Lines[0].SupplyKind)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, "camera", resp.Items[0].ListingSlug)
+	require.Equal(t, contracts.SupplyAvailabilityLowStock, resp.Items[0].Status)
+	require.Equal(t, int64(2), resp.Items[0].AvailableQuantity)
+}
+
+func TestQuoteGuestOrderSupplyUsesVariantDigitalLicensePool(t *testing.T) {
+	db := newGuestQuoteConfigDB(t)
+	assetSvc := newGuestQuoteDigitalAssetService(t, db)
+	_, err := assetSvc.ImportLicenseKeys("ebook", "", "app-universal", []string{"UNIVERSAL-1"}, "perpetual", 1, time.Time{})
+	require.NoError(t, err)
+	_, err = assetSvc.ImportLicenseKeys("ebook", "sku-blue", "app-blue", []string{"BLUE-1", "BLUE-2"}, "perpetual", 1, time.Time{})
+	require.NoError(t, err)
+
+	supply := newProviderBackedGuestSupplyAvailability(
+		digital.NewLicenseKeyPoolProvider(db),
+		digital.NewUnlimitedDigitalProvider(db),
+	)
+	listing := guestListingWithSku("ebook", "Color", "Blue", "3", "1200")
+	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	listing.Listing.Item.Skus[0].ProductID = "sku-blue"
+	svc := &GuestOrderAppService{
+		db:                 db,
+		resolver:           alwaysEnabledResolver{},
+		digitalSupplyLines: assetSvc,
+		supplyAvailability: supply,
+		listings: &stubGuestListings{
+			bySlug: map[string]*pb.SignedListing{
+				"ebook": listing,
+			},
+		},
+	}
+
+	resp, err := svc.QuoteGuestOrderSupply(context.Background(), contracts.QuoteGuestOrderSupplyRequest{
+		Items: []contracts.GuestOrderItemRequest{{
+			ListingSlug: "ebook",
+			Quantity:    2,
+			Options:     []map[string]string{{"Color": "Blue"}},
+		}},
+	})
+	require.NoError(t, err)
+	require.True(t, resp.CanSell)
+	require.False(t, resp.ManualActionRequired)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, contracts.SupplyKindLicenseKeyPool, resp.Items[0].SupplyKind)
+	require.Equal(t, contracts.SupplyAvailabilityAvailable, resp.Items[0].Status)
+	require.True(t, resp.Items[0].Available)
+	require.Equal(t, int64(2), resp.Items[0].AvailableQuantity)
+
+	require.Len(t, supply.quoteRequests, 1)
+	require.Len(t, supply.quoteRequests[0].Lines, 1)
+	require.Equal(t, "sku-blue", supply.quoteRequests[0].Lines[0].VariantSKU)
+}
+
+func TestQuoteGuestOrderSupplyReportsMissingDigitalAssetManualAction(t *testing.T) {
+	db := newGuestQuoteConfigDB(t)
+	assetSvc := newGuestQuoteDigitalAssetService(t, db)
+	supply := newProviderBackedGuestSupplyAvailability(
+		digital.NewLicenseKeyPoolProvider(db),
+		digital.NewUnlimitedDigitalProvider(db),
+	)
+	svc := &GuestOrderAppService{
+		db:                 db,
+		resolver:           alwaysEnabledResolver{},
+		digitalSupplyLines: assetSvc,
+		supplyAvailability: supply,
+		listings: &stubGuestListings{
+			bySlug: map[string]*pb.SignedListing{
+				"ebook-missing": guestListing("ebook-missing", pb.Listing_Metadata_DIGITAL_GOOD),
+			},
+		},
+	}
+
+	resp, err := svc.QuoteGuestOrderSupply(context.Background(), contracts.QuoteGuestOrderSupplyRequest{
+		Items: []contracts.GuestOrderItemRequest{{
+			ListingSlug: "ebook-missing",
+			Quantity:    1,
+		}},
+	})
+	require.NoError(t, err)
+	require.False(t, resp.CanSell)
+	require.True(t, resp.ManualActionRequired)
+	require.Equal(t, "manual_action_required", resp.Reason)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, contracts.SupplyKindUnlimitedDigital, resp.Items[0].SupplyKind)
+	require.Equal(t, contracts.SupplyAvailabilityManualActionRequired, resp.Items[0].Status)
+	require.False(t, resp.Items[0].Available)
+	require.True(t, resp.Items[0].ManualActionRequired)
+	require.Equal(t, "digital_asset_missing", resp.Items[0].Reason)
+
+	require.Len(t, supply.quoteRequests, 1)
+	require.Len(t, supply.quoteRequests[0].Lines, 1)
+	require.Equal(t, "digital_asset_missing", supply.quoteRequests[0].Lines[0].Metadata["manualActionReason"])
+}
+
 func TestQuoteSupplyAvailabilityShadowSwallowsQuoteError(t *testing.T) {
 	recorder := &recordingSupplyAvailability{
 		quoteErr: errors.New("quote unavailable"),
@@ -144,6 +422,17 @@ func TestQuoteSupplyAvailabilityShadowSwallowsQuoteError(t *testing.T) {
 		)
 	})
 	require.Len(t, recorder.quoteRequests, 1)
+}
+
+func newGuestQuoteConfigDB(t *testing.T) *testDatabase {
+	t.Helper()
+	db := newGuestTestDB(t)
+	require.NoError(t, db.gormDB.AutoMigrate(&models.GuestCheckoutConfig{}))
+	require.NoError(t, db.gormDB.Create(&models.GuestCheckoutConfig{
+		Enabled:       true,
+		AcceptedCoins: "LTC",
+	}).Error)
+	return db
 }
 
 func TestCreateGuestOrder_ShadowQuotePreservesGuestInventoryReservation(t *testing.T) {
@@ -430,6 +719,21 @@ func TestGuestReservableSupplyLines_SkipExternalKeepSku(t *testing.T) {
 	require.Equal(t, "camera", reservable[0].ListingSlug)
 }
 
+func TestFinalizeGuestSupplyCommitBlocksFundedWhenAuthoritative(t *testing.T) {
+	recorder := &transactionalRecordingSupplyAvailability{
+		commitErr: errors.New("commit failed"),
+	}
+	svc := &GuestOrderAppService{
+		resolver:           alwaysEnabledResolver{},
+		supplyAvailability: recorder,
+	}
+
+	err := svc.finalizeGuestSupplyCommitInTx(context.Background(), nil, "gst_test")
+	require.ErrorContains(t, err, "commit guest supply")
+	require.ErrorContains(t, err, "commit failed")
+	require.Empty(t, recorder.commitTxRequests)
+}
+
 func TestCommitGuestSupplyInTx_UsesAuthoritativeServiceWhenEnabled(t *testing.T) {
 	db := newGuestTestDB(t)
 	recorder := &transactionalRecordingSupplyAvailability{}
@@ -508,10 +812,135 @@ func (fixedBIP44KeyDeriver) DerivePrivateKey(iwallet.ChainType, uint32) ([]byte,
 	return []byte{1}, nil
 }
 
+func newGuestQuoteDigitalAssetService(t *testing.T, db *testDatabase) *digital.DigitalAssetAppService {
+	t.Helper()
+	require.NoError(t, db.gormDB.AutoMigrate(
+		&models.DigitalAsset{},
+		&models.DigitalLicenseKey{},
+		&models.LicenseActivation{},
+		&models.DownloadGrant{},
+		&models.DigitalDownloadLog{},
+	))
+	return digital.NewDigitalAssetAppService(db, guestQuoteNoopBlobStore{}, guestQuoteKeyProvider{})
+}
+
+type providerBackedGuestSupplyAvailability struct {
+	providers     map[contracts.SupplyKind]contracts.SupplyProvider
+	quoteRequests []contracts.SupplyQuoteRequest
+}
+
+func newProviderBackedGuestSupplyAvailability(providers ...contracts.SupplyProvider) *providerBackedGuestSupplyAvailability {
+	svc := &providerBackedGuestSupplyAvailability{
+		providers: make(map[contracts.SupplyKind]contracts.SupplyProvider, len(providers)),
+	}
+	for _, provider := range providers {
+		svc.providers[provider.Kind()] = provider
+	}
+	return svc
+}
+
+func (s *providerBackedGuestSupplyAvailability) Quote(ctx context.Context, req contracts.SupplyQuoteRequest) (*contracts.SupplyQuoteResult, error) {
+	s.quoteRequests = append(s.quoteRequests, req)
+	result := &contracts.SupplyQuoteResult{
+		CanSell: true,
+		Results: make([]contracts.AvailabilityResult, 0, len(req.Lines)),
+	}
+	for _, line := range req.Lines {
+		provider := s.providers[line.SupplyKind]
+		if provider == nil {
+			return nil, contracts.ErrSupplyKindUnsupported
+		}
+		availability, err := provider.GetAvailability(ctx, contracts.AvailabilityRequest{Line: line})
+		if err != nil {
+			return nil, err
+		}
+		result.Results = append(result.Results, *availability)
+		if availability.ManualActionRequired || availability.Status == contracts.SupplyAvailabilityManualActionRequired {
+			result.ManualActionRequired = true
+		}
+		if !availability.Available || availability.ManualActionRequired {
+			result.CanSell = false
+		}
+	}
+	if result.ManualActionRequired {
+		result.Reason = "manual_action_required"
+	} else if !result.CanSell {
+		result.Reason = "supply_unavailable"
+	}
+	return result, nil
+}
+
+func (*providerBackedGuestSupplyAvailability) ReserveOrder(context.Context, contracts.ReserveOrderSupplyRequest) (*contracts.ReserveOrderSupplyResult, error) {
+	return &contracts.ReserveOrderSupplyResult{}, nil
+}
+
+func (*providerBackedGuestSupplyAvailability) CommitOrder(context.Context, string, string) error {
+	return nil
+}
+
+func (*providerBackedGuestSupplyAvailability) ReleaseOrder(context.Context, string, string, string) error {
+	return nil
+}
+
+type guestQuoteNoopBlobStore struct{}
+
+func (guestQuoteNoopBlobStore) Put(context.Context, string, []byte, string) error {
+	return nil
+}
+
+func (guestQuoteNoopBlobStore) PutStream(_ context.Context, _ string, r io.Reader, _ int64, _ string) error {
+	_, err := io.Copy(io.Discard, r)
+	return err
+}
+
+func (guestQuoteNoopBlobStore) Get(context.Context, string) (io.ReadCloser, string, error) {
+	return nil, "", contracts.ErrBlobNotFound
+}
+
+func (guestQuoteNoopBlobStore) Exists(context.Context, string) (bool, error) {
+	return false, nil
+}
+
+func (guestQuoteNoopBlobStore) PublicURL(string) string { return "" }
+
+type guestQuoteKeyProvider struct{}
+
+func (guestQuoteKeyProvider) DigitalContentMasterKey(int) ([]byte, error) {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i + 1)
+	}
+	return key, nil
+}
+
+func (guestQuoteKeyProvider) EVMMasterKey() (*btcec.PrivateKey, error)     { return nil, nil }
+func (guestQuoteKeyProvider) SolanaMasterKey() (*solana.PrivateKey, error) { return nil, nil }
+func (guestQuoteKeyProvider) EscrowMasterKey() (*btcec.PrivateKey, error)  { return nil, nil }
+func (guestQuoteKeyProvider) RatingMasterKey() (*btcec.PrivateKey, error)  { return nil, nil }
+func (guestQuoteKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error)    { return nil, nil }
+
+var _ contracts.SupplyAvailabilityService = (*providerBackedGuestSupplyAvailability)(nil)
+
 type recordingSupplyAvailability struct {
 	quoteRequests []contracts.SupplyQuoteRequest
 	quoteResult   *contracts.SupplyQuoteResult
 	quoteErr      error
+}
+
+type recordingGuestDigitalSupplyLineResolver struct {
+	items [][]digital.OrderLineItem
+	lines []contracts.SupplyLine
+	err   error
+}
+
+func (r *recordingGuestDigitalSupplyLineResolver) SupplyAvailabilityLinesForOrderItems(items []digital.OrderLineItem) ([]contracts.SupplyLine, error) {
+	r.items = append(r.items, append([]digital.OrderLineItem(nil), items...))
+	if r.err != nil {
+		return nil, r.err
+	}
+	lines := make([]contracts.SupplyLine, len(r.lines))
+	copy(lines, r.lines)
+	return lines, nil
 }
 
 func (r *recordingSupplyAvailability) Quote(_ context.Context, req contracts.SupplyQuoteRequest) (*contracts.SupplyQuoteResult, error) {
@@ -544,6 +973,7 @@ type transactionalRecordingSupplyAvailability struct {
 	reserveTxRequests []contracts.ReserveOrderSupplyRequest
 	commitTxRequests  []string
 	releaseTxRequests []string
+	commitErr         error
 }
 
 func (r *transactionalRecordingSupplyAvailability) ReserveOrderTx(_ context.Context, tx database.Tx, req contracts.ReserveOrderSupplyRequest) (*contracts.ReserveOrderSupplyResult, error) {
@@ -585,6 +1015,9 @@ func (r *transactionalRecordingSupplyAvailability) ReserveOrderTx(_ context.Cont
 }
 
 func (r *transactionalRecordingSupplyAvailability) CommitOrderTx(_ context.Context, tx database.Tx, orderRef string, orderType string) error {
+	if r.commitErr != nil {
+		return r.commitErr
+	}
 	r.commitTxRequests = append(r.commitTxRequests, orderRef)
 	farFuture := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
 	var reservations []models.InventoryReservation
@@ -671,6 +1104,20 @@ func (disabledSupplyAvailabilityResolver) Evaluate(context.Context, string) pkgc
 }
 
 func (disabledSupplyAvailabilityResolver) List(context.Context) []pkgconfig.EffectiveFeature {
+	return nil
+}
+
+type guestCheckoutOnlyResolver struct{}
+
+func (guestCheckoutOnlyResolver) IsEnabled(_ context.Context, key string) bool {
+	return key == pkgconfig.FeatureGuestCheckoutEnabled.Key
+}
+
+func (guestCheckoutOnlyResolver) Evaluate(_ context.Context, key string) pkgconfig.Evaluation {
+	return pkgconfig.Evaluation{Key: key, Enabled: key == pkgconfig.FeatureGuestCheckoutEnabled.Key}
+}
+
+func (guestCheckoutOnlyResolver) List(context.Context) []pkgconfig.EffectiveFeature {
 	return nil
 }
 

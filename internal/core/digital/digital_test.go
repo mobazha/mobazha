@@ -164,20 +164,50 @@ func TestAssetService_CreateAndRevealLink(t *testing.T) {
 	assert.Equal(t, url, revealed)
 }
 
-func TestAssetService_RejectsVariantSpecificAssetsInPhase1(t *testing.T) {
+func TestAssetService_AllowsVariantSpecificAssets(t *testing.T) {
 	svc, _ := newTestAssetService(t)
 
-	_, err := svc.CreateLinkAsset("listing-link", "sku-blue", "https://example.com")
-	require.ErrorIs(t, err, contracts.ErrDigitalVariantUnsupported)
+	link, err := svc.CreateLinkAsset("listing-link", " sku-blue ", "https://example.com")
+	require.NoError(t, err)
+	require.Equal(t, "sku-blue", link.VariantSKU)
+	universalLink, err := svc.CreateLinkAsset("listing-link", "", "https://example.com/universal")
+	require.NoError(t, err)
+	require.Empty(t, universalLink.VariantSKU)
+	variantAssets, err := svc.GetAssetsByListing("listing-link", "sku-blue")
+	require.NoError(t, err)
+	require.Len(t, variantAssets, 1)
+	require.Equal(t, "sku-blue", variantAssets[0].VariantSKU)
+	universalAssets, err := svc.GetAssetsByListing("listing-link", "")
+	require.NoError(t, err)
+	require.Len(t, universalAssets, 1)
+	require.Empty(t, universalAssets[0].VariantSKU)
 
-	_, err = svc.CreateLicenseKeyAsset("listing-lic", "sku-blue", "app-test")
-	require.ErrorIs(t, err, contracts.ErrDigitalVariantUnsupported)
+	licenseAsset, err := svc.CreateLicenseKeyAsset("listing-lic", " sku-blue ", "app-test")
+	require.NoError(t, err)
+	require.Equal(t, "sku-blue", licenseAsset.VariantSKU)
 
-	_, err = svc.ImportLicenseKeys("listing-lic", "sku-blue", "app-test", []string{"KEY-001"}, "perpetual", 1, time.Time{})
-	require.ErrorIs(t, err, contracts.ErrDigitalVariantUnsupported)
+	imported, err := svc.ImportLicenseKeys("listing-lic", " sku-blue ", "app-test", []string{"KEY-001"}, "perpetual", 1, time.Time{})
+	require.NoError(t, err)
+	require.Equal(t, 1, imported)
+	stats, err := svc.GetLicenseKeyPoolStats("listing-lic", "sku-blue")
+	require.NoError(t, err)
+	require.Equal(t, int64(1), stats.Available)
+	listedKeys, err := svc.ListLicenseKeys("listing-lic", "sku-blue", 50, 0)
+	require.NoError(t, err)
+	require.Len(t, listedKeys, 1)
+	universalKeys, err := svc.ListLicenseKeys("listing-lic", "", 50, 0)
+	require.NoError(t, err)
+	require.Empty(t, universalKeys)
 
-	_, err = svc.UploadFileAssetStream(context.Background(), "listing-file", "sku-blue", "file.zip", "application/zip", bytes.NewReader([]byte("x")), 1)
-	require.ErrorIs(t, err, contracts.ErrDigitalVariantUnsupported)
+	file, err := svc.UploadFileAssetStream(context.Background(), "listing-file", " sku-blue ", "file.zip", "application/zip", bytes.NewReader([]byte("x")), 1)
+	require.NoError(t, err)
+	require.Equal(t, "sku-blue", file.VariantSKU)
+	variantFiles, err := svc.GetAssetsByListing("listing-file", "sku-blue")
+	require.NoError(t, err)
+	require.Len(t, variantFiles, 1)
+	universalFiles, err := svc.GetAssetsByListing("listing-file", "")
+	require.NoError(t, err)
+	require.Empty(t, universalFiles)
 }
 
 // ---------------------------------------------------------------------------

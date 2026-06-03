@@ -95,9 +95,7 @@ func (s *DigitalAssetAppService) UploadFileAssetStream(
 	src io.Reader,
 	expectedSize int64,
 ) (*contracts.DigitalAssetInfo, error) {
-	if err := requirePhase1UniversalAsset(variantSKU); err != nil {
-		return nil, err
-	}
+	variantSKU = strings.TrimSpace(variantSKU)
 
 	assetID := uuid.Must(uuid.NewV7()).String()
 	keyVersion := 1
@@ -167,9 +165,7 @@ func (s *DigitalAssetAppService) CreateLinkAsset(
 	variantSKU string,
 	url string,
 ) (*contracts.DigitalAssetInfo, error) {
-	if err := requirePhase1UniversalAsset(variantSKU); err != nil {
-		return nil, err
-	}
+	variantSKU = strings.TrimSpace(variantSKU)
 
 	assetID := uuid.Must(uuid.NewV7()).String()
 	keyVersion := 1
@@ -206,9 +202,7 @@ func (s *DigitalAssetAppService) CreateLicenseKeyAsset(
 	variantSKU string,
 	appID string,
 ) (*contracts.DigitalAssetInfo, error) {
-	if err := requirePhase1UniversalAsset(variantSKU); err != nil {
-		return nil, err
-	}
+	variantSKU = strings.TrimSpace(variantSKU)
 
 	assetID := uuid.Must(uuid.NewV7()).String()
 
@@ -239,9 +233,7 @@ func (s *DigitalAssetAppService) ImportLicenseKeys(
 	maxActivations int,
 	expiresAt time.Time,
 ) (int, error) {
-	if err := requirePhase1UniversalAsset(variantSKU); err != nil {
-		return 0, err
-	}
+	variantSKU = strings.TrimSpace(variantSKU)
 	if len(keys) == 0 {
 		return 0, nil
 	}
@@ -301,13 +293,6 @@ func (s *DigitalAssetAppService) ImportLicenseKeys(
 	})
 
 	return imported, err
-}
-
-func requirePhase1UniversalAsset(variantSKU string) error {
-	if strings.TrimSpace(variantSKU) != "" {
-		return contracts.ErrDigitalVariantUnsupported
-	}
-	return nil
 }
 
 // AllocateLicenseKey picks one available license key from the pool, marks it
@@ -401,6 +386,7 @@ func (s *DigitalAssetAppService) GetLicenseKeyPoolStats(
 	listingSlug string,
 	variantSKU string,
 ) (*contracts.LicenseKeyPoolStats, error) {
+	variantSKU = strings.TrimSpace(variantSKU)
 	var available, dispensed, revoked, total int64
 	err := s.db.View(func(tx database.Tx) error {
 		baseWhere := "listing_slug = ? AND variant_sku = ? AND status = ?"
@@ -791,7 +777,7 @@ func (s *DigitalAssetAppService) GetAssetsByListing(
 	listingSlug string,
 	variantSKU string,
 ) ([]contracts.DigitalAssetInfo, error) {
-	assets, err := s.getAssetModelsByListing(listingSlug, variantSKU)
+	assets, err := s.getAssetModelsByListingExact(listingSlug, variantSKU)
 	if err != nil {
 		return nil, err
 	}
@@ -804,10 +790,26 @@ func (s *DigitalAssetAppService) GetAssetsByListing(
 	return result, nil
 }
 
+func (s *DigitalAssetAppService) getAssetModelsByListingExact(
+	listingSlug string,
+	variantSKU string,
+) ([]models.DigitalAsset, error) {
+	variantSKU = strings.TrimSpace(variantSKU)
+	var assets []models.DigitalAsset
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("listing_slug = ? AND variant_sku = ?", listingSlug, variantSKU).
+			Order("sort_order ASC").
+			Find(&assets).Error
+	})
+	return assets, err
+}
+
 func (s *DigitalAssetAppService) getAssetModelsByListing(
 	listingSlug string,
 	variantSKU string,
 ) ([]models.DigitalAsset, error) {
+	variantSKU = strings.TrimSpace(variantSKU)
 	var assets []models.DigitalAsset
 	err := s.db.View(func(tx database.Tx) error {
 		q := tx.Read().Where("listing_slug = ?", listingSlug)
@@ -1566,12 +1568,10 @@ func (s *DigitalAssetAppService) ListLicenseKeys(
 	listingSlug, variantSKU string,
 	limit, offset int,
 ) ([]contracts.MaskedLicenseKey, error) {
+	variantSKU = strings.TrimSpace(variantSKU)
 	var keys []models.DigitalLicenseKey
 	err := s.db.View(func(tx database.Tx) error {
-		q := tx.Read().Where("listing_slug = ?", listingSlug)
-		if variantSKU != "" {
-			q = q.Where("variant_sku = ?", variantSKU)
-		}
+		q := tx.Read().Where("listing_slug = ? AND variant_sku = ?", listingSlug, variantSKU)
 		// ID is UUIDv7 (time-ordered); ordering by ID is equivalent to ordering
 		// by insertion time without requiring a separate created_at column.
 		return q.Order("id DESC").Limit(limit).Offset(offset).Find(&keys).Error

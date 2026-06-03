@@ -48,6 +48,12 @@ type CreateGuestOrderRequest struct {
 	PaymentCoin     string                  `json:"paymentCoin"`
 }
 
+// QuoteGuestOrderSupplyRequest is the public preflight input for checking
+// guest checkout supply without creating an order or holding inventory.
+type QuoteGuestOrderSupplyRequest struct {
+	Items []GuestOrderItemRequest `json:"items"`
+}
+
 // GuestOrderItemRequest describes a single item in a guest order.
 type GuestOrderItemRequest struct {
 	ListingSlug     string              `json:"listingSlug"`
@@ -56,6 +62,27 @@ type GuestOrderItemRequest struct {
 	Options         []map[string]string `json:"options,omitempty"`
 	ShippingOption  string              `json:"shippingOption,omitempty"`
 	ShippingService string              `json:"shippingService,omitempty"`
+}
+
+// GuestOrderSupplyQuoteResponse is a buyer-safe supply preflight response.
+// It intentionally omits provider identifiers and provider references.
+type GuestOrderSupplyQuoteResponse struct {
+	Items                []GuestOrderSupplyQuoteItem `json:"items"`
+	CanSell              bool                        `json:"canSell"`
+	ManualActionRequired bool                        `json:"manualActionRequired,omitempty"`
+	Reason               string                      `json:"reason,omitempty"`
+}
+
+type GuestOrderSupplyQuoteItem struct {
+	ListingSlug          string                   `json:"listingSlug"`
+	Quantity             int                      `json:"quantity"`
+	SupplyKind           SupplyKind               `json:"-"` // buyer-safe API: internal routing only
+	Status               SupplyAvailabilityStatus `json:"status"`
+	Available            bool                     `json:"available"`
+	Unlimited            bool                     `json:"unlimited,omitempty"`
+	AvailableQuantity    int64                    `json:"availableQuantity,omitempty"`
+	ManualActionRequired bool                     `json:"manualActionRequired,omitempty"`
+	Reason               string                   `json:"reason,omitempty"`
 }
 
 // GuestOrderResponse is returned after order creation.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -99,6 +100,7 @@ type OrderAppService struct {
 	coTenantVerifiedPayment contracts.CoTenantVerifiedPaymentFn
 	resolver                pkgconfig.ResolverInterface
 	supplyAvailability      contracts.SupplyAvailabilityService
+	digitalSupplyLines      DigitalSupplyLineResolver
 }
 
 // OrderAppServiceConfig groups the dependencies for constructing OrderAppService.
@@ -129,6 +131,13 @@ type OrderAppServiceConfig struct {
 	CoTenantVerifiedPayment    contracts.CoTenantVerifiedPaymentFn
 	Resolver                   pkgconfig.ResolverInterface
 	SupplyAvailability         contracts.SupplyAvailabilityService
+	DigitalSupplyLines         DigitalSupplyLineResolver
+}
+
+// DigitalSupplyLineResolver resolves digital order metadata into supply lines
+// while keeping order lifecycle code independent of digital delivery internals.
+type DigitalSupplyLineResolver interface {
+	SupplyAvailabilityLinesForOrderItems([]digital.OrderLineItem) ([]contracts.SupplyLine, error)
 }
 
 // NewOrderAppService constructs an OrderAppService with the given dependencies.
@@ -158,7 +167,17 @@ func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {
 		coTenantVerifiedPayment:    cfg.CoTenantVerifiedPayment,
 		resolver:                   cfg.Resolver,
 		supplyAvailability:         cfg.SupplyAvailability,
+		digitalSupplyLines:         cfg.DigitalSupplyLines,
 	}
+}
+
+// SetDigitalSupplyLineResolver wires digital metadata after the digital
+// subsystem has initialized. This avoids an init-order cycle with orders.
+func (s *OrderAppService) SetDigitalSupplyLineResolver(resolver DigitalSupplyLineResolver) {
+	if s == nil {
+		return
+	}
+	s.digitalSupplyLines = resolver
 }
 
 // SetRegistry wires the payment registry after construction (same lifecycle

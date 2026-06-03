@@ -4,9 +4,11 @@ package order
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -94,7 +96,7 @@ func TestPostProcessOrderOpen_LeavesExternalSupplyLineForManualAction(t *testing
 		if err := tx.Save(order); err != nil {
 			return err
 		}
-		lines, err := standardOrderSupplyLinesFromOrderOpen(tx, "order-standard-external", orderSupplyOrderOpen(listing, listingHash))
+		lines, err := standardOrderSupplyLinesFromOrderOpen(tx, "order-standard-external", orderSupplyOrderOpen(listing, listingHash), nil, false)
 		require.NoError(t, err)
 		require.Len(t, lines, 1)
 		require.Equal(t, contracts.SupplyKindExternalSupply, lines[0].SupplyKind)
@@ -108,6 +110,63 @@ func TestPostProcessOrderOpen_LeavesExternalSupplyLineForManualAction(t *testing
 	}))
 
 	require.Empty(t, recorder.reserveTxRequests)
+}
+
+func TestStandardOrderSupplyLinesUsesDigitalResolverForDigitalGoods(t *testing.T) {
+	resolver := &recordingDigitalSupplyLineResolver{
+		lines: []contracts.SupplyLine{{
+			LineID:      "digital:0:ebook:license_key_pool",
+			ListingSlug: "ebook",
+			Quantity:    2,
+			SupplyKind:  contracts.SupplyKindLicenseKeyPool,
+		}},
+	}
+	listing := orderSupplyListing(t, "ebook", "Color", "Red", "")
+	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	listing.Listing.Item.Skus[0].ProductID = "sku-red"
+	listingHash := orderSupplyListingHash(t, listing)
+
+	lines, err := standardOrderSupplyLinesFromOrderOpen(nil, "order-standard-digital", orderSupplyOrderOpenWithQuantity(listing, listingHash, "2"), resolver, false)
+	require.NoError(t, err)
+	require.Len(t, resolver.items, 1)
+	require.Equal(t, "ebook", resolver.items[0][0].ListingSlug)
+	require.Equal(t, "sku-red", resolver.items[0][0].VariantSKU)
+	require.Equal(t, uint32(2), resolver.items[0][0].Quantity)
+	require.Equal(t, []contracts.SupplyLine{{
+		LineID:      "digital:0:ebook:license_key_pool",
+		ListingSlug: "ebook",
+		Quantity:    2,
+		SupplyKind:  contracts.SupplyKindLicenseKeyPool,
+	}}, lines)
+}
+
+func TestStandardOrderSupplyLinesSkipsDigitalGoodsWithoutResolver(t *testing.T) {
+	listing := orderSupplyListing(t, "ebook", "", "", "")
+	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	listingHash := orderSupplyListingHash(t, listing)
+
+	lines, err := standardOrderSupplyLinesFromOrderOpen(nil, "order-standard-digital", orderSupplyOrderOpen(listing, listingHash), nil, false)
+	require.NoError(t, err)
+	require.Empty(t, lines)
+}
+
+func TestStandardOrderSupplyLinesFailsDigitalGoodsWithoutResolverWhenRequired(t *testing.T) {
+	listing := orderSupplyListing(t, "ebook", "", "", "")
+	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	listingHash := orderSupplyListingHash(t, listing)
+
+	_, err := standardOrderSupplyLinesFromOrderOpen(nil, "order-standard-digital", orderSupplyOrderOpen(listing, listingHash), nil, true)
+	require.ErrorContains(t, err, "digital supply resolver unavailable")
+}
+
+func TestStandardOrderSupplyLinesReturnsDigitalResolverError(t *testing.T) {
+	resolver := &recordingDigitalSupplyLineResolver{err: fmt.Errorf("digital resolver offline")}
+	listing := orderSupplyListing(t, "ebook", "", "", "")
+	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	listingHash := orderSupplyListingHash(t, listing)
+
+	_, err := standardOrderSupplyLinesFromOrderOpen(nil, "order-standard-digital", orderSupplyOrderOpen(listing, listingHash), resolver, false)
+	require.ErrorContains(t, err, "digital resolver offline")
 }
 
 func TestPostProcessOrderOpen_SkipsClosedOrDeclinedStandardOrder(t *testing.T) {
@@ -261,6 +320,22 @@ type recordingOrderSupplyAvailability struct {
 	releaseTxRequests []standardOrderSupplyReleaseRequest
 }
 
+type recordingDigitalSupplyLineResolver struct {
+	items [][]digital.OrderLineItem
+	lines []contracts.SupplyLine
+	err   error
+}
+
+func (r *recordingDigitalSupplyLineResolver) SupplyAvailabilityLinesForOrderItems(items []digital.OrderLineItem) ([]contracts.SupplyLine, error) {
+	r.items = append(r.items, append([]digital.OrderLineItem(nil), items...))
+	if r.err != nil {
+		return nil, r.err
+	}
+	lines := make([]contracts.SupplyLine, len(r.lines))
+	copy(lines, r.lines)
+	return lines, nil
+}
+
 func (r *recordingOrderSupplyAvailability) Quote(context.Context, contracts.SupplyQuoteRequest) (*contracts.SupplyQuoteResult, error) {
 	return &contracts.SupplyQuoteResult{CanSell: true}, nil
 }
@@ -359,6 +434,10 @@ func orderSupplyListingHash(t *testing.T, sl *pb.SignedListing) string {
 }
 
 func orderSupplyOrderOpen(listing *pb.SignedListing, listingHash string) *pb.OrderOpen {
+	return orderSupplyOrderOpenWithQuantity(listing, listingHash, "1")
+}
+
+func orderSupplyOrderOpenWithQuantity(listing *pb.SignedListing, listingHash string, quantity string) *pb.OrderOpen {
 	return &pb.OrderOpen{
 		Timestamp: timestamppb.Now(),
 		BuyerID: &pb.ID{
@@ -367,7 +446,7 @@ func orderSupplyOrderOpen(listing *pb.SignedListing, listingHash string) *pb.Ord
 		Listings: []*pb.SignedListing{listing},
 		Items: []*pb.OrderOpen_Item{{
 			ListingHash: listingHash,
-			Quantity:    "1",
+			Quantity:    quantity,
 			Options: []*pb.OrderOpen_Item_Option{{
 				Name:  "Color",
 				Value: "Red",

@@ -16,6 +16,7 @@ import (
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	pkgdatabase "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"gorm.io/gorm"
 )
 
@@ -70,6 +71,8 @@ func initSupplyAvailabilitySubsystem(obNode *MobazhaNode) {
 func supplyAvailabilityProvidersForNode(obNode *MobazhaNode) []pkgcontracts.SupplyProvider {
 	providers := []pkgcontracts.SupplyProvider{
 		NewSkuQuantityProvider(obNode.db),
+		digital.NewLicenseKeyPoolProvider(obNode.db),
+		digital.NewUnlimitedDigitalProvider(obNode.db),
 	}
 	if obNode.supplyChainRegistry != nil {
 		providers = append(providers, NewExternalSupplyProvider(obNode.db, obNode.supplyChainRegistry))
@@ -152,6 +155,7 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 	if obNode.eventBus == nil {
 		assetSvc.SetOrderQuerier(&dbOrderQuerier{db: obNode.db})
 		obNode.digitalAssetService = assetSvc
+		wireDigitalSupplyLineResolver(obNode, assetSvc)
 		logger.LogInfoWithID(log, obNode.nodeID, "Digital asset subsystem initialized (entitlement disabled: no event bus)")
 		return
 	}
@@ -159,6 +163,7 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 	orders := &dbOrderQuerier{db: obNode.db}
 	assetSvc.SetOrderQuerier(orders)
 	obNode.digitalAssetService = assetSvc
+	wireDigitalSupplyLineResolver(obNode, assetSvc)
 	digitalCtx := obNode.nodeCtx
 	if pkgconfig.TenantIDFromContext(digitalCtx) == "" {
 		digitalCtx = pkgconfig.ContextWithTenantID(digitalCtx, pkgdatabase.StandaloneTenantID)
@@ -176,6 +181,18 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 	}
 	obNode.digitalEntitlementService = entitlementSvc
 	logger.LogInfoWithID(log, obNode.nodeID, "Digital subsystem initialized")
+}
+
+func wireDigitalSupplyLineResolver(obNode *MobazhaNode, assetSvc *digital.DigitalAssetAppService) {
+	if obNode == nil || assetSvc == nil {
+		return
+	}
+	if obNode.orderService != nil {
+		obNode.orderService.SetDigitalSupplyLineResolver(assetSvc)
+	}
+	if obNode.guestOrderService != nil {
+		obNode.guestOrderService.SetDigitalSupplyLineResolver(assetSvc)
+	}
 }
 
 type guestDigitalOrderShipper interface {
@@ -215,13 +232,6 @@ func (s *digitalOrderShipper) ShipOrder(orderID models.OrderID, shipments []mode
 // protobufs. A thin adapter is acceptable as long as we don't expand the
 // queried fields; if more callers need this metadata, promote it to
 // contracts.OrderRepo and have OrderAppService implement it.
-//
-// VariantSKU is intentionally left blank in this adapter: resolving the SKU
-// requires the listing's variant table (selected options -> SKU mapping),
-// which is not loaded here. Phase 1 digital asset writes reject non-empty
-// variantSku values, and DigitalAssetAppService.getAssetModelsByListing
-// treats empty SKU as universal assets only (`variant_sku = ”`).
-//
 // 清除条件: contracts.OrderRepo exposes GetOrderMetadata or OrderConfirmation
 // events carry the resolved (slug, variantSKU) pair directly.
 type dbOrderQuerier struct {
@@ -262,10 +272,10 @@ func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadat
 
 		// Items and Listings are NOT 1:1 index-aligned. Items reference their
 		// listing by ListingHash (== SignedListing.Cid). Build a lookup map.
-		cidToSlug := make(map[string]string, len(oo.Listings))
+		cidToListing := make(map[string]*pb.SignedListing, len(oo.Listings))
 		for _, sl := range oo.Listings {
 			if sl != nil && sl.Listing != nil && sl.Cid != "" {
-				cidToSlug[sl.Cid] = sl.Listing.Slug
+				cidToListing[sl.Cid] = sl
 				if meta.SellerPeerID == "" && sl.Listing.VendorID != nil {
 					meta.SellerPeerID = sl.Listing.VendorID.PeerID
 				}
@@ -276,25 +286,23 @@ func (q *dbOrderQuerier) GetOrderMetadata(orderID string) (*digital.OrderMetadat
 			if oi == nil {
 				continue
 			}
-			slug := cidToSlug[oi.ListingHash]
-			if slug == "" {
+			sl := cidToListing[oi.ListingHash]
+			if sl == nil {
 				// Item.ListingHash is frozen at purchase time; SignedListing.Cid
 				// changes when the seller edits/republishes. Fall back when the
 				// order snapshot still carries the listing row.
 				if len(oo.Listings) == 1 && oo.Listings[0] != nil && oo.Listings[0].Listing != nil {
-					slug = oo.Listings[0].Listing.Slug
+					sl = oo.Listings[0]
 				} else if i < len(oo.Listings) && oo.Listings[i] != nil && oo.Listings[i].Listing != nil {
-					slug = oo.Listings[i].Listing.Slug
+					sl = oo.Listings[i]
 				}
 			}
-			if slug == "" {
+			if sl == nil || sl.Listing == nil || sl.Listing.Slug == "" {
 				continue
 			}
 			item := digital.OrderLineItem{
-				ListingSlug: slug,
-				// TECHDEBT(TD-099): VariantSKU requires variant table
-				// lookup (selected options → SKU mapping). Left blank;
-				// getAssetModelsByListing treats "" as "universal assets only".
+				ListingSlug: sl.Listing.Slug,
+				VariantSKU:  standardOrderMetadataVariantSKU(sl.Listing, oi.Options),
 			}
 			if oi.Quantity != "" {
 				if q, err := strconv.ParseUint(oi.Quantity, 10, 32); err == nil {
@@ -348,11 +356,40 @@ func (q *dbOrderQuerier) getGuestOrderMetadata(orderToken string) (*digital.Orde
 		}
 		meta.LineItems = append(meta.LineItems, digital.OrderLineItem{
 			ListingSlug: it.ListingSlug,
-			// TECHDEBT(TD-099): GuestOrderItem stores VariantHash, not
-			// VariantSKU. Phase 1 rejects variant-specific digital
-			// assets, so empty SKU deliberately targets universal assets.
-			Quantity: qty,
+			VariantSKU:  it.VariantSKU,
+			Quantity:    qty,
 		})
 	}
 	return meta, nil
+}
+
+func standardOrderMetadataVariantSKU(listing *pb.Listing, options []*pb.OrderOpen_Item_Option) string {
+	sku, err := standardOrderMetadataSelectedSKU(listing, options)
+	if err != nil || sku == nil {
+		return ""
+	}
+	return strings.TrimSpace(sku.GetProductID())
+}
+
+func standardOrderMetadataSelectedSKU(listing *pb.Listing, options []*pb.OrderOpen_Item_Option) (*pb.Listing_Item_Sku, error) {
+	if listing == nil || listing.Item == nil || len(listing.Item.Options) == 0 {
+		return nil, nil
+	}
+	opts := make(map[string]string)
+	for _, option := range options {
+		opts[strings.ToLower(strings.TrimSpace(option.Name))] = strings.ToLower(strings.TrimSpace(option.Value))
+	}
+	for _, sku := range listing.Item.Skus {
+		matches := true
+		for _, sel := range sku.Selections {
+			if opts[strings.ToLower(strings.TrimSpace(sel.Option))] != strings.ToLower(strings.TrimSpace(sel.Variant)) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return sku, nil
+		}
+	}
+	return nil, errors.New("selected sku not found in listing")
 }

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -636,7 +637,7 @@ func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb
 	if err := orderMsg.Message.UnmarshalTo(orderOpen); err != nil {
 		return err
 	}
-	lines, err := standardOrderSupplyLinesFromOrderOpen(tx, orderMsg.OrderID, orderOpen)
+	lines, err := s.standardOrderSupplyLinesFromOrderOpen(tx, orderMsg.OrderID, orderOpen, true)
 	if err != nil {
 		return err
 	}
@@ -720,7 +721,15 @@ func standardOrderIsVendorInTx(tx database.Tx, orderID string) (bool, error) {
 	return stored.Role() == models.RoleVendor, nil
 }
 
-func standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, orderOpen *pb.OrderOpen) ([]contracts.SupplyLine, error) {
+func (s *OrderAppService) standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, orderOpen *pb.OrderOpen, requireDigitalResolver bool) ([]contracts.SupplyLine, error) {
+	var digitalResolver DigitalSupplyLineResolver
+	if s != nil {
+		digitalResolver = s.digitalSupplyLines
+	}
+	return standardOrderSupplyLinesFromOrderOpen(tx, orderID, orderOpen, digitalResolver, requireDigitalResolver)
+}
+
+func standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, orderOpen *pb.OrderOpen, digitalResolver DigitalSupplyLineResolver, requireDigitalResolver bool) ([]contracts.SupplyLine, error) {
 	if orderOpen == nil || len(orderOpen.Items) == 0 {
 		return nil, nil
 	}
@@ -730,12 +739,37 @@ func standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, order
 		if err != nil {
 			return nil, err
 		}
-		if listing.Metadata == nil || listing.Metadata.ContractType != pb.Listing_Metadata_PHYSICAL_GOOD {
-			continue
-		}
 		qty, err := strconv.Atoi(strings.TrimSpace(item.Quantity))
 		if err != nil || qty <= 0 {
 			return nil, fmt.Errorf("item %d quantity must be a positive integer", i)
+		}
+		if listing.Metadata == nil {
+			continue
+		}
+		if listing.Metadata.ContractType == pb.Listing_Metadata_DIGITAL_GOOD {
+			if digitalResolver == nil {
+				if requireDigitalResolver {
+					return nil, fmt.Errorf("digital supply resolver unavailable for listing %q", listing.Slug)
+				}
+				continue
+			}
+			variantSKU, err := standardOrderVariantSKUFromOptions(listing, item.Options)
+			if err != nil {
+				return nil, fmt.Errorf("select digital sku for %q: %w", listing.Slug, err)
+			}
+			digitalLines, err := digitalResolver.SupplyAvailabilityLinesForOrderItems([]digital.OrderLineItem{{
+				ListingSlug: listing.Slug,
+				VariantSKU:  variantSKU,
+				Quantity:    uint32(qty),
+			}})
+			if err != nil {
+				return nil, fmt.Errorf("resolve digital supply for %q: %w", listing.Slug, err)
+			}
+			lines = append(lines, digitalLines...)
+			continue
+		}
+		if listing.Metadata.ContractType != pb.Listing_Metadata_PHYSICAL_GOOD {
+			continue
 		}
 		externalLine, err := standardOrderExternalSupplyLineInTx(tx, orderID, i, listing.Slug, qty)
 		if err != nil {
@@ -864,6 +898,17 @@ func selectedStandardOrderSku(listing *pb.Listing, options []*pb.OrderOpen_Item_
 		}
 	}
 	return nil, errors.New("selected sku not found in listing")
+}
+
+func standardOrderVariantSKUFromOptions(listing *pb.Listing, options []*pb.OrderOpen_Item_Option) (string, error) {
+	sku, err := selectedStandardOrderSku(listing, options)
+	if err != nil {
+		return "", err
+	}
+	if sku == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(sku.GetProductID()), nil
 }
 
 func standardOrderVariantHashFromSku(sku *pb.Listing_Item_Sku) string {

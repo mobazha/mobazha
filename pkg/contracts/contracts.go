@@ -368,6 +368,7 @@ type GuestOrderService interface {
 	// consulting the legacy GuestCheckoutConfig.Enabled field.
 	IsEnabled(ctx context.Context) bool
 
+	QuoteGuestOrderSupply(ctx context.Context, req QuoteGuestOrderSupplyRequest) (*GuestOrderSupplyQuoteResponse, error)
 	CreateGuestOrder(ctx context.Context, req CreateGuestOrderRequest) (*GuestOrderResponse, error)
 	GetGuestOrderStatus(ctx context.Context, token string) (*GuestOrderStatusResponse, error)
 	ListGuestOrders(ctx context.Context, filter GuestOrderFilter) ([]models.GuestOrder, int64, error)

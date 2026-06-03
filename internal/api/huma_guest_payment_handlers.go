@@ -134,6 +134,36 @@ func (g *Gateway) registerGuestOrderPostPublic(api huma.API) {
 	})
 }
 
+func (g *Gateway) registerGuestOrderQuotePublic(api huma.API) {
+	type in struct {
+		Body json.RawMessage `json:",omitempty"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "guest-orders-quote-public",
+		Method:      http.MethodPost,
+		Path:        "/v1/guest/orders/quote",
+		Summary:     "Public guest checkout supply preflight",
+		Tags:        []string{"orders", "guest"},
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		if g.guestOrderLimiter != nil {
+			ip := clientIPFromContext(ctx)
+			if !g.guestOrderLimiter.allow(ip) {
+				return nil, huma.NewError(http.StatusTooManyRequests,
+					"Rate limit exceeded. Please try again later.")
+			}
+		}
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/guest/orders/quote", bytes.NewReader(hi.Body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePOSTGuestOrderQuote(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
 func (g *Gateway) registerGuestOrderGetPublic(api huma.API) {
 	type in struct {
 		Token string `path:"token" doc:"Guest checkout token."`

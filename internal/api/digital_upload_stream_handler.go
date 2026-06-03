@@ -134,8 +134,7 @@ func (g *Gateway) handlePOSTDigitalAssetUploadStream(w http.ResponseWriter, r *h
 		_ = part.Close()
 		if uploadErr != nil {
 			if errors.Is(uploadErr, contracts.ErrDigitalVariantUnsupported) {
-				response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
-					"variant-specific digital assets are not supported in Phase 1")
+				response.Error(w, http.StatusBadRequest, response.CodeBadRequest, uploadErr.Error())
 				return
 			}
 			if isMaxBytesError(uploadErr) {

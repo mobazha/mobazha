@@ -101,7 +101,6 @@ func (r *recordingGuestService) HandlePoolPayment(orderToken, txHash string, amo
 	return nil
 }
 
-
 func (r *recordingGuestService) getPoolDetections() []poolDetection {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -129,6 +128,9 @@ func (r *recordingGuestService) getDetections() []paymentDetection {
 func (r *recordingGuestService) CreateGuestOrder(context.Context, contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error) {
 	return nil, nil
 }
+func (r *recordingGuestService) QuoteGuestOrderSupply(context.Context, contracts.QuoteGuestOrderSupplyRequest) (*contracts.GuestOrderSupplyQuoteResponse, error) {
+	return nil, nil
+}
 func (r *recordingGuestService) GetGuestOrderStatus(context.Context, string) (*contracts.GuestOrderStatusResponse, error) {
 	return nil, nil
 }
@@ -139,16 +141,16 @@ func (r *recordingGuestService) ShipGuestOrder(context.Context, string, string, 
 	return nil
 }
 func (r *recordingGuestService) CompleteGuestOrder(context.Context, string) error { return nil }
-func (r *recordingGuestService) HandleConfirmationUpdate(string, int) error { return nil }
+func (r *recordingGuestService) HandleConfirmationUpdate(string, int) error       { return nil }
 func (r *recordingGuestService) HandleLatePayment(orderToken, txHash, status string, paid, expected uint64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.late = append(r.late, latePayment{orderToken, txHash, status, paid, expected})
 	return nil
 }
-func (r *recordingGuestService) CleanupExpiredOrders(context.Context)             {}
-func (r *recordingGuestService) AutoCompleteOrders(context.Context)               {}
-func (r *recordingGuestService) RunGuestCleanupOnce()                             {}
+func (r *recordingGuestService) CleanupExpiredOrders(context.Context) {}
+func (r *recordingGuestService) AutoCompleteOrders(context.Context)   {}
+func (r *recordingGuestService) RunGuestCleanupOnce()                 {}
 func (r *recordingGuestService) GetGuestCheckoutConfig(context.Context) (*models.GuestCheckoutConfig, error) {
 	return nil, nil
 }
@@ -418,11 +420,11 @@ func TestComputeWatcherDeadline_AddsSlackInPollIntervalUnits(t *testing.T) {
 // transitions and Fetch() returns over time. Records every call so tests
 // can assert that the loop survives initial outages and eventually polls.
 type fakeFetcher struct {
-	mu       sync.Mutex
-	healthy  []bool // index per call; clamps to last element if exhausted
-	confs    []int
-	fetchErr []error
-	calls    int
+	mu          sync.Mutex
+	healthy     []bool // index per call; clamps to last element if exhausted
+	confs       []int
+	fetchErr    []error
+	calls       int
 	healthCalls int
 }
 

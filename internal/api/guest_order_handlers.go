@@ -95,6 +95,35 @@ func getGuestOrderService(r *http.Request) contracts.GuestOrderService {
 	return ns.GuestOrder()
 }
 
+// handlePOSTGuestOrderQuote returns a buyer-safe advisory supply quote.
+// POST /v1/guest/orders/quote
+func (g *Gateway) handlePOSTGuestOrderQuote(w http.ResponseWriter, r *http.Request) {
+	svc := getGuestOrderService(r)
+	if svc == nil {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
+			"Guest Checkout is not available")
+		return
+	}
+
+	var req contracts.QuoteGuestOrderSupplyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
+		return
+	}
+	if len(req.Items) == 0 {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "At least one item is required")
+		return
+	}
+
+	resp, err := svc.QuoteGuestOrderSupply(r.Context(), req)
+	if err != nil {
+		status, code := classifyGuestOrderError(err)
+		response.Error(w, status, code, err.Error())
+		return
+	}
+	response.Success(w, resp)
+}
+
 // handlePOSTGuestOrder creates a new guest order (public — anonymous buyer).
 // POST /v1/guest/orders
 func (g *Gateway) handlePOSTGuestOrder(w http.ResponseWriter, r *http.Request) {
@@ -490,6 +519,8 @@ func classifyGuestOrderError(err error) (int, string) {
 	case errors.Is(err, contracts.ErrCoinUnsupported):
 		return http.StatusBadRequest, response.CodeBadRequest
 	case errors.Is(err, contracts.ErrInsufficientStock):
+		return http.StatusConflict, response.CodeConflict
+	case errors.Is(err, contracts.ErrSupplyManualActionRequired):
 		return http.StatusConflict, response.CodeConflict
 	case errors.Is(err, contracts.ErrInvalidVariant):
 		return http.StatusBadRequest, response.CodeBadRequest

@@ -404,7 +404,7 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 		info, err := svc.CreateLinkAsset(in.Body.ListingSlug, in.Body.VariantSKU, in.Body.URL)
 		if err != nil {
 			if errors.Is(err, contracts.ErrDigitalVariantUnsupported) {
-				return nil, huma.Error400BadRequest("variant-specific digital assets are not supported in Phase 1")
+				return nil, huma.Error400BadRequest(err.Error())
 			}
 			log.Errorf("digital link asset creation failed: %v", err)
 			return nil, huma.Error500InternalServerError("failed to create link asset")
@@ -435,7 +435,7 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 		info, err := svc.CreateLicenseKeyAsset(in.Body.ListingSlug, in.Body.VariantSKU, in.Body.AppID)
 		if err != nil {
 			if errors.Is(err, contracts.ErrDigitalVariantUnsupported) {
-				return nil, huma.Error400BadRequest("variant-specific digital assets are not supported in Phase 1")
+				return nil, huma.Error400BadRequest(err.Error())
 			}
 			log.Errorf("digital license key asset creation failed: %v", err)
 			return nil, huma.Error500InternalServerError("failed to create license key asset")
@@ -582,7 +582,7 @@ func (g *Gateway) registerNodeHumaSellerDigitalOperations(api huma.API) {
 			in.Body.Keys, in.Body.LicenseType, in.Body.MaxActivations, exp)
 		if err != nil {
 			if errors.Is(err, contracts.ErrDigitalVariantUnsupported) {
-				return nil, huma.Error400BadRequest("variant-specific digital assets are not supported in Phase 1")
+				return nil, huma.Error400BadRequest(err.Error())
 			}
 			log.Errorf("digital license key import failed: %v", err)
 			return nil, huma.Error500InternalServerError("failed to import license keys")

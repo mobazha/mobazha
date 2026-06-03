@@ -20,6 +20,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/stretchr/testify/require"
 )
 
 // ---------------------------------------------------------------------------
@@ -27,13 +29,21 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockGuestOrderService struct {
-	createGuestOrderFunc     func(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error)
-	getGuestOrderStatusFunc  func(ctx context.Context, token string) (*contracts.GuestOrderStatusResponse, error)
-	listGuestOrdersFunc      func(ctx context.Context, filter contracts.GuestOrderFilter) ([]models.GuestOrder, int64, error)
-	shipGuestOrderFunc       func(ctx context.Context, token, tracking, carrier string) error
-	completeGuestOrderFunc   func(ctx context.Context, token string) error
-	getGuestCheckoutCfgFunc  func(ctx context.Context) (*models.GuestCheckoutConfig, error)
-	saveGuestCheckoutCfgFunc func(ctx context.Context, cfg *models.GuestCheckoutConfig) error
+	quoteGuestOrderSupplyFunc func(ctx context.Context, req contracts.QuoteGuestOrderSupplyRequest) (*contracts.GuestOrderSupplyQuoteResponse, error)
+	createGuestOrderFunc      func(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error)
+	getGuestOrderStatusFunc   func(ctx context.Context, token string) (*contracts.GuestOrderStatusResponse, error)
+	listGuestOrdersFunc       func(ctx context.Context, filter contracts.GuestOrderFilter) ([]models.GuestOrder, int64, error)
+	shipGuestOrderFunc        func(ctx context.Context, token, tracking, carrier string) error
+	completeGuestOrderFunc    func(ctx context.Context, token string) error
+	getGuestCheckoutCfgFunc   func(ctx context.Context) (*models.GuestCheckoutConfig, error)
+	saveGuestCheckoutCfgFunc  func(ctx context.Context, cfg *models.GuestCheckoutConfig) error
+}
+
+func (m *mockGuestOrderService) QuoteGuestOrderSupply(ctx context.Context, req contracts.QuoteGuestOrderSupplyRequest) (*contracts.GuestOrderSupplyQuoteResponse, error) {
+	if m.quoteGuestOrderSupplyFunc != nil {
+		return m.quoteGuestOrderSupplyFunc(ctx, req)
+	}
+	return nil, errors.New("not implemented")
 }
 
 func (m *mockGuestOrderService) CreateGuestOrder(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error) {
@@ -205,6 +215,65 @@ func guestAssertErrorCode(t *testing.T, body []byte, expectedCode string) {
 	if envelope.Error.Code != expectedCode {
 		t.Errorf("expected error code %q, got %q", expectedCode, envelope.Error.Code)
 	}
+}
+
+func TestPOSTGuestOrderQuote_Valid(t *testing.T) {
+	var captured contracts.QuoteGuestOrderSupplyRequest
+	svc := &mockGuestOrderService{
+		quoteGuestOrderSupplyFunc: func(_ context.Context, req contracts.QuoteGuestOrderSupplyRequest) (*contracts.GuestOrderSupplyQuoteResponse, error) {
+			captured = req
+			return &contracts.GuestOrderSupplyQuoteResponse{
+				CanSell: true,
+				Items: []contracts.GuestOrderSupplyQuoteItem{{
+					ListingSlug:       "test-item",
+					Quantity:          1,
+					SupplyKind:        contracts.SupplyKindSkuQuantity,
+					Status:            contracts.SupplyAvailabilityAvailable,
+					Available:         true,
+					AvailableQuantity: 3,
+				}},
+			}, nil
+		},
+	}
+	ts := guestTestServer(t, svc)
+
+	body, _ := json.Marshal(contracts.QuoteGuestOrderSupplyRequest{
+		Items: []contracts.GuestOrderItemRequest{{ListingSlug: "test-item", Quantity: 1}},
+	})
+
+	resp, respBody := guestDoReq(t, ts, "POST", "/v1/guest/orders/quote", body)
+	guestAssertStatus(t, resp, http.StatusOK)
+	require.Len(t, captured.Items, 1)
+	require.Equal(t, "test-item", captured.Items[0].ListingSlug)
+
+	var envelope struct {
+		Data contracts.GuestOrderSupplyQuoteResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(respBody, &envelope))
+	require.True(t, envelope.Data.CanSell)
+	require.Len(t, envelope.Data.Items, 1)
+	require.Equal(t, contracts.SupplyAvailabilityAvailable, envelope.Data.Items[0].Status)
+	require.NotContains(t, string(respBody), "supplyKind")
+}
+
+func TestPOSTGuestOrderQuote_EmptyItems(t *testing.T) {
+	svc := &mockGuestOrderService{}
+	ts := guestTestServer(t, svc)
+
+	body, _ := json.Marshal(contracts.QuoteGuestOrderSupplyRequest{})
+
+	resp, _ := guestDoReq(t, ts, "POST", "/v1/guest/orders/quote", body)
+	guestAssertStatus(t, resp, http.StatusBadRequest)
+}
+
+func TestClassifyGuestOrderError_ManualActionRequired(t *testing.T) {
+	status, code := classifyGuestOrderError(errors.Join(
+		contracts.ErrSupplyManualActionRequired,
+		errors.New("digital asset missing"),
+	))
+
+	require.Equal(t, http.StatusConflict, status)
+	require.Equal(t, response.CodeConflict, code)
 }
 
 // ---------------------------------------------------------------------------

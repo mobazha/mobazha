@@ -16,6 +16,7 @@ import (
 // registerNodeHumaOrderPublicOperations registers public order/checkout ops
 // accessible without authentication (buyer storefront browsing).
 func (g *Gateway) registerNodeHumaOrderPublicOperations(api huma.API) {
+	g.registerGuestOrderQuotePublic(api)
 	g.registerGuestOrderPostPublic(api)
 	g.registerGuestOrderGetPublic(api)
 	g.registerPaymentMethodsGet(api)

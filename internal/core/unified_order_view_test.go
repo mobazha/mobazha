@@ -35,6 +35,9 @@ type mockGuestSvc struct {
 func (m *mockGuestSvc) CreateGuestOrder(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error) {
 	return nil, nil
 }
+func (m *mockGuestSvc) QuoteGuestOrderSupply(ctx context.Context, req contracts.QuoteGuestOrderSupplyRequest) (*contracts.GuestOrderSupplyQuoteResponse, error) {
+	return nil, nil
+}
 func (m *mockGuestSvc) GetGuestOrderStatus(ctx context.Context, token string) (*contracts.GuestOrderStatusResponse, error) {
 	return nil, nil
 }

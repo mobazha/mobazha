@@ -239,6 +239,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"guest-orders-get-public",
 		"guest-orders-list-auth",
 		"guest-orders-post-public",
+		"guest-orders-quote-public",
 		"guest-orders-ship-token",
 		"orders-delete-payment-watch",
 		"orders-get-detail",

@@ -215,6 +215,7 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 		{"GET", "/v1/ai/status"},
 		// Guest checkout
 		{"POST", "/v1/guest/orders"},
+		{"POST", "/v1/guest/orders/quote"},
 		// Payment methods
 		{"GET", "/v1/payment-methods/peer1"},
 		// Batch 5: misc / system / auth

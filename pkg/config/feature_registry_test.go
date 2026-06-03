@@ -39,6 +39,25 @@ func TestRegistry_ListFeatures(t *testing.T) {
 	}
 }
 
+func TestRegistry_SupplyAvailabilityFeature(t *testing.T) {
+	f, ok := LookupFeature(FeatureSupplyAvailabilityEnabled.Key)
+	if !ok {
+		t.Fatalf("FeatureSupplyAvailabilityEnabled not found in registry")
+	}
+	if f.DefaultValue {
+		t.Fatal("supply availability must default off for shadow rollout")
+	}
+	if f.ClientVisible {
+		t.Fatal("SA-0 must not expose a client-visible flag before API/UI exists")
+	}
+	if f.Stability != StabilityExperimental {
+		t.Fatalf("unexpected stability: %s", f.Stability)
+	}
+	if len(f.AllowedScopes) != 3 {
+		t.Fatalf("expected 3 allowed scopes, got %d", len(f.AllowedScopes))
+	}
+}
+
 // TestRegistry_ValidateRegistry — 默认注册表应校验通过。
 func TestRegistry_ValidateRegistry(t *testing.T) {
 	// 重置的 validated 状态不影响——Validate 是幂等的在同一个 Registry 上。

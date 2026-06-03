@@ -49,7 +49,7 @@ func TestHandlePOSTOrderSettlementAction_Success(t *testing.T) {
 	g := &Gateway{}
 	g.handlePOSTOrderSettlementAction(rec, req)
 
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
 	}
 
@@ -66,6 +66,34 @@ func TestHandlePOSTOrderSettlementAction_Success(t *testing.T) {
 	}
 	if _, exists := body["instructions"]; exists {
 		t.Fatalf("response leaked legacy instructions field: %#v", body["instructions"])
+	}
+}
+
+func TestHandlePOSTOrderSettlementAction_CompleteAccepted(t *testing.T) {
+	node := &mockNode{
+		executeSettlementActionFunc: func(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error) {
+			if action != "complete" {
+				t.Fatalf("action = %s, want complete", action)
+			}
+			return &payment.ActionResult{
+				Mode:     payment.ActionModeSubmitted,
+				ActionID: "complete-act-1",
+			}, iwallet.CoinType("crypto:eip155:1:native"), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/orders/QmOrder123/settlement-actions/complete", nil)
+	req = withNodeAndRouteParams(req, node, map[string]string{
+		"orderID": "QmOrder123",
+		"action":  "complete",
+	})
+	rec := httptest.NewRecorder()
+
+	g := &Gateway{}
+	g.handlePOSTOrderSettlementAction(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 body=%s", rec.Code, rec.Body.String())
 	}
 }
 

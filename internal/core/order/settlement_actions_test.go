@@ -353,6 +353,51 @@ func TestSubmitSettlementCancelAction_UsesActionStatusTxHash(t *testing.T) {
 	}
 }
 
+func TestCompleteSettlementReleaseState(t *testing.T) {
+	t.Parallel()
+
+	order := &models.Order{
+		SettlementActions: []models.SettlementActionSnapshot{
+			{Action: "confirm", State: "confirmed"},
+			{Action: "complete", State: "submitted", ActionID: "act-1"},
+		},
+	}
+	if completeSettlementReleaseReady(order, "") {
+		t.Fatal("submitted without tx hash should not be ready")
+	}
+	if !completeSettlementReleasePending(order, "") {
+		t.Fatal("expected pending complete settlement action")
+	}
+
+	order.SettlementActions[1].TxHash = "0xabc"
+	if !completeSettlementReleaseReady(order, "") {
+		t.Fatal("expected ready when tx hash is present")
+	}
+	if completeSettlementReleasePending(order, "") {
+		t.Fatal("expected not pending when tx hash is present")
+	}
+
+	order.SettlementActions = []models.SettlementActionSnapshot{
+		{Action: "complete", State: "confirmed"},
+	}
+	if completeSettlementReleaseReady(order, "") {
+		t.Fatal("confirmed without tx hash should not be ready")
+	}
+	if !completeSettlementReleasePending(order, "") {
+		t.Fatal("expected confirmed action without tx hash to remain pending")
+	}
+
+	order.SettlementActions = []models.SettlementActionSnapshot{
+		{Action: "complete", State: "abandoned"},
+	}
+	if completeSettlementReleaseReady(order, "") {
+		t.Fatal("expected abandoned complete settlement action not to be ready")
+	}
+	if completeSettlementReleasePending(order, "") {
+		t.Fatal("expected abandoned complete settlement action not to be pending")
+	}
+}
+
 func TestBuildRefundMessage_ManagedEscrowCancelable_UsesSettlementCancelAction(t *testing.T) {
 	t.Parallel()
 

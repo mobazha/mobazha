@@ -170,7 +170,7 @@ func TestOrderAppService_GetCompleteOrderInstructions_ManagedEscrowRejectsLegacy
 	assert.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coinType)
 	assert.Nil(t, instructions)
 	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
-	assert.Contains(t, err.Error(), "/v1/orders/{orderID}/complete")
+	assert.Contains(t, err.Error(), "/settlement-actions/complete")
 }
 
 func TestOrderAppService_GetReleaseFundsInstructions_ManagedEscrowRejectsLegacyPath(t *testing.T) {

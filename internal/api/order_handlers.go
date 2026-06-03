@@ -1184,21 +1184,13 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 
 	orderSvc := getOrderService(r)
 
-	done := make(chan struct{})
-	err = orderSvc.CompleteOrder(models.OrderID(orderID), iwallet.TransactionID(completeParam.TxID), completeParam.Ratings, !completeParam.Anonymous, done)
+	err = orderSvc.CompleteOrder(models.OrderID(orderID), iwallet.TransactionID(completeParam.TxID), completeParam.Ratings, !completeParam.Anonymous, nil)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 10):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handlePOSTOrderRate(w http.ResponseWriter, r *http.Request) {
@@ -1227,21 +1219,13 @@ func (g *Gateway) handlePOSTOrderRate(w http.ResponseWriter, r *http.Request) {
 
 	orderSvc := getOrderService(r)
 
-	done := make(chan struct{})
-	err := orderSvc.RateOrder(models.OrderID(orderID), req.Ratings, !req.Anonymous, done)
+	err := orderSvc.RateOrder(models.OrderID(orderID), req.Ratings, !req.Anonymous, nil)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 10):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handlePOSTExtendProtection(w http.ResponseWriter, r *http.Request) {

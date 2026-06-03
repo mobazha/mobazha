@@ -41,6 +41,7 @@ type mockNode struct {
 	getCompleteOrderInstructionsFunc func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	shipOrderFunc                    func(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
 	completeOrderFunc                func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
+	rateOrderFunc                    func(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                  func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	refundOrderViaRelayFunc          func(orderID models.OrderID, done chan struct{}) error
 	declineOrderViaRelayFunc         func(orderID models.OrderID, reason string, done chan struct{}) error
@@ -235,6 +236,9 @@ func (m *mockNode) CompleteOrder(orderID models.OrderID, txid iwallet.Transactio
 	return m.completeOrderFunc(orderID, txid, ratings, includeIDInRating, done)
 }
 func (m *mockNode) RateOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
+	if m.rateOrderFunc != nil {
+		return m.rateOrderFunc(orderID, ratings, includeIDInRating, done)
+	}
 	return nil
 }
 func (m *mockNode) CancelOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {

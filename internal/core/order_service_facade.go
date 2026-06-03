@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"strings"
 
 	"github.com/mobazha/mobazha3.0/internal/core/order"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
@@ -35,6 +36,9 @@ func (f *orderServiceFacade) GetConfirmOrderInstructions(orderID models.OrderID,
 // ExecuteSettlementAction is the default settlement surface for backend-
 // submitted routes such as ManagedEscrow-backed EVM.
 func (f *orderServiceFacade) ExecuteSettlementAction(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*paypkg.ActionResult, iwallet.CoinType, error) {
+	if strings.EqualFold(strings.TrimSpace(action), "complete") {
+		return f.OrderAppService.ExecuteSettlementCompleteAction(ctx, orderID)
+	}
 	return f.settlement.ExecuteSettlementAction(ctx, action, orderID, payoutAddr)
 }
 

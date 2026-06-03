@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -24,6 +25,41 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+type orderOpTiming struct {
+	nodeID  string
+	orderID string
+	op      string
+	step    string
+	start   time.Time
+	stepAt  time.Time
+}
+
+func newOrderOpTiming(nodeID, orderID, op string) *orderOpTiming {
+	now := time.Now()
+	return &orderOpTiming{
+		nodeID:  nodeID,
+		orderID: orderID,
+		op:      op,
+		step:    "start",
+		start:   now,
+		stepAt:  now,
+	}
+}
+
+func (t *orderOpTiming) next(step string) {
+	logger.LogInfoWithIDf(log, t.nodeID,
+		"%s order=%s stage=%s elapsed=%s total=%s",
+		t.op, t.orderID, t.step, time.Since(t.stepAt), time.Since(t.start))
+	t.step = step
+	t.stepAt = time.Now()
+}
+
+func (t *orderOpTiming) finish() {
+	logger.LogInfoWithIDf(log, t.nodeID,
+		"%s order=%s stage=%s elapsed=%s total=%s",
+		t.op, t.orderID, t.step, time.Since(t.stepAt), time.Since(t.start))
+}
 
 // GetCompleteOrderInstructions preserves the legacy client-signed
 // completion surface. Backend-owned completion routes such as ManagedEscrow-backed
@@ -73,7 +109,7 @@ func (s *OrderAppService) GetLegacyCompleteOrderInstructions(orderID models.Orde
 	}
 	if !orderRequiresClientSignedInstructions(&order, paymentSent) {
 		if spec, ok := payment.ResolveSettlementSpec(&order, paymentSent); ok && spec.UsesManagedEscrow() {
-			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed moderated completion must use POST /v1/orders/{orderID}/complete",
+			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed moderated completion must use POST /v1/orders/{orderID}/settlement-actions/complete",
 				coreiface.ErrBadRequest)
 		}
 		return coinType, nil, nil
@@ -113,10 +149,14 @@ func (s *OrderAppService) GetLegacyCompleteOrderInstructions(orderID models.Orde
 // Ratings are optional: pass nil/empty to complete without rating.
 // Use RateOrder to submit ratings for an already-completed order.
 func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
+	timing := newOrderOpTiming(s.nodeID, orderID.String(), "CompleteOrder")
+	defer timing.finish()
+
 	if err := s.acquireOrderLock(orderID); err != nil {
 		return fmt.Errorf("failed to acquire order lock for %s: %w", orderID, err)
 	}
 	defer s.releaseOrderLock(orderID)
+	timing.next("load_order")
 
 	var (
 		order   models.Order
@@ -136,6 +176,11 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 
 	if !order.CanComplete() {
 		return fmt.Errorf("%w: order is not in a state where it can be completed", coreiface.ErrBadRequest)
+	}
+	timing.next("validate_order")
+
+	if err := s.attachSettlementActions(&order); err != nil {
+		return fmt.Errorf("load settlement actions for order %s: %w", orderID, err)
 	}
 
 	orderOpen, err := order.OrderOpenMessage()
@@ -177,6 +222,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 			return fmt.Errorf("process ratings: %w", err)
 		}
 	}
+	timing.next("process_ratings")
 
 	completeMsg := &pb.OrderComplete{
 		Timestamp: timestamppb.Now(),
@@ -185,36 +231,85 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 
 	var releaseTx *iwallet.Transaction
 	if method, ok := payment.ResolvedPaymentMethod(&order, paymentSent); ok && payment.MethodIsModerated(method) {
-		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
-		if err != nil {
-			return err
-		}
-
-		release, tx, err := s.releaseCompleteEscrowFunds(&order, wallet, shipments[0].ReleaseInfo)
-		if err != nil {
-			return err
-		}
 		completionStrategy, csErr := s.paymentRegistry.ForCoinV2(coinType)
 		isClientSigned := csErr == nil && completionStrategy.Model() == payment.PaymentModelClientSigned
-		if isClientSigned {
-			release.Txid = txid.String()
+		usesBackendSettlementComplete := orderUsesMonitoredBackendSettlementComplete(
+			&order,
+			paymentSent,
+			coinType,
+			s.paymentRegistry,
+		)
 
-			if txid != "" {
-				if s.receiptVerifier != nil {
-					if err := s.receiptVerifier.VerifyTransactionReceipt(context.Background(), string(coinType), txid.String()); err != nil {
-						return fmt.Errorf("release transaction verification failed for order %s: %w", orderID, err)
+		if usesBackendSettlementComplete {
+			if completeSettlementReleasePending(&order, txid) {
+				return fmt.Errorf("%w: settlement complete release is still pending; retry after tx hash is available",
+					coreiface.ErrBadRequest)
+			}
+			releaseAlreadySubmitted := completeSettlementReleaseReady(&order, txid)
+			if releaseAlreadySubmitted {
+				release := cloneEscrowRelease(shipments[0].ReleaseInfo)
+				if release == nil {
+					return fmt.Errorf("%w: shipment release info is missing", coreiface.ErrBadRequest)
+				}
+				if txid != "" {
+					release.Txid = txid.String()
+					releaseTx = &iwallet.Transaction{ID: txid}
+				} else {
+					for _, action := range order.SettlementActions {
+						if settlementActionName(action) != "complete" {
+							continue
+						}
+						if action.TxHash != "" {
+							release.Txid = action.TxHash
+							releaseTx = &iwallet.Transaction{ID: iwallet.TransactionID(action.TxHash)}
+						}
+						break
 					}
 				}
-				syntheticTx := iwallet.Transaction{ID: txid}
-				releaseTx = &syntheticTx
+				completeMsg.ReleaseInfo = release
+			} else {
+				wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
+				if err != nil {
+					return err
+				}
+				release, tx, err := s.releaseCompleteEscrowFunds(&order, wallet, shipments[0].ReleaseInfo)
+				if err != nil {
+					return err
+				}
+				completeMsg.ReleaseInfo = release
+				releaseTx = tx
+			}
+		} else {
+			wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
+			if err != nil {
+				return err
+			}
+
+			release, tx, err := s.releaseCompleteEscrowFunds(&order, wallet, shipments[0].ReleaseInfo)
+			if err != nil {
+				return err
+			}
+			if isClientSigned {
+				release.Txid = txid.String()
+
+				if txid != "" {
+					if s.receiptVerifier != nil {
+						if err := s.receiptVerifier.VerifyTransactionReceipt(context.Background(), string(coinType), txid.String()); err != nil {
+							return fmt.Errorf("release transaction verification failed for order %s: %w", orderID, err)
+						}
+					}
+					syntheticTx := iwallet.Transaction{ID: txid}
+					releaseTx = &syntheticTx
+				}
+			}
+
+			completeMsg.ReleaseInfo = release
+			if releaseTx == nil {
+				releaseTx = tx
 			}
 		}
-
-		completeMsg.ReleaseInfo = release
-		if releaseTx == nil {
-			releaseTx = tx
-		}
 	}
+	timing.next("release_complete_escrow_funds")
 
 	var completionEvent interface{}
 	if err := s.db.Update(func(tx database.Tx) error {
@@ -246,6 +341,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 		if err != nil {
 			return err
 		}
+		timing.next("process_message")
 
 		if releaseTx != nil {
 			if err := saveTransactionToFreshOrder(tx, order.ID, *releaseTx); err != nil {
@@ -253,10 +349,15 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 			}
 		}
 
-		return s.messenger.ReliablySendMessage(tx, vendor, message, done)
+		if err := s.messenger.ReliablySendMessage(tx, vendor, message, done); err != nil {
+			return err
+		}
+		timing.next("reliably_send_message")
+		return nil
 	}); err != nil {
 		return err
 	}
+	timing.next("persist_and_dispatch")
 	s.emitOrderProcessorEvents(completionEvent)
 	return nil
 }
@@ -265,6 +366,9 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 // without ratings. Builds a new ORDER_COMPLETE message with ratings and sends
 // it to the vendor as a "rating supplement".
 func (s *OrderAppService) RateOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
+	timing := newOrderOpTiming(s.nodeID, orderID.String(), "RateOrder")
+	defer timing.finish()
+
 	if len(ratings) == 0 {
 		return fmt.Errorf("%w: ratings cannot be empty", coreiface.ErrBadRequest)
 	}
@@ -293,6 +397,7 @@ func (s *OrderAppService) RateOrder(orderID models.OrderID, ratings []models.Rat
 	if order.State != models.OrderState_COMPLETED {
 		return fmt.Errorf("%w: order must be COMPLETED to submit ratings", coreiface.ErrBadRequest)
 	}
+	timing.next("load_order")
 
 	existingComplete, err := order.OrderCompleteMessage()
 	if err != nil {
@@ -333,6 +438,7 @@ func (s *OrderAppService) RateOrder(orderID models.OrderID, ratings []models.Rat
 	if err != nil {
 		return fmt.Errorf("failed to process ratings: %w", err)
 	}
+	timing.next("process_ratings")
 
 	supplementMsg := &pb.OrderComplete{
 		Timestamp:   existingComplete.Timestamp,
@@ -370,11 +476,17 @@ func (s *OrderAppService) RateOrder(orderID models.OrderID, ratings []models.Rat
 		if err != nil {
 			return err
 		}
+		timing.next("process_message")
 
-		return s.messenger.ReliablySendMessage(tx, vendor, message, done)
+		if err := s.messenger.ReliablySendMessage(tx, vendor, message, done); err != nil {
+			return err
+		}
+		timing.next("reliably_send_message")
+		return nil
 	}); err != nil {
 		return err
 	}
+	timing.next("persist_and_dispatch")
 	s.emitOrderProcessorEvents(completionEvent)
 	return nil
 }

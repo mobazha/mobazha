@@ -20,7 +20,7 @@ import (
 
 func TestExecuteSettlementAction_RejectsUnimplementedActionsBeforeDB(t *testing.T) {
 	svc := &SettlementService{}
-	_, _, err := svc.ExecuteSettlementAction(context.Background(), "complete", models.OrderID("order-1"), "")
+	_, _, err := svc.ExecuteSettlementAction(context.Background(), "dispute_release", models.OrderID("order-1"), "")
 	if err == nil {
 		t.Fatal("expected unsupported action error")
 	}

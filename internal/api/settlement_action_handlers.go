@@ -24,7 +24,7 @@ import (
 //
 // POST /v1/orders/{orderID}/settlement-actions/{action}
 //
-// Path action (case-insensitive): "confirm" | "cancel".
+// Path action (case-insensitive): "confirm" | "cancel" | "complete".
 //
 // Body JSON (optional, camelCase):
 //   - payoutAddress — vendor payout (confirm) or buyer refund override (cancel).
@@ -40,9 +40,9 @@ func (g *Gateway) handlePOSTOrderSettlementAction(w http.ResponseWriter, r *http
 	}
 
 	action := strings.ToLower(strings.TrimSpace(chi.URLParam(r, "action")))
-	if action != "confirm" && action != "cancel" {
+	if action != "confirm" && action != "cancel" && action != "complete" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation,
-			`action must be "confirm" or "cancel"`)
+			`action must be "confirm", "cancel", or "complete"`)
 		return
 	}
 
@@ -119,7 +119,11 @@ func (g *Gateway) handlePOSTOrderSettlementAction(w http.ResponseWriter, r *http
 		resp.TxHash = result.SubmittedTxHash
 	}
 
-	responsePkg.Success(w, resp)
+	status := http.StatusOK
+	if result != nil && result.Mode == payment.ActionModeSubmitted {
+		status = http.StatusAccepted
+	}
+	responsePkg.StatusWithData(w, status, resp)
 }
 
 // handleGETOrderSettlementActionStatus returns the latest known status for a

@@ -82,6 +82,36 @@ func TestOrderHandlers(t *testing.T) {
 			},
 		},
 		{
+			name:   "complete order bad request returns 400",
+			path:   "/v1/orders/order-complete/complete",
+			method: http.MethodPost,
+			body:   []byte(`{}`),
+			setNodeMethods: func(n *mockNode) {
+				n.completeOrderFunc = func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
+					return fmt.Errorf("%w: settlement complete release is still pending", coreiface.ErrBadRequest)
+				}
+			},
+			statusCode: http.StatusBadRequest,
+			expectedResponse: func() ([]byte, error) {
+				return nil, nil
+			},
+		},
+		{
+			name:   "rate order bad request returns 400",
+			path:   "/v1/orders/order-rate/rate",
+			method: http.MethodPost,
+			body:   []byte(`{"ratings":[{"slug":"listing","overall":5}]}`),
+			setNodeMethods: func(n *mockNode) {
+				n.rateOrderFunc = func(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
+					return fmt.Errorf("%w: order must be completed", coreiface.ErrBadRequest)
+				}
+			},
+			statusCode: http.StatusBadRequest,
+			expectedResponse: func() ([]byte, error) {
+				return nil, nil
+			},
+		},
+		{
 			name:   "ship order applies receiving account as order-level payout",
 			path:   "/v1/orders/order-ship-accounts/ship",
 			method: http.MethodPost,

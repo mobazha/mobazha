@@ -1879,7 +1879,48 @@ func (o *Order) MarshalJSON() ([]byte, error) {
 		payload["afterSaleDispute"] = o.AfterSaleDispute
 	}
 
+	mergeDisputeOpenAPIFields(payload, o)
+
 	return json.Marshal(payload)
+}
+
+// mergeDisputeOpenAPIFields ensures dispute evidence is visible in order detail API responses.
+// Sources: dispute_evidence_hashes column (opening/replica nodes) and pb.DisputeOpen on the contract.
+func mergeDisputeOpenAPIFields(payload map[string]interface{}, o *Order) {
+	hashes := disputeEvidenceHashesForAPI(o)
+	if len(hashes) == 0 {
+		return
+	}
+	disputeOpen, ok := payload["disputeOpen"].(map[string]interface{})
+	if !ok {
+		disputeOpen = make(map[string]interface{})
+		payload["disputeOpen"] = disputeOpen
+	}
+	existing, _ := disputeOpen["evidenceHashes"].([]interface{})
+	if len(existing) > 0 {
+		return
+	}
+	arr := make([]interface{}, len(hashes))
+	for i, h := range hashes {
+		arr[i] = h
+	}
+	disputeOpen["evidenceHashes"] = arr
+}
+
+// disputeEvidenceHashesForAPI prefers the DB column, then falls back to the stored DISPUTE_OPEN message.
+func disputeEvidenceHashesForAPI(o *Order) []string {
+	if len(o.DisputeEvidenceHashes) > 0 {
+		out := make([]string, len(o.DisputeEvidenceHashes))
+		for i, h := range o.DisputeEvidenceHashes {
+			out[i] = string(h)
+		}
+		return out
+	}
+	msg, err := o.DisputeOpenMessage()
+	if err != nil || msg == nil || len(msg.EvidenceHashes) == 0 {
+		return nil
+	}
+	return msg.EvidenceHashes
 }
 
 func (o *Order) toProtobuf() (*pb.Contract, error) {

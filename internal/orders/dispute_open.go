@@ -206,5 +206,24 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s", order.ID)
 	}
 
+	if err := persistInboundDisputeEvidence(dbtx, order, disputeOpen.EvidenceHashes); err != nil {
+		return nil, err
+	}
+
 	return event, order.PutMessage(message)
+}
+
+// persistInboundDisputeEvidence mirrors OpenDispute DB persistence for nodes that receive
+// DISPUTE_OPEN over P2P (seller, moderator) so API merge and case views can read hashes.
+func persistInboundDisputeEvidence(tx database.Tx, order *models.Order, hashes []string) error {
+	if len(hashes) == 0 || len(order.DisputeEvidenceHashes) > 0 {
+		return nil
+	}
+	order.DisputeEvidenceHashes = models.StringSlice(hashes)
+	return tx.Update(
+		"dispute_evidence_hashes",
+		order.DisputeEvidenceHashes,
+		map[string]interface{}{"id": order.ID.String()},
+		&models.Order{},
+	)
 }

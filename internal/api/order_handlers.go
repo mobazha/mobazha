@@ -340,6 +340,7 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 		SettlementTxHash   string                      `json:"settlementTxHash,omitempty"`
 		UnreadChatMessages int                         `json:"unreadChatMessages"`
 		Protection         *models.OrderProtectionInfo `json:"protection,omitempty"`
+		ContractType       string                      `json:"contractType,omitempty"`
 	}
 
 	purchases := []purchaseInfo{}
@@ -397,6 +398,9 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 			UnreadChatMessages: order.UnreadChatMessages,
 			Moderated:          isModerated,
 			Protection:         order.ComputeProtection(now),
+		}
+		if listingInfo.Metadata != nil {
+			info.ContractType = listingInfo.Metadata.ContractType.String()
 		}
 		info.SettlementAction, info.SettlementActionID, info.SettlementState, info.SettlementTxHash = latestSettlementSummary(order)
 
@@ -481,6 +485,7 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 		SettlementTxHash   string                      `json:"settlementTxHash,omitempty"`
 		UnreadChatMessages int                         `json:"unreadChatMessages"`
 		Protection         *models.OrderProtectionInfo `json:"protection,omitempty"`
+		ContractType       string                      `json:"contractType,omitempty"`
 	}
 
 	sales := []saleInfo{}
@@ -538,6 +543,9 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 			UnreadChatMessages: order.UnreadChatMessages,
 			Moderated:          isModerated,
 			Protection:         order.ComputeProtection(now),
+		}
+		if listingInfo.Metadata != nil {
+			info.ContractType = listingInfo.Metadata.ContractType.String()
 		}
 		info.SettlementAction, info.SettlementActionID, info.SettlementState, info.SettlementTxHash = latestSettlementSummary(order)
 
@@ -1030,7 +1038,7 @@ func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request
 
 	err = orderSvc.ShipOrder(models.OrderID(orderID), shipments, nil)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 

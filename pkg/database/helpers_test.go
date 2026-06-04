@@ -19,7 +19,7 @@ type mockReadSaver struct {
 	db *gorm.DB
 }
 
-func (m *mockReadSaver) Read() *gorm.DB          { return m.db }
+func (m *mockReadSaver) Read() *gorm.DB           { return m.db }
 func (m *mockReadSaver) Save(i interface{}) error { return m.db.Save(i).Error }
 
 func setupTestDB(t *testing.T) *gorm.DB {
@@ -108,5 +108,58 @@ func TestSaveByBusinessKey_CopiesIDField(t *testing.T) {
 	}
 	if m.ID != 42 {
 		t.Errorf("expected ID=42, got %d", m.ID)
+	}
+}
+
+func TestInsertIfAbsent_InsertsNewRow(t *testing.T) {
+	db := setupTestDB(t)
+	tx := &mockReadSaver{db: db}
+
+	inserted, err := InsertIfAbsent(tx, &testModel{
+		TenantID: "t1",
+		ID:       1,
+		Name:     "first",
+		BizKey:   "bk1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !inserted {
+		t.Fatal("expected insert to report inserted=true")
+	}
+
+	var count int64
+	db.Model(&testModel{}).Count(&count)
+	if count != 1 {
+		t.Errorf("expected 1 record, got %d", count)
+	}
+}
+
+func TestInsertIfAbsent_IgnoresDuplicateRow(t *testing.T) {
+	db := setupTestDB(t)
+	tx := &mockReadSaver{db: db}
+
+	first := &testModel{TenantID: "t1", ID: 1, Name: "first", BizKey: "bk1"}
+	if inserted, err := InsertIfAbsent(tx, first); err != nil {
+		t.Fatal(err)
+	} else if !inserted {
+		t.Fatal("expected first insert to report inserted=true")
+	}
+
+	duplicate := &testModel{TenantID: "t1", ID: 1, Name: "duplicate", BizKey: "bk1"}
+	inserted, err := InsertIfAbsent(tx, duplicate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inserted {
+		t.Fatal("expected duplicate insert to report inserted=false")
+	}
+
+	var result testModel
+	if err := db.First(&result, "tenant_id = ? AND id = ?", "t1", 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if result.Name != "first" {
+		t.Errorf("expected original row to remain unchanged, got %s", result.Name)
 	}
 }

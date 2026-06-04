@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ReadSaver is the minimal interface for SaveByBusinessKey.
@@ -11,6 +12,12 @@ import (
 type ReadSaver interface {
 	Read() *gorm.DB
 	Save(i interface{}) error
+}
+
+// ReadCreator is the minimal interface for InsertIfAbsent.
+// Both Tx and lightweight tests can satisfy this without exposing all Tx methods.
+type ReadCreator interface {
+	Read() *gorm.DB
 }
 
 // SaveByBusinessKey performs an upsert for composite PK models (TenantID, ID)
@@ -33,4 +40,14 @@ func SaveByBusinessKey(tx ReadSaver, model interface{}, businessWhere string, ar
 		}
 	}
 	return tx.Save(model)
+}
+
+// InsertIfAbsent inserts model atomically and ignores conflicts on unique keys.
+// It returns true only when a new row was inserted.
+func InsertIfAbsent(tx ReadCreator, model interface{}) (bool, error) {
+	res := tx.Read().Clauses(clause.OnConflict{DoNothing: true}).Create(model)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }

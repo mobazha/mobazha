@@ -93,7 +93,7 @@ func TestNotificationSink_PersistentNotification(t *testing.T) {
 	sink := NewNotificationSink(db, cap.notify)
 
 	meta := events.EventMeta{Category: "order", Name: "order.created", Persistent: true}
-	evt := &events.NewOrder{OrderID: "ord-1", Title: "Test"}
+	evt := &events.NewOrder{Title: "Test"}
 
 	err := sink.Handle(context.Background(), meta, evt)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestNotificationSink_PersistentNotification(t *testing.T) {
 	}
 }
 
-func TestNotificationSink_OrderConfirmationReplayIsIdempotent(t *testing.T) {
+func TestNotificationSink_OrderNotificationReplayIsIdempotent(t *testing.T) {
 	db, err := dbstore.NewMemoryDB(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -162,8 +162,8 @@ func TestNotificationSink_OrderConfirmationReplayIsIdempotent(t *testing.T) {
 
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(db, cap.notify)
-	meta := events.EventMeta{Category: "order", Name: "order.confirmed", Persistent: true}
-	first := &events.OrderConfirmation{OrderID: "gst_replayed", VendorID: "seller"}
+	meta := events.EventMeta{Category: "order", Name: "order.funded", Persistent: true}
+	first := &events.OrderFunded{OrderID: "gst_replayed", BuyerID: "buyer", Title: "Test"}
 	if err := sink.Handle(context.Background(), meta, first); err != nil {
 		t.Fatalf("first Handle error: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestNotificationSink_OrderConfirmationReplayIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	second := &events.OrderConfirmation{OrderID: "gst_replayed", VendorID: "seller"}
+	second := &events.OrderFunded{OrderID: "gst_replayed", BuyerID: "buyer", Title: "Test"}
 	if err := sink.Handle(context.Background(), meta, second); err != nil {
 		t.Fatalf("second Handle error: %v", err)
 	}
@@ -203,6 +203,86 @@ func TestNotificationSink_OrderConfirmationReplayIsIdempotent(t *testing.T) {
 	cap.mu.Unlock()
 	if pushes != 1 {
 		t.Fatalf("expected one websocket push after replay, got %d", pushes)
+	}
+}
+
+func TestDeterministicNotificationIDUsesEntityFieldByCategory(t *testing.T) {
+	type syntheticOrderNotification struct {
+		events.Notification
+		OrderID string
+	}
+
+	meta := events.EventMeta{Category: "order", Name: "order.synthetic", Persistent: true}
+	id, ok := deterministicNotificationID(meta, syntheticOrderNotification{OrderID: "order-1"})
+	if !ok {
+		t.Fatal("expected order notification with OrderID to be deduplicated")
+	}
+
+	replayID, ok := deterministicNotificationID(meta, &syntheticOrderNotification{OrderID: "order-1"})
+	if !ok {
+		t.Fatal("expected pointer event with OrderID to be deduplicated")
+	}
+	if replayID != id {
+		t.Fatalf("expected same deterministic ID for value and pointer, got %q and %q", id, replayID)
+	}
+}
+
+func TestDeterministicNotificationIDIgnoresUnknownCategory(t *testing.T) {
+	type syntheticNotification struct {
+		events.Notification
+		OrderID string
+	}
+
+	meta := events.EventMeta{Category: "catalog", Name: "catalog.synthetic", Persistent: true}
+	if id, ok := deterministicNotificationID(meta, syntheticNotification{OrderID: "order-1"}); ok {
+		t.Fatalf("expected unknown category to skip deterministic ID, got %q", id)
+	}
+}
+
+func TestNotificationSink_DifferentOrderNotificationTypesRemainDistinct(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := db.Update(func(tx database.Tx) error {
+		return tx.Migrate(&models.NotificationRecord{})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	cap := &notifyCapture{}
+	sink := NewNotificationSink(db, cap.notify)
+	orderID := "gst_distinct_lifecycle"
+	eventsToPersist := []struct {
+		meta  events.EventMeta
+		event any
+	}{
+		{
+			meta:  events.EventMeta{Category: "order", Name: "order.funded", Persistent: true},
+			event: &events.OrderFunded{OrderID: orderID, BuyerID: "buyer", Title: "Test"},
+		},
+		{
+			meta:  events.EventMeta{Category: "order", Name: "order.confirmed", Persistent: true},
+			event: &events.OrderConfirmation{OrderID: orderID, VendorID: "seller"},
+		},
+	}
+
+	for _, item := range eventsToPersist {
+		if err := sink.Handle(context.Background(), item.meta, item.event); err != nil {
+			t.Fatalf("Handle error for %s: %v", item.meta.Name, err)
+		}
+	}
+
+	var records []models.NotificationRecord
+	if err := db.View(func(tx database.Tx) error {
+		return tx.Read().Find(&records).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("expected different lifecycle notification types to persist separately, got %d", len(records))
 	}
 }
 
@@ -280,7 +360,7 @@ func TestNotificationSink_PersistentNotificationRoutesExplicitTenant(t *testing.
 	})
 
 	meta := events.EventMeta{Category: "order", Name: "order.funded", Persistent: true}
-	evt := &events.OrderFunded{TenantID: "seller", OrderID: "ord-1", Title: "Test"}
+	evt := &events.OrderFunded{TenantID: "seller", Title: "Test"}
 
 	err := sink.Handle(context.Background(), meta, evt)
 	if err != nil {
@@ -325,7 +405,7 @@ func TestNotificationSink_PersistentNotificationIgnoresTenantOnNonRoutableDB(t *
 	})
 
 	meta := events.EventMeta{Category: "order", Name: "order.funded", Persistent: true}
-	evt := &events.OrderFunded{TenantID: database.StandaloneTenantID, OrderID: "ord-1", Title: "Test"}
+	evt := &events.OrderFunded{TenantID: database.StandaloneTenantID, Title: "Test"}
 
 	err := sink.Handle(context.Background(), meta, evt)
 	if err != nil {

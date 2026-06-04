@@ -52,7 +52,13 @@ func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request)
 		Notification map[string]interface{} `json:"notification"`
 	}
 
-	payload := notifData{0, total, []json.RawMessage{}}
+	unread, err := node.GetNotificationsUnreadCount()
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	payload := notifData{unread, total, []json.RawMessage{}}
 	for _, n := range notifications {
 		var data map[string]interface{}
 		if err := json.Unmarshal(n.Notification, &data); err != nil {

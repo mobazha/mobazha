@@ -153,6 +153,25 @@ func TestOrderHandlers(t *testing.T) {
 				return nil, nil
 			},
 		},
+		{
+			name:   "ship order bad request returns 400",
+			path:   "/v1/orders/order-ship-bad-request/ship",
+			method: http.MethodPost,
+			body: []byte(`{
+				"shipments": [
+					{"itemIndex": 0, "note": "service completed"}
+				]
+			}`),
+			setNodeMethods: func(n *mockNode) {
+				n.shipOrderFunc = func(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error {
+					return fmt.Errorf("%w: order is not in a state where it can be shipped", coreiface.ErrBadRequest)
+				}
+			},
+			statusCode: http.StatusBadRequest,
+			expectedResponse: func() ([]byte, error) {
+				return nil, nil
+			},
+		},
 	})
 }
 

@@ -15,7 +15,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 var log = logging.MustGetLogger("NOTF")
@@ -201,33 +200,37 @@ func insertNotificationIfAbsent(
 		record.TenantID = scoped.TenantID()
 	}
 
-	// Tx has no insert-ignore primitive. Use GORM's atomic conflict handling,
-	// while setting TenantID explicitly to preserve tenant isolation on Create.
-	res := tx.Read().Clauses(clause.OnConflict{DoNothing: true}).Create(record)
-	if res.Error != nil {
-		return false, res.Error
-	}
-	return res.RowsAffected > 0, nil
+	return database.InsertIfAbsent(tx, record)
 }
 
 func deterministicNotificationID(meta events.EventMeta, event interface{}) (string, bool) {
-	if meta.Name != "order.confirmed" {
+	entityID, ok := notificationDedupEntityID(meta, event)
+	if !ok {
 		return "", false
 	}
-	orderID := ""
-	switch e := event.(type) {
-	case *events.OrderConfirmation:
-		orderID = e.OrderID
-	case events.OrderConfirmation:
-		orderID = e.OrderID
-	default:
-		return "", false
-	}
-	if orderID == "" {
-		return "", false
-	}
-	sum := sha1.Sum([]byte(meta.Name + ":" + orderID))
+
+	sum := sha1.Sum([]byte(meta.Name + ":" + entityID))
 	return "stable:" + hex.EncodeToString(sum[:]), true
+}
+
+func notificationDedupEntityID(meta events.EventMeta, event interface{}) (string, bool) {
+	for _, fieldName := range notificationDedupFields(meta.Category) {
+		if value := stringStructField(event, fieldName); value != "" {
+			return value, true
+		}
+	}
+	return "", false
+}
+
+func notificationDedupFields(category string) []string {
+	switch category {
+	case "order", "payment":
+		return []string{"OrderID"}
+	case "dispute":
+		return []string{"OrderID", "CaseID"}
+	default:
+		return nil
+	}
 }
 
 // getUnreadCount queries the unread notification count from DB.
@@ -286,6 +289,10 @@ func (s *NotificationSink) notifyFuncForTenant(tenantID string) func(any) error 
 }
 
 func extractTargetTenantID(event interface{}) string {
+	return stringStructField(event, "TenantID")
+}
+
+func stringStructField(event interface{}, name string) string {
 	v := reflect.ValueOf(event)
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
@@ -296,7 +303,7 @@ func extractTargetTenantID(event interface{}) string {
 	if v.Kind() != reflect.Struct {
 		return ""
 	}
-	field := v.FieldByName("TenantID")
+	field := v.FieldByName(name)
 	if !field.IsValid() || field.Kind() != reflect.String {
 		return ""
 	}

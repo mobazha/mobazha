@@ -715,10 +715,15 @@ func (s *OrderAppService) authoritativeSupplyAvailabilityTxService(ctx context.C
 
 func standardOrderIsVendorInTx(tx database.Tx, orderID string) (bool, error) {
 	var stored models.Order
-	if err := tx.Read().Where("id = ?", orderID).First(&stored).Error; err != nil {
+	if err := tx.Read().
+		Where("id = ? AND my_role = ?", orderID, string(models.RoleVendor)).
+		First(&stored).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
 		return false, err
 	}
-	return stored.Role() == models.RoleVendor, nil
+	return true, nil
 }
 
 func (s *OrderAppService) standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, orderOpen *pb.OrderOpen, requireDigitalResolver bool) ([]contracts.SupplyLine, error) {
@@ -786,24 +791,30 @@ func standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, order
 		if localListing == nil || localListing.Listing == nil || localListing.Listing.Item == nil {
 			return nil, fmt.Errorf("local listing %q is incomplete", listing.Slug)
 		}
+		// Seller-local listing is authoritative for inventory reserve (same as guest
+		// checkout). The embedded order listing may omit SKU rows or quantities.
 		sku, err := selectedStandardOrderSku(localListing.Listing, item.Options)
+		if err != nil {
+			sku, err = selectedStandardOrderSku(listing, item.Options)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("select sku for %q: %w", listing.Slug, err)
 		}
-		if sku == nil || strings.TrimSpace(sku.Quantity) == "" {
+		if sku == nil {
 			continue
 		}
-		stockLimit, err := strconv.ParseInt(strings.TrimSpace(sku.Quantity), 10, 64)
+		stockSku := authoritativeStandardStockSku(localListing.Listing, sku, item.Options)
+		stockLimit, tracked, err := skuTrackedStockLimit(stockSku)
 		if err != nil {
 			return nil, fmt.Errorf("parse sku quantity for %q: %w", listing.Slug, err)
 		}
-		if stockLimit < 0 {
-			return nil, fmt.Errorf("sku quantity for %q cannot be negative", listing.Slug)
+		if !tracked {
+			continue
 		}
 		lines = append(lines, contracts.SupplyLine{
 			LineID:       fmt.Sprintf("%s:%d", orderID, i),
 			ListingSlug:  listing.Slug,
-			VariantHash:  standardOrderVariantHashFromSku(sku),
+			VariantHash:  standardOrderVariantHashFromSku(stockSku),
 			Quantity:     qty,
 			SupplyKind:   contracts.SupplyKindSkuQuantity,
 			StockTracked: true,
@@ -878,26 +889,120 @@ func extractOrderOpenListing(listingHash string, listings []*pb.SignedListing) (
 }
 
 func selectedStandardOrderSku(listing *pb.Listing, options []*pb.OrderOpen_Item_Option) (*pb.Listing_Item_Sku, error) {
-	if listing == nil || listing.Item == nil || len(listing.Item.Options) == 0 {
+	if listing == nil || listing.Item == nil {
 		return nil, nil
 	}
-	opts := make(map[string]string)
-	for _, option := range options {
-		opts[strings.ToLower(option.Name)] = strings.ToLower(option.Value)
+	if len(listing.Item.Skus) == 0 {
+		return nil, nil
 	}
+	if len(listing.Item.Options) == 0 && len(listing.Item.Skus) == 1 {
+		return listing.Item.Skus[0], nil
+	}
+	if len(listing.Item.Options) > 0 && len(options) == 0 {
+		return nil, errors.New("selected sku not found in listing")
+	}
+	opts := standardOrderOptionMap(options)
 	for _, sku := range listing.Item.Skus {
-		matches := true
-		for _, sel := range sku.Selections {
-			if opts[strings.ToLower(sel.Option)] != strings.ToLower(sel.Variant) {
-				matches = false
-				break
-			}
-		}
-		if matches {
+		if skuSelectionsMatchOptions(sku.GetSelections(), opts) {
 			return sku, nil
 		}
 	}
 	return nil, errors.New("selected sku not found in listing")
+}
+
+func standardOrderOptionMap(options []*pb.OrderOpen_Item_Option) map[string]string {
+	opts := make(map[string]string, len(options))
+	for _, option := range options {
+		name := strings.ToLower(strings.TrimSpace(option.GetName()))
+		if name == "" {
+			continue
+		}
+		opts[name] = strings.ToLower(strings.TrimSpace(option.GetValue()))
+	}
+	return opts
+}
+
+func skuSelectionsMatchOptions(selections []*pb.Listing_Item_Sku_Selection, opts map[string]string) bool {
+	if len(selections) != len(opts) {
+		return false
+	}
+	for _, sel := range selections {
+		option := strings.ToLower(strings.TrimSpace(sel.GetOption()))
+		if option == "" {
+			return false
+		}
+		if opts[option] != strings.ToLower(strings.TrimSpace(sel.GetVariant())) {
+			return false
+		}
+	}
+	return true
+}
+
+func matchingLocalSku(local *pb.Listing, sku *pb.Listing_Item_Sku) *pb.Listing_Item_Sku {
+	if local == nil || local.Item == nil || sku == nil {
+		return nil
+	}
+	if len(local.Item.Options) == 0 && len(local.Item.Skus) == 1 && len(sku.Selections) == 0 {
+		return local.Item.Skus[0]
+	}
+	productID := strings.TrimSpace(sku.GetProductID())
+	if productID != "" {
+		for _, candidate := range local.Item.Skus {
+			if strings.TrimSpace(candidate.GetProductID()) == productID {
+				return candidate
+			}
+		}
+	}
+	if len(sku.Selections) == 0 {
+		return nil
+	}
+	opts := make(map[string]string, len(sku.GetSelections()))
+	for _, sel := range sku.GetSelections() {
+		option := strings.ToLower(strings.TrimSpace(sel.GetOption()))
+		if option == "" {
+			continue
+		}
+		opts[option] = strings.ToLower(strings.TrimSpace(sel.GetVariant()))
+	}
+	for _, candidate := range local.Item.Skus {
+		if skuSelectionsMatchOptions(candidate.GetSelections(), opts) {
+			return candidate
+		}
+	}
+	return nil
+}
+
+func authoritativeStandardStockSku(local *pb.Listing, embeddedSku *pb.Listing_Item_Sku, options []*pb.OrderOpen_Item_Option) *pb.Listing_Item_Sku {
+	if embeddedSku == nil {
+		return nil
+	}
+	if localSku := matchingLocalSku(local, embeddedSku); localSku != nil {
+		return localSku
+	}
+	if local != nil {
+		if localSku, err := selectedStandardOrderSku(local, options); err == nil && localSku != nil {
+			return localSku
+		}
+	}
+	return embeddedSku
+}
+
+func skuTrackedStockLimit(sku *pb.Listing_Item_Sku) (int64, bool, error) {
+	if sku == nil {
+		return 0, false, nil
+	}
+	qty := strings.TrimSpace(sku.GetQuantity())
+	if qty == "" {
+		return 0, false, nil
+	}
+	stockLimit, err := strconv.ParseInt(qty, 10, 64)
+	if err != nil {
+		return 0, false, err
+	}
+	if stockLimit < 0 {
+		return 0, false, nil
+	}
+	return stockLimit, true, nil
 }
 
 func standardOrderVariantSKUFromOptions(listing *pb.Listing, options []*pb.OrderOpen_Item_Option) (string, error) {

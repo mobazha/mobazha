@@ -21,6 +21,7 @@ import (
 
 // CheckoutSupplyListingReader loads seller-local listings for checkout supply preflight.
 type CheckoutSupplyListingReader interface {
+	GetMyListings() (models.ListingIndex, error)
 	GetMyListingBySlug(slug string) (*pb.SignedListing, error)
 }
 
@@ -114,6 +115,260 @@ func (s *CheckoutSupplyQuoteService) Quote(
 		return unknownCheckoutSupplyQuoteResponse(reqItems, "quote_unavailable"), nil
 	}
 	return checkoutSupplyQuoteResponseFromResult(lines, quote), nil
+}
+
+// SellerSummary performs a seller-safe advisory supply summary for admin
+// product surfaces. It reuses checkout Quote so supplier/digital/SKU resolution
+// stays centralized; no inventory holds are created.
+func (s *CheckoutSupplyQuoteService) SellerSummary(
+	ctx context.Context,
+	req contracts.ListingSupplySummaryRequest,
+) (*contracts.ListingSupplySummaryResponse, error) {
+	if s == nil || s.listings == nil {
+		return nil, fmt.Errorf("checkout supply quote service not configured")
+	}
+	slugs, total, limit, offset, err := s.sellerSummarySlugs(req)
+	if err != nil {
+		return nil, err
+	}
+	resp := &contracts.ListingSupplySummaryResponse{
+		Items:  make([]contracts.ListingSupplySummaryItem, 0, len(slugs)),
+		Limit:  limit,
+		Offset: offset,
+		Total:  total,
+	}
+	if len(slugs) == 0 {
+		return resp, nil
+	}
+
+	for _, slug := range slugs {
+		items, err := s.sellerSummaryQuoteItemsForSlug(slug)
+		if err != nil {
+			resp.Items = append(resp.Items, unknownSellerSupplySummaryItem(slug, "quote_unavailable"))
+			continue
+		}
+		quote, err := s.Quote(ctx, models.OrderTypeStandard, sellerSummaryLineRef(slug), items)
+		if err != nil {
+			resp.Items = append(resp.Items, unknownSellerSupplySummaryItem(slug, "quote_unavailable"))
+			continue
+		}
+		summary := sellerSupplySummaryItemFromQuoteItems(slug, quote.Items)
+		if sl, slErr := s.listings.GetMyListingBySlug(slug); slErr == nil {
+			s.enrichSellerSummaryQuantities(&summary, sl)
+		}
+		resp.Items = append(resp.Items, summary)
+	}
+	return resp, nil
+}
+
+const (
+	sellerSupplySummaryDefaultLimit = 50
+	sellerSupplySummaryMaxLimit     = 50
+)
+
+func (s *CheckoutSupplyQuoteService) sellerSummarySlugs(req contracts.ListingSupplySummaryRequest) ([]string, int, int, int, error) {
+	limit := req.Limit
+	if limit <= 0 || limit > sellerSupplySummaryMaxLimit {
+		limit = sellerSupplySummaryDefaultLimit
+	}
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	source := normalizedSellerSummarySlugs(req.Slugs)
+	if len(source) == 0 {
+		index, err := s.listings.GetMyListings()
+		if err != nil {
+			return nil, 0, limit, offset, err
+		}
+		source = make([]string, 0, len(index))
+		for _, meta := range index {
+			source = append(source, normalizedSellerSummarySlugs([]string{meta.Slug})...)
+		}
+	}
+
+	total := len(source)
+	if offset >= total {
+		return nil, total, limit, offset, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return source[offset:end], total, limit, offset, nil
+}
+
+func normalizedSellerSummarySlugs(slugs []string) []string {
+	normalized := make([]string, 0, len(slugs))
+	for _, slug := range slugs {
+		if trimmed := strings.TrimSpace(slug); trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	return normalized
+}
+
+func sellerSummaryLineRef(slug string) string {
+	return "seller_supply_summary:" + slug
+}
+
+func (s *CheckoutSupplyQuoteService) sellerSummaryQuoteItemsForSlug(slug string) ([]contracts.CheckoutSupplyItemRequest, error) {
+	sl, err := s.listings.GetMyListingBySlug(slug)
+	if err != nil {
+		return nil, fmt.Errorf("resolve item for %q: listing %q not found: %w", slug, slug, err)
+	}
+	listing := sl.GetListing()
+	if listing == nil || listing.GetItem() == nil || len(listing.GetItem().GetSkus()) == 0 {
+		return []contracts.CheckoutSupplyItemRequest{{
+			ListingSlug: slug,
+			Quantity:    1,
+		}}, nil
+	}
+	items := make([]contracts.CheckoutSupplyItemRequest, 0, len(listing.GetItem().GetSkus()))
+	for _, sku := range listing.GetItem().GetSkus() {
+		item := contracts.CheckoutSupplyItemRequest{
+			ListingSlug: slug,
+			Quantity:    1,
+		}
+		if len(sku.GetSelections()) > 0 {
+			opts := make(map[string]string, len(sku.GetSelections()))
+			for _, sel := range sku.GetSelections() {
+				if strings.TrimSpace(sel.GetOption()) == "" {
+					continue
+				}
+				opts[sel.GetOption()] = sel.GetVariant()
+			}
+			if len(opts) > 0 {
+				item.Options = []map[string]string{opts}
+			}
+		}
+		items = append(items, item)
+	}
+	if len(items) == 0 {
+		items = append(items, contracts.CheckoutSupplyItemRequest{
+			ListingSlug: slug,
+			Quantity:    1,
+		})
+	}
+	return items, nil
+}
+
+func sellerSupplySummaryItemFromQuoteItems(slug string, items []contracts.CheckoutSupplyQuoteItem) contracts.ListingSupplySummaryItem {
+	if len(items) == 0 {
+		return unknownSellerSupplySummaryItem(slug, "quote_unavailable")
+	}
+	summary := contracts.ListingSupplySummaryItem{
+		ListingSlug: slug,
+		SupplyMode:  contracts.ListingSupplyModeUnknown,
+		Status:      contracts.SupplyAvailabilityUnknown,
+	}
+	var totalAvailable int64
+	var hasAvailableQuantity bool
+	var hasAvailable bool
+	var hasLowStock bool
+	var hasOutOfStock bool
+	var hasManualAction bool
+	var hasSupplierUnavailable bool
+	allUnlimited := true
+	for _, item := range items {
+		summary.SupplyMode = preferSellerSupplyMode(summary.SupplyMode, sellerSupplyModeFromKind(item.SupplyKind))
+		switch item.Status {
+		case contracts.SupplyAvailabilityManualActionRequired:
+			hasManualAction = true
+		case contracts.SupplyAvailabilitySupplierUnavailable:
+			hasSupplierUnavailable = true
+		case contracts.SupplyAvailabilityOutOfStock:
+			hasOutOfStock = true
+		case contracts.SupplyAvailabilityLowStock:
+			hasLowStock = true
+		case contracts.SupplyAvailabilityAvailable, contracts.SupplyAvailabilityUnlimited:
+			hasAvailable = true
+		}
+		if item.ManualActionRequired {
+			summary.ManualActionRequired = true
+		}
+		if summary.Reason == "" && item.Reason != "" {
+			summary.Reason = item.Reason
+		}
+		if !item.Unlimited {
+			allUnlimited = false
+		}
+		if item.Status != contracts.SupplyAvailabilityUnknown && !item.Unlimited {
+			totalAvailable += item.AvailableQuantity
+			hasAvailableQuantity = true
+		}
+	}
+	switch {
+	case hasManualAction:
+		summary.Status = contracts.SupplyAvailabilityManualActionRequired
+		summary.ManualActionRequired = true
+	case hasSupplierUnavailable:
+		summary.Status = contracts.SupplyAvailabilitySupplierUnavailable
+	case allUnlimited:
+		summary.Status = contracts.SupplyAvailabilityUnlimited
+	case hasAvailableQuantity && totalAvailable == 0:
+		summary.Status = contracts.SupplyAvailabilityOutOfStock
+	case hasLowStock || hasOutOfStock:
+		summary.Status = contracts.SupplyAvailabilityLowStock
+	case hasAvailable:
+		summary.Status = contracts.SupplyAvailabilityAvailable
+	default:
+		summary.Status = contracts.SupplyAvailabilityUnknown
+	}
+	if hasAvailableQuantity {
+		q := totalAvailable
+		summary.AvailableQuantity = &q
+	}
+	return summary
+}
+
+func unknownSellerSupplySummaryItem(slug, reason string) contracts.ListingSupplySummaryItem {
+	return contracts.ListingSupplySummaryItem{
+		ListingSlug: slug,
+		SupplyMode:  contracts.ListingSupplyModeUnknown,
+		Status:      contracts.SupplyAvailabilityUnknown,
+		Reason:      reason,
+	}
+}
+
+func preferSellerSupplyMode(current, candidate contracts.ListingSupplyMode) contracts.ListingSupplyMode {
+	if current == contracts.ListingSupplyModeUnknown {
+		return candidate
+	}
+	priority := func(mode contracts.ListingSupplyMode) int {
+		switch mode {
+		case contracts.ListingSupplyModeSupplierFulfilled:
+			return 4
+		case contracts.ListingSupplyModeLicenseCodes:
+			return 3
+		case contracts.ListingSupplyModeInstantDownload:
+			return 2
+		case contracts.ListingSupplyModeTrackedStock:
+			return 1
+		default:
+			return 0
+		}
+	}
+	if priority(candidate) > priority(current) {
+		return candidate
+	}
+	return current
+}
+
+func sellerSupplyModeFromKind(kind contracts.SupplyKind) contracts.ListingSupplyMode {
+	switch kind {
+	case contracts.SupplyKindSkuQuantity:
+		return contracts.ListingSupplyModeTrackedStock
+	case contracts.SupplyKindLicenseKeyPool:
+		return contracts.ListingSupplyModeLicenseCodes
+	case contracts.SupplyKindUnlimitedDigital:
+		return contracts.ListingSupplyModeInstantDownload
+	case contracts.SupplyKindExternalSupply:
+		return contracts.ListingSupplyModeSupplierFulfilled
+	default:
+		return contracts.ListingSupplyModeUnknown
+	}
 }
 
 type checkoutInventoryBucketKey struct {

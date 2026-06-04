@@ -47,8 +47,8 @@ func TestRegistry_SupplyAvailabilityFeature(t *testing.T) {
 	if f.DefaultValue {
 		t.Fatal("supply availability must default off for shadow rollout")
 	}
-	if f.ClientVisible {
-		t.Fatal("SA-0 must not expose a client-visible flag before API/UI exists")
+	if !f.ClientVisible {
+		t.Fatal("supply availability rollout must be client-visible for seller admin gating")
 	}
 	if f.Stability != StabilityExperimental {
 		t.Fatalf("unexpected stability: %s", f.Stability)

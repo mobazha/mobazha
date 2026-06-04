@@ -16,6 +16,14 @@ type stubListingReader struct {
 	bySlug map[string]*pb.SignedListing
 }
 
+func (s *stubListingReader) GetMyListings() (models.ListingIndex, error) {
+	index := make(models.ListingIndex, 0, len(s.bySlug))
+	for slug := range s.bySlug {
+		index = append(index, models.ListingMetadata{Slug: slug})
+	}
+	return index, nil
+}
+
 func (s *stubListingReader) GetMyListingBySlug(slug string) (*pb.SignedListing, error) {
 	sl, ok := s.bySlug[slug]
 	if !ok {
@@ -51,12 +59,16 @@ func (enabledSupplyFeatureResolver) List(context.Context) []pkgconfig.EffectiveF
 }
 
 type recordingSupplyAvailability struct {
-	quoteResult   *contracts.SupplyQuoteResult
-	quoteRequests []contracts.SupplyQuoteRequest
+	quoteResult     *contracts.SupplyQuoteResult
+	quoteResultFunc func(contracts.SupplyQuoteRequest) *contracts.SupplyQuoteResult
+	quoteRequests   []contracts.SupplyQuoteRequest
 }
 
 func (r *recordingSupplyAvailability) Quote(_ context.Context, req contracts.SupplyQuoteRequest) (*contracts.SupplyQuoteResult, error) {
 	r.quoteRequests = append(r.quoteRequests, req)
+	if r.quoteResultFunc != nil {
+		return r.quoteResultFunc(req), nil
+	}
 	if r.quoteResult != nil {
 		return r.quoteResult, nil
 	}
@@ -98,6 +110,25 @@ func listingWithSku(slug, option, variant, quantity, price string) *pb.SignedLis
 					Quantity: quantity,
 					Price:    price,
 				}},
+			},
+		},
+	}
+}
+
+func listingWithSkus(slug string, skus ...*pb.Listing_Item_Sku) *pb.SignedListing {
+	return &pb.SignedListing{
+		Listing: &pb.Listing{
+			Slug: slug,
+			Metadata: &pb.Listing_Metadata{
+				ContractType: pb.Listing_Metadata_PHYSICAL_GOOD,
+				PricingCurrency: &pb.Currency{
+					Code: "USD",
+				},
+			},
+			Item: &pb.Listing_Item{
+				Title: slug,
+				Price: "1000",
+				Skus:  skus,
 			},
 		},
 	}
@@ -175,4 +206,200 @@ func TestQuote_ReturnsBuyerManagedEscrowAvailability(t *testing.T) {
 	require.Equal(t, contracts.SupplyAvailabilityLowStock, resp.Items[0].Status)
 	require.Equal(t, int64(2), resp.Items[0].AvailableQuantity)
 	require.NotContains(t, fmt.Sprintf("%+v", resp), "internal-provider")
+}
+
+func TestSellerSummary_PaginatesAndMapsModes(t *testing.T) {
+	recorder := &recordingSupplyAvailability{
+		quoteResult: &contracts.SupplyQuoteResult{
+			CanSell: true,
+			Results: []contracts.AvailabilityResult{{
+				Status:            contracts.SupplyAvailabilityLowStock,
+				Available:         true,
+				AvailableQuantity: 2,
+			}},
+		},
+	}
+	svc := NewCheckoutSupplyQuoteService(CheckoutSupplyQuoteServiceConfig{
+		Resolver:           enabledSupplyFeatureResolver{},
+		SupplyAvailability: recorder,
+		Listings: &stubListingReader{
+			bySlug: map[string]*pb.SignedListing{
+				"camera": listingWithSku("camera", "Color", "Red", "3", "1200"),
+			},
+		},
+	})
+
+	resp, err := svc.SellerSummary(context.Background(), contracts.ListingSupplySummaryRequest{
+		Limit:  50,
+		Offset: 0,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 50, resp.Limit)
+	require.Equal(t, 0, resp.Offset)
+	require.Equal(t, 1, resp.Total)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, "camera", resp.Items[0].ListingSlug)
+	require.Equal(t, contracts.ListingSupplyModeTrackedStock, resp.Items[0].SupplyMode)
+	require.Equal(t, contracts.SupplyAvailabilityLowStock, resp.Items[0].Status)
+	require.NotNil(t, resp.Items[0].AvailableQuantity)
+	require.EqualValues(t, 2, *resp.Items[0].AvailableQuantity)
+	require.NotNil(t, resp.Items[0].OnHandQuantity)
+	require.EqualValues(t, 3, *resp.Items[0].OnHandQuantity)
+	require.Len(t, recorder.quoteRequests, 1)
+	require.Equal(t, contracts.SupplyKindSkuQuantity, recorder.quoteRequests[0].Lines[0].SupplyKind)
+	require.Equal(t, "seller_supply_summary:camera:0", recorder.quoteRequests[0].Lines[0].LineID)
+}
+
+func TestSellerSummary_NormalizesSlugsBeforePagination(t *testing.T) {
+	recorder := &recordingSupplyAvailability{
+		quoteResultFunc: func(req contracts.SupplyQuoteRequest) *contracts.SupplyQuoteResult {
+			results := make([]contracts.AvailabilityResult, 0, len(req.Lines))
+			for _, line := range req.Lines {
+				results = append(results, contracts.AvailabilityResult{
+					LineID:            line.LineID,
+					Status:            contracts.SupplyAvailabilityAvailable,
+					Available:         true,
+					AvailableQuantity: 4,
+				})
+			}
+			return &contracts.SupplyQuoteResult{CanSell: true, Results: results}
+		},
+	}
+	svc := NewCheckoutSupplyQuoteService(CheckoutSupplyQuoteServiceConfig{
+		Resolver:           enabledSupplyFeatureResolver{},
+		SupplyAvailability: recorder,
+		Listings: &stubListingReader{
+			bySlug: map[string]*pb.SignedListing{
+				"camera": listingWithSku("camera", "Color", "Red", "4", "1200"),
+			},
+		},
+	})
+
+	resp, err := svc.SellerSummary(context.Background(), contracts.ListingSupplySummaryRequest{
+		Slugs: []string{" ", " camera ", ""},
+		Limit: 50,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, resp.Total)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, "camera", resp.Items[0].ListingSlug)
+	require.Len(t, recorder.quoteRequests, 1)
+	require.Equal(t, "seller_supply_summary:camera:0", recorder.quoteRequests[0].Lines[0].LineID)
+}
+
+func TestSellerSummary_AggregatesVariantATPWithoutMarkingWholeListingOutOfStock(t *testing.T) {
+	recorder := &recordingSupplyAvailability{
+		quoteResult: &contracts.SupplyQuoteResult{
+			CanSell: true,
+			Results: []contracts.AvailabilityResult{
+				{
+					Status:            contracts.SupplyAvailabilityOutOfStock,
+					Available:         false,
+					AvailableQuantity: 0,
+				},
+				{
+					Status:            contracts.SupplyAvailabilityAvailable,
+					Available:         true,
+					AvailableQuantity: 3,
+				},
+			},
+		},
+	}
+	svc := NewCheckoutSupplyQuoteService(CheckoutSupplyQuoteServiceConfig{
+		Resolver:           enabledSupplyFeatureResolver{},
+		SupplyAvailability: recorder,
+		Listings: &stubListingReader{
+			bySlug: map[string]*pb.SignedListing{
+				"shirt": listingWithSkus("shirt",
+					&pb.Listing_Item_Sku{
+						Selections: []*pb.Listing_Item_Sku_Selection{{Option: "Size", Variant: "S"}},
+						Quantity:   "0",
+					},
+					&pb.Listing_Item_Sku{
+						Selections: []*pb.Listing_Item_Sku_Selection{{Option: "Size", Variant: "M"}},
+						Quantity:   "3",
+					},
+				),
+			},
+		},
+	})
+
+	resp, err := svc.SellerSummary(context.Background(), contracts.ListingSupplySummaryRequest{
+		Slugs: []string{"shirt"},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, contracts.SupplyAvailabilityLowStock, resp.Items[0].Status)
+	require.NotNil(t, resp.Items[0].AvailableQuantity)
+	require.EqualValues(t, 3, *resp.Items[0].AvailableQuantity)
+	require.NotNil(t, resp.Items[0].OnHandQuantity)
+	require.EqualValues(t, 3, *resp.Items[0].OnHandQuantity)
+	require.Len(t, recorder.quoteRequests, 1)
+	require.Len(t, recorder.quoteRequests[0].Lines, 2)
+}
+
+func TestSellerSummary_PrioritizesManualActionOverOutOfStock(t *testing.T) {
+	recorder := &recordingSupplyAvailability{
+		quoteResult: &contracts.SupplyQuoteResult{
+			CanSell: false,
+			Results: []contracts.AvailabilityResult{{
+				Status:            contracts.SupplyAvailabilityManualActionRequired,
+				Available:         false,
+				AvailableQuantity: 0,
+			}},
+		},
+	}
+	svc := NewCheckoutSupplyQuoteService(CheckoutSupplyQuoteServiceConfig{
+		Resolver:           enabledSupplyFeatureResolver{},
+		SupplyAvailability: recorder,
+		Listings: &stubListingReader{
+			bySlug: map[string]*pb.SignedListing{
+				"digital-missing": listingWithSku("digital-missing", "", "", "-1", "500"),
+			},
+		},
+	})
+
+	resp, err := svc.SellerSummary(context.Background(), contracts.ListingSupplySummaryRequest{
+		Slugs: []string{"digital-missing"},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, contracts.SupplyAvailabilityManualActionRequired, resp.Items[0].Status)
+	require.True(t, resp.Items[0].ManualActionRequired)
+}
+
+func TestSellerSummary_ContinuesWhenOneListingFails(t *testing.T) {
+	recorder := &recordingSupplyAvailability{
+		quoteResultFunc: func(req contracts.SupplyQuoteRequest) *contracts.SupplyQuoteResult {
+			results := make([]contracts.AvailabilityResult, 0, len(req.Lines))
+			for _, line := range req.Lines {
+				results = append(results, contracts.AvailabilityResult{
+					LineID:            line.LineID,
+					Status:            contracts.SupplyAvailabilityAvailable,
+					Available:         true,
+					AvailableQuantity: 4,
+				})
+			}
+			return &contracts.SupplyQuoteResult{CanSell: true, Results: results}
+		},
+	}
+	svc := NewCheckoutSupplyQuoteService(CheckoutSupplyQuoteServiceConfig{
+		Resolver:           enabledSupplyFeatureResolver{},
+		SupplyAvailability: recorder,
+		Listings: &stubListingReader{
+			bySlug: map[string]*pb.SignedListing{
+				"camera": listingWithSku("camera", "Color", "Red", "4", "1200"),
+			},
+		},
+	})
+
+	resp, err := svc.SellerSummary(context.Background(), contracts.ListingSupplySummaryRequest{
+		Slugs: []string{"camera", "missing"},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 2)
+	require.Equal(t, contracts.SupplyAvailabilityAvailable, resp.Items[0].Status)
+	require.Equal(t, "missing", resp.Items[1].ListingSlug)
+	require.Equal(t, contracts.SupplyAvailabilityUnknown, resp.Items[1].Status)
+	require.Equal(t, "quote_unavailable", resp.Items[1].Reason)
 }

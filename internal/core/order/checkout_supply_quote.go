@@ -33,3 +33,12 @@ func (s *OrderAppService) QuoteCheckoutSupply(ctx context.Context, req contracts
 	}
 	return s.checkoutSupplyQuoter.Quote(ctx, models.OrderTypeStandard, "checkout_quote", req.Items)
 }
+
+// SummarizeListingSupply performs a seller-safe advisory supply summary for
+// admin product surfaces without creating inventory holds.
+func (s *OrderAppService) SummarizeListingSupply(ctx context.Context, req contracts.ListingSupplySummaryRequest) (*contracts.ListingSupplySummaryResponse, error) {
+	if s == nil || s.checkoutSupplyQuoter == nil {
+		return nil, fmt.Errorf("checkout supply quote service not configured")
+	}
+	return s.checkoutSupplyQuoter.SellerSummary(ctx, req)
+}

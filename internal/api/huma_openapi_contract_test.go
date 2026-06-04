@@ -139,6 +139,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"chat-get-status",
 		// listings
 		"listings-get-mine-slug-or-cid",
+		"listings-post-supply-summary",
 		"listings-create",
 		"listings-update",
 		"listings-delete",

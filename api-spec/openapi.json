@@ -9326,6 +9326,56 @@
         ]
       }
     },
+    "/v1/listings/supply-summary": {
+      "post": {
+        "operationId": "listings-post-supply-summary",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get seller supply summaries",
+        "tags": [
+          "listings"
+        ]
+      }
+    },
     "/v1/listings/template": {
       "get": {
         "operationId": "listings-template",

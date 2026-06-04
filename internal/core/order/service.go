@@ -12,8 +12,8 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/core/checkoutsupply"
+	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -753,6 +753,9 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 			return err
 		}
 		localEvents = append(localEvents, evt)
+		if err := s.postProcessInTx(tx, &resp, nil, &order); err != nil {
+			return err
+		}
 
 		if shouldSendFiatRefund {
 			refundMsg, err := s.buildFiatRefundMessage(&order, fiatRefundResult)

@@ -700,8 +700,7 @@ var FeatureSupplyChainEnabled = registerFeature(Feature{
 // 门控点：
 //   - SupplyAvailabilityService 内部聚合边界
 //   - Provider Quote/Reserve/Commit/Release shadow rollout
-//
-// SA-0 仅注册 contracts 和 feature flag，不暴露公开 API / Admin UI。
+//   - Seller admin supply availability surfaces
 var FeatureSupplyAvailabilityEnabled = registerFeature(Feature{
 	Key:           "supplyAvailabilityEnabled",
 	DisplayName:   "Supply availability",
@@ -709,7 +708,7 @@ var FeatureSupplyAvailabilityEnabled = registerFeature(Feature{
 	Category:      "platform",
 	Stability:     StabilityExperimental,
 	DefaultValue:  false,
-	ClientVisible: false,
+	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,
 		ScopeTenant,

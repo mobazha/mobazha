@@ -4,11 +4,14 @@ package order
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"testing"
 	"time"
 
+	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/mobazha/mobazha3.0/internal/core/digital"
+	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -17,10 +20,243 @@ import (
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+func TestSelectedStandardOrderSku_ResolvesSingleSkuWithoutVariantOptions(t *testing.T) {
+	listing := orderSupplyListingNoVariant(t, "simple-shirt", "5")
+	sku, err := selectedStandardOrderSku(listing.Listing, nil)
+	require.NoError(t, err)
+	require.NotNil(t, sku)
+	require.Equal(t, "5", sku.Quantity)
+}
+
+func TestSelectedStandardOrderSku_ReturnsNilWhenListingHasNoSkus(t *testing.T) {
+	listing := orderSupplyListingNoVariant(t, "empty-shirt", "5")
+	listing.Listing.Item.Skus = nil
+	sku, err := selectedStandardOrderSku(listing.Listing, nil)
+	require.NoError(t, err)
+	require.Nil(t, sku)
+}
+
+func TestSelectedStandardOrderSku_ReturnsErrorWhenVariantListingHasNoSelection(t *testing.T) {
+	listing := orderSupplyListing(t, "camera", "Color", "Red", "3")
+	_, err := selectedStandardOrderSku(listing.Listing, nil)
+	require.ErrorContains(t, err, "selected sku not found")
+}
+
+func TestMatchingLocalSku_MatchesByProductID(t *testing.T) {
+	embedded := orderSupplyListingNoVariant(t, "shirt", "5")
+	embedded.Listing.Item.Skus[0].ProductID = "sku-001"
+
+	local := proto.Clone(embedded.Listing).(*pb.Listing)
+	local.Item.Skus[0].Quantity = "8"
+
+	matched := matchingLocalSku(local, embedded.Listing.Item.Skus[0])
+	require.NotNil(t, matched)
+	require.Equal(t, "8", matched.Quantity)
+}
+
+func TestMatchingLocalSku_DoesNotMatchSelectionlessCandidateForVariant(t *testing.T) {
+	embedded := orderSupplyListing(t, "shirt", "Size", "M", "")
+	local := orderSupplyListing(t, "shirt", "Size", "S", "2")
+	local.Listing.Item.Skus = append([]*pb.Listing_Item_Sku{
+		{Quantity: "99"},
+	}, local.Listing.Item.Skus...)
+
+	matched := matchingLocalSku(local.Listing, embedded.Listing.Item.Skus[0])
+	require.Nil(t, matched)
+}
+
+func TestAuthoritativeStandardStockSku_UsesLocalWhenEmbeddedSkuOmitsQuantity(t *testing.T) {
+	local := orderSupplyListingNoVariant(t, "shirt", "8")
+	embedded := proto.Clone(local.Listing).(*pb.Listing)
+	embedded.Item.Skus[0].Quantity = ""
+	embedded.Item.Skus[0].ProductID = ""
+
+	stockSku := authoritativeStandardStockSku(local.Listing, embedded.Item.Skus[0], nil)
+	require.NotNil(t, stockSku)
+	require.Equal(t, "8", stockSku.Quantity)
+}
+
+func TestPostProcessOrderOpen_UsesLocalVariantHashWhenEmbeddedSkuOnlyHasProductID(t *testing.T) {
+	recorder := &recordingOrderSupplyAvailability{}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Resolver:           orderSupplyAlwaysEnabledResolver{},
+		SupplyAvailability: recorder,
+	})
+	local := orderSupplyListing(t, "variant-shirt", "Size", "M", "7")
+	local.Listing.Item.Skus[0].ProductID = "sku-m"
+	embedded := orderSupplyListingNoVariant(t, "variant-shirt", "")
+	embedded.Listing.Item.Skus[0].ProductID = "sku-m"
+	listingHash := orderSupplyListingHash(t, embedded)
+
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		if err := tx.SetListing(local); err != nil {
+			return err
+		}
+		order := &models.Order{
+			ID:     models.OrderID("order-embedded-product-id-only"),
+			MyRole: string(models.RoleVendor),
+			Open:   true,
+		}
+		exp := time.Now().Add(time.Hour)
+		order.ExpiresAt = &exp
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-product-id-only", embedded, listingHash))
+	}))
+
+	require.Len(t, recorder.reserveTxRequests, 1)
+	require.NotEmpty(t, recorder.reserveTxRequests[0].Lines[0].VariantHash)
+	require.Equal(t, int64(7), recorder.reserveTxRequests[0].Lines[0].StockLimit)
+}
+
+func TestPostProcessOrderOpen_ReservesWhenOrderListingOmitsSkuQuantity(t *testing.T) {
+	recorder := &recordingOrderSupplyAvailability{}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Resolver:           orderSupplyAlwaysEnabledResolver{},
+		SupplyAvailability: recorder,
+	})
+	local := orderSupplyListingNoVariant(t, "public-shirt", "5")
+	orderEmbed := proto.Clone(local).(*pb.SignedListing)
+	orderEmbed.Listing.Item.Skus[0].Quantity = ""
+	orderEmbed.Listing.Item.Skus[0].ProductID = ""
+	listingHash := orderSupplyListingHash(t, orderEmbed)
+
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		if err := tx.SetListing(local); err != nil {
+			return err
+		}
+		order := &models.Order{
+			ID:     models.OrderID("order-public-embed-no-qty"),
+			MyRole: string(models.RoleVendor),
+			Open:   true,
+		}
+		exp := time.Now().Add(time.Hour)
+		order.ExpiresAt = &exp
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-public-embed-no-qty", orderEmbed, listingHash))
+	}))
+
+	require.Len(t, recorder.reserveTxRequests, 1)
+	require.Equal(t, int64(5), recorder.reserveTxRequests[0].Lines[0].StockLimit)
+}
+
+func TestPostProcessOrderOpen_ReservesUsingEmbeddedSkuWithLocalStockLimit(t *testing.T) {
+	recorder := &recordingOrderSupplyAvailability{}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Resolver:           orderSupplyAlwaysEnabledResolver{},
+		SupplyAvailability: recorder,
+	})
+	embedded := orderSupplyListingNoVariant(t, "embedded-shirt", "5")
+	embedded.Listing.Item.Skus[0].ProductID = "sku-001"
+	local := proto.Clone(embedded).(*pb.SignedListing)
+	local.Listing.Item.Skus[0].Quantity = "8"
+	listingHash := orderSupplyListingHash(t, embedded)
+
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		if err := tx.SetListing(local); err != nil {
+			return err
+		}
+		order := &models.Order{
+			ID:     models.OrderID("order-embedded-local-stock"),
+			MyRole: string(models.RoleVendor),
+			Open:   true,
+		}
+		exp := time.Now().Add(time.Hour)
+		order.ExpiresAt = &exp
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-local-stock", embedded, listingHash))
+	}))
+
+	require.Len(t, recorder.reserveTxRequests, 1)
+	require.Equal(t, int64(8), recorder.reserveTxRequests[0].Lines[0].StockLimit)
+}
+
+func TestPostProcessOrderOpen_ReservesStandardOrderSupplyForVendorWithoutVariantOptions(t *testing.T) {
+	recorder := &recordingOrderSupplyAvailability{}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Resolver:           orderSupplyAlwaysEnabledResolver{},
+		SupplyAvailability: recorder,
+	})
+	listing := orderSupplyListingNoVariant(t, "simple-shirt", "5")
+	listingHash := orderSupplyListingHash(t, listing)
+
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		if err := tx.SetListing(listing); err != nil {
+			return err
+		}
+		order := &models.Order{
+			ID:     models.OrderID("order-standard-no-variant"),
+			MyRole: string(models.RoleVendor),
+			Open:   true,
+		}
+		exp := time.Now().Add(time.Hour)
+		order.ExpiresAt = &exp
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-standard-no-variant", listing, listingHash))
+	}))
+
+	require.Len(t, recorder.reserveTxRequests, 1)
+	req := recorder.reserveTxRequests[0]
+	require.Equal(t, "order-standard-no-variant", req.OrderRef)
+	require.Equal(t, models.OrderTypeStandard, req.OrderType)
+	require.Len(t, req.Lines, 1)
+	require.Equal(t, contracts.SupplyKindSkuQuantity, req.Lines[0].SupplyKind)
+	require.Equal(t, "simple-shirt", req.Lines[0].ListingSlug)
+	require.Equal(t, 1, req.Lines[0].Quantity)
+	require.Equal(t, int64(5), req.Lines[0].StockLimit)
+	require.True(t, req.Lines[0].StockTracked)
+	require.Empty(t, req.Lines[0].VariantHash)
+}
+
+func TestPostProcessOrderOpen_ReservesWhenEmbeddedListingHasNoSkus(t *testing.T) {
+	recorder := &recordingOrderSupplyAvailability{}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Resolver:           orderSupplyAlwaysEnabledResolver{},
+		SupplyAvailability: recorder,
+	})
+	local := orderSupplyListingNoVariant(t, "local-shirt", "5")
+	embedded := proto.Clone(local).(*pb.SignedListing)
+	embedded.Listing.Item.Skus = nil
+	listingHash := orderSupplyListingHash(t, embedded)
+
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		if err := tx.SetListing(local); err != nil {
+			return err
+		}
+		order := &models.Order{
+			ID:     models.OrderID("order-embedded-no-skus"),
+			MyRole: string(models.RoleVendor),
+			Open:   true,
+		}
+		exp := time.Now().Add(time.Hour)
+		order.ExpiresAt = &exp
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-no-skus", embedded, listingHash))
+	}))
+
+	require.Len(t, recorder.reserveTxRequests, 1)
+	require.Equal(t, int64(5), recorder.reserveTxRequests[0].Lines[0].StockLimit)
+}
 
 func TestPostProcessOrderOpen_ReservesStandardOrderSupplyForVendor(t *testing.T) {
 	recorder := &recordingOrderSupplyAvailability{}
@@ -141,7 +377,7 @@ func TestStandardOrderSupplyLinesUsesDigitalResolverForDigitalGoods(t *testing.T
 }
 
 func TestStandardOrderSupplyLinesSkipsDigitalGoodsWithoutResolver(t *testing.T) {
-	listing := orderSupplyListing(t, "ebook", "", "", "")
+	listing := orderSupplyListingNoVariant(t, "ebook", "")
 	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
 	listingHash := orderSupplyListingHash(t, listing)
 
@@ -151,7 +387,7 @@ func TestStandardOrderSupplyLinesSkipsDigitalGoodsWithoutResolver(t *testing.T) 
 }
 
 func TestStandardOrderSupplyLinesFailsDigitalGoodsWithoutResolverWhenRequired(t *testing.T) {
-	listing := orderSupplyListing(t, "ebook", "", "", "")
+	listing := orderSupplyListingNoVariant(t, "ebook", "")
 	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
 	listingHash := orderSupplyListingHash(t, listing)
 
@@ -161,7 +397,7 @@ func TestStandardOrderSupplyLinesFailsDigitalGoodsWithoutResolverWhenRequired(t 
 
 func TestStandardOrderSupplyLinesReturnsDigitalResolverError(t *testing.T) {
 	resolver := &recordingDigitalSupplyLineResolver{err: fmt.Errorf("digital resolver offline")}
-	listing := orderSupplyListing(t, "ebook", "", "", "")
+	listing := orderSupplyListingNoVariant(t, "ebook", "")
 	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
 	listingHash := orderSupplyListingHash(t, listing)
 
@@ -275,6 +511,61 @@ func TestPostProcessInTx_DispatchesStandardOrderSupplyLifecycle(t *testing.T) {
 	require.Equal(t, "declined", recorder.releaseTxRequests[1].reason)
 }
 
+func TestDeclineOrder_ReleasesStandardOrderSupplyHold(t *testing.T) {
+	recorder := &recordingOrderSupplyAvailability{}
+	privKey, _, err := libp2pcrypto.GenerateEd25519Key(rand.Reader)
+	require.NoError(t, err)
+	marshaledKey, err := libp2pcrypto.MarshalPrivateKey(privKey)
+	require.NoError(t, err)
+	signer, err := contracts.NewKeyPairSignerFromMarshaledKey(marshaledKey)
+	require.NoError(t, err)
+
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Signer:             signer,
+		Messenger:          noopMessenger{},
+		Resolver:           orderSupplyAlwaysEnabledResolver{},
+		SupplyAvailability: recorder,
+	})
+	svc.orderProcessor = orders.NewOrderProcessor(&orders.Config{
+		Db:        svc.db,
+		Signer:    signer,
+		Messenger: noopMessenger{},
+		EventBus:  svc.eventBus,
+	})
+
+	listing := orderSupplyListingNoVariant(t, "decline-shirt", "5")
+	listing.Listing.VendorID = &pb.ID{PeerID: signer.PeerID().String()}
+	listing.Listing.Item.Images = []*pb.Image{{Tiny: "tiny", Small: "small"}}
+	listingHash := orderSupplyListingHash(t, listing)
+	orderOpen := orderSupplyOrderOpenNoOptions(listing, listingHash)
+	orderOpen.BuyerID = &pb.ID{PeerID: "12D3KooWG1kQhGJSYgbPibZVUcny4U28tRZZSStDq8FdpbUoGsah"}
+	serializedOrderOpen, err := protojson.Marshal(orderOpen)
+	require.NoError(t, err)
+
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		order := &models.Order{
+			ID:                  models.OrderID("order-local-decline-release"),
+			MyRole:              string(models.RoleVendor),
+			Open:                true,
+			SerializedOrderOpen: serializedOrderOpen,
+		}
+		exp := time.Now().Add(time.Hour)
+		order.ExpiresAt = &exp
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+		return tx.Save(order)
+	}))
+
+	require.NoError(t, svc.DeclineOrder("order-local-decline-release", "", "seller declined", nil))
+
+	require.Len(t, recorder.releaseTxRequests, 1)
+	require.Equal(t, standardOrderSupplyReleaseRequest{
+		orderRef:  "order-local-decline-release",
+		orderType: models.OrderTypeStandard,
+		reason:    "declined",
+		txSeen:    true,
+	}, recorder.releaseTxRequests[0])
+}
+
 func TestStandardOrderSupplyLifecycle_SkipsBuyerRole(t *testing.T) {
 	recorder := &recordingOrderSupplyAvailability{}
 	svc := newTestOrderAppService(t, OrderAppServiceConfig{
@@ -299,6 +590,44 @@ func TestStandardOrderSupplyLifecycle_SkipsBuyerRole(t *testing.T) {
 
 	require.Empty(t, recorder.commitTxRequests)
 	require.Empty(t, recorder.releaseTxRequests)
+}
+
+func TestStandardOrderSupplyLifecycle_UsesVendorRowWhenBuyerAndVendorShareOrderID(t *testing.T) {
+	recorder := &recordingOrderSupplyAvailability{}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Resolver:           orderSupplyAlwaysEnabledResolver{},
+		SupplyAvailability: recorder,
+	})
+
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		buyerOrder := &models.Order{
+			TenantMixin: models.TenantMixin{TenantID: "buyer-tenant"},
+			ID:          models.OrderID("order-standard-shared"),
+			MyRole:      string(models.RoleBuyer),
+			Open:        false,
+		}
+		if err := tx.Save(buyerOrder); err != nil {
+			return err
+		}
+		vendorOrder := &models.Order{
+			TenantMixin: models.TenantMixin{TenantID: "vendor-tenant"},
+			ID:          models.OrderID("order-standard-shared"),
+			MyRole:      string(models.RoleVendor),
+			Open:        false,
+		}
+		if err := tx.Save(vendorOrder); err != nil {
+			return err
+		}
+		return svc.releaseStandardOrderSupplyInTx(tx, "order-standard-shared", "declined")
+	}))
+
+	require.Len(t, recorder.releaseTxRequests, 1)
+	require.Equal(t, standardOrderSupplyReleaseRequest{
+		orderRef:  "order-standard-shared",
+		orderType: models.OrderTypeStandard,
+		reason:    "declined",
+		txSeen:    true,
+	}, recorder.releaseTxRequests[0])
 }
 
 type standardOrderSupplyCommitRequest struct {
@@ -390,6 +719,30 @@ func (orderSupplyAlwaysEnabledResolver) List(context.Context) []pkgconfig.Effect
 	return nil
 }
 
+func orderSupplyListingNoVariant(t *testing.T, slug, quantity string) *pb.SignedListing {
+	t.Helper()
+	return &pb.SignedListing{
+		Listing: &pb.Listing{
+			Slug: slug,
+			Metadata: &pb.Listing_Metadata{
+				Version:      ListingVersion,
+				ContractType: pb.Listing_Metadata_PHYSICAL_GOOD,
+				PricingCurrency: &pb.Currency{
+					Code: "USD",
+				},
+			},
+			Item: &pb.Listing_Item{
+				Title: slug,
+				Price: "1000",
+				Skus: []*pb.Listing_Item_Sku{{
+					Quantity: quantity,
+					Price:    "1000",
+				}},
+			},
+		},
+	}
+}
+
 func orderSupplyListing(t *testing.T, slug, option, variant, quantity string) *pb.SignedListing {
 	t.Helper()
 	return &pb.SignedListing{
@@ -456,9 +809,40 @@ func orderSupplyOrderOpenWithQuantity(listing *pb.SignedListing, listingHash str
 	}
 }
 
+func orderSupplyOrderOpenNoOptions(listing *pb.SignedListing, listingHash string) *pb.OrderOpen {
+	return orderSupplyOrderOpenNoOptionsWithQuantity(listing, listingHash, "1")
+}
+
+func orderSupplyOrderOpenNoOptionsWithQuantity(listing *pb.SignedListing, listingHash string, quantity string) *pb.OrderOpen {
+	return &pb.OrderOpen{
+		Timestamp: timestamppb.Now(),
+		BuyerID: &pb.ID{
+			PeerID: "buyer",
+		},
+		Listings: []*pb.SignedListing{listing},
+		Items: []*pb.OrderOpen_Item{{
+			ListingHash: listingHash,
+			Quantity:    quantity,
+		}},
+		RatingKeys: [][]byte{{1}},
+	}
+}
+
 func orderSupplyOrderOpenMessage(t *testing.T, orderID string, listing *pb.SignedListing, listingHash string) *npb.OrderMessage {
 	t.Helper()
 	orderOpen := orderSupplyOrderOpen(listing, listingHash)
+	anyMsg, err := anypb.New(orderOpen)
+	require.NoError(t, err)
+	return &npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_ORDER_OPEN,
+		Message:     anyMsg,
+	}
+}
+
+func orderSupplyOrderOpenMessageNoOptions(t *testing.T, orderID string, listing *pb.SignedListing, listingHash string) *npb.OrderMessage {
+	t.Helper()
+	orderOpen := orderSupplyOrderOpenNoOptions(listing, listingHash)
 	anyMsg, err := anypb.New(orderOpen)
 	require.NoError(t, err)
 	return &npb.OrderMessage{

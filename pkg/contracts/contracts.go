@@ -150,6 +150,9 @@ type OrderService interface {
 	// QuoteCheckoutSupply performs a buyer-safe advisory supply preflight for
 	// authenticated standard checkout without creating an order or holding inventory.
 	QuoteCheckoutSupply(ctx context.Context, req QuoteCheckoutSupplyRequest) (*CheckoutSupplyQuoteResponse, error)
+	// SummarizeListingSupply performs a seller-safe advisory supply summary for
+	// authenticated admin product surfaces without creating holds.
+	SummarizeListingSupply(ctx context.Context, req ListingSupplySummaryRequest) (*ListingSupplySummaryResponse, error)
 }
 
 // ListingService handles product listing management.

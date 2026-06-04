@@ -178,6 +178,7 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 		{"GET", "/v1/fiat/stripe/config"},
 		// Listings
 		{"POST", "/v1/listings"},
+		{"POST", "/v1/listings/supply-summary"},
 		{"GET", "/v1/listings/peer1/my-product"},
 		// Media
 		{"POST", "/v1/media/images"},

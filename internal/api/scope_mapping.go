@@ -22,6 +22,7 @@ import "github.com/mobazha/mobazha3.0/pkg/contracts"
 var routeScopeMap = []routeScope{
 	// Listings
 	{"GET /v1/listings", contracts.ScopeListingsRead},
+	{"POST /v1/listings/supply-summary", contracts.ScopeListingsRead},
 	{"POST /v1/listings", contracts.ScopeListingsWrite},
 	{"PUT /v1/listings", contracts.ScopeListingsWrite},
 	{"DELETE /v1/listings", contracts.ScopeListingsWrite},

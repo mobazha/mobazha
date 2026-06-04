@@ -266,6 +266,25 @@ func TestPOSTGuestOrderQuote_EmptyItems(t *testing.T) {
 	guestAssertStatus(t, resp, http.StatusBadRequest)
 }
 
+func TestPOSTGuestOrderQuote_ServiceNotConfigured(t *testing.T) {
+	svc := &mockGuestOrderService{
+		quoteGuestOrderSupplyFunc: func(context.Context, contracts.QuoteGuestOrderSupplyRequest) (*contracts.GuestOrderSupplyQuoteResponse, error) {
+			return nil, errors.New("checkout supply quote service not configured")
+		},
+	}
+	ts := guestTestServer(t, svc)
+
+	body, _ := json.Marshal(contracts.QuoteGuestOrderSupplyRequest{
+		Items: []contracts.GuestOrderItemRequest{{ListingSlug: "item", Quantity: 1}},
+	})
+
+	resp, respBody := guestDoReq(t, ts, "POST", "/v1/guest/orders/quote", body)
+	guestAssertStatus(t, resp, http.StatusNotImplemented)
+	guestAssertErrorCode(t, respBody, response.CodeNotImplemented)
+	require.Contains(t, string(respBody), "Supply quote is not available")
+	require.NotContains(t, string(respBody), "not configured")
+}
+
 func TestClassifyGuestOrderError_ManualActionRequired(t *testing.T) {
 	status, code := classifyGuestOrderError(errors.Join(
 		contracts.ErrSupplyManualActionRequired,

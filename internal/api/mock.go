@@ -103,6 +103,7 @@ type mockNode struct {
 	getRatingFunc                    func(ctx context.Context, cid cid.Cid) (*pb.Rating, error)
 	purchaseFunc                     func(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)
 	estimateOrderTotalFunc           func(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
+	quoteCheckoutSupplyFunc          func(ctx context.Context, req contracts.QuoteCheckoutSupplyRequest) (*contracts.CheckoutSupplyQuoteResponse, error)
 	getOrderInfoFunc                 func(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
 	processOrderPaymentFunc          func(ctx context.Context, paymentData *models.PaymentData) error
 	declineOrderFunc                 func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
@@ -461,6 +462,12 @@ func (m *mockNode) PurchaseListing(ctx context.Context, purchase *models.Purchas
 }
 func (m *mockNode) EstimateOrderTotal(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error) {
 	return m.estimateOrderTotalFunc(ctx, purchase)
+}
+func (m *mockNode) QuoteCheckoutSupply(ctx context.Context, req contracts.QuoteCheckoutSupplyRequest) (*contracts.CheckoutSupplyQuoteResponse, error) {
+	if m.quoteCheckoutSupplyFunc != nil {
+		return m.quoteCheckoutSupplyFunc(ctx, req)
+	}
+	return &contracts.CheckoutSupplyQuoteResponse{CanSell: true}, nil
 }
 func (m *mockNode) GetOrderInfo(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error) {
 	return m.getOrderInfoFunc(orderID, coinType)

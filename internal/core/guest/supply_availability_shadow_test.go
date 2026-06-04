@@ -10,6 +10,7 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/gagliardetto/solana-go"
+	"github.com/mobazha/mobazha3.0/internal/core/checkoutsupply"
 	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
@@ -242,6 +243,20 @@ func TestQuoteSupplyAvailabilityShadowPassesGuestOrderLines(t *testing.T) {
 	require.Equal(t, int64(5), req.Lines[0].StockLimit)
 }
 
+func wireGuestCheckoutSupplyQuoter(svc *GuestOrderAppService) {
+	if svc == nil {
+		return
+	}
+	quoter := checkoutsupply.NewCheckoutSupplyQuoteService(checkoutsupply.CheckoutSupplyQuoteServiceConfig{
+		DB:                 svc.db,
+		SupplyAvailability: svc.supplyAvailability,
+		Resolver:           svc.resolver,
+		DigitalSupplyLines: svc.digitalSupplyLines,
+		Listings:           svc.listings,
+	})
+	svc.SetCheckoutSupplyQuoter(quoter)
+}
+
 func TestQuoteGuestOrderSupplyReturnsUnknownWhenFeatureDisabled(t *testing.T) {
 	svc := &GuestOrderAppService{
 		resolver: guestCheckoutOnlyResolver{},
@@ -252,6 +267,7 @@ func TestQuoteGuestOrderSupplyReturnsUnknownWhenFeatureDisabled(t *testing.T) {
 		},
 	}
 	svc.db = newGuestQuoteConfigDB(t)
+	wireGuestCheckoutSupplyQuoter(svc)
 
 	resp, err := svc.QuoteGuestOrderSupply(context.Background(), contracts.QuoteGuestOrderSupplyRequest{
 		Items: []contracts.GuestOrderItemRequest{{
@@ -292,6 +308,7 @@ func TestQuoteGuestOrderSupplyReturnsBuyerManagedEscrowAvailability(t *testing.T
 		},
 	}
 	svc.db = newGuestQuoteConfigDB(t)
+	wireGuestCheckoutSupplyQuoter(svc)
 
 	resp, err := svc.QuoteGuestOrderSupply(context.Background(), contracts.QuoteGuestOrderSupplyRequest{
 		Items: []contracts.GuestOrderItemRequest{{
@@ -337,6 +354,7 @@ func TestQuoteGuestOrderSupplyUsesVariantDigitalLicensePool(t *testing.T) {
 			},
 		},
 	}
+	wireGuestCheckoutSupplyQuoter(svc)
 
 	resp, err := svc.QuoteGuestOrderSupply(context.Background(), contracts.QuoteGuestOrderSupplyRequest{
 		Items: []contracts.GuestOrderItemRequest{{
@@ -377,6 +395,7 @@ func TestQuoteGuestOrderSupplyReportsMissingDigitalAssetManualAction(t *testing.
 			},
 		},
 	}
+	wireGuestCheckoutSupplyQuoter(svc)
 
 	resp, err := svc.QuoteGuestOrderSupply(context.Background(), contracts.QuoteGuestOrderSupplyRequest{
 		Items: []contracts.GuestOrderItemRequest{{

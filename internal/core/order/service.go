@@ -13,6 +13,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/core/digital"
+	"github.com/mobazha/mobazha3.0/internal/core/checkoutsupply"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -101,6 +102,7 @@ type OrderAppService struct {
 	resolver                pkgconfig.ResolverInterface
 	supplyAvailability      contracts.SupplyAvailabilityService
 	digitalSupplyLines      DigitalSupplyLineResolver
+	checkoutSupplyQuoter    *checkoutsupply.CheckoutSupplyQuoteService
 }
 
 // OrderAppServiceConfig groups the dependencies for constructing OrderAppService.
@@ -178,6 +180,9 @@ func (s *OrderAppService) SetDigitalSupplyLineResolver(resolver DigitalSupplyLin
 		return
 	}
 	s.digitalSupplyLines = resolver
+	if s.checkoutSupplyQuoter != nil {
+		s.checkoutSupplyQuoter.SetDigitalSupplyLineResolver(resolver)
+	}
 }
 
 // SetRegistry wires the payment registry after construction (same lifecycle

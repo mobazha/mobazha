@@ -42,6 +42,7 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 
 	g.registerOrdersPostEstimate(api)
 	g.registerOrdersPostCheckoutBreakdown(api)
+	g.registerOrdersPostSupplyQuote(api)
 	g.registerOrdersPostPurchase(api)
 	g.registerOrdersPostSpend(api)
 	g.registerOrdersPostPayment(api)
@@ -452,6 +453,30 @@ func (g *Gateway) registerOrdersPostCheckoutBreakdown(api huma.API) {
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handlePOSTCheckoutBreakdown(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerOrdersPostSupplyQuote(api huma.API) {
+	type in struct {
+		Body json.RawMessage `json:",omitempty"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "orders-post-supply-quote",
+		Method:      http.MethodPost,
+		Path:        "/v1/orders/supply-quote",
+		Summary:     "Authenticated checkout supply preflight",
+		Tags:        []string{"orders"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/orders/supply-quote", bytes.NewReader(hi.Body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePOSTOrderSupplyQuote(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

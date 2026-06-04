@@ -166,6 +166,7 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 		{"GET", "/v1/notifications/count"},
 		// Orders
 		{"POST", "/v1/orders"},
+		{"POST", "/v1/orders/supply-quote"},
 		{"GET", "/v1/orders/order123"},
 		{"POST", "/v1/orders/order123/confirm"},
 		{"GET", "/v1/purchases"},

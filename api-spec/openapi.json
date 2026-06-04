@@ -1,6 +1,306 @@
 {
   "components": {
     "schemas": {
+      "AssetUpdateInput": {
+        "additionalProperties": false,
+        "properties": {
+          "expiryHours": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "maxDownloads": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sortOrder": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BuyerAssetEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "deliveryURL": {
+            "type": "string"
+          },
+          "downloadCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "downloadURL": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "licenseKeys": {
+            "items": {
+              "$ref": "#/components/schemas/BuyerLicenseEntry"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "maxDownloads": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "restrictedReason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "assetType",
+          "downloadCount",
+          "maxDownloads",
+          "status"
+        ],
+        "type": "object"
+      },
+      "BuyerLicenseEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "activations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "licenseKey": {
+            "type": "string"
+          },
+          "licenseType": {
+            "type": "string"
+          },
+          "maxActivations": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "licenseKey",
+          "activations"
+        ],
+        "type": "object"
+      },
+      "Digital-asset-create-license-keyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "listingSlug": {
+            "type": "string"
+          },
+          "variantSku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "listingSlug"
+        ],
+        "type": "object"
+      },
+      "Digital-asset-create-linkRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "listingSlug": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "variantSku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "listingSlug",
+          "url"
+        ],
+        "type": "object"
+      },
+      "Digital-asset-import-license-keysRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "RFC3339 expiration timestamp.",
+            "type": "string"
+          },
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "licenseType": {
+            "type": "string"
+          },
+          "listingSlug": {
+            "type": "string"
+          },
+          "maxActivations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "variantSku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "listingSlug",
+          "keys"
+        ],
+        "type": "object"
+      },
+      "DigitalAssetInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "assetType": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expiryHours": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "listingSlug": {
+            "type": "string"
+          },
+          "maxDownloads": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "variantSku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "listingSlug",
+          "assetType",
+          "sortOrder",
+          "maxDownloads",
+          "expiryHours",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "DigitalDeliveryStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "accessibleGrantCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "assetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "deliveryURL": {
+            "type": "string"
+          },
+          "grantCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "isDigitalOrder": {
+            "type": "boolean"
+          },
+          "listingSlugs": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "manualFallbackAllowed": {
+            "type": "boolean"
+          },
+          "orderID": {
+            "type": "string"
+          },
+          "preconfiguredAssetHint": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderID",
+          "isDigitalOrder",
+          "status",
+          "assetCount",
+          "grantCount",
+          "accessibleGrantCount",
+          "manualFallbackAllowed",
+          "preconfiguredAssetHint"
+        ],
+        "type": "object"
+      },
       "EnvelopeError": {
         "additionalProperties": false,
         "type": "object"
@@ -24,6 +324,218 @@
         "required": [
           "message",
           "serverTime"
+        ],
+        "type": "object"
+      },
+      "ImportKeysOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "imported": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "imported"
+        ],
+        "type": "object"
+      },
+      "License-activateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint": {
+            "description": "Unique device/machine fingerprint.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "label": {
+            "description": "Human-readable device label (e.g. 'MacBook Pro').",
+            "type": "string"
+          },
+          "licenseKey": {
+            "description": "The license key to activate.",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "licenseKey",
+          "fingerprint"
+        ],
+        "type": "object"
+      },
+      "License-deactivateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint": {
+            "description": "Device fingerprint to unbind.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "licenseKey": {
+            "description": "The license key to deactivate.",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "licenseKey",
+          "fingerprint"
+        ],
+        "type": "object"
+      },
+      "License-validateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "appID": {
+            "description": "Application identifier for multi-product stores.",
+            "type": "string"
+          },
+          "fingerprint": {
+            "description": "Optional machine fingerprint for activation check.",
+            "type": "string"
+          },
+          "licenseKey": {
+            "description": "The license key to validate.",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "licenseKey"
+        ],
+        "type": "object"
+      },
+      "LicenseActivationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "licenseId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "licenseId",
+          "fingerprint",
+          "isActive",
+          "lastSeenAt"
+        ],
+        "type": "object"
+      },
+      "LicenseKeyPoolStats": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dispensed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "revoked": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "available",
+          "dispensed",
+          "revoked",
+          "total"
+        ],
+        "type": "object"
+      },
+      "LicenseValidationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "activations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "licenseId": {
+            "type": "string"
+          },
+          "licenseType": {
+            "type": "string"
+          },
+          "maxActivations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid"
+        ],
+        "type": "object"
+      },
+      "MaskedLicenseKey": {
+        "additionalProperties": false,
+        "properties": {
+          "dispensedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "licenseType": {
+            "type": "string"
+          },
+          "maskedKey": {
+            "type": "string"
+          },
+          "maxActivations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "maskedKey",
+          "licenseType",
+          "maxActivations"
         ],
         "type": "object"
       }
@@ -99,9 +611,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Rotate standalone admin password",
@@ -653,9 +1162,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "List local API tokens (standalone)",
@@ -701,9 +1207,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Mint local API token (standalone)",
@@ -746,9 +1249,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Revoke local API token by ID",
@@ -3987,6 +4487,578 @@
         ]
       }
     },
+    "/v1/digital-assets": {
+      "get": {
+        "operationId": "digital-asset-list",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "listingSlug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "variantSku",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DigitalAssetInfo"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List digital assets for a listing",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/digital-assets/license-key": {
+      "post": {
+        "operationId": "digital-asset-create-license-key",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Digital-asset-create-license-keyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigitalAssetInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Create a license-key-type digital asset",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/digital-assets/license-keys": {
+      "get": {
+        "operationId": "digital-asset-list-license-keys",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "listingSlug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "variantSku",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MaskedLicenseKey"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List license keys (masked) for a listing",
+        "tags": [
+          "digital-assets"
+        ]
+      },
+      "post": {
+        "operationId": "digital-asset-import-license-keys",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Digital-asset-import-license-keysRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportKeysOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Import license keys for a listing",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/digital-assets/license-keys/stats": {
+      "get": {
+        "operationId": "digital-asset-license-key-stats",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "listingSlug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "variantSku",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LicenseKeyPoolStats"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get license key pool statistics for a listing",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/digital-assets/license-keys/{keyID}/revoke": {
+      "post": {
+        "operationId": "digital-asset-revoke-license-key",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "keyID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Revoke a license key",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/digital-assets/link": {
+      "post": {
+        "operationId": "digital-asset-create-link",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Digital-asset-create-linkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigitalAssetInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Create a link-type digital asset",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/digital-assets/{assetID}": {
+      "delete": {
+        "operationId": "digital-asset-delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assetID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Delete a digital asset",
+        "tags": [
+          "digital-assets"
+        ]
+      },
+      "get": {
+        "operationId": "digital-asset-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assetID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigitalAssetInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get a digital asset by ID",
+        "tags": [
+          "digital-assets"
+        ]
+      },
+      "patch": {
+        "operationId": "digital-asset-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assetID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetUpdateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigitalAssetInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Update a digital asset",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
     "/v1/discounts": {
       "get": {
         "operationId": "discounts-get",
@@ -4782,6 +5854,7 @@
     },
     "/v1/disputes/{orderID}/instructions/release": {
       "post": {
+        "description": "Compatibility endpoint for client-signed moderated dispute payouts. ManagedEscrow-backed moderated dispute resolution stays on the backend close/release path and should not use this instructions contract as its primary entrypoint.",
         "operationId": "disputes-post-instructions-release",
         "parameters": [
           {
@@ -4836,7 +5909,7 @@
             "apiToken": []
           }
         ],
-        "summary": "Get release-funds instructions for a dispute",
+        "summary": "Legacy dispute release instructions",
         "tags": [
           "disputes"
         ]
@@ -6294,6 +7367,191 @@
         ]
       }
     },
+    "/v1/fulfillment/alerts": {
+      "get": {
+        "operationId": "fulfillment-get-alerts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List fulfillment alerts",
+        "tags": [
+          "fulfillment"
+        ]
+      }
+    },
+    "/v1/fulfillment/alerts/{alertID}": {
+      "delete": {
+        "operationId": "fulfillment-delete-alert",
+        "parameters": [
+          {
+            "description": "Alert ID to dismiss.",
+            "in": "path",
+            "name": "alertID",
+            "required": true,
+            "schema": {
+              "description": "Alert ID to dismiss.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Dismiss a fulfillment alert",
+        "tags": [
+          "fulfillment"
+        ]
+      }
+    },
+    "/v1/fulfillment/locations": {
+      "get": {
+        "operationId": "fulfillment-get-locations",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List fulfillment locations",
+        "tags": [
+          "fulfillment"
+        ]
+      }
+    },
+    "/v1/fulfillment/locations/{locationID}": {
+      "get": {
+        "operationId": "fulfillment-get-location",
+        "parameters": [
+          {
+            "description": "Fulfillment location ID.",
+            "in": "path",
+            "name": "locationID",
+            "required": true,
+            "schema": {
+              "description": "Fulfillment location ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get fulfillment location detail",
+        "tags": [
+          "fulfillment"
+        ]
+      }
+    },
     "/v1/fulfillment/orders/{orderID}/status": {
       "get": {
         "operationId": "fulfillment-get-order-status",
@@ -6439,6 +7697,143 @@
           }
         ],
         "summary": "List fulfillment providers",
+        "tags": [
+          "fulfillment"
+        ]
+      }
+    },
+    "/v1/fulfillment/rules": {
+      "get": {
+        "operationId": "fulfillment-get-rules",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List fulfillment auto-action rules",
+        "tags": [
+          "fulfillment"
+        ]
+      },
+      "post": {
+        "operationId": "fulfillment-post-rule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Create a fulfillment auto-action rule",
+        "tags": [
+          "fulfillment"
+        ]
+      }
+    },
+    "/v1/fulfillment/rules/{ruleID}": {
+      "delete": {
+        "operationId": "fulfillment-delete-rule",
+        "parameters": [
+          {
+            "description": "Rule ID to delete.",
+            "in": "path",
+            "name": "ruleID",
+            "required": true,
+            "schema": {
+              "description": "Rule ID to delete.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Delete a fulfillment auto-action rule",
         "tags": [
           "fulfillment"
         ]
@@ -7069,6 +8464,63 @@
         ]
       }
     },
+    "/v1/fulfillment/{providerID}/synced-products/{mappingID}": {
+      "delete": {
+        "operationId": "fulfillment-delete-synced-product",
+        "parameters": [
+          {
+            "description": "Fulfillment provider ID.",
+            "in": "path",
+            "name": "providerID",
+            "required": true,
+            "schema": {
+              "description": "Fulfillment provider ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Synced product mapping ID.",
+            "in": "path",
+            "name": "mappingID",
+            "required": true,
+            "schema": {
+              "description": "Synced product mapping ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Unlink a synced product from its supplier",
+        "tags": [
+          "fulfillment"
+        ]
+      }
+    },
     "/v1/fulfillment/{providerID}/webhooks/{webhookSecret}": {
       "post": {
         "operationId": "fulfillment-public-post-provider-webhook",
@@ -7230,6 +8682,46 @@
         ]
       }
     },
+    "/v1/guest/orders/quote": {
+      "post": {
+        "operationId": "guest-orders-quote-public",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Public guest checkout supply preflight",
+        "tags": [
+          "orders",
+          "guest"
+        ]
+      }
+    },
     "/v1/guest/orders/{token}": {
       "get": {
         "operationId": "guest-orders-get-public",
@@ -7316,6 +8808,61 @@
           }
         ],
         "summary": "Manually finalize guest-funded order",
+        "tags": [
+          "orders",
+          "guest"
+        ]
+      }
+    },
+    "/v1/guest/orders/{token}/detail": {
+      "get": {
+        "operationId": "guest-orders-admin-detail",
+        "parameters": [
+          {
+            "description": "Guest checkout token.",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "description": "Guest checkout token.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Admin: full guest order detail including encrypted shipping address",
         "tags": [
           "orders",
           "guest"
@@ -7535,6 +9082,57 @@
           }
         ],
         "summary": "Import listings from ZIP (multipart)",
+        "tags": [
+          "listings"
+        ]
+      }
+    },
+    "/v1/listings/import/gumroad": {
+      "post": {
+        "description": "Reads products from the Gumroad v2 API using a personal access token and imports them as DRAFT digital-good listings. The seller must upload the actual digital file to each draft before publishing — Gumroad's protected file URLs are not server-fetchable. Pass {\"dryRun\": true} to preview without writing.",
+        "operationId": "listings-import-gumroad",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Import listings from a Gumroad creator account",
         "tags": [
           "listings"
         ]
@@ -9245,6 +10843,56 @@
         ]
       }
     },
+    "/v1/orders/supply-quote": {
+      "post": {
+        "operationId": "orders-post-supply-quote",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Authenticated checkout supply preflight",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
     "/v1/orders/{orderID}": {
       "get": {
         "operationId": "orders-get-detail",
@@ -9485,6 +11133,325 @@
         ]
       }
     },
+    "/v1/orders/{orderID}/digital-assets": {
+      "get": {
+        "description": "Returns all digital entitlements (files, license keys, links) granted to the buyer after order confirmation. Guest checkout access requires the independent buyerPortalToken issued at order creation.",
+        "operationId": "digital-assets-buyer-get",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "example": "QmOrder123",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "examples": [
+                "QmOrder123"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Independent buyer portal bearer token issued at guest order creation.",
+            "in": "header",
+            "name": "X-Buyer-Portal-Token",
+            "schema": {
+              "description": "Independent buyer portal bearer token issued at guest order creation.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Signed download URL expiry in seconds.",
+            "explode": false,
+            "in": "query",
+            "name": "urlExpirySec",
+            "schema": {
+              "default": 3600,
+              "description": "Signed download URL expiry in seconds.",
+              "format": "int64",
+              "maximum": 86400,
+              "minimum": 60,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "List of digital entitlements for this order.",
+                  "items": {
+                    "$ref": "#/components/schemas/BuyerAssetEntry"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [],
+        "summary": "Get buyer digital assets for an order",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/digital-delivery": {
+      "get": {
+        "description": "Returns the order-level digital delivery contract used by seller and buyer order pages. It exposes delivery state and counts only; digital secrets are returned by the buyer assets endpoint.",
+        "operationId": "digital-delivery-status-get",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "example": "QmOrder123",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "examples": [
+                "QmOrder123"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Independent buyer portal bearer token issued at guest order creation.",
+            "in": "header",
+            "name": "X-Buyer-Portal-Token",
+            "schema": {
+              "description": "Independent buyer portal bearer token issued at guest order creation.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigitalDeliveryStatus",
+                  "description": "Order-level digital delivery status."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [],
+        "summary": "Get digital delivery status for an order",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/digital-delivery/retry": {
+      "post": {
+        "description": "Replays automatic digital entitlement creation for a seller order. This is intended for recoverable cases where digital assets were added after payment confirmation.",
+        "operationId": "digital-delivery-retry",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "example": "QmOrder123",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "examples": [
+                "QmOrder123"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigitalDeliveryStatus",
+                  "description": "Order-level digital delivery status."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Retry digital delivery for an order",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/digital-download": {
+      "get": {
+        "description": "Serves the binary content of a purchased digital asset. Authentication is provided by the HMAC signature embedded in the query parameters (generated by the buyer portal API). No session or admin token required.",
+        "operationId": "digital-download",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Grant nonce.",
+            "explode": false,
+            "in": "query",
+            "name": "grant",
+            "required": true,
+            "schema": {
+              "description": "Grant nonce.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Asset ID.",
+            "explode": false,
+            "in": "query",
+            "name": "asset",
+            "required": true,
+            "schema": {
+              "description": "Asset ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Expiry unix timestamp.",
+            "explode": false,
+            "in": "query",
+            "name": "expires",
+            "required": true,
+            "schema": {
+              "description": "Expiry unix timestamp.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Grant version.",
+            "explode": false,
+            "in": "query",
+            "name": "v",
+            "required": true,
+            "schema": {
+              "description": "Grant version.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "HMAC-SHA256 hex signature.",
+            "explode": false,
+            "in": "query",
+            "name": "sig",
+            "required": true,
+            "schema": {
+              "description": "HMAC-SHA256 hex signature.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "contentEncoding": "base64",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "description": "Cache directive.",
+                  "type": "string"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "description": "Attachment hint for downloads.",
+                  "type": "string"
+                }
+              },
+              "Content-Type": {
+                "schema": {
+                  "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [],
+        "summary": "Download a purchased digital file",
+        "tags": [
+          "digital-assets"
+        ]
+      }
+    },
     "/v1/orders/{orderID}/extend-protection": {
       "post": {
         "operationId": "orders-post-extend-protection",
@@ -9603,6 +11570,7 @@
     },
     "/v1/orders/{orderID}/instructions/complete": {
       "post": {
+        "description": "Compatibility endpoint for client-signed moderated completion flows. ManagedEscrow-backed moderated completion stays on the backend-owned completion path and does not use this instructions contract as its primary entrypoint.",
         "operationId": "orders-post-instructions-complete",
         "parameters": [
           {
@@ -9657,7 +11625,7 @@
             "apiToken": []
           }
         ],
-        "summary": "Order completion payout instructions",
+        "summary": "Legacy completion payout instructions",
         "tags": [
           "orders"
         ]
@@ -9787,69 +11755,6 @@
         ]
       }
     },
-    "/v1/orders/{orderID}/rwa-token/payment-info": {
-      "post": {
-        "operationId": "orders-post-rwa-token-payment-info",
-        "parameters": [
-          {
-            "description": "Order ID.",
-            "in": "path",
-            "name": "orderID",
-            "required": true,
-            "schema": {
-              "description": "Order ID.",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {}
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Success envelope inner data."
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnvelopeError"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "security": [
-          {
-            "basicAuth": []
-          },
-          {
-            "bearerJWT": []
-          },
-          {
-            "apiToken": []
-          }
-        ],
-        "description": "Returns buyer and vendor chain identity addresses for RWA token purchases.",
-        "summary": "Get RWA token identity payment info",
-        "tags": [
-          "orders"
-        ]
-      }
-    },
     "/v1/orders/{orderID}/instructions/refund": {
       "post": {
         "operationId": "orders-post-instructions-refund",
@@ -9971,6 +11876,124 @@
         "summary": "Buyer submit payment payloads",
         "tags": [
           "orders"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/payment-session": {
+      "get": {
+        "description": "Returns a PaymentSession projection built from existing order, payment, and fiat metadata. Settlement modes include address_monitored (UTXO, ExternalPayment, ManagedEscrow-backed EVM, and Solana escrow when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), and provider_checkout (Stripe/PayPal).",
+        "operationId": "orders-get-payment-session",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Unified payment session view for an order",
+        "tags": [
+          "orders",
+          "payments"
+        ]
+      },
+      "post": {
+        "description": "Creates or idempotently returns a PaymentSession. Fiat: canonical paymentCoin fiat:{provider}:{currency}, fiatAmountCents (\u003e0), and optional PayPal return/cancel URLs. Crypto: optional refundAddress/payerAddress/moderator; address-monitored flows may auto-fill refunds after confirmation.",
+        "operationId": "orders-post-payment-session",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Provision unified payment session",
+        "tags": [
+          "orders",
+          "payments"
         ]
       }
     },
@@ -10261,6 +12284,220 @@
         "summary": "Finalize refund transaction",
         "tags": [
           "orders"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/rwa-token/payment-info": {
+      "post": {
+        "description": "Returns buyer and vendor chain identity addresses for RWA token purchases.",
+        "operationId": "orders-post-rwa-token-payment-info",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get RWA token identity payment info",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/settlement-actions/{action}": {
+      "post": {
+        "description": "Runs the default backend-submitted settlement action flow for crypto orders, including ManagedEscrow-backed EVM. Client-signed legacy chains must keep using the legacy instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
+        "operationId": "orders-post-settlement-action",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Settlement intent: confirm or cancel.",
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "description": "Settlement intent: confirm or cancel.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Execute backend settlement action (confirm / cancel)",
+        "tags": [
+          "orders",
+          "payments"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/settlement-actions/{action}/status": {
+      "get": {
+        "description": "Returns the latest status for a previously issued backend settlement action. ManagedEscrow-backed flows expose relay task correlation and confirmations through this endpoint.",
+        "operationId": "orders-get-settlement-action-status",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Settlement intent: confirm or cancel.",
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "description": "Settlement intent: confirm or cancel.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque settlement action poll key returned by POST settlement-actions.",
+            "explode": false,
+            "in": "query",
+            "name": "actionId",
+            "required": true,
+            "schema": {
+              "description": "Opaque settlement action poll key returned by POST settlement-actions.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Read unified settlement action status",
+        "tags": [
+          "orders",
+          "payments"
         ]
       }
     },
@@ -12123,17 +14360,6 @@
             "description": "Error"
           }
         },
-        "security": [
-          {
-            "basicAuth": []
-          },
-          {
-            "bearerJWT": []
-          },
-          {
-            "apiToken": []
-          }
-        ],
         "summary": "Get guest checkout settings",
         "tags": [
           "settings"
@@ -12183,6 +14409,244 @@
           }
         ],
         "summary": "Update guest checkout settings",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/settings/guest-checkout/readiness": {
+      "get": {
+        "operationId": "settings-guest-checkout-readiness-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get guest checkout UTXO readiness",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/settings/payment-policy": {
+      "get": {
+        "operationId": "settings-payment-policy-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get store payment policy",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "settings-payment-policy-put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Update store payment policy",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/settings/pgp-key": {
+      "delete": {
+        "operationId": "settings-pgp-key-delete",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          }
+        ],
+        "summary": "Remove seller PGP public key",
+        "tags": [
+          "settings"
+        ]
+      },
+      "get": {
+        "operationId": "settings-pgp-key-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get seller PGP public key (public)",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "settings-pgp-key-put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          }
+        ],
+        "summary": "Set seller PGP public key",
         "tags": [
           "settings"
         ]
@@ -13096,9 +15560,9 @@
         ]
       }
     },
-    "/v1/system/cache": {
-      "delete": {
-        "operationId": "system-cache-delete",
+    "/v1/store-policy": {
+      "get": {
+        "operationId": "store-policy-get",
         "responses": {
           "200": {
             "content": {
@@ -13130,6 +15594,438 @@
           },
           {
             "apiToken": []
+          }
+        ],
+        "summary": "Get store policy",
+        "tags": [
+          "store-policy"
+        ]
+      }
+    },
+    "/v1/store-policy/moderators": {
+      "get": {
+        "operationId": "store-policy-moderators-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List store moderators",
+        "tags": [
+          "store-policy"
+        ]
+      },
+      "post": {
+        "operationId": "store-policy-moderators-post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Add or update store moderator",
+        "tags": [
+          "store-policy"
+        ]
+      },
+      "put": {
+        "operationId": "store-policy-moderators-put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Replace store moderators",
+        "tags": [
+          "store-policy"
+        ]
+      }
+    },
+    "/v1/store-policy/moderators/{peerID}": {
+      "delete": {
+        "operationId": "store-policy-moderators-peer-delete",
+        "parameters": [
+          {
+            "description": "Moderator peer ID.",
+            "in": "path",
+            "name": "peerID",
+            "required": true,
+            "schema": {
+              "description": "Moderator peer ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Remove store moderator",
+        "tags": [
+          "store-policy"
+        ]
+      }
+    },
+    "/v1/store-policy/{peerID}/published": {
+      "get": {
+        "operationId": "store-policy-peer-published-get",
+        "parameters": [
+          {
+            "description": "Store peer ID.",
+            "in": "path",
+            "name": "peerID",
+            "required": true,
+            "schema": {
+              "description": "Store peer ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get published store policy",
+        "tags": [
+          "store-policy"
+        ]
+      }
+    },
+    "/v1/stores/{storeID}/licenses/activate": {
+      "post": {
+        "description": "Binds a license key to a device fingerprint. Returns existing activation if already activated for this fingerprint.",
+        "operationId": "license-activate",
+        "parameters": [
+          {
+            "description": "Store identifier (peerID or handle).",
+            "in": "path",
+            "name": "storeID",
+            "required": true,
+            "schema": {
+              "description": "Store identifier (peerID or handle).",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/License-activateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LicenseActivationResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [],
+        "summary": "Activate a license key on a device",
+        "tags": [
+          "licenses"
+        ]
+      }
+    },
+    "/v1/stores/{storeID}/licenses/deactivate": {
+      "post": {
+        "description": "Unbinds a license key from a device fingerprint, freeing up an activation slot.",
+        "operationId": "license-deactivate",
+        "parameters": [
+          {
+            "description": "Store identifier (peerID or handle).",
+            "in": "path",
+            "name": "storeID",
+            "required": true,
+            "schema": {
+              "description": "Store identifier (peerID or handle).",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/License-deactivateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [],
+        "summary": "Deactivate a license key on a device",
+        "tags": [
+          "licenses"
+        ]
+      }
+    },
+    "/v1/stores/{storeID}/licenses/validate": {
+      "post": {
+        "description": "Checks whether a license key is valid and returns its status. Public endpoint for use by third-party software.",
+        "operationId": "license-validate",
+        "parameters": [
+          {
+            "description": "Store identifier (peerID or handle). Used for multi-tenant routing in SaaS mode.",
+            "in": "path",
+            "name": "storeID",
+            "required": true,
+            "schema": {
+              "description": "Store identifier (peerID or handle). Used for multi-tenant routing in SaaS mode.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/License-validateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LicenseValidationResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [],
+        "summary": "Validate a license key",
+        "tags": [
+          "licenses"
+        ]
+      }
+    },
+    "/v1/system/cache": {
+      "delete": {
+        "operationId": "system-cache-delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
           }
         ],
         "summary": "Purge publishing cache",
@@ -13216,9 +16112,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Bind standalone store owner to SaaS identity",
@@ -13258,9 +16151,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Export structured diagnostics blob",
@@ -13300,9 +16190,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Run self-check diagnostics snapshot",
@@ -13342,9 +16229,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Inspect store domain bindings",
@@ -13390,9 +16274,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Update store domain configuration",
@@ -13432,9 +16313,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Node health and telemetry",
@@ -13506,9 +16384,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Get system/network info snapshot",
@@ -13548,9 +16423,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Tail recent node log lines",
@@ -13590,9 +16462,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Detect MCP client capabilities",
@@ -13633,9 +16502,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "List configured MCP clients",
@@ -13684,9 +16550,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Auto-configure MCP client",
@@ -13745,9 +16608,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Auto-configure a specific MCP client",
@@ -13788,9 +16648,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Remove MCP integration",
@@ -13841,9 +16698,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Remove integration for one MCP client",
@@ -13884,9 +16738,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Inspect network overlays and listening multiaddrs",
@@ -13932,9 +16783,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Change network overlays (standalone)",
@@ -13974,9 +16822,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Publish store data",
@@ -14047,7 +16892,7 @@
             "description": "Error"
           }
         },
-        "summary": "Standalone one-time password setup (public)",
+        "summary": "Standalone one-time password setup",
         "tags": [
           "system"
         ]
@@ -14084,9 +16929,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Shutdown standalone node process",
@@ -14126,9 +16968,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Read auto-update configuration sidecar",
@@ -14174,9 +17013,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Write auto-update configuration sidecar",
@@ -14224,9 +17060,6 @@
           },
           {
             "bearerJWT": []
-          },
-          {
-            "apiToken": []
           }
         ],
         "summary": "Ask launcher/native updater to action",

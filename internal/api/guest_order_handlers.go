@@ -117,8 +117,8 @@ func (g *Gateway) handlePOSTGuestOrderQuote(w http.ResponseWriter, r *http.Reque
 
 	resp, err := svc.QuoteGuestOrderSupply(r.Context(), req)
 	if err != nil {
-		status, code := classifyGuestOrderError(err)
-		response.Error(w, status, code, err.Error())
+		status, code, message := classifyGuestSupplyQuoteError(err)
+		response.Error(w, status, code, message)
 		return
 	}
 	response.Success(w, resp)

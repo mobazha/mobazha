@@ -12,6 +12,7 @@ import (
 	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/core/checkoutsupply"
 	"github.com/mobazha/mobazha3.0/internal/core/guest"
 	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
@@ -981,6 +982,15 @@ func (n *MobazhaNode) initGuestOrderService() {
 	n.guestPaymentMonitor = guest.NewGuestPaymentMonitor(n.db, n.guestOrderService, nil, nil)
 	n.guestPaymentMonitor.SetMultiwallet(n.multiwallet)
 	n.guestOrderService.SetPaymentWatcher(n.guestPaymentMonitor)
+
+	checkoutSupplyQuoter := checkoutsupply.NewCheckoutSupplyQuoteService(checkoutsupply.CheckoutSupplyQuoteServiceConfig{
+		DB:                 n.db,
+		SupplyAvailability: n.supplyAvailabilityService,
+		Resolver:           n.featureResolver,
+		Listings:           n.listingService,
+	})
+	n.orderService.SetCheckoutSupplyQuoter(checkoutSupplyQuoter)
+	n.guestOrderService.SetCheckoutSupplyQuoter(checkoutSupplyQuoter)
 
 	n.unifiedOrderView = NewUnifiedOrderView(n.orderService, n.guestOrderService, n.db)
 }

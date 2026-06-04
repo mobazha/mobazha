@@ -146,6 +146,10 @@ type OrderService interface {
 	// SetOrderRefundAddressForPayment validates and persists the buyer-controlled
 	// crypto refund destination for an order once the payout coin is known.
 	SetOrderRefundAddressForPayment(ctx context.Context, orderID string, coin iwallet.CoinType, refundAddr string) error
+
+	// QuoteCheckoutSupply performs a buyer-safe advisory supply preflight for
+	// authenticated standard checkout without creating an order or holding inventory.
+	QuoteCheckoutSupply(ctx context.Context, req QuoteCheckoutSupplyRequest) (*CheckoutSupplyQuoteResponse, error)
 }
 
 // ListingService handles product listing management.

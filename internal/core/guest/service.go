@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/core/checkoutsupply"
 	ordercontracttype "github.com/mobazha/mobazha3.0/internal/core/contracttype"
 	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -116,6 +117,7 @@ type GuestOrderAppService struct {
 	evmManagedEscrowMonitorChains       map[iwallet.ChainType]struct{}
 	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
 	external_paymentAvailable func() bool
+	checkoutSupplyQuoter *checkoutsupply.CheckoutSupplyQuoteService
 }
 
 // SetEVMManagedEscrowSettlement wires Phase 3C ManagedEscrow relay settlement (after registerManagedEscrowAdapterShadow).
@@ -159,6 +161,20 @@ func (s *GuestOrderAppService) SetDigitalSupplyLineResolver(resolver DigitalSupp
 		return
 	}
 	s.digitalSupplyLines = resolver
+	if s.checkoutSupplyQuoter != nil {
+		s.checkoutSupplyQuoter.SetDigitalSupplyLineResolver(resolver)
+	}
+}
+
+// SetCheckoutSupplyQuoter wires the shared checkout supply quote service.
+func (s *GuestOrderAppService) SetCheckoutSupplyQuoter(quoter *checkoutsupply.CheckoutSupplyQuoteService) {
+	if s == nil {
+		return
+	}
+	s.checkoutSupplyQuoter = quoter
+	if s.digitalSupplyLines != nil && quoter != nil {
+		quoter.SetDigitalSupplyLineResolver(s.digitalSupplyLines)
+	}
 }
 
 // IsEnabled reports whether guest checkout is currently enabled, consulting
@@ -205,44 +221,18 @@ func (s *GuestOrderAppService) QuoteGuestOrderSupply(ctx context.Context, req co
 	if !s.IsEnabled(ctx) {
 		return nil, contracts.ErrGuestCheckoutDisabled
 	}
-	if len(req.Items) == 0 {
-		return nil, fmt.Errorf("at least one item is required")
-	}
 	cfg, err := s.loadGuestCheckoutConfig()
 	if err != nil || !cfg.Enabled {
 		return nil, contracts.ErrGuestCheckoutDisabled
 	}
-
-	items, itemBuckets, itemStockLimits, err := s.resolveGuestSupplyQuoteItems(req.Items)
-	if err != nil {
-		return nil, err
+	if s.checkoutSupplyQuoter == nil {
+		return nil, fmt.Errorf("checkout supply quote service not configured")
 	}
-	if !s.isSupplyAvailabilityQuoteEnabled(ctx) {
-		return unknownGuestSupplyQuoteResponse(req.Items, "supply_availability_disabled"), nil
+	items := make([]contracts.CheckoutSupplyItemRequest, len(req.Items))
+	for i, item := range req.Items {
+		items[i] = contracts.CheckoutSupplyItemRequest(item)
 	}
-
-	externalMappings, err := s.guestExternalSupplyMappingsForItems(items)
-	if err != nil {
-		return nil, fmt.Errorf("resolve guest external supply mappings: %w", err)
-	}
-	lines, err := s.supplyAvailabilityLinesForGuestItems(ctx, items, itemBuckets, itemStockLimits, externalMappings)
-	if err != nil {
-		return nil, fmt.Errorf("resolve guest supply lines: %w", err)
-	}
-	if len(lines) == 0 {
-		return unknownGuestSupplyQuoteResponse(req.Items, "supply_lines_unavailable"), nil
-	}
-	quote, err := s.supplyAvailability.Quote(ctx, contracts.SupplyQuoteRequest{
-		OrderType: models.OrderTypeGuest,
-		Lines:     lines,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("quote guest supply: %w", err)
-	}
-	if quote == nil {
-		return unknownGuestSupplyQuoteResponse(req.Items, "quote_unavailable"), nil
-	}
-	return guestSupplyQuoteResponseFromResult(lines, quote), nil
+	return s.checkoutSupplyQuoter.Quote(ctx, models.OrderTypeGuest, "guest_quote", items)
 }
 
 // CreateGuestOrder validates items, reserves inventory, generates a payment address,
@@ -1040,121 +1030,11 @@ func (s *GuestOrderAppService) transitionState(
 
 // --- Inventory helpers ---
 
-func (s *GuestOrderAppService) resolveGuestSupplyQuoteItems(reqItems []contracts.GuestOrderItemRequest) ([]models.GuestOrderItem, []guestInventoryBucketKey, map[guestInventoryBucketKey]int64, error) {
-	items := make([]models.GuestOrderItem, 0, len(reqItems))
-	itemBuckets := make([]guestInventoryBucketKey, 0, len(reqItems))
-	itemStockLimits := make(map[guestInventoryBucketKey]int64)
-	var orderContractType pb.Listing_Metadata_ContractType
-	var hasOrderContractType bool
-	var priceCurrencyCode string
-
-	for _, reqItem := range reqItems {
-		if reqItem.Quantity <= 0 {
-			return nil, nil, nil, fmt.Errorf("%w: item %q quantity must be positive",
-				contracts.ErrInvalidGuestRequest, reqItem.ListingSlug)
-		}
-		resolved, err := s.resolveItemPrice(reqItem)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("resolve price for %q: %w", reqItem.ListingSlug, err)
-		}
-		var sameType bool
-		orderContractType, hasOrderContractType, sameType = ordercontracttype.AddToSingleTypeOrder(
-			orderContractType,
-			hasOrderContractType,
-			resolved.ContractType,
-		)
-		if !sameType {
-			return nil, nil, nil, fmt.Errorf("%w: %s",
-				contracts.ErrInvalidGuestRequest,
-				ordercontracttype.MixedOrderTypeMessage(orderContractType, resolved.ContractType, reqItem.ListingSlug),
-			)
-		}
-		if priceCurrencyCode == "" {
-			priceCurrencyCode = resolved.PriceCurrencyCode
-		} else if priceCurrencyCode != resolved.PriceCurrencyCode {
-			return nil, nil, nil, fmt.Errorf("%w: mixed pricing currencies (%s vs %s)",
-				contracts.ErrInvalidGuestRequest, priceCurrencyCode, resolved.PriceCurrencyCode)
-		}
-
-		bucket := guestInventoryBucketKey{Slug: reqItem.ListingSlug, VariantHash: resolved.VariantHash}
-		itemBuckets = append(itemBuckets, bucket)
-		if resolved.HasStockTracking {
-			itemStockLimits[bucket] = resolved.StockQty
-		}
-		items = append(items, models.GuestOrderItem{
-			OrderToken:   "guest_quote",
-			ListingSlug:  reqItem.ListingSlug,
-			ContractType: resolved.ContractType.String(),
-			Quantity:     reqItem.Quantity,
-			VariantHash:  resolved.VariantHash,
-			VariantSKU:   resolved.VariantSKU,
-		})
-	}
-	return items, itemBuckets, itemStockLimits, nil
-}
-
 func (s *GuestOrderAppService) isSupplyAvailabilityQuoteEnabled(ctx context.Context) bool {
 	if s == nil || s.supplyAvailability == nil || s.resolver == nil {
 		return false
 	}
 	return s.resolver.IsEnabled(ctx, pkgconfig.FeatureSupplyAvailabilityEnabled.Key)
-}
-
-func unknownGuestSupplyQuoteResponse(items []contracts.GuestOrderItemRequest, reason string) *contracts.GuestOrderSupplyQuoteResponse {
-	resp := &contracts.GuestOrderSupplyQuoteResponse{
-		CanSell: true,
-		Reason:  reason,
-		Items:   make([]contracts.GuestOrderSupplyQuoteItem, 0, len(items)),
-	}
-	for _, item := range items {
-		resp.Items = append(resp.Items, contracts.GuestOrderSupplyQuoteItem{
-			ListingSlug: item.ListingSlug,
-			Quantity:    item.Quantity,
-			Status:      contracts.SupplyAvailabilityUnknown,
-			Available:   false,
-			Reason:      reason,
-		})
-	}
-	return resp
-}
-
-func guestSupplyQuoteResponseFromResult(lines []contracts.SupplyLine, quote *contracts.SupplyQuoteResult) *contracts.GuestOrderSupplyQuoteResponse {
-	resp := &contracts.GuestOrderSupplyQuoteResponse{
-		CanSell:              quote.CanSell,
-		ManualActionRequired: quote.ManualActionRequired,
-		Reason:               quote.Reason,
-		Items:                make([]contracts.GuestOrderSupplyQuoteItem, 0, len(lines)),
-	}
-	resultsByLineID := make(map[string]contracts.AvailabilityResult, len(quote.Results))
-	for _, result := range quote.Results {
-		if result.LineID != "" {
-			resultsByLineID[result.LineID] = result
-		}
-	}
-	for i, line := range lines {
-		var result contracts.AvailabilityResult
-		if line.LineID != "" {
-			result = resultsByLineID[line.LineID]
-		}
-		if result.Status == "" && i < len(quote.Results) {
-			result = quote.Results[i]
-		}
-		if result.Status == "" {
-			result.Status = contracts.SupplyAvailabilityUnknown
-		}
-		resp.Items = append(resp.Items, contracts.GuestOrderSupplyQuoteItem{
-			ListingSlug:          line.ListingSlug,
-			Quantity:             line.Quantity,
-			SupplyKind:           line.SupplyKind,
-			Status:               result.Status,
-			Available:            result.Available,
-			Unlimited:            result.Unlimited,
-			AvailableQuantity:    result.AvailableQuantity,
-			ManualActionRequired: result.ManualActionRequired,
-			Reason:               result.Reason,
-		})
-	}
-	return resp
 }
 
 type transactionalSupplyAvailabilityService interface {

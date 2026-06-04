@@ -55,35 +55,13 @@ type QuoteGuestOrderSupplyRequest struct {
 }
 
 // GuestOrderItemRequest describes a single item in a guest order.
-type GuestOrderItemRequest struct {
-	ListingSlug     string              `json:"listingSlug"`
-	ListingHash     string              `json:"listingHash"`
-	Quantity        int                 `json:"quantity"`
-	Options         []map[string]string `json:"options,omitempty"`
-	ShippingOption  string              `json:"shippingOption,omitempty"`
-	ShippingService string              `json:"shippingService,omitempty"`
-}
+type GuestOrderItemRequest = CheckoutSupplyItemRequest
 
 // GuestOrderSupplyQuoteResponse is a buyer-safe supply preflight response.
-// It intentionally omits provider identifiers and provider references.
-type GuestOrderSupplyQuoteResponse struct {
-	Items                []GuestOrderSupplyQuoteItem `json:"items"`
-	CanSell              bool                        `json:"canSell"`
-	ManualActionRequired bool                        `json:"manualActionRequired,omitempty"`
-	Reason               string                      `json:"reason,omitempty"`
-}
+type GuestOrderSupplyQuoteResponse = CheckoutSupplyQuoteResponse
 
-type GuestOrderSupplyQuoteItem struct {
-	ListingSlug          string                   `json:"listingSlug"`
-	Quantity             int                      `json:"quantity"`
-	SupplyKind           SupplyKind               `json:"-"` // buyer-safe API: internal routing only
-	Status               SupplyAvailabilityStatus `json:"status"`
-	Available            bool                     `json:"available"`
-	Unlimited            bool                     `json:"unlimited,omitempty"`
-	AvailableQuantity    int64                    `json:"availableQuantity,omitempty"`
-	ManualActionRequired bool                     `json:"manualActionRequired,omitempty"`
-	Reason               string                   `json:"reason,omitempty"`
-}
+// GuestOrderSupplyQuoteItem is one buyer-visible line in a guest supply quote.
+type GuestOrderSupplyQuoteItem = CheckoutSupplyQuoteItem
 
 // GuestOrderResponse is returned after order creation.
 type GuestOrderResponse struct {

@@ -761,11 +761,13 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 				return err
 			}
 
-			go func() {
-				<-done1
-				<-done2
-				close(done)
-			}()
+			if done != nil {
+				go func() {
+					<-done1
+					<-done2
+					close(done)
+				}()
+			}
 
 			return nil
 		}
@@ -824,11 +826,13 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 					return err
 				}
 
-				go func() {
-					<-done1
-					<-done2
-					close(done)
-				}()
+				if done != nil {
+					go func() {
+						<-done1
+						<-done2
+						close(done)
+					}()
+				}
 
 				return refundResult.commit()
 			}
@@ -1405,7 +1409,7 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 				return nil, fmt.Errorf("failed to release settlement CANCELABLE escrow for refund: %w", err)
 			}
 			if !handled {
-				return nil, errors.New("automatic refund for unconfirmed CANCELABLE orders is only supported for UTXO script, ManagedEscrow, or Solana escrow")
+				return nil, errors.New("automatic refund for unconfirmed CANCELABLE orders requires ManagedEscrow or Solana escrow via settlement-actions; UTXO uses inline escrow release")
 			}
 			if settlementTxid == "" {
 				return nil, fmt.Errorf("settlement cancelable refund for order %s returned no transaction id", order.ID)

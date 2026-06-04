@@ -196,3 +196,133 @@ func TestCompleteOrder_ManagedEscrowMonitored_SkipsInlineReleaseWhenSettlementTx
 	_, err = updated.OrderCompleteMessage()
 	require.NoError(t, err)
 }
+
+func seedUTXOModeratedShippedOrderForComplete(
+	t *testing.T,
+	svc *OrderAppService,
+	orderID string,
+	buyerPeerID, sellerPeerID peer.ID,
+) {
+	t.Helper()
+
+	coinType := iwallet.CoinType("BCH")
+	order := &models.Order{
+		ID:             models.OrderID(orderID),
+		MyRole:         string(models.RoleBuyer),
+		PaymentAddress: "bitcoincash:qpayment",
+		Open:           true,
+	}
+	order.SetFSMState(models.OrderState_SHIPPED)
+
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
+		BuyerID:   &pb.ID{PeerID: buyerPeerID.String()},
+		Chaincode: "01020304",
+		Listings: []*pb.SignedListing{{
+			Listing: &pb.Listing{
+				VendorID: &pb.ID{PeerID: sellerPeerID.String()},
+				Slug:     "utxo-complete-test",
+				Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_PHYSICAL_GOOD},
+				Item: &pb.Listing_Item{
+					Title: "UTXO complete item",
+					Images: []*pb.Image{{
+						Tiny:  "ipfs://tiny",
+						Small: "ipfs://small",
+					}},
+				},
+			},
+		}},
+		Items: []*pb.OrderOpen_Item{{ListingHash: "listing-1", Quantity: "1"}},
+	})))
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderShipment{
+		Shipments: []*pb.OrderShipment_ShippedItem{{ItemIndex: 0}},
+		ReleaseInfo: &pb.EscrowRelease{
+			ToAddress: "bitcoincash:qvendor",
+		},
+	})))
+
+	paymentSent := &pb.PaymentSent{
+		Coin:           string(coinType),
+		Amount:         "100000",
+		ToAddress:      order.PaymentAddress,
+		Moderator:      "12D3KooWModerator",
+		Chaincode:      "abcd",
+		Script:         "beef",
+		SettlementSpec: payment.NewUTXOSpec(true).ToPaymentSent(),
+	}
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+}
+
+func newUTXOCompleteTestService(
+	t *testing.T,
+	buyerSigner contracts.Signer,
+	buyerPeerID peer.ID,
+) *OrderAppService {
+	t.Helper()
+
+	reg := payment.NewRegistry()
+	reg.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored})
+
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	require.NoError(t, intdb.MigrateManagedEscrowRelayActionModels(db))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.SetProfile(&models.Profile{Name: "Test Buyer"})
+	}))
+	t.Cleanup(func() { _ = db.Close() })
+
+	bus := events.NewBus()
+	op := orders.NewOrderProcessor(&orders.Config{
+		NodeID:    "utxo-complete-test",
+		Db:        db,
+		Signer:    buyerSigner,
+		Messenger: noopMessenger{},
+		EventBus:  bus,
+	})
+
+	return NewOrderAppService(OrderAppServiceConfig{
+		DB:              db,
+		PaymentRegistry: reg,
+		Signer:          buyerSigner,
+		OrderProcessor:  op,
+		Messenger:       noopMessenger{},
+		EventBus:        bus,
+		NodeID:          "utxo-complete-test",
+		PeerID:          func() peer.ID { return buyerPeerID },
+	})
+}
+
+func TestCompleteOrder_UTXOMonitored_RequiresSettlementAction(t *testing.T) {
+	t.Parallel()
+
+	buyerSigner, buyerPeerID := testSigner(t)
+	_, sellerPeerID := testSigner(t)
+	svc := newUTXOCompleteTestService(t, buyerSigner, buyerPeerID)
+
+	const orderID = "utxo-complete-no-settlement"
+	seedUTXOModeratedShippedOrderForComplete(t, svc, orderID, buyerPeerID, sellerPeerID)
+
+	err := svc.CompleteOrder(models.OrderID(orderID), "", nil, false, nil)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+	assert.Contains(t, err.Error(), "settlement-actions/complete")
+}
+
+func TestCompleteOrder_RejectsClientTxIDWithoutSettlementEvidence(t *testing.T) {
+	t.Parallel()
+
+	buyerSigner, buyerPeerID := testSigner(t)
+	_, sellerPeerID := testSigner(t)
+	svc := newUTXOCompleteTestService(t, buyerSigner, buyerPeerID)
+
+	const orderID = "utxo-complete-fake-txid"
+	seedUTXOModeratedShippedOrderForComplete(t, svc, orderID, buyerPeerID, sellerPeerID)
+
+	err := svc.CompleteOrder(models.OrderID(orderID), iwallet.TransactionID("fake-txid-without-settlement"), nil, false, nil)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+	assert.Contains(t, err.Error(), "settlement-actions/complete")
+}

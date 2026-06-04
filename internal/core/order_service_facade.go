@@ -36,10 +36,14 @@ func (f *orderServiceFacade) GetConfirmOrderInstructions(orderID models.OrderID,
 // ExecuteSettlementAction is the default settlement surface for backend-
 // submitted routes such as ManagedEscrow-backed EVM.
 func (f *orderServiceFacade) ExecuteSettlementAction(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*paypkg.ActionResult, iwallet.CoinType, error) {
-	if strings.EqualFold(strings.TrimSpace(action), "complete") {
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case "complete":
 		return f.OrderAppService.ExecuteSettlementCompleteAction(ctx, orderID)
+	case "dispute_release":
+		return f.OrderAppService.ExecuteSettlementDisputeReleaseAction(ctx, orderID)
+	default:
+		return f.settlement.ExecuteSettlementAction(ctx, action, orderID, payoutAddr)
 	}
-	return f.settlement.ExecuteSettlementAction(ctx, action, orderID, payoutAddr)
 }
 
 func (f *orderServiceFacade) GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*paypkg.ActionStatus, iwallet.CoinType, error) {

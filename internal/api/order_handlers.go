@@ -333,6 +333,7 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 		State              string                      `json:"state"`
 		Read               bool                        `json:"read"`
 		Moderated          bool                        `json:"moderated"`
+		PaymentEscrowType  string                      `json:"paymentEscrowType,omitempty"`
 		SettlementAction   string                      `json:"settlementAction,omitempty"`
 		SettlementActionID string                      `json:"settlementActionId,omitempty"`
 		SettlementState    string                      `json:"settlementState,omitempty"`
@@ -353,10 +354,14 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 
 		paymentSent, err := order.PaymentSentMessage()
 		paymentCoin := ""
+		paymentEscrowType := ""
 		isModerated := false
 		if err == nil {
 			isModerated = paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_MODERATED
 			paymentCoin = paymentSent.Coin
+			if paymentSent.GetSettlementSpec() != nil {
+				paymentEscrowType = paymentSent.GetSettlementSpec().GetEscrowType()
+			}
 		}
 
 		var listingInfo *pb.Listing
@@ -386,6 +391,7 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
 			PaymentCoin:        paymentCoin,
+			PaymentEscrowType:  paymentEscrowType,
 			State:              order.State.String(),
 			Read:               order.Read,
 			UnreadChatMessages: order.UnreadChatMessages,
@@ -468,6 +474,7 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 		State              string                      `json:"state"`
 		Read               bool                        `json:"read"`
 		Moderated          bool                        `json:"moderated"`
+		PaymentEscrowType  string                      `json:"paymentEscrowType,omitempty"`
 		SettlementAction   string                      `json:"settlementAction,omitempty"`
 		SettlementActionID string                      `json:"settlementActionId,omitempty"`
 		SettlementState    string                      `json:"settlementState,omitempty"`
@@ -489,9 +496,13 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 		paymentSent, err := order.PaymentSentMessage()
 		isModerated := false
 		paymentCoin := ""
+		paymentEscrowType := ""
 		if err == nil {
 			isModerated = paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_MODERATED
 			paymentCoin = paymentSent.Coin
+			if paymentSent.GetSettlementSpec() != nil {
+				paymentEscrowType = paymentSent.GetSettlementSpec().GetEscrowType()
+			}
 		}
 
 		var listingInfo *pb.Listing
@@ -521,6 +532,7 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
 			PaymentCoin:        paymentCoin,
+			PaymentEscrowType:  paymentEscrowType,
 			State:              order.State.String(),
 			Read:               order.Read,
 			UnreadChatMessages: order.UnreadChatMessages,
@@ -807,26 +819,17 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 
 	orderSvc := getOrderService(r)
 
-	done := make(chan struct{})
-
 	if cancelParam.TransactionID != "" {
-		err = orderSvc.CancelOrder(models.OrderID(orderID), iwallet.TransactionID(cancelParam.TransactionID), done)
+		err = orderSvc.CancelOrder(models.OrderID(orderID), iwallet.TransactionID(cancelParam.TransactionID), nil)
 	} else {
-		err = orderSvc.CancelOrderViaRelay(models.OrderID(orderID), done)
+		err = orderSvc.CancelOrderViaRelay(models.OrderID(orderID), nil)
 	}
 	if err != nil {
 		orderActionErrorResponse(w, err)
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 15):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 // handleGETOrderConfirmationInstructions serves the legacy instructions surface
@@ -943,14 +946,13 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 
 	orderSvc := getOrderService(r)
 
-	done := make(chan struct{})
 	if !conf.Decline {
-		err = orderSvc.ConfirmOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, done)
+		err = orderSvc.ConfirmOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, nil)
 	} else {
 		if conf.TransactionID != "" {
-			err = orderSvc.DeclineOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, done)
+			err = orderSvc.DeclineOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, nil)
 		} else {
-			err = orderSvc.DeclineOrderViaRelay(models.OrderID(orderID), conf.Reason, done)
+			err = orderSvc.DeclineOrderViaRelay(models.OrderID(orderID), conf.Reason, nil)
 		}
 	}
 	if err != nil {
@@ -958,14 +960,7 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 15):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request) {
@@ -1033,21 +1028,13 @@ func (g *Gateway) handlePOSTOrderShipment(w http.ResponseWriter, r *http.Request
 
 	orderSvc := getOrderService(r)
 
-	done := make(chan struct{})
-	err = orderSvc.ShipOrder(models.OrderID(orderID), shipments, done)
+	err = orderSvc.ShipOrder(models.OrderID(orderID), shipments, nil)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 10):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handleGETOrderRefundInstructions(w http.ResponseWriter, r *http.Request) {
@@ -1076,26 +1063,17 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 
 	orderSvc := getOrderService(r)
 
-	done := make(chan struct{})
-
 	if refundParam.TransactionID != "" {
-		err = orderSvc.RefundOrder(models.OrderID(orderID), iwallet.TransactionID(refundParam.TransactionID), done)
+		err = orderSvc.RefundOrder(models.OrderID(orderID), iwallet.TransactionID(refundParam.TransactionID), nil)
 	} else {
-		err = orderSvc.RefundOrderViaRelay(models.OrderID(orderID), done)
+		err = orderSvc.RefundOrderViaRelay(models.OrderID(orderID), nil)
 	}
 	if err != nil {
 		orderActionErrorResponse(w, err)
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 15):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *http.Request) {

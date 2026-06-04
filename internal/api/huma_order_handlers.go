@@ -934,24 +934,21 @@ func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 
 // registerOrderSettlementActionPost registers POST /v1/orders/{orderID}/settlement-actions/{action}.
 //
-// Unified settlement intents (confirm / cancel) via ChainEscrowV2 — the
-// default backend settlement surface for ManagedEscrow-backed EVM and other
-// backend-submitted routes. Legacy POST .../instructions/* stays as the
-// compatibility path for client-signed chains only.
+// Backend settlement intents: confirm, cancel, complete, dispute-release.
 func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 	type in struct {
 		OrderID string          `path:"orderID" doc:"Order ID."`
-		Action  string          `path:"action" doc:"Settlement intent: confirm or cancel."`
+		Action  string          `path:"action" doc:"Settlement intent: confirm, cancel, complete, or dispute-release."`
 		Body    json.RawMessage `json:",omitempty"`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "orders-post-settlement-action",
 		Method:      http.MethodPost,
 		Path:        "/v1/orders/{orderID}/settlement-actions/{action}",
-		Summary:     "Execute backend settlement action (confirm / cancel)",
-		Description: "Runs the default backend-submitted settlement action flow for crypto orders, " +
-			"including ManagedEscrow-backed EVM. Client-signed legacy chains must keep using the legacy " +
-			"instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
+		Summary:     "Execute backend settlement action",
+		Description: "Runs backend-submitted settlement for crypto orders (ManagedEscrow EVM, Solana Anchor, UTXO sync). " +
+			"Supported actions: confirm, cancel, complete, dispute-release. " +
+			"Client-signed legacy chains use instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
@@ -976,7 +973,7 @@ func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 func (g *Gateway) registerOrderSettlementActionStatusGet(api huma.API) {
 	type in struct {
 		OrderID  string `path:"orderID" doc:"Order ID."`
-		Action   string `path:"action" doc:"Settlement intent: confirm or cancel."`
+		Action   string `path:"action" doc:"Settlement intent: confirm, cancel, complete, or dispute-release."`
 		ActionID string `query:"actionId" required:"true" doc:"Opaque settlement action poll key returned by POST settlement-actions."`
 	}
 	huma.Register(api, huma.Operation{

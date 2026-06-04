@@ -97,6 +97,81 @@ func TestHandlePOSTOrderSettlementAction_CompleteAccepted(t *testing.T) {
 	}
 }
 
+func TestHandlePOSTOrderSettlementAction_DisputeReleaseAccepted(t *testing.T) {
+	node := &mockNode{
+		executeSettlementActionFunc: func(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error) {
+			if action != "dispute_release" {
+				t.Fatalf("action = %s, want dispute_release", action)
+			}
+			return &payment.ActionResult{
+				Mode:              payment.ActionModeSubmitted,
+				ActionID:          "dispute-act-1",
+				SubmittedTxHash:   "0xdisputeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+			}, iwallet.CoinType("crypto:eip155:11155111:native"), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/orders/QmOrder123/settlement-actions/dispute-release", nil)
+	req = withNodeAndRouteParams(req, node, map[string]string{
+		"orderID": "QmOrder123",
+		"action":  "dispute-release",
+	})
+	rec := httptest.NewRecorder()
+
+	g := &Gateway{}
+	g.handlePOSTOrderSettlementAction(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandlePOSTOrderSettlementAction_RejectsInvalidActionPath(t *testing.T) {
+	for _, action := range []string{"dispute_release", "release", "bogus"} {
+		action := action
+		t.Run(action, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/v1/orders/QmOrder123/settlement-actions/"+action, nil)
+			req = withNodeAndRouteParams(req, &mockNode{}, map[string]string{
+				"orderID": "QmOrder123",
+				"action":  action,
+			})
+			rec := httptest.NewRecorder()
+
+			g := &Gateway{}
+			g.handlePOSTOrderSettlementAction(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400 body=%s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandleGETOrderSettlementActionStatus_DisputeReleaseAccepted(t *testing.T) {
+	node := &mockNode{
+		getSettlementActionStatusFunc: func(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error) {
+			if action != "dispute_release" {
+				t.Fatalf("action = %s, want dispute_release", action)
+			}
+			return &payment.ActionStatus{State: "submitted"}, iwallet.CoinType("crypto:eip155:1:native"), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/orders/QmOrder123/settlement-actions/dispute-release/status?actionId=act-123", nil)
+	req = withNodeAndRouteParams(req, node, map[string]string{
+		"orderID": "QmOrder123",
+		"action":  "dispute-release",
+	})
+	rec := httptest.NewRecorder()
+
+	g := &Gateway{}
+	g.handleGETOrderSettlementActionStatus(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandleGETOrderSettlementActionStatus_Success(t *testing.T) {
 	node := &mockNode{
 		getSettlementActionStatusFunc: func(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error) {

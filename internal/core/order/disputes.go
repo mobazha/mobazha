@@ -859,6 +859,10 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 		return fmt.Errorf("get order payment info for %s: %w", orderID, err)
 	}
 
+	if err := s.attachSettlementActions(order); err != nil {
+		return fmt.Errorf("load settlement actions for order %s: %w", orderID, err)
+	}
+
 	releaseTx, err := s.BuildDisputeReleaseTransaction(disputeClose.ReleaseInfo, paymentSent)
 	if err != nil {
 		return fmt.Errorf("build dispute release tx: %w", err)
@@ -868,31 +872,23 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 	if err != nil {
 		return err
 	}
-	releaseStrategy, stratErr := s.v2StrategyForCoin(coinType)
-	isMonitored := stratErr == nil && releaseStrategy.Model() == payment.PaymentModelMonitored
-	isClientSigned := stratErr == nil && releaseStrategy.Model() == payment.PaymentModelClientSigned
-	if txidSettlement, txSettlement, handled, err := s.submitSettlementDisputeReleaseAction(context.Background(), order, coinType, paymentSent, disputeClose.ReleaseInfo); handled {
-		if err != nil {
-			return err
-		}
-		txid = txidSettlement
-		if txSettlement != nil {
-			releaseTx = *txSettlement
-		}
-	} else if isMonitored {
-		if err := s.signAndSendReleaseTransaction(&releaseTx, paymentSent, disputeClose); err != nil {
-			return err
-		}
-		txid = releaseTx.ID
+
+	if !orderRequiresMonitoredSettlementActions(order, paymentSent, coinType, s.paymentRegistry) {
+		return errRetiredClientSignedModeratedSettlement("dispute_release")
 	}
-	if isClientSigned && txid != "" {
-		if s.receiptVerifier != nil {
-			if err := s.receiptVerifier.VerifyTransactionReceipt(context.Background(), string(coinType), txid.String()); err != nil {
-				return fmt.Errorf("dispute release transaction verification failed for order %s: %w", orderID, err)
-			}
-		}
-		releaseTx.ID = txid
+	if _, err := requireBackendSubmittedSettlementSpec(order, paymentSent); err != nil {
+		return err
 	}
+
+	var releaseAlreadySubmitted bool
+	txid, releaseAlreadySubmitted, err = evaluateMonitoredSettlementRelease(order, txid, "dispute_release")
+	if err != nil {
+		return err
+	}
+	if !releaseAlreadySubmitted {
+		return errSettlementReleaseActionRequired(orderID, "dispute_release")
+	}
+	releaseTx.ID = txid
 
 	buyer, err := order.Buyer()
 	if err != nil {
@@ -1195,12 +1191,13 @@ func (s *OrderAppService) GetLegacyReleaseFundsInstructions(orderID models.Order
 		return "", nil, err
 	}
 
+	method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
+	if ok && payment.MethodIsModerated(method) {
+		return coinType, nil, fmt.Errorf("%w: moderated dispute release uses POST /v1/orders/{orderID}/settlement-actions/dispute-release",
+			coreiface.ErrBadRequest)
+	}
+
 	if !orderRequiresClientSignedInstructions(order, paymentSent) {
-		spec, ok := payment.ResolveSettlementSpec(order, paymentSent)
-		if ok && spec.UsesManagedEscrow() {
-			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed moderated dispute payouts must use POST /v1/disputes/{orderID}/close or /v1/disputes/{orderID}/release",
-				coreiface.ErrBadRequest)
-		}
 		return coinType, nil, nil
 	}
 

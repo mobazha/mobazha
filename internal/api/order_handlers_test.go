@@ -142,7 +142,9 @@ func TestOrderHandlers(t *testing.T) {
 					if shipments[1].ReceivingAccountAddress != "" {
 						t.Fatalf("shipment 1 address = %q", shipments[1].ReceivingAccountAddress)
 					}
-					close(done)
+					if done != nil {
+						close(done)
+					}
 					return nil
 				}
 			},

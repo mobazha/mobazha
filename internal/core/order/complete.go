@@ -107,42 +107,8 @@ func (s *OrderAppService) GetLegacyCompleteOrderInstructions(orderID models.Orde
 	if !payment.MethodIsModerated(method) {
 		return coinType, nil, nil
 	}
-	if !orderRequiresClientSignedInstructions(&order, paymentSent) {
-		if spec, ok := payment.ResolveSettlementSpec(&order, paymentSent); ok && spec.UsesManagedEscrow() {
-			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed moderated completion must use POST /v1/orders/{orderID}/settlement-actions/complete",
-				coreiface.ErrBadRequest)
-		}
-		return coinType, nil, nil
-	}
-
-	shipments, err := order.OrderShipmentMessages()
-	if err != nil {
-		return coinType, nil, fmt.Errorf("failed to get order shipments: %w", err)
-	}
-
-	if _, err := order.Buyer(); err != nil {
-		return coinType, nil, fmt.Errorf("failed to get buyer: %w", err)
-	}
-	if _, err := order.Vendor(); err != nil {
-		return coinType, nil, fmt.Errorf("failed to get vendor: %w", err)
-	}
-
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
-	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
-	}
-
-	result, err := strategy.GetCompleteInstructions(context.Background(), payment.InstructionParams{
-		OrderID:       orderID.String(),
-		InitiatorAddr: initiatorAddress,
-		OrderData:     &order,
-		ReleaseInfo:   shipments[0].ReleaseInfo,
-	})
-	if err != nil {
-		return coinType, nil, err
-	}
-
-	return coinType, result.Instructions, nil
+	return coinType, nil, fmt.Errorf("%w: moderated completion uses POST /v1/orders/{orderID}/settlement-actions/complete",
+		coreiface.ErrBadRequest)
 }
 
 // CompleteOrder builds an OrderComplete message and sends it to the vendor.
@@ -231,83 +197,30 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 
 	var releaseTx *iwallet.Transaction
 	if method, ok := payment.ResolvedPaymentMethod(&order, paymentSent); ok && payment.MethodIsModerated(method) {
-		completionStrategy, csErr := s.paymentRegistry.ForCoinV2(coinType)
-		isClientSigned := csErr == nil && completionStrategy.Model() == payment.PaymentModelClientSigned
-		usesBackendSettlementComplete := orderUsesMonitoredBackendSettlementComplete(
-			&order,
-			paymentSent,
-			coinType,
-			s.paymentRegistry,
-		)
-
-		if usesBackendSettlementComplete {
-			if completeSettlementReleasePending(&order, txid) {
-				return fmt.Errorf("%w: settlement complete release is still pending; retry after tx hash is available",
-					coreiface.ErrBadRequest)
-			}
-			releaseAlreadySubmitted := completeSettlementReleaseReady(&order, txid)
-			if releaseAlreadySubmitted {
-				release := cloneEscrowRelease(shipments[0].ReleaseInfo)
-				if release == nil {
-					return fmt.Errorf("%w: shipment release info is missing", coreiface.ErrBadRequest)
-				}
-				if txid != "" {
-					release.Txid = txid.String()
-					releaseTx = &iwallet.Transaction{ID: txid}
-				} else {
-					for _, action := range order.SettlementActions {
-						if settlementActionName(action) != "complete" {
-							continue
-						}
-						if action.TxHash != "" {
-							release.Txid = action.TxHash
-							releaseTx = &iwallet.Transaction{ID: iwallet.TransactionID(action.TxHash)}
-						}
-						break
-					}
-				}
-				completeMsg.ReleaseInfo = release
-			} else {
-				wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
-				if err != nil {
-					return err
-				}
-				release, tx, err := s.releaseCompleteEscrowFunds(&order, wallet, shipments[0].ReleaseInfo)
-				if err != nil {
-					return err
-				}
-				completeMsg.ReleaseInfo = release
-				releaseTx = tx
-			}
-		} else {
-			wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
-			if err != nil {
-				return err
-			}
-
-			release, tx, err := s.releaseCompleteEscrowFunds(&order, wallet, shipments[0].ReleaseInfo)
-			if err != nil {
-				return err
-			}
-			if isClientSigned {
-				release.Txid = txid.String()
-
-				if txid != "" {
-					if s.receiptVerifier != nil {
-						if err := s.receiptVerifier.VerifyTransactionReceipt(context.Background(), string(coinType), txid.String()); err != nil {
-							return fmt.Errorf("release transaction verification failed for order %s: %w", orderID, err)
-						}
-					}
-					syntheticTx := iwallet.Transaction{ID: txid}
-					releaseTx = &syntheticTx
-				}
-			}
-
-			completeMsg.ReleaseInfo = release
-			if releaseTx == nil {
-				releaseTx = tx
-			}
+		if !orderRequiresMonitoredSettlementActions(&order, paymentSent, coinType, s.paymentRegistry) {
+			return errRetiredClientSignedModeratedSettlement("complete")
 		}
+		if _, err := requireBackendSubmittedSettlementSpec(&order, paymentSent); err != nil {
+			return err
+		}
+
+		var releaseAlreadySubmitted bool
+		txid, releaseAlreadySubmitted, err = evaluateMonitoredSettlementRelease(&order, txid, "complete")
+		if err != nil {
+			return err
+		}
+		if !releaseAlreadySubmitted {
+			return errSettlementReleaseActionRequired(orderID, "complete")
+		}
+		release := cloneEscrowRelease(shipments[0].ReleaseInfo)
+		if release == nil {
+			return fmt.Errorf("%w: shipment release info is missing", coreiface.ErrBadRequest)
+		}
+		if txid != "" {
+			release.Txid = txid.String()
+			releaseTx = &iwallet.Transaction{ID: txid}
+		}
+		completeMsg.ReleaseInfo = release
 	}
 	timing.next("release_complete_escrow_funds")
 
@@ -587,8 +500,9 @@ func (s *OrderAppService) processRatings(ratings []models.Rating, orderOpen *pb.
 	return ratingPBs, nil
 }
 
-// releaseCompleteEscrowFunds signs and broadcasts the escrow release transaction.
-func (s *OrderAppService) releaseCompleteEscrowFunds(order *models.Order, wallet iwallet.Wallet, releaseInfo *pb.EscrowRelease) (*pb.EscrowRelease, *iwallet.Transaction, error) {
+// executeUTXOSyncModeratedCompleteRelease signs and broadcasts a moderated UTXO
+// complete release via settlement-actions/complete.
+func (s *OrderAppService) executeUTXOSyncModeratedCompleteRelease(order *models.Order, wallet iwallet.Wallet, releaseInfo *pb.EscrowRelease) (*pb.EscrowRelease, *iwallet.Transaction, error) {
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get payment sent message: %w", err)
@@ -597,13 +511,6 @@ func (s *OrderAppService) releaseCompleteEscrowFunds(order *models.Order, wallet
 	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if release, tx, handled, err := s.submitSettlementCompleteAction(context.Background(), order, coinType, paymentSent, releaseInfo); handled {
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to submit settlement complete action: %w", err)
-		}
-		return release, tx, nil
 	}
 
 	txn := iwallet.Transaction{

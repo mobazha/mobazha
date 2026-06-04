@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
@@ -48,21 +47,13 @@ func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) 
 
 	node := getOrderService(r)
 
-	done := make(chan struct{})
-	err = node.OpenDispute(models.OrderID(orderID), d.Claim, d.EvidenceHashes, done)
+	err = node.OpenDispute(models.OrderID(orderID), d.Claim, d.EvidenceHashes, nil)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 10):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request) {
@@ -87,21 +78,13 @@ func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request)
 
 	node := getOrderService(r)
 
-	done := make(chan struct{})
-	err = node.CloseDispute(models.OrderID(orderID), d.BuyerPercentage, d.VendorPercentage, d.Resolution, done)
+	err = node.CloseDispute(models.OrderID(orderID), d.BuyerPercentage, d.VendorPercentage, d.Resolution, nil)
 	if err != nil {
 		orderActionErrorResponse(w, err)
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 10):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request) {
@@ -123,21 +106,13 @@ func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request)
 	}
 
 	node := getOrderService(r)
-	done := make(chan struct{})
-	err = node.ReleaseFunds(models.OrderID(orderID), iwallet.TransactionID(rel.TxID), done)
+	err = node.ReleaseFunds(models.OrderID(orderID), iwallet.TransactionID(rel.TxID), nil)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 10):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handlePOSTOpenAfterSaleDispute(w http.ResponseWriter, r *http.Request) {
@@ -173,22 +148,14 @@ func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	done := make(chan struct{})
 	node := getOrderService(r)
-	err := node.ReleaseFundsAfterTimeout(models.OrderID(orderID), done)
+	err := node.ReleaseFundsAfterTimeout(models.OrderID(orderID), nil)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{}`)
-		return
-	case <-time.After(time.Second * 10):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	sanitizedStringResponse(w, `{}`)
 }
 
 func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *http.Request) {

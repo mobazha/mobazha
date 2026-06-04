@@ -10,6 +10,9 @@ import (
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/stretchr/testify/require"
 
+	intdb "github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -274,7 +277,7 @@ func TestBuildEscrowRelease_UsesSettlementActionSigner(t *testing.T) {
 	}
 }
 
-func TestSubmitSettlementCompleteAction_UsesActionStatusTxHash(t *testing.T) {
+func TestRunMonitoredSettlementComplete_UsesActionStatusTxHash(t *testing.T) {
 	t.Parallel()
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
@@ -293,12 +296,12 @@ func TestSubmitSettlementCompleteAction_UsesActionStatusTxHash(t *testing.T) {
 		ToAmount:  paymentSent.Amount,
 	}
 
-	release, tx, handled, err := svc.submitSettlementCompleteAction(context.Background(), order, coinType, paymentSent, releaseInfo)
+	result, release, tx, handled, err := svc.runMonitoredSettlementComplete(context.Background(), order, coinType, paymentSent, releaseInfo)
 	if err != nil {
-		t.Fatalf("submitSettlementCompleteAction: %v", err)
+		t.Fatalf("runMonitoredSettlementComplete: %v", err)
 	}
 	if !handled {
-		t.Fatal("submitSettlementCompleteAction handled = false, want true")
+		t.Fatal("runMonitoredSettlementComplete handled = false, want true")
 	}
 	if strategy.completeCalls != 1 {
 		t.Fatalf("Complete calls = %d, want 1", strategy.completeCalls)
@@ -309,6 +312,7 @@ func TestSubmitSettlementCompleteAction_UsesActionStatusTxHash(t *testing.T) {
 	if release.Txid != strategy.actionStatus.TxHash {
 		t.Fatalf("release.Txid = %q, want %q", release.Txid, strategy.actionStatus.TxHash)
 	}
+	_ = result
 }
 
 func TestSubmitSettlementCancelAction_UsesActionStatusTxHash(t *testing.T) {
@@ -395,6 +399,102 @@ func TestCompleteSettlementReleaseState(t *testing.T) {
 	}
 	if completeSettlementReleasePending(order, "") {
 		t.Fatal("expected abandoned complete settlement action not to be pending")
+	}
+}
+
+func TestDisputeSettlementReleaseState(t *testing.T) {
+	t.Parallel()
+
+	order := &models.Order{
+		SettlementActions: []models.SettlementActionSnapshot{
+			{Action: "dispute_release", State: "submitted", ActionID: "act-1"},
+		},
+	}
+	if disputeSettlementReleaseReady(order, "") {
+		t.Fatal("submitted without tx hash should not be ready")
+	}
+	if !disputeSettlementReleasePending(order, "") {
+		t.Fatal("expected pending dispute release settlement action")
+	}
+
+	order.SettlementActions[0].TxHash = "0xdef"
+	if !disputeSettlementReleaseReady(order, "") {
+		t.Fatal("expected ready when tx hash is present")
+	}
+	if disputeSettlementReleasePending(order, "") {
+		t.Fatal("expected not pending when tx hash is present")
+	}
+
+	orderWithoutTx := &models.Order{
+		SettlementActions: []models.SettlementActionSnapshot{
+			{Action: "confirm", State: "confirmed"},
+		},
+	}
+	if disputeSettlementReleaseReady(orderWithoutTx, iwallet.TransactionID("0xfake")) {
+		t.Fatal("client txid alone must not mark release ready without settlement projection")
+	}
+
+	txid, ready, err := evaluateMonitoredSettlementRelease(orderWithoutTx, iwallet.TransactionID("0xfake"), "dispute_release")
+	if err != nil || ready {
+		t.Fatalf("evaluateMonitoredSettlementRelease(fake txid, no projection) = (%q, %v, %v), want not ready", txid, ready, err)
+	}
+
+	txid, ready, err = evaluateMonitoredSettlementRelease(order, iwallet.TransactionID("0xdef"), "dispute_release")
+	if err != nil || !ready || txid != iwallet.TransactionID("0xdef") {
+		t.Fatalf("evaluateMonitoredSettlementRelease(matching txid) = (%q, %v, %v)", txid, ready, err)
+	}
+}
+
+func TestEvaluateMonitoredSettlementRelease(t *testing.T) {
+	t.Parallel()
+
+	order := &models.Order{
+		SettlementActions: []models.SettlementActionSnapshot{
+			{Action: "dispute_release", State: "submitted", ActionID: "act-1"},
+		},
+	}
+	_, _, err := evaluateMonitoredSettlementRelease(order, "", "dispute_release")
+	require.Error(t, err)
+
+	const txHash = "0xreadyhash"
+	order.SettlementActions[0].TxHash = txHash
+	txid, ready, err := evaluateMonitoredSettlementRelease(order, "", "dispute_release")
+	require.NoError(t, err)
+	require.True(t, ready)
+	require.Equal(t, iwallet.TransactionID(txHash), txid)
+
+	_, ready, err = evaluateMonitoredSettlementRelease(order, iwallet.TransactionID("0xwrong"), "dispute_release")
+	require.Error(t, err)
+	require.False(t, ready)
+}
+
+func TestExistingMonitoredSettlementActionResult(t *testing.T) {
+	t.Parallel()
+
+	order := &models.Order{
+		SettlementActions: []models.SettlementActionSnapshot{
+			{Action: "confirm", State: "confirmed", ActionID: "act-confirm"},
+			{Action: "dispute_release", State: "submitted", ActionID: "act-pending"},
+		},
+	}
+	result, ok := existingMonitoredSettlementActionResult(order, "dispute_release")
+	if !ok || result == nil {
+		t.Fatal("expected pending dispute_release action")
+	}
+	if result.ActionID != "act-pending" {
+		t.Fatalf("ActionID = %s, want act-pending", result.ActionID)
+	}
+	if result.SubmittedTxHash != "" {
+		t.Fatalf("SubmittedTxHash = %q, want empty", result.SubmittedTxHash)
+	}
+
+	order.SettlementActions[1].TxHash = "0xabc"
+	result, ok = existingMonitoredSettlementActionResult(order, "dispute_release")
+	if !ok || result == nil {
+		t.Fatal("expected ready dispute_release action")
+	}
+	if result.SubmittedTxHash != "0xabc" {
+		t.Fatalf("SubmittedTxHash = %q, want 0xabc", result.SubmittedTxHash)
 	}
 }
 
@@ -530,7 +630,7 @@ func TestSubmitSettlementCancelAction_PrefersSubmittedTxHash(t *testing.T) {
 	require.Equal(t, relayHash, tx.ID.String())
 }
 
-func TestSubmitSettlementDisputeReleaseAction_UsesActionStatusTxHash(t *testing.T) {
+func TestRunMonitoredSettlementDisputeRelease_UsesActionStatusTxHash(t *testing.T) {
 	t.Parallel()
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
@@ -549,20 +649,114 @@ func TestSubmitSettlementDisputeReleaseAction_UsesActionStatusTxHash(t *testing.
 		BuyerAmount:  paymentSent.Amount,
 	}
 
-	txid, tx, handled, err := svc.submitSettlementDisputeReleaseAction(context.Background(), order, coinType, paymentSent, releaseInfo)
+	result, tx, handled, err := svc.runMonitoredSettlementDisputeRelease(context.Background(), order, coinType, paymentSent, releaseInfo)
 	if err != nil {
-		t.Fatalf("submitSettlementDisputeReleaseAction: %v", err)
+		t.Fatalf("runMonitoredSettlementDisputeRelease: %v", err)
 	}
 	if !handled {
-		t.Fatal("submitSettlementDisputeReleaseAction handled = false, want true")
+		t.Fatal("runMonitoredSettlementDisputeRelease handled = false, want true")
 	}
 	if strategy.disputeCalls != 1 {
 		t.Fatalf("DisputeRelease calls = %d, want 1", strategy.disputeCalls)
 	}
-	if txid.String() != strategy.actionStatus.TxHash {
-		t.Fatalf("txid = %q, want %q", txid, strategy.actionStatus.TxHash)
+	txHash := ""
+	if result != nil && result.SubmittedTxHash != "" {
+		txHash = result.SubmittedTxHash
+	}
+	if txHash == "" && tx != nil {
+		txHash = tx.ID.String()
+	}
+	if txHash != strategy.actionStatus.TxHash {
+		t.Fatalf("txHash = %q, want %q", txHash, strategy.actionStatus.TxHash)
 	}
 	if tx == nil || tx.ID.String() != strategy.actionStatus.TxHash {
 		t.Fatalf("tx = %#v, want synthetic tx with %s", tx, strategy.actionStatus.TxHash)
 	}
+}
+
+func TestOrderRequiresMonitoredSettlementActions_IncludesUTXOScript(t *testing.T) {
+	t.Parallel()
+
+	reg := payment.NewRegistry()
+	reg.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored})
+
+	order := &models.Order{ID: models.OrderID("utxo-complete-gate")}
+	paymentSent := &pb.PaymentSent{
+		Coin:           "BCH",
+		SettlementSpec: payment.NewUTXOSpec(true).ToPaymentSent(),
+	}
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+
+	got := orderRequiresMonitoredSettlementActions(
+		order,
+		paymentSent,
+		iwallet.CoinType("BCH"),
+		reg,
+	)
+	require.True(t, got)
+}
+
+func TestRequireBackendSubmittedSettlementSpec_RejectsMissingSpec(t *testing.T) {
+	t.Parallel()
+
+	order := &models.Order{ID: models.OrderID("missing-spec-order")}
+	paymentSent := &pb.PaymentSent{
+		Coin:   "BCH",
+		Amount: "100",
+	}
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+
+	_, err := requireBackendSubmittedSettlementSpec(order, paymentSent)
+	require.Error(t, err)
+}
+
+func TestRequireBackendSubmittedSettlementSpec_RejectsClientSignedEscrow(t *testing.T) {
+	t.Parallel()
+
+	order := &models.Order{ID: models.OrderID("evm-contract-order")}
+	paymentSent := &pb.PaymentSent{
+		Coin:           "crypto:eip155:1:native",
+		Amount:         "1000000000000000000",
+		SettlementSpec: payment.NewLegacyEVMContractSpec(true).ToPaymentSent(),
+	}
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+
+	_, err := requireBackendSubmittedSettlementSpec(order, paymentSent)
+	require.Error(t, err)
+}
+
+func TestBeginSyncBackendSettlementAction_AllowsRetryAfterFailure(t *testing.T) {
+	t.Parallel()
+
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	require.NoError(t, intdb.MigrateManagedEscrowRelayActionModels(db))
+	t.Cleanup(func() { _ = db.Close() })
+
+	svc := &OrderAppService{db: db}
+	const orderID = "utxo-sync-retry-order"
+
+	actionID, existingTx, err := svc.beginSyncBackendSettlementAction(orderID, "complete", "BCH", "1000")
+	require.NoError(t, err)
+	require.Empty(t, existingTx)
+	require.Equal(t, syncSettlementActionID(orderID, "complete"), actionID)
+
+	svc.failSyncBackendSettlementAction(actionID, "broadcast failed")
+
+	var row models.ManagedEscrowRelayAction
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
+	}))
+	require.Equal(t, "failed", row.State)
+	require.Equal(t, "broadcast failed", row.LastError)
+
+	actionID2, existingTx2, err := svc.beginSyncBackendSettlementAction(orderID, "complete", "BCH", "1000")
+	require.NoError(t, err)
+	require.Empty(t, existingTx2)
+	require.Equal(t, actionID, actionID2)
+
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
+	}))
+	require.Equal(t, "submitting", row.State)
 }

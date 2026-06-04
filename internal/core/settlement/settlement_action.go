@@ -14,19 +14,18 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 // ExecuteSettlementAction runs a chain escrow V2 lifecycle action for crypto orders.
 //
-// Supported actions (Phase PS minimal surface — unified payment architecture §7.2):
-//   - "confirm" — cancelable payout / buyer acceptance path (delegates to ChainEscrowV2.Confirm).
-//   - "cancel" — cancel / refund-before-ship path (delegates to ChainEscrowV2.Cancel).
+// Supported actions on this SettlementService surface (CANCELABLE only):
+//   - "confirm" — cancelable payout / buyer acceptance (ManagedEscrow/Solana relay).
+//   - "cancel" — cancel / refund-before-ship (ManagedEscrow/Solana relay).
 //
-// Non-CANCELABLE methods return a completed no-op result for this minimal
-// confirm/cancel surface. Their business action still runs through the order
-// service: MODERATED completion and dispute release build their settlement
-// inside CompleteOrder / ReleaseFunds, while seller refunds build release info
-// in the refund/decline path.
+// MODERATED complete and dispute_release are handled by OrderAppService
+// POST /v1/orders/{id}/settlement-actions/{complete|dispute-release}, not here.
+// UTXO cancelable confirm/cancel still uses ConfirmOrder inline escrow release.
 //
 // Fiat orders return ErrBadRequest — refunds remain on fiat provider APIs.
 func (s *SettlementService) ExecuteSettlementAction(
@@ -234,16 +233,32 @@ func (s *SettlementService) GetSettlementActionStatus(
 	}
 	status, err := strategy.GetActionStatus(ctx, actionID)
 	if err != nil {
-		if errors.Is(err, payment.ErrActionNotFound) {
-			return nil, coinType, fmt.Errorf("%w: settlement action not found", coreiface.ErrNotFound)
-		}
 		if errors.Is(err, payment.ErrUnsupportedAction) {
-			return nil, coinType, fmt.Errorf("%w: settlement action status unsupported for %s", coreiface.ErrBadRequest, coinType)
+			var storeErr error
+			status, storeErr = s.lookupSettlementActionStatusFromStore(actionID)
+			if storeErr != nil {
+				if errors.Is(storeErr, gorm.ErrRecordNotFound) {
+					return nil, coinType, fmt.Errorf("%w: settlement action not found", coreiface.ErrNotFound)
+				}
+				return nil, coinType, storeErr
+			}
+		} else if errors.Is(err, payment.ErrActionNotFound) {
+			return nil, coinType, fmt.Errorf("%w: settlement action not found", coreiface.ErrNotFound)
+		} else {
+			return nil, coinType, err
 		}
-		return nil, coinType, err
 	}
 	if status == nil {
-		return nil, coinType, fmt.Errorf("%w: settlement action not found", coreiface.ErrNotFound)
+		// V1-backed adapters (e.g. UTXO) have no action ledger; sync actions
+		// are persisted in managed_escrow_relay_actions by OrderAppService.
+		var storeErr error
+		status, storeErr = s.lookupSettlementActionStatusFromStore(actionID)
+		if storeErr != nil {
+			if errors.Is(storeErr, gorm.ErrRecordNotFound) {
+				return nil, coinType, fmt.Errorf("%w: settlement action not found", coreiface.ErrNotFound)
+			}
+			return nil, coinType, storeErr
+		}
 	}
 	if status.OrderID != "" && status.OrderID != orderID.String() {
 		return nil, coinType, fmt.Errorf("%w: settlement action does not belong to order %s", coreiface.ErrBadRequest, orderID)
@@ -253,4 +268,31 @@ func (s *SettlementService) GetSettlementActionStatus(
 			coreiface.ErrBadRequest, status.SettlementAction, action)
 	}
 	return status, coinType, nil
+}
+
+func (s *SettlementService) lookupSettlementActionStatusFromStore(actionID string) (*payment.ActionStatus, error) {
+	if s == nil || s.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	var row models.ManagedEscrowRelayAction
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	snap := row.Snapshot()
+	return &payment.ActionStatus{
+		State:            snap.State,
+		TxHash:           snap.TxHash,
+		Confirmations:    snap.Confirmations,
+		LastError:        snap.LastError,
+		OrderID:          row.OrderID,
+		SettlementAction: snap.SettlementAction,
+		RelayTaskID:      snap.RelayTaskID,
+		SettlementCoin:   snap.SettlementCoin,
+		GrossAmount:      snap.GrossAmount,
+		PlannedLines:     snap.PlannedLines,
+		ObservedLines:    snap.ObservedLines,
+	}, nil
 }

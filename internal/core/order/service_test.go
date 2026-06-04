@@ -202,7 +202,7 @@ func TestOrderAppService_GetReleaseFundsInstructions_ManagedEscrowRejectsLegacyP
 	assert.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coinType)
 	assert.Nil(t, instructions)
 	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
-	assert.Contains(t, err.Error(), "/v1/disputes/{orderID}/close")
+	assert.Contains(t, err.Error(), "/settlement-actions/dispute-release")
 }
 
 // ── GetOrder ────────────────────────────────────────────────────────────

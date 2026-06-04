@@ -4,8 +4,10 @@ package order
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -16,6 +18,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 func (s *OrderAppService) v2StrategyForCoin(coinType iwallet.CoinType) (payment.ChainEscrowV2, error) {
@@ -127,7 +130,9 @@ func actionRelayTxHash(ctx context.Context, strategy payment.ChainEscrowV2, resu
 	return ""
 }
 
-func orderUsesMonitoredBackendSettlementComplete(
+// orderRequiresMonitoredSettlementActions reports moderated orders whose escrow
+// release/complete must go through settlement-actions before domain handlers run.
+func orderRequiresMonitoredSettlementActions(
 	order *models.Order,
 	paymentSent *pb.PaymentSent,
 	coinType iwallet.CoinType,
@@ -144,8 +149,36 @@ func orderUsesMonitoredBackendSettlementComplete(
 	if err != nil || strategy.Model() != payment.PaymentModelMonitored {
 		return false
 	}
+	return true
+}
+
+func requireBackendSubmittedSettlementSpec(order *models.Order, paymentSent *pb.PaymentSent) (payment.SettlementSpec, error) {
 	spec, ok := payment.ResolveSettlementSpec(order, paymentSent)
-	return ok && (spec.UsesManagedEscrow() || spec.UsesSolanaEscrow())
+	if !ok {
+		return payment.SettlementSpec{}, fmt.Errorf("%w: payment settlement spec is required", coreiface.ErrBadRequest)
+	}
+	if !orderEscrowUsesBackendSubmittedSettlementRelease(spec) {
+		return payment.SettlementSpec{}, fmt.Errorf("%w: escrow type %q must use settlement-actions; client-signed legacy routes are retired",
+			coreiface.ErrBadRequest, spec.EscrowType)
+	}
+	return spec, nil
+}
+
+func errRetiredClientSignedModeratedSettlement(action string) error {
+	return fmt.Errorf("%w: moderated client-signed %s is retired; use POST /v1/orders/{orderID}/settlement-actions/%s",
+		coreiface.ErrBadRequest, action, payment.SettlementActionPathSegment(action))
+}
+
+// orderEscrowUsesBackendSubmittedSettlementRelease reports escrow types whose
+// moderated release/complete flows use settlement-actions (relay or sync).
+func orderEscrowUsesBackendSubmittedSettlementRelease(spec payment.SettlementSpec) bool {
+	return spec.UsesManagedEscrow() || spec.UsesSolanaEscrow() || spec.UsesUTXOScript()
+}
+
+// orderEscrowUsesRelaySettlementRelease reports escrow types whose release is
+// submitted asynchronously via relay + action store (ManagedEscrow, Solana Anchor).
+func orderEscrowUsesRelaySettlementRelease(spec payment.SettlementSpec) bool {
+	return spec.UsesManagedEscrow() || spec.UsesSolanaEscrow()
 }
 
 func settlementActionName(action models.SettlementActionSnapshot) string {
@@ -160,34 +193,155 @@ func settlementActionName(action models.SettlementActionSnapshot) string {
 // evidence exists. Completion needs a concrete release tx hash so the
 // ORDER_COMPLETE message can carry auditable release info.
 func completeSettlementReleaseReady(order *models.Order, txid iwallet.TransactionID) bool {
-	if txid != "" {
-		return true
-	}
-	if order == nil {
-		return false
-	}
-	for _, action := range order.SettlementActions {
-		if settlementActionName(action) != "complete" {
-			continue
-		}
-		if action.TxHash != "" {
-			return true
-		}
-	}
-	return false
+	return settlementReleaseReady(order, txid, "complete")
 }
 
 // completeSettlementReleasePending reports an in-flight settlement complete
 // action that has not yet produced a tx hash.
 func completeSettlementReleasePending(order *models.Order, txid iwallet.TransactionID) bool {
-	if txid != "" {
+	return settlementReleasePending(order, txid, "complete")
+}
+
+func syncSettlementActionID(orderID, action string) string {
+	return fmt.Sprintf("sync-%s-%s", action, orderID)
+}
+
+func (s *OrderAppService) loadSyncBackendSettlementAction(orderID, action string) (*models.ManagedEscrowRelayAction, error) {
+	if s == nil || s.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	actionID := syncSettlementActionID(orderID, action)
+	var row models.ManagedEscrowRelayAction
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+// beginSyncBackendSettlementAction reserves a deterministic sync action row
+// before UTXO sign+broadcast so retries do not double-spend on chain.
+func (s *OrderAppService) beginSyncBackendSettlementAction(
+	orderID, action, settlementCoin, grossAmount string,
+) (actionID string, existingTxHash string, err error) {
+	if s == nil || s.db == nil {
+		return "", "", fmt.Errorf("database not initialized")
+	}
+	actionID = syncSettlementActionID(orderID, action)
+	existing, err := s.loadSyncBackendSettlementAction(orderID, action)
+	if err != nil {
+		return "", "", err
+	}
+	if existing != nil {
+		if existing.TxHash != "" {
+			return actionID, existing.TxHash, nil
+		}
+		state := strings.ToLower(strings.TrimSpace(existing.State))
+		if state == "submitting" || state == "submitted" || state == "confirmed" {
+			return "", "", fmt.Errorf("%w: settlement %s release is still pending; retry after tx hash is available",
+				coreiface.ErrBadRequest, action)
+		}
+	}
+
+	now := time.Now().UTC()
+	row := &models.ManagedEscrowRelayAction{
+		ActionID:       actionID,
+		OrderID:        orderID,
+		ActionKind:     action,
+		State:          "submitting",
+		SettlementCoin: settlementCoin,
+		GrossAmount:    grossAmount,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if existing != nil {
+		row.CreatedAt = existing.CreatedAt
+	}
+	if err := s.db.Update(func(tx database.Tx) error {
+		return tx.Save(row)
+	}); err != nil {
+		return "", "", err
+	}
+	return actionID, "", nil
+}
+
+func (s *OrderAppService) confirmSyncBackendSettlementAction(actionID, txHash string) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	if txHash == "" {
+		return fmt.Errorf("settlement action %s confirmed without tx hash", actionID)
+	}
+	now := time.Now().UTC()
+	return s.db.Update(func(tx database.Tx) error {
+		_, err := tx.UpdateColumns(map[string]interface{}{
+			"state":        "confirmed",
+			"tx_hash":      txHash,
+			"confirmed_at": now,
+			"updated_at":   now,
+		}, map[string]interface{}{
+			"action_id = ?": actionID,
+		}, &models.ManagedEscrowRelayAction{})
+		return err
+	})
+}
+
+func (s *OrderAppService) failSyncBackendSettlementAction(actionID, reason string) {
+	if s == nil || s.db == nil || strings.TrimSpace(actionID) == "" {
+		return
+	}
+	reason = strings.TrimSpace(reason)
+	if len(reason) > 2048 {
+		reason = reason[:2048]
+	}
+	now := time.Now().UTC()
+	_ = s.db.Update(func(tx database.Tx) error {
+		_, err := tx.UpdateColumns(map[string]interface{}{
+			"state":      "failed",
+			"last_error": reason,
+			"updated_at": now,
+		}, map[string]interface{}{
+			"action_id = ?": actionID,
+		}, &models.ManagedEscrowRelayAction{})
+		return err
+	})
+}
+
+func errSettlementReleaseActionRequired(orderID models.OrderID, action string) error {
+	return fmt.Errorf("%w: submit POST /v1/orders/%s/settlement-actions/%s before continuing",
+		coreiface.ErrBadRequest, orderID, payment.SettlementActionPathSegment(action))
+}
+
+// disputeSettlementReleaseReady reports whether monitored dispute release
+// evidence exists before accepting the arbitration payout.
+func disputeSettlementReleaseReady(order *models.Order, txid iwallet.TransactionID) bool {
+	return settlementReleaseReady(order, txid, "dispute_release")
+}
+
+// disputeSettlementReleasePending reports an in-flight settlement dispute
+// release action that has not yet produced a tx hash.
+func disputeSettlementReleasePending(order *models.Order, txid iwallet.TransactionID) bool {
+	return settlementReleasePending(order, txid, "dispute_release")
+}
+
+func settlementReleaseReady(order *models.Order, _ iwallet.TransactionID, actionName string) bool {
+	return settlementActionTxHash(order, actionName) != ""
+}
+
+func settlementReleasePending(order *models.Order, _ iwallet.TransactionID, actionName string) bool {
+	if settlementActionTxHash(order, actionName) != "" {
 		return false
 	}
 	if order == nil {
 		return false
 	}
 	for _, action := range order.SettlementActions {
-		if settlementActionName(action) != "complete" {
+		if settlementActionName(action) != actionName {
 			continue
 		}
 		state := strings.ToLower(strings.TrimSpace(action.State))
@@ -201,9 +355,82 @@ func completeSettlementReleasePending(order *models.Order, txid iwallet.Transact
 	return false
 }
 
-// ExecuteSettlementCompleteAction submits the backend-monitored escrow release
-// for a MODERATED order (ManagedEscrow / Solana Anchor). UTXO and client-signed routes
-// return a completed no-op — CompleteOrder still handles release inline.
+// evaluateMonitoredSettlementRelease checks pending/ready state for a backend
+// settlement release action (complete or dispute_release).
+func evaluateMonitoredSettlementRelease(
+	order *models.Order,
+	txid iwallet.TransactionID,
+	actionName string,
+) (resolvedTxid iwallet.TransactionID, releaseAlreadySubmitted bool, err error) {
+	if settlementReleasePending(order, txid, actionName) {
+		return "", false, fmt.Errorf("%w: settlement %s release is still pending; retry after tx hash is available",
+			coreiface.ErrBadRequest, actionName)
+	}
+	if settlementReleaseReady(order, txid, actionName) {
+		resolved := settlementActionTxHash(order, actionName)
+		if resolved == "" {
+			return "", false, nil
+		}
+		if txid != "" && txid != resolved {
+			return "", false, fmt.Errorf("%w: txID does not match settlement %s release hash",
+				coreiface.ErrBadRequest, actionName)
+		}
+		return resolved, true, nil
+	}
+	return "", false, nil
+}
+
+func settlementActionTxHash(order *models.Order, actionName string) iwallet.TransactionID {
+	if order == nil {
+		return ""
+	}
+	for _, action := range order.SettlementActions {
+		if settlementActionName(action) != actionName {
+			continue
+		}
+		if action.TxHash != "" {
+			return iwallet.TransactionID(action.TxHash)
+		}
+		break
+	}
+	return ""
+}
+
+// existingMonitoredSettlementActionResult returns an in-flight or completed backend
+// settlement action so ExecuteSettlement*Action endpoints stay idempotent on retry.
+func existingMonitoredSettlementActionResult(order *models.Order, actionName string) (*payment.ActionResult, bool) {
+	if order == nil {
+		return nil, false
+	}
+	var pending *payment.ActionResult
+	for _, action := range order.SettlementActions {
+		if settlementActionName(action) != actionName {
+			continue
+		}
+		if action.TxHash != "" {
+			return &payment.ActionResult{
+				Mode:            payment.ActionModeSubmitted,
+				ActionID:        action.ActionID,
+				SubmittedTxHash: action.TxHash,
+			}, true
+		}
+		state := strings.ToLower(strings.TrimSpace(action.State))
+		if state == "submitting" || state == "submitted" || state == "confirmed" {
+			pending = &payment.ActionResult{
+				Mode:     payment.ActionModeSubmitted,
+				ActionID: action.ActionID,
+			}
+		}
+	}
+	if pending != nil {
+		return pending, true
+	}
+	return nil, false
+}
+
+// ExecuteSettlementCompleteAction submits backend escrow release for moderated
+// ManagedEscrow / Solana Anchor (relay) or UTXO (sync sign+broadcast) orders via
+// settlement-actions/complete.
 func (s *OrderAppService) ExecuteSettlementCompleteAction(
 	ctx context.Context,
 	orderID models.OrderID,
@@ -231,8 +458,22 @@ func (s *OrderAppService) ExecuteSettlementCompleteAction(
 		return nil, "", err
 	}
 
-	if !orderUsesMonitoredBackendSettlementComplete(&order, paymentSent, coinType, s.paymentRegistry) {
+	if !orderRequiresMonitoredSettlementActions(&order, paymentSent, coinType, s.paymentRegistry) {
+		method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+		if ok && payment.MethodIsModerated(method) {
+			return nil, coinType, errRetiredClientSignedModeratedSettlement("complete")
+		}
 		return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
+	}
+	if _, err := requireBackendSubmittedSettlementSpec(&order, paymentSent); err != nil {
+		return nil, coinType, err
+	}
+
+	if err := s.attachSettlementActions(&order); err != nil {
+		return nil, coinType, fmt.Errorf("load settlement actions for order %s: %w", orderID, err)
+	}
+	if existing, ok := existingMonitoredSettlementActionResult(&order, "complete"); ok {
+		return existing, coinType, nil
 	}
 
 	shipments, err := order.OrderShipmentMessages()
@@ -289,8 +530,14 @@ func (s *OrderAppService) runMonitoredSettlementComplete(
 	if strategy.Model() != payment.PaymentModelMonitored {
 		return nil, nil, nil, false, nil
 	}
-	spec, ok := payment.ResolveSettlementSpec(order, paymentSent)
-	if !ok || (!spec.UsesManagedEscrow() && !spec.UsesSolanaEscrow()) {
+	spec, err := requireBackendSubmittedSettlementSpec(order, paymentSent)
+	if err != nil {
+		return nil, nil, nil, true, err
+	}
+	if spec.UsesUTXOScript() {
+		return s.runUTXOSyncSettlementComplete(ctx, order, coinType, paymentSent, releaseInfo)
+	}
+	if !orderEscrowUsesRelaySettlementRelease(spec) {
 		return nil, nil, nil, false, nil
 	}
 
@@ -324,9 +571,59 @@ func (s *OrderAppService) runMonitoredSettlementComplete(
 	return result, release, tx, true, nil
 }
 
-func (s *OrderAppService) submitSettlementCompleteAction(ctx context.Context, order *models.Order, coinType iwallet.CoinType, paymentSent *pb.PaymentSent, releaseInfo *pb.EscrowRelease) (*pb.EscrowRelease, *iwallet.Transaction, bool, error) {
-	_, release, tx, handled, err := s.runMonitoredSettlementComplete(ctx, order, coinType, paymentSent, releaseInfo)
-	return release, tx, handled, err
+func (s *OrderAppService) runUTXOSyncSettlementComplete(
+	ctx context.Context,
+	order *models.Order,
+	coinType iwallet.CoinType,
+	paymentSent *pb.PaymentSent,
+	releaseInfo *pb.EscrowRelease,
+) (*payment.ActionResult, *pb.EscrowRelease, *iwallet.Transaction, bool, error) {
+	_ = ctx
+	orderID := order.ID.String()
+	actionID, existingTxHash, err := s.beginSyncBackendSettlementAction(
+		orderID, "complete", string(coinType), paymentSent.Amount,
+	)
+	if err != nil {
+		return nil, nil, nil, true, err
+	}
+	if existingTxHash != "" {
+		release := cloneEscrowRelease(releaseInfo)
+		if release != nil {
+			release.Txid = existingTxHash
+		}
+		tx := &iwallet.Transaction{ID: iwallet.TransactionID(existingTxHash)}
+		return &payment.ActionResult{
+			Mode:            payment.ActionModeCompleted,
+			ActionID:        actionID,
+			SubmittedTxHash: existingTxHash,
+		}, release, tx, true, nil
+	}
+
+	wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
+	if err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, nil, true, err
+	}
+	release, tx, err := s.executeUTXOSyncModeratedCompleteRelease(order, wallet, releaseInfo)
+	if err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, nil, true, err
+	}
+	txHash := ""
+	if tx != nil && tx.ID != "" {
+		txHash = tx.ID.String()
+	} else if release != nil {
+		txHash = release.Txid
+	}
+	if err := s.confirmSyncBackendSettlementAction(actionID, txHash); err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, nil, true, err
+	}
+	return &payment.ActionResult{
+		Mode:            payment.ActionModeCompleted,
+		ActionID:        actionID,
+		SubmittedTxHash: txHash,
+	}, release, tx, true, nil
 }
 
 func (s *OrderAppService) submitSettlementCancelAction(ctx context.Context, order *models.Order, coinType iwallet.CoinType, paymentSent *pb.PaymentSent, payoutAddr string) (iwallet.TransactionID, *iwallet.Transaction, bool, error) {
@@ -338,7 +635,8 @@ func (s *OrderAppService) submitSettlementCancelAction(ctx context.Context, orde
 		return "", nil, false, nil
 	}
 	spec, ok := payment.ResolveSettlementSpec(order, paymentSent)
-	if !ok || (!spec.UsesManagedEscrow() && !spec.UsesSolanaEscrow()) {
+	if !ok || !orderEscrowUsesRelaySettlementRelease(spec) {
+		// UTXO cancelable confirm/cancel still uses ConfirmOrder / escrow inline release.
 		return "", nil, false, nil
 	}
 
@@ -371,22 +669,34 @@ func (s *OrderAppService) submitSettlementCancelAction(ctx context.Context, orde
 	return txid, &iwallet.Transaction{ID: txid}, true, nil
 }
 
-func (s *OrderAppService) submitSettlementDisputeReleaseAction(ctx context.Context, order *models.Order, coinType iwallet.CoinType, paymentSent *pb.PaymentSent, releaseInfo *pb.DisputeClose_ModeratedEscrowRelease) (iwallet.TransactionID, *iwallet.Transaction, bool, error) {
+func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
+	ctx context.Context,
+	order *models.Order,
+	coinType iwallet.CoinType,
+	paymentSent *pb.PaymentSent,
+	releaseInfo *pb.DisputeClose_ModeratedEscrowRelease,
+) (*payment.ActionResult, *iwallet.Transaction, bool, error) {
 	strategy, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
-		return "", nil, false, err
+		return nil, nil, false, err
 	}
 	if strategy.Model() != payment.PaymentModelMonitored {
-		return "", nil, false, nil
+		return nil, nil, false, nil
 	}
-	spec, ok := payment.ResolveSettlementSpec(order, paymentSent)
-	if !ok || (!spec.UsesManagedEscrow() && !spec.UsesSolanaEscrow()) {
-		return "", nil, false, nil
+	spec, err := requireBackendSubmittedSettlementSpec(order, paymentSent)
+	if err != nil {
+		return nil, nil, true, err
+	}
+	if spec.UsesUTXOScript() {
+		return s.runUTXOSyncSettlementDisputeRelease(order, coinType, paymentSent, releaseInfo)
+	}
+	if !orderEscrowUsesRelaySettlementRelease(spec) {
+		return nil, nil, false, nil
 	}
 
 	release := cloneDisputeRelease(releaseInfo)
 	if release == nil {
-		return "", nil, true, fmt.Errorf("settlement dispute release info is nil")
+		return nil, nil, true, fmt.Errorf("settlement dispute release info is nil")
 	}
 
 	result, err := strategy.DisputeRelease(ctx, payment.ActionParams{
@@ -399,13 +709,136 @@ func (s *OrderAppService) submitSettlementDisputeReleaseAction(ctx context.Conte
 		ReleaseInfo:   release,
 	})
 	if err != nil {
-		return "", nil, true, err
+		return nil, nil, true, err
 	}
 
 	txHash := actionRelayTxHash(ctx, strategy, result)
-	if txHash == "" {
-		return "", nil, true, fmt.Errorf("settlement dispute release action submitted without tx hash (order %s)", order.ID)
+	var tx *iwallet.Transaction
+	if txHash != "" {
+		tx = &iwallet.Transaction{ID: iwallet.TransactionID(txHash)}
 	}
-	tx := &iwallet.Transaction{ID: iwallet.TransactionID(txHash)}
-	return tx.ID, tx, true, nil
+	return result, tx, true, nil
+}
+
+func (s *OrderAppService) runUTXOSyncSettlementDisputeRelease(
+	order *models.Order,
+	coinType iwallet.CoinType,
+	paymentSent *pb.PaymentSent,
+	releaseInfo *pb.DisputeClose_ModeratedEscrowRelease,
+) (*payment.ActionResult, *iwallet.Transaction, bool, error) {
+	orderID := order.ID.String()
+	actionID, existingTxHash, err := s.beginSyncBackendSettlementAction(
+		orderID, "dispute_release", string(coinType), paymentSent.Amount,
+	)
+	if err != nil {
+		return nil, nil, true, err
+	}
+	if existingTxHash != "" {
+		tx := &iwallet.Transaction{ID: iwallet.TransactionID(existingTxHash)}
+		return &payment.ActionResult{
+			Mode:            payment.ActionModeCompleted,
+			ActionID:        actionID,
+			SubmittedTxHash: existingTxHash,
+		}, tx, true, nil
+	}
+
+	releaseTx, err := s.BuildDisputeReleaseTransaction(releaseInfo, paymentSent)
+	if err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, true, err
+	}
+	disputeClose := &pb.DisputeClose{ReleaseInfo: releaseInfo}
+	if err := s.signAndSendReleaseTransaction(&releaseTx, paymentSent, disputeClose); err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, true, err
+	}
+	if err := s.confirmSyncBackendSettlementAction(actionID, releaseTx.ID.String()); err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, true, err
+	}
+	return &payment.ActionResult{
+		Mode:            payment.ActionModeCompleted,
+		ActionID:        actionID,
+		SubmittedTxHash: releaseTx.ID.String(),
+	}, &releaseTx, true, nil
+}
+
+// ExecuteSettlementDisputeReleaseAction submits backend escrow release for
+// DECIDED moderated ManagedEscrow / Solana Anchor (relay) or UTXO (sync) disputes via
+// settlement-actions/dispute-release.
+func (s *OrderAppService) ExecuteSettlementDisputeReleaseAction(
+	ctx context.Context,
+	orderID models.OrderID,
+) (*payment.ActionResult, iwallet.CoinType, error) {
+	if err := s.requireDisputeReleaseParticipant(orderID); err != nil {
+		return nil, "", err
+	}
+
+	var order models.Order
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	disputeClose, err := order.DisputeClosedMessage()
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: dispute close message is missing", coreiface.ErrBadRequest)
+	}
+	if disputeClose.ReleaseInfo == nil {
+		return nil, "", fmt.Errorf("%w: dispute release info is missing", coreiface.ErrBadRequest)
+	}
+
+	paymentSent, err := order.PaymentSentMessage()
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: payment not recorded for this order", coreiface.ErrBadRequest)
+	}
+
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if !orderRequiresMonitoredSettlementActions(&order, paymentSent, coinType, s.paymentRegistry) {
+		return nil, coinType, errRetiredClientSignedModeratedSettlement("dispute_release")
+	}
+	if _, err := requireBackendSubmittedSettlementSpec(&order, paymentSent); err != nil {
+		return nil, coinType, err
+	}
+
+	if err := s.attachSettlementActions(&order); err != nil {
+		return nil, coinType, fmt.Errorf("load settlement actions for order %s: %w", orderID, err)
+	}
+	if existing, ok := existingMonitoredSettlementActionResult(&order, "dispute_release"); ok {
+		return existing, coinType, nil
+	}
+
+	result, tx, handled, err := s.runMonitoredSettlementDisputeRelease(
+		ctx,
+		&order,
+		coinType,
+		paymentSent,
+		disputeClose.ReleaseInfo,
+	)
+	if err != nil {
+		return nil, coinType, err
+	}
+	if !handled {
+		return nil, coinType, fmt.Errorf("%w: settlement dispute release is not supported for coin %s",
+			coreiface.ErrBadRequest, coinType)
+	}
+	if result == nil {
+		result = &payment.ActionResult{Mode: payment.ActionModeCompleted}
+	}
+	if result.Mode == payment.ActionModeInstructionsRequired || result.Instructions != nil {
+		return nil, coinType, fmt.Errorf("%w: settlement-actions only support backend-submitted flows for coin %s",
+			coreiface.ErrBadRequest, coinType)
+	}
+	if result.SubmittedTxHash == "" {
+		if tx != nil && tx.ID != "" {
+			result.SubmittedTxHash = tx.ID.String()
+		}
+	}
+	return result, coinType, nil
 }

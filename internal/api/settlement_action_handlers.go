@@ -24,7 +24,7 @@ import (
 //
 // POST /v1/orders/{orderID}/settlement-actions/{action}
 //
-// Path action (case-insensitive): "confirm" | "cancel" | "complete".
+// Path action (case-insensitive): "confirm" | "cancel" | "complete" | "dispute-release".
 //
 // Body JSON (optional, camelCase):
 //   - payoutAddress — vendor payout (confirm) or buyer refund override (cancel).
@@ -39,10 +39,9 @@ func (g *Gateway) handlePOSTOrderSettlementAction(w http.ResponseWriter, r *http
 		return
 	}
 
-	action := strings.ToLower(strings.TrimSpace(chi.URLParam(r, "action")))
-	if action != "confirm" && action != "cancel" && action != "complete" {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation,
-			`action must be "confirm", "cancel", or "complete"`)
+	action, err := payment.ParseSettlementActionPath(chi.URLParam(r, "action"))
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
 		return
 	}
 
@@ -137,10 +136,9 @@ func (g *Gateway) handleGETOrderSettlementActionStatus(w http.ResponseWriter, r 
 		return
 	}
 
-	action := strings.ToLower(strings.TrimSpace(chi.URLParam(r, "action")))
-	if action != "confirm" && action != "cancel" && action != "complete" && action != "dispute_release" {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation,
-			`action must be "confirm", "cancel", "complete", or "dispute_release"`)
+	action, err := payment.ParseSettlementActionPath(chi.URLParam(r, "action"))
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
 		return
 	}
 

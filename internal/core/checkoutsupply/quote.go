@@ -118,8 +118,10 @@ func (s *CheckoutSupplyQuoteService) Quote(
 }
 
 // SellerSummary performs a seller-safe advisory supply summary for admin
-// product surfaces. It reuses checkout Quote so supplier/digital/SKU resolution
-// stays centralized; no inventory holds are created.
+// product surfaces. In the common plaintext-listing path it uses a batched
+// tenant-scoped read model so seller product lists do not fan out into one
+// checkout Quote per listing; listings not available in plaintext fall back to
+// Quote so the established decrypting reader stays authoritative.
 func (s *CheckoutSupplyQuoteService) SellerSummary(
 	ctx context.Context,
 	req contracts.ListingSupplySummaryRequest,
@@ -141,24 +143,58 @@ func (s *CheckoutSupplyQuoteService) SellerSummary(
 		return resp, nil
 	}
 
-	for _, slug := range slugs {
-		items, err := s.sellerSummaryQuoteItemsForSlug(slug)
-		if err != nil {
-			resp.Items = append(resp.Items, unknownSellerSupplySummaryItem(slug, "quote_unavailable"))
-			continue
+	if !s.isSupplyAvailabilityQuoteEnabled(ctx) {
+		for _, slug := range slugs {
+			resp.Items = append(resp.Items, unknownSellerSupplySummaryItem(slug, "supply_availability_disabled"))
 		}
-		quote, err := s.Quote(ctx, models.OrderTypeStandard, sellerSummaryLineRef(slug), items)
-		if err != nil {
-			resp.Items = append(resp.Items, unknownSellerSupplySummaryItem(slug, "quote_unavailable"))
-			continue
-		}
-		summary := sellerSupplySummaryItemFromQuoteItems(slug, quote.Items)
-		if sl, slErr := s.listings.GetMyListingBySlug(slug); slErr == nil {
-			s.enrichSellerSummaryQuantities(&summary, sl)
-		}
-		resp.Items = append(resp.Items, summary)
+		return resp, nil
 	}
-	return resp, nil
+	if s.supplyAvailability == nil {
+		for _, slug := range slugs {
+			resp.Items = append(resp.Items, unknownSellerSupplySummaryItem(slug, "quote_unavailable"))
+		}
+		return resp, nil
+	}
+	if s.canUseSellerSummaryReadModel() {
+		items, err := s.sellerSummaryFromReadModel(ctx, slugs)
+		if err != nil {
+			return nil, err
+		}
+		resp.Items = append(resp.Items, items...)
+		return resp, nil
+	}
+
+	return s.sellerSummaryViaQuote(ctx, resp, slugs), nil
+}
+
+func (s *CheckoutSupplyQuoteService) sellerSummaryViaQuote(
+	ctx context.Context,
+	resp *contracts.ListingSupplySummaryResponse,
+	slugs []string,
+) *contracts.ListingSupplySummaryResponse {
+	for _, slug := range slugs {
+		resp.Items = append(resp.Items, s.sellerSummaryItemViaQuote(ctx, slug))
+	}
+	return resp
+}
+
+func (s *CheckoutSupplyQuoteService) sellerSummaryItemViaQuote(
+	ctx context.Context,
+	slug string,
+) contracts.ListingSupplySummaryItem {
+	items, err := s.sellerSummaryQuoteItemsForSlug(slug)
+	if err != nil {
+		return unknownSellerSupplySummaryItem(slug, "quote_unavailable")
+	}
+	quote, err := s.Quote(ctx, models.OrderTypeStandard, sellerSummaryLineRef(slug), items)
+	if err != nil {
+		return unknownSellerSupplySummaryItem(slug, "quote_unavailable")
+	}
+	summary := sellerSupplySummaryItemFromQuoteItems(slug, quote.Items)
+	if sl, slErr := s.listings.GetMyListingBySlug(slug); slErr == nil {
+		s.enrichSellerSummaryQuantities(&summary, sl)
+	}
+	return summary
 }
 
 const (

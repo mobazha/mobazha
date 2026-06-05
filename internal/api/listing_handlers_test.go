@@ -10,6 +10,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -41,6 +42,66 @@ func TestListingHandlers(t *testing.T) {
 					Slug: "t-shirt",
 					CID:  "h",
 				})
+				return wrapDataInEnvelope(i)
+			},
+		},
+		{
+			name:   "Get my listing index with supply summaries",
+			path:   "/v1/listings/index?includeSupplySummary=true",
+			method: http.MethodGet,
+			setNodeMethods: func(n *mockNode) {
+				n.getMyListingsFunc = func() (models.ListingIndex, error) {
+					i := models.ListingIndex{}
+					i.UpdateListing(models.ListingMetadata{
+						Slug: "t-shirt",
+						CID:  "h",
+					})
+					return i, nil
+				}
+				n.getMyRatingsFunc = func() (models.RatingIndex, error) {
+					return nil, nil
+				}
+				n.summarizeListingSupplyFunc = func(_ context.Context, req contracts.ListingSupplySummaryRequest) (*contracts.ListingSupplySummaryResponse, error) {
+					if len(req.Slugs) != 1 || req.Slugs[0] != "t-shirt" {
+						t.Fatalf("unexpected summary request slugs: %#v", req.Slugs)
+					}
+					available := int64(7)
+					onHand := int64(10)
+					held := int64(3)
+					return &contracts.ListingSupplySummaryResponse{
+						Items: []contracts.ListingSupplySummaryItem{{
+							ListingSlug:       "t-shirt",
+							SupplyMode:        contracts.ListingSupplyModeTrackedStock,
+							Status:            contracts.SupplyAvailabilityAvailable,
+							AvailableQuantity: &available,
+							OnHandQuantity:    &onHand,
+							HeldQuantity:      &held,
+						}},
+						Limit:  1,
+						Offset: 0,
+						Total:  1,
+					}, nil
+				}
+			},
+			statusCode: http.StatusOK,
+			expectedResponse: func() ([]byte, error) {
+				available := int64(7)
+				onHand := int64(10)
+				held := int64(3)
+				i := []listingMetadataWithSupplySummary{{
+					ListingMetadata: models.ListingMetadata{
+						Slug: "t-shirt",
+						CID:  "h",
+					},
+					SupplySummary: &contracts.ListingSupplySummaryItem{
+						ListingSlug:       "t-shirt",
+						SupplyMode:        contracts.ListingSupplyModeTrackedStock,
+						Status:            contracts.SupplyAvailabilityAvailable,
+						AvailableQuantity: &available,
+						OnHandQuantity:    &onHand,
+						HeldQuantity:      &held,
+					},
+				}}
 				return wrapDataInEnvelope(i)
 			},
 		},

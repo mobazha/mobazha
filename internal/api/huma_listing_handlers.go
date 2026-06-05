@@ -210,14 +210,21 @@ func (g *Gateway) registerListingIndexByPeer(api huma.API) {
 }
 
 func (g *Gateway) registerListingIndex(api huma.API) {
+	type listingIndexInput struct {
+		IncludeSupplySummary bool `query:"includeSupplySummary" required:"false" doc:"Include seller-safe supply summaries for the authenticated store owner."`
+	}
 	huma.Register(api, huma.Operation{
 		OperationID: "listings-index",
 		Method:      http.MethodGet,
 		Path:        "/v1/listings/index",
 		Summary:     "Get listing index (self)",
 		Tags:        []string{"listings"},
-	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
-		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/listings/index", nil)
+	}, func(ctx context.Context, in *listingIndexInput) (*nodeDataOutput, error) {
+		rawURL := "/v1/listings/index"
+		if in.IncludeSupplySummary {
+			rawURL += "?includeSupplySummary=true"
+		}
+		req := nodeBridgeRequest(ctx, http.MethodGet, rawURL, nil)
 		rr := httptest.NewRecorder()
 		g.handleGETListingIndex(rr, req)
 		data, err := nodeBridgeSuccessData(rr)

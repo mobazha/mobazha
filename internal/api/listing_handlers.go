@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
@@ -27,6 +28,16 @@ var (
 		DiscardUnknown: true,
 	}
 )
+
+const (
+	listingIndexSupplySummaryBatchSize  = 50
+	listingIndexSupplySummaryConcurrent = 2
+)
+
+type listingMetadataWithSupplySummary struct {
+	models.ListingMetadata
+	SupplySummary *contracts.ListingSupplySummaryItem `json:"supplySummary,omitempty"`
+}
 
 // extractRequestContext extracts group context from HTTP headers and creates a request.Context
 func extractRequestContext(r *http.Request) *request.Context {
@@ -234,7 +245,115 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		applyStorefrontPriceRuleToIndex(listingIndex, rule)
 	}
 
+	if shouldIncludeListingIndexSupplySummary(r, peerIDStr) {
+		sanitizedJSONResponse(w, listingIndexWithSupplySummary(r.Context(), listingIndex, getOrderService(r)))
+		return
+	}
+
 	sanitizedJSONResponse(w, listingIndex)
+}
+
+func shouldIncludeListingIndexSupplySummary(r *http.Request, peerIDStr string) bool {
+	if peerIDStr != "" {
+		return false
+	}
+	include, err := strconv.ParseBool(r.URL.Query().Get("includeSupplySummary"))
+	return err == nil && include
+}
+
+func listingIndexWithSupplySummary(
+	ctx context.Context,
+	listingIndex models.ListingIndex,
+	orderSvc contracts.OrderService,
+) []listingMetadataWithSupplySummary {
+	items := make([]listingMetadataWithSupplySummary, 0, len(listingIndex))
+	if len(listingIndex) == 0 {
+		return items
+	}
+	summaries := listingSupplySummaryBySlug(ctx, listingIndex, orderSvc)
+	for _, listing := range listingIndex {
+		item := listingMetadataWithSupplySummary{ListingMetadata: listing}
+		if summary, ok := summaries[listing.Slug]; ok {
+			copy := summary
+			item.SupplySummary = &copy
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
+func listingSupplySummaryBySlug(
+	ctx context.Context,
+	listingIndex models.ListingIndex,
+	orderSvc contracts.OrderService,
+) map[string]contracts.ListingSupplySummaryItem {
+	if orderSvc == nil || len(listingIndex) == 0 {
+		return nil
+	}
+	summaries := make(map[string]contracts.ListingSupplySummaryItem, len(listingIndex))
+	slugs := make([]string, 0, len(listingIndex))
+	seen := make(map[string]struct{}, len(listingIndex))
+	for _, listing := range listingIndex {
+		if listing.Slug == "" {
+			continue
+		}
+		if _, ok := seen[listing.Slug]; ok {
+			continue
+		}
+		seen[listing.Slug] = struct{}{}
+		slugs = append(slugs, listing.Slug)
+	}
+	batches := make([][]string, 0, (len(slugs)+listingIndexSupplySummaryBatchSize-1)/listingIndexSupplySummaryBatchSize)
+	for start := 0; start < len(slugs); start += listingIndexSupplySummaryBatchSize {
+		end := start + listingIndexSupplySummaryBatchSize
+		if end > len(slugs) {
+			end = len(slugs)
+		}
+		batches = append(batches, slugs[start:end])
+	}
+
+	var (
+		cursor int
+		mu     sync.Mutex
+		wg     sync.WaitGroup
+	)
+	workerCount := listingIndexSupplySummaryConcurrent
+	if workerCount > len(batches) {
+		workerCount = len(batches)
+	}
+	for range workerCount {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				mu.Lock()
+				if cursor >= len(batches) {
+					mu.Unlock()
+					return
+				}
+				batch := batches[cursor]
+				cursor++
+				mu.Unlock()
+
+				resp, err := orderSvc.SummarizeListingSupply(ctx, contracts.ListingSupplySummaryRequest{
+					Slugs: batch,
+					Limit: len(batch),
+				})
+				if err != nil || resp == nil {
+					continue
+				}
+				mu.Lock()
+				for _, summary := range resp.Items {
+					if summary.ListingSlug != "" {
+						summaries[summary.ListingSlug] = summary
+					}
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	return summaries
 }
 
 // applyStorefrontPriceRuleToIndex mutates listingIndex in place, replacing

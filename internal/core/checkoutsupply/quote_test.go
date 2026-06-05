@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type stubListingReader struct {
@@ -55,6 +60,20 @@ func (enabledSupplyFeatureResolver) Evaluate(context.Context, string) pkgconfig.
 }
 
 func (enabledSupplyFeatureResolver) List(context.Context) []pkgconfig.EffectiveFeature {
+	return nil
+}
+
+type sellerSummaryReadModelResolver struct{}
+
+func (sellerSummaryReadModelResolver) IsEnabled(_ context.Context, key string) bool {
+	return key == pkgconfig.FeatureSupplyAvailabilityEnabled.Key
+}
+
+func (sellerSummaryReadModelResolver) Evaluate(_ context.Context, key string) pkgconfig.Evaluation {
+	return pkgconfig.Evaluation{Enabled: key == pkgconfig.FeatureSupplyAvailabilityEnabled.Key}
+}
+
+func (sellerSummaryReadModelResolver) List(context.Context) []pkgconfig.EffectiveFeature {
 	return nil
 }
 
@@ -132,6 +151,12 @@ func listingWithSkus(slug string, skus ...*pb.Listing_Item_Sku) *pb.SignedListin
 			},
 		},
 	}
+}
+
+func digitalListing(slug string) *pb.SignedListing {
+	sl := listingWithSkus(slug)
+	sl.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	return sl
 }
 
 func TestQuote_RequiresItems(t *testing.T) {
@@ -402,4 +427,142 @@ func TestSellerSummary_ContinuesWhenOneListingFails(t *testing.T) {
 	require.Equal(t, "missing", resp.Items[1].ListingSlug)
 	require.Equal(t, contracts.SupplyAvailabilityUnknown, resp.Items[1].Status)
 	require.Equal(t, "quote_unavailable", resp.Items[1].Reason)
+}
+
+func TestSellerSummary_ReadModelBatchesTenantScopedSupplyState(t *testing.T) {
+	sharedDB, err := gorm.Open(sqlitedialect.Open("file:seller_summary_read_model?mode=memory&cache=shared"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	require.NoError(t, err)
+	require.NoError(t, sharedDB.AutoMigrate(
+		&dbstore.PublicDataRecord{},
+		&dbstore.PublicMediaRecord{},
+		&models.InventoryReservation{},
+		&models.DigitalAsset{},
+		&models.DigitalLicenseKey{},
+		&models.SyncedProductMapping{},
+	))
+	db, err := dbstore.NewTenantDBWithPublicData(
+		sharedDB,
+		"tenant-a",
+		dbstore.NewDBPublicData(sharedDB, "tenant-a"),
+	)
+	require.NoError(t, err)
+	defer db.Close()
+
+	redSKU := &pb.Listing_Item_Sku{
+		Selections: []*pb.Listing_Item_Sku_Selection{{Option: "Color", Variant: "Red"}},
+		Quantity:   "3",
+	}
+	tracked := listingWithSkus("tracked-shirt",
+		redSKU,
+		&pb.Listing_Item_Sku{
+			Selections: []*pb.Listing_Item_Sku_Selection{{Option: "Color", Variant: "Blue"}},
+			Quantity:   "0",
+		},
+	)
+	license := digitalListing("license-app")
+	missingDigital := digitalListing("missing-digital")
+	supplier := listingWithSkus("supplier-shirt")
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		for _, sl := range []*pb.SignedListing{tracked, license, missingDigital, supplier} {
+			if err := tx.SetListing(sl); err != nil {
+				return err
+			}
+		}
+		if err := tx.Save(&models.InventoryReservation{
+			ID:          1,
+			OrderRef:    "order-1",
+			OrderType:   models.OrderTypeGuest,
+			ListingSlug: "tracked-shirt",
+			VariantHash: computeCheckoutVariantHashFromSku(redSKU),
+			Quantity:    1,
+		}); err != nil {
+			return err
+		}
+		if err := tx.Save(&models.DigitalAsset{
+			ID:          "asset-license",
+			ListingSlug: "license-app",
+			AssetType:   models.AssetTypeLicenseKey,
+		}); err != nil {
+			return err
+		}
+		if err := tx.Save(&models.DigitalLicenseKey{
+			ID:          "key-available",
+			ListingSlug: "license-app",
+			LicenseHash: "hash-a",
+			AppID:       "license-app",
+			Status:      models.LicenseKeyStatusAvailable,
+		}); err != nil {
+			return err
+		}
+		if err := tx.Save(&models.DigitalLicenseKey{
+			ID:          "key-reserved",
+			ListingSlug: "license-app",
+			LicenseHash: "hash-r",
+			AppID:       "license-app",
+			Status:      models.LicenseKeyStatusReserved,
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&models.SyncedProductMapping{
+			ID:          "supplier-map",
+			ProviderID:  "printful",
+			ListingSlug: "supplier-shirt",
+			Status:      "synced",
+		})
+	}))
+	require.NoError(t, sharedDB.Create(&models.InventoryReservation{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-b"},
+		ID:          99,
+		OrderRef:    "other-tenant-order",
+		OrderType:   models.OrderTypeGuest,
+		ListingSlug: "tracked-shirt",
+		VariantHash: computeCheckoutVariantHashFromSku(redSKU),
+		Quantity:    100,
+	}).Error)
+
+	recorder := &recordingSupplyAvailability{}
+	svc := NewCheckoutSupplyQuoteService(CheckoutSupplyQuoteServiceConfig{
+		DB:                 db,
+		Resolver:           sellerSummaryReadModelResolver{},
+		SupplyAvailability: recorder,
+		Listings: &stubListingReader{
+			bySlug: map[string]*pb.SignedListing{
+				"tracked-shirt":   tracked,
+				"license-app":     license,
+				"missing-digital": missingDigital,
+				"supplier-shirt":  supplier,
+			},
+		},
+	})
+
+	resp, err := svc.SellerSummary(context.Background(), contracts.ListingSupplySummaryRequest{
+		Slugs: []string{"tracked-shirt", "license-app", "missing-digital", "supplier-shirt"},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 4)
+	require.Empty(t, recorder.quoteRequests, "read model must not fan out into per-listing Quote calls")
+
+	trackedSummary := resp.Items[0]
+	require.Equal(t, contracts.ListingSupplyModeTrackedStock, trackedSummary.SupplyMode)
+	require.Equal(t, contracts.SupplyAvailabilityLowStock, trackedSummary.Status)
+	require.EqualValues(t, 2, *trackedSummary.AvailableQuantity)
+	require.EqualValues(t, 3, *trackedSummary.OnHandQuantity)
+	require.EqualValues(t, 1, *trackedSummary.HeldQuantity)
+
+	licenseSummary := resp.Items[1]
+	require.Equal(t, contracts.ListingSupplyModeLicenseCodes, licenseSummary.SupplyMode)
+	require.Equal(t, contracts.SupplyAvailabilityAvailable, licenseSummary.Status)
+	require.EqualValues(t, 1, *licenseSummary.AvailableQuantity)
+	require.EqualValues(t, 2, *licenseSummary.OnHandQuantity)
+	require.EqualValues(t, 1, *licenseSummary.HeldQuantity)
+
+	require.Equal(t, contracts.ListingSupplyModeInstantDownload, resp.Items[2].SupplyMode)
+	require.Equal(t, contracts.SupplyAvailabilityManualActionRequired, resp.Items[2].Status)
+	require.Equal(t, "digital_asset_missing", resp.Items[2].Reason)
+
+	require.Equal(t, contracts.ListingSupplyModeSupplierFulfilled, resp.Items[3].SupplyMode)
+	require.Equal(t, contracts.SupplyAvailabilityAvailable, resp.Items[3].Status)
 }

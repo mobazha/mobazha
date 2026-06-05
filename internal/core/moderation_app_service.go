@@ -4,10 +4,11 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
 	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -171,20 +172,13 @@ func (s *ModerationAppService) GetVerifiedModerators(ctx context.Context) []peer
 	}
 	defer resp.Body.Close()
 
-	type ModResp struct {
-		Success bool     `json:"success"`
-		Total   int32    `json:"total"`
-		Results []string `json:"results"`
-	}
-	var modResp ModResp
-
-	decoder := json.NewDecoder(resp.Body)
-	if err := decoder.Decode(&modResp); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil || resp.StatusCode != http.StatusOK {
 		return []peer.ID{}
 	}
 
 	var mods []peer.ID
-	for _, id := range modResp.Results {
+	for _, id := range parseVerifiedModeratorPeerIDs(body) {
 		mod, err := peer.Decode(id)
 		if err != nil {
 			continue

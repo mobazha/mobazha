@@ -339,7 +339,19 @@ func listingSupplySummaryBySlug(
 					Slugs: batch,
 					Limit: len(batch),
 				})
-				if err != nil || resp == nil {
+				if err != nil {
+					log.Warningf(
+						"listing index supply summary batch failed (slugs=%d): %v",
+						len(batch),
+						err,
+					)
+					continue
+				}
+				if resp == nil {
+					log.Warningf(
+						"listing index supply summary batch returned nil (slugs=%d)",
+						len(batch),
+					)
 					continue
 				}
 				mu.Lock()

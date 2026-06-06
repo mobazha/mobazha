@@ -33,6 +33,11 @@ func (s *SettlementService) HandleCancelablePaymentForUTXO(event *events.Cancela
 	}
 	defer unlock()
 
+	if !order.CanConfirm() {
+		logger.LogWarningWithIDf(log, s.nodeID, "Order %s cannot be auto-confirmed (state=%s)", order.ID, order.State)
+		return
+	}
+
 	logger.LogInfoWithIDf(log, s.nodeID, "Auto-confirming UTXO CANCELABLE payment for order %s", order.ID)
 
 	s.eventBus.Emit(&events.OrderAutoConfirmRequest{
@@ -229,22 +234,12 @@ func (s *SettlementService) AutoConfirmManagedEscrowCancelable(ctx context.Conte
 // ── Solana Auto-Confirm ─────────────────────────────────────────────────
 
 // HandleCancelablePaymentForSolana handles CancelablePaymentReady event for Solana
-// chains via relay.
+// chains. Anchor escrow preserves the seller decision window after payment is
+// verified: seller confirm releases to the seller, while seller decline refunds
+// through the dedicated seller_decline_refund action.
 func (s *SettlementService) HandleCancelablePaymentForSolana(event *events.CancelablePaymentReady) {
-	logger.LogInfoWithIDf(log, s.nodeID, "Handling Solana CANCELABLE payment ready event for order %s", event.OrderID)
-
-	if !s.IsSolanaRelayAvailable() {
-		logger.LogWarningWithIDf(log, s.nodeID, "Solana Relay service not available, cannot auto-confirm Solana CANCELABLE payment for order %s", event.OrderID)
-		return
-	}
-
-	order, err := s.fetchOrderByID(event.OrderID)
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get order %s for Solana CANCELABLE auto-confirm: %v", event.OrderID, err)
-		return
-	}
-
-	s.autoConfirmSolanaCancelablePayment(order)
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"Skipping Solana CANCELABLE auto-confirm for order %s; awaiting seller confirm or seller_decline_refund", event.OrderID)
 }
 
 func (s *SettlementService) autoConfirmSolanaCancelablePayment(order *models.Order) {
@@ -312,15 +307,6 @@ func (s *SettlementService) autoConfirmSolanaCancelablePayment(order *models.Ord
 	})
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Emitted OrderAutoConfirmRequest for Solana CANCELABLE order %s", order.ID)
-}
-
-// ── TRON Auto-Confirm ───────────────────────────────────────────────────
-
-// HandleCancelablePaymentForTRON handles CancelablePaymentReady event for TRON.
-// TRON relay integration will be implemented in a future sprint;
-// for now this logs and returns.
-func (s *SettlementService) HandleCancelablePaymentForTRON(event *events.CancelablePaymentReady) {
-	logger.LogInfoWithIDf(log, s.nodeID, "Handling TRON CANCELABLE payment ready event for order %s (relay not yet implemented)", event.OrderID)
 }
 
 // ── FIAT Auto-Confirm ───────────────────────────────────────────────────

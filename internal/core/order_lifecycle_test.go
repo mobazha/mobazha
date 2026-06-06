@@ -5,12 +5,16 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"gorm.io/gorm"
 
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -42,6 +46,10 @@ func newMockUTXOAdapter(node *MobazhaNode) *adapters.UTXOAutoConfirmAdapter {
 // without requiring a live wallet or Multiwallet.
 func newStubUTXOAdapter() *adapters.UTXOAutoConfirmAdapter {
 	return &adapters.UTXOAutoConfirmAdapter{}
+}
+
+func registerChainMockV2(node *MobazhaNode, adapter *adapters.UTXOAutoConfirmAdapter) {
+	node.paymentRegistry.RegisterV2(iwallet.ChainMock, payment.NewV1AsV2(adapter))
 }
 
 // setupMockNetDB creates a mock HTTP server that serves listing index data
@@ -288,6 +296,130 @@ func ingestPaymentToWallets(t *testing.T, paymentData *models.PaymentData, nodes
 	}
 }
 
+// ensureMockUTXOFundingFacts backfills PaymentSent funding facts on mocknet
+// orders so monitored UTXO settlement can resolve chain funding evidence.
+// Production paths populate facts during payment verification; mock tests
+// call this after payment sync and before confirm/cancel/complete.
+func ensureMockUTXOFundingFacts(t *testing.T, orderID models.OrderID, paymentData *models.PaymentData, nodes ...*MobazhaNode) {
+	t.Helper()
+
+	if err := paymentData.EnsureTransactionFields(); err != nil {
+		t.Fatalf("ensureMockUTXOFundingFacts: EnsureTransactionFields: %v", err)
+	}
+	tx, err := paymentData.BuildTransaction()
+	if err != nil {
+		t.Fatalf("ensureMockUTXOFundingFacts: BuildTransaction: %v", err)
+	}
+
+	eventIndex := int32(0)
+	amount := strconv.FormatUint(paymentData.Amount, 10)
+	for i, out := range tx.To {
+		if payment.SameUTXOAddress(out.Address.String(), paymentData.ToAddress) {
+			eventIndex = int32(i)
+			amount = out.Amount.String()
+			break
+		}
+	}
+
+	for _, node := range nodes {
+		err := node.repo.DB().Update(func(dbtx database.Tx) error {
+			var order models.Order
+			if err := dbtx.Read().Where("id = ?", orderID.String()).First(&order).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil
+				}
+				return err
+			}
+			ps, err := order.PaymentSentMessage()
+			if err != nil {
+				return nil
+			}
+			if len(ps.GetFundingFacts()) > 0 {
+				return nil
+			}
+			if ps.ConfirmationPolicy == "" {
+				ps.ConfirmationPolicy = models.PaymentConfirmationPolicyChainConfirmed
+			}
+			ps.FundingFacts = []*pb.PaymentSent_FundingFact{{
+				Id:           "mock-funding-1",
+				TxHash:       paymentData.TransactionID,
+				TxHashSource: models.PaymentTxHashSourceChainTx,
+				EventIndex:   eventIndex,
+				ToAddress:    paymentData.ToAddress,
+				Amount:       amount,
+				Status:       models.PaymentObservationStatusConfirmed,
+			}}
+			if err := order.SetPaymentSent(ps); err != nil {
+				return err
+			}
+			return dbtx.Save(&order)
+		})
+		if err != nil {
+			t.Fatalf("ensureMockUTXOFundingFacts on node %s: %v", node.nodeID, err)
+		}
+	}
+}
+
+// processMockUTXOPayment ingests the mock chain tx and submits payment from
+// the buyer. Call ensureMockUTXOFundingFacts after payment sync before
+// confirm/cancel/complete/dispute settlement actions.
+// submitMockModeratedSettlementComplete runs the settlement-actions/complete
+// step required before CompleteOrder on monitored moderated UTXO orders.
+func submitMockModeratedSettlementComplete(t *testing.T, buyer *MobazhaNode, orderID models.OrderID) {
+	t.Helper()
+	_, _, err := buyer.Order().ExecuteSettlementAction(context.Background(), "complete", orderID, "")
+	if err != nil {
+		t.Fatalf("ExecuteSettlementAction(complete): %v", err)
+	}
+}
+
+// submitMockModeratedSettlementDisputeRelease runs settlement-actions/dispute-release
+// before ReleaseFunds on monitored moderated UTXO disputes.
+func submitMockModeratedSettlementDisputeRelease(t *testing.T, buyer *MobazhaNode, orderID models.OrderID) {
+	t.Helper()
+	_, _, err := buyer.Order().ExecuteSettlementAction(context.Background(), "dispute_release", orderID, "")
+	if err != nil {
+		t.Fatalf("ExecuteSettlementAction(dispute_release): %v", err)
+	}
+}
+
+func processMockUTXOPayment(t *testing.T, buyer *MobazhaNode, paymentData *models.PaymentData, walletNodes ...*MobazhaNode) {
+	t.Helper()
+
+	nodes := append([]*MobazhaNode{buyer}, walletNodes...)
+	ingestPaymentToWallets(t, paymentData, nodes...)
+	if err := buyer.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
+		t.Fatalf("processMockUTXOPayment: ProcessOrderPayment: %v", err)
+	}
+}
+
+// recoverMockCancelableAutoConfirm simulates production recovery: P2P PaymentSent
+// verifies before funding facts exist, facts are backfilled, then RecordVerifiedPayment
+// emits CancelablePaymentReady through emitVerifiedPaymentSettlementRecovery.
+func recoverMockCancelableAutoConfirm(t *testing.T, seller *MobazhaNode, orderID models.OrderID, paymentData *models.PaymentData) {
+	t.Helper()
+
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, seller)
+	if err := paymentData.EnsureTransactionFields(); err != nil {
+		t.Fatalf("recoverMockCancelableAutoConfirm: EnsureTransactionFields: %v", err)
+	}
+	tx, err := paymentData.BuildTransaction()
+	if err != nil {
+		t.Fatalf("recoverMockCancelableAutoConfirm: BuildTransaction: %v", err)
+	}
+
+	err = seller.repo.DB().Update(func(dbtx database.Tx) error {
+		var order models.Order
+		if err := dbtx.Read().Where("id = ?", orderID.String()).First(&order).Error; err != nil {
+			return err
+		}
+		return seller.orderProcessor.RecordVerifiedPayment(dbtx, &order, tx)
+	})
+	if err != nil {
+		t.Fatalf("recoverMockCancelableAutoConfirm: %v", err)
+	}
+}
+
 // ── Common Test Helpers ──────────────────────────────────────────────────
 //
 // These helpers reduce boilerplate across order lifecycle tests.
@@ -460,10 +592,10 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	// This verifies that registry initialization doesn't interfere with
 	// the normal order processing pipeline.
 	sellerNode.registerPaymentStrategies()
-	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+	registerChainMockV2(sellerNode, newMockUTXOAdapter(sellerNode))
 
 	// Verify registry is populated correctly
-	strategy, err := sellerNode.paymentRegistry.ForCoin(iwallet.CtMock)
+	strategy, err := sellerNode.paymentRegistry.ForCoinV2(iwallet.CtMock)
 	if err != nil {
 		t.Fatalf("ChainMock not registered in payment registry: %v", err)
 	}
@@ -551,14 +683,11 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 		ToAddress:     "mock-payment-addr",
 	}
 	// Ingest into both wallets so vendor GetTransaction succeeds (PaymentVerified)
-	ingestPaymentToWallets(t, paymentData, buyerNode, sellerNode)
-
-	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, buyerNode, paymentData, sellerNode)
 
 	// Wait for payment to propagate
 	time.Sleep(100 * time.Millisecond)
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, buyerNode, sellerNode)
 
 	// ── Step 4: Seller Confirms Order ────────────────────────────
 	confirmSub, err := buyerNode.eventBus.Subscribe(&events.OrderConfirmation{})
@@ -757,10 +886,10 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	// ── Registry Setup ──────────────────────────────────────────
 	// Initialize the payment registry and register ChainMock
 	sellerNode.registerPaymentStrategies()
-	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+	registerChainMockV2(sellerNode, newMockUTXOAdapter(sellerNode))
 
 	// Verify registry is populated
-	strategy, err := sellerNode.paymentRegistry.ForCoin(iwallet.CtMock)
+	strategy, err := sellerNode.paymentRegistry.ForCoinV2(iwallet.CtMock)
 	if err != nil {
 		t.Fatalf("ChainMock not registered: %v", err)
 	}
@@ -768,10 +897,8 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 		t.Fatalf("Expected PaymentModelMonitored, got %s", strategy.Model())
 	}
 
-	// Start the cancelable payment monitor (key for auto-confirm)
+	// Start monitors before payment so CancelablePaymentReady is not dropped.
 	sellerNode.startCancelablePaymentMonitor()
-
-	// Start the order event monitor so OrderAutoConfirmRequest is handled
 	sellerNode.orderService.StartPaymentEventMonitor()
 
 	// Start order processors for message handling
@@ -853,9 +980,6 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	}
 	t.Logf("CANCELABLE payment: amount=%d, address=%s", paymentData.Amount, paymentData.ToAddress)
 
-	// Ingest tx into both wallets so vendor GetTransaction succeeds (PaymentVerified)
-	ingestPaymentToWallets(t, paymentData, buyerNode, sellerNode)
-
 	// ── Step 4: Buyer Sends CANCELABLE Payment ───────────────────
 	// Subscribe to OrderConfirmation BEFORE processing payment,
 	// because auto-confirm happens asynchronously after payment processing.
@@ -864,12 +988,12 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, buyerNode, paymentData, sellerNode)
+	time.Sleep(500 * time.Millisecond)
+	recoverMockCancelableAutoConfirm(t, sellerNode, orderID, paymentData)
 
 	// ── Step 5: Wait for Auto-Confirm ────────────────────────────
-	// The seller's payment monitor receives CancelablePaymentReady event,
+	// Funding facts backfill triggers CancelablePaymentReady recovery; the monitor
 	// dispatches to utxoAutoConfirmAdapter.AutoConfirm, which calls
 	// ConfirmOrder → releaseFromCancelableAddress → sends OrderConfirmation.
 	select {
@@ -1125,13 +1249,11 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 	buyerWal := bw.(*wallet.MockWallet)
 	buyerWal.IngestTransaction(tx)
 
-	// ── Step 4: Buyer Sends CANCELABLE Payment ───────────────────
-	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, buyerNode, paymentData, sellerNode)
 
 	// Give time for payment message to propagate to seller
 	time.Sleep(500 * time.Millisecond)
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, buyerNode, sellerNode)
 
 	// Verify payment was recorded
 	var buyerOrder models.Order
@@ -1219,13 +1341,13 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	// Register ChainMock with a stub adapter (no wallet needed for registry coverage)
-	n.paymentRegistry.Register(iwallet.ChainMock, newStubUTXOAdapter())
+	registerChainMockV2(n, newStubUTXOAdapter())
 
-	// Verify all expected chains are registered
+	// Verify chains always registered at startup (V2 UTXO/Solana; TRON retired).
+	// EVM ManagedEscrowAdapter chains appear only after registerManagedEscrowAdapterShadow succeeds.
 	chains := n.paymentRegistry.Chains()
 	expectedChains := []iwallet.ChainType{
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash, iwallet.ChainLitecoin, iwallet.ChainZCash,
-		iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon, iwallet.ChainBase,
 		iwallet.ChainSolana, iwallet.ChainMock,
 	}
 	chainSet := make(map[iwallet.ChainType]bool)
@@ -1239,16 +1361,21 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	}
 
 	// Verify ChainMock resolves correctly
-	strategy, err := n.paymentRegistry.ForCoin(iwallet.CtMock)
+	strategy, err := n.paymentRegistry.ForCoinV2(iwallet.CtMock)
 	if err != nil {
-		t.Fatalf("ForCoin(MCK) failed: %v", err)
+		t.Fatalf("ForCoinV2(MCK) failed: %v", err)
 	}
 	if strategy.Model() != payment.PaymentModelMonitored {
 		t.Errorf("ChainMock model = %s, want %s", strategy.Model(), payment.PaymentModelMonitored)
 	}
 
-	// Verify instruction methods return nil for UTXO (backend-handled)
-	result, err := strategy.GetConfirmInstructions(context.Background(), payment.InstructionParams{})
+	// Verify wrapped V1 instruction methods return nil for UTXO (backend-handled).
+	wrapped, ok := strategy.(*payment.V1AsV2)
+	if !ok {
+		t.Fatalf("ForCoinV2(MCK) returned %T, want *payment.V1AsV2", strategy)
+	}
+	legacy := wrapped.Underlying()
+	result, err := legacy.GetConfirmInstructions(context.Background(), payment.InstructionParams{})
 	if err != nil {
 		t.Fatalf("GetConfirmInstructions failed: %v", err)
 	}
@@ -1256,7 +1383,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 		t.Error("UTXO GetConfirmInstructions should return nil Instructions (backend-handled)")
 	}
 
-	result, err = strategy.GetCancelInstructions(context.Background(), payment.InstructionParams{})
+	result, err = legacy.GetCancelInstructions(context.Background(), payment.InstructionParams{})
 	if err != nil {
 		t.Fatalf("GetCancelInstructions failed: %v", err)
 	}
@@ -1264,7 +1391,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 		t.Error("UTXO GetCancelInstructions should return nil Instructions")
 	}
 
-	result, err = strategy.GetCompleteInstructions(context.Background(), payment.InstructionParams{})
+	result, err = legacy.GetCompleteInstructions(context.Background(), payment.InstructionParams{})
 	if err != nil {
 		t.Fatalf("GetCompleteInstructions failed: %v", err)
 	}
@@ -1272,7 +1399,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 		t.Error("UTXO GetCompleteInstructions should return nil Instructions")
 	}
 
-	result, err = strategy.GetDisputeReleaseInstructions(context.Background(), payment.InstructionParams{})
+	result, err = legacy.GetDisputeReleaseInstructions(context.Background(), payment.InstructionParams{})
 	if err != nil {
 		t.Fatalf("GetDisputeReleaseInstructions failed: %v", err)
 	}
@@ -1280,44 +1407,55 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 		t.Error("UTXO GetDisputeReleaseInstructions should return nil Instructions")
 	}
 
-	// ── Verify EVM chains use PaymentModelClientSigned ──────────
+	// ── Verify Ready EVM chains use PaymentModelMonitored via V2 ──
 	testEvmChains := []iwallet.ChainType{
 		iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon,
 		iwallet.ChainBase,
 	}
 	for _, chain := range testEvmChains {
-		evmStrategy, err := n.paymentRegistry.ForChain(chain)
-		if err != nil {
-			t.Errorf("ForChain(%s) failed for EVM chain: %v", chain, err)
+		if _, err := n.paymentRegistry.ForChain(chain); err == nil {
+			t.Errorf("ForChain(%s): legacy V1 EVM registration is retired", chain)
 			continue
 		}
-		if evmStrategy.Model() != payment.PaymentModelClientSigned {
+		evmStrategy, err := n.paymentRegistry.ForChainV2(chain)
+		if err != nil {
+			t.Logf("ForChainV2(%s) unavailable without ManagedEscrowAdapter deps: %v", chain, err)
+			continue
+		}
+		if evmStrategy.Model() != payment.PaymentModelMonitored {
 			t.Errorf("EVM chain %s: model = %s, want %s",
-				chain, evmStrategy.Model(), payment.PaymentModelClientSigned)
+				chain, evmStrategy.Model(), payment.PaymentModelMonitored)
 		}
 	}
-	t.Log("✓ EVM chains (BSC/ETH/MATIC/BASE) use PaymentModelClientSigned")
+	t.Log("✓ Ready EVM chains (BSC/ETH/MATIC/BASE) use PaymentModelMonitored via ManagedEscrowAdapter V2")
 
-	// ── Verify Solana uses PaymentModelClientSigned ──────────────
-	solStrategy, err := n.paymentRegistry.ForChain(iwallet.ChainSolana)
+	// ── Verify Solana uses PaymentModelMonitored via V2 ─────────
+	if _, err := n.paymentRegistry.ForChain(iwallet.ChainSolana); err == nil {
+		t.Fatal("ForChain(SOL): legacy V1 Solana registration is retired")
+	}
+	solStrategy, err := n.paymentRegistry.ForChainV2(iwallet.ChainSolana)
 	if err != nil {
-		t.Fatalf("ForChain(SOL) failed: %v", err)
+		t.Fatalf("ForChainV2(SOL) failed: %v", err)
 	}
-	if solStrategy.Model() != payment.PaymentModelClientSigned {
+	if solStrategy.Model() != payment.PaymentModelMonitored {
 		t.Errorf("Solana: model = %s, want %s",
-			solStrategy.Model(), payment.PaymentModelClientSigned)
+			solStrategy.Model(), payment.PaymentModelMonitored)
 	}
-	t.Log("✓ Solana uses PaymentModelClientSigned")
+	t.Log("✓ Solana uses PaymentModelMonitored via SolanaAnchorAdapter V2")
 
-	// ── Verify UTXO chains use PaymentModelMonitored ────────────
+	// ── Verify UTXO chains use PaymentModelMonitored via V2 ─────
 	testUtxoChains := []iwallet.ChainType{
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash,
 		iwallet.ChainLitecoin, iwallet.ChainZCash,
 	}
 	for _, chain := range testUtxoChains {
-		utxoStrat, err := n.paymentRegistry.ForChain(chain)
+		if _, err := n.paymentRegistry.ForChain(chain); err == nil {
+			t.Errorf("ForChain(%s): legacy V1 UTXO registration is retired", chain)
+			continue
+		}
+		utxoStrat, err := n.paymentRegistry.ForChainV2(chain)
 		if err != nil {
-			t.Errorf("ForChain(%s) failed for UTXO chain: %v", chain, err)
+			t.Errorf("ForChainV2(%s) failed for UTXO chain: %v", chain, err)
 			continue
 		}
 		if utxoStrat.Model() != payment.PaymentModelMonitored {
@@ -1325,13 +1463,13 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 				chain, utxoStrat.Model(), payment.PaymentModelMonitored)
 		}
 	}
-	t.Log("✓ UTXO chains (BTC/BCH/LTC/ZEC) use PaymentModelMonitored")
+	t.Log("✓ UTXO chains (BTC/BCH/LTC/ZEC) use PaymentModelMonitored via V2")
 
 	// ── Summary: Model semantics table ──────────────────────────
 	t.Log("Model semantics verified:")
 	t.Log("  UTXO (BTC/BCH/LTC/ZEC/Mock): Monitored — backend auto-confirms, instructions=nil")
-	t.Log("  EVM (BSC/ETH/MATIC/BASE): ClientSigned — frontend signs, instructions!=nil")
-	t.Log("  Solana (SOL): ClientSigned — frontend signs, instructions!=nil")
+	t.Log("  EVM (BSC/ETH/MATIC/BASE): Monitored — ManagedEscrow address + backend settlement actions")
+	t.Log("  Solana (SOL): Monitored — Anchor escrow + backend relay")
 }
 
 // TestOrderLifecycle_Moderated_FullHappyPath tests the full moderated order lifecycle:
@@ -1361,7 +1499,7 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 	setupModeratorNode(t, moderatorNode, []string{"MCK"})
 
 	sellerNode.registerPaymentStrategies()
-	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+	registerChainMockV2(sellerNode, newMockUTXOAdapter(sellerNode))
 
 	for _, node := range network.Nodes() {
 		go node.orderProcessor.Start()
@@ -1397,14 +1535,12 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ingestPaymentToWallets(t, paymentData, sellerNode, buyerNode)
-	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, buyerNode, paymentData, sellerNode)
 
 	waitForEvent(t, fundingSub, "OrderFunded on seller")
 	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
 	waitForEvent(t, ratingSigAck, "MessageACK (rating sig) on seller")
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, sellerNode, buyerNode)
 
 	// ── Step 5: Seller Confirms Order ───────────────────────────
 	confirmSub, err := buyerNode.eventBus.Subscribe(&events.OrderConfirmation{})
@@ -1460,6 +1596,8 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	submitMockModeratedSettlementComplete(t, buyerNode, orderID)
 
 	done7 := make(chan struct{})
 	ratings := []models.Rating{
@@ -1564,7 +1702,7 @@ func TestOrderLifecycle_Moderated_Dispute_FullResolution(t *testing.T) {
 	setupModeratorNode(t, moderatorNode, []string{"MCK"})
 
 	sellerNode.registerPaymentStrategies()
-	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+	registerChainMockV2(sellerNode, newMockUTXOAdapter(sellerNode))
 
 	for _, node := range network.Nodes() {
 		go node.orderProcessor.Start()
@@ -1595,14 +1733,12 @@ func TestOrderLifecycle_Moderated_Dispute_FullResolution(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ingestPaymentToWallets(t, paymentData, sellerNode, buyerNode)
-	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, buyerNode, paymentData, sellerNode)
 
 	waitForEvent(t, fundingSub, "OrderFunded on seller")
 	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
 	waitForEvent(t, ratingSigAck, "MessageACK (rating sig) on seller")
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, sellerNode, buyerNode, moderatorNode)
 
 	// ── Step 4: Seller Confirms ─────────────────────────────────
 	confirmSub, err := buyerNode.eventBus.Subscribe(&events.OrderConfirmation{})
@@ -1754,6 +1890,8 @@ func TestOrderLifecycle_Moderated_Dispute_FullResolution(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	submitMockModeratedSettlementDisputeRelease(t, buyerNode, orderID)
+
 	done7 := make(chan struct{})
 	if err := buyerNode.Order().ReleaseFunds(orderID, iwallet.TransactionID(""), done7); err != nil {
 		t.Fatal(err)
@@ -1807,7 +1945,7 @@ func TestOrderLifecycle_SellerDecline_AfterCancelablePayment(t *testing.T) {
 	setupMockReceivingAccounts(t, network.Nodes())
 
 	sellerNode.registerPaymentStrategies()
-	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+	registerChainMockV2(sellerNode, newMockUTXOAdapter(sellerNode))
 
 	for _, node := range network.Nodes() {
 		go node.orderProcessor.Start()
@@ -1843,13 +1981,11 @@ func TestOrderLifecycle_SellerDecline_AfterCancelablePayment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ingestPaymentToWallets(t, paymentData, sellerNode, buyerNode)
-	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, buyerNode, paymentData, sellerNode)
 
 	waitForEvent(t, fundingSub, "OrderFunded on seller")
 	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, sellerNode, buyerNode)
 
 	// ── Step 3: Seller Declines (funded — buyer releases CANCELABLE escrow inline) ──
 	declineSub, err := buyerNode.eventBus.Subscribe(&events.OrderDeclined{})
@@ -1906,7 +2042,7 @@ func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
 	setupMockReceivingAccounts(t, network.Nodes())
 
 	sellerNode.registerPaymentStrategies()
-	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+	registerChainMockV2(sellerNode, newMockUTXOAdapter(sellerNode))
 
 	for _, node := range network.Nodes() {
 		go node.orderProcessor.Start()
@@ -1946,14 +2082,12 @@ func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ingestPaymentToWallets(t, paymentData, sellerNode, buyerNode)
-	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, buyerNode, paymentData, sellerNode)
 
 	waitForEvent(t, fundingSub, "OrderFunded on seller")
 	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
 	waitForEvent(t, ratingSigAck, "MessageACK (rating sig) on seller")
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, sellerNode, buyerNode)
 
 	// ── Step 4: Seller Confirms (releases escrow) ───────────────
 	sellerWallet, err := sellerNode.multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
@@ -2005,42 +2139,47 @@ func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
 	t.Log("CANCELABLE confirm + refund-blocked: Purchase -> Payment -> Confirm -> RefundBlocked")
 }
 
-// TestOrderLifecycle_ClientSigned_InstructionMatrix validates all chains' instruction
-// behavior in a table-driven test. Pure memory — no Mocknet needed.
-func TestOrderLifecycle_ClientSigned_InstructionMatrix(t *testing.T) {
+// TestOrderLifecycle_MonitoredInstructionMatrix validates monitored chains return
+// nil frontend instructions. EVM/Solana require V2 registration; TRON is retired.
+func TestOrderLifecycle_MonitoredInstructionMatrix(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-instruction-matrix"}}
 	n.registerPaymentStrategies()
-	n.paymentRegistry.Register(iwallet.ChainMock, newStubUTXOAdapter())
+	registerChainMockV2(n, newStubUTXOAdapter())
 
 	type chainTest struct {
 		chain    iwallet.ChainType
+		useV2    bool
 		model    payment.PaymentModel
 		hasInstr bool
 	}
 
 	chains := []chainTest{
-		{iwallet.ChainBitcoin, payment.PaymentModelMonitored, false},
-		{iwallet.ChainLitecoin, payment.PaymentModelMonitored, false},
-		{iwallet.ChainBitcoinCash, payment.PaymentModelMonitored, false},
-		{iwallet.ChainZCash, payment.PaymentModelMonitored, false},
-		{iwallet.ChainMock, payment.PaymentModelMonitored, false},
-		{iwallet.ChainBSC, payment.PaymentModelClientSigned, true},
-		{iwallet.ChainEthereum, payment.PaymentModelClientSigned, true},
-		{iwallet.ChainPolygon, payment.PaymentModelClientSigned, true},
-		{iwallet.ChainBase, payment.PaymentModelClientSigned, true},
-		{iwallet.ChainSolana, payment.PaymentModelClientSigned, true},
+		{iwallet.ChainBitcoin, true, payment.PaymentModelMonitored, false},
+		{iwallet.ChainLitecoin, true, payment.PaymentModelMonitored, false},
+		{iwallet.ChainBitcoinCash, true, payment.PaymentModelMonitored, false},
+		{iwallet.ChainZCash, true, payment.PaymentModelMonitored, false},
+		{iwallet.ChainMock, true, payment.PaymentModelMonitored, false},
+		{iwallet.ChainSolana, true, payment.PaymentModelMonitored, false},
 	}
 
 	ctx := context.Background()
 
 	for _, tc := range chains {
 		t.Run(string(tc.chain), func(t *testing.T) {
-			strategy, err := n.paymentRegistry.ForChain(tc.chain)
-			if err != nil {
-				t.Fatalf("ForChain(%s) failed: %v", tc.chain, err)
-			}
-			if strategy.Model() != tc.model {
-				t.Errorf("Model = %s, want %s", strategy.Model(), tc.model)
+			var strategy payment.ChainEscrow
+			if tc.useV2 {
+				v2, err := n.paymentRegistry.ForChainV2(tc.chain)
+				if err != nil {
+					t.Fatalf("ForChainV2(%s) failed: %v", tc.chain, err)
+				}
+				if v2.Model() != tc.model {
+					t.Errorf("Model = %s, want %s", v2.Model(), tc.model)
+				}
+				wrapped, ok := v2.(*payment.V1AsV2)
+				if !ok {
+					return
+				}
+				strategy = wrapped.Underlying()
 			}
 
 			if !tc.hasInstr {
@@ -2054,11 +2193,11 @@ func TestOrderLifecycle_ClientSigned_InstructionMatrix(t *testing.T) {
 				for name, fn := range methods {
 					result, err := fn(ctx, params)
 					if err != nil {
-						t.Errorf("%s should not error for UTXO chain, got: %v", name, err)
+						t.Errorf("%s should not error for monitored chain, got: %v", name, err)
 						continue
 					}
 					if result.Instructions != nil {
-						t.Errorf("%s: UTXO should return nil instructions, got non-nil", name)
+						t.Errorf("%s: monitored chain should return nil instructions, got non-nil", name)
 					}
 				}
 			}

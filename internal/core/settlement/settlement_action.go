@@ -19,9 +19,12 @@ import (
 
 // ExecuteSettlementAction runs a chain escrow V2 lifecycle action for crypto orders.
 //
-// Supported actions on this SettlementService surface (CANCELABLE only):
+// Supported actions on this SettlementService surface:
 //   - "confirm" — cancelable payout / buyer acceptance (ManagedEscrow/Solana relay).
-//   - "cancel" — cancel / refund-before-ship (ManagedEscrow/Solana relay).
+//   - "cancel" — cancelable buyer cancel or pre-confirm moderated seller refund
+//     (ManagedEscrow/Solana relay).
+//   - "seller_decline_refund" — seller-authorized refund for chains whose
+//     on-chain program separates seller decline from buyer cancel.
 //
 // MODERATED complete and dispute_release are handled by OrderAppService
 // POST /v1/orders/{id}/settlement-actions/{complete|dispute-release}, not here.
@@ -52,8 +55,10 @@ func (s *SettlementService) ExecuteSettlementAction(
 
 func normalizeSettlementAction(action string) (string, error) {
 	action = strings.ToLower(strings.TrimSpace(action))
-	if action != "confirm" && action != "cancel" {
-		return "", fmt.Errorf("%w: unsupported settlement action %q (supported: confirm, cancel)",
+	if action != payment.SettlementActionConfirm &&
+		action != payment.SettlementActionCancel &&
+		action != payment.SettlementActionSellerDeclineRefund {
+		return "", fmt.Errorf("%w: unsupported settlement action %q (supported: confirm, cancel, seller_decline_refund)",
 			coreiface.ErrBadRequest, action)
 	}
 	return action, nil
@@ -129,8 +134,12 @@ func (s *SettlementService) executeSettlementActionForOrder(
 			return nil, coinType, fmt.Errorf("%w: order cannot be cancelled or refunded in its current state",
 				coreiface.ErrBadRequest)
 		}
-		if method != pb.PaymentSent_CANCELABLE {
+		if method != pb.PaymentSent_CANCELABLE && method != pb.PaymentSent_MODERATED {
 			return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
+		}
+		if method == pb.PaymentSent_MODERATED && order.SerializedOrderConfirmation != nil {
+			return nil, coinType, fmt.Errorf("%w: moderated orders can only be cancelled before seller confirmation",
+				coreiface.ErrBadRequest)
 		}
 		strategy, err := s.settlementActionStrategy(coinType)
 		if err != nil {
@@ -138,11 +147,50 @@ func (s *SettlementService) executeSettlementActionForOrder(
 		}
 		out := payoutAddr
 		if out == "" {
+			out = paymentSent.RefundAddress
+		}
+		if out == "" {
 			out = paymentSent.PayerAddress
 		}
 		params.PayoutAddr = out
 		result, cerr := strategy.Cancel(ctx, params)
 		return s.normalizeSettlementActionResult(result, coinType, cerr)
+
+	case payment.SettlementActionSellerDeclineRefund:
+		if order.Role() != models.RoleVendor {
+			return nil, coinType, fmt.Errorf("%w: seller_decline_refund requires the seller node",
+				coreiface.ErrBadRequest)
+		}
+		if !order.CanCancel() && !order.CanRefund() {
+			return nil, coinType, fmt.Errorf("%w: order cannot be seller-declined and refunded in its current state",
+				coreiface.ErrBadRequest)
+		}
+		if method != pb.PaymentSent_CANCELABLE && method != pb.PaymentSent_MODERATED {
+			return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
+		}
+		if method == pb.PaymentSent_MODERATED && order.SerializedOrderConfirmation != nil {
+			return nil, coinType, fmt.Errorf("%w: moderated orders can only be seller-declined before seller confirmation",
+				coreiface.ErrBadRequest)
+		}
+		strategy, err := s.settlementActionStrategy(coinType)
+		if err != nil {
+			return nil, coinType, err
+		}
+		refunder, ok := strategy.(payment.SellerDeclineRefunder)
+		if !ok {
+			return nil, coinType, fmt.Errorf("%w: coin %s does not support seller_decline_refund settlement action",
+				coreiface.ErrBadRequest, coinType)
+		}
+		out := payoutAddr
+		if out == "" {
+			out = paymentSent.RefundAddress
+		}
+		if out == "" {
+			out = paymentSent.PayerAddress
+		}
+		params.PayoutAddr = out
+		result, rerr := refunder.SellerDeclineRefund(ctx, params)
+		return s.normalizeSettlementActionResult(result, coinType, rerr)
 
 	default:
 		return nil, coinType, fmt.Errorf("%w: unsupported settlement action", coreiface.ErrBadRequest)
@@ -188,8 +236,12 @@ func (s *SettlementService) GetSettlementActionStatus(
 	actionID string,
 ) (*payment.ActionStatus, iwallet.CoinType, error) {
 	action = strings.ToLower(strings.TrimSpace(action))
-	if action != "confirm" && action != "cancel" && action != "complete" && action != "dispute_release" {
-		return nil, "", fmt.Errorf("%w: unsupported settlement action %q (supported: confirm, cancel, complete, dispute_release)",
+	if action != payment.SettlementActionConfirm &&
+		action != payment.SettlementActionCancel &&
+		action != payment.SettlementActionSellerDeclineRefund &&
+		action != payment.SettlementActionComplete &&
+		action != payment.SettlementActionDisputeRelease {
+		return nil, "", fmt.Errorf("%w: unsupported settlement action %q (supported: confirm, cancel, seller_decline_refund, complete, dispute_release)",
 			coreiface.ErrBadRequest, action)
 	}
 	actionID = strings.TrimSpace(actionID)

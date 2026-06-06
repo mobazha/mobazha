@@ -188,12 +188,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	}
 	// Set buyer's address so the refund code can extract it from tx.From
 	paymentData.PayerAddress = addr1.String()
-	// Ingest tx into seller wallet so vendor GetTransaction succeeds (PaymentVerified)
-	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
-	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, network.Nodes()[1], paymentData, network.Nodes()[0])
 
 	select {
 	case <-fundingSub0.Out():
@@ -208,6 +203,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
+	ensureMockUTXOFundingFacts(t, order.ID, paymentData, network.Nodes()...)
 
 	// CANCELABLE refund: order is NOT yet confirmed, funds are still in 1-of-2 multisig escrow.
 	// Vendor should be able to release funds back to buyer.
@@ -336,12 +332,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUTXOPaymentInfo (moderated) failed: %v", err)
 	}
-	// Ingest tx into seller wallet so vendor GetTransaction succeeds (PaymentVerified)
-	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
-	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, network.Nodes()[1], paymentData, network.Nodes()[0])
 
 	select {
 	case <-fundingSub3.Out():
@@ -349,6 +340,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
+	ensureMockUTXOFundingFacts(t, orderID2, paymentData, network.Nodes()...)
 
 	txSub5, err := network.Nodes()[1].eventBus.Subscribe(&events.TransactionReceived{})
 	if err != nil {
@@ -509,11 +501,20 @@ func Test_buildRefundMessage(t *testing.T) {
 				paymentSent.RefundAddress = "abc"
 				paymentSent.PayerAddress = "abc"
 				paymentSent.SettlementSpec = payment.NewUTXOSpec(true).ToPaymentSent()
+				paymentSent.FundingFacts = []*pb.PaymentSent_FundingFact{{
+					Id:           "mock-funding-1",
+					TxHash:       "123",
+					TxHashSource: models.PaymentTxHashSourceChainTx,
+					ToAddress:    paymentSent.ToAddress,
+					Amount:       "10000",
+					Status:       models.PaymentObservationStatusConfirmed,
+				}}
 
 				err = order.PutTransaction(iwallet.Transaction{
 					ID: "123",
 					To: []iwallet.SpendInfo{
 						{
+							ID:      []byte{0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 							Address: iwallet.NewAddress(paymentSent.ToAddress, iwallet.CtMock),
 							Amount:  iwallet.NewAmount(10000),
 						},
@@ -535,8 +536,8 @@ func Test_buildRefundMessage(t *testing.T) {
 				if msg.GetReleaseInfo().ToAddress != "abc" {
 					return errors.New("incorrect refund address")
 				}
-				if msg.GetReleaseInfo().ToAmount != "7975" {
-					return fmt.Errorf("incorrect refund amount: got %s, want 7975", msg.GetReleaseInfo().ToAmount)
+				if msg.GetReleaseInfo().ToAmount != "8875" {
+					return fmt.Errorf("incorrect refund amount: got %s, want 8875", msg.GetReleaseInfo().ToAmount)
 				}
 				if len(msg.GetReleaseInfo().EscrowSignatures) != 1 {
 					return errors.New("incorrect number of signatures")
@@ -560,6 +561,14 @@ func Test_buildRefundMessage(t *testing.T) {
 				paymentSent.RefundAddress = "abc"
 				paymentSent.PayerAddress = "abc"
 				paymentSent.SettlementSpec = payment.NewUTXOSpec(true).ToPaymentSent()
+				paymentSent.FundingFacts = []*pb.PaymentSent_FundingFact{{
+					Id:           "mock-funding-1",
+					TxHash:       "123",
+					TxHashSource: models.PaymentTxHashSourceChainTx,
+					ToAddress:    paymentSent.ToAddress,
+					Amount:       "10000",
+					Status:       models.PaymentObservationStatusConfirmed,
+				}}
 
 				err = order.PutTransaction(iwallet.Transaction{
 					ID: "123",
@@ -614,8 +623,8 @@ func Test_buildRefundMessage(t *testing.T) {
 				if msg.GetReleaseInfo().ToAddress != "abc" {
 					return errors.New("incorrect refund address")
 				}
-				if msg.GetReleaseInfo().ToAmount != "2975" {
-					return fmt.Errorf("incorrect refund amount: got %s, want 2975", msg.GetReleaseInfo().ToAmount)
+				if msg.GetReleaseInfo().ToAmount != "8875" {
+					return fmt.Errorf("incorrect refund amount: got %s, want 8875", msg.GetReleaseInfo().ToAmount)
 				}
 				if len(msg.GetReleaseInfo().EscrowSignatures) != 1 {
 					return errors.New("incorrect number of signatures")
@@ -650,6 +659,14 @@ func Test_buildRefundMessage(t *testing.T) {
 		var order models.Order
 		if err := test.setup(&order); err != nil {
 			t.Errorf("Test %d: setup failed: %s", i, err)
+		}
+
+		if txs, err := order.GetTransactions(); err == nil {
+			for _, txn := range txs {
+				if err := net.Wallets()[0].AddTransaction(txn.ID, txn); err != nil {
+					t.Errorf("Test %d: seed wallet tx: %s", i, err)
+				}
+			}
 		}
 
 		_, msg, err := n.orderService.BuildRefundMessageForTesting(&order, net.Wallets()[0], "")

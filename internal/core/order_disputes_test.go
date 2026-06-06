@@ -144,12 +144,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Ingest tx into seller wallet so vendor GetTransaction succeeds (PaymentVerified)
-	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
-	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, network.Nodes()[1], paymentData, network.Nodes()[0])
 
 	select {
 	case <-fundingSub0.Out():
@@ -171,6 +166,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, network.Nodes()...)
 
 	// Step: Seller confirms order (now PaymentSent exists, CanConfirm() returns true)
 	confirmSub, err := network.Nodes()[1].eventBus.Subscribe(&events.OrderConfirmation{})
@@ -409,6 +405,8 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	submitMockModeratedSettlementDisputeRelease(t, network.Nodes()[1], orderID)
+
 	done7 := make(chan struct{})
 	if err := network.Nodes()[1].Order().ReleaseFunds(orderID, iwallet.TransactionID(""), done7); err != nil {
 		t.Fatal(err)
@@ -609,12 +607,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Ingest tx into seller wallet so vendor GetTransaction succeeds (PaymentVerified)
-	ingestPaymentToWallets(t, paymentData2, network.Nodes()[0], network.Nodes()[1])
-	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, network.Nodes()[1], paymentData2, network.Nodes()[0])
 
 	select {
 	case <-fundingSub0.Out():
@@ -636,6 +629,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
+	ensureMockUTXOFundingFacts(t, orderID, paymentData2, network.Nodes()...)
 
 	// Step: Seller confirms order (now PaymentSent exists)
 	confirmSub, err := network.Nodes()[1].eventBus.Subscribe(&events.OrderConfirmation{})

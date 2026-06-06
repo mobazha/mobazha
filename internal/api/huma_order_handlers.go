@@ -960,11 +960,11 @@ func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 
 // registerOrderSettlementActionPost registers POST /v1/orders/{orderID}/settlement-actions/{action}.
 //
-// Backend settlement intents: confirm, cancel, complete, dispute-release.
+// Backend settlement intents: confirm, cancel, seller-decline-refund, complete, dispute-release.
 func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 	type in struct {
 		OrderID string          `path:"orderID" doc:"Order ID."`
-		Action  string          `path:"action" doc:"Settlement intent: confirm, cancel, complete, or dispute-release."`
+		Action  string          `path:"action" doc:"Settlement intent: confirm, cancel, seller-decline-refund, complete, or dispute-release."`
 		Body    json.RawMessage `json:",omitempty"`
 	}
 	huma.Register(api, huma.Operation{
@@ -973,7 +973,7 @@ func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 		Path:        "/v1/orders/{orderID}/settlement-actions/{action}",
 		Summary:     "Execute backend settlement action",
 		Description: "Runs backend-submitted settlement for crypto orders (ManagedEscrow EVM, Solana Anchor, UTXO sync). " +
-			"Supported actions: confirm, cancel, complete, dispute-release. " +
+			"Supported actions: confirm, cancel, seller-decline-refund, complete, dispute-release. " +
 			"Client-signed legacy chains use instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
@@ -999,7 +999,7 @@ func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 func (g *Gateway) registerOrderSettlementActionStatusGet(api huma.API) {
 	type in struct {
 		OrderID  string `path:"orderID" doc:"Order ID."`
-		Action   string `path:"action" doc:"Settlement intent: confirm, cancel, complete, or dispute-release."`
+		Action   string `path:"action" doc:"Settlement intent: confirm, cancel, seller-decline-refund, complete, or dispute-release."`
 		ActionID string `query:"actionId" required:"true" doc:"Opaque settlement action poll key returned by POST settlement-actions."`
 	}
 	huma.Register(api, huma.Operation{

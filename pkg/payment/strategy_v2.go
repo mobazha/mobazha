@@ -193,6 +193,12 @@ type ActionSigner interface {
 	SignAction(ctx context.Context, action string, params ActionParams) ([]ActionOwnerSignature, error)
 }
 
+// SellerDeclineRefunder is an optional V2 capability for chains whose on-chain
+// program distinguishes seller-initiated refunds from buyer cancel.
+type SellerDeclineRefunder interface {
+	SellerDeclineRefund(ctx context.Context, params ActionParams) (*ActionResult, error)
+}
+
 // ActionParams is the V2 input shape for confirm/cancel/complete/
 // dispute-release. It is a strict superset of V1's InstructionParams,
 // adding the policy and refund hints that ManagedEscrow-style adapters need

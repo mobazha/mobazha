@@ -524,24 +524,39 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		return fmt.Errorf("failed to get vendor id: %w", err)
 	}
 
+	paymentSent := preferredContract.GetPaymentSent()
+	if paymentSent == nil {
+		return fmt.Errorf("%w: dispute contract is missing payment sent", coreiface.ErrBadRequest)
+	}
+
+	settlementSpec, hasSettlementSpec := payment.ResolveSettlementSpec(nil, paymentSent)
+	usesBalanceEscrow := hasSettlementSpec && (settlementSpec.UsesManagedEscrow() || settlementSpec.UsesSolanaEscrow())
+	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
+	if !ok {
+		coinType = iwallet.CoinType(paymentSent.Coin)
+	}
+
 	txs := preferredContract.GetTransactions()
+	if len(txs) == 0 && !usesBalanceEscrow {
+		txs = disputeReleaseOutpointsFromFundingFacts(paymentSent, coinType, paymentSent.ToAddress)
+	}
+	if len(txs) == 0 && !usesBalanceEscrow {
+		txs = s.disputeReleaseOutpointsFromLocalOrder(orderID, paymentSent)
+	}
+
 	totalOut := iwallet.NewAmount(0)
 	for _, tx := range txs {
 		totalOut = totalOut.Add(iwallet.NewAmount(tx.GetValue()))
 	}
 
-	paymentSent := preferredContract.GetPaymentSent()
-	settlementSpec, hasSettlementSpec := payment.ResolveSettlementSpec(nil, paymentSent)
-	usesBalanceEscrow := hasSettlementSpec && (settlementSpec.UsesManagedEscrow() || settlementSpec.UsesSolanaEscrow())
 	if len(txs) == 0 && usesBalanceEscrow {
 		// Address-monitored smart escrows do not always project legacy
 		// transaction rows into dispute case snapshots. In that route,
 		// PaymentSent.Amount is the canonical funded value.
 		totalOut = iwallet.NewAmount(paymentSent.Amount)
 	}
-	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
-	if !ok {
-		coinType = iwallet.CoinType(paymentSent.Coin)
+	if len(txs) == 0 && !usesBalanceEscrow {
+		return fmt.Errorf("%w: dispute funding outpoints are missing for order %s", coreiface.ErrBadRequest, orderID)
 	}
 
 	disputeStrategy, err := s.v2StrategyForCoin(coinType)
@@ -627,9 +642,12 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		}
 		moderatedEscrowRelease.EscrowSignatures = append(moderatedEscrowRelease.EscrowSignatures, settlementSigs...)
 	} else {
-		legacyStrategy, err := s.paymentRegistry.ForCoin(coinType)
+		if err := errBalanceMonitoredEscrowRequiresSettlementAction(orderData, paymentSent, "dispute_release"); err != nil {
+			return err
+		}
+		legacyStrategy, err := s.v2StrategyForCoin(coinType)
 		if err != nil {
-			return fmt.Errorf("no legacy chain escrow for coin %s: %w", coinType, err)
+			return fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 		}
 
 		script, err := hex.DecodeString(paymentSent.Script)
@@ -1201,12 +1219,12 @@ func (s *OrderAppService) GetLegacyReleaseFundsInstructions(orderID models.Order
 		return coinType, nil, nil
 	}
 
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategy, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
+		return coinType, nil, fmt.Errorf("no client-signed settlement strategy for coin %s: %w", coinType, err)
 	}
 
-	result, err := strategy.GetDisputeReleaseInstructions(context.Background(), payment.InstructionParams{
+	result, err := strategy.DisputeRelease(context.Background(), payment.ActionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		OrderData:     order,
@@ -1335,4 +1353,106 @@ func extractPaymentSent(contract []byte) (*pb.PaymentSent, error) {
 		return nil, err
 	}
 	return c.PaymentSent, nil
+}
+
+func (s *OrderAppService) disputeReleaseOutpointsFromLocalOrder(orderID models.OrderID, paymentSent *pb.PaymentSent) []*pb.Contract_Transaction {
+	if paymentSent == nil {
+		return nil
+	}
+
+	paymentAddress := strings.TrimSpace(paymentSent.ToAddress)
+	if paymentAddress == "" {
+		return nil
+	}
+
+	var order models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
+	}); err != nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "Unable to load local order %s for dispute outpoint recovery: %v", orderID, err)
+		return nil
+	}
+
+	if order.PaymentAddress != "" {
+		paymentAddress = strings.TrimSpace(order.PaymentAddress)
+	}
+
+	orderTxs, err := order.GetTransactions()
+	if err != nil {
+		if !models.IsMessageNotExistError(err) {
+			logger.LogWarningWithIDf(log, s.nodeID, "Unable to load local transactions for dispute outpoint recovery on order %s: %v", orderID, err)
+		}
+		return nil
+	}
+
+	var outpoints []*pb.Contract_Transaction
+	for _, tx := range orderTxs {
+		for _, to := range tx.To {
+			if !payment.SameUTXOAddress(to.Address.String(), paymentAddress) {
+				continue
+			}
+			outpoints = append(outpoints, &pb.Contract_Transaction{
+				Txid:   tx.ID.String(),
+				FromID: to.ID,
+				Value:  to.Amount.String(),
+			})
+		}
+	}
+	if len(outpoints) > 0 {
+		logger.LogInfoWithIDf(log, s.nodeID, "Recovered %d dispute funding outpoint(s) from local order %s", len(outpoints), orderID)
+	}
+	return outpoints
+}
+
+func disputeReleaseOutpointsFromFundingFacts(paymentSent *pb.PaymentSent, coinType iwallet.CoinType, paymentAddress string) []*pb.Contract_Transaction {
+	if paymentSent == nil {
+		return nil
+	}
+	paymentAddress = strings.TrimSpace(paymentAddress)
+	if paymentAddress == "" {
+		paymentAddress = strings.TrimSpace(paymentSent.ToAddress)
+	}
+	if paymentAddress == "" {
+		return nil
+	}
+
+	outpoints := make([]*pb.Contract_Transaction, 0, len(paymentSent.GetFundingFacts()))
+	seen := make(map[string]struct{}, len(paymentSent.GetFundingFacts()))
+	for _, fact := range paymentSent.GetFundingFacts() {
+		if fact == nil {
+			continue
+		}
+		txHash := strings.TrimSpace(fact.GetTxHash())
+		if txHash == "" || models.NormalizePaymentTxHashSource(fact.GetTxHashSource()) != models.PaymentTxHashSourceChainTx {
+			continue
+		}
+		if !models.FundingFactStatusCountsTowardTotal(fact.GetStatus(), paymentSent.GetConfirmationPolicy()) {
+			continue
+		}
+		if fact.GetEventIndex() < 0 {
+			continue
+		}
+		if toAddress := strings.TrimSpace(fact.GetToAddress()); toAddress != "" && !payment.SameUTXOAddress(toAddress, paymentAddress) {
+			continue
+		}
+		amount := iwallet.NewAmount(strings.TrimSpace(fact.GetAmount()))
+		if amount.Cmp(iwallet.NewAmount(0)) <= 0 {
+			continue
+		}
+		seenKey := fmt.Sprintf("%s:%d", txHash, fact.GetEventIndex())
+		if _, ok := seen[seenKey]; ok {
+			continue
+		}
+		fromID := models.BuildPaymentDataOutpointID(iwallet.TransactionID(txHash), coinType, uint32(fact.GetEventIndex()))
+		if len(fromID) == 0 {
+			continue
+		}
+		outpoints = append(outpoints, &pb.Contract_Transaction{
+			Txid:   txHash,
+			FromID: fromID,
+			Value:  amount.String(),
+		})
+		seen[seenKey] = struct{}{}
+	}
+	return outpoints
 }

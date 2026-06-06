@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	ordersettlement "github.com/mobazha/mobazha3.0/internal/core/order/settlement"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -212,7 +213,7 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 		if !releaseAlreadySubmitted {
 			return errSettlementReleaseActionRequired(orderID, "complete")
 		}
-		release := cloneEscrowRelease(shipments[0].ReleaseInfo)
+		release := ordersettlement.CloneEscrowRelease(shipments[0].ReleaseInfo)
 		if release == nil {
 			return fmt.Errorf("%w: shipment release info is missing", coreiface.ErrBadRequest)
 		}
@@ -546,7 +547,7 @@ func (s *OrderAppService) executeUTXOSyncModeratedCompleteRelease(order *models.
 		return nil, nil, fmt.Errorf("failed to decode chain code: %w", err)
 	}
 
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategy, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
 		return nil, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}

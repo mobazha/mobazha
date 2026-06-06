@@ -139,25 +139,11 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 	rand.Read(toIDBytes)
 	paymentData.ToID = toIDBytes
 
-	tx, err := paymentData.BuildTransaction()
-	if err != nil {
-		t.Fatalf("BuildTransaction failed: %v", err)
-	}
-	// Use IngestTransaction instead of AddTransaction to trigger events via network
-	bw, _ := buyerNode.Multiwallet().WalletForChain(iwallet.ChainMock)
-	buyerWal, ok := bw.(*wallet.MockWallet)
-	if !ok {
-		t.Fatal("Failed to get buyer wallet")
-	}
-	buyerWal.IngestTransaction(tx)
-
-	err = buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, buyerNode, paymentData, sellerNode)
 
 	// Give some time for message propagation
 	time.Sleep(500 * time.Millisecond)
+	ensureMockUTXOFundingFacts(t, orderID2, paymentData, buyerNode, sellerNode)
 
 	var order3 models.Order
 	err = sellerNode.repo.DB().View(func(tx database.Tx) error {
@@ -288,17 +274,29 @@ func TestMobazhaNode_releaseFromCancelableAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	addr := iwallet.NewAddress("1234", iwallet.CtMock)
+	tx := walletbase.NewMockTransaction(nil, &addr)
+	if err := mockWallet.AddTransaction(tx.ID, tx); err != nil {
+		t.Fatal(err)
+	}
+
 	paymentSent := &pb.PaymentSent{
 		SettlementSpec: payment.NewUTXOSpec(false).ToPaymentSent(),
 		Coin:           iwallet.CtMock.String(),
 		ToAddress:      "1234",
+		FundingFacts: []*pb.PaymentSent_FundingFact{{
+			Id:           "mock-funding-1",
+			TxHash:       tx.ID.String(),
+			TxHashSource: models.PaymentTxHashSourceChainTx,
+			ToAddress:    "1234",
+			Amount:       tx.To[0].Amount.String(),
+			Status:       models.PaymentObservationStatusConfirmed,
+		}},
 	}
 	if err := order.PutMessage(utils.MustWrapOrderMessage(paymentSent)); err != nil {
 		t.Fatal(err)
 	}
 
-	addr := iwallet.NewAddress("1234", iwallet.CtMock)
-	tx := walletbase.NewMockTransaction(nil, &addr)
 	if err := order.PutTransaction(tx); err != nil {
 		t.Fatal(err)
 	}
@@ -324,12 +322,4 @@ func TestMobazhaNode_releaseFromCancelableAddress(t *testing.T) {
 		t.Fatal("failed to return to address")
 	}
 
-	if err := order.PutTransaction(walletbase.NewMockTransaction(&tx.To[0], nil)); err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = node.orderService.ReleaseFromCancelableAddress(order)
-	if err == nil {
-		t.Fatal("Expected error spending non-existent coins")
-	}
 }

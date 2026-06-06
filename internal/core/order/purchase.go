@@ -540,12 +540,16 @@ func persistOrderRefundAddressGorm(gdb *gorm.DB, orderID string, refundAddr stri
 	if gdb == nil {
 		return fmt.Errorf("load order %s to set refund address: db unavailable", orderID)
 	}
-	var dbOrder models.Order
-	if err := gdb.Where("id = ?", orderID).First(&dbOrder).Error; err != nil {
+	var count int64
+	if err := gdb.Model(&models.Order{}).Where("id = ?", orderID).Count(&count).Error; err != nil {
 		return fmt.Errorf("load order %s to set refund address: %w", orderID, err)
 	}
-	dbOrder.RefundAddress = strings.TrimSpace(refundAddr)
-	if err := gdb.Save(&dbOrder).Error; err != nil {
+	if count == 0 {
+		return fmt.Errorf("load order %s to set refund address: %w", orderID, gorm.ErrRecordNotFound)
+	}
+	if err := gdb.Model(&models.Order{}).
+		Where("id = ?", orderID).
+		Update("refund_address", strings.TrimSpace(refundAddr)).Error; err != nil {
 		return fmt.Errorf("save order %s with refund address: %w", orderID, err)
 	}
 	return nil

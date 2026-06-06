@@ -404,7 +404,13 @@ func signedOrderOpen(t *testing.T, buyerPeerID, sellerPeerID peer.ID) []byte {
 					VendorID: &pb.ID{PeerID: sellerPeerID.String()},
 					Slug:     "cotenant-solana",
 					Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_PHYSICAL_GOOD},
-					Item:     &pb.Listing_Item{Title: "Co-tenant Solana item"},
+					Item: &pb.Listing_Item{
+						Title: "Co-tenant Solana item",
+						Images: []*pb.Image{{
+							Tiny:  "tiny",
+							Small: "small",
+						}},
+					},
 				},
 			},
 		},

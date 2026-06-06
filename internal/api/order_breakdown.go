@@ -212,7 +212,7 @@ func latestConfirmedSettlementLines(actions []models.SettlementActionSnapshot) (
 
 func isSettlementActionName(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "confirm", "cancel", "complete", "dispute_release":
+	case "confirm", "cancel", "seller_decline_refund", "complete", "dispute_release":
 		return true
 	default:
 		return false

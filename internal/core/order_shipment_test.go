@@ -154,10 +154,7 @@ func TestMobazhaNode_ShipOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUTXOPaymentInfo failed: %v", err)
 	}
-	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
-	if err := network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, network.Nodes()[1], paymentData, network.Nodes()[0])
 
 	select {
 	case <-fundingSub0.Out():
@@ -179,6 +176,7 @@ func TestMobazhaNode_ShipOrder(t *testing.T) {
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, network.Nodes()...)
 
 	confirmSub, err := network.Nodes()[1].eventBus.Subscribe(&events.OrderConfirmation{})
 	if err != nil {

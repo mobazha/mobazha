@@ -12,6 +12,7 @@ func TestParseSettlementActionPath(t *testing.T) {
 	}{
 		{raw: "confirm", want: SettlementActionConfirm, wantOK: true},
 		{raw: "Complete", want: SettlementActionComplete, wantOK: true},
+		{raw: "seller-decline-refund", want: SettlementActionSellerDeclineRefund, wantOK: true},
 		{raw: "dispute-release", want: SettlementActionDisputeRelease, wantOK: true},
 		{raw: "dispute_release", wantOK: false},
 		{raw: "release", wantOK: false},
@@ -39,6 +40,9 @@ func TestSettlementActionPathSegment(t *testing.T) {
 
 	if got := SettlementActionPathSegment(SettlementActionDisputeRelease); got != "dispute-release" {
 		t.Fatalf("got %q, want dispute-release", got)
+	}
+	if got := SettlementActionPathSegment(SettlementActionSellerDeclineRefund); got != "seller-decline-refund" {
+		t.Fatalf("got %q, want seller-decline-refund", got)
 	}
 	if got := SettlementActionPathSegment(SettlementActionComplete); got != SettlementActionComplete {
 		t.Fatalf("got %q, want complete", got)

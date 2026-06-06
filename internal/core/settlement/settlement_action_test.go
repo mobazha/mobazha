@@ -26,7 +26,7 @@ func TestExecuteSettlementAction_RejectsUnimplementedActionsBeforeDB(t *testing.
 	if err == nil {
 		t.Fatal("expected unsupported action error")
 	}
-	if !strings.Contains(err.Error(), "supported: confirm, cancel") {
+	if !strings.Contains(err.Error(), "supported: confirm, cancel, seller_decline_refund") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -51,12 +51,20 @@ func TestExecuteSettlementAction_ConfirmModeratedReturnsNoop(t *testing.T) {
 	require.Equal(t, payment.ActionModeCompleted, result.Mode)
 }
 
-func TestExecuteSettlementAction_CancelModeratedReturnsNoop(t *testing.T) {
+func TestExecuteSettlementAction_CancelModeratedBeforeConfirmUsesStrategy(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
+	strategy := &utxoActionStatusStub{
+		model:        payment.PaymentModelMonitored,
+		cancelResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "act-cancel"},
+	}
+	reg := payment.NewRegistry()
+	reg.RegisterV2(iwallet.ChainEthereum, strategy)
+
 	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	svc.SetRegistry(reg)
 	order := seedModeratedSettlementActionOrder(t, db, "order-moderated-cancel", models.RoleVendor)
 
 	result, coinType, err := svc.ExecuteSettlementAction(
@@ -68,7 +76,41 @@ func TestExecuteSettlementAction_CancelModeratedReturnsNoop(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "crypto:eip155:1:native", coinType.String())
 	require.NotNil(t, result)
-	require.Equal(t, payment.ActionModeCompleted, result.Mode)
+	require.Equal(t, payment.ActionModeSubmitted, result.Mode)
+	require.Equal(t, "act-cancel", result.ActionID)
+	require.Equal(t, order.ID.String(), strategy.lastCancel.OrderID)
+	require.Equal(t, "0x3333333333333333333333333333333333333333", strategy.lastCancel.PayoutAddr)
+}
+
+func TestExecuteSettlementAction_SellerDeclineRefundUsesOptionalStrategy(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	strategy := &utxoActionStatusStub{
+		model:               payment.PaymentModelMonitored,
+		sellerDeclineResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "act-seller-decline-refund"},
+	}
+	reg := payment.NewRegistry()
+	reg.RegisterV2(iwallet.ChainEthereum, strategy)
+
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	svc.SetRegistry(reg)
+	order := seedModeratedSettlementActionOrder(t, db, "order-seller-decline-refund", models.RoleVendor)
+
+	result, coinType, err := svc.ExecuteSettlementAction(
+		context.Background(),
+		payment.SettlementActionSellerDeclineRefund,
+		order.ID,
+		"0x4444444444444444444444444444444444444444",
+	)
+	require.NoError(t, err)
+	require.Equal(t, "crypto:eip155:1:native", coinType.String())
+	require.NotNil(t, result)
+	require.Equal(t, payment.ActionModeSubmitted, result.Mode)
+	require.Equal(t, "act-seller-decline-refund", result.ActionID)
+	require.Equal(t, order.ID.String(), strategy.lastSellerDecline.OrderID)
+	require.Equal(t, "0x4444444444444444444444444444444444444444", strategy.lastSellerDecline.PayoutAddr)
 }
 
 func seedModeratedSettlementActionOrder(
@@ -121,7 +163,11 @@ func seedModeratedSettlementActionOrder(
 }
 
 type utxoActionStatusStub struct {
-	model payment.PaymentModel
+	model               payment.PaymentModel
+	cancelResult        *payment.ActionResult
+	sellerDeclineResult *payment.ActionResult
+	lastCancel          payment.ActionParams
+	lastSellerDecline   payment.ActionParams
 }
 
 func (s *utxoActionStatusStub) Model() payment.PaymentModel { return s.model }
@@ -138,7 +184,18 @@ func (s *utxoActionStatusStub) SetupPayment(context.Context, payment.PaymentSetu
 func (s *utxoActionStatusStub) Confirm(context.Context, payment.ActionParams) (*payment.ActionResult, error) {
 	return nil, payment.ErrUnsupportedAction
 }
-func (s *utxoActionStatusStub) Cancel(context.Context, payment.ActionParams) (*payment.ActionResult, error) {
+func (s *utxoActionStatusStub) Cancel(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
+	s.lastCancel = params
+	if s.cancelResult != nil {
+		return s.cancelResult, nil
+	}
+	return nil, payment.ErrUnsupportedAction
+}
+func (s *utxoActionStatusStub) SellerDeclineRefund(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
+	s.lastSellerDecline = params
+	if s.sellerDeclineResult != nil {
+		return s.sellerDeclineResult, nil
+	}
 	return nil, payment.ErrUnsupportedAction
 }
 func (s *utxoActionStatusStub) Complete(context.Context, payment.ActionParams) (*payment.ActionResult, error) {

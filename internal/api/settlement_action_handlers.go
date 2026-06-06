@@ -24,7 +24,7 @@ import (
 //
 // POST /v1/orders/{orderID}/settlement-actions/{action}
 //
-// Path action (case-insensitive): "confirm" | "cancel" | "complete" | "dispute-release".
+// Path action (case-insensitive): "confirm" | "cancel" | "seller-decline-refund" | "complete" | "dispute-release".
 //
 // Body JSON (optional, camelCase):
 //   - payoutAddress — vendor payout (confirm) or buyer refund override (cancel).

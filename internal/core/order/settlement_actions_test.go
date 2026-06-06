@@ -9,12 +9,17 @@ import (
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 
+	ordersettlement "github.com/mobazha/mobazha3.0/internal/core/order/settlement"
+	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	intdb "github.com/mobazha/mobazha3.0/internal/database"
+	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -130,6 +135,17 @@ func (f *fakeManagedEscrowStrategy) SignAction(_ context.Context, action string,
 	f.lastAction = action
 	f.lastParams = params
 	return f.signatures, nil
+}
+
+type fakeRefunderStrategy struct {
+	fakeManagedEscrowStrategy
+	sellerDeclineCalls int
+}
+
+func (f *fakeRefunderStrategy) SellerDeclineRefund(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
+	f.sellerDeclineCalls++
+	f.lastParams = params
+	return f.actionResult, nil
 }
 
 func newManagedEscrowOrderForTests(t *testing.T, coinType iwallet.CoinType) (*models.Order, *pb.PaymentSent) {
@@ -357,6 +373,84 @@ func TestSubmitSettlementCancelAction_UsesActionStatusTxHash(t *testing.T) {
 	}
 }
 
+func TestPreProcessOrderDecline_BuyerFallbackUsesCancelWhenRefunderSupported(t *testing.T) {
+	t.Parallel()
+
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainSolana)
+	require.NoError(t, err)
+	reg := payment.NewRegistry()
+	strategy := &fakeRefunderStrategy{
+		fakeManagedEscrowStrategy: fakeManagedEscrowStrategy{
+			model:        payment.PaymentModelMonitored,
+			actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "buyer-cancel-action"},
+			actionStatus: &payment.ActionStatus{TxHash: "solana-buyer-cancel-tx"},
+		},
+	}
+	reg.RegisterV2(iwallet.ChainSolana, strategy)
+
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{PaymentRegistry: reg})
+	order := &models.Order{
+		ID:             models.OrderID("buyer-decline-fallback"),
+		MyRole:         string(models.RoleBuyer),
+		PaymentAddress: "4EPetAS58DkvcU1Ftx3Y7ULnqB6Q93ckhawvSWNZB3xJ",
+	}
+	order.SetFSMState(models.OrderState_PENDING)
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{})))
+	paymentSent := &pb.PaymentSent{
+		Coin:           coinType.String(),
+		Amount:         "1000",
+		ToAddress:      order.PaymentAddress,
+		PayerAddress:   "buyer-payer",
+		RefundAddress:  "buyer-refund",
+		SettlementSpec: payment.NewSolanaEscrowSpec(false).ToPaymentSent(),
+	}
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	require.NoError(t, order.PutTransaction(iwallet.Transaction{
+		ID: iwallet.TransactionID("funding-tx"),
+		To: []iwallet.SpendInfo{{
+			Address: iwallet.NewAddress(order.PaymentAddress, coinType),
+			Amount:  iwallet.NewAmount(paymentSent.Amount),
+		}},
+	}))
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	msg := utils.MustWrapOrderMessage(&pb.OrderDecline{Type: pb.OrderDecline_USER_DECLINE})
+	msg.OrderID = order.ID.String()
+	msg.MessageType = npb.OrderMessage_ORDER_DECLINE
+	pre, err := svc.preProcessOrderDecline(context.Background(), msg)
+	require.NoError(t, err)
+	require.NotNil(t, pre)
+	require.True(t, pre.CancelableReleaseCommitted)
+	require.Equal(t, 1, strategy.cancelCalls)
+	require.Zero(t, strategy.sellerDeclineCalls)
+	require.Equal(t, paymentSent.RefundAddress, strategy.lastParams.PayoutAddr)
+}
+
+func TestCanSellerDeclineFundedRefund_RejectsConfirmedCancelableOrder(t *testing.T) {
+	t.Parallel()
+
+	coinType := iwallet.CoinType("crypto:eip155:1:native")
+	reg := payment.NewRegistry()
+	reg.RegisterV2(iwallet.ChainEthereum, &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored})
+
+	svc := &OrderAppService{paymentRegistry: reg}
+	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
+	order.MyRole = string(models.RoleVendor)
+	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+
+	ok, err := svc.canSellerDeclineFundedRefund(order)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	order.SerializedOrderConfirmation = []byte{0x01}
+	ok, err = svc.canSellerDeclineFundedRefund(order)
+	require.NoError(t, err)
+	require.False(t, ok)
+}
+
 func TestCompleteSettlementReleaseState(t *testing.T) {
 	t.Parallel()
 
@@ -366,38 +460,38 @@ func TestCompleteSettlementReleaseState(t *testing.T) {
 			{Action: "complete", State: "submitted", ActionID: "act-1"},
 		},
 	}
-	if completeSettlementReleaseReady(order, "") {
+	if ordersettlement.CompleteReleaseReady(order, "") {
 		t.Fatal("submitted without tx hash should not be ready")
 	}
-	if !completeSettlementReleasePending(order, "") {
+	if !ordersettlement.CompleteReleasePending(order, "") {
 		t.Fatal("expected pending complete settlement action")
 	}
 
 	order.SettlementActions[1].TxHash = "0xabc"
-	if !completeSettlementReleaseReady(order, "") {
+	if !ordersettlement.CompleteReleaseReady(order, "") {
 		t.Fatal("expected ready when tx hash is present")
 	}
-	if completeSettlementReleasePending(order, "") {
+	if ordersettlement.CompleteReleasePending(order, "") {
 		t.Fatal("expected not pending when tx hash is present")
 	}
 
 	order.SettlementActions = []models.SettlementActionSnapshot{
 		{Action: "complete", State: "confirmed"},
 	}
-	if completeSettlementReleaseReady(order, "") {
+	if ordersettlement.CompleteReleaseReady(order, "") {
 		t.Fatal("confirmed without tx hash should not be ready")
 	}
-	if !completeSettlementReleasePending(order, "") {
+	if !ordersettlement.CompleteReleasePending(order, "") {
 		t.Fatal("expected confirmed action without tx hash to remain pending")
 	}
 
 	order.SettlementActions = []models.SettlementActionSnapshot{
 		{Action: "complete", State: "abandoned"},
 	}
-	if completeSettlementReleaseReady(order, "") {
+	if ordersettlement.CompleteReleaseReady(order, "") {
 		t.Fatal("expected abandoned complete settlement action not to be ready")
 	}
-	if completeSettlementReleasePending(order, "") {
+	if ordersettlement.CompleteReleasePending(order, "") {
 		t.Fatal("expected abandoned complete settlement action not to be pending")
 	}
 }
@@ -410,18 +504,18 @@ func TestDisputeSettlementReleaseState(t *testing.T) {
 			{Action: "dispute_release", State: "submitted", ActionID: "act-1"},
 		},
 	}
-	if disputeSettlementReleaseReady(order, "") {
+	if ordersettlement.DisputeReleaseReady(order, "") {
 		t.Fatal("submitted without tx hash should not be ready")
 	}
-	if !disputeSettlementReleasePending(order, "") {
+	if !ordersettlement.DisputeReleasePending(order, "") {
 		t.Fatal("expected pending dispute release settlement action")
 	}
 
 	order.SettlementActions[0].TxHash = "0xdef"
-	if !disputeSettlementReleaseReady(order, "") {
+	if !ordersettlement.DisputeReleaseReady(order, "") {
 		t.Fatal("expected ready when tx hash is present")
 	}
-	if disputeSettlementReleasePending(order, "") {
+	if ordersettlement.DisputeReleasePending(order, "") {
 		t.Fatal("expected not pending when tx hash is present")
 	}
 
@@ -430,7 +524,7 @@ func TestDisputeSettlementReleaseState(t *testing.T) {
 			{Action: "confirm", State: "confirmed"},
 		},
 	}
-	if disputeSettlementReleaseReady(orderWithoutTx, iwallet.TransactionID("0xfake")) {
+	if ordersettlement.DisputeReleaseReady(orderWithoutTx, iwallet.TransactionID("0xfake")) {
 		t.Fatal("client txid alone must not mark release ready without settlement projection")
 	}
 
@@ -477,7 +571,7 @@ func TestExistingMonitoredSettlementActionResult(t *testing.T) {
 			{Action: "dispute_release", State: "submitted", ActionID: "act-pending"},
 		},
 	}
-	result, ok := existingMonitoredSettlementActionResult(order, "dispute_release")
+	result, ok := ordersettlement.ExistingActionResult(order, "dispute_release")
 	if !ok || result == nil {
 		t.Fatal("expected pending dispute_release action")
 	}
@@ -489,7 +583,7 @@ func TestExistingMonitoredSettlementActionResult(t *testing.T) {
 	}
 
 	order.SettlementActions[1].TxHash = "0xabc"
-	result, ok = existingMonitoredSettlementActionResult(order, "dispute_release")
+	result, ok = ordersettlement.ExistingActionResult(order, "dispute_release")
 	if !ok || result == nil {
 		t.Fatal("expected ready dispute_release action")
 	}
@@ -506,13 +600,13 @@ func TestExistingMonitoredSettlementActionResult_IgnoresStaleSyncAction(t *testi
 			{
 				Action:    "complete",
 				State:     "submitting",
-				ActionID:  syncSettlementActionID("stale-order", "complete"),
-				UpdatedAt: time.Now().UTC().Add(-syncSettlementActionStaleAfter - time.Minute),
+				ActionID:  ordersettlement.SyncActionID("stale-order", "complete"),
+				UpdatedAt: time.Now().UTC().Add(-3 * time.Minute),
 			},
 		},
 	}
 
-	result, ok := existingMonitoredSettlementActionResult(order, "complete")
+	result, ok := ordersettlement.ExistingActionResult(order, "complete")
 	require.False(t, ok)
 	require.Nil(t, result)
 }
@@ -550,6 +644,69 @@ func TestBuildRefundMessage_ManagedEscrowCancelable_UsesSettlementCancelAction(t
 	require.Equal(t, strategy.actionStatus.TxHash, refund.GetTransactionID())
 	require.Equal(t, paymentSent.Amount, refund.Amount)
 	require.Equal(t, 1, strategy.cancelCalls)
+}
+
+func TestBuildRefundMessage_ManagedEscrowModerated_HydratesRefundAddressFromSharedIntent(t *testing.T) {
+	coinType := iwallet.CoinType("crypto:eip155:1:native")
+	reg := payment.NewRegistry()
+	strategy := &fakeManagedEscrowStrategy{
+		model:        payment.PaymentModelMonitored,
+		signatures:   []payment.ActionOwnerSignature{{From: "0x2222222222222222222222222222222222222222", Signature: []byte{0xaa}, Index: 1}},
+		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "moderated-refund-action"},
+		actionStatus: &payment.ActionStatus{TxHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+	}
+	reg.RegisterV2(iwallet.ChainEthereum, strategy)
+
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{PaymentRegistry: reg})
+	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
+	order.ID = models.OrderID("managed_escrow-moderated-shared-refund")
+	order.RefundAddress = ""
+	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(true).ToPaymentSent()
+	paymentSent.RefundAddress = ""
+	paymentSent.PayerAddress = ""
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:           paymentSent.Coin,
+		Address:        order.PaymentAddress,
+		Moderated:      true,
+		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
+	}))
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	rawProvider, ok := svc.db.(interface{ RawDB() *gorm.DB })
+	require.True(t, ok)
+	require.NoError(t, paymentintent.UpsertSharedPaymentIntent(
+		rawProvider.RawDB(),
+		order.ID.String(),
+		order.PaymentAddress,
+		"0x1111111111111111111111111111111111111111",
+		&models.PendingManagedEscrowPaymentInfo{
+			Coin:           paymentSent.Coin,
+			Address:        order.PaymentAddress,
+			Moderated:      true,
+			SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
+		},
+	))
+
+	wTx, msg, err := svc.buildRefundMessage(order, nil, "")
+	require.NoError(t, err)
+	require.Nil(t, wTx)
+	require.NotNil(t, msg)
+
+	require.Equal(t, 0, strategy.cancelCalls)
+	require.Equal(t, 1, strategy.signActionCalls)
+	require.Equal(t, "cancel", strategy.lastAction)
+	require.Equal(t, "0x1111111111111111111111111111111111111111", strategy.lastParams.PayoutAddr)
+
+	refund := new(pb.Refund)
+	require.NoError(t, msg.Message.UnmarshalTo(refund))
+	require.Empty(t, refund.GetTransactionID())
+	require.NotNil(t, refund.GetReleaseInfo())
+	require.Equal(t, "0x1111111111111111111111111111111111111111", refund.GetReleaseInfo().ToAddress)
+	require.Len(t, refund.GetReleaseInfo().EscrowSignatures, 1)
+	require.Equal(t, paymentSent.Amount, refund.Amount)
 }
 
 func TestBuildRefundMessage_ManagedEscrowCancelable_UsesProvidedSettlementTx(t *testing.T) {
@@ -758,7 +915,7 @@ func TestBeginSyncBackendSettlementAction_AllowsRetryAfterFailure(t *testing.T) 
 	actionID, existingTx, err := svc.beginSyncBackendSettlementAction(orderID, "complete", "BCH", "1000")
 	require.NoError(t, err)
 	require.Empty(t, existingTx)
-	require.Equal(t, syncSettlementActionID(orderID, "complete"), actionID)
+	require.Equal(t, ordersettlement.SyncActionID(orderID, "complete"), actionID)
 
 	_, _, err = svc.beginSyncBackendSettlementAction(orderID, "complete", "BCH", "1000")
 	require.Error(t, err)
@@ -782,7 +939,7 @@ func TestBeginSyncBackendSettlementAction_AllowsRetryAfterFailure(t *testing.T) 
 	}))
 	require.Equal(t, "submitting", row.State)
 
-	staleAt := time.Now().UTC().Add(-syncSettlementActionStaleAfter - time.Minute)
+	staleAt := time.Now().UTC().Add(-3 * time.Minute)
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		_, err := tx.UpdateColumns(map[string]interface{}{
 			"state":      "submitting",
@@ -798,4 +955,17 @@ func TestBeginSyncBackendSettlementAction_AllowsRetryAfterFailure(t *testing.T) 
 	require.NoError(t, err)
 	require.Empty(t, existingTx3)
 	require.Equal(t, actionID, actionID3)
+}
+
+func TestErrBalanceMonitoredEscrowRequiresSettlementAction_UsesPaymentSentWhenOrderNil(t *testing.T) {
+	ps := &pb.PaymentSent{
+		SettlementSpec: &pb.PaymentSent_SettlementSpec{
+			Method:     pb.PaymentSent_MODERATED,
+			PayMode:    "address_monitored",
+			EscrowType: string(payment.EscrowTypeManagedEscrow),
+		},
+	}
+	err := errBalanceMonitoredEscrowRequiresSettlementAction(nil, ps, "dispute_release")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "settlement-actions/dispute-release")
 }

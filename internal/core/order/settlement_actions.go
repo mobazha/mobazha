@@ -21,6 +21,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const syncSettlementActionStaleAfter = 2 * time.Minute
+
 func (s *OrderAppService) v2StrategyForCoin(coinType iwallet.CoinType) (payment.ChainEscrowV2, error) {
 	if s.paymentRegistry == nil {
 		return nil, fmt.Errorf("payment registry not initialized")
@@ -206,12 +208,26 @@ func syncSettlementActionID(orderID, action string) string {
 	return fmt.Sprintf("sync-%s-%s", action, orderID)
 }
 
-func (s *OrderAppService) loadSyncBackendSettlementAction(orderID, action string) (*models.ManagedEscrowRelayAction, error) {
+func staleSyncSettlementAction(actionID, state, txHash string, updatedAt time.Time, now time.Time) bool {
+	if strings.TrimSpace(txHash) != "" || !strings.HasPrefix(strings.TrimSpace(actionID), "sync-") {
+		return false
+	}
+	state = strings.ToLower(strings.TrimSpace(state))
+	if state != "submitting" && state != "submitted" {
+		return false
+	}
+	if updatedAt.IsZero() || now.Before(updatedAt) {
+		return false
+	}
+	return now.Sub(updatedAt) > syncSettlementActionStaleAfter
+}
+
+func (s *OrderAppService) loadSyncBackendSettlementAction(orderID, action string) (*models.SettlementAction, error) {
 	if s == nil || s.db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
 	actionID := syncSettlementActionID(orderID, action)
-	var row models.ManagedEscrowRelayAction
+	var row models.SettlementAction
 	err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
 	})
@@ -243,13 +259,17 @@ func (s *OrderAppService) beginSyncBackendSettlementAction(
 		}
 		state := strings.ToLower(strings.TrimSpace(existing.State))
 		if state == "submitting" || state == "submitted" || state == "confirmed" {
+			if staleSyncSettlementAction(existing.ActionID, existing.State, existing.TxHash, existing.UpdatedAt, time.Now().UTC()) {
+				goto reserve
+			}
 			return "", "", fmt.Errorf("%w: settlement %s release is still pending; retry after tx hash is available",
 				coreiface.ErrBadRequest, action)
 		}
 	}
 
+reserve:
 	now := time.Now().UTC()
-	row := &models.ManagedEscrowRelayAction{
+	row := &models.SettlementAction{
 		ActionID:       actionID,
 		OrderID:        orderID,
 		ActionKind:     action,
@@ -286,7 +306,7 @@ func (s *OrderAppService) confirmSyncBackendSettlementAction(actionID, txHash st
 			"updated_at":   now,
 		}, map[string]interface{}{
 			"action_id = ?": actionID,
-		}, &models.ManagedEscrowRelayAction{})
+		}, &models.SettlementAction{})
 		return err
 	})
 }
@@ -307,7 +327,7 @@ func (s *OrderAppService) failSyncBackendSettlementAction(actionID, reason strin
 			"updated_at": now,
 		}, map[string]interface{}{
 			"action_id = ?": actionID,
-		}, &models.ManagedEscrowRelayAction{})
+		}, &models.SettlementAction{})
 		return err
 	})
 }
@@ -416,6 +436,9 @@ func existingMonitoredSettlementActionResult(order *models.Order, actionName str
 		}
 		state := strings.ToLower(strings.TrimSpace(action.State))
 		if state == "submitting" || state == "submitted" || state == "confirmed" {
+			if staleSyncSettlementAction(action.ActionID, action.State, action.TxHash, action.UpdatedAt, time.Now().UTC()) {
+				continue
+			}
 			pending = &payment.ActionResult{
 				Mode:     payment.ActionModeSubmitted,
 				ActionID: action.ActionID,

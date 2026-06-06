@@ -184,7 +184,7 @@ func TestGetSettlementActionStatus_UTXOSyncActionFromStore(t *testing.T) {
 		return tx.Save(order)
 	}))
 	require.NoError(t, db.Update(func(tx database.Tx) error {
-		return tx.Save(&models.ManagedEscrowRelayAction{
+		return tx.Save(&models.SettlementAction{
 			ActionID:       actionID,
 			OrderID:        orderID,
 			ActionKind:     "complete",

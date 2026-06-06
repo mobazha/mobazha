@@ -69,7 +69,7 @@ func TestSettlementActionStore_RecordStatusConfirmedCopiesObservedLines(t *testi
 	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
 
 	s := NewSettlementActionStore(db)
-	row := models.ManagedEscrowRelayAction{
+	row := models.SettlementAction{
 		ActionID:       "act-confirm-lines",
 		OrderID:        "order-1",
 		ActionKind:     "confirm",
@@ -116,7 +116,7 @@ func TestSettlementActionStore_ClaimRetryUsesCASAndPreservesHashHistory(t *testi
 	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
 
 	s := NewSettlementActionStore(db)
-	row := models.ManagedEscrowRelayAction{
+	row := models.SettlementAction{
 		ActionID:        "act-retry-claim",
 		OrderID:         "order-1",
 		ActionKind:      "confirm",

@@ -250,7 +250,7 @@ func (s *SettlementService) GetSettlementActionStatus(
 	}
 	if status == nil {
 		// V1-backed adapters (e.g. UTXO) have no action ledger; sync actions
-		// are persisted in managed_escrow_relay_actions by OrderAppService.
+		// are persisted in settlement_actions by OrderAppService.
 		var storeErr error
 		status, storeErr = s.lookupSettlementActionStatusFromStore(actionID)
 		if storeErr != nil {
@@ -274,7 +274,7 @@ func (s *SettlementService) lookupSettlementActionStatusFromStore(actionID strin
 	if s == nil || s.db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-	var row models.ManagedEscrowRelayAction
+	var row models.SettlementAction
 	err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
 	})

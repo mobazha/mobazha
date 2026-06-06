@@ -38,7 +38,7 @@ func newTestOrderAppService(t *testing.T, cfg OrderAppServiceConfig) *OrderAppSe
 	if cfg.NodeID == "" {
 		cfg.NodeID = "test-order-svc"
 	}
-	require.NoError(t, intdb.MigrateManagedEscrowRelayActionModels(cfg.DB))
+	require.NoError(t, intdb.MigrateSettlementActionModels(cfg.DB))
 	return NewOrderAppService(cfg)
 }
 
@@ -227,7 +227,7 @@ func TestOrderAppService_GetOrder_AttachesSettlementActions(t *testing.T) {
 	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
 	seedOrder(t, svc, "order-get-safe", "buyer", models.OrderState_PENDING)
 	err := svc.db.Update(func(tx database.Tx) error {
-		return tx.Save(&models.ManagedEscrowRelayAction{
+		return tx.Save(&models.SettlementAction{
 			ActionID:    "act-1",
 			OrderID:     "order-get-safe",
 			ActionKind:  "complete",

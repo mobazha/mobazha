@@ -498,6 +498,25 @@ func TestExistingMonitoredSettlementActionResult(t *testing.T) {
 	}
 }
 
+func TestExistingMonitoredSettlementActionResult_IgnoresStaleSyncAction(t *testing.T) {
+	t.Parallel()
+
+	order := &models.Order{
+		SettlementActions: []models.SettlementActionSnapshot{
+			{
+				Action:    "complete",
+				State:     "submitting",
+				ActionID:  syncSettlementActionID("stale-order", "complete"),
+				UpdatedAt: time.Now().UTC().Add(-syncSettlementActionStaleAfter - time.Minute),
+			},
+		},
+	}
+
+	result, ok := existingMonitoredSettlementActionResult(order, "complete")
+	require.False(t, ok)
+	require.Nil(t, result)
+}
+
 func TestBuildRefundMessage_ManagedEscrowCancelable_UsesSettlementCancelAction(t *testing.T) {
 	t.Parallel()
 
@@ -730,7 +749,7 @@ func TestBeginSyncBackendSettlementAction_AllowsRetryAfterFailure(t *testing.T) 
 
 	db, err := repo.MockDB()
 	require.NoError(t, err)
-	require.NoError(t, intdb.MigrateManagedEscrowRelayActionModels(db))
+	require.NoError(t, intdb.MigrateSettlementActionModels(db))
 	t.Cleanup(func() { _ = db.Close() })
 
 	svc := &OrderAppService{db: db}
@@ -741,9 +760,12 @@ func TestBeginSyncBackendSettlementAction_AllowsRetryAfterFailure(t *testing.T) 
 	require.Empty(t, existingTx)
 	require.Equal(t, syncSettlementActionID(orderID, "complete"), actionID)
 
+	_, _, err = svc.beginSyncBackendSettlementAction(orderID, "complete", "BCH", "1000")
+	require.Error(t, err)
+
 	svc.failSyncBackendSettlementAction(actionID, "broadcast failed")
 
-	var row models.ManagedEscrowRelayAction
+	var row models.SettlementAction
 	require.NoError(t, db.View(func(tx database.Tx) error {
 		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
 	}))
@@ -759,4 +781,21 @@ func TestBeginSyncBackendSettlementAction_AllowsRetryAfterFailure(t *testing.T) 
 		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
 	}))
 	require.Equal(t, "submitting", row.State)
+
+	staleAt := time.Now().UTC().Add(-syncSettlementActionStaleAfter - time.Minute)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		_, err := tx.UpdateColumns(map[string]interface{}{
+			"state":      "submitting",
+			"tx_hash":    "",
+			"updated_at": staleAt,
+		}, map[string]interface{}{
+			"action_id = ?": actionID,
+		}, &models.SettlementAction{})
+		return err
+	}))
+
+	actionID3, existingTx3, err := svc.beginSyncBackendSettlementAction(orderID, "complete", "BCH", "1000")
+	require.NoError(t, err)
+	require.Empty(t, existingTx3)
+	require.Equal(t, actionID, actionID3)
 }

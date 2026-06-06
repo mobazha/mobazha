@@ -558,7 +558,7 @@ func autoMigrateDatabase(db database.Database) error {
 		// monitor-driven payment model. See
 		// docs/escrow/MONITOR_DRIVEN_PAYMENT.md (v2.0).
 		&models.PaymentObservation{},
-		&models.ManagedEscrowRelayAction{},
+		&models.SettlementAction{},
 		&models.SharedPaymentIntent{},
 	}
 
@@ -796,7 +796,7 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		// monitor-driven payment model. See
 		// docs/escrow/MONITOR_DRIVEN_PAYMENT.md (v2.0).
 		&models.PaymentObservation{},
-		&models.ManagedEscrowRelayAction{},
+		&models.SettlementAction{},
 		&models.SharedPaymentIntent{},
 	}
 

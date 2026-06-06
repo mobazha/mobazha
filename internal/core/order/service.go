@@ -1989,20 +1989,20 @@ func (s *OrderAppService) attachSettlementActionsBatch(orders []models.Order) er
 	return nil
 }
 
-func (s *OrderAppService) loadSettlementActionRows(orderIDs []string) (map[string][]models.ManagedEscrowRelayAction, error) {
-	out := make(map[string][]models.ManagedEscrowRelayAction, len(orderIDs))
+func (s *OrderAppService) loadSettlementActionRows(orderIDs []string) (map[string][]models.SettlementAction, error) {
+	out := make(map[string][]models.SettlementAction, len(orderIDs))
 	if s == nil || s.db == nil || len(orderIDs) == 0 {
 		return out, nil
 	}
 
-	var rows []models.ManagedEscrowRelayAction
+	var rows []models.SettlementAction
 	if err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().
 			Where("order_id IN ?", orderIDs).
 			Order("updated_at desc").
 			Find(&rows).Error
 	}); err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "managed_escrow_relay_actions") &&
+		if strings.Contains(strings.ToLower(err.Error()), "settlement_actions") &&
 			(strings.Contains(strings.ToLower(err.Error()), "no such table") ||
 				strings.Contains(strings.ToLower(err.Error()), "does not exist")) {
 			return out, nil

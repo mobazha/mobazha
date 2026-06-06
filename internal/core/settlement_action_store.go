@@ -14,9 +14,8 @@ import (
 )
 
 // SettlementActionStore implements adapters.ActionStore and adapters.ActionRecorder
-// on top of the node's tenant-scoped SQL store. The underlying table name is
-// still managed_escrow_relay_actions for DB compatibility, but rows now track all
-// backend-submitted settlement actions (ManagedEscrow, Solana Anchor, guest relay).
+// on top of the node's tenant-scoped SQL store. Rows track backend-submitted
+// settlement actions across ManagedEscrow, Solana Anchor, UTXO, and guest relay flows.
 type SettlementActionStore struct {
 	db pkgdb.Database
 }
@@ -37,7 +36,7 @@ func (s *SettlementActionStore) Lookup(ctx context.Context, actionID string) (*a
 	if actionID == "" {
 		return nil, adapters.ErrActionRecordNotFound
 	}
-	var row models.ManagedEscrowRelayAction
+	var row models.SettlementAction
 	err := s.db.View(func(tx pkgdb.Tx) error {
 		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
 	})
@@ -78,7 +77,7 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		return errors.New("action store: ActionID is empty")
 	}
 	now := time.Now().UTC()
-	row := models.ManagedEscrowRelayAction{
+	row := models.SettlementAction{
 		ActionID:        rec.ActionID,
 		OrderID:         rec.OrderID,
 		ActionKind:      rec.Action,
@@ -100,7 +99,7 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		CreatedAt:       rec.CreatedAt,
 		UpdatedAt:       rec.UpdatedAt,
 	}
-	var existing models.ManagedEscrowRelayAction
+	var existing models.SettlementAction
 	err := s.db.View(func(tx pkgdb.Tx) error {
 		e := tx.Read().Where("action_id = ?", rec.ActionID).First(&existing).Error
 		if errors.Is(e, gorm.ErrRecordNotFound) {
@@ -154,7 +153,7 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 	})
 }
 
-func (s *SettlementActionStore) ClaimRetry(row models.ManagedEscrowRelayAction, nextAttempt int) (string, bool, error) {
+func (s *SettlementActionStore) ClaimRetry(row models.SettlementAction, nextAttempt int) (string, bool, error) {
 	if s == nil || s.db == nil {
 		return "", false, nil
 	}
@@ -176,7 +175,7 @@ func (s *SettlementActionStore) ClaimRetry(row models.ManagedEscrowRelayAction, 
 	return attemptTxHashes, rows == 1, err
 }
 
-func (s *SettlementActionStore) DeferRetry(row models.ManagedEscrowRelayAction, reason string) error {
+func (s *SettlementActionStore) DeferRetry(row models.SettlementAction, reason string) error {
 	if s == nil || s.db == nil {
 		return nil
 	}
@@ -197,7 +196,7 @@ func (s *SettlementActionStore) DeferRetry(row models.ManagedEscrowRelayAction, 
 	return err
 }
 
-func (s *SettlementActionStore) RecordRetrySubmitted(row models.ManagedEscrowRelayAction, txHash, attemptTxHashes string, attempts int) error {
+func (s *SettlementActionStore) RecordRetrySubmitted(row models.SettlementAction, txHash, attemptTxHashes string, attempts int) error {
 	if s == nil || s.db == nil {
 		return nil
 	}
@@ -218,7 +217,7 @@ func (s *SettlementActionStore) RecordRetrySubmitted(row models.ManagedEscrowRel
 	return err
 }
 
-func (s *SettlementActionStore) MarkTerminal(row models.ManagedEscrowRelayAction, state, reason string) error {
+func (s *SettlementActionStore) MarkTerminal(row models.SettlementAction, state, reason string) error {
 	return s.RecordStatus(row, SettlementActionStatusUpdate{
 		State:     state,
 		LastError: reason,
@@ -233,7 +232,7 @@ type SettlementActionStatusUpdate struct {
 	ObservedLines []models.SettlementPayoutLine
 }
 
-func (s *SettlementActionStore) RecordStatus(row models.ManagedEscrowRelayAction, update SettlementActionStatusUpdate) error {
+func (s *SettlementActionStore) RecordStatus(row models.SettlementAction, update SettlementActionStatusUpdate) error {
 	if s == nil || s.db == nil {
 		return nil
 	}
@@ -270,7 +269,7 @@ func (s *SettlementActionStore) RecordStatus(row models.ManagedEscrowRelayAction
 func (s *SettlementActionStore) updateActionColumns(values, where map[string]interface{}) (int64, error) {
 	var rows int64
 	err := s.db.Update(func(tx pkgdb.Tx) error {
-		affected, err := tx.UpdateColumns(values, where, &models.ManagedEscrowRelayAction{})
+		affected, err := tx.UpdateColumns(values, where, &models.SettlementAction{})
 		if err != nil {
 			return err
 		}

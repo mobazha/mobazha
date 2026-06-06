@@ -51,7 +51,11 @@ func (s *PaymentAppService) GetUTXOEscrowKeys(ctx context.Context, order *models
 		return nil, fmt.Errorf("generate vendor key: %v", err)
 	}
 
-	buyerKey, err := utils.GenerateEscrowPublicKey(s.escrowMasterPubKey, chaincode)
+	buyerEscrowPubkey, err := btcec.ParsePubKey(orderOpen.BuyerID.Pubkeys.Escrow)
+	if err != nil {
+		return nil, fmt.Errorf("parse buyer escrow pubkey: %v", err)
+	}
+	buyerKey, err := utils.GenerateEscrowPublicKey(buyerEscrowPubkey, chaincode)
 	if err != nil {
 		return nil, fmt.Errorf("generate buyer key: %v", err)
 	}
@@ -208,8 +212,8 @@ func (s *PaymentAppService) GetUTXOPaymentInfo(ctx context.Context, orderID stri
 		return nil, fmt.Errorf("invalid payment coin %s: %w", coinType, err)
 	}
 	minAmountsByChain := map[iwallet.ChainType]uint64{
-		iwallet.ChainBitcoin:     10000,
-		iwallet.ChainLitecoin:    10000,
+		iwallet.ChainBitcoin:     1000,
+		iwallet.ChainLitecoin:    1000,
 		iwallet.ChainBitcoinCash: 5000,
 		iwallet.ChainZCash:       10000,
 	}

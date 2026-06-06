@@ -7,9 +7,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	intdb "github.com/mobazha/mobazha3.0/internal/database"
-	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/internal/orders"
+	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -19,7 +20,6 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -102,7 +102,7 @@ func seedSettlementDisputeReleaseAction(
 ) {
 	t.Helper()
 
-	row := &models.ManagedEscrowRelayAction{
+	row := &models.SettlementAction{
 		ActionID:   actionID,
 		OrderID:    orderID,
 		ActionKind: "dispute_release",
@@ -127,7 +127,7 @@ func newManagedEscrowDisputeReleaseTestService(
 
 	db, err := repo.MockDB()
 	require.NoError(t, err)
-	require.NoError(t, intdb.MigrateManagedEscrowRelayActionModels(db))
+	require.NoError(t, intdb.MigrateSettlementActionModels(db))
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		return tx.SetProfile(&models.Profile{Name: "Test Buyer"})
 	}))
@@ -356,7 +356,7 @@ func newSolanaDisputeReleaseTestService(
 
 	db, err := repo.MockDB()
 	require.NoError(t, err)
-	require.NoError(t, intdb.MigrateManagedEscrowRelayActionModels(db))
+	require.NoError(t, intdb.MigrateSettlementActionModels(db))
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		return tx.SetProfile(&models.Profile{Name: "Test Buyer"})
 	}))
@@ -513,7 +513,7 @@ func newUTXODisputeReleaseTestService(
 
 	db, err := repo.MockDB()
 	require.NoError(t, err)
-	require.NoError(t, intdb.MigrateManagedEscrowRelayActionModels(db))
+	require.NoError(t, intdb.MigrateSettlementActionModels(db))
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		return tx.SetProfile(&models.Profile{Name: "Test Buyer"})
 	}))

@@ -4,10 +4,13 @@ package payment
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"testing"
 
+	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/mobazha/mobazha3.0/internal/config"
+	orderutils "github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	walletpkg "github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -19,6 +22,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
 )
 
@@ -111,6 +115,49 @@ func TestPaymentAppService_Registry_GetSet(t *testing.T) {
 	reg := payment.NewRegistry()
 	svc.SetRegistry(reg)
 	assert.Same(t, reg, svc.Registry())
+}
+
+func TestGetUTXOEscrowKeys_UsesOrderBuyerPubkey(t *testing.T) {
+	buyerKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	vendorKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	chaincode := []byte("0123456789abcdef0123456789abcdef")
+
+	rawOpen, err := (protojson.MarshalOptions{}).Marshal(&pb.OrderOpen{
+		BuyerID: &pb.ID{Pubkeys: &pb.ID_Pubkeys{
+			Escrow: buyerKey.PubKey().SerializeCompressed(),
+		}},
+		Listings: []*pb.SignedListing{{
+			Listing: &pb.Listing{
+				VendorID: &pb.ID{Pubkeys: &pb.ID_Pubkeys{
+					Escrow: vendorKey.PubKey().SerializeCompressed(),
+				}},
+			},
+		}},
+		Chaincode: hex.EncodeToString(chaincode),
+	})
+	require.NoError(t, err)
+
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
+		// Simulate provisioning from a seller-scoped service. The derived buyer
+		// key must still come from the signed order open, not this local key.
+		EscrowMasterPubKey: vendorKey.PubKey(),
+	})
+	keys, err := svc.GetUTXOEscrowKeys(context.Background(), &models.Order{
+		ID:                  models.OrderID("order-utxo-buyer-key"),
+		SerializedOrderOpen: rawOpen,
+	}, "")
+	require.NoError(t, err)
+
+	expectedBuyer, err := orderutils.GenerateEscrowPublicKey(buyerKey.PubKey(), chaincode)
+	require.NoError(t, err)
+	expectedVendor, err := orderutils.GenerateEscrowPublicKey(vendorKey.PubKey(), chaincode)
+	require.NoError(t, err)
+
+	require.Equal(t, expectedBuyer.SerializeCompressed(), keys.BuyerKey.SerializeCompressed())
+	require.Equal(t, expectedVendor.SerializeCompressed(), keys.VendorKey.SerializeCompressed())
+	require.NotEqual(t, keys.BuyerKey.SerializeCompressed(), keys.VendorKey.SerializeCompressed())
 }
 
 type stubFiatPaymentQuery struct{}
@@ -330,7 +377,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowGasFees
 
 	const (
 		platformAddr = "0x7777777777777777777777777777777777777777"
-		feeWei       = "250000000000000" // $0.50 at $2,000/ETH
+		feeWei       = "75000000000000" // $0.15 at $2,000/ETH
 	)
 	reg := payment.NewRegistry()
 	strategy := &testChainEscrow{

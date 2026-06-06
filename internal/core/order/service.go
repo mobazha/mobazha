@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/core/checkoutsupply"
 	"github.com/mobazha/mobazha3.0/internal/core/digital"
+	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -672,13 +673,56 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 		return err
 	}
 
-	if !order.CanDecline() {
+	canFundedDeclineRefund, err := s.canSellerDeclineFundedRefund(&order)
+	if err != nil {
+		return err
+	}
+	if !order.CanDecline() && !canFundedDeclineRefund {
 		return fmt.Errorf("%w: order is not in a state where it can be declined", coreiface.ErrBadRequest)
 	}
 
 	buyer, err := order.Buyer()
 	if err != nil {
 		return err
+	}
+
+	if txid == "" {
+		funded, err := order.IsFunded()
+		if err != nil {
+			return err
+		}
+		if funded {
+			paymentSent, err := order.PaymentSentMessage()
+			if err != nil {
+				return err
+			}
+			coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+			if err != nil {
+				return err
+			}
+			method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+			if !ok {
+				return fmt.Errorf("payment settlement spec is missing")
+			}
+			if action, ok := s.settlementActionForIntent(&order, paymentSent, method, coinType, settlementIntentSellerDeclineFundedRefund); payment.MethodIsCancelable(method) && ok {
+				var settlementTxID iwallet.TransactionID
+				var handled bool
+				switch action {
+				case payment.SettlementActionSellerDeclineRefund:
+					settlementTxID, _, handled, err = s.submitSettlementSellerDeclineRefundAction(context.Background(), &order, coinType, paymentSent, "")
+				case payment.SettlementActionCancel:
+					settlementTxID, _, handled, err = s.submitSettlementCancelAction(context.Background(), &order, coinType, paymentSent, "")
+				default:
+					err = fmt.Errorf("%w: unsupported seller decline settlement action %s", payment.ErrUnsupportedAction, action)
+				}
+				if err != nil {
+					return err
+				}
+				if handled && settlementTxID != "" {
+					txid = settlementTxID
+				}
+			}
+		}
 	}
 
 	decline := pb.OrderDecline{
@@ -721,6 +765,8 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 		paymentSent          *pb.PaymentSent
 		fiatRefundResult     *contracts.RefundResult
 		shouldSendFiatRefund bool
+		cryptoRefundResult   *refundBuildResult
+		cryptoRefundWire     *npb.Message
 	)
 
 	if funded {
@@ -743,6 +789,34 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 				return err
 			}
 			shouldSendFiatRefund = true
+		} else if !payment.MethodIsCancelable(method) {
+			var wallet iwallet.Wallet
+			if !s.shouldSubmitSettlementCancel(&order, paymentSent, method, coinType) {
+				wallet, err = s.multiwallet.WalletForCurrencyCode(string(coinType))
+				if err != nil {
+					return err
+				}
+			}
+
+			cryptoRefundResult, err = s.prepareRefundMessage(context.Background(), &order, wallet, txid)
+			if err != nil {
+				return err
+			}
+
+			if err := utils.SignOrderMessage(cryptoRefundResult.Message, s.signer); err != nil {
+				cryptoRefundResult.rollback()
+				return err
+			}
+
+			refundPayload := &anypb.Any{}
+			if err := refundPayload.MarshalFrom(cryptoRefundResult.Message); err != nil {
+				cryptoRefundResult.rollback()
+				return err
+			}
+
+			cryptoRefundWire = newMessageWithID()
+			cryptoRefundWire.MessageType = npb.Message_ORDER
+			cryptoRefundWire.Payload = refundPayload
 		}
 	}
 
@@ -806,74 +880,45 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 			return nil
 		}
 
-		if funded && paymentSent != nil {
-			method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
-			if ok && !payment.MethodIsCancelable(method) {
-				coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
-				if err != nil {
-					return err
-				}
-				wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
-				if err != nil {
-					return err
-				}
-
-				refundResult, err := s.prepareRefundMessage(&order, wallet, txid)
-				if err != nil {
-					return err
-				}
-
-				if err := utils.SignOrderMessage(refundResult.Message, s.signer); err != nil {
-					refundResult.rollback()
-					return err
-				}
-
-				refundPayload := &anypb.Any{}
-				if err := refundPayload.MarshalFrom(refundResult.Message); err != nil {
-					refundResult.rollback()
-					return err
-				}
-
-				refundResp := newMessageWithID()
-				refundResp.MessageType = npb.Message_ORDER
-				refundResp.Payload = refundPayload
-
-				evt, err = s.orderProcessor.ProcessMessage(tx, refundResult.Message)
-				if err != nil {
-					refundResult.rollback()
-					return err
-				}
-				localEvents = append(localEvents, evt)
-
-				var (
-					done1 = make(chan struct{})
-					done2 = make(chan struct{})
-				)
-
-				if err := s.messenger.ReliablySendMessage(tx, buyer, message, done1); err != nil {
-					refundResult.rollback()
-					return err
-				}
-
-				if err := s.messenger.ReliablySendMessage(tx, buyer, refundResp, done2); err != nil {
-					refundResult.rollback()
-					return err
-				}
-
-				if done != nil {
-					go func() {
-						<-done1
-						<-done2
-						close(done)
-					}()
-				}
-
-				return refundResult.commit()
+		if cryptoRefundResult != nil {
+			evt, err = s.orderProcessor.ProcessMessage(tx, cryptoRefundResult.Message)
+			if err != nil {
+				cryptoRefundResult.rollback()
+				return err
 			}
+			localEvents = append(localEvents, evt)
+
+			var (
+				done1 = make(chan struct{})
+				done2 = make(chan struct{})
+			)
+
+			if err := s.messenger.ReliablySendMessage(tx, buyer, message, done1); err != nil {
+				cryptoRefundResult.rollback()
+				return err
+			}
+
+			if err := s.messenger.ReliablySendMessage(tx, buyer, cryptoRefundWire, done2); err != nil {
+				cryptoRefundResult.rollback()
+				return err
+			}
+
+			if done != nil {
+				go func() {
+					<-done1
+					<-done2
+					close(done)
+				}()
+			}
+
+			return cryptoRefundResult.commit()
 		}
 
 		return s.messenger.ReliablySendMessage(tx, buyer, message, done)
 	}); err != nil {
+		if cryptoRefundResult != nil {
+			cryptoRefundResult.rollback()
+		}
 		return err
 	}
 	s.emitOrderProcessorEvents(localEvents...)
@@ -1048,36 +1093,43 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 		return err
 	}
 
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return err
+	}
+	method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
+	if !ok {
+		return fmt.Errorf("payment settlement spec is missing")
+	}
+	var wallet iwallet.Wallet
+	if !s.shouldSubmitSettlementCancel(order, paymentSent, method, coinType) {
+		wallet, err = s.multiwallet.WalletForCurrencyCode(string(coinType))
+		if err != nil {
+			return err
+		}
+	}
+	refundResult, err := s.prepareRefundMessage(context.Background(), order, wallet, txid)
+	if err != nil {
+		return err
+	}
+
+	if err := utils.SignOrderMessage(refundResult.Message, s.signer); err != nil {
+		refundResult.rollback()
+		return err
+	}
+
+	refundPayload := &anypb.Any{}
+	if err := refundPayload.MarshalFrom(refundResult.Message); err != nil {
+		refundResult.rollback()
+		return err
+	}
+
+	message := newMessageWithID()
+	message.MessageType = npb.Message_ORDER
+	message.Payload = refundPayload
+
 	var refundEvent interface{}
 	if err := s.db.Update(func(tx database.Tx) error {
-		coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
-		if err != nil {
-			return err
-		}
-		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
-		if err != nil {
-			return err
-		}
-		refundResult, err := s.prepareRefundMessage(order, wallet, txid)
-		if err != nil {
-			return err
-		}
-
-		if err := utils.SignOrderMessage(refundResult.Message, s.signer); err != nil {
-			refundResult.rollback()
-			return err
-		}
-
-		refundPayload := &anypb.Any{}
-		if err := refundPayload.MarshalFrom(refundResult.Message); err != nil {
-			refundResult.rollback()
-			return err
-		}
-
-		message := newMessageWithID()
-		message.MessageType = npb.Message_ORDER
-		message.Payload = refundPayload
-
 		refundEvent, err = s.orderProcessor.ProcessMessage(tx, refundResult.Message)
 		if err != nil {
 			refundResult.rollback()
@@ -1090,6 +1142,7 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 
 		return refundResult.commit()
 	}); err != nil {
+		refundResult.rollback()
 		return err
 	}
 	s.emitOrderProcessorEvents(refundEvent)
@@ -1220,12 +1273,12 @@ func (s *OrderAppService) GetLegacyEscrowReleaseInstructions(orderID models.Orde
 		return coinType, nil, nil
 	}
 
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategy, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
+		return coinType, nil, fmt.Errorf("no client-signed settlement strategy for coin %s: %w", coinType, err)
 	}
 
-	result, err := strategy.GetCancelInstructions(context.Background(), payment.InstructionParams{
+	result, err := strategy.Cancel(context.Background(), payment.ActionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		PayoutAddr:    toAddress,
@@ -1251,6 +1304,9 @@ func buyerCancelablePayoutAddr(order *models.Order, paymentSent *pb.PaymentSent,
 	if paymentSent.RefundAddress != "" {
 		return paymentSent.RefundAddress, nil
 	}
+	if order != nil && strings.TrimSpace(order.RefundAddress) != "" {
+		return strings.TrimSpace(order.RefundAddress), nil
+	}
 	if paymentSent.PayerAddress != "" {
 		return paymentSent.PayerAddress, nil
 	}
@@ -1265,7 +1321,11 @@ func buyerCancelablePayoutAddr(order *models.Order, paymentSent *pb.PaymentSent,
 			}
 		}
 	}
-	return "", fmt.Errorf("no buyer refund address available for CANCELABLE order refund")
+	method := "escrow"
+	if paymentSent.GetSettlementSpec() != nil {
+		method = paymentSent.GetSettlementSpec().GetMethod().String()
+	}
+	return "", fmt.Errorf("no buyer refund address available for %s order refund", method)
 }
 
 // refundBuildResult carries the refund order message plus the optional wallet
@@ -1274,6 +1334,31 @@ func buyerCancelablePayoutAddr(order *models.Order, paymentSent *pb.PaymentSent,
 type refundBuildResult struct {
 	WalletTx iwallet.Tx
 	Message  *npb.OrderMessage
+}
+
+func (s *OrderAppService) shouldSubmitSettlementCancel(
+	order *models.Order,
+	paymentSent *pb.PaymentSent,
+	method pb.PaymentSent_Method,
+	coinType iwallet.CoinType,
+) bool {
+	action, ok := s.settlementActionForIntent(order, paymentSent, method, coinType, settlementIntentBuyerCancel)
+	return ok && action == payment.SettlementActionCancel
+}
+
+func (s *OrderAppService) hydrateOrderPaymentIntent(order *models.Order) error {
+	if order == nil || s == nil || s.db == nil {
+		return nil
+	}
+	rawProvider, ok := s.db.(interface{ RawDB() *gorm.DB })
+	if !ok {
+		return nil
+	}
+	raw := rawProvider.RawDB()
+	if raw == nil {
+		return nil
+	}
+	return paymentintent.HydrateOrderFromSharedIntent(raw, order)
 }
 
 func (r *refundBuildResult) rollback() {
@@ -1289,7 +1374,13 @@ func (r *refundBuildResult) commit() error {
 	return r.WalletTx.Commit()
 }
 
-func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwallet.Wallet, refundTxID iwallet.TransactionID) (*refundBuildResult, error) {
+func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *models.Order, wallet iwallet.Wallet, refundTxID iwallet.TransactionID) (*refundBuildResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := s.hydrateOrderPaymentIntent(order); err != nil {
+		return nil, fmt.Errorf("hydrate order payment intent: %w", err)
+	}
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		return nil, err
@@ -1438,7 +1529,7 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 				return &refundBuildResult{Message: refundResp}, nil
 			}
 
-			settlementTxid, _, handled, err := s.submitSettlementCancelAction(context.Background(), order, coinType, paymentSent, payoutAddr)
+			settlementTxid, _, handled, err := s.submitSettlementCancelAction(ctx, order, coinType, paymentSent, payoutAddr)
 			if err != nil {
 				return nil, fmt.Errorf("failed to release settlement CANCELABLE escrow for refund: %w", err)
 			}
@@ -1465,6 +1556,63 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 			refundResp.Message = refundAny
 			return &refundBuildResult{Message: refundResp}, nil
 		case payment.MethodIsModerated(method):
+			if s.shouldSubmitSettlementCancel(order, paymentSent, method, coinType) {
+				payoutAddr, err := buyerCancelablePayoutAddr(order, paymentSent, coinType)
+				if err != nil {
+					return nil, err
+				}
+				if spec, ok := payment.ResolveSettlementSpec(order, paymentSent); ok && spec.UsesManagedEscrow() {
+					release, err := s.buildSignedSettlementCancelRelease(ctx, order, coinType, paymentSent, payoutAddr)
+					if err != nil {
+						return nil, fmt.Errorf("failed to sign settlement MODERATED refund: %w", err)
+					}
+					refund := &pb.Refund{
+						RefundInfo: &pb.Refund_ReleaseInfo{
+							ReleaseInfo: release,
+						},
+						Amount:    paymentSent.Amount,
+						Timestamp: timestamppb.Now(),
+					}
+
+					refundAny := &anypb.Any{}
+					if err := refundAny.MarshalFrom(refund); err != nil {
+						return nil, fmt.Errorf("failed to marshal refund: %w", err)
+					}
+
+					refundResp.Message = refundAny
+					return &refundBuildResult{Message: refundResp}, nil
+				}
+				settlementTxid, _, handled, err := s.submitSettlementCancelAction(ctx, order, coinType, paymentSent, payoutAddr)
+				if err != nil {
+					return nil, fmt.Errorf("failed to release settlement MODERATED escrow for refund: %w", err)
+				}
+				if !handled {
+					return nil, errors.New("automatic refund for unconfirmed MODERATED orders requires backend settlement-actions")
+				}
+				if settlementTxid == "" {
+					return nil, fmt.Errorf("settlement moderated refund for order %s returned no transaction id", order.ID)
+				}
+
+				refund := &pb.Refund{
+					RefundInfo: &pb.Refund_TransactionID{
+						TransactionID: settlementTxid.String(),
+					},
+					Amount:    paymentSent.Amount,
+					Timestamp: timestamppb.Now(),
+				}
+
+				refundAny := &anypb.Any{}
+				if err := refundAny.MarshalFrom(refund); err != nil {
+					return nil, fmt.Errorf("failed to marshal refund: %w", err)
+				}
+
+				refundResp.Message = refundAny
+				return &refundBuildResult{Message: refundResp}, nil
+			}
+
+			if wallet == nil {
+				return nil, fmt.Errorf("wallet is required for MODERATED refund on %s", coinType)
+			}
 			wdbTx, err := wallet.Begin()
 			if err != nil {
 				return nil, err
@@ -1505,8 +1653,36 @@ func (s *OrderAppService) prepareRefundMessage(order *models.Order, wallet iwall
 	}
 }
 
+func (s *OrderAppService) buildSignedSettlementCancelRelease(ctx context.Context, order *models.Order, coinType iwallet.CoinType, paymentSent *pb.PaymentSent, payoutAddr string) (*pb.EscrowRelease, error) {
+	release := &pb.EscrowRelease{
+		ToAddress:        payoutAddr,
+		ToAmount:         paymentSent.Amount,
+		PlatformAmount:   "0",
+		TransactionFee:   "0",
+		EscrowSignatures: nil,
+	}
+	settlementSigs, handled, err := s.signSettlementActionRelease(ctx, coinType, "cancel", payment.ActionParams{
+		OrderID:       order.ID.String(),
+		PaymentCoin:   string(coinType),
+		PaymentAmount: paymentSent.Amount,
+		Chaincode:     paymentSent.Chaincode,
+		Script:        paymentSent.Script,
+		OrderData:     order,
+		PayoutAddr:    payoutAddr,
+		ReleaseInfo:   release,
+	})
+	if handled {
+		if err != nil {
+			return nil, err
+		}
+		release.EscrowSignatures = append(release.EscrowSignatures, settlementSigs...)
+		return release, nil
+	}
+	return nil, fmt.Errorf("settlement cancel signing is not supported for coin %s", coinType)
+}
+
 func (s *OrderAppService) buildRefundMessage(order *models.Order, wallet iwallet.Wallet, refundTxID iwallet.TransactionID) (iwallet.Tx, *npb.OrderMessage, error) {
-	result, err := s.prepareRefundMessage(order, wallet, refundTxID)
+	result, err := s.prepareRefundMessage(context.Background(), order, wallet, refundTxID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1537,56 +1713,65 @@ func (s *OrderAppService) CancelOrder(orderID models.OrderID, txid iwallet.Trans
 		return fmt.Errorf("%w: order is not in a state where it can be canceled", coreiface.ErrBadRequest)
 	}
 
-	paymentSent, err := order.PaymentSentMessage()
-	if err != nil {
-		return err
-	}
-
 	vendor, err := order.Vendor()
 	if err != nil {
 		return err
 	}
 
-	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
-	if err != nil {
-		return err
-	}
-
-	cancelStrategy, err := s.paymentRegistry.ForCoinV2(coinType)
+	funded, err := order.IsFunded()
 	if err != nil {
 		return err
 	}
 
 	var wTx iwallet.Tx
 	var releaseTx *iwallet.Transaction
-	if cancelStrategy.Model() == payment.PaymentModelMonitored {
-		switch {
-		case txid != "":
-			// The caller already performed the on-chain cancel and supplied
-			// the resulting txid; only record it with the ORDER_CANCEL message.
-			releaseTx = &iwallet.Transaction{ID: txid}
-		case payment.UsesUTXOScriptEscrow(&order, paymentSent):
-			result, err := s.ReleaseFromCancelableAddress(&order)
-			if err != nil {
-				return err
-			}
-			wTx = result.WalletTx
-			releaseTx = result.Transaction
-			txid = releaseTx.ID
-		default:
-			settlementTxid, settlementTx, handled, err := s.submitSettlementCancelAction(context.Background(), &order, coinType, paymentSent, "")
-			if err != nil {
-				return err
-			}
-			if handled {
-				if settlementTx != nil {
-					releaseTx = settlementTx
+	if funded || txid != "" {
+		paymentSent, err := order.PaymentSentMessage()
+		if err != nil {
+			return err
+		}
+
+		coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+		if err != nil {
+			return err
+		}
+
+		cancelStrategy, err := s.paymentRegistry.ForCoinV2(coinType)
+		if err != nil {
+			return err
+		}
+
+		if cancelStrategy.Model() == payment.PaymentModelMonitored {
+			switch {
+			case txid != "":
+				// The caller already performed the on-chain cancel and supplied
+				// the resulting txid; only record it with the ORDER_CANCEL message.
+				releaseTx = &iwallet.Transaction{ID: txid}
+			case payment.UsesUTXOScriptEscrow(&order, paymentSent):
+				result, err := s.ReleaseFromCancelableAddress(&order)
+				if err != nil {
+					return err
 				}
-				if settlementTxid != "" {
-					txid = settlementTxid
+				wTx = result.WalletTx
+				releaseTx = result.Transaction
+				txid = releaseTx.ID
+			default:
+				settlementTxid, settlementTx, handled, err := s.submitSettlementCancelAction(context.Background(), &order, coinType, paymentSent, "")
+				if err != nil {
+					return err
+				}
+				if handled {
+					if settlementTx != nil {
+						releaseTx = settlementTx
+					}
+					if settlementTxid != "" {
+						txid = settlementTxid
+					}
 				}
 			}
 		}
+	} else {
+		logger.LogInfoWithIDf(log, s.nodeID, "Canceling unfunded order %s without escrow release", order.ID)
 	}
 
 	cancel := &pb.OrderCancel{
@@ -1834,9 +2019,13 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		return release, nil
 	}
 
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	if err := errBalanceMonitoredEscrowRequiresSettlementAction(order, paymentSent, "complete"); err != nil {
+		return nil, err
+	}
+
+	strategy, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
-		return nil, fmt.Errorf("no legacy chain escrow for coin %s: %w", coinType, err)
+		return nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
 	script, err := hex.DecodeString(paymentSent.Script)

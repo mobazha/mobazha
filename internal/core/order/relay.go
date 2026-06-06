@@ -75,6 +75,9 @@ func (s *OrderAppService) DeclineOrderViaRelay(orderID models.OrderID, reason st
 
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
+		if models.IsMessageNotExistError(err) {
+			return s.CancelOrder(orderID, "", done)
+		}
 		return err
 	}
 
@@ -92,6 +95,10 @@ func (s *OrderAppService) DeclineOrderViaRelay(orderID models.OrderID, reason st
 	}
 
 	if coinInfo.Chain.IsUTXOChain() {
+		return s.DeclineOrder(orderID, "", reason, done)
+	}
+
+	if method, ok := payment.ResolvedPaymentMethod(&order, paymentSent); ok && s.shouldSubmitSettlementCancel(&order, paymentSent, method, coinType) {
 		return s.DeclineOrder(orderID, "", reason, done)
 	}
 
@@ -115,8 +122,19 @@ func (s *OrderAppService) CancelOrderViaRelay(orderID models.OrderID, done chan 
 		return err
 	}
 
+	funded, err := order.IsFunded()
+	if err != nil {
+		return err
+	}
+	if !funded {
+		return s.CancelOrder(orderID, "", done)
+	}
+
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
+		if models.IsMessageNotExistError(err) {
+			return s.CancelOrder(orderID, "", done)
+		}
 		return err
 	}
 
@@ -130,6 +148,11 @@ func (s *OrderAppService) CancelOrderViaRelay(orderID models.OrderID, done chan 
 	}
 
 	if coinInfo.Chain.IsUTXOChain() {
+		return s.CancelOrder(orderID, "", done)
+	}
+
+	method, ok := payment.ResolvedPaymentMethod(&order, paymentSent)
+	if ok && s.shouldSubmitSettlementCancel(&order, paymentSent, method, coinType) {
 		return s.CancelOrder(orderID, "", done)
 	}
 

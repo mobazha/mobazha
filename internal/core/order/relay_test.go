@@ -5,9 +5,14 @@ package order
 import (
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/internal/orders"
+	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -138,4 +143,127 @@ func TestRelayOrDirect_CryptoInstructionsUseEscrowRelay(t *testing.T) {
 	assert.False(t, directCalled)
 	assert.True(t, escrow.called)
 	assert.Equal(t, iwallet.TransactionID("0xrelay"), relayedTx)
+}
+
+func TestCancelOrderViaRelay_UnfundedOrderBypassesPaymentSent(t *testing.T) {
+	buyerSigner, buyerPeerID := testSigner(t)
+	_, sellerPeerID := testSigner(t)
+	bus := events.NewBus()
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	op := orders.NewOrderProcessor(&orders.Config{
+		NodeID:    "cancel-relay-test",
+		Db:        db,
+		Signer:    buyerSigner,
+		Messenger: noopMessenger{},
+		EventBus:  bus,
+	})
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		DB:             db,
+		Signer:         buyerSigner,
+		OrderProcessor: op,
+		Messenger:      noopMessenger{},
+		EventBus:       bus,
+		NodeID:         "cancel-relay-test",
+	})
+
+	orderID := "unfunded-cancel-via-relay"
+	order := &models.Order{
+		ID:                  models.OrderID(orderID),
+		MyRole:              string(models.RoleBuyer),
+		SerializedOrderOpen: signedOrderOpen(t, buyerPeerID, sellerPeerID),
+	}
+	order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	require.NoError(t, svc.CancelOrderViaRelay(models.OrderID(orderID), nil))
+
+	var stored models.Order
+	require.NoError(t, svc.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&stored).Error
+	}))
+	cancel, err := stored.OrderCancelMessage()
+	require.NoError(t, err)
+	assert.Empty(t, cancel.TransactionID)
+	assert.False(t, stored.Open)
+}
+
+func TestDeclineOrderViaRelay_ManagedEscrowModeratedBeforeConfirmUsesSettlementCancel(t *testing.T) {
+	sellerSigner, sellerPeerID := testSigner(t)
+	_, buyerPeerID := testSigner(t)
+	bus := events.NewBus()
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	op := orders.NewOrderProcessor(&orders.Config{
+		NodeID:    "decline-relay-test",
+		Db:        db,
+		Signer:    sellerSigner,
+		Messenger: noopMessenger{},
+		EventBus:  bus,
+	})
+	reg := payment.NewRegistry()
+	strategy := &fakeManagedEscrowStrategy{
+		model:        payment.PaymentModelMonitored,
+		signatures:   []payment.ActionOwnerSignature{{From: "0x2222222222222222222222222222222222222222", Signature: []byte{0xaa}, Index: 1}},
+		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "managed_escrow-cancel-action"},
+		actionStatus: &payment.ActionStatus{TxHash: "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+	}
+	reg.RegisterV2(iwallet.ChainEthereum, strategy)
+
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		DB:              db,
+		Signer:          sellerSigner,
+		OrderProcessor:  op,
+		Messenger:       noopMessenger{},
+		EventBus:        bus,
+		NodeID:          "decline-relay-test",
+		PaymentRegistry: reg,
+	})
+
+	coinType := iwallet.CoinType("crypto:eip155:1:native")
+	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
+	order.ID = models.OrderID("managed_escrow-moderated-decline-via-relay")
+	order.MyRole = string(models.RoleVendor)
+	order.SerializedOrderOpen = signedOrderOpen(t, buyerPeerID, sellerPeerID)
+	order.SetFSMState(models.OrderState_PENDING)
+	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(true).ToPaymentSent()
+	paymentSent.RefundAddress = "0x1111111111111111111111111111111111111111"
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		Coin:           paymentSent.Coin,
+		Address:        order.PaymentAddress,
+		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
+	}))
+	order.MarkPaymentVerified()
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	require.NoError(t, svc.DeclineOrderViaRelay(order.ID, "seller declined before confirm", nil))
+	assert.Equal(t, 0, strategy.cancelCalls)
+	assert.Equal(t, 1, strategy.signActionCalls)
+	assert.Equal(t, "cancel", strategy.lastAction)
+	assert.Equal(t, paymentSent.RefundAddress, strategy.lastParams.PayoutAddr)
+
+	var stored models.Order
+	require.NoError(t, svc.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", order.ID.String()).First(&stored).Error
+	}))
+	decline, err := stored.OrderDeclineMessage()
+	require.NoError(t, err)
+	assert.Empty(t, decline.TransactionID)
+	refunds, err := stored.Refunds()
+	require.NoError(t, err)
+	require.Len(t, refunds, 1)
+	assert.Empty(t, refunds[0].GetTransactionID())
+	require.NotNil(t, refunds[0].GetReleaseInfo())
+	assert.Equal(t, paymentSent.RefundAddress, refunds[0].GetReleaseInfo().ToAddress)
+	require.Len(t, refunds[0].GetReleaseInfo().EscrowSignatures, 1)
+	assert.False(t, stored.Open)
 }

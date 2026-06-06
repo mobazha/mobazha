@@ -414,6 +414,11 @@ func (s *OrderAppService) preProcessOrderCancel(_ context.Context, orderMsg *npb
 //   - Fiat: trigger fiat refund via provider
 //   - UTXO CANCELABLE: release funds from cancelable address
 func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *npb.OrderMessage) (*PreProcessContext, error) {
+	orderDecline := new(pb.OrderDecline)
+	if err := orderMsg.Message.UnmarshalTo(orderDecline); err != nil {
+		return nil, err
+	}
+
 	var order models.Order
 	err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderMsg.OrderID).First(&order).Error
@@ -462,9 +467,25 @@ func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *
 			result.WalletTx.Commit()
 			return &PreProcessContext{CancelableReleaseCommitted: true}, nil
 		}
-		_, _, handled, err := s.submitSettlementCancelAction(ctx, &order, coinType, paymentSent, "")
+		action, actionOK := s.settlementActionForIntent(&order, paymentSent, method, coinType, settlementIntentBuyerCancel)
+		if strings.TrimSpace(orderDecline.TransactionID) != "" {
+			logger.LogInfoWithIDf(log, s.nodeID,
+				"Skipping settlement %s on decline for order %s; decline already carries transaction %s",
+				action, order.ID, orderDecline.TransactionID)
+			return &PreProcessContext{CancelableReleaseCommitted: true}, nil
+		}
+		if !actionOK {
+			return nil, nil
+		}
+		var handled bool
+		switch action {
+		case payment.SettlementActionCancel:
+			_, _, handled, err = s.submitSettlementCancelAction(ctx, &order, coinType, paymentSent, "")
+		default:
+			err = fmt.Errorf("%w: unsupported buyer decline fallback settlement action %s", payment.ErrUnsupportedAction, action)
+		}
 		if err != nil {
-			return nil, fmt.Errorf("settlement cancelable release on decline failed for order %s: %w", order.ID, err)
+			return nil, fmt.Errorf("settlement %s release on decline failed for order %s: %w", action, order.ID, err)
 		}
 		if handled {
 			return &PreProcessContext{CancelableReleaseCommitted: true}, nil
@@ -477,7 +498,7 @@ func (s *OrderAppService) preProcessOrderDecline(ctx context.Context, orderMsg *
 // preProcessRefund handles pre-processing for REFUND messages:
 //   - DIRECT: fetch outgoing chain transaction
 //   - MODERATED UTXO: release escrow funds with buyer co-signature
-func (s *OrderAppService) preProcessRefund(_ context.Context, orderMsg *npb.OrderMessage) (*PreProcessContext, error) {
+func (s *OrderAppService) preProcessRefund(ctx context.Context, orderMsg *npb.OrderMessage) (*PreProcessContext, error) {
 	refund := new(pb.Refund)
 	if err := orderMsg.Message.UnmarshalTo(refund); err != nil {
 		return nil, nil
@@ -523,6 +544,19 @@ func (s *OrderAppService) preProcessRefund(_ context.Context, orderMsg *npb.Orde
 				return nil, fmt.Errorf("refund escrow release failed for order %s: %w", orderMsg.OrderID, err)
 			}
 			return &PreProcessContext{EscrowRefundCommitted: true}, nil
+		}
+		if spec, ok := payment.ResolveSettlementSpec(&order, paymentSent); ok && spec.UsesManagedEscrow() {
+			release := refund.GetReleaseInfo()
+			_, settlementTx, handled, err := s.submitSettlementCancelAction(ctx, &order, coinType, paymentSent, release.GetToAddress(), release)
+			if err != nil {
+				logger.LogInfoWithIDf(log, s.nodeID,
+					"Error releasing ManagedEscrow escrow during refund processing for order %s: %v",
+					orderMsg.OrderID, err)
+				return nil, fmt.Errorf("refund ManagedEscrow escrow release failed for order %s: %w", orderMsg.OrderID, err)
+			}
+			if handled {
+				return &PreProcessContext{OutgoingTx: settlementTx}, nil
+			}
 		}
 	}
 
@@ -1055,25 +1089,24 @@ func (s *OrderAppService) postProcessPaymentSentInTx(tx database.Tx, orderMsg *n
 // by querying the ChainEscrow's Capabilities. Falls back to false if the
 // registry or strategy is unavailable.
 func (s *OrderAppService) shouldVerifyReceipt(coinType iwallet.CoinType) bool {
-	if s.paymentRegistry == nil {
-		return false
-	}
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
-	if err != nil {
-		return false
-	}
-	return strategy.Capabilities().HasReceiptVerification
+	caps, ok := s.chainEscrowCapabilities(coinType)
+	return ok && caps.HasReceiptVerification
 }
 
 // hasClientSignedEscrow checks whether the chain uses client-signed escrow
 // (EVM/Solana/TRON smart contracts vs UTXO multisig).
 func (s *OrderAppService) hasClientSignedEscrow(coinType iwallet.CoinType) bool {
-	if s.paymentRegistry == nil {
-		return false
+	caps, ok := s.chainEscrowCapabilities(coinType)
+	return ok && caps.HasClientSignedEscrow
+}
+
+func (s *OrderAppService) chainEscrowCapabilities(coinType iwallet.CoinType) (payment.ChainCapabilities, bool) {
+	if s == nil || s.paymentRegistry == nil {
+		return payment.ChainCapabilities{}, false
 	}
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
-		return false
+		return payment.ChainCapabilities{}, false
 	}
-	return strategy.Capabilities().HasClientSignedEscrow
+	return strategy.Capabilities(), true
 }

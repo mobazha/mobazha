@@ -297,12 +297,7 @@ func TestMobazhaNode_DeclineOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
-
-	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	processMockUTXOPayment(t, network.Nodes()[1], paymentData, network.Nodes()[0])
 
 	select {
 	case <-fundingSub0.Out():
@@ -324,6 +319,7 @@ func TestMobazhaNode_DeclineOrder(t *testing.T) {
 	case <-time.After(time.Second * 10):
 		t.Fatal("Timeout waiting on channel")
 	}
+	ensureMockUTXOFundingFacts(t, orderID, paymentData, network.Nodes()...)
 
 	declineSub, err = network.Nodes()[1].eventBus.Subscribe(&events.OrderDeclined{})
 	if err != nil {

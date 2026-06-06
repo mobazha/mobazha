@@ -1,6 +1,8 @@
 package orders
 
 import (
+	"strings"
+
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -25,8 +27,18 @@ func (op *OrderProcessor) processOrderDeclineMessage(dbtx database.Tx, order *mo
 		return nil, nil
 	}
 
-	// FSM-covered: if the order is in AWAITING_SHIPMENT (confirmed), the FSM rejects EventVendorDecline.
-	if order.SerializedOrderConfirmation != nil {
+	confirmedDeclineRefund := order.SerializedOrderConfirmation != nil &&
+		strings.TrimSpace(orderDecline.TransactionID) != "" &&
+		order.SerializedOrderShipments == nil &&
+		order.SerializedOrderComplete == nil &&
+		order.SerializedDisputeOpen == nil &&
+		order.SerializedDisputeUpdate == nil &&
+		order.SerializedDisputeClosed == nil &&
+		order.SerializedRefunds == nil &&
+		order.SerializedPaymentFinalized == nil
+	// Confirmed but unfulfilled monitored orders may still receive a seller
+	// decline that carries the already-submitted refund txid.
+	if order.SerializedOrderConfirmation != nil && !confirmedDeclineRefund {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_DECLINE message for order %s after ORDER_CONFIRMATION", order.ID)
 		return nil, ErrUnexpectedMessage
 	}

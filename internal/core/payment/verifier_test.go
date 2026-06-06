@@ -414,7 +414,7 @@ func TestAggregateAndEmit_PendingUTXOMempoolAcceptedPolicyVerifies(t *testing.T)
 	ready, ok := bus.emitted[1].(*events.CancelablePaymentReady)
 	require.True(t, ok, "UTXO cancelable payment should emit auto-confirm event")
 	require.Equal(t, "order-1", ready.OrderID)
-	require.Equal(t, uint64(1000), ready.Amount)
+	require.Equal(t, "1000", ready.Amount)
 
 	got := loadOrder(t, db, "order-1")
 	require.True(t, got.IsPaymentVerified())
@@ -530,7 +530,7 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 	ready, ok := bus.emitted[1].(*events.CancelablePaymentReady)
 	require.True(t, ok, "vendor cancelable payment should emit auto-confirm event")
 	require.Equal(t, "order-1", ready.OrderID)
-	require.Equal(t, uint64(1000), ready.Amount)
+	require.Equal(t, "1000", ready.Amount)
 
 	got := loadOrder(t, db, "order-1")
 	require.True(t, got.IsPaymentVerified())
@@ -677,7 +677,7 @@ func TestAggregateAndEmit_VendorVerifiedPaymentEmitsOrderFunded(t *testing.T) {
 	ready, ok := bus.emitted[2].(*events.CancelablePaymentReady)
 	require.True(t, ok, "cancelable verified payments still trigger auto-confirm")
 	require.Equal(t, "order-vendor-funded", ready.OrderID)
-	require.Equal(t, uint64(1000), ready.Amount)
+	require.Equal(t, "1000", ready.Amount)
 	select {
 	case call := <-handlerCalls:
 		require.Equal(t, "order-vendor-funded", call.orderID)
@@ -716,7 +716,7 @@ func TestAggregateAndEmit_VendorCancelableEmitsReadyWithoutFundedNotification(t 
 	ready, ok := bus.emitted[1].(*events.CancelablePaymentReady)
 	require.True(t, ok, "financial auto-confirm event must not depend on listing notification payload")
 	require.Equal(t, "order-vendor-ready-no-listing", ready.OrderID)
-	require.Equal(t, uint64(1000), ready.Amount)
+	require.Equal(t, "1000", ready.Amount)
 	require.Equal(t, "btc-ready-tx", ready.TransactionID)
 }
 
@@ -1445,6 +1445,140 @@ func TestAggregateAndEmit_AlreadyVerified_SkipsEmitButRefreshesTotals(t *testing
 	require.Equal(t, "1250", got.TotalReceived, "late deposit must update TotalReceived")
 	require.Equal(t, "250", got.OverpaidAmount, "late deposit becomes overpayment")
 	require.Equal(t, frozenEnvelope, got.SerializedPaymentSent, "envelope is frozen at first verification")
+}
+
+func TestAggregateAndEmit_AlreadyVerifiedUTXOBackfillsFactsAndEmitsReady(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	const orderID = "order-verified-before-facts"
+	seedOrder(t, db, orderID, "1000", "bch-refund")
+	seedPendingUTXOInfo(t, db, orderID, models.PaymentConfirmationPolicyChainConfirmed)
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().
+			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, orderID).
+			First(&order).Error; err != nil {
+			return err
+		}
+		order.SetFSMState(models.OrderState_PENDING)
+		order.MarkPaymentVerified()
+		if err := order.SetPaymentSent(&pb.PaymentSent{
+			TransactionID: "buyer-reported-without-facts",
+			Coin:          "crypto:bitcoincash:mainnet:native",
+			Amount:        "1000",
+			ToAddress:     "bch-escrow",
+			RefundAddress: "bch-refund",
+			SettlementSpec: &pb.PaymentSent_SettlementSpec{
+				Method:     pb.PaymentSent_CANCELABLE,
+				PayMode:    "address_monitored",
+				EscrowType: "utxo_script",
+			},
+			ConfirmationPolicy: models.PaymentConfirmationPolicyChainConfirmed,
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	}))
+
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-late-facts",
+		OrderID:        orderID,
+		ChainNamespace: "bitcoincash",
+		ChainReference: "mainnet",
+		TxHash:         "bch-late-facts-tx",
+		EventType:      models.PaymentEventUTXOFunding,
+		FromAddress:    "bch-payer",
+		ToAddress:      "bch-escrow",
+		Amount:         "1000",
+		Status:         models.PaymentObservationStatusConfirmed,
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, orderID))
+	require.Len(t, bus.emitted, 1)
+	ready, ok := bus.emitted[0].(*events.CancelablePaymentReady)
+	require.True(t, ok, "verified UTXO order should recover auto-confirm after funding facts arrive")
+	require.Equal(t, orderID, ready.OrderID)
+	require.Equal(t, "bch-late-facts-tx", ready.TransactionID)
+	require.Equal(t, "1000", ready.Amount)
+
+	got := loadOrder(t, db, orderID)
+	require.True(t, got.IsPaymentVerified())
+	require.NotNil(t, got.PaymentSettlementSignaledAt)
+	ps, err := got.PaymentSentMessage()
+	require.NoError(t, err)
+	require.Equal(t, "bch-late-facts-tx", ps.TransactionID)
+	require.Len(t, ps.FundingFacts, 1)
+	require.Equal(t, "obs-late-facts", ps.FundingFacts[0].Id)
+}
+
+func TestAggregateAndEmit_AlreadyVerifiedUTXOEmitsReadyWhenFactsAlreadyPresent(t *testing.T) {
+	db := newVerifierTestDB(t)
+	bus := &recordingBus{}
+	v := NewAggregatingVerifier(db, bus)
+
+	const orderID = "order-verified-with-facts-deferred"
+	seedOrder(t, db, orderID, "1000", "bch-refund")
+	seedPendingUTXOInfo(t, db, orderID, models.PaymentConfirmationPolicyChainConfirmed)
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var order models.Order
+		if err := tx.Read().
+			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, orderID).
+			First(&order).Error; err != nil {
+			return err
+		}
+		order.SetFSMState(models.OrderState_PENDING)
+		order.MarkPaymentVerified()
+		if err := order.SetPaymentSent(&pb.PaymentSent{
+			TransactionID: "bch-facts-ready-tx",
+			Coin:          "crypto:bitcoincash:mainnet:native",
+			Amount:        "1000",
+			ToAddress:     "bch-escrow",
+			RefundAddress: "bch-refund",
+			SettlementSpec: &pb.PaymentSent_SettlementSpec{
+				Method:     pb.PaymentSent_CANCELABLE,
+				PayMode:    "address_monitored",
+				EscrowType: "utxo_script",
+			},
+			ConfirmationPolicy: models.PaymentConfirmationPolicyChainConfirmed,
+			FundingFacts: []*pb.PaymentSent_FundingFact{{
+				Id:        "obs-preloaded",
+				TxHash:    "bch-facts-ready-tx",
+				ToAddress: "bch-escrow",
+				Amount:    "1000",
+				Status:    models.PaymentObservationStatusConfirmed,
+			}},
+		}); err != nil {
+			return err
+		}
+		return tx.Save(&order)
+	}))
+
+	insertObs(t, db, models.PaymentObservation{
+		ID:             "obs-preloaded",
+		OrderID:        orderID,
+		ChainNamespace: "bitcoincash",
+		ChainReference: "mainnet",
+		TxHash:         "bch-facts-ready-tx",
+		EventType:      models.PaymentEventUTXOFunding,
+		FromAddress:    "bch-payer",
+		ToAddress:      "bch-escrow",
+		Amount:         "1000",
+		Status:         models.PaymentObservationStatusConfirmed,
+	})
+
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, orderID))
+	require.Len(t, bus.emitted, 1)
+	ready, ok := bus.emitted[0].(*events.CancelablePaymentReady)
+	require.True(t, ok, "deferred cancelable auto-confirm should recover when facts already exist")
+	require.Equal(t, orderID, ready.OrderID)
+	require.Equal(t, "1000", ready.Amount)
+
+	got := loadOrder(t, db, orderID)
+	require.NotNil(t, got.PaymentSettlementSignaledAt)
 }
 
 // ─────────────────────────────────────────────────────────────────────────

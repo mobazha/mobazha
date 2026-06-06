@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
@@ -215,18 +216,21 @@ func TestRegistryDispatch_UTXOChainsRegistered(t *testing.T) {
 	}
 
 	for _, tc := range utxoChains {
-		strategy, err := n.paymentRegistry.ForCoin(tc.coin)
+		if _, err := n.paymentRegistry.ForCoin(tc.coin); err == nil {
+			t.Errorf("ForCoin(%s): legacy V1 UTXO registration is retired, expected error", tc.coin)
+		}
+		strategy, err := n.paymentRegistry.ForCoinV2(tc.coin)
 		if err != nil {
-			t.Errorf("ForCoin(%s): unexpected error: %v", tc.coin, err)
+			t.Errorf("ForCoinV2(%s): unexpected error: %v", tc.coin, err)
 			continue
 		}
 		if strategy.Model() != payment.PaymentModelMonitored {
-			t.Errorf("ForCoin(%s).Model() = %s, want %s", tc.coin, strategy.Model(), payment.PaymentModelMonitored)
+			t.Errorf("ForCoinV2(%s).Model() = %s, want %s", tc.coin, strategy.Model(), payment.PaymentModelMonitored)
 		}
 	}
 }
 
-func TestRegistryDispatch_EVMChainsRegistered(t *testing.T) {
+func TestRegistryDispatch_EVMLegacyV1Retired(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
@@ -236,13 +240,11 @@ func TestRegistryDispatch_EVMChainsRegistered(t *testing.T) {
 	}
 
 	for _, coin := range evmCoins {
-		strategy, err := n.paymentRegistry.ForCoin(coin)
-		if err != nil {
-			t.Errorf("ForCoin(%s): unexpected error: %v", coin, err)
-			continue
+		if _, err := n.paymentRegistry.ForCoin(coin); err == nil {
+			t.Errorf("ForCoin(%s): legacy V1 EVM registration is retired, expected error", coin)
 		}
-		if strategy.Model() != payment.PaymentModelClientSigned {
-			t.Errorf("ForCoin(%s).Model() = %s, want %s", coin, strategy.Model(), payment.PaymentModelClientSigned)
+		if _, err := n.paymentRegistry.ForCoinV2(coin); err == nil {
+			t.Errorf("ForCoinV2(%s): expected error without ManagedEscrowAdapter registration", coin)
 		}
 	}
 }
@@ -251,12 +253,8 @@ func TestRegistryDispatch_SolanaRegistered(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
-	strategy, err := n.paymentRegistry.ForCoin(testSOLNativeCoin)
-	if err != nil {
-		t.Fatalf("ForCoin(SOL): unexpected error: %v", err)
-	}
-	if strategy.Model() != payment.PaymentModelClientSigned {
-		t.Errorf("solana strategy.Model() = %s, want %s", strategy.Model(), payment.PaymentModelClientSigned)
+	if _, err := n.paymentRegistry.ForCoin(testSOLNativeCoin); err == nil {
+		t.Fatal("ForCoin(SOL): legacy V1 Solana registration is retired, expected error")
 	}
 }
 
@@ -284,11 +282,9 @@ func TestRegistryDispatch_ChainCount(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	chains := n.paymentRegistry.Chains()
-	// With managed_escrowCapConfig=nil all Ready chains stay on the legacy V1 path.
-	// Ready EVM chains are 12 because zkSync Era remains Ready=false.
-	// Expected: UTXO (4) + EVM (12) + Solana (1) + TRON (1) = 18.
-	if len(chains) != 18 {
-		t.Errorf("registry has %d chains, want 18 (4 UTXO + 12 EVM + 1 Solana + 1 TRON)", len(chains))
+	// Legacy V1 registration retired for UTXO/Solana/EVM/TRON. Expected: UTXO (4) + Solana (1) = 5.
+	if len(chains) != 5 {
+		t.Errorf("registry has %d chains, want 5 (4 UTXO + 1 Solana)", len(chains))
 	}
 }
 
@@ -296,16 +292,28 @@ func TestRegistryDispatch_AllSupportedCoinsInRegistry(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
-	// Every supported coin should resolve to a registered strategy
-	supportedCoins := []iwallet.CoinType{
+	utxoCoins := []iwallet.CoinType{
 		testBTCNativeCoin, testBCHNativeCoin, testLTCNativeCoin, testZECNativeCoin,
-		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin,
 		testSOLNativeCoin,
 	}
+	for _, coin := range utxoCoins {
+		if _, err := n.paymentRegistry.ForCoin(coin); err == nil {
+			t.Errorf("ForCoin(%s): legacy V1 registration is retired, expected error", coin)
+		}
+		if _, err := n.paymentRegistry.ForCoinV2(coin); err != nil {
+			t.Errorf("ForCoinV2(%s): expected success, got error: %v", coin, err)
+		}
+	}
 
-	for _, coin := range supportedCoins {
-		if _, err := n.paymentRegistry.ForCoin(coin); err != nil {
-			t.Errorf("ForCoin(%s): expected success, got error: %v", coin, err)
+	evmCoins := []iwallet.CoinType{
+		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin,
+	}
+	for _, coin := range evmCoins {
+		if _, err := n.paymentRegistry.ForCoin(coin); err == nil {
+			t.Errorf("ForCoin(%s): legacy V1 EVM registration is retired, expected error", coin)
+		}
+		if _, err := n.paymentRegistry.ForCoinV2(coin); err == nil {
+			t.Errorf("ForCoinV2(%s): expected error without ManagedEscrowAdapter registration", coin)
 		}
 	}
 }
@@ -333,7 +341,7 @@ func TestDispatchCancelablePayment_NilRegistrySafety(t *testing.T) {
 		OrderID:       "test-nil-registry",
 		TransactionID: "test-tx",
 		Coin:          string(testBTCNativeCoin),
-		Amount:        1000,
+		Amount:        "1000",
 	})
 }
 
@@ -360,10 +368,77 @@ func TestDispatchCancelablePayment_UnknownCoinSafety(t *testing.T) {
 				OrderID:       "test-order-" + tc.name,
 				TransactionID: "test-tx",
 				Coin:          tc.coin,
-				Amount:        1000,
+				Amount:        "1000",
 			})
 		})
 	}
+}
+
+func TestDispatchCancelablePayment_SkipsSolanaSellerDeclineRefunderAutoConfirm(t *testing.T) {
+	called := make(chan struct{})
+	strategy := &autoConfirmRefunderProbeStrategy{
+		autoConfirmProbeStrategy: autoConfirmProbeStrategy{called: called},
+	}
+	n := &MobazhaNode{
+		identityFields: identityFields{nodeID: "seller-node"},
+		walletFields:   walletFields{paymentRegistry: payment.NewRegistry()},
+	}
+	n.paymentRegistry.RegisterV2(iwallet.ChainSolana, strategy)
+
+	n.dispatchCancelablePayment(&events.CancelablePaymentReady{
+		OrderID:       "solana-order",
+		TransactionID: "tx",
+		Coin:          string(testSOLNativeCoin),
+		Amount:        "1000",
+		TenantID:      "seller-node",
+	})
+
+	select {
+	case <-called:
+		t.Fatal("Solana seller_decline_refund strategy should preserve seller decision window instead of auto-confirming")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestDispatchCancelablePayment_StillAutoConfirmsNonRefunderStrategy(t *testing.T) {
+	called := make(chan struct{})
+	n := &MobazhaNode{
+		identityFields: identityFields{nodeID: "seller-node"},
+		walletFields:   walletFields{paymentRegistry: payment.NewRegistry()},
+	}
+	n.paymentRegistry.RegisterV2(iwallet.ChainBitcoin, &autoConfirmProbeStrategy{called: called})
+
+	n.dispatchCancelablePayment(&events.CancelablePaymentReady{
+		OrderID:       "btc-order",
+		TransactionID: "tx",
+		Coin:          string(testBTCNativeCoin),
+		Amount:        "1000",
+		TenantID:      "seller-node",
+	})
+
+	select {
+	case <-called:
+	case <-time.After(time.Second):
+		t.Fatal("expected non-refunder strategy to receive AutoConfirm")
+	}
+}
+
+type autoConfirmProbeStrategy struct {
+	payment.ChainEscrowV2
+	called chan struct{}
+}
+
+func (s *autoConfirmProbeStrategy) AutoConfirm(context.Context, *events.CancelablePaymentReady) error {
+	close(s.called)
+	return nil
+}
+
+type autoConfirmRefunderProbeStrategy struct {
+	autoConfirmProbeStrategy
+}
+
+func (s *autoConfirmRefunderProbeStrategy) SellerDeclineRefund(context.Context, payment.ActionParams) (*payment.ActionResult, error) {
+	return nil, nil
 }
 
 func TestCancelablePaymentEventTargetsNode(t *testing.T) {
@@ -441,6 +516,7 @@ func nodeWithManagedEscrowShadowMonitorDeps(t *testing.T) *MobazhaNode {
 		networkFields: networkFields{eventBus: events.NewBus()},
 		walletFields: walletFields{
 			managed_escrowCapConfig: readyManagedEscrowCapConfig(t),
+			relayAPIURL:   "http://relay.test", // ManagedEscrowAdapter V2 requires a real relayer
 		},
 	}
 	n.keyProvider = &mockKeyProvider{}
@@ -489,6 +565,34 @@ func readyManagedEscrowCapConfig(t *testing.T) *managed_escrow.ChainCapabilityCo
 	return &managed_escrow.ChainCapabilityConfig{ManagedEscrowChains: managed_escrowChains}
 }
 
+func TestManagedEscrowAdapterShadow_SkipsRegistrationWithoutRelayer(t *testing.T) {
+	n := nodeWithManagedEscrowShadowMonitorDeps(t)
+	n.relayAPIURL = "" // simulate standalone without RelayAPIURL
+	n.registerPaymentStrategies()
+
+	if len(n.managedEscrowAdapters) != 0 {
+		t.Fatalf("managedEscrowAdapters = %d entries, want 0 without relayer", len(n.managedEscrowAdapters))
+	}
+	if len(n.managed_escrowMonitors) != 0 {
+		t.Fatalf("managed_escrowMonitors = %d entries, want 0 without relayer", len(n.managed_escrowMonitors))
+	}
+	if !managed_escrow.RelayerIsConfigured(n.managed_escrowRelayer) {
+		return
+	}
+	t.Fatal("managed_escrowRelayer should be NoopRelayer when relay is not configured")
+}
+
+func TestManagedEscrowAdapterShadow_ForCoinV2UnavailableWithoutRelayer(t *testing.T) {
+	n := nodeWithManagedEscrowShadowMonitorDeps(t)
+	n.relayAPIURL = ""
+	n.registerPaymentStrategies()
+
+	_, err := n.paymentRegistry.ForCoinV2(testETHNativeCoin)
+	if err == nil {
+		t.Fatal("ForCoinV2(ETH) should fail when ManagedEscrowAdapter is skipped due to missing relayer")
+	}
+}
+
 func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
@@ -527,28 +631,15 @@ func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
 	}
 }
 
-func TestManagedEscrowAdapterShadow_V1PathRemainsCanonical(t *testing.T) {
+func TestManagedEscrowAdapterShadow_V1PathRetired(t *testing.T) {
 	n := nodeWithManagedEscrowShadowDeps()
 	n.registerPaymentStrategies()
 
-	// Asserting strategy.Model() == PaymentModelClientSigned pins down
-	// both "shadow did not hide V1" and "shadow did not promote a wrong
-	// strategy into the EVM slot" in one pass.
 	for _, coin := range []iwallet.CoinType{
 		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin,
 	} {
-		strategy, err := n.paymentRegistry.ForCoin(coin)
-		if err != nil {
-			t.Errorf("ForCoin(%s): %v", coin, err)
-			continue
-		}
-		if strategy == nil {
-			t.Errorf("ForCoin(%s) returned nil strategy", coin)
-			continue
-		}
-		if strategy.Model() != payment.PaymentModelClientSigned {
-			t.Errorf("ForCoin(%s).Model() = %s, want %s — V1 EVMChainOps should still be the canonical strategy",
-				coin, strategy.Model(), payment.PaymentModelClientSigned)
+		if _, err := n.paymentRegistry.ForCoin(coin); err == nil {
+			t.Errorf("ForCoin(%s): legacy V1 EVM registration is retired, expected error", coin)
 		}
 	}
 }
@@ -746,12 +837,12 @@ func TestManagedEscrowAdapterShadow_SkippedWhenDepsMissing(t *testing.T) {
 		t.Errorf("managedEscrowAdapters should be nil when shadow registration is skipped, got %d entries", len(n.managedEscrowAdapters))
 	}
 
-	// V1 EVM strategies must still be present.
+	// Legacy V1 EVM strategies must not be registered when shadow is skipped.
 	for _, coin := range []iwallet.CoinType{
 		testETHNativeCoin, testBNBNativeCoin, testMATICNativeCoin, testBASENativeCoin,
 	} {
-		if _, err := n.paymentRegistry.ForCoin(coin); err != nil {
-			t.Errorf("ForCoin(%s) after shadow skip: %v", coin, err)
+		if _, err := n.paymentRegistry.ForCoin(coin); err == nil {
+			t.Errorf("ForCoin(%s) after shadow skip: legacy V1 EVM registration is retired, expected error", coin)
 		}
 	}
 }

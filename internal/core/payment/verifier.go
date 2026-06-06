@@ -203,13 +203,13 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 
 	if emitVerified {
 		v.bus.Emit(events.PaymentVerified{TenantID: tenantID, OrderID: orderID})
-		for _, evt := range emitBusinessEvents {
-			v.bus.Emit(evt)
-		}
 		if v.paymentVerifiedHandler != nil && emitHandlerPayment != nil && emitHandlerOrderID != "" {
 			go v.paymentVerifiedHandler(emitHandlerOrderID, emitHandlerPayment)
 		}
 		paymentmetrics.RecordPaymentAggregationEnvelopeEmitted(tenantID, emitVerifiedNamespace, orderID)
+	}
+	for _, evt := range emitBusinessEvents {
+		v.bus.Emit(evt)
 	}
 	return nil
 }
@@ -298,6 +298,12 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 
 		if alreadyVerified {
 			promoteAfterVerification(&order, v.clock())
+			if err := v.tryRecoverVerifiedCancelableAutoConfirm(
+				&order, orderOpen, deduped, total,
+				emitBusinessEvents, emitHandlerOrderID, emitHandlerPayment,
+			); err != nil {
+				return fmt.Errorf("aggregating verifier: recover cancelable auto-confirm for %s: %w", orderID, err)
+			}
 			break
 		}
 
@@ -325,6 +331,78 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 
 	if err := saveOrder(&order); err != nil {
 		return fmt.Errorf("aggregating verifier: save order %s: %w", orderID, err)
+	}
+	return nil
+}
+
+// tryRecoverVerifiedCancelableAutoConfirm backfills PaymentSent funding facts
+// and emits CancelablePaymentReady when a vendor order was verified early (e.g.
+// via P2P PaymentSent) before UTXO settlement inputs were available.
+func (v *AggregatingVerifier) tryRecoverVerifiedCancelableAutoConfirm(
+	order *models.Order,
+	orderOpen *pb.OrderOpen,
+	observations []models.PaymentObservation,
+	total *big.Int,
+	emitBusinessEvents *[]interface{},
+	emitHandlerOrderID *string,
+	emitHandlerPayment **pb.PaymentSent,
+) error {
+	if order == nil || orderOpen == nil ||
+		order.Role() != models.RoleVendor ||
+		order.PaymentSettlementSignaledAt != nil ||
+		len(order.SerializedOrderConfirmation) > 0 {
+		return nil
+	}
+
+	ps, err := order.PaymentSentMessage()
+	if err != nil {
+		return nil
+	}
+	method, ok := paymentmetrics.ResolvedPaymentMethod(order, ps)
+	if !ok || !paymentmetrics.MethodIsCancelable(method) {
+		return nil
+	}
+
+	emitCancelableRecovery := func(emitPS *pb.PaymentSent) {
+		events := cancelableRecoveryBusinessEvents(order, emitPS, total)
+		if len(events) == 0 {
+			return
+		}
+		now := v.clock()
+		order.PaymentSettlementSignaledAt = &now
+		*emitBusinessEvents = events
+		*emitHandlerOrderID = order.ID.String()
+		*emitHandlerPayment = emitPS
+	}
+
+	if paymentmetrics.CancelableAutoConfirmReady(order, ps) {
+		emitCancelableRecovery(ps)
+		return nil
+	}
+	if len(observations) == 0 {
+		return nil
+	}
+
+	newPS, err := buildAggregatedPaymentSent(orderOpen, observations, total, order, v.clock())
+	if err != nil {
+		return err
+	}
+	if !paymentmetrics.CancelableAutoConfirmReady(order, newPS) {
+		return nil
+	}
+	if err := order.SetPaymentSent(newPS); err != nil {
+		return err
+	}
+	emitCancelableRecovery(newPS)
+	return nil
+}
+
+// cancelableRecoveryBusinessEvents emits only CancelablePaymentReady for orders
+// that were verified before auto-confirm inputs were ready. Recovery must not
+// replay OrderFunded or other first-verification side effects.
+func cancelableRecoveryBusinessEvents(order *models.Order, ps *pb.PaymentSent, total *big.Int) []interface{} {
+	if ready := paymentmetrics.CancelablePaymentReadyEvent(order, ps, total); ready != nil {
+		return []interface{}{ready}
 	}
 	return nil
 }
@@ -357,17 +435,9 @@ func paymentVerifiedBusinessEvents(order *models.Order, orderOpen *pb.OrderOpen,
 		}
 		switch spec.GetMethod() {
 		case pb.PaymentSent_CANCELABLE:
-			var amount uint64
-			if total != nil && total.IsUint64() {
-				amount = total.Uint64()
+			if ready := paymentmetrics.CancelablePaymentReadyEvent(order, ps, total); ready != nil {
+				out = append(out, ready)
 			}
-			out = append(out, &events.CancelablePaymentReady{
-				TenantID:      order.TenantID,
-				OrderID:       order.ID.String(),
-				TransactionID: ps.TransactionID,
-				Coin:          ps.Coin,
-				Amount:        amount,
-			})
 		case pb.PaymentSent_RWA_INSTANT:
 			out = append(out, &events.RwaInstantBuyCompleted{
 				OrderID:       order.ID.String(),

@@ -54,14 +54,13 @@ func WithHostService(hs coreiface.HostService) NodeOption {
 	}
 }
 
-// WithManagedEscrowCapConfig sets the grayscale routing configuration for EVM-ManagedEscrow.
-// When cfg is non-nil and lists chains in ManagedEscrowChains, those chains activate
-// the V2 ManagedEscrowAdapter path (ForCoinV2) and are excluded from V1 ClientSigned
-// registration. Pass nil (default) to keep all EVM chains on the legacy V1
-// path — this is the safe production default until the operator is ready.
+// WithManagedEscrowCapConfig sets the EVM-ManagedEscrow routing configuration. Legacy EVM
+// ClientSigned escrow is retired. Omit this option (nil cfg) to keep ManagedEscrow off;
+// pass a config with empty ManagedEscrowChains for all Ready EVM chains; pass a
+// non-empty ManagedEscrowChains list to limit ManagedEscrowAdapter activation.
 //
-// Injection point: hosting builder calls this after reading HostingConfig
-// from app.yaml. Standalone nodes omit this option (nil default).
+// Injection point: hosting calls this only when evm_managed_escrow.managed_escrow_chains is set;
+// standalone start always passes ManagedEscrowCapabilityConfig() from repo config.
 func WithManagedEscrowCapConfig(cfg *managed_escrow.ChainCapabilityConfig) NodeOption {
 	return func(n *MobazhaNode) {
 		n.managed_escrowCapConfig = cfg

@@ -223,6 +223,9 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 	if s.paymentRegistry == nil {
 		return nil, fmt.Errorf("payment registry not initialized for node %s", s.nodeID)
 	}
+	if coinInfo, coinErr := payment.SettlementCoinInfoForCoin(params.CoinType); coinErr == nil && payment.IsRetiredPaymentChain(coinInfo.Chain) {
+		return nil, fmt.Errorf("%w: coin %s", payment.ErrTRONPaymentRetired, params.CoinType)
+	}
 	strategy, err := s.paymentRegistry.ForCoinV2(params.CoinType)
 	if err != nil {
 		return nil, fmt.Errorf("no chain escrow for coin %s on node %s (registry chains=%d): %w",
@@ -231,6 +234,38 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 	result, err := strategy.SetupPayment(ctx, params)
 	if err != nil {
 		return nil, err
+	}
+
+	coinInfo, coinErr := payment.SettlementCoinInfoForCoin(params.CoinType)
+	if coinErr == nil {
+		fundingAddr := ""
+		if result != nil && result.PaymentData != nil {
+			fundingAddr = result.PaymentData.ToAddress
+		}
+		if fundingAddr == "" && result != nil {
+			fundingAddr = result.EscrowAddr
+		}
+
+		switch {
+		case coinInfo.IsEthTypeChain():
+			if strategy.Model() != payment.PaymentModelMonitored {
+				return nil, fmt.Errorf("%w: coin %s resolved to %T", ErrLegacyEVMPaymentRetired, params.CoinType, strategy)
+			}
+			if !IsValidEVMFundingAddress(fundingAddr) {
+				return nil, fmt.Errorf("%w: got %q", ErrInvalidEVMFundingAddress, fundingAddr)
+			}
+		case coinInfo.Chain == iwallet.ChainSolana:
+			if strategy.Model() != payment.PaymentModelMonitored {
+				return nil, fmt.Errorf("%w: coin %s resolved to %T", ErrLegacySolanaPaymentRetired, params.CoinType, strategy)
+			}
+			if !IsValidSolanaFundingAddress(fundingAddr) {
+				return nil, fmt.Errorf("%w: got %q", ErrInvalidSolanaFundingAddress, fundingAddr)
+			}
+		case coinInfo.Chain.IsUTXOChain():
+			if strategy.Model() != payment.PaymentModelMonitored {
+				return nil, fmt.Errorf("%w: coin %s resolved to %T", ErrLegacyUTXOPaymentRetired, params.CoinType, strategy)
+			}
+		}
 	}
 
 	setupResult := &payment.PaymentSetupResult{
@@ -253,7 +288,6 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 	// PendingManagedEscrowPaymentInfo so the PaymentSessionProjector can classify
 	// this order as SettlementModeAddressMonitored immediately (without
 	// waiting for a PaymentSent message to arrive).
-	coinInfo, coinErr := payment.SettlementCoinInfoForCoin(params.CoinType)
 	if coinErr == nil &&
 		strategy.Model() == payment.PaymentModelMonitored &&
 		coinInfo.IsEthTypeChain() &&
@@ -277,6 +311,7 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 			lockedPaymentCoin,
 			result.PaymentData.ToAddress,
 			result.PaymentData.Amount,
+			params.RefundAddress,
 			moderated,
 			result.PaymentData.Moderator,
 			result.PaymentData.ModeratorAddress,
@@ -304,7 +339,8 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 // persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
-func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string) error {
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, refundAddress string, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string) error {
+	refundAddress = strings.TrimSpace(refundAddress)
 	info := &models.PendingManagedEscrowPaymentInfo{
 		Coin:             coin,
 		Amount:           amount,
@@ -323,7 +359,7 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 			return fmt.Errorf("load orders: raw DB unavailable")
 		}
 		return raw.Transaction(func(tx *gorm.DB) error {
-			if err := paymentintent.UpsertSharedPaymentIntent(tx, orderID, managed_escrowAddress, "", info); err != nil {
+			if err := paymentintent.UpsertSharedPaymentIntent(tx, orderID, managed_escrowAddress, refundAddress, info); err != nil {
 				return fmt.Errorf("save shared payment intent: %w", err)
 			}
 			var orders []models.Order
@@ -336,6 +372,9 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 			for i := range orders {
 				orders[i].PaymentAddress = managed_escrowAddress
 				orders[i].CancelFeeAmount = cancelFeeAmount
+				if refundAddress != "" {
+					orders[i].RefundAddress = refundAddress
+				}
 				if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
 					return fmt.Errorf("set pending managed escrow payment info: %w", err)
 				}
@@ -348,7 +387,7 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 	}
 
 	return s.db.Update(func(tx database.Tx) error {
-		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), orderID, managed_escrowAddress, "", info); err != nil {
+		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), orderID, managed_escrowAddress, refundAddress, info); err != nil {
 			return fmt.Errorf("save shared payment intent: %w", err)
 		}
 		var orders []models.Order
@@ -361,6 +400,9 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 		for i := range orders {
 			orders[i].PaymentAddress = managed_escrowAddress
 			orders[i].CancelFeeAmount = cancelFeeAmount
+			if refundAddress != "" {
+				orders[i].RefundAddress = refundAddress
+			}
 			if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
 				return fmt.Errorf("set pending managed escrow payment info: %w", err)
 			}
@@ -409,12 +451,18 @@ func (s *PaymentAppService) persistSharedPaymentPolicySnapshot(orderID, moderato
 }
 
 // BuildInitEscrowInstructions builds escrow initialization instructions for
-// contract/program chains. EVM remains client-signed; Solana now builds Anchor
-// create instructions that the V2 adapter submits through the backend relay.
+// contract/program chains. EVM setup is retired (ManagedEscrow V2 only); Solana builds
+// Anchor create instructions that the V2 adapter submits through the backend relay.
 func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
 	coinInfo, err := payment.SettlementCoinInfoForCoin(params.CoinType)
 	if err != nil {
 		return nil, iwallet.Address{}, nil, err
+	}
+	if payment.IsRetiredPaymentChain(coinInfo.Chain) {
+		return nil, iwallet.Address{}, nil, fmt.Errorf("%w: coin %s", payment.ErrTRONPaymentRetired, params.CoinType)
+	}
+	if coinInfo.IsEthTypeChain() {
+		return nil, iwallet.Address{}, nil, fmt.Errorf("%w", ErrLegacyEVMPaymentRetired)
 	}
 
 	wallet, err := s.multiwallet.WalletForCurrencyCode(string(params.CoinType))

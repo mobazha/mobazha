@@ -38,8 +38,8 @@ import (
 // All chains are registered here — the dispatcher uses registry-only lookup
 // with no legacy fallback.
 //
-// UTXO chains use utxoAutoConfirmAdapter directly.
-// EVM and Solana chains use clientSignedAdapter with chain-specific chainOps.
+// UTXO and Solana register as V2-monitored adapters; EVM chains activate
+// via registerManagedEscrowAdapterShadow (ManagedEscrowAdapter V2). TRON is retired.
 //
 // Dependencies are injected into adapters via explicit fields / callbacks,
 // not via a *MobazhaNode reference (hexagonal architecture Phase A).
@@ -47,6 +47,8 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	n.paymentRegistry = payment.NewRegistry()
 
 	// ── UTXO ────────────────────────────────────────────────────
+	// Legacy V1 registration is retired. UTXO chains register as V2-native
+	// (Monitored + payment-session observation); V1AsV2 forwards shared ops.
 	utxoStrategy := &adapters.UTXOAutoConfirmAdapter{
 		Multiwallet:    n.multiwallet,
 		Keys:           n.keyProvider,
@@ -57,37 +59,23 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash,
 		iwallet.ChainLitecoin, iwallet.ChainZCash,
 	} {
-		n.paymentRegistry.Register(chain, utxoStrategy)
+		n.paymentRegistry.RegisterV2(chain, payment.NewV1AsV2(utxoStrategy))
 	}
 
 	// ── EVM ─────────────────────────────────────────────────────
-	// ManagedEscrowEnabled chains are activated via the V2 RegisterV2 path in
-	// registerManagedEscrowAdapterShadow; they are intentionally excluded from
-	// the V1 Register loop so that ForCoin(managed_escrowEnabledChain) returns
-	// an error — callers must migrate to ForCoinV2 to use those chains.
-	// This makes the migration explicit and prevents silent fallback to
-	// the legacy ClientSigned path on ManagedEscrow-activated chains.
-	evmOps := &adapters.EVMChainOps{
-		Keys:            n.keyProvider,
-		Multiwallet:     n.multiwallet,
-		BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
-		OnAutoConfirm:   n.handleCancelablePaymentForEVM,
-	}
-	evmStrategy := adapters.NewClientSignedAdapter(evmOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
-	for _, chain := range managed_escrow.LegacyChains(n.managed_escrowCapConfig) {
-		n.paymentRegistry.Register(chain, evmStrategy)
-	}
+	// Legacy V1 ClientSigned registration is retired. All Ready EVM chains
+	// activate via registerManagedEscrowAdapterShadow (ManagedEscrowAdapter V2 only).
 
 	// ── Solana ──────────────────────────────────────────────────
+	// Legacy V1 ClientSigned registration is retired. SolanaAnchorAdapter (V2)
+	// is the sole canonical path; solCompat remains internal to the anchor adapter.
 	solOps := &adapters.SolanaChainOps{
 		Keys:            n.keyProvider,
 		Multiwallet:     n.multiwallet,
 		BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
-		OnAutoConfirm:   n.handleCancelablePaymentForSolana,
 		NodeID:          n.nodeID,
 	}
 	solCompat := adapters.NewSolanaLifecycleCompatAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
-	n.paymentRegistry.Register(iwallet.ChainSolana, solCompat)
 	solActionStore, solActionRecorder := n.newSettlementActionStore("Solana Anchor")
 	var solRelayer adapters.SolanaInstructionRelayer
 	if n.settlementService != nil {
@@ -105,17 +93,6 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		Keys:            n.keyProvider,
 		Wallets:         n.multiwallet,
 	}))
-
-	// ── TRON ──────────────────────────────────────────────────
-	tronOps := &adapters.TRONChainOps{
-		Keys:            n.keyProvider,
-		Multiwallet:     n.multiwallet,
-		BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
-		OnAutoConfirm:   n.handleCancelablePaymentForTRON,
-		TronClient:      n.tronClient,
-		NodeID:          n.nodeID,
-	}
-	n.paymentRegistry.Register(iwallet.ChainTRON, adapters.NewClientSignedAdapter(tronOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions))
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
@@ -147,11 +124,11 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 // grayscale routing).
 //
 // Routing semantics (EVM_HYBRID_STRATEGY.md §5.5 D-Hybrid-23):
-//   - ManagedEscrow-enabled chains: ForCoinV2 returns ManagedEscrowAdapter; ForCoin (V1)
-//     has no entry for these chains (they were skipped in
-//     registerPaymentStrategies). Callers MUST use ForCoinV2.
-//   - Legacy chains (not in ManagedEscrowChains): ForCoin (V1) returns
-//     ClientSignedAdapter; ForCoinV2 is empty for them.
+//   - Ready EVM chains: ForCoinV2 returns ManagedEscrowAdapter when relayer is
+//     configured; legacy ClientSigned V1 registration is retired.
+//   - Without relayer (no RelayAPIURL on standalone, no hosting relay on
+//     SaaS), ManagedEscrowAdapter is skipped and EVM coins have no V2 strategy.
+//   - UTXO/Solana register as V2-monitored in registerPaymentStrategies.
 //
 // Provider wiring lands in incremental commits:
 //
@@ -166,6 +143,11 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 //   - D18c — Relayer. Hosted/SaaS: HostService.GetEVMRelayService() via
 //     adapters.NewRelayBridgeWithRecorder. Standalone: RelayAPIURL + Bearer from
 //     RelayAPIBearer, else pkg/relay.EnvPlatformRelayToken (same as Settlement HTTP).
+//     ManagedEscrowAdapter V2 is NOT registered when no real relayer is wired — matching
+//     hosting gateway (relay required before ManagedEscrowCapConfig). SetupPayment without
+//     relay would only strand buyer funds in a ManagedEscrow that cannot settle.
+//     Note: settlement.IsEVMRelayAvailable() is a separate check for legacy
+//     ClientSigned relay HTTP paths; ManagedEscrow uses RelayerIsConfigured(managed_escrowRelayer).
 //
 // Test-only paths that build a stripped MobazhaNode (no paymentService)
 // continue to leave OwnerProvider nil, so SetupPayment short-circuits
@@ -207,6 +189,19 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	var relayer managed_escrow.Relayer = managed_escrow.NoopRelayer()
 	if relaySvc != nil {
 		relayer = adapters.NewRelayBridgeWithRecorder(relaySvc, recorder)
+	}
+
+	if len(activeChainsEarly) > 0 && !managed_escrow.RelayerIsConfigured(relayer) {
+		logger.LogWarningWithIDf(log, n.nodeID,
+			"ManagedEscrowAdapter V2: relayer not configured — skipping %d ManagedEscrow-enabled chain(s). "+
+				"Configure RelayAPIURL (standalone) or enable hosting relay (SaaS) before EVM ManagedEscrow checkout.",
+			len(activeChainsEarly))
+		n.managed_escrowRelayer = relayer
+		for _, chain := range managed_escrow.ReadyEVMChainTypes() {
+			managed_escrow.SetManagedEscrowRoutingDecision(string(chain), false)
+		}
+		n.configureGuestEVMManagedEscrowClosureRuntime(nil)
+		return
 	}
 
 	codeAndNonce := &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet}
@@ -306,14 +301,16 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	for chain, adapter := range shadow {
 		managed_escrow.SetManagedEscrowRoutingDecision(string(chain), adapter != nil)
 	}
-	// Chains on V1 legacy path also get a routing=0 gauge for completeness.
-	for _, chain := range managed_escrow.LegacyChains(n.managed_escrowCapConfig) {
-		managed_escrow.SetManagedEscrowRoutingDecision(string(chain), false)
+	// Chains without an active ManagedEscrowAdapter also get routing=0 for observability.
+	for _, chain := range managed_escrow.ReadyEVMChainTypes() {
+		if _, ok := shadow[chain]; !ok {
+			managed_escrow.SetManagedEscrowRoutingDecision(string(chain), false)
+		}
 	}
 
 	if len(activeChainsEarly) == 0 {
 		logger.LogInfoWithIDf(log, n.nodeID,
-			"ManagedEscrowAdapter: no chains activated (managed_escrow_chains config empty — all EVM on V1 legacy path)")
+			"ManagedEscrowAdapter: no chains activated (no Ready EVM chains or monitor wiring failed)")
 	} else {
 		logger.LogInfoWithIDf(log, n.nodeID,
 			"ManagedEscrowAdapter V2 activated for %d/%d EVM chains: %v (runtime chainIDs: %v)", len(shadow), len(activeChainsEarly), shadow, runtimeChainIDs)
@@ -728,10 +725,6 @@ func (n *MobazhaNode) handleCancelablePaymentForSolana(event *events.CancelableP
 	n.settlementService.HandleCancelablePaymentForSolana(event)
 }
 
-func (n *MobazhaNode) handleCancelablePaymentForTRON(event *events.CancelablePaymentReady) {
-	n.settlementService.HandleCancelablePaymentForTRON(event)
-}
-
 // ── Cancelable payment event dispatching ─────────────────────────────────
 
 // startCancelablePaymentMonitor subscribes to CancelablePaymentReady events
@@ -790,6 +783,18 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 	if err != nil {
 		logger.LogWarningWithIDf(log, n.nodeID, "No chain escrow for coin %s (order %s): %v", event.Coin, event.OrderID, err)
 		return
+	}
+	chain, err := payment.SettlementChainForCoin(coinType)
+	if err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "Unable to resolve chain for coin %s (order %s): %v", event.Coin, event.OrderID, err)
+		return
+	}
+	if chain == iwallet.ChainSolana {
+		if _, ok := strategyV2.(payment.SellerDeclineRefunder); ok {
+			logger.LogInfoWithIDf(log, n.nodeID,
+				"Skipping Solana Anchor auto-confirm for order %s; awaiting seller confirm or seller_decline_refund", event.OrderID)
+			return
+		}
 	}
 
 	go func() {

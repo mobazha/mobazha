@@ -16,6 +16,7 @@ import (
 	corePmt "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	paypb "github.com/mobazha/mobazha3.0/pkg/payment"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
 type mockPaymentSessionService struct {
@@ -121,6 +122,41 @@ func TestHandlePOSTOrderPaymentSession_PaymentCoinDisabled(t *testing.T) {
 	g.handlePOSTOrderPaymentSession(w, r)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandlePOSTOrderPaymentSession_TRONPaymentRetired(t *testing.T) {
+	svc := &mockPaymentSessionService{
+		createFunc: func(_ context.Context, req contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {
+			if req.PaymentCoin != "crypto:tron:mainnet:native" {
+				t.Fatalf("paymentCoin = %q", req.PaymentCoin)
+			}
+			return nil, corePmt.ErrTRONPaymentRetired
+		},
+	}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newPaymentSessionHandlerRequest(t,
+		http.MethodPost,
+		"/v1/orders/o1/payment-session",
+		map[string]interface{}{
+			"paymentCoin": "TRX",
+		},
+		map[string]string{"orderID": "o1"},
+		svc,
+	)
+
+	g.handlePOSTOrderPaymentSession(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+	}
+
+	var env responsePkg.ErrorEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Error.Code != responsePkg.CodeTRONPaymentRetired {
+		t.Fatalf("code = %q body=%s", env.Error.Code, w.Body.String())
 	}
 }
 

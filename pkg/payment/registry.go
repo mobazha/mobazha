@@ -75,8 +75,7 @@ func (r *Registry) Register(chain iwallet.ChainType, strategy ChainEscrow) {
 // (e.g., via embedding or a hand-written V2-to-V1 adapter).
 //
 // Use this for ManagedEscrowAdapter, SolanaAnchorAdapter, and any future
-// action-centric strategy. V1-only strategies (TRON today) keep using
-// Register and are auto-wrapped by ForCoinV2.
+// action-centric strategy. Retired chains are not registered.
 func (r *Registry) RegisterV2(chain iwallet.ChainType, strategy ChainEscrowV2) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

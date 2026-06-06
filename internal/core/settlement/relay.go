@@ -356,12 +356,12 @@ func (s *SettlementService) GetLegacyConfirmOrderInstructions(orderID models.Ord
 	if s.paymentRegistry == nil {
 		return coinType, nil, fmt.Errorf("payment registry not initialized")
 	}
-	strategy, err := s.paymentRegistry.ForCoin(coinType)
+	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
 	if err != nil {
-		return coinType, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
+		return coinType, nil, fmt.Errorf("no client-signed settlement strategy for coin %s: %w", coinType, err)
 	}
 
-	result, err := strategy.GetConfirmInstructions(context.Background(), payment.InstructionParams{
+	result, err := strategy.Confirm(context.Background(), payment.ActionParams{
 		OrderID:       orderID.String(),
 		InitiatorAddr: initiatorAddress,
 		PayoutAddr:    payoutAddress,

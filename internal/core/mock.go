@@ -27,6 +27,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	ma "github.com/multiformats/go-multiaddr"
@@ -211,12 +212,12 @@ func MockNode() (*MobazhaNode, error) {
 	node.initPostsService()
 	node.initShoppingCartService()
 	node.registerPaymentStrategies()
-	node.paymentRegistry.Register(iwallet.ChainMock, &adapters.UTXOAutoConfirmAdapter{
+	node.paymentRegistry.RegisterV2(iwallet.ChainMock, payment.NewV1AsV2(&adapters.UTXOAutoConfirmAdapter{
 		Multiwallet:    node.multiwallet,
 		Keys:           node.keyProvider,
 		OnAutoConfirm:  node.handleCancelablePaymentForUTXO,
 		GetPaymentInfo: node.paymentService.GetUTXOPaymentInfo,
-	})
+	}))
 	node.registerHandlers()
 	node.listenNetworkEvents()
 	node.publishHandler()
@@ -420,12 +421,12 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		node.initPostsService()
 		node.initShoppingCartService()
 		node.registerPaymentStrategies()
-		node.paymentRegistry.Register(iwallet.ChainMock, &adapters.UTXOAutoConfirmAdapter{
+		node.paymentRegistry.RegisterV2(iwallet.ChainMock, payment.NewV1AsV2(&adapters.UTXOAutoConfirmAdapter{
 			Multiwallet:    node.multiwallet,
 			Keys:           node.keyProvider,
 			OnAutoConfirm:  node.handleCancelablePaymentForUTXO,
 			GetPaymentInfo: node.paymentService.GetUTXOPaymentInfo,
-		})
+		}))
 		node.registerHandlers()
 		node.listenNetworkEvents()
 		node.publishHandler()

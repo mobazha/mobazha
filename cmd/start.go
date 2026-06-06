@@ -61,9 +61,8 @@ func (x *Start) Execute(args []string) error {
 	}
 
 	printSplashScreen()
-	opts := make([]core.NodeOption, 0, 1)
-	if managed_escrowCfg := cfg.ManagedEscrowCapabilityConfig(); managed_escrowCfg != nil {
-		opts = append(opts, core.WithManagedEscrowCapConfig(managed_escrowCfg))
+	opts := []core.NodeOption{
+		core.WithManagedEscrowCapConfig(cfg.ManagedEscrowCapabilityConfig()),
 	}
 	n, err := core.NewNodeWithOptions(context.Background(), cfg, repo.DefaultNodeID, nil, opts...)
 	if err != nil {

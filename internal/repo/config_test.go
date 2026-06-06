@@ -33,10 +33,14 @@ func TestCreateDefaultConfigFile(t *testing.T) {
 }
 
 func TestConfigManagedEscrowCapabilityConfig(t *testing.T) {
-	t.Run("nil when unset", func(t *testing.T) {
+	t.Run("defaults to all ready ManagedEscrow chains", func(t *testing.T) {
 		cfg := &Config{}
-		if got := cfg.ManagedEscrowCapabilityConfig(); got != nil {
-			t.Fatalf("expected nil config, got %#v", got)
+		got := cfg.ManagedEscrowCapabilityConfig()
+		if got == nil {
+			t.Fatal("expected non-nil default ManagedEscrow config")
+		}
+		if len(got.ManagedEscrowChains) == 0 {
+			t.Fatal("expected ready ManagedEscrow chains in default config")
 		}
 	})
 

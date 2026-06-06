@@ -31,7 +31,8 @@ func (s *GuestOrderAppService) appendEVMReadiness(out *contracts.GuestCheckoutRe
 	chains := s.evmReadinessChainList()
 	if len(chains) == 0 {
 		// Report canonical ManagedEscrow-enabled EVM chains even when monitors are not wired yet.
-		for _, chain := range managed_escrow.ManagedEscrowEnabledChains(nil) {
+		// Non-nil empty config = all Ready chains (standalone default); nil would disable ManagedEscrow.
+		for _, chain := range managed_escrow.ManagedEscrowEnabledChains(&managed_escrow.ChainCapabilityConfig{}) {
 			chains = append(chains, chain)
 		}
 	}

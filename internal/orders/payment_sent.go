@@ -318,21 +318,20 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected and chain-verified: Order %s fully funded", order.ID)
 		}
 
-		if method, ok := payment.ResolvedPaymentMethod(order, paymentSent); ok && payment.MethodIsCancelable(method) && order.IsPaymentVerified() {
-			if !markPaymentSettlementSignaled(order) {
-				return
-			}
-			amount := parsePaymentSentEventAmount(paymentSent)
-			dbtx.RegisterCommitHook(func() {
-				op.bus.Emit(&events.CancelablePaymentReady{
-					TenantID:      order.TenantID,
-					OrderID:       order.ID.String(),
-					TransactionID: paymentSent.TransactionID,
-					Coin:          paymentSent.Coin,
-					Amount:        amount,
+		if order.IsPaymentVerified() {
+			if ready := payment.CancelablePaymentReadyEvent(order, paymentSent, nil); ready != nil {
+				if !markPaymentSettlementSignaled(order) {
+					return
+				}
+				dbtx.RegisterCommitHook(func() {
+					op.bus.Emit(ready)
 				})
-			})
-			logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE payment chain-verified, ready for auto-confirm: order %s (coin=%s)", order.ID, paymentSent.Coin)
+				logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE payment chain-verified, ready for auto-confirm: order %s (coin=%s)", order.ID, paymentSent.Coin)
+			} else if method, ok := payment.ResolvedPaymentMethod(order, paymentSent); ok && payment.MethodIsCancelable(method) {
+				logger.LogInfoWithIDf(log, op.nodeID,
+					"CANCELABLE payment verified for order %s but settlement inputs not ready (awaiting funding facts)",
+					order.ID)
+			}
 		}
 
 		if paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_RWA_INSTANT && order.IsPaymentVerified() {
@@ -400,6 +399,10 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 		return dbtx.Save(order)
 	}
 
+	if paymentVerificationShouldNotStartFulfillment(order) {
+		return dbtx.Save(order)
+	}
+
 	op.advanceToPendingAfterVerification(order)
 
 	// Replay parked messages that were waiting for payment verification.
@@ -437,26 +440,19 @@ func (op *OrderProcessor) emitVerifiedPaymentSettlementRecovery(
 	}
 	coinType := iwallet.CoinType(paymentSent.Coin)
 	method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
-	if ok && payment.MethodIsCancelable(method) {
+	if ready := payment.CancelablePaymentReadyEvent(order, paymentSent, nil); ready != nil {
 		if !markPaymentSettlementSignaled(order) {
 			return
 		}
-		amount := parsePaymentSentEventAmount(paymentSent)
 		dbtx.RegisterCommitHook(func() {
-			op.bus.Emit(&events.CancelablePaymentReady{
-				TenantID:      order.TenantID,
-				OrderID:       order.ID.String(),
-				TransactionID: paymentSent.TransactionID,
-				Coin:          paymentSent.Coin,
-				Amount:        amount,
-			})
+			op.bus.Emit(ready)
 		})
 		logger.LogInfoWithIDf(log, op.nodeID,
 			"Recovered CANCELABLE payment ready event for verified order %s (coin=%s)",
 			order.ID, paymentSent.Coin)
 		return
 	}
-	if payment.IsFiatPaymentRoute(method, coinType) {
+	if ok && payment.IsFiatPaymentRoute(method, coinType) {
 		return
 	}
 	if paymentSent.GetSettlementSpec() != nil && paymentSent.GetSettlementSpec().GetMethod() == pb.PaymentSent_RWA_INSTANT {
@@ -495,7 +491,30 @@ func normalizeAwaitingPaymentBeforePaymentSent(order *models.Order) {
 	}
 }
 
+func paymentVerificationShouldNotStartFulfillment(order *models.Order) bool {
+	if order == nil {
+		return true
+	}
+	if len(order.SerializedOrderDecline) > 0 ||
+		len(order.SerializedOrderCancel) > 0 ||
+		len(order.SerializedRefunds) > 0 {
+		return true
+	}
+	switch order.State {
+	case models.OrderState_DECLINED,
+		models.OrderState_CANCELED,
+		models.OrderState_REFUNDED:
+		return true
+	default:
+		return false
+	}
+}
+
 func (op *OrderProcessor) advanceToPendingAfterVerification(order *models.Order) {
+	if paymentVerificationShouldNotStartFulfillment(order) {
+		return
+	}
+
 	if op.stateValidator != nil {
 		currentState := coreorders.OrderState(order.State)
 		if newState, valid := op.stateValidator.ValidateTransition(

@@ -8,6 +8,7 @@ import (
 
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,14 @@ import (
 
 type stubGuestListings struct {
 	bySlug map[string]*pb.SignedListing
+}
+
+func (s *stubGuestListings) GetMyListings() (models.ListingIndex, error) {
+	index := make(models.ListingIndex, 0, len(s.bySlug))
+	for slug := range s.bySlug {
+		index = append(index, models.ListingMetadata{Slug: slug})
+	}
+	return index, nil
 }
 
 func (s *stubGuestListings) GetMyListingBySlug(slug string) (*pb.SignedListing, error) {

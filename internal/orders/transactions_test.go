@@ -426,6 +426,13 @@ func TestProcessOrderPayment_CancelableConfirmedTxEmitsSingleReadyEvent(t *testi
 		ToAddress:      toAddress,
 		Amount:         "123",
 		Timestamp:      timestamppb.Now(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{{
+			Id:        "fact-" + txID,
+			TxHash:    txID,
+			ToAddress: toAddress,
+			Amount:    "123",
+			Status:    models.PaymentObservationStatusConfirmed,
+		}},
 	}
 
 	msg := &npb.OrderMessage{
@@ -484,8 +491,8 @@ func TestProcessOrderPayment_CancelableConfirmedTxEmitsSingleReadyEvent(t *testi
 			if ready.Coin != paymentSent.Coin {
 				t.Fatalf("event coin = %s, want %s", ready.Coin, paymentSent.Coin)
 			}
-			if ready.Amount != 123 {
-				t.Fatalf("event amount = %d, want aggregated PaymentSent amount 123", ready.Amount)
+			if ready.Amount != "123" {
+				t.Fatalf("event amount = %q, want aggregated PaymentSent amount 123", ready.Amount)
 			}
 			return
 		}
@@ -1111,6 +1118,132 @@ func TestRecordVerifiedPayment_ReplacesProvisionalTransaction(t *testing.T) {
 	}
 }
 
+func TestRecordVerifiedPayment_DoesNotRestartDeclinedOrder(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	op.stateValidator = &mockStateBridge{}
+	op.multiwallet = nil
+
+	sub, err := op.bus.Subscribe(&events.CancelablePaymentReady{}, events.BufSize(4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Close()
+
+	orderID := "tx-verified-after-decline-1"
+	orderOpen, _, err := factory.NewOrder()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		txID      = "tx_verified_after_decline_123"
+		toAddress = "mock_dest_addr_after_decline"
+	)
+	paymentSent := &pb.PaymentSent{
+		TransactionID:  txID,
+		Coin:           string(iwallet.CtMock),
+		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_CANCELABLE),
+		ToAddress:      toAddress,
+		Amount:         "100",
+		Timestamp:      timestamppb.Now(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{{
+			Id:        "fact-" + txID,
+			TxHash:    txID,
+			ToAddress: toAddress,
+			Amount:    "100",
+			Status:    models.PaymentObservationStatusConfirmed,
+		}},
+	}
+	paymentMsg := &npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_PAYMENT_SENT,
+		Message:     mustBuildAny(paymentSent),
+	}
+	if err := utils.SignOrderMessage(paymentMsg, op.signer); err != nil {
+		t.Fatal(err)
+	}
+	declineMsg := &npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_ORDER_DECLINE,
+		Message: mustBuildAny(&pb.OrderDecline{
+			Type:          pb.OrderDecline_USER_DECLINE,
+			Reason:        "seller declined after escrow funding",
+			TransactionID: "seller_decline_refund_tx",
+			Timestamp:     timestamppb.Now(),
+		}),
+	}
+	if err := utils.SignOrderMessage(declineMsg, op.signer); err != nil {
+		t.Fatal(err)
+	}
+
+	order := &models.Order{
+		ID:             models.OrderID(orderID),
+		MyRole:         string(models.RoleVendor),
+		PaymentAddress: toAddress,
+	}
+	order.SetFSMState(models.OrderState_DECLINED)
+	if err := order.PutMessage(&npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_ORDER_OPEN,
+		Signature:   []byte("sig"),
+		Message:     mustBuildAny(orderOpen),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(paymentMsg); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(declineMsg); err != nil {
+		t.Fatal(err)
+	}
+
+	verifiedTx := iwallet.Transaction{
+		ID:     iwallet.TransactionID(txID),
+		Height: 12345,
+		To: []iwallet.SpendInfo{{
+			Address: iwallet.NewAddress(toAddress, iwallet.CoinType(iwallet.CtMock)),
+			Amount:  iwallet.NewAmount(100),
+		}},
+		Value: iwallet.NewAmount(100),
+	}
+
+	if err := op.db.Update(func(dbtx database.Tx) error {
+		if err := dbtx.Save(order); err != nil {
+			return err
+		}
+		return op.RecordVerifiedPayment(dbtx, order, verifiedTx)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var stored models.Order
+	if err := op.db.View(func(dbtx database.Tx) error {
+		return dbtx.Read().Where("id = ?", orderID).First(&stored).Error
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !stored.IsPaymentVerified() {
+		t.Fatal("expected payment verification fact to be recorded")
+	}
+	if stored.State != models.OrderState_DECLINED {
+		t.Fatalf("expected declined order to stay DECLINED, got %s", stored.State)
+	}
+	if stored.PaymentSettlementSignaledAt != nil {
+		t.Fatal("declined order must not be marked ready for settlement auto-confirm")
+	}
+
+	select {
+	case evt := <-sub.Out():
+		t.Fatalf("declined order emitted unexpected settlement event %T", evt)
+	default:
+	}
+}
+
 func TestRecordVerifiedPayment_AlreadyVerifiedVendorRecoversCancelableReady(t *testing.T) {
 	op, teardown, err := newMockOrderProcessor()
 	if err != nil {
@@ -1144,6 +1277,13 @@ func TestRecordVerifiedPayment_AlreadyVerifiedVendorRecoversCancelableReady(t *t
 		ToAddress:      toAddress,
 		Amount:         "100",
 		Timestamp:      timestamppb.Now(),
+		FundingFacts: []*pb.PaymentSent_FundingFact{{
+			Id:        "fact-" + txID,
+			TxHash:    txID,
+			ToAddress: toAddress,
+			Amount:    "100",
+			Status:    models.PaymentObservationStatusConfirmed,
+		}},
 	}
 	msg := &npb.OrderMessage{
 		OrderID:     orderID,
@@ -1198,7 +1338,7 @@ func TestRecordVerifiedPayment_AlreadyVerifiedVendorRecoversCancelableReady(t *t
 		if !ok {
 			t.Fatalf("expected CancelablePaymentReady, got %T", evt)
 		}
-		if ready.OrderID != orderID || ready.TransactionID != txID || ready.Amount != 100 {
+		if ready.OrderID != orderID || ready.TransactionID != txID || ready.Amount != "100" {
 			t.Fatalf("unexpected ready event: %+v", ready)
 		}
 	case <-time.After(time.Second):

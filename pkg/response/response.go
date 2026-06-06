@@ -41,18 +41,19 @@ type FieldError struct {
 }
 
 const (
-	CodeValidation      = "VALIDATION_ERROR"
-	CodeBadRequest      = "BAD_REQUEST"
-	CodeNotFound        = "NOT_FOUND"
-	CodeUnauthorized    = "UNAUTHORIZED"
-	CodeForbidden       = "FORBIDDEN"
-	CodeConflict        = "CONFLICT"
-	CodeInternalError   = "INTERNAL_ERROR"
-	CodeNotImplemented  = "NOT_IMPLEMENTED"
-	CodeServiceUnavail  = "SERVICE_UNAVAILABLE"
-	CodePayloadTooLarge = "PAYLOAD_TOO_LARGE"
-	CodeProviderError   = "PROVIDER_ERROR"
-	CodeRateLimited     = "RATE_LIMITED"
+	CodeValidation         = "VALIDATION_ERROR"
+	CodeBadRequest         = "BAD_REQUEST"
+	CodeNotFound           = "NOT_FOUND"
+	CodeUnauthorized       = "UNAUTHORIZED"
+	CodeForbidden          = "FORBIDDEN"
+	CodeConflict           = "CONFLICT"
+	CodeInternalError      = "INTERNAL_ERROR"
+	CodeNotImplemented     = "NOT_IMPLEMENTED"
+	CodeServiceUnavail     = "SERVICE_UNAVAILABLE"
+	CodePayloadTooLarge    = "PAYLOAD_TOO_LARGE"
+	CodeProviderError      = "PROVIDER_ERROR"
+	CodeRateLimited        = "RATE_LIMITED"
+	CodeTRONPaymentRetired = "TRON_PAYMENT_RETIRED"
 	// CodeAccountLinkConflict signals that an OAuth provider ID (e.g. Telegram,
 	// Discord) is already bound to a different Casdoor account. The response
 	// should include APIError.Data with the conflicting account's metadata so

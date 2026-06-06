@@ -121,9 +121,9 @@ type Config struct {
 	DHTClientOnly          bool     `long:"dhtclientonly" description:"Disable participating in serving data in the DHT. This should be used if your node is undialable."`
 	NetConfigEndpoint      string   `long:"netconfigendpoint" description:"Override the default net config endpoint with the provided value"`
 	NetDBEndpoint          string   `long:"netdbendpoint" description:"Override the default NetDB endpoint for search index sync"`
-	RelayAPIURL            string   `long:"relayapiurl" description:"Platform base URL for relay HTTP API (append /platform/v1/relay/execute). Used when HostService is unavailable."`
+	RelayAPIURL            string   `long:"relayapiurl" description:"Platform base URL for relay HTTP API (append /platform/v1/relay/execute). Required for standalone EVM checkout (ManagedEscrow V2); SaaS uses hosting relay when HostService is wired."`
 	RelayAPIBearer         string   `long:"relayapibearer" description:"Bearer JWT for platform relay HTTP API; if empty, MOBAZHA_PLATFORM_RELAY_TOKEN is used (same as ManagedEscrow HTTP relay path)"`
-	ManagedEscrowChains             []string `long:"safechain" description:"Enable ManagedEscrow-backed EVM routing for the given chain type (repeatable, e.g. ETH). Standalone default is legacy when unset"`
+	ManagedEscrowChains             []string `long:"safechain" description:"Limit ManagedEscrow-backed EVM routing to the given chain types (repeatable, e.g. ETH). When unset, all Ready EVM chains are enabled; ManagedEscrowAdapter still requires relayapiurl (standalone) or hosting relay (SaaS)."`
 
 	// GuestCheckout enables the guest (anonymous) checkout feature.
 	// When true, the node accepts orders from unauthenticated buyers
@@ -261,11 +261,14 @@ func (c *Config) ParseElectrumServers() map[string]string {
 	return parseKeyValueSlice(c.ElectrumServers)
 }
 
-// ManagedEscrowCapabilityConfig returns the ManagedEscrow chain routing config for this node.
-// Nil means no ManagedEscrow chains are enabled and all EVM chains stay on the legacy path.
+// ManagedEscrowCapabilityConfig returns the ManagedEscrow chain routing config for standalone nodes.
+// When repo ManagedEscrowChains is empty, returns DefaultChainCapabilityConfig() with an
+// explicit Ready-chain list (equivalent to non-nil cfg with empty ManagedEscrowChains).
+// A non-empty ManagedEscrowChains limits ManagedEscrowAdapter activation for operator rollout.
+// Actual registration still requires a configured relayer (see registerManagedEscrowAdapterShadow).
 func (c *Config) ManagedEscrowCapabilityConfig() *managed_escrow.ChainCapabilityConfig {
 	if len(c.ManagedEscrowChains) == 0 {
-		return nil
+		return managed_escrow.DefaultChainCapabilityConfig()
 	}
 	return &managed_escrow.ChainCapabilityConfig{ManagedEscrowChains: append([]string(nil), c.ManagedEscrowChains...)}
 }

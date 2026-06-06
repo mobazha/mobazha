@@ -46,10 +46,8 @@ type PaymentWatcher interface {
 	WatchOrder(order *models.GuestOrder)
 }
 
-// GuestListingQuery is a narrow interface satisfied by *ListingAppService.
-type GuestListingQuery interface {
-	GetMyListingBySlug(slug string) (*pb.SignedListing, error)
-}
+// GuestListingQuery is satisfied by *ListingAppService.
+type GuestListingQuery = checkoutsupply.CheckoutSupplyListingReader
 
 // GuestOrderAppServiceConfig groups dependencies for GuestOrderAppService.
 type GuestOrderAppServiceConfig struct {

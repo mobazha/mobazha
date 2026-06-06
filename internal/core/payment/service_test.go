@@ -219,15 +219,16 @@ func TestPaymentAppService_FetchOrderByID_Found(t *testing.T) {
 
 func TestPaymentAppService_GeneratePaymentInstructions_Success(t *testing.T) {
 	reg := payment.NewRegistry()
+	managed_escrowAddr := "0x111122223333444455556666777788889999aaaa"
 	expectedResult := &payment.PaymentSetupResult{
-		PaymentModel: payment.PaymentModelClientSigned,
-		EscrowAddr:   "0xabc",
+		PaymentModel: payment.PaymentModelMonitored,
+		EscrowAddr:   managed_escrowAddr,
 	}
 	strategy := &testChainEscrow{
-		model:     payment.PaymentModelClientSigned,
+		model:     payment.PaymentModelMonitored,
 		genResult: expectedResult,
 	}
-	reg.Register(iwallet.ChainEthereum, strategy)
+	reg.RegisterV2(iwallet.ChainEthereum, payment.NewV1AsV2(strategy))
 
 	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
 		PaymentRegistry: reg,
@@ -239,8 +240,8 @@ func TestPaymentAppService_GeneratePaymentInstructions_Success(t *testing.T) {
 		Amount:   1000000,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, payment.PaymentModelClientSigned, result.PaymentModel)
-	assert.Equal(t, "0xabc", result.EscrowAddr)
+	assert.Equal(t, payment.PaymentModelMonitored, result.PaymentModel)
+	assert.Equal(t, managed_escrowAddr, result.EscrowAddr)
 	assert.Equal(t, 1, strategy.genCallCount)
 }
 
@@ -256,13 +257,16 @@ func TestPaymentAppService_GeneratePaymentSetup_PersistsPolicySnapshot(t *testin
 
 	reg := payment.NewRegistry()
 	strategy := &testChainEscrow{
-		model: payment.PaymentModelClientSigned,
+		model: payment.PaymentModelMonitored,
 		genResult: &payment.PaymentSetupResult{
-			PaymentModel: payment.PaymentModelClientSigned,
-			PaymentData:  &models.PaymentData{OrderID: "order-policy-setup"},
+			PaymentModel: payment.PaymentModelMonitored,
+			EscrowAddr:   "0x111122223333444455556666777788889999aaaa",
+			PaymentData: &models.PaymentData{
+				OrderID: "order-policy-setup",
+			},
 		},
 	}
-	reg.Register(iwallet.ChainEthereum, strategy)
+	reg.RegisterV2(iwallet.ChainEthereum, payment.NewV1AsV2(strategy))
 
 	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
 		DB:              db,
@@ -280,6 +284,78 @@ func TestPaymentAppService_GeneratePaymentSetup_PersistsPolicySnapshot(t *testin
 	require.NoError(t, raw.Where("order_id = ?", "order-policy-setup").First(&shared).Error)
 	require.Equal(t, "mod-peer", shared.ModeratorPeerID)
 	require.Equal(t, uint64(42), shared.StorePolicyRevision)
+}
+
+func TestPaymentAppService_GeneratePaymentSetup_RejectsLegacyEVMFundingHash(t *testing.T) {
+	reg := payment.NewRegistry()
+	legacyHash := "0xdfac9fe89ed092e0b27e5bf1a71639758d799a6cd301476e78475165e7a2b5ae"
+	strategy := &testChainEscrow{
+		model: payment.PaymentModelMonitored,
+		genResult: &payment.PaymentSetupResult{
+			PaymentModel: payment.PaymentModelMonitored,
+			EscrowAddr:   legacyHash,
+		},
+	}
+	reg.RegisterV2(iwallet.ChainEthereum, payment.NewV1AsV2(strategy))
+
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
+		PaymentRegistry: reg,
+	})
+
+	_, err := svc.GeneratePaymentSetup(context.Background(), payment.PaymentSetupParams{
+		OrderID:  "order-legacy-hash",
+		CoinType: iwallet.CoinType("crypto:eip155:1:native"),
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidEVMFundingAddress)
+}
+
+func TestPaymentAppService_GeneratePaymentSetup_RejectsLegacyEVMModel(t *testing.T) {
+	reg := payment.NewRegistry()
+	strategy := &testChainEscrow{
+		model: payment.PaymentModelClientSigned,
+		genResult: &payment.PaymentSetupResult{
+			PaymentModel: payment.PaymentModelClientSigned,
+			EscrowAddr:   "0x111122223333444455556666777788889999aaaa",
+		},
+	}
+	reg.RegisterV2(iwallet.ChainEthereum, payment.NewV1AsV2(strategy))
+
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
+		PaymentRegistry: reg,
+	})
+
+	_, err := svc.GeneratePaymentSetup(context.Background(), payment.PaymentSetupParams{
+		OrderID:  "order-legacy-model",
+		CoinType: iwallet.CoinType("crypto:eip155:1:native"),
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrLegacyEVMPaymentRetired)
+}
+
+func TestPaymentAppService_GeneratePaymentSetup_FailsWhenEVMStrategyNotRegistered(t *testing.T) {
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
+		PaymentRegistry: payment.NewRegistry(),
+	})
+
+	_, err := svc.GeneratePaymentSetup(context.Background(), payment.PaymentSetupParams{
+		OrderID:  "order-no-managed-route",
+		CoinType: iwallet.CoinType("crypto:eip155:1:native"),
+	})
+	require.Error(t, err)
+}
+
+func TestPaymentAppService_GeneratePaymentSetup_RejectsRetiredTRONBeforeRegistryLookup(t *testing.T) {
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
+		PaymentRegistry: payment.NewRegistry(),
+	})
+
+	_, err := svc.GeneratePaymentSetup(context.Background(), payment.PaymentSetupParams{
+		OrderID:  "order-tron-retired",
+		CoinType: iwallet.CoinType("crypto:tron:mainnet:native"),
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrTRONPaymentRetired)
 }
 
 func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRows(t *testing.T) {
@@ -307,6 +383,7 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 		"crypto:eip155:11155111:native",
 		"0xmanagedescrow",
 		1000,
+		"0x1111111111111111111111111111111111111111",
 		false,
 		"",
 		"",
@@ -323,6 +400,7 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 	require.Len(t, orders, 2)
 	for i := range orders {
 		require.Equal(t, "0xmanagedescrow", orders[i].PaymentAddress)
+		require.Equal(t, "0x1111111111111111111111111111111111111111", orders[i].RefundAddress)
 		info, err := orders[i].GetPendingManagedEscrowPaymentInfo()
 		require.NoError(t, err)
 		require.NotNil(t, info)
@@ -335,6 +413,7 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 	var shared models.SharedPaymentIntent
 	require.NoError(t, raw.Where("order_id = ?", "order-safe").First(&shared).Error)
 	require.Equal(t, "0xmanagedescrow", shared.PaymentAddress)
+	require.Equal(t, "0x1111111111111111111111111111111111111111", shared.RefundAddress)
 	info, err := shared.GetPendingManagedEscrowPaymentInfo()
 	require.NoError(t, err)
 	require.NotNil(t, info)
@@ -393,7 +472,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowGasFees
 			},
 		},
 	}
-	reg.Register(iwallet.ChainEthereum, strategy)
+	reg.RegisterV2(iwallet.ChainEthereum, payment.NewV1AsV2(strategy))
 
 	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
 		DB:              db,
@@ -468,12 +547,15 @@ func TestPaymentAppService_GeneratePaymentInstructions_MultipleChains(t *testing
 		genResult: &payment.PaymentSetupResult{PaymentModel: payment.PaymentModelMonitored},
 	}
 	evmStrategy := &testChainEscrow{
-		model:     payment.PaymentModelClientSigned,
-		genResult: &payment.PaymentSetupResult{PaymentModel: payment.PaymentModelClientSigned},
+		model: payment.PaymentModelMonitored,
+		genResult: &payment.PaymentSetupResult{
+			PaymentModel: payment.PaymentModelMonitored,
+			EscrowAddr:   "0x111122223333444455556666777788889999aaaa",
+		},
 	}
 
-	reg.Register(iwallet.ChainBitcoin, utxoStrategy)
-	reg.Register(iwallet.ChainEthereum, evmStrategy)
+	reg.RegisterV2(iwallet.ChainBitcoin, payment.NewV1AsV2(utxoStrategy))
+	reg.RegisterV2(iwallet.ChainEthereum, payment.NewV1AsV2(evmStrategy))
 
 	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
 		PaymentRegistry: reg,
@@ -485,7 +567,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_MultipleChains(t *testing
 		expected payment.PaymentModel
 	}{
 		{"BTC dispatches to UTXO strategy", iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native"), payment.PaymentModelMonitored},
-		{"ETH dispatches to EVM strategy", iwallet.CoinType("crypto:eip155:1:native"), payment.PaymentModelClientSigned},
+		{"ETH dispatches to ManagedEscrow-monitored strategy", iwallet.CoinType("crypto:eip155:1:native"), payment.PaymentModelMonitored},
 	}
 
 	for _, tt := range tests {

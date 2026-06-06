@@ -1716,7 +1716,7 @@ func (o *Order) IsDisputeAccepted() bool {
 // short, it is a genuine partial payment (e.g. UTXO QR scan where the
 // buyer manually reduced the amount) and we return false.
 func (o *Order) IsFunded() (bool, error) {
-	if o.SerializedPaymentSent == nil {
+	if len(o.SerializedPaymentSent) == 0 {
 		return false, nil
 	}
 

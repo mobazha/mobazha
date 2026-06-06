@@ -83,13 +83,12 @@ func (s *PaymentAppService) checkOrderPendingPayment(order *models.Order) bool {
 		}
 
 		if coinInfo.Chain.IsUTXOChain() || coinInfo.IsEthTypeChain() {
-			logger.LogInfoWithIDf(log, s.nodeID, "Emitting CancelablePaymentReady for pending order %s (chain=%s)", order.ID, coinInfo.Chain)
-			s.eventBus.Emit(&events.CancelablePaymentReady{
-				TenantID: order.TenantID,
-				OrderID:  order.ID.String(),
-				Coin:     string(coinType),
-			})
-			return true
+			if ready := settlementpayment.CancelablePaymentReadyEvent(order, paymentSent, nil); ready != nil {
+				logger.LogInfoWithIDf(log, s.nodeID, "Emitting CancelablePaymentReady for pending order %s (chain=%s)", order.ID, coinInfo.Chain)
+				s.eventBus.Emit(ready)
+				return true
+			}
+			return false
 		}
 
 		return false

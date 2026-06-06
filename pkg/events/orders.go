@@ -286,7 +286,7 @@ type CancelablePaymentReady struct {
 	OrderID       string `json:"orderID"`
 	TransactionID string `json:"transactionID"`
 	Coin          string `json:"coin"`
-	Amount        uint64 `json:"amount"`
+	Amount        string `json:"amount"`
 }
 
 // FiatPaymentReady is emitted when a fiat payment (Stripe/PayPal) capture succeeds.

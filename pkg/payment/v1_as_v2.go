@@ -41,9 +41,8 @@ func NewV1AsV2(v1 ChainEscrow) *V1AsV2 {
 	return &V1AsV2{v1: v1}
 }
 
-// Underlying returns the wrapped V1 implementation. Useful for tests
-// and for callers that explicitly downgrade to V1 (e.g., legacy
-// dispatch paths).
+// Underlying returns the wrapped V1 implementation. This is useful for tests
+// that need to assert the exact adapter registered behind a V2 wrapper.
 func (w *V1AsV2) Underlying() ChainEscrow { return w.v1 }
 
 // chainEscrowV2Marker satisfies asV2Marker so Registry.ForCoinV2 can
@@ -52,8 +51,8 @@ func (*V1AsV2) chainEscrowV2Marker() {}
 
 // ── Meta ───────────────────────────────────────────────────────
 
-func (w *V1AsV2) Model() PaymentModel              { return w.v1.Model() }
-func (w *V1AsV2) Capabilities() ChainCapabilities  { return w.v1.Capabilities() }
+func (w *V1AsV2) Model() PaymentModel             { return w.v1.Model() }
+func (w *V1AsV2) Capabilities() ChainCapabilities { return w.v1.Capabilities() }
 
 // ── Action-centric lifecycle ──────────────────────────────────
 

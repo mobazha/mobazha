@@ -179,6 +179,9 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 		case errors.Is(err, corePmt.ErrExchangeRateUnavailable):
 			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
 				"exchange rate service unavailable — cross-currency crypto payment cannot be calculated")
+		case errors.Is(err, corePmt.ErrTRONPaymentRetired):
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeTRONPaymentRetired,
+				"TRON payments are retired for new orders")
 		case errors.Is(err, corePmt.ErrRWAPaymentSessionUnsupported):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		case errors.Is(err, corePmt.ErrPaymentCoinDisabled):

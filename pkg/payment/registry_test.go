@@ -152,6 +152,12 @@ func TestRegistry_ForCoin_UnknownCoinReturnsError(t *testing.T) {
 	}
 }
 
+func TestIsRetiredPaymentChain_TRON(t *testing.T) {
+	if !payment.IsRetiredPaymentChain(iwallet.ChainTRON) {
+		t.Fatal("TRON should be retired")
+	}
+}
+
 func TestRegistry_Register_Overwrites(t *testing.T) {
 	r := payment.NewRegistry()
 	s1 := &mockStrategy{model: payment.PaymentModelMonitored}
@@ -200,5 +206,48 @@ func TestRegistry_Chains_EmptyRegistry(t *testing.T) {
 	chains := r.Chains()
 	if len(chains) != 0 {
 		t.Errorf("Chains() on empty registry returned %d, want 0", len(chains))
+	}
+}
+
+func TestRegistry_ForCoinV2_V1RegistrationWrapsUnderlying(t *testing.T) {
+	r := payment.NewRegistry()
+	v1 := &mockStrategy{model: payment.PaymentModelClientSigned}
+	r.Register(iwallet.ChainTRON, v1)
+	tronCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainTRON)
+	if err != nil {
+		t.Fatalf("RequireCanonicalNativeCoinType(TRON): %v", err)
+	}
+
+	got, err := r.ForCoinV2(tronCoin)
+	if err != nil {
+		t.Fatalf("ForCoinV2: %v", err)
+	}
+	wrapped, ok := got.(*payment.V1AsV2)
+	if !ok {
+		t.Fatalf("ForCoinV2 returned %T, want *payment.V1AsV2", got)
+	}
+	if wrapped.Underlying() != v1 {
+		t.Fatal("expected underlying V1 strategy")
+	}
+}
+
+func TestRegistry_ForCoinV2_V2NativeNotWrapped(t *testing.T) {
+	r := payment.NewRegistry()
+	native := &nativeV2Strategy{model: payment.PaymentModelMonitored}
+	r.RegisterV2(iwallet.ChainSolana, native)
+	solCoin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainSolana)
+	if err != nil {
+		t.Fatalf("RequireCanonicalNativeCoinType(SOL): %v", err)
+	}
+
+	got, err := r.ForCoinV2(solCoin)
+	if err != nil {
+		t.Fatalf("ForCoinV2: %v", err)
+	}
+	if got != native {
+		t.Fatalf("ForCoinV2 returned %T, want native V2 strategy", got)
+	}
+	if _, ok := got.(*payment.V1AsV2); ok {
+		t.Fatal("native V2 strategy should not be wrapped")
 	}
 }

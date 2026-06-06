@@ -244,7 +244,7 @@ func (p *PaymentData) BuildTransaction() (iwallet.Transaction, error) {
 
 	// Auto-generate ToID (outpoint) if not provided.
 	if len(toID) == 0 {
-		toID = buildPaymentDataOutpointID(txID, p.Coin, 0)
+		toID = BuildPaymentDataOutpointID(txID, p.Coin, 0)
 	}
 
 	tx := iwallet.Transaction{
@@ -270,7 +270,10 @@ func (p *PaymentData) BuildTransaction() (iwallet.Transaction, error) {
 	return tx, nil
 }
 
-func buildPaymentDataOutpointID(txID iwallet.TransactionID, coin iwallet.CoinType, outputIndex uint32) []byte {
+// BuildPaymentDataOutpointID returns the canonical outpoint identifier used by
+// payment-derived transactions. UTXO chains encode txid little-endian plus the
+// little-endian output index; account-based chains keep big-endian index order.
+func BuildPaymentDataOutpointID(txID iwallet.TransactionID, coin iwallet.CoinType, outputIndex uint32) []byte {
 	txidBytes, err := hex.DecodeString(string(txID))
 	if err != nil || len(txidBytes) < 32 {
 		return nil
@@ -287,6 +290,10 @@ func buildPaymentDataOutpointID(txID iwallet.TransactionID, coin iwallet.CoinTyp
 		binary.BigEndian.PutUint32(idx, outputIndex)
 	}
 	return append(txidBytes, idx...)
+}
+
+func buildPaymentDataOutpointID(txID iwallet.TransactionID, coin iwallet.CoinType, outputIndex uint32) []byte {
+	return BuildPaymentDataOutpointID(txID, coin, outputIndex)
 }
 
 // DiscountDetail describes a single applied discount for API responses.

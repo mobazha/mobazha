@@ -5,6 +5,7 @@ package payment
 import (
 	"context"
 	"errors"
+	"math/big"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -12,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -133,6 +135,7 @@ func (s *PaymentAppService) verifyOrderPayment(order *models.Order) {
 	}
 
 	if s.paymentRecorder == nil {
+		order.MarkPaymentVerified()
 		s.emitVerifiedPaymentEvents(order, paymentSent, &vp.Transaction)
 	}
 
@@ -220,18 +223,15 @@ func (s *PaymentAppService) emitVerifiedPaymentEvents(order *models.Order, payme
 
 	switch spec.GetMethod() {
 	case pb.PaymentSent_CANCELABLE:
-		var amount uint64
+		var total *big.Int
 		if tx != nil {
-			amount = uint64(tx.Value.Int64())
+			amt := (*big.Int)(&tx.Value)
+			total = new(big.Int).Set(amt)
 		}
-		s.eventBus.Emit(&events.CancelablePaymentReady{
-			TenantID:      order.TenantID,
-			OrderID:       order.ID.String(),
-			TransactionID: paymentSent.TransactionID,
-			Coin:          paymentSent.Coin,
-			Amount:        amount,
-		})
-		logger.LogInfoWithIDf(log, s.nodeID, "Payment verification: emitted CancelablePaymentReady for order %s", order.ID)
+		if ready := payment.CancelablePaymentReadyEvent(order, paymentSent, total); ready != nil {
+			s.eventBus.Emit(ready)
+			logger.LogInfoWithIDf(log, s.nodeID, "Payment verification: emitted CancelablePaymentReady for order %s", order.ID)
+		}
 
 	case pb.PaymentSent_RWA_INSTANT:
 		s.eventBus.Emit(&events.RwaInstantBuyCompleted{

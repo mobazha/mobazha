@@ -260,58 +260,9 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 		Address:   order.PaymentAddress,
 		AssetID:   paymentCoin,
 		Amount:    expectedAmount,
-		QRPayload: buildAddressQRPayload(paymentCoin, order.PaymentAddress, expectedAmount),
+		QRPayload: payment.BuildFundingQRPayload(paymentCoin, order.PaymentAddress, expectedAmount),
 	}
 	return payment.SettlementModeAddressMonitored, target
-}
-
-func buildAddressQRPayload(paymentCoin, address, amount string) string {
-	scheme := paymentURIScheme(paymentCoin)
-	if scheme == "" {
-		return ""
-	}
-
-	addr := strings.TrimSpace(address)
-	if addr == "" {
-		return ""
-	}
-
-	payload := addr
-	if !strings.HasPrefix(strings.ToLower(addr), scheme+":") {
-		payload = scheme + ":" + addr
-	}
-
-	amt := strings.TrimSpace(amount)
-	if !isPositiveDecimal(amt) {
-		return payload
-	}
-	if strings.Contains(payload, "?") {
-		return payload + "&amount=" + amt
-	}
-	return payload + "?amount=" + amt
-}
-
-func paymentURIScheme(paymentCoin string) string {
-	switch coin := strings.ToLower(strings.TrimSpace(paymentCoin)); {
-	case coin == "btc", strings.HasPrefix(coin, "crypto:bip122:000000000019d6689c085ae165831e93:"), strings.HasPrefix(coin, "crypto:bitcoin:"):
-		return "bitcoin"
-	case coin == "ltc", strings.HasPrefix(coin, "crypto:bip122:12a765e31ffd4059bada1e25190f6e98:"), strings.HasPrefix(coin, "crypto:litecoin:"):
-		return "litecoin"
-	case coin == "bch", strings.HasPrefix(coin, "crypto:bitcoincash:"):
-		return "bitcoincash"
-	case coin == "zec", strings.HasPrefix(coin, "crypto:zcash:"):
-		return "zcash"
-	default:
-		return ""
-	}
-}
-
-func isPositiveDecimal(amount string) bool {
-	if amount == "" {
-		return false
-	}
-	v, ok := new(big.Rat).SetString(amount)
-	return ok && v.Sign() > 0
 }
 
 // deriveFiatFundingTarget builds a FundingTargetView for fiat provider sessions.

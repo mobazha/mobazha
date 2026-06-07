@@ -176,6 +176,36 @@ func TestDeriveFundingTarget_UTXOQRPayloadUsesCoinScheme(t *testing.T) {
 	}
 }
 
+func TestDeriveFundingTarget_EVMIncludesAmountInQRPayload(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	addr := "0x259d0C6C6c53a746Fd8EA025AB5b47dfd842baCB"
+	order := &models.Order{PaymentAddress: addr}
+
+	mode, target := p.deriveFundingTarget(order,
+		"crypto:eip155:1:native",
+		"0.011",
+		testProjectInput(order),
+	)
+
+	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
+	require.Equal(t, "ethereum:"+addr+"@1?value=0.011e18", target.QRPayload)
+}
+
+func TestDeriveFundingTarget_SolanaIncludesAmountInQRPayload(t *testing.T) {
+	p := &PaymentSessionProjector{}
+	addr := "7EqQDM5s8MWTD5M9s8MWTD5M9s8MWTD5M9s8MWTD5M9"
+	order := &models.Order{PaymentAddress: addr}
+
+	mode, target := p.deriveFundingTarget(order,
+		"crypto:solana:mainnet:native",
+		"0.5",
+		testProjectInput(order),
+	)
+
+	require.Equal(t, pkpayment.SettlementModeAddressMonitored, mode)
+	require.Equal(t, "solana:"+addr+"?amount=0.5", target.QRPayload)
+}
+
 func TestProject_FormatsUTXOAmountsAsDecimalStrings(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "bc1qtest"}

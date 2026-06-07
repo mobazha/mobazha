@@ -608,6 +608,9 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		ModeratorAmount:  modValue.String(),
 		TransactionFee:   totalFee.String(),
 	}
+	if err := validateDisputePayoutAddresses(&moderatedEscrowRelease); err != nil {
+		return err
+	}
 
 	var txn iwallet.Transaction
 
@@ -730,6 +733,23 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		}
 		return dbtx.Save(disputeCase)
 	})
+}
+
+func validateDisputePayoutAddresses(release *pb.DisputeClose_ModeratedEscrowRelease) error {
+	if release == nil {
+		return fmt.Errorf("%w: dispute release info is missing", coreiface.ErrBadRequest)
+	}
+	zero := iwallet.NewAmount(0)
+	if iwallet.NewAmount(release.BuyerAmount).Cmp(zero) > 0 && strings.TrimSpace(release.BuyerAddress) == "" {
+		return fmt.Errorf("%w: buyer payout address is required when buyer payout amount is greater than zero", coreiface.ErrBadRequest)
+	}
+	if iwallet.NewAmount(release.VendorAmount).Cmp(zero) > 0 && strings.TrimSpace(release.VendorAddress) == "" {
+		return fmt.Errorf("%w: vendor payout address is required when vendor payout amount is greater than zero", coreiface.ErrBadRequest)
+	}
+	if iwallet.NewAmount(release.ModeratorAmount).Cmp(zero) > 0 && strings.TrimSpace(release.ModeratorAddress) == "" {
+		return fmt.Errorf("%w: moderator payout address is required when moderator payout amount is greater than zero", coreiface.ErrBadRequest)
+	}
+	return nil
 }
 
 func (s *OrderAppService) getOrderAndPaymentInfo(orderID models.OrderID) (*models.Order, *pb.OrderOpen, *pb.PaymentSent, *pb.DisputeClose, error) {

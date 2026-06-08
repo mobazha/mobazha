@@ -63,6 +63,7 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 	// Phase PS / B1: unified payment session read endpoint.
 	g.registerOrderPaymentSessionGet(api)
 	g.registerOrderPaymentSessionPost(api)
+	g.registerOrderRefundAddressPost(api)
 	g.registerOrderSettlementActionPost(api)
 	g.registerOrderSettlementActionStatusGet(api)
 
@@ -941,7 +942,7 @@ func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 		Summary:     "Provision unified payment session",
 		Description: "Creates or idempotently returns a PaymentSession. Fiat: canonical " +
 			"paymentCoin fiat:{provider}:{currency}, fiatAmountCents (>0), and optional PayPal return/cancel URLs. " +
-			"Crypto: optional refundAddress/payerAddress/moderator; address-monitored flows may auto-fill refunds after confirmation.",
+			"Crypto: optional refundAddress/payerAddress/moderator; buyers should declare refundAddress before paying.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
@@ -950,6 +951,35 @@ func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 		g.handlePOSTOrderPaymentSession(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerOrderRefundAddressPost registers POST /v1/orders/{orderID}/refund-address.
+func (g *Gateway) registerOrderRefundAddressPost(api huma.API) {
+	type in struct {
+		OrderID string          `path:"orderID" doc:"Order ID."`
+		Body    json.RawMessage `json:",omitempty"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "orders-post-refund-address",
+		Method:      http.MethodPost,
+		Path:        "/v1/orders/{orderID}/refund-address",
+		Summary:     "Set buyer refund wallet address",
+		Description: "Validates and persists the buyer-controlled crypto refund destination. " +
+			"Requires buyer role. paymentCoin is optional when the order already has a selected coin.",
+		Tags:     []string{"orders", "payments"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/refund-address"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(hi.Body), map[string]string{"orderID": hi.OrderID})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePOSTOrderRefundAddress(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

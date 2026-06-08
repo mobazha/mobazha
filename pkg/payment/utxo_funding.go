@@ -8,6 +8,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment/utxoaddress"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -149,7 +150,7 @@ func CollectUnspentOutputsForAddress(txs []iwallet.Transaction, paymentAddress s
 			if _, ok := spent[hex.EncodeToString(to.ID)]; ok {
 				continue
 			}
-			if SameUTXOAddress(to.Address.String(), paymentAddress) {
+			if utxoaddress.SameUTXOAddress(to.Address.String(), paymentAddress) {
 				txn.From = append(txn.From, to)
 				totalOut = totalOut.Add(to.Amount)
 			}
@@ -160,24 +161,13 @@ func CollectUnspentOutputsForAddress(txs []iwallet.Transaction, paymentAddress s
 
 func fundingOutputMatches(out iwallet.SpendInfo, paymentAddress string, amount iwallet.Amount) bool {
 	return len(out.ID) > 0 &&
-		SameUTXOAddress(out.Address.String(), paymentAddress) &&
+		utxoaddress.SameUTXOAddress(out.Address.String(), paymentAddress) &&
 		out.Amount.Cmp(amount) == 0
 }
 
-// SameUTXOAddress compares UTXO addresses while tolerating URI/network prefixes
-// such as "bitcoincash:" that different chain sources may include or omit.
+// SameUTXOAddress compares UTXO addresses while tolerating URI/network prefixes.
 func SameUTXOAddress(a, b string) bool {
-	a = normalizeUTXOAddressForCompare(a)
-	b = normalizeUTXOAddressForCompare(b)
-	return a != "" && strings.EqualFold(a, b)
-}
-
-func normalizeUTXOAddressForCompare(address string) string {
-	address = strings.TrimSpace(address)
-	if i := strings.LastIndex(address, ":"); i >= 0 {
-		address = address[i+1:]
-	}
-	return address
+	return utxoaddress.SameUTXOAddress(a, b)
 }
 
 // UTXOOutpointID returns the serialized outpoint ID used by wallet-interface

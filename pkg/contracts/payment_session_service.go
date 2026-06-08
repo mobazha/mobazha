@@ -41,6 +41,10 @@ type CreatePaymentSessionRequest struct {
 	// Moderator is the dispute moderator Libp2p peer ID (required when the order uses moderated escrow).
 	Moderator string
 
+	// PayFromCustodial marks exchange/custodial-wallet payments that must
+	// declare an explicit refundAddress at session creation time.
+	PayFromCustodial bool
+
 	// ── Fiat-specific fields (only set when PaymentCoin starts with "fiat:") ──
 
 	// FiatAmountCents is the payment amount in the smallest currency unit

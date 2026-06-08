@@ -84,6 +84,8 @@ func (g *Gateway) handlePOSTOrderSettlementAction(w http.ResponseWriter, r *http
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "order not found")
+		case errors.Is(err, models.ErrRefundAddressRequired):
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeRefundAddressRequired, err.Error())
 		case errors.Is(err, coreiface.ErrBadRequest):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		default:

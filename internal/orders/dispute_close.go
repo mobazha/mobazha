@@ -142,6 +142,7 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 	}
 
 	buyerAddrs := newAddressSet(normalizedCoin)
+	buyerAddrs.Add(order.RefundAddress)
 	buyerAddrs.Add(paymentSent.PayerAddress)
 	buyerAddrs.Add(paymentSent.RefundAddress)
 
@@ -178,6 +179,9 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 	}
 
 	if err := validatePayoutAmountsNonNegative(releaseInfo); err != nil {
+		return err
+	}
+	if err := payment.ValidateDisputeReleaseFunding(releaseInfo, paymentSent); err != nil {
 		return err
 	}
 

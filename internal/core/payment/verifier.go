@@ -249,6 +249,7 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 	if err := hydrateSharedManagedEscrowMetadata(gdb, &order); err != nil {
 		return fmt.Errorf("aggregating verifier: hydrate shared metadata for %s: %w", orderID, err)
 	}
+	sharedRefund := loadSharedRefundAddress(gdb, orderID)
 	if err := hydrateCotenantEscrowMetadata(gdb, &order); err != nil {
 		return fmt.Errorf("aggregating verifier: hydrate co-tenant escrow metadata for %s: %w", orderID, err)
 	}
@@ -299,7 +300,7 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 		if alreadyVerified {
 			promoteAfterVerification(&order, v.clock())
 			if err := v.tryRecoverVerifiedCancelableAutoConfirm(
-				&order, orderOpen, deduped, total,
+				&order, orderOpen, deduped, total, sharedRefund,
 				emitBusinessEvents, emitHandlerOrderID, emitHandlerPayment,
 			); err != nil {
 				return fmt.Errorf("aggregating verifier: recover cancelable auto-confirm for %s: %w", orderID, err)
@@ -307,16 +308,14 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 			break
 		}
 
-		ps, err := buildAggregatedPaymentSent(orderOpen, deduped, total, &order, v.clock())
+		ps, err := buildAggregatedPaymentSent(orderOpen, deduped, total, &order, sharedRefund, v.clock())
 		if err != nil {
 			return fmt.Errorf("aggregating verifier: build PaymentSent for %s: %w", orderID, err)
 		}
 		if err := order.SetPaymentSent(ps); err != nil {
 			return fmt.Errorf("aggregating verifier: marshal PaymentSent for %s: %w", orderID, err)
 		}
-		if order.RefundAddress == "" && ps.RefundAddress != "" {
-			order.RefundAddress = ps.RefundAddress
-		}
+		backfillResolvedBuyerRefundAddress(&order, ps, deduped)
 		if order.PaymentAddress == "" && ps.ToAddress != "" {
 			order.PaymentAddress = ps.ToAddress
 		}
@@ -343,6 +342,7 @@ func (v *AggregatingVerifier) tryRecoverVerifiedCancelableAutoConfirm(
 	orderOpen *pb.OrderOpen,
 	observations []models.PaymentObservation,
 	total *big.Int,
+	sharedRefund string,
 	emitBusinessEvents *[]interface{},
 	emitHandlerOrderID *string,
 	emitHandlerPayment **pb.PaymentSent,
@@ -383,7 +383,7 @@ func (v *AggregatingVerifier) tryRecoverVerifiedCancelableAutoConfirm(
 		return nil
 	}
 
-	newPS, err := buildAggregatedPaymentSent(orderOpen, observations, total, order, v.clock())
+	newPS, err := buildAggregatedPaymentSent(orderOpen, observations, total, order, sharedRefund, v.clock())
 	if err != nil {
 		return err
 	}
@@ -393,6 +393,7 @@ func (v *AggregatingVerifier) tryRecoverVerifiedCancelableAutoConfirm(
 	if err := order.SetPaymentSent(newPS); err != nil {
 		return err
 	}
+	backfillResolvedBuyerRefundAddress(order, newPS, observations)
 	emitCancelableRecovery(newPS)
 	return nil
 }
@@ -627,6 +628,7 @@ func buildAggregatedPaymentSent(
 	rows []models.PaymentObservation,
 	total *big.Int,
 	order *models.Order,
+	sharedRefund string,
 	now time.Time,
 ) (*pb.PaymentSent, error) {
 	if len(rows) == 0 {
@@ -665,12 +667,9 @@ func buildAggregatedPaymentSent(
 	}
 
 	// The aggregated PaymentSent envelope must be byte-identical across buyer
-	// and vendor mirrors. For monitor-only payments, Order.RefundAddress may be
-	// present only on the buyer mirror (buyer-declared API input), so we must
-	// not embed that tenant-local field into the shared envelope. Preserve a
-	// refund address only when it already lives in a peer-shared PaymentSent;
-	// otherwise infer from a single unambiguous observed sender.
-	refundAddr := aggregatedRefundAddress(order, rows)
+	// and vendor mirrors. Embed buyer-declared refund targets only when they
+	// live in SharedPaymentIntent or an existing shared PaymentSent envelope.
+	refundAddr := aggregatedRefundAddress(order, sharedRefund)
 
 	intent := resolveAggregatedPaymentIntent(order, rows)
 	if !intent.settlementSpecOK {
@@ -874,25 +873,7 @@ func utxoAggregatedPaymentIntent(pendingInfo *models.PendingUTXOPaymentInfo) agg
 	return intent
 }
 
-func inferredRefundAddress(rows []models.PaymentObservation) string {
-	candidate := ""
-	for i := range rows {
-		addr := strings.TrimSpace(rows[i].FromAddress)
-		if addr == "" {
-			return ""
-		}
-		if candidate == "" {
-			candidate = addr
-			continue
-		}
-		if !strings.EqualFold(candidate, addr) {
-			return ""
-		}
-	}
-	return candidate
-}
-
-func aggregatedRefundAddress(order *models.Order, rows []models.PaymentObservation) string {
+func aggregatedRefundAddress(order *models.Order, sharedRefund string) string {
 	if order != nil {
 		if existing, err := order.PaymentSentMessage(); err == nil {
 			if addr := strings.TrimSpace(existing.RefundAddress); addr != "" {
@@ -900,7 +881,32 @@ func aggregatedRefundAddress(order *models.Order, rows []models.PaymentObservati
 			}
 		}
 	}
-	return inferredRefundAddress(rows)
+	if addr := strings.TrimSpace(sharedRefund); addr != "" {
+		return addr
+	}
+	return ""
+}
+
+func backfillResolvedBuyerRefundAddress(order *models.Order, paymentSent *pb.PaymentSent, observations []models.PaymentObservation) {
+	if order == nil || paymentSent == nil || strings.TrimSpace(order.RefundAddress) != "" {
+		return
+	}
+	result := paymentmetrics.ResolveBuyerRefundAddress(paymentmetrics.ResolveBuyerRefundAddressParams{
+		Order:        order,
+		PaymentSent:  paymentSent,
+		Observations: observations,
+	})
+	if result.Found() {
+		order.RefundAddress = result.Address
+	}
+}
+
+func loadSharedRefundAddress(gdb *gorm.DB, orderID string) string {
+	intent, err := paymentintent.LoadSharedPaymentIntent(gdb, orderID)
+	if err != nil || intent == nil {
+		return ""
+	}
+	return strings.TrimSpace(intent.RefundAddress)
 }
 
 func hydrateSharedManagedEscrowMetadata(gdb *gorm.DB, order *models.Order) error {

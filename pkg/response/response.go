@@ -54,6 +54,9 @@ const (
 	CodeProviderError      = "PROVIDER_ERROR"
 	CodeRateLimited        = "RATE_LIMITED"
 	CodeTRONPaymentRetired = "TRON_PAYMENT_RETIRED"
+	// CodeRefundAddressRequired signals that a crypto order action needs a
+	// buyer-declared refund destination before payout can proceed.
+	CodeRefundAddressRequired = "REFUND_ADDRESS_REQUIRED"
 	// CodeAccountLinkConflict signals that an OAuth provider ID (e.g. Telegram,
 	// Discord) is already bound to a different Casdoor account. The response
 	// should include APIError.Data with the conflicting account's metadata so

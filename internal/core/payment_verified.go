@@ -177,7 +177,7 @@ func hydratePaymentDataFromTransaction(pd *models.PaymentData, tx iwallet.Transa
 	var match iwallet.SpendInfo
 	matches := 0
 	for _, out := range tx.To {
-		if out.Address.String() != pd.ToAddress || len(out.ID) == 0 {
+		if !paymentpkg.SameUTXOAddress(out.Address.String(), pd.ToAddress) || len(out.ID) == 0 {
 			continue
 		}
 		match = out

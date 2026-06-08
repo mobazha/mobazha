@@ -288,6 +288,13 @@ type PaymentSession struct {
 	// refunds. Required for sessions that support cancel/refund/dispute
 	// release. Empty for pure fiat sessions (provider handles refunds).
 	RefundAddress string `json:"refundAddress,omitempty"`
+	// RefundAddressSource describes how RefundAddress was resolved.
+	RefundAddressSource string `json:"refundAddressSource,omitempty"`
+	// RefundRequiresInput is true when the buyer must supply a refund address
+	// before payout actions (e.g. exchange payment or ambiguous UTXO inputs).
+	RefundRequiresInput bool `json:"refundRequiresInput,omitempty"`
+	// RefundResolveReason explains why input is required or still pending.
+	RefundResolveReason string `json:"refundResolveReason,omitempty"`
 
 	ExpiresAt time.Time `json:"expiresAt"`
 

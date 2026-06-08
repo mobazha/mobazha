@@ -18,6 +18,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"gorm.io/gorm"
@@ -101,6 +102,8 @@ func orderActionErrorResponse(w http.ResponseWriter, err error) {
 		ErrorResponse(w, http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, coreiface.ErrRelayChainNotSupported):
 		ErrorResponse(w, http.StatusNotImplemented, err.Error())
+	case errors.Is(err, models.ErrRefundAddressRequired):
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeRefundAddressRequired, err.Error())
 	case errors.Is(err, coreiface.ErrBadRequest):
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, coreiface.ErrNotFound):
@@ -1308,7 +1311,7 @@ func (g *Gateway) handleGETPaymentRemaining(w http.ResponseWriter, r *http.Reque
 			// Calculate amount paid to payment address in this transaction
 			var txAmount uint64
 			for _, to := range tx.To {
-				if to.Address.String() == order.PaymentAddress {
+				if payment.SameUTXOAddress(to.Address.String(), order.PaymentAddress) {
 					txAmount = to.Amount.Uint64()
 					break
 				}

@@ -203,3 +203,25 @@ func TestOrderMarshalJSON_IncludesAfterSaleDisputeFields(t *testing.T) {
 		t.Fatal("afterSaleDispute.openedAt should be present in marshaled JSON")
 	}
 }
+
+func TestOrderMarshalJSON_IncludesRefundAddress(t *testing.T) {
+	order := Order{
+		ID:            "order-refund-json",
+		State:         OrderState_AWAITING_PAYMENT,
+		RefundAddress: "0xbuyerRefund123456789012345678901234567890",
+	}
+	order.SetRole(RoleBuyer)
+
+	raw, err := json.Marshal(&order)
+	if err != nil {
+		t.Fatalf("json.Marshal(order): %v", err)
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("json.Unmarshal(payload): %v", err)
+	}
+	if got, _ := payload["refundAddress"].(string); got != order.RefundAddress {
+		t.Fatalf("refundAddress = %q, want %q", got, order.RefundAddress)
+	}
+}

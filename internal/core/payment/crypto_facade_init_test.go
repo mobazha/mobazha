@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -201,16 +202,17 @@ func TestCryptoPaymentFacade_ValidateStorePolicyModeratorResolvesSellerTenantFro
 	}
 }
 
-func TestNormalizeCryptoRefundAddress_DefaultsToPayerAddress(t *testing.T) {
+func TestResolveCreateSessionRefundAddress_DefaultsToPayerAddress(t *testing.T) {
 	coin := iwallet.CoinType("crypto:eip155:1:native")
 	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {
 		t.Skip("canonical coin unavailable in build env")
 	}
 
-	got, err := normalizeCryptoRefundAddress(
+	got, err := resolveCreateSessionRefundAddress(
 		coin,
-		"",
-		"  0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ",
+		contracts.CreatePaymentSessionRequest{
+			PayerAddress: "  0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ",
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -220,21 +222,38 @@ func TestNormalizeCryptoRefundAddress_DefaultsToPayerAddress(t *testing.T) {
 	}
 }
 
-func TestNormalizeCryptoRefundAddress_ExplicitRefundWins(t *testing.T) {
+func TestResolveCreateSessionRefundAddress_ExplicitRefundWins(t *testing.T) {
 	coin := iwallet.CoinType("crypto:eip155:1:native")
 	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {
 		t.Skip("canonical coin unavailable in build env")
 	}
 
-	got, err := normalizeCryptoRefundAddress(
+	got, err := resolveCreateSessionRefundAddress(
 		coin,
-		"0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-		"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		contracts.CreatePaymentSessionRequest{
+			RefundAddress: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			PayerAddress:  "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
 		t.Fatalf("refund address = %q", got)
+	}
+}
+
+func TestResolveCreateSessionRefundAddress_CustodialRequiresExplicitRefund(t *testing.T) {
+	coin := iwallet.CoinType("crypto:eip155:1:native")
+	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {
+		t.Skip("canonical coin unavailable in build env")
+	}
+
+	_, err := resolveCreateSessionRefundAddress(coin, contracts.CreatePaymentSessionRequest{
+		PayerAddress:     "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		PayFromCustodial: true,
+	})
+	if !errors.Is(err, coreiface.ErrBadRequest) || !errors.Is(err, models.ErrRefundAddressRequired) {
+		t.Fatalf("error = %v, want bad request + refund address required", err)
 	}
 }

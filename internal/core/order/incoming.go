@@ -537,7 +537,7 @@ func (s *OrderAppService) preProcessRefund(ctx context.Context, orderMsg *npb.Or
 			return nil, nil
 		}
 		if wallet.CoinCategory() == iwallet.CoinCategoryBitcoin {
-			if err := s.releaseRefundEscrowFunds(wallet, paymentSent, refund.GetReleaseInfo()); err != nil {
+			if err := s.releaseRefundEscrowFunds(wallet, &order, paymentSent, refund.GetReleaseInfo()); err != nil {
 				logger.LogInfoWithIDf(log, s.nodeID,
 					"Error releasing funds from escrow during refund processing for order %s: %v",
 					orderMsg.OrderID, err)
@@ -583,7 +583,7 @@ func (s *OrderAppService) fetchOutgoingTx(coinCode string, txID string, paymentA
 	}
 
 	for _, from := range tx.From {
-		if from.Address.String() == paymentAddress {
+		if payment.SameUTXOAddress(from.Address.String(), paymentAddress) {
 			return tx, nil
 		}
 	}

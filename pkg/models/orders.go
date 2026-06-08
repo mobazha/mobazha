@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment/utxoaddress"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -588,11 +589,7 @@ func (o *Order) PutTransaction(transaction iwallet.Transaction) error {
 		}
 	}
 
-	for _, to := range transaction.To {
-		if to.Address.String() == o.PaymentAddress {
-			transaction.Value = to.Amount
-		}
-	}
+	normalizeOrderPaymentTransactionValue(&transaction, o.PaymentAddress)
 
 	transactions = append(transactions, transaction)
 
@@ -602,6 +599,18 @@ func (o *Order) PutTransaction(transaction iwallet.Transaction) error {
 	}
 	o.Transactions = ser
 	return nil
+}
+
+func normalizeOrderPaymentTransactionValue(transaction *iwallet.Transaction, paymentAddress string) {
+	if transaction == nil || strings.TrimSpace(paymentAddress) == "" {
+		return
+	}
+	for _, to := range transaction.To {
+		if utxoaddress.SameUTXOAddress(to.Address.String(), paymentAddress) {
+			transaction.Value = to.Amount
+			return
+		}
+	}
 }
 
 // UpdateTransaction update order when transaction is updated, for example,
@@ -614,11 +623,7 @@ func (o *Order) UpdateTransaction(transaction iwallet.Transaction) error {
 		}
 	}
 
-	for _, to := range transaction.To {
-		if to.Address.String() == o.PaymentAddress {
-			transaction.Value = to.Amount
-		}
-	}
+	normalizeOrderPaymentTransactionValue(&transaction, o.PaymentAddress)
 
 	// Check if the transaction already exists.
 	existing := false
@@ -1743,7 +1748,7 @@ func (o *Order) IsFunded() (bool, error) {
 			if addr == "" {
 				continue
 			}
-			if addr == paymentAddress || addr == platformAddr {
+			if utxoaddress.SameUTXOAddress(addr, paymentAddress) || utxoaddress.SameUTXOAddress(addr, platformAddr) {
 				totalPaid = totalPaid.Add(to.Amount)
 				hasMatchingTx = true
 			}
@@ -1811,7 +1816,7 @@ func (o *Order) FundingTotal() (iwallet.Amount, error) {
 	}
 	for _, tx := range txs {
 		for _, to := range tx.To {
-			if to.Address.String() == paymentAddress {
+			if utxoaddress.SameUTXOAddress(to.Address.String(), paymentAddress) {
 				totalPaid = totalPaid.Add(to.Amount)
 			}
 		}
@@ -1823,7 +1828,7 @@ func (o *Order) FundingTotal() (iwallet.Amount, error) {
 		if fact == nil {
 			continue
 		}
-		if fact.GetToAddress() != "" && fact.GetToAddress() != paymentAddress {
+		if fact.GetToAddress() != "" && !utxoaddress.SameUTXOAddress(fact.GetToAddress(), paymentAddress) {
 			continue
 		}
 		if !FundingFactStatusCountsTowardTotal(fact.GetStatus(), paymentSent.GetConfirmationPolicy()) {
@@ -1880,6 +1885,10 @@ func (o *Order) MarshalJSON() ([]byte, error) {
 	}
 
 	mergeDisputeOpenAPIFields(payload, o)
+
+	if addr := strings.TrimSpace(o.RefundAddress); addr != "" {
+		payload["refundAddress"] = addr
+	}
 
 	return json.Marshal(payload)
 }
@@ -2004,10 +2013,14 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 			return nil, fmt.Errorf("invalid transaction timestamp for tx %s: %w", tx.ID, tsErr)
 		}
 
-		var fromID []byte
+		var (
+			fromID []byte
+			value  = tx.Value
+		)
 		for _, to := range tx.To {
-			if to.Address.String() == o.PaymentAddress {
+			if utxoaddress.SameUTXOAddress(to.Address.String(), o.PaymentAddress) {
 				fromID = to.ID
+				value = to.Amount
 			}
 		}
 		if len(fromID) == 0 && tx.ID != "" {
@@ -2017,7 +2030,7 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 		transactions = append(transactions, &pb.Contract_Transaction{
 			Txid:      tx.ID.String(),
 			FromID:    fromID,
-			Value:     tx.Value.String(),
+			Value:     value.String(),
 			Height:    tx.Height,
 			Timestamp: ts,
 		})

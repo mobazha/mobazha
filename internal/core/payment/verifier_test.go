@@ -581,9 +581,9 @@ func TestBuildAggregatedPaymentSent_UsesDeterministicObservationTimestamp(t *tes
 		BlockTime:      blockTime,
 	}}
 
-	psA, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC))
+	psA, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, "", time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
-	psB, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Date(2031, 1, 1, 0, 0, 0, 0, time.UTC))
+	psB, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, "", time.Date(2031, 1, 1, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 	require.Equal(t, blockTime.Unix(), psA.Timestamp.AsTime().Unix())
 	require.Equal(t, psA.Timestamp.AsTime().Unix(), psB.Timestamp.AsTime().Unix())
@@ -614,7 +614,7 @@ func TestBuildAggregatedPaymentSent_PrefersExistingSharedRefundAddress(t *testin
 		BlockTime:      time.Date(2026, 5, 14, 12, 30, 0, 0, time.UTC),
 	}}
 
-	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, "", time.Now())
 	require.NoError(t, err)
 	require.Equal(t, "0xshared-refund", ps.RefundAddress)
 }
@@ -922,7 +922,7 @@ func TestBuildAggregatedPaymentSent_DerivesNativeCoinFromObservationWhenPricingI
 		Amount:         "1000",
 	}}
 
-	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, "", time.Now())
 
 	require.NoError(t, err)
 	require.Equal(t, "crypto:eip155:1:native", ps.Coin)
@@ -946,7 +946,7 @@ func TestBuildAggregatedPaymentSent_DoesNotUsePricingCoinAsSettlementCoin(t *tes
 		Amount:         "1000",
 	}}
 
-	_, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+	_, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, "", time.Now())
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot determine PaymentSent.Coin")
@@ -973,7 +973,7 @@ func TestBuildAggregatedPaymentSent_PendingEscrowRequiresSettlementSpec(t *testi
 		Amount:         "1000",
 	}}
 
-	_, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+	_, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, "", time.Now())
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "missing settlement spec")
@@ -1189,7 +1189,7 @@ func TestBuildAggregatedPaymentSent_SolanaEscrowPreservesProgramID(t *testing.T)
 		BlockTime:      time.Date(2026, 5, 28, 0, 29, 18, 0, time.UTC),
 	}}
 
-	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, time.Now())
+	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, "", time.Now())
 	require.NoError(t, err)
 	require.Equal(t, programID, ps.ContractAddress)
 	require.Equal(t, escrowAddress, ps.ToAddress)
@@ -1217,7 +1217,7 @@ func TestResolveAggregatedPaymentIntent_NoPendingIntentFallsBackDirect(t *testin
 	require.Equal(t, pb.PaymentSent_DIRECT, intent.settlementSpec.Method)
 }
 
-func TestAggregateAndEmit_BackfillsRefundAddressFromUniqueObservedSender(t *testing.T) {
+func TestAggregateAndEmit_BackfillsRefundAddressFromUniqueAccountPayer(t *testing.T) {
 	db := newVerifierTestDB(t)
 	bus := &recordingBus{}
 	v := NewAggregatingVerifier(db, bus)
@@ -1243,7 +1243,7 @@ func TestAggregateAndEmit_BackfillsRefundAddressFromUniqueObservedSender(t *test
 
 	ps, err := got.PaymentSentMessage()
 	require.NoError(t, err)
-	require.Equal(t, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ps.RefundAddress)
+	require.Empty(t, ps.RefundAddress, "shared PaymentSent envelope must not embed locally inferred refund metadata")
 	require.Equal(t, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ps.PayerAddress)
 }
 

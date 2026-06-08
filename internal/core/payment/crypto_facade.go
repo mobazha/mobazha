@@ -74,11 +74,7 @@ func (c *CryptoPaymentFacade) CreateSession(
 	}
 	order := input.order
 	if models.BuyerAwaitingPaymentReadiness(order) {
-		session, projErr := c.projector.Project(input)
-		if projErr != nil {
-			return nil, projErr
-		}
-		return session, nil
+		return c.UpdateCreateSessionRefundAddress(ctx, req)
 	}
 	orderOpen := input.orderOpen
 	if orderOpen == nil {
@@ -92,11 +88,7 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("%w", ErrRWAPaymentSessionUnsupported)
 	}
 
-	// Validate refund address only when provided. If the client-signed path
-	// sends payerAddress but omits refundAddress, use the payer as the default
-	// refund target. Address-monitored flows can still omit both and let the
-	// verifier infer only when the observed sender is unambiguous.
-	refundAddr, err := normalizeCryptoRefundAddress(coin, req.RefundAddress, req.PayerAddress)
+	refundAddr, err := resolveCreateSessionRefundAddress(coin, req)
 	if err != nil {
 		return nil, err
 	}
@@ -125,15 +117,8 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("crypto facade: generate instructions: %w", err)
 	}
 
-	// Persist refund address when the buyer explicitly provided one or when
-	// client-signed setup supplied a payerAddress we can safely default to.
-	if refundAddr != "" {
-		if err := c.orderSvc.SetOrderRefundAddressForPayment(ctx, req.OrderID, coin, refundAddr); err != nil {
-			if errors.Is(err, coreiface.ErrBadRequest) || errors.Is(err, models.ErrRefundAddressRequired) || errors.Is(err, models.ErrRefundAddressInvalid) {
-				return nil, err
-			}
-			return nil, fmt.Errorf("crypto facade: save refund address: %w", err)
-		}
+	if err := c.saveCreateSessionRefundAddress(ctx, coin, req.OrderID, refundAddr); err != nil {
+		return nil, err
 	}
 
 	input2, err := c.projector.fetchProjectInput(req.OrderID)
@@ -141,6 +126,41 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("crypto facade: re-load order %s: %w", req.OrderID, err)
 	}
 	return c.projector.Project(input2)
+}
+
+// UpdateCreateSessionRefundAddress saves the refund address carried by a
+// CreateSession request and returns a fresh payment session projection without
+// provisioning or re-provisioning a funding target.
+func (c *CryptoPaymentFacade) UpdateCreateSessionRefundAddress(ctx context.Context, req contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {
+	coin := iwallet.CoinType(req.PaymentCoin)
+	refundAddr, err := resolveCreateSessionRefundAddress(coin, req)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.saveCreateSessionRefundAddress(ctx, coin, req.OrderID, refundAddr); err != nil {
+		return nil, err
+	}
+	input, err := c.projector.fetchProjectInput(req.OrderID)
+	if err != nil {
+		return nil, fmt.Errorf("crypto facade: re-load order %s: %w", req.OrderID, err)
+	}
+	return c.projector.Project(input)
+}
+
+func (c *CryptoPaymentFacade) saveCreateSessionRefundAddress(ctx context.Context, coin iwallet.CoinType, orderID string, refundAddr string) error {
+	if refundAddr == "" {
+		return nil
+	}
+	if c.orderSvc == nil {
+		return nil
+	}
+	if err := c.orderSvc.SetOrderRefundAddressForPayment(ctx, orderID, coin, refundAddr); err != nil {
+		if errors.Is(err, coreiface.ErrBadRequest) || errors.Is(err, models.ErrRefundAddressRequired) || errors.Is(err, models.ErrRefundAddressInvalid) {
+			return err
+		}
+		return fmt.Errorf("crypto facade: save refund address: %w", err)
+	}
+	return nil
 }
 
 func (c *CryptoPaymentFacade) validateStorePolicyModerator(ctx context.Context, orderID string, orderOpen *porderpb.OrderOpen, moderatorID string) (uint64, error) {
@@ -311,18 +331,31 @@ func validateStorePolicyContainsModerator(policy *models.StorePolicy, canonicalM
 	return 0, fmt.Errorf("%w: moderator is not in store policy", coreiface.ErrBadRequest)
 }
 
-func normalizeCryptoRefundAddress(coin iwallet.CoinType, refundAddress, payerAddress string) (string, error) {
-	refundAddr := strings.TrimSpace(refundAddress)
-	if refundAddr == "" {
-		refundAddr = strings.TrimSpace(payerAddress)
+func resolveCreateSessionRefundAddress(coin iwallet.CoinType, req contracts.CreatePaymentSessionRequest) (string, error) {
+	explicit := strings.TrimSpace(req.RefundAddress)
+	if req.PayFromCustodial {
+		if explicit == "" {
+			return "", fmt.Errorf("%w: %w: refund address is required when paying from an exchange or custodial wallet", coreiface.ErrBadRequest, models.ErrRefundAddressRequired)
+		}
+		if err := models.ValidateRefundAddress(coin, explicit); err != nil {
+			return "", fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+		}
+		return explicit, nil
 	}
-	if refundAddr == "" {
-		return "", nil
+	if explicit != "" {
+		if err := models.ValidateRefundAddress(coin, explicit); err != nil {
+			return "", fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+		}
+		return explicit, nil
 	}
-	if err := models.ValidateRefundAddress(coin, refundAddr); err != nil {
-		return "", fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+	// Client-signed escrow setup may still forward payerAddress as refund.
+	if payer := strings.TrimSpace(req.PayerAddress); payer != "" {
+		if err := models.ValidateRefundAddress(coin, payer); err != nil {
+			return "", fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+		}
+		return payer, nil
 	}
-	return refundAddr, nil
+	return "", nil
 }
 
 func buildPaymentSetupParamsFromOrder(

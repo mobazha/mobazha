@@ -102,7 +102,6 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		Status:             status,
 		ConfirmationPolicy: p.deriveConfirmationPolicy(order),
 		ExpectedAmount:     expectedAmount,
-		RefundAddress:      order.RefundAddress,
 		ExpiresAt:          expiresAt,
 		FundingTarget:      fundingTarget,
 		PaymentProgress:    progress,
@@ -110,8 +109,34 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		PaymentReadiness:   readiness,
 		UserActionRequest:  nil, // Phase B: no user action required for address_monitored
 	}
+	applyRefundProjection(session, input, paymentCoin)
 	payment.ApplyBuyerPaymentReadinessGate(session)
 	return session, nil
+}
+
+func applyRefundProjection(session *payment.PaymentSession, input *projectOrderInput, paymentCoin string) {
+	if session == nil || input == nil || input.order == nil {
+		return
+	}
+	coin, err := iwallet.NormalizePaymentCoinIngress(paymentCoin)
+	if err != nil {
+		coin = iwallet.CoinType(paymentCoin)
+	}
+	if coin.IsFiatPayment() {
+		return
+	}
+	result := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+		Order:        input.order,
+		PaymentSent:  input.paymentSent,
+		Coin:         coin,
+		Observations: input.observations,
+	})
+	if result.Found() {
+		session.RefundAddress = result.Address
+	}
+	session.RefundAddressSource = string(result.Source)
+	session.RefundRequiresInput = result.RequiresUserInput
+	session.RefundResolveReason = result.Reason
 }
 
 // ── Private derivation helpers ────────────────────────────────────────────
@@ -424,7 +449,7 @@ func progressObservationSnapshot(order *models.Order, input *projectOrderInput) 
 	}
 	rows := append([]models.PaymentObservation(nil), input.observations...)
 	if order != nil {
-		rows = append(rows, paymentSentFundingFactRows(order, input.paymentSent)...)
+		rows = append(rows, payment.FundingFactsAsObservations(order, input.paymentSent)...)
 	}
 	if len(rows) == 0 {
 		return nil, input.observedAmountRaw, input.obsCount, input.lastObsAt
@@ -446,68 +471,6 @@ func progressObservationSnapshot(order *models.Order, input *projectOrderInput) 
 		lastSeen = input.lastObsAt
 	}
 	return rows, total.String(), len(rows), lastSeen
-}
-
-func paymentSentFundingFactRows(order *models.Order, paymentSent *pb.PaymentSent) []models.PaymentObservation {
-	if order == nil {
-		return nil
-	}
-	ps := paymentSent
-	if ps == nil {
-		var err error
-		ps, err = order.PaymentSentMessage()
-		if err != nil {
-			return nil
-		}
-	}
-	if len(ps.GetFundingFacts()) == 0 {
-		return nil
-	}
-	rows := make([]models.PaymentObservation, 0, len(ps.GetFundingFacts()))
-	for i, fact := range ps.GetFundingFacts() {
-		if fact == nil {
-			continue
-		}
-		id := strings.TrimSpace(fact.GetId())
-		if id == "" {
-			id = fmt.Sprintf("paymentsent:%s:%d", fact.GetTxHash(), fact.GetEventIndex())
-		}
-		blockTime := time.Time{}
-		if fact.GetObservedAt() != nil {
-			blockTime = fact.GetObservedAt().AsTime()
-		}
-		source := strings.TrimSpace(fact.GetSource())
-		if source == "" {
-			source = models.PaymentObservationSourceBuyerReported
-		}
-		status := strings.TrimSpace(fact.GetStatus())
-		if status == "" {
-			status = models.PaymentObservationStatusConfirmed
-		}
-		txHashSource := models.NormalizePaymentTxHashSource(fact.GetTxHashSource())
-		rows = append(rows, models.PaymentObservation{
-			TenantID:       order.TenantID,
-			ID:             id,
-			OrderID:        order.ID.String(),
-			ChainNamespace: fact.GetChainNamespace(),
-			ChainReference: fact.GetChainReference(),
-			TxHash:         fact.GetTxHash(),
-			EventIndex:     int(fact.GetEventIndex()),
-			TxHashSource:   txHashSource,
-			EventType:      fact.GetEventType(),
-			FromAddress:    fact.GetFromAddress(),
-			ToAddress:      fact.GetToAddress(),
-			TokenAddress:   fact.GetTokenAddress(),
-			Amount:         fact.GetAmount(),
-			BlockNumber:    fact.GetBlockNumber(),
-			BlockTime:      blockTime,
-			Confirmations:  int(fact.GetConfirmations()),
-			Status:         status,
-			Source:         source,
-			Observer:       fmt.Sprintf("paymentsent:%d", i),
-		})
-	}
-	return rows
 }
 
 // deriveExpiry calculates the session expiry from OrderOpen's funding timeout

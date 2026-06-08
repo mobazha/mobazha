@@ -128,8 +128,25 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 
 		var payoutAddress iwallet.Address
 		if order.Role() == models.RoleBuyer {
-			// For buyer, the payout address is the payer address
-			payoutAddress = iwallet.NewAddress(paymentSent.PayerAddress, iwallet.CoinType(paymentSent.Coin))
+			coin, coinErr := payment.SettlementCoinFromPaymentSent(paymentSent)
+			if coinErr != nil {
+				coin = iwallet.CoinType(paymentSent.Coin)
+			}
+			observations := payment.RefundResolutionObservationsTx(dbtx, order, paymentSent)
+			refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+				Order:        order,
+				PaymentSent:  paymentSent,
+				Coin:         coin,
+				Observations: observations,
+			})
+			if refundResult.Found() {
+				payoutAddress = iwallet.NewAddress(refundResult.Address, coin)
+			} else if !coin.IsFiatPayment() {
+				if parkErr := order.ParkMessage(message); parkErr != nil {
+					return nil, parkErr
+				}
+				return nil, ErrMessageParked
+			}
 		} else {
 			orderConfirmation, err := order.OrderConfirmationMessage()
 			if err != nil {

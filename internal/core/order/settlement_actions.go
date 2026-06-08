@@ -375,12 +375,19 @@ func (s *OrderAppService) submitSettlementAction(ctx context.Context, action str
 		return "", nil, false, nil
 	}
 
-	if payoutAddr == "" {
-		if paymentSent.RefundAddress != "" {
-			payoutAddr = paymentSent.RefundAddress
-		} else if paymentSent.PayerAddress != "" {
-			payoutAddr = paymentSent.PayerAddress
+	if payoutAddr == "" && (action == payment.SettlementActionCancel || action == payment.SettlementActionSellerDeclineRefund) {
+		observations := payment.RefundResolutionObservations(s.db, order, paymentSent)
+		refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+			Order:        order,
+			PaymentSent:  paymentSent,
+			Coin:         coinType,
+			Observations: observations,
+		})
+		if !refundResult.Found() {
+			return "", nil, false, fmt.Errorf("%w: no buyer refund address available for settlement %s (%s)",
+				models.ErrRefundAddressRequired, action, refundResult.Reason)
 		}
+		payoutAddr = refundResult.Address
 	}
 
 	params := payment.ActionParams{

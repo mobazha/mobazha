@@ -1300,32 +1300,21 @@ func (s *OrderAppService) GetLegacyEscrowReleaseInstructions(orderID models.Orde
 
 // ── Shared helpers ──────────────────────────────────────────────
 
-func buyerCancelablePayoutAddr(order *models.Order, paymentSent *pb.PaymentSent, coinType iwallet.CoinType) (string, error) {
-	if paymentSent.RefundAddress != "" {
-		return paymentSent.RefundAddress, nil
-	}
-	if order != nil && strings.TrimSpace(order.RefundAddress) != "" {
-		return strings.TrimSpace(order.RefundAddress), nil
-	}
-	if paymentSent.PayerAddress != "" {
-		return paymentSent.PayerAddress, nil
-	}
-	txs, err := order.GetTransactions()
-	if err != nil {
-		return "", fmt.Errorf("no buyer address in PaymentSent and failed to load transactions: %w", err)
-	}
-	for _, tx := range txs {
-		for _, from := range tx.From {
-			if from.Address.String() != "" {
-				return from.Address.String(), nil
-			}
-		}
+func buyerCancelablePayoutAddr(order *models.Order, paymentSent *pb.PaymentSent, coinType iwallet.CoinType, observations []models.PaymentObservation) (string, error) {
+	result := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+		Order:        order,
+		PaymentSent:  paymentSent,
+		Coin:         coinType,
+		Observations: observations,
+	})
+	if result.Found() {
+		return result.Address, nil
 	}
 	method := "escrow"
 	if paymentSent.GetSettlementSpec() != nil {
 		method = paymentSent.GetSettlementSpec().GetMethod().String()
 	}
-	return "", fmt.Errorf("no buyer refund address available for %s order refund", method)
+	return "", fmt.Errorf("%w: no buyer refund address available for %s order refund (%s)", models.ErrRefundAddressRequired, method, result.Reason)
 }
 
 // refundBuildResult carries the refund order message plus the optional wallet
@@ -1390,8 +1379,8 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 	if err != nil {
 		return nil, err
 	}
+	refundObservations := payment.RefundResolutionObservations(s.db, order, paymentSent)
 	var (
-		refundAddress   = iwallet.NewAddress(paymentSent.RefundAddress, coinType)
 		prevRefundTotal = iwallet.NewAmount(0)
 		refundResp      = &npb.OrderMessage{
 			OrderID:     order.ID.String(),
@@ -1426,6 +1415,17 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 		}
 		switch {
 		case payment.MethodIsDirect(method):
+			refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+				Order:        order,
+				PaymentSent:  paymentSent,
+				Coin:         coinType,
+				Observations: refundObservations,
+			})
+			if !refundResult.Found() {
+				return nil, fmt.Errorf("%w: no buyer refund address available for direct refund (%s)", models.ErrRefundAddressRequired, refundResult.Reason)
+			}
+			refundAddress := iwallet.NewAddress(refundResult.Address, coinType)
+
 			wdbTx, err := wallet.Begin()
 			if err != nil {
 				return nil, err
@@ -1469,7 +1469,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 				return nil, errors.New("automatic refund not supported for confirmed CANCELABLE orders: funds were released to external wallet, please refund manually")
 			}
 
-			payoutAddr, err := buyerCancelablePayoutAddr(order, paymentSent, coinType)
+			payoutAddr, err := buyerCancelablePayoutAddr(order, paymentSent, coinType, refundObservations)
 			if err != nil {
 				return nil, err
 			}
@@ -1557,7 +1557,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 			return &refundBuildResult{Message: refundResp}, nil
 		case payment.MethodIsModerated(method):
 			if s.shouldSubmitSettlementCancel(order, paymentSent, method, coinType) {
-				payoutAddr, err := buyerCancelablePayoutAddr(order, paymentSent, coinType)
+				payoutAddr, err := buyerCancelablePayoutAddr(order, paymentSent, coinType, refundObservations)
 				if err != nil {
 					return nil, err
 				}

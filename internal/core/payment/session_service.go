@@ -144,6 +144,14 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 	}
 
 	if view.PaymentReadiness.Status != payment.PaymentReadinessReadyToPay {
+		if view.PaymentReadiness.Status == payment.PaymentReadinessAwaitingSellerReceipt &&
+			strings.HasPrefix(req.PaymentCoin, "crypto:") &&
+			createSessionCarriesRefundAddressUpdate(req) {
+			if s.crypto == nil {
+				return nil, ErrProvisioningNotImplemented
+			}
+			return s.crypto.UpdateCreateSessionRefundAddress(ctx, req)
+		}
 		return view, nil
 	}
 
@@ -176,6 +184,12 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 	}
 
 	if alreadyProvisioned {
+		if strings.HasPrefix(req.PaymentCoin, "crypto:") && createSessionCarriesRefundAddressUpdate(req) {
+			if s.crypto == nil {
+				return nil, ErrProvisioningNotImplemented
+			}
+			return s.crypto.UpdateCreateSessionRefundAddress(ctx, req)
+		}
 		return view, nil
 	}
 
@@ -204,6 +218,12 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 
 	// Read-only query with no paymentCoin — return best-effort projection.
 	return view, nil
+}
+
+func createSessionCarriesRefundAddressUpdate(req contracts.CreatePaymentSessionRequest) bool {
+	return req.PayFromCustodial ||
+		strings.TrimSpace(req.RefundAddress) != "" ||
+		strings.TrimSpace(req.PayerAddress) != ""
 }
 
 // fiatSessionIDFromView extracts the "sessionID" key from FundingTarget.ProviderData.

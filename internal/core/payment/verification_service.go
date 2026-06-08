@@ -180,7 +180,7 @@ func (s *PaymentVerificationService) FetchAndVerify(
 	if !isFiat {
 		matched := false
 		for _, to := range tx.To {
-			if to.Address.String() == paymentAddress {
+			if payment.SameUTXOAddress(to.Address.String(), paymentAddress) {
 				matched = true
 				break
 			}
@@ -293,7 +293,7 @@ func (s *PaymentVerificationService) verifyFundingFact(
 	if toAddress == "" {
 		toAddress = strings.TrimSpace(paymentSent.ToAddress)
 	}
-	if paymentAddress != "" && !strings.EqualFold(toAddress, paymentAddress) {
+	if paymentAddress != "" && !payment.SameUTXOAddress(toAddress, paymentAddress) {
 		return iwallet.SpendInfo{}, fmt.Errorf("%w: funding fact %s pays to %s (expected %s)", ErrPaymentAddressMismatch, fact.GetId(), toAddress, paymentAddress)
 	}
 
@@ -373,7 +373,7 @@ func spendFromTransactionFundingFact(
 
 func fundingFactOutputMatches(out iwallet.SpendInfo, toAddress string, amount *big.Int) bool {
 	outAmount, ok := new(big.Int).SetString(out.Amount.String(), 10)
-	return ok && strings.EqualFold(out.Address.String(), toAddress) && outAmount.Cmp(amount) == 0 && len(out.ID) > 0
+	return ok && payment.SameUTXOAddress(out.Address.String(), toAddress) && outAmount.Cmp(amount) == 0 && len(out.ID) > 0
 }
 
 func fundingFactKey(fact *pb.PaymentSent_FundingFact) string {

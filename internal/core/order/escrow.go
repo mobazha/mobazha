@@ -8,20 +8,35 @@ import (
 	"math/big"
 
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // releaseRefundEscrowFunds co-signs and broadcasts a moderated refund escrow
 // release for UTXO Bitcoin orders. This was migrated from OrderProcessor to the
 // orchestration layer so that OrderProcessor remains free of wallet I/O.
-func (s *OrderAppService) releaseRefundEscrowFunds(wallet iwallet.Wallet, paymentSent *pb.PaymentSent, releaseInfo *pb.EscrowRelease) error {
+func (s *OrderAppService) releaseRefundEscrowFunds(wallet iwallet.Wallet, order *models.Order, paymentSent *pb.PaymentSent, releaseInfo *pb.EscrowRelease) error {
 	escrowWallet, ok := wallet.(iwallet.UTXOEscrow)
 	if !ok {
 		return errors.New("wallet for moderated order does not support escrow")
 	}
 
-	if releaseInfo.ToAddress != paymentSent.RefundAddress {
+	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+	if err != nil {
+		return err
+	}
+	refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+		Order:        order,
+		PaymentSent:  paymentSent,
+		Coin:         coinType,
+		Observations: payment.RefundResolutionObservations(s.db, order, paymentSent),
+	})
+	if !refundResult.Found() {
+		return errors.New("refund address is not available")
+	}
+	if !payment.SameUTXOAddress(releaseInfo.ToAddress, refundResult.Address) {
 		return errors.New("refund does not pay out to our refund address")
 	}
 	if _, ok := new(big.Int).SetString(releaseInfo.ToAmount, 10); !ok {

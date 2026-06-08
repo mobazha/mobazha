@@ -451,11 +451,11 @@ func validatePurchaseRefundAddress(purchase *models.Purchase) error {
 	}
 
 	// Allow empty refund address for crypto orders. The buyer may not know
-	// their refund address at checkout time (e.g. ManagedEscrow/UTXO payments where
-	// the payer address is only known after the on-chain transaction).
-	// The address will be set later at payment time (client_signed passes
-	// payerAddress) or auto-detected from the chain observation when the
-	// AggregatingVerifier confirms the payment (see buildAggregatedPaymentSent).
+	// their refund address at checkout time (e.g. UTXO/ManagedEscrow address-monitored
+	// flows). It can be supplied later via payment-session (payerAddress /
+	// payFromCustodial + refundAddress), POST /refund-address, or inferred
+	// locally after verification via ResolveBuyerRefundAddress (never embedded
+	// into the peer-shared PaymentSent envelope unless buyer-declared).
 	if addr == "" {
 		purchase.RefundAddress = ""
 		return nil
@@ -491,19 +491,34 @@ func (s *OrderAppService) SetOrderRefundAddressForPayment(ctx context.Context, o
 		if raw == nil {
 			return fmt.Errorf("set refund address: raw DB unavailable")
 		}
-		return raw.Transaction(func(tx *gorm.DB) error {
+		if err := raw.Transaction(func(tx *gorm.DB) error {
 			if err := paymentintent.UpsertSharedPaymentIntent(tx, orderID, "", addr, nil); err != nil {
 				return fmt.Errorf("save shared refund address: %w", err)
 			}
 			return persistOrderRefundAddressGorm(tx, orderID, addr)
-		})
+		}); err != nil {
+			return err
+		}
+		return s.replayParkedMessagesAfterRefundAddress(orderID)
 	}
 
-	return s.db.Update(func(tx database.Tx) error {
+	if err := s.db.Update(func(tx database.Tx) error {
 		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), orderID, "", addr, nil); err != nil {
 			return fmt.Errorf("save shared refund address: %w", err)
 		}
 		return persistOrderRefundAddress(tx, orderID, addr)
+	}); err != nil {
+		return err
+	}
+	return s.replayParkedMessagesAfterRefundAddress(orderID)
+}
+
+func (s *OrderAppService) replayParkedMessagesAfterRefundAddress(orderID string) error {
+	if s.orderProcessor == nil {
+		return nil
+	}
+	return s.db.Update(func(tx database.Tx) error {
+		return s.orderProcessor.ReplayParkedMessages(tx, orderID)
 	})
 }
 
@@ -860,7 +875,7 @@ func hydratePaymentDataFromVerifiedTransaction(paymentData *models.PaymentData, 
 	var match iwallet.SpendInfo
 	matches := 0
 	for _, out := range tx.To {
-		if out.Address.String() != paymentData.ToAddress || len(out.ID) == 0 {
+		if !paymentpkg.SameUTXOAddress(out.Address.String(), paymentData.ToAddress) || len(out.ID) == 0 {
 			continue
 		}
 		match = out

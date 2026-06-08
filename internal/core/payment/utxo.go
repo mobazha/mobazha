@@ -369,7 +369,7 @@ func (s *PaymentAppService) cancelExcessPayment(order *models.Order, tx *iwallet
 	var excessUTXO *iwallet.SpendInfo
 	var excessAmount = iwallet.NewAmount(0)
 	for _, to := range tx.To {
-		if to.Address.String() == paymentSent.ToAddress {
+		if settlementpayment.SameUTXOAddress(to.Address.String(), paymentSent.ToAddress) {
 			excessUTXO = &to
 			excessAmount = to.Amount
 			break
@@ -507,13 +507,7 @@ func (s *PaymentAppService) dispatchUTXOObservation(order *models.Order, tx *iwa
 	knownConfirmed := tx.Height > 0
 	blockNumber := int64(tx.Height) // 0 = mempool / unconfirmed; never coerce to 1
 
-	var fromAddr string
-	for _, from := range tx.From {
-		if from.Address.String() != "" {
-			fromAddr = from.Address.String()
-			break
-		}
-	}
+	fromAddr := singleUTXOInputAddress(tx)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -546,6 +540,13 @@ func (s *PaymentAppService) dispatchUTXOObservation(order *models.Order, tx *iwa
 	}
 }
 
+func singleUTXOInputAddress(tx *iwallet.Transaction) string {
+	if tx == nil || len(tx.From) != 1 {
+		return ""
+	}
+	return strings.TrimSpace(tx.From[0].Address.String())
+}
+
 type utxoPaymentOutput struct {
 	eventIndex int
 	spend      iwallet.SpendInfo
@@ -557,7 +558,7 @@ func paymentOutputsForAddress(tx *iwallet.Transaction, address string) []utxoPay
 	}
 	var out []utxoPaymentOutput
 	for i, spend := range tx.To {
-		if !sameUTXOAddress(spend.Address.String(), address) {
+		if !settlementpayment.SameUTXOAddress(spend.Address.String(), address) {
 			continue
 		}
 		eventIndex := i
@@ -582,23 +583,9 @@ func amountPaidToAddress(tx *iwallet.Transaction, address string) uint64 {
 	}
 	var total uint64
 	for _, out := range tx.To {
-		if sameUTXOAddress(out.Address.String(), address) {
+		if settlementpayment.SameUTXOAddress(out.Address.String(), address) {
 			total += out.Amount.Uint64()
 		}
 	}
 	return total
-}
-
-func sameUTXOAddress(a, b string) bool {
-	a = normalizeUTXOAddressForCompare(a)
-	b = normalizeUTXOAddressForCompare(b)
-	return a != "" && strings.EqualFold(a, b)
-}
-
-func normalizeUTXOAddressForCompare(address string) string {
-	address = strings.TrimSpace(address)
-	if i := strings.LastIndex(address, ":"); i >= 0 {
-		address = address[i+1:]
-	}
-	return address
 }

@@ -4,15 +4,24 @@ package order
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"testing"
 
+	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	orderprocessor "github.com/mobazha/mobazha3.0/internal/orders"
+	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"gorm.io/gorm"
 )
 
@@ -191,6 +200,82 @@ func TestSetOrderRefundAddressForPayment_UsesActualPaymentCoin(t *testing.T) {
 	assert.Equal(t, refundAddr, shared.RefundAddress)
 }
 
+func TestSetOrderRefundAddressForPayment_ReplaysParkedMessages(t *testing.T) {
+	privKey, _, err := libp2pcrypto.GenerateEd25519Key(rand.Reader)
+	require.NoError(t, err)
+	marshaledKey, err := libp2pcrypto.MarshalPrivateKey(privKey)
+	require.NoError(t, err)
+	signer, err := contracts.NewKeyPairSignerFromMarshaledKey(marshaledKey)
+	require.NoError(t, err)
+
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{Signer: signer})
+	svc.orderProcessor = orderprocessor.NewOrderProcessor(&orderprocessor.Config{
+		Db:       svc.db,
+		Signer:   signer,
+		EventBus: svc.eventBus,
+	})
+
+	const orderID = "test-order-refund-replay-parked"
+	const refundAddr = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+
+	orderOpen := &pb.OrderOpen{
+		Listings: []*pb.SignedListing{
+			{
+				Listing: &pb.Listing{
+					VendorID: &pb.ID{PeerID: signer.PeerID().String()},
+					Item: &pb.Listing_Item{
+						Images: []*pb.Image{{Tiny: "tiny", Small: "small"}},
+					},
+				},
+			},
+		},
+	}
+	declineMsg := &npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_ORDER_DECLINE,
+		Message: mustAny(t, &pb.OrderDecline{
+			Type:   pb.OrderDecline_VALIDATION_ERROR,
+			Reason: "test replay",
+		}),
+	}
+	require.NoError(t, utils.SignOrderMessage(declineMsg, signer))
+
+	err = svc.db.Update(func(tx database.Tx) error {
+		order := &models.Order{
+			ID:     models.OrderID(orderID),
+			MyRole: string(models.RoleBuyer),
+		}
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+		if err := order.PutMessage(&npb.OrderMessage{
+			Signature:   []byte("order-open-sig"),
+			Message:     mustAny(t, orderOpen),
+			MessageType: npb.OrderMessage_ORDER_OPEN,
+		}); err != nil {
+			return err
+		}
+		if err := order.ParkMessage(declineMsg); err != nil {
+			return err
+		}
+		return tx.Save(order)
+	})
+	require.NoError(t, err)
+
+	err = svc.SetOrderRefundAddressForPayment(context.Background(), orderID, iwallet.CoinType("crypto:eip155:1:native"), refundAddr)
+	require.NoError(t, err)
+
+	var got models.Order
+	err = svc.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&got).Error
+	})
+	require.NoError(t, err)
+	assert.Equal(t, refundAddr, got.RefundAddress)
+	assert.NotNil(t, got.SerializedOrderDecline)
+
+	parked, err := got.GetParkedMessages()
+	require.NoError(t, err)
+	assert.Empty(t, parked.Messages)
+}
+
 func TestSetOrderRefundAddressForPayment_EmptyCryptoRejected(t *testing.T) {
 	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
 
@@ -198,4 +283,11 @@ func TestSetOrderRefundAddressForPayment_EmptyCryptoRejected(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
 	assert.True(t, errors.Is(err, models.ErrRefundAddressRequired))
+}
+
+func mustAny(t *testing.T, msg proto.Message) *anypb.Any {
+	t.Helper()
+	a := &anypb.Any{}
+	require.NoError(t, a.MarshalFrom(msg))
+	return a
 }

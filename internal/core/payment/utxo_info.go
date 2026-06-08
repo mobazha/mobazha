@@ -98,15 +98,12 @@ func (s *PaymentAppService) GetUTXOEscrowKeys(ctx context.Context, order *models
 
 // GetRefundAddressFromTransactions extracts the buyer's refund address from transaction inputs.
 func (s *PaymentAppService) GetRefundAddressFromTransactions(txs []iwallet.Transaction, coinType iwallet.CoinType) (iwallet.Address, error) {
-	for _, tx := range txs {
-		for _, from := range tx.From {
-			if from.Address.String() != "" {
-				return from.Address, nil
-			}
-		}
+	addr, ok, reason := pkpayment.UniqueUTXOInputAddress(nil, nil, txs)
+	if ok {
+		return iwallet.NewAddress(addr, coinType), nil
 	}
 
-	return iwallet.NewAddress("", coinType), fmt.Errorf("no refund address found in transaction inputs for %s", coinType)
+	return iwallet.NewAddress("", coinType), fmt.Errorf("no unique refund address found in transaction inputs for %s (%s)", coinType, reason)
 }
 
 // CalculateTotalPaidToAddress sums all transaction outputs sent to a specific address.
@@ -126,7 +123,7 @@ func (s *PaymentAppService) CalculateTotalPaidToAddress(order *models.Order, add
 	totalPaid := iwallet.NewAmount(0)
 	for _, tx := range txs {
 		for _, to := range tx.To {
-			if to.Address.String() == address {
+			if pkpayment.SameUTXOAddress(to.Address.String(), address) {
 				totalPaid = totalPaid.Add(to.Amount)
 			}
 		}

@@ -147,10 +147,16 @@ func (s *SettlementService) executeSettlementActionForOrder(
 		}
 		out := payoutAddr
 		if out == "" {
-			out = paymentSent.RefundAddress
-		}
-		if out == "" {
-			out = paymentSent.PayerAddress
+			refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+				Order:       order,
+				PaymentSent: paymentSent,
+				Coin:        coinType,
+			})
+			if !refundResult.Found() {
+				return nil, coinType, fmt.Errorf("%w: %w: no buyer refund address available for cancel settlement (%s)",
+					coreiface.ErrBadRequest, models.ErrRefundAddressRequired, refundResult.Reason)
+			}
+			out = refundResult.Address
 		}
 		params.PayoutAddr = out
 		result, cerr := strategy.Cancel(ctx, params)
@@ -183,10 +189,16 @@ func (s *SettlementService) executeSettlementActionForOrder(
 		}
 		out := payoutAddr
 		if out == "" {
-			out = paymentSent.RefundAddress
-		}
-		if out == "" {
-			out = paymentSent.PayerAddress
+			refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+				Order:       order,
+				PaymentSent: paymentSent,
+				Coin:        coinType,
+			})
+			if !refundResult.Found() {
+				return nil, coinType, fmt.Errorf("%w: %w: no buyer refund address available for seller_decline_refund settlement (%s)",
+					coreiface.ErrBadRequest, models.ErrRefundAddressRequired, refundResult.Reason)
+			}
+			out = refundResult.Address
 		}
 		params.PayoutAddr = out
 		result, rerr := refunder.SellerDeclineRefund(ctx, params)

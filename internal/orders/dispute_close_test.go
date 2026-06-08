@@ -135,10 +135,10 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 
 	buyerPayerAddr := "123"
 	paymentSent := &pb.PaymentSent{
-		Coin:         iwallet.CtMock.String(),
-		Moderator:    "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
+		Coin:           iwallet.CtMock.String(),
+		Moderator:      "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
 		SettlementSpec: testPaymentSentSpec(pb.PaymentSent_MODERATED),
-		PayerAddress: buyerPayerAddr,
+		PayerAddress:   buyerPayerAddr,
 	}
 
 	orderConfirmation := &pb.OrderConfirmation{
@@ -367,11 +367,11 @@ func TestValidateDisputeResolution_AddressCheck(t *testing.T) {
 		order.ID = "test-addr-check"
 
 		ps := &pb.PaymentSent{
-			Coin:          iwallet.CtMock.String(),
-			Moderator:     "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
+			Coin:           iwallet.CtMock.String(),
+			Moderator:      "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
 			SettlementSpec: testPaymentSentSpec(pb.PaymentSent_MODERATED),
-			PayerAddress:  payerAddr,
-			RefundAddress: refundAddr,
+			PayerAddress:   payerAddr,
+			RefundAddress:  refundAddr,
 		}
 		order.PutMessage(&npb.OrderMessage{
 			Signature: []byte("s"), Message: mustBuildAny(ps),
@@ -597,6 +597,20 @@ func TestValidateDisputeResolution_AddressCheck(t *testing.T) {
 				return r
 			}(),
 			wantErr: "moderator payout amount is negative",
+		},
+		{
+			name: "reject — release exceeds escrow inputs",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.TransactionFee = "1"
+				return r
+			}(),
+			wantErr: "outputs plus fee exceed escrow inputs",
 		},
 	}
 

@@ -101,12 +101,27 @@ func (s *OrderAppService) OpenDispute(orderID models.OrderID, reason string, evi
 		return fmt.Errorf("canonical payment coin: %w", err)
 	}
 
-	payoutAddress, err := s.escrow.GetPayoutAddress(string(coinType))
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get payout address: %v", err)
-		if order.Role() == models.RoleBuyer {
-			payoutAddress = iwallet.NewAddress(paymentSent.PayerAddress, coinType)
-		} else {
+	var payoutAddress iwallet.Address
+	if order.Role() == models.RoleBuyer && !coinType.IsFiatPayment() {
+		observations := payment.RefundResolutionObservations(s.db, &order, paymentSent)
+		refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
+			Order:        &order,
+			PaymentSent:  paymentSent,
+			Coin:         coinType,
+			Observations: observations,
+		})
+		if refundResult.RequiresUserInput {
+			return fmt.Errorf("%w: buyer must provide a refund address before opening a dispute (%s)", models.ErrRefundAddressRequired, refundResult.Reason)
+		}
+		if !refundResult.Found() {
+			return fmt.Errorf("%w: buyer refund address is not available yet (%s)", models.ErrRefundAddressRequired, refundResult.Reason)
+		}
+		payoutAddress = iwallet.NewAddress(refundResult.Address, coinType)
+	} else {
+		var err error
+		payoutAddress, err = s.escrow.GetPayoutAddress(string(coinType))
+		if err != nil {
+			logger.LogErrorWithIDf(log, s.nodeID, "Failed to get payout address: %v", err)
 			orderConfirmation, err := order.OrderConfirmationMessage()
 			if err != nil {
 				return fmt.Errorf("failed to get payout address and order confirmation: %w", err)
@@ -536,12 +551,17 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		coinType = iwallet.CoinType(paymentSent.Coin)
 	}
 
-	txs := preferredContract.GetTransactions()
-	if len(txs) == 0 && !usesBalanceEscrow {
+	var txs []*pb.Contract_Transaction
+	if !usesBalanceEscrow {
 		txs = disputeReleaseOutpointsFromFundingFacts(paymentSent, coinType, paymentSent.ToAddress)
-	}
-	if len(txs) == 0 && !usesBalanceEscrow {
-		txs = s.disputeReleaseOutpointsFromLocalOrder(orderID, paymentSent)
+		if len(txs) == 0 {
+			txs = preferredContract.GetTransactions()
+		}
+		if len(txs) == 0 {
+			txs = s.disputeReleaseOutpointsFromLocalOrder(orderID, paymentSent)
+		}
+	} else {
+		txs = preferredContract.GetTransactions()
 	}
 
 	totalOut := iwallet.NewAmount(0)
@@ -619,6 +639,9 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 			FromID: tx.FromID,
 			Value:  tx.Value,
 		})
+	}
+	if err := payment.ValidateDisputeReleaseFunding(&moderatedEscrowRelease, paymentSent); err != nil {
+		return fmt.Errorf("invalid dispute release funding: %w", err)
 	}
 
 	txn, err = s.BuildDisputeReleaseTransaction(&moderatedEscrowRelease, paymentSent)
@@ -784,6 +807,12 @@ func (s *OrderAppService) getOrderAndPaymentInfo(orderID models.OrderID) (*model
 
 func (s *OrderAppService) BuildDisputeReleaseTransaction(releaseInfo *pb.DisputeClose_ModeratedEscrowRelease, paymentSent *pb.PaymentSent) (iwallet.Transaction, error) {
 	var txn iwallet.Transaction
+	if paymentSent == nil {
+		return txn, errors.New("payment sent is missing")
+	}
+	if err := payment.ValidateDisputeReleaseFunding(releaseInfo, paymentSent); err != nil {
+		return txn, err
+	}
 	coinType, ok := payment.NormalizeSettlementPaymentCoin(paymentSent.Coin)
 	if !ok {
 		coinType = iwallet.CoinType(normalizeCurrencyCode(paymentSent.Coin))
@@ -1084,7 +1113,7 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 	totalOut := iwallet.NewAmount(0)
 	for _, tx := range txs {
 		for _, to := range tx.To {
-			if to.Address.String() == order.PaymentAddress {
+			if payment.SameUTXOAddress(to.Address.String(), order.PaymentAddress) {
 				txn.From = append(txn.From, to)
 				totalOut = totalOut.Add(to.Amount)
 			}

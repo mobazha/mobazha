@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -223,5 +224,103 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 				t.Errorf("Error executing db update: %s", err)
 			}
 		})
+	}
+}
+
+func TestOrderProcessor_ReplayParkedMessages_OrderDecline(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	_, pub, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubkeyBytes, err := crypto.MarshalPublicKey(pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const orderID = "replay-parked-decline"
+	orderOpen := &pb.OrderOpen{
+		Listings: []*pb.SignedListing{
+			{
+				Listing: &pb.Listing{
+					VendorID: &pb.ID{
+						PeerID: op.identity.String(),
+						Pubkeys: &pb.ID_Pubkeys{
+							Identity: pubkeyBytes,
+						},
+					},
+					Item: &pb.Listing_Item{
+						Images: []*pb.Image{{Small: "small", Tiny: "tiny"}},
+					},
+				},
+			},
+		},
+	}
+
+	declineMsg := &npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_ORDER_DECLINE,
+		Message: mustBuildAny(&pb.OrderDecline{
+			Type:   pb.OrderDecline_VALIDATION_ERROR,
+			Reason: "test replay",
+		}),
+	}
+	if err := utils.SignOrderMessage(declineMsg, op.signer); err != nil {
+		t.Fatal(err)
+	}
+
+	err = op.db.Update(func(tx database.Tx) error {
+		order := &models.Order{
+			ID:     models.OrderID(orderID),
+			MyRole: string(models.RoleBuyer),
+		}
+		order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+		if err := order.PutMessage(&npb.OrderMessage{
+			Signature:   []byte("order-open-sig"),
+			Message:     mustBuildAny(orderOpen),
+			MessageType: npb.OrderMessage_ORDER_OPEN,
+		}); err != nil {
+			return err
+		}
+		if err := order.ParkMessage(declineMsg); err != nil {
+			return err
+		}
+		return tx.Save(order)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = op.db.Update(func(tx database.Tx) error {
+		return op.ReplayParkedMessages(tx, orderID)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = op.db.View(func(tx database.Tx) error {
+		var got models.Order
+		if err := tx.Read().Where("id = ?", orderID).First(&got).Error; err != nil {
+			return err
+		}
+		if got.SerializedOrderDecline == nil {
+			return fmt.Errorf("expected order decline to be processed")
+		}
+		parked, err := got.GetParkedMessages()
+		if err != nil {
+			return err
+		}
+		if len(parked.Messages) != 0 {
+			return fmt.Errorf("expected parked messages to be cleared, got %d", len(parked.Messages))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

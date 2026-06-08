@@ -757,6 +757,7 @@ func TestSubmitSettlementCancelAction_ErrorsWhenTxHashMissing(t *testing.T) {
 
 	svc := &OrderAppService{paymentRegistry: reg}
 	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
+	order.RefundAddress = "0x1111111111111111111111111111111111111111"
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	require.NoError(t, order.SetPaymentSent(paymentSent))
 	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
@@ -790,6 +791,7 @@ func TestSubmitSettlementCancelAction_PrefersSubmittedTxHash(t *testing.T) {
 
 	svc := &OrderAppService{paymentRegistry: reg}
 	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
+	order.RefundAddress = "0x1111111111111111111111111111111111111111"
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	require.NoError(t, order.SetPaymentSent(paymentSent))
 	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{

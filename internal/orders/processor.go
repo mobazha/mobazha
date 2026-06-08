@@ -228,6 +228,18 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, message *npb.OrderMes
 	return event, dbtx.Save(&order)
 }
 
+// ReplayParkedMessages loads an order and replays any parked order messages
+// whose prerequisites may have become available outside the normal inbound
+// message flow.
+func (op *OrderProcessor) ReplayParkedMessages(dbtx database.Tx, orderID string) error {
+	var order models.Order
+	if err := dbtx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
+		return err
+	}
+	op.replayParkedMessages(dbtx, &order)
+	return dbtx.Save(&order)
+}
+
 // ProcessACK loads the order from the database and sets the ACK for the message type.
 // paymentReadyNewly is true when ORDER_OPEN ACK marks the buyer order payment-ready
 // for the first time; paymentReadyOrderID is set in that case.

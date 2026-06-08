@@ -49,7 +49,7 @@ func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) 
 
 	err = node.OpenDispute(models.OrderID(orderID), d.Claim, d.EvidenceHashes, nil)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 

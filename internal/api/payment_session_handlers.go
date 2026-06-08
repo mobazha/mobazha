@@ -98,15 +98,16 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 	}
 
 	var payload struct {
-		PaymentCoin     string `json:"paymentCoin"`
-		RefundAddress   string `json:"refundAddress"`
-		BuyerPeerID     string `json:"buyerPeerID"`
-		PayerAddress    string `json:"payerAddress"`
-		Moderator       string `json:"moderator"`
-		FiatAmountCents int64  `json:"fiatAmountCents"`
-		FiatDescription string `json:"fiatDescription"`
-		FiatReturnURL   string `json:"fiatReturnURL"`
-		FiatCancelURL   string `json:"fiatCancelURL"`
+		PaymentCoin      string `json:"paymentCoin"`
+		RefundAddress    string `json:"refundAddress"`
+		PayFromCustodial bool   `json:"payFromCustodial"`
+		BuyerPeerID      string `json:"buyerPeerID"`
+		PayerAddress     string `json:"payerAddress"`
+		Moderator        string `json:"moderator"`
+		FiatAmountCents  int64  `json:"fiatAmountCents"`
+		FiatDescription  string `json:"fiatDescription"`
+		FiatReturnURL    string `json:"fiatReturnURL"`
+		FiatCancelURL    string `json:"fiatCancelURL"`
 	}
 	if r.Body != nil {
 		dec := json.NewDecoder(r.Body)
@@ -139,16 +140,17 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 	}
 
 	req := contracts.CreatePaymentSessionRequest{
-		OrderID:         orderID,
-		PaymentCoin:     string(normalizedCoin),
-		RefundAddress:   payload.RefundAddress,
-		BuyerPeerID:     payload.BuyerPeerID,
-		PayerAddress:    payload.PayerAddress,
-		Moderator:       payload.Moderator,
-		FiatAmountCents: payload.FiatAmountCents,
-		FiatDescription: payload.FiatDescription,
-		FiatReturnURL:   payload.FiatReturnURL,
-		FiatCancelURL:   payload.FiatCancelURL,
+		OrderID:          orderID,
+		PaymentCoin:      string(normalizedCoin),
+		RefundAddress:    payload.RefundAddress,
+		PayFromCustodial: payload.PayFromCustodial,
+		BuyerPeerID:      payload.BuyerPeerID,
+		PayerAddress:     payload.PayerAddress,
+		Moderator:        payload.Moderator,
+		FiatAmountCents:  payload.FiatAmountCents,
+		FiatDescription:  payload.FiatDescription,
+		FiatReturnURL:    payload.FiatReturnURL,
+		FiatCancelURL:    payload.FiatCancelURL,
 	}
 
 	if strings.HasPrefix(strings.ToLower(req.PaymentCoin), "fiat:") && req.FiatAmountCents <= 0 {

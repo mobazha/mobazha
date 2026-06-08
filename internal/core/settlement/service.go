@@ -213,7 +213,7 @@ func calculateTotalPaidToAddress(order *models.Order, address string) (iwallet.A
 	totalPaid := iwallet.NewAmount(0)
 	for _, tx := range txs {
 		for _, to := range tx.To {
-			if to.Address.String() == address {
+			if payment.SameUTXOAddress(to.Address.String(), address) {
 				totalPaid = totalPaid.Add(to.Amount)
 			}
 		}

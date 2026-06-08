@@ -135,6 +135,9 @@ type ListingMetadata struct {
 	IntroVideo              string           `json:"introVideo"`
 	AltIntroVideoLinks      []string         `json:"altIntroVideoLinks"`
 	Price                   CurrencyValue    `json:"price"`
+	BasePrice               *CurrencyValue   `json:"basePrice,omitempty"`
+	PriceMax                *CurrencyValue   `json:"priceMax,omitempty"`
+	PriceHasRange           bool             `json:"priceHasRange,omitempty"`
 	ShipsTo                 []string         `json:"shipsTo"`
 	FreeShipping            []string         `json:"freeShipping"`
 	Language                string           `json:"language"`
@@ -201,7 +204,9 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		}
 	}
 
-	cv := NewCurrencyValue(listing.Item.Price, CurrencyDefinitions[listing.Metadata.PricingCurrency.Code])
+	priceSnap := ResolveListingPriceSnapshot(listing.Item)
+	currencyDef := CurrencyDefinitions[listing.Metadata.PricingCurrency.Code]
+	cv := NewCurrencyValue(priceSnap.DisplayAmount, currencyDef)
 
 	introVideoHash := ""
 	if listing.Item.IntroVideo != nil {
@@ -230,6 +235,7 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		IntroVideo:              introVideoHash,
 		AltIntroVideoLinks:      listing.Item.AltIntroVideoLinks,
 		Price:                   *cv,
+		PriceHasRange:           priceSnap.HasRange,
 		ShipsTo:                 shipsTo,
 		FreeShipping:            freeShipping,
 		Language:                listing.Metadata.Language,
@@ -238,6 +244,14 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		RwaEscrowTimeoutSeconds: listing.Metadata.RwaEscrowTimeoutSeconds,
 		RwaListingId:            listing.Metadata.RwaListingId,
 		TokenStandard:           listing.Item.TokenStandard,
+	}
+	if priceSnap.UsesSkuPrice {
+		baseCV := NewCurrencyValue(priceSnap.BaseAmount, currencyDef)
+		ld.BasePrice = baseCV
+		if priceSnap.HasRange {
+			maxCV := NewCurrencyValue(priceSnap.MaxAmount, currencyDef)
+			ld.PriceMax = maxCV
+		}
 	}
 	return ld, nil
 }

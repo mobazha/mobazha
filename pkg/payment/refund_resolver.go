@@ -5,6 +5,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/paymentaddress"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -13,6 +14,7 @@ type RefundAddressSource string
 
 const (
 	RefundAddressSourceExplicit        RefundAddressSource = "explicit"
+	RefundAddressSourceAccountDefault  RefundAddressSource = "account_default"
 	RefundAddressSourceSingleUTXOInput RefundAddressSource = "single_utxo_input"
 	RefundAddressSourcePayer           RefundAddressSource = "payer"
 	RefundAddressSourceNone            RefundAddressSource = "none"
@@ -37,11 +39,12 @@ func (r RefundResolveResult) Found() bool {
 // ResolveBuyerRefundAddressParams carries the evidence used to choose a buyer
 // refund destination.
 type ResolveBuyerRefundAddressParams struct {
-	Order            *models.Order
-	PaymentSent      *pb.PaymentSent
-	Coin             iwallet.CoinType
-	Observations     []models.PaymentObservation
-	PayFromCustodial bool
+	Order                  *models.Order
+	PaymentSent            *pb.PaymentSent
+	Coin                   iwallet.CoinType
+	Observations           []models.PaymentObservation
+	PayFromCustodial       bool
+	AccountRefundAddresses map[string]string
 }
 
 // ResolveBuyerRefundAddress resolves the safest currently-known buyer refund
@@ -61,6 +64,11 @@ func ResolveBuyerRefundAddress(params ResolveBuyerRefundAddressParams) RefundRes
 	if coin.IsFiatPayment() {
 		return RefundResolveResult{Source: RefundAddressSourceNone}
 	}
+
+	if addr := paymentaddress.LookupByPaymentCoin(params.AccountRefundAddresses, coin); addr != "" {
+		return refundResolved(addr, RefundAddressSourceAccountDefault)
+	}
+
 	if params.PayFromCustodial {
 		return refundRequired(RefundResolveReasonExchangeDeclared)
 	}

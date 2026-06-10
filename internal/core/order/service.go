@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/core/checkoutsupply"
 	"github.com/mobazha/mobazha3.0/internal/core/digital"
+	nodepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -1300,13 +1301,8 @@ func (s *OrderAppService) GetLegacyEscrowReleaseInstructions(orderID models.Orde
 
 // ── Shared helpers ──────────────────────────────────────────────
 
-func buyerCancelablePayoutAddr(order *models.Order, paymentSent *pb.PaymentSent, coinType iwallet.CoinType, observations []models.PaymentObservation) (string, error) {
-	result := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-		Order:        order,
-		PaymentSent:  paymentSent,
-		Coin:         coinType,
-		Observations: observations,
-	})
+func (s *OrderAppService) buyerCancelablePayoutAddr(order *models.Order, paymentSent *pb.PaymentSent, coinType iwallet.CoinType, observations []models.PaymentObservation) (string, error) {
+	result := nodepayment.ResolveBuyerRefundForLocalNode(s.db, order, paymentSent, coinType, observations, false)
 	if result.Found() {
 		return result.Address, nil
 	}
@@ -1415,12 +1411,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 		}
 		switch {
 		case payment.MethodIsDirect(method):
-			refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-				Order:        order,
-				PaymentSent:  paymentSent,
-				Coin:         coinType,
-				Observations: refundObservations,
-			})
+			refundResult := nodepayment.ResolveBuyerRefundForLocalNode(s.db, order, paymentSent, coinType, refundObservations, false)
 			if !refundResult.Found() {
 				return nil, fmt.Errorf("%w: no buyer refund address available for direct refund (%s)", models.ErrRefundAddressRequired, refundResult.Reason)
 			}
@@ -1469,7 +1460,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 				return nil, errors.New("automatic refund not supported for confirmed CANCELABLE orders: funds were released to external wallet, please refund manually")
 			}
 
-			payoutAddr, err := buyerCancelablePayoutAddr(order, paymentSent, coinType, refundObservations)
+			payoutAddr, err := s.buyerCancelablePayoutAddr(order, paymentSent, coinType, refundObservations)
 			if err != nil {
 				return nil, err
 			}
@@ -1557,7 +1548,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 			return &refundBuildResult{Message: refundResp}, nil
 		case payment.MethodIsModerated(method):
 			if s.shouldSubmitSettlementCancel(order, paymentSent, method, coinType) {
-				payoutAddr, err := buyerCancelablePayoutAddr(order, paymentSent, coinType, refundObservations)
+				payoutAddr, err := s.buyerCancelablePayoutAddr(order, paymentSent, coinType, refundObservations)
 				if err != nil {
 					return nil, err
 				}

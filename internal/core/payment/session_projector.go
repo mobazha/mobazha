@@ -109,12 +109,12 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		PaymentReadiness:   readiness,
 		UserActionRequest:  nil, // Phase B: no user action required for address_monitored
 	}
-	applyRefundProjection(session, input, paymentCoin)
+	applyRefundProjection(p.db, session, input, paymentCoin)
 	payment.ApplyBuyerPaymentReadinessGate(session)
 	return session, nil
 }
 
-func applyRefundProjection(session *payment.PaymentSession, input *projectOrderInput, paymentCoin string) {
+func applyRefundProjection(db database.Database, session *payment.PaymentSession, input *projectOrderInput, paymentCoin string) {
 	if session == nil || input == nil || input.order == nil {
 		return
 	}
@@ -125,12 +125,7 @@ func applyRefundProjection(session *payment.PaymentSession, input *projectOrderI
 	if coin.IsFiatPayment() {
 		return
 	}
-	result := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-		Order:        input.order,
-		PaymentSent:  input.paymentSent,
-		Coin:         coin,
-		Observations: input.observations,
-	})
+	result := ResolveBuyerRefundForLocalNode(db, input.order, input.paymentSent, coin, input.observations, false)
 	if result.Found() {
 		session.RefundAddress = result.Address
 	}

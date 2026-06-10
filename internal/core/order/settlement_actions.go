@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	ordersettlement "github.com/mobazha/mobazha3.0/internal/core/order/settlement"
+	nodepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -377,12 +378,7 @@ func (s *OrderAppService) submitSettlementAction(ctx context.Context, action str
 
 	if payoutAddr == "" && (action == payment.SettlementActionCancel || action == payment.SettlementActionSellerDeclineRefund) {
 		observations := payment.RefundResolutionObservations(s.db, order, paymentSent)
-		refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-			Order:        order,
-			PaymentSent:  paymentSent,
-			Coin:         coinType,
-			Observations: observations,
-		})
+		refundResult := nodepayment.ResolveBuyerRefundForLocalNode(s.db, order, paymentSent, coinType, observations, false)
 		if !refundResult.Found() {
 			return "", nil, false, fmt.Errorf("%w: no buyer refund address available for settlement %s (%s)",
 				models.ErrRefundAddressRequired, action, refundResult.Reason)

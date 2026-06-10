@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -315,7 +316,7 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 		if err := order.SetPaymentSent(ps); err != nil {
 			return fmt.Errorf("aggregating verifier: marshal PaymentSent for %s: %w", orderID, err)
 		}
-		backfillResolvedBuyerRefundAddress(&order, ps, deduped)
+		backfillResolvedBuyerRefundAddress(gdb, &order, ps, deduped)
 		if order.PaymentAddress == "" && ps.ToAddress != "" {
 			order.PaymentAddress = ps.ToAddress
 		}
@@ -393,7 +394,7 @@ func (v *AggregatingVerifier) tryRecoverVerifiedCancelableAutoConfirm(
 	if err := order.SetPaymentSent(newPS); err != nil {
 		return err
 	}
-	backfillResolvedBuyerRefundAddress(order, newPS, observations)
+	backfillResolvedBuyerRefundAddress(nil, order, newPS, observations)
 	emitCancelableRecovery(newPS)
 	return nil
 }
@@ -887,15 +888,27 @@ func aggregatedRefundAddress(order *models.Order, sharedRefund string) string {
 	return ""
 }
 
-func backfillResolvedBuyerRefundAddress(order *models.Order, paymentSent *pb.PaymentSent, observations []models.PaymentObservation) {
+func backfillResolvedBuyerRefundAddress(gdb *gorm.DB, order *models.Order, paymentSent *pb.PaymentSent, observations []models.PaymentObservation) {
 	if order == nil || paymentSent == nil || strings.TrimSpace(order.RefundAddress) != "" {
 		return
 	}
-	result := paymentmetrics.ResolveBuyerRefundAddress(paymentmetrics.ResolveBuyerRefundAddressParams{
-		Order:        order,
-		PaymentSent:  paymentSent,
-		Observations: observations,
-	})
+	var prefs map[string]string
+	if order.Role() == models.RoleBuyer && gdb != nil {
+		loaded, loadErr := loadLocalRefundReceivingPreferencesGorm(gdb)
+		if loadErr != nil {
+			logger.LogWarningWithIDf(log, order.ID.String(), "Failed to load refund receiving preferences: %v", loadErr)
+		} else {
+			prefs = loaded
+		}
+	}
+	coin, _ := paymentmetrics.SettlementCoinFromPaymentSent(paymentSent)
+	result := paymentmetrics.RefundResolveRequest{
+		Order:                  order,
+		PaymentSent:            paymentSent,
+		Coin:                   coin,
+		Observations:           observations,
+		LocalRefundPreferences: prefs,
+	}.Resolve()
 	if result.Found() {
 		order.RefundAddress = result.Address
 	}

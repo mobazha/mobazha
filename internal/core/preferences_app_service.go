@@ -52,6 +52,21 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 			coreiface.ErrBadRequest, models.MaxDigitalGoodReviewWindowDays)
 	}
 
+	refundAddrs, err := prefs.RefundReceivingAddresses()
+	if err != nil {
+		return fmt.Errorf("%w: invalid refund receiving addresses", coreiface.ErrBadRequest)
+	}
+	if err := prefs.SetRefundReceivingAddresses(refundAddrs); err != nil {
+		return fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+	}
+	refundAddrs, err = prefs.RefundReceivingAddresses()
+	if err != nil {
+		return fmt.Errorf("%w: invalid refund receiving addresses", coreiface.ErrBadRequest)
+	}
+	if err := models.ValidateRefundReceivingAddresses(refundAddrs); err != nil {
+		return fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+	}
+
 	shippingProfiles, err := prefs.GetShippingProfiles()
 	if err != nil {
 		return fmt.Errorf("%w: invalid shipping profiles", coreiface.ErrBadRequest)

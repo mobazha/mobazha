@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math/big"
 
+	nodepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -27,12 +28,14 @@ func (s *OrderAppService) releaseRefundEscrowFunds(wallet iwallet.Wallet, order 
 	if err != nil {
 		return err
 	}
-	refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-		Order:        order,
-		PaymentSent:  paymentSent,
-		Coin:         coinType,
-		Observations: payment.RefundResolutionObservations(s.db, order, paymentSent),
-	})
+	refundResult := nodepayment.ResolveBuyerRefundForLocalNode(
+		s.db,
+		order,
+		paymentSent,
+		coinType,
+		payment.RefundResolutionObservations(s.db, order, paymentSent),
+		false,
+	)
 	if !refundResult.Found() {
 		return errors.New("refund address is not available")
 	}

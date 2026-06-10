@@ -36,6 +36,65 @@ func TestResolveBuyerRefundAddress_CustodialRequiresExplicit(t *testing.T) {
 	require.Equal(t, RefundResolveReasonExchangeDeclared, result.Reason)
 }
 
+func TestResolveBuyerRefundAddress_AccountDefaultWinsOverPayer(t *testing.T) {
+	result := ResolveBuyerRefundAddress(ResolveBuyerRefundAddressParams{
+		Coin:        iwallet.CoinType("crypto:eip155:1:native"),
+		PaymentSent: &pb.PaymentSent{PayerAddress: "0xpayer"},
+		AccountRefundAddresses: map[string]string{
+			"crypto:eip155:1:native": "0xaccount-default",
+		},
+	})
+
+	require.Equal(t, "0xaccount-default", result.Address)
+	require.Equal(t, RefundAddressSourceAccountDefault, result.Source)
+	require.False(t, result.RequiresUserInput)
+}
+
+func TestResolveBuyerRefundAddress_CustodialUsesAccountDefault(t *testing.T) {
+	result := ResolveBuyerRefundAddress(ResolveBuyerRefundAddressParams{
+		Coin:             iwallet.CoinType("crypto:eip155:1:native"),
+		PaymentSent:      &pb.PaymentSent{PayerAddress: "0xexchange"},
+		PayFromCustodial: true,
+		AccountRefundAddresses: map[string]string{
+			"crypto:eip155:1:native": "0xaccount-default",
+		},
+	})
+
+	require.Equal(t, "0xaccount-default", result.Address)
+	require.Equal(t, RefundAddressSourceAccountDefault, result.Source)
+	require.False(t, result.RequiresUserInput)
+}
+
+func TestAccountRefundAddressesForBuyerRole_VendorGetsNil(t *testing.T) {
+	require.Nil(t, AccountRefundAddressesForBuyerRole(&models.Order{MyRole: string(models.RoleVendor)}, map[string]string{
+		"crypto:eip155:1:native": "0xaccount-default",
+	}))
+}
+
+func TestRefundResolveRequest_BuyerRoleUsesPrefs(t *testing.T) {
+	result := RefundResolveRequest{
+		Order: &models.Order{MyRole: string(models.RoleBuyer)},
+		Coin:  iwallet.CoinType("crypto:eip155:1:native"),
+		LocalRefundPreferences: map[string]string{
+			"crypto:eip155:1:native": "0xaccount-default",
+		},
+	}.Resolve()
+	require.Equal(t, "0xaccount-default", result.Address)
+	require.Equal(t, RefundAddressSourceAccountDefault, result.Source)
+}
+
+func TestResolveBuyerRefundAddress_ExplicitWinsOverAccountDefault(t *testing.T) {
+	result := ResolveBuyerRefundAddress(ResolveBuyerRefundAddressParams{
+		Order: &models.Order{RefundAddress: "0xexplicit"},
+		AccountRefundAddresses: map[string]string{
+			"crypto:eip155:1:native": "0xaccount-default",
+		},
+	})
+
+	require.Equal(t, "0xexplicit", result.Address)
+	require.Equal(t, RefundAddressSourceExplicit, result.Source)
+}
+
 func TestResolveBuyerRefundAddress_AccountChainUsesPayer(t *testing.T) {
 	result := ResolveBuyerRefundAddress(ResolveBuyerRefundAddressParams{
 		Coin:        iwallet.CoinType("crypto:eip155:1:native"),

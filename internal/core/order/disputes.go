@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	nodepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -104,12 +105,7 @@ func (s *OrderAppService) OpenDispute(orderID models.OrderID, reason string, evi
 	var payoutAddress iwallet.Address
 	if order.Role() == models.RoleBuyer && !coinType.IsFiatPayment() {
 		observations := payment.RefundResolutionObservations(s.db, &order, paymentSent)
-		refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-			Order:        &order,
-			PaymentSent:  paymentSent,
-			Coin:         coinType,
-			Observations: observations,
-		})
+		refundResult := nodepayment.ResolveBuyerRefundForLocalNode(s.db, &order, paymentSent, coinType, observations, false)
 		if refundResult.RequiresUserInput {
 			return fmt.Errorf("%w: buyer must provide a refund address before opening a dispute (%s)", models.ErrRefundAddressRequired, refundResult.Reason)
 		}

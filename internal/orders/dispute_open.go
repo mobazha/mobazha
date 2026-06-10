@@ -133,12 +133,23 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 				coin = iwallet.CoinType(paymentSent.Coin)
 			}
 			observations := payment.RefundResolutionObservationsTx(dbtx, order, paymentSent)
-			refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-				Order:        order,
-				PaymentSent:  paymentSent,
-				Coin:         coin,
-				Observations: observations,
-			})
+			var prefs map[string]string
+			var userPrefs models.UserPreferences
+			if err := dbtx.Read().First(&userPrefs).Error; err == nil {
+				loaded, loadErr := userPrefs.RefundReceivingAddresses()
+				if loadErr != nil {
+					logger.LogWarningWithIDf(log, op.nodeID, "Failed to load refund receiving preferences for order %s: %v", order.ID, loadErr)
+				} else {
+					prefs = loaded
+				}
+			}
+			refundResult := payment.RefundResolveRequest{
+				Order:                  order,
+				PaymentSent:            paymentSent,
+				Coin:                   coin,
+				Observations:           observations,
+				LocalRefundPreferences: prefs,
+			}.Resolve()
 			if refundResult.Found() {
 				payoutAddress = iwallet.NewAddress(refundResult.Address, coin)
 			} else if !coin.IsFiatPayment() {

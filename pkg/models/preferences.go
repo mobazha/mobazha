@@ -2,33 +2,36 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/paymentaddress"
 )
 
 // UserPreferences are set by the client and persisted in the database.
 type UserPreferences struct {
 	TenantMixin
-	ID                  int     `json:"-" gorm:"primaryKey;autoIncrement:false"`
-	UserAgent           string  `json:"userAgent"`
-	PaymentDataInQR     bool    `json:"paymentDataInQR"`
-	ShowNotifications   bool    `json:"showNotifications"`
-	ShowNsfw            bool    `json:"showNsfw"`
-	ShippingAddresses   []byte  `json:"shippingAddresses"` // Self receiving address
-	ShippingProfiles    []byte  `json:"shippingProfiles"`  // 新版：配送档案列表（Shopify 模式）
-	ShippingLocations   []byte  `json:"shippingLocations"` // v2：发货地点列表
-	LocalCurrency       string  `json:"localCurrency"`
-	Country             string  `json:"country"`
-	TermsAndConditions  string  `json:"termsAndConditions"`
-	RefundPolicy        string  `json:"refundPolicy"`
-	Blocked             []byte  `json:"blockedNodes"`
-	ExtPaymentAddresses []byte  `json:"externalPaymentAddresses"`
-	MisPaymentBuffer    float32 `json:"mispaymentBuffer"`
-	AutoConfirm         bool    `json:"autoConfirm"`
-	EmailNotifications  string  `json:"emailNotifications"`
-	PrefCurrencies      []byte  `json:"preferredCurrencies"`
-	ChannelSubs         []byte  `json:"channelSubscriptions"`
+	ID                   int     `json:"-" gorm:"primaryKey;autoIncrement:false"`
+	UserAgent            string  `json:"userAgent"`
+	PaymentDataInQR      bool    `json:"paymentDataInQR"`
+	ShowNotifications    bool    `json:"showNotifications"`
+	ShowNsfw             bool    `json:"showNsfw"`
+	ShippingAddresses    []byte  `json:"shippingAddresses"` // Self receiving address
+	ShippingProfiles     []byte  `json:"shippingProfiles"`  // 新版：配送档案列表（Shopify 模式）
+	ShippingLocations    []byte  `json:"shippingLocations"` // v2：发货地点列表
+	LocalCurrency        string  `json:"localCurrency"`
+	Country              string  `json:"country"`
+	TermsAndConditions   string  `json:"termsAndConditions"`
+	RefundPolicy         string  `json:"refundPolicy"`
+	Blocked              []byte  `json:"blockedNodes"`
+	ExtPaymentAddresses  []byte  `json:"externalPaymentAddresses"`
+	RefundReceivingAddrs []byte  `json:"refundReceivingAddresses"`
+	MisPaymentBuffer     float32 `json:"mispaymentBuffer"`
+	AutoConfirm          bool    `json:"autoConfirm"`
+	EmailNotifications   string  `json:"emailNotifications"`
+	PrefCurrencies       []byte  `json:"preferredCurrencies"`
+	ChannelSubs          []byte  `json:"channelSubscriptions"`
 
 	// DigitalGoodReviewWindowDays is the seller's preferred buyer-protection
 	// window for DIGITAL_GOOD orders, in days. Range 1-7; 0 = use the
@@ -242,6 +245,7 @@ type prefsJSON struct {
 	RefundPolicy             string                       `json:"refundPolicy"`
 	BlockedNodes             []string                     `json:"blockedNodes"`
 	ExternalPaymentAddresses map[string]AddressEnablement `json:"externalPaymentAddresses"`
+	RefundReceivingAddresses map[string]string            `json:"refundReceivingAddresses,omitempty"`
 	MisPaymentBuffer         float32                      `json:"mispaymentBuffer"`
 	AutoConfirm              bool                         `json:"autoConfirm"`
 	EmailNotifications       string                       `json:"emailNotifications"`
@@ -399,6 +403,37 @@ func (prefs *UserPreferences) ExternalPaymentAddresses() (map[string]AddressEnab
 	return enablements, nil
 }
 
+// RefundReceivingAddresses returns buyer default refund destinations keyed by
+// canonical payment coin (crypto:* / fiat:*).
+func (prefs *UserPreferences) RefundReceivingAddresses() (map[string]string, error) {
+	var addrs map[string]string
+	if prefs.RefundReceivingAddrs != nil {
+		if err := json.Unmarshal(prefs.RefundReceivingAddrs, &addrs); err != nil {
+			return nil, err
+		}
+	}
+	return addrs, nil
+}
+
+// SetRefundReceivingAddresses persists buyer default refund destinations with
+// canonical payment-coin keys (crypto:* / fiat:provider:CURRENCY).
+func (prefs *UserPreferences) SetRefundReceivingAddresses(addrs map[string]string) error {
+	canonical, err := paymentaddress.CanonicalizePaymentCoinAddressMap(addrs)
+	if err != nil {
+		return fmt.Errorf("refund receiving addresses: %w", err)
+	}
+	if len(canonical) == 0 {
+		prefs.RefundReceivingAddrs = nil
+		return nil
+	}
+	data, err := json.Marshal(canonical)
+	if err != nil {
+		return err
+	}
+	prefs.RefundReceivingAddrs = data
+	return nil
+}
+
 // BlockedNodes returns the blocked peer IDs.
 func (prefs *UserPreferences) BlockedNodes() ([]peer.ID, error) {
 	var peerIDStrs []string
@@ -523,6 +558,7 @@ func (prefs *UserPreferences) MarshalJSON() ([]byte, error) {
 	}
 	extAddresses, _ := prefs.ExternalPaymentAddresses()
 	c0.ExternalPaymentAddresses = extAddresses
+	c0.RefundReceivingAddresses, _ = prefs.RefundReceivingAddresses()
 	c0.MisPaymentBuffer = prefs.MisPaymentBuffer
 	c0.AutoConfirm = prefs.AutoConfirm
 	c0.EmailNotifications = prefs.EmailNotifications
@@ -580,6 +616,9 @@ func (prefs *UserPreferences) UnmarshalJSON(b []byte) error {
 		prefs.RefundPolicy = c0.RefundPolicy
 		prefs.Blocked = blockedNodes
 		prefs.ExtPaymentAddresses = extPaymentAddress
+		if err := prefs.SetRefundReceivingAddresses(c0.RefundReceivingAddresses); err != nil {
+			return err
+		}
 		prefs.MisPaymentBuffer = c0.MisPaymentBuffer
 		prefs.AutoConfirm = c0.AutoConfirm
 		prefs.EmailNotifications = c0.EmailNotifications

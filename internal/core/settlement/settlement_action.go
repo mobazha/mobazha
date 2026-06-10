@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	nodepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -147,11 +148,7 @@ func (s *SettlementService) executeSettlementActionForOrder(
 		}
 		out := payoutAddr
 		if out == "" {
-			refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-				Order:       order,
-				PaymentSent: paymentSent,
-				Coin:        coinType,
-			})
+			refundResult := nodepayment.ResolveBuyerRefundForLocalNode(s.db, order, paymentSent, coinType, nil, false)
 			if !refundResult.Found() {
 				return nil, coinType, fmt.Errorf("%w: %w: no buyer refund address available for cancel settlement (%s)",
 					coreiface.ErrBadRequest, models.ErrRefundAddressRequired, refundResult.Reason)
@@ -189,11 +186,7 @@ func (s *SettlementService) executeSettlementActionForOrder(
 		}
 		out := payoutAddr
 		if out == "" {
-			refundResult := payment.ResolveBuyerRefundAddress(payment.ResolveBuyerRefundAddressParams{
-				Order:       order,
-				PaymentSent: paymentSent,
-				Coin:        coinType,
-			})
+			refundResult := nodepayment.ResolveBuyerRefundForLocalNode(s.db, order, paymentSent, coinType, nil, false)
 			if !refundResult.Found() {
 				return nil, coinType, fmt.Errorf("%w: %w: no buyer refund address available for seller_decline_refund settlement (%s)",
 					coreiface.ErrBadRequest, models.ErrRefundAddressRequired, refundResult.Reason)

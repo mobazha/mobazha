@@ -1,14 +1,16 @@
 package utxo
 
 const (
-	txVersionAndLockTimeSize = 8
-	outpointSize             = 36
-	sequenceSize             = 4
-	p2pkhOutputSize          = 34
-	compressedPubKeySize     = 33
-	pushOpcodeSize           = 1
-	witnessMarkerFlagSize    = 2
-	p2wshRelaySafetyVBytes   = 10
+	txVersionAndLockTimeSize    = 8
+	outpointSize                = 36
+	sequenceSize                = 4
+	p2pkhOutputSize             = 34
+	compressedPubKeySize        = 33
+	pushOpcodeSize              = 1
+	witnessMarkerFlagSize       = 2
+	p2wshRelaySafetyVBytes      = 10
+	p2shRelaySafetyBytes        = 20
+	p2shSchnorrRelaySafetyBytes = 80
 )
 
 // EstimateP2WSHMultisigSpendVSize estimates the virtual size of a native
@@ -67,8 +69,16 @@ func EstimateP2SHECDSAMultisigSpendSize(nInputs int, threshold int, nOuts int, e
 	return EstimateP2SHMultisigSpendSize(nInputs, threshold, nOuts, maxECDSASigWithHashTypeSize, extraBytes)
 }
 
+func EstimateP2SHECDSAMultisigSpendRelaySize(nInputs int, threshold int, nOuts int) int {
+	return EstimateP2SHECDSAMultisigSpendSize(nInputs, threshold, nOuts, p2shRelaySafetyBytes*positiveOrOne(nInputs))
+}
+
 func EstimateP2SHSchnorrMultisigSpendSize(nInputs int, threshold int, nOuts int, extraBytes int) int {
 	return EstimateP2SHMultisigSpendSize(nInputs, threshold, nOuts, schnorrSigWithHashTypeSize, extraBytes)
+}
+
+func EstimateP2SHSchnorrMultisigSpendRelaySize(nInputs int, threshold int, nOuts int) int {
+	return EstimateP2SHSchnorrMultisigSpendSize(nInputs, threshold, nOuts, p2shSchnorrRelaySafetyBytes*positiveOrOne(nInputs))
 }
 
 func multisigRedeemScriptSize(threshold int) int {

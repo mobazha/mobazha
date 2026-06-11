@@ -108,37 +108,37 @@ func TestBitcoinCashWallet_EstimateEscrowFee(t *testing.T) {
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(6720),
+			expected:  iwallet.NewAmount(9120),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(8960),
+			expected:  iwallet.NewAmount(12160),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(11200),
+			expected:  iwallet.NewAmount(15200),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(10740),
+			expected:  iwallet.NewAmount(13140),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(14320),
+			expected:  iwallet.NewAmount(17520),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(17900),
+			expected:  iwallet.NewAmount(21900),
 		},
 	}
 
@@ -154,6 +154,29 @@ func TestBitcoinCashWallet_EstimateEscrowFee(t *testing.T) {
 		if fee.Cmp(test.expected) != 0 {
 			t.Errorf("Test %d: expected %s, got %s", i, test.expected, fee)
 		}
+	}
+}
+
+func TestBitcoinCashWallet_EstimateEscrowFee_UsesRelayFeeFloor(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chainClient, ok := w.ChainClient.(*base.MockChainClient)
+	if !ok {
+		t.Fatal("expected *base.MockChainClient")
+	}
+	chainClient.SetEstimateFee(map[iwallet.FeeLevel]iwallet.EstimateFeeRes{
+		iwallet.FlNormal: {FeePerTx: iwallet.NewAmount(0), FeePerUnit: iwallet.NewAmount(0)},
+	})
+
+	fee, err := w.EstimateEscrowFee(1, 1, 1, iwallet.FlNormal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := iwallet.NewAmount(304); fee.Cmp(want) != 0 {
+		t.Fatalf("expected BCH relay fee floor %s, got %s", want, fee)
 	}
 }
 
@@ -277,7 +300,7 @@ func TestBitcoinCashWallet_Multisig1of2(t *testing.T) {
 		t.Fatal("Expected broadcasted transaction")
 	}
 	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
-	if got, wantMax := len(txBytes), chainutxo.EstimateP2SHSchnorrMultisigSpendSize(1, 1, 1, 0); got > wantMax {
+	if got, wantMax := len(txBytes), chainutxo.EstimateP2SHSchnorrMultisigSpendRelaySize(1, 1, 1); got > wantMax {
 		t.Fatalf("serialized tx size %d exceeds estimated size %d", got, wantMax)
 	}
 

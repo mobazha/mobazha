@@ -142,7 +142,7 @@ func (w *ZCashWallet) IsDust(iaddr iwallet.Address, amount iwallet.Amount) bool 
 // will add 50% of the returned fee for each additional input. This is a
 // crude fee calculating but it simplifies things quite a bit.
 func (w *ZCashWallet) EstimateEscrowFee(nInputs int, threshold int, nOuts int, level iwallet.FeeLevel) (iwallet.Amount, error) {
-	size := chainutxo.EstimateP2SHECDSAMultisigSpendSize(nInputs, threshold, nOuts, 15)
+	size := chainutxo.EstimateP2SHECDSAMultisigSpendRelaySize(nInputs, threshold, nOuts)
 
 	resp, err := w.ChainClient.EstimateFee(size)
 	if err != nil {

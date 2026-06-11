@@ -91,7 +91,9 @@ func (w *BitcoinCashWallet) IsDust(iaddr iwallet.Address, amount iwallet.Amount)
 // will add 50% of the returned fee for each additional input. This is a
 // crude fee calculating but it simplifies things quite a bit.
 func (w *BitcoinCashWallet) EstimateEscrowFee(nInputs int, threshold int, nOuts int, level iwallet.FeeLevel) (iwallet.Amount, error) {
-	size := chainutxo.EstimateP2SHSchnorrMultisigSpendSize(nInputs, threshold, nOuts, 0)
+	// Keep a small relay-policy allowance so exact min-relay estimates do not
+	// produce transactions rejected as "min relay fee not met".
+	size := chainutxo.EstimateP2SHSchnorrMultisigSpendRelaySize(nInputs, threshold, nOuts)
 	resp, err := w.ChainClient.EstimateFee(size)
 	if err != nil {
 		return iwallet.NewAmount(0), err
@@ -99,6 +101,10 @@ func (w *BitcoinCashWallet) EstimateEscrowFee(nInputs int, threshold int, nOuts 
 	fee, ok := resp[level]
 	if !ok {
 		return iwallet.NewAmount(0), fmt.Errorf("fee estimate missing level %v", level)
+	}
+	minRelayFee := iwallet.NewAmount(int64(txrules.FeeForSerializeSize(txrules.DefaultRelayFeePerKb, size)))
+	if fee.FeePerTx.Cmp(minRelayFee) < 0 {
+		return minRelayFee, nil
 	}
 	return fee.FeePerTx, nil
 }

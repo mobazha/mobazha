@@ -42,6 +42,11 @@ func TestEstimateP2SHMultisigSpendSize(t *testing.T) {
 			expected: 224,
 		},
 		{
+			name:     "BCH Schnorr 1-of-2 relay",
+			estimate: func() int { return EstimateP2SHSchnorrMultisigSpendRelaySize(1, 1, 1) },
+			expected: 304,
+		},
+		{
 			name:     "BCH Schnorr 2-of-3",
 			estimate: func() int { return EstimateP2SHSchnorrMultisigSpendSize(1, 2, 2, 0) },
 			expected: 358,
@@ -52,6 +57,11 @@ func TestEstimateP2SHMultisigSpendSize(t *testing.T) {
 			expected: 247,
 		},
 		{
+			name:     "ZEC ECDSA 1-of-2 relay",
+			estimate: func() int { return EstimateP2SHECDSAMultisigSpendRelaySize(1, 1, 1) },
+			expected: 252,
+		},
+		{
 			name:     "ZEC ECDSA 2-of-3",
 			estimate: func() int { return EstimateP2SHECDSAMultisigSpendSize(1, 2, 2, 15) },
 			expected: 391,
@@ -60,6 +70,11 @@ func TestEstimateP2SHMultisigSpendSize(t *testing.T) {
 			name:     "BCH Schnorr 2-of-3 multiple inputs",
 			estimate: func() int { return EstimateP2SHSchnorrMultisigSpendSize(2, 2, 2, 0) },
 			expected: 638,
+		},
+		{
+			name:     "BCH Schnorr 2-of-3 multiple inputs relay",
+			estimate: func() int { return EstimateP2SHSchnorrMultisigSpendRelaySize(2, 2, 2) },
+			expected: 798,
 		},
 	}
 

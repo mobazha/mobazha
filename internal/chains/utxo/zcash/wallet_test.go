@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -139,37 +140,37 @@ func TestZCashWallet_EstimateEscrowFee(t *testing.T) {
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(7410),
+			expected:  iwallet.NewAmount(7560),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(9880),
+			expected:  iwallet.NewAmount(10080),
 		},
 		{
 			threshold: 1,
 			nOuts:     1,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(12350),
+			expected:  iwallet.NewAmount(12600),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlEconomic,
-			expected:  iwallet.NewAmount(11730),
+			expected:  iwallet.NewAmount(11880),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlNormal,
-			expected:  iwallet.NewAmount(15640),
+			expected:  iwallet.NewAmount(15840),
 		},
 		{
 			threshold: 2,
 			nOuts:     2,
 			level:     iwallet.FlPriority,
-			expected:  iwallet.NewAmount(19550),
+			expected:  iwallet.NewAmount(19800),
 		},
 	}
 
@@ -271,6 +272,10 @@ func TestZCashWallet_Multisig1of2(t *testing.T) {
 	}
 	if len(chainClient.BroadcastedTxs) == 0 {
 		t.Fatal("Expected broadcasted transaction")
+	}
+	txBytes := chainClient.BroadcastedTxs[len(chainClient.BroadcastedTxs)-1]
+	if got, wantMax := len(txBytes), chainutxo.EstimateP2SHECDSAMultisigSpendRelaySize(1, 1, 1); got > wantMax {
+		t.Fatalf("serialized tx size %d exceeds estimated size %d", got, wantMax)
 	}
 }
 

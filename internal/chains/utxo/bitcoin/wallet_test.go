@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -396,6 +397,12 @@ func TestBitcoinWallet_Multisig1of2(t *testing.T) {
 	var msgTx wire.MsgTx
 	if err := msgTx.BtcDecode(bytes.NewReader(txBytes), wire.ProtocolVersion, wire.WitnessEncoding); err != nil {
 		t.Fatal(err)
+	}
+	baseSize := msgTx.SerializeSizeStripped()
+	totalSize := msgTx.SerializeSize()
+	vSize := (baseSize*3 + totalSize + 3) / 4
+	if got, wantMax := vSize, chainutxo.EstimateP2WSHMultisigSpendRelayVSize(1, 1, 1); got > wantMax {
+		t.Fatalf("serialized tx vsize %d exceeds estimated vsize %d", got, wantMax)
 	}
 
 	var amt int64 = 1000000

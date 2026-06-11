@@ -183,18 +183,6 @@ func initDigitalSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Digital subsystem initialized")
 }
 
-func wireDigitalSupplyLineResolver(obNode *MobazhaNode, assetSvc *digital.DigitalAssetAppService) {
-	if obNode == nil || assetSvc == nil {
-		return
-	}
-	if obNode.orderService != nil {
-		obNode.orderService.SetDigitalSupplyLineResolver(assetSvc)
-	}
-	if obNode.guestOrderService != nil {
-		obNode.guestOrderService.SetDigitalSupplyLineResolver(assetSvc)
-	}
-}
-
 type guestDigitalOrderShipper interface {
 	ShipGuestOrder(ctx context.Context, token string, tracking, carrier string) error
 }

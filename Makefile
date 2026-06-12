@@ -1,4 +1,4 @@
-.PHONY: build build-private_distribution smoke-private_distribution smoke-private_distribution-da test test-invariants test-e2e-evm test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
+.PHONY: build build-private_distribution embed-private_distribution-frontend build-private_distribution-image smoke-private_distribution smoke-private_distribution-da test test-invariants test-e2e-evm test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
 
 SYSTEM_GO := /usr/local/go/bin/go
 GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
@@ -9,6 +9,11 @@ build: ## 构建项目
 
 build-private_distribution: ## 构建 PrivateDistribution 精简版（CGO-free，隐私模式）
 	CGO_ENABLED=0 $(GO) build -tags "private_distribution purego_sqlite embed_frontend" -ldflags "-s -w" -o mobazha-private_distribution .
+
+embed-private_distribution-frontend: ## 构建 PrivateDistribution SPA + Brotli 嵌入（Tor / Managed pool）
+	bash ./scripts/embed-private_distribution-frontend.sh
+
+build-private_distribution-image: embed-private_distribution-frontend build-private_distribution ## PrivateDistribution 前端嵌入 + 二进制（本地 Docker 前置）
 
 test: ## 运行测试
 	$(GO) test -tags '$(GO_TEST_TAGS)' ./...

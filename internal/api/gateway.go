@@ -253,6 +253,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			PrivateDistributionMode:        detectDeploymentMode() == "private_distribution",
 			Brand:              config.Brand,
 			FeaturesSnapshotFn: featuresSnapshotFromNodeManager(nodeManager),
+			NeedsSetupShellFn:  g.needsSetupShell,
 		})
 		topMux.Handle("/", feHandler)
 		log.Info("Serving embedded Web UI on /")

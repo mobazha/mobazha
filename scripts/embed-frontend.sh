@@ -2,13 +2,21 @@
 set -euo pipefail
 
 # Copies the Vite SPA build output into the go:embed directory and
-# optionally pre-compresses assets with Brotli for zero-overhead serving.
+# pre-compresses assets with Brotli for zero-overhead serving.
 #
 # Usage:
 #   ./scripts/embed-frontend.sh [SPA_DIST_DIR]
 #
+# PrivateDistribution (Tor / Managed pool): use embed-private_distribution-frontend.sh instead — it runs
+#   VITE_BUILD_TARGET=private_distribution build + denylist validation before embedding.
+#
+# Standalone native binary: build with NEXT_PUBLIC_ENV_MODE=standalone, then:
+#   ./scripts/embed-frontend.sh path/to/dist
+#
+# SaaS: does not use go:embed — no action needed here.
+#
 # Defaults:
-#   SPA_DIST_DIR = ../../mobazha-unified/apps/web/dist  (relative to repo root)
+#   SPA_DIST_DIR = mobazha-unified/apps/web/dist (auto-detected)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -18,9 +26,9 @@ SPA_DIST="${1:-$(cd "$REPO_ROOT/../.." && pwd)/dev/openbazaar/mobazha-unified/ap
 
 if [ ! -d "$SPA_DIST" ]; then
     echo "ERROR: SPA dist directory not found: $SPA_DIST"
-    echo "Run standalone embed build first, e.g.:"
-    echo "  NEXT_PUBLIC_ENV_MODE=standalone NEXT_PUBLIC_SAAS_URL=https://app.mobazha.org pnpm --filter @mobazha/web build"
-    echo "(Do not set NEXT_PUBLIC_AUTH_MODE=basic with standalone — it overrides auth.mode.)"
+    echo "Run a frontend build first, e.g.:"
+    echo "  PrivateDistribution:  ./scripts/embed-private_distribution-frontend.sh"
+    echo "  Standalone native: NEXT_PUBLIC_ENV_MODE=standalone pnpm --filter @mobazha/web build"
     exit 1
 fi
 
@@ -60,4 +68,5 @@ DIR_SIZE=$(du -sh "$EMBED_DIR" | cut -f1)
 echo "==> Done. Embedded $FILE_COUNT files ($DIR_SIZE)"
 echo ""
 echo "Now rebuild the binary:"
-echo "  CGO_ENABLED=0 go build -tags 'goolm purego_sqlite' -o mobazha ."
+echo "  PrivateDistribution:     CGO_ENABLED=0 go build -tags 'private_distribution purego_sqlite embed_frontend goolm' -o mobazha-private_distribution ."
+echo "  Standalone:  CGO_ENABLED=0 go build -tags 'goolm purego_sqlite embed_frontend' -o mobazha ."

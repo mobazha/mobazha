@@ -84,6 +84,10 @@ type ServerConfig struct {
 	// propagate to the SPA without a process restart. A nil callback
 	// yields an empty features map (fail-closed).
 	FeaturesSnapshotFn func(context.Context) []FeatureSnapshot
+
+	// NeedsSetupShellFn, when set with PrivateDistributionMode, serves setup.html instead
+	// of the full SPA for /admin/* while initial setup is incomplete.
+	NeedsSetupShellFn func() bool
 }
 
 // NewHandler returns an http.Handler that serves the SPA frontend.
@@ -102,6 +106,7 @@ func NewHandler(cfg ServerConfig) http.Handler {
 		private_distributionMode:        cfg.PrivateDistributionMode,
 		brand:              cfg.Brand,
 		featuresSnapshotFn: cfg.FeaturesSnapshotFn,
+		needsSetupShellFn:  cfg.NeedsSetupShellFn,
 	}
 }
 
@@ -112,6 +117,7 @@ type spaHandler struct {
 	private_distributionMode        bool
 	brand              *BrandSnapshot
 	featuresSnapshotFn func(context.Context) []FeatureSnapshot
+	needsSetupShellFn  func() bool
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +158,11 @@ func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.ServeFileFS(w, r, h.embedded, urlPath)
 			return
 		}
+	}
+
+	if h.shouldServeSetupShell(r.URL.Path) {
+		h.serveSetupShell(w, r)
+		return
 	}
 
 	h.serveIndex(w, r)
@@ -206,6 +217,37 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.NotFound(w, r)
+}
+
+func (h *spaHandler) shouldServeSetupShell(urlPath string) bool {
+	if !h.private_distributionMode || h.needsSetupShellFn == nil || !h.needsSetupShellFn() {
+		return false
+	}
+	return urlPath == "/admin" || strings.HasPrefix(urlPath, "/admin/")
+}
+
+func (h *spaHandler) serveSetupShell(w http.ResponseWriter, r *http.Request) {
+	const setupFile = "setup.html"
+	if h.tryServeBrotli(w, r, setupFile) {
+		return
+	}
+
+	if h.overrideDir != "" {
+		setupPath := filepath.Join(h.overrideDir, setupFile)
+		if _, err := os.Stat(setupPath); err == nil {
+			w.Header().Set("Cache-Control", "no-store")
+			http.ServeFile(w, r, setupPath)
+			return
+		}
+	}
+
+	if h.embedded != nil {
+		w.Header().Set("Cache-Control", "no-store")
+		http.ServeFileFS(w, r, h.embedded, setupFile)
+		return
+	}
+
+	h.serveIndex(w, r)
 }
 
 // private_distributionCSP is the Content-Security-Policy for PrivateDistribution mode.

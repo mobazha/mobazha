@@ -208,6 +208,37 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// needsSetupShell reports whether PrivateDistribution should serve the lightweight setup.html
+// shell instead of the full SPA for /admin/* routes.
+func (g *Gateway) needsSetupShell() bool {
+	if detectDeploymentMode() != "private_distribution" {
+		return false
+	}
+	dataDir := g.setupDataDir()
+	if dataDir == "" {
+		return false
+	}
+	if !g.isSetupComplete() {
+		return true
+	}
+	if g.nodeManager == nil {
+		return false
+	}
+	node := g.nodeManager.GetDefaultNode()
+	if node == nil {
+		return false
+	}
+	profileSvc := node.Profile()
+	if profileSvc == nil {
+		return true
+	}
+	profile, err := profileSvc.GetMyProfile()
+	if err != nil || profile == nil {
+		return true
+	}
+	return strings.TrimSpace(profile.Name) == ""
+}
+
 // handleSetup dispatches GET/POST for /v1/system/setup.
 func (g *Gateway) handleSetup(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {

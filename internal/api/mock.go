@@ -565,6 +565,9 @@ func (m *mockNode) SavePreferences(prefs *models.UserPreferences, done chan stru
 func (m *mockNode) GetPreferences() (*models.UserPreferences, error) {
 	return m.getUserPreferencesFunc()
 }
+func (m *mockNode) SetBillingHold(_ models.BillingHold) error {
+	return nil
+}
 func (m *mockNode) BlockNode(peerID string) (bool, error) {
 	return m.blockNodeFunc(peerID)
 }

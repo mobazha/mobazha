@@ -38,6 +38,9 @@ type UserPreferences struct {
 	// ContractType default (currently 3d). Snapshotted into Order at
 	// creation time via ResolvePolicyForOrder (DG-1.11).
 	DigitalGoodReviewWindowDays uint32 `json:"digitalGoodReviewWindowDays"`
+
+	// BillingHoldData stores L1 billing grace (JSON BillingHold); checkout blocked when active.
+	BillingHoldData []byte `json:"billingHold,omitempty"`
 }
 
 // MaxDigitalGoodReviewWindowDays caps the per-store buyer-protection override
@@ -252,7 +255,8 @@ type prefsJSON struct {
 	PreferredCurrencies      []string                     `json:"preferredCurrencies"`
 	ChannelSubscriptions     []string                     `json:"channelSubscriptions"`
 
-	DigitalGoodReviewWindowDays uint32 `json:"digitalGoodReviewWindowDays"`
+	DigitalGoodReviewWindowDays uint32       `json:"digitalGoodReviewWindowDays"`
+	BillingHold                 *BillingHold `json:"billingHold,omitempty"`
 }
 
 func (prefs *UserPreferences) GetShippingAddresses() ([]shippingAddress, error) {
@@ -565,6 +569,10 @@ func (prefs *UserPreferences) MarshalJSON() ([]byte, error) {
 	c0.PreferredCurrencies, _ = prefs.PreferredCurrencies()
 	c0.ChannelSubscriptions, _ = prefs.ChannelSubscriptions()
 	c0.DigitalGoodReviewWindowDays = prefs.DigitalGoodReviewWindowDays
+	if h, err := prefs.GetBillingHold(); err == nil && h.Active {
+		hold := h
+		c0.BillingHold = &hold
+	}
 
 	return json.Marshal(c0)
 }

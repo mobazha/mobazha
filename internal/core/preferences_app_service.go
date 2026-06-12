@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 // PreferencesAppService encapsulates user preferences and block-list management.
@@ -105,6 +107,16 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 				return fmt.Errorf("%w: currency %s is not valid", coreiface.ErrBadRequest, cur)
 			}
 		}
+		var current models.UserPreferences
+		err = tx.Read().First(&current).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil {
+			prefs.BillingHoldData = current.BillingHoldData
+		} else {
+			prefs.BillingHoldData = nil
+		}
 		prefs.ID = 1
 		return tx.Save(prefs)
 	})
@@ -195,4 +207,21 @@ func (s *PreferencesAppService) countPhysicalGoods() (int, error) {
 		return nil
 	})
 	return count, err
+}
+
+// SetBillingHold toggles L1 billing grace on user preferences.
+func (s *PreferencesAppService) SetBillingHold(h models.BillingHold) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var prefs models.UserPreferences
+		err := tx.Read().First(&prefs).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			prefs = models.UserPreferences{}
+		} else if err != nil {
+			return err
+		}
+		if err := prefs.SetBillingHold(h); err != nil {
+			return err
+		}
+		return tx.Save(&prefs)
+	})
 }

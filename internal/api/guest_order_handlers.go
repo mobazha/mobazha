@@ -526,6 +526,8 @@ func classifyGuestOrderError(err error) (int, string) {
 		return http.StatusBadRequest, response.CodeBadRequest
 	case errors.Is(err, contracts.ErrInvalidGuestRequest):
 		return http.StatusBadRequest, response.CodeBadRequest
+	case errors.Is(err, contracts.ErrBillingHoldActive):
+		return http.StatusServiceUnavailable, response.CodeServiceUnavail
 	}
 	msg := err.Error()
 	switch {

@@ -20,6 +20,7 @@ func (g *Gateway) registerPreHumaRoutes(r chi.Router) {
 	if !g.config.PublicOnly {
 		g.registerDigitalAssetStreamRoute(r)
 		g.registerExportRoutes(r)
+		g.registerBillingHoldRoutes(r)
 	}
 }
 

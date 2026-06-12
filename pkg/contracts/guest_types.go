@@ -38,6 +38,10 @@ var (
 	// ErrInvalidGuestRequest — request validation failure (bad amounts,
 	// unknown listing slug, mixed pricing, etc). Maps to HTTP 400.
 	ErrInvalidGuestRequest = errors.New("invalid guest order request")
+
+	// ErrBillingHoldActive — L1 billing grace: storefront online, checkout blocked.
+	// Maps to HTTP 503 SERVICE_UNAVAILABLE.
+	ErrBillingHoldActive = errors.New("store is temporarily unavailable")
 )
 
 // CreateGuestOrderRequest is the input for creating a Guest Order.

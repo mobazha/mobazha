@@ -973,6 +973,17 @@ func (n *MobazhaNode) initGuestOrderService() {
 		SupportedUTXOChains:     supportedUTXO,
 		EVMObservationAvailable: guestEvmAvailable,
 		SolanaMonitorAvailable:  guestSolanaAvailable,
+		BillingHoldActive: func() bool {
+			if n.preferencesService == nil {
+				return false
+			}
+			prefs, err := n.preferencesService.GetPreferences()
+			if err != nil || prefs == nil {
+				return false
+			}
+			active, err := prefs.BillingHoldActive()
+			return err == nil && active
+		},
 	})
 	if n.multiwallet != nil {
 		n.guestOrderService.SetMultiwallet(n.multiwallet)

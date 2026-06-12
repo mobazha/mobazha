@@ -74,6 +74,8 @@ type GuestOrderAppServiceConfig struct {
 	// CreateGuestOrder call so transient wallet-rpc outages surface as
 	// ErrCoinUnavailable instead of a generic 500 on CreateAddress later.
 	ExternalPaymentAvailable func() bool
+	// BillingHoldActive reports L1 billing grace (checkout blocked).
+	BillingHoldActive func() bool
 }
 
 // DigitalSupplyLineResolver resolves digital order items into provider-neutral
@@ -115,6 +117,7 @@ type GuestOrderAppService struct {
 	evmManagedEscrowMonitorChains       map[iwallet.ChainType]struct{}
 	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
 	external_paymentAvailable func() bool
+	billingHoldActive func() bool
 	checkoutSupplyQuoter *checkoutsupply.CheckoutSupplyQuoteService
 }
 
@@ -148,6 +151,7 @@ func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppServi
 		evmObservationAvailable: cfg.EVMObservationAvailable,
 		solanaMonitorAvailable:  cfg.SolanaMonitorAvailable,
 		external_paymentAvailable:         cfg.ExternalPaymentAvailable,
+		billingHoldActive:       cfg.BillingHoldActive,
 	}
 }
 
@@ -216,6 +220,9 @@ type guestInventoryBucketKey struct {
 // QuoteGuestOrderSupply performs a buyer-safe advisory supply preflight without
 // creating an order or holding inventory.
 func (s *GuestOrderAppService) QuoteGuestOrderSupply(ctx context.Context, req contracts.QuoteGuestOrderSupplyRequest) (*contracts.GuestOrderSupplyQuoteResponse, error) {
+	if err := s.ensureCheckoutAllowed(); err != nil {
+		return nil, err
+	}
 	if !s.IsEnabled(ctx) {
 		return nil, contracts.ErrGuestCheckoutDisabled
 	}
@@ -233,9 +240,19 @@ func (s *GuestOrderAppService) QuoteGuestOrderSupply(ctx context.Context, req co
 	return s.checkoutSupplyQuoter.Quote(ctx, models.OrderTypeGuest, "guest_quote", items)
 }
 
+func (s *GuestOrderAppService) ensureCheckoutAllowed() error {
+	if s.billingHoldActive != nil && s.billingHoldActive() {
+		return contracts.ErrBillingHoldActive
+	}
+	return nil
+}
+
 // CreateGuestOrder validates items, reserves inventory, generates a payment address,
 // and creates the order in a single transaction.
 func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contracts.CreateGuestOrderRequest) (*contracts.GuestOrderResponse, error) {
+	if err := s.ensureCheckoutAllowed(); err != nil {
+		return nil, err
+	}
 	if !s.IsEnabled(ctx) {
 		return nil, contracts.ErrGuestCheckoutDisabled
 	}

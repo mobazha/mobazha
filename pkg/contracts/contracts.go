@@ -269,6 +269,7 @@ type SocialService interface {
 type PreferencesService interface {
 	GetPreferences() (*models.UserPreferences, error)
 	SavePreferences(prefs *models.UserPreferences, done chan struct{}) error
+	SetBillingHold(h models.BillingHold) error
 	BlockNode(peerID string) (bool, error)
 	UnblockNode(peerID string) (bool, error)
 }

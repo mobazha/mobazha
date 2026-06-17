@@ -3,11 +3,16 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.26.1"
 
 jobs:
   test:
@@ -19,19 +24,12 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: node/go.sum
 
       - name: Create workspace
         run: |
-          cat > go.work <<'EOF'
-          go 1.25.0
-
-          use (
-            ./node
-          )
-          EOF
-          sed -i 's/^          //' go.work
+          printf 'go %s\n\nuse (\n\t./node\n)\n' "${{ env.GO_VERSION }}" > go.work
 
       - name: Vet
         run: go vet -tags goolm ./...
@@ -50,19 +48,12 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: node/go.sum
 
       - name: Create workspace
         run: |
-          cat > go.work <<'EOF'
-          go 1.25.0
-
-          use (
-            ./node
-          )
-          EOF
-          sed -i 's/^          //' go.work
+          printf 'go %s\n\nuse (\n\t./node\n)\n' "${{ env.GO_VERSION }}" > go.work
 
       - name: Build
         run: go build -tags goolm -o /dev/null .
@@ -77,19 +68,12 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: node/go.sum
 
       - name: Create workspace
         run: |
-          cat > go.work <<'EOF'
-          go 1.25.0
-
-          use (
-            ./node
-          )
-          EOF
-          sed -i 's/^          //' go.work
+          printf 'go %s\n\nuse (\n\t./node\n)\n' "${{ env.GO_VERSION }}" > go.work
 
       - name: Build private_distribution binary
         working-directory: node
@@ -110,3 +94,60 @@ jobs:
         run: |
           chmod +x scripts/private_distribution-digital-assets-smoke.sh
           ./scripts/private_distribution-digital-assets-smoke.sh ./mobazha-private_distribution
+
+  # Mirrors release-native build tags on main to catch embed_frontend drift before tagging.
+  release-build-check:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: mobazha/mobazha-unified
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Build SPA (release path)
+        env:
+          NEXT_PUBLIC_ENV_MODE: standalone
+          NEXT_PUBLIC_SAAS_URL: https://app.mobazha.org
+          NEXT_PUBLIC_API_BASE_URL: ''
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @mobazha/web build
+
+      - uses: actions/checkout@v4
+        with:
+          path: node
+
+      - name: Stage embedded frontend
+        run: |
+          mkdir -p node/internal/embedded/frontend/dist
+          cp -R apps/web/dist/. node/internal/embedded/frontend/dist/
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: node/go.sum
+
+      - name: Create workspace
+        run: |
+          printf 'go %s\n\nuse (\n\t./node\n)\n' "${{ env.GO_VERSION }}" > go.work
+
+      - name: Build release-tagged binary
+        working-directory: node
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          go build -tags "goolm purego_sqlite embed_frontend" -o /tmp/mobazha-release-check .
+
+      - name: Run native release smoke
+        run: |
+          chmod +x node/scripts/release-native-smoke.sh
+          node/scripts/release-native-smoke.sh /tmp/mobazha-release-check

@@ -58,7 +58,9 @@ FROM ${NODE_IMAGE:-go-builder} AS node-binary
 # ============================================================
 FROM node:22-alpine AS fe-builder
 
-RUN corepack enable pnpm
+# node-gyp (bigint-buffer etc.) needs Python + build tools during pnpm install
+RUN apk add --no-cache python3 make g++ \
+    && corepack enable pnpm
 
 WORKDIR /frontend
 

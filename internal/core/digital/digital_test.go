@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -549,13 +550,13 @@ func TestAssetService_RetryDigitalDelivery_CreatesGrantsForLateAssets(t *testing
 	assert.Equal(t, 1, status.GrantCount)
 	assert.Equal(t, 1, status.AccessibleGrantCount)
 	assert.Equal(t, "/v1/orders/order-late-asset/digital-assets", status.DeliveryURL)
-	require.Equal(t, 1, shipper.calls)
-	assert.Equal(t, models.OrderID("order-late-asset"), shipper.orderID)
+	require.Equal(t, 1, shipper.callCount())
+	assert.Equal(t, models.OrderID("order-late-asset"), shipper.lastOrderID())
 
 	status, err = assetSvc.RetryDigitalDelivery("order-late-asset", "seller-peer", false)
 	require.NoError(t, err)
 	assert.Equal(t, contracts.DigitalDeliveryStatusDelivered, status.Status)
-	assert.Equal(t, 1, shipper.calls, "delivered retry should not ship again")
+	assert.Equal(t, 1, shipper.callCount(), "delivered retry should not ship again")
 }
 
 func TestAssetService_RetryDigitalDelivery_RequiresSellerPeer(t *testing.T) {
@@ -567,6 +568,7 @@ func TestAssetService_RetryDigitalDelivery_RequiresSellerPeer(t *testing.T) {
 }
 
 type testOrderShipper struct {
+	mu        sync.Mutex
 	calls     int
 	orderID   models.OrderID
 	shipments []models.Shipment
@@ -574,13 +576,33 @@ type testOrderShipper struct {
 }
 
 func (s *testOrderShipper) ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error {
+	s.mu.Lock()
 	s.calls++
 	s.orderID = orderID
 	s.shipments = append([]models.Shipment(nil), shipments...)
+	s.mu.Unlock()
 	if done != nil {
 		close(done)
 	}
 	return s.err
+}
+
+func (s *testOrderShipper) callCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls
+}
+
+func (s *testOrderShipper) lastOrderID() models.OrderID {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.orderID
+}
+
+func (s *testOrderShipper) snapshotShipments() []models.Shipment {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]models.Shipment(nil), s.shipments...)
 }
 
 func TestEntitlement_OrderConfirmation_DoesNotGrantLicenseAssetWithoutKeys(t *testing.T) {
@@ -599,7 +621,7 @@ func TestEntitlement_OrderConfirmation_DoesNotGrantLicenseAssetWithoutKeys(t *te
 	grants, err := assetSvc.GetGrantsByOrder("order-empty-lic")
 	require.NoError(t, err)
 	assert.Empty(t, grants, "license-key asset without enough keys must not create a buyer-visible grant")
-	assert.Equal(t, 0, shipper.calls, "incomplete digital entitlement must not auto-ship")
+	assert.Equal(t, 0, shipper.callCount(), "incomplete digital entitlement must not auto-ship")
 }
 
 func TestEntitlement_OrderConfirmation_GrantsPartiallyAllocatedLicenseAsset(t *testing.T) {
@@ -622,7 +644,7 @@ func TestEntitlement_OrderConfirmation_GrantsPartiallyAllocatedLicenseAsset(t *t
 	require.NoError(t, err)
 	require.Len(t, grants, 1, "partially allocated license assets should still expose delivered keys")
 	assert.Equal(t, int64(2), assetSvc.CountAllocatedKeys("order-partial-lic", "listing-partial-lic", ""))
-	assert.Equal(t, 0, shipper.calls, "partial license allocation must not auto-ship the whole line item")
+	assert.Equal(t, 0, shipper.callCount(), "partial license allocation must not auto-ship the whole line item")
 }
 
 func TestEntitlement_OrderConfirmation_AutoShipsEveryDigitalLineItem(t *testing.T) {
@@ -647,12 +669,13 @@ func TestEntitlement_OrderConfirmation_AutoShipsEveryDigitalLineItem(t *testing.
 	grants, err := assetSvc.GetGrantsByOrder("order-multi-digital")
 	require.NoError(t, err)
 	require.Len(t, grants, 2)
-	require.Equal(t, 1, shipper.calls)
-	require.Len(t, shipper.shipments, 2)
-	assert.Equal(t, 0, shipper.shipments[0].ItemIndex)
-	assert.Equal(t, 1, shipper.shipments[1].ItemIndex)
-	assert.NotNil(t, shipper.shipments[0].DigitalDelivery)
-	assert.NotNil(t, shipper.shipments[1].DigitalDelivery)
+	require.Equal(t, 1, shipper.callCount())
+	shipments := shipper.snapshotShipments()
+	require.Len(t, shipments, 2)
+	assert.Equal(t, 0, shipments[0].ItemIndex)
+	assert.Equal(t, 1, shipments[1].ItemIndex)
+	assert.NotNil(t, shipments[0].DigitalDelivery)
+	assert.NotNil(t, shipments[1].DigitalDelivery)
 }
 
 func TestEntitlement_OrderConfirmation_CreatesActiveGrant_CANCELABLE(t *testing.T) {

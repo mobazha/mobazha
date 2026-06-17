@@ -1301,7 +1301,7 @@ func (s *OrderAppService) GetLegacyEscrowReleaseInstructions(orderID models.Orde
 
 // ── Shared helpers ──────────────────────────────────────────────
 
-func (s *OrderAppService) buyerCancelablePayoutAddr(order *models.Order, paymentSent *pb.PaymentSent, coinType iwallet.CoinType, observations []models.PaymentObservation) (string, error) {
+func (s *OrderAppService) buyerRefundPayoutAddr(order *models.Order, paymentSent *pb.PaymentSent, coinType iwallet.CoinType, observations []models.PaymentObservation) (string, error) {
 	result := nodepayment.ResolveBuyerRefundForLocalNode(s.db, order, paymentSent, coinType, observations, false)
 	if result.Found() {
 		return result.Address, nil
@@ -1460,7 +1460,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 				return nil, errors.New("automatic refund not supported for confirmed CANCELABLE orders: funds were released to external wallet, please refund manually")
 			}
 
-			payoutAddr, err := s.buyerCancelablePayoutAddr(order, paymentSent, coinType, refundObservations)
+			payoutAddr, err := s.buyerRefundPayoutAddr(order, paymentSent, coinType, refundObservations)
 			if err != nil {
 				return nil, err
 			}
@@ -1548,7 +1548,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 			return &refundBuildResult{Message: refundResp}, nil
 		case payment.MethodIsModerated(method):
 			if s.shouldSubmitSettlementCancel(order, paymentSent, method, coinType) {
-				payoutAddr, err := s.buyerCancelablePayoutAddr(order, paymentSent, coinType, refundObservations)
+				payoutAddr, err := s.buyerRefundPayoutAddr(order, paymentSent, coinType, refundObservations)
 				if err != nil {
 					return nil, err
 				}
@@ -1614,8 +1614,14 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 			}
 			escrowReleaseFee = escrowReleaseFee.Mul(iwallet.NewAmount(150)).Div(iwallet.NewAmount(100))
 
+			payoutAddr, err := s.buyerRefundPayoutAddr(order, paymentSent, coinType, refundObservations)
+			if err != nil {
+				_ = wdbTx.Rollback()
+				return nil, err
+			}
+
 			release, err := s.buildEscrowRelease(order, wallet,
-				iwallet.NewAddress(paymentSent.PayerAddress, coinType),
+				iwallet.NewAddress(payoutAddr, coinType),
 				escrowReleaseFee,
 				iwallet.Address{}, iwallet.Amount{})
 			if err != nil {

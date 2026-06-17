@@ -267,6 +267,24 @@ func setupMockReceivingAccounts(t *testing.T, nodes []*MobazhaNode) {
 	}
 }
 
+func mockUTXOBuyerPayerAddress(t *testing.T, buyer *MobazhaNode) string {
+	t.Helper()
+
+	w, ok := buyer.Multiwallet().WalletForChain(iwallet.ChainMock)
+	if !ok {
+		t.Fatalf("mockUTXOBuyerPayerAddress: WalletForChain(ChainMock) not found")
+	}
+	mockWallet, ok := w.(*wallet.MockWallet)
+	if !ok {
+		t.Fatalf("mockUTXOBuyerPayerAddress: expected *wallet.MockWallet, got %T", w)
+	}
+	addr, err := mockWallet.CurrentAddress()
+	if err != nil {
+		t.Fatalf("mockUTXOBuyerPayerAddress: CurrentAddress failed: %v", err)
+	}
+	return addr.String()
+}
+
 // ingestPaymentToWallets builds a transaction from paymentData and synchronously
 // adds it to the specified nodes' mock wallets. This simulates blockchain broadcast
 // so that GetTransaction succeeds on the vendor side (required for PaymentVerified).
@@ -313,12 +331,16 @@ func ensureMockUTXOFundingFacts(t *testing.T, orderID models.OrderID, paymentDat
 
 	eventIndex := int32(0)
 	amount := strconv.FormatUint(paymentData.Amount, 10)
+	fromAddress := strings.TrimSpace(paymentData.PayerAddress)
 	for i, out := range tx.To {
 		if payment.SameUTXOAddress(out.Address.String(), paymentData.ToAddress) {
 			eventIndex = int32(i)
 			amount = out.Amount.String()
 			break
 		}
+	}
+	if fromAddress == "" && len(tx.From) > 0 {
+		fromAddress = tx.From[0].Address.String()
 	}
 
 	for _, node := range nodes {
@@ -334,17 +356,56 @@ func ensureMockUTXOFundingFacts(t *testing.T, orderID models.OrderID, paymentDat
 			if err != nil {
 				return nil
 			}
-			if len(ps.GetFundingFacts()) > 0 {
-				return nil
+
+			nodeFromAddress := fromAddress
+			if nodeFromAddress == "" {
+				nodeFromAddress = strings.TrimSpace(ps.PayerAddress)
 			}
+			if nodeFromAddress == "" {
+				nodeFromAddress = strings.TrimSpace(ps.RefundAddress)
+			}
+
+			changed := false
+			if nodeFromAddress != "" {
+				if strings.TrimSpace(ps.RefundAddress) != nodeFromAddress {
+					ps.RefundAddress = nodeFromAddress
+					changed = true
+				}
+				if strings.TrimSpace(order.RefundAddress) != nodeFromAddress {
+					order.RefundAddress = nodeFromAddress
+					changed = true
+				}
+				if strings.TrimSpace(ps.PayerAddress) == "" {
+					ps.PayerAddress = nodeFromAddress
+					changed = true
+				}
+			}
+
+			facts := ps.GetFundingFacts()
+			if len(facts) > 0 {
+				if nodeFromAddress != "" && facts[0] != nil && strings.TrimSpace(facts[0].FromAddress) == "" {
+					facts[0].FromAddress = nodeFromAddress
+					changed = true
+				}
+				if !changed {
+					return nil
+				}
+				if err := order.SetPaymentSent(ps); err != nil {
+					return err
+				}
+				return dbtx.Save(&order)
+			}
+
 			if ps.ConfirmationPolicy == "" {
 				ps.ConfirmationPolicy = models.PaymentConfirmationPolicyChainConfirmed
+				changed = true
 			}
 			ps.FundingFacts = []*pb.PaymentSent_FundingFact{{
 				Id:           "mock-funding-1",
 				TxHash:       paymentData.TransactionID,
 				TxHashSource: models.PaymentTxHashSourceChainTx,
 				EventIndex:   eventIndex,
+				FromAddress:  nodeFromAddress,
 				ToAddress:    paymentData.ToAddress,
 				Amount:       amount,
 				Status:       models.PaymentObservationStatusConfirmed,
@@ -385,6 +446,10 @@ func submitMockModeratedSettlementDisputeRelease(t *testing.T, buyer *MobazhaNod
 
 func processMockUTXOPayment(t *testing.T, buyer *MobazhaNode, paymentData *models.PaymentData, walletNodes ...*MobazhaNode) {
 	t.Helper()
+
+	if strings.TrimSpace(paymentData.PayerAddress) == "" {
+		paymentData.PayerAddress = mockUTXOBuyerPayerAddress(t, buyer)
+	}
 
 	nodes := append([]*MobazhaNode{buyer}, walletNodes...)
 	ingestPaymentToWallets(t, paymentData, nodes...)

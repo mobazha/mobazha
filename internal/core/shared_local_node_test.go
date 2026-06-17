@@ -34,6 +34,12 @@ func newSharedLocalNode(t *testing.T) *MobazhaNode {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { node.DestroyNode() })
+
+	// NewNode does not wire publish; listing save waits on initialBootstrapChan.
+	// Mirror MockNode: start publishHandler and signal bootstrap ready.
+	node.publishHandler()
+	close(node.initialBootstrapChan)
+
 	seedSharedShippingProfile(t, node)
 	return node
 }

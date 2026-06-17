@@ -187,8 +187,14 @@ func TestCoinGeckoProvider_StablecoinMapping(t *testing.T) {
 			t.Errorf("%s rate not found", code)
 			continue
 		}
-		if rate.Int64() != 1000000 {
-			t.Errorf("%s expected rate 1000000, got %d", code, rate.Int64())
+		def, err := models.CurrencyDefinitions.Lookup(code)
+		if err != nil {
+			t.Fatalf("lookup %s: %v", code, err)
+		}
+		// 1 USD pegged stablecoin: rate=1.0 in smallest units = 10^divisibility.
+		expected := int64(math.Pow10(int(def.Divisibility)))
+		if rate.Int64() != expected {
+			t.Errorf("%s expected rate %d, got %d", code, expected, rate.Int64())
 		}
 	}
 

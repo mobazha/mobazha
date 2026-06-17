@@ -16,6 +16,7 @@ import (
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -311,8 +312,10 @@ func TestPaymentSentFundingFactDuplicatePreservesCaseSensitiveChains(t *testing.
 }
 
 func protoClonePaymentSent(ps *pb.PaymentSent) *pb.PaymentSent {
-	out := *ps
-	return &out
+	if ps == nil {
+		return nil
+	}
+	return proto.Clone(ps).(*pb.PaymentSent)
 }
 
 func balancePollFact(id, toAddress, amount string) *pb.PaymentSent_FundingFact {

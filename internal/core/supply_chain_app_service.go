@@ -32,6 +32,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"golang.org/x/crypto/hkdf"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
 	"crypto/sha256"
@@ -3570,8 +3571,7 @@ func cloneSupplyChainImage(img *pb.Image) *pb.Image {
 	if img == nil {
 		return nil
 	}
-	cloned := *img
-	return &cloned
+	return proto.Clone(img).(*pb.Image)
 }
 
 // Compile-time interface checks.

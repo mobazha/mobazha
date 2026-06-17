@@ -275,10 +275,19 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 				tokenPresent = true
 			}
 			if tokenPresent {
-				if identity, ok := g.tryJWTAuthWith(jv, buildMinimalRequest(authHeader, ctx)); ok {
+				req := buildMinimalRequest(authHeader, ctx)
+				if identity, ok := g.tryJWTAuthWith(jv, req); ok {
 					g.resetHumaAuthFailure(ctx)
 					next(huma.WithContext(ctx, WithAuthIdentity(ctx.Context(), identity)))
 					return
+				}
+				// Cross-store marketplace: SaaS buyer JWT forwarded by gateway proxy.
+				if isCrossStoreProxyRequest(ctx) && isCrossStoreBuyerCheckoutOperation(op) {
+					if identity, ok := g.tryJWTCasdoorBuyerWith(jv, req); ok {
+						g.resetHumaAuthFailure(ctx)
+						next(huma.WithContext(ctx, WithAuthIdentity(ctx.Context(), identity)))
+						return
+					}
 				}
 				// Bearer was present but invalid → hard fail
 				if g.recordHumaAuthFailureAndRateLimited(ctx) {
@@ -411,4 +420,33 @@ func buildMinimalRequest(authHeader string, ctx huma.Context) *http.Request {
 		r.URL.RawQuery = "token=" + qp
 	}
 	return r
+}
+
+func isCrossStoreProxyRequest(ctx huma.Context) bool {
+	switch ctx.Header("X-Cross-Store-Proxy") {
+	case "true", "libp2p":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCrossStoreBuyerCheckoutOperation(op *huma.Operation) bool {
+	if op == nil {
+		return false
+	}
+	switch op.Method + " " + op.Path {
+	case http.MethodPost + " /v1/orders",
+		http.MethodPost + " /v1/orders/supply-quote":
+		return true
+	}
+	if !strings.HasPrefix(op.Path, "/v1/orders/") {
+		return false
+	}
+	switch op.Method {
+	case http.MethodGet, http.MethodPost:
+		return true
+	default:
+		return false
+	}
 }

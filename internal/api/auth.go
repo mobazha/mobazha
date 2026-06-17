@@ -315,6 +315,38 @@ func (g *Gateway) tryJWTSubjectWith(jv *JWTValidator, r *http.Request) (*AuthIde
 	}, true
 }
 
+// tryJWTCasdoorBuyerWith validates a Casdoor JWT and returns a buyer identity
+// for cross-store marketplace checkout on external standalone stores.
+// Scopes are nil (same as hosting's identityFromJWTClaims bridge) so buyer
+// checkout routes pass scope enforcement without admin privileges.
+func (g *Gateway) tryJWTCasdoorBuyerWith(jv *JWTValidator, r *http.Request) (*AuthIdentity, bool) {
+	if jv == nil {
+		return nil, false
+	}
+
+	var tokenStr string
+	authHeader := r.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr = strings.TrimSpace(authHeader[7:])
+	} else if qp := r.URL.Query().Get("token"); qp != "" && !strings.HasPrefix(qp, "basic:") {
+		tokenStr = qp
+	}
+	if tokenStr == "" || apitoken.IsAPIToken(tokenStr) {
+		return nil, false
+	}
+
+	claims, err := jv.ValidateToken(tokenStr)
+	if err != nil {
+		return nil, false
+	}
+
+	return &AuthIdentity{
+		UserID:  claims.Id,
+		PeerID:  claims.PeerID(),
+		IsAdmin: false,
+	}, true
+}
+
 // tryAPITokenAuth validates an mbz_ prefixed API token against the local store.
 // Returns the resolved AuthIdentity (carrying the token's persisted ScopeSet)
 // and true on success; (nil, false) if the token is missing, revoked, expired,

@@ -8,8 +8,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
-const defaultMaxBodySize int64 = 1 << 20  // 1 MB
-const mediaMaxBodySize int64 = 15 << 20 // 15 MB — base64 JSON image uploads (10 MB raw × 1.34 base64 + JSON overhead)
+const defaultMaxBodySize int64 = 1 << 20 // 1 MB
+const mediaMaxBodySize int64 = 32 << 20  // 32 MB — base64 JSON image uploads (~20 MB raw art photos × 1.34 + JSON overhead)
 
 // largeBodyPaths lists URL path prefixes that carry base64-encoded media
 // inside JSON bodies and therefore need a higher body size limit.

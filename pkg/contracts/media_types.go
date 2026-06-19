@@ -16,7 +16,7 @@ type UploadOpts struct {
 	// Applicable only to images.
 	Variants bool
 
-	// MaxBytes overrides the default upload size limit (0 = 15 MB default).
+	// MaxBytes overrides the default upload size limit (0 = 20 MB default).
 	MaxBytes int64
 }
 

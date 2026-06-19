@@ -62,12 +62,13 @@ func (g *Gateway) registerMediaPostAvatar(api huma.API) {
 		Body json.RawMessage
 	}
 	huma.Register(api, huma.Operation{
-		OperationID: "media-post-avatar",
-		Method:      http.MethodPost,
-		Path:        "/v1/media/avatar",
-		Summary:     "Upload store avatar image",
-		Tags:        []string{"media"},
-		Security:    nodeAuthSecurity,
+		OperationID:  "media-post-avatar",
+		Method:       http.MethodPost,
+		Path:         "/v1/media/avatar",
+		Summary:      "Upload store avatar image",
+		Tags:         []string{"media"},
+		Security:     nodeAuthSecurity,
+		MaxBodyBytes: mediaMaxBodySize,
 	}, func(ctx context.Context, in *mediaBodyInput) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/media/avatar", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -86,12 +87,13 @@ func (g *Gateway) registerMediaPostHeader(api huma.API) {
 		Body json.RawMessage
 	}
 	huma.Register(api, huma.Operation{
-		OperationID: "media-post-header",
-		Method:      http.MethodPost,
-		Path:        "/v1/media/header",
-		Summary:     "Upload store header image",
-		Tags:        []string{"media"},
-		Security:    nodeAuthSecurity,
+		OperationID:  "media-post-header",
+		Method:       http.MethodPost,
+		Path:         "/v1/media/header",
+		Summary:      "Upload store header image",
+		Tags:         []string{"media"},
+		Security:     nodeAuthSecurity,
+		MaxBodyBytes: mediaMaxBodySize,
 	}, func(ctx context.Context, in *mediaBodyInput) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/media/header", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -110,12 +112,13 @@ func (g *Gateway) registerMediaPostImages(api huma.API) {
 		Body json.RawMessage
 	}
 	huma.Register(api, huma.Operation{
-		OperationID: "media-post-images",
-		Method:      http.MethodPost,
-		Path:        "/v1/media/images",
-		Summary:     "Upload one or more images",
-		Tags:        []string{"media"},
-		Security:    nodeAuthSecurity,
+		OperationID:  "media-post-images",
+		Method:       http.MethodPost,
+		Path:         "/v1/media/images",
+		Summary:      "Upload one or more images",
+		Tags:         []string{"media"},
+		Security:     nodeAuthSecurity,
+		MaxBodyBytes: mediaMaxBodySize,
 	}, func(ctx context.Context, in *mediaBodyInput) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/media/images", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")
@@ -134,12 +137,13 @@ func (g *Gateway) registerMediaPostProductImages(api huma.API) {
 		Body json.RawMessage
 	}
 	huma.Register(api, huma.Operation{
-		OperationID: "media-post-product-images",
-		Method:      http.MethodPost,
-		Path:        "/v1/media/product-images",
-		Summary:     "Upload product images with variants",
-		Tags:        []string{"media"},
-		Security:    nodeAuthSecurity,
+		OperationID:  "media-post-product-images",
+		Method:       http.MethodPost,
+		Path:         "/v1/media/product-images",
+		Summary:      "Upload product images with variants",
+		Tags:         []string{"media"},
+		Security:     nodeAuthSecurity,
+		MaxBodyBytes: mediaMaxBodySize,
 	}, func(ctx context.Context, in *mediaBodyInput) (*nodeDataOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/media/product-images", bytes.NewReader(in.Body))
 		req.Header.Set("Content-Type", "application/json")

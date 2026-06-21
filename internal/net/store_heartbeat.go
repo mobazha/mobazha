@@ -17,7 +17,7 @@ const (
 
 // StoreHeartbeatConfig holds configuration for the heartbeat sender.
 type StoreHeartbeatConfig struct {
-	SaaSURL     string // SaaS platform base URL (e.g. https://api.mobazha.com)
+	SaaSURL     string // SaaS platform base URL (e.g. https://app.mobazha.org)
 	PeerID      string // this node's peer ID
 	EndpointURL string // this node's public API endpoint (empty for NAT-only stores)
 	APIKey      string // API key obtained during registration

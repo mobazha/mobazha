@@ -22,7 +22,7 @@ import (
 //   - SMTP: when "smtp_server" is present (for standalone deployments)
 type EmailSender struct {
 	client   *http.Client
-	storeURL string // base URL for action links, e.g. "https://mystore.mobazha.com"
+	storeURL string // base URL for action links, e.g. "https://alice-shop.mymbz.org"
 }
 
 func NewEmailSender(client *http.Client) *EmailSender {
@@ -73,7 +73,7 @@ func (s *EmailSender) TestMessage(cfg ChannelConfig) error {
 // sendViaResend uses the Resend HTTP API to deliver email.
 func (s *EmailSender) sendViaResend(apiKey, from, to, subject, htmlBody string) error {
 	if from == "" {
-		from = "Mobazha <notifications@mobazha.com>"
+		from = "Mobazha <notifications@mobazha.org>"
 	}
 	payload := map[string]interface{}{
 		"from":    from,

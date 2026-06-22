@@ -182,8 +182,6 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 				netConfig.MatrixRegistrationSecret = v
 			}
 		}
-		erp := wallet.NewExchangeRateProvider(nil)
-
 		// Standalone nodes default to the public SaaS URL so Matrix
 		// provisioning, heartbeat, and exchange rates work out of the box.
 		if !cfg.SaaSMode && cfg.SaaSAPIURL == "" {
@@ -198,6 +196,8 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		if !cfg.SaaSMode && cfg.SaaSAPIURL != "" {
 			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(cfg.SaaSAPIURL)
 		}
+
+		erp := wallet.NewExchangeRateProvider(nil)
 
 		// Auto-configure HTTP proxy trusted peers from NetConfig so that
 		// native binary nodes accept LibP2P API proxy requests from SaaS

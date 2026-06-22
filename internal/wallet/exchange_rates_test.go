@@ -56,6 +56,7 @@ func TestNormalizeBaseForRateQuery(t *testing.T) {
 
 func TestNewExchangeRateProvider(t *testing.T) {
 	cfg := config.GetGlobalExchangeRateConfig()
+	cfg.SetRemoteSaaSURL("")
 	cfg.SetCoinGeckoEnabled(true)
 	cfg.SetChainlinkEnabled(false)
 
@@ -74,6 +75,31 @@ func TestNewExchangeRateProvider(t *testing.T) {
 	}
 
 	t.Logf("Initialized %d providers", len(provider.providers))
+}
+
+func TestNewExchangeRateProvider_RemoteSaaSProviderFirst(t *testing.T) {
+	cfg := config.GetGlobalExchangeRateConfig()
+	cfg.SetRemoteSaaSURL("https://app.mobazha.test")
+	cfg.SetCoinGeckoEnabled(true)
+	cfg.SetBinanceEnabled(false)
+	cfg.SetChainlinkEnabled(false)
+	t.Cleanup(func() {
+		cfg.SetRemoteSaaSURL("")
+		cfg.SetCoinGeckoEnabled(true)
+		cfg.SetBinanceEnabled(false)
+		cfg.SetChainlinkEnabled(false)
+	})
+
+	provider := NewExchangeRateProvider(nil)
+	if len(provider.providers) < 2 {
+		t.Fatalf("providers = %d, want remote + coingecko", len(provider.providers))
+	}
+	if _, ok := provider.providers[0].(*remoteProvider); !ok {
+		t.Fatalf("first provider = %T, want *remoteProvider", provider.providers[0])
+	}
+	if provider.providerHealth[0].name != "remote_saas" {
+		t.Fatalf("providerHealth[0].name = %q, want remote_saas", provider.providerHealth[0].name)
+	}
 }
 
 func TestExchangeRateProviderGetRate_Mock(t *testing.T) {

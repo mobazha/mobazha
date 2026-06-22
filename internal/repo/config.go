@@ -243,17 +243,28 @@ type Config struct {
 	MatrixCryptoStore interface{} `no-flag:"true"`
 
 	// Platform AI Gateway — injected by hosting to provide zero-config AI.
-	// When the tenant hasn't configured BYOK, AIConfig() falls back to this.
-	PlatformAIProvider   string `no-flag:"true"`
-	PlatformAIAPIKey     string `no-flag:"true"`
-	PlatformAIModel      string `no-flag:"true"`
-	PlatformAIBaseURL    string `no-flag:"true"`
-	PlatformAIDailyLimit int    `no-flag:"true"` // per-tenant daily call limit (0 = unlimited)
+	// When the tenant hasn't configured BYOK, AIConfigFor* falls back to this.
+	PlatformAI PlatformAIProfileConfig `no-flag:"true"`
 
 	// ManagedEscrow payment platform settings injected by hosting/platform-console.
 	// Keys are iwallet.ChainType strings (for example "ETH", "BSC").
 	ManagedEscrowPlatformAddrs      map[string]string `no-flag:"true"`
 	ManagedEscrowReleaseFeeUSDCents map[string]uint64 `no-flag:"true"`
+}
+
+// PlatformAIEndpointConfig is one platform-managed LLM endpoint route.
+type PlatformAIEndpointConfig struct {
+	Provider string
+	APIKey   string
+	Model    string
+	BaseURL  string
+}
+
+// PlatformAIProfileConfig groups platform-managed text and vision LLM routes.
+type PlatformAIProfileConfig struct {
+	Text       PlatformAIEndpointConfig
+	Vision     PlatformAIEndpointConfig
+	DailyLimit int
 }
 
 // ParseElectrumServers parses the repeatable "chain=host:port" entries into a map.

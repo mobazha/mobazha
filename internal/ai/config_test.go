@@ -132,8 +132,8 @@ func TestLookupProvider_FallbackWhenNotInRemote(t *testing.T) {
 	}
 
 	cfg := &Config{Provider: "deepseek"}
-	if got := cfg.EffectiveModel(); got != "deepseek-chat" {
-		t.Errorf("expected fallback model 'deepseek-chat', got %q", got)
+	if got := cfg.EffectiveModel(); got != "deepseek-v4-flash" {
+		t.Errorf("expected fallback model 'deepseek-v4-flash', got %q", got)
 	}
 	if got := cfg.EffectiveBaseURL(); got != "https://api.deepseek.com/v1" {
 		t.Errorf("expected fallback base_url, got %q", got)

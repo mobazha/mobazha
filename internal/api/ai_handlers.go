@@ -4,6 +4,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
@@ -15,11 +16,14 @@ var aiLog = logging.MustGetLogger("AI")
 
 type aiConfigProvider interface {
 	AIConfig() aipkg.Config
+	AIConfigForGenerate(aipkg.GenerateRequest) (aipkg.Config, error)
+	AIConfigForChat([]aipkg.ChatMsg) (aipkg.Config, error)
 	AIMultiConfig() aipkg.MultiConfig
 	SaveAIMultiConfig(aipkg.MultiConfig) error
 	AIProxy() *aipkg.Proxy
 	AIRateLimiter() *aipkg.DailyRateLimiter
 	PlatformAIConfig() *aipkg.Config
+	PlatformAIProfile() aipkg.PlatformProfile
 }
 
 func getAIProvider(r *http.Request) aiConfigProvider {
@@ -166,7 +170,32 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 
-	cfg := p.AIConfig()
+	var req aipkg.GenerateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		aiLog.Errorf("Invalid AI generate request body: %s", err)
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Invalid request body")
+		return
+	}
+	if req.Action == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Missing action field")
+		return
+	}
+
+	cfg, err := p.AIConfigForGenerate(req)
+	if err != nil {
+		switch {
+		case errors.Is(err, aipkg.ErrVisionUnsupported):
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+				"Configured AI provider does not support image input. Configure a vision-capable provider for image generation.")
+		case errors.Is(err, aipkg.ErrVisionNotConfigured):
+			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
+				"AI vision model is not configured. Please configure a vision-capable provider.")
+		default:
+			aiLog.Warningf("AI config resolution failed: %v", err)
+			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "AI is not configured")
+		}
+		return
+	}
 	if !cfg.IsValid() {
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "AI is not configured. Please set up your AI provider in Settings > Integrations.")
 		return
@@ -181,17 +210,6 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-	}
-
-	var req aipkg.GenerateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		aiLog.Errorf("Invalid AI generate request body: %s", err)
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Invalid request body")
-		return
-	}
-	if req.Action == "" {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Missing action field")
-		return
 	}
 
 	proxy := p.AIProxy()
@@ -227,6 +245,9 @@ func (g *Gateway) handleGETAIStatus(w http.ResponseWriter, r *http.Request) {
 	mc := p.AIMultiConfig()
 	userCfg := mc.ActiveConfig()
 	byokConfigured := userCfg.IsValid()
+	profile := p.PlatformAIProfile()
+	textAvailable := byokConfigured || profile.TextAvailable()
+	visionAvailable := (byokConfigured && aipkg.ConfigSupportsVision(userCfg)) || profile.VisionAvailable()
 
 	var source string
 	var dailyLimit, dailyUsed int
@@ -234,10 +255,12 @@ func (g *Gateway) handleGETAIStatus(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case byokConfigured:
 		source = "byok"
-	case p.PlatformAIConfig() != nil && p.PlatformAIConfig().IsValid():
+	case profile.TextAvailable() || profile.VisionAvailable():
 		source = "platform"
 		pCfg := p.PlatformAIConfig()
-		dailyLimit = pCfg.DailyLimit
+		if pCfg != nil {
+			dailyLimit = pCfg.DailyLimit
+		}
 		if rl := p.AIRateLimiter(); rl != nil {
 			dailyUsed = rl.Usage(getIdentityService(r).GetNodeID())
 		}
@@ -246,10 +269,12 @@ func (g *Gateway) handleGETAIStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responsePkg.Success(w, map[string]interface{}{
-		"available":       source != "none",
-		"source":          source,
-		"daily_limit":     dailyLimit,
-		"daily_used":      dailyUsed,
-		"byok_configured": byokConfigured,
+		"available":        source != "none",
+		"source":           source,
+		"daily_limit":      dailyLimit,
+		"daily_used":       dailyUsed,
+		"byok_configured":  byokConfigured,
+		"text_available":   textAvailable,
+		"vision_available": visionAvailable,
 	})
 }

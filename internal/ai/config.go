@@ -43,13 +43,13 @@ var fallbackProviders = map[string]ProviderPreset{
 		HelpURL: "https://aistudio.google.com/apikey",
 	},
 	"deepseek": {
-		Label: "DeepSeek", DefaultModel: "deepseek-chat", DefaultBaseURL: "https://api.deepseek.com/v1",
-		Models:  []string{"deepseek-chat", "deepseek-reasoner"},
+		Label: "DeepSeek", DefaultModel: "deepseek-v4-flash", DefaultBaseURL: "https://api.deepseek.com/v1",
+		Models:  []string{"deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner"},
 		HelpURL: "https://platform.deepseek.com/api_keys",
 	},
 	"qwen": {
 		Label: "Qwen (通义千问)", DefaultModel: "qwen-max", DefaultBaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-		Models:  []string{"qwen-max", "qwen-plus", "qwen-turbo", "qwen-vl-max"},
+		Models:  []string{"qwen-max", "qwen-plus", "qwen-turbo", "qwen3-vl-flash", "qwen-vl-max"},
 		HelpURL: "https://dashscope.console.aliyun.com/apiKey",
 	},
 	"custom": {Label: "Custom (OpenAI-compatible)", DefaultModel: "", DefaultBaseURL: ""},

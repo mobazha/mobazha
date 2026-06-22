@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	internalapi "github.com/mobazha/mobazha3.0/internal/api"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/core"
@@ -46,6 +47,36 @@ func NewNodeWithOptions(ctx context.Context, cfg *repo.Config, nodeID string,
 // Pass nil (or omit) to keep all EVM chains on the legacy V1 path.
 func WithManagedEscrowCapConfig(cfg *managed_escrow.ChainCapabilityConfig) NodeOption {
 	return core.WithManagedEscrowCapConfig(cfg)
+}
+
+// SetPlatformAIProfile updates platform-provided AI routes on a running node.
+func SetPlatformAIProfile(node *MobazhaNode, profile repo.PlatformAIProfileConfig) {
+	if node == nil {
+		return
+	}
+	node.SetPlatformAIProfile(aipkg.PlatformProfile{
+		Text:   platformAIEndpointConfig(profile.Text, profile.DailyLimit),
+		Vision: platformAIEndpointConfig(profile.Vision, profile.DailyLimit),
+	})
+}
+
+func platformAIEndpointConfig(endpoint repo.PlatformAIEndpointConfig, dailyLimit int) *aipkg.Config {
+	if endpoint.Provider == "" || endpoint.APIKey == "" {
+		return nil
+	}
+	cfg := &aipkg.Config{
+		Provider:   endpoint.Provider,
+		APIKey:     endpoint.APIKey,
+		Model:      endpoint.Model,
+		BaseURL:    endpoint.BaseURL,
+		Enabled:    true,
+		IsPlatform: true,
+		DailyLimit: dailyLimit,
+	}
+	if !cfg.IsValid() {
+		return nil
+	}
+	return cfg
 }
 
 // GetNodeManager returns the global NodeManagerIface instance.

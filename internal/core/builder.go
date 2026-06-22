@@ -1555,22 +1555,35 @@ func initEventDispatcher(
 // initPlatformAIConfig sets up the platform-provided AI fallback config
 // from repo.Config fields injected by hosting (SaaS) or standalone admin.
 func initPlatformAIConfig(obNode *MobazhaNode, cfg *repo.Config) {
-	if cfg.PlatformAIProvider == "" || cfg.PlatformAIAPIKey == "" {
+	profile := aipkg.PlatformProfile{
+		Text:   platformEndpointConfig(cfg.PlatformAI.Text, cfg.PlatformAI.DailyLimit),
+		Vision: platformEndpointConfig(cfg.PlatformAI.Vision, cfg.PlatformAI.DailyLimit),
+	}
+	if !profile.TextAvailable() && !profile.VisionAvailable() {
 		return
 	}
-	pCfg := &aipkg.Config{
-		Provider:   cfg.PlatformAIProvider,
-		APIKey:     cfg.PlatformAIAPIKey,
-		Model:      cfg.PlatformAIModel,
-		BaseURL:    cfg.PlatformAIBaseURL,
+	obNode.SetPlatformAIProfile(profile)
+	logger.LogInfoWithIDf(log, obNode.nodeID, "Platform AI configured (text=%t, vision=%t, limit=%d/day)",
+		profile.TextAvailable(), profile.VisionAvailable(), cfg.PlatformAI.DailyLimit)
+}
+
+func platformEndpointConfig(endpoint repo.PlatformAIEndpointConfig, dailyLimit int) *aipkg.Config {
+	if endpoint.Provider == "" || endpoint.APIKey == "" {
+		return nil
+	}
+	cfg := &aipkg.Config{
+		Provider:   endpoint.Provider,
+		APIKey:     endpoint.APIKey,
+		Model:      endpoint.Model,
+		BaseURL:    endpoint.BaseURL,
 		Enabled:    true,
 		IsPlatform: true,
-		DailyLimit: cfg.PlatformAIDailyLimit,
+		DailyLimit: dailyLimit,
 	}
-	if pCfg.IsValid() {
-		obNode.platformAIConfig = pCfg
-		logger.LogInfoWithIDf(log, obNode.nodeID, "Platform AI configured (provider=%s, limit=%d/day)", pCfg.Provider, pCfg.DailyLimit)
+	if !cfg.IsValid() {
+		return nil
 	}
+	return cfg
 }
 
 // gatewayLocalAddr derives the local HTTP API address from cfg.GatewayAddr.

@@ -4,6 +4,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -103,7 +104,31 @@ func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := p.AIConfig()
+	var req aipkg.ChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid request body")
+		return
+	}
+	if strings.TrimSpace(req.Message) == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "message is required")
+		return
+	}
+	if len(req.Message) > aipkg.MaxUserMessageLen {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation,
+			fmt.Sprintf("message too long (max %d characters)", aipkg.MaxUserMessageLen))
+		return
+	}
+
+	cfg, err := p.AIConfigForChat(nil)
+	if err != nil {
+		if errors.Is(err, aipkg.ErrVisionNotConfigured) || errors.Is(err, aipkg.ErrVisionUnsupported) {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "AI chat model is not configured for this input")
+			return
+		}
+		aiLog.Warningf("AI chat config resolution failed: %v", err)
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "AI is not configured")
+		return
+	}
 	if !cfg.IsValid() {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "AI is not configured. Please set up an AI provider in Settings > Integrations.")
 		return
@@ -127,21 +152,6 @@ func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer activeAIStreams.Delete(streamKey)
-
-	var req aipkg.ChatRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid request body")
-		return
-	}
-	if strings.TrimSpace(req.Message) == "" {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "message is required")
-		return
-	}
-	if len(req.Message) > aipkg.MaxUserMessageLen {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation,
-			fmt.Sprintf("message too long (max %d characters)", aipkg.MaxUserMessageLen))
-		return
-	}
 
 	role := aipkg.UserRoleSeller
 

@@ -9,31 +9,62 @@ import (
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 )
 
-func TestBuildLLMMessages(t *testing.T) {
-	history := []aipkg.ChatMsg{
-		{Role: aipkg.RoleUser, Content: "Previous question"},
-		{Role: aipkg.RoleAssistant, Content: "Previous answer"},
+func TestVisibleChatMessages_HidesInternalToolTraffic(t *testing.T) {
+	messages := []aipkg.ChatMsg{
+		{Role: aipkg.RoleSystem, Content: "system prompt"},
+		{Role: aipkg.RoleUser, Content: "What should I focus on?"},
+		{
+			Role: aipkg.RoleAssistant,
+			ToolCalls: []aipkg.ToolCall{{
+				ID: "call_1",
+				Function: aipkg.ToolCallFunc{
+					Name:      "sales_list",
+					Arguments: `{"limit":20}`,
+				},
+			}},
+		},
+		{
+			Role:       aipkg.RoleTool,
+			Content:    `{"data":[{"orderID":"QmSecret"}]}`,
+			ToolCallID: "call_1",
+			Name:       "sales_list",
+		},
+		{Role: aipkg.RoleAssistant, Content: "Start with unread customer messages."},
 	}
-	msgs := buildLLMMessages("System prompt", history, "Current message")
 
-	if len(msgs) != 4 {
-		t.Fatalf("expected 4 messages (system + 2 history + current), got %d", len(msgs))
+	visible := visibleChatMessages(messages)
+	if len(visible) != 2 {
+		t.Fatalf("expected only user and final assistant messages, got %d: %#v", len(visible), visible)
 	}
-	if msgs[0].Role != aipkg.RoleSystem || msgs[0].Content != "System prompt" {
-		t.Error("first message should be system prompt")
+	if visible[0].Role != aipkg.RoleUser || visible[0].Content != "What should I focus on?" {
+		t.Fatalf("unexpected first visible message: %#v", visible[0])
 	}
-	if msgs[1].Content != "Previous question" {
-		t.Error("second message should be history[0]")
+	if visible[1].Role != aipkg.RoleAssistant || visible[1].Content != "Start with unread customer messages." {
+		t.Fatalf("unexpected assistant message: %#v", visible[1])
 	}
-	if msgs[3].Role != aipkg.RoleUser || msgs[3].Content != "Current message" {
-		t.Error("last message should be current user message")
+	if visible[1].ToolCalls != nil || visible[1].ToolCallID != "" || visible[1].Name != "" {
+		t.Fatalf("assistant internals should be stripped: %#v", visible[1])
 	}
 }
 
-func TestBuildLLMMessages_EmptyHistory(t *testing.T) {
-	msgs := buildLLMMessages("System", nil, "Hello")
-	if len(msgs) != 2 {
-		t.Fatalf("expected 2 messages, got %d", len(msgs))
+func TestVisibleChatSession_DoesNotMutateStoredSession(t *testing.T) {
+	session := &aipkg.ChatSession{
+		ID: "session-1",
+		Messages: []aipkg.ChatMsg{
+			{Role: aipkg.RoleUser, Content: "Hello"},
+			{Role: aipkg.RoleTool, Content: `{"data":[]}`, Name: "profile_get"},
+		},
+	}
+
+	visible := visibleChatSession(session)
+	if visible == session {
+		t.Fatal("visibleChatSession should return a copy")
+	}
+	if len(visible.Messages) != 1 {
+		t.Fatalf("expected one visible message, got %d", len(visible.Messages))
+	}
+	if len(session.Messages) != 2 {
+		t.Fatalf("stored session should remain unchanged, got %d messages", len(session.Messages))
 	}
 }
 

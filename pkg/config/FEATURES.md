@@ -562,7 +562,7 @@
 - **Consumers**:
   - Seller Admin dashboard tab (Insights / AI Workspace)
   - Rule-based opportunity cards + inline WorkspaceChat
-- **Dependencies**: none (WS-0 uses existing `/v1/ai/chat` and `/v1/ai/status`)
+- **Dependencies**: none (Workspace chat uses `/v1/agent/chat`; status still uses `/v1/ai/status`)
 
 ---
 

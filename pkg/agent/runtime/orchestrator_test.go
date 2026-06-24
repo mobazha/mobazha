@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/agent/budget"
 	"github.com/mobazha/mobazha3.0/pkg/agent/exec"
+	"github.com/mobazha/mobazha3.0/pkg/agent/store"
 	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
 	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
 )
@@ -29,6 +31,74 @@ type capturedCall struct {
 type mockLLMResponse struct {
 	chunks []stream.Chunk
 	err    error
+}
+
+type fakePersistence struct {
+	thread         *store.Thread
+	messages       []*store.Message
+	saveMessageErr error
+	saveTurnErr    error
+	turnSaveCount  int
+}
+
+func (p *fakePersistence) SaveThread(_ context.Context, t *store.Thread) error {
+	if t == nil {
+		return nil
+	}
+	cp := *t
+	p.thread = &cp
+	return nil
+}
+
+func (p *fakePersistence) SaveTurn(context.Context, *store.Turn) error {
+	p.turnSaveCount++
+	if p.saveTurnErr != nil && p.turnSaveCount > 1 {
+		return p.saveTurnErr
+	}
+	return nil
+}
+
+func (p *fakePersistence) SaveMessage(_ context.Context, m *store.Message) error {
+	if p.saveMessageErr != nil {
+		return p.saveMessageErr
+	}
+	cp := *m
+	p.messages = append(p.messages, &cp)
+	return nil
+}
+
+func (p *fakePersistence) LoadThread(_ context.Context, _, threadID string) (*store.Thread, error) {
+	if p.thread == nil || p.thread.ID != threadID {
+		return nil, store.ErrThreadNotFound
+	}
+	cp := *p.thread
+	return &cp, nil
+}
+
+func (p *fakePersistence) ListThreads(context.Context, string, int, int) ([]*store.Thread, error) {
+	if p.thread == nil {
+		return nil, nil
+	}
+	cp := *p.thread
+	return []*store.Thread{&cp}, nil
+}
+
+func (p *fakePersistence) LoadMessages(_ context.Context, _, threadID string) ([]*store.Message, error) {
+	out := make([]*store.Message, 0, len(p.messages))
+	for _, msg := range p.messages {
+		if msg.ThreadID != threadID {
+			continue
+		}
+		cp := *msg
+		out = append(out, &cp)
+	}
+	return out, nil
+}
+
+func (p *fakePersistence) DeleteThread(context.Context, string, string) error {
+	p.thread = nil
+	p.messages = nil
+	return nil
 }
 
 func (m *mockLLM) ChatStream(_ context.Context, msgs []Message, tools []ToolDef) (stream.Stream, error) {
@@ -101,6 +171,72 @@ func TestRunTurn_SimpleTextResponse(t *testing.T) {
 	}
 }
 
+func TestHydrateThread_SeedsHistoryForNextTurn(t *testing.T) {
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{{Delta: "next"}}},
+		},
+	}
+
+	orch := newTestOrch(llm, nil)
+	orch.HydrateThread("tenant_1", "th_1", []*store.Message{
+		{Role: "user", Content: "Previous question"},
+		{Role: "assistant", Content: "Previous answer"},
+	})
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_1", "Current question")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("stream error: %v", err)
+	}
+
+	if len(llm.captured) != 1 {
+		t.Fatalf("expected one LLM call, got %d", len(llm.captured))
+	}
+	got := llm.captured[0].messages
+	if len(got) != 3 {
+		t.Fatalf("expected hydrated history plus current message, got %#v", got)
+	}
+	if got[0].Content != "Previous question" || got[1].Content != "Previous answer" || got[2].Content != "Current question" {
+		t.Fatalf("unexpected message order: %#v", got)
+	}
+}
+
+func TestForgetThread_RemovesHydratedHistory(t *testing.T) {
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{{Delta: "fresh"}}},
+		},
+	}
+	orch := newTestOrch(llm, nil)
+	orch.HydrateThread("tenant_1", "th_deleted", []*store.Message{
+		{Role: "user", Content: "Deleted question"},
+		{Role: "assistant", Content: "Deleted answer"},
+	})
+
+	orch.ForgetThread("tenant_1", "th_deleted")
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_deleted", "Fresh question")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("stream error: %v", err)
+	}
+
+	if len(llm.captured) != 1 {
+		t.Fatalf("expected one LLM call, got %d", len(llm.captured))
+	}
+	got := llm.captured[0].messages
+	if len(got) != 1 {
+		t.Fatalf("expected only current message after forget, got %#v", got)
+	}
+	if got[0].Content != "Fresh question" {
+		t.Fatalf("unexpected message after forget: %#v", got)
+	}
+}
+
 func TestRunTurn_WithToolCalls(t *testing.T) {
 	llm := &mockLLM{
 		responses: []mockLLMResponse{
@@ -165,6 +301,47 @@ func TestRunTurn_WithToolCalls(t *testing.T) {
 	turnComplete := emitter.ByType(telemetry.TurnCompleted)
 	if len(turnComplete) == 0 {
 		t.Error("expected turn_completed telemetry event")
+	}
+}
+
+func TestRunTurn_EmitsRedactedToolProgress(t *testing.T) {
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{
+				{ToolCalls: []stream.ToolCall{
+					{ID: "tc_1", Name: "search", Arguments: `{"secret":"hidden"}`},
+				}},
+			}},
+			{chunks: []stream.Chunk{{Delta: "done"}}},
+		},
+	}
+	orch := newTestOrch(llm, nil)
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_progress", "Search")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("stream error: %v", streamErr)
+	}
+
+	var sawExecuting, sawDone bool
+	for _, chunk := range chunks {
+		if chunk.ToolEvent == nil {
+			continue
+		}
+		if chunk.ToolEvent.ID != "tc_1" || chunk.ToolEvent.Name != "search" {
+			t.Fatalf("unexpected tool event: %#v", chunk.ToolEvent)
+		}
+		if strings.Contains(fmt.Sprintf("%#v", chunk.ToolEvent), "hidden") {
+			t.Fatal("tool event should not expose arguments")
+		}
+		sawExecuting = sawExecuting || chunk.ToolEvent.Status == "executing"
+		sawDone = sawDone || chunk.ToolEvent.Status == "done"
+	}
+	if !sawExecuting || !sawDone {
+		t.Fatalf("expected executing and done tool events, got %#v", chunks)
 	}
 }
 
@@ -318,6 +495,109 @@ func TestRunTurn_MultiTurnMemory(t *testing.T) {
 	}
 	if !foundAssistantAlice {
 		t.Error("turn 2 should include prior assistant response")
+	}
+}
+
+func TestRunTurn_PersistenceFailureDoesNotPolluteMemory(t *testing.T) {
+	persist := &fakePersistence{saveMessageErr: errors.New("disk full")}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "unused"}}}},
+	}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		telemetry.NoopEmitter{},
+		nil,
+	)
+
+	_, err := orch.RunTurn(context.Background(), "tenant_1", "th_fail", "hello")
+	if err == nil {
+		t.Fatal("expected RunTurn to fail when persistence rejects the user message")
+	}
+	if got := orch.mem.GetMessages("tenant_1", "th_fail"); len(got) != 0 {
+		t.Fatalf("memory should not contain unpersisted messages, got %#v", got)
+	}
+}
+
+func TestRunTurn_CompletedTurnPersistenceFailureReturnsStreamError(t *testing.T) {
+	persist := &fakePersistence{saveTurnErr: errors.New("turn update failed")}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "answer"}}}},
+	}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		telemetry.NoopEmitter{},
+		nil,
+	)
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_turn_fail", "hello")
+	if err != nil {
+		t.Fatalf("RunTurn should start successfully, got %v", err)
+	}
+	_, streamErr := stream.Collect(result.Output)
+	if streamErr == nil || !strings.Contains(streamErr.Error(), "turn update failed") {
+		t.Fatalf("expected completed turn persistence error, got %v", streamErr)
+	}
+}
+
+func TestRunTurn_LoadsHistoryFromPersistenceAfterRestart(t *testing.T) {
+	persist := &fakePersistence{}
+	llm1 := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "first answer"}}}}}
+	orch1 := NewOrchestrator(
+		llm1,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		telemetry.NoopEmitter{},
+		nil,
+	)
+	r1, err := orch1.RunTurn(context.Background(), "tenant_1", "th_restart", "first question")
+	if err != nil {
+		t.Fatalf("turn 1 error: %v", err)
+	}
+	if _, err := stream.Collect(r1.Output); err != nil {
+		t.Fatalf("turn 1 stream error: %v", err)
+	}
+
+	llm2 := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "second answer"}}}}}
+	orch2 := NewOrchestrator(
+		llm2,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		telemetry.NoopEmitter{},
+		nil,
+	)
+	r2, err := orch2.RunTurn(context.Background(), "tenant_1", "th_restart", "second question")
+	if err != nil {
+		t.Fatalf("turn 2 error: %v", err)
+	}
+	if _, err := stream.Collect(r2.Output); err != nil {
+		t.Fatalf("turn 2 stream error: %v", err)
+	}
+
+	if len(llm2.captured) != 1 {
+		t.Fatalf("expected one LLM call after restart, got %d", len(llm2.captured))
+	}
+	got := llm2.captured[0].messages
+	if len(got) < 3 {
+		t.Fatalf("expected persisted history plus current message, got %#v", got)
+	}
+	if got[0].Content != "first question" || got[1].Content != "first answer" || got[len(got)-1].Content != "second question" {
+		t.Fatalf("unexpected restored history: %#v", got)
 	}
 }
 

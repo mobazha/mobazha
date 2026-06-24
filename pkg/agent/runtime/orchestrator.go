@@ -3,9 +3,11 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mobazha/mobazha3.0/pkg/agent/budget"
 	"github.com/mobazha/mobazha3.0/pkg/agent/exec"
 	"github.com/mobazha/mobazha3.0/pkg/agent/store"
@@ -21,9 +23,9 @@ type LLMClient interface {
 
 // Message is an agent conversation message sent to/from the LLM.
 type Message struct {
-	Role       string           `json:"role"`
-	Content    string           `json:"content"`
-	ToolCallID string           `json:"tool_call_id,omitempty"`
+	Role       string            `json:"role"`
+	Content    string            `json:"content"`
+	ToolCallID string            `json:"tool_call_id,omitempty"`
 	ToolCalls  []stream.ToolCall `json:"tool_calls,omitempty"`
 }
 
@@ -69,9 +71,9 @@ type Orchestrator struct {
 	emitter   telemetry.Emitter
 	cfg       Config
 
-	systemPrompt    string
-	tools           []ToolDef
-	inputGuardrails []InputGuardrail
+	systemPrompt     string
+	tools            []ToolDef
+	inputGuardrails  []InputGuardrail
 	outputGuardrails []OutputGuardrail
 }
 
@@ -123,6 +125,47 @@ func (o *Orchestrator) RegisterTools(tools []ToolDef) {
 	o.tools = tools
 }
 
+// HydrateThread seeds runtime memory from durable history when a thread is
+// resumed after process restart or cache eviction. Existing in-memory history
+// wins to avoid duplicating messages during active conversations.
+func (o *Orchestrator) HydrateThread(tenantID, threadID string, messages []*store.Message) {
+	if tenantID == "" || threadID == "" {
+		return
+	}
+	if len(o.mem.GetMessages(tenantID, threadID)) > 0 {
+		return
+	}
+	if _, ok := o.mem.GetThread(tenantID, threadID); !ok {
+		now := time.Now()
+		o.mem.UpdateThread(&store.Thread{
+			ID:         threadID,
+			TenantID:   tenantID,
+			CreatedAt:  now,
+			LastActive: now,
+		})
+	}
+	for _, msg := range messages {
+		if msg == nil {
+			continue
+		}
+		cp := *msg
+		cp.TenantID = tenantID
+		if cp.CreatedAt.IsZero() {
+			cp.CreatedAt = time.Now()
+		}
+		o.mem.AppendMessage(tenantID, threadID, &cp)
+	}
+}
+
+// ForgetThread removes the in-memory copy of a thread. Durable persistence is
+// owned by the store adapter; callers should delete persistent rows separately.
+func (o *Orchestrator) ForgetThread(tenantID, threadID string) {
+	if o == nil || tenantID == "" || threadID == "" {
+		return
+	}
+	o.mem.RemoveThread(tenantID, threadID)
+}
+
 // AddInputGuardrail adds an input validation guardrail.
 func (o *Orchestrator) AddInputGuardrail(g InputGuardrail) {
 	o.inputGuardrails = append(o.inputGuardrails, g)
@@ -145,7 +188,7 @@ type TurnResult struct {
 //  3. Assemble messages: system prompt + history + user message
 //  4. Loop: send to LLM → if tool_calls, execute tools, append results, repeat
 //  5. Validate output via guardrails
-//  6. Save messages to in-memory store
+//  6. Save messages to runtime memory and durable persistence
 //  7. Stream final assistant output
 func (o *Orchestrator) RunTurn(ctx context.Context, tenantID, threadID string, userMsg string) (*TurnResult, error) {
 	if len(o.inputGuardrails) > 0 {
@@ -160,7 +203,8 @@ func (o *Orchestrator) RunTurn(ctx context.Context, tenantID, threadID string, u
 
 	turnCtx, cancel := context.WithTimeout(ctx, o.cfg.TurnTimeout)
 
-	turnID := fmt.Sprintf("turn_%d", time.Now().UnixMilli())
+	turnID := newTurnID()
+	turnStartedAt := time.Now()
 
 	o.emitter.Emit(ctx, telemetry.Event{
 		Type:     telemetry.TurnStarted,
@@ -169,26 +213,41 @@ func (o *Orchestrator) RunTurn(ctx context.Context, tenantID, threadID string, u
 		Attrs:    map[string]any{"turn_id": turnID},
 	})
 
-	thread := o.ensureThread(tenantID, threadID)
-	_ = thread
+	if _, err := o.ensureThread(ctx, tenantID, threadID); err != nil {
+		return nil, err
+	}
+	if err := o.saveTurn(ctx, &store.Turn{
+		ID:        turnID,
+		TenantID:  tenantID,
+		ThreadID:  threadID,
+		StartedAt: turnStartedAt,
+		Completed: false,
+	}); err != nil {
+		return nil, err
+	}
 
 	history := o.assembleHistory(tenantID, threadID, userMsg)
 
-	o.mem.AppendMessage(tenantID, threadID, &store.Message{
-		ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+	if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
+		ID:        newMessageID(),
 		TenantID:  tenantID,
+		ThreadID:  threadID,
+		TurnID:    turnID,
 		Role:      "user",
 		Content:   userMsg,
 		Tokens:    budget.EstimateTokens(userMsg),
+		Bytes:     len(userMsg),
 		CreatedAt: time.Now(),
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	outStream := stream.NewBuffered(ctx, 32)
 
 	go func() {
 		defer cancel()
 		defer outStream.Finish()
-		o.runLoop(turnCtx, tenantID, threadID, turnID, history, outStream)
+		o.runLoop(turnCtx, tenantID, threadID, turnID, turnStartedAt, history, outStream)
 	}()
 
 	return &TurnResult{Output: outStream, TurnID: turnID}, nil
@@ -226,6 +285,7 @@ func (o *Orchestrator) assembleHistory(tenantID, threadID, userMsg string) []Mes
 func (o *Orchestrator) runLoop(
 	ctx context.Context,
 	tenantID, threadID, turnID string,
+	turnStartedAt time.Time,
 	history []Message,
 	out *stream.Buffered,
 ) {
@@ -265,7 +325,10 @@ func (o *Orchestrator) runLoop(
 		}
 
 		if len(toolCalls) == 0 {
-			o.saveAssistantMessage(tenantID, threadID, assistantText)
+			if err := o.saveAssistantMessage(ctx, tenantID, threadID, turnID, assistantText); err != nil {
+				out.SendError(err)
+				return
+			}
 
 			// Output guardrails run post-stream as audit/telemetry only.
 			// In streaming mode, content is already delivered to the consumer —
@@ -293,25 +356,49 @@ func (o *Orchestrator) runLoop(
 					"rounds":  round + 1,
 				},
 			})
+			completedAt := time.Now()
+			if err := o.saveTurn(ctx, &store.Turn{
+				ID:          turnID,
+				TenantID:    tenantID,
+				ThreadID:    threadID,
+				StartedAt:   turnStartedAt,
+				CompletedAt: &completedAt,
+				Completed:   true,
+			}); err != nil {
+				out.SendError(err)
+			}
 			return
 		}
 
 		history = append(history, Message{Role: "assistant", Content: assistantText, ToolCalls: toolCalls})
 
 		toolCallsJSON, _ := json.Marshal(toolCalls)
-		o.mem.AppendMessage(tenantID, threadID, &store.Message{
-			ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+		if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
+			ID:        newMessageID(),
 			TenantID:  tenantID,
+			ThreadID:  threadID,
+			TurnID:    turnID,
 			Role:      "assistant",
 			Content:   assistantText,
 			ToolCalls: string(toolCallsJSON),
 			Tokens:    budget.EstimateTokens(assistantText),
+			Bytes:     len(assistantText),
 			CreatedAt: time.Now(),
-		})
+		}); err != nil {
+			out.SendError(err)
+			return
+		}
 
 		execCalls := make([]exec.ToolCall, len(toolCalls))
+		toolNames := make(map[string]string, len(toolCalls))
 		for i, tc := range toolCalls {
 			execCalls[i] = exec.ToolCall{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments}
+			toolNames[tc.ID] = tc.Name
+			out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
+				ID:     tc.ID,
+				Name:   tc.Name,
+				Status: "executing",
+			}})
 		}
 
 		start := time.Now()
@@ -338,20 +425,39 @@ func (o *Orchestrator) runLoop(
 		})
 
 		for _, r := range results {
+			status := "done"
+			if r.IsError {
+				status = "error"
+			}
+			toolName := r.Name
+			if toolName == "" {
+				toolName = toolNames[r.CallID]
+			}
+			out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
+				ID:     r.CallID,
+				Name:   toolName,
+				Status: status,
+			}})
 			history = append(history, Message{
 				Role:       "tool",
 				Content:    r.Content,
 				ToolCallID: r.CallID,
 			})
-			o.mem.AppendMessage(tenantID, threadID, &store.Message{
-				ID:         fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+			if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
+				ID:         newMessageID(),
 				TenantID:   tenantID,
+				ThreadID:   threadID,
+				TurnID:     turnID,
 				Role:       "tool",
 				Content:    r.Content,
 				ToolCallID: r.CallID,
 				Tokens:     budget.EstimateTokens(r.Content),
+				Bytes:      len(r.Content),
 				CreatedAt:  time.Now(),
-			})
+			}); err != nil {
+				out.SendError(err)
+				return
+			}
 		}
 
 		if execErr != nil && errCount == len(results) {
@@ -388,14 +494,48 @@ func (o *Orchestrator) callLLMWithRetry(ctx context.Context, history []Message) 
 	return nil, lastErr
 }
 
-// saveAssistantMessage persists the assistant's response to in-memory store.
-func (o *Orchestrator) saveAssistantMessage(tenantID, threadID, text string) {
-	o.mem.AppendMessage(tenantID, threadID, &store.Message{
-		ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+func (o *Orchestrator) saveTurn(ctx context.Context, turn *store.Turn) error {
+	if o.persist == nil {
+		return nil
+	}
+	if err := o.persist.SaveTurn(ctx, turn); err != nil {
+		return fmt.Errorf("agent runtime: save turn: %w", err)
+	}
+	return nil
+}
+
+func (o *Orchestrator) saveMessage(ctx context.Context, tenantID, threadID string, msg *store.Message) error {
+	if msg == nil {
+		return nil
+	}
+	if o.persist != nil {
+		if err := o.persist.SaveMessage(ctx, msg); err != nil {
+			return fmt.Errorf("agent runtime: save message: %w", err)
+		}
+	}
+	o.mem.AppendMessage(tenantID, threadID, msg)
+	return nil
+}
+
+func newTurnID() string {
+	return "turn_" + uuid.NewString()
+}
+
+func newMessageID() string {
+	return "msg_" + uuid.NewString()
+}
+
+// saveAssistantMessage persists the assistant's response to runtime memory and durable store.
+func (o *Orchestrator) saveAssistantMessage(ctx context.Context, tenantID, threadID, turnID, text string) error {
+	return o.saveMessage(ctx, tenantID, threadID, &store.Message{
+		ID:        newMessageID(),
 		TenantID:  tenantID,
+		ThreadID:  threadID,
+		TurnID:    turnID,
 		Role:      "assistant",
 		Content:   text,
 		Tokens:    budget.EstimateTokens(text),
+		Bytes:     len(text),
 		CreatedAt: time.Now(),
 	})
 }
@@ -432,11 +572,38 @@ func (o *Orchestrator) drainLLMStream(
 	return chunks, toolCalls, text, llmStream.Err()
 }
 
-func (o *Orchestrator) ensureThread(tenantID, threadID string) *store.Thread {
+func (o *Orchestrator) ensureThread(ctx context.Context, tenantID, threadID string) (*store.Thread, error) {
 	if t, ok := o.mem.GetThread(tenantID, threadID); ok {
 		o.mem.TouchThread(tenantID, threadID)
-		return t
+		t.LastActive = time.Now()
+		if o.persist != nil {
+			if err := o.persist.SaveThread(ctx, t); err != nil {
+				return nil, fmt.Errorf("agent runtime: touch thread: %w", err)
+			}
+		}
+		return t, nil
 	}
+
+	if o.persist != nil {
+		t, err := o.persist.LoadThread(ctx, tenantID, threadID)
+		if err != nil && !errors.Is(err, store.ErrThreadNotFound) {
+			return nil, fmt.Errorf("agent runtime: load thread: %w", err)
+		}
+		if t != nil {
+			t.LastActive = time.Now()
+			o.mem.UpdateThread(t)
+			messages, err := o.persist.LoadMessages(ctx, tenantID, threadID)
+			if err != nil {
+				return nil, fmt.Errorf("agent runtime: load messages: %w", err)
+			}
+			o.HydrateThread(tenantID, threadID, messages)
+			if err := o.persist.SaveThread(ctx, t); err != nil {
+				return nil, fmt.Errorf("agent runtime: update thread: %w", err)
+			}
+			return t, nil
+		}
+	}
+
 	t := &store.Thread{
 		ID:         threadID,
 		TenantID:   tenantID,
@@ -444,5 +611,10 @@ func (o *Orchestrator) ensureThread(tenantID, threadID string) *store.Thread {
 		LastActive: time.Now(),
 	}
 	o.mem.UpdateThread(t)
-	return t
+	if o.persist != nil {
+		if err := o.persist.SaveThread(ctx, t); err != nil {
+			return nil, fmt.Errorf("agent runtime: create thread: %w", err)
+		}
+	}
+	return t, nil
 }

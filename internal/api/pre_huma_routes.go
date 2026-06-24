@@ -19,6 +19,7 @@ import (
 func (g *Gateway) registerPreHumaRoutes(r chi.Router) {
 	if !g.config.PublicOnly {
 		g.registerDigitalAssetStreamRoute(r)
+		g.registerAgentChatStreamRoute(r)
 		g.registerExportRoutes(r)
 		g.registerBillingHoldRoutes(r)
 	}

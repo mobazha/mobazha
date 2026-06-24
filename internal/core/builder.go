@@ -42,6 +42,7 @@ import (
 	oniontransport "github.com/mobazha/mobazha3.0/libs/onion-transport"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
+	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -617,8 +618,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	if err := MigrateNodeSettings(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate node_settings: %v", err)
 	}
-	if err := aipkg.MigrateChatModels(obNode.db); err != nil {
-		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate ai_chat_sessions: %v", err)
+	if err := agentstore.MigrateModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate agent runtime tables: %v", err)
 	}
 
 	initWebhookSubsystem(obNode)
@@ -1279,8 +1280,8 @@ func newLightweightNode(
 	if err := MigrateNodeSettings(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate node_settings: %v", err)
 	}
-	if err := aipkg.MigrateChatModels(obNode.db); err != nil {
-		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate ai_chat_sessions: %v", err)
+	if err := agentstore.MigrateModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate agent runtime tables: %v", err)
 	}
 
 	initWebhookSubsystem(obNode)

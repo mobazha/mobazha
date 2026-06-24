@@ -650,37 +650,32 @@
         ]
       }
     },
-    "/v1/ai/chat": {
+    "/v1/agent/chat": {
       "post": {
-        "operationId": "ai-chat-post",
+        "description": "Starts a seller AI assistant turn and streams server-sent events. Runtime is handled by a raw chi route so response chunks are not buffered by Huma.",
+        "operationId": "agent-chat-stream-post",
         "requestBody": {
           "content": {
-            "application/json": {
-              "schema": {}
-            }
+            "application/json": {}
           },
+          "description": "Agent chat request body.",
           "required": true
         },
         "responses": {
           "200": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Success envelope inner data."
-                }
-              }
+              "text/event-stream": {}
             },
-            "description": "OK"
+            "description": "Server-sent event stream. Events include content, redacted tool progress, done, and error payloads."
           },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnvelopeError"
-                }
-              }
-            },
-            "description": "Error"
+          "400": {
+            "description": "Invalid request or AI configuration."
+          },
+          "429": {
+            "description": "Rate limited or another stream is already active."
+          },
+          "500": {
+            "description": "Streaming is unavailable."
           }
         },
         "security": [
@@ -694,15 +689,15 @@
             "apiToken": []
           }
         ],
-        "summary": "Streaming AI chat (SSE)",
+        "summary": "Stream an agent chat turn",
         "tags": [
           "ai"
         ]
       }
     },
-    "/v1/ai/chat/sessions": {
+    "/v1/agent/chat/sessions": {
       "get": {
-        "operationId": "ai-chat-sessions-get",
+        "operationId": "agent-chat-sessions-get",
         "parameters": [
           {
             "explode": false,
@@ -754,15 +749,15 @@
             "apiToken": []
           }
         ],
-        "summary": "List AI chat sessions",
+        "summary": "List agent chat sessions",
         "tags": [
           "ai"
         ]
       }
     },
-    "/v1/ai/chat/{sessionId}": {
+    "/v1/agent/chat/{sessionId}": {
       "delete": {
-        "operationId": "ai-chat-session-delete",
+        "operationId": "agent-chat-session-delete",
         "parameters": [
           {
             "description": "Chat session ID.",
@@ -801,13 +796,13 @@
             "apiToken": []
           }
         ],
-        "summary": "Delete AI chat session",
+        "summary": "Delete agent chat session",
         "tags": [
           "ai"
         ]
       },
       "get": {
-        "operationId": "ai-chat-session-get",
+        "operationId": "agent-chat-session-get",
         "parameters": [
           {
             "description": "Chat session ID.",
@@ -853,7 +848,7 @@
             "apiToken": []
           }
         ],
-        "summary": "Get AI chat session",
+        "summary": "Get agent chat session",
         "tags": [
           "ai"
         ]

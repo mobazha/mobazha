@@ -1,8 +1,15 @@
 package store
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestRuntimeStore_CRUD(t *testing.T) {
@@ -197,4 +204,119 @@ func TestRuntimeStore_GetMessages_ReturnsDefensiveCopy(t *testing.T) {
 	if fresh[0].Content != "original" {
 		t.Error("GetMessages should return a defensive copy; internal state was modified")
 	}
+}
+
+func TestGormPersistence_CRUDAndTenantIsolation(t *testing.T) {
+	sharedDB, err := gorm.Open(sqlitedialect.Open(t.TempDir()+"/agent-store.db"), &gorm.Config{})
+	require.NoError(t, err)
+	dbA := newAgentStoreTestTenantDB(t, sharedDB, "tenant_a")
+	dbB := newAgentStoreTestTenantDB(t, sharedDB, "tenant_b")
+	require.NoError(t, MigrateModels(dbA))
+
+	persist := NewGormPersistence(dbA)
+	ctx := context.Background()
+	now := time.Now()
+
+	require.NoError(t, persist.SaveThread(ctx, &Thread{
+		ID:         "shared-thread",
+		TenantID:   "tenant_a",
+		Persona:    "seller",
+		Title:      "Tenant A",
+		CreatedAt:  now,
+		LastActive: now,
+	}))
+	require.NoError(t, persist.SaveMessage(ctx, &Message{
+		ID:        "msg_a",
+		TenantID:  "tenant_a",
+		ThreadID:  "shared-thread",
+		Role:      "user",
+		Content:   "hello a",
+		CreatedAt: now,
+	}))
+
+	persistB := NewGormPersistence(dbB)
+	require.NoError(t, persistB.SaveThread(ctx, &Thread{
+		ID:         "shared-thread",
+		TenantID:   "tenant_b",
+		Persona:    "seller",
+		Title:      "Tenant B",
+		CreatedAt:  now,
+		LastActive: now.Add(time.Minute),
+	}))
+	require.NoError(t, persistB.SaveMessage(ctx, &Message{
+		ID:        "msg_b",
+		TenantID:  "tenant_b",
+		ThreadID:  "shared-thread",
+		Role:      "user",
+		Content:   "hello b",
+		CreatedAt: now,
+	}))
+
+	gotB, err := persistB.LoadThread(ctx, "tenant_b", "shared-thread")
+	require.NoError(t, err)
+	require.Equal(t, "Tenant B", gotB.Title)
+	msgsB, err := persistB.LoadMessages(ctx, "tenant_b", "shared-thread")
+	require.NoError(t, err)
+	require.Len(t, msgsB, 1)
+	require.Equal(t, "hello b", msgsB[0].Content)
+
+	gotA, err := persist.LoadThread(ctx, "tenant_a", "shared-thread")
+	require.NoError(t, err)
+	require.Equal(t, "Tenant A", gotA.Title)
+	msgsA, err := persist.LoadMessages(ctx, "tenant_a", "shared-thread")
+	require.NoError(t, err)
+	require.Len(t, msgsA, 1)
+	require.Equal(t, "hello a", msgsA[0].Content)
+}
+
+func newAgentStoreTestTenantDB(t *testing.T, sharedDB *gorm.DB, tenantID string) database.Database {
+	t.Helper()
+	db, err := dbstore.NewTenantDBWithPublicData(sharedDB, tenantID, dbstore.NewDBPublicData(sharedDB, tenantID))
+	require.NoError(t, err)
+	return db
+}
+
+func TestGormPersistence_DeleteThread(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	require.NoError(t, persist.SaveThread(ctx, &Thread{ID: "th", TenantID: "tenant", LastActive: time.Now()}))
+	require.NoError(t, persist.SaveTurn(ctx, &Turn{ID: "turn", TenantID: "tenant", ThreadID: "th"}))
+	require.NoError(t, persist.SaveMessage(ctx, &Message{ID: "msg", TenantID: "tenant", ThreadID: "th", Role: "user", Content: "hello"}))
+
+	require.NoError(t, persist.DeleteThread(ctx, "tenant", "th"))
+	_, err = persist.LoadThread(ctx, "tenant", "th")
+	require.ErrorIs(t, err, ErrThreadNotFound)
+	msgs, err := persist.LoadMessages(ctx, "tenant", "th")
+	require.NoError(t, err)
+	require.Empty(t, msgs)
+}
+
+func TestGormPersistence_RedactsSensitiveJSON(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	require.NoError(t, persist.SaveThread(ctx, &Thread{ID: "th", TenantID: "tenant", LastActive: time.Now()}))
+	require.NoError(t, persist.SaveMessage(ctx, &Message{
+		ID:        "msg",
+		TenantID:  "tenant",
+		ThreadID:  "th",
+		Role:      "tool",
+		Content:   `{"token":"secret-token","value":"safe"}`,
+		ToolCalls: `[{"name":"x","arguments":"{\"api_key\":\"secret-key\",\"query\":\"safe\"}"}]`,
+	}))
+
+	msgs, err := persist.LoadMessages(ctx, "tenant", "th")
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	require.Contains(t, msgs[0].Content, `"token":"[REDACTED]"`)
+	require.NotContains(t, msgs[0].Content, "secret-token")
+	require.NotContains(t, msgs[0].ToolCalls, "secret-key")
+	require.Contains(t, msgs[0].ToolCalls, `[REDACTED]`)
 }

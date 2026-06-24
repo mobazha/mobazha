@@ -3,7 +3,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,15 +12,15 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
 type aiChatProvider interface {
 	aiConfigProvider
-	ChatStore() *aipkg.ChatStore
+	AgentStore() agentstore.Persistence
 	ProfileName() string
 	ProductCatalog() []aipkg.ListingSummary
 }
@@ -76,8 +75,8 @@ type catalogCacheEntry struct {
 
 const catalogCacheTTL = 30 * time.Second
 
-func getCachedCatalog(p aiChatProvider) string {
-	key := "catalog-" + p.ProfileName()
+func getCachedCatalog(tenantID string, p aiChatProvider) string {
+	key := catalogCacheKey(tenantID, p.ProfileName())
 	if v, ok := catalogCache.Load(key); ok {
 		entry := v.(*catalogCacheEntry)
 		if time.Now().Before(entry.expiresAt) {
@@ -96,162 +95,12 @@ func getCachedCatalog(p aiChatProvider) string {
 	return text
 }
 
-// handlePOSTAIChat handles POST /v1/ai/chat — streaming AI conversation.
-func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
-	p, ok := getAIChatProvider(r)
-	if !ok {
-		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available in this mode")
-		return
-	}
-
-	var req aipkg.ChatRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid request body")
-		return
-	}
-	if strings.TrimSpace(req.Message) == "" {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "message is required")
-		return
-	}
-	if len(req.Message) > aipkg.MaxUserMessageLen {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation,
-			fmt.Sprintf("message too long (max %d characters)", aipkg.MaxUserMessageLen))
-		return
-	}
-
-	cfg, err := p.AIConfigForChat(nil)
-	if err != nil {
-		if errors.Is(err, aipkg.ErrVisionNotConfigured) || errors.Is(err, aipkg.ErrVisionUnsupported) {
-			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "AI chat model is not configured for this input")
-			return
-		}
-		aiLog.Warningf("AI chat config resolution failed: %v", err)
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "AI is not configured")
-		return
-	}
-	if !cfg.IsValid() {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "AI is not configured. Please set up an AI provider in Settings > Integrations.")
-		return
-	}
-
-	if cfg.IsPlatform {
-		nodeID := getIdentityService(r).GetNodeID()
-		if rl := p.AIRateLimiter(); rl != nil {
-			if ok, _ := rl.Allow(nodeID, cfg.DailyLimit); !ok {
-				responsePkg.Error(w, http.StatusTooManyRequests, "RATE_LIMITED",
-					"Daily AI limit reached. Configure your own API key in Settings > Integrations for unlimited usage.")
-				return
-			}
-		}
-	}
-
-	store := p.ChatStore()
-	streamKey := "ai-chat-" + p.ProfileName()
-	if _, loaded := activeAIStreams.LoadOrStore(streamKey, true); loaded {
-		responsePkg.Error(w, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Another AI chat request is still in progress. Please wait.")
-		return
-	}
-	defer activeAIStreams.Delete(streamKey)
-
-	role := aipkg.UserRoleSeller
-
-	var session *aipkg.ChatSession
-	if req.SessionID != "" {
-		existing, err := store.GetSession(req.SessionID)
-		if err != nil {
-			aiLog.Errorf("get session: %s", err)
-			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load session")
-			return
-		}
-		session = existing
-	}
-
-	if session == nil {
-		session = &aipkg.ChatSession{
-			ID:        uuid.New().String(),
-			Role:      string(role),
-			CreatedAt: time.Now(),
-		}
-	}
-
-	systemPrompt := aipkg.BuildSystemPrompt(role, p.ProfileName(), req.Context)
-	if catalogCtx := getCachedCatalog(p); catalogCtx != "" {
-		systemPrompt += "\n\n" + catalogCtx
-	}
-	messages := buildLLMMessages(systemPrompt, session.Messages, req.Message)
-
-	localURL := getLocalAPIURL(r)
-	authToken := getAuthToken(r)
-	executor := aipkg.NewToolExecutor(localURL, authToken)
-	tools := aipkg.SellerTools()
-
-	engine := aipkg.NewChatEngine(p.AIProxy(), cfg, executor, tools)
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "streaming not supported")
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
-
-	session.Messages = append(session.Messages, aipkg.ChatMsg{
-		Role:    aipkg.RoleUser,
-		Content: req.Message,
-	})
-
-	emitSSE := func(event aipkg.SSEEvent) {
-		data, err := json.Marshal(event)
-		if err != nil {
-			return
-		}
-		eventType := event.Type
-		if eventType == "" {
-			eventType = "message"
-		}
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventType, data)
-		flusher.Flush()
-	}
-
-	newMsgs, err := engine.RunStream(r.Context(), messages, emitSSE)
-	if err != nil {
-		emitSSE(aipkg.SSEEvent{
-			Type:  aipkg.SSETypeError,
-			Error: err.Error(),
-		})
-		return
-	}
-
-	if cfg.IsPlatform {
-		if rl := p.AIRateLimiter(); rl != nil {
-			rl.Increment(getIdentityService(r).GetNodeID())
-		}
-	}
-
-	session.Messages = append(session.Messages, newMsgs...)
-
-	if session.Title == "" && len(session.Messages) >= 2 {
-		session.Title = generateSessionTitle(req.Message)
-	}
-
-	trimSessionMessages(session)
-
-	if err := store.CreateOrUpdateSession(session); err != nil {
-		aiLog.Errorf("save session: %s", err)
-	}
-
-	emitSSE(aipkg.SSEEvent{
-		Type:      aipkg.SSETypeDone,
-		SessionID: session.ID,
-	})
+func catalogCacheKey(tenantID, profileName string) string {
+	return "catalog-" + tenantID + ":" + profileName
 }
 
-// handleGETAIChatSessions handles GET /v1/ai/chat/sessions.
-func (g *Gateway) handleGETAIChatSessions(w http.ResponseWriter, r *http.Request) {
+// handleGETAgentChatSessions handles GET /v1/agent/chat/sessions.
+func (g *Gateway) handleGETAgentChatSessions(w http.ResponseWriter, r *http.Request) {
 	p, ok := getAIChatProvider(r)
 	if !ok {
 		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
@@ -261,7 +110,8 @@ func (g *Gateway) handleGETAIChatSessions(w http.ResponseWriter, r *http.Request
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 
-	sessions, err := p.ChatStore().ListSessions(limit, offset)
+	tenantID := agentChatTenantID(r, p)
+	sessions, err := p.AgentStore().ListThreads(r.Context(), tenantID, limit, offset)
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to list sessions")
 		return
@@ -278,17 +128,17 @@ func (g *Gateway) handleGETAIChatSessions(w http.ResponseWriter, r *http.Request
 	for i, s := range sessions {
 		summaries[i] = sessionSummary{
 			ID:        s.ID,
-			Role:      s.Role,
+			Role:      agentChatRole(s.Persona),
 			Title:     s.Title,
 			CreatedAt: s.CreatedAt,
-			UpdatedAt: s.UpdatedAt,
+			UpdatedAt: s.LastActive,
 		}
 	}
 	responsePkg.Success(w, summaries)
 }
 
-// handleGETAIChatSession handles GET /v1/ai/chat/{sessionId}.
-func (g *Gateway) handleGETAIChatSession(w http.ResponseWriter, r *http.Request) {
+// handleGETAgentChatSession handles GET /v1/agent/chat/{sessionId}.
+func (g *Gateway) handleGETAgentChatSession(w http.ResponseWriter, r *http.Request) {
 	p, ok := getAIChatProvider(r)
 	if !ok {
 		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
@@ -296,20 +146,26 @@ func (g *Gateway) handleGETAIChatSession(w http.ResponseWriter, r *http.Request)
 	}
 
 	sessionID := chi.URLParam(r, "sessionId")
-	session, err := p.ChatStore().GetSession(sessionID)
+	tenantID := agentChatTenantID(r, p)
+	thread, err := p.AgentStore().LoadThread(r.Context(), tenantID, sessionID)
+	if errors.Is(err, agentstore.ErrThreadNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "session not found")
+		return
+	}
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load session")
 		return
 	}
-	if session == nil {
-		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "session not found")
+	messages, err := p.AgentStore().LoadMessages(r.Context(), tenantID, sessionID)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load session messages")
 		return
 	}
-	responsePkg.Success(w, session)
+	responsePkg.Success(w, agentChatSessionFromThread(thread, messages))
 }
 
-// handleDELETEAIChatSession handles DELETE /v1/ai/chat/{sessionId}.
-func (g *Gateway) handleDELETEAIChatSession(w http.ResponseWriter, r *http.Request) {
+// handleDELETEAgentChatSession handles DELETE /v1/agent/chat/{sessionId}.
+func (g *Gateway) handleDELETEAgentChatSession(w http.ResponseWriter, r *http.Request) {
 	p, ok := getAIChatProvider(r)
 	if !ok {
 		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
@@ -317,18 +173,88 @@ func (g *Gateway) handleDELETEAIChatSession(w http.ResponseWriter, r *http.Reque
 	}
 
 	sessionID := chi.URLParam(r, "sessionId")
-	if err := p.ChatStore().DeleteSession(sessionID); err != nil {
+	tenantID := agentChatTenantID(r, p)
+	if err := p.AgentStore().DeleteThread(r.Context(), tenantID, sessionID); err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to delete session")
 		return
 	}
+	forgetAgentChatThread(tenantID+":"+p.ProfileName(), tenantID, sessionID)
 	responsePkg.NoContent(w)
 }
 
-func buildLLMMessages(systemPrompt string, history []aipkg.ChatMsg, currentMessage string) []aipkg.ChatMsg {
-	msgs := []aipkg.ChatMsg{{Role: aipkg.RoleSystem, Content: systemPrompt}}
-	msgs = append(msgs, history...)
-	msgs = append(msgs, aipkg.ChatMsg{Role: aipkg.RoleUser, Content: currentMessage})
-	return msgs
+func agentChatTenantID(r *http.Request, p aiChatProvider) string {
+	nodeID := getIdentityService(r).GetNodeID()
+	if nodeID != "" {
+		return nodeID
+	}
+	return p.ProfileName()
+}
+
+func agentChatRole(persona string) string {
+	if persona != "" {
+		return persona
+	}
+	return string(aipkg.UserRoleSeller)
+}
+
+func agentChatSessionFromThread(thread *agentstore.Thread, messages []*agentstore.Message) *aipkg.ChatSession {
+	session := &aipkg.ChatSession{
+		ID:        thread.ID,
+		TenantID:  thread.TenantID,
+		Role:      agentChatRole(thread.Persona),
+		Title:     thread.Title,
+		CreatedAt: thread.CreatedAt,
+		UpdatedAt: thread.LastActive,
+		Messages:  agentChatVisibleMessages(messages),
+	}
+	return session
+}
+
+func agentChatVisibleMessages(messages []*agentstore.Message) []aipkg.ChatMsg {
+	out := make([]aipkg.ChatMsg, 0, len(messages))
+	for _, msg := range messages {
+		if msg == nil {
+			continue
+		}
+		role := aipkg.ChatRole(msg.Role)
+		if role != aipkg.RoleUser && role != aipkg.RoleAssistant {
+			continue
+		}
+		if role == aipkg.RoleAssistant && strings.TrimSpace(msg.Content) == "" {
+			continue
+		}
+		out = append(out, aipkg.ChatMsg{
+			Role:    role,
+			Content: msg.Content,
+		})
+	}
+	return out
+}
+
+func visibleChatSession(session *aipkg.ChatSession) *aipkg.ChatSession {
+	if session == nil {
+		return nil
+	}
+	visible := *session
+	visible.Messages = visibleChatMessages(session.Messages)
+	return &visible
+}
+
+func visibleChatMessages(messages []aipkg.ChatMsg) []aipkg.ChatMsg {
+	visible := make([]aipkg.ChatMsg, 0, len(messages))
+	for _, msg := range messages {
+		if msg.Role == aipkg.RoleTool || msg.Role == aipkg.RoleSystem {
+			continue
+		}
+		if msg.Role == aipkg.RoleAssistant && strings.TrimSpace(msg.Content) == "" {
+			continue
+		}
+		msg.ToolCalls = nil
+		msg.ToolCallID = ""
+		msg.Name = ""
+		visible = append(visible, msg)
+	}
+	return visible
 }
 
 // generateSessionTitle extracts a clean title from the user's first message.

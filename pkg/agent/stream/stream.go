@@ -9,6 +9,7 @@ import (
 type Chunk struct {
 	Delta      string     `json:"delta,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolEvent  *ToolEvent `json:"tool_event,omitempty"`
 	FinishFlag string     `json:"finish_flag,omitempty"`
 	Error      error      `json:"-"`
 }
@@ -18,6 +19,14 @@ type ToolCall struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Arguments string `json:"arguments"`
+}
+
+// ToolEvent is a redacted progress event for UI transparency. It deliberately
+// excludes tool arguments and results.
+type ToolEvent struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
 
 // Stream is a pull-based iterator over incremental chunks.

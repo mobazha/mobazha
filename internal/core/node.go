@@ -251,5 +251,5 @@ func MigrateNodeSettings(db database.Database) error {
 	})
 }
 
-// ChatStore, ProfileName, ProductCatalog, and SchedulerHooks are defined
+// AgentStore, ProfileName, ProductCatalog, and SchedulerHooks are defined
 // in node_methods_full.go (!private_distribution) / node_methods_private_distribution.go (private_distribution).

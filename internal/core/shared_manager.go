@@ -184,7 +184,9 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		}
 		// Standalone nodes default to the public SaaS URL so Matrix
 		// provisioning, heartbeat, and exchange rates work out of the box.
-		if !cfg.SaaSMode && cfg.SaaSAPIURL == "" {
+		// Hosting's infrastructure-only default node must not consume remote
+		// rates from itself (hairpin via public URL).
+		if !cfg.SaaSMode && cfg.SaaSAPIURL == "" && !cfg.InfrastructureOnly {
 			cfg.SaaSAPIURL = "https://app.mobazha.org"
 		}
 
@@ -193,7 +195,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			cfg.StandaloneAPIKey = loadPersistedAPIKey(cfg.DataDir)
 		}
 
-		if !cfg.SaaSMode && cfg.SaaSAPIURL != "" {
+		if !cfg.SaaSMode && cfg.SaaSAPIURL != "" && !cfg.InfrastructureOnly {
 			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(cfg.SaaSAPIURL)
 		}
 

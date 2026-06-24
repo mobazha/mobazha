@@ -181,6 +181,10 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	origin := publicRequestOrigin(r)
+	allowLoopbackGateway := allowLoopbackGatewayForRequest(r)
+	req.Images = aipkg.ResolveImageURLs(req.Images, origin)
+
 	cfg, err := p.AIConfigForGenerate(req)
 	if err != nil {
 		switch {
@@ -219,6 +223,17 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if aipkg.GenerateNeedsVision(req) {
+		inlined, inlineErr := aipkg.InlineImageURLs(r.Context(), proxy.HTTPClient(), origin, allowLoopbackGateway, req.Images)
+		if inlineErr != nil {
+			aiLog.Warningf("AI image inline failed: %v", inlineErr)
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+				"Failed to load product images for AI analysis")
+			return
+		}
+		req.Images = inlined
+	}
+
 	result, err := proxy.Generate(cfg, req)
 	if err != nil {
 		aiLog.Warningf("AI generate failed: %v", err)
@@ -247,7 +262,10 @@ func (g *Gateway) handleGETAIStatus(w http.ResponseWriter, r *http.Request) {
 	byokConfigured := userCfg.IsValid()
 	profile := p.PlatformAIProfile()
 	textAvailable := byokConfigured || profile.TextAvailable()
-	visionAvailable := (byokConfigured && aipkg.ConfigSupportsVision(userCfg)) || profile.VisionAvailable()
+	visionAvailable := profile.VisionAvailable()
+	if byokConfigured {
+		visionAvailable = aipkg.ConfigSupportsVision(userCfg)
+	}
 
 	var source string
 	var dailyLimit, dailyUsed int

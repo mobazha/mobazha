@@ -41,19 +41,7 @@ func sanitizeProviderError(err error) string {
 }
 
 func requestWebhookURL(r *http.Request, providerID string) string {
-	scheme := "https"
-	if r.TLS == nil {
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			scheme = proto
-		} else {
-			scheme = "http"
-		}
-	}
-	host := r.Host
-	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
-		host = fwdHost
-	}
-	return fmt.Sprintf("%s://%s/v1/fiat/%s/webhooks", scheme, host, providerID)
+	return fmt.Sprintf("%s/v1/fiat/%s/webhooks", publicRequestOrigin(r), providerID)
 }
 
 // getFiatService extracts the FiatService from the request's NodeService

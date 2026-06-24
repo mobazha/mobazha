@@ -332,6 +332,9 @@ func (p *Proxy) Generate(cfg Config, req GenerateRequest) (*GenerateResponse, er
 var fencedJSONRegexp = regexp.MustCompile("(?s)```(?:json)?\\s*(.*?)```")
 
 func validateImageURL(rawURL string) error {
+	if strings.HasPrefix(strings.ToLower(rawURL), "data:image/") {
+		return nil
+	}
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("invalid image URL: %w", err)

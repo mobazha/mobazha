@@ -551,6 +551,19 @@
   - Tiered subscription enforcement
 - **Dependencies**: scaEnabled
 
+### `aiWorkspaceEnabled`
+
+- **Category**: platform
+- **Stability**: experimental
+- **Default**: false
+- **Scopes**: PlatformGlobal, Tenant, NodeRuntime
+- **Client-visible**: yes
+- **Introduced in**: ai-workspace-ws-0
+- **Consumers**:
+  - Seller Admin dashboard tab (Insights / AI Workspace)
+  - Rule-based opportunity cards + inline WorkspaceChat
+- **Dependencies**: none (WS-0 uses existing `/v1/ai/chat` and `/v1/ai/status`)
+
 ---
 
 ## Scheduler Workers (AH-3 Sprint 4 — 待注册)
@@ -578,7 +591,7 @@
 | privacy | 1 | 1 beta |
 | payment | 4 | 3 beta, 1 experimental |
 | group | 1 | 1 beta |
-| platform | 7 | 1 stable, 1 beta, 5 experimental |
+| platform | 8 | 1 stable, 1 beta, 6 experimental |
 | multistore | 3 | 2 beta, 1 experimental |
 | storefronts | 4 | 3 beta, 1 experimental |
 | tg | 4 | 1 beta, 3 experimental |
@@ -586,4 +599,4 @@
 | saas | 2 | 2 experimental |
 | identity | 4 | 4 experimental |
 | kill | 3 | 3 stable |
-| **Total** | **37** | 5 stable, 11 beta, 21 experimental |
+| **Total** | **38** | 5 stable, 11 beta, 22 experimental |

@@ -92,6 +92,25 @@
 
 ---
 
+## Collectibles
+
+### `collectiblesHubEnabled`
+
+- **Owner**: mobazha_hosting (Collectibles RWA P1)
+- **Default**: false
+- **Stability**: experimental
+- **Lifecycle**: experimental (since collectibles-rwa-p1)
+- **Scopes**: PlatformGlobal
+- **Consumers**:
+  - mobazha_hosting/api/huma_api.go — Huma collectibles operation group
+  - mobazha_hosting/api/huma_collectibles_handlers.go — Hub intake, mint, NFT, burn, redemption endpoints
+  - mobazha_hosting/internal/collectibles/ — Hub/NFT/redemption service
+  - mobazha-unified/apps/web/src/app/collectibles/ — future first-party collectibles UI
+- **Kill Path**: 设 false → collectibles Huma operations return feature-disabled response; production entry stays hidden
+- **Dependencies**: Solana NFT mint/burn service, Hub operating process, Gate 3c production checklist
+
+---
+
 ## Platform
 
 ### `platformTestEnvEnabled`
@@ -124,6 +143,20 @@
   - mobazha-unified/apps/web/src/app/admin/products/page.tsx
 - **Kill Path**: 设 false → 供应链路由 404；EventBus listener 不注册；workers 不启动
 - **Dependencies**: 无
+
+### `supplyAvailabilityEnabled`
+
+- **Owner**: mobazha_hosting (Supply Availability SA-0)
+- **Default**: false
+- **Stability**: experimental
+- **Lifecycle**: experimental (since supply-availability-sa-0)
+- **Scopes**: PlatformGlobal, Tenant, NodeRuntime
+- **Consumers**:
+  - mobazha3.0/internal/core/ — SupplyAvailabilityService 聚合边界
+  - mobazha3.0/internal/core/ — Provider Quote/Reserve/Commit/Release shadow rollout
+  - mobazha-unified/apps/web/src/app/admin/ — seller supply availability surfaces
+- **Kill Path**: 设 false → 统一供给可用性边界停用，回退到既有供应链/数字商品路径
+- **Dependencies**: supplyChainEnabled（业务依赖；注册表暂不做强制级联）
 
 ---
 

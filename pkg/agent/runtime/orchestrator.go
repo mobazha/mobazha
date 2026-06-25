@@ -54,6 +54,7 @@ type Config struct {
 	TurnTimeout    time.Duration // overall timeout for a single turn (default 120s)
 	MaxHistoryMsgs int           // max messages loaded from thread history (default 50)
 	LLMRetries     int           // retry count on transient LLM errors (default 2)
+	ShapeKeepMsgs  int           // recent messages retained when replay shaping triggers (default 16)
 }
 
 func defaultConfig() Config {
@@ -62,6 +63,7 @@ func defaultConfig() Config {
 		TurnTimeout:    120 * time.Second,
 		MaxHistoryMsgs: 50,
 		LLMRetries:     2,
+		ShapeKeepMsgs:  16,
 	}
 }
 
@@ -111,6 +113,9 @@ func NewOrchestrator(
 		}
 		if cfg.LLMRetries > 0 {
 			c.LLMRetries = cfg.LLMRetries
+		}
+		if cfg.ShapeKeepMsgs > 0 {
+			c.ShapeKeepMsgs = cfg.ShapeKeepMsgs
 		}
 	}
 	if emitter == nil {
@@ -203,6 +208,7 @@ type TurnOptions struct {
 	SkillFilter     agentskill.Filter
 	ContextBlocks   []string
 	ToolCatalog     kernel.ToolCatalog
+	MemoryStore     kernel.MemoryStore
 	Scope           kernel.Scope
 }
 
@@ -216,6 +222,7 @@ type resolvedTurnContext struct {
 	contextBlocks   []string
 	skillProvider   agentskill.Provider
 	toolCatalog     kernel.ToolCatalog
+	memoryStore     kernel.MemoryStore
 	scope           kernel.Scope
 }
 
@@ -317,6 +324,10 @@ func (o *Orchestrator) assembleHistory(ctx context.Context, tenantID, threadID, 
 	var msgs []Message
 
 	systemPrompt := o.systemPromptWithSkills(resolved)
+	if memoryBlock := o.memoryContextBlock(ctx, resolved, userMsg); memoryBlock != "" {
+		resolved.contextBlocks = append([]string{memoryBlock}, resolved.contextBlocks...)
+		systemPrompt = o.systemPromptWithSkills(resolved)
+	}
 	if systemPrompt != "" {
 		msgs = append(msgs, Message{Role: "system", Content: systemPrompt})
 	}
@@ -350,6 +361,7 @@ func (o *Orchestrator) resolveTurnContext(ctx context.Context, opts TurnOptions)
 		grantedTools:    map[string][]kernel.ToolMetadata{},
 		skillProvider:   opts.SkillProvider,
 		toolCatalog:     opts.ToolCatalog,
+		memoryStore:     opts.MemoryStore,
 		scope:           opts.Scope,
 	}
 	if opts.SkillProvider == nil {
@@ -429,6 +441,55 @@ func toolResultMode(resolved *resolvedTurnContext, toolName string) string {
 		return ""
 	}
 	return resolved.toolResultModes[toolName]
+}
+
+func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolvedTurnContext, _ string) string {
+	if resolved.memoryStore == nil || resolved.scope.TenantID == "" {
+		return ""
+	}
+	items, err := resolved.memoryStore.Search(ctx, kernel.MemoryQuery{
+		Scope: resolved.scope,
+		Types: []kernel.MemoryScope{
+			kernel.MemoryUser,
+			kernel.MemoryStoreScope,
+			kernel.MemoryTenant,
+		},
+		Limit: 5,
+	})
+	if err != nil || len(items) == 0 {
+		if err != nil {
+			o.emitter.Emit(ctx, telemetry.Event{
+				Type:     telemetry.MemoryRetrievalFailed,
+				TenantID: resolved.scope.TenantID,
+				Attrs:    map[string]any{"error": err.Error()},
+			})
+		}
+		return ""
+	}
+	lines := []string{
+		"Relevant memory for this turn:",
+		"Use memory as preference/context only. If memory conflicts with current user input or tool results, prefer current input and tools.",
+	}
+	for _, item := range items {
+		content := compactToolResultRaw(item.Content, 320)
+		if content == "" {
+			continue
+		}
+		subject := item.Subject
+		if subject == "" {
+			subject = "general"
+		}
+		lines = append(lines, fmt.Sprintf("- [%s/%s] %s", item.Scope, subject, content))
+	}
+	if len(lines) <= 2 {
+		return ""
+	}
+	o.emitter.Emit(ctx, telemetry.Event{
+		Type:     telemetry.MemoryRetrieved,
+		TenantID: resolved.scope.TenantID,
+		Attrs:    map[string]any{"count": len(lines) - 2},
+	})
+	return strings.Join(lines, "\n")
 }
 
 func recalculateGrantedTools(ctx context.Context, resolved *resolvedTurnContext) error {
@@ -790,6 +851,55 @@ func (o *Orchestrator) runLoop(
 			tokens += budget.EstimateTokens(m.Content)
 		}
 		decision := o.budget.Decide(tokens)
+		if decision.ShouldShape {
+			shaped := shapeReplayHistory(history, o.cfg.ShapeKeepMsgs)
+			if len(shaped) < len(history) {
+				history = shaped
+				tokens = estimateMessagesTokens(history)
+				decision = o.budget.Decide(tokens)
+				o.emitter.Emit(ctx, telemetry.Event{
+					Type:     telemetry.ReplayShaped,
+					TenantID: tenantID,
+					ThreadID: threadID,
+					Attrs: map[string]any{
+						"estimated": decision.Estimated,
+						"kept_msgs": len(history),
+					},
+				})
+			}
+		}
+		if decision.ShouldCompact {
+			o.emitter.Emit(ctx, telemetry.Event{
+				Type:     telemetry.CompactionStarted,
+				TenantID: tenantID,
+				ThreadID: threadID,
+				Attrs: map[string]any{
+					"estimated": decision.Estimated,
+				},
+			})
+			compacted := compactReplayHistory(history, o.cfg.ShapeKeepMsgs)
+			if len(compacted) < len(history) {
+				history = compacted
+				tokens = estimateMessagesTokens(history)
+				decision = o.budget.Decide(tokens)
+				o.emitter.Emit(ctx, telemetry.Event{
+					Type:     telemetry.CompactionSucceeded,
+					TenantID: tenantID,
+					ThreadID: threadID,
+					Attrs: map[string]any{
+						"estimated": decision.Estimated,
+						"kept_msgs": len(history),
+					},
+				})
+			} else {
+				o.emitter.Emit(ctx, telemetry.Event{
+					Type:     telemetry.CompactionFailed,
+					TenantID: tenantID,
+					ThreadID: threadID,
+					Attrs:    map[string]any{"reason": "no compactable replay messages"},
+				})
+			}
+		}
 
 		if decision.Overflow {
 			o.emitter.Emit(ctx, telemetry.Event{
@@ -1106,6 +1216,102 @@ func (o *Orchestrator) runLoop(
 	out.SendError(fmt.Errorf("exceeded max tool rounds (%d)", o.cfg.MaxToolRounds))
 }
 
+func estimateMessagesTokens(messages []Message) int {
+	tokens := 0
+	for _, m := range messages {
+		tokens += budget.EstimateTokens(m.Content)
+	}
+	return tokens
+}
+
+func shapeReplayHistory(history []Message, keepLast int) []Message {
+	if keepLast <= 0 || len(history) <= keepLast {
+		return history
+	}
+	system := firstSystemMessage(history)
+	tailStart := managed_escrowReplayTailStart(history, len(history)-keepLast)
+	tail := append([]Message(nil), history[tailStart:]...)
+	if system == nil || (len(tail) > 0 && tail[0].Role == "system") {
+		return tail
+	}
+	return append([]Message{*system}, tail...)
+}
+
+func compactReplayHistory(history []Message, keepLast int) []Message {
+	if keepLast <= 0 || len(history) <= keepLast+2 {
+		return history
+	}
+	system := firstSystemMessage(history)
+	start := 0
+	if system != nil {
+		start = 1
+	}
+	prefixEnd := managed_escrowReplayTailStart(history, len(history)-keepLast)
+	if prefixEnd <= start {
+		return history
+	}
+	summary := summarizeReplayMessages(history[start:prefixEnd])
+	tail := append([]Message(nil), history[prefixEnd:]...)
+	out := make([]Message, 0, len(tail)+2)
+	if system != nil {
+		out = append(out, *system)
+	}
+	out = append(out, Message{
+		Role:    "system",
+		Content: summary,
+	})
+	out = append(out, tail...)
+	return out
+}
+
+func managed_escrowReplayTailStart(history []Message, desiredStart int) int {
+	if desiredStart <= 0 {
+		return 0
+	}
+	if desiredStart >= len(history) {
+		return len(history)
+	}
+	start := desiredStart
+	for start > 0 && history[start].Role == "tool" {
+		start--
+	}
+	if start > 0 && history[start-1].Role == "assistant" && len(history[start-1].ToolCalls) > 0 {
+		start--
+	}
+	return start
+}
+
+func firstSystemMessage(history []Message) *Message {
+	if len(history) == 0 || history[0].Role != "system" {
+		return nil
+	}
+	msg := history[0]
+	return &msg
+}
+
+func summarizeReplayMessages(messages []Message) string {
+	if len(messages) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(messages)+1)
+	parts = append(parts, fmt.Sprintf("Earlier conversation compacted deterministically (%d messages). Recent messages below are authoritative.", len(messages)))
+	for i, msg := range messages {
+		if i >= 12 {
+			parts = append(parts, fmt.Sprintf("... %d more compacted messages omitted.", len(messages)-i))
+			break
+		}
+		content := compactToolResultRaw(msg.Content, 220)
+		if content == "" && len(msg.ToolCalls) > 0 {
+			content = fmt.Sprintf("%d tool call(s)", len(msg.ToolCalls))
+		}
+		if content == "" {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("- %s: %s", msg.Role, content))
+	}
+	return strings.Join(parts, "\n")
+}
+
 func approvalRequiredToolResult(resolved *resolvedTurnContext, tenantID, threadID, turnID string, call stream.ToolCall) (string, *store.Approval, bool, error) {
 	tool, skillID, ok := grantedToolMetadata(resolved, call.Name)
 	if !ok || tool.Approval != kernel.ApprovalExplicit {
@@ -1278,9 +1484,10 @@ func uniqueStringList(items []string, limit int) []string {
 		}
 		seen[item] = struct{}{}
 		out = append(out, item)
-		if len(out) >= limit {
-			break
-		}
+	}
+	sort.Strings(out)
+	if len(out) > limit {
+		out = out[:limit]
 	}
 	return out
 }

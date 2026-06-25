@@ -528,6 +528,93 @@ func TestGormPersistence_ApprovalApplyFailureCanBeReclaimed(t *testing.T) {
 	require.Equal(t, "applier_2", latest.AppliedBy)
 }
 
+func TestGormPersistence_MemoryStoreScopesAndArchive(t *testing.T) {
+	sharedDB, err := gorm.Open(sqlitedialect.Open(t.TempDir()+"/agent-memory.db"), &gorm.Config{})
+	require.NoError(t, err)
+	dbA := newAgentStoreTestTenantDB(t, sharedDB, "tenant_a")
+	dbB := newAgentStoreTestTenantDB(t, sharedDB, "tenant_b")
+	require.NoError(t, MigrateModels(dbA))
+	persistA := NewGormPersistence(dbA)
+	persistB := NewGormPersistence(dbB)
+	ctx := context.Background()
+	scopeA := kernel.Scope{TenantID: "tenant_a", StoreID: "store_a", ActorID: "actor_a"}
+	scopeAOtherStore := kernel.Scope{TenantID: "tenant_a", StoreID: "store_other", ActorID: "actor_a"}
+	scopeAOtherActor := kernel.Scope{TenantID: "tenant_a", StoreID: "store_a", ActorID: "actor_other"}
+	scopeB := kernel.Scope{TenantID: "tenant_b", StoreID: "store_b", ActorID: "actor_b"}
+
+	require.NoError(t, persistA.Save(ctx, scopeA, kernel.MemoryItem{
+		ID:      "mem_user",
+		Scope:   kernel.MemoryUser,
+		Subject: "language",
+		Content: "请默认用中文回答",
+	}))
+	require.NoError(t, persistA.Save(ctx, scopeA, kernel.MemoryItem{
+		ID:      "mem_store",
+		Scope:   kernel.MemoryStoreScope,
+		Subject: "brand",
+		Content: "品牌语气保持克制",
+	}))
+	require.NoError(t, persistA.Save(ctx, scopeA, kernel.MemoryItem{
+		ID:      "mem_tenant",
+		Scope:   kernel.MemoryTenant,
+		Subject: "policy",
+		Content: "租户默认人工确认",
+	}))
+	require.NoError(t, persistB.Save(ctx, scopeB, kernel.MemoryItem{
+		ID:      "mem_user",
+		Scope:   kernel.MemoryUser,
+		Subject: "language",
+		Content: "tenant b memory",
+	}))
+
+	items, err := persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 3)
+
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeAOtherStore, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	for _, item := range items {
+		require.NotEqual(t, "mem_store", item.ID)
+	}
+
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeAOtherActor, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	for _, item := range items {
+		require.NotEqual(t, "mem_user", item.ID)
+	}
+
+	items, err = persistB.Search(ctx, kernel.MemoryQuery{Scope: scopeB, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, "tenant b memory", items[0].Content)
+
+	require.ErrorIs(t, persistA.Delete(ctx, scopeAOtherActor, "mem_user"), ErrMemoryNotFound)
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 3)
+
+	require.NoError(t, persistA.Delete(ctx, scopeA, "mem_user"))
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	for _, item := range items {
+		require.NotEqual(t, "mem_user", item.ID)
+	}
+
+	require.Error(t, persistA.Save(ctx, kernel.Scope{TenantID: "tenant_a"}, kernel.MemoryItem{
+		ID:      "mem_invalid_user",
+		Scope:   kernel.MemoryUser,
+		Content: "missing actor",
+	}))
+	require.Error(t, persistA.Save(ctx, kernel.Scope{TenantID: "tenant_a"}, kernel.MemoryItem{
+		ID:      "mem_invalid_store",
+		Scope:   kernel.MemoryStoreScope,
+		Content: "missing store",
+	}))
+}
+
 func newAgentStoreTestTenantDB(t *testing.T, sharedDB *gorm.DB, tenantID string) database.Database {
 	t.Helper()
 	db, err := dbstore.NewTenantDBWithPublicData(sharedDB, tenantID, dbstore.NewDBPublicData(sharedDB, tenantID))

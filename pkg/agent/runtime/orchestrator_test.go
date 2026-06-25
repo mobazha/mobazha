@@ -48,6 +48,26 @@ type fakePersistence struct {
 	turnSaveCount  int
 }
 
+type fakeMemoryStore struct {
+	items []kernel.MemoryItem
+	err   error
+}
+
+func (s *fakeMemoryStore) Search(context.Context, kernel.MemoryQuery) ([]kernel.MemoryItem, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.items, nil
+}
+
+func (s *fakeMemoryStore) Save(context.Context, kernel.Scope, kernel.MemoryItem) error {
+	return nil
+}
+
+func (s *fakeMemoryStore) Delete(context.Context, kernel.Scope, string) error {
+	return nil
+}
+
 func (p *fakePersistence) SaveThread(_ context.Context, t *store.Thread) error {
 	if t == nil {
 		return nil
@@ -1347,6 +1367,194 @@ func TestRunTurn_MultiTurnMemory(t *testing.T) {
 	}
 	if !foundAssistantAlice {
 		t.Error("turn 2 should include prior assistant response")
+	}
+}
+
+func TestRunTurn_ReplayShapingKeepsRecentMessages(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.Config{
+			MaxContextTokens: 1000,
+			ReservedOutput:   1,
+			ShapeThreshold:   0.01,
+			CompactThreshold: 0.99,
+		}),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		&Config{ShapeKeepMsgs: 3},
+	)
+	for i := 0; i < 20; i++ {
+		orch.mem.AppendMessage("tenant_1", "thread_1", &store.Message{
+			ID:      fmt.Sprintf("msg_%d", i),
+			Role:    "user",
+			Content: fmt.Sprintf("old message %d", i),
+		})
+	}
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "thread_1", "current request")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(emitter.ByType(telemetry.ReplayShaped)) == 0 {
+		t.Fatal("expected replay_shaped telemetry")
+	}
+	if len(llm.captured) != 1 {
+		t.Fatalf("expected one LLM call, got %d", len(llm.captured))
+	}
+	for _, msg := range llm.captured[0].messages {
+		if strings.Contains(msg.Content, "old message 0") {
+			t.Fatalf("oldest message should have been shaped out: %#v", llm.captured[0].messages)
+		}
+	}
+}
+
+func TestRunTurn_DeterministicCompactionAddsSummary(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.Config{
+			MaxContextTokens: 1000,
+			ReservedOutput:   1,
+			ShapeThreshold:   0.99,
+			CompactThreshold: 0.01,
+		}),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		&Config{ShapeKeepMsgs: 3},
+	)
+	for i := 0; i < 12; i++ {
+		orch.mem.AppendMessage("tenant_1", "thread_2", &store.Message{
+			ID:      fmt.Sprintf("msg_%d", i),
+			Role:    "assistant",
+			Content: fmt.Sprintf("detailed historical answer %d", i),
+		})
+	}
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "thread_2", "current request")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(emitter.ByType(telemetry.CompactionSucceeded)) == 0 {
+		t.Fatal("expected compaction success telemetry")
+	}
+	foundSummary := false
+	for _, msg := range llm.captured[0].messages {
+		if msg.Role == "system" && strings.Contains(msg.Content, "Earlier conversation compacted deterministically") {
+			foundSummary = true
+		}
+	}
+	if !foundSummary {
+		t.Fatalf("expected deterministic compaction summary in prompt: %#v", llm.captured[0].messages)
+	}
+}
+
+func TestReplayShapingPreservesToolCallGroup(t *testing.T) {
+	history := []Message{
+		{Role: "system", Content: "system prompt"},
+		{Role: "user", Content: "older question"},
+		{Role: "assistant", Content: "older answer"},
+		{Role: "user", Content: "search this"},
+		{Role: "assistant", ToolCalls: []stream.ToolCall{{ID: "tc_1", Name: "search", Arguments: `{}`}}},
+		{Role: "tool", Content: "search result", ToolCallID: "tc_1"},
+		{Role: "user", Content: "current request"},
+	}
+
+	shaped := shapeReplayHistory(history, 2)
+	if len(shaped) != 4 {
+		t.Fatalf("expected system plus intact tool-call group, got %#v", shaped)
+	}
+	if shaped[0].Role != "system" {
+		t.Fatalf("expected system message to be retained, got %#v", shaped)
+	}
+	if shaped[1].Role != "assistant" || len(shaped[1].ToolCalls) != 1 || shaped[1].ToolCalls[0].ID != "tc_1" {
+		t.Fatalf("expected assistant tool call before tool result, got %#v", shaped)
+	}
+	if shaped[2].Role != "tool" || shaped[2].ToolCallID != "tc_1" {
+		t.Fatalf("expected matching tool result after assistant call, got %#v", shaped)
+	}
+}
+
+func TestReplayCompactionPreservesToolCallGroup(t *testing.T) {
+	history := []Message{
+		{Role: "system", Content: "system prompt"},
+		{Role: "user", Content: "older question"},
+		{Role: "assistant", Content: "older answer"},
+		{Role: "user", Content: "search this"},
+		{Role: "assistant", ToolCalls: []stream.ToolCall{{ID: "tc_1", Name: "search", Arguments: `{}`}}},
+		{Role: "tool", Content: "search result", ToolCallID: "tc_1"},
+		{Role: "user", Content: "current request"},
+	}
+
+	compacted := compactReplayHistory(history, 2)
+	if len(compacted) != 5 {
+		t.Fatalf("expected compacted summary plus intact tool-call group, got %#v", compacted)
+	}
+	if compacted[0].Role != "system" {
+		t.Fatalf("expected system message to be retained, got %#v", compacted)
+	}
+	if compacted[1].Role != "system" || !strings.Contains(compacted[1].Content, "Earlier conversation compacted deterministically") {
+		t.Fatalf("expected deterministic summary, got %#v", compacted)
+	}
+	if compacted[2].Role != "assistant" || len(compacted[2].ToolCalls) != 1 || compacted[2].ToolCalls[0].ID != "tc_1" {
+		t.Fatalf("expected assistant tool call before tool result, got %#v", compacted)
+	}
+	if compacted[3].Role != "tool" || compacted[3].ToolCallID != "tc_1" {
+		t.Fatalf("expected matching tool result after assistant call, got %#v", compacted)
+	}
+}
+
+func TestRunTurnWithOptions_InjectsRetrievedMemory(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{items: []kernel.MemoryItem{
+		{
+			ID:      "mem_1",
+			Scope:   kernel.MemoryUser,
+			Subject: "language",
+			Content: "用户偏好中文回答。",
+		},
+	}}
+	orch := newTestOrch(llm, nil)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_memory", "hello", TurnOptions{
+		MemoryStore: memory,
+		Scope: kernel.Scope{
+			TenantID: "tenant_1",
+			ActorID:  "actor_1",
+			StoreID:  "store_1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(llm.captured) != 1 {
+		t.Fatalf("expected one LLM call, got %d", len(llm.captured))
+	}
+	found := false
+	for _, msg := range llm.captured[0].messages {
+		if msg.Role == "system" && strings.Contains(msg.Content, "Relevant memory for this turn") && strings.Contains(msg.Content, "用户偏好中文回答") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected memory context in system prompt: %#v", llm.captured[0].messages)
 	}
 }
 

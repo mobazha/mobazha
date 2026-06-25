@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/redact"
 	"gorm.io/gorm"
@@ -20,6 +22,7 @@ var (
 	ErrApprovalClaimConflict = errors.New("agent: approval apply claim conflict")
 	ErrSkillRunNotFound      = errors.New("agent: skill run not found")
 	ErrArtifactNotFound      = errors.New("agent: artifact not found")
+	ErrMemoryNotFound        = errors.New("agent: memory not found")
 )
 
 const (
@@ -68,6 +71,11 @@ const (
 	ApprovalStatusApplied = "applied"
 	// ApprovalStatusApplyFailed means the approved tool call failed while applying.
 	ApprovalStatusApplyFailed = "apply_failed"
+
+	// MemoryStatusActive means a memory is available for retrieval.
+	MemoryStatusActive = "active"
+	// MemoryStatusArchived means a memory is retained but no longer retrieved.
+	MemoryStatusArchived = "archived"
 )
 
 // Persistence provides durable storage for agent threads, turns, and messages.
@@ -107,10 +115,104 @@ func NewGormPersistence(db pkgdb.Database) *GormPersistence {
 // MigrateModels creates or updates the agent runtime tables.
 func MigrateModels(db pkgdb.Database) error {
 	return db.Update(func(tx pkgdb.Tx) error {
-		for _, model := range []interface{}{&Thread{}, &Turn{}, &Message{}, &SkillRun{}, &Artifact{}, &Approval{}} {
+		for _, model := range []interface{}{&Thread{}, &Turn{}, &Message{}, &SkillRun{}, &Artifact{}, &Approval{}, &Memory{}} {
 			if err := tx.Migrate(model); err != nil {
 				return err
 			}
+		}
+		return nil
+	})
+}
+
+// Save stores or updates an explicit memory item for the given actor scope.
+func (p *GormPersistence) Save(_ context.Context, scope kernel.Scope, item kernel.MemoryItem) error {
+	if p == nil || p.db == nil {
+		return nil
+	}
+	memory, err := memoryFromKernel(scope, item)
+	if err != nil {
+		return err
+	}
+	return p.db.Update(func(tx pkgdb.Tx) error {
+		return tx.Save(memory)
+	})
+}
+
+// Search returns active memories visible to the provided agent scope.
+func (p *GormPersistence) Search(_ context.Context, q kernel.MemoryQuery) ([]kernel.MemoryItem, error) {
+	if p == nil || p.db == nil {
+		return nil, nil
+	}
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 5
+	}
+	var records []Memory
+	err := p.db.View(func(tx pkgdb.Tx) error {
+		query := tx.Read().
+			Where("tenant_id = ? AND status = ?", q.Scope.TenantID, MemoryStatusActive)
+		if len(q.Types) > 0 {
+			scopes := make([]string, 0, len(q.Types))
+			for _, s := range q.Types {
+				scopes = append(scopes, string(s))
+			}
+			query = query.Where("scope IN (?)", scopes)
+		}
+		if q.Subject != "" {
+			query = query.Where("subject = ?", q.Subject)
+		}
+		query = visibleMemoryQuery(query, q.Scope)
+		if q.Query != "" {
+			like := "%" + q.Query + "%"
+			query = query.Where("(content LIKE ? OR subject LIKE ?)", like, like)
+		}
+		return query.
+			Order("updated_at DESC").
+			Limit(limit).
+			Find(&records).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]kernel.MemoryItem, 0, len(records))
+	for _, record := range records {
+		out = append(out, record.toKernel())
+	}
+	return out, nil
+}
+
+// Delete archives a memory visible to the provided scope.
+func (p *GormPersistence) Delete(_ context.Context, scope kernel.Scope, id string) error {
+	if p == nil || p.db == nil {
+		return nil
+	}
+	now := time.Now()
+	return p.db.Update(func(tx pkgdb.Tx) error {
+		var memory Memory
+		query := tx.Read().Where("tenant_id = ? AND id = ?", scope.TenantID, id)
+		if err := visibleMemoryQuery(query, scope).First(&memory).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrMemoryNotFound
+			}
+			return err
+		}
+		where := map[string]interface{}{
+			"tenant_id = ?": scope.TenantID,
+			"id = ?":        id,
+		}
+		rows, err := tx.UpdateColumns(
+			map[string]interface{}{
+				"status":     MemoryStatusArchived,
+				"updated_at": now,
+			},
+			where,
+			&Memory{},
+		)
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return ErrMemoryNotFound
 		}
 		return nil
 	})
@@ -726,6 +828,99 @@ func SanitizeApprovalsForAPI(items []*Approval) []*Approval {
 		out = append(out, SanitizeApprovalForAPI(item))
 	}
 	return out
+}
+
+func memoryFromKernel(scope kernel.Scope, item kernel.MemoryItem) (*Memory, error) {
+	if scope.TenantID == "" {
+		return nil, fmt.Errorf("agent store: memory tenant scope is required")
+	}
+	if item.ID == "" {
+		return nil, fmt.Errorf("agent store: memory id is required")
+	}
+	if item.Scope == "" {
+		return nil, fmt.Errorf("agent store: memory scope is required")
+	}
+	if item.Scope == kernel.MemoryUser && scope.ActorID == "" {
+		return nil, fmt.Errorf("agent store: user memory actor scope is required")
+	}
+	if item.Scope == kernel.MemoryStoreScope && scope.StoreID == "" {
+		return nil, fmt.Errorf("agent store: store memory store scope is required")
+	}
+	if item.Content == "" {
+		return nil, fmt.Errorf("agent store: memory content is required")
+	}
+	now := time.Now()
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = now
+	}
+	if item.UpdatedAt.IsZero() {
+		item.UpdatedAt = now
+	}
+	metadata := ""
+	if len(item.Metadata) > 0 {
+		data, err := json.Marshal(item.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("agent store: marshal memory metadata: %w", err)
+		}
+		metadata = sanitizeJSONText(string(data))
+	}
+	return &Memory{
+		ID:        item.ID,
+		TenantID:  scope.TenantID,
+		Scope:     string(item.Scope),
+		Subject:   item.Subject,
+		StoreID:   memoryStoreID(scope, item.Scope),
+		ActorID:   memoryActorID(scope, item.Scope),
+		Status:    MemoryStatusActive,
+		Content:   truncateStoreText(redact.SanitizeEnvBlock(item.Content), 4000),
+		Metadata:  metadata,
+		CreatedAt: item.CreatedAt,
+		UpdatedAt: item.UpdatedAt,
+	}, nil
+}
+
+func memoryStoreID(scope kernel.Scope, memoryScope kernel.MemoryScope) string {
+	if memoryScope == kernel.MemoryStoreScope {
+		return scope.StoreID
+	}
+	return ""
+}
+
+func memoryActorID(scope kernel.Scope, memoryScope kernel.MemoryScope) string {
+	if memoryScope == kernel.MemoryUser {
+		return scope.ActorID
+	}
+	return ""
+}
+
+func visibleMemoryQuery(query *gorm.DB, scope kernel.Scope) *gorm.DB {
+	clauses := []string{"scope = ?"}
+	args := []interface{}{string(kernel.MemoryTenant)}
+	if scope.ActorID != "" {
+		clauses = append(clauses, "(scope = ? AND actor_id = ?)")
+		args = append(args, string(kernel.MemoryUser), scope.ActorID)
+	}
+	if scope.StoreID != "" {
+		clauses = append(clauses, "(scope = ? AND store_id = ?)")
+		args = append(args, string(kernel.MemoryStoreScope), scope.StoreID)
+	}
+	return query.Where("("+strings.Join(clauses, " OR ")+")", args...)
+}
+
+func (m Memory) toKernel() kernel.MemoryItem {
+	metadata := map[string]string{}
+	if m.Metadata != "" {
+		_ = json.Unmarshal([]byte(m.Metadata), &metadata)
+	}
+	return kernel.MemoryItem{
+		ID:        m.ID,
+		Scope:     kernel.MemoryScope(m.Scope),
+		Subject:   m.Subject,
+		Content:   m.Content,
+		Metadata:  metadata,
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
+	}
 }
 
 // RuntimeStore is an in-memory cache for active thread state and messages.

@@ -260,6 +260,7 @@ func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, r
 		SkillFilter:     skillFilter,
 		ContextBlocks:   contextBlocks,
 		ToolCatalog:     kernel.NewStaticToolCatalog(aipkg.SellerToolMetadata()),
+		MemoryStore:     agentChatKernelMemoryStore(persist),
 		Scope: kernel.Scope{
 			TenantID:      tenantID,
 			StoreID:       storeID,
@@ -268,6 +269,13 @@ func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, r
 			ActingPersona: kernel.PersonaSeller,
 		},
 	}, nil
+}
+
+func agentChatKernelMemoryStore(persist agentstore.Persistence) kernel.MemoryStore {
+	if memoryStore, ok := persist.(kernel.MemoryStore); ok {
+		return memoryStore
+	}
+	return nil
 }
 
 func agentChatArtifactContextBlocks(ctx context.Context, persist agentstore.Persistence, tenantID string, chatCtx *aipkg.ChatContext) ([]string, error) {

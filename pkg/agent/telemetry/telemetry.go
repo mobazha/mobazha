@@ -10,18 +10,20 @@ import (
 
 // Event types emitted by the agent runtime.
 const (
-	OverflowDetected         = "overflow_detected"
-	ReplayShaped             = "replay_shaped"
-	CompactionStarted        = "auto_compaction_started"
-	CompactionSucceeded      = "auto_compaction_succeeded"
-	CompactionFailed         = "auto_compaction_failed"
-	ToolCallBatch            = "tool_call_batch"
-	PendingRequestCreated    = "pending_request_created"
-	PendingRequestResolved   = "pending_request_resolved"
-	TurnStarted              = "turn_started"
-	TurnCompleted            = "turn_completed"
-	GuardrailBlocked         = "guardrail_blocked"
-	LLMRetried               = "llm_retried"
+	OverflowDetected       = "overflow_detected"
+	ReplayShaped           = "replay_shaped"
+	CompactionStarted      = "auto_compaction_started"
+	CompactionSucceeded    = "auto_compaction_succeeded"
+	CompactionFailed       = "auto_compaction_failed"
+	ToolCallBatch          = "tool_call_batch"
+	PendingRequestCreated  = "pending_request_created"
+	PendingRequestResolved = "pending_request_resolved"
+	TurnStarted            = "turn_started"
+	TurnCompleted          = "turn_completed"
+	GuardrailBlocked       = "guardrail_blocked"
+	LLMRetried             = "llm_retried"
+	MemoryRetrieved        = "memory_retrieved"
+	MemoryRetrievalFailed  = "memory_retrieval_failed"
 )
 
 // Event is a structured telemetry event from the agent runtime.

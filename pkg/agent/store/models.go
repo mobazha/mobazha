@@ -108,6 +108,23 @@ type Approval struct {
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
+// Memory stores explicit long-lived agent memory scoped to a user, store,
+// tenant, thread, or skill. Real-time commerce facts still belong in tools.
+type Memory struct {
+	ID         string     `gorm:"column:id;type:varchar(64);primaryKey" json:"id"`
+	TenantID   string     `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_memories_scope_subject,priority:1" json:"tenant_id"`
+	Scope      string     `gorm:"column:scope;type:varchar(32);index:idx_agent_memories_scope_subject,priority:2" json:"scope"`
+	Subject    string     `gorm:"column:subject;type:varchar(128);index:idx_agent_memories_scope_subject,priority:3" json:"subject,omitempty"`
+	StoreID    string     `gorm:"column:store_id;type:varchar(255);index" json:"store_id,omitempty"`
+	ActorID    string     `gorm:"column:actor_id;type:varchar(255);index" json:"actor_id,omitempty"`
+	Status     string     `gorm:"column:status;type:varchar(32);index" json:"status"`
+	Content    string     `gorm:"column:content;type:text" json:"content"`
+	Metadata   string     `gorm:"column:metadata;type:text" json:"metadata,omitempty"`
+	CreatedAt  time.Time  `gorm:"index" json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+	LastUsedAt *time.Time `gorm:"column:last_used_at" json:"last_used_at,omitempty"`
+}
+
 func (Thread) TableName() string { return "agent_threads" }
 
 func (Turn) TableName() string { return "agent_turns" }
@@ -119,3 +136,5 @@ func (SkillRun) TableName() string { return "agent_skill_runs" }
 func (Artifact) TableName() string { return "agent_artifacts" }
 
 func (Approval) TableName() string { return "agent_approvals" }
+
+func (Memory) TableName() string { return "agent_memories" }

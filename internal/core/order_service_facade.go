@@ -44,6 +44,10 @@ func (f *orderServiceFacade) ExecuteSettlementAction(ctx context.Context, action
 	}
 }
 
+func (f *orderServiceFacade) ExecuteCollectiblePrimarySaleRelease(ctx context.Context, orderID models.OrderID, payoutAddr string) (*paypkg.ActionResult, iwallet.CoinType, error) {
+	return f.settlement.ExecuteCollectiblePrimarySaleRelease(ctx, orderID, payoutAddr)
+}
+
 func (f *orderServiceFacade) GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*paypkg.ActionStatus, iwallet.CoinType, error) {
 	return f.settlement.GetSettlementActionStatus(ctx, action, orderID, actionID)
 }

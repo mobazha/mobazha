@@ -1,7 +1,11 @@
 package scheduler
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -10,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 )
 
 // --- test helpers ---
@@ -84,6 +89,33 @@ func TestJobs_PaymentReconcileScanIsSeparateFromVerification(t *testing.T) {
 	}
 	if verify.Name == obs.Name {
 		t.Fatal("payment reconcile scan and verification must remain separate scheduler jobs")
+	}
+}
+
+func TestJobs_CollectibleMaintenanceJobs(t *testing.T) {
+	release, ok := Jobs["collectible-primary-sale-release"]
+	if !ok {
+		t.Fatal("collectible-primary-sale-release job is not registered")
+	}
+	if release.Interval != 10*time.Second {
+		t.Fatalf("release interval = %s, want 10s", release.Interval)
+	}
+	if release.PerNodeTimeout >= release.Interval {
+		t.Fatalf("release timeout = %s must stay below interval %s", release.PerNodeTimeout, release.Interval)
+	}
+
+	reconcile, ok := Jobs["collectible-reconcile"]
+	if !ok {
+		t.Fatal("collectible-reconcile job is not registered")
+	}
+	if reconcile.Interval != 15*time.Minute {
+		t.Fatalf("reconcile interval = %s, want 15m", reconcile.Interval)
+	}
+	if reconcile.PerNodeTimeout >= reconcile.Interval {
+		t.Fatalf("reconcile timeout = %s must stay below interval %s", reconcile.PerNodeTimeout, reconcile.Interval)
+	}
+	if reconcile.Name == release.Name {
+		t.Fatal("collectible release and reconcile jobs must remain separate")
 	}
 }
 
@@ -169,6 +201,36 @@ func TestGlobalFn_Fires(t *testing.T) {
 	got := count.Load()
 	if got < 2 {
 		t.Fatalf("expected at least 2 ticks, got %d", got)
+	}
+}
+
+func TestGlobalFn_ErrorIsLogged(t *testing.T) {
+	var logs bytes.Buffer
+	oldLogConfig := logging.CurrentConfig()
+	logging.Configure(logging.Config{
+		Level:   logging.WARNING,
+		Format:  logging.FormatText,
+		Writers: []io.Writer{&logs},
+	})
+	t.Cleanup(func() { logging.Configure(oldLogConfig) })
+
+	job := Job{
+		Name:     "failing-global",
+		Interval: time.Second,
+		GlobalFn: func(context.Context) error {
+			return errors.New("boom")
+		},
+	}
+	raw, _ := New(Config{HolderID: "test"})
+	s := raw.(*scheduler)
+	if err := s.Register(job); err != nil {
+		t.Fatal(err)
+	}
+	s.tick(context.Background(), job)
+
+	got := logs.String()
+	if !strings.Contains(got, "scheduler job") || !strings.Contains(got, "failing-global") || !strings.Contains(got, "boom") {
+		t.Fatalf("log output = %q, want scheduler job failure", got)
 	}
 }
 

@@ -95,6 +95,9 @@ type OrderService interface {
 	// (confirm / cancel) via ChainEscrowV2. Client-signed legacy chains
 	// are intentionally excluded from this surface.
 	ExecuteSettlementAction(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error)
+	// ExecuteCollectiblePrimarySaleRelease releases the seller payout for a
+	// verified collectible primary-sale order after hosting confirms Hub intake.
+	ExecuteCollectiblePrimarySaleRelease(ctx context.Context, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error)
 	// GetSettlementActionStatus returns the latest known lifecycle state for a
 	// previously issued settlement action.
 	GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error)

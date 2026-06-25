@@ -24,8 +24,11 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/logging"
 	"gorm.io/gorm"
 )
+
+var schedulerLog = logging.MustGetLogger("SCHED")
 
 // OverlapPolicy decides what happens when a previous tick of the same Job
 // is still running at the next interval boundary.
@@ -58,21 +61,23 @@ type JobMeta struct {
 // Jobs is the single-source-of-truth registry for all scheduler-driven
 // workers. The map key equals JobMeta.Name.
 var Jobs = map[string]JobMeta{
-	"order-timeout":                   {Name: "order-timeout", Interval: 1 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 30 * time.Second},
-	"outbox-poll":                     {Name: "outbox-poll", Interval: 5 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 4 * time.Second},
-	"outbox-cleanup":                  {Name: "outbox-cleanup", Interval: 1 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
-	"payment-reconcile-scan":          {Name: "payment-reconcile-scan", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
-	"payment-verification":            {Name: "payment-verification", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
-	"settlement-action-confirmations": {Name: "settlement-action-confirmations", Interval: 10 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 8 * time.Second},
-	"webhook-delivery":                {Name: "webhook-delivery", Interval: 5 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 4 * time.Second},
-	"webhook-cleanup":                 {Name: "webhook-cleanup", Interval: 1 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
-	"analytics-cleanup":               {Name: "analytics-cleanup", Interval: 24 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 60 * time.Second},
-	"fiat-reconciliation":             {Name: "fiat-reconciliation", Interval: 2 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 90 * time.Second},
-	"fiat-cleanup":                    {Name: "fiat-cleanup", Interval: 24 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
-	"guest-order-cleanup":             {Name: "guest-order-cleanup", Interval: 1 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 30 * time.Second},
-	"follower-connect":                {Name: "follower-connect", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
-	"netdb-reconcile":                 {Name: "netdb-reconcile", Interval: 10 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 60 * time.Second},
-	"order-lock-cleanup":              {Name: "order-lock-cleanup", Interval: 30 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"order-timeout":                    {Name: "order-timeout", Interval: 1 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 30 * time.Second},
+	"outbox-poll":                      {Name: "outbox-poll", Interval: 5 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 4 * time.Second},
+	"outbox-cleanup":                   {Name: "outbox-cleanup", Interval: 1 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"payment-reconcile-scan":           {Name: "payment-reconcile-scan", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
+	"payment-verification":             {Name: "payment-verification", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
+	"settlement-action-confirmations":  {Name: "settlement-action-confirmations", Interval: 10 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 8 * time.Second},
+	"collectible-primary-sale-release": {Name: "collectible-primary-sale-release", Interval: 10 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 1, PerNodeTimeout: 8 * time.Second},
+	"collectible-reconcile":            {Name: "collectible-reconcile", Interval: 15 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 1, PerNodeTimeout: 2 * time.Minute},
+	"webhook-delivery":                 {Name: "webhook-delivery", Interval: 5 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 4 * time.Second},
+	"webhook-cleanup":                  {Name: "webhook-cleanup", Interval: 1 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"analytics-cleanup":                {Name: "analytics-cleanup", Interval: 24 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 60 * time.Second},
+	"fiat-reconciliation":              {Name: "fiat-reconciliation", Interval: 2 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 90 * time.Second},
+	"fiat-cleanup":                     {Name: "fiat-cleanup", Interval: 24 * time.Hour, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"guest-order-cleanup":              {Name: "guest-order-cleanup", Interval: 1 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 30 * time.Second},
+	"follower-connect":                 {Name: "follower-connect", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
+	"netdb-reconcile":                  {Name: "netdb-reconcile", Interval: 10 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 60 * time.Second},
+	"order-lock-cleanup":               {Name: "order-lock-cleanup", Interval: 30 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
 
 	"supply-chain-retry":           {Name: "supply-chain-retry", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 25 * time.Second},
 	"supply-chain-reconcile":       {Name: "supply-chain-reconcile", Interval: 5 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 4 * time.Minute},
@@ -257,7 +262,9 @@ func (s *scheduler) tick(ctx context.Context, j Job) {
 	}
 
 	if j.GlobalFn != nil {
-		_ = j.GlobalFn(ctx)
+		if err := j.GlobalFn(ctx); err != nil {
+			schedulerLog.Warningf("scheduler job %q failed: %v", j.Name, err)
+		}
 		return
 	}
 

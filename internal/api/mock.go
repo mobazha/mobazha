@@ -216,6 +216,9 @@ func (m *mockNode) ExecuteSettlementAction(ctx context.Context, action string, o
 	}
 	return nil, "", fmt.Errorf("ExecuteSettlementAction not stubbed in mockNode")
 }
+func (m *mockNode) ExecuteCollectiblePrimarySaleRelease(context.Context, models.OrderID, string) (*payment.ActionResult, iwallet.CoinType, error) {
+	return nil, "", fmt.Errorf("ExecuteCollectiblePrimarySaleRelease not stubbed in mockNode")
+}
 func (m *mockNode) GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error) {
 	if m.getSettlementActionStatusFunc != nil {
 		return m.getSettlementActionStatusFunc(ctx, action, orderID, actionID)

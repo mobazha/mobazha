@@ -157,6 +157,65 @@ func TestExecuteSettlementAction_ReusesActiveDurableIntent(t *testing.T) {
 	require.Zero(t, strategy.confirmCalls)
 }
 
+func TestExecuteCollectiblePrimarySaleRelease_UsesConfirmSettlement(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	strategy := &utxoActionStatusStub{
+		model:         payment.PaymentModelMonitored,
+		confirmResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "act-primary-sale-release"},
+	}
+	reg := payment.NewRegistry()
+	reg.RegisterV2(iwallet.ChainEthereum, strategy)
+
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	svc.SetRegistry(reg)
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-primary-sale-release", models.RoleVendor, true)
+
+	result, coinType, err := svc.ExecuteCollectiblePrimarySaleRelease(
+		context.Background(),
+		order.ID,
+		"0x5555555555555555555555555555555555555555",
+	)
+	require.NoError(t, err)
+	require.Equal(t, "crypto:eip155:1:native", coinType.String())
+	require.NotNil(t, result)
+	require.Equal(t, payment.ActionModeSubmitted, result.Mode)
+	require.Equal(t, "act-primary-sale-release", result.ActionID)
+	require.Equal(t, order.ID.String(), strategy.lastConfirm.OrderID)
+	require.Equal(t, "0x5555555555555555555555555555555555555555", strategy.lastConfirm.PayoutAddr)
+}
+
+func TestExecuteCollectiblePrimarySaleRelease_RejectsNonCollectibleOrder(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	order := seedModeratedSettlementActionOrder(t, db, "order-not-collectible", models.RoleVendor)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	_, _, err = svc.ExecuteCollectiblePrimarySaleRelease(context.Background(), order.ID, "")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not a collectible primary sale")
+}
+
+func TestExecuteCollectiblePrimarySaleRelease_RequiresVerifiedPayment(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-primary-sale-unverified", models.RoleVendor, false)
+
+	_, _, err = svc.ExecuteCollectiblePrimarySaleRelease(context.Background(), order.ID, "")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "requires verified payment")
+}
+
 func seedModeratedSettlementActionOrder(
 	t *testing.T,
 	db database.Database,
@@ -206,12 +265,49 @@ func seedModeratedSettlementActionOrder(
 	return order
 }
 
+func seedCollectiblePrimarySaleReleaseOrder(
+	t *testing.T,
+	db database.Database,
+	id string,
+	role models.OrderRole,
+	verified bool,
+) *models.Order {
+	t.Helper()
+
+	order := seedModeratedSettlementActionOrder(t, db, id, role)
+	if verified {
+		order.MarkPaymentVerified()
+	} else {
+		order.MarkPaymentVerificationPending()
+	}
+	require.NoError(t, order.SetPaymentSent(&pb.PaymentSent{
+		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPaymentSent(),
+		Amount:         "1000",
+		Coin:           "crypto:eip155:11155111:native",
+		PayerAddress:   "0x1111111111111111111111111111111111111111",
+		RefundAddress:  "0x1111111111111111111111111111111111111111",
+		Moderator:      "12D3KooWModerator",
+	}))
+	require.NoError(t, order.MergeFiatMetadata(map[string]string{
+		models.CollectibleMetadataKeyType:         models.CollectibleMetadataTypePrimarySale,
+		models.CollectibleMetadataKeyFulfillment:  models.CollectibleFulfillmentNFT,
+		models.CollectibleMetadataKeyHubSlotID:    "slot-primary-sale-release",
+		models.CollectibleMetadataKeyBuyerPeerID:  "buyer-peer",
+		models.CollectibleMetadataKeySellerPeerID: "seller-peer",
+	}))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+	return order
+}
+
 type utxoActionStatusStub struct {
 	model               payment.PaymentModel
 	confirmResult       *payment.ActionResult
 	cancelResult        *payment.ActionResult
 	sellerDeclineResult *payment.ActionResult
 	confirmCalls        int
+	lastConfirm         payment.ActionParams
 	lastCancel          payment.ActionParams
 	lastSellerDecline   payment.ActionParams
 }
@@ -227,9 +323,9 @@ func (s *utxoActionStatusStub) GetActionStatus(context.Context, string) (*paymen
 func (s *utxoActionStatusStub) SetupPayment(context.Context, payment.PaymentSetupParams) (*payment.ActionResult, error) {
 	return nil, payment.ErrUnsupportedAction
 }
-
-func (s *utxoActionStatusStub) Confirm(context.Context, payment.ActionParams) (*payment.ActionResult, error) {
+func (s *utxoActionStatusStub) Confirm(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
 	s.confirmCalls++
+	s.lastConfirm = params
 	if s.confirmResult != nil {
 		return s.confirmResult, nil
 	}

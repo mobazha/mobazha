@@ -46,8 +46,17 @@ var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
 		return toolRoute{"GET", "/v1/listings/mine/" + sanitizePathParam(a["slug"])}
 	},
 	"listings_get_template": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/template"} },
+	"agent_artifacts_list": func(_ map[string]interface{}) toolRoute {
+		return toolRoute{"GET", "/v1/agent/artifacts"}
+	},
+	"agent_artifacts_get": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"GET", "/v1/agent/artifacts/" + sanitizePathParam(a["artifactId"])}
+	},
 	"agent_artifacts_create": func(_ map[string]interface{}) toolRoute {
 		return toolRoute{"POST", "/v1/agent/artifacts"}
+	},
+	"agent_artifacts_update": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"PATCH", "/v1/agent/artifacts/" + sanitizePathParam(a["artifactId"])}
 	},
 	"listings_create": func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/listings"} },
 	"listings_update": func(_ map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/listings"} },
@@ -125,7 +134,7 @@ func (te *ToolExecutor) Execute(ctx context.Context, toolName string, argsJSON s
 	route := routeFn(args)
 
 	var bodyReader io.Reader
-	if route.Method == "POST" || route.Method == "PUT" {
+	if route.Method == "POST" || route.Method == "PUT" || route.Method == "PATCH" {
 		bodyBytes, err := buildRequestBody(toolName, args)
 		if err != nil {
 			return "", err
@@ -187,6 +196,14 @@ func buildRequestBody(toolName string, args map[string]interface{}) ([]byte, err
 			return json.Marshal(collection)
 		}
 		return json.Marshal(args)
+	case toolName == "agent_artifacts_update":
+		payload := make(map[string]interface{}, len(args))
+		for k, v := range args {
+			if k != "artifactId" {
+				payload[k] = v
+			}
+		}
+		return json.Marshal(payload)
 	case toolName == "chat_send_message":
 		payload := map[string]interface{}{}
 		if body, ok := args["body"]; ok {
@@ -209,6 +226,9 @@ func appendQueryParams(baseURL, toolName string, args map[string]interface{}) st
 		"orders_get_sales":   {"limit", "offset"},
 		"notifications_list": {"limit", "offset"},
 		"chat_get_messages":  {"limit", "before", "after", "since"},
+		"agent_artifacts_list": {
+			"skillRunId", "kind", "status", "limit", "offset",
+		},
 	}
 	keys, ok := paramKeys[toolName]
 	if !ok {

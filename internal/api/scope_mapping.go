@@ -140,6 +140,7 @@ var routeScopeMap = []routeScope{
 	// AI
 	{"GET /v1/agent", contracts.ScopeAIUse},
 	{"POST /v1/agent", contracts.ScopeAIUse},
+	{"PATCH /v1/agent", contracts.ScopeAIUse},
 	{"DELETE /v1/agent", contracts.ScopeAIUse},
 	{"POST /v1/ai", contracts.ScopeAIUse},
 	{"GET /v1/ai", contracts.ScopeAIUse},

@@ -763,7 +763,7 @@ capabilities: listing.read, listing.draft_write
 				ToolCalls: []stream.ToolCall{{
 					ID:        "create_call_1",
 					Name:      "listings_create",
-					Arguments: `{"listing":{"title":"Draft Shirt"}}`,
+					Arguments: `{"sourceArtifactIds":["art_proposal_1","art_proposal_1"],"listing":{"title":"Draft Shirt","proposalArtifactId":"art_proposal_2"}}`,
 				}},
 			}}},
 			{chunks: []stream.Chunk{{Delta: "Approval required"}}},
@@ -834,6 +834,9 @@ capabilities: listing.read, listing.draft_write
 			if len(chunk.ToolEvent.Result) == 0 || !strings.Contains(string(chunk.ToolEvent.Result), `"status":"approval_required"`) {
 				t.Fatalf("expected structured approval result payload, got %#v", chunk.ToolEvent.Result)
 			}
+			if !strings.Contains(string(chunk.ToolEvent.Result), `"artifactIds":["art_proposal_1","art_proposal_2"]`) {
+				t.Fatalf("expected artifact ids in approval result, got %s", string(chunk.ToolEvent.Result))
+			}
 		}
 	}
 	if !sawToolResult {
@@ -858,6 +861,9 @@ capabilities: listing.read, listing.draft_write
 	}
 	if approval.RequestHash == "" || approval.ToolCallID != "create_call_1" || approval.SkillID != string(kernel.SkillProductImport) {
 		t.Fatalf("persisted approval missing identity/hash fields: %#v", approval)
+	}
+	if approval.ArtifactIDs != `["art_proposal_1","art_proposal_2"]` {
+		t.Fatalf("persisted approval should reference proposal artifacts, got %q", approval.ArtifactIDs)
 	}
 	for _, want := range []string{`"status":"approval_required"`, `"action":"listings_create"`, `"requestHash":`, `"id":"appr_`} {
 		if !strings.Contains(approvalMessage.Content, want) {
@@ -997,6 +1003,110 @@ func TestRunTurn_WithToolCalls(t *testing.T) {
 	turnComplete := emitter.ByType(telemetry.TurnCompleted)
 	if len(turnComplete) == 0 {
 		t.Error("expected turn_completed telemetry event")
+	}
+}
+
+func TestRunTurn_CompactsSummaryToolResultsInHistory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "product.import"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "product.import", "SKILL.md"), []byte(`---
+name: product.import
+description: Import local product materials.
+persona: seller
+capabilities: listing.read
+tool_hints: search
+---
+
+# Product Import
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{{
+				ToolCalls: []stream.ToolCall{{
+					ID:        "tc_1",
+					Name:      "search",
+					Arguments: `{"q":"caps"}`,
+				}},
+			}}},
+			{chunks: []stream.Chunk{{Delta: "Found candidates."}}},
+		},
+	}
+	persist := &fakePersistence{}
+	executor := exec.ToolExecutorFunc(func(_ context.Context, c exec.ToolCall) (exec.ToolResult, error) {
+		return exec.ToolResult{
+			CallID:  c.ID,
+			Name:    c.Name,
+			Content: `{"data":[{"title":"Cap","api_key":"secret-value"}],"meta":{"page":1}}`,
+		}, nil
+	})
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(executor, 5*time.Second, 0),
+		persist,
+		&telemetry.BufferEmitter{},
+		nil,
+	)
+	orch.RegisterTools([]ToolDef{{Name: "search", Description: "Search", Schema: `{}`}})
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "th_summary_tool", "import caps", TurnOptions{
+		SkillProvider:   agentskill.NewFilesystemProvider(dir),
+		RequestedSkills: []string{"product.import"},
+		ToolCatalog: kernel.NewStaticToolCatalog([]kernel.ToolMetadata{
+			{
+				Name:            "search",
+				Description:     "Search",
+				Risk:            kernel.RiskRead,
+				Approval:        kernel.ApprovalNone,
+				SideEffect:      kernel.SideEffectNone,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingRead},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+				ResultMode:      "summary",
+			},
+		}),
+		Scope: kernel.Scope{ActingPersona: kernel.PersonaSeller},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("stream error: %v", err)
+	}
+
+	var toolContent string
+	for _, msg := range persist.messages {
+		if msg.Role == "tool" && msg.ToolCallID == "tc_1" {
+			toolContent = msg.Content
+			break
+		}
+	}
+	if toolContent == "" {
+		t.Fatalf("missing persisted tool message: %#v", persist.messages)
+	}
+	for _, want := range []string{"Tool result compacted", `"resultMode":"summary"`, `"dataItemCount":1`, "[REDACTED]"} {
+		if !strings.Contains(toolContent, want) {
+			t.Fatalf("compacted tool content missing %q:\n%s", want, toolContent)
+		}
+	}
+	if strings.Contains(toolContent, "secret-value") {
+		t.Fatalf("tool content should redact sensitive values:\n%s", toolContent)
+	}
+}
+
+func TestRunTurn_RedactsRedactedToolResultsInHistory(t *testing.T) {
+	content := compactToolResultForHistory("listings_create", `{"id":"listing_1","title":"Cap"}`, "redacted", false)
+	for _, want := range []string{`"tool":"listings_create"`, `"resultMode":"redacted"`, "result omitted"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("redacted result missing %q:\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, "listing_1") || strings.Contains(content, "Cap") {
+		t.Fatalf("redacted result leaked content:\n%s", content)
 	}
 }
 

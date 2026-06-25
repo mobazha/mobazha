@@ -17,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/agent/store"
 	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
 	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 )
 
 // LLMClient abstracts the model inference call.
@@ -41,6 +42,11 @@ type ToolDef struct {
 }
 
 const runtimeUseSkillToolName = "use_skill_tool"
+
+const (
+	toolResultHistoryMaxLen = 2000
+	toolResultExcerptMaxLen = 1200
+)
 
 // Config holds the orchestrator's tuning parameters.
 type Config struct {
@@ -206,6 +212,7 @@ type resolvedTurnContext struct {
 	grantedTools    map[string][]kernel.ToolMetadata
 	baseTools       []ToolDef
 	tools           []ToolDef
+	toolResultModes map[string]string
 	contextBlocks   []string
 	skillProvider   agentskill.Provider
 	toolCatalog     kernel.ToolCatalog
@@ -336,13 +343,14 @@ func (o *Orchestrator) assembleHistory(ctx context.Context, tenantID, threadID, 
 
 func (o *Orchestrator) resolveTurnContext(ctx context.Context, opts TurnOptions) (resolvedTurnContext, error) {
 	resolved := resolvedTurnContext{
-		baseTools:     append([]ToolDef(nil), o.tools...),
-		tools:         append([]ToolDef(nil), o.tools...),
-		contextBlocks: append([]string(nil), opts.ContextBlocks...),
-		grantedTools:  map[string][]kernel.ToolMetadata{},
-		skillProvider: opts.SkillProvider,
-		toolCatalog:   opts.ToolCatalog,
-		scope:         opts.Scope,
+		baseTools:       append([]ToolDef(nil), o.tools...),
+		tools:           append([]ToolDef(nil), o.tools...),
+		toolResultModes: map[string]string{},
+		contextBlocks:   append([]string(nil), opts.ContextBlocks...),
+		grantedTools:    map[string][]kernel.ToolMetadata{},
+		skillProvider:   opts.SkillProvider,
+		toolCatalog:     opts.ToolCatalog,
+		scope:           opts.Scope,
 	}
 	if opts.SkillProvider == nil {
 		return resolved, nil
@@ -391,6 +399,7 @@ func recalculateInitialTools(ctx context.Context, resolved *resolvedTurnContext)
 	for _, tool := range catalogTools {
 		if initialToolAllowed(tool) {
 			allowedNames[tool.Name] = struct{}{}
+			rememberToolResultMode(resolved, tool)
 		}
 	}
 	resolved.tools = appendRuntimeSkillTool(filterToolDefs(resolved.baseTools, allowedNames))
@@ -403,6 +412,23 @@ func initialToolAllowed(tool kernel.ToolMetadata) bool {
 		tool.Risk == kernel.RiskRead &&
 		tool.Approval == kernel.ApprovalNone &&
 		tool.SideEffect == kernel.SideEffectNone
+}
+
+func rememberToolResultMode(resolved *resolvedTurnContext, tool kernel.ToolMetadata) {
+	if resolved == nil || tool.Name == "" || tool.ResultMode == "" {
+		return
+	}
+	if resolved.toolResultModes == nil {
+		resolved.toolResultModes = map[string]string{}
+	}
+	resolved.toolResultModes[tool.Name] = tool.ResultMode
+}
+
+func toolResultMode(resolved *resolvedTurnContext, toolName string) string {
+	if resolved == nil || resolved.toolResultModes == nil {
+		return ""
+	}
+	return resolved.toolResultModes[toolName]
 }
 
 func recalculateGrantedTools(ctx context.Context, resolved *resolvedTurnContext) error {
@@ -428,6 +454,7 @@ func recalculateGrantedTools(ctx context.Context, resolved *resolvedTurnContext)
 		resolved.grantedTools[s.ID] = granted
 		for _, tool := range granted {
 			allowedNames[tool.Name] = struct{}{}
+			rememberToolResultMode(resolved, tool)
 		}
 	}
 	if len(allowedNames) == 0 {
@@ -436,6 +463,144 @@ func recalculateGrantedTools(ctx context.Context, resolved *resolvedTurnContext)
 	}
 	resolved.tools = appendRuntimeSkillTool(filterToolDefs(resolved.baseTools, allowedNames))
 	return nil
+}
+
+func compactToolResultForHistory(toolName, content, resultMode string, isError bool) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	if isError {
+		return compactToolResultRaw(content, toolResultExcerptMaxLen)
+	}
+	switch resultMode {
+	case "redacted":
+		return marshalCompactToolResult(map[string]any{
+			"tool":       toolName,
+			"resultMode": "redacted",
+			"summary":    "Tool completed; result omitted from chat history because the catalog marks it redacted.",
+		})
+	case "summary":
+		return summarizeToolResult(toolName, content, resultMode)
+	}
+	if len(content) > toolResultHistoryMaxLen {
+		return summarizeToolResult(toolName, content, "summary")
+	}
+	return compactToolResultRaw(content, toolResultHistoryMaxLen)
+}
+
+func summarizeToolResult(toolName, content, resultMode string) string {
+	summary := map[string]any{
+		"tool":       toolName,
+		"resultMode": resultMode,
+		"summary":    "Tool result compacted for chat history; use an artifact/read tool if exact payload is required.",
+	}
+	var decoded any
+	if err := json.Unmarshal([]byte(content), &decoded); err == nil {
+		switch v := decoded.(type) {
+		case map[string]any:
+			redacted, _ := redactToolResultValue(v).(map[string]any)
+			summary["type"] = "object"
+			summary["keys"] = sortedMapKeys(redacted, 12)
+			addToolResultDataShape(summary, redacted["data"])
+			if compact, err := json.Marshal(redacted); err == nil {
+				summary["excerpt"] = compactToolResultRaw(string(compact), toolResultExcerptMaxLen)
+			}
+		case []any:
+			v, _ = redactToolResultValue(v).([]any)
+			summary["type"] = "array"
+			summary["itemCount"] = len(v)
+			if compact, err := json.Marshal(v); err == nil {
+				summary["excerpt"] = compactToolResultRaw(string(compact), toolResultExcerptMaxLen)
+			}
+		default:
+			summary["type"] = "scalar"
+			if compact, err := json.Marshal(decoded); err == nil {
+				summary["excerpt"] = compactToolResultRaw(string(compact), toolResultExcerptMaxLen)
+			}
+		}
+	} else {
+		summary["type"] = "text"
+		summary["excerpt"] = compactToolResultRaw(content, toolResultExcerptMaxLen)
+	}
+	return marshalCompactToolResult(summary)
+}
+
+func redactToolResultValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, item := range v {
+			if redact.IsSensitiveKey(key) {
+				out[key] = "[REDACTED]"
+				continue
+			}
+			out[key] = redactToolResultValue(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = redactToolResultValue(item)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+func addToolResultDataShape(summary map[string]any, data any) {
+	switch v := data.(type) {
+	case []any:
+		summary["dataType"] = "array"
+		summary["dataItemCount"] = len(v)
+	case map[string]any:
+		summary["dataType"] = "object"
+		summary["dataKeys"] = sortedMapKeys(v, 12)
+	case nil:
+	default:
+		summary["dataType"] = fmt.Sprintf("%T", data)
+	}
+}
+
+func sortedMapKeys(m map[string]any, limit int) []string {
+	if len(m) == 0 || limit <= 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	if len(keys) > limit {
+		keys = keys[:limit]
+	}
+	return keys
+}
+
+func compactToolResultRaw(raw string, limit int) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || limit <= 0 {
+		return ""
+	}
+	raw = redact.SanitizeEnvBlock(raw)
+	raw = strings.ReplaceAll(raw, "\n", " ")
+	raw = strings.Join(strings.Fields(raw), " ")
+	if len(raw) <= limit {
+		return raw
+	}
+	if limit <= 3 {
+		return raw[:limit]
+	}
+	return raw[:limit-3] + "..."
+}
+
+func marshalCompactToolResult(value map[string]any) string {
+	out, err := json.Marshal(value)
+	if err != nil {
+		return `{"summary":"Tool result compacted for chat history."}`
+	}
+	return string(out)
 }
 
 func (o *Orchestrator) systemPromptWithSkills(resolved resolvedTurnContext) string {
@@ -904,6 +1069,7 @@ func (o *Orchestrator) runLoop(
 			if toolName == "" {
 				toolName = toolNames[r.CallID]
 			}
+			content := compactToolResultForHistory(toolName, r.Content, toolResultMode(resolved, toolName), r.IsError)
 			out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
 				ID:     r.CallID,
 				Name:   toolName,
@@ -911,7 +1077,7 @@ func (o *Orchestrator) runLoop(
 			}})
 			history = append(history, Message{
 				Role:       "tool",
-				Content:    r.Content,
+				Content:    content,
 				ToolCallID: r.CallID,
 			})
 			if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
@@ -920,10 +1086,10 @@ func (o *Orchestrator) runLoop(
 				ThreadID:   threadID,
 				TurnID:     turnID,
 				Role:       "tool",
-				Content:    r.Content,
+				Content:    content,
 				ToolCallID: r.CallID,
-				Tokens:     budget.EstimateTokens(r.Content),
-				Bytes:      len(r.Content),
+				Tokens:     budget.EstimateTokens(content),
+				Bytes:      len(content),
 				CreatedAt:  time.Now(),
 			}); err != nil {
 				out.SendError(err)
@@ -946,6 +1112,8 @@ func approvalRequiredToolResult(resolved *resolvedTurnContext, tenantID, threadI
 		return "", nil, false, nil
 	}
 	payload := toolCallPayload(call.Arguments)
+	artifactIDs := approvalArtifactIDsFromPayload(payload)
+	artifactIDsJSON := marshalApprovalArtifactIDs(artifactIDs)
 	createdAt := time.Now()
 	req := kernel.ApprovalRequest{
 		ID:             newApprovalID(),
@@ -977,6 +1145,7 @@ func approvalRequiredToolResult(resolved *resolvedTurnContext, tenantID, threadI
 		Action:         req.Action,
 		Summary:        req.Summary,
 		Payload:        string(payload),
+		ArtifactIDs:    artifactIDsJSON,
 		RequestHash:    req.RequestHash,
 		IdempotencyKey: req.IdempotencyKey,
 		Status:         store.ApprovalStatusPending,
@@ -984,13 +1153,15 @@ func approvalRequiredToolResult(resolved *resolvedTurnContext, tenantID, threadI
 		UpdatedAt:      createdAt,
 	}
 	data, err := json.Marshal(struct {
-		Status   string                 `json:"status"`
-		Message  string                 `json:"message"`
-		Approval kernel.ApprovalRequest `json:"approval"`
+		Status      string                 `json:"status"`
+		Message     string                 `json:"message"`
+		ArtifactIDs []string               `json:"artifactIds,omitempty"`
+		Approval    kernel.ApprovalRequest `json:"approval"`
 	}{
-		Status:   "approval_required",
-		Message:  "This tool requires explicit approval before execution.",
-		Approval: req,
+		Status:      "approval_required",
+		Message:     "This tool requires explicit approval before execution.",
+		ArtifactIDs: artifactIDs,
+		Approval:    req,
 	})
 	if err != nil {
 		return "", nil, true, fmt.Errorf("marshal approval request: %w", err)
@@ -1036,6 +1207,93 @@ func toolCallPayload(arguments string) json.RawMessage {
 		return json.RawMessage(`{}`)
 	}
 	return json.RawMessage(data)
+}
+
+func approvalArtifactIDsFromPayload(payload json.RawMessage) []string {
+	if len(payload) == 0 || !json.Valid(payload) {
+		return nil
+	}
+	var decoded any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		return nil
+	}
+	var out []string
+	collectApprovalArtifactIDs(decoded, "", &out)
+	return uniqueStringList(out, 20)
+}
+
+func collectApprovalArtifactIDs(value any, key string, out *[]string) {
+	switch v := value.(type) {
+	case map[string]any:
+		for childKey, childValue := range v {
+			collectApprovalArtifactIDs(childValue, childKey, out)
+		}
+	case []any:
+		if isArtifactIDKey(key) {
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					*out = append(*out, s)
+				}
+			}
+			return
+		}
+		for _, item := range v {
+			collectApprovalArtifactIDs(item, key, out)
+		}
+	case string:
+		if isArtifactIDKey(key) {
+			*out = append(*out, v)
+		}
+	}
+}
+
+func isArtifactIDKey(key string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(key), "_", ""))
+	switch normalized {
+	case "artifactid",
+		"artifactids",
+		"sourceartifactid",
+		"sourceartifactids",
+		"proposalartifactid",
+		"proposalartifactids":
+		return true
+	default:
+		return false
+	}
+}
+
+func uniqueStringList(items []string, limit int) []string {
+	if len(items) == 0 || limit <= 0 {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+func marshalApprovalArtifactIDs(ids []string) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	data, err := json.Marshal(ids)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func hasRuntimeSkillToolCall(toolCalls []stream.ToolCall) bool {

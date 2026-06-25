@@ -320,6 +320,13 @@ type agentArtifactCreateRequest struct {
 	Data        json.RawMessage `json:"data,omitempty"`
 }
 
+type agentArtifactUpdateRequest struct {
+	Status  *string         `json:"status,omitempty"`
+	Name    *string         `json:"name,omitempty"`
+	Summary *string         `json:"summary,omitempty"`
+	Data    json.RawMessage `json:"data,omitempty"`
+}
+
 // handlePOSTAgentArtifact handles POST /v1/agent/artifacts.
 func (g *Gateway) handlePOSTAgentArtifact(w http.ResponseWriter, r *http.Request) {
 	p, ok := getAIChatProvider(r)
@@ -345,12 +352,20 @@ func (g *Gateway) handlePOSTAgentArtifact(w http.ResponseWriter, r *http.Request
 		}
 		req.Kind = agentstore.ArtifactKindSourceMaterial
 	}
+	if !validAgentArtifactCreateKind(req.Kind) {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid artifact kind")
+		return
+	}
 	status := strings.TrimSpace(req.Status)
 	if status == "" {
 		status = agentstore.ArtifactStatusNew
 		if req.Kind == agentstore.ArtifactKindSourceMaterial && hasMaterial {
 			status = agentstore.ArtifactStatusReady
 		}
+	}
+	if !validAgentArtifactCreateStatus(status) {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid artifact status")
+		return
 	}
 	contentType := strings.TrimSpace(req.ContentType)
 	if contentType == "" && strings.TrimSpace(req.Text) != "" {
@@ -404,6 +419,59 @@ func (g *Gateway) handlePOSTAgentArtifact(w http.ResponseWriter, r *http.Request
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
+	if err := p.AgentStore().SaveArtifact(r.Context(), artifact); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save artifact")
+		return
+	}
+	responsePkg.Success(w, artifact)
+}
+
+// handlePATCHAgentArtifact handles PATCH /v1/agent/artifacts/{artifactId}.
+func (g *Gateway) handlePATCHAgentArtifact(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	var req agentArtifactUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid artifact update body")
+		return
+	}
+	rawData, hasData, err := validatedOptionalRawJSON(req.Data)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	artifactID := strings.TrimSpace(chi.URLParam(r, "artifactId"))
+	tenantID := agentChatTenantID(r, p)
+	artifact, err := p.AgentStore().LoadArtifact(r.Context(), tenantID, artifactID)
+	if errors.Is(err, agentstore.ErrArtifactNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "artifact not found")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load artifact")
+		return
+	}
+	if req.Status != nil {
+		status := strings.TrimSpace(*req.Status)
+		if !validAgentArtifactMutableStatus(status) {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid artifact status")
+			return
+		}
+		artifact.Status = status
+	}
+	if req.Name != nil {
+		artifact.Name = strings.TrimSpace(*req.Name)
+	}
+	if req.Summary != nil {
+		artifact.Summary = strings.TrimSpace(*req.Summary)
+	}
+	if hasData {
+		artifact.Data = string(rawData)
+	}
+	artifact.UpdatedAt = time.Now()
 	if err := p.AgentStore().SaveArtifact(r.Context(), artifact); err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save artifact")
 		return
@@ -626,7 +694,41 @@ func applyAgentApproval(ctx context.Context, persist agentstore.Persistence, ten
 		}
 		return failed, execErr
 	}
-	return persist.MarkApprovalApplied(ctx, tenantID, approvalID, result, actorID)
+	applied, err := persist.MarkApprovalApplied(ctx, tenantID, approvalID, result, actorID)
+	if err != nil {
+		return nil, err
+	}
+	markApprovalArtifactsApplied(ctx, persist, tenantID, applied)
+	return applied, nil
+}
+
+func markApprovalArtifactsApplied(ctx context.Context, persist agentstore.Persistence, tenantID string, approval *agentstore.Approval) {
+	if persist == nil || approval == nil {
+		return
+	}
+	for _, artifactID := range approvalArtifactIDs(approval) {
+		artifact, err := persist.LoadArtifact(ctx, tenantID, artifactID)
+		if err != nil {
+			continue
+		}
+		if artifact.Kind != agentstore.ArtifactKindProposal {
+			continue
+		}
+		artifact.Status = agentstore.ArtifactStatusApplied
+		artifact.UpdatedAt = time.Now()
+		_ = persist.SaveArtifact(ctx, artifact)
+	}
+}
+
+func approvalArtifactIDs(approval *agentstore.Approval) []string {
+	if approval == nil || strings.TrimSpace(approval.ArtifactIDs) == "" {
+		return nil
+	}
+	var ids []string
+	if err := json.Unmarshal([]byte(approval.ArtifactIDs), &ids); err != nil {
+		return nil
+	}
+	return uniqueTrimmedStrings(ids)
 }
 
 func verifyAgentApprovalHash(approval *agentstore.Approval) error {
@@ -741,6 +843,53 @@ func agentArtifactMaterialData(req agentArtifactCreateRequest) (json.RawMessage,
 		return nil, false, fmt.Errorf("invalid artifact metadata")
 	}
 	return data, true, nil
+}
+
+func validAgentArtifactCreateKind(kind string) bool {
+	switch kind {
+	case agentstore.ArtifactKindSourceMaterial,
+		agentstore.ArtifactKindCandidate,
+		agentstore.ArtifactKindProposal,
+		agentstore.ArtifactKindValidationReport:
+		return true
+	default:
+		return false
+	}
+}
+
+func validAgentArtifactCreateStatus(status string) bool {
+	switch status {
+	case agentstore.ArtifactStatusNew,
+		agentstore.ArtifactStatusReady,
+		agentstore.ArtifactStatusNeedsReview,
+		agentstore.ArtifactStatusSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+func validAgentArtifactMutableStatus(status string) bool {
+	switch status {
+	case agentstore.ArtifactStatusNew,
+		agentstore.ArtifactStatusReady,
+		agentstore.ArtifactStatusNeedsReview,
+		agentstore.ArtifactStatusSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+func validatedOptionalRawJSON(raw json.RawMessage) (json.RawMessage, bool, error) {
+	raw = json.RawMessage(strings.TrimSpace(string(raw)))
+	if len(raw) == 0 {
+		return nil, false, nil
+	}
+	if !json.Valid(raw) {
+		return nil, false, fmt.Errorf("invalid artifact data")
+	}
+	return raw, true, nil
 }
 
 func agentArtifactSourceHash(req agentArtifactCreateRequest, data json.RawMessage) string {

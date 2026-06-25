@@ -7,8 +7,8 @@ import (
 
 func TestSellerTools_Count(t *testing.T) {
 	tools := SellerTools()
-	if len(tools) != 27 {
-		t.Errorf("expected 27 seller tools, got %d", len(tools))
+	if len(tools) != 30 {
+		t.Errorf("expected 30 seller tools, got %d", len(tools))
 	}
 }
 
@@ -73,6 +73,83 @@ func TestSellerTools_IncludesAgentArtifactCreate(t *testing.T) {
 		return
 	}
 	t.Fatal("agent_artifacts_create should be available to authorized agent skills")
+}
+
+func TestSellerTools_IncludesAgentArtifactRead(t *testing.T) {
+	tools := SellerTools()
+	foundList := false
+	foundGet := false
+	for _, tool := range tools {
+		switch tool.Name {
+		case "agent_artifacts_list":
+			foundList = true
+			var schema struct {
+				Properties map[string]struct {
+					Enum []string `json:"enum"`
+				} `json:"properties"`
+			}
+			if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+				t.Fatalf("decode agent_artifacts_list schema: %v", err)
+			}
+			for _, field := range []string{"skillRunId", "kind", "status", "limit", "offset"} {
+				if _, ok := schema.Properties[field]; !ok {
+					t.Fatalf("agent_artifacts_list schema missing %s", field)
+				}
+			}
+			if !sameStringSet(schema.Properties["kind"].Enum, []string{"source_material", "candidate", "proposal", "validation_report"}) {
+				t.Fatalf("unexpected kind enum: %#v", schema.Properties["kind"].Enum)
+			}
+		case "agent_artifacts_get":
+			foundGet = true
+			var schema struct {
+				Required   []string               `json:"required"`
+				Properties map[string]interface{} `json:"properties"`
+			}
+			if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+				t.Fatalf("decode agent_artifacts_get schema: %v", err)
+			}
+			if !sameStringSet(schema.Required, []string{"artifactId"}) {
+				t.Fatalf("unexpected required fields: %#v", schema.Required)
+			}
+			if _, ok := schema.Properties["artifactId"]; !ok {
+				t.Fatal("agent_artifacts_get schema missing artifactId")
+			}
+		}
+	}
+	if !foundList || !foundGet {
+		t.Fatalf("expected artifact read tools, found list=%v get=%v", foundList, foundGet)
+	}
+}
+
+func TestSellerTools_IncludesAgentArtifactUpdate(t *testing.T) {
+	tools := SellerTools()
+	for _, tool := range tools {
+		if tool.Name != "agent_artifacts_update" {
+			continue
+		}
+		var schema struct {
+			Required   []string `json:"required"`
+			Properties map[string]struct {
+				Enum []string `json:"enum"`
+			} `json:"properties"`
+		}
+		if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+			t.Fatalf("decode agent_artifacts_update schema: %v", err)
+		}
+		for _, field := range []string{"artifactId", "status", "name", "summary", "data"} {
+			if _, ok := schema.Properties[field]; !ok {
+				t.Fatalf("agent_artifacts_update schema missing %s", field)
+			}
+		}
+		if !sameStringSet(schema.Required, []string{"artifactId"}) {
+			t.Fatalf("unexpected required fields: %#v", schema.Required)
+		}
+		if !sameStringSet(schema.Properties["status"].Enum, []string{"new", "ready", "needs_review", "skipped"}) {
+			t.Fatalf("unexpected status enum: %#v", schema.Properties["status"].Enum)
+		}
+		return
+	}
+	t.Fatal("agent_artifacts_update should be available to authorized agent skills")
 }
 
 func sameStringSet(a, b []string) bool {

@@ -67,6 +67,12 @@ func (s *agentChatMemoryStore) SaveSkillRun(_ context.Context, run *agentstore.S
 
 func (s *agentChatMemoryStore) SaveArtifact(_ context.Context, artifact *agentstore.Artifact) error {
 	cp := *artifact
+	for i, existing := range s.artifacts {
+		if existing.TenantID == artifact.TenantID && existing.ID == artifact.ID {
+			s.artifacts[i] = &cp
+			return nil
+		}
+	}
 	s.artifacts = append(s.artifacts, &cp)
 	return nil
 }
@@ -424,7 +430,16 @@ func TestAgentChatTurnOptions_LoadsReferencedArtifactsAsContext(t *testing.T) {
 		t.Fatalf("expected one artifact context block, got %#v", opts.ContextBlocks)
 	}
 	block := opts.ContextBlocks[0]
-	for _, want := range []string{"Referenced artifacts for this turn", "id=art_source", "kind=source_material", "Supplier notes with three hoodie variants", "[REDACTED]"} {
+	for _, want := range []string{
+		"Referenced artifacts for this turn",
+		"Use these artifacts as bounded context",
+		"Artifact 1: id=art_source",
+		"kind=source_material",
+		"threadId=thread_1",
+		"dataExcerpt(redacted/truncated)",
+		"Supplier notes with three hoodie variants",
+		"[REDACTED]",
+	} {
 		if !strings.Contains(block, want) {
 			t.Fatalf("artifact context missing %q:\n%s", want, block)
 		}
@@ -594,7 +609,7 @@ func TestHandlePOSTAgentChat_IncludesReferencedArtifactsInTurnContext(t *testing
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	system := firstOpenAIMessageContent(t, upstreamReq, "system")
-	for _, want := range []string{"## Turn Context", "Referenced artifacts for this turn", "id=art_ctx", "kind=source_material", "Two product notes from supplier chat", "[REDACTED]"} {
+	for _, want := range []string{"## Turn Context", "Referenced artifacts for this turn", "Use these artifacts as bounded context", "Artifact 1: id=art_ctx", "kind=source_material", "dataExcerpt(redacted/truncated)", "Two product notes from supplier chat", "[REDACTED]"} {
 		if !strings.Contains(system, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, system)
 		}
@@ -654,7 +669,7 @@ func TestHandlePOSTAgentChat_ProductImportSkillRestrictsTools(t *testing.T) {
 		}
 	}
 	toolNames := openAIToolNames(t, upstreamReq)
-	for _, want := range []string{"listings_get_template", "listings_list_mine", "listings_get", "agent_artifacts_create", "listings_create", "listings_update", "collections_list", "collections_create", "exchange_rates_get"} {
+	for _, want := range []string{"listings_get_template", "listings_list_mine", "listings_get", "agent_artifacts_list", "agent_artifacts_get", "agent_artifacts_create", "agent_artifacts_update", "listings_create", "listings_update", "collections_list", "collections_create", "exchange_rates_get"} {
 		if !containsString(toolNames, want) {
 			t.Fatalf("expected granted product import tool %s, got %#v", want, toolNames)
 		}
@@ -824,6 +839,146 @@ func TestHandlePOSTAgentArtifact_RejectsEmptyKindWithoutMaterial(t *testing.T) {
 	}
 }
 
+func TestHandlePOSTAgentArtifact_ValidatesKindAndStatus(t *testing.T) {
+	tests := []struct {
+		name      string
+		body      string
+		wantError string
+	}{
+		{
+			name:      "unknown kind",
+			body:      `{"kind":"listing_draft","status":"ready","data":{"title":"Cap"}}`,
+			wantError: "invalid artifact kind",
+		},
+		{
+			name:      "unknown status",
+			body:      `{"kind":"candidate","status":"queued","data":{"title":"Cap"}}`,
+			wantError: "invalid artifact status",
+		},
+		{
+			name:      "applied cannot be created directly",
+			body:      `{"kind":"proposal","status":"applied","data":{"title":"Cap"}}`,
+			wantError: "invalid artifact status",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			node := &agentChatHTTPTestNode{
+				aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+				store:            &agentChatMemoryStore{},
+			}
+			req := httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts", strings.NewReader(tt.body))
+			req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+			rr := httptest.NewRecorder()
+
+			(&Gateway{}).handlePOSTAgentArtifact(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+			}
+			if !strings.Contains(rr.Body.String(), tt.wantError) {
+				t.Fatalf("expected %q, got %s", tt.wantError, rr.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandlePATCHAgentArtifact_UpdatesReviewableFields(t *testing.T) {
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{
+			{
+				ID:        "art_patch",
+				TenantID:  "test-node",
+				ThreadID:  "thread_import",
+				Kind:      agentstore.ArtifactKindCandidate,
+				Status:    agentstore.ArtifactStatusNew,
+				Name:      "candidate",
+				Summary:   "old",
+				Data:      `{"old":true}`,
+				CreatedAt: time.Now().Add(-time.Hour),
+				UpdatedAt: time.Now().Add(-time.Hour),
+			},
+		},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	body := strings.NewReader(`{
+		"status":"needs_review",
+		"name":"Reviewed candidate",
+		"summary":"ready for seller review",
+		"data":{"items":[{"title":"Cap","confidence":0.83}]}
+	}`)
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/artifacts/art_patch", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_patch"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentArtifact(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentstore.Artifact `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode artifact: %v", err)
+	}
+	if resp.Data.Status != agentstore.ArtifactStatusNeedsReview || resp.Data.Name != "Reviewed candidate" || resp.Data.Summary != "ready for seller review" {
+		t.Fatalf("unexpected artifact update: %#v", resp.Data)
+	}
+	if !strings.Contains(resp.Data.Data, `"title":"Cap"`) || !strings.Contains(resp.Data.Data, `"confidence":0.83`) {
+		t.Fatalf("artifact data was not updated: %s", resp.Data.Data)
+	}
+	loaded, err := store.LoadArtifact(context.Background(), "test-node", "art_patch")
+	if err != nil {
+		t.Fatalf("load updated artifact: %v", err)
+	}
+	if loaded.Status != agentstore.ArtifactStatusNeedsReview || !strings.Contains(loaded.Data, `"title":"Cap"`) {
+		t.Fatalf("stored artifact mismatch: %#v", loaded)
+	}
+}
+
+func TestHandlePATCHAgentArtifact_ValidatesStatus(t *testing.T) {
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{
+			{
+				ID:       "art_patch",
+				TenantID: "test-node",
+				Kind:     agentstore.ArtifactKindCandidate,
+				Status:   agentstore.ArtifactStatusNew,
+				Data:     `{}`,
+			},
+		},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/artifacts/art_patch", strings.NewReader(`{"status":"applied"}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_patch"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentArtifact(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "invalid artifact status") {
+		t.Fatalf("expected status validation error, got %s", rr.Body.String())
+	}
+	loaded, err := store.LoadArtifact(context.Background(), "test-node", "art_patch")
+	if err != nil {
+		t.Fatalf("load artifact: %v", err)
+	}
+	if loaded.Status != agentstore.ArtifactStatusNew {
+		t.Fatalf("artifact status should not change, got %#v", loaded)
+	}
+}
+
 func TestHandleGETAgentApprovals_DefaultsToPending(t *testing.T) {
 	store := &agentChatMemoryStore{
 		approvals: []*agentstore.Approval{
@@ -937,7 +1092,26 @@ func TestHandlePOSTAgentApprovalDecision_UpdatesPendingApproval(t *testing.T) {
 func TestHandlePOSTAgentApprovalApply_ExecutesApprovedPayloadOnce(t *testing.T) {
 	payload := `{"listing":{"title":"Draft Shirt"}}`
 	approval := testAgentApproval(t, "appr_apply", "test-node", agentstore.ApprovalStatusApproved, payload)
-	store := &agentChatMemoryStore{approvals: []*agentstore.Approval{approval}}
+	approval.ArtifactIDs = `["art_proposal","art_source"]`
+	store := &agentChatMemoryStore{
+		approvals: []*agentstore.Approval{approval},
+		artifacts: []*agentstore.Artifact{
+			{
+				ID:       "art_proposal",
+				TenantID: "test-node",
+				Kind:     agentstore.ArtifactKindProposal,
+				Status:   agentstore.ArtifactStatusReady,
+				Data:     `{"title":"Draft Shirt"}`,
+			},
+			{
+				ID:       "art_source",
+				TenantID: "test-node",
+				Kind:     agentstore.ArtifactKindSourceMaterial,
+				Status:   agentstore.ArtifactStatusReady,
+				Data:     `{"text":"supplier notes"}`,
+			},
+		},
+	}
 	node := &agentChatHTTPTestNode{
 		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
 		store:            store,
@@ -968,6 +1142,12 @@ func TestHandlePOSTAgentApprovalApply_ExecutesApprovedPayloadOnce(t *testing.T) 
 	}
 	if store.approvals[0].Status != agentstore.ApprovalStatusApplied || store.approvals[0].AppliedAt == nil {
 		t.Fatalf("expected approval to be applied, got %#v", store.approvals[0])
+	}
+	if store.artifacts[0].Status != agentstore.ArtifactStatusApplied {
+		t.Fatalf("expected linked proposal artifact to be applied, got %#v", store.artifacts[0])
+	}
+	if store.artifacts[1].Status != agentstore.ArtifactStatusReady {
+		t.Fatalf("expected linked source material to remain ready, got %#v", store.artifacts[1])
 	}
 
 	rr = httptest.NewRecorder()
@@ -1054,8 +1234,8 @@ func writeProductImportSkill(t *testing.T, root string) {
 name: product.import
 description: Import local product materials.
 persona: seller
-capabilities: listing.read, listing.draft_write, listing.apply_after_approval, collection.read, collection.write, exchange.rates.read, agent.artifact.write
-tool_hints: listings_get_template, agent_artifacts_create, listings_create, collections_list, exchange_rates_get
+capabilities: listing.read, listing.draft_write, listing.apply_after_approval, collection.read, collection.write, exchange.rates.read, agent.artifact.read, agent.artifact.write
+tool_hints: listings_get_template, agent_artifacts_list, agent_artifacts_get, agent_artifacts_create, agent_artifacts_update, listings_create, collections_list, exchange_rates_get
 examples:
   - 批量导入商品 CSV
   - 帮我从这些商品描述里整理出可上架的产品

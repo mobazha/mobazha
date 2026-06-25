@@ -94,6 +94,7 @@ type Approval struct {
 	Action         string     `gorm:"column:action;type:varchar(128)" json:"action"`
 	Summary        string     `gorm:"column:summary;type:text" json:"summary"`
 	Payload        string     `gorm:"column:payload;type:text" json:"payload,omitempty"`
+	ArtifactIDs    string     `gorm:"column:artifact_ids;type:text" json:"artifact_ids,omitempty"`
 	RequestHash    string     `gorm:"column:request_hash;type:varchar(128);index" json:"request_hash"`
 	IdempotencyKey string     `gorm:"column:idempotency_key;type:varchar(255);index" json:"idempotency_key,omitempty"`
 	Status         string     `gorm:"column:status;type:varchar(32);index:idx_agent_approvals_tenant_status_created,priority:2" json:"status"`

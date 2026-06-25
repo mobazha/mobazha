@@ -638,6 +638,7 @@ func TestGormPersistence_ApprovalPayloadPreservesExecutionHash(t *testing.T) {
 		Action:        req.Action,
 		Summary:       req.Summary,
 		Payload:       payload,
+		ArtifactIDs:   `["art_proposal_1"]`,
 		RequestHash:   hash,
 		Status:        ApprovalStatusApproved,
 		CreatedAt:     time.Now(),
@@ -646,6 +647,7 @@ func TestGormPersistence_ApprovalPayloadPreservesExecutionHash(t *testing.T) {
 	got, err := persist.LoadApproval(ctx, "tenant_a", "appr_hash")
 	require.NoError(t, err)
 	require.Contains(t, got.Payload, "secret-value")
+	require.Equal(t, `["art_proposal_1"]`, got.ArtifactIDs)
 
 	recomputed, err := kernel.ComputeApprovalHash(kernel.ApprovalRequest{
 		SkillID: req.SkillID,

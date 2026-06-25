@@ -22,9 +22,24 @@ func SellerTools() []ToolDefinition {
 			Parameters:  mustJSON(`{"type":"object","properties":{}}`),
 		},
 		{
+			Name:        "agent_artifacts_list",
+			Description: "List tenant-scoped agent artifacts for the current workspace, optionally filtered by skill run, kind, or review status. Use this to resume or inspect intermediate work without reading raw chat history.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"skillRunId":{"type":"string","description":"Optional related skill run ID"},"kind":{"type":"string","enum":["source_material","candidate","proposal","validation_report"],"description":"Optional artifact category filter"},"status":{"type":"string","enum":["new","ready","needs_review","skipped"],"description":"Optional artifact review state filter"},"limit":{"type":"integer","description":"Max items (default 20)"},"offset":{"type":"integer","description":"Pagination offset"}}}`),
+		},
+		{
+			Name:        "agent_artifacts_get",
+			Description: "Get a single tenant-scoped agent artifact by ID, including its summary and structured payload.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"artifactId":{"type":"string","description":"Artifact ID"}},"required":["artifactId"]}`),
+		},
+		{
 			Name:        "agent_artifacts_create",
 			Description: "Create a tenant-scoped agent artifact for source material, extracted candidates, reviewable proposals, or validation notes. Use this to preserve intermediate work for user review without writing business state.",
 			Parameters:  mustJSON(`{"type":"object","properties":{"threadId":{"type":"string","description":"Current agent thread/session ID when known"},"turnId":{"type":"string","description":"Current agent turn ID when known"},"skillRunId":{"type":"string","description":"Optional related skill run ID"},"skillId":{"type":"string","description":"Skill ID producing the artifact, e.g. product.import"},"kind":{"type":"string","enum":["source_material","candidate","proposal","validation_report"],"description":"Artifact category to create"},"status":{"type":"string","enum":["new","ready","needs_review","skipped"],"description":"Review state for the artifact; omit for the server default"},"name":{"type":"string","description":"Human-readable artifact name"},"contentType":{"type":"string","description":"MIME type or logical content type"},"sourceUri":{"type":"string","description":"Optional source URI or file reference"},"sourceName":{"type":"string","description":"Optional source filename or label"},"summary":{"type":"string","description":"Short human-readable summary"},"text":{"type":"string","description":"Plain text material to store as artifact data"},"metadata":{"type":"object","description":"Small structured metadata for source/candidate provenance"},"data":{"type":"object","description":"Structured artifact payload such as extracted candidates or review proposals"}}}`),
+		},
+		{
+			Name:        "agent_artifacts_update",
+			Description: "Update a tenant-scoped agent artifact's review status, name, summary, or structured payload. Use this to revise intermediate work; it does not write listing/business state.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"artifactId":{"type":"string","description":"Artifact ID returned by agent_artifacts_create or listed in context"},"status":{"type":"string","enum":["new","ready","needs_review","skipped"],"description":"Review state for the artifact"},"name":{"type":"string","description":"Updated human-readable artifact name"},"summary":{"type":"string","description":"Updated short human-readable summary"},"data":{"type":"object","description":"Updated structured artifact payload such as extracted candidates, review proposals, field sources, or validation notes"}},"required":["artifactId"]}`),
 		},
 		{
 			Name:        "listings_create",

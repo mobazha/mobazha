@@ -1074,6 +1074,66 @@
         "tags": [
           "ai"
         ]
+      },
+      "patch": {
+        "operationId": "agent-artifact-patch",
+        "parameters": [
+          {
+            "description": "Agent artifact ID.",
+            "in": "path",
+            "name": "artifactId",
+            "required": true,
+            "schema": {
+              "description": "Agent artifact ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Update an agent artifact",
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/v1/agent/chat": {

@@ -281,9 +281,10 @@ func agentChatArtifactContextBlocks(ctx context.Context, persist agentstore.Pers
 	if len(ids) > agentChatMaxContextArtifacts {
 		return nil, fmt.Errorf("too many artifactIds (max %d)", agentChatMaxContextArtifacts)
 	}
-	lines := make([]string, 0, len(ids)+1)
+	lines := make([]string, 0, len(ids)*6+2)
 	lines = append(lines, "Referenced artifacts for this turn:")
-	for _, id := range ids {
+	lines = append(lines, "Use these artifacts as bounded context. dataExcerpt values are redacted and may be truncated; fetch the artifact by id when exact source payload is required.")
+	for i, id := range ids {
 		artifact, err := persist.LoadArtifact(ctx, tenantID, id)
 		if errors.Is(err, agentstore.ErrArtifactNotFound) {
 			return nil, fmt.Errorf("artifact %q not found", id)
@@ -291,39 +292,52 @@ func agentChatArtifactContextBlocks(ctx context.Context, persist agentstore.Pers
 		if err != nil {
 			return nil, fmt.Errorf("load artifact %q: %w", id, err)
 		}
-		lines = append(lines, formatAgentChatArtifactContextLine(artifact))
+		lines = append(lines, formatAgentChatArtifactContextBlock(i+1, artifact))
 	}
 	return []string{strings.Join(lines, "\n")}, nil
 }
 
-func formatAgentChatArtifactContextLine(artifact *agentstore.Artifact) string {
+func formatAgentChatArtifactContextBlock(index int, artifact *agentstore.Artifact) string {
 	if artifact == nil {
-		return "- artifact: <nil>"
+		return fmt.Sprintf("- Artifact %d: <nil>", index)
 	}
 	parts := []string{
 		"id=" + artifact.ID,
 		"kind=" + artifact.Kind,
 		"status=" + artifact.Status,
 	}
+	if artifact.ThreadID != "" {
+		parts = append(parts, "threadId="+artifact.ThreadID)
+	}
+	if artifact.SkillRunID != "" {
+		parts = append(parts, "skillRunId="+artifact.SkillRunID)
+	}
+	if artifact.SkillID != "" {
+		parts = append(parts, "skillId="+artifact.SkillID)
+	}
+	if !artifact.UpdatedAt.IsZero() {
+		parts = append(parts, "updatedAt="+artifact.UpdatedAt.UTC().Format(time.RFC3339))
+	}
+	lines := []string{fmt.Sprintf("- Artifact %d: %s", index, strings.Join(parts, "; "))}
 	if value := artifactContextPromptValue(artifact.Name, 160); value != "" {
-		parts = append(parts, "name="+value)
+		lines = append(lines, "  name: "+value)
 	}
 	if value := artifactContextPromptValue(artifact.ContentType, 80); value != "" {
-		parts = append(parts, "contentType="+value)
+		lines = append(lines, "  contentType: "+value)
 	}
 	if value := artifactContextPromptValue(artifact.SourceName, 160); value != "" {
-		parts = append(parts, "sourceName="+value)
+		lines = append(lines, "  sourceName: "+value)
 	}
 	if artifact.SourceURI != "" {
-		parts = append(parts, "sourceUri="+redact.URL(artifact.SourceURI))
+		lines = append(lines, "  sourceUri: "+redact.URL(artifact.SourceURI))
 	}
 	if value := artifactContextPromptValue(artifact.Summary, 320); value != "" {
-		parts = append(parts, "summary="+value)
+		lines = append(lines, "  summary: "+value)
 	}
 	if excerpt := compactArtifactDataExcerpt(artifact.Data, agentChatArtifactDataMaxLen); excerpt != "" {
-		parts = append(parts, "dataExcerpt="+excerpt)
+		lines = append(lines, "  dataExcerpt(redacted/truncated): "+excerpt)
 	}
-	return "- " + strings.Join(parts, "; ")
+	return strings.Join(lines, "\n")
 }
 
 func artifactContextPromptValue(raw string, limit int) string {

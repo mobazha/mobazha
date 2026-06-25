@@ -188,6 +188,7 @@ func (p *GormPersistence) SaveApproval(_ context.Context, a *Approval) error {
 	if cp.Status == "" {
 		cp.Status = ApprovalStatusPending
 	}
+	cp.ArtifactIDs = sanitizeJSONText(cp.ArtifactIDs)
 	return p.db.Update(func(tx pkgdb.Tx) error {
 		return tx.Save(&cp)
 	})

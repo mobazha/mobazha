@@ -47,6 +47,7 @@ const (
 	CapabilityProfileWrite              Capability = "profile.write"
 	CapabilityChatRead                  Capability = "chat.read"
 	CapabilityChatWrite                 Capability = "chat.write"
+	CapabilityAgentArtifactRead         Capability = "agent.artifact.read"
 	CapabilityAgentArtifactWrite        Capability = "agent.artifact.write"
 )
 

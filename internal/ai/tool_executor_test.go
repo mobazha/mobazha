@@ -194,6 +194,81 @@ func TestToolExecutor_ExecuteAgentArtifactCreate(t *testing.T) {
 	}
 }
 
+func TestToolExecutor_ExecuteAgentArtifactReadTools(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/agent/artifacts":
+			if r.Method != http.MethodGet {
+				t.Fatalf("unexpected method for list: %s", r.Method)
+			}
+			if r.URL.Query().Get("kind") != "proposal" || r.URL.Query().Get("status") != "needs_review" {
+				t.Fatalf("unexpected artifact list query: %s", r.URL.RawQuery)
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"data":[{"id":"art_1","kind":"proposal"}]}`))
+		case "/v1/agent/artifacts/art_1":
+			if r.Method != http.MethodGet {
+				t.Fatalf("unexpected method for get: %s", r.Method)
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"data":{"id":"art_1","kind":"proposal"}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "")
+	result, err := executor.Execute(context.Background(), "agent_artifacts_list", `{"kind":"proposal","status":"needs_review","limit":10}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"art_1"`) {
+		t.Fatalf("unexpected list result: %s", result)
+	}
+	result, err = executor.Execute(context.Background(), "agent_artifacts_get", `{"artifactId":"art_1"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"proposal"`) {
+		t.Fatalf("unexpected get result: %s", result)
+	}
+}
+
+func TestToolExecutor_ExecuteAgentArtifactUpdate(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/agent/artifacts/art_1" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPatch {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var parsed map[string]interface{}
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if _, ok := parsed["artifactId"]; ok {
+			t.Fatalf("artifactId should stay in URL path, got body %s", string(body))
+		}
+		if parsed["status"] != "needs_review" || parsed["summary"] != "ready" {
+			t.Fatalf("artifact update body should pass review fields, got %s", string(body))
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"data":{"id":"art_1","status":"needs_review"}}`))
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "")
+	result, err := executor.Execute(context.Background(), "agent_artifacts_update", `{"artifactId":"art_1","status":"needs_review","summary":"ready","data":{"items":[{"title":"Cap"}]}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"needs_review"`) {
+		t.Fatalf("unexpected result: %s", result)
+	}
+}
+
 func TestSanitizePathParam_PathTraversal(t *testing.T) {
 	tests := []struct {
 		input    interface{}

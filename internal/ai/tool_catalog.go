@@ -75,12 +75,17 @@ func sellerToolPolicy(name string) toolPolicy {
 		allowedPersonas: []kernel.Persona{kernel.PersonaSeller},
 		resultMode:      "summary",
 	}
+	artifactRead := read
+	artifactRead.capabilities = []kernel.Capability{kernel.CapabilityAgentArtifactRead}
+	artifactRead.allowedSkills = []kernel.SkillID{kernel.SkillProductImport}
 	switch name {
 	case "listings_list_mine", "listings_get", "listings_get_template":
 		read.capabilities = []kernel.Capability{kernel.CapabilityListingRead}
 		read.allowedSkills = []kernel.SkillID{kernel.SkillProductImport}
 		return read
-	case "agent_artifacts_create":
+	case "agent_artifacts_list", "agent_artifacts_get":
+		return artifactRead
+	case "agent_artifacts_create", "agent_artifacts_update":
 		return artifactWrite
 	case "listings_create", "listings_update":
 		write.capabilities = []kernel.Capability{kernel.CapabilityListingDraftWrite, kernel.CapabilityListingApplyAfterApproval}

@@ -347,9 +347,9 @@ func TestGormPersistence_SkillRunsAndArtifacts(t *testing.T) {
 		ThreadID:   "th_a",
 		SkillRunID: "run_shared",
 		SkillID:    "product.import",
-		Kind:       ArtifactKindProductDraft,
+		Kind:       ArtifactKindProposal,
 		Status:     ArtifactStatusNeedsReview,
-		Name:       "Row 12 draft",
+		Name:       "Row 12 proposal",
 		Data:       `{"columnMapping":{"Item Name":"title","Cost USD":"price.amountMinor"},"token":"secret"}`,
 		CreatedAt:  now,
 	}))
@@ -359,7 +359,7 @@ func TestGormPersistence_SkillRunsAndArtifacts(t *testing.T) {
 		ThreadID:   "th_b",
 		SkillRunID: "run_shared",
 		SkillID:    "product.import",
-		Kind:       ArtifactKindProductDraft,
+		Kind:       ArtifactKindProposal,
 		Status:     ArtifactStatusReady,
 		Data:       `{"title":"B"}`,
 		CreatedAt:  now,
@@ -375,7 +375,7 @@ func TestGormPersistence_SkillRunsAndArtifacts(t *testing.T) {
 	require.Len(t, runsA, 1)
 	require.Equal(t, "tenant_a", runsA[0].TenantID)
 
-	artifactsA, err := persistA.ListArtifacts(ctx, "tenant_a", "run_shared", ArtifactKindProductDraft, ArtifactStatusNeedsReview, 10, 0)
+	artifactsA, err := persistA.ListArtifacts(ctx, "tenant_a", "run_shared", ArtifactKindProposal, ArtifactStatusNeedsReview, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, artifactsA, 1)
 	require.Contains(t, artifactsA[0].Data, `"Item Name":"title"`)
@@ -546,7 +546,7 @@ func TestGormPersistence_DeleteThread(t *testing.T) {
 	require.NoError(t, persist.SaveTurn(ctx, &Turn{ID: "turn", TenantID: database.StandaloneTenantID, ThreadID: "th"}))
 	require.NoError(t, persist.SaveMessage(ctx, &Message{ID: "msg", TenantID: database.StandaloneTenantID, ThreadID: "th", Role: "user", Content: "hello"}))
 	require.NoError(t, persist.SaveSkillRun(ctx, &SkillRun{ID: "run", TenantID: database.StandaloneTenantID, ThreadID: "th", SkillID: "product.import"}))
-	require.NoError(t, persist.SaveArtifact(ctx, &Artifact{ID: "art", TenantID: database.StandaloneTenantID, ThreadID: "th", SkillRunID: "run", Kind: ArtifactKindProductDraft}))
+	require.NoError(t, persist.SaveArtifact(ctx, &Artifact{ID: "art", TenantID: database.StandaloneTenantID, ThreadID: "th", SkillRunID: "run", Kind: ArtifactKindProposal}))
 	require.NoError(t, persist.SaveApproval(ctx, &Approval{
 		ID:          "appr",
 		TenantID:    database.StandaloneTenantID,
@@ -628,19 +628,19 @@ func TestGormPersistence_ApprovalPayloadPreservesExecutionHash(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, persist.SaveApproval(ctx, &Approval{
-		ID:          req.ID,
-		TenantID:    "tenant_a",
-		SkillID:     string(req.SkillID),
-		StoreID:     req.Scope.StoreID,
-		ActorID:     req.Scope.ActorID,
+		ID:            req.ID,
+		TenantID:      "tenant_a",
+		SkillID:       string(req.SkillID),
+		StoreID:       req.Scope.StoreID,
+		ActorID:       req.Scope.ActorID,
 		ActingPersona: string(req.Scope.ActingPersona),
-		Risk:        string(req.Risk),
-		Action:      req.Action,
-		Summary:     req.Summary,
-		Payload:     payload,
-		RequestHash: hash,
-		Status:      ApprovalStatusApproved,
-		CreatedAt:   time.Now(),
+		Risk:          string(req.Risk),
+		Action:        req.Action,
+		Summary:       req.Summary,
+		Payload:       payload,
+		RequestHash:   hash,
+		Status:        ApprovalStatusApproved,
+		CreatedAt:     time.Now(),
 	}))
 
 	got, err := persist.LoadApproval(ctx, "tenant_a", "appr_hash")

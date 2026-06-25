@@ -565,9 +565,9 @@ func TestAgentSkillRunArtifactHandlers_SaveNonStandardTableDraft(t *testing.T) {
 
 	artifactBody := strings.NewReader(fmt.Sprintf(`{
 		"skillRunId":%q,
-		"kind":"product_draft",
+		"kind":"proposal",
 		"status":"needs_review",
-		"name":"Row 12 draft",
+		"name":"Row 12 proposal",
 		"data":{
 			"row":12,
 			"columnMapping":{"Item Name":"title","Cost USD":"price.amountMinor","Qty on hand":"inventory.quantity"},
@@ -591,7 +591,7 @@ func TestAgentSkillRunArtifactHandlers_SaveNonStandardTableDraft(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&artifactResp); err != nil {
 		t.Fatalf("decode artifact: %v", err)
 	}
-	if artifactResp.Data.Kind != agentstore.ArtifactKindProductDraft || artifactResp.Data.Status != agentstore.ArtifactStatusNeedsReview {
+	if artifactResp.Data.Kind != agentstore.ArtifactKindProposal || artifactResp.Data.Status != agentstore.ArtifactStatusNeedsReview {
 		t.Fatalf("unexpected artifact: %#v", artifactResp.Data)
 	}
 	if artifactResp.Data.ThreadID != "thread_import" || artifactResp.Data.SkillID != string(kernel.SkillProductImport) {
@@ -601,7 +601,7 @@ func TestAgentSkillRunArtifactHandlers_SaveNonStandardTableDraft(t *testing.T) {
 		t.Fatalf("artifact should preserve non-standard mapping and review signal: %s", artifactResp.Data.Data)
 	}
 
-	listURL := "/v1/agent/artifacts?skillRunId=" + runResp.Data.ID + "&kind=product_draft&status=needs_review"
+	listURL := "/v1/agent/artifacts?skillRunId=" + runResp.Data.ID + "&kind=proposal&status=needs_review"
 	req = httptest.NewRequest(http.MethodGet, listURL, nil)
 	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
 	rr = httptest.NewRecorder()
@@ -618,7 +618,7 @@ func TestAgentSkillRunArtifactHandlers_SaveNonStandardTableDraft(t *testing.T) {
 		t.Fatalf("decode artifacts: %v", err)
 	}
 	if len(listResp.Data) != 1 || listResp.Data[0].ID != artifactResp.Data.ID {
-		t.Fatalf("expected one draft artifact, got %#v", listResp.Data)
+		t.Fatalf("expected one proposal artifact, got %#v", listResp.Data)
 	}
 }
 
@@ -867,7 +867,7 @@ examples:
 
 # Product Import Skill
 
-Always create reviewable ProductDraft records before apply.
+Always create reviewable proposals before apply.
 `
 	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)

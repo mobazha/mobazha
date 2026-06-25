@@ -376,7 +376,7 @@ tool_hints: listings_get_template, listings_create
 
 # Product Import
 
-Always create ProductDraft records before apply.
+Always create reviewable proposals before apply.
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +438,7 @@ Always create ProductDraft records before apply.
 	if system.Role != "system" {
 		t.Fatalf("expected system message, got %#v", system)
 	}
-	for _, want := range []string{"Base prompt.", "## Available Skills", "## Runtime-Injected Active Skills", "required capabilities", "granted tools for this turn", "Always create ProductDraft records before apply."} {
+	for _, want := range []string{"Base prompt.", "## Available Skills", "## Runtime-Injected Active Skills", "required capabilities", "granted tools for this turn", "Always create reviewable proposals before apply."} {
 		if !strings.Contains(system.Content, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, system.Content)
 		}
@@ -544,7 +544,7 @@ capabilities: listing.read, listing.draft_write
 
 # Product Import
 
-Always create ProductDraft records before apply.
+Always create reviewable proposals before apply.
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -637,7 +637,7 @@ capabilities: listing.read, listing.draft_write
 
 # Product Import
 
-Always create ProductDraft records before apply.
+Always create reviewable proposals before apply.
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}

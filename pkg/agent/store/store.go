@@ -38,10 +38,10 @@ const (
 
 	// ArtifactKindSourceMaterial stores uploaded or pasted source material metadata.
 	ArtifactKindSourceMaterial = "source_material"
-	// ArtifactKindProductCandidate stores extracted product candidates.
-	ArtifactKindProductCandidate = "product_candidate"
-	// ArtifactKindProductDraft stores reviewable product drafts.
-	ArtifactKindProductDraft = "product_draft"
+	// ArtifactKindCandidate stores extracted candidates for a skill-specific task.
+	ArtifactKindCandidate = "candidate"
+	// ArtifactKindProposal stores reviewable proposals before a business write.
+	ArtifactKindProposal = "proposal"
 	// ArtifactKindValidationReport stores validation results.
 	ArtifactKindValidationReport = "validation_report"
 

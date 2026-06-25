@@ -4,6 +4,8 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +23,8 @@ import (
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
+
+const agentArtifactMaterialTextMaxLen = 1 << 20
 
 type aiChatProvider interface {
 	aiConfigProvider
@@ -303,7 +307,7 @@ type agentArtifactCreateRequest struct {
 	TurnID      string          `json:"turnId,omitempty"`
 	SkillRunID  string          `json:"skillRunId,omitempty"`
 	SkillID     string          `json:"skillId,omitempty"`
-	Kind        string          `json:"kind"`
+	Kind        string          `json:"kind,omitempty"`
 	Status      string          `json:"status,omitempty"`
 	Name        string          `json:"name,omitempty"`
 	ContentType string          `json:"contentType,omitempty"`
@@ -311,6 +315,8 @@ type agentArtifactCreateRequest struct {
 	SourceName  string          `json:"sourceName,omitempty"`
 	SourceHash  string          `json:"sourceHash,omitempty"`
 	Summary     string          `json:"summary,omitempty"`
+	Text        string          `json:"text,omitempty"`
+	Metadata    map[string]any  `json:"metadata,omitempty"`
 	Data        json.RawMessage `json:"data,omitempty"`
 }
 
@@ -326,14 +332,37 @@ func (g *Gateway) handlePOSTAgentArtifact(w http.ResponseWriter, r *http.Request
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid artifact body")
 		return
 	}
+	materialData, hasMaterial, err := agentArtifactMaterialData(req)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
 	req.Kind = strings.TrimSpace(req.Kind)
 	if req.Kind == "" {
-		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "kind is required")
-		return
+		if !hasMaterial {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "kind is required")
+			return
+		}
+		req.Kind = agentstore.ArtifactKindSourceMaterial
 	}
 	status := strings.TrimSpace(req.Status)
 	if status == "" {
 		status = agentstore.ArtifactStatusNew
+		if req.Kind == agentstore.ArtifactKindSourceMaterial && hasMaterial {
+			status = agentstore.ArtifactStatusReady
+		}
+	}
+	contentType := strings.TrimSpace(req.ContentType)
+	if contentType == "" && strings.TrimSpace(req.Text) != "" {
+		contentType = "text/plain"
+	}
+	sourceName := strings.TrimSpace(req.SourceName)
+	if sourceName == "" && req.Kind == agentstore.ArtifactKindSourceMaterial {
+		sourceName = strings.TrimSpace(req.Name)
+	}
+	sourceHash := strings.TrimSpace(req.SourceHash)
+	if sourceHash == "" && req.Kind == agentstore.ArtifactKindSourceMaterial && hasMaterial {
+		sourceHash = agentArtifactSourceHash(req, materialData)
 	}
 	tenantID := agentChatTenantID(r, p)
 	threadID := strings.TrimSpace(req.ThreadID)
@@ -366,12 +395,12 @@ func (g *Gateway) handlePOSTAgentArtifact(w http.ResponseWriter, r *http.Request
 		Kind:        req.Kind,
 		Status:      status,
 		Name:        strings.TrimSpace(req.Name),
-		ContentType: strings.TrimSpace(req.ContentType),
+		ContentType: contentType,
 		SourceURI:   strings.TrimSpace(req.SourceURI),
-		SourceName:  strings.TrimSpace(req.SourceName),
-		SourceHash:  strings.TrimSpace(req.SourceHash),
+		SourceName:  sourceName,
+		SourceHash:  sourceHash,
 		Summary:     strings.TrimSpace(req.Summary),
-		Data:        string(validRawJSONOrObject(req.Data)),
+		Data:        string(materialData),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -682,6 +711,51 @@ func validRawJSONOrObject(raw json.RawMessage) json.RawMessage {
 		return raw
 	}
 	return json.RawMessage(`{}`)
+}
+
+func agentArtifactMaterialData(req agentArtifactCreateRequest) (json.RawMessage, bool, error) {
+	text := strings.TrimSpace(req.Text)
+	if len(text) > agentArtifactMaterialTextMaxLen {
+		return nil, false, fmt.Errorf("text exceeds %d bytes", agentArtifactMaterialTextMaxLen)
+	}
+	hasRawData := strings.TrimSpace(string(req.Data)) != ""
+	hasMaterial := text != "" || len(req.Metadata) > 0 || strings.TrimSpace(req.SourceURI) != "" || strings.TrimSpace(req.SourceName) != ""
+	if hasRawData {
+		if json.Valid(req.Data) {
+			return json.RawMessage(strings.TrimSpace(string(req.Data))), true, nil
+		}
+		return json.RawMessage(`{}`), hasMaterial, nil
+	}
+	if text == "" && len(req.Metadata) == 0 {
+		return json.RawMessage(`{}`), hasMaterial, nil
+	}
+	payload := map[string]any{}
+	if text != "" {
+		payload["text"] = text
+	}
+	if len(req.Metadata) > 0 {
+		payload["metadata"] = req.Metadata
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid artifact metadata")
+	}
+	return data, true, nil
+}
+
+func agentArtifactSourceHash(req agentArtifactCreateRequest, data json.RawMessage) string {
+	source := strings.TrimSpace(req.Text)
+	if source == "" {
+		source = strings.TrimSpace(string(data))
+	}
+	if source == "" || source == "{}" {
+		source = strings.TrimSpace(req.SourceURI)
+	}
+	if source == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(source))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func newAgentSkillRunID() string {

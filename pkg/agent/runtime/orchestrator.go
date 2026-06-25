@@ -188,12 +188,14 @@ type TurnResult struct {
 	TurnID string
 }
 
-// TurnOptions carries per-turn runtime context. Skills are intentionally
-// per-turn, not global orchestrator state, to avoid cross-thread leakage.
+// TurnOptions carries per-turn runtime context. Skills and context blocks are
+// intentionally per-turn, not global orchestrator state, to avoid cross-thread
+// leakage.
 type TurnOptions struct {
 	SkillProvider   agentskill.Provider
 	RequestedSkills []string
 	SkillFilter     agentskill.Filter
+	ContextBlocks   []string
 	ToolCatalog     kernel.ToolCatalog
 	Scope           kernel.Scope
 }
@@ -204,6 +206,7 @@ type resolvedTurnContext struct {
 	grantedTools    map[string][]kernel.ToolMetadata
 	baseTools       []ToolDef
 	tools           []ToolDef
+	contextBlocks   []string
 	skillProvider   agentskill.Provider
 	toolCatalog     kernel.ToolCatalog
 	scope           kernel.Scope
@@ -335,6 +338,7 @@ func (o *Orchestrator) resolveTurnContext(ctx context.Context, opts TurnOptions)
 	resolved := resolvedTurnContext{
 		baseTools:     append([]ToolDef(nil), o.tools...),
 		tools:         append([]ToolDef(nil), o.tools...),
+		contextBlocks: append([]string(nil), opts.ContextBlocks...),
 		grantedTools:  map[string][]kernel.ToolMetadata{},
 		skillProvider: opts.SkillProvider,
 		toolCatalog:   opts.ToolCatalog,
@@ -442,12 +446,33 @@ func (o *Orchestrator) systemPromptWithSkills(resolved resolvedTurnContext) stri
 		GrantedTools: promptToolsBySkill(resolved.grantedTools),
 	})
 	if skillPrompt == "" {
-		return prompt
+		return promptWithTurnContext(prompt, resolved.contextBlocks)
 	}
 	if prompt == "" {
-		return skillPrompt
+		return promptWithTurnContext(skillPrompt, resolved.contextBlocks)
 	}
-	return prompt + "\n\n" + skillPrompt
+	return promptWithTurnContext(prompt+"\n\n"+skillPrompt, resolved.contextBlocks)
+}
+
+func promptWithTurnContext(prompt string, blocks []string) string {
+	if len(blocks) == 0 {
+		return prompt
+	}
+	parts := make([]string, 0, len(blocks))
+	for _, block := range blocks {
+		block = strings.TrimSpace(block)
+		if block != "" {
+			parts = append(parts, block)
+		}
+	}
+	if len(parts) == 0 {
+		return prompt
+	}
+	context := "## Turn Context\n" + strings.Join(parts, "\n\n")
+	if strings.TrimSpace(prompt) == "" {
+		return context
+	}
+	return prompt + "\n\n" + context
 }
 
 func skillCapabilities(s *agentskill.Skill) []kernel.Capability {

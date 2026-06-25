@@ -56,10 +56,11 @@ type ChatRequest struct {
 
 // ChatContext carries optional UI hints (not used for authz).
 type ChatContext struct {
-	CurrentPage        string `json:"currentPage,omitempty"`
-	SelectedListSlug   string `json:"selectedListingSlug,omitempty"`
-	SelectedOrderID    string `json:"selectedOrderId,omitempty"`
-	Locale             string `json:"locale,omitempty"`
+	CurrentPage      string   `json:"currentPage,omitempty"`
+	SelectedListSlug string   `json:"selectedListingSlug,omitempty"`
+	SelectedOrderID  string   `json:"selectedOrderId,omitempty"`
+	Locale           string   `json:"locale,omitempty"`
+	ArtifactIDs      []string `json:"artifactIds,omitempty"`
 }
 
 // SSEEvent is a server-sent event payload for the chat stream.
@@ -84,9 +85,9 @@ const (
 )
 
 const (
-	MaxSessionMessages  = 40
-	MaxUserMessageLen   = 8000
-	DefaultMaxTokens    = 4096
-	DefaultTemperature  = 0.7
-	StreamTimeout       = 120 * time.Second
+	MaxSessionMessages = 40
+	MaxUserMessageLen  = 8000
+	DefaultMaxTokens   = 4096
+	DefaultTemperature = 0.7
+	StreamTimeout      = 120 * time.Second
 )

@@ -25,6 +25,7 @@ import (
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 	agentstream "github.com/mobazha/mobazha3.0/pkg/agent/stream"
 	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
+	"github.com/mobazha/mobazha3.0/pkg/redact"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -41,6 +42,11 @@ type agentToolContext struct {
 type agentToolContextKey struct{}
 
 var agentChatRuntimes sync.Map
+
+const (
+	agentChatMaxContextArtifacts = 10
+	agentChatArtifactDataMaxLen  = 1200
+)
 
 // handlePOSTAgentChat handles POST /v1/agent/chat — the Orchestrator-backed
 // seller AI chat endpoint.
@@ -148,7 +154,7 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		baseURL:   getLocalAPIURL(r),
 		authToken: getAuthToken(r),
 	})
-	turnOptions, err := agentChatTurnOptions(turnCtx, req, tenantID, nodeID, p.ProfileName())
+	turnOptions, err := agentChatTurnOptions(turnCtx, persist, req, tenantID, nodeID, p.ProfileName())
 	if err != nil {
 		aiLog.Warningf("Agent chat skill routing failed: %v", err)
 		emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeError, Error: agentChatRouteErrorMessage(err)})
@@ -234,7 +240,7 @@ func updateAgentChatThreadMetadata(ctx context.Context, persist agentstore.Persi
 	return persist.SaveThread(ctx, thread)
 }
 
-func agentChatTurnOptions(ctx context.Context, req aipkg.ChatRequest, tenantID, actorID, storeID string) (agentruntime.TurnOptions, error) {
+func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, req aipkg.ChatRequest, tenantID, actorID, storeID string) (agentruntime.TurnOptions, error) {
 	skillProvider, err := agentChatSkillProvider(ctx)
 	if err != nil {
 		return agentruntime.TurnOptions{}, err
@@ -244,10 +250,15 @@ func agentChatTurnOptions(ctx context.Context, req aipkg.ChatRequest, tenantID, 
 	if err != nil {
 		return agentruntime.TurnOptions{}, err
 	}
+	contextBlocks, err := agentChatArtifactContextBlocks(ctx, persist, tenantID, req.Context)
+	if err != nil {
+		return agentruntime.TurnOptions{}, err
+	}
 	return agentruntime.TurnOptions{
 		SkillProvider:   skillProvider,
 		RequestedSkills: requestedSkills,
 		SkillFilter:     skillFilter,
+		ContextBlocks:   contextBlocks,
 		ToolCatalog:     kernel.NewStaticToolCatalog(aipkg.SellerToolMetadata()),
 		Scope: kernel.Scope{
 			TenantID:      tenantID,
@@ -259,12 +270,142 @@ func agentChatTurnOptions(ctx context.Context, req aipkg.ChatRequest, tenantID, 
 	}, nil
 }
 
+func agentChatArtifactContextBlocks(ctx context.Context, persist agentstore.Persistence, tenantID string, chatCtx *aipkg.ChatContext) ([]string, error) {
+	if persist == nil || chatCtx == nil || len(chatCtx.ArtifactIDs) == 0 {
+		return nil, nil
+	}
+	ids := uniqueTrimmedStrings(chatCtx.ArtifactIDs)
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if len(ids) > agentChatMaxContextArtifacts {
+		return nil, fmt.Errorf("too many artifactIds (max %d)", agentChatMaxContextArtifacts)
+	}
+	lines := make([]string, 0, len(ids)+1)
+	lines = append(lines, "Referenced artifacts for this turn:")
+	for _, id := range ids {
+		artifact, err := persist.LoadArtifact(ctx, tenantID, id)
+		if errors.Is(err, agentstore.ErrArtifactNotFound) {
+			return nil, fmt.Errorf("artifact %q not found", id)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("load artifact %q: %w", id, err)
+		}
+		lines = append(lines, formatAgentChatArtifactContextLine(artifact))
+	}
+	return []string{strings.Join(lines, "\n")}, nil
+}
+
+func formatAgentChatArtifactContextLine(artifact *agentstore.Artifact) string {
+	if artifact == nil {
+		return "- artifact: <nil>"
+	}
+	parts := []string{
+		"id=" + artifact.ID,
+		"kind=" + artifact.Kind,
+		"status=" + artifact.Status,
+	}
+	if value := artifactContextPromptValue(artifact.Name, 160); value != "" {
+		parts = append(parts, "name="+value)
+	}
+	if value := artifactContextPromptValue(artifact.ContentType, 80); value != "" {
+		parts = append(parts, "contentType="+value)
+	}
+	if value := artifactContextPromptValue(artifact.SourceName, 160); value != "" {
+		parts = append(parts, "sourceName="+value)
+	}
+	if artifact.SourceURI != "" {
+		parts = append(parts, "sourceUri="+redact.URL(artifact.SourceURI))
+	}
+	if value := artifactContextPromptValue(artifact.Summary, 320); value != "" {
+		parts = append(parts, "summary="+value)
+	}
+	if excerpt := compactArtifactDataExcerpt(artifact.Data, agentChatArtifactDataMaxLen); excerpt != "" {
+		parts = append(parts, "dataExcerpt="+excerpt)
+	}
+	return "- " + strings.Join(parts, "; ")
+}
+
+func artifactContextPromptValue(raw string, limit int) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || limit <= 0 {
+		return ""
+	}
+	raw = redact.SanitizeEnvBlock(raw)
+	raw = strings.ReplaceAll(raw, "\n", " ")
+	raw = strings.Join(strings.Fields(raw), " ")
+	if len(raw) <= limit {
+		return raw
+	}
+	if limit <= 3 {
+		return raw[:limit]
+	}
+	return raw[:limit-3] + "..."
+}
+
+func compactArtifactDataExcerpt(raw string, limit int) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || limit <= 0 {
+		return ""
+	}
+	var decoded any
+	if err := json.Unmarshal([]byte(raw), &decoded); err == nil {
+		switch v := decoded.(type) {
+		case map[string]any:
+			raw = redact.RedactMapJSON(v)
+		case []any:
+			for i, item := range v {
+				if obj, ok := item.(map[string]any); ok {
+					v[i] = redact.RedactMap(obj)
+				}
+			}
+			if compact, err := json.Marshal(v); err == nil {
+				raw = string(compact)
+			}
+		default:
+			if compact, err := json.Marshal(decoded); err == nil {
+				raw = string(compact)
+			}
+		}
+	}
+	raw = redact.SanitizeEnvBlock(raw)
+	raw = strings.ReplaceAll(raw, "\n", " ")
+	raw = strings.Join(strings.Fields(raw), " ")
+	if len(raw) <= limit {
+		return raw
+	}
+	if limit <= 3 {
+		return raw[:limit]
+	}
+	return raw[:limit-3] + "..."
+}
+
+func uniqueTrimmedStrings(items []string) []string {
+	out := make([]string, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
+}
+
 func agentChatRouteErrorMessage(err error) string {
 	if err == nil {
 		return "AI assistant failed to route the request"
 	}
 	if strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
 		return "AI assistant requires private skill configuration (MOBAZHA_AGENT_SKILLS_DIR)"
+	}
+	if strings.Contains(err.Error(), "artifact") {
+		return "Referenced artifact is not available"
 	}
 	return "AI assistant failed to route the request"
 }

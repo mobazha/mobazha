@@ -369,7 +369,7 @@ func TestAgentChatTurnOptions_LoadsPrivateSkillProviderFromEnv(t *testing.T) {
 	}
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
 
-	opts, err := agentChatTurnOptions(context.Background(), aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "store_1")
+	opts, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "store_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,10 +388,73 @@ func TestAgentChatTurnOptions_LoadsPrivateSkillProviderFromEnv(t *testing.T) {
 	}
 }
 
+func TestAgentChatTurnOptions_LoadsReferencedArtifactsAsContext(t *testing.T) {
+	dir := t.TempDir()
+	writeProductImportSkill(t, dir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{
+			{
+				ID:          "art_source",
+				TenantID:    "tenant_1",
+				ThreadID:    "thread_1",
+				Kind:        agentstore.ArtifactKindSourceMaterial,
+				Status:      agentstore.ArtifactStatusReady,
+				Name:        "supplier paste",
+				ContentType: "text/plain",
+				SourceURI:   "https://example.test/file.txt?token=secret-token",
+				Summary:     "Supplier notes with three hoodie variants",
+				Data:        `{"text":"Black hoodie $45 sizes S M L","api_key":"secret"}`,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+		},
+	}
+
+	opts, err := agentChatTurnOptions(context.Background(), store, aipkg.ChatRequest{
+		Message: "帮我从素材里整理商品",
+		Context: &aipkg.ChatContext{
+			ArtifactIDs: []string{"art_source", "art_source"},
+		},
+	}, "tenant_1", "actor_1", "store_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(opts.ContextBlocks) != 1 {
+		t.Fatalf("expected one artifact context block, got %#v", opts.ContextBlocks)
+	}
+	block := opts.ContextBlocks[0]
+	for _, want := range []string{"Referenced artifacts for this turn", "id=art_source", "kind=source_material", "Supplier notes with three hoodie variants", "[REDACTED]"} {
+		if !strings.Contains(block, want) {
+			t.Fatalf("artifact context missing %q:\n%s", want, block)
+		}
+	}
+	if strings.Contains(block, "secret") {
+		t.Fatalf("artifact context should redact sensitive data:\n%s", block)
+	}
+}
+
+func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
+	dir := t.TempDir()
+	writeProductImportSkill(t, dir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
+
+	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
+		Message: "使用这个素材",
+		Context: &aipkg.ChatContext{ArtifactIDs: []string{"missing_artifact"}},
+	}, "tenant_1", "actor_1", "store_1")
+	if err == nil || !strings.Contains(err.Error(), "missing_artifact") {
+		t.Fatalf("expected missing artifact error, got %v", err)
+	}
+	if got := agentChatRouteErrorMessage(err); got != "Referenced artifact is not available" {
+		t.Fatalf("unexpected route error message %q", got)
+	}
+}
+
 func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", "")
 
-	_, err := agentChatTurnOptions(context.Background(), aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
 		t.Fatalf("expected missing skills dir error, got %v", err)
 	}
@@ -400,14 +463,14 @@ func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 func TestAgentChatTurnOptions_RequiresAccessibleSellerSkillDir(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", filepath.Join(t.TempDir(), "missing"))
 
-	_, err := agentChatTurnOptions(context.Background(), aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "not accessible") {
 		t.Fatalf("expected inaccessible skills dir error, got %v", err)
 	}
 
 	emptyDir := t.TempDir()
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", emptyDir)
-	_, err = agentChatTurnOptions(context.Background(), aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err = agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "no seller skills") {
 		t.Fatalf("expected empty seller skills dir error, got %v", err)
 	}
@@ -466,6 +529,78 @@ func TestHandlePOSTAgentChat_StreamsSSE(t *testing.T) {
 	store := node.store.(*agentChatMemoryStore)
 	if store.thread == nil || store.thread.Title != "hello" || store.thread.LastActive.Before(time.Now().Add(-time.Minute)) {
 		t.Fatalf("expected thread metadata to be persisted, got %#v", store.thread)
+	}
+}
+
+func TestHandlePOSTAgentChat_IncludesReferencedArtifactsInTurnContext(t *testing.T) {
+	skillsDir := t.TempDir()
+	writeProductImportSkill(t, skillsDir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", skillsDir)
+
+	var upstreamReq map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Fatalf("unexpected upstream path: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&upstreamReq); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"I can use the artifact\"},\"finish_reason\":\"stop\"}]}\n\n")
+	}))
+	defer upstream.Close()
+
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{
+			{
+				ID:          "art_ctx",
+				TenantID:    "test-node",
+				ThreadID:    "thread-artifacts",
+				Kind:        agentstore.ArtifactKindSourceMaterial,
+				Status:      agentstore.ArtifactStatusReady,
+				Name:        "supplier message",
+				ContentType: "text/plain",
+				SourceURI:   "https://example.test/supplier.txt?token=secret-token",
+				Summary:     "Two product notes from supplier chat",
+				Data:        `{"text":"cotton cap $25; linen bag $45","token":"secret-token"}`,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+		},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{
+			Enabled:        true,
+			ActiveProvider: "custom",
+			Providers: map[string]aipkg.ProviderCredential{
+				"custom": {APIKey: "test-key", Model: "test-model", BaseURL: upstream.URL},
+			},
+		}, aipkg.PlatformProfile{}),
+		proxy: aipkg.NewProxy(upstream.Client()),
+		store: store,
+	}
+	cacheKey := "test-node:" + node.ProfileName()
+	agentChatRuntimes.Delete(cacheKey)
+	defer agentChatRuntimes.Delete(cacheKey)
+
+	body := strings.NewReader(`{"message":"请根据这个素材整理下一步","sessionId":"thread-artifacts","context":{"artifactIds":["art_ctx"]}}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/chat", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentChat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	system := firstOpenAIMessageContent(t, upstreamReq, "system")
+	for _, want := range []string{"## Turn Context", "Referenced artifacts for this turn", "id=art_ctx", "kind=source_material", "Two product notes from supplier chat", "[REDACTED]"} {
+		if !strings.Contains(system, want) {
+			t.Fatalf("system prompt missing %q:\n%s", want, system)
+		}
+	}
+	if strings.Contains(system, "secret-token") {
+		t.Fatalf("system prompt should redact sensitive artifact data:\n%s", system)
 	}
 }
 
@@ -619,6 +754,73 @@ func TestAgentSkillRunArtifactHandlers_SaveNonStandardTableDraft(t *testing.T) {
 	}
 	if len(listResp.Data) != 1 || listResp.Data[0].ID != artifactResp.Data.ID {
 		t.Fatalf("expected one proposal artifact, got %#v", listResp.Data)
+	}
+}
+
+func TestHandlePOSTAgentArtifact_CreatesSourceMaterialFromText(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	body := strings.NewReader(`{
+		"threadId":"thread_material",
+		"name":"supplier paste",
+		"summary":"Supplier notes copied from chat",
+		"text":"cotton cap $25\nlinen bag, MOQ 12",
+		"metadata":{"source":"paste","language":"mixed"}
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentArtifact(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentstore.Artifact `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode artifact: %v", err)
+	}
+	if resp.Data.Kind != agentstore.ArtifactKindSourceMaterial || resp.Data.Status != agentstore.ArtifactStatusReady {
+		t.Fatalf("unexpected source material artifact: %#v", resp.Data)
+	}
+	if resp.Data.TenantID != "test-node" || resp.Data.ThreadID != "thread_material" {
+		t.Fatalf("artifact should be tenant-scoped to the request node/thread, got %#v", resp.Data)
+	}
+	if resp.Data.ContentType != "text/plain" || resp.Data.SourceName != "supplier paste" {
+		t.Fatalf("artifact should infer text metadata, got %#v", resp.Data)
+	}
+	if !strings.HasPrefix(resp.Data.SourceHash, "sha256:") {
+		t.Fatalf("expected source hash, got %q", resp.Data.SourceHash)
+	}
+	if !strings.Contains(resp.Data.Data, "cotton cap") || !strings.Contains(resp.Data.Data, `"source":"paste"`) {
+		t.Fatalf("artifact should preserve pasted material and metadata: %s", resp.Data.Data)
+	}
+	if len(store.artifacts) != 1 || store.artifacts[0].ID != resp.Data.ID {
+		t.Fatalf("expected artifact to be persisted, got %#v", store.artifacts)
+	}
+}
+
+func TestHandlePOSTAgentArtifact_RejectsEmptyKindWithoutMaterial(t *testing.T) {
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            &agentChatMemoryStore{},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts", strings.NewReader(`{"name":"empty"}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentArtifact(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "kind is required") {
+		t.Fatalf("expected kind validation error, got %s", rr.Body.String())
 	}
 }
 

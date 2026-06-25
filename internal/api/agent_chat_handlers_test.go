@@ -654,7 +654,7 @@ func TestHandlePOSTAgentChat_ProductImportSkillRestrictsTools(t *testing.T) {
 		}
 	}
 	toolNames := openAIToolNames(t, upstreamReq)
-	for _, want := range []string{"listings_get_template", "listings_list_mine", "listings_get", "listings_create", "listings_update", "collections_list", "collections_create", "exchange_rates_get"} {
+	for _, want := range []string{"listings_get_template", "listings_list_mine", "listings_get", "agent_artifacts_create", "listings_create", "listings_update", "collections_list", "collections_create", "exchange_rates_get"} {
 		if !containsString(toolNames, want) {
 			t.Fatalf("expected granted product import tool %s, got %#v", want, toolNames)
 		}
@@ -1054,8 +1054,8 @@ func writeProductImportSkill(t *testing.T, root string) {
 name: product.import
 description: Import local product materials.
 persona: seller
-capabilities: listing.read, listing.draft_write, listing.apply_after_approval, collection.read, collection.write, exchange.rates.read
-tool_hints: listings_get_template, listings_create, collections_list, exchange_rates_get
+capabilities: listing.read, listing.draft_write, listing.apply_after_approval, collection.read, collection.write, exchange.rates.read, agent.artifact.write
+tool_hints: listings_get_template, agent_artifacts_create, listings_create, collections_list, exchange_rates_get
 examples:
   - 批量导入商品 CSV
   - 帮我从这些商品描述里整理出可上架的产品

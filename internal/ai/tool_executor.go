@@ -46,8 +46,11 @@ var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
 		return toolRoute{"GET", "/v1/listings/mine/" + sanitizePathParam(a["slug"])}
 	},
 	"listings_get_template": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/template"} },
-	"listings_create":       func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/listings"} },
-	"listings_update":       func(_ map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/listings"} },
+	"agent_artifacts_create": func(_ map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/agent/artifacts"}
+	},
+	"listings_create": func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/listings"} },
+	"listings_update": func(_ map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/listings"} },
 	"listings_delete": func(a map[string]interface{}) toolRoute {
 		return toolRoute{"DELETE", "/v1/listings/" + sanitizePathParam(a["slug"])}
 	},

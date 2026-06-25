@@ -163,6 +163,37 @@ func TestToolExecutor_Execute_POSTBody(t *testing.T) {
 	}
 }
 
+func TestToolExecutor_ExecuteAgentArtifactCreate(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/agent/artifacts" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var parsed map[string]interface{}
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if parsed["kind"] != "candidate" || parsed["name"] != "extracted candidates" {
+			t.Fatalf("artifact create body should pass through, got %s", string(body))
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"data":{"id":"art_1","kind":"candidate"}}`))
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "")
+	result, err := executor.Execute(context.Background(), "agent_artifacts_create", `{"kind":"candidate","name":"extracted candidates","data":{"items":[{"title":"Cap"}]}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"art_1"`) {
+		t.Fatalf("unexpected result: %s", result)
+	}
+}
+
 func TestSanitizePathParam_PathTraversal(t *testing.T) {
 	tests := []struct {
 		input    interface{}

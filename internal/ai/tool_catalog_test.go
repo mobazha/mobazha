@@ -32,6 +32,7 @@ func TestSellerToolMetadataApprovalBoundaries(t *testing.T) {
 		byName[item.Name] = item
 	}
 	assertTool(t, byName["listings_get_template"], kernel.RiskRead, kernel.ApprovalNone)
+	assertTool(t, byName["agent_artifacts_create"], kernel.RiskDraft, kernel.ApprovalNone)
 	assertTool(t, byName["listings_create"], kernel.RiskWrite, kernel.ApprovalExplicit)
 	assertTool(t, byName["orders_refund"], kernel.RiskFinancial, kernel.ApprovalExplicit)
 	assertTool(t, byName["listings_delete"], kernel.RiskDangerous, kernel.ApprovalExplicit)
@@ -49,6 +50,13 @@ func TestSellerToolMetadataApprovalBoundaries(t *testing.T) {
 	if create.Parallelizable {
 		t.Fatal("write tools should not be marked parallelizable by default")
 	}
+	artifactCreate := byName["agent_artifacts_create"]
+	if len(artifactCreate.AllowedSkills) != 1 || artifactCreate.AllowedSkills[0] != kernel.SkillProductImport {
+		t.Fatalf("agent_artifacts_create should be restricted to product.import, got %#v", artifactCreate.AllowedSkills)
+	}
+	if !hasCapability(artifactCreate, kernel.CapabilityAgentArtifactWrite) {
+		t.Fatalf("agent_artifacts_create should expose agent artifact capability, got %#v", artifactCreate.Capabilities)
+	}
 }
 
 func TestSellerToolMetadataProductImportGrant(t *testing.T) {
@@ -61,6 +69,7 @@ func TestSellerToolMetadataProductImportGrant(t *testing.T) {
 			kernel.CapabilityCollectionRead,
 			kernel.CapabilityCollectionWrite,
 			kernel.CapabilityExchangeRatesRead,
+			kernel.CapabilityAgentArtifactWrite,
 		},
 		Persona: kernel.PersonaSeller,
 	})
@@ -70,6 +79,7 @@ func TestSellerToolMetadataProductImportGrant(t *testing.T) {
 	}
 	for _, name := range []string{
 		"listings_get_template", "listings_list_mine", "listings_get",
+		"agent_artifacts_create",
 		"listings_create", "listings_update",
 		"collections_list", "collections_create", "exchange_rates_get",
 	} {

@@ -47,6 +47,7 @@ const (
 	CapabilityProfileWrite              Capability = "profile.write"
 	CapabilityChatRead                  Capability = "chat.read"
 	CapabilityChatWrite                 Capability = "chat.write"
+	CapabilityAgentArtifactWrite        Capability = "agent.artifact.write"
 )
 
 // Scope identifies the actor and commerce boundary for an agent operation.

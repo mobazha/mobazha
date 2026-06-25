@@ -7,8 +7,8 @@ import (
 
 func TestSellerTools_Count(t *testing.T) {
 	tools := SellerTools()
-	if len(tools) != 26 {
-		t.Errorf("expected 26 seller tools, got %d", len(tools))
+	if len(tools) != 27 {
+		t.Errorf("expected 27 seller tools, got %d", len(tools))
 	}
 }
 
@@ -43,6 +43,53 @@ func TestSellerTools_ValidJSON(t *testing.T) {
 			t.Errorf("tool %s: parameters root type should be 'object', got %v", tool.Name, schema["type"])
 		}
 	}
+}
+
+func TestSellerTools_IncludesAgentArtifactCreate(t *testing.T) {
+	tools := SellerTools()
+	for _, tool := range tools {
+		if tool.Name != "agent_artifacts_create" {
+			continue
+		}
+		var schema struct {
+			Properties map[string]struct {
+				Enum []string `json:"enum"`
+			} `json:"properties"`
+		}
+		if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+			t.Fatalf("decode agent_artifacts_create schema: %v", err)
+		}
+		for _, field := range []string{"kind", "status", "name", "text", "metadata", "data"} {
+			if _, ok := schema.Properties[field]; !ok {
+				t.Fatalf("agent_artifacts_create schema missing %s", field)
+			}
+		}
+		if !sameStringSet(schema.Properties["kind"].Enum, []string{"source_material", "candidate", "proposal", "validation_report"}) {
+			t.Fatalf("unexpected kind enum: %#v", schema.Properties["kind"].Enum)
+		}
+		if !sameStringSet(schema.Properties["status"].Enum, []string{"new", "ready", "needs_review", "skipped"}) {
+			t.Fatalf("unexpected status enum: %#v", schema.Properties["status"].Enum)
+		}
+		return
+	}
+	t.Fatal("agent_artifacts_create should be available to authorized agent skills")
+}
+
+func sameStringSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[string]int, len(a))
+	for _, item := range a {
+		seen[item]++
+	}
+	for _, item := range b {
+		seen[item]--
+		if seen[item] < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func TestSellerTools_DestructiveToolsMarked(t *testing.T) {

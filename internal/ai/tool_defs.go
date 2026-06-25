@@ -22,6 +22,11 @@ func SellerTools() []ToolDefinition {
 			Parameters:  mustJSON(`{"type":"object","properties":{}}`),
 		},
 		{
+			Name:        "agent_artifacts_create",
+			Description: "Create a tenant-scoped agent artifact for source material, extracted candidates, reviewable proposals, or validation notes. Use this to preserve intermediate work for user review without writing business state.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"threadId":{"type":"string","description":"Current agent thread/session ID when known"},"turnId":{"type":"string","description":"Current agent turn ID when known"},"skillRunId":{"type":"string","description":"Optional related skill run ID"},"skillId":{"type":"string","description":"Skill ID producing the artifact, e.g. product.import"},"kind":{"type":"string","enum":["source_material","candidate","proposal","validation_report"],"description":"Artifact category to create"},"status":{"type":"string","enum":["new","ready","needs_review","skipped"],"description":"Review state for the artifact; omit for the server default"},"name":{"type":"string","description":"Human-readable artifact name"},"contentType":{"type":"string","description":"MIME type or logical content type"},"sourceUri":{"type":"string","description":"Optional source URI or file reference"},"sourceName":{"type":"string","description":"Optional source filename or label"},"summary":{"type":"string","description":"Short human-readable summary"},"text":{"type":"string","description":"Plain text material to store as artifact data"},"metadata":{"type":"object","description":"Small structured metadata for source/candidate provenance"},"data":{"type":"object","description":"Structured artifact payload such as extracted candidates or review proposals"}}}`),
+		},
+		{
 			Name:        "listings_create",
 			Description: "Create a new product listing. The listing JSON should follow the template structure.",
 			Parameters:  mustJSON(`{"type":"object","properties":{"listing":{"type":"object","description":"Complete listing JSON following the template structure"}},"required":["listing"]}`),

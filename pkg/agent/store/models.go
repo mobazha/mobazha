@@ -116,6 +116,8 @@ type Memory struct {
 	Scope      string     `gorm:"column:scope;type:varchar(32);index:idx_agent_memories_scope_subject,priority:2" json:"scope"`
 	Subject    string     `gorm:"column:subject;type:varchar(128);index:idx_agent_memories_scope_subject,priority:3" json:"subject,omitempty"`
 	StoreID    string     `gorm:"column:store_id;type:varchar(255);index" json:"store_id,omitempty"`
+	ThreadID   string     `gorm:"column:thread_id;type:varchar(64);index" json:"thread_id,omitempty"`
+	SkillID    string     `gorm:"column:skill_id;type:varchar(128);index" json:"skill_id,omitempty"`
 	ActorID    string     `gorm:"column:actor_id;type:varchar(255);index" json:"actor_id,omitempty"`
 	Status     string     `gorm:"column:status;type:varchar(32);index" json:"status"`
 	Content    string     `gorm:"column:content;type:text" json:"content"`

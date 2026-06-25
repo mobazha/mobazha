@@ -55,6 +55,8 @@ const (
 type Scope struct {
 	TenantID      string    `json:"tenantId"`
 	StoreID       string    `json:"storeId,omitempty"`
+	ThreadID      string    `json:"threadId,omitempty"`
+	SkillID       string    `json:"skillId,omitempty"`
 	ActorID       string    `json:"actorId,omitempty"`
 	ActorRole     string    `json:"actorRole,omitempty"`
 	ActorRoles    []Persona `json:"actorRoles,omitempty"`

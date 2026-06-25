@@ -849,6 +849,12 @@ func memoryFromKernel(scope kernel.Scope, item kernel.MemoryItem) (*Memory, erro
 	if item.Scope == kernel.MemoryStoreScope && scope.StoreID == "" {
 		return nil, fmt.Errorf("agent store: store memory store scope is required")
 	}
+	if item.Scope == kernel.MemoryThread && scope.ThreadID == "" {
+		return nil, fmt.Errorf("agent store: thread memory thread scope is required")
+	}
+	if item.Scope == kernel.MemorySkill && scope.SkillID == "" {
+		return nil, fmt.Errorf("agent store: skill memory skill scope is required")
+	}
 	if item.Content == "" {
 		return nil, fmt.Errorf("agent store: memory content is required")
 	}
@@ -873,6 +879,8 @@ func memoryFromKernel(scope kernel.Scope, item kernel.MemoryItem) (*Memory, erro
 		Scope:     string(item.Scope),
 		Subject:   item.Subject,
 		StoreID:   memoryStoreID(scope, item.Scope),
+		ThreadID:  memoryThreadID(scope, item.Scope),
+		SkillID:   memorySkillID(scope, item.Scope),
 		ActorID:   memoryActorID(scope, item.Scope),
 		Status:    MemoryStatusActive,
 		Content:   truncateStoreText(redact.SanitizeEnvBlock(item.Content), 4000),
@@ -892,6 +900,20 @@ func memoryStoreID(scope kernel.Scope, memoryScope kernel.MemoryScope) string {
 func memoryActorID(scope kernel.Scope, memoryScope kernel.MemoryScope) string {
 	if memoryScope == kernel.MemoryUser {
 		return scope.ActorID
+	}
+	return ""
+}
+
+func memoryThreadID(scope kernel.Scope, memoryScope kernel.MemoryScope) string {
+	if memoryScope == kernel.MemoryThread {
+		return scope.ThreadID
+	}
+	return ""
+}
+
+func memorySkillID(scope kernel.Scope, memoryScope kernel.MemoryScope) string {
+	if memoryScope == kernel.MemorySkill {
+		return scope.SkillID
 	}
 	return ""
 }
@@ -935,6 +957,14 @@ func visibleMemoryQuery(query *gorm.DB, scope kernel.Scope) *gorm.DB {
 	if scope.StoreID != "" {
 		clauses = append(clauses, "(scope = ? AND store_id = ?)")
 		args = append(args, string(kernel.MemoryStoreScope), scope.StoreID)
+	}
+	if scope.ThreadID != "" {
+		clauses = append(clauses, "(scope = ? AND thread_id = ?)")
+		args = append(args, string(kernel.MemoryThread), scope.ThreadID)
+	}
+	if scope.SkillID != "" {
+		clauses = append(clauses, "(scope = ? AND skill_id = ?)")
+		args = append(args, string(kernel.MemorySkill), scope.SkillID)
 	}
 	return query.Where("("+strings.Join(clauses, " OR ")+")", args...)
 }

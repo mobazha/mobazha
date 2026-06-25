@@ -72,7 +72,9 @@ func TestAllEventConstants(t *testing.T) {
 		OverflowDetected, ReplayShaped, CompactionStarted,
 		CompactionSucceeded, CompactionFailed, ToolCallBatch,
 		PendingRequestCreated, PendingRequestResolved,
-		TurnStarted, TurnCompleted,
+		TurnStarted, TurnCompleted, GuardrailBlocked, LLMRetried,
+		MemoryRetrieved, MemoryRetrievalFailed,
+		MemorySaved, MemorySaveFailed,
 	}
 	seen := make(map[string]bool)
 	for _, c := range constants {

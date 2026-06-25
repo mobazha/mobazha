@@ -51,7 +51,10 @@ type fakePersistence struct {
 type fakeMemoryStore struct {
 	items       []kernel.MemoryItem
 	err         error
+	saveErr     error
 	queries     []kernel.MemoryQuery
+	savedScopes []kernel.Scope
+	savedItems  []kernel.MemoryItem
 	missQueries bool
 }
 
@@ -66,7 +69,12 @@ func (s *fakeMemoryStore) Search(_ context.Context, q kernel.MemoryQuery) ([]ker
 	return s.items, nil
 }
 
-func (s *fakeMemoryStore) Save(context.Context, kernel.Scope, kernel.MemoryItem) error {
+func (s *fakeMemoryStore) Save(_ context.Context, scope kernel.Scope, item kernel.MemoryItem) error {
+	s.savedScopes = append(s.savedScopes, scope)
+	s.savedItems = append(s.savedItems, item)
+	if s.saveErr != nil {
+		return s.saveErr
+	}
 	return nil
 }
 
@@ -1599,6 +1607,9 @@ func TestRunTurnWithOptions_MemoryFallsBackWhenQueryMisses(t *testing.T) {
 	if memory.queries[0].Query != "please review risk" {
 		t.Fatalf("expected normalized user query, got %q", memory.queries[0].Query)
 	}
+	if memory.queries[0].Scope.ThreadID != "thread_memory_fallback" {
+		t.Fatalf("expected turn thread scope, got %#v", memory.queries[0].Scope)
+	}
 	if memory.queries[1].Query != "" {
 		t.Fatalf("expected fallback query to be empty, got %q", memory.queries[1].Query)
 	}
@@ -1610,6 +1621,129 @@ func TestRunTurnWithOptions_MemoryFallsBackWhenQueryMisses(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected fallback memory context in system prompt: %#v", llm.captured[0].messages)
+	}
+}
+
+func TestRunTurnWithOptions_SavesExplicitMemory(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		nil,
+	)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_memory_save", "请记住：我喜欢中文回答", TurnOptions{
+		MemoryStore: memory,
+		Scope: kernel.Scope{
+			TenantID: "tenant_1",
+			ActorID:  "actor_1",
+			StoreID:  "store_1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(memory.savedItems) != 1 {
+		t.Fatalf("expected one saved memory, got %#v", memory.savedItems)
+	}
+	if memory.savedScopes[0].ThreadID != "thread_memory_save" {
+		t.Fatalf("expected saved scope to include turn thread id, got %#v", memory.savedScopes[0])
+	}
+	saved := memory.savedItems[0]
+	if saved.Scope != kernel.MemoryUser {
+		t.Fatalf("expected user-scoped memory, got %q", saved.Scope)
+	}
+	if saved.Subject != "preference" {
+		t.Fatalf("expected preference subject, got %q", saved.Subject)
+	}
+	if saved.Content != "我喜欢中文回答" {
+		t.Fatalf("expected cleaned memory content, got %q", saved.Content)
+	}
+	if saved.ID == "" || saved.Metadata["source"] != "explicit_user_message" {
+		t.Fatalf("expected stable id and source metadata, got %#v", saved)
+	}
+	if len(emitter.ByType(telemetry.MemorySaved)) != 1 {
+		t.Fatalf("expected memory_saved telemetry, got %#v", emitter.Events)
+	}
+}
+
+func TestRunTurnWithOptions_DoesNotSaveNegatedExplicitMemory(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{}
+	orch := newTestOrch(llm, nil)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_memory_skip", "不要记住这个临时偏好", TurnOptions{
+		MemoryStore: memory,
+		Scope: kernel.Scope{
+			TenantID: "tenant_1",
+			ActorID:  "actor_1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(memory.savedItems) != 0 {
+		t.Fatalf("expected no saved memories, got %#v", memory.savedItems)
+	}
+}
+
+func TestRunTurnWithOptions_MemorySaveFailureDoesNotFailTurn(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{saveErr: errors.New("memory unavailable")}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		nil,
+	)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_memory_save_failed", "remember that default language is Chinese", TurnOptions{
+		MemoryStore: memory,
+		Scope: kernel.Scope{
+			TenantID: "tenant_1",
+			ActorID:  "actor_1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(memory.savedItems) != 1 {
+		t.Fatalf("expected attempted memory save, got %#v", memory.savedItems)
+	}
+	if len(emitter.ByType(telemetry.MemorySaveFailed)) != 1 {
+		t.Fatalf("expected memory_save_failed telemetry, got %#v", emitter.Events)
+	}
+}
+
+func TestExplicitMemoryContent_IsConservative(t *testing.T) {
+	content, ok := explicitMemoryContent("你还记住我喜欢中文回答吗")
+	if ok || content != "" {
+		t.Fatalf("expected question about memory not to be captured, got %q", content)
+	}
+	content, ok = explicitMemoryContent("记住：我喜欢中文回答")
+	if !ok || content != "我喜欢中文回答" {
+		t.Fatalf("expected explicit memory content, got ok=%v content=%q", ok, content)
 	}
 }
 

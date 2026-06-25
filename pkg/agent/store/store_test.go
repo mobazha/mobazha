@@ -538,6 +538,7 @@ func TestGormPersistence_MemoryStoreScopesAndArchive(t *testing.T) {
 	persistB := NewGormPersistence(dbB)
 	ctx := context.Background()
 	scopeA := kernel.Scope{TenantID: "tenant_a", StoreID: "store_a", ActorID: "actor_a"}
+	scopeAThreadSkill := kernel.Scope{TenantID: "tenant_a", StoreID: "store_a", ActorID: "actor_a", ThreadID: "thread_a", SkillID: "skill_a"}
 	scopeAOtherStore := kernel.Scope{TenantID: "tenant_a", StoreID: "store_other", ActorID: "actor_a"}
 	scopeAOtherActor := kernel.Scope{TenantID: "tenant_a", StoreID: "store_a", ActorID: "actor_other"}
 	scopeB := kernel.Scope{TenantID: "tenant_b", StoreID: "store_b", ActorID: "actor_b"}
@@ -566,6 +567,18 @@ func TestGormPersistence_MemoryStoreScopesAndArchive(t *testing.T) {
 		Subject: "language",
 		Content: "tenant b memory",
 	}))
+	require.NoError(t, persistA.Save(ctx, scopeAThreadSkill, kernel.MemoryItem{
+		ID:      "mem_thread",
+		Scope:   kernel.MemoryThread,
+		Subject: "thread_context",
+		Content: "当前会话关注退款流程",
+	}))
+	require.NoError(t, persistA.Save(ctx, scopeAThreadSkill, kernel.MemoryItem{
+		ID:      "mem_skill",
+		Scope:   kernel.MemorySkill,
+		Subject: "skill_context",
+		Content: "导入技能需要先验证图片",
+	}))
 
 	items, err := persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Limit: 10})
 	require.NoError(t, err)
@@ -583,6 +596,22 @@ func TestGormPersistence_MemoryStoreScopesAndArchive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.Equal(t, "mem_store", items[0].ID)
+
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{
+		Scope: scopeAThreadSkill,
+		Types: []kernel.MemoryScope{kernel.MemoryThread, kernel.MemorySkill},
+		Limit: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{
+		Scope: scopeA,
+		Types: []kernel.MemoryScope{kernel.MemoryThread, kernel.MemorySkill},
+		Limit: 10,
+	})
+	require.NoError(t, err)
+	require.Empty(t, items)
 
 	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Subject: "language", Limit: 10})
 	require.NoError(t, err)
@@ -635,6 +664,16 @@ func TestGormPersistence_MemoryStoreScopesAndArchive(t *testing.T) {
 		ID:      "mem_invalid_store",
 		Scope:   kernel.MemoryStoreScope,
 		Content: "missing store",
+	}))
+	require.Error(t, persistA.Save(ctx, kernel.Scope{TenantID: "tenant_a"}, kernel.MemoryItem{
+		ID:      "mem_invalid_thread",
+		Scope:   kernel.MemoryThread,
+		Content: "missing thread",
+	}))
+	require.Error(t, persistA.Save(ctx, kernel.Scope{TenantID: "tenant_a"}, kernel.MemoryItem{
+		ID:      "mem_invalid_skill",
+		Scope:   kernel.MemorySkill,
+		Content: "missing skill",
 	}))
 }
 

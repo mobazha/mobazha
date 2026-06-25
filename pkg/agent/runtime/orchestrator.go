@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -266,6 +268,12 @@ func (o *Orchestrator) RunTurnWithOptions(ctx context.Context, tenantID, threadI
 	if err != nil {
 		return nil, err
 	}
+	if resolved.scope.TenantID == "" {
+		resolved.scope.TenantID = tenantID
+	}
+	if resolved.scope.ThreadID == "" {
+		resolved.scope.ThreadID = threadID
+	}
 
 	o.emitter.Emit(ctx, telemetry.Event{
 		Type:     telemetry.TurnStarted,
@@ -305,6 +313,7 @@ func (o *Orchestrator) RunTurnWithOptions(ctx context.Context, tenantID, threadI
 	}); err != nil {
 		return nil, err
 	}
+	o.captureExplicitMemory(turnCtx, resolved, userMsg)
 
 	outStream := stream.NewBuffered(ctx, 32)
 
@@ -453,6 +462,8 @@ func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolved
 			kernel.MemoryUser,
 			kernel.MemoryStoreScope,
 			kernel.MemoryTenant,
+			kernel.MemoryThread,
+			kernel.MemorySkill,
 		},
 		Limit: 5,
 	}
@@ -511,6 +522,130 @@ func memoryQueryText(text string) string {
 		return string(runes[:160])
 	}
 	return text
+}
+
+func (o *Orchestrator) captureExplicitMemory(ctx context.Context, resolved resolvedTurnContext, userMsg string) {
+	if resolved.memoryStore == nil || resolved.scope.TenantID == "" {
+		return
+	}
+	content, ok := explicitMemoryContent(userMsg)
+	if !ok {
+		return
+	}
+	item := kernel.MemoryItem{
+		ID:      explicitMemoryID(resolved.scope, content),
+		Scope:   explicitMemoryScope(resolved.scope),
+		Subject: explicitMemorySubject(content),
+		Content: content,
+		Metadata: map[string]string{
+			"source": "explicit_user_message",
+		},
+	}
+	if err := resolved.memoryStore.Save(ctx, resolved.scope, item); err != nil {
+		o.emitter.Emit(ctx, telemetry.Event{
+			Type:     telemetry.MemorySaveFailed,
+			TenantID: resolved.scope.TenantID,
+			Attrs: map[string]any{
+				"error": err.Error(),
+				"scope": item.Scope,
+			},
+		})
+		return
+	}
+	o.emitter.Emit(ctx, telemetry.Event{
+		Type:     telemetry.MemorySaved,
+		TenantID: resolved.scope.TenantID,
+		Attrs: map[string]any{
+			"scope":   item.Scope,
+			"subject": item.Subject,
+		},
+	})
+}
+
+func explicitMemoryContent(text string) (string, bool) {
+	normalized := strings.TrimSpace(strings.Join(strings.Fields(text), " "))
+	if normalized == "" {
+		return "", false
+	}
+	lower := strings.ToLower(normalized)
+	if strings.Contains(lower, "don't remember") ||
+		strings.Contains(lower, "do not remember") ||
+		strings.Contains(normalized, "不要记住") ||
+		strings.Contains(normalized, "别记住") {
+		return "", false
+	}
+	candidates := []string{
+		"请帮我记住",
+		"请记住",
+		"帮我记住",
+		"记住",
+	}
+	for _, marker := range candidates {
+		if strings.HasPrefix(normalized, marker) {
+			if content := cleanExplicitMemoryContent(normalized[len(marker):]); content != "" {
+				return content, true
+			}
+		}
+	}
+	prefixes := []string{
+		"please remember that ",
+		"please remember ",
+		"remember that ",
+		"remember: ",
+		"remember ",
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(lower, prefix) {
+			if content := cleanExplicitMemoryContent(normalized[len(prefix):]); content != "" {
+				return content, true
+			}
+		}
+	}
+	return "", false
+}
+
+func cleanExplicitMemoryContent(text string) string {
+	text = strings.TrimSpace(text)
+	text = strings.TrimLeft(text, ":：,，.。;； ")
+	text = strings.TrimSpace(text)
+	runes := []rune(text)
+	if len(runes) > 600 {
+		text = string(runes[:600])
+	}
+	return text
+}
+
+func explicitMemoryScope(scope kernel.Scope) kernel.MemoryScope {
+	if scope.ActorID != "" {
+		return kernel.MemoryUser
+	}
+	return kernel.MemoryTenant
+}
+
+func explicitMemorySubject(content string) string {
+	lower := strings.ToLower(content)
+	if strings.Contains(content, "偏好") ||
+		strings.Contains(content, "默认") ||
+		strings.Contains(content, "喜欢") ||
+		strings.Contains(lower, "prefer") ||
+		strings.Contains(lower, "preference") ||
+		strings.Contains(lower, "default") {
+		return "preference"
+	}
+	return "user_note"
+}
+
+func explicitMemoryID(scope kernel.Scope, content string) string {
+	key := strings.Join([]string{
+		scope.TenantID,
+		scope.StoreID,
+		scope.ActorID,
+		string(explicitMemoryScope(scope)),
+		explicitMemorySubject(content),
+		content,
+	}, "\x00")
+	sum := sha256.Sum256([]byte(key))
+	return "mem_" + hex.EncodeToString(sum[:])[:24]
 }
 
 func recalculateGrantedTools(ctx context.Context, resolved *resolvedTurnContext) error {

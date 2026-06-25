@@ -75,6 +75,7 @@ func TestAllEventConstants(t *testing.T) {
 		TurnStarted, TurnCompleted, GuardrailBlocked, LLMRetried,
 		MemoryRetrieved, MemoryRetrievalFailed,
 		MemorySaved, MemorySaveFailed,
+		MemoryDeleted, MemoryDeleteFailed,
 	}
 	seen := make(map[string]bool)
 	for _, c := range constants {

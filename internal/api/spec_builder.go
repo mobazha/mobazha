@@ -100,6 +100,7 @@ func BuildOpenAPISpec() []byte {
 	g.registerNodeHumaNotificationOperations(api)
 	g.registerNodeHumaWebhookOperations(api)
 	g.registerNodeHumaAIOperations(api)
+	g.registerNodeHumaAgentMemoryOperations(api)
 	g.registerNodeHumaShippingOperations(api)
 	g.registerNodeHumaDigitalOperations(api)
 	g.registerNodeHumaSellerDigitalOperations(api)

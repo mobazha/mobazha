@@ -295,6 +295,8 @@ func (o *Orchestrator) RunTurnWithOptions(ctx context.Context, tenantID, threadI
 		return nil, err
 	}
 
+	o.forgetExplicitMemory(turnCtx, resolved, userMsg)
+
 	history, err := o.assembleHistory(ctx, tenantID, threadID, userMsg, resolved)
 	if err != nil {
 		return nil, err
@@ -562,6 +564,61 @@ func (o *Orchestrator) captureExplicitMemory(ctx context.Context, resolved resol
 	})
 }
 
+func (o *Orchestrator) forgetExplicitMemory(ctx context.Context, resolved resolvedTurnContext, userMsg string) {
+	if resolved.memoryStore == nil || resolved.scope.TenantID == "" || resolved.scope.ActorID == "" {
+		return
+	}
+	queryText, ok := explicitMemoryForgetQuery(userMsg)
+	if !ok {
+		return
+	}
+	items, err := resolved.memoryStore.Search(ctx, kernel.MemoryQuery{
+		Scope: resolved.scope,
+		Types: []kernel.MemoryScope{kernel.MemoryUser},
+		Query: queryText,
+		Limit: 5,
+	})
+	if err != nil {
+		o.emitter.Emit(ctx, telemetry.Event{
+			Type:     telemetry.MemoryDeleteFailed,
+			TenantID: resolved.scope.TenantID,
+			Attrs: map[string]any{
+				"error": err.Error(),
+				"scope": kernel.MemoryUser,
+			},
+		})
+		return
+	}
+	deleted := 0
+	for _, item := range items {
+		if item.ID == "" || item.Scope != kernel.MemoryUser {
+			continue
+		}
+		if err := resolved.memoryStore.Delete(ctx, resolved.scope, item.ID); err != nil {
+			o.emitter.Emit(ctx, telemetry.Event{
+				Type:     telemetry.MemoryDeleteFailed,
+				TenantID: resolved.scope.TenantID,
+				Attrs: map[string]any{
+					"error": err.Error(),
+					"scope": kernel.MemoryUser,
+				},
+			})
+			continue
+		}
+		deleted++
+	}
+	if deleted > 0 {
+		o.emitter.Emit(ctx, telemetry.Event{
+			Type:     telemetry.MemoryDeleted,
+			TenantID: resolved.scope.TenantID,
+			Attrs: map[string]any{
+				"scope": kernel.MemoryUser,
+				"count": deleted,
+			},
+		})
+	}
+}
+
 func explicitMemoryContent(text string) (string, bool) {
 	normalized := strings.TrimSpace(strings.Join(strings.Fields(text), " "))
 	if normalized == "" {
@@ -602,6 +659,72 @@ func explicitMemoryContent(text string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func explicitMemoryForgetQuery(text string) (string, bool) {
+	normalized := strings.TrimSpace(strings.Join(strings.Fields(text), " "))
+	if normalized == "" {
+		return "", false
+	}
+	markers := []string{
+		"请帮我忘记",
+		"请忘记",
+		"帮我忘记",
+		"不要再记住",
+		"别再记住",
+		"不要记住",
+		"别记住",
+		"删除记忆",
+		"清除记忆",
+		"移除记忆",
+		"忘记",
+	}
+	for _, marker := range markers {
+		if strings.HasPrefix(normalized, marker) {
+			if query := cleanExplicitMemoryContent(normalized[len(marker):]); managed_escrowForgetQuery(query) {
+				return query, true
+			}
+			return "", false
+		}
+	}
+	lower := strings.ToLower(normalized)
+	prefixes := []string{
+		"please forget that ",
+		"please forget ",
+		"forget that ",
+		"forget: ",
+		"forget ",
+		"delete memory that ",
+		"delete memory ",
+		"remove memory that ",
+		"remove memory ",
+		"don't remember that ",
+		"don't remember ",
+		"do not remember that ",
+		"do not remember ",
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(lower, prefix) {
+			if query := cleanExplicitMemoryContent(normalized[len(prefix):]); managed_escrowForgetQuery(query) {
+				return query, true
+			}
+			return "", false
+		}
+	}
+	return "", false
+}
+
+func managed_escrowForgetQuery(query string) bool {
+	query = strings.TrimSpace(strings.ToLower(query))
+	if query == "" {
+		return false
+	}
+	switch query {
+	case "all", "everything", "anything", "全部", "所有", "全部内容", "所有内容":
+		return false
+	default:
+		return true
+	}
 }
 
 func cleanExplicitMemoryContent(text string) string {

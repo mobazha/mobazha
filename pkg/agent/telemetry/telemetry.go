@@ -26,6 +26,8 @@ const (
 	MemoryRetrievalFailed  = "memory_retrieval_failed"
 	MemorySaved            = "memory_saved"
 	MemorySaveFailed       = "memory_save_failed"
+	MemoryDeleted          = "memory_deleted"
+	MemoryDeleteFailed     = "memory_delete_failed"
 )
 
 // Event is a structured telemetry event from the agent runtime.

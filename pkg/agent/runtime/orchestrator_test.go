@@ -52,9 +52,11 @@ type fakeMemoryStore struct {
 	items       []kernel.MemoryItem
 	err         error
 	saveErr     error
+	deleteErr   error
 	queries     []kernel.MemoryQuery
 	savedScopes []kernel.Scope
 	savedItems  []kernel.MemoryItem
+	deletedIDs  []string
 	missQueries bool
 }
 
@@ -78,7 +80,17 @@ func (s *fakeMemoryStore) Save(_ context.Context, scope kernel.Scope, item kerne
 	return nil
 }
 
-func (s *fakeMemoryStore) Delete(context.Context, kernel.Scope, string) error {
+func (s *fakeMemoryStore) Delete(_ context.Context, _ kernel.Scope, id string) error {
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
+	s.deletedIDs = append(s.deletedIDs, id)
+	for i, item := range s.items {
+		if item.ID == id {
+			s.items = append(s.items[:i], s.items[i+1:]...)
+			break
+		}
+	}
 	return nil
 }
 
@@ -1736,6 +1748,96 @@ func TestRunTurnWithOptions_MemorySaveFailureDoesNotFailTurn(t *testing.T) {
 	}
 }
 
+func TestRunTurnWithOptions_DeletesExplicitForgetMemory(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{items: []kernel.MemoryItem{{
+		ID:      "mem_1",
+		Scope:   kernel.MemoryUser,
+		Subject: "preference",
+		Content: "我喜欢中文回答",
+	}}}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		nil,
+	)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_memory_forget", "忘记：我喜欢中文回答", TurnOptions{
+		MemoryStore: memory,
+		Scope: kernel.Scope{
+			TenantID: "tenant_1",
+			ActorID:  "actor_1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(memory.deletedIDs) != 1 || memory.deletedIDs[0] != "mem_1" {
+		t.Fatalf("expected memory deletion, got %#v", memory.deletedIDs)
+	}
+	if len(memory.savedItems) != 0 {
+		t.Fatalf("expected no memory save for forget request, got %#v", memory.savedItems)
+	}
+	if len(memory.queries) == 0 || memory.queries[0].Query != "我喜欢中文回答" {
+		t.Fatalf("expected explicit forget search query first, got %#v", memory.queries)
+	}
+	if len(memory.queries[0].Types) != 1 || memory.queries[0].Types[0] != kernel.MemoryUser {
+		t.Fatalf("expected forget to search user memories only, got %#v", memory.queries[0].Types)
+	}
+	if len(emitter.ByType(telemetry.MemoryDeleted)) != 1 {
+		t.Fatalf("expected memory_deleted telemetry, got %#v", emitter.Events)
+	}
+}
+
+func TestRunTurnWithOptions_MemoryDeleteFailureDoesNotFailTurn(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{
+		items: []kernel.MemoryItem{{
+			ID:      "mem_1",
+			Scope:   kernel.MemoryUser,
+			Content: "我喜欢中文回答",
+		}},
+		deleteErr: errors.New("memory delete unavailable"),
+	}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		nil,
+	)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_memory_delete_failed", "忘记：我喜欢中文回答", TurnOptions{
+		MemoryStore: memory,
+		Scope: kernel.Scope{
+			TenantID: "tenant_1",
+			ActorID:  "actor_1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(emitter.ByType(telemetry.MemoryDeleteFailed)) != 1 {
+		t.Fatalf("expected memory_delete_failed telemetry, got %#v", emitter.Events)
+	}
+}
+
 func TestExplicitMemoryContent_IsConservative(t *testing.T) {
 	content, ok := explicitMemoryContent("你还记住我喜欢中文回答吗")
 	if ok || content != "" {
@@ -1744,6 +1846,21 @@ func TestExplicitMemoryContent_IsConservative(t *testing.T) {
 	content, ok = explicitMemoryContent("记住：我喜欢中文回答")
 	if !ok || content != "我喜欢中文回答" {
 		t.Fatalf("expected explicit memory content, got ok=%v content=%q", ok, content)
+	}
+}
+
+func TestExplicitMemoryForgetQuery_IsConservative(t *testing.T) {
+	query, ok := explicitMemoryForgetQuery("你会忘记我喜欢中文回答吗")
+	if ok || query != "" {
+		t.Fatalf("expected forget question not to delete memory, got %q", query)
+	}
+	query, ok = explicitMemoryForgetQuery("忘记：我喜欢中文回答")
+	if !ok || query != "我喜欢中文回答" {
+		t.Fatalf("expected explicit forget query, got ok=%v query=%q", ok, query)
+	}
+	query, ok = explicitMemoryForgetQuery("forget everything")
+	if ok || query != "" {
+		t.Fatalf("expected broad forget request to be rejected, got %q", query)
 	}
 }
 

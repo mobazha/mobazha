@@ -121,6 +121,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 		g.registerNodeHumaNotificationOperations(api)
 		g.registerNodeHumaWebhookOperations(api)
 		g.registerNodeHumaAIOperations(api)
+		g.registerNodeHumaAgentMemoryOperations(api)
 		g.registerNodeHumaShippingOperations(api)
 		g.registerNodeHumaSellerDigitalOperations(api)
 	}

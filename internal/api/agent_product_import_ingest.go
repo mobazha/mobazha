@@ -34,6 +34,8 @@ const (
 	productImportMaxFiles         = 20
 	productImportMaxSourceBytes   = 2 << 20
 	productImportMaxPreviewRows   = 25
+	productImportMaxApprovalBatch = 100
+	productImportArtifactPageSize = 500
 	productImportApprovalPageSize = 500
 	productImportDefaultCurrency  = "USD"
 )
@@ -73,6 +75,21 @@ type agentProductImportWorkbench struct {
 	Rows              []agentProductImportWorkbenchRow        `json:"rows"`
 	ValidationReports []agentProductImportWorkbenchValidation `json:"validationReports,omitempty"`
 	Counts            map[string]int                          `json:"counts"`
+	Page              agentProductImportWorkbenchPage         `json:"page"`
+}
+
+type agentProductImportWorkbenchOptions struct {
+	RowLimit  int
+	RowOffset int
+	RowStatus string
+}
+
+type agentProductImportWorkbenchPage struct {
+	Limit        int    `json:"limit,omitempty"`
+	Offset       int    `json:"offset"`
+	TotalRows    int    `json:"totalRows"`
+	ReturnedRows int    `json:"returnedRows"`
+	Status       string `json:"status,omitempty"`
 }
 
 type agentProductImportWorkbenchSource struct {
@@ -104,6 +121,29 @@ type agentProductImportApprovalView struct {
 	RequestHash string `json:"requestHash"`
 }
 
+type agentProductImportApprovalBatchRequest struct {
+	ProposalArtifactIDs []string `json:"proposalArtifactIds,omitempty"`
+}
+
+type agentProductImportApprovalBatchResult struct {
+	SkillRun  *agentstore.SkillRun                      `json:"skillRun"`
+	Approvals []*agentstore.Approval                    `json:"approvals"`
+	Created   int                                       `json:"created"`
+	Reused    int                                       `json:"reused"`
+	Skipped   []agentProductImportApprovalBatchSkip     `json:"skipped,omitempty"`
+	Page      agentProductImportApprovalBatchResultPage `json:"page"`
+}
+
+type agentProductImportApprovalBatchSkip struct {
+	ProposalArtifactID string `json:"proposalArtifactId,omitempty"`
+	Reason             string `json:"reason"`
+}
+
+type agentProductImportApprovalBatchResultPage struct {
+	TotalProposals int `json:"totalProposals"`
+	Selected       int `json:"selected"`
+}
+
 type agentProductImportWorkbenchValidation struct {
 	ArtifactID string         `json:"artifactId"`
 	SourceName string         `json:"sourceName,omitempty"`
@@ -115,6 +155,8 @@ type productImportIngestError struct {
 	Stage string
 	Err   error
 }
+
+var errProductImportApprovalInternal = errors.New("product import approval internal error")
 
 func (e *productImportIngestError) Error() string {
 	if e == nil || e.Err == nil {
@@ -146,7 +188,12 @@ func (g *Gateway) handleGETAgentProductImportWorkbench(w http.ResponseWriter, r 
 	}
 	tenantID := agentChatTenantID(r, p)
 	runID := strings.TrimSpace(chi.URLParam(r, "runId"))
-	workbench, err := buildProductImportWorkbench(r.Context(), p, tenantID, runID)
+	opts, err := productImportWorkbenchOptionsFromRequest(r)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	workbench, err := buildProductImportWorkbench(r.Context(), p, tenantID, runID, opts)
 	if errors.Is(err, agentstore.ErrSkillRunNotFound) {
 		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "skill run not found")
 		return
@@ -156,6 +203,32 @@ func (g *Gateway) handleGETAgentProductImportWorkbench(w http.ResponseWriter, r 
 		return
 	}
 	responsePkg.Success(w, workbench)
+}
+
+func productImportWorkbenchOptionsFromRequest(r *http.Request) (agentProductImportWorkbenchOptions, error) {
+	opts := agentProductImportWorkbenchOptions{
+		RowStatus: strings.TrimSpace(r.URL.Query().Get("status")),
+	}
+	var err error
+	if opts.RowLimit, err = productImportNonNegativeQueryInt(r, "limit"); err != nil {
+		return opts, err
+	}
+	if opts.RowOffset, err = productImportNonNegativeQueryInt(r, "offset"); err != nil {
+		return opts, err
+	}
+	return opts, nil
+}
+
+func productImportNonNegativeQueryInt(r *http.Request, name string) (int, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get(name))
+	if raw == "" {
+		return 0, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return 0, fmt.Errorf("%s must be a non-negative integer", name)
+	}
+	return value, nil
 }
 
 // handlePOSTAgentArtifactApproval handles POST /v1/agent/artifacts/{artifactId}/approval.
@@ -180,31 +253,162 @@ func (g *Gateway) handlePOSTAgentArtifactApproval(w http.ResponseWriter, r *http
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
 		return
 	}
-	existingApproval, err := productImportExistingActiveApprovalForArtifact(r.Context(), p, tenantID, artifactID)
-	if err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load approval")
+	approval, _, err := ensureProductImportProposalApproval(r.Context(), r, p, tenantID, artifact)
+	if errors.Is(err, errProductImportApprovalInternal) {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save approval")
 		return
 	}
-	if existingApproval != nil {
-		responsePkg.Success(w, agentstore.SanitizeApprovalForAPI(existingApproval))
-		return
-	}
-	approval, err := buildProductImportProposalApproval(r, p, artifact)
 	if err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
 		return
 	}
-	if err := p.AgentStore().SaveApproval(r.Context(), approval); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save approval")
+	responsePkg.Success(w, agentstore.SanitizeApprovalForAPI(approval))
+}
+
+// handlePOSTAgentProductImportRunApprovals handles POST /v1/agent/product-import/runs/{runId}/approvals.
+func (g *Gateway) handlePOSTAgentProductImportRunApprovals(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
 		return
+	}
+	req, err := parseProductImportApprovalBatchRequest(r)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	tenantID := agentChatTenantID(r, p)
+	runID := strings.TrimSpace(chi.URLParam(r, "runId"))
+	result, err := buildProductImportRunApprovals(r.Context(), r, p, tenantID, runID, req)
+	if errors.Is(err, agentstore.ErrSkillRunNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "skill run not found")
+		return
+	}
+	if errors.Is(err, errProductImportApprovalInternal) {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to create product import approvals")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	responsePkg.Success(w, sanitizeProductImportApprovalBatchResultForAPI(result))
+}
+
+func parseProductImportApprovalBatchRequest(r *http.Request) (agentProductImportApprovalBatchRequest, error) {
+	var req agentProductImportApprovalBatchRequest
+	if r == nil || r.Body == nil || r.Body == http.NoBody {
+		return req, nil
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if errors.Is(err, io.EOF) {
+			return req, nil
+		}
+		return req, fmt.Errorf("invalid product import approval body")
+	}
+	req.ProposalArtifactIDs = uniqueTrimmedStrings(req.ProposalArtifactIDs)
+	if len(req.ProposalArtifactIDs) > productImportMaxApprovalBatch {
+		return req, fmt.Errorf("too many proposalArtifactIds (max %d)", productImportMaxApprovalBatch)
+	}
+	return req, nil
+}
+
+func buildProductImportRunApprovals(ctx context.Context, r *http.Request, p aiChatProvider, tenantID, runID string, req agentProductImportApprovalBatchRequest) (*agentProductImportApprovalBatchResult, error) {
+	run, err := p.AgentStore().LoadSkillRun(ctx, tenantID, runID)
+	if err != nil {
+		return nil, err
+	}
+	if run.SkillID != productImportSkillID {
+		return nil, agentstore.ErrSkillRunNotFound
+	}
+	artifacts, err := listProductImportRunArtifacts(ctx, p, tenantID, runID)
+	if err != nil {
+		return nil, err
+	}
+	selected := map[string]struct{}{}
+	for _, artifactID := range req.ProposalArtifactIDs {
+		selected[artifactID] = struct{}{}
+	}
+	explicitSelection := len(selected) > 0
+	seen := map[string]struct{}{}
+	result := &agentProductImportApprovalBatchResult{
+		SkillRun: run,
+		Page: agentProductImportApprovalBatchResultPage{
+			Selected: len(selected),
+		},
+	}
+	for _, artifact := range artifacts {
+		if artifact == nil || artifact.Kind != agentstore.ArtifactKindProposal {
+			continue
+		}
+		result.Page.TotalProposals++
+	}
+	if !explicitSelection && result.Page.TotalProposals > productImportMaxApprovalBatch {
+		return nil, fmt.Errorf("too many product import proposals for one approval batch (max %d)", productImportMaxApprovalBatch)
+	}
+	for _, artifact := range artifacts {
+		if artifact == nil || artifact.Kind != agentstore.ArtifactKindProposal {
+			continue
+		}
+		if explicitSelection {
+			if _, ok := selected[artifact.ID]; !ok {
+				continue
+			}
+			seen[artifact.ID] = struct{}{}
+		}
+		approval, created, err := ensureProductImportProposalApproval(ctx, r, p, tenantID, artifact)
+		if err != nil {
+			if errors.Is(err, errProductImportApprovalInternal) {
+				return nil, err
+			}
+			result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ProposalArtifactID: artifact.ID, Reason: err.Error()})
+			continue
+		}
+		if created {
+			result.Created++
+		} else {
+			result.Reused++
+		}
+		result.Approvals = append(result.Approvals, approval)
+	}
+	for _, artifactID := range req.ProposalArtifactIDs {
+		if _, ok := seen[artifactID]; !ok {
+			result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ProposalArtifactID: artifactID, Reason: "proposal artifact is not in this product import run"})
+		}
+	}
+	if len(result.Approvals) == 0 {
+		return nil, fmt.Errorf("no reviewable product import proposals found")
+	}
+	if !explicitSelection {
+		result.Page.Selected = result.Page.TotalProposals
+	}
+	return result, nil
+}
+
+func ensureProductImportProposalApproval(ctx context.Context, r *http.Request, p aiChatProvider, tenantID string, artifact *agentstore.Artifact) (*agentstore.Approval, bool, error) {
+	if err := validateProductImportProposalArtifactIdentity(artifact); err != nil {
+		return nil, false, err
+	}
+	existingApproval, err := productImportExistingActiveApprovalForArtifact(ctx, p, tenantID, artifact.ID)
+	if err != nil {
+		return nil, false, fmt.Errorf("%w: load approval: %v", errProductImportApprovalInternal, err)
+	}
+	if existingApproval != nil {
+		return existingApproval, false, nil
+	}
+	approval, err := buildProductImportProposalApproval(r, p, artifact)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := p.AgentStore().SaveApproval(ctx, approval); err != nil {
+		return nil, false, fmt.Errorf("%w: save approval: %v", errProductImportApprovalInternal, err)
 	}
 	artifact.Status = agentstore.ArtifactStatusNeedsReview
 	artifact.UpdatedAt = time.Now()
-	if err := p.AgentStore().SaveArtifact(r.Context(), artifact); err != nil {
-		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to update artifact")
-		return
+	if err := p.AgentStore().SaveArtifact(ctx, artifact); err != nil {
+		return nil, false, fmt.Errorf("%w: update artifact: %v", errProductImportApprovalInternal, err)
 	}
-	responsePkg.Success(w, agentstore.SanitizeApprovalForAPI(approval))
+	return approval, true, nil
 }
 
 func validateProductImportProposalArtifactIdentity(artifact *agentstore.Artifact) error {
@@ -237,7 +441,7 @@ func productImportExistingActiveApprovalForArtifact(ctx context.Context, p aiCha
 	return latest, nil
 }
 
-func buildProductImportWorkbench(ctx context.Context, p aiChatProvider, tenantID, runID string) (*agentProductImportWorkbench, error) {
+func buildProductImportWorkbench(ctx context.Context, p aiChatProvider, tenantID, runID string, opts agentProductImportWorkbenchOptions) (*agentProductImportWorkbench, error) {
 	run, err := p.AgentStore().LoadSkillRun(ctx, tenantID, runID)
 	if err != nil {
 		return nil, err
@@ -245,7 +449,7 @@ func buildProductImportWorkbench(ctx context.Context, p aiChatProvider, tenantID
 	if run.SkillID != productImportSkillID {
 		return nil, agentstore.ErrSkillRunNotFound
 	}
-	artifacts, err := p.AgentStore().ListArtifacts(ctx, tenantID, runID, "", "", 500, 0)
+	artifacts, err := listProductImportRunArtifacts(ctx, p, tenantID, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -287,13 +491,72 @@ func buildProductImportWorkbench(ctx context.Context, p aiChatProvider, tenantID
 			if row.Approval != nil {
 				workbench.Counts["approval"]++
 			}
-			workbench.Rows = append(workbench.Rows, row)
+			if productImportWorkbenchRowMatchesStatus(row, opts.RowStatus) {
+				workbench.Rows = append(workbench.Rows, row)
+			}
 		case agentstore.ArtifactKindValidationReport:
 			workbench.Counts["validation"]++
 			workbench.ValidationReports = append(workbench.ValidationReports, productImportWorkbenchValidationFromArtifact(artifact))
 		}
 	}
+	workbench.Page = agentProductImportWorkbenchPage{
+		Limit:     opts.RowLimit,
+		Offset:    opts.RowOffset,
+		TotalRows: len(workbench.Rows),
+		Status:    opts.RowStatus,
+	}
+	workbench.Rows = pageProductImportWorkbenchRows(workbench.Rows, opts.RowLimit, opts.RowOffset)
+	workbench.Page.ReturnedRows = len(workbench.Rows)
 	return workbench, nil
+}
+
+func listProductImportRunArtifacts(ctx context.Context, p aiChatProvider, tenantID, runID string) ([]*agentstore.Artifact, error) {
+	var out []*agentstore.Artifact
+	for offset := 0; ; offset += productImportArtifactPageSize {
+		page, err := p.AgentStore().ListArtifacts(ctx, tenantID, runID, "", "", productImportArtifactPageSize, offset)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, page...)
+		if len(page) < productImportArtifactPageSize {
+			break
+		}
+	}
+	return out, nil
+}
+
+func productImportWorkbenchRowMatchesStatus(row agentProductImportWorkbenchRow, status string) bool {
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status == "" || status == "all" {
+		return true
+	}
+	approvalStatus := ""
+	if row.Approval != nil {
+		approvalStatus = strings.ToLower(strings.TrimSpace(row.Approval.Status))
+	}
+	switch status {
+	case "pending_approval", "approval_pending":
+		return approvalStatus == agentstore.ApprovalStatusPending ||
+			approvalStatus == agentstore.ApprovalStatusApproved ||
+			approvalStatus == agentstore.ApprovalStatusApplying
+	case "approval_failed":
+		return approvalStatus == agentstore.ApprovalStatusApplyFailed
+	default:
+		return strings.ToLower(strings.TrimSpace(row.Status)) == status || approvalStatus == status
+	}
+}
+
+func pageProductImportWorkbenchRows(rows []agentProductImportWorkbenchRow, limit, offset int) []agentProductImportWorkbenchRow {
+	if offset >= len(rows) {
+		return nil
+	}
+	if offset > 0 {
+		rows = rows[offset:]
+	}
+	if limit > 0 && limit < len(rows) {
+		rows = rows[:limit]
+	}
+	return rows
 }
 
 func productImportArtifactIDSet(artifacts []*agentstore.Artifact) map[string]struct{} {
@@ -385,6 +648,15 @@ func sanitizeProductImportIngestResultForAPI(result *agentProductImportIngestRes
 	out.CandidateArtifacts = sanitizeProductImportArtifactsForAPI(result.CandidateArtifacts)
 	out.ProposalArtifacts = sanitizeProductImportArtifactsForAPI(result.ProposalArtifacts)
 	out.ValidationArtifacts = sanitizeProductImportArtifactsForAPI(result.ValidationArtifacts)
+	return &out
+}
+
+func sanitizeProductImportApprovalBatchResultForAPI(result *agentProductImportApprovalBatchResult) *agentProductImportApprovalBatchResult {
+	if result == nil {
+		return nil
+	}
+	out := *result
+	out.Approvals = agentstore.SanitizeApprovalsForAPI(result.Approvals)
 	return &out
 }
 

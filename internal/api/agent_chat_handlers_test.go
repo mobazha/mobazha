@@ -1384,6 +1384,290 @@ func TestHandleGETAgentProductImportWorkbench_AggregatesRowsAndApprovals(t *test
 	if workbenchResp.Data.Counts["source"] != 1 || workbenchResp.Data.Counts["proposal"] != 1 || workbenchResp.Data.Counts["approval"] != 1 {
 		t.Fatalf("unexpected workbench counts: %#v", workbenchResp.Data.Counts)
 	}
+	if workbenchResp.Data.Page.TotalRows != 1 || workbenchResp.Data.Page.ReturnedRows != 1 {
+		t.Fatalf("unexpected workbench page metadata: %#v", workbenchResp.Data.Page)
+	}
+}
+
+func TestHandleGETAgentProductImportWorkbench_PaginatesAndFiltersRows(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var csvBody strings.Builder
+	csvBody.WriteString("Item Name,Cost USD,Qty on hand\n")
+	for i := 1; i <= 5; i++ {
+		fmt.Fprintf(&csvBody, "Linen Tote %d,$45.00,%d\n", i, i)
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv part: %v", err)
+	}
+	if _, err := part.Write([]byte(csvBody.String())); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected ingest 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var ingestResp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&ingestResp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	if len(ingestResp.Data.ProposalArtifacts) != 5 {
+		t.Fatalf("expected five proposals, got %#v", ingestResp.Data.ProposalArtifacts)
+	}
+
+	runID := ingestResp.Data.SkillRun.ID
+	req = httptest.NewRequest(http.MethodGet, "/v1/agent/product-import/runs/"+runID+"/workbench?limit=2&offset=1", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": runID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentProductImportWorkbench(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected paged workbench 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var pagedResp struct {
+		Data agentProductImportWorkbench `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&pagedResp); err != nil {
+		t.Fatalf("decode paged workbench: %v", err)
+	}
+	if pagedResp.Data.Page.Limit != 2 || pagedResp.Data.Page.Offset != 1 || pagedResp.Data.Page.TotalRows != 5 || pagedResp.Data.Page.ReturnedRows != 2 {
+		t.Fatalf("unexpected paged metadata: %#v", pagedResp.Data.Page)
+	}
+	if len(pagedResp.Data.Rows) != 2 || pagedResp.Data.Rows[0].RowNumber != 3 || pagedResp.Data.Rows[1].RowNumber != 4 {
+		t.Fatalf("unexpected paged rows: %#v", pagedResp.Data.Rows)
+	}
+
+	proposalID := ingestResp.Data.ProposalArtifacts[0].ID
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts/"+proposalID+"/approval", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": proposalID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentArtifactApproval(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected approval 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, "/v1/agent/product-import/runs/"+runID+"/workbench?status=pending_approval", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": runID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentProductImportWorkbench(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected filtered workbench 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var filteredResp struct {
+		Data agentProductImportWorkbench `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&filteredResp); err != nil {
+		t.Fatalf("decode filtered workbench: %v", err)
+	}
+	if filteredResp.Data.Page.Status != "pending_approval" || filteredResp.Data.Page.TotalRows != 1 || len(filteredResp.Data.Rows) != 1 {
+		t.Fatalf("unexpected filtered workbench: page=%#v rows=%#v", filteredResp.Data.Page, filteredResp.Data.Rows)
+	}
+	if filteredResp.Data.Rows[0].ProposalArtifactID != proposalID || filteredResp.Data.Rows[0].Approval == nil {
+		t.Fatalf("filtered row should be the pending approval proposal, got %#v", filteredResp.Data.Rows[0])
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/agent/product-import/runs/"+runID+"/workbench?limit=-1", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": runID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentProductImportWorkbench(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid limit 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandlePOSTAgentProductImportRunApprovals_CreatesSelectedApprovals(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var csvBody strings.Builder
+	csvBody.WriteString("Item Name,Cost USD,Qty on hand\n")
+	for i := 1; i <= 3; i++ {
+		fmt.Fprintf(&csvBody, "Linen Tote %d,$45.00,%d\n", i, i)
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv part: %v", err)
+	}
+	if _, err := part.Write([]byte(csvBody.String())); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected ingest 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var ingestResp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&ingestResp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	runID := ingestResp.Data.SkillRun.ID
+	firstProposalID := ingestResp.Data.ProposalArtifacts[0].ID
+	thirdProposalID := ingestResp.Data.ProposalArtifacts[2].ID
+	batchBody := fmt.Sprintf(`{"proposalArtifactIds":["%s","%s"]}`, firstProposalID, thirdProposalID)
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/"+runID+"/approvals", strings.NewReader(batchBody))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": runID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunApprovals(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected batch approval 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var batchResp struct {
+		Data agentProductImportApprovalBatchResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&batchResp); err != nil {
+		t.Fatalf("decode batch approval: %v", err)
+	}
+	if batchResp.Data.Created != 2 || batchResp.Data.Reused != 0 || len(batchResp.Data.Approvals) != 2 {
+		t.Fatalf("expected two created approvals, got %#v", batchResp.Data)
+	}
+	if batchResp.Data.Page.TotalProposals != 3 || batchResp.Data.Page.Selected != 2 {
+		t.Fatalf("unexpected batch page metadata: %#v", batchResp.Data.Page)
+	}
+	if len(store.approvals) != 2 {
+		t.Fatalf("expected two persisted approvals, got %#v", store.approvals)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/"+runID+"/approvals", strings.NewReader(batchBody))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": runID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunApprovals(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected repeated batch approval 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var repeatedResp struct {
+		Data agentProductImportApprovalBatchResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&repeatedResp); err != nil {
+		t.Fatalf("decode repeated batch approval: %v", err)
+	}
+	if repeatedResp.Data.Created != 0 || repeatedResp.Data.Reused != 2 || len(store.approvals) != 2 {
+		t.Fatalf("repeated batch should reuse approvals, response=%#v approvals=%#v", repeatedResp.Data, store.approvals)
+	}
+}
+
+func TestHandlePOSTAgentProductImportRunApprovals_RejectsEmptySelection(t *testing.T) {
+	store := &agentChatMemoryStore{
+		skillRuns: []*agentstore.SkillRun{
+			{
+				ID:       "skillrun_empty",
+				TenantID: "test-node",
+				SkillID:  string(kernel.SkillProductImport),
+				Status:   agentstore.SkillRunStatusWaitingForReview,
+			},
+		},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/skillrun_empty/approvals", strings.NewReader(`{"proposalArtifactIds":["art_missing"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "skillrun_empty"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunApprovals(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected empty selection 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if len(store.approvals) != 0 {
+		t.Fatalf("empty selection should not create approvals, got %#v", store.approvals)
+	}
+}
+
+func TestHandlePOSTAgentProductImportRunApprovals_RejectsOversizedDefaultBatch(t *testing.T) {
+	store := &agentChatMemoryStore{
+		skillRuns: []*agentstore.SkillRun{
+			{
+				ID:       "skillrun_large",
+				TenantID: "test-node",
+				SkillID:  string(kernel.SkillProductImport),
+				Status:   agentstore.SkillRunStatusWaitingForReview,
+			},
+		},
+	}
+	for i := 0; i < productImportMaxApprovalBatch+1; i++ {
+		store.artifacts = append(store.artifacts, &agentstore.Artifact{
+			ID:         fmt.Sprintf("art_proposal_%d", i),
+			TenantID:   "test-node",
+			SkillRunID: "skillrun_large",
+			SkillID:    string(kernel.SkillProductImport),
+			Kind:       agentstore.ArtifactKindProposal,
+			Status:     agentstore.ArtifactStatusNeedsReview,
+			Name:       fmt.Sprintf("proposal %d", i),
+			Data:       fmt.Sprintf(`{"draft":{"title":"Linen Tote %d"}}`, i),
+			CreatedAt:  time.Now().Add(time.Duration(i) * time.Second),
+			UpdatedAt:  time.Now().Add(time.Duration(i) * time.Second),
+		})
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/skillrun_large/approvals", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "skillrun_large"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunApprovals(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected oversized default batch 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if len(store.approvals) != 0 {
+		t.Fatalf("oversized default batch should not create approvals, got %#v", store.approvals)
+	}
 }
 
 func TestHandleGETAgentProductImportWorkbench_ReflectsAppliedProposal(t *testing.T) {

@@ -217,6 +217,7 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 		{"GET", "/v1/ai/status"},
 		{"POST", "/v1/agent/product-import/ingest"},
 		{"GET", "/v1/agent/product-import/runs/skillrun_1/workbench"},
+		{"POST", "/v1/agent/product-import/runs/skillrun_1/approvals"},
 		{"POST", "/v1/agent/artifacts/art_1/approval"},
 		// Guest checkout
 		{"POST", "/v1/guest/orders"},

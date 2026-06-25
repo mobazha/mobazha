@@ -1,6 +1,21 @@
 {
   "components": {
     "schemas": {
+      "AgentProductImportApprovalBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "proposalArtifactIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "AssetUpdateInput": {
         "additionalProperties": false,
         "properties": {
@@ -1458,6 +1473,69 @@
         ]
       }
     },
+    "/v1/agent/product-import/runs/{runId}/approvals": {
+      "post": {
+        "operationId": "agent-product-import-run-approvals-post",
+        "parameters": [
+          {
+            "description": "Agent skill run ID.",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "description": "Agent skill run ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentProductImportApprovalBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Create approval requests for product import proposals",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/v1/agent/product-import/runs/{runId}/workbench": {
       "get": {
         "operationId": "agent-product-import-workbench-get",
@@ -1469,6 +1547,36 @@
             "required": true,
             "schema": {
               "description": "Agent skill run ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum workbench proposal rows to return.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Maximum workbench proposal rows to return.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Workbench proposal row offset.",
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "description": "Workbench proposal row offset.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional workbench row status filter.",
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "description": "Optional workbench row status filter.",
               "type": "string"
             }
           }

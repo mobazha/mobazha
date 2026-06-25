@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/agent/budget"
 	"github.com/mobazha/mobazha3.0/pkg/agent/exec"
+	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
+	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	"github.com/mobazha/mobazha3.0/pkg/agent/store"
 	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
 	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
@@ -36,6 +40,9 @@ type mockLLMResponse struct {
 type fakePersistence struct {
 	thread         *store.Thread
 	messages       []*store.Message
+	skillRuns      []*store.SkillRun
+	artifacts      []*store.Artifact
+	approvals      []*store.Approval
 	saveMessageErr error
 	saveTurnErr    error
 	turnSaveCount  int
@@ -67,6 +74,33 @@ func (p *fakePersistence) SaveMessage(_ context.Context, m *store.Message) error
 	return nil
 }
 
+func (p *fakePersistence) SaveSkillRun(_ context.Context, r *store.SkillRun) error {
+	if r == nil {
+		return nil
+	}
+	cp := *r
+	p.skillRuns = append(p.skillRuns, &cp)
+	return nil
+}
+
+func (p *fakePersistence) SaveArtifact(_ context.Context, a *store.Artifact) error {
+	if a == nil {
+		return nil
+	}
+	cp := *a
+	p.artifacts = append(p.artifacts, &cp)
+	return nil
+}
+
+func (p *fakePersistence) SaveApproval(_ context.Context, a *store.Approval) error {
+	if a == nil {
+		return nil
+	}
+	cp := *a
+	p.approvals = append(p.approvals, &cp)
+	return nil
+}
+
 func (p *fakePersistence) LoadThread(_ context.Context, _, threadID string) (*store.Thread, error) {
 	if p.thread == nil || p.thread.ID != threadID {
 		return nil, store.ErrThreadNotFound
@@ -95,9 +129,164 @@ func (p *fakePersistence) LoadMessages(_ context.Context, _, threadID string) ([
 	return out, nil
 }
 
+func (p *fakePersistence) LoadSkillRun(_ context.Context, tenantID, runID string) (*store.SkillRun, error) {
+	for _, run := range p.skillRuns {
+		if run.TenantID == tenantID && run.ID == runID {
+			cp := *run
+			return &cp, nil
+		}
+	}
+	return nil, store.ErrSkillRunNotFound
+}
+
+func (p *fakePersistence) ListSkillRuns(_ context.Context, tenantID, skillID, status string, _, _ int) ([]*store.SkillRun, error) {
+	out := make([]*store.SkillRun, 0, len(p.skillRuns))
+	for _, run := range p.skillRuns {
+		if run.TenantID != tenantID {
+			continue
+		}
+		if skillID != "" && run.SkillID != skillID {
+			continue
+		}
+		if status != "" && run.Status != status {
+			continue
+		}
+		cp := *run
+		out = append(out, &cp)
+	}
+	return out, nil
+}
+
+func (p *fakePersistence) LoadArtifact(_ context.Context, tenantID, artifactID string) (*store.Artifact, error) {
+	for _, artifact := range p.artifacts {
+		if artifact.TenantID == tenantID && artifact.ID == artifactID {
+			cp := *artifact
+			return &cp, nil
+		}
+	}
+	return nil, store.ErrArtifactNotFound
+}
+
+func (p *fakePersistence) ListArtifacts(_ context.Context, tenantID, skillRunID, kind, status string, _, _ int) ([]*store.Artifact, error) {
+	out := make([]*store.Artifact, 0, len(p.artifacts))
+	for _, artifact := range p.artifacts {
+		if artifact.TenantID != tenantID {
+			continue
+		}
+		if skillRunID != "" && artifact.SkillRunID != skillRunID {
+			continue
+		}
+		if kind != "" && artifact.Kind != kind {
+			continue
+		}
+		if status != "" && artifact.Status != status {
+			continue
+		}
+		cp := *artifact
+		out = append(out, &cp)
+	}
+	return out, nil
+}
+
+func (p *fakePersistence) LoadApproval(_ context.Context, tenantID, approvalID string) (*store.Approval, error) {
+	for _, approval := range p.approvals {
+		if approval.TenantID == tenantID && approval.ID == approvalID {
+			cp := *approval
+			return &cp, nil
+		}
+	}
+	return nil, store.ErrApprovalNotFound
+}
+
+func (p *fakePersistence) ListApprovals(_ context.Context, tenantID, status string, _, _ int) ([]*store.Approval, error) {
+	out := make([]*store.Approval, 0, len(p.approvals))
+	for _, approval := range p.approvals {
+		if approval.TenantID != tenantID {
+			continue
+		}
+		if status != "" && approval.Status != status {
+			continue
+		}
+		cp := *approval
+		out = append(out, &cp)
+	}
+	return out, nil
+}
+
+func (p *fakePersistence) UpdateApprovalStatus(_ context.Context, tenantID, approvalID, status, actorID string) (*store.Approval, error) {
+	for _, approval := range p.approvals {
+		if approval.TenantID == tenantID && approval.ID == approvalID {
+			if approval.Status == "" || approval.Status == store.ApprovalStatusPending {
+				now := time.Now()
+				approval.Status = status
+				approval.DecisionBy = actorID
+				approval.DecisionAt = &now
+				approval.UpdatedAt = now
+			}
+			cp := *approval
+			return &cp, nil
+		}
+	}
+	return nil, store.ErrApprovalNotFound
+}
+
+func (p *fakePersistence) ClaimApprovalForApply(_ context.Context, tenantID, approvalID, actorID string) (*store.Approval, error) {
+	for _, approval := range p.approvals {
+		if approval.TenantID == tenantID && approval.ID == approvalID {
+			if approval.Status == store.ApprovalStatusApproved || approval.Status == store.ApprovalStatusApplyFailed {
+				approval.Status = store.ApprovalStatusApplying
+				approval.AppliedBy = actorID
+				approval.ApplyError = ""
+				approval.UpdatedAt = time.Now()
+			}
+			cp := *approval
+			return &cp, nil
+		}
+	}
+	return nil, store.ErrApprovalNotFound
+}
+
+func (p *fakePersistence) MarkApprovalApplied(_ context.Context, tenantID, approvalID, result, actorID string) (*store.Approval, error) {
+	for _, approval := range p.approvals {
+		if approval.TenantID == tenantID && approval.ID == approvalID {
+			if approval.Status == store.ApprovalStatusApplying {
+				now := time.Now()
+				approval.Status = store.ApprovalStatusApplied
+				approval.AppliedBy = actorID
+				approval.AppliedAt = &now
+				approval.ApplyResult = result
+				approval.ApplyError = ""
+				approval.UpdatedAt = now
+			}
+			cp := *approval
+			return &cp, nil
+		}
+	}
+	return nil, store.ErrApprovalNotFound
+}
+
+func (p *fakePersistence) MarkApprovalApplyFailed(_ context.Context, tenantID, approvalID, applyErr, actorID string) (*store.Approval, error) {
+	for _, approval := range p.approvals {
+		if approval.TenantID == tenantID && approval.ID == approvalID {
+			if approval.Status == store.ApprovalStatusApplying {
+				approval.Status = store.ApprovalStatusApplyFailed
+				approval.AppliedBy = actorID
+				approval.ApplyError = applyErr
+				approval.UpdatedAt = time.Now()
+			}
+			cp := *approval
+			return &cp, nil
+		}
+	}
+	return nil, store.ErrApprovalNotFound
+}
+
 func (p *fakePersistence) DeleteThread(context.Context, string, string) error {
 	p.thread = nil
 	p.messages = nil
+	p.skillRuns = nil
+	p.artifacts = nil
+	p.approvals = nil
 	return nil
 }
 
@@ -168,6 +357,512 @@ func TestRunTurn_SimpleTextResponse(t *testing.T) {
 	}
 	if combined != "Hello, world!" {
 		t.Errorf("expected 'Hello, world!', got %q", combined)
+	}
+}
+
+func TestRunTurnWithOptions_LoadsActiveMarkdownSkill(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "private", "product.import")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "skill.md"), []byte(`---
+name: product.import
+description: Import local product materials.
+persona: seller
+capabilities: listing.read, listing.draft_write, listing.apply_after_approval
+tool_hints: listings_get_template, listings_create
+---
+
+# Product Import
+
+Always create ProductDraft records before apply.
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{{Delta: "ok"}}},
+		},
+	}
+	orch := newTestOrch(llm, nil)
+	orch.SetSystemPrompt("Base prompt.")
+	orch.RegisterTools([]ToolDef{
+		{Name: "listings_get_template", Description: "Get listing template", Schema: `{}`},
+		{Name: "listings_create", Description: "Create listing", Schema: `{}`},
+		{Name: "orders_refund", Description: "Refund order", Schema: `{}`},
+	})
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "th_1", "import products", TurnOptions{
+		SkillProvider:   agentskill.NewFilesystemProvider(dir),
+		RequestedSkills: []string{"product.import"},
+		ToolCatalog: kernel.NewStaticToolCatalog([]kernel.ToolMetadata{
+			{
+				Name:            "listings_get_template",
+				Description:     "Get listing template",
+				Risk:            kernel.RiskRead,
+				Approval:        kernel.ApprovalNone,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingRead},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "listings_create",
+				Description:     "Create listing",
+				Risk:            kernel.RiskWrite,
+				Approval:        kernel.ApprovalExplicit,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingDraftWrite},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "orders_refund",
+				Description:     "Refund order",
+				Risk:            kernel.RiskFinancial,
+				Approval:        kernel.ApprovalExplicit,
+				Capabilities:    []kernel.Capability{kernel.CapabilityOrderFinancial},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+		}),
+		Scope: kernel.Scope{ActingPersona: kernel.PersonaSeller},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("stream error: %v", err)
+	}
+	if len(llm.captured) != 1 || len(llm.captured[0].messages) == 0 {
+		t.Fatalf("expected captured LLM call")
+	}
+	system := llm.captured[0].messages[0]
+	if system.Role != "system" {
+		t.Fatalf("expected system message, got %#v", system)
+	}
+	for _, want := range []string{"Base prompt.", "## Available Skills", "## Runtime-Injected Active Skills", "required capabilities", "granted tools for this turn", "Always create ProductDraft records before apply."} {
+		if !strings.Contains(system.Content, want) {
+			t.Fatalf("system prompt missing %q:\n%s", want, system.Content)
+		}
+	}
+	tools := llm.captured[0].tools
+	if len(tools) != 3 {
+		t.Fatalf("expected two granted tools plus use_skill_tool, got %#v", tools)
+	}
+	if tools[0].Name != "listings_get_template" || tools[1].Name != "listings_create" || tools[2].Name != runtimeUseSkillToolName {
+		t.Fatalf("unexpected granted tool set: %#v", tools)
+	}
+	if strings.Contains(system.Content, "orders_refund") {
+		t.Fatalf("system prompt should not expose ungranted refund tool:\n%s", system.Content)
+	}
+}
+
+func TestRunTurnWithOptions_MissingSkillDoesNotSaveTurn(t *testing.T) {
+	llm := &mockLLM{}
+	persist := &fakePersistence{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, c exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{CallID: c.ID, Content: "ok"}, nil
+		}), 5*time.Second, 0),
+		persist,
+		&telemetry.BufferEmitter{},
+		nil,
+	)
+
+	_, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "th_1", "import products", TurnOptions{
+		SkillProvider:   agentskill.NewFilesystemProvider(t.TempDir()),
+		RequestedSkills: []string{"product.import"},
+	})
+	if !errors.Is(err, agentskill.ErrSkillNotFound) {
+		t.Fatalf("expected missing skill error, got %v", err)
+	}
+	if persist.turnSaveCount != 0 {
+		t.Fatalf("turn should not be saved when skill resolution fails, got %d saves", persist.turnSaveCount)
+	}
+	if len(llm.captured) != 0 {
+		t.Fatal("LLM should not be called when skill resolution fails")
+	}
+}
+
+func TestRunTurnWithOptions_RequestedSkillRespectsFilter(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "product.import")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(`---
+name: product.import
+description: Import local product materials.
+persona: seller
+---
+
+# Product Import
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	llm := &mockLLM{}
+	persist := &fakePersistence{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, c exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{CallID: c.ID, Content: "ok"}, nil
+		}), 5*time.Second, 0),
+		persist,
+		&telemetry.BufferEmitter{},
+		nil,
+	)
+
+	_, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "th_filtered_skill", "import products", TurnOptions{
+		SkillProvider:   agentskill.NewFilesystemProvider(dir),
+		RequestedSkills: []string{"product.import"},
+		SkillFilter:     agentskill.Filter{Persona: string(kernel.PersonaBuyer)},
+	})
+	if err == nil || !strings.Contains(err.Error(), "not available for this turn") {
+		t.Fatalf("expected requested skill to respect filter, got %v", err)
+	}
+	if persist.turnSaveCount != 0 {
+		t.Fatalf("turn should not be saved when requested skill is unavailable, got %d saves", persist.turnSaveCount)
+	}
+	if len(llm.captured) != 0 {
+		t.Fatal("LLM should not be called when requested skill is filtered out")
+	}
+}
+
+func TestRunTurnWithOptions_UseSkillToolLoadsSkillAndRestrictsNextTools(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "product.import")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(`---
+name: product.import
+description: Import local product materials.
+persona: seller
+capabilities: listing.read, listing.draft_write
+---
+
+# Product Import
+
+Always create ProductDraft records before apply.
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{{
+				ToolCalls: []stream.ToolCall{{
+					ID:        "skill_call_1",
+					Name:      runtimeUseSkillToolName,
+					Arguments: `{"skill":"product.import"}`,
+				}},
+			}}},
+			{chunks: []stream.Chunk{{Delta: "skill loaded"}}},
+		},
+	}
+	orch := newTestOrch(llm, nil)
+	orch.RegisterTools([]ToolDef{
+		{Name: "listings_get_template", Description: "Get listing template", Schema: `{}`},
+		{Name: "listings_create", Description: "Create listing", Schema: `{}`},
+		{Name: "orders_refund", Description: "Refund order", Schema: `{}`},
+	})
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "th_use_skill", "import products", TurnOptions{
+		SkillProvider: agentskill.NewFilesystemProvider(dir),
+		ToolCatalog: kernel.NewStaticToolCatalog([]kernel.ToolMetadata{
+			{
+				Name:            "listings_get_template",
+				Description:     "Get listing template",
+				Risk:            kernel.RiskRead,
+				Approval:        kernel.ApprovalNone,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingRead},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "listings_create",
+				Description:     "Create listing",
+				Risk:            kernel.RiskWrite,
+				Approval:        kernel.ApprovalExplicit,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingDraftWrite},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "orders_refund",
+				Description:     "Refund order",
+				Risk:            kernel.RiskFinancial,
+				Approval:        kernel.ApprovalExplicit,
+				Capabilities:    []kernel.Capability{kernel.CapabilityOrderFinancial},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+		}),
+		Scope: kernel.Scope{ActingPersona: kernel.PersonaSeller},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("stream error: %v", err)
+	}
+	if len(llm.captured) != 2 {
+		t.Fatalf("expected two LLM calls, got %d", len(llm.captured))
+	}
+	firstTools := toolDefNames(llm.captured[0].tools)
+	if len(firstTools) != 1 || firstTools[0] != runtimeUseSkillToolName {
+		t.Fatalf("first turn should expose only use_skill_tool before skill activation, got %#v", firstTools)
+	}
+	secondTools := toolDefNames(llm.captured[1].tools)
+	for _, want := range []string{runtimeUseSkillToolName, "listings_get_template", "listings_create"} {
+		if !containsToolDef(secondTools, want) {
+			t.Fatalf("second turn missing %s, got %#v", want, secondTools)
+		}
+	}
+	if containsToolDef(secondTools, "orders_refund") {
+		t.Fatalf("second turn should not expose refund after product.import activation: %#v", secondTools)
+	}
+}
+
+func TestRunTurnWithOptions_UseSkillToolDefersMixedOrdinaryTools(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "product.import")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(`---
+name: product.import
+description: Import local product materials.
+persona: seller
+capabilities: listing.read, listing.draft_write
+---
+
+# Product Import
+
+Always create ProductDraft records before apply.
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{{
+				ToolCalls: []stream.ToolCall{
+					{
+						ID:        "skill_call_1",
+						Name:      runtimeUseSkillToolName,
+						Arguments: `{"skill":"product.import"}`,
+					},
+					{
+						ID:        "refund_call_1",
+						Name:      "orders_refund",
+						Arguments: `{}`,
+					},
+				},
+			}}},
+			{chunks: []stream.Chunk{{Delta: "skill loaded"}}},
+		},
+	}
+	executed := false
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, c exec.ToolCall) (exec.ToolResult, error) {
+			executed = true
+			return exec.ToolResult{CallID: c.ID, Name: c.Name, Content: "ok"}, nil
+		}), 5*time.Second, 0),
+		nil,
+		&telemetry.BufferEmitter{},
+		nil,
+	)
+	orch.RegisterTools([]ToolDef{
+		{Name: "listings_get_template", Description: "Get listing template", Schema: `{}`},
+		{Name: "listings_create", Description: "Create listing", Schema: `{}`},
+		{Name: "orders_refund", Description: "Refund order", Schema: `{}`},
+	})
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "th_use_skill_mixed", "import products", TurnOptions{
+		SkillProvider: agentskill.NewFilesystemProvider(dir),
+		ToolCatalog: kernel.NewStaticToolCatalog([]kernel.ToolMetadata{
+			{
+				Name:            "listings_get_template",
+				Description:     "Get listing template",
+				Risk:            kernel.RiskRead,
+				Approval:        kernel.ApprovalNone,
+				SideEffect:      kernel.SideEffectNone,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingRead},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "listings_create",
+				Description:     "Create listing",
+				Risk:            kernel.RiskWrite,
+				Approval:        kernel.ApprovalExplicit,
+				SideEffect:      kernel.SideEffectMutable,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingDraftWrite},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "orders_refund",
+				Description:     "Refund order",
+				Risk:            kernel.RiskFinancial,
+				Approval:        kernel.ApprovalExplicit,
+				SideEffect:      kernel.SideEffectMutable,
+				Capabilities:    []kernel.Capability{kernel.CapabilityOrderFinancial},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+		}),
+		Scope: kernel.Scope{ActingPersona: kernel.PersonaSeller},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("stream error: %v", streamErr)
+	}
+	if executed {
+		t.Fatal("ordinary tool in same batch as use_skill_tool should not be executed")
+	}
+	if len(llm.captured) != 2 {
+		t.Fatalf("expected second LLM call after skill routing, got %d", len(llm.captured))
+	}
+	secondTools := toolDefNames(llm.captured[1].tools)
+	if containsToolDef(secondTools, "orders_refund") {
+		t.Fatalf("refund should not be exposed after product.import activation: %#v", secondTools)
+	}
+	var sawRefundRejected bool
+	for _, chunk := range chunks {
+		if chunk.ToolEvent != nil && chunk.ToolEvent.ID == "refund_call_1" && chunk.ToolEvent.Status == "error" {
+			sawRefundRejected = true
+		}
+	}
+	if !sawRefundRejected {
+		t.Fatalf("expected mixed ordinary tool to be rejected, got %#v", chunks)
+	}
+}
+
+func TestRunTurnWithOptions_ExplicitApprovalToolRequiresApproval(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "product.import")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(`---
+name: product.import
+description: Import local product materials.
+persona: seller
+capabilities: listing.read, listing.draft_write
+---
+
+# Product Import
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{{
+				ToolCalls: []stream.ToolCall{{
+					ID:        "create_call_1",
+					Name:      "listings_create",
+					Arguments: `{"listing":{"title":"Draft Shirt"}}`,
+				}},
+			}}},
+			{chunks: []stream.Chunk{{Delta: "Approval required"}}},
+		},
+	}
+	persist := &fakePersistence{}
+	executed := false
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, c exec.ToolCall) (exec.ToolResult, error) {
+			executed = true
+			return exec.ToolResult{CallID: c.ID, Name: c.Name, Content: "ok"}, nil
+		}), 5*time.Second, 0),
+		persist,
+		&telemetry.BufferEmitter{},
+		nil,
+	)
+	orch.RegisterTools([]ToolDef{
+		{Name: "listings_get_template", Description: "Get listing template", Schema: `{}`},
+		{Name: "listings_create", Description: "Create listing", Schema: `{}`},
+	})
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "th_approval_required", "import products", TurnOptions{
+		SkillProvider:   agentskill.NewFilesystemProvider(dir),
+		RequestedSkills: []string{"product.import"},
+		ToolCatalog: kernel.NewStaticToolCatalog([]kernel.ToolMetadata{
+			{
+				Name:            "listings_get_template",
+				Description:     "Get listing template",
+				Risk:            kernel.RiskRead,
+				Approval:        kernel.ApprovalNone,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingRead},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "listings_create",
+				Description:     "Create listing",
+				Risk:            kernel.RiskWrite,
+				Approval:        kernel.ApprovalExplicit,
+				SideEffect:      kernel.SideEffectMutable,
+				Capabilities:    []kernel.Capability{kernel.CapabilityListingDraftWrite},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+		}),
+		Scope: kernel.Scope{
+			TenantID:      "tenant_1",
+			StoreID:       "store_1",
+			ActorID:       "seller_1",
+			ActingPersona: kernel.PersonaSeller,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("stream error: %v", streamErr)
+	}
+	if executed {
+		t.Fatal("approval-explicit tool should not be executed directly")
+	}
+	var sawToolResult bool
+	for _, chunk := range chunks {
+		if chunk.ToolEvent != nil && chunk.ToolEvent.ID == "create_call_1" && chunk.ToolEvent.Status == "approval_required" {
+			sawToolResult = true
+			if len(chunk.ToolEvent.Result) == 0 || !strings.Contains(string(chunk.ToolEvent.Result), `"status":"approval_required"`) {
+				t.Fatalf("expected structured approval result payload, got %#v", chunk.ToolEvent.Result)
+			}
+		}
+	}
+	if !sawToolResult {
+		t.Fatalf("expected approval-required tool result event, got %#v", chunks)
+	}
+	var approvalMessage *store.Message
+	for _, msg := range persist.messages {
+		if msg.Role == "tool" && msg.ToolCallID == "create_call_1" {
+			approvalMessage = msg
+			break
+		}
+	}
+	if approvalMessage == nil {
+		t.Fatal("expected approval-required tool message to be saved")
+	}
+	if len(persist.approvals) != 1 {
+		t.Fatalf("expected one durable approval, got %#v", persist.approvals)
+	}
+	approval := persist.approvals[0]
+	if approval.Status != store.ApprovalStatusPending || approval.TenantID != "tenant_1" || approval.StoreID != "store_1" || approval.Action != "listings_create" {
+		t.Fatalf("unexpected persisted approval: %#v", approval)
+	}
+	if approval.RequestHash == "" || approval.ToolCallID != "create_call_1" || approval.SkillID != string(kernel.SkillProductImport) {
+		t.Fatalf("persisted approval missing identity/hash fields: %#v", approval)
+	}
+	for _, want := range []string{`"status":"approval_required"`, `"action":"listings_create"`, `"requestHash":`, `"id":"appr_`} {
+		if !strings.Contains(approvalMessage.Content, want) {
+			t.Fatalf("approval message missing %s: %s", want, approvalMessage.Content)
+		}
 	}
 }
 
@@ -270,6 +965,7 @@ func TestRunTurn_WithToolCalls(t *testing.T) {
 		emitter,
 		nil,
 	)
+	orch.RegisterTools([]ToolDef{{Name: "search", Description: "Search", Schema: `{}`}})
 
 	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_2", "What's trending?")
 	if err != nil {
@@ -316,6 +1012,7 @@ func TestRunTurn_EmitsRedactedToolProgress(t *testing.T) {
 		},
 	}
 	orch := newTestOrch(llm, nil)
+	orch.RegisterTools([]ToolDef{{Name: "search", Description: "Search", Schema: `{}`}})
 
 	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_progress", "Search")
 	if err != nil {
@@ -342,6 +1039,51 @@ func TestRunTurn_EmitsRedactedToolProgress(t *testing.T) {
 	}
 	if !sawExecuting || !sawDone {
 		t.Fatalf("expected executing and done tool events, got %#v", chunks)
+	}
+}
+
+func TestRunTurn_RejectsUnauthorizedToolCall(t *testing.T) {
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{
+				{ToolCalls: []stream.ToolCall{{ID: "tc_1", Name: "refund", Arguments: `{}`}}},
+			}},
+			{chunks: []stream.Chunk{{Delta: "I cannot run that tool."}}},
+		},
+	}
+	executed := false
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, c exec.ToolCall) (exec.ToolResult, error) {
+			executed = true
+			return exec.ToolResult{CallID: c.ID, Content: "ok"}, nil
+		}), 5*time.Second, 0),
+		nil,
+		&telemetry.BufferEmitter{},
+		nil,
+	)
+	orch.RegisterTools([]ToolDef{{Name: "search", Description: "Search", Schema: `{}`}})
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_unauthorized", "refund")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("stream error: %v", streamErr)
+	}
+	if executed {
+		t.Fatal("unauthorized tool should not be executed")
+	}
+	var sawRejected bool
+	for _, chunk := range chunks {
+		if chunk.ToolEvent != nil && chunk.ToolEvent.Name == "refund" && chunk.ToolEvent.Status == "error" {
+			sawRejected = true
+		}
+	}
+	if !sawRejected {
+		t.Fatalf("expected rejected tool event, got %#v", chunks)
 	}
 }
 
@@ -783,6 +1525,7 @@ func TestRunTurn_ToolCallsInHistory(t *testing.T) {
 	}
 
 	orch := newTestOrch(llm, nil)
+	orch.RegisterTools([]ToolDef{{Name: "search", Description: "Search", Schema: `{}`}})
 
 	r1, err := orch.RunTurn(context.Background(), "t1", "th_tc", "Find shoes")
 	if err != nil {
@@ -838,4 +1581,21 @@ func TestGuardrailChain(t *testing.T) {
 	if r.Passed {
 		t.Error("expected block for SQL injection attempt")
 	}
+}
+
+func toolDefNames(tools []ToolDef) []string {
+	out := make([]string, len(tools))
+	for i, tool := range tools {
+		out[i] = tool.Name
+	}
+	return out
+}
+
+func containsToolDef(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
 }

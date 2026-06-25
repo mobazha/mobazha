@@ -650,6 +650,432 @@
         ]
       }
     },
+    "/v1/agent/approvals": {
+      "get": {
+        "operationId": "agent-approvals-get",
+        "parameters": [
+          {
+            "description": "Approval status filter: pending, approved, rejected, applying, applied, apply_failed, or all.",
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "description": "Approval status filter: pending, approved, rejected, applying, applied, apply_failed, or all.",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List agent approval requests",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/approvals/{approvalId}": {
+      "get": {
+        "operationId": "agent-approval-get",
+        "parameters": [
+          {
+            "description": "Agent approval ID.",
+            "in": "path",
+            "name": "approvalId",
+            "required": true,
+            "schema": {
+              "description": "Agent approval ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get an agent approval request",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/approvals/{approvalId}/apply": {
+      "post": {
+        "operationId": "agent-approval-apply-post",
+        "parameters": [
+          {
+            "description": "Agent approval ID.",
+            "in": "path",
+            "name": "approvalId",
+            "required": true,
+            "schema": {
+              "description": "Agent approval ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Apply an approved agent approval request",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/approvals/{approvalId}/decision": {
+      "post": {
+        "operationId": "agent-approval-decision-post",
+        "parameters": [
+          {
+            "description": "Agent approval ID.",
+            "in": "path",
+            "name": "approvalId",
+            "required": true,
+            "schema": {
+              "description": "Agent approval ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Approve or reject an agent approval request",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/artifacts": {
+      "get": {
+        "operationId": "agent-artifacts-get",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "skillRunId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List agent artifacts",
+        "tags": [
+          "ai"
+        ]
+      },
+      "post": {
+        "operationId": "agent-artifacts-post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Create an agent artifact",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/artifacts/{artifactId}": {
+      "get": {
+        "operationId": "agent-artifact-get",
+        "parameters": [
+          {
+            "description": "Agent artifact ID.",
+            "in": "path",
+            "name": "artifactId",
+            "required": true,
+            "schema": {
+              "description": "Agent artifact ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get an agent artifact",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/v1/agent/chat": {
       "post": {
         "description": "Starts a seller AI assistant turn and streams server-sent events. Runtime is handled by a raw chi route so response chunks are not buffered by Huma.",
@@ -849,6 +1275,184 @@
           }
         ],
         "summary": "Get agent chat session",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/skill-runs": {
+      "get": {
+        "operationId": "agent-skill-runs-get",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "skillId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "List agent skill runs",
+        "tags": [
+          "ai"
+        ]
+      },
+      "post": {
+        "operationId": "agent-skill-runs-post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Create an agent skill run",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/skill-runs/{runId}": {
+      "get": {
+        "operationId": "agent-skill-run-get",
+        "parameters": [
+          {
+            "description": "Agent skill run ID.",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "description": "Agent skill run ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get an agent skill run",
         "tags": [
           "ai"
         ]

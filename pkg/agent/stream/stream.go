@@ -2,6 +2,7 @@ package stream
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 )
 
@@ -21,12 +22,14 @@ type ToolCall struct {
 	Arguments string `json:"arguments"`
 }
 
-// ToolEvent is a redacted progress event for UI transparency. It deliberately
-// excludes tool arguments and results.
+// ToolEvent is a redacted progress event for UI transparency. Tool arguments and
+// ordinary execution results stay out of the stream; structured approval_required
+// payloads are the intentional exception so clients can render approval UI.
 type ToolEvent struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	ID     string          `json:"id"`
+	Name   string          `json:"name"`
+	Status string          `json:"status"`
+	Result json.RawMessage `json:"result,omitempty"`
 }
 
 // Stream is a pull-based iterator over incremental chunks.

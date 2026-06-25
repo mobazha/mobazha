@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha3.0/pkg/agent/budget"
 	"github.com/mobazha/mobazha3.0/pkg/agent/exec"
+	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
+	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	"github.com/mobazha/mobazha3.0/pkg/agent/store"
 	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
 	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
@@ -35,6 +39,8 @@ type ToolDef struct {
 	Description string `json:"description"`
 	Schema      string `json:"schema"`
 }
+
+const runtimeUseSkillToolName = "use_skill_tool"
 
 // Config holds the orchestrator's tuning parameters.
 type Config struct {
@@ -182,6 +188,27 @@ type TurnResult struct {
 	TurnID string
 }
 
+// TurnOptions carries per-turn runtime context. Skills are intentionally
+// per-turn, not global orchestrator state, to avoid cross-thread leakage.
+type TurnOptions struct {
+	SkillProvider   agentskill.Provider
+	RequestedSkills []string
+	SkillFilter     agentskill.Filter
+	ToolCatalog     kernel.ToolCatalog
+	Scope           kernel.Scope
+}
+
+type resolvedTurnContext struct {
+	availableSkills []string
+	activeSkills    []*agentskill.Skill
+	grantedTools    map[string][]kernel.ToolMetadata
+	baseTools       []ToolDef
+	tools           []ToolDef
+	skillProvider   agentskill.Provider
+	toolCatalog     kernel.ToolCatalog
+	scope           kernel.Scope
+}
+
 // RunTurn executes a single conversational turn:
 //  1. Validate input via guardrails
 //  2. Load or create thread, load message history
@@ -191,6 +218,12 @@ type TurnResult struct {
 //  6. Save messages to runtime memory and durable persistence
 //  7. Stream final assistant output
 func (o *Orchestrator) RunTurn(ctx context.Context, tenantID, threadID string, userMsg string) (*TurnResult, error) {
+	return o.RunTurnWithOptions(ctx, tenantID, threadID, userMsg, TurnOptions{})
+}
+
+// RunTurnWithOptions executes a turn with per-turn dynamic context such as
+// runtime-loaded Markdown skills.
+func (o *Orchestrator) RunTurnWithOptions(ctx context.Context, tenantID, threadID string, userMsg string, opts TurnOptions) (*TurnResult, error) {
 	if len(o.inputGuardrails) > 0 {
 		result := RunInputGuardrails(ctx, o.inputGuardrails, tenantID, threadID, userMsg)
 		if !result.Passed {
@@ -202,9 +235,20 @@ func (o *Orchestrator) RunTurn(ctx context.Context, tenantID, threadID string, u
 	}
 
 	turnCtx, cancel := context.WithTimeout(ctx, o.cfg.TurnTimeout)
+	turnStarted := false
+	defer func() {
+		if !turnStarted {
+			cancel()
+		}
+	}()
 
 	turnID := newTurnID()
 	turnStartedAt := time.Now()
+
+	resolved, err := o.resolveTurnContext(turnCtx, opts)
+	if err != nil {
+		return nil, err
+	}
 
 	o.emitter.Emit(ctx, telemetry.Event{
 		Type:     telemetry.TurnStarted,
@@ -226,7 +270,10 @@ func (o *Orchestrator) RunTurn(ctx context.Context, tenantID, threadID string, u
 		return nil, err
 	}
 
-	history := o.assembleHistory(tenantID, threadID, userMsg)
+	history, err := o.assembleHistory(ctx, tenantID, threadID, userMsg, resolved)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
 		ID:        newMessageID(),
@@ -247,19 +294,21 @@ func (o *Orchestrator) RunTurn(ctx context.Context, tenantID, threadID string, u
 	go func() {
 		defer cancel()
 		defer outStream.Finish()
-		o.runLoop(turnCtx, tenantID, threadID, turnID, turnStartedAt, history, outStream)
+		o.runLoop(turnCtx, tenantID, threadID, turnID, turnStartedAt, history, &resolved, outStream)
 	}()
+	turnStarted = true
 
 	return &TurnResult{Output: outStream, TurnID: turnID}, nil
 }
 
 // assembleHistory builds the full message list for the LLM call:
 // [system prompt] + [prior messages from memory] + [current user message].
-func (o *Orchestrator) assembleHistory(tenantID, threadID, userMsg string) []Message {
+func (o *Orchestrator) assembleHistory(ctx context.Context, tenantID, threadID, userMsg string, resolved resolvedTurnContext) ([]Message, error) {
 	var msgs []Message
 
-	if o.systemPrompt != "" {
-		msgs = append(msgs, Message{Role: "system", Content: o.systemPrompt})
+	systemPrompt := o.systemPromptWithSkills(resolved)
+	if systemPrompt != "" {
+		msgs = append(msgs, Message{Role: "system", Content: systemPrompt})
 	}
 
 	priorMessages := o.mem.GetMessages(tenantID, threadID)
@@ -279,7 +328,257 @@ func (o *Orchestrator) assembleHistory(tenantID, threadID, userMsg string) []Mes
 	}
 
 	msgs = append(msgs, Message{Role: "user", Content: userMsg})
-	return msgs
+	return msgs, nil
+}
+
+func (o *Orchestrator) resolveTurnContext(ctx context.Context, opts TurnOptions) (resolvedTurnContext, error) {
+	resolved := resolvedTurnContext{
+		baseTools:     append([]ToolDef(nil), o.tools...),
+		tools:         append([]ToolDef(nil), o.tools...),
+		grantedTools:  map[string][]kernel.ToolMetadata{},
+		skillProvider: opts.SkillProvider,
+		toolCatalog:   opts.ToolCatalog,
+		scope:         opts.Scope,
+	}
+	if opts.SkillProvider == nil {
+		return resolved, nil
+	}
+	available, err := opts.SkillProvider.List(ctx, opts.SkillFilter)
+	if err != nil {
+		return resolvedTurnContext{}, err
+	}
+	sort.Strings(available)
+	resolved.availableSkills = available
+	resolved.tools = appendRuntimeSkillTool(nil)
+
+	for _, requested := range opts.RequestedSkills {
+		s, err := opts.SkillProvider.Load(ctx, requested)
+		if err != nil {
+			return resolvedTurnContext{}, err
+		}
+		if !containsSkillID(resolved.availableSkills, s.ID) {
+			return resolvedTurnContext{}, fmt.Errorf("skill %q is not available for this turn", s.ID)
+		}
+		resolved.activeSkills = append(resolved.activeSkills, s)
+	}
+	if opts.ToolCatalog == nil || len(resolved.activeSkills) == 0 {
+		if opts.ToolCatalog != nil && len(resolved.activeSkills) == 0 {
+			if err := recalculateInitialTools(ctx, &resolved); err != nil {
+				return resolvedTurnContext{}, err
+			}
+		}
+		return resolved, nil
+	}
+	if err := recalculateGrantedTools(ctx, &resolved); err != nil {
+		return resolvedTurnContext{}, err
+	}
+	return resolved, nil
+}
+
+func recalculateInitialTools(ctx context.Context, resolved *resolvedTurnContext) error {
+	if resolved == nil || resolved.toolCatalog == nil || resolved.skillProvider == nil {
+		return nil
+	}
+	catalogTools, err := resolved.toolCatalog.List(ctx, resolved.scope)
+	if err != nil {
+		return err
+	}
+	allowedNames := map[string]struct{}{}
+	for _, tool := range catalogTools {
+		if initialToolAllowed(tool) {
+			allowedNames[tool.Name] = struct{}{}
+		}
+	}
+	resolved.tools = appendRuntimeSkillTool(filterToolDefs(resolved.baseTools, allowedNames))
+	return nil
+}
+
+func initialToolAllowed(tool kernel.ToolMetadata) bool {
+	return len(tool.AllowedSkills) == 0 &&
+		len(tool.Capabilities) == 0 &&
+		tool.Risk == kernel.RiskRead &&
+		tool.Approval == kernel.ApprovalNone &&
+		tool.SideEffect == kernel.SideEffectNone
+}
+
+func recalculateGrantedTools(ctx context.Context, resolved *resolvedTurnContext) error {
+	if resolved == nil || resolved.toolCatalog == nil || len(resolved.activeSkills) == 0 {
+		return nil
+	}
+	catalogTools, err := resolved.toolCatalog.List(ctx, resolved.scope)
+	if err != nil {
+		return err
+	}
+	allowedNames := map[string]struct{}{}
+	resolved.grantedTools = map[string][]kernel.ToolMetadata{}
+	for _, s := range resolved.activeSkills {
+		if s == nil {
+			continue
+		}
+		grant := kernel.ToolGrant{
+			SkillID:      kernel.SkillID(s.ID),
+			Capabilities: skillCapabilities(s),
+			Persona:      turnPersona(resolved.scope, s),
+		}
+		granted := kernel.FilterToolsForGrant(catalogTools, grant)
+		resolved.grantedTools[s.ID] = granted
+		for _, tool := range granted {
+			allowedNames[tool.Name] = struct{}{}
+		}
+	}
+	if len(allowedNames) == 0 {
+		resolved.tools = appendRuntimeSkillTool(nil)
+		return nil
+	}
+	resolved.tools = appendRuntimeSkillTool(filterToolDefs(resolved.baseTools, allowedNames))
+	return nil
+}
+
+func (o *Orchestrator) systemPromptWithSkills(resolved resolvedTurnContext) string {
+	prompt := o.systemPrompt
+	skillPrompt := agentskill.BuildPromptContextWithOptions(agentskill.PromptContextOptions{
+		Available:    resolved.availableSkills,
+		Active:       resolved.activeSkills,
+		GrantedTools: promptToolsBySkill(resolved.grantedTools),
+	})
+	if skillPrompt == "" {
+		return prompt
+	}
+	if prompt == "" {
+		return skillPrompt
+	}
+	return prompt + "\n\n" + skillPrompt
+}
+
+func skillCapabilities(s *agentskill.Skill) []kernel.Capability {
+	if s == nil {
+		return nil
+	}
+	raw := s.Capabilities()
+	out := make([]kernel.Capability, 0, len(raw))
+	for _, item := range raw {
+		if item == "" {
+			continue
+		}
+		out = append(out, kernel.Capability(item))
+	}
+	return out
+}
+
+func turnPersona(scope kernel.Scope, s *agentskill.Skill) kernel.Persona {
+	if scope.ActingPersona != "" {
+		return scope.ActingPersona
+	}
+	if s != nil && s.Persona() != "" {
+		return kernel.Persona(s.Persona())
+	}
+	return ""
+}
+
+func filterToolDefs(tools []ToolDef, allowedNames map[string]struct{}) []ToolDef {
+	out := make([]ToolDef, 0, len(tools))
+	for _, tool := range tools {
+		if _, ok := allowedNames[tool.Name]; ok {
+			out = append(out, tool)
+		}
+	}
+	return out
+}
+
+func promptToolsBySkill(granted map[string][]kernel.ToolMetadata) map[string][]agentskill.PromptTool {
+	if len(granted) == 0 {
+		return nil
+	}
+	out := make(map[string][]agentskill.PromptTool, len(granted))
+	for skillID, tools := range granted {
+		items := make([]agentskill.PromptTool, 0, len(tools))
+		for _, tool := range tools {
+			items = append(items, agentskill.PromptTool{
+				Name:        tool.Name,
+				Description: tool.Description,
+				Risk:        string(tool.Risk),
+				Approval:    string(tool.Approval),
+			})
+		}
+		sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
+		out[skillID] = items
+	}
+	return out
+}
+
+func toolDefNameSet(tools []ToolDef) map[string]struct{} {
+	out := make(map[string]struct{}, len(tools))
+	for _, tool := range tools {
+		if tool.Name == "" {
+			continue
+		}
+		out[tool.Name] = struct{}{}
+	}
+	return out
+}
+
+func appendRuntimeSkillTool(tools []ToolDef) []ToolDef {
+	for _, tool := range tools {
+		if tool.Name == runtimeUseSkillToolName {
+			return tools
+		}
+	}
+	return append(tools, ToolDef{
+		Name:        runtimeUseSkillToolName,
+		Description: "Load one available skill for the current response. Use when the user request clearly matches a skill or explicitly asks for a skill.",
+		Schema:      `{"type":"object","properties":{"skill":{"type":"string","description":"Skill identifier, name, or path to load."}},"required":["skill"],"additionalProperties":false}`,
+	})
+}
+
+func activateRuntimeSkillTool(ctx context.Context, resolved *resolvedTurnContext, arguments string) (string, error) {
+	if resolved == nil || resolved.skillProvider == nil {
+		return "", fmt.Errorf("skill provider is not available")
+	}
+	var req struct {
+		Skill string `json:"skill"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &req); err != nil {
+		return "", fmt.Errorf("parse use_skill_tool arguments: %w", err)
+	}
+	req.Skill = strings.TrimSpace(req.Skill)
+	if req.Skill == "" {
+		return "", fmt.Errorf("skill is required")
+	}
+	s, err := resolved.skillProvider.Load(ctx, req.Skill)
+	if err != nil {
+		return "", err
+	}
+	if !containsSkillID(resolved.availableSkills, s.ID) {
+		return "", fmt.Errorf("skill is not available for this turn")
+	}
+	if !hasActiveSkill(resolved.activeSkills, s.ID) {
+		resolved.activeSkills = append(resolved.activeSkills, s)
+	}
+	if err := recalculateGrantedTools(ctx, resolved); err != nil {
+		return "", err
+	}
+	return agentskill.BuildPromptContextWithOptions(agentskill.PromptContextOptions{
+		Active:       []*agentskill.Skill{s},
+		GrantedTools: promptToolsBySkill(resolved.grantedTools),
+	}), nil
+}
+
+func hasActiveSkill(skills []*agentskill.Skill, id string) bool {
+	for _, s := range skills {
+		if s != nil && s.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSkillID(ids []string, id string) bool {
+	for _, item := range ids {
+		if item == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (o *Orchestrator) runLoop(
@@ -287,9 +586,15 @@ func (o *Orchestrator) runLoop(
 	tenantID, threadID, turnID string,
 	turnStartedAt time.Time,
 	history []Message,
+	resolved *resolvedTurnContext,
 	out *stream.Buffered,
 ) {
 	for round := 0; round < o.cfg.MaxToolRounds; round++ {
+		tools := []ToolDef(nil)
+		if resolved != nil {
+			tools = resolved.tools
+		}
+		allowedTools := toolDefNameSet(tools)
 		tokens := 0
 		for _, m := range history {
 			tokens += budget.EstimateTokens(m.Content)
@@ -310,7 +615,7 @@ func (o *Orchestrator) runLoop(
 			return
 		}
 
-		llmStream, err := o.callLLMWithRetry(ctx, history)
+		llmStream, err := o.callLLMWithRetry(ctx, history, tools)
 		if err != nil {
 			out.SendError(fmt.Errorf("LLM call failed: %w", err))
 			return
@@ -389,16 +694,157 @@ func (o *Orchestrator) runLoop(
 			return
 		}
 
-		execCalls := make([]exec.ToolCall, len(toolCalls))
+		skillRoutingBatch := hasRuntimeSkillToolCall(toolCalls)
+		execCalls := make([]exec.ToolCall, 0, len(toolCalls))
 		toolNames := make(map[string]string, len(toolCalls))
-		for i, tc := range toolCalls {
-			execCalls[i] = exec.ToolCall{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments}
+		for _, tc := range toolCalls {
+			if tc.Name == runtimeUseSkillToolName {
+				out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
+					ID:     tc.ID,
+					Name:   tc.Name,
+					Status: "executing",
+				}})
+				content, err := activateRuntimeSkillTool(ctx, resolved, tc.Arguments)
+				status := "done"
+				if err != nil {
+					status = "error"
+					content = fmt.Sprintf(`{"error":%q}`, err.Error())
+				}
+				out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
+					ID:     tc.ID,
+					Name:   tc.Name,
+					Status: status,
+				}})
+				history = append(history, Message{
+					Role:       "tool",
+					Content:    content,
+					ToolCallID: tc.ID,
+				})
+				if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
+					ID:         newMessageID(),
+					TenantID:   tenantID,
+					ThreadID:   threadID,
+					TurnID:     turnID,
+					Role:       "tool",
+					Content:    content,
+					ToolCallID: tc.ID,
+					Tokens:     budget.EstimateTokens(content),
+					Bytes:      len(content),
+					CreatedAt:  time.Now(),
+				}); err != nil {
+					out.SendError(err)
+					return
+				}
+				continue
+			}
+			if skillRoutingBatch {
+				out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
+					ID:     tc.ID,
+					Name:   tc.Name,
+					Status: "error",
+				}})
+				content := fmt.Sprintf(`{"error":%q}`, "ordinary tools must be retried after skill routing completes")
+				history = append(history, Message{
+					Role:       "tool",
+					Content:    content,
+					ToolCallID: tc.ID,
+				})
+				if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
+					ID:         newMessageID(),
+					TenantID:   tenantID,
+					ThreadID:   threadID,
+					TurnID:     turnID,
+					Role:       "tool",
+					Content:    content,
+					ToolCallID: tc.ID,
+					Tokens:     budget.EstimateTokens(content),
+					Bytes:      len(content),
+					CreatedAt:  time.Now(),
+				}); err != nil {
+					out.SendError(err)
+					return
+				}
+				continue
+			}
+			if _, ok := allowedTools[tc.Name]; !ok {
+				out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
+					ID:     tc.ID,
+					Name:   tc.Name,
+					Status: "error",
+				}})
+				content := fmt.Sprintf(`{"error":%q}`, "tool is not authorized for this turn")
+				history = append(history, Message{
+					Role:       "tool",
+					Content:    content,
+					ToolCallID: tc.ID,
+				})
+				if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
+					ID:         newMessageID(),
+					TenantID:   tenantID,
+					ThreadID:   threadID,
+					TurnID:     turnID,
+					Role:       "tool",
+					Content:    content,
+					ToolCallID: tc.ID,
+					Tokens:     budget.EstimateTokens(content),
+					Bytes:      len(content),
+					CreatedAt:  time.Now(),
+				}); err != nil {
+					out.SendError(err)
+					return
+				}
+				continue
+			}
+			if content, approval, ok, err := approvalRequiredToolResult(resolved, tenantID, threadID, turnID, tc); ok {
+				status := "approval_required"
+				if err != nil {
+					status = "error"
+					content = fmt.Sprintf(`{"error":%q}`, err.Error())
+				} else if err := o.saveApproval(ctx, approval); err != nil {
+					status = "error"
+					content = fmt.Sprintf(`{"error":%q}`, err.Error())
+				}
+				toolEvent := &stream.ToolEvent{
+					ID:     tc.ID,
+					Name:   tc.Name,
+					Status: status,
+				}
+				if status == "approval_required" {
+					toolEvent.Result = json.RawMessage(content)
+				}
+				out.Send(stream.Chunk{ToolEvent: toolEvent})
+				history = append(history, Message{
+					Role:       "tool",
+					Content:    content,
+					ToolCallID: tc.ID,
+				})
+				if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
+					ID:         newMessageID(),
+					TenantID:   tenantID,
+					ThreadID:   threadID,
+					TurnID:     turnID,
+					Role:       "tool",
+					Content:    content,
+					ToolCallID: tc.ID,
+					Tokens:     budget.EstimateTokens(content),
+					Bytes:      len(content),
+					CreatedAt:  time.Now(),
+				}); err != nil {
+					out.SendError(err)
+					return
+				}
+				continue
+			}
+			execCalls = append(execCalls, exec.ToolCall{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments})
 			toolNames[tc.ID] = tc.Name
 			out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
 				ID:     tc.ID,
 				Name:   tc.Name,
 				Status: "executing",
 			}})
+		}
+		if len(execCalls) == 0 {
+			continue
 		}
 
 		start := time.Now()
@@ -418,7 +864,7 @@ func (o *Orchestrator) runLoop(
 			ThreadID: threadID,
 			Attrs: map[string]any{
 				"mode":        "parallel",
-				"count":       len(toolCalls),
+				"count":       len(execCalls),
 				"duration_ms": duration.Milliseconds(),
 				"error_count": errCount,
 			},
@@ -469,8 +915,115 @@ func (o *Orchestrator) runLoop(
 	out.SendError(fmt.Errorf("exceeded max tool rounds (%d)", o.cfg.MaxToolRounds))
 }
 
+func approvalRequiredToolResult(resolved *resolvedTurnContext, tenantID, threadID, turnID string, call stream.ToolCall) (string, *store.Approval, bool, error) {
+	tool, skillID, ok := grantedToolMetadata(resolved, call.Name)
+	if !ok || tool.Approval != kernel.ApprovalExplicit {
+		return "", nil, false, nil
+	}
+	payload := toolCallPayload(call.Arguments)
+	createdAt := time.Now()
+	req := kernel.ApprovalRequest{
+		ID:             newApprovalID(),
+		SkillID:        kernel.SkillID(skillID),
+		Scope:          resolved.scope,
+		Risk:           tool.Risk,
+		Action:         call.Name,
+		Summary:        fmt.Sprintf("Approval required to run %s", call.Name),
+		Payload:        payload,
+		IdempotencyKey: fmt.Sprintf("%s:%s:%s", threadID, turnID, call.ID),
+		CreatedAt:      createdAt,
+	}
+	hash, err := kernel.ComputeApprovalHash(req)
+	if err != nil {
+		return "", nil, true, fmt.Errorf("compute approval hash: %w", err)
+	}
+	req.RequestHash = hash
+	approval := &store.Approval{
+		ID:             req.ID,
+		TenantID:       tenantID,
+		ThreadID:       threadID,
+		TurnID:         turnID,
+		ToolCallID:     call.ID,
+		SkillID:        string(req.SkillID),
+		StoreID:        req.Scope.StoreID,
+		ActorID:        req.Scope.ActorID,
+		ActingPersona:  string(req.Scope.ActingPersona),
+		Risk:           string(req.Risk),
+		Action:         req.Action,
+		Summary:        req.Summary,
+		Payload:        string(payload),
+		RequestHash:    req.RequestHash,
+		IdempotencyKey: req.IdempotencyKey,
+		Status:         store.ApprovalStatusPending,
+		CreatedAt:      createdAt,
+		UpdatedAt:      createdAt,
+	}
+	data, err := json.Marshal(struct {
+		Status   string                 `json:"status"`
+		Message  string                 `json:"message"`
+		Approval kernel.ApprovalRequest `json:"approval"`
+	}{
+		Status:   "approval_required",
+		Message:  "This tool requires explicit approval before execution.",
+		Approval: req,
+	})
+	if err != nil {
+		return "", nil, true, fmt.Errorf("marshal approval request: %w", err)
+	}
+	return string(data), approval, true, nil
+}
+
+func grantedToolMetadata(resolved *resolvedTurnContext, toolName string) (kernel.ToolMetadata, string, bool) {
+	if resolved == nil {
+		return kernel.ToolMetadata{}, "", false
+	}
+	var fallback kernel.ToolMetadata
+	var fallbackSkill string
+	var found bool
+	for skillID, tools := range resolved.grantedTools {
+		for _, tool := range tools {
+			if tool.Name != toolName {
+				continue
+			}
+			if tool.Approval == kernel.ApprovalExplicit {
+				return tool, skillID, true
+			}
+			if !found {
+				fallback = tool
+				fallbackSkill = skillID
+				found = true
+			}
+		}
+	}
+	return fallback, fallbackSkill, found
+}
+
+func toolCallPayload(arguments string) json.RawMessage {
+	args := strings.TrimSpace(arguments)
+	if args == "" {
+		return json.RawMessage(`{}`)
+	}
+	if json.Valid([]byte(args)) {
+		return json.RawMessage(args)
+	}
+	data, err := json.Marshal(map[string]string{"arguments": arguments})
+	if err != nil {
+		return json.RawMessage(`{}`)
+	}
+	return json.RawMessage(data)
+}
+
+func hasRuntimeSkillToolCall(toolCalls []stream.ToolCall) bool {
+	for _, tc := range toolCalls {
+		if tc.Name == runtimeUseSkillToolName {
+			return true
+		}
+	}
+	return false
+}
+
 // callLLMWithRetry wraps the LLM call with simple retry logic for transient errors.
-func (o *Orchestrator) callLLMWithRetry(ctx context.Context, history []Message) (stream.Stream, error) {
+func (o *Orchestrator) callLLMWithRetry(ctx context.Context, history []Message, tools []ToolDef) (stream.Stream, error) {
 	var lastErr error
 	for attempt := 0; attempt <= o.cfg.LLMRetries; attempt++ {
 		if attempt > 0 {
@@ -485,7 +1038,7 @@ func (o *Orchestrator) callLLMWithRetry(ctx context.Context, history []Message) 
 				return nil, ctx.Err()
 			}
 		}
-		s, err := o.llm.ChatStream(ctx, history, o.tools)
+		s, err := o.llm.ChatStream(ctx, history, tools)
 		if err == nil {
 			return s, nil
 		}
@@ -517,12 +1070,26 @@ func (o *Orchestrator) saveMessage(ctx context.Context, tenantID, threadID strin
 	return nil
 }
 
+func (o *Orchestrator) saveApproval(ctx context.Context, approval *store.Approval) error {
+	if approval == nil || o.persist == nil {
+		return nil
+	}
+	if err := o.persist.SaveApproval(ctx, approval); err != nil {
+		return fmt.Errorf("agent runtime: save approval: %w", err)
+	}
+	return nil
+}
+
 func newTurnID() string {
 	return "turn_" + uuid.NewString()
 }
 
 func newMessageID() string {
 	return "msg_" + uuid.NewString()
+}
+
+func newApprovalID() string {
+	return "appr_" + uuid.NewString()
 }
 
 // saveAssistantMessage persists the assistant's response to runtime memory and durable store.

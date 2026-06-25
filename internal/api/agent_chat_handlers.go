@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +19,9 @@ import (
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/pkg/agent/budget"
 	agentexec "github.com/mobazha/mobazha3.0/pkg/agent/exec"
+	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
 	agentruntime "github.com/mobazha/mobazha3.0/pkg/agent/runtime"
+	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 	agentstream "github.com/mobazha/mobazha3.0/pkg/agent/stream"
 	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
@@ -145,7 +148,13 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		baseURL:   getLocalAPIURL(r),
 		authToken: getAuthToken(r),
 	})
-	result, err := orch.RunTurn(turnCtx, tenantID, threadID, req.Message)
+	turnOptions, err := agentChatTurnOptions(turnCtx, req, tenantID, nodeID, p.ProfileName())
+	if err != nil {
+		aiLog.Warningf("Agent chat skill routing failed: %v", err)
+		emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeError, Error: agentChatRouteErrorMessage(err)})
+		return
+	}
+	result, err := orch.RunTurnWithOptions(turnCtx, tenantID, threadID, req.Message, turnOptions)
 	if err != nil {
 		aiLog.Warningf("Agent chat turn failed before streaming: %v", err)
 		emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeError, Error: "AI assistant failed to start the request"})
@@ -174,6 +183,12 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 			}
 			if chunk.ToolEvent.Status == "error" {
 				event.Error = "tool execution failed"
+			}
+			if len(chunk.ToolEvent.Result) > 0 {
+				var result any
+				if err := json.Unmarshal(chunk.ToolEvent.Result, &result); err == nil {
+					event.Result = result
+				}
 			}
 			emitSSE(event)
 		}
@@ -217,6 +232,82 @@ func updateAgentChatThreadMetadata(ctx context.Context, persist agentstore.Persi
 	}
 	thread.LastActive = time.Now()
 	return persist.SaveThread(ctx, thread)
+}
+
+func agentChatTurnOptions(ctx context.Context, req aipkg.ChatRequest, tenantID, actorID, storeID string) (agentruntime.TurnOptions, error) {
+	skillProvider, err := agentChatSkillProvider(ctx)
+	if err != nil {
+		return agentruntime.TurnOptions{}, err
+	}
+	skillFilter := agentskill.Filter{Persona: string(kernel.PersonaSeller)}
+	requestedSkills, err := requestedAgentSkills(ctx, skillProvider, req, skillFilter)
+	if err != nil {
+		return agentruntime.TurnOptions{}, err
+	}
+	return agentruntime.TurnOptions{
+		SkillProvider:   skillProvider,
+		RequestedSkills: requestedSkills,
+		SkillFilter:     skillFilter,
+		ToolCatalog:     kernel.NewStaticToolCatalog(aipkg.SellerToolMetadata()),
+		Scope: kernel.Scope{
+			TenantID:      tenantID,
+			StoreID:       storeID,
+			ActorID:       actorID,
+			ActorRoles:    []kernel.Persona{kernel.PersonaSeller},
+			ActingPersona: kernel.PersonaSeller,
+		},
+	}, nil
+}
+
+func agentChatRouteErrorMessage(err error) string {
+	if err == nil {
+		return "AI assistant failed to route the request"
+	}
+	if strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
+		return "AI assistant requires private skill configuration (MOBAZHA_AGENT_SKILLS_DIR)"
+	}
+	return "AI assistant failed to route the request"
+}
+
+func agentChatSkillProvider(ctx context.Context) (agentskill.Provider, error) {
+	dir := strings.TrimSpace(os.Getenv("MOBAZHA_AGENT_SKILLS_DIR"))
+	if dir == "" {
+		return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR is required for agent chat")
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR is not accessible: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR must point to a directory")
+	}
+	provider := agentskill.NewFilesystemProvider(dir)
+	ids, err := provider.List(ctx, agentskill.Filter{Persona: string(kernel.PersonaSeller)})
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR has no seller skills")
+	}
+	return provider, nil
+}
+
+func requestedAgentSkills(ctx context.Context, provider agentskill.Provider, req aipkg.ChatRequest, filter agentskill.Filter) ([]string, error) {
+	if provider == nil {
+		return nil, nil
+	}
+	text := req.Message
+	if req.Context != nil {
+		text += "\n" + req.Context.CurrentPage
+	}
+	decision, err := agentskill.NewSkillRouter(provider).Route(ctx, agentskill.RouteInput{
+		Text:   text,
+		Filter: filter,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return decision.RequestedSkills, nil
 }
 
 func getAgentChatOrchestrator(cacheKey string, cfg aipkg.Config, systemPrompt string, proxy *aipkg.Proxy, persist agentstore.Persistence) *agentruntime.Orchestrator {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -24,7 +25,37 @@ type Skill struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty"`
 	Content     string            `json:"content"`
+	Location    string            `json:"location,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+// Persona returns the acting persona declared by the skill manifest.
+func (s Skill) Persona() string {
+	return strings.TrimSpace(s.Metadata["persona"])
+}
+
+// Capabilities returns the abstract business capabilities requested by this
+// skill. They are requirements, not authorization grants.
+func (s Skill) Capabilities() []string {
+	return splitMetadataList(s.Metadata["capabilities"])
+}
+
+// ToolHints returns optional concrete tool hints for planning. Runtime policy
+// must still authorize tools through the ToolCatalog before exposing them.
+func (s Skill) ToolHints() []string {
+	return splitMetadataList(s.Metadata["tool_hints"])
+}
+
+// Examples returns representative user requests that should activate this
+// skill. Routers use examples as routing hints, not as security policy.
+func (s Skill) Examples() []string {
+	return splitMetadataList(s.Metadata["examples"])
+}
+
+// Modalities returns optional input modalities supported by this skill, such as
+// text, csv, spreadsheet, image, or pdf.
+func (s Skill) Modalities() []string {
+	return splitMetadataList(s.Metadata["modalities"])
 }
 
 // Filter constrains which skills to list.
@@ -45,8 +76,17 @@ var (
 	ErrDecryptFailed = errors.New("agent: skill decryption failed")
 )
 
-// FilesystemProvider loads Tier-0 plain text skills from a directory.
-// Each skill is a subdirectory containing a SKILL.md file.
+// LoadDefinitionFromString parses a Markdown skill definition. It is useful for
+// embedded public reference skills and private providers that fetch Markdown
+// from SaaS storage before handing it to the kernel.
+func LoadDefinitionFromString(content, location string) (*Skill, error) {
+	skill := parseMarkdownSkill(content, location)
+	return &skill, nil
+}
+
+// FilesystemProvider loads Tier-0 plain text skills from Markdown files.
+// It supports both WAE-style recursive skill.md files and Mobazha/Codex-style
+// <skill-id>/SKILL.md directories.
 type FilesystemProvider struct {
 	rootDir string
 }
@@ -57,52 +97,218 @@ func NewFilesystemProvider(rootDir string) *FilesystemProvider {
 }
 
 func (p *FilesystemProvider) Load(_ context.Context, skillID string) (*Skill, error) {
-	cleanID := filepath.Clean(skillID)
-	if strings.Contains(cleanID, "..") {
+	requested := strings.TrimSpace(skillID)
+	if requested == "" || strings.Contains(filepath.Clean(requested), "..") {
 		return nil, ErrSkillNotFound
 	}
-
-	skillPath := filepath.Join(p.rootDir, cleanID, "SKILL.md")
-	data, err := os.ReadFile(skillPath)
+	skills, err := p.discover()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, ErrSkillNotFound
-		}
 		return nil, err
 	}
-
-	return &Skill{
-		ID:      cleanID,
-		Tier:    Tier0PlainText,
-		Name:    cleanID,
-		Content: string(data),
-	}, nil
+	for i := range skills {
+		if matches(requested, skills[i]) {
+			cp := skills[i]
+			return &cp, nil
+		}
+	}
+	return nil, ErrSkillNotFound
 }
 
 func (p *FilesystemProvider) List(_ context.Context, filter Filter) ([]string, error) {
 	if filter.Tier != nil && *filter.Tier != Tier0PlainText {
 		return nil, nil
 	}
-
-	entries, err := os.ReadDir(p.rootDir)
+	skills, err := p.discover()
 	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(skills))
+	for _, s := range skills {
+		if filter.Persona != "" && s.Metadata["persona"] != filter.Persona {
+			continue
+		}
+		ids = append(ids, s.ID)
+	}
+	sort.Strings(ids)
+	return ids, nil
+}
+
+func (p *FilesystemProvider) discover() ([]Skill, error) {
+	var skills []Skill
+	if p == nil || p.rootDir == "" {
+		return skills, nil
+	}
+	if _, err := os.Stat(p.rootDir); err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return skills, nil
 		}
 		return nil, err
 	}
-
-	var ids []string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
+	err := filepath.WalkDir(p.rootDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		skillFile := filepath.Join(p.rootDir, entry.Name(), "SKILL.md")
-		if _, err := os.Stat(skillFile); err == nil {
-			ids = append(ids, entry.Name())
+		if entry.IsDir() {
+			return nil
+		}
+		if !isSkillFile(entry.Name()) {
+			return nil
+		}
+		skill, err := loadMarkdownSkill(p.rootDir, path)
+		if err != nil {
+			return err
+		}
+		skills = append(skills, skill)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(skills, func(i, j int) bool { return skills[i].ID < skills[j].ID })
+	return skills, nil
+}
+
+func isSkillFile(name string) bool {
+	return strings.EqualFold(name, "skill.md")
+}
+
+func loadMarkdownSkill(rootDir, path string) (Skill, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Skill{}, err
+	}
+	rel, err := filepath.Rel(rootDir, path)
+	if err != nil {
+		rel = path
+	}
+	return parseMarkdownSkill(string(data), filepath.ToSlash(rel)), nil
+}
+
+func parseMarkdownSkill(content, location string) Skill {
+	id := skillIDFromPath(location)
+	name := id
+	description := ""
+	metadata := map[string]string{}
+
+	if fm, body, ok := splitFrontMatter(content); ok {
+		content = strings.TrimSpace(body)
+		for key, value := range fm {
+			switch key {
+			case "name":
+				if value != "" {
+					name = value
+					id = value
+				}
+			case "description":
+				description = value
+			default:
+				metadata[key] = value
+			}
 		}
 	}
-	return ids, nil
+	return Skill{
+		ID:          id,
+		Tier:        Tier0PlainText,
+		Name:        name,
+		Description: description,
+		Content:     content,
+		Location:    filepath.ToSlash(location),
+		Metadata:    metadata,
+	}
+}
+
+func splitFrontMatter(content string) (map[string]string, string, bool) {
+	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
+	if len(lines) < 3 || strings.TrimSpace(lines[0]) != "---" {
+		return nil, content, false
+	}
+	end := -1
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "---" {
+			end = i
+			break
+		}
+	}
+	if end < 0 {
+		return nil, content, false
+	}
+	fm := map[string]string{}
+	currentListKey := ""
+	for i := 1; i < end; i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if currentListKey != "" && strings.HasPrefix(line, "- ") {
+			item := strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "- ")), `"'`)
+			if item != "" {
+				if fm[currentListKey] != "" {
+					fm[currentListKey] += "\n"
+				}
+				fm[currentListKey] += item
+			}
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			currentListKey = ""
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+		if key != "" {
+			fm[key] = value
+			if value == "" {
+				currentListKey = key
+			} else {
+				currentListKey = ""
+			}
+		}
+	}
+	return fm, strings.Join(lines[end+1:], "\n"), true
+}
+
+func skillIDFromPath(rel string) string {
+	rel = filepath.ToSlash(rel)
+	dir := filepath.Dir(rel)
+	if dir == "." || dir == "" {
+		return strings.TrimSuffix(filepath.Base(rel), filepath.Ext(rel))
+	}
+	return filepath.Base(dir)
+}
+
+func matches(requested string, s Skill) bool {
+	req := normalize(requested)
+	return req == normalize(s.ID) ||
+		req == normalize(s.Name) ||
+		req == normalize(s.Location) ||
+		req == normalize(skillIDFromPath(s.Location))
+}
+
+func normalize(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	value = strings.ReplaceAll(value, "\\", "/")
+	return value
+}
+
+func splitMetadataList(value string) []string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\t'
+	})
+	out := make([]string, 0, len(fields))
+	seen := map[string]struct{}{}
+	for _, field := range fields {
+		item := strings.Trim(strings.TrimSpace(field), `"'`)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
 }
 
 // EncryptedProvider is a placeholder for Tier-1 envelope encryption.

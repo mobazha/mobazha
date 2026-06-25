@@ -3,6 +3,8 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,8 +14,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -63,6 +67,16 @@ func getAuthToken(r *http.Request) string {
 
 // activeAIStreams enforces max 1 concurrent AI chat stream per tenant.
 var activeAIStreams sync.Map
+
+var (
+	errAgentApprovalApplyState = errors.New("agent approval is not approved for apply")
+	errAgentApprovalHash       = errors.New("agent approval request hash mismatch")
+	errAgentApprovalApplying   = errors.New("agent approval is already applying")
+)
+
+var executeAgentApprovalTool = func(ctx context.Context, baseURL, authToken, action, payload string) (string, error) {
+	return aipkg.NewToolExecutor(baseURL, authToken).Execute(ctx, action, payload)
+}
 
 // catalogCache stores formatted product catalog text per provider with a short TTL
 // to avoid reading the full ListingIndex from DB on every chat message.
@@ -180,6 +194,502 @@ func (g *Gateway) handleDELETEAgentChatSession(w http.ResponseWriter, r *http.Re
 	}
 	forgetAgentChatThread(tenantID+":"+p.ProfileName(), tenantID, sessionID)
 	responsePkg.NoContent(w)
+}
+
+type agentSkillRunCreateRequest struct {
+	SkillID  string          `json:"skillId"`
+	ThreadID string          `json:"threadId,omitempty"`
+	TurnID   string          `json:"turnId,omitempty"`
+	StoreID  string          `json:"storeId,omitempty"`
+	Status   string          `json:"status,omitempty"`
+	Input    json.RawMessage `json:"input,omitempty"`
+}
+
+// handlePOSTAgentSkillRun handles POST /v1/agent/skill-runs.
+func (g *Gateway) handlePOSTAgentSkillRun(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	var req agentSkillRunCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid skill run body")
+		return
+	}
+	req.SkillID = strings.TrimSpace(req.SkillID)
+	if req.SkillID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "skillId is required")
+		return
+	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = agentstore.SkillRunStatusCreated
+	}
+	tenantID := agentChatTenantID(r, p)
+	storeID := strings.TrimSpace(req.StoreID)
+	if storeID == "" {
+		storeID = p.ProfileName()
+	}
+	run := &agentstore.SkillRun{
+		ID:            newAgentSkillRunID(),
+		TenantID:      tenantID,
+		ThreadID:      strings.TrimSpace(req.ThreadID),
+		TurnID:        strings.TrimSpace(req.TurnID),
+		SkillID:       req.SkillID,
+		StoreID:       storeID,
+		ActorID:       agentApprovalDecisionActor(r, p),
+		ActingPersona: string(kernel.PersonaSeller),
+		Status:        status,
+		Input:         string(validRawJSONOrObject(req.Input)),
+		StartedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	if err := p.AgentStore().SaveSkillRun(r.Context(), run); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save skill run")
+		return
+	}
+	responsePkg.Success(w, run)
+}
+
+// handleGETAgentSkillRuns handles GET /v1/agent/skill-runs.
+func (g *Gateway) handleGETAgentSkillRuns(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	tenantID := agentChatTenantID(r, p)
+	runs, err := p.AgentStore().ListSkillRuns(
+		r.Context(),
+		tenantID,
+		strings.TrimSpace(r.URL.Query().Get("skillId")),
+		strings.TrimSpace(r.URL.Query().Get("status")),
+		limit,
+		offset,
+	)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to list skill runs")
+		return
+	}
+	responsePkg.Success(w, runs)
+}
+
+// handleGETAgentSkillRun handles GET /v1/agent/skill-runs/{runId}.
+func (g *Gateway) handleGETAgentSkillRun(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	runID := chi.URLParam(r, "runId")
+	tenantID := agentChatTenantID(r, p)
+	run, err := p.AgentStore().LoadSkillRun(r.Context(), tenantID, runID)
+	if errors.Is(err, agentstore.ErrSkillRunNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "skill run not found")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load skill run")
+		return
+	}
+	responsePkg.Success(w, run)
+}
+
+type agentArtifactCreateRequest struct {
+	ThreadID    string          `json:"threadId,omitempty"`
+	TurnID      string          `json:"turnId,omitempty"`
+	SkillRunID  string          `json:"skillRunId,omitempty"`
+	SkillID     string          `json:"skillId,omitempty"`
+	Kind        string          `json:"kind"`
+	Status      string          `json:"status,omitempty"`
+	Name        string          `json:"name,omitempty"`
+	ContentType string          `json:"contentType,omitempty"`
+	SourceURI   string          `json:"sourceUri,omitempty"`
+	SourceName  string          `json:"sourceName,omitempty"`
+	SourceHash  string          `json:"sourceHash,omitempty"`
+	Summary     string          `json:"summary,omitempty"`
+	Data        json.RawMessage `json:"data,omitempty"`
+}
+
+// handlePOSTAgentArtifact handles POST /v1/agent/artifacts.
+func (g *Gateway) handlePOSTAgentArtifact(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	var req agentArtifactCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid artifact body")
+		return
+	}
+	req.Kind = strings.TrimSpace(req.Kind)
+	if req.Kind == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "kind is required")
+		return
+	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = agentstore.ArtifactStatusNew
+	}
+	tenantID := agentChatTenantID(r, p)
+	threadID := strings.TrimSpace(req.ThreadID)
+	skillID := strings.TrimSpace(req.SkillID)
+	if runID := strings.TrimSpace(req.SkillRunID); runID != "" {
+		run, err := p.AgentStore().LoadSkillRun(r.Context(), tenantID, runID)
+		if errors.Is(err, agentstore.ErrSkillRunNotFound) {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "skill run not found")
+			return
+		}
+		if err != nil {
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load skill run")
+			return
+		}
+		if threadID == "" {
+			threadID = run.ThreadID
+		}
+		if skillID == "" {
+			skillID = run.SkillID
+		}
+	}
+	now := time.Now()
+	artifact := &agentstore.Artifact{
+		ID:          newAgentArtifactID(),
+		TenantID:    tenantID,
+		ThreadID:    threadID,
+		TurnID:      strings.TrimSpace(req.TurnID),
+		SkillRunID:  strings.TrimSpace(req.SkillRunID),
+		SkillID:     skillID,
+		Kind:        req.Kind,
+		Status:      status,
+		Name:        strings.TrimSpace(req.Name),
+		ContentType: strings.TrimSpace(req.ContentType),
+		SourceURI:   strings.TrimSpace(req.SourceURI),
+		SourceName:  strings.TrimSpace(req.SourceName),
+		SourceHash:  strings.TrimSpace(req.SourceHash),
+		Summary:     strings.TrimSpace(req.Summary),
+		Data:        string(validRawJSONOrObject(req.Data)),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := p.AgentStore().SaveArtifact(r.Context(), artifact); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save artifact")
+		return
+	}
+	responsePkg.Success(w, artifact)
+}
+
+// handleGETAgentArtifacts handles GET /v1/agent/artifacts.
+func (g *Gateway) handleGETAgentArtifacts(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	tenantID := agentChatTenantID(r, p)
+	artifacts, err := p.AgentStore().ListArtifacts(
+		r.Context(),
+		tenantID,
+		strings.TrimSpace(r.URL.Query().Get("skillRunId")),
+		strings.TrimSpace(r.URL.Query().Get("kind")),
+		strings.TrimSpace(r.URL.Query().Get("status")),
+		limit,
+		offset,
+	)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to list artifacts")
+		return
+	}
+	responsePkg.Success(w, artifacts)
+}
+
+// handleGETAgentArtifact handles GET /v1/agent/artifacts/{artifactId}.
+func (g *Gateway) handleGETAgentArtifact(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	artifactID := chi.URLParam(r, "artifactId")
+	tenantID := agentChatTenantID(r, p)
+	artifact, err := p.AgentStore().LoadArtifact(r.Context(), tenantID, artifactID)
+	if errors.Is(err, agentstore.ErrArtifactNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "artifact not found")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load artifact")
+		return
+	}
+	responsePkg.Success(w, artifact)
+}
+
+// handleGETAgentApprovals handles GET /v1/agent/approvals.
+func (g *Gateway) handleGETAgentApprovals(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	status, ok := normalizeApprovalStatusQuery(r.URL.Query().Get("status"))
+	if !ok {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid approval status")
+		return
+	}
+
+	tenantID := agentChatTenantID(r, p)
+	approvals, err := p.AgentStore().ListApprovals(r.Context(), tenantID, status, limit, offset)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to list approvals")
+		return
+	}
+	responsePkg.Success(w, agentstore.SanitizeApprovalsForAPI(approvals))
+}
+
+// handleGETAgentApproval handles GET /v1/agent/approvals/{approvalId}.
+func (g *Gateway) handleGETAgentApproval(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+
+	approvalID := chi.URLParam(r, "approvalId")
+	tenantID := agentChatTenantID(r, p)
+	approval, err := p.AgentStore().LoadApproval(r.Context(), tenantID, approvalID)
+	if errors.Is(err, agentstore.ErrApprovalNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "approval not found")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load approval")
+		return
+	}
+	responsePkg.Success(w, agentstore.SanitizeApprovalForAPI(approval))
+}
+
+type agentApprovalDecisionRequest struct {
+	Decision string `json:"decision"`
+	Status   string `json:"status,omitempty"`
+}
+
+// handlePOSTAgentApprovalDecision handles POST /v1/agent/approvals/{approvalId}/decision.
+func (g *Gateway) handlePOSTAgentApprovalDecision(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+
+	var req agentApprovalDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid approval decision body")
+		return
+	}
+	status := strings.TrimSpace(req.Decision)
+	if status == "" {
+		status = strings.TrimSpace(req.Status)
+	}
+	if status != agentstore.ApprovalStatusApproved && status != agentstore.ApprovalStatusRejected {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "approval decision must be approved or rejected")
+		return
+	}
+
+	approvalID := chi.URLParam(r, "approvalId")
+	tenantID := agentChatTenantID(r, p)
+	approval, err := p.AgentStore().UpdateApprovalStatus(r.Context(), tenantID, approvalID, status, agentApprovalDecisionActor(r, p))
+	if errors.Is(err, agentstore.ErrApprovalNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "approval not found")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to update approval")
+		return
+	}
+	responsePkg.Success(w, agentstore.SanitizeApprovalForAPI(approval))
+}
+
+// handlePOSTAgentApprovalApply handles POST /v1/agent/approvals/{approvalId}/apply.
+func (g *Gateway) handlePOSTAgentApprovalApply(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+
+	approvalID := chi.URLParam(r, "approvalId")
+	tenantID := agentChatTenantID(r, p)
+	approval, err := applyAgentApproval(r.Context(), p.AgentStore(), tenantID, approvalID, agentApprovalDecisionActor(r, p), getLocalAPIURL(r), getAuthToken(r))
+	if errors.Is(err, agentstore.ErrApprovalNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "approval not found")
+		return
+	}
+	if errors.Is(err, errAgentApprovalApplyState) || errors.Is(err, errAgentApprovalHash) || errors.Is(err, errAgentApprovalApplying) {
+		responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadGateway, responsePkg.CodeInternalError, "failed to apply approval")
+		return
+	}
+	responsePkg.Success(w, agentstore.SanitizeApprovalForAPI(approval))
+}
+
+func applyAgentApproval(ctx context.Context, persist agentstore.Persistence, tenantID, approvalID, actorID, baseURL, authToken string) (*agentstore.Approval, error) {
+	if persist == nil {
+		return nil, agentstore.ErrApprovalNotFound
+	}
+	approval, err := persist.LoadApproval(ctx, tenantID, approvalID)
+	if err != nil {
+		return nil, err
+	}
+	if approval.Status == agentstore.ApprovalStatusApplied {
+		return approval, nil
+	}
+	if approval.Status == agentstore.ApprovalStatusApplying {
+		return nil, errAgentApprovalApplying
+	}
+	if approval.Status != agentstore.ApprovalStatusApproved && approval.Status != agentstore.ApprovalStatusApplyFailed {
+		return nil, errAgentApprovalApplyState
+	}
+	if err := verifyAgentApprovalHash(approval); err != nil {
+		return nil, err
+	}
+
+	claimed, err := persist.ClaimApprovalForApply(ctx, tenantID, approvalID, actorID)
+	if errors.Is(err, agentstore.ErrApprovalClaimConflict) {
+		latest, loadErr := persist.LoadApproval(ctx, tenantID, approvalID)
+		if loadErr != nil {
+			return nil, loadErr
+		}
+		switch latest.Status {
+		case agentstore.ApprovalStatusApplied:
+			return latest, nil
+		case agentstore.ApprovalStatusApplying:
+			return nil, errAgentApprovalApplying
+		default:
+			return nil, errAgentApprovalApplyState
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if claimed.Status == agentstore.ApprovalStatusApplied {
+		return claimed, nil
+	}
+	if claimed.Status != agentstore.ApprovalStatusApplying {
+		return nil, errAgentApprovalApplyState
+	}
+
+	result, execErr := executeAgentApprovalTool(ctx, baseURL, authToken, claimed.Action, claimed.Payload)
+	if execErr != nil {
+		failed, markErr := persist.MarkApprovalApplyFailed(ctx, tenantID, approvalID, execErr.Error(), actorID)
+		if markErr != nil {
+			return nil, fmt.Errorf("mark approval apply failed: %w", markErr)
+		}
+		return failed, execErr
+	}
+	return persist.MarkApprovalApplied(ctx, tenantID, approvalID, result, actorID)
+}
+
+func verifyAgentApprovalHash(approval *agentstore.Approval) error {
+	req, err := approvalHashRequest(approval)
+	if err != nil {
+		return err
+	}
+	hash, err := kernel.ComputeApprovalHash(req)
+	if err != nil {
+		return err
+	}
+	if approval.RequestHash == "" || hash != approval.RequestHash {
+		return errAgentApprovalHash
+	}
+	return nil
+}
+
+func approvalHashRequest(approval *agentstore.Approval) (kernel.ApprovalRequest, error) {
+	if approval == nil {
+		return kernel.ApprovalRequest{}, agentstore.ErrApprovalNotFound
+	}
+	payload := strings.TrimSpace(approval.Payload)
+	if payload == "" {
+		payload = "{}"
+	}
+	if !json.Valid([]byte(payload)) {
+		return kernel.ApprovalRequest{}, fmt.Errorf("invalid approval payload")
+	}
+	return kernel.ApprovalRequest{
+		ID:      approval.ID,
+		SkillID: kernel.SkillID(approval.SkillID),
+		Scope: kernel.Scope{
+			TenantID:      approval.TenantID,
+			StoreID:       approval.StoreID,
+			ActorID:       approval.ActorID,
+			ActingPersona: kernel.Persona(approval.ActingPersona),
+		},
+		Risk:           kernel.Risk(approval.Risk),
+		Action:         approval.Action,
+		Summary:        approval.Summary,
+		Payload:        json.RawMessage(payload),
+		RequestHash:    approval.RequestHash,
+		IdempotencyKey: approval.IdempotencyKey,
+		CreatedAt:      approval.CreatedAt,
+	}, nil
+}
+
+func normalizeApprovalStatusQuery(status string) (string, bool) {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return agentstore.ApprovalStatusPending, true
+	}
+	switch status {
+	case "all":
+		return "", true
+	case agentstore.ApprovalStatusPending,
+		agentstore.ApprovalStatusApproved,
+		agentstore.ApprovalStatusRejected,
+		agentstore.ApprovalStatusApplying,
+		agentstore.ApprovalStatusApplied,
+		agentstore.ApprovalStatusApplyFailed:
+		return status, true
+	default:
+		return "", false
+	}
+}
+
+func agentApprovalDecisionActor(r *http.Request, p aiChatProvider) string {
+	nodeID := getIdentityService(r).GetNodeID()
+	if nodeID != "" {
+		return nodeID
+	}
+	return p.ProfileName()
+}
+
+func validRawJSONOrObject(raw json.RawMessage) json.RawMessage {
+	raw = json.RawMessage(strings.TrimSpace(string(raw)))
+	if len(raw) == 0 {
+		return json.RawMessage(`{}`)
+	}
+	if json.Valid(raw) {
+		return raw
+	}
+	return json.RawMessage(`{}`)
+}
+
+func newAgentSkillRunID() string {
+	return "skillrun_" + uuid.NewString()
+}
+
+func newAgentArtifactID() string {
+	return "art_" + uuid.NewString()
 }
 
 func agentChatTenantID(r *http.Request, p aiChatProvider) string {

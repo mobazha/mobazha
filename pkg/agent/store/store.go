@@ -15,7 +15,59 @@ import (
 
 // Common errors.
 var (
-	ErrThreadNotFound = errors.New("agent: thread not found")
+	ErrThreadNotFound        = errors.New("agent: thread not found")
+	ErrApprovalNotFound      = errors.New("agent: approval not found")
+	ErrApprovalClaimConflict = errors.New("agent: approval apply claim conflict")
+	ErrSkillRunNotFound      = errors.New("agent: skill run not found")
+	ErrArtifactNotFound      = errors.New("agent: artifact not found")
+)
+
+const (
+	// SkillRunStatusCreated means the skill run has been created but not started.
+	SkillRunStatusCreated = "created"
+	// SkillRunStatusRunning means the skill run is actively producing artifacts.
+	SkillRunStatusRunning = "running"
+	// SkillRunStatusWaitingForReview means the skill run is waiting for user review.
+	SkillRunStatusWaitingForReview = "waiting_for_review"
+	// SkillRunStatusWaitingForApproval means the skill run is waiting for approval.
+	SkillRunStatusWaitingForApproval = "waiting_for_approval"
+	// SkillRunStatusCompleted means the skill run completed successfully.
+	SkillRunStatusCompleted = "completed"
+	// SkillRunStatusFailed means the skill run failed.
+	SkillRunStatusFailed = "failed"
+
+	// ArtifactKindSourceMaterial stores uploaded or pasted source material metadata.
+	ArtifactKindSourceMaterial = "source_material"
+	// ArtifactKindProductCandidate stores extracted product candidates.
+	ArtifactKindProductCandidate = "product_candidate"
+	// ArtifactKindProductDraft stores reviewable product drafts.
+	ArtifactKindProductDraft = "product_draft"
+	// ArtifactKindValidationReport stores validation results.
+	ArtifactKindValidationReport = "validation_report"
+
+	// ArtifactStatusNew means the artifact has just been created.
+	ArtifactStatusNew = "new"
+	// ArtifactStatusNeedsReview means the artifact needs human review.
+	ArtifactStatusNeedsReview = "needs_review"
+	// ArtifactStatusReady means the artifact is ready for approval or apply.
+	ArtifactStatusReady = "ready"
+	// ArtifactStatusSkipped means the artifact was intentionally skipped.
+	ArtifactStatusSkipped = "skipped"
+	// ArtifactStatusApplied means the artifact has been applied to commerce state.
+	ArtifactStatusApplied = "applied"
+
+	// ApprovalStatusPending means a tool call is waiting for human approval.
+	ApprovalStatusPending = "pending"
+	// ApprovalStatusApproved means a human approved the pending tool call.
+	ApprovalStatusApproved = "approved"
+	// ApprovalStatusRejected means a human rejected the pending tool call.
+	ApprovalStatusRejected = "rejected"
+	// ApprovalStatusApplying means an approved tool call is currently applying.
+	ApprovalStatusApplying = "applying"
+	// ApprovalStatusApplied means the approved tool call has been applied.
+	ApprovalStatusApplied = "applied"
+	// ApprovalStatusApplyFailed means the approved tool call failed while applying.
+	ApprovalStatusApplyFailed = "apply_failed"
 )
 
 // Persistence provides durable storage for agent threads, turns, and messages.
@@ -23,9 +75,22 @@ type Persistence interface {
 	SaveThread(ctx context.Context, t *Thread) error
 	SaveTurn(ctx context.Context, t *Turn) error
 	SaveMessage(ctx context.Context, m *Message) error
+	SaveSkillRun(ctx context.Context, r *SkillRun) error
+	SaveArtifact(ctx context.Context, a *Artifact) error
+	SaveApproval(ctx context.Context, a *Approval) error
 	LoadThread(ctx context.Context, tenantID, threadID string) (*Thread, error)
 	ListThreads(ctx context.Context, tenantID string, limit, offset int) ([]*Thread, error)
 	LoadMessages(ctx context.Context, tenantID, threadID string) ([]*Message, error)
+	LoadSkillRun(ctx context.Context, tenantID, runID string) (*SkillRun, error)
+	ListSkillRuns(ctx context.Context, tenantID, skillID, status string, limit, offset int) ([]*SkillRun, error)
+	LoadArtifact(ctx context.Context, tenantID, artifactID string) (*Artifact, error)
+	ListArtifacts(ctx context.Context, tenantID, skillRunID, kind, status string, limit, offset int) ([]*Artifact, error)
+	LoadApproval(ctx context.Context, tenantID, approvalID string) (*Approval, error)
+	ListApprovals(ctx context.Context, tenantID, status string, limit, offset int) ([]*Approval, error)
+	UpdateApprovalStatus(ctx context.Context, tenantID, approvalID, status, actorID string) (*Approval, error)
+	ClaimApprovalForApply(ctx context.Context, tenantID, approvalID, actorID string) (*Approval, error)
+	MarkApprovalApplied(ctx context.Context, tenantID, approvalID, result, actorID string) (*Approval, error)
+	MarkApprovalApplyFailed(ctx context.Context, tenantID, approvalID, applyErr, actorID string) (*Approval, error)
 	DeleteThread(ctx context.Context, tenantID, threadID string) error
 }
 
@@ -42,12 +107,89 @@ func NewGormPersistence(db pkgdb.Database) *GormPersistence {
 // MigrateModels creates or updates the agent runtime tables.
 func MigrateModels(db pkgdb.Database) error {
 	return db.Update(func(tx pkgdb.Tx) error {
-		for _, model := range []interface{}{&Thread{}, &Turn{}, &Message{}} {
+		for _, model := range []interface{}{&Thread{}, &Turn{}, &Message{}, &SkillRun{}, &Artifact{}, &Approval{}} {
 			if err := tx.Migrate(model); err != nil {
 				return err
 			}
 		}
 		return nil
+	})
+}
+
+// SaveSkillRun persists a durable skill run.
+func (p *GormPersistence) SaveSkillRun(_ context.Context, r *SkillRun) error {
+	if p == nil || p.db == nil {
+		return nil
+	}
+	if r == nil {
+		return fmt.Errorf("agent store: skill run is nil")
+	}
+	cp := *r
+	now := time.Now()
+	if cp.StartedAt.IsZero() {
+		cp.StartedAt = now
+	}
+	if cp.UpdatedAt.IsZero() {
+		cp.UpdatedAt = now
+	}
+	if cp.Status == "" {
+		cp.Status = SkillRunStatusCreated
+	}
+	cp.Input = sanitizeJSONText(cp.Input)
+	cp.Output = sanitizeJSONText(cp.Output)
+	cp.Error = truncateStoreText(cp.Error, 2000)
+	return p.db.Update(func(tx pkgdb.Tx) error {
+		return tx.Save(&cp)
+	})
+}
+
+// SaveArtifact persists a durable skill artifact.
+func (p *GormPersistence) SaveArtifact(_ context.Context, a *Artifact) error {
+	if p == nil || p.db == nil {
+		return nil
+	}
+	if a == nil {
+		return fmt.Errorf("agent store: artifact is nil")
+	}
+	cp := *a
+	now := time.Now()
+	if cp.CreatedAt.IsZero() {
+		cp.CreatedAt = now
+	}
+	if cp.UpdatedAt.IsZero() {
+		cp.UpdatedAt = now
+	}
+	if cp.Status == "" {
+		cp.Status = ArtifactStatusNew
+	}
+	cp.Data = sanitizeJSONText(cp.Data)
+	cp.Summary = truncateStoreText(cp.Summary, 4000)
+	return p.db.Update(func(tx pkgdb.Tx) error {
+		return tx.Save(&cp)
+	})
+}
+
+// SaveApproval persists a pending or decided approval request.
+func (p *GormPersistence) SaveApproval(_ context.Context, a *Approval) error {
+	if p == nil || p.db == nil {
+		return nil
+	}
+	if a == nil {
+		return fmt.Errorf("agent store: approval is nil")
+	}
+	cp := *a
+	now := time.Now()
+	if cp.CreatedAt.IsZero() {
+		cp.CreatedAt = now
+	}
+	if cp.UpdatedAt.IsZero() {
+		cp.UpdatedAt = now
+	}
+	if cp.Status == "" {
+		cp.Status = ApprovalStatusPending
+	}
+	return p.db.Update(func(tx pkgdb.Tx) error {
+		return tx.Save(&cp)
 	})
 }
 
@@ -114,7 +256,7 @@ func (p *GormPersistence) LoadThread(_ context.Context, tenantID, threadID strin
 	}
 	var thread Thread
 	err := p.db.View(func(tx pkgdb.Tx) error {
-		return tx.Read().Where("id = ?", threadID).First(&thread).Error
+		return tx.Read().Where("tenant_id = ? AND id = ?", tenantID, threadID).First(&thread).Error
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -136,6 +278,7 @@ func (p *GormPersistence) ListThreads(_ context.Context, tenantID string, limit,
 	var records []Thread
 	err := p.db.View(func(tx pkgdb.Tx) error {
 		return tx.Read().
+			Where("tenant_id = ?", tenantID).
 			Order("last_active DESC").
 			Limit(limit).
 			Offset(offset).
@@ -159,7 +302,7 @@ func (p *GormPersistence) LoadMessages(_ context.Context, tenantID, threadID str
 	var records []Message
 	err := p.db.View(func(tx pkgdb.Tx) error {
 		return tx.Read().
-			Where("thread_id = ?", threadID).
+			Where("tenant_id = ? AND thread_id = ?", tenantID, threadID).
 			Order("created_at ASC, id ASC").
 			Find(&records).Error
 	})
@@ -173,19 +316,333 @@ func (p *GormPersistence) LoadMessages(_ context.Context, tenantID, threadID str
 	return out, nil
 }
 
+// LoadSkillRun loads a single tenant-scoped skill run.
+func (p *GormPersistence) LoadSkillRun(_ context.Context, tenantID, runID string) (*SkillRun, error) {
+	if p == nil || p.db == nil {
+		return nil, ErrSkillRunNotFound
+	}
+	var run SkillRun
+	err := p.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Where("tenant_id = ? AND id = ?", tenantID, runID).First(&run).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSkillRunNotFound
+		}
+		return nil, err
+	}
+	return &run, nil
+}
+
+// ListSkillRuns returns recent tenant-scoped skill runs.
+func (p *GormPersistence) ListSkillRuns(_ context.Context, tenantID, skillID, status string, limit, offset int) ([]*SkillRun, error) {
+	if p == nil || p.db == nil {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	var records []SkillRun
+	err := p.db.View(func(tx pkgdb.Tx) error {
+		query := tx.Read().Where("tenant_id = ?", tenantID)
+		if skillID != "" {
+			query = query.Where("skill_id = ?", skillID)
+		}
+		if status != "" {
+			query = query.Where("status = ?", status)
+		}
+		return query.
+			Order("started_at DESC").
+			Limit(limit).
+			Offset(offset).
+			Find(&records).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*SkillRun, len(records))
+	for i := range records {
+		out[i] = &records[i]
+	}
+	return out, nil
+}
+
+// LoadArtifact loads a single tenant-scoped artifact.
+func (p *GormPersistence) LoadArtifact(_ context.Context, tenantID, artifactID string) (*Artifact, error) {
+	if p == nil || p.db == nil {
+		return nil, ErrArtifactNotFound
+	}
+	var artifact Artifact
+	err := p.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Where("tenant_id = ? AND id = ?", tenantID, artifactID).First(&artifact).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrArtifactNotFound
+		}
+		return nil, err
+	}
+	return &artifact, nil
+}
+
+// ListArtifacts returns tenant-scoped skill artifacts.
+func (p *GormPersistence) ListArtifacts(_ context.Context, tenantID, skillRunID, kind, status string, limit, offset int) ([]*Artifact, error) {
+	if p == nil || p.db == nil {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	var records []Artifact
+	err := p.db.View(func(tx pkgdb.Tx) error {
+		query := tx.Read().Where("tenant_id = ?", tenantID)
+		if skillRunID != "" {
+			query = query.Where("skill_run_id = ?", skillRunID)
+		}
+		if kind != "" {
+			query = query.Where("kind = ?", kind)
+		}
+		if status != "" {
+			query = query.Where("status = ?", status)
+		}
+		return query.
+			Order("created_at ASC, id ASC").
+			Limit(limit).
+			Offset(offset).
+			Find(&records).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*Artifact, len(records))
+	for i := range records {
+		out[i] = &records[i]
+	}
+	return out, nil
+}
+
+// LoadApproval loads a single tenant-scoped approval request.
+func (p *GormPersistence) LoadApproval(_ context.Context, tenantID, approvalID string) (*Approval, error) {
+	if p == nil || p.db == nil {
+		return nil, ErrApprovalNotFound
+	}
+	var approval Approval
+	err := p.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Where("tenant_id = ? AND id = ?", tenantID, approvalID).First(&approval).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrApprovalNotFound
+		}
+		return nil, err
+	}
+	return &approval, nil
+}
+
+// ListApprovals returns recent tenant-scoped approval requests.
+func (p *GormPersistence) ListApprovals(_ context.Context, tenantID, status string, limit, offset int) ([]*Approval, error) {
+	if p == nil || p.db == nil {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	var records []Approval
+	err := p.db.View(func(tx pkgdb.Tx) error {
+		query := tx.Read().Where("tenant_id = ?", tenantID)
+		if status != "" {
+			query = query.Where("status = ?", status)
+		}
+		return query.
+			Order("created_at DESC").
+			Limit(limit).
+			Offset(offset).
+			Find(&records).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*Approval, len(records))
+	for i := range records {
+		out[i] = &records[i]
+	}
+	return out, nil
+}
+
+// UpdateApprovalStatus records a human approval decision.
+func (p *GormPersistence) UpdateApprovalStatus(_ context.Context, tenantID, approvalID, status, actorID string) (*Approval, error) {
+	if p == nil || p.db == nil {
+		return nil, ErrApprovalNotFound
+	}
+	if status != ApprovalStatusApproved && status != ApprovalStatusRejected {
+		return nil, fmt.Errorf("agent store: invalid approval status %q", status)
+	}
+	var approval Approval
+	now := time.Now()
+	err := p.db.Update(func(tx pkgdb.Tx) error {
+		_, err := tx.UpdateColumns(
+			map[string]interface{}{
+				"status":      status,
+				"decision_by": actorID,
+				"decision_at": now,
+				"updated_at":  now,
+			},
+			map[string]interface{}{
+				"id = ?":     approvalID,
+				"status = ?": ApprovalStatusPending,
+			},
+			&Approval{},
+		)
+		if err != nil {
+			return err
+		}
+		return tx.Read().Where("tenant_id = ? AND id = ?", tenantID, approvalID).First(&approval).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrApprovalNotFound
+		}
+		return nil, err
+	}
+	return &approval, nil
+}
+
+// ClaimApprovalForApply atomically moves an approved approval into applying.
+func (p *GormPersistence) ClaimApprovalForApply(_ context.Context, tenantID, approvalID, actorID string) (*Approval, error) {
+	if p == nil || p.db == nil {
+		return nil, ErrApprovalNotFound
+	}
+	var approval Approval
+	now := time.Now()
+	err := p.db.Update(func(tx pkgdb.Tx) error {
+		rows, err := tx.UpdateColumns(
+			map[string]interface{}{
+				"status":      ApprovalStatusApplying,
+				"applied_by":  actorID,
+				"apply_error": "",
+				"updated_at":  now,
+			},
+			map[string]interface{}{
+				"id = ?":        approvalID,
+				"status IN (?)": []string{ApprovalStatusApproved, ApprovalStatusApplyFailed},
+			},
+			&Approval{},
+		)
+		if err != nil {
+			return err
+		}
+		if err := tx.Read().Where("tenant_id = ? AND id = ?", tenantID, approvalID).First(&approval).Error; err != nil {
+			return err
+		}
+		if rows == 0 {
+			return ErrApprovalClaimConflict
+		}
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrApprovalNotFound
+		}
+		return nil, err
+	}
+	return &approval, nil
+}
+
+// MarkApprovalApplied records a successful apply result.
+func (p *GormPersistence) MarkApprovalApplied(_ context.Context, tenantID, approvalID, result, actorID string) (*Approval, error) {
+	if p == nil || p.db == nil {
+		return nil, ErrApprovalNotFound
+	}
+	var approval Approval
+	now := time.Now()
+	err := p.db.Update(func(tx pkgdb.Tx) error {
+		_, err := tx.UpdateColumns(
+			map[string]interface{}{
+				"status":       ApprovalStatusApplied,
+				"applied_by":   actorID,
+				"applied_at":   now,
+				"apply_result": sanitizeJSONText(result),
+				"apply_error":  "",
+				"updated_at":   now,
+			},
+			map[string]interface{}{
+				"id = ?":     approvalID,
+				"status = ?": ApprovalStatusApplying,
+			},
+			&Approval{},
+		)
+		if err != nil {
+			return err
+		}
+		return tx.Read().Where("tenant_id = ? AND id = ?", tenantID, approvalID).First(&approval).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrApprovalNotFound
+		}
+		return nil, err
+	}
+	return &approval, nil
+}
+
+// MarkApprovalApplyFailed records a failed apply attempt for later review.
+func (p *GormPersistence) MarkApprovalApplyFailed(_ context.Context, tenantID, approvalID, applyErr, actorID string) (*Approval, error) {
+	if p == nil || p.db == nil {
+		return nil, ErrApprovalNotFound
+	}
+	var approval Approval
+	now := time.Now()
+	err := p.db.Update(func(tx pkgdb.Tx) error {
+		_, err := tx.UpdateColumns(
+			map[string]interface{}{
+				"status":      ApprovalStatusApplyFailed,
+				"applied_by":  actorID,
+				"apply_error": truncateStoreText(applyErr, 2000),
+				"updated_at":  now,
+			},
+			map[string]interface{}{
+				"id = ?":     approvalID,
+				"status = ?": ApprovalStatusApplying,
+			},
+			&Approval{},
+		)
+		if err != nil {
+			return err
+		}
+		return tx.Read().Where("tenant_id = ? AND id = ?", tenantID, approvalID).First(&approval).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrApprovalNotFound
+		}
+		return nil, err
+	}
+	return &approval, nil
+}
+
 // DeleteThread removes a thread and all its turn/message rows.
 func (p *GormPersistence) DeleteThread(_ context.Context, tenantID, threadID string) error {
 	if p == nil || p.db == nil {
 		return nil
 	}
 	return p.db.Update(func(tx pkgdb.Tx) error {
-		if err := tx.Delete("thread_id", threadID, nil, &Message{}); err != nil {
+		where := map[string]interface{}{"tenant_id": tenantID}
+		if err := tx.Delete("thread_id", threadID, where, &Message{}); err != nil {
 			return err
 		}
-		if err := tx.Delete("thread_id", threadID, nil, &Turn{}); err != nil {
+		if err := tx.Delete("thread_id", threadID, where, &Turn{}); err != nil {
 			return err
 		}
-		return tx.Delete("id", threadID, nil, &Thread{})
+		if err := tx.Delete("thread_id", threadID, where, &SkillRun{}); err != nil {
+			return err
+		}
+		if err := tx.Delete("thread_id", threadID, where, &Artifact{}); err != nil {
+			return err
+		}
+		if err := tx.Delete("thread_id", threadID, where, &Approval{}); err != nil {
+			return err
+		}
+		return tx.Delete("id", threadID, where, &Thread{})
 	})
 }
 
@@ -231,6 +688,43 @@ func sanitizeToolCalls(raw string) string {
 		return raw
 	}
 	return string(data)
+}
+
+func truncateStoreText(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max]) + "...(truncated)"
+}
+
+// SanitizeApprovalForAPI returns a copy safe for external API responses.
+// Execution paths must use the persisted Approval directly so hash checks and
+// tool replay keep the original payload.
+func SanitizeApprovalForAPI(a *Approval) *Approval {
+	if a == nil {
+		return nil
+	}
+	cp := *a
+	if cp.Payload != "" {
+		cp.Payload = sanitizeJSONText(cp.Payload)
+	}
+	if cp.ApplyResult != "" {
+		cp.ApplyResult = sanitizeJSONText(cp.ApplyResult)
+	}
+	return &cp
+}
+
+// SanitizeApprovalsForAPI sanitizes a list of approvals for API responses.
+func SanitizeApprovalsForAPI(items []*Approval) []*Approval {
+	if len(items) == 0 {
+		return items
+	}
+	out := make([]*Approval, 0, len(items))
+	for _, item := range items {
+		out = append(out, SanitizeApprovalForAPI(item))
+	}
+	return out
 }
 
 // RuntimeStore is an in-memory cache for active thread state and messages.

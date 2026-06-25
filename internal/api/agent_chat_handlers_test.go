@@ -3,9 +3,12 @@
 package api
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,6 +22,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
 	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/xuri/excelize/v2"
 )
 
 type agentChatHTTPTestNode struct {
@@ -33,12 +38,13 @@ func (n *agentChatHTTPTestNode) ProfileName() string                    { return
 func (n *agentChatHTTPTestNode) ProductCatalog() []aipkg.ListingSummary { return nil }
 
 type agentChatMemoryStore struct {
-	thread    *agentstore.Thread
-	turns     []*agentstore.Turn
-	messages  []*agentstore.Message
-	skillRuns []*agentstore.SkillRun
-	artifacts []*agentstore.Artifact
-	approvals []*agentstore.Approval
+	thread          *agentstore.Thread
+	turns           []*agentstore.Turn
+	messages        []*agentstore.Message
+	skillRuns       []*agentstore.SkillRun
+	artifacts       []*agentstore.Artifact
+	approvals       []*agentstore.Approval
+	saveArtifactErr error
 }
 
 func (s *agentChatMemoryStore) SaveThread(_ context.Context, thread *agentstore.Thread) error {
@@ -61,11 +67,20 @@ func (s *agentChatMemoryStore) SaveMessage(_ context.Context, msg *agentstore.Me
 
 func (s *agentChatMemoryStore) SaveSkillRun(_ context.Context, run *agentstore.SkillRun) error {
 	cp := *run
+	for i, existing := range s.skillRuns {
+		if existing.TenantID == run.TenantID && existing.ID == run.ID {
+			s.skillRuns[i] = &cp
+			return nil
+		}
+	}
 	s.skillRuns = append(s.skillRuns, &cp)
 	return nil
 }
 
 func (s *agentChatMemoryStore) SaveArtifact(_ context.Context, artifact *agentstore.Artifact) error {
+	if s.saveArtifactErr != nil {
+		return s.saveArtifactErr
+	}
 	cp := *artifact
 	for i, existing := range s.artifacts {
 		if existing.TenantID == artifact.TenantID && existing.ID == artifact.ID {
@@ -769,6 +784,712 @@ func TestAgentSkillRunArtifactHandlers_SaveNonStandardTableDraft(t *testing.T) {
 	}
 	if len(listResp.Data) != 1 || listResp.Data[0].ID != artifactResp.Data.ID {
 		t.Fatalf("expected one proposal artifact, got %#v", listResp.Data)
+	}
+}
+
+func TestHandlePOSTAgentProductImportIngest_CSVCreatesRunAndPreviewArtifacts(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("threadId", "thread_import"); err != nil {
+		t.Fatalf("write thread field: %v", err)
+	}
+	part, err := writer.CreateFormFile("file", "supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv part: %v", err)
+	}
+	if _, err := part.Write([]byte("Item Name,Cost USD,Qty on hand\nLinen Tote,$45.00,12\n")); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	if resp.Data.SkillRun == nil || resp.Data.SkillRun.SkillID != string(kernel.SkillProductImport) || resp.Data.SkillRun.Status != agentstore.SkillRunStatusWaitingForReview {
+		t.Fatalf("unexpected skill run: %#v", resp.Data.SkillRun)
+	}
+	if len(resp.Data.SourceArtifacts) != 1 || len(resp.Data.CandidateArtifacts) != 1 || len(resp.Data.ProposalArtifacts) != 1 {
+		t.Fatalf("expected source/candidate/proposal artifacts, got %#v", resp.Data)
+	}
+	source := resp.Data.SourceArtifacts[0]
+	if source.Kind != agentstore.ArtifactKindSourceMaterial || source.ContentType != "text/csv" || !strings.HasPrefix(source.SourceHash, "sha256:") {
+		t.Fatalf("unexpected source artifact: %#v", source)
+	}
+	if source.Data != "" {
+		t.Fatalf("ingest response should not echo raw source data, got %s", source.Data)
+	}
+	if len(store.artifacts) == 0 || !strings.Contains(store.artifacts[0].Data, "Linen Tote") {
+		t.Fatalf("stored source artifact should retain raw data for later skill steps, got %#v", store.artifacts)
+	}
+	proposal := resp.Data.ProposalArtifacts[0]
+	if proposal.Kind != agentstore.ArtifactKindProposal || proposal.Status != agentstore.ArtifactStatusNeedsReview {
+		t.Fatalf("unexpected proposal artifact: %#v", proposal)
+	}
+	for _, want := range []string{`"title":"Linen Tote"`, `"amountMinor":4500`, `"quantity":12`, `"fieldSources"`, source.ID} {
+		if !strings.Contains(proposal.Data, want) {
+			t.Fatalf("proposal data missing %q: %s", want, proposal.Data)
+		}
+	}
+
+	listURL := "/v1/agent/artifacts?skillRunId=" + resp.Data.SkillRun.ID
+	req = httptest.NewRequest(http.MethodGet, listURL, nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentArtifacts(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var listResp struct {
+		Data []agentstore.Artifact `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&listResp); err != nil {
+		t.Fatalf("decode artifacts: %v", err)
+	}
+	if len(listResp.Data) != 3 {
+		t.Fatalf("expected three artifacts for workbench, got %#v", listResp.Data)
+	}
+}
+
+func TestHandlePOSTAgentProductImportIngest_LongCSVAddsPreviewLimitValidation(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var csvBody strings.Builder
+	csvBody.WriteString("Item Name,Cost USD,Qty on hand\n")
+	for i := 1; i <= productImportMaxPreviewRows+2; i++ {
+		fmt.Fprintf(&csvBody, "Linen Tote %d,$45.00,12\n", i)
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv part: %v", err)
+	}
+	if _, err := part.Write([]byte(csvBody.String())); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	if len(resp.Data.ProposalArtifacts) != productImportMaxPreviewRows {
+		t.Fatalf("expected %d preview proposals, got %d", productImportMaxPreviewRows, len(resp.Data.ProposalArtifacts))
+	}
+	if len(resp.Data.ValidationArtifacts) != 1 {
+		t.Fatalf("expected preview limit validation, got %#v", resp.Data.ValidationArtifacts)
+	}
+	validation := resp.Data.ValidationArtifacts[0].Data
+	for _, want := range []string{`"code":"preview_row_limit_reached"`, `"totalRows":27`, `"previewRows":25`, `"omittedRows":2`} {
+		if !strings.Contains(validation, want) {
+			t.Fatalf("preview limit validation missing %q: %s", want, validation)
+		}
+	}
+}
+
+func TestHandlePOSTAgentProductImportIngest_InternalErrorReturnsStage(t *testing.T) {
+	store := &agentChatMemoryStore{saveArtifactErr: fmt.Errorf("storage unavailable")}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	body := strings.NewReader(`{
+		"files":[{
+			"sourceName":"supplier.csv",
+			"text":"Item Name,Cost USD,Qty on hand\nLinen Tote,$45.00,12\n"
+		}]
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Error struct {
+			Code string `json:"code"`
+			Data struct {
+				Stage string `json:"stage"`
+			} `json:"data"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if resp.Error.Code != responsePkg.CodeInternalError || resp.Error.Data.Stage != "save_source_artifact" {
+		t.Fatalf("expected structured internal stage, got %#v", resp.Error)
+	}
+}
+
+func TestHandlePOSTAgentProductImportIngest_ZIPExpandsEntries(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var archive bytes.Buffer
+	zipWriter := zip.NewWriter(&archive)
+	csvEntry, err := zipWriter.Create("supplier/supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv entry: %v", err)
+	}
+	if _, err := csvEntry.Write([]byte("Item Name,Cost USD,Qty on hand\nLinen Tote,$45.00,12\n")); err != nil {
+		t.Fatalf("write csv entry: %v", err)
+	}
+	textEntry, err := zipWriter.Create("supplier/notes.txt")
+	if err != nil {
+		t.Fatalf("create notes entry: %v", err)
+	}
+	if _, err := textEntry.Write([]byte("photos describe the linen tote variants")); err != nil {
+		t.Fatalf("write notes entry: %v", err)
+	}
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("close zip: %v", err)
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.zip")
+	if err != nil {
+		t.Fatalf("create zip part: %v", err)
+	}
+	if _, err := part.Write(archive.Bytes()); err != nil {
+		t.Fatalf("write zip: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	if len(resp.Data.SourceArtifacts) != 3 || len(resp.Data.CandidateArtifacts) != 1 || len(resp.Data.ProposalArtifacts) != 1 {
+		t.Fatalf("expected zip plus entries with one preview row, got %#v", resp.Data)
+	}
+	var csvSource *agentstore.Artifact
+	var notesSource *agentstore.Artifact
+	for _, artifact := range resp.Data.SourceArtifacts {
+		if artifact.Data != "" {
+			t.Fatalf("ingest response should not echo raw source data, got %s", artifact.Data)
+		}
+		switch artifact.SourceName {
+		case "supplier/supplier.csv":
+			csvSource = artifact
+		case "supplier/notes.txt":
+			notesSource = artifact
+		}
+	}
+	if csvSource == nil || notesSource == nil {
+		t.Fatalf("expected expanded csv and notes sources, got %#v", resp.Data.SourceArtifacts)
+	}
+	var storedCSVSource *agentstore.Artifact
+	var storedNotesSource *agentstore.Artifact
+	for _, artifact := range store.artifacts {
+		switch artifact.SourceName {
+		case "supplier/supplier.csv":
+			storedCSVSource = artifact
+		case "supplier/notes.txt":
+			storedNotesSource = artifact
+		}
+	}
+	if storedCSVSource == nil || storedNotesSource == nil {
+		t.Fatalf("expected stored expanded sources, got %#v", store.artifacts)
+	}
+	if !strings.Contains(storedCSVSource.Data, `"container"`) || !strings.Contains(storedNotesSource.Data, `"container"`) {
+		t.Fatalf("expanded entries should reference their zip container, csv=%s notes=%s", storedCSVSource.Data, storedNotesSource.Data)
+	}
+	if !strings.Contains(resp.Data.ProposalArtifacts[0].Data, csvSource.ID) {
+		t.Fatalf("proposal should reference expanded csv source, got %s", resp.Data.ProposalArtifacts[0].Data)
+	}
+	if len(resp.Data.ValidationArtifacts) != 1 || !strings.Contains(resp.Data.ValidationArtifacts[0].Data, `"inputKind":"text"`) {
+		t.Fatalf("expected text entry validation for later AI parsing, got %#v", resp.Data.ValidationArtifacts)
+	}
+}
+
+func TestHandlePOSTAgentProductImportIngest_XLSXCreatesPreviewArtifacts(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	xlsx := excelize.NewFile()
+	defer xlsx.Close()
+	if err := xlsx.SetCellValue("Sheet1", "A1", "Item Name"); err != nil {
+		t.Fatalf("write xlsx header: %v", err)
+	}
+	if err := xlsx.SetCellValue("Sheet1", "B1", "Cost USD"); err != nil {
+		t.Fatalf("write xlsx header: %v", err)
+	}
+	if err := xlsx.SetCellValue("Sheet1", "C1", "Qty on hand"); err != nil {
+		t.Fatalf("write xlsx header: %v", err)
+	}
+	if err := xlsx.SetCellValue("Sheet1", "A2", "Linen Tote"); err != nil {
+		t.Fatalf("write xlsx row: %v", err)
+	}
+	if err := xlsx.SetCellValue("Sheet1", "B2", "$45.00"); err != nil {
+		t.Fatalf("write xlsx row: %v", err)
+	}
+	if err := xlsx.SetCellValue("Sheet1", "C2", "12"); err != nil {
+		t.Fatalf("write xlsx row: %v", err)
+	}
+	xlsxBytes, err := xlsx.WriteToBuffer()
+	if err != nil {
+		t.Fatalf("render xlsx: %v", err)
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.xlsx")
+	if err != nil {
+		t.Fatalf("create xlsx part: %v", err)
+	}
+	if _, err := part.Write(xlsxBytes.Bytes()); err != nil {
+		t.Fatalf("write xlsx: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	if len(resp.Data.SourceArtifacts) != 1 || len(resp.Data.CandidateArtifacts) != 1 || len(resp.Data.ProposalArtifacts) != 1 || len(resp.Data.ValidationArtifacts) != 0 {
+		t.Fatalf("expected xlsx source/candidate/proposal artifacts, got %#v", resp.Data)
+	}
+	proposal := resp.Data.ProposalArtifacts[0]
+	for _, want := range []string{`"title":"Linen Tote"`, `"amountMinor":4500`, `"quantity":12`, "XLSX"} {
+		if !strings.Contains(proposal.Data, want) {
+			t.Fatalf("xlsx proposal data missing %q: %s", want, proposal.Data)
+		}
+	}
+}
+
+func TestHandlePOSTAgentProductImportIngest_TextSourceWaitsForReview(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	body := strings.NewReader(`{
+		"files":[{
+			"sourceName":"supplier-notes.txt",
+			"text":"Linen Tote costs $45 and has 12 units."
+		}]
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	if resp.Data.SkillRun.Status != agentstore.SkillRunStatusWaitingForReview {
+		t.Fatalf("text-only ingest should wait for review, got %#v", resp.Data.SkillRun)
+	}
+	if len(resp.Data.SourceArtifacts) != 1 || len(resp.Data.ValidationArtifacts) != 1 || len(resp.Data.ProposalArtifacts) != 0 {
+		t.Fatalf("expected source and validation for text-only ingest, got %#v", resp.Data)
+	}
+}
+
+func TestHandlePOSTAgentArtifactApproval_CreatesListingsCreateApprovalFromProposal(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	run := &agentstore.SkillRun{
+		ID:            "skillrun_import",
+		TenantID:      "test-node",
+		ThreadID:      "thread_import",
+		SkillID:       string(kernel.SkillProductImport),
+		StoreID:       "store_1",
+		ActorID:       "actor_1",
+		ActingPersona: string(kernel.PersonaSeller),
+		Status:        agentstore.SkillRunStatusWaitingForReview,
+		StartedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	if err := store.SaveSkillRun(context.Background(), run); err != nil {
+		t.Fatalf("save skill run: %v", err)
+	}
+	proposal := &agentstore.Artifact{
+		ID:         "art_proposal",
+		TenantID:   "test-node",
+		ThreadID:   "thread_import",
+		SkillRunID: run.ID,
+		SkillID:    string(kernel.SkillProductImport),
+		Kind:       agentstore.ArtifactKindProposal,
+		Status:     agentstore.ArtifactStatusNeedsReview,
+		Name:       "supplier.csv row 2 proposal",
+		Data:       `{"sourceArtifactId":"art_source","candidateArtifactId":"art_candidate","draft":{"title":"Linen Tote","price":{"amountMinor":4500,"currencyCode":"USD","divisibility":2},"inventory":{"quantity":12}}}`,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if err := store.SaveArtifact(context.Background(), proposal); err != nil {
+		t.Fatalf("save proposal: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts/art_proposal/approval", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_proposal"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentArtifactApproval(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentstore.Approval `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode approval: %v", err)
+	}
+	if resp.Data.Status != agentstore.ApprovalStatusPending || resp.Data.Action != "listings_create" || resp.Data.SkillID != string(kernel.SkillProductImport) {
+		t.Fatalf("unexpected approval: %#v", resp.Data)
+	}
+	if resp.Data.StoreID != "store_1" || resp.Data.Risk != string(kernel.RiskWrite) {
+		t.Fatalf("approval should preserve scope/risk, got %#v", resp.Data)
+	}
+	if !strings.Contains(resp.Data.Payload, `"title":"Linen Tote"`) || !strings.Contains(resp.Data.Payload, `"proposalArtifactId":"art_proposal"`) {
+		t.Fatalf("approval payload should reference proposal listing draft, got %s", resp.Data.Payload)
+	}
+	if resp.Data.ArtifactIDs != `["art_proposal","art_source","art_candidate"]` {
+		t.Fatalf("approval should link proposal/source/candidate artifacts, got %q", resp.Data.ArtifactIDs)
+	}
+	if len(store.approvals) != 1 || store.approvals[0].RequestHash == "" {
+		t.Fatalf("expected one persisted approval with hash, got %#v", store.approvals)
+	}
+	if err := verifyAgentApprovalHash(store.approvals[0]); err != nil {
+		t.Fatalf("approval hash should verify: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts/art_proposal/approval", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_proposal"})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentArtifactApproval(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected duplicate approval request to return 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var duplicateResp struct {
+		Data agentstore.Approval `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&duplicateResp); err != nil {
+		t.Fatalf("decode duplicate approval: %v", err)
+	}
+	if len(store.approvals) != 1 || duplicateResp.Data.ID != resp.Data.ID {
+		t.Fatalf("duplicate approval request should reuse existing approval, approvals=%#v response=%#v", store.approvals, duplicateResp.Data)
+	}
+}
+
+func TestHandlePOSTAgentArtifactApproval_RejectsLinkedSourceArtifact(t *testing.T) {
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{
+			{
+				ID:       "art_source",
+				TenantID: "test-node",
+				SkillID:  string(kernel.SkillProductImport),
+				Kind:     agentstore.ArtifactKindSourceMaterial,
+				Status:   agentstore.ArtifactStatusReady,
+			},
+		},
+		approvals: []*agentstore.Approval{
+			{
+				ID:          "appr_existing",
+				TenantID:    "test-node",
+				SkillID:     string(kernel.SkillProductImport),
+				Status:      agentstore.ApprovalStatusPending,
+				ArtifactIDs: `["art_proposal","art_source"]`,
+				CreatedAt:   time.Now(),
+			},
+		},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts/art_source/approval", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_source"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentArtifactApproval(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected linked source artifact approval to be rejected, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "artifact is not a proposal") {
+		t.Fatalf("expected proposal validation error, got %s", rr.Body.String())
+	}
+}
+
+func TestHandleGETAgentProductImportWorkbench_AggregatesRowsAndApprovals(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv part: %v", err)
+	}
+	if _, err := part.Write([]byte("Item Name,Cost USD,Qty on hand\nLinen Tote,$45.00,12\n")); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected ingest 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var ingestResp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&ingestResp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	for i := 0; i < productImportApprovalPageSize+5; i++ {
+		store.approvals = append(store.approvals, &agentstore.Approval{
+			ID:          fmt.Sprintf("appr_unrelated_%d", i),
+			TenantID:    "test-node",
+			SkillID:     string(kernel.SkillProductImport),
+			Status:      agentstore.ApprovalStatusPending,
+			ArtifactIDs: fmt.Sprintf(`["art_unrelated_%d"]`, i),
+			CreatedAt:   time.Now().Add(time.Duration(i) * time.Second),
+		})
+	}
+	proposalID := ingestResp.Data.ProposalArtifacts[0].ID
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts/"+proposalID+"/approval", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": proposalID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentArtifactApproval(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected approval 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, "/v1/agent/product-import/runs/"+ingestResp.Data.SkillRun.ID+"/workbench", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": ingestResp.Data.SkillRun.ID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentProductImportWorkbench(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected workbench 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var workbenchResp struct {
+		Data agentProductImportWorkbench `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&workbenchResp); err != nil {
+		t.Fatalf("decode workbench: %v", err)
+	}
+	if workbenchResp.Data.SkillRun == nil || workbenchResp.Data.SkillRun.ID != ingestResp.Data.SkillRun.ID {
+		t.Fatalf("unexpected workbench run: %#v", workbenchResp.Data.SkillRun)
+	}
+	if len(workbenchResp.Data.Sources) != 1 || len(workbenchResp.Data.Rows) != 1 {
+		t.Fatalf("expected one source and row, got %#v", workbenchResp.Data)
+	}
+	row := workbenchResp.Data.Rows[0]
+	if row.ProposalArtifactID != proposalID || row.Approval == nil || row.Approval.Status != agentstore.ApprovalStatusPending {
+		t.Fatalf("row should include linked approval, got %#v", row)
+	}
+	if row.Draft["title"] != "Linen Tote" || row.FieldSources["title"] == nil {
+		t.Fatalf("row should expose draft and field sources, got %#v", row)
+	}
+	if workbenchResp.Data.Counts["source"] != 1 || workbenchResp.Data.Counts["proposal"] != 1 || workbenchResp.Data.Counts["approval"] != 1 {
+		t.Fatalf("unexpected workbench counts: %#v", workbenchResp.Data.Counts)
+	}
+}
+
+func TestHandleGETAgentProductImportWorkbench_ReflectsAppliedProposal(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv part: %v", err)
+	}
+	if _, err := part.Write([]byte("Item Name,Cost USD,Qty on hand\nLinen Tote,$45.00,12\n")); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected ingest 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var ingestResp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&ingestResp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	proposalID := ingestResp.Data.ProposalArtifacts[0].ID
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/artifacts/"+proposalID+"/approval", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": proposalID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentArtifactApproval(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected approval 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var approvalResp struct {
+		Data agentstore.Approval `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&approvalResp); err != nil {
+		t.Fatalf("decode approval response: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/approvals/"+approvalResp.Data.ID+"/decision", strings.NewReader(`{"decision":"approved"}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"approvalId": approvalResp.Data.ID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentApprovalDecision(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected decision 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	oldExecute := executeAgentApprovalTool
+	executeAgentApprovalTool = func(_ context.Context, _, _, action, gotPayload string) (string, error) {
+		if action != "listings_create" || !strings.Contains(gotPayload, `"title":"Linen Tote"`) {
+			t.Fatalf("unexpected tool execution action=%s payload=%s", action, gotPayload)
+		}
+		return `{"data":{"slug":"linen-tote"}}`, nil
+	}
+	t.Cleanup(func() { executeAgentApprovalTool = oldExecute })
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/approvals/"+approvalResp.Data.ID+"/apply", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"approvalId": approvalResp.Data.ID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentApprovalApply(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected apply 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, "/v1/agent/product-import/runs/"+ingestResp.Data.SkillRun.ID+"/workbench", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": ingestResp.Data.SkillRun.ID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentProductImportWorkbench(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected workbench 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var workbenchResp struct {
+		Data agentProductImportWorkbench `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&workbenchResp); err != nil {
+		t.Fatalf("decode workbench: %v", err)
+	}
+	if len(workbenchResp.Data.Rows) != 1 {
+		t.Fatalf("expected one row, got %#v", workbenchResp.Data.Rows)
+	}
+	row := workbenchResp.Data.Rows[0]
+	if row.Status != agentstore.ArtifactStatusApplied || row.Approval == nil || row.Approval.Status != agentstore.ApprovalStatusApplied {
+		t.Fatalf("workbench row should reflect applied proposal and approval, got %#v", row)
+	}
+	if workbenchResp.Data.Counts["approval"] != 1 || workbenchResp.Data.Counts["proposal"] != 1 {
+		t.Fatalf("unexpected workbench counts: %#v", workbenchResp.Data.Counts)
 	}
 }
 

@@ -1136,6 +1136,60 @@
         ]
       }
     },
+    "/v1/agent/artifacts/{artifactId}/approval": {
+      "post": {
+        "operationId": "agent-artifact-approval-post",
+        "parameters": [
+          {
+            "description": "Agent artifact ID.",
+            "in": "path",
+            "name": "artifactId",
+            "required": true,
+            "schema": {
+              "description": "Agent artifact ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Create an approval from an agent proposal artifact",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/v1/agent/chat": {
       "post": {
         "description": "Starts a seller AI assistant turn and streams server-sent events. Runtime is handled by a raw chi route so response chunks are not buffered by Huma.",
@@ -1335,6 +1389,124 @@
           }
         ],
         "summary": "Get agent chat session",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/product-import/ingest": {
+      "post": {
+        "operationId": "agent-product-import-ingest-post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Content-Type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "contentMediaType": "application/octet-stream",
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Ingest product import source material",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/product-import/runs/{runId}/workbench": {
+      "get": {
+        "operationId": "agent-product-import-workbench-get",
+        "parameters": [
+          {
+            "description": "Agent skill run ID.",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "description": "Agent skill run ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get product import workbench data",
         "tags": [
           "ai"
         ]

@@ -649,11 +649,6 @@ type orderTransactionalSupplyAvailabilityService interface {
 }
 
 func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb.OrderMessage) error {
-	txService, ok := s.authoritativeSupplyAvailabilityTxService(context.Background())
-	if !ok {
-		return nil
-	}
-
 	var stored models.Order
 	if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&stored).Error; err != nil {
 		return err
@@ -668,6 +663,14 @@ func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb
 	orderOpen := new(pb.OrderOpen)
 	if err := orderMsg.Message.UnmarshalTo(orderOpen); err != nil {
 		return err
+	}
+	if err := persistCollectibleOrderMetadata(tx, orderMsg.OrderID, orderOpen); err != nil {
+		return err
+	}
+
+	txService, ok := s.authoritativeSupplyAvailabilityTxService(context.Background())
+	if !ok {
+		return nil
 	}
 	lines, err := s.standardOrderSupplyLinesFromOrderOpen(tx, orderMsg.OrderID, orderOpen, true)
 	if err != nil {

@@ -72,6 +72,15 @@ func WithAIProfile(profile contracts.AIProfile) NodeOption {
 	}}
 }
 
+// WithCollectiblePrimarySalePaidHook wires hosting's collectibles first-sale
+// bridge. Nil leaves collectible payment verification as a local metadata-only
+// no-op, which is the standalone-safe default.
+func WithCollectiblePrimarySalePaidHook(hook CollectiblePrimarySalePaidHook) NodeOption {
+	return func(n *MobazhaNode) {
+		n.collectiblePrimarySalePaidHook = hook
+	}
+}
+
 // WithPlatformFeatureProvider overrides the default PlatformGlobalProvider
 // (which allows every feature). SaaS hosting injects an adapter that
 // reads app.yaml / runtime admin API to honor platform-wide kill switches.

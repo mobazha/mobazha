@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -54,6 +55,7 @@ func (n *MobazhaNode) handleCryptoPaymentVerified(orderID string, paymentSent *p
 			logger.LogInfoWithIDf(log, n.nodeID, "payment verified: UTXO order %s tx %s has multiple or no unique outputs for address %s; relaying verified transaction without synthetic outpoint", orderID, pd.TransactionID, pd.ToAddress)
 		}
 	}
+	n.signalCollectiblePrimarySalePaid(ctx, orderID, order, paymentSent)
 	switch order.Role() {
 	case models.RoleVendor:
 		if err := n.orderService.EnsureRatingSignatures(ctx, models.OrderID(orderID)); err != nil {
@@ -78,6 +80,43 @@ func (n *MobazhaNode) handleCryptoPaymentVerified(orderID string, paymentSent *p
 		n.orderService.RelayPaymentToCounterpartyWithTransaction(ctx, orderID, vendorPeerID, pd, verifiedTx)
 	default:
 		logger.LogInfoWithIDf(log, n.nodeID, "payment verified: order %s role %q has no counterparty relay", orderID, order.Role())
+	}
+}
+
+func (n *MobazhaNode) signalCollectiblePrimarySalePaid(ctx context.Context, orderID string, order *models.Order, paymentSent *pb.PaymentSent) {
+	if n == nil || n.collectiblePrimarySalePaidHook == nil || order == nil || paymentSent == nil {
+		return
+	}
+	fiatMeta, err := order.GetFiatMetadata()
+	if err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "payment verified: read collectible metadata for order %s: %v", orderID, err)
+		return
+	}
+	meta, ok := models.CollectibleOrderMetadataFromFiatMetadata(fiatMeta)
+	if !ok {
+		return
+	}
+	paidAt := time.Now().UTC()
+	if order.PaidAt != nil {
+		paidAt = order.PaidAt.UTC()
+	}
+	escrowID := strings.TrimSpace(paymentSent.GetTransactionID())
+	if escrowID == "" {
+		escrowID = strings.TrimSpace(paymentSent.GetToAddress())
+	}
+	if err := n.collectiblePrimarySalePaidHook(ctx, CollectiblePrimarySalePaidSignal{
+		OrderID:      orderID,
+		EscrowID:     escrowID,
+		HubSlotID:    meta.HubSlotID,
+		NFTMint:      meta.NFTMint,
+		CertNumber:   meta.CertNumber,
+		BuyerPeerID:  meta.BuyerPeerID,
+		SellerPeerID: meta.SellerPeerID,
+		PriceAmount:  strings.TrimSpace(paymentSent.GetAmount()),
+		CurrencyCode: strings.TrimSpace(paymentSent.GetCoin()),
+		PaidAt:       paidAt,
+	}); err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "payment verified: signal collectible primary sale paid for order %s: %v", orderID, err)
 	}
 }
 

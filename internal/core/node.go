@@ -37,6 +37,7 @@ type MobazhaNode struct {
 	lifecycleFields
 	appServices
 	platformFields
+	collectiblesFields
 }
 
 // identityFields, storageFields, cryptoFields, networkFields, walletFields,

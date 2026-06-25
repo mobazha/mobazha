@@ -133,3 +133,74 @@ func TestCreateOrder_RejectsMixedContractTypes(t *testing.T) {
 	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
 	assert.Contains(t, err.Error(), "mixed contract types")
 }
+
+func TestCreateOrder_RejectsMultiItemCollectiblePrimarySale(t *testing.T) {
+	kp, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	pid, err := identity.PeerIDFromPublicKey(kp.PubKey)
+	require.NoError(t, err)
+	signer := contracts.NewKeyPairSigner(kp, pid)
+	vendorPeer := pid.String()
+
+	first := testSignedListingForContractType(t, "rwa-card-1", vendorPeer, pb.Listing_Metadata_RWA_TOKEN)
+	second := testSignedListingForContractType(t, "rwa-card-2", vendorPeer, pb.Listing_Metadata_RWA_TOKEN)
+	firstCID := listingCID(t, first)
+	secondCID := listingCID(t, second)
+	listings := &contractTypeTestListings{
+		byCID: map[string]*pb.SignedListing{
+			firstCID.String():  first,
+			secondCID.String(): second,
+		},
+		index: models.ListingIndex{
+			{Slug: first.Listing.Slug, CID: firstCID.String()},
+			{Slug: second.Listing.Slug, CID: secondCID.String()},
+		},
+	}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Signer:   signer,
+		Listings: listings,
+	})
+
+	_, _, err = svc.createOrder(context.Background(), &models.Purchase{
+		PricingCoin: "crypto:eip155:1:native",
+		Items: []models.PurchaseItem{
+			{ListingHash: firstCID.String(), Quantity: "1", HubSlotID: "slot-1"},
+			{ListingHash: secondCID.String(), Quantity: "1", HubSlotID: "slot-2"},
+		},
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+	assert.Contains(t, err.Error(), "exactly one item")
+}
+
+func TestCreateOrder_RejectsCollectibleQuantityAboveOne(t *testing.T) {
+	kp, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	pid, err := identity.PeerIDFromPublicKey(kp.PubKey)
+	require.NoError(t, err)
+	signer := contracts.NewKeyPairSigner(kp, pid)
+	vendorPeer := pid.String()
+
+	listing := testSignedListingForContractType(t, "rwa-card", vendorPeer, pb.Listing_Metadata_RWA_TOKEN)
+	listingCID := listingCID(t, listing)
+	listings := &contractTypeTestListings{
+		byCID: map[string]*pb.SignedListing{listingCID.String(): listing},
+		index: models.ListingIndex{{Slug: listing.Listing.Slug, CID: listingCID.String()}},
+	}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Signer:   signer,
+		Listings: listings,
+	})
+
+	_, _, err = svc.createOrder(context.Background(), &models.Purchase{
+		PricingCoin: "crypto:eip155:1:native",
+		Items: []models.PurchaseItem{{
+			ListingHash: listingCID.String(),
+			Quantity:    "2",
+			HubSlotID:   "slot-1",
+		}},
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+	assert.Contains(t, err.Error(), "quantity 1")
+}

@@ -113,6 +113,9 @@ func (s *OrderAppService) PurchaseListing(ctx context.Context, purchase *models.
 				return err
 			}
 		}
+		if err = persistCollectibleOrderMetadata(tx, order.OrderID, orderOpen); err != nil {
+			return err
+		}
 
 		return s.messenger.ReliablySendMessage(tx, vendorPeerID, message, nil)
 	})
@@ -233,6 +236,11 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 		if listing.Listing.Metadata.ContractType == pb.Listing_Metadata_CLASSIFIED {
 			return nil, nil, fmt.Errorf("%w: classified listings cannot be purchased", coreiface.ErrBadRequest)
 		}
+		if listing.Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN || models.PurchaseItemHasCollectibleMetadata(item) {
+			if len(purchase.Items) != 1 || strings.TrimSpace(item.Quantity) != "1" {
+				return nil, nil, fmt.Errorf("%w: collectible NFT primary-sale orders must contain exactly one item with quantity 1", coreiface.ErrBadRequest)
+			}
+		}
 		var sameType bool
 		orderContractType, hasOrderContractType, sameType = ordercontracttype.AddToSingleTypeOrder(
 			orderContractType,
@@ -291,7 +299,7 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 			PaymentAddress:   item.PaymentAddress,
 			ShippingOption:   shippingOption,
 			Options:          options,
-			OptionalFeatures: item.OptionalFeatures,
+			OptionalFeatures: models.PurchaseItemOptionalFeaturesWithCollectibleMetadata(item),
 		}
 		items = append(items, orderItem)
 	}
@@ -545,6 +553,26 @@ func persistOrderRefundAddress(tx database.Tx, orderID string, refundAddr string
 	dbOrder.RefundAddress = strings.TrimSpace(refundAddr)
 	if err := tx.Save(&dbOrder); err != nil {
 		return fmt.Errorf("save order %s with refund address: %w", orderID, err)
+	}
+	return nil
+}
+
+func persistCollectibleOrderMetadata(tx database.Tx, orderID string, orderOpen *pb.OrderOpen) error {
+	meta, ok := models.CollectibleOrderMetadataFromOrderOpen(orderOpen)
+	if !ok {
+		return nil
+	}
+	var dbOrder models.Order
+	if err := tx.Read().Where("id = ?", orderID).First(&dbOrder).Error; err != nil {
+		return fmt.Errorf("load order %s to set collectible metadata: %w", orderID, err)
+	}
+	if err := dbOrder.MergeFiatMetadata(meta.FiatMetadataMap()); err != nil {
+		return fmt.Errorf("merge collectible metadata for order %s: %w", orderID, err)
+	}
+	if err := tx.Update("fiat_metadata", dbOrder.FiatMetadata,
+		map[string]interface{}{"id = ?": orderID},
+		&models.Order{}); err != nil {
+		return fmt.Errorf("save order %s with collectible metadata: %w", orderID, err)
 	}
 	return nil
 }

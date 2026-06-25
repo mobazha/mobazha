@@ -19,6 +19,9 @@ import (
 
 type MobazhaNode = core.MobazhaNode
 
+type CollectiblePrimarySalePaidSignal = core.CollectiblePrimarySalePaidSignal
+type CollectiblePrimarySalePaidHook = core.CollectiblePrimarySalePaidHook
+
 // APIGateway is a type alias for internal/api.Gateway, enabling hosting
 // to reference the concrete Gateway type without importing internal packages.
 type APIGateway = internalapi.Gateway
@@ -70,6 +73,12 @@ func SetAIProfile(node *MobazhaNode, profile contracts.AIProfile) {
 		return
 	}
 	node.SetAIProfile(profile)
+}
+
+// WithCollectiblePrimarySalePaidHook wires an optional first-sale lifecycle
+// callback into verified payment handling.
+func WithCollectiblePrimarySalePaidHook(hook CollectiblePrimarySalePaidHook) NodeOption {
+	return core.WithCollectiblePrimarySalePaidHook(hook)
 }
 
 // RuntimeAccess exposes the narrow shared-runtime ports needed by a

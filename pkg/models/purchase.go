@@ -34,6 +34,10 @@ type PurchaseItem struct {
 	Memo             string                 `json:"memo"`
 	PaymentAddress   string                 `json:"paymentAddress"`
 	OptionalFeatures []string               `json:"optionalFeatures"`
+	Fulfillment      string                 `json:"fulfillment,omitempty"`
+	HubSlotID        string                 `json:"hubSlotID,omitempty"`
+	NFTMint          string                 `json:"nftMint,omitempty"`
+	CertNumber       string                 `json:"certNumber,omitempty"`
 }
 
 // ShoppingCartItem is information about the item in the shopping cart.

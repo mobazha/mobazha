@@ -174,6 +174,9 @@ func (p *GormPersistence) Search(_ context.Context, q kernel.MemoryQuery) ([]ker
 	if err != nil {
 		return nil, err
 	}
+	if err := p.touchRetrievedMemories(records); err != nil {
+		return nil, err
+	}
 	out := make([]kernel.MemoryItem, 0, len(records))
 	for _, record := range records {
 		out = append(out, record.toKernel())
@@ -891,6 +894,35 @@ func memoryActorID(scope kernel.Scope, memoryScope kernel.MemoryScope) string {
 		return scope.ActorID
 	}
 	return ""
+}
+
+func (p *GormPersistence) touchRetrievedMemories(records []Memory) error {
+	if len(records) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(records))
+	for _, record := range records {
+		if record.ID != "" {
+			ids = append(ids, record.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	now := time.Now()
+	return p.db.Update(func(tx pkgdb.Tx) error {
+		_, err := tx.UpdateColumns(
+			map[string]interface{}{
+				"last_used_at": now,
+			},
+			map[string]interface{}{
+				"id IN (?)":  ids,
+				"status = ?": MemoryStatusActive,
+			},
+			&Memory{},
+		)
+		return err
+	})
 }
 
 func visibleMemoryQuery(query *gorm.DB, scope kernel.Scope) *gorm.DB {

@@ -443,11 +443,11 @@ func toolResultMode(resolved *resolvedTurnContext, toolName string) string {
 	return resolved.toolResultModes[toolName]
 }
 
-func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolvedTurnContext, _ string) string {
+func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolvedTurnContext, userMsg string) string {
 	if resolved.memoryStore == nil || resolved.scope.TenantID == "" {
 		return ""
 	}
-	items, err := resolved.memoryStore.Search(ctx, kernel.MemoryQuery{
+	query := kernel.MemoryQuery{
 		Scope: resolved.scope,
 		Types: []kernel.MemoryScope{
 			kernel.MemoryUser,
@@ -455,7 +455,15 @@ func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolved
 			kernel.MemoryTenant,
 		},
 		Limit: 5,
-	})
+	}
+	if text := memoryQueryText(userMsg); text != "" {
+		query.Query = text
+	}
+	items, err := resolved.memoryStore.Search(ctx, query)
+	if err == nil && len(items) == 0 && query.Query != "" {
+		query.Query = ""
+		items, err = resolved.memoryStore.Search(ctx, query)
+	}
 	if err != nil || len(items) == 0 {
 		if err != nil {
 			o.emitter.Emit(ctx, telemetry.Event{
@@ -490,6 +498,19 @@ func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolved
 		Attrs:    map[string]any{"count": len(lines) - 2},
 	})
 	return strings.Join(lines, "\n")
+}
+
+func memoryQueryText(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	text = strings.Join(strings.Fields(text), " ")
+	runes := []rune(text)
+	if len(runes) > 160 {
+		return string(runes[:160])
+	}
+	return text
 }
 
 func recalculateGrantedTools(ctx context.Context, resolved *resolvedTurnContext) error {

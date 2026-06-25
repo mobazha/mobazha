@@ -570,6 +570,29 @@ func TestGormPersistence_MemoryStoreScopesAndArchive(t *testing.T) {
 	items, err := persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, items, 3)
+	require.NotNil(t, loadAgentMemoryRecord(t, dbA, "mem_user").LastUsedAt)
+	require.NotNil(t, loadAgentMemoryRecord(t, dbA, "mem_store").LastUsedAt)
+	require.NotNil(t, loadAgentMemoryRecord(t, dbA, "mem_tenant").LastUsedAt)
+	require.Nil(t, loadAgentMemoryRecord(t, dbB, "mem_user").LastUsedAt)
+
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{
+		Scope: scopeA,
+		Types: []kernel.MemoryScope{kernel.MemoryStoreScope},
+		Limit: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, "mem_store", items[0].ID)
+
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Subject: "language", Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, "mem_user", items[0].ID)
+
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Query: "克制", Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, "mem_store", items[0].ID)
 
 	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeAOtherStore, Limit: 10})
 	require.NoError(t, err)
@@ -620,6 +643,15 @@ func newAgentStoreTestTenantDB(t *testing.T, sharedDB *gorm.DB, tenantID string)
 	db, err := dbstore.NewTenantDBWithPublicData(sharedDB, tenantID, dbstore.NewDBPublicData(sharedDB, tenantID))
 	require.NoError(t, err)
 	return db
+}
+
+func loadAgentMemoryRecord(t *testing.T, db database.Database, id string) Memory {
+	t.Helper()
+	var record Memory
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", id).First(&record).Error
+	}))
+	return record
 }
 
 func TestGormPersistence_DeleteThread(t *testing.T) {

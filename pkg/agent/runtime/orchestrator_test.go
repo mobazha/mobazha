@@ -49,13 +49,19 @@ type fakePersistence struct {
 }
 
 type fakeMemoryStore struct {
-	items []kernel.MemoryItem
-	err   error
+	items       []kernel.MemoryItem
+	err         error
+	queries     []kernel.MemoryQuery
+	missQueries bool
 }
 
-func (s *fakeMemoryStore) Search(context.Context, kernel.MemoryQuery) ([]kernel.MemoryItem, error) {
+func (s *fakeMemoryStore) Search(_ context.Context, q kernel.MemoryQuery) ([]kernel.MemoryItem, error) {
+	s.queries = append(s.queries, q)
 	if s.err != nil {
 		return nil, s.err
+	}
+	if s.missQueries && q.Query != "" {
+		return nil, nil
 	}
 	return s.items, nil
 }
@@ -1555,6 +1561,55 @@ func TestRunTurnWithOptions_InjectsRetrievedMemory(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected memory context in system prompt: %#v", llm.captured[0].messages)
+	}
+}
+
+func TestRunTurnWithOptions_MemoryFallsBackWhenQueryMisses(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{
+		missQueries: true,
+		items: []kernel.MemoryItem{
+			{
+				ID:      "mem_1",
+				Scope:   kernel.MemoryTenant,
+				Subject: "policy",
+				Content: "人工确认高风险操作。",
+			},
+		},
+	}
+	orch := newTestOrch(llm, nil)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_memory_fallback", "   please review risk   ", TurnOptions{
+		MemoryStore: memory,
+		Scope: kernel.Scope{
+			TenantID: "tenant_1",
+			ActorID:  "actor_1",
+			StoreID:  "store_1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(memory.queries) != 2 {
+		t.Fatalf("expected query search plus fallback search, got %#v", memory.queries)
+	}
+	if memory.queries[0].Query != "please review risk" {
+		t.Fatalf("expected normalized user query, got %q", memory.queries[0].Query)
+	}
+	if memory.queries[1].Query != "" {
+		t.Fatalf("expected fallback query to be empty, got %q", memory.queries[1].Query)
+	}
+	found := false
+	for _, msg := range llm.captured[0].messages {
+		if msg.Role == "system" && strings.Contains(msg.Content, "人工确认高风险操作") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected fallback memory context in system prompt: %#v", llm.captured[0].messages)
 	}
 }
 

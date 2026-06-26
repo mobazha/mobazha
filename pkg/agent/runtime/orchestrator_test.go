@@ -37,6 +37,25 @@ type mockLLMResponse struct {
 	err    error
 }
 
+type fakeThreadCompactor struct {
+	summary  string
+	err      error
+	requests []ThreadCompactionRequest
+}
+
+func (f *fakeThreadCompactor) CompactThread(_ context.Context, req ThreadCompactionRequest) (string, error) {
+	cp := ThreadCompactionRequest{
+		TenantID: req.TenantID,
+		ThreadID: req.ThreadID,
+		Messages: append([]Message(nil), req.Messages...),
+	}
+	f.requests = append(f.requests, cp)
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.summary, nil
+}
+
 type fakePersistence struct {
 	thread         *store.Thread
 	turns          []*store.Turn
@@ -1651,6 +1670,122 @@ func TestRunTurn_DeterministicCompactionAddsSummary(t *testing.T) {
 	}
 	if !foundSummary {
 		t.Fatalf("expected deterministic compaction summary in prompt: %#v", llm.captured[0].messages)
+	}
+}
+
+func TestRunTurn_ThreadCompactorAddsSummary(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	emitter := &telemetry.BufferEmitter{}
+	compactor := &fakeThreadCompactor{summary: "Earlier thread summary from model."}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.Config{
+			MaxContextTokens: 1000,
+			ReservedOutput:   1,
+			ShapeThreshold:   0.99,
+			CompactThreshold: 0.01,
+		}),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		&Config{ShapeKeepMsgs: 3},
+	)
+	orch.SetThreadCompactor(compactor)
+	for i := 0; i < 12; i++ {
+		orch.mem.AppendMessage("tenant_1", "thread_model_compact", &store.Message{
+			ID:      fmt.Sprintf("msg_%d", i),
+			Role:    "assistant",
+			Content: fmt.Sprintf("historical answer %d", i),
+		})
+	}
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "thread_model_compact", "current request")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(compactor.requests) != 1 {
+		t.Fatalf("expected one compaction request, got %#v", compactor.requests)
+	}
+	req := compactor.requests[0]
+	if req.TenantID != "tenant_1" || req.ThreadID != "thread_model_compact" {
+		t.Fatalf("unexpected compaction identity: %#v", req)
+	}
+	for _, msg := range req.Messages {
+		if strings.Contains(msg.Content, "current request") {
+			t.Fatalf("compactor should only receive older replay prefix, got %#v", req.Messages)
+		}
+	}
+	foundSummary := false
+	for _, msg := range llm.captured[0].messages {
+		if msg.Role == "system" && strings.Contains(msg.Content, "Earlier thread summary from model.") {
+			foundSummary = true
+		}
+	}
+	if !foundSummary {
+		t.Fatalf("expected thread compactor summary in prompt: %#v", llm.captured[0].messages)
+	}
+	events := emitter.ByType(telemetry.CompactionSucceeded)
+	if len(events) == 0 || events[0].Attrs["mode"] != "thread_compactor" {
+		t.Fatalf("expected thread compactor success telemetry, got %#v", events)
+	}
+}
+
+func TestRunTurn_ThreadCompactorFailureFallsBackDeterministically(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	emitter := &telemetry.BufferEmitter{}
+	compactor := &fakeThreadCompactor{err: errors.New("summary service unavailable")}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.Config{
+			MaxContextTokens: 1000,
+			ReservedOutput:   1,
+			ShapeThreshold:   0.99,
+			CompactThreshold: 0.01,
+		}),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		&Config{ShapeKeepMsgs: 3},
+	)
+	orch.SetThreadCompactor(compactor)
+	for i := 0; i < 12; i++ {
+		orch.mem.AppendMessage("tenant_1", "thread_model_compact_fallback", &store.Message{
+			ID:      fmt.Sprintf("msg_%d", i),
+			Role:    "assistant",
+			Content: fmt.Sprintf("historical answer %d", i),
+		})
+	}
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "thread_model_compact_fallback", "current request")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	failed := emitter.ByType(telemetry.CompactionFailed)
+	if len(failed) == 0 || !strings.Contains(fmt.Sprint(failed[0].Attrs["reason"]), "summary service unavailable") {
+		t.Fatalf("expected compaction failure telemetry, got %#v", failed)
+	}
+	succeeded := emitter.ByType(telemetry.CompactionSucceeded)
+	if len(succeeded) == 0 || succeeded[0].Attrs["mode"] != "deterministic_fallback" {
+		t.Fatalf("expected deterministic fallback success telemetry, got %#v", succeeded)
+	}
+	foundDeterministicSummary := false
+	for _, msg := range llm.captured[0].messages {
+		if msg.Role == "system" && strings.Contains(msg.Content, "Earlier conversation compacted deterministically") {
+			foundDeterministicSummary = true
+		}
+	}
+	if !foundDeterministicSummary {
+		t.Fatalf("expected deterministic fallback summary in prompt: %#v", llm.captured[0].messages)
 	}
 }
 

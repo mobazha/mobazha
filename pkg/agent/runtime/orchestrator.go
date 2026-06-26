@@ -28,6 +28,21 @@ type LLMClient interface {
 	ChatStream(ctx context.Context, messages []Message, tools []ToolDef) (stream.Stream, error)
 }
 
+// ThreadCompactionRequest is the replay prefix that can be summarized before
+// the most recent messages are sent back to the LLM.
+type ThreadCompactionRequest struct {
+	TenantID string
+	ThreadID string
+	Messages []Message
+}
+
+// ThreadCompactor summarizes older replay history. Runtime still owns the
+// system prompt and recent tail preservation so model summaries cannot break
+// tool-call grouping.
+type ThreadCompactor interface {
+	CompactThread(ctx context.Context, req ThreadCompactionRequest) (string, error)
+}
+
 // Message is an agent conversation message sent to/from the LLM.
 type Message struct {
 	Role       string            `json:"role"`
@@ -46,8 +61,9 @@ type ToolDef struct {
 const runtimeUseSkillToolName = "use_skill_tool"
 
 const (
-	toolResultHistoryMaxLen = 2000
-	toolResultExcerptMaxLen = 1200
+	toolResultHistoryMaxLen       = 2000
+	toolResultExcerptMaxLen       = 1200
+	threadCompactionSummaryMaxLen = 4000
 )
 
 // Config holds the orchestrator's tuning parameters.
@@ -89,6 +105,7 @@ type Orchestrator struct {
 
 	systemPrompt     string
 	tools            []ToolDef
+	threadCompactor  ThreadCompactor
 	inputGuardrails  []InputGuardrail
 	outputGuardrails []OutputGuardrail
 }
@@ -142,6 +159,12 @@ func (o *Orchestrator) SetSystemPrompt(prompt string) {
 // RegisterTools sets the tool definitions available for LLM invocation.
 func (o *Orchestrator) RegisterTools(tools []ToolDef) {
 	o.tools = tools
+}
+
+// SetThreadCompactor enables model-backed summarization of older replay
+// history. Passing nil restores deterministic local compaction.
+func (o *Orchestrator) SetThreadCompactor(compactor ThreadCompactor) {
+	o.threadCompactor = compactor
 }
 
 // HydrateThread seeds runtime memory from durable history when a thread is
@@ -1163,7 +1186,15 @@ func (o *Orchestrator) runLoop(
 					"estimated": decision.Estimated,
 				},
 			})
-			compacted := compactReplayHistory(history, o.cfg.ShapeKeepMsgs)
+			compacted, mode, compactErr := o.compactReplayHistory(ctx, tenantID, threadID, history, o.cfg.ShapeKeepMsgs)
+			if compactErr != nil {
+				o.emitter.Emit(ctx, telemetry.Event{
+					Type:     telemetry.CompactionFailed,
+					TenantID: tenantID,
+					ThreadID: threadID,
+					Attrs:    map[string]any{"reason": runtimeDiagnosticError(compactErr)},
+				})
+			}
 			if len(compacted) < len(history) {
 				history = compacted
 				tokens = estimateMessagesTokens(history)
@@ -1175,9 +1206,10 @@ func (o *Orchestrator) runLoop(
 					Attrs: map[string]any{
 						"estimated": decision.Estimated,
 						"kept_msgs": len(history),
+						"mode":      mode,
 					},
 				})
-			} else {
+			} else if compactErr == nil {
 				o.emitter.Emit(ctx, telemetry.Event{
 					Type:     telemetry.CompactionFailed,
 					TenantID: tenantID,
@@ -1524,8 +1556,41 @@ func shapeReplayHistory(history []Message, keepLast int) []Message {
 }
 
 func compactReplayHistory(history []Message, keepLast int) []Message {
+	compacted, _ := compactReplayHistoryWithSummary(history, keepLast, func(messages []Message) (string, error) {
+		return summarizeReplayMessages(messages), nil
+	})
+	return compacted
+}
+
+func (o *Orchestrator) compactReplayHistory(ctx context.Context, tenantID, threadID string, history []Message, keepLast int) ([]Message, string, error) {
+	if o.threadCompactor == nil {
+		return compactReplayHistory(history, keepLast), "deterministic", nil
+	}
+	compacted, err := compactReplayHistoryWithSummary(history, keepLast, func(messages []Message) (string, error) {
+		req := ThreadCompactionRequest{
+			TenantID: tenantID,
+			ThreadID: threadID,
+			Messages: append([]Message(nil), messages...),
+		}
+		summary, err := o.threadCompactor.CompactThread(ctx, req)
+		if err != nil {
+			return "", err
+		}
+		summary = compactToolResultRaw(strings.TrimSpace(summary), threadCompactionSummaryMaxLen)
+		if summary == "" {
+			return "", errors.New("thread compactor returned empty summary")
+		}
+		return summary, nil
+	})
+	if err != nil {
+		return compactReplayHistory(history, keepLast), "deterministic_fallback", err
+	}
+	return compacted, "thread_compactor", nil
+}
+
+func compactReplayHistoryWithSummary(history []Message, keepLast int, summarize func([]Message) (string, error)) ([]Message, error) {
 	if keepLast <= 0 || len(history) <= keepLast+2 {
-		return history
+		return history, nil
 	}
 	system := firstSystemMessage(history)
 	start := 0
@@ -1534,9 +1599,12 @@ func compactReplayHistory(history []Message, keepLast int) []Message {
 	}
 	prefixEnd := managed_escrowReplayTailStart(history, len(history)-keepLast)
 	if prefixEnd <= start {
-		return history
+		return history, nil
 	}
-	summary := summarizeReplayMessages(history[start:prefixEnd])
+	summary, err := summarize(history[start:prefixEnd])
+	if err != nil {
+		return history, err
+	}
 	tail := append([]Message(nil), history[prefixEnd:]...)
 	out := make([]Message, 0, len(tail)+2)
 	if system != nil {
@@ -1547,7 +1615,7 @@ func compactReplayHistory(history []Message, keepLast int) []Message {
 		Content: summary,
 	})
 	out = append(out, tail...)
-	return out
+	return out, nil
 }
 
 func managed_escrowReplayTailStart(history []Message, desiredStart int) int {

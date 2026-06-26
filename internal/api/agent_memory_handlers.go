@@ -3,6 +3,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -32,13 +33,27 @@ type agentMemoryCreateRequest struct {
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
+type agentMemoryPatchRequest struct {
+	Subject  *string            `json:"subject,omitempty"`
+	Content  *string            `json:"content,omitempty"`
+	Metadata *map[string]string `json:"metadata,omitempty"`
+}
+
+type agentMemoryUpdateStore interface {
+	UpdateMemory(ctx context.Context, scope kernel.Scope, id string, update agentstore.MemoryUpdate) (*kernel.MemoryItem, error)
+}
+
 func (g *Gateway) handleGETAgentMemories(w http.ResponseWriter, r *http.Request) {
 	p, memoryStore, ok := agentMemoryProvider(r)
 	if !ok {
 		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Agent memory is not available in this mode")
 		return
 	}
-	scope := agentMemoryVisibleScope(r, p)
+	scope, err := agentMemoryVisibleScope(r, p)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
 	types, ok := agentMemoryQueryScopes(r.URL.Query().Get("scope"))
 	if !ok {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "Invalid memory scope")
@@ -103,6 +118,49 @@ func (g *Gateway) handlePOSTAgentMemory(w http.ResponseWriter, r *http.Request) 
 	responsePkg.Created(w, item)
 }
 
+func (g *Gateway) handlePATCHAgentMemory(w http.ResponseWriter, r *http.Request) {
+	p, memoryStore, ok := agentMemoryProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Agent memory is not available in this mode")
+		return
+	}
+	updateStore, ok := memoryStore.(agentMemoryUpdateStore)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Agent memory editing is not available in this mode")
+		return
+	}
+	id := strings.TrimSpace(chi.URLParam(r, "memoryId"))
+	if id == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "Memory id is required")
+		return
+	}
+	var req agentMemoryPatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Invalid request body")
+		return
+	}
+	update, err := agentMemoryUpdateFromPatch(req)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	scope, err := agentMemoryVisibleScope(r, p)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	item, err := updateStore.UpdateMemory(r.Context(), scope, id, update)
+	if err != nil {
+		if errors.Is(err, agentstore.ErrMemoryNotFound) {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Agent memory not found")
+			return
+		}
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to update agent memory")
+		return
+	}
+	responsePkg.Success(w, item)
+}
+
 func (g *Gateway) handleDELETEAgentMemory(w http.ResponseWriter, r *http.Request) {
 	p, memoryStore, ok := agentMemoryProvider(r)
 	if !ok {
@@ -114,7 +172,11 @@ func (g *Gateway) handleDELETEAgentMemory(w http.ResponseWriter, r *http.Request
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "Memory id is required")
 		return
 	}
-	scope := agentMemoryVisibleScope(r, p)
+	scope, err := agentMemoryVisibleScope(r, p)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
 	if err := memoryStore.Delete(r.Context(), scope, id); err != nil {
 		if errors.Is(err, agentstore.ErrMemoryNotFound) {
 			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Agent memory not found")
@@ -138,7 +200,7 @@ func agentMemoryProvider(r *http.Request) (aiChatProvider, kernel.MemoryStore, b
 	return p, memoryStore, true
 }
 
-func agentMemoryVisibleScope(r *http.Request, p aiChatProvider) kernel.Scope {
+func agentMemoryVisibleScope(r *http.Request, p aiChatProvider) (kernel.Scope, error) {
 	if p == nil {
 		if provider, ok := getAIChatProvider(r); ok {
 			p = provider
@@ -152,11 +214,13 @@ func agentMemoryVisibleScope(r *http.Request, p aiChatProvider) kernel.Scope {
 	}
 	q := r.URL.Query()
 	if storeID := strings.TrimSpace(q.Get("storeId")); storeID != "" {
-		scope.StoreID = storeID
+		if scope.StoreID == "" || storeID != scope.StoreID {
+			return kernel.Scope{}, errors.New("storeId does not match current store")
+		}
 	}
 	scope.ThreadID = strings.TrimSpace(q.Get("threadId"))
 	scope.SkillID = strings.TrimSpace(q.Get("skillId"))
-	return scope
+	return scope, nil
 }
 
 func agentMemoryWriteScope(r *http.Request, p aiChatProvider, req agentMemoryCreateRequest) (kernel.Scope, kernel.MemoryScope, error) {
@@ -172,7 +236,9 @@ func agentMemoryWriteScope(r *http.Request, p aiChatProvider, req agentMemoryCre
 		SkillID:  strings.TrimSpace(req.SkillID),
 	}
 	if storeID := strings.TrimSpace(req.StoreID); storeID != "" {
-		scope.StoreID = storeID
+		if scope.StoreID == "" || storeID != scope.StoreID {
+			return kernel.Scope{}, "", errors.New("storeId does not match current store")
+		}
 	}
 	switch memoryScope {
 	case kernel.MemoryUser:
@@ -197,6 +263,36 @@ func agentMemoryWriteScope(r *http.Request, p aiChatProvider, req agentMemoryCre
 		}
 	}
 	return scope, memoryScope, nil
+}
+
+func agentMemoryUpdateFromPatch(req agentMemoryPatchRequest) (agentstore.MemoryUpdate, error) {
+	update := agentstore.MemoryUpdate{}
+	if req.Subject != nil {
+		subject := strings.TrimSpace(*req.Subject)
+		update.Subject = &subject
+	}
+	if req.Content != nil {
+		content := strings.TrimSpace(*req.Content)
+		if content == "" {
+			return agentstore.MemoryUpdate{}, errors.New("Memory content is required")
+		}
+		update.Content = &content
+	}
+	if req.Metadata != nil {
+		metadata := map[string]string{}
+		for key, value := range *req.Metadata {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			metadata[key] = strings.TrimSpace(value)
+		}
+		update.Metadata = &metadata
+	}
+	if update.Subject == nil && update.Content == nil && update.Metadata == nil {
+		return agentstore.MemoryUpdate{}, errors.New("Memory update is empty")
+	}
+	return update, nil
 }
 
 func agentMemoryScope(raw string, fallback kernel.MemoryScope) (kernel.MemoryScope, bool) {

@@ -623,6 +623,33 @@ func TestGormPersistence_MemoryStoreScopesAndArchive(t *testing.T) {
 	require.Len(t, items, 1)
 	require.Equal(t, "mem_store", items[0].ID)
 
+	updatedSubject := "brand_voice"
+	updatedContent := "品牌语气更直接"
+	updatedMetadata := map[string]string{"source": "manual_edit"}
+	updated, err := persistA.UpdateMemory(ctx, scopeA, "mem_store", MemoryUpdate{
+		Subject:  &updatedSubject,
+		Content:  &updatedContent,
+		Metadata: &updatedMetadata,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "mem_store", updated.ID)
+	require.Equal(t, "brand_voice", updated.Subject)
+	require.Equal(t, "品牌语气更直接", updated.Content)
+	require.Equal(t, "manual_edit", updated.Metadata["source"])
+
+	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeA, Query: "直接", Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, "mem_store", items[0].ID)
+
+	forbiddenContent := "should not update"
+	_, err = persistA.UpdateMemory(ctx, scopeAOtherActor, "mem_user", MemoryUpdate{Content: &forbiddenContent})
+	require.ErrorIs(t, err, ErrMemoryNotFound)
+	_, err = persistA.UpdateMemory(ctx, scopeA, "mem_missing", MemoryUpdate{Content: &forbiddenContent})
+	require.ErrorIs(t, err, ErrMemoryNotFound)
+	_, err = persistA.UpdateMemory(ctx, scopeA, "mem_store", MemoryUpdate{})
+	require.Error(t, err)
+
 	items, err = persistA.Search(ctx, kernel.MemoryQuery{Scope: scopeAOtherStore, Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, items, 2)

@@ -2171,12 +2171,12 @@
             }
           },
           {
-            "description": "Optional store scope identifier.",
+            "description": "Optional store scope identifier. When set, it must match the current store.",
             "explode": false,
             "in": "query",
             "name": "storeId",
             "schema": {
-              "description": "Optional store scope identifier.",
+              "description": "Optional store scope identifier. When set, it must match the current store.",
               "type": "string"
             }
           },
@@ -2225,6 +2225,93 @@
           }
         ],
         "summary": "Delete an agent memory",
+        "tags": [
+          "agent"
+        ]
+      },
+      "patch": {
+        "operationId": "agent-memory-patch",
+        "parameters": [
+          {
+            "description": "Agent memory ID.",
+            "in": "path",
+            "name": "memoryId",
+            "required": true,
+            "schema": {
+              "description": "Agent memory ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional store scope identifier. When set, it must match the current store.",
+            "explode": false,
+            "in": "query",
+            "name": "storeId",
+            "schema": {
+              "description": "Optional store scope identifier. When set, it must match the current store.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional thread scope identifier.",
+            "explode": false,
+            "in": "query",
+            "name": "threadId",
+            "schema": {
+              "description": "Optional thread scope identifier.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional skill scope identifier.",
+            "explode": false,
+            "in": "query",
+            "name": "skillId",
+            "schema": {
+              "description": "Optional skill scope identifier.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          }
+        ],
+        "summary": "Update an agent memory",
         "tags": [
           "agent"
         ]

@@ -489,7 +489,7 @@ func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolved
 			o.emitter.Emit(ctx, telemetry.Event{
 				Type:     telemetry.MemoryRetrievalFailed,
 				TenantID: resolved.scope.TenantID,
-				Attrs:    map[string]any{"error": err.Error()},
+				Attrs:    map[string]any{"error": runtimeDiagnosticError(err)},
 			})
 		}
 		return ""
@@ -555,7 +555,7 @@ func (o *Orchestrator) captureExplicitMemory(ctx context.Context, resolved resol
 			Type:     telemetry.MemorySaveFailed,
 			TenantID: resolved.scope.TenantID,
 			Attrs: map[string]any{
-				"error": err.Error(),
+				"error": runtimeDiagnosticError(err),
 				"scope": item.Scope,
 			},
 		})
@@ -590,7 +590,7 @@ func (o *Orchestrator) forgetExplicitMemory(ctx context.Context, resolved resolv
 			Type:     telemetry.MemoryDeleteFailed,
 			TenantID: resolved.scope.TenantID,
 			Attrs: map[string]any{
-				"error": err.Error(),
+				"error": runtimeDiagnosticError(err),
 				"scope": kernel.MemoryUser,
 			},
 		})
@@ -606,7 +606,7 @@ func (o *Orchestrator) forgetExplicitMemory(ctx context.Context, resolved resolv
 				Type:     telemetry.MemoryDeleteFailed,
 				TenantID: resolved.scope.TenantID,
 				Attrs: map[string]any{
-					"error": err.Error(),
+					"error": runtimeDiagnosticError(err),
 					"scope": kernel.MemoryUser,
 				},
 			})
@@ -1805,7 +1805,7 @@ func (o *Orchestrator) callLLMWithRetry(ctx context.Context, history []Message, 
 		if attempt > 0 {
 			o.emitter.Emit(ctx, telemetry.Event{
 				Type:  telemetry.LLMRetried,
-				Attrs: map[string]any{"attempt": attempt, "error": lastErr.Error()},
+				Attrs: map[string]any{"attempt": attempt, "error": runtimeDiagnosticError(lastErr)},
 			})
 			backoff := time.Duration(attempt*500) * time.Millisecond
 			select {
@@ -1879,7 +1879,7 @@ func (o *Orchestrator) completeTurnFailed(ctx context.Context, tenantID, threadI
 		attrs["error"] = errorText
 	}
 	if err != nil {
-		attrs["turn_save_error"] = compactToolResultRaw(err.Error(), 500)
+		attrs["turn_save_error"] = runtimeDiagnosticError(err)
 	}
 	o.emitter.Emit(ctx, telemetry.Event{
 		Type:     telemetry.TurnFailed,
@@ -1894,7 +1894,60 @@ func turnFailureError(err error) string {
 	if err == nil {
 		return ""
 	}
-	return compactToolResultRaw(err.Error(), 500)
+	return runtimeDiagnosticError(err)
+}
+
+func runtimeDiagnosticError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return compactToolResultRaw(redactRuntimeDiagnostic(err.Error()), 500)
+}
+
+func redactRuntimeDiagnostic(text string) string {
+	text = redact.SanitizeEnvBlock(text)
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(text), &obj); err == nil {
+		return redact.RedactMapJSON(obj)
+	}
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(text), &arr); err == nil {
+		for i := range arr {
+			arr[i] = redact.RedactMap(arr[i])
+		}
+		if data, err := json.Marshal(arr); err == nil {
+			return string(data)
+		}
+	}
+	if redacted, ok := redactEmbeddedJSONDiagnostic(text); ok {
+		return redacted
+	}
+	return text
+}
+
+func redactEmbeddedJSONDiagnostic(text string) (string, bool) {
+	start := strings.IndexByte(text, '{')
+	end := strings.LastIndexByte(text, '}')
+	if start >= 0 && end > start {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(text[start:end+1]), &obj); err == nil {
+			return text[:start] + redact.RedactMapJSON(obj) + text[end+1:], true
+		}
+	}
+	start = strings.IndexByte(text, '[')
+	end = strings.LastIndexByte(text, ']')
+	if start >= 0 && end > start {
+		var arr []map[string]any
+		if err := json.Unmarshal([]byte(text[start:end+1]), &arr); err == nil {
+			for i := range arr {
+				arr[i] = redact.RedactMap(arr[i])
+			}
+			if data, err := json.Marshal(arr); err == nil {
+				return text[:start] + string(data) + text[end+1:], true
+			}
+		}
+	}
+	return "", false
 }
 
 func (o *Orchestrator) saveMessage(ctx context.Context, tenantID, threadID string, msg *store.Message) error {

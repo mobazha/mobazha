@@ -114,6 +114,13 @@ type GormPersistence struct {
 	db pkgdb.Database
 }
 
+// MemoryUpdate describes mutable user-managed memory fields.
+type MemoryUpdate struct {
+	Subject  *string
+	Content  *string
+	Metadata *map[string]string
+}
+
 // NewGormPersistence creates a durable agent runtime persistence adapter.
 func NewGormPersistence(db pkgdb.Database) *GormPersistence {
 	return &GormPersistence{db: db}
@@ -226,6 +233,52 @@ func (p *GormPersistence) Delete(_ context.Context, scope kernel.Scope, id strin
 		}
 		return nil
 	})
+}
+
+// UpdateMemory updates mutable fields on a memory visible to the provided scope.
+func (p *GormPersistence) UpdateMemory(_ context.Context, scope kernel.Scope, id string, update MemoryUpdate) (*kernel.MemoryItem, error) {
+	if p == nil || p.db == nil {
+		return nil, nil
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, ErrMemoryNotFound
+	}
+	values, err := memoryUpdateColumns(update)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	values["updated_at"] = now
+	var memory Memory
+	err = p.db.Update(func(tx pkgdb.Tx) error {
+		query := tx.Read().Where("tenant_id = ? AND id = ? AND status = ?", scope.TenantID, id, MemoryStatusActive)
+		if err := visibleMemoryQuery(query, scope).First(&memory).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrMemoryNotFound
+			}
+			return err
+		}
+		rows, err := tx.UpdateColumns(values, map[string]interface{}{
+			"tenant_id = ?": scope.TenantID,
+			"id = ?":        id,
+			"status = ?":    MemoryStatusActive,
+		}, &Memory{})
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return ErrMemoryNotFound
+		}
+		applyMemoryUpdateColumns(&memory, values)
+		memory.UpdatedAt = now
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	item := memory.toKernel()
+	return &item, nil
 }
 
 // SaveSkillRun persists a durable skill run.
@@ -903,6 +956,50 @@ func memoryFromKernel(scope kernel.Scope, item kernel.MemoryItem) (*Memory, erro
 		CreatedAt: item.CreatedAt,
 		UpdatedAt: item.UpdatedAt,
 	}, nil
+}
+
+func memoryUpdateColumns(update MemoryUpdate) (map[string]interface{}, error) {
+	values := map[string]interface{}{}
+	if update.Subject != nil {
+		values["subject"] = truncateStoreText(strings.TrimSpace(*update.Subject), 128)
+	}
+	if update.Content != nil {
+		content := strings.TrimSpace(*update.Content)
+		if content == "" {
+			return nil, fmt.Errorf("agent store: memory content is required")
+		}
+		values["content"] = truncateStoreText(redact.SanitizeEnvBlock(content), 4000)
+	}
+	if update.Metadata != nil {
+		metadata := ""
+		if len(*update.Metadata) > 0 {
+			data, err := json.Marshal(*update.Metadata)
+			if err != nil {
+				return nil, fmt.Errorf("agent store: marshal memory metadata: %w", err)
+			}
+			metadata = sanitizeJSONText(string(data))
+		}
+		values["metadata"] = metadata
+	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("agent store: memory update is empty")
+	}
+	return values, nil
+}
+
+func applyMemoryUpdateColumns(memory *Memory, values map[string]interface{}) {
+	if memory == nil {
+		return
+	}
+	if value, ok := values["subject"].(string); ok {
+		memory.Subject = value
+	}
+	if value, ok := values["content"].(string); ok {
+		memory.Content = value
+	}
+	if value, ok := values["metadata"].(string); ok {
+		memory.Metadata = value
+	}
 }
 
 func memoryStoreID(scope kernel.Scope, memoryScope kernel.MemoryScope) string {

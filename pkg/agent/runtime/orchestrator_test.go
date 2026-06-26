@@ -377,6 +377,13 @@ func newTestOrch(llm *mockLLM, emitter telemetry.Emitter) *Orchestrator {
 	)
 }
 
+func assertTelemetryAttrDoesNotContain(t *testing.T, event telemetry.Event, attr, secret string) {
+	t.Helper()
+	if got := fmt.Sprint(event.Attrs[attr]); strings.Contains(got, secret) {
+		t.Fatalf("%s telemetry leaked secret in %q: %q", event.Type, attr, got)
+	}
+}
+
 // --- tests ---
 
 func TestRunTurn_SimpleTextResponse(t *testing.T) {
@@ -488,6 +495,80 @@ func TestRunTurn_PersistsFailedTurnStatus(t *testing.T) {
 	if failures[0].Attrs["reason"] != "llm_call_failed" {
 		t.Fatalf("unexpected failure telemetry attrs: %#v", failures[0].Attrs)
 	}
+}
+
+func TestRunTurn_RedactsFailedTurnTelemetry(t *testing.T) {
+	persist := &fakePersistence{}
+	secretErr := errors.New(`{"error":"provider failed","api_key":"sk-secret"}`)
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{err: secretErr},
+			{err: secretErr},
+			{err: secretErr},
+		},
+	}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		emitter,
+		nil,
+	)
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_status_secret", "hello")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err == nil {
+		t.Fatal("expected stream error")
+	}
+	final := persist.turns[len(persist.turns)-1]
+	if strings.Contains(final.Error, "sk-secret") {
+		t.Fatalf("persisted turn error leaked secret: %q", final.Error)
+	}
+	failures := emitter.ByType(telemetry.TurnFailed)
+	if len(failures) != 1 {
+		t.Fatalf("expected turn_failed telemetry, got %#v", emitter.Events)
+	}
+	assertTelemetryAttrDoesNotContain(t, failures[0], "error", "sk-secret")
+}
+
+func TestRunTurn_RedactsLLMRetryTelemetry(t *testing.T) {
+	secretErr := errors.New(`LLM call failed: {"api_key":"sk-secret","error":"provider overloaded"}`)
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{err: secretErr},
+			{chunks: []stream.Chunk{{Delta: "ok"}}},
+		},
+	}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		&Config{LLMRetries: 1},
+	)
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_retry_secret", "hello")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	retries := emitter.ByType(telemetry.LLMRetried)
+	if len(retries) != 1 {
+		t.Fatalf("expected llm_retried telemetry, got %#v", emitter.Events)
+	}
+	assertTelemetryAttrDoesNotContain(t, retries[0], "error", "sk-secret")
 }
 
 func TestRunTurnWithOptions_LoadsActiveMarkdownSkill(t *testing.T) {
@@ -1720,6 +1801,41 @@ func TestRunTurnWithOptions_MemoryFallsBackWhenQueryMisses(t *testing.T) {
 	}
 }
 
+func TestRunTurnWithOptions_MemoryRetrievalFailureRedactsTelemetry(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{err: errors.New(`{"error":"search failed","api_key":"sk-secret"}`)}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		nil,
+	)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_memory_retrieve_failed", "hello", TurnOptions{
+		MemoryStore: memory,
+		Scope: kernel.Scope{
+			TenantID: "tenant_1",
+			ActorID:  "actor_1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	failures := emitter.ByType(telemetry.MemoryRetrievalFailed)
+	if len(failures) != 1 {
+		t.Fatalf("expected memory_retrieval_failed telemetry, got %#v", emitter.Events)
+	}
+	assertTelemetryAttrDoesNotContain(t, failures[0], "error", "sk-secret")
+}
+
 func TestRunTurnWithOptions_SavesExplicitMemory(t *testing.T) {
 	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
 	memory := &fakeMemoryStore{}
@@ -1798,7 +1914,7 @@ func TestRunTurnWithOptions_DoesNotSaveNegatedExplicitMemory(t *testing.T) {
 
 func TestRunTurnWithOptions_MemorySaveFailureDoesNotFailTurn(t *testing.T) {
 	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
-	memory := &fakeMemoryStore{saveErr: errors.New("memory unavailable")}
+	memory := &fakeMemoryStore{saveErr: errors.New(`{"error":"memory unavailable","api_key":"sk-secret"}`)}
 	emitter := &telemetry.BufferEmitter{}
 	orch := NewOrchestrator(
 		llm,
@@ -1827,9 +1943,11 @@ func TestRunTurnWithOptions_MemorySaveFailureDoesNotFailTurn(t *testing.T) {
 	if len(memory.savedItems) != 1 {
 		t.Fatalf("expected attempted memory save, got %#v", memory.savedItems)
 	}
-	if len(emitter.ByType(telemetry.MemorySaveFailed)) != 1 {
+	failures := emitter.ByType(telemetry.MemorySaveFailed)
+	if len(failures) != 1 {
 		t.Fatalf("expected memory_save_failed telemetry, got %#v", emitter.Events)
 	}
+	assertTelemetryAttrDoesNotContain(t, failures[0], "error", "sk-secret")
 }
 
 func TestRunTurnWithOptions_DeletesExplicitForgetMemory(t *testing.T) {
@@ -1890,7 +2008,7 @@ func TestRunTurnWithOptions_MemoryDeleteFailureDoesNotFailTurn(t *testing.T) {
 			Scope:   kernel.MemoryUser,
 			Content: "我喜欢中文回答",
 		}},
-		deleteErr: errors.New("memory delete unavailable"),
+		deleteErr: errors.New(`{"error":"memory delete unavailable","api_key":"sk-secret"}`),
 	}
 	emitter := &telemetry.BufferEmitter{}
 	orch := NewOrchestrator(
@@ -1917,9 +2035,11 @@ func TestRunTurnWithOptions_MemoryDeleteFailureDoesNotFailTurn(t *testing.T) {
 	if _, err := stream.Collect(result.Output); err != nil {
 		t.Fatalf("collect stream: %v", err)
 	}
-	if len(emitter.ByType(telemetry.MemoryDeleteFailed)) != 1 {
+	failures := emitter.ByType(telemetry.MemoryDeleteFailed)
+	if len(failures) != 1 {
 		t.Fatalf("expected memory_delete_failed telemetry, got %#v", emitter.Events)
 	}
+	assertTelemetryAttrDoesNotContain(t, failures[0], "error", "sk-secret")
 }
 
 func TestExplicitMemoryContent_IsConservative(t *testing.T) {

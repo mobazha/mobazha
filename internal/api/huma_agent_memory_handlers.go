@@ -27,9 +27,16 @@ func (g *Gateway) registerNodeHumaAgentMemoryOperations(api huma.API) {
 	type agentMemoryCreateInput struct {
 		Body json.RawMessage
 	}
+	type agentMemoryPatchInput struct {
+		MemoryID string `path:"memoryId" doc:"Agent memory ID."`
+		StoreID  string `query:"storeId" doc:"Optional store scope identifier. When set, it must match the current store."`
+		ThreadID string `query:"threadId" doc:"Optional thread scope identifier."`
+		SkillID  string `query:"skillId" doc:"Optional skill scope identifier."`
+		Body     json.RawMessage
+	}
 	type agentMemoryDeleteInput struct {
 		MemoryID string `path:"memoryId" doc:"Agent memory ID."`
-		StoreID  string `query:"storeId" doc:"Optional store scope identifier."`
+		StoreID  string `query:"storeId" doc:"Optional store scope identifier. When set, it must match the current store."`
 		ThreadID string `query:"threadId" doc:"Optional thread scope identifier."`
 		SkillID  string `query:"skillId" doc:"Optional skill scope identifier."`
 	}
@@ -73,6 +80,26 @@ func (g *Gateway) registerNodeHumaAgentMemoryOperations(api huma.API) {
 	})
 
 	huma.Register(api, huma.Operation{
+		OperationID: "agent-memory-patch",
+		Method:      http.MethodPatch,
+		Path:        "/v1/agent/memories/{memoryId}",
+		Summary:     "Update an agent memory",
+		Tags:        []string{"agent"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, in *agentMemoryPatchInput) (*nodeDataOutput, error) {
+		rawURL := agentMemoryItemURL(in.MemoryID, in.StoreID, in.ThreadID, in.SkillID)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPatch, rawURL, bytes.NewReader(in.Body), map[string]string{"memoryId": in.MemoryID})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePATCHAgentMemory(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "agent-memory-delete",
 		Method:      http.MethodDelete,
 		Path:        "/v1/agent/memories/{memoryId}",
@@ -80,7 +107,7 @@ func (g *Gateway) registerNodeHumaAgentMemoryOperations(api huma.API) {
 		Tags:        []string{"agent"},
 		Security:    adminOnlyAuthSecurity,
 	}, func(ctx context.Context, in *agentMemoryDeleteInput) (*nodeNoContentOutput, error) {
-		rawURL := agentMemoryDeleteURL(in.MemoryID, in.StoreID, in.ThreadID, in.SkillID)
+		rawURL := agentMemoryItemURL(in.MemoryID, in.StoreID, in.ThreadID, in.SkillID)
 		req := nodeBridgeRequestWithVars(ctx, http.MethodDelete, rawURL, nil, map[string]string{"memoryId": in.MemoryID})
 		rr := httptest.NewRecorder()
 		g.handleDELETEAgentMemory(rr, req)
@@ -121,7 +148,7 @@ func agentMemoriesURL(scope, subject, query string, limit int, storeID, threadID
 	return rawURL
 }
 
-func agentMemoryDeleteURL(memoryID, storeID, threadID, skillID string) string {
+func agentMemoryItemURL(memoryID, storeID, threadID, skillID string) string {
 	values := url.Values{}
 	if storeID != "" {
 		values.Set("storeId", storeID)

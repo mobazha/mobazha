@@ -285,6 +285,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"agent-memories-get",
 		"agent-memories-post",
 		"agent-memory-delete",
+		"agent-memory-patch",
 		"agent-product-import-ingest-post",
 		"agent-product-import-run-approval-applications-post",
 		"agent-product-import-run-approval-decisions-post",

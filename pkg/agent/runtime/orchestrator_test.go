@@ -78,10 +78,14 @@ type fakeMemoryStore struct {
 	savedItems  []kernel.MemoryItem
 	deletedIDs  []string
 	missQueries bool
+	searchFn    func(kernel.MemoryQuery) ([]kernel.MemoryItem, error)
 }
 
 func (s *fakeMemoryStore) Search(_ context.Context, q kernel.MemoryQuery) ([]kernel.MemoryItem, error) {
 	s.queries = append(s.queries, q)
+	if s.searchFn != nil {
+		return s.searchFn(q)
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -1922,6 +1926,77 @@ func TestRunTurnWithOptions_InjectsRetrievedMemory(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected memory context in system prompt: %#v", llm.captured[0].messages)
+	}
+}
+
+func TestRunTurnWithOptions_InjectsActiveSkillMemory(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "product.import")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(`---
+name: product.import
+description: Import product materials.
+persona: seller
+capabilities: listing.read
+tool_hints: search
+---
+
+# Product Import
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	memory := &fakeMemoryStore{}
+	memory.searchFn = func(q kernel.MemoryQuery) ([]kernel.MemoryItem, error) {
+		if q.Scope.SkillID == "product.import" && len(q.Types) == 1 && q.Types[0] == kernel.MemorySkill {
+			return []kernel.MemoryItem{{
+				ID:      "mem_skill_1",
+				Scope:   kernel.MemorySkill,
+				Subject: "import-rules",
+				Content: "Always create reviewable product proposals before apply.",
+			}}, nil
+		}
+		return nil, nil
+	}
+	orch := newTestOrch(llm, nil)
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "thread_skill_memory", "import products", TurnOptions{
+		SkillProvider:   agentskill.NewFilesystemProvider(dir),
+		RequestedSkills: []string{"product.import"},
+		SkillFilter:     agentskill.Filter{Persona: string(kernel.PersonaSeller)},
+		MemoryStore:     memory,
+		Scope: kernel.Scope{
+			TenantID:      "tenant_1",
+			StoreID:       "store_1",
+			ActorID:       "actor_1",
+			ActingPersona: kernel.PersonaSeller,
+		},
+	})
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	foundSkillMemory := false
+	for _, msg := range llm.captured[0].messages {
+		if msg.Role == "system" && strings.Contains(msg.Content, "[skill/import-rules] Always create reviewable product proposals before apply.") {
+			foundSkillMemory = true
+		}
+	}
+	if !foundSkillMemory {
+		t.Fatalf("expected active skill memory in system prompt: %#v", llm.captured[0].messages)
+	}
+	sawSkillQuery := false
+	for _, query := range memory.queries {
+		if query.Scope.SkillID == "product.import" && len(query.Types) == 1 && query.Types[0] == kernel.MemorySkill {
+			sawSkillQuery = true
+		}
+	}
+	if !sawSkillQuery {
+		t.Fatalf("expected active skill memory query, got %#v", memory.queries)
 	}
 }
 

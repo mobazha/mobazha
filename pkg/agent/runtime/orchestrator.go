@@ -501,40 +501,39 @@ func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolved
 	if resolved.memoryStore == nil || resolved.scope.TenantID == "" {
 		return ""
 	}
+	queryText := memoryQueryText(userMsg)
+	types := []kernel.MemoryScope{
+		kernel.MemoryUser,
+		kernel.MemoryStoreScope,
+		kernel.MemoryTenant,
+		kernel.MemoryThread,
+	}
+	if resolved.scope.SkillID != "" {
+		types = append(types, kernel.MemorySkill)
+	}
 	query := kernel.MemoryQuery{
 		Scope: resolved.scope,
-		Types: []kernel.MemoryScope{
-			kernel.MemoryUser,
-			kernel.MemoryStoreScope,
-			kernel.MemoryTenant,
-			kernel.MemoryThread,
-			kernel.MemorySkill,
-		},
+		Types: types,
 		Limit: 5,
 	}
-	if text := memoryQueryText(userMsg); text != "" {
-		query.Query = text
+	if queryText != "" {
+		query.Query = queryText
 	}
-	items, err := resolved.memoryStore.Search(ctx, query)
-	if err == nil && len(items) == 0 && query.Query != "" {
-		query.Query = ""
-		items, err = resolved.memoryStore.Search(ctx, query)
-	}
-	if err != nil || len(items) == 0 {
-		if err != nil {
-			o.emitter.Emit(ctx, telemetry.Event{
-				Type:     telemetry.MemoryRetrievalFailed,
-				TenantID: resolved.scope.TenantID,
-				Attrs:    map[string]any{"error": runtimeDiagnosticError(err)},
-			})
-		}
+	items, err := searchMemoryWithFallback(ctx, resolved.memoryStore, query)
+	if err != nil {
+		o.emitter.Emit(ctx, telemetry.Event{
+			Type:     telemetry.MemoryRetrievalFailed,
+			TenantID: resolved.scope.TenantID,
+			Attrs:    map[string]any{"error": runtimeDiagnosticError(err)},
+		})
 		return ""
 	}
+	items = appendActiveSkillMemory(ctx, o, resolved, queryText, items)
 	lines := []string{
 		"Relevant memory for this turn:",
 		"Use memory as preference/context only. If memory conflicts with current user input or tool results, prefer current input and tools.",
 	}
-	for _, item := range items {
+	for _, item := range uniqueMemoryItems(items) {
 		content := compactToolResultRaw(item.Content, 320)
 		if content == "" {
 			continue
@@ -554,6 +553,79 @@ func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolved
 		Attrs:    map[string]any{"count": len(lines) - 2},
 	})
 	return strings.Join(lines, "\n")
+}
+
+func appendActiveSkillMemory(ctx context.Context, o *Orchestrator, resolved resolvedTurnContext, queryText string, items []kernel.MemoryItem) []kernel.MemoryItem {
+	if len(resolved.activeSkills) == 0 {
+		return items
+	}
+	seenSkills := map[string]struct{}{}
+	if resolved.scope.SkillID != "" {
+		seenSkills[resolved.scope.SkillID] = struct{}{}
+	}
+	for _, skill := range resolved.activeSkills {
+		if skill == nil || strings.TrimSpace(skill.ID) == "" {
+			continue
+		}
+		skillID := strings.TrimSpace(skill.ID)
+		if _, ok := seenSkills[skillID]; ok {
+			continue
+		}
+		seenSkills[skillID] = struct{}{}
+		scope := resolved.scope
+		scope.SkillID = skillID
+		query := kernel.MemoryQuery{
+			Scope: scope,
+			Types: []kernel.MemoryScope{kernel.MemorySkill},
+			Limit: 3,
+			Query: queryText,
+		}
+		skillItems, err := searchMemoryWithFallback(ctx, resolved.memoryStore, query)
+		if err != nil {
+			if o != nil {
+				o.emitter.Emit(ctx, telemetry.Event{
+					Type:     telemetry.MemoryRetrievalFailed,
+					TenantID: resolved.scope.TenantID,
+					Attrs: map[string]any{
+						"error":    runtimeDiagnosticError(err),
+						"skill_id": skillID,
+					},
+				})
+			}
+			continue
+		}
+		items = append(items, skillItems...)
+	}
+	return items
+}
+
+func searchMemoryWithFallback(ctx context.Context, memoryStore kernel.MemoryStore, query kernel.MemoryQuery) ([]kernel.MemoryItem, error) {
+	items, err := memoryStore.Search(ctx, query)
+	if err == nil && len(items) == 0 && query.Query != "" {
+		query.Query = ""
+		items, err = memoryStore.Search(ctx, query)
+	}
+	return items, err
+}
+
+func uniqueMemoryItems(items []kernel.MemoryItem) []kernel.MemoryItem {
+	if len(items) <= 1 {
+		return items
+	}
+	seen := map[string]struct{}{}
+	out := make([]kernel.MemoryItem, 0, len(items))
+	for _, item := range items {
+		key := item.ID
+		if key == "" {
+			key = string(item.Scope) + "\x00" + item.Subject + "\x00" + item.Content
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, item)
+	}
+	return out
 }
 
 func memoryQueryText(text string) string {

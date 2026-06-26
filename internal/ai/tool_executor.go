@@ -46,6 +46,18 @@ var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
 		return toolRoute{"GET", "/v1/listings/mine/" + sanitizePathParam(a["slug"])}
 	},
 	"listings_get_template": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/template"} },
+	"agent_skill_runs_create": func(_ map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/agent/skill-runs"}
+	},
+	"agent_skill_runs_list": func(_ map[string]interface{}) toolRoute {
+		return toolRoute{"GET", "/v1/agent/skill-runs"}
+	},
+	"agent_skill_runs_get": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"GET", "/v1/agent/skill-runs/" + sanitizePathParam(a["runId"])}
+	},
+	"agent_skill_runs_update": func(a map[string]interface{}) toolRoute {
+		return toolRoute{"PATCH", "/v1/agent/skill-runs/" + sanitizePathParam(a["runId"])}
+	},
 	"agent_artifacts_list": func(_ map[string]interface{}) toolRoute {
 		return toolRoute{"GET", "/v1/agent/artifacts"}
 	},
@@ -204,6 +216,14 @@ func buildRequestBody(toolName string, args map[string]interface{}) ([]byte, err
 			}
 		}
 		return json.Marshal(payload)
+	case toolName == "agent_skill_runs_update":
+		payload := make(map[string]interface{}, len(args))
+		for k, v := range args {
+			if k != "runId" {
+				payload[k] = v
+			}
+		}
+		return json.Marshal(payload)
 	case toolName == "chat_send_message":
 		payload := map[string]interface{}{}
 		if body, ok := args["body"]; ok {
@@ -226,6 +246,9 @@ func appendQueryParams(baseURL, toolName string, args map[string]interface{}) st
 		"orders_get_sales":   {"limit", "offset"},
 		"notifications_list": {"limit", "offset"},
 		"chat_get_messages":  {"limit", "before", "after", "since"},
+		"agent_skill_runs_list": {
+			"skillId", "status", "limit", "offset",
+		},
 		"agent_artifacts_list": {
 			"skillRunId", "kind", "status", "limit", "offset",
 		},

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,7 +46,10 @@ var agentChatRuntimes sync.Map
 
 const (
 	agentChatMaxContextArtifacts = 10
+	agentChatMaxContextSkillRuns = 3
+	agentChatSkillRunArtifactMax = 15
 	agentChatArtifactDataMaxLen  = 1200
+	agentChatSkillRunDataMaxLen  = 480
 )
 
 const agentChatThreadCompactionPrompt = `Summarize the earlier part of this agent conversation for future context replay.
@@ -258,7 +262,12 @@ func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, r
 	if err != nil {
 		return agentruntime.TurnOptions{}, err
 	}
-	contextBlocks, err := agentChatArtifactContextBlocks(ctx, persist, tenantID, req.Context)
+	referencedRuns, err := agentChatReferencedSkillRuns(ctx, persist, tenantID, req.Context)
+	if err != nil {
+		return agentruntime.TurnOptions{}, err
+	}
+	requestedSkills = agentChatRequestedSkillsWithRuns(requestedSkills, referencedRuns)
+	contextBlocks, err := agentChatContextBlocks(ctx, persist, tenantID, req.Context, referencedRuns)
 	if err != nil {
 		return agentruntime.TurnOptions{}, err
 	}
@@ -284,6 +293,72 @@ func agentChatKernelMemoryStore(persist agentstore.Persistence) kernel.MemorySto
 		return memoryStore
 	}
 	return nil
+}
+
+func agentChatReferencedSkillRuns(ctx context.Context, persist agentstore.Persistence, tenantID string, chatCtx *aipkg.ChatContext) ([]*agentstore.SkillRun, error) {
+	runIDs, err := agentChatContextSkillRunIDs(chatCtx)
+	if err != nil {
+		return nil, err
+	}
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	if persist == nil {
+		return nil, fmt.Errorf("skill run context requires agent store")
+	}
+	runs := make([]*agentstore.SkillRun, 0, len(runIDs))
+	for _, runID := range runIDs {
+		run, err := persist.LoadSkillRun(ctx, tenantID, runID)
+		if errors.Is(err, agentstore.ErrSkillRunNotFound) {
+			return nil, fmt.Errorf("skill run %q not found", runID)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("load skill run %q: %w", runID, err)
+		}
+		runs = append(runs, run)
+	}
+	return runs, nil
+}
+
+func agentChatRequestedSkillsWithRuns(requested []string, runs []*agentstore.SkillRun) []string {
+	out := append([]string(nil), requested...)
+	seen := map[string]struct{}{}
+	for _, skillID := range out {
+		skillID = strings.TrimSpace(skillID)
+		if skillID != "" {
+			seen[skillID] = struct{}{}
+		}
+	}
+	for _, run := range runs {
+		if run == nil {
+			continue
+		}
+		skillID := strings.TrimSpace(run.SkillID)
+		if skillID == "" {
+			continue
+		}
+		if _, ok := seen[skillID]; ok {
+			continue
+		}
+		seen[skillID] = struct{}{}
+		out = append(out, skillID)
+	}
+	return out
+}
+
+func agentChatContextBlocks(ctx context.Context, persist agentstore.Persistence, tenantID string, chatCtx *aipkg.ChatContext, referencedRuns []*agentstore.SkillRun) ([]string, error) {
+	var blocks []string
+	artifactBlocks, err := agentChatArtifactContextBlocks(ctx, persist, tenantID, chatCtx)
+	if err != nil {
+		return nil, err
+	}
+	blocks = append(blocks, artifactBlocks...)
+	runBlocks, err := agentChatSkillRunContextBlocks(ctx, persist, tenantID, referencedRuns)
+	if err != nil {
+		return nil, err
+	}
+	blocks = append(blocks, runBlocks...)
+	return blocks, nil
 }
 
 func agentChatArtifactContextBlocks(ctx context.Context, persist agentstore.Persistence, tenantID string, chatCtx *aipkg.ChatContext) ([]string, error) {
@@ -313,7 +388,122 @@ func agentChatArtifactContextBlocks(ctx context.Context, persist agentstore.Pers
 	return []string{strings.Join(lines, "\n")}, nil
 }
 
+func agentChatSkillRunContextBlocks(ctx context.Context, persist agentstore.Persistence, tenantID string, runs []*agentstore.SkillRun) ([]string, error) {
+	if len(runs) == 0 {
+		return nil, nil
+	}
+	if persist == nil {
+		return nil, fmt.Errorf("skill run context requires agent store")
+	}
+	lines := make([]string, 0, len(runs)*8+3)
+	lines = append(lines, "Referenced skill runs for this turn:")
+	lines = append(lines, "Continue from these skill runs and their artifacts. Do not ask the user to paste the same sources again. Fetch artifacts by id when exact data is required before creating or applying changes.")
+	for i, run := range runs {
+		if run == nil {
+			continue
+		}
+		artifacts, err := persist.ListArtifacts(ctx, tenantID, run.ID, "", "", agentChatSkillRunArtifactMax, 0)
+		if err != nil {
+			return nil, fmt.Errorf("list artifacts for skill run %q: %w", run.ID, err)
+		}
+		lines = append(lines, formatAgentChatSkillRunContextBlock(i+1, run, artifacts))
+	}
+	return []string{strings.Join(lines, "\n")}, nil
+}
+
+func agentChatContextSkillRunIDs(chatCtx *aipkg.ChatContext) ([]string, error) {
+	if chatCtx == nil || len(chatCtx.SkillRunIDs) == 0 {
+		return nil, nil
+	}
+	ids := uniqueTrimmedStrings(chatCtx.SkillRunIDs)
+	if len(ids) > agentChatMaxContextSkillRuns {
+		return nil, fmt.Errorf("too many skillRunIds (max %d)", agentChatMaxContextSkillRuns)
+	}
+	return ids, nil
+}
+
+func formatAgentChatSkillRunContextBlock(index int, run *agentstore.SkillRun, artifacts []*agentstore.Artifact) string {
+	if run == nil {
+		return fmt.Sprintf("- SkillRun %d: <nil>", index)
+	}
+	parts := []string{
+		"id=" + run.ID,
+		"skillId=" + run.SkillID,
+		"status=" + run.Status,
+	}
+	if run.ThreadID != "" {
+		parts = append(parts, "threadId="+run.ThreadID)
+	}
+	if run.StoreID != "" {
+		parts = append(parts, "storeId="+run.StoreID)
+	}
+	if run.ActingPersona != "" {
+		parts = append(parts, "actingPersona="+run.ActingPersona)
+	}
+	if !run.UpdatedAt.IsZero() {
+		parts = append(parts, "updatedAt="+run.UpdatedAt.UTC().Format(time.RFC3339))
+	}
+	lines := []string{fmt.Sprintf("- SkillRun %d: %s", index, strings.Join(parts, "; "))}
+	if excerpt := compactArtifactDataExcerpt(run.Input, agentChatSkillRunDataMaxLen); excerpt != "" {
+		lines = append(lines, "  inputExcerpt(redacted/truncated): "+excerpt)
+	}
+	if excerpt := compactArtifactDataExcerpt(run.Output, agentChatSkillRunDataMaxLen); excerpt != "" {
+		lines = append(lines, "  outputExcerpt(redacted/truncated): "+excerpt)
+	}
+	if value := artifactContextPromptValue(run.Error, 240); value != "" {
+		lines = append(lines, "  error(redacted/truncated): "+value)
+	}
+	if counts := formatAgentChatArtifactCounts(artifacts); counts != "" {
+		lines = append(lines, "  artifactCountsShown: "+counts)
+	}
+	if len(artifacts) == 0 {
+		lines = append(lines, "  artifacts: none")
+		return strings.Join(lines, "\n")
+	}
+	lines = append(lines, fmt.Sprintf("  artifactsShown: %d", len(artifacts)))
+	for i, artifact := range artifacts {
+		for _, line := range strings.Split(formatAgentChatArtifactContextBlockWithDataLimit(i+1, artifact, agentChatSkillRunDataMaxLen), "\n") {
+			lines = append(lines, "  "+line)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func formatAgentChatArtifactCounts(artifacts []*agentstore.Artifact) string {
+	if len(artifacts) == 0 {
+		return ""
+	}
+	counts := make(map[string]int)
+	keys := make([]string, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		if artifact == nil {
+			continue
+		}
+		key := strings.TrimSpace(artifact.Kind)
+		if key == "" {
+			key = "unknown"
+		}
+		if artifact.Status != "" {
+			key += "." + artifact.Status
+		}
+		if _, ok := counts[key]; !ok {
+			keys = append(keys, key)
+		}
+		counts[key]++
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", key, counts[key]))
+	}
+	return strings.Join(parts, ", ")
+}
+
 func formatAgentChatArtifactContextBlock(index int, artifact *agentstore.Artifact) string {
+	return formatAgentChatArtifactContextBlockWithDataLimit(index, artifact, agentChatArtifactDataMaxLen)
+}
+
+func formatAgentChatArtifactContextBlockWithDataLimit(index int, artifact *agentstore.Artifact, dataLimit int) string {
 	if artifact == nil {
 		return fmt.Sprintf("- Artifact %d: <nil>", index)
 	}
@@ -350,7 +540,7 @@ func formatAgentChatArtifactContextBlock(index int, artifact *agentstore.Artifac
 	if value := artifactContextPromptValue(artifact.Summary, 320); value != "" {
 		lines = append(lines, "  summary: "+value)
 	}
-	if excerpt := compactArtifactDataExcerpt(artifact.Data, agentChatArtifactDataMaxLen); excerpt != "" {
+	if excerpt := compactArtifactDataExcerpt(artifact.Data, dataLimit); excerpt != "" {
 		lines = append(lines, "  dataExcerpt(redacted/truncated): "+excerpt)
 	}
 	return strings.Join(lines, "\n")
@@ -433,6 +623,9 @@ func agentChatRouteErrorMessage(err error) string {
 	}
 	if strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
 		return "AI assistant requires private skill configuration (MOBAZHA_AGENT_SKILLS_DIR)"
+	}
+	if strings.Contains(err.Error(), "skill run") || strings.Contains(err.Error(), "skillRunIds") {
+		return "Referenced skill run is not available"
 	}
 	if strings.Contains(err.Error(), "artifact") {
 		return "Referenced artifact is not available"

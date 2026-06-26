@@ -32,6 +32,10 @@ func TestSellerToolMetadataApprovalBoundaries(t *testing.T) {
 		byName[item.Name] = item
 	}
 	assertTool(t, byName["listings_get_template"], kernel.RiskRead, kernel.ApprovalNone)
+	assertTool(t, byName["agent_skill_runs_create"], kernel.RiskDraft, kernel.ApprovalNone)
+	assertTool(t, byName["agent_skill_runs_list"], kernel.RiskRead, kernel.ApprovalNone)
+	assertTool(t, byName["agent_skill_runs_get"], kernel.RiskRead, kernel.ApprovalNone)
+	assertTool(t, byName["agent_skill_runs_update"], kernel.RiskDraft, kernel.ApprovalNone)
 	assertTool(t, byName["agent_artifacts_list"], kernel.RiskRead, kernel.ApprovalNone)
 	assertTool(t, byName["agent_artifacts_get"], kernel.RiskRead, kernel.ApprovalNone)
 	assertTool(t, byName["agent_artifacts_create"], kernel.RiskDraft, kernel.ApprovalNone)
@@ -52,6 +56,20 @@ func TestSellerToolMetadataApprovalBoundaries(t *testing.T) {
 	}
 	if create.Parallelizable {
 		t.Fatal("write tools should not be marked parallelizable by default")
+	}
+	skillRunList := byName["agent_skill_runs_list"]
+	if len(skillRunList.AllowedSkills) != 1 || skillRunList.AllowedSkills[0] != kernel.SkillProductImport {
+		t.Fatalf("agent_skill_runs_list should be restricted to product.import, got %#v", skillRunList.AllowedSkills)
+	}
+	if !hasCapability(skillRunList, kernel.CapabilityAgentArtifactRead) {
+		t.Fatalf("agent_skill_runs_list should expose agent workspace read capability, got %#v", skillRunList.Capabilities)
+	}
+	skillRunCreate := byName["agent_skill_runs_create"]
+	if len(skillRunCreate.AllowedSkills) != 1 || skillRunCreate.AllowedSkills[0] != kernel.SkillProductImport {
+		t.Fatalf("agent_skill_runs_create should be restricted to product.import, got %#v", skillRunCreate.AllowedSkills)
+	}
+	if !hasCapability(skillRunCreate, kernel.CapabilityAgentArtifactWrite) {
+		t.Fatalf("agent_skill_runs_create should expose agent workspace write capability, got %#v", skillRunCreate.Capabilities)
 	}
 	artifactList := byName["agent_artifacts_list"]
 	if len(artifactList.AllowedSkills) != 1 || artifactList.AllowedSkills[0] != kernel.SkillProductImport {
@@ -97,6 +115,7 @@ func TestSellerToolMetadataProductImportGrant(t *testing.T) {
 	}
 	for _, name := range []string{
 		"listings_get_template", "listings_list_mine", "listings_get",
+		"agent_skill_runs_create", "agent_skill_runs_list", "agent_skill_runs_get", "agent_skill_runs_update",
 		"agent_artifacts_list", "agent_artifacts_get", "agent_artifacts_create", "agent_artifacts_update",
 		"listings_create", "listings_update",
 		"collections_list", "collections_create", "exchange_rates_get",

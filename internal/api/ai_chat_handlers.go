@@ -209,6 +209,12 @@ type agentSkillRunCreateRequest struct {
 	Input    json.RawMessage `json:"input,omitempty"`
 }
 
+type agentSkillRunUpdateRequest struct {
+	Status *string         `json:"status,omitempty"`
+	Output json.RawMessage `json:"output,omitempty"`
+	Error  *string         `json:"error,omitempty"`
+}
+
 // handlePOSTAgentSkillRun handles POST /v1/agent/skill-runs.
 func (g *Gateway) handlePOSTAgentSkillRun(w http.ResponseWriter, r *http.Request) {
 	p, ok := getAIChatProvider(r)
@@ -230,6 +236,10 @@ func (g *Gateway) handlePOSTAgentSkillRun(w http.ResponseWriter, r *http.Request
 	if status == "" {
 		status = agentstore.SkillRunStatusCreated
 	}
+	if !validAgentSkillRunStatus(status) {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid skill run status")
+		return
+	}
 	tenantID := agentChatTenantID(r, p)
 	storeID := strings.TrimSpace(req.StoreID)
 	if storeID == "" {
@@ -249,6 +259,73 @@ func (g *Gateway) handlePOSTAgentSkillRun(w http.ResponseWriter, r *http.Request
 		StartedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}
+	if err := p.AgentStore().SaveSkillRun(r.Context(), run); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save skill run")
+		return
+	}
+	responsePkg.Success(w, run)
+}
+
+// handlePATCHAgentSkillRun handles PATCH /v1/agent/skill-runs/{runId}.
+func (g *Gateway) handlePATCHAgentSkillRun(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	var req agentSkillRunUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid skill run update body")
+		return
+	}
+	rawOutput, hasOutput, err := validatedOptionalRawJSON(req.Output, "skill run output")
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	if req.Status == nil && !hasOutput && req.Error == nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "no skill run fields to update")
+		return
+	}
+	runID := strings.TrimSpace(chi.URLParam(r, "runId"))
+	if runID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "runId is required")
+		return
+	}
+	tenantID := agentChatTenantID(r, p)
+	run, err := p.AgentStore().LoadSkillRun(r.Context(), tenantID, runID)
+	if errors.Is(err, agentstore.ErrSkillRunNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "skill run not found")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load skill run")
+		return
+	}
+	if req.Status != nil {
+		status := strings.TrimSpace(*req.Status)
+		if !validAgentSkillRunStatus(status) {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid skill run status")
+			return
+		}
+		run.Status = status
+		switch status {
+		case agentstore.SkillRunStatusCompleted, agentstore.SkillRunStatusFailed:
+			if run.CompletedAt == nil {
+				now := time.Now()
+				run.CompletedAt = &now
+			}
+		default:
+			run.CompletedAt = nil
+		}
+	}
+	if hasOutput {
+		run.Output = string(rawOutput)
+	}
+	if req.Error != nil {
+		run.Error = strings.TrimSpace(*req.Error)
+	}
+	run.UpdatedAt = time.Now()
 	if err := p.AgentStore().SaveSkillRun(r.Context(), run); err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save skill run")
 		return
@@ -438,7 +515,7 @@ func (g *Gateway) handlePATCHAgentArtifact(w http.ResponseWriter, r *http.Reques
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid artifact update body")
 		return
 	}
-	rawData, hasData, err := validatedOptionalRawJSON(req.Data)
+	rawData, hasData, err := validatedOptionalRawJSON(req.Data, "artifact data")
 	if err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
 		return
@@ -881,13 +958,31 @@ func validAgentArtifactMutableStatus(status string) bool {
 	}
 }
 
-func validatedOptionalRawJSON(raw json.RawMessage) (json.RawMessage, bool, error) {
+func validAgentSkillRunStatus(status string) bool {
+	switch status {
+	case agentstore.SkillRunStatusCreated,
+		agentstore.SkillRunStatusRunning,
+		agentstore.SkillRunStatusWaitingForReview,
+		agentstore.SkillRunStatusWaitingForApproval,
+		agentstore.SkillRunStatusCompleted,
+		agentstore.SkillRunStatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+func validatedOptionalRawJSON(raw json.RawMessage, label string) (json.RawMessage, bool, error) {
 	raw = json.RawMessage(strings.TrimSpace(string(raw)))
 	if len(raw) == 0 {
 		return nil, false, nil
 	}
 	if !json.Valid(raw) {
-		return nil, false, fmt.Errorf("invalid artifact data")
+		label = strings.TrimSpace(label)
+		if label == "" {
+			label = "JSON data"
+		}
+		return nil, false, fmt.Errorf("invalid %s", label)
 	}
 	return raw, true, nil
 }

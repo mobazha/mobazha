@@ -2833,6 +2833,66 @@
         "tags": [
           "ai"
         ]
+      },
+      "patch": {
+        "operationId": "agent-skill-run-patch",
+        "parameters": [
+          {
+            "description": "Agent skill run ID.",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "description": "Agent skill run ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Update an agent skill run",
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/v1/ai/generate": {

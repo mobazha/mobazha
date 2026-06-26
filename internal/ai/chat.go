@@ -61,6 +61,7 @@ type ChatContext struct {
 	SelectedOrderID  string   `json:"selectedOrderId,omitempty"`
 	Locale           string   `json:"locale,omitempty"`
 	ArtifactIDs      []string `json:"artifactIds,omitempty"`
+	SkillRunIDs      []string `json:"skillRunIds,omitempty"`
 }
 
 // SSEEvent is a server-sent event payload for the chat stream.

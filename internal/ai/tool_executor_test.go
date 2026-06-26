@@ -235,6 +235,86 @@ func TestToolExecutor_ExecuteAgentArtifactReadTools(t *testing.T) {
 	}
 }
 
+func TestToolExecutor_ExecuteAgentSkillRunLifecycleTools(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/agent/skill-runs":
+			if r.Method == http.MethodPost {
+				body, _ := io.ReadAll(r.Body)
+				if !strings.Contains(string(body), `"skillId":"product.import"`) {
+					t.Fatalf("unexpected create body: %s", string(body))
+				}
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"data":{"id":"run_1","skillId":"product.import"}}`))
+				return
+			}
+			if r.Method != http.MethodGet {
+				t.Fatalf("unexpected method for list: %s", r.Method)
+			}
+			if r.URL.Query().Get("skillId") != "product.import" || r.URL.Query().Get("status") != "waiting_for_review" {
+				t.Fatalf("unexpected skill run list query: %s", r.URL.RawQuery)
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"data":[{"id":"run_1","skillId":"product.import"}]}`))
+		case "/v1/agent/skill-runs/run_1":
+			switch r.Method {
+			case http.MethodGet:
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"data":{"id":"run_1","status":"waiting_for_review"}}`))
+			case http.MethodPatch:
+				body, _ := io.ReadAll(r.Body)
+				var parsed map[string]interface{}
+				if err := json.Unmarshal(body, &parsed); err != nil {
+					t.Fatalf("decode body: %v", err)
+				}
+				if _, ok := parsed["runId"]; ok {
+					t.Fatalf("runId should stay in URL path, got body %s", string(body))
+				}
+				if parsed["status"] != "waiting_for_review" {
+					t.Fatalf("unexpected update body: %s", string(body))
+				}
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"data":{"id":"run_1","status":"waiting_for_review"}}`))
+			default:
+				t.Fatalf("unexpected method for get/update: %s", r.Method)
+			}
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "")
+	result, err := executor.Execute(context.Background(), "agent_skill_runs_create", `{"skillId":"product.import","status":"running","input":{"source":"paste"}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"run_1"`) {
+		t.Fatalf("unexpected create result: %s", result)
+	}
+	result, err = executor.Execute(context.Background(), "agent_skill_runs_list", `{"skillId":"product.import","status":"waiting_for_review","limit":10}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"run_1"`) {
+		t.Fatalf("unexpected list result: %s", result)
+	}
+	result, err = executor.Execute(context.Background(), "agent_skill_runs_get", `{"runId":"run_1"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"waiting_for_review"`) {
+		t.Fatalf("unexpected get result: %s", result)
+	}
+	result, err = executor.Execute(context.Background(), "agent_skill_runs_update", `{"runId":"run_1","status":"waiting_for_review","output":{"proposalArtifactIds":["art_1"]}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"waiting_for_review"`) {
+		t.Fatalf("unexpected update result: %s", result)
+	}
+}
+
 func TestToolExecutor_ExecuteAgentArtifactUpdate(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/agent/artifacts/art_1" {

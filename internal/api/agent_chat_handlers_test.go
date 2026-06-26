@@ -46,6 +46,7 @@ type agentChatMemoryStore struct {
 	artifacts       []*agentstore.Artifact
 	approvals       []*agentstore.Approval
 	saveArtifactErr error
+	loadSkillRunN   int
 }
 
 func (s *agentChatMemoryStore) SaveThread(_ context.Context, thread *agentstore.Thread) error {
@@ -127,6 +128,7 @@ func (s *agentChatMemoryStore) LoadMessages(_ context.Context, _, threadID strin
 }
 
 func (s *agentChatMemoryStore) LoadSkillRun(_ context.Context, tenantID, runID string) (*agentstore.SkillRun, error) {
+	s.loadSkillRunN++
 	for _, run := range s.skillRuns {
 		if run.TenantID == tenantID && run.ID == runID {
 			cp := *run
@@ -465,6 +467,133 @@ func TestAgentChatTurnOptions_LoadsReferencedArtifactsAsContext(t *testing.T) {
 	}
 }
 
+func TestAgentChatTurnOptions_LoadsReferencedSkillRunAsContext(t *testing.T) {
+	dir := t.TempDir()
+	writeProductImportSkill(t, dir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
+	now := time.Now()
+	store := &agentChatMemoryStore{
+		skillRuns: []*agentstore.SkillRun{
+			{
+				ID:            "run_import",
+				TenantID:      "tenant_1",
+				ThreadID:      "thread_import",
+				SkillID:       string(kernel.SkillProductImport),
+				StoreID:       "store_1",
+				ActingPersona: string(kernel.PersonaSeller),
+				Status:        agentstore.SkillRunStatusWaitingForReview,
+				Input:         `{"source":"supplier notes","api_key":"secret"}`,
+				Output:        `{"proposals":1,"validationReports":1}`,
+				StartedAt:     now,
+				UpdatedAt:     now,
+			},
+		},
+		artifacts: []*agentstore.Artifact{
+			{
+				ID:          "art_source",
+				TenantID:    "tenant_1",
+				ThreadID:    "thread_import",
+				SkillRunID:  "run_import",
+				SkillID:     string(kernel.SkillProductImport),
+				Kind:        agentstore.ArtifactKindSourceMaterial,
+				Status:      agentstore.ArtifactStatusReady,
+				Name:        "supplier notes",
+				ContentType: "text/plain",
+				Summary:     "Unstructured supplier notes for two products",
+				Data:        `{"text":"Linen tote costs $45 and has 12 units","token":"secret-token"}`,
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+			{
+				ID:         "art_proposal",
+				TenantID:   "tenant_1",
+				ThreadID:   "thread_import",
+				SkillRunID: "run_import",
+				SkillID:    string(kernel.SkillProductImport),
+				Kind:       agentstore.ArtifactKindProposal,
+				Status:     agentstore.ArtifactStatusNeedsReview,
+				Name:       "Linen Tote proposal",
+				Summary:    "One draft listing waiting for seller review",
+				Data:       `{"draft":{"title":"Linen Tote","price":{"amountMinor":4500,"currencyCode":"USD","divisibility":2}}}`,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			},
+		},
+	}
+
+	opts, err := agentChatTurnOptions(context.Background(), store, aipkg.ChatRequest{
+		Message: "继续处理这批",
+		Context: &aipkg.ChatContext{
+			SkillRunIDs: []string{"run_import", "run_import"},
+		},
+	}, "tenant_1", "actor_1", "store_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsString(opts.RequestedSkills, string(kernel.SkillProductImport)) {
+		t.Fatalf("expected skill run to activate product.import, got %#v", opts.RequestedSkills)
+	}
+	if store.loadSkillRunN != 1 {
+		t.Fatalf("expected one skill run load, got %d", store.loadSkillRunN)
+	}
+	if len(opts.ContextBlocks) != 1 {
+		t.Fatalf("expected one skill run context block, got %#v", opts.ContextBlocks)
+	}
+	block := opts.ContextBlocks[0]
+	for _, want := range []string{
+		"Referenced skill runs for this turn",
+		"Do not ask the user to paste the same sources again",
+		"SkillRun 1: id=run_import",
+		"skillId=product.import",
+		"artifactCountsShown: proposal.needs_review=1, source_material.ready=1",
+		"Artifact 1: id=art_source",
+		"Artifact 2: id=art_proposal",
+		"Unstructured supplier notes for two products",
+		"[REDACTED]",
+	} {
+		if !strings.Contains(block, want) {
+			t.Fatalf("skill run context missing %q:\n%s", want, block)
+		}
+	}
+	if strings.Contains(block, "secret-token") || strings.Contains(block, `"secret"`) {
+		t.Fatalf("skill run context should redact sensitive data:\n%s", block)
+	}
+}
+
+func TestAgentChatTurnOptions_RejectsMissingReferencedSkillRun(t *testing.T) {
+	dir := t.TempDir()
+	writeProductImportSkill(t, dir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
+
+	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
+		Message: "继续处理这批",
+		Context: &aipkg.ChatContext{SkillRunIDs: []string{"missing_run"}},
+	}, "tenant_1", "actor_1", "store_1")
+	if err == nil || !strings.Contains(err.Error(), "missing_run") {
+		t.Fatalf("expected missing skill run error, got %v", err)
+	}
+	if got := agentChatRouteErrorMessage(err); got != "Referenced skill run is not available" {
+		t.Fatalf("unexpected route error message %q", got)
+	}
+}
+
+func TestAgentChatTurnOptions_RejectsTooManyReferencedSkillRuns(t *testing.T) {
+	dir := t.TempDir()
+	writeProductImportSkill(t, dir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
+
+	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
+		Message: "继续处理这些批次",
+		Context: &aipkg.ChatContext{SkillRunIDs: []string{"run_1", "run_2", "run_3", "run_4"}},
+	}, "tenant_1", "actor_1", "store_1")
+	if err == nil || !strings.Contains(err.Error(), "too many skillRunIds") {
+		t.Fatalf("expected too many skillRunIds error, got %v", err)
+	}
+	if got := agentChatRouteErrorMessage(err); got != "Referenced skill run is not available" {
+		t.Fatalf("unexpected route error message %q", got)
+	}
+}
+
 func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 	dir := t.TempDir()
 	writeProductImportSkill(t, dir)
@@ -687,6 +816,100 @@ func TestHandlePOSTAgentChat_IncludesReferencedArtifactsInTurnContext(t *testing
 	}
 }
 
+func TestHandlePOSTAgentChat_IncludesReferencedSkillRunInTurnContext(t *testing.T) {
+	skillsDir := t.TempDir()
+	writeProductImportSkill(t, skillsDir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", skillsDir)
+
+	var upstreamReq map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Fatalf("unexpected upstream path: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&upstreamReq); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"I can continue the run\"},\"finish_reason\":\"stop\"}]}\n\n")
+	}))
+	defer upstream.Close()
+
+	now := time.Now()
+	store := &agentChatMemoryStore{
+		skillRuns: []*agentstore.SkillRun{
+			{
+				ID:            "run_ctx",
+				TenantID:      "test-node",
+				ThreadID:      "thread-run",
+				SkillID:       string(kernel.SkillProductImport),
+				StoreID:       "Test Store",
+				ActingPersona: string(kernel.PersonaSeller),
+				Status:        agentstore.SkillRunStatusWaitingForReview,
+				Input:         `{"source":"messy supplier spreadsheet","api_key":"secret"}`,
+				Output:        `{"proposals":1}`,
+				StartedAt:     now,
+				UpdatedAt:     now,
+			},
+		},
+		artifacts: []*agentstore.Artifact{
+			{
+				ID:         "art_run_ctx",
+				TenantID:   "test-node",
+				ThreadID:   "thread-run",
+				SkillRunID: "run_ctx",
+				SkillID:    string(kernel.SkillProductImport),
+				Kind:       agentstore.ArtifactKindProposal,
+				Status:     agentstore.ArtifactStatusNeedsReview,
+				Name:       "Linen Tote proposal",
+				Summary:    "Reviewable listing draft from non-standard source",
+				Data:       `{"draft":{"title":"Linen Tote"},"token":"secret-token"}`,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			},
+		},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{
+			Enabled:        true,
+			ActiveProvider: "custom",
+			Providers: map[string]aipkg.ProviderCredential{
+				"custom": {APIKey: "test-key", Model: "test-model", BaseURL: upstream.URL},
+			},
+		}, aipkg.PlatformProfile{}),
+		proxy: aipkg.NewProxy(upstream.Client()),
+		store: store,
+	}
+	cacheKey := "test-node:" + node.ProfileName()
+	agentChatRuntimes.Delete(cacheKey)
+	defer agentChatRuntimes.Delete(cacheKey)
+
+	body := strings.NewReader(`{"message":"继续处理这批","sessionId":"thread-run","context":{"skillRunIds":["run_ctx"]}}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/chat", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentChat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	system := firstOpenAIMessageContent(t, upstreamReq, "system")
+	for _, want := range []string{"## Turn Context", "Referenced skill runs for this turn", "SkillRun 1: id=run_ctx", "artifactCountsShown: proposal.needs_review=1", "Reviewable listing draft from non-standard source", "Product Import Skill", "[REDACTED]"} {
+		if !strings.Contains(system, want) {
+			t.Fatalf("system prompt missing %q:\n%s", want, system)
+		}
+	}
+	if strings.Contains(system, "secret-token") {
+		t.Fatalf("system prompt should redact sensitive skill run data:\n%s", system)
+	}
+	toolNames := openAIToolNames(t, upstreamReq)
+	for _, want := range []string{"agent_skill_runs_get", "agent_artifacts_list", "agent_artifacts_update"} {
+		if !containsString(toolNames, want) {
+			t.Fatalf("expected product.import tool %s, got %#v", want, toolNames)
+		}
+	}
+}
+
 func TestHandlePOSTAgentChat_ProductImportSkillRestrictsTools(t *testing.T) {
 	skillsDir := t.TempDir()
 	writeProductImportSkill(t, skillsDir)
@@ -737,7 +960,7 @@ func TestHandlePOSTAgentChat_ProductImportSkillRestrictsTools(t *testing.T) {
 		}
 	}
 	toolNames := openAIToolNames(t, upstreamReq)
-	for _, want := range []string{"listings_get_template", "listings_list_mine", "listings_get", "agent_artifacts_list", "agent_artifacts_get", "agent_artifacts_create", "agent_artifacts_update", "listings_create", "listings_update", "collections_list", "collections_create", "exchange_rates_get"} {
+	for _, want := range []string{"listings_get_template", "listings_list_mine", "listings_get", "agent_skill_runs_create", "agent_skill_runs_list", "agent_skill_runs_get", "agent_skill_runs_update", "agent_artifacts_list", "agent_artifacts_get", "agent_artifacts_create", "agent_artifacts_update", "listings_create", "listings_update", "collections_list", "collections_create", "exchange_rates_get"} {
 		if !containsString(toolNames, want) {
 			t.Fatalf("expected granted product import tool %s, got %#v", want, toolNames)
 		}
@@ -837,6 +1060,136 @@ func TestAgentSkillRunArtifactHandlers_SaveNonStandardTableDraft(t *testing.T) {
 	}
 	if len(listResp.Data) != 1 || listResp.Data[0].ID != artifactResp.Data.ID {
 		t.Fatalf("expected one proposal artifact, got %#v", listResp.Data)
+	}
+}
+
+func TestHandlePOSTAgentSkillRun_ValidatesStatus(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/skill-runs", strings.NewReader(`{"skillId":"product.import","status":"done-ish"}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentSkillRun(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandlePATCHAgentSkillRun_UpdatesLifecycleFields(t *testing.T) {
+	now := time.Now()
+	store := &agentChatMemoryStore{
+		skillRuns: []*agentstore.SkillRun{
+			{
+				ID:        "run_patch",
+				TenantID:  "test-node",
+				ThreadID:  "thread_import",
+				SkillID:   string(kernel.SkillProductImport),
+				StoreID:   "Test Store",
+				Status:    agentstore.SkillRunStatusRunning,
+				Input:     `{"source":"supplier notes"}`,
+				StartedAt: now,
+				UpdatedAt: now,
+			},
+		},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	body := strings.NewReader(`{"status":"waiting_for_review","output":{"proposalArtifactIds":["art_1"],"validationReports":1},"error":"  "}`)
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/skill-runs/run_patch", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "run_patch"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentSkillRun(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentstore.SkillRun `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode skill run: %v", err)
+	}
+	if resp.Data.Status != agentstore.SkillRunStatusWaitingForReview {
+		t.Fatalf("unexpected status: %#v", resp.Data)
+	}
+	if resp.Data.CompletedAt != nil {
+		t.Fatalf("waiting_for_review should not set completedAt: %#v", resp.Data.CompletedAt)
+	}
+	if !strings.Contains(resp.Data.Output, `"proposalArtifactIds":["art_1"]`) || resp.Data.Error != "" {
+		t.Fatalf("unexpected output/error: %#v", resp.Data)
+	}
+
+	body = strings.NewReader(`{"status":"completed","output":{"applied":1}}`)
+	req = httptest.NewRequest(http.MethodPatch, "/v1/agent/skill-runs/run_patch", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "run_patch"})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentSkillRun(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode completed skill run: %v", err)
+	}
+	if resp.Data.Status != agentstore.SkillRunStatusCompleted || resp.Data.CompletedAt == nil {
+		t.Fatalf("completed run should set completedAt, got %#v", resp.Data)
+	}
+}
+
+func TestHandlePATCHAgentSkillRun_ValidatesStatus(t *testing.T) {
+	store := &agentChatMemoryStore{
+		skillRuns: []*agentstore.SkillRun{
+			{
+				ID:        "run_patch",
+				TenantID:  "test-node",
+				SkillID:   string(kernel.SkillProductImport),
+				Status:    agentstore.SkillRunStatusRunning,
+				StartedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+		},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/skill-runs/run_patch", strings.NewReader(`{"status":"done-ish"}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "run_patch"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentSkillRun(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandlePATCHAgentSkillRun_RequiresRunID(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/skill-runs/", strings.NewReader(`{"status":"completed"}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentSkillRun(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -2177,6 +2530,18 @@ func TestHandlePATCHAgentArtifact_ValidatesStatus(t *testing.T) {
 	}
 }
 
+func TestValidatedOptionalRawJSON_UsesFieldLabel(t *testing.T) {
+	_, _, err := validatedOptionalRawJSON(json.RawMessage(`{"unterminated"`), "skill run output")
+	if err == nil || err.Error() != "invalid skill run output" {
+		t.Fatalf("expected skill run output label, got %v", err)
+	}
+
+	_, _, err = validatedOptionalRawJSON(json.RawMessage(`{"unterminated"`), "artifact data")
+	if err == nil || err.Error() != "invalid artifact data" {
+		t.Fatalf("expected artifact data label, got %v", err)
+	}
+}
+
 func TestHandleGETAgentApprovals_DefaultsToPending(t *testing.T) {
 	store := &agentChatMemoryStore{
 		approvals: []*agentstore.Approval{
@@ -2433,7 +2798,7 @@ name: product.import
 description: Import local product materials.
 persona: seller
 capabilities: listing.read, listing.draft_write, listing.apply_after_approval, collection.read, collection.write, exchange.rates.read, agent.artifact.read, agent.artifact.write
-tool_hints: listings_get_template, agent_artifacts_list, agent_artifacts_get, agent_artifacts_create, agent_artifacts_update, listings_create, collections_list, exchange_rates_get
+tool_hints: listings_get_template, agent_skill_runs_create, agent_skill_runs_list, agent_skill_runs_get, agent_skill_runs_update, agent_artifacts_list, agent_artifacts_get, agent_artifacts_create, agent_artifacts_update, listings_create, collections_list, exchange_rates_get
 examples:
   - 批量导入商品 CSV
   - 帮我从这些商品描述里整理出可上架的产品

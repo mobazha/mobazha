@@ -7,8 +7,8 @@ import (
 
 func TestSellerTools_Count(t *testing.T) {
 	tools := SellerTools()
-	if len(tools) != 30 {
-		t.Errorf("expected 30 seller tools, got %d", len(tools))
+	if len(tools) != 34 {
+		t.Errorf("expected 34 seller tools, got %d", len(tools))
 	}
 }
 
@@ -118,6 +118,88 @@ func TestSellerTools_IncludesAgentArtifactRead(t *testing.T) {
 	}
 	if !foundList || !foundGet {
 		t.Fatalf("expected artifact read tools, found list=%v get=%v", foundList, foundGet)
+	}
+}
+
+func TestSellerTools_IncludesAgentSkillRunLifecycle(t *testing.T) {
+	tools := SellerTools()
+	foundCreate := false
+	foundList := false
+	foundGet := false
+	foundUpdate := false
+	for _, tool := range tools {
+		switch tool.Name {
+		case "agent_skill_runs_create":
+			foundCreate = true
+			var schema struct {
+				Required   []string               `json:"required"`
+				Properties map[string]interface{} `json:"properties"`
+			}
+			if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+				t.Fatalf("decode agent_skill_runs_create schema: %v", err)
+			}
+			if !sameStringSet(schema.Required, []string{"skillId"}) {
+				t.Fatalf("unexpected required fields: %#v", schema.Required)
+			}
+			for _, field := range []string{"skillId", "status", "input"} {
+				if _, ok := schema.Properties[field]; !ok {
+					t.Fatalf("agent_skill_runs_create schema missing %s", field)
+				}
+			}
+		case "agent_skill_runs_list":
+			foundList = true
+			var schema struct {
+				Properties map[string]struct {
+					Enum []string `json:"enum"`
+				} `json:"properties"`
+			}
+			if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+				t.Fatalf("decode agent_skill_runs_list schema: %v", err)
+			}
+			for _, field := range []string{"skillId", "status", "limit", "offset"} {
+				if _, ok := schema.Properties[field]; !ok {
+					t.Fatalf("agent_skill_runs_list schema missing %s", field)
+				}
+			}
+			if !sameStringSet(schema.Properties["status"].Enum, []string{"created", "running", "waiting_for_review", "waiting_for_approval", "completed", "failed"}) {
+				t.Fatalf("unexpected status enum: %#v", schema.Properties["status"].Enum)
+			}
+		case "agent_skill_runs_get":
+			foundGet = true
+			var schema struct {
+				Required   []string               `json:"required"`
+				Properties map[string]interface{} `json:"properties"`
+			}
+			if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+				t.Fatalf("decode agent_skill_runs_get schema: %v", err)
+			}
+			if !sameStringSet(schema.Required, []string{"runId"}) {
+				t.Fatalf("unexpected required fields: %#v", schema.Required)
+			}
+			if _, ok := schema.Properties["runId"]; !ok {
+				t.Fatal("agent_skill_runs_get schema missing runId")
+			}
+		case "agent_skill_runs_update":
+			foundUpdate = true
+			var schema struct {
+				Required   []string               `json:"required"`
+				Properties map[string]interface{} `json:"properties"`
+			}
+			if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+				t.Fatalf("decode agent_skill_runs_update schema: %v", err)
+			}
+			if !sameStringSet(schema.Required, []string{"runId"}) {
+				t.Fatalf("unexpected required fields: %#v", schema.Required)
+			}
+			for _, field := range []string{"runId", "status", "output", "error"} {
+				if _, ok := schema.Properties[field]; !ok {
+					t.Fatalf("agent_skill_runs_update schema missing %s", field)
+				}
+			}
+		}
+	}
+	if !foundCreate || !foundList || !foundGet || !foundUpdate {
+		t.Fatalf("expected skill run lifecycle tools, found create=%v list=%v get=%v update=%v", foundCreate, foundList, foundGet, foundUpdate)
 	}
 }
 

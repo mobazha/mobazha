@@ -22,6 +22,26 @@ func SellerTools() []ToolDefinition {
 			Parameters:  mustJSON(`{"type":"object","properties":{}}`),
 		},
 		{
+			Name:        "agent_skill_runs_create",
+			Description: "Create a tenant-scoped agent skill run to track durable work for a business skill such as product.import. Use this before creating artifacts when no run exists yet.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"skillId":{"type":"string","description":"Skill ID, e.g. product.import"},"threadId":{"type":"string","description":"Current agent thread/session ID when known"},"turnId":{"type":"string","description":"Current agent turn ID when known"},"storeId":{"type":"string","description":"Current store/profile ID when known"},"status":{"type":"string","enum":["created","running","waiting_for_review","waiting_for_approval","completed","failed"],"description":"Initial skill run status; omit for created"},"input":{"type":"object","description":"Small structured task input or source summary"}},"required":["skillId"]}`),
+		},
+		{
+			Name:        "agent_skill_runs_list",
+			Description: "List tenant-scoped agent skill runs for the current workspace, optionally filtered by skill or status. Use this to resume import tasks and inspect durable agent work state.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"skillId":{"type":"string","description":"Optional skill ID filter, e.g. product.import"},"status":{"type":"string","enum":["created","running","waiting_for_review","waiting_for_approval","completed","failed"],"description":"Optional skill run status filter"},"limit":{"type":"integer","description":"Max items (default 20)"},"offset":{"type":"integer","description":"Pagination offset"}}}`),
+		},
+		{
+			Name:        "agent_skill_runs_get",
+			Description: "Get one tenant-scoped agent skill run by ID, including its status, input summary, output summary, and related task metadata.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"runId":{"type":"string","description":"Agent skill run ID"}},"required":["runId"]}`),
+		},
+		{
+			Name:        "agent_skill_runs_update",
+			Description: "Update a tenant-scoped agent skill run status, output summary, or error after producing artifacts. This only updates agent run metadata and does not write listing/business state.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"runId":{"type":"string","description":"Agent skill run ID"},"status":{"type":"string","enum":["created","running","waiting_for_review","waiting_for_approval","completed","failed"],"description":"Updated skill run status"},"output":{"type":"object","description":"Small structured output summary such as produced artifact IDs or counts"},"error":{"type":"string","description":"Short failure summary when status is failed"}},"required":["runId"]}`),
+		},
+		{
 			Name:        "agent_artifacts_list",
 			Description: "List tenant-scoped agent artifacts for the current workspace, optionally filtered by skill run, kind, or review status. Use this to resume or inspect intermediate work without reading raw chat history.",
 			Parameters:  mustJSON(`{"type":"object","properties":{"skillRunId":{"type":"string","description":"Optional related skill run ID"},"kind":{"type":"string","enum":["source_material","candidate","proposal","validation_report"],"description":"Optional artifact category filter"},"status":{"type":"string","enum":["new","ready","needs_review","skipped"],"description":"Optional artifact review state filter"},"limit":{"type":"integer","description":"Max items (default 20)"},"offset":{"type":"integer","description":"Pagination offset"}}}`),

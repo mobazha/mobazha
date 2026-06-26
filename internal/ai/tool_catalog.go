@@ -83,6 +83,10 @@ func sellerToolPolicy(name string) toolPolicy {
 		read.capabilities = []kernel.Capability{kernel.CapabilityListingRead}
 		read.allowedSkills = []kernel.SkillID{kernel.SkillProductImport}
 		return read
+	case "agent_skill_runs_list", "agent_skill_runs_get":
+		return artifactRead
+	case "agent_skill_runs_create", "agent_skill_runs_update":
+		return artifactWrite
 	case "agent_artifacts_list", "agent_artifacts_get":
 		return artifactRead
 	case "agent_artifacts_create", "agent_artifacts_update":

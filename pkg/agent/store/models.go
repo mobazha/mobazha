@@ -18,6 +18,8 @@ type Turn struct {
 	TenantID    string     `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_turns_tenant_thread,priority:1" json:"tenant_id"`
 	ThreadID    string     `gorm:"column:thread_id;type:varchar(64);index:idx_agent_turns_tenant_thread,priority:2" json:"thread_id"`
 	TurnIndex   int        `json:"turn_index"`
+	Status      string     `gorm:"column:status;type:varchar(32);index" json:"status"`
+	Error       string     `gorm:"column:error;type:text" json:"error,omitempty"`
 	StartedAt   time.Time  `json:"started_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	Completed   bool       `json:"completed"`

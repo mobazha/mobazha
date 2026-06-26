@@ -20,6 +20,7 @@ const (
 	PendingRequestResolved = "pending_request_resolved"
 	TurnStarted            = "turn_started"
 	TurnCompleted          = "turn_completed"
+	TurnFailed             = "turn_failed"
 	GuardrailBlocked       = "guardrail_blocked"
 	LLMRetried             = "llm_retried"
 	MemoryRetrieved        = "memory_retrieved"

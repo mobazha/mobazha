@@ -693,6 +693,48 @@ func loadAgentMemoryRecord(t *testing.T, db database.Database, id string) Memory
 	return record
 }
 
+func TestGormPersistence_SaveTurnStatusAndError(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	require.NoError(t, persist.SaveTurn(ctx, &Turn{
+		ID:       "turn_running",
+		TenantID: database.StandaloneTenantID,
+		ThreadID: "th",
+	}))
+
+	var running Turn
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", "turn_running").First(&running).Error
+	}))
+	require.Equal(t, TurnStatusRunning, running.Status)
+	require.False(t, running.Completed)
+
+	completedAt := time.Now()
+	require.NoError(t, persist.SaveTurn(ctx, &Turn{
+		ID:          "turn_failed",
+		TenantID:    database.StandaloneTenantID,
+		ThreadID:    "th",
+		Status:      TurnStatusFailed,
+		Error:       `{"error":"provider failed","api_key":"sk-secret"}`,
+		Completed:   true,
+		CompletedAt: &completedAt,
+	}))
+
+	var failed Turn
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", "turn_failed").First(&failed).Error
+	}))
+	require.Equal(t, TurnStatusFailed, failed.Status)
+	require.True(t, failed.Completed)
+	require.NotNil(t, failed.CompletedAt)
+	require.NotContains(t, failed.Error, "sk-secret")
+	require.Contains(t, failed.Error, "provider failed")
+}
+
 func TestGormPersistence_DeleteThread(t *testing.T) {
 	db, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)

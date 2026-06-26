@@ -76,6 +76,13 @@ const (
 	MemoryStatusActive = "active"
 	// MemoryStatusArchived means a memory is retained but no longer retrieved.
 	MemoryStatusArchived = "archived"
+
+	// TurnStatusRunning means the turn has started but has not reached a terminal state.
+	TurnStatusRunning = "running"
+	// TurnStatusCompleted means the turn produced a final assistant response.
+	TurnStatusCompleted = "completed"
+	// TurnStatusFailed means the turn reached a terminal error after it was created.
+	TurnStatusFailed = "failed"
 )
 
 // Persistence provides durable storage for agent threads, turns, and messages.
@@ -330,6 +337,14 @@ func (p *GormPersistence) SaveTurn(_ context.Context, t *Turn) error {
 	if t.StartedAt.IsZero() {
 		t.StartedAt = time.Now()
 	}
+	if t.Status == "" {
+		if t.Completed {
+			t.Status = TurnStatusCompleted
+		} else {
+			t.Status = TurnStatusRunning
+		}
+	}
+	t.Error = truncateStoreText(sanitizeJSONText(redact.SanitizeEnvBlock(t.Error)), 2000)
 	return p.db.Update(func(tx pkgdb.Tx) error {
 		return tx.Save(t)
 	})

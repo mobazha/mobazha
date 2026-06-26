@@ -289,6 +289,7 @@ func (o *Orchestrator) RunTurnWithOptions(ctx context.Context, tenantID, threadI
 		ID:        turnID,
 		TenantID:  tenantID,
 		ThreadID:  threadID,
+		Status:    store.TurnStatusRunning,
 		StartedAt: turnStartedAt,
 		Completed: false,
 	}); err != nil {
@@ -299,6 +300,9 @@ func (o *Orchestrator) RunTurnWithOptions(ctx context.Context, tenantID, threadI
 
 	history, err := o.assembleHistory(ctx, tenantID, threadID, userMsg, resolved)
 	if err != nil {
+		if markErr := o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "assemble_history_failed", err); markErr != nil {
+			return nil, fmt.Errorf("%w; additionally failed to mark turn failed: %v", err, markErr)
+		}
 		return nil, err
 	}
 
@@ -313,6 +317,9 @@ func (o *Orchestrator) RunTurnWithOptions(ctx context.Context, tenantID, threadI
 		Bytes:     len(userMsg),
 		CreatedAt: time.Now(),
 	}); err != nil {
+		if markErr := o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_user_message_failed", err); markErr != nil {
+			return nil, fmt.Errorf("%w; additionally failed to mark turn failed: %v", err, markErr)
+		}
 		return nil, err
 	}
 	o.captureExplicitMemory(turnCtx, resolved, userMsg)
@@ -1190,13 +1197,17 @@ func (o *Orchestrator) runLoop(
 					"available": decision.Available,
 				},
 			})
-			out.SendError(fmt.Errorf("context overflow: estimated %d tokens, 0 available", decision.Estimated))
+			err := fmt.Errorf("context overflow: estimated %d tokens, 0 available", decision.Estimated)
+			_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "context_overflow", err)
+			out.SendError(err)
 			return
 		}
 
 		llmStream, err := o.callLLMWithRetry(ctx, history, tools)
 		if err != nil {
-			out.SendError(fmt.Errorf("LLM call failed: %w", err))
+			turnErr := fmt.Errorf("LLM call failed: %w", err)
+			_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "llm_call_failed", turnErr)
+			out.SendError(turnErr)
 			return
 		}
 
@@ -1204,12 +1215,15 @@ func (o *Orchestrator) runLoop(
 		_ = chunks
 
 		if streamErr != nil {
-			out.SendError(fmt.Errorf("LLM stream error: %w", streamErr))
+			turnErr := fmt.Errorf("LLM stream error: %w", streamErr)
+			_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "llm_stream_failed", turnErr)
+			out.SendError(turnErr)
 			return
 		}
 
 		if len(toolCalls) == 0 {
 			if err := o.saveAssistantMessage(ctx, tenantID, threadID, turnID, assistantText); err != nil {
+				_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_assistant_message_failed", err)
 				out.SendError(err)
 				return
 			}
@@ -1231,24 +1245,7 @@ func (o *Orchestrator) runLoop(
 				}
 			}
 
-			o.emitter.Emit(ctx, telemetry.Event{
-				Type:     telemetry.TurnCompleted,
-				TenantID: tenantID,
-				ThreadID: threadID,
-				Attrs: map[string]any{
-					"turn_id": turnID,
-					"rounds":  round + 1,
-				},
-			})
-			completedAt := time.Now()
-			if err := o.saveTurn(ctx, &store.Turn{
-				ID:          turnID,
-				TenantID:    tenantID,
-				ThreadID:    threadID,
-				StartedAt:   turnStartedAt,
-				CompletedAt: &completedAt,
-				Completed:   true,
-			}); err != nil {
+			if err := o.completeTurnSucceeded(ctx, tenantID, threadID, turnID, turnStartedAt, round+1); err != nil {
 				out.SendError(err)
 			}
 			return
@@ -1269,6 +1266,7 @@ func (o *Orchestrator) runLoop(
 			Bytes:     len(assistantText),
 			CreatedAt: time.Now(),
 		}); err != nil {
+			_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_assistant_tool_call_failed", err)
 			out.SendError(err)
 			return
 		}
@@ -1311,6 +1309,7 @@ func (o *Orchestrator) runLoop(
 					Bytes:      len(content),
 					CreatedAt:  time.Now(),
 				}); err != nil {
+					_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_skill_routing_result_failed", err)
 					out.SendError(err)
 					return
 				}
@@ -1340,6 +1339,7 @@ func (o *Orchestrator) runLoop(
 					Bytes:      len(content),
 					CreatedAt:  time.Now(),
 				}); err != nil {
+					_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_deferred_tool_result_failed", err)
 					out.SendError(err)
 					return
 				}
@@ -1369,6 +1369,7 @@ func (o *Orchestrator) runLoop(
 					Bytes:      len(content),
 					CreatedAt:  time.Now(),
 				}); err != nil {
+					_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_unauthorized_tool_result_failed", err)
 					out.SendError(err)
 					return
 				}
@@ -1409,6 +1410,7 @@ func (o *Orchestrator) runLoop(
 					Bytes:      len(content),
 					CreatedAt:  time.Now(),
 				}); err != nil {
+					_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_approval_tool_result_failed", err)
 					out.SendError(err)
 					return
 				}
@@ -1481,18 +1483,23 @@ func (o *Orchestrator) runLoop(
 				Bytes:      len(content),
 				CreatedAt:  time.Now(),
 			}); err != nil {
+				_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_tool_result_failed", err)
 				out.SendError(err)
 				return
 			}
 		}
 
 		if execErr != nil && errCount == len(results) {
-			out.SendError(fmt.Errorf("all tool calls failed: %w", execErr))
+			turnErr := fmt.Errorf("all tool calls failed: %w", execErr)
+			_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "all_tool_calls_failed", turnErr)
+			out.SendError(turnErr)
 			return
 		}
 	}
 
-	out.SendError(fmt.Errorf("exceeded max tool rounds (%d)", o.cfg.MaxToolRounds))
+	turnErr := fmt.Errorf("exceeded max tool rounds (%d)", o.cfg.MaxToolRounds)
+	_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "max_tool_rounds_exceeded", turnErr)
+	out.SendError(turnErr)
 }
 
 func estimateMessagesTokens(messages []Message) int {
@@ -1824,6 +1831,70 @@ func (o *Orchestrator) saveTurn(ctx context.Context, turn *store.Turn) error {
 		return fmt.Errorf("agent runtime: save turn: %w", err)
 	}
 	return nil
+}
+
+func (o *Orchestrator) completeTurnSucceeded(ctx context.Context, tenantID, threadID, turnID string, startedAt time.Time, rounds int) error {
+	completedAt := time.Now()
+	if err := o.saveTurn(ctx, &store.Turn{
+		ID:          turnID,
+		TenantID:    tenantID,
+		ThreadID:    threadID,
+		Status:      store.TurnStatusCompleted,
+		StartedAt:   startedAt,
+		CompletedAt: &completedAt,
+		Completed:   true,
+	}); err != nil {
+		return err
+	}
+	o.emitter.Emit(ctx, telemetry.Event{
+		Type:     telemetry.TurnCompleted,
+		TenantID: tenantID,
+		ThreadID: threadID,
+		Attrs: map[string]any{
+			"turn_id": turnID,
+			"rounds":  rounds,
+		},
+	})
+	return nil
+}
+
+func (o *Orchestrator) completeTurnFailed(ctx context.Context, tenantID, threadID, turnID string, startedAt time.Time, reason string, cause error) error {
+	completedAt := time.Now()
+	errorText := turnFailureError(cause)
+	err := o.saveTurn(ctx, &store.Turn{
+		ID:          turnID,
+		TenantID:    tenantID,
+		ThreadID:    threadID,
+		Status:      store.TurnStatusFailed,
+		Error:       errorText,
+		StartedAt:   startedAt,
+		CompletedAt: &completedAt,
+		Completed:   true,
+	})
+	attrs := map[string]any{
+		"turn_id": turnID,
+		"reason":  reason,
+	}
+	if errorText != "" {
+		attrs["error"] = errorText
+	}
+	if err != nil {
+		attrs["turn_save_error"] = compactToolResultRaw(err.Error(), 500)
+	}
+	o.emitter.Emit(ctx, telemetry.Event{
+		Type:     telemetry.TurnFailed,
+		TenantID: tenantID,
+		ThreadID: threadID,
+		Attrs:    attrs,
+	})
+	return err
+}
+
+func turnFailureError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return compactToolResultRaw(err.Error(), 500)
 }
 
 func (o *Orchestrator) saveMessage(ctx context.Context, tenantID, threadID string, msg *store.Message) error {

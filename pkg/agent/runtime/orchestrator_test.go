@@ -39,6 +39,7 @@ type mockLLMResponse struct {
 
 type fakePersistence struct {
 	thread         *store.Thread
+	turns          []*store.Turn
 	messages       []*store.Message
 	skillRuns      []*store.SkillRun
 	artifacts      []*store.Artifact
@@ -103,11 +104,13 @@ func (p *fakePersistence) SaveThread(_ context.Context, t *store.Thread) error {
 	return nil
 }
 
-func (p *fakePersistence) SaveTurn(context.Context, *store.Turn) error {
+func (p *fakePersistence) SaveTurn(_ context.Context, t *store.Turn) error {
 	p.turnSaveCount++
 	if p.saveTurnErr != nil && p.turnSaveCount > 1 {
 		return p.saveTurnErr
 	}
+	cp := *t
+	p.turns = append(p.turns, &cp)
 	return nil
 }
 
@@ -403,6 +406,87 @@ func TestRunTurn_SimpleTextResponse(t *testing.T) {
 	}
 	if combined != "Hello, world!" {
 		t.Errorf("expected 'Hello, world!', got %q", combined)
+	}
+}
+
+func TestRunTurn_PersistsCompletedTurnStatus(t *testing.T) {
+	persist := &fakePersistence{}
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "done"}}}}}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		emitter,
+		nil,
+	)
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_status_done", "hello")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if len(persist.turns) != 2 {
+		t.Fatalf("expected running and completed turn saves, got %#v", persist.turns)
+	}
+	if persist.turns[0].Status != store.TurnStatusRunning || persist.turns[0].Completed {
+		t.Fatalf("unexpected initial turn state: %#v", persist.turns[0])
+	}
+	final := persist.turns[len(persist.turns)-1]
+	if final.Status != store.TurnStatusCompleted || !final.Completed || final.CompletedAt == nil || final.Error != "" {
+		t.Fatalf("unexpected completed turn state: %#v", final)
+	}
+	if len(emitter.ByType(telemetry.TurnCompleted)) != 1 {
+		t.Fatalf("expected turn_completed telemetry, got %#v", emitter.Events)
+	}
+}
+
+func TestRunTurn_PersistsFailedTurnStatus(t *testing.T) {
+	persist := &fakePersistence{}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{err: errors.New("provider unavailable")},
+			{err: errors.New("provider unavailable")},
+			{err: errors.New("provider unavailable")},
+		},
+	}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		emitter,
+		nil,
+	)
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_status_failed", "hello")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err == nil {
+		t.Fatal("expected stream error")
+	}
+	final := persist.turns[len(persist.turns)-1]
+	if final.Status != store.TurnStatusFailed || !final.Completed || final.CompletedAt == nil {
+		t.Fatalf("unexpected failed turn state: %#v", final)
+	}
+	if !strings.Contains(final.Error, "provider unavailable") {
+		t.Fatalf("expected persisted failure reason, got %q", final.Error)
+	}
+	failures := emitter.ByType(telemetry.TurnFailed)
+	if len(failures) != 1 {
+		t.Fatalf("expected turn_failed telemetry, got %#v", emitter.Events)
+	}
+	if failures[0].Attrs["reason"] != "llm_call_failed" {
+		t.Fatalf("unexpected failure telemetry attrs: %#v", failures[0].Attrs)
 	}
 }
 

@@ -1386,6 +1386,63 @@ func TestRunTurn_EmitsRedactedToolProgress(t *testing.T) {
 	}
 }
 
+func TestRunTurn_ToolExecutionFailureContinuesToAssistant(t *testing.T) {
+	persist := &fakePersistence{}
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{
+				{ToolCalls: []stream.ToolCall{{ID: "tc_1", Name: "search", Arguments: `{"q":"disputes"}`}}},
+			}},
+			{chunks: []stream.Chunk{{Delta: "I could not read the store data yet."}}},
+		},
+	}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, _ exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, fmt.Errorf("backend returned 500: sales unavailable")
+		}), 5*time.Second, 0),
+		persist,
+		&telemetry.BufferEmitter{},
+		nil,
+	)
+	orch.RegisterTools([]ToolDef{{Name: "search", Description: "Search", Schema: `{}`}})
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_tool_error_continue", "check disputes")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("tool execution failure should be returned to the model, not fail the stream: %v", streamErr)
+	}
+	if len(llm.captured) != 2 {
+		t.Fatalf("expected second LLM call after tool error, got %d", len(llm.captured))
+	}
+
+	var sawToolError bool
+	var combined string
+	for _, chunk := range chunks {
+		if chunk.ToolEvent != nil && chunk.ToolEvent.ID == "tc_1" && chunk.ToolEvent.Status == "error" {
+			sawToolError = true
+			if !strings.Contains(string(chunk.ToolEvent.Result), "sales unavailable") {
+				t.Fatalf("expected redacted tool error result in stream, got %s", string(chunk.ToolEvent.Result))
+			}
+		}
+		combined += chunk.Delta
+	}
+	if !sawToolError {
+		t.Fatalf("expected tool error event, got %#v", chunks)
+	}
+	if !strings.Contains(combined, "could not read") {
+		t.Fatalf("expected assistant recovery response, got %q", combined)
+	}
+	final := persist.turns[len(persist.turns)-1]
+	if final.Status != store.TurnStatusCompleted || final.Error != "" {
+		t.Fatalf("tool execution failure should not fail the turn: %#v", final)
+	}
+}
+
 func TestRunTurn_RejectsUnauthorizedToolCall(t *testing.T) {
 	llm := &mockLLM{
 		responses: []mockLLMResponse{

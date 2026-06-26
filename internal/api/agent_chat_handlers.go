@@ -190,25 +190,7 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if chunk.ToolEvent != nil {
-			eventType := aipkg.SSETypeToolResult
-			if chunk.ToolEvent.Status == "executing" {
-				eventType = aipkg.SSETypeToolCall
-			}
-			event := aipkg.SSEEvent{
-				Type:   eventType,
-				Tool:   chunk.ToolEvent.Name,
-				ToolID: chunk.ToolEvent.ID,
-			}
-			if chunk.ToolEvent.Status == "error" {
-				event.Error = "tool execution failed"
-			}
-			if len(chunk.ToolEvent.Result) > 0 {
-				var result any
-				if err := json.Unmarshal(chunk.ToolEvent.Result, &result); err == nil {
-					event.Result = result
-				}
-			}
-			emitSSE(event)
+			emitSSE(agentChatSSEEventFromToolEvent(chunk.ToolEvent))
 		}
 		if chunk.Delta != "" {
 			emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeContent, Content: chunk.Delta})
@@ -234,6 +216,28 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		Type:      aipkg.SSETypeDone,
 		SessionID: threadID,
 	})
+}
+
+func agentChatSSEEventFromToolEvent(toolEvent *agentstream.ToolEvent) aipkg.SSEEvent {
+	eventType := aipkg.SSETypeToolResult
+	if toolEvent.Status == "executing" {
+		eventType = aipkg.SSETypeToolCall
+	}
+	event := aipkg.SSEEvent{
+		Type:   eventType,
+		Tool:   toolEvent.Name,
+		ToolID: toolEvent.ID,
+	}
+	if len(toolEvent.Result) > 0 {
+		var result any
+		if err := json.Unmarshal(toolEvent.Result, &result); err == nil {
+			event.Result = result
+		}
+	}
+	if toolEvent.Status == "error" && event.Result == nil {
+		event.Result = map[string]any{"error": "tool execution failed"}
+	}
+	return event
 }
 
 func updateAgentChatThreadMetadata(ctx context.Context, persist agentstore.Persistence, tenantID, threadID, firstMessage string) error {

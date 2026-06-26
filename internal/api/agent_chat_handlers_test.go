@@ -23,6 +23,7 @@ import (
 	agentruntime "github.com/mobazha/mobazha3.0/pkg/agent/runtime"
 	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
+	agentstream "github.com/mobazha/mobazha3.0/pkg/agent/stream"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	"github.com/xuri/excelize/v2"
 )
@@ -689,6 +690,29 @@ func TestHandlePOSTAgentChat_StreamsSSE(t *testing.T) {
 	store := node.store.(*agentChatMemoryStore)
 	if store.thread == nil || store.thread.Title != "hello" || store.thread.LastActive.Before(time.Now().Add(-time.Minute)) {
 		t.Fatalf("expected thread metadata to be persisted, got %#v", store.thread)
+	}
+}
+
+func TestAgentChatSSEEventFromToolEvent_PreservesErrorResult(t *testing.T) {
+	event := agentChatSSEEventFromToolEvent(&agentstream.ToolEvent{
+		ID:     "tool_1",
+		Name:   "orders_get_sales",
+		Status: "error",
+		Result: json.RawMessage(`{"error":"backend returned 500: sales unavailable"}`),
+	})
+
+	if event.Type != aipkg.SSETypeToolResult || event.ToolID != "tool_1" || event.Tool != "orders_get_sales" {
+		t.Fatalf("unexpected SSE event header: %#v", event)
+	}
+	if event.Error != "" {
+		t.Fatalf("tool result should carry error in result payload, not SSE error: %#v", event)
+	}
+	result, ok := event.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected result map, got %#v", event.Result)
+	}
+	if result["error"] != "backend returned 500: sales unavailable" {
+		t.Fatalf("unexpected error result: %#v", result)
 	}
 }
 

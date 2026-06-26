@@ -1546,7 +1546,7 @@ func (o *Orchestrator) runLoop(
 		}
 
 		start := time.Now()
-		results, execErr := o.batchExec.Execute(ctx, execCalls, exec.Parallel)
+		results, _ := o.batchExec.Execute(ctx, execCalls, exec.Parallel)
 		duration := time.Since(start)
 
 		errCount := 0
@@ -1578,11 +1578,15 @@ func (o *Orchestrator) runLoop(
 				toolName = toolNames[r.CallID]
 			}
 			content := compactToolResultForHistory(toolName, r.Content, toolResultMode(resolved, toolName), r.IsError)
-			out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
+			toolEvent := &stream.ToolEvent{
 				ID:     r.CallID,
 				Name:   toolName,
 				Status: status,
-			}})
+			}
+			if r.IsError && content != "" {
+				toolEvent.Result = toolErrorResultPayload(content)
+			}
+			out.Send(stream.Chunk{ToolEvent: toolEvent})
 			history = append(history, Message{
 				Role:       "tool",
 				Content:    content,
@@ -1606,17 +1610,22 @@ func (o *Orchestrator) runLoop(
 			}
 		}
 
-		if execErr != nil && errCount == len(results) {
-			turnErr := fmt.Errorf("all tool calls failed: %w", execErr)
-			_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "all_tool_calls_failed", turnErr)
-			out.SendError(turnErr)
-			return
-		}
 	}
 
 	turnErr := fmt.Errorf("exceeded max tool rounds (%d)", o.cfg.MaxToolRounds)
 	_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "max_tool_rounds_exceeded", turnErr)
 	out.SendError(turnErr)
+}
+
+func toolErrorResultPayload(content string) json.RawMessage {
+	if json.Valid([]byte(content)) {
+		return json.RawMessage(content)
+	}
+	data, err := json.Marshal(map[string]string{"error": content})
+	if err != nil {
+		return json.RawMessage(`{"error":"tool execution failed"}`)
+	}
+	return json.RawMessage(data)
 }
 
 func estimateMessagesTokens(messages []Message) int {

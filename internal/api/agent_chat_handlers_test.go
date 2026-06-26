@@ -1594,6 +1594,131 @@ func TestHandlePOSTAgentProductImportRunApprovals_CreatesSelectedApprovals(t *te
 	}
 }
 
+func TestHandlePOSTAgentProductImportRunApprovalActions_DecidesAndAppliesRunApprovals(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv part: %v", err)
+	}
+	if _, err := part.Write([]byte("Item Name,Cost USD,Qty on hand\nLinen Tote,$45.00,12\nCanvas Cap,$25.00,7\n")); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected ingest 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var ingestResp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&ingestResp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	runID := ingestResp.Data.SkillRun.ID
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/"+runID+"/approvals", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": runID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunApprovals(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected batch approval 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	sourceOnlyApproval := testAgentApproval(t, "appr_source_only", "test-node", agentstore.ApprovalStatusPending, `{"listing":{"title":"Should Not Apply"}}`)
+	sourceOnlyApproval.ArtifactIDs = fmt.Sprintf(`["%s"]`, ingestResp.Data.SourceArtifacts[0].ID)
+	store.approvals = append(store.approvals, sourceOnlyApproval)
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/"+runID+"/approval-decisions", strings.NewReader(`{"decision":"approved"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": runID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunApprovalDecisions(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected batch decision 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var decisionResp struct {
+		Data agentProductImportApprovalActionBatchResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&decisionResp); err != nil {
+		t.Fatalf("decode batch decision: %v", err)
+	}
+	if decisionResp.Data.Processed != 2 || decisionResp.Data.Page.TotalApprovals != 2 || decisionResp.Data.Page.Selected != 2 {
+		t.Fatalf("unexpected batch decision result: %#v", decisionResp.Data)
+	}
+	for _, approval := range store.approvals {
+		if approval.ID == "appr_source_only" {
+			if approval.Status != agentstore.ApprovalStatusPending {
+				t.Fatalf("source-only approval should not be decided, got %#v", approval)
+			}
+			continue
+		}
+		if approval.Status != agentstore.ApprovalStatusApproved {
+			t.Fatalf("expected approval to be approved, got %#v", approval)
+		}
+	}
+
+	var calls int
+	oldExecute := executeAgentApprovalTool
+	executeAgentApprovalTool = func(_ context.Context, _, _, action, gotPayload string) (string, error) {
+		calls++
+		if action != "listings_create" || !strings.Contains(gotPayload, `"title":`) {
+			t.Fatalf("unexpected tool execution action=%s payload=%s", action, gotPayload)
+		}
+		return fmt.Sprintf(`{"data":{"slug":"created-%d"}}`, calls), nil
+	}
+	t.Cleanup(func() { executeAgentApprovalTool = oldExecute })
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/"+runID+"/approval-applications", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": runID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunApprovalApplications(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected batch apply 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var applyResp struct {
+		Data agentProductImportApprovalActionBatchResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&applyResp); err != nil {
+		t.Fatalf("decode batch apply: %v", err)
+	}
+	if applyResp.Data.Processed != 2 || calls != 2 {
+		t.Fatalf("expected two applied approvals, response=%#v calls=%d", applyResp.Data, calls)
+	}
+	for _, approval := range store.approvals {
+		if approval.ID == "appr_source_only" {
+			if approval.Status != agentstore.ApprovalStatusPending {
+				t.Fatalf("source-only approval should not be applied, got %#v", approval)
+			}
+			continue
+		}
+		if approval.Status != agentstore.ApprovalStatusApplied || approval.AppliedAt == nil {
+			t.Fatalf("expected approval to be applied, got %#v", approval)
+		}
+	}
+}
+
 func TestHandlePOSTAgentProductImportRunApprovals_RejectsEmptySelection(t *testing.T) {
 	store := &agentChatMemoryStore{
 		skillRuns: []*agentstore.SkillRun{

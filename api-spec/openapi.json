@@ -1,6 +1,39 @@
 {
   "components": {
     "schemas": {
+      "AgentProductImportApprovalActionBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "approvalIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "decision": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AgentProductImportApprovalApplyBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "approvalIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "AgentProductImportApprovalBatchRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1468,6 +1501,132 @@
           }
         ],
         "summary": "Ingest product import source material",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/product-import/runs/{runId}/approval-applications": {
+      "post": {
+        "operationId": "agent-product-import-run-approval-applications-post",
+        "parameters": [
+          {
+            "description": "Agent skill run ID.",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "description": "Agent skill run ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentProductImportApprovalApplyBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Apply approved product import approval requests",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/product-import/runs/{runId}/approval-decisions": {
+      "post": {
+        "operationId": "agent-product-import-run-approval-decisions-post",
+        "parameters": [
+          {
+            "description": "Agent skill run ID.",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "description": "Agent skill run ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentProductImportApprovalActionBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Approve or reject product import approval requests",
         "tags": [
           "ai"
         ]

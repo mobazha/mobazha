@@ -282,6 +282,8 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"agent-chat-stream-post",
 		"agent-artifact-approval-post",
 		"agent-product-import-ingest-post",
+		"agent-product-import-run-approval-applications-post",
+		"agent-product-import-run-approval-decisions-post",
 		"agent-product-import-run-approvals-post",
 		"agent-product-import-workbench-get",
 		"ai-generate-post",

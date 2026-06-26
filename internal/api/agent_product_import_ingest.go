@@ -136,11 +136,35 @@ type agentProductImportApprovalBatchResult struct {
 
 type agentProductImportApprovalBatchSkip struct {
 	ProposalArtifactID string `json:"proposalArtifactId,omitempty"`
+	ApprovalID         string `json:"approvalId,omitempty"`
 	Reason             string `json:"reason"`
 }
 
 type agentProductImportApprovalBatchResultPage struct {
 	TotalProposals int `json:"totalProposals"`
+	Selected       int `json:"selected"`
+}
+
+type agentProductImportApprovalActionBatchRequest struct {
+	ApprovalIDs []string `json:"approvalIds,omitempty"`
+	Decision    string   `json:"decision,omitempty"`
+}
+
+type agentProductImportApprovalApplyBatchRequest struct {
+	ApprovalIDs []string `json:"approvalIds,omitempty"`
+}
+
+type agentProductImportApprovalActionBatchResult struct {
+	SkillRun  *agentstore.SkillRun                  `json:"skillRun"`
+	Approvals []*agentstore.Approval                `json:"approvals"`
+	Processed int                                   `json:"processed"`
+	Failed    int                                   `json:"failed,omitempty"`
+	Skipped   []agentProductImportApprovalBatchSkip `json:"skipped,omitempty"`
+	Page      agentProductImportApprovalActionPage  `json:"page"`
+}
+
+type agentProductImportApprovalActionPage struct {
+	TotalApprovals int `json:"totalApprovals"`
 	Selected       int `json:"selected"`
 }
 
@@ -295,6 +319,66 @@ func (g *Gateway) handlePOSTAgentProductImportRunApprovals(w http.ResponseWriter
 	responsePkg.Success(w, sanitizeProductImportApprovalBatchResultForAPI(result))
 }
 
+// handlePOSTAgentProductImportRunApprovalDecisions handles POST /v1/agent/product-import/runs/{runId}/approval-decisions.
+func (g *Gateway) handlePOSTAgentProductImportRunApprovalDecisions(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	req, err := parseProductImportApprovalActionBatchRequest(r)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	tenantID := agentChatTenantID(r, p)
+	runID := strings.TrimSpace(chi.URLParam(r, "runId"))
+	result, err := decideProductImportRunApprovals(r.Context(), p, tenantID, runID, agentApprovalDecisionActor(r, p), req)
+	if errors.Is(err, agentstore.ErrSkillRunNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "skill run not found")
+		return
+	}
+	if errors.Is(err, errProductImportApprovalInternal) {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to decide product import approvals")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	responsePkg.Success(w, sanitizeProductImportApprovalActionBatchResultForAPI(result))
+}
+
+// handlePOSTAgentProductImportRunApprovalApplications handles POST /v1/agent/product-import/runs/{runId}/approval-applications.
+func (g *Gateway) handlePOSTAgentProductImportRunApprovalApplications(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	req, err := parseProductImportApprovalActionBatchRequest(r)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	tenantID := agentChatTenantID(r, p)
+	runID := strings.TrimSpace(chi.URLParam(r, "runId"))
+	result, err := applyProductImportRunApprovals(r.Context(), r, p, tenantID, runID, agentApprovalDecisionActor(r, p), req)
+	if errors.Is(err, agentstore.ErrSkillRunNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "skill run not found")
+		return
+	}
+	if errors.Is(err, errProductImportApprovalInternal) {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to apply product import approvals")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	responsePkg.Success(w, sanitizeProductImportApprovalActionBatchResultForAPI(result))
+}
+
 func parseProductImportApprovalBatchRequest(r *http.Request) (agentProductImportApprovalBatchRequest, error) {
 	var req agentProductImportApprovalBatchRequest
 	if r == nil || r.Body == nil || r.Body == http.NoBody {
@@ -310,6 +394,25 @@ func parseProductImportApprovalBatchRequest(r *http.Request) (agentProductImport
 	if len(req.ProposalArtifactIDs) > productImportMaxApprovalBatch {
 		return req, fmt.Errorf("too many proposalArtifactIds (max %d)", productImportMaxApprovalBatch)
 	}
+	return req, nil
+}
+
+func parseProductImportApprovalActionBatchRequest(r *http.Request) (agentProductImportApprovalActionBatchRequest, error) {
+	var req agentProductImportApprovalActionBatchRequest
+	if r == nil || r.Body == nil || r.Body == http.NoBody {
+		return req, nil
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if errors.Is(err, io.EOF) {
+			return req, nil
+		}
+		return req, fmt.Errorf("invalid product import approval action body")
+	}
+	req.ApprovalIDs = uniqueTrimmedStrings(req.ApprovalIDs)
+	if len(req.ApprovalIDs) > productImportMaxApprovalBatch {
+		return req, fmt.Errorf("too many approvalIds (max %d)", productImportMaxApprovalBatch)
+	}
+	req.Decision = strings.TrimSpace(req.Decision)
 	return req, nil
 }
 
@@ -383,6 +486,151 @@ func buildProductImportRunApprovals(ctx context.Context, r *http.Request, p aiCh
 		result.Page.Selected = result.Page.TotalProposals
 	}
 	return result, nil
+}
+
+func decideProductImportRunApprovals(ctx context.Context, p aiChatProvider, tenantID, runID, actorID string, req agentProductImportApprovalActionBatchRequest) (*agentProductImportApprovalActionBatchResult, error) {
+	decision := strings.TrimSpace(req.Decision)
+	if decision != agentstore.ApprovalStatusApproved && decision != agentstore.ApprovalStatusRejected {
+		return nil, fmt.Errorf("decision must be approved or rejected")
+	}
+	run, approvals, err := loadProductImportRunApprovals(ctx, p, tenantID, runID)
+	if err != nil {
+		return nil, err
+	}
+	result := newProductImportApprovalActionBatchResult(run, approvals, req.ApprovalIDs)
+	targets, skipped, err := selectProductImportRunApprovals(approvals, req.ApprovalIDs, func(approval *agentstore.Approval) bool {
+		return approval.Status == agentstore.ApprovalStatusPending
+	})
+	if err != nil {
+		return nil, err
+	}
+	result.Skipped = append(result.Skipped, skipped...)
+	if len(req.ApprovalIDs) == 0 {
+		result.Page.Selected = len(targets)
+	}
+	for _, approval := range targets {
+		updated, err := p.AgentStore().UpdateApprovalStatus(ctx, tenantID, approval.ID, decision, actorID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: update approval decision: %v", errProductImportApprovalInternal, err)
+		}
+		result.Processed++
+		result.Approvals = append(result.Approvals, updated)
+	}
+	if result.Processed == 0 {
+		return nil, fmt.Errorf("no pending product import approvals found")
+	}
+	return result, nil
+}
+
+func applyProductImportRunApprovals(ctx context.Context, r *http.Request, p aiChatProvider, tenantID, runID, actorID string, req agentProductImportApprovalActionBatchRequest) (*agentProductImportApprovalActionBatchResult, error) {
+	run, approvals, err := loadProductImportRunApprovals(ctx, p, tenantID, runID)
+	if err != nil {
+		return nil, err
+	}
+	result := newProductImportApprovalActionBatchResult(run, approvals, req.ApprovalIDs)
+	targets, skipped, err := selectProductImportRunApprovals(approvals, req.ApprovalIDs, func(approval *agentstore.Approval) bool {
+		return approval.Status == agentstore.ApprovalStatusApproved || approval.Status == agentstore.ApprovalStatusApplyFailed
+	})
+	if err != nil {
+		return nil, err
+	}
+	result.Skipped = append(result.Skipped, skipped...)
+	if len(req.ApprovalIDs) == 0 {
+		result.Page.Selected = len(targets)
+	}
+	for _, approval := range targets {
+		applied, err := applyAgentApproval(ctx, p.AgentStore(), tenantID, approval.ID, actorID, getLocalAPIURL(r), getAuthToken(r))
+		if err != nil {
+			if applied != nil {
+				result.Failed++
+				result.Approvals = append(result.Approvals, applied)
+				result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ApprovalID: approval.ID, Reason: err.Error()})
+				continue
+			}
+			if errors.Is(err, agentstore.ErrApprovalNotFound) {
+				result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ApprovalID: approval.ID, Reason: "approval not found"})
+				continue
+			}
+			if errors.Is(err, errAgentApprovalApplyState) || errors.Is(err, errAgentApprovalHash) || errors.Is(err, errAgentApprovalApplying) {
+				result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ApprovalID: approval.ID, Reason: err.Error()})
+				continue
+			}
+			return nil, fmt.Errorf("%w: apply approval: %v", errProductImportApprovalInternal, err)
+		}
+		result.Processed++
+		result.Approvals = append(result.Approvals, applied)
+	}
+	if result.Processed == 0 && result.Failed == 0 {
+		return nil, fmt.Errorf("no approved product import approvals found")
+	}
+	return result, nil
+}
+
+func loadProductImportRunApprovals(ctx context.Context, p aiChatProvider, tenantID, runID string) (*agentstore.SkillRun, []*agentstore.Approval, error) {
+	run, err := p.AgentStore().LoadSkillRun(ctx, tenantID, runID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if run.SkillID != productImportSkillID {
+		return nil, nil, agentstore.ErrSkillRunNotFound
+	}
+	artifacts, err := listProductImportRunArtifacts(ctx, p, tenantID, runID)
+	if err != nil {
+		return nil, nil, err
+	}
+	approvals, err := listProductImportApprovalsForArtifactIDs(ctx, p, tenantID, productImportProposalArtifactIDSet(artifacts))
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: list approvals: %v", errProductImportApprovalInternal, err)
+	}
+	return run, approvals, nil
+}
+
+func newProductImportApprovalActionBatchResult(run *agentstore.SkillRun, approvals []*agentstore.Approval, approvalIDs []string) *agentProductImportApprovalActionBatchResult {
+	return &agentProductImportApprovalActionBatchResult{
+		SkillRun: run,
+		Page: agentProductImportApprovalActionPage{
+			TotalApprovals: len(approvals),
+			Selected:       len(approvalIDs),
+		},
+	}
+}
+
+func selectProductImportRunApprovals(approvals []*agentstore.Approval, approvalIDs []string, eligible func(*agentstore.Approval) bool) ([]*agentstore.Approval, []agentProductImportApprovalBatchSkip, error) {
+	explicitSelection := len(approvalIDs) > 0
+	selected := map[string]struct{}{}
+	for _, approvalID := range approvalIDs {
+		selected[approvalID] = struct{}{}
+	}
+	seen := map[string]struct{}{}
+	var targets []*agentstore.Approval
+	var skipped []agentProductImportApprovalBatchSkip
+	for _, approval := range approvals {
+		if approval == nil || approval.SkillID != productImportSkillID {
+			continue
+		}
+		if explicitSelection {
+			if _, ok := selected[approval.ID]; !ok {
+				continue
+			}
+			seen[approval.ID] = struct{}{}
+		}
+		if !eligible(approval) {
+			if explicitSelection {
+				skipped = append(skipped, agentProductImportApprovalBatchSkip{ApprovalID: approval.ID, Reason: fmt.Sprintf("approval status %s is not eligible", approval.Status)})
+			}
+			continue
+		}
+		targets = append(targets, approval)
+	}
+	for _, approvalID := range approvalIDs {
+		if _, ok := seen[approvalID]; !ok {
+			skipped = append(skipped, agentProductImportApprovalBatchSkip{ApprovalID: approvalID, Reason: "approval is not in this product import run"})
+		}
+	}
+	if !explicitSelection && len(targets) > productImportMaxApprovalBatch {
+		return nil, nil, fmt.Errorf("too many product import approvals for one batch (max %d)", productImportMaxApprovalBatch)
+	}
+	return targets, skipped, nil
 }
 
 func ensureProductImportProposalApproval(ctx context.Context, r *http.Request, p aiChatProvider, tenantID string, artifact *agentstore.Artifact) (*agentstore.Approval, bool, error) {
@@ -570,6 +818,17 @@ func productImportArtifactIDSet(artifacts []*agentstore.Artifact) map[string]str
 	return out
 }
 
+func productImportProposalArtifactIDSet(artifacts []*agentstore.Artifact) map[string]struct{} {
+	out := make(map[string]struct{}, len(artifacts))
+	for _, artifact := range artifacts {
+		if artifact == nil || artifact.ID == "" || artifact.Kind != agentstore.ArtifactKindProposal {
+			continue
+		}
+		out[artifact.ID] = struct{}{}
+	}
+	return out
+}
+
 func listProductImportApprovalsForArtifactIDs(ctx context.Context, p aiChatProvider, tenantID string, artifactIDs map[string]struct{}) ([]*agentstore.Approval, error) {
 	if len(artifactIDs) == 0 {
 		return nil, nil
@@ -652,6 +911,15 @@ func sanitizeProductImportIngestResultForAPI(result *agentProductImportIngestRes
 }
 
 func sanitizeProductImportApprovalBatchResultForAPI(result *agentProductImportApprovalBatchResult) *agentProductImportApprovalBatchResult {
+	if result == nil {
+		return nil
+	}
+	out := *result
+	out.Approvals = agentstore.SanitizeApprovalsForAPI(result.Approvals)
+	return &out
+}
+
+func sanitizeProductImportApprovalActionBatchResultForAPI(result *agentProductImportApprovalActionBatchResult) *agentProductImportApprovalActionBatchResult {
 	if result == nil {
 		return nil
 	}

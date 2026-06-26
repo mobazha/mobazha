@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
+	agentruntime "github.com/mobazha/mobazha3.0/pkg/agent/runtime"
 	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -559,6 +560,58 @@ func TestHandlePOSTAgentChat_StreamsSSE(t *testing.T) {
 	store := node.store.(*agentChatMemoryStore)
 	if store.thread == nil || store.thread.Title != "hello" || store.thread.LastActive.Before(time.Now().Add(-time.Minute)) {
 		t.Fatalf("expected thread metadata to be persisted, got %#v", store.thread)
+	}
+}
+
+func TestAgentChatThreadCompactor_StreamsSummaryWithoutTools(t *testing.T) {
+	var upstreamReq map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Fatalf("unexpected upstream path: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&upstreamReq); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"User prefers concise Chinese replies.\"}}]}\n\n")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\" Open task: review listing drafts.\"},\"finish_reason\":\"stop\"}]}\n\n")
+	}))
+	defer upstream.Close()
+
+	compactor := agentChatThreadCompactor{
+		proxy: aipkg.NewProxy(upstream.Client()),
+		cfg: aipkg.Config{
+			Enabled:  true,
+			Provider: "custom",
+			APIKey:   "test-key",
+			Model:    "test-model",
+			BaseURL:  upstream.URL,
+		},
+	}
+	summary, err := compactor.CompactThread(context.Background(), agentruntime.ThreadCompactionRequest{
+		TenantID: "tenant_1",
+		ThreadID: "thread_1",
+		Messages: []agentruntime.Message{
+			{Role: "user", Content: "请以后用中文简洁回答"},
+			{Role: "assistant", Content: "好的，我会保持简洁。"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("compact thread: %v", err)
+	}
+	if summary != "User prefers concise Chinese replies. Open task: review listing drafts." {
+		t.Fatalf("unexpected summary: %q", summary)
+	}
+	if _, ok := upstreamReq["tools"]; ok {
+		t.Fatalf("compaction request should not include tools: %#v", upstreamReq)
+	}
+	messages, ok := upstreamReq["messages"].([]any)
+	if !ok || len(messages) != 3 {
+		t.Fatalf("expected prompt plus two history messages, got %#v", upstreamReq["messages"])
+	}
+	system, _ := messages[0].(map[string]any)
+	if system["role"] != "system" || !strings.Contains(fmt.Sprint(system["content"]), "Summarize the earlier part") {
+		t.Fatalf("expected compaction system prompt, got %#v", system)
 	}
 }
 

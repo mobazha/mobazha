@@ -48,6 +48,14 @@ const (
 	agentChatArtifactDataMaxLen  = 1200
 )
 
+const agentChatThreadCompactionPrompt = `Summarize the earlier part of this agent conversation for future context replay.
+
+Rules:
+- Preserve durable user preferences, store facts, task state, decisions, open questions, and constraints.
+- Preserve references to tools, artifacts, approvals, listings, orders, and skill runs when they affect future turns.
+- Do not invent facts, do not execute actions, and do not include secrets.
+- Output only the summary in concise plain text.`
+
 // handlePOSTAgentChat handles POST /v1/agent/chat — the Orchestrator-backed
 // seller AI chat endpoint.
 func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
@@ -492,6 +500,7 @@ func getAgentChatOrchestrator(cacheKey string, cfg aipkg.Config, systemPrompt st
 	)
 	orch.SetSystemPrompt(systemPrompt)
 	orch.RegisterTools(agentToolDefs(aipkg.SellerTools()))
+	orch.SetThreadCompactor(agentChatThreadCompactor{proxy: proxy, cfg: cfg})
 
 	entry := &agentChatRuntimeCacheEntry{fingerprint: fingerprint, orch: orch}
 	agentChatRuntimes.Store(cacheKey, entry)
@@ -538,6 +547,11 @@ type agentChatLLMClient struct {
 	cfg   aipkg.Config
 }
 
+type agentChatThreadCompactor struct {
+	proxy *aipkg.Proxy
+	cfg   aipkg.Config
+}
+
 func (c agentChatLLMClient) ChatStream(ctx context.Context, messages []agentruntime.Message, tools []agentruntime.ToolDef) (agentstream.Stream, error) {
 	deltas, err := c.proxy.StreamChat(ctx, c.cfg, agentChatMessages(messages), agentChatTools(tools))
 	if err != nil {
@@ -564,6 +578,39 @@ func (c agentChatLLMClient) ChatStream(ctx context.Context, messages []agentrunt
 			}
 		}
 	}()
+	return out, nil
+}
+
+func (c agentChatThreadCompactor) CompactThread(ctx context.Context, req agentruntime.ThreadCompactionRequest) (string, error) {
+	if c.proxy == nil {
+		return "", fmt.Errorf("AI proxy is not configured")
+	}
+	messages := make([]aipkg.ChatMsg, 0, len(req.Messages)+1)
+	messages = append(messages, aipkg.ChatMsg{
+		Role:    aipkg.RoleSystem,
+		Content: agentChatThreadCompactionPrompt,
+	})
+	messages = append(messages, agentChatMessages(req.Messages)...)
+	deltas, err := c.proxy.StreamChat(ctx, c.cfg, messages, nil)
+	if err != nil {
+		return "", err
+	}
+	var summary strings.Builder
+	for delta := range deltas {
+		if delta.Error != "" {
+			return "", fmt.Errorf("%s", delta.Error)
+		}
+		if delta.Content != "" {
+			summary.WriteString(delta.Content)
+		}
+		if delta.Done {
+			break
+		}
+	}
+	out := strings.TrimSpace(summary.String())
+	if out == "" {
+		return "", fmt.Errorf("thread compactor returned empty summary")
+	}
 	return out, nil
 }
 

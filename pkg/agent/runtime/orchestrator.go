@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,6 +44,12 @@ type ThreadCompactor interface {
 	CompactThread(ctx context.Context, req ThreadCompactionRequest) (string, error)
 }
 
+type threadCompactionCacheEntry struct {
+	TenantID string
+	ThreadID string
+	Summary  string
+}
+
 // Message is an agent conversation message sent to/from the LLM.
 type Message struct {
 	Role       string            `json:"role"`
@@ -64,6 +71,7 @@ const (
 	toolResultHistoryMaxLen       = 2000
 	toolResultExcerptMaxLen       = 1200
 	threadCompactionSummaryMaxLen = 4000
+	threadCompactionCacheMaxItems = 256
 )
 
 // Config holds the orchestrator's tuning parameters.
@@ -103,6 +111,9 @@ type Orchestrator struct {
 	emitter   telemetry.Emitter
 	cfg       Config
 
+	compactionMu    sync.Mutex
+	compactionCache map[string]threadCompactionCacheEntry
+
 	systemPrompt     string
 	tools            []ToolDef
 	threadCompactor  ThreadCompactor
@@ -141,13 +152,14 @@ func NewOrchestrator(
 		emitter = telemetry.NoopEmitter{}
 	}
 	return &Orchestrator{
-		llm:       llm,
-		budget:    budgetCalc,
-		batchExec: batchExec,
-		persist:   persist,
-		mem:       store.NewRuntimeStore(),
-		emitter:   emitter,
-		cfg:       c,
+		llm:             llm,
+		budget:          budgetCalc,
+		batchExec:       batchExec,
+		persist:         persist,
+		mem:             store.NewRuntimeStore(),
+		emitter:         emitter,
+		cfg:             c,
+		compactionCache: map[string]threadCompactionCacheEntry{},
 	}
 }
 
@@ -206,6 +218,7 @@ func (o *Orchestrator) ForgetThread(tenantID, threadID string) {
 		return
 	}
 	o.mem.RemoveThread(tenantID, threadID)
+	o.forgetThreadCompactionCache(tenantID, threadID)
 }
 
 // AddInputGuardrail adds an input validation guardrail.
@@ -1566,7 +1579,13 @@ func (o *Orchestrator) compactReplayHistory(ctx context.Context, tenantID, threa
 	if o.threadCompactor == nil {
 		return compactReplayHistory(history, keepLast), "deterministic", nil
 	}
+	mode := "thread_compactor"
 	compacted, err := compactReplayHistoryWithSummary(history, keepLast, func(messages []Message) (string, error) {
+		cacheKey := threadCompactionCacheKey(tenantID, threadID, messages)
+		if summary, ok := o.threadCompactionSummary(cacheKey); ok {
+			mode = "thread_compactor_cached"
+			return summary, nil
+		}
 		req := ThreadCompactionRequest{
 			TenantID: tenantID,
 			ThreadID: threadID,
@@ -1580,12 +1599,17 @@ func (o *Orchestrator) compactReplayHistory(ctx context.Context, tenantID, threa
 		if summary == "" {
 			return "", errors.New("thread compactor returned empty summary")
 		}
+		o.storeThreadCompactionSummary(cacheKey, threadCompactionCacheEntry{
+			TenantID: tenantID,
+			ThreadID: threadID,
+			Summary:  summary,
+		})
 		return summary, nil
 	})
 	if err != nil {
 		return compactReplayHistory(history, keepLast), "deterministic_fallback", err
 	}
-	return compacted, "thread_compactor", nil
+	return compacted, mode, nil
 }
 
 func compactReplayHistoryWithSummary(history []Message, keepLast int, summarize func([]Message) (string, error)) ([]Message, error) {
@@ -1664,6 +1688,73 @@ func summarizeReplayMessages(messages []Message) string {
 		parts = append(parts, fmt.Sprintf("- %s: %s", msg.Role, content))
 	}
 	return strings.Join(parts, "\n")
+}
+
+func threadCompactionCacheKey(tenantID, threadID string, messages []Message) string {
+	h := sha256.New()
+	_, _ = h.Write([]byte(tenantID))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(threadID))
+	_, _ = h.Write([]byte{0})
+	for _, msg := range messages {
+		_, _ = h.Write([]byte(msg.Role))
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(msg.Content))
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(msg.ToolCallID))
+		_, _ = h.Write([]byte{0})
+		for _, call := range msg.ToolCalls {
+			_, _ = h.Write([]byte(call.ID))
+			_, _ = h.Write([]byte{0})
+			_, _ = h.Write([]byte(call.Name))
+			_, _ = h.Write([]byte{0})
+			_, _ = h.Write([]byte(call.Arguments))
+			_, _ = h.Write([]byte{0})
+		}
+		_, _ = h.Write([]byte{1})
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (o *Orchestrator) threadCompactionSummary(key string) (string, bool) {
+	if o == nil || key == "" {
+		return "", false
+	}
+	o.compactionMu.Lock()
+	defer o.compactionMu.Unlock()
+	entry, ok := o.compactionCache[key]
+	return entry.Summary, ok
+}
+
+func (o *Orchestrator) storeThreadCompactionSummary(key string, entry threadCompactionCacheEntry) {
+	if o == nil || key == "" || entry.Summary == "" {
+		return
+	}
+	o.compactionMu.Lock()
+	defer o.compactionMu.Unlock()
+	if o.compactionCache == nil {
+		o.compactionCache = map[string]threadCompactionCacheEntry{}
+	}
+	if len(o.compactionCache) >= threadCompactionCacheMaxItems {
+		for oldKey := range o.compactionCache {
+			delete(o.compactionCache, oldKey)
+			break
+		}
+	}
+	o.compactionCache[key] = entry
+}
+
+func (o *Orchestrator) forgetThreadCompactionCache(tenantID, threadID string) {
+	if o == nil || tenantID == "" || threadID == "" {
+		return
+	}
+	o.compactionMu.Lock()
+	defer o.compactionMu.Unlock()
+	for key, entry := range o.compactionCache {
+		if entry.TenantID == tenantID && entry.ThreadID == threadID {
+			delete(o.compactionCache, key)
+		}
+	}
 }
 
 func approvalRequiredToolResult(resolved *resolvedTurnContext, tenantID, threadID, turnID string, call stream.ToolCall) (string, *store.Approval, bool, error) {

@@ -1789,6 +1789,47 @@ func TestRunTurn_ThreadCompactorFailureFallsBackDeterministically(t *testing.T) 
 	}
 }
 
+func TestCompactReplayHistory_ReusesThreadCompactorSummary(t *testing.T) {
+	compactor := &fakeThreadCompactor{summary: "Cached earlier thread summary."}
+	orch := newTestOrch(&mockLLM{}, nil)
+	orch.SetThreadCompactor(compactor)
+	history := []Message{
+		{Role: "system", Content: "system prompt"},
+		{Role: "user", Content: "older question"},
+		{Role: "assistant", Content: "older answer"},
+		{Role: "user", Content: "next question"},
+		{Role: "assistant", Content: "next answer"},
+		{Role: "user", Content: "current request"},
+	}
+
+	first, mode, err := orch.compactReplayHistory(context.Background(), "tenant_1", "thread_cached", history, 2)
+	if err != nil {
+		t.Fatalf("first compaction: %v", err)
+	}
+	if mode != "thread_compactor" || len(compactor.requests) != 1 {
+		t.Fatalf("expected first compaction to call compactor, mode=%q requests=%d", mode, len(compactor.requests))
+	}
+	second, mode, err := orch.compactReplayHistory(context.Background(), "tenant_1", "thread_cached", history, 2)
+	if err != nil {
+		t.Fatalf("second compaction: %v", err)
+	}
+	if mode != "thread_compactor_cached" || len(compactor.requests) != 1 {
+		t.Fatalf("expected second compaction to reuse cache, mode=%q requests=%d", mode, len(compactor.requests))
+	}
+	if fmt.Sprint(first) != fmt.Sprint(second) {
+		t.Fatalf("cached compaction should match first output\nfirst=%#v\nsecond=%#v", first, second)
+	}
+
+	orch.ForgetThread("tenant_1", "thread_cached")
+	_, mode, err = orch.compactReplayHistory(context.Background(), "tenant_1", "thread_cached", history, 2)
+	if err != nil {
+		t.Fatalf("third compaction: %v", err)
+	}
+	if mode != "thread_compactor" || len(compactor.requests) != 2 {
+		t.Fatalf("expected cache clear after ForgetThread, mode=%q requests=%d", mode, len(compactor.requests))
+	}
+}
+
 func TestReplayShapingPreservesToolCallGroup(t *testing.T) {
 	history := []Message{
 		{Role: "system", Content: "system prompt"},

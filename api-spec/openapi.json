@@ -19,6 +19,103 @@
         },
         "type": "object"
       },
+      "AgentProductImportApprovalActionBatchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "approvals": {
+            "items": {
+              "$ref": "#/components/schemas/Approval"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "failed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "items": {
+            "description": "Per-approval batch action outcomes; correlate entries by approvalId.",
+            "items": {
+              "$ref": "#/components/schemas/AgentProductImportApprovalActionItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "page": {
+            "$ref": "#/components/schemas/AgentProductImportApprovalActionPage"
+          },
+          "processed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "skillRun": {
+            "$ref": "#/components/schemas/SkillRun"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProductImportApprovalBatchSkip"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "skillRun",
+          "approvals",
+          "processed",
+          "page"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportApprovalActionItem": {
+        "additionalProperties": false,
+        "properties": {
+          "approvalId": {
+            "description": "Approval ID when known.",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Human-readable detail when skipped or failed.",
+            "type": "string"
+          },
+          "result": {
+            "description": "Action outcome: processed, skipped, or failed.",
+            "type": "string"
+          },
+          "status": {
+            "description": "Approval status after the action, when applicable.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportApprovalActionPage": {
+        "additionalProperties": false,
+        "properties": {
+          "selected": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalApprovals": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalApprovals",
+          "selected"
+        ],
+        "type": "object"
+      },
       "AgentProductImportApprovalApplyBatchRequest": {
         "additionalProperties": false,
         "properties": {
@@ -47,6 +144,404 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "AgentProductImportApprovalBatchSkip": {
+        "additionalProperties": false,
+        "properties": {
+          "approvalId": {
+            "type": "string"
+          },
+          "proposalArtifactId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportApprovalView": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "requestHash": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "action",
+          "requestHash"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportWorkbench": {
+        "additionalProperties": false,
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "page": {
+            "$ref": "#/components/schemas/AgentProductImportWorkbenchPage"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProductImportWorkbenchRow"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "skillRun": {
+            "$ref": "#/components/schemas/SkillRun"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProductImportWorkbenchSource"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/AgentProductImportWorkbenchSummary"
+          },
+          "validationReports": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProductImportWorkbenchValidation"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "skillRun",
+          "sources",
+          "rows",
+          "counts",
+          "summary",
+          "page"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportWorkbenchPage": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "Requested row page size (0 means no limit).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Requested row offset into the filtered result set.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "returnedRows": {
+            "description": "Proposal rows returned in this response page.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "description": "Active row status filter, if any.",
+            "type": "string"
+          },
+          "totalRows": {
+            "description": "Proposal rows after status filter, before limit/offset pagination.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "offset",
+          "totalRows",
+          "returnedRows"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportWorkbenchRow": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "$ref": "#/components/schemas/AgentProductImportApprovalView"
+          },
+          "candidateArtifactId": {
+            "type": "string"
+          },
+          "draft": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "fieldSources": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "proposalArtifactId": {
+            "type": "string"
+          },
+          "rowNumber": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceArtifactId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "validation": {
+            "items": {},
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "proposalArtifactId",
+          "status",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportWorkbenchSource": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactId": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactId",
+          "status"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportWorkbenchSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "actionableCount": {
+            "description": "Rows needing merchant action (full run; ignores status filter).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "appliedCount": {
+            "description": "Proposal rows with artifact status applied (full run).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "applyFailedCount": {
+            "description": "Rows with apply_failed approvals (full run).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "applyingCount": {
+            "description": "Rows with approvals currently applying (full run).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "approvedCount": {
+            "description": "Rows with approved but not yet applied approvals (full run).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "noApprovalCount": {
+            "description": "Proposal rows without a linked approval (full run).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "pendingApprovalCount": {
+            "description": "Rows with pending approvals (full run).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "rejectedCount": {
+            "description": "Rows with rejected approvals (full run).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "reviewableCount": {
+            "description": "Proposal rows still in review (full run).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "skippedCount": {
+            "description": "Proposal rows marked skipped (full run).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "noApprovalCount",
+          "pendingApprovalCount",
+          "approvedCount",
+          "applyingCount",
+          "appliedCount",
+          "rejectedCount",
+          "applyFailedCount",
+          "reviewableCount",
+          "skippedCount",
+          "actionableCount"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportWorkbenchValidation": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactId": {
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactId",
+          "status"
+        ],
+        "type": "object"
+      },
+      "Approval": {
+        "additionalProperties": false,
+        "properties": {
+          "acting_persona": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "applied_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "applied_by": {
+            "type": "string"
+          },
+          "apply_error": {
+            "type": "string"
+          },
+          "apply_result": {
+            "type": "string"
+          },
+          "artifact_ids": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decision_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decision_by": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "string"
+          },
+          "request_hash": {
+            "type": "string"
+          },
+          "risk": {
+            "type": "string"
+          },
+          "skill_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "store_id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "tool_call_id": {
+            "type": "string"
+          },
+          "turn_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "risk",
+          "action",
+          "summary",
+          "request_hash",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
         "type": "object"
       },
       "AssetUpdateInput": {
@@ -584,6 +1079,68 @@
           "maskedKey",
           "licenseType",
           "maxActivations"
+        ],
+        "type": "object"
+      },
+      "SkillRun": {
+        "additionalProperties": false,
+        "properties": {
+          "acting_persona": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "completed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "input": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
+          },
+          "skill_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "store_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "turn_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "skill_id",
+          "status",
+          "started_at",
+          "updated_at"
         ],
         "type": "object"
       }
@@ -1442,6 +1999,237 @@
         ]
       }
     },
+    "/v1/agent/memories": {
+      "get": {
+        "operationId": "agent-memories-get",
+        "parameters": [
+          {
+            "description": "Comma-separated memory scopes: user,store,tenant,thread,skill.",
+            "explode": false,
+            "in": "query",
+            "name": "scope",
+            "schema": {
+              "description": "Comma-separated memory scopes: user,store,tenant,thread,skill.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional memory subject filter.",
+            "explode": false,
+            "in": "query",
+            "name": "subject",
+            "schema": {
+              "description": "Optional memory subject filter.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional full-text memory query.",
+            "explode": false,
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "description": "Optional full-text memory query.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of memories to return.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Maximum number of memories to return.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional store scope identifier.",
+            "explode": false,
+            "in": "query",
+            "name": "storeId",
+            "schema": {
+              "description": "Optional store scope identifier.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional thread scope identifier.",
+            "explode": false,
+            "in": "query",
+            "name": "threadId",
+            "schema": {
+              "description": "Optional thread scope identifier.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional skill scope identifier.",
+            "explode": false,
+            "in": "query",
+            "name": "skillId",
+            "schema": {
+              "description": "Optional skill scope identifier.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          }
+        ],
+        "summary": "List agent memories",
+        "tags": [
+          "agent"
+        ]
+      },
+      "post": {
+        "operationId": "agent-memories-post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          }
+        ],
+        "summary": "Save an agent memory",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/v1/agent/memories/{memoryId}": {
+      "delete": {
+        "operationId": "agent-memory-delete",
+        "parameters": [
+          {
+            "description": "Agent memory ID.",
+            "in": "path",
+            "name": "memoryId",
+            "required": true,
+            "schema": {
+              "description": "Agent memory ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional store scope identifier.",
+            "explode": false,
+            "in": "query",
+            "name": "storeId",
+            "schema": {
+              "description": "Optional store scope identifier.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional thread scope identifier.",
+            "explode": false,
+            "in": "query",
+            "name": "threadId",
+            "schema": {
+              "description": "Optional thread scope identifier.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional skill scope identifier.",
+            "explode": false,
+            "in": "query",
+            "name": "skillId",
+            "schema": {
+              "description": "Optional skill scope identifier.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          }
+        ],
+        "summary": "Delete an agent memory",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
     "/v1/agent/product-import/ingest": {
       "post": {
         "operationId": "agent-product-import-ingest-post",
@@ -1535,7 +2323,8 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Success envelope inner data."
+                  "$ref": "#/components/schemas/AgentProductImportApprovalActionBatchResult",
+                  "description": "Batch approval decision or apply result."
                 }
               }
             },
@@ -1598,7 +2387,8 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Success envelope inner data."
+                  "$ref": "#/components/schemas/AgentProductImportApprovalActionBatchResult",
+                  "description": "Batch approval decision or apply result."
                 }
               }
             },
@@ -1730,12 +2520,12 @@
             }
           },
           {
-            "description": "Optional workbench row status filter.",
+            "description": "Optional row filter. summary counts always reflect the full run; page.totalRows reflects filtered rows.",
             "explode": false,
             "in": "query",
             "name": "status",
             "schema": {
-              "description": "Optional workbench row status filter.",
+              "description": "Optional row filter. summary counts always reflect the full run; page.totalRows reflects filtered rows.",
               "type": "string"
             }
           }
@@ -1745,7 +2535,8 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Success envelope inner data."
+                  "$ref": "#/components/schemas/AgentProductImportWorkbench",
+                  "description": "Product import workbench for a skill run."
                 }
               }
             },

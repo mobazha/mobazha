@@ -1384,6 +1384,9 @@ func TestHandleGETAgentProductImportWorkbench_AggregatesRowsAndApprovals(t *test
 	if workbenchResp.Data.Counts["source"] != 1 || workbenchResp.Data.Counts["proposal"] != 1 || workbenchResp.Data.Counts["approval"] != 1 {
 		t.Fatalf("unexpected workbench counts: %#v", workbenchResp.Data.Counts)
 	}
+	if workbenchResp.Data.Summary.PendingApprovalCount != 1 || workbenchResp.Data.Summary.ActionableCount != 1 || workbenchResp.Data.Summary.ReviewableCount != 1 {
+		t.Fatalf("unexpected workbench summary: %#v", workbenchResp.Data.Summary)
+	}
 	if workbenchResp.Data.Page.TotalRows != 1 || workbenchResp.Data.Page.ReturnedRows != 1 {
 		t.Fatalf("unexpected workbench page metadata: %#v", workbenchResp.Data.Page)
 	}
@@ -1485,6 +1488,9 @@ func TestHandleGETAgentProductImportWorkbench_PaginatesAndFiltersRows(t *testing
 	}
 	if filteredResp.Data.Page.Status != "pending_approval" || filteredResp.Data.Page.TotalRows != 1 || len(filteredResp.Data.Rows) != 1 {
 		t.Fatalf("unexpected filtered workbench: page=%#v rows=%#v", filteredResp.Data.Page, filteredResp.Data.Rows)
+	}
+	if filteredResp.Data.Summary.ReviewableCount != 5 || filteredResp.Data.Summary.PendingApprovalCount != 1 || filteredResp.Data.Summary.NoApprovalCount != 4 {
+		t.Fatalf("summary should reflect full run, not filtered rows: %#v", filteredResp.Data.Summary)
 	}
 	if filteredResp.Data.Rows[0].ProposalArtifactID != proposalID || filteredResp.Data.Rows[0].Approval == nil {
 		t.Fatalf("filtered row should be the pending approval proposal, got %#v", filteredResp.Data.Rows[0])
@@ -1664,6 +1670,9 @@ func TestHandlePOSTAgentProductImportRunApprovalActions_DecidesAndAppliesRunAppr
 	if decisionResp.Data.Processed != 2 || decisionResp.Data.Page.TotalApprovals != 2 || decisionResp.Data.Page.Selected != 2 {
 		t.Fatalf("unexpected batch decision result: %#v", decisionResp.Data)
 	}
+	if len(decisionResp.Data.Items) != 2 || decisionResp.Data.Items[0].Result != "processed" {
+		t.Fatalf("expected per-approval decision items, got %#v", decisionResp.Data.Items)
+	}
 	for _, approval := range store.approvals {
 		if approval.ID == "appr_source_only" {
 			if approval.Status != agentstore.ApprovalStatusPending {
@@ -1705,6 +1714,9 @@ func TestHandlePOSTAgentProductImportRunApprovalActions_DecidesAndAppliesRunAppr
 	}
 	if applyResp.Data.Processed != 2 || calls != 2 {
 		t.Fatalf("expected two applied approvals, response=%#v calls=%d", applyResp.Data, calls)
+	}
+	if len(applyResp.Data.Items) != 2 || applyResp.Data.Items[0].Status != agentstore.ApprovalStatusApplied {
+		t.Fatalf("expected per-approval apply items, got %#v", applyResp.Data.Items)
 	}
 	for _, approval := range store.approvals {
 		if approval.ID == "appr_source_only" {
@@ -1899,6 +1911,9 @@ func TestHandleGETAgentProductImportWorkbench_ReflectsAppliedProposal(t *testing
 	}
 	if workbenchResp.Data.Counts["approval"] != 1 || workbenchResp.Data.Counts["proposal"] != 1 {
 		t.Fatalf("unexpected workbench counts: %#v", workbenchResp.Data.Counts)
+	}
+	if workbenchResp.Data.Summary.AppliedCount != 1 || workbenchResp.Data.Summary.ActionableCount != 0 {
+		t.Fatalf("unexpected workbench summary after apply: %#v", workbenchResp.Data.Summary)
 	}
 }
 

@@ -75,7 +75,21 @@ type agentProductImportWorkbench struct {
 	Rows              []agentProductImportWorkbenchRow        `json:"rows"`
 	ValidationReports []agentProductImportWorkbenchValidation `json:"validationReports,omitempty"`
 	Counts            map[string]int                          `json:"counts"`
+	Summary           agentProductImportWorkbenchSummary      `json:"summary"`
 	Page              agentProductImportWorkbenchPage         `json:"page"`
+}
+
+type agentProductImportWorkbenchSummary struct {
+	NoApprovalCount      int `json:"noApprovalCount" doc:"Proposal rows without a linked approval (full run)."`
+	PendingApprovalCount int `json:"pendingApprovalCount" doc:"Rows with pending approvals (full run)."`
+	ApprovedCount        int `json:"approvedCount" doc:"Rows with approved but not yet applied approvals (full run)."`
+	ApplyingCount        int `json:"applyingCount" doc:"Rows with approvals currently applying (full run)."`
+	AppliedCount         int `json:"appliedCount" doc:"Proposal rows with artifact status applied (full run)."`
+	RejectedCount        int `json:"rejectedCount" doc:"Rows with rejected approvals (full run)."`
+	ApplyFailedCount     int `json:"applyFailedCount" doc:"Rows with apply_failed approvals (full run)."`
+	ReviewableCount      int `json:"reviewableCount" doc:"Proposal rows still in review (full run)."`
+	SkippedCount         int `json:"skippedCount" doc:"Proposal rows marked skipped (full run)."`
+	ActionableCount      int `json:"actionableCount" doc:"Rows needing merchant action (full run; ignores status filter)."`
 }
 
 type agentProductImportWorkbenchOptions struct {
@@ -85,11 +99,11 @@ type agentProductImportWorkbenchOptions struct {
 }
 
 type agentProductImportWorkbenchPage struct {
-	Limit        int    `json:"limit,omitempty"`
-	Offset       int    `json:"offset"`
-	TotalRows    int    `json:"totalRows"`
-	ReturnedRows int    `json:"returnedRows"`
-	Status       string `json:"status,omitempty"`
+	Limit        int    `json:"limit,omitempty" doc:"Requested row page size (0 means no limit)."`
+	Offset       int    `json:"offset" doc:"Requested row offset into the filtered result set."`
+	TotalRows    int    `json:"totalRows" doc:"Proposal rows after status filter, before limit/offset pagination."`
+	ReturnedRows int    `json:"returnedRows" doc:"Proposal rows returned in this response page."`
+	Status       string `json:"status,omitempty" doc:"Active row status filter, if any."`
 }
 
 type agentProductImportWorkbenchSource struct {
@@ -155,12 +169,20 @@ type agentProductImportApprovalApplyBatchRequest struct {
 }
 
 type agentProductImportApprovalActionBatchResult struct {
-	SkillRun  *agentstore.SkillRun                  `json:"skillRun"`
-	Approvals []*agentstore.Approval                `json:"approvals"`
-	Processed int                                   `json:"processed"`
-	Failed    int                                   `json:"failed,omitempty"`
-	Skipped   []agentProductImportApprovalBatchSkip `json:"skipped,omitempty"`
-	Page      agentProductImportApprovalActionPage  `json:"page"`
+	SkillRun  *agentstore.SkillRun                   `json:"skillRun"`
+	Approvals []*agentstore.Approval                 `json:"approvals"`
+	Items     []agentProductImportApprovalActionItem `json:"items,omitempty" doc:"Per-approval batch action outcomes; correlate entries by approvalId."`
+	Processed int                                    `json:"processed"`
+	Failed    int                                    `json:"failed,omitempty"`
+	Skipped   []agentProductImportApprovalBatchSkip  `json:"skipped,omitempty"`
+	Page      agentProductImportApprovalActionPage   `json:"page"`
+}
+
+type agentProductImportApprovalActionItem struct {
+	ApprovalID string `json:"approvalId,omitempty" doc:"Approval ID when known."`
+	Status     string `json:"status,omitempty" doc:"Approval status after the action, when applicable."`
+	Result     string `json:"result" doc:"Action outcome: processed, skipped, or failed."`
+	Reason     string `json:"reason,omitempty" doc:"Human-readable detail when skipped or failed."`
 }
 
 type agentProductImportApprovalActionPage struct {
@@ -505,6 +527,7 @@ func decideProductImportRunApprovals(ctx context.Context, p aiChatProvider, tena
 		return nil, err
 	}
 	result.Skipped = append(result.Skipped, skipped...)
+	result.Items = append(result.Items, productImportApprovalSkippedItems(skipped)...)
 	if len(req.ApprovalIDs) == 0 {
 		result.Page.Selected = len(targets)
 	}
@@ -515,6 +538,11 @@ func decideProductImportRunApprovals(ctx context.Context, p aiChatProvider, tena
 		}
 		result.Processed++
 		result.Approvals = append(result.Approvals, updated)
+		result.Items = append(result.Items, agentProductImportApprovalActionItem{
+			ApprovalID: updated.ID,
+			Status:     updated.Status,
+			Result:     "processed",
+		})
 	}
 	if result.Processed == 0 {
 		return nil, fmt.Errorf("no pending product import approvals found")
@@ -535,6 +563,7 @@ func applyProductImportRunApprovals(ctx context.Context, r *http.Request, p aiCh
 		return nil, err
 	}
 	result.Skipped = append(result.Skipped, skipped...)
+	result.Items = append(result.Items, productImportApprovalSkippedItems(skipped)...)
 	if len(req.ApprovalIDs) == 0 {
 		result.Page.Selected = len(targets)
 	}
@@ -545,20 +574,42 @@ func applyProductImportRunApprovals(ctx context.Context, r *http.Request, p aiCh
 				result.Failed++
 				result.Approvals = append(result.Approvals, applied)
 				result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ApprovalID: approval.ID, Reason: err.Error()})
+				result.Items = append(result.Items, agentProductImportApprovalActionItem{
+					ApprovalID: approval.ID,
+					Status:     applied.Status,
+					Result:     "failed",
+					Reason:     err.Error(),
+				})
 				continue
 			}
 			if errors.Is(err, agentstore.ErrApprovalNotFound) {
 				result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ApprovalID: approval.ID, Reason: "approval not found"})
+				result.Items = append(result.Items, agentProductImportApprovalActionItem{
+					ApprovalID: approval.ID,
+					Result:     "skipped",
+					Reason:     "approval not found",
+				})
 				continue
 			}
 			if errors.Is(err, errAgentApprovalApplyState) || errors.Is(err, errAgentApprovalHash) || errors.Is(err, errAgentApprovalApplying) {
 				result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ApprovalID: approval.ID, Reason: err.Error()})
+				result.Items = append(result.Items, agentProductImportApprovalActionItem{
+					ApprovalID: approval.ID,
+					Status:     approval.Status,
+					Result:     "skipped",
+					Reason:     err.Error(),
+				})
 				continue
 			}
 			return nil, fmt.Errorf("%w: apply approval: %v", errProductImportApprovalInternal, err)
 		}
 		result.Processed++
 		result.Approvals = append(result.Approvals, applied)
+		result.Items = append(result.Items, agentProductImportApprovalActionItem{
+			ApprovalID: applied.ID,
+			Status:     applied.Status,
+			Result:     "processed",
+		})
 	}
 	if result.Processed == 0 && result.Failed == 0 {
 		return nil, fmt.Errorf("no approved product import approvals found")
@@ -631,6 +682,21 @@ func selectProductImportRunApprovals(approvals []*agentstore.Approval, approvalI
 		return nil, nil, fmt.Errorf("too many product import approvals for one batch (max %d)", productImportMaxApprovalBatch)
 	}
 	return targets, skipped, nil
+}
+
+func productImportApprovalSkippedItems(skipped []agentProductImportApprovalBatchSkip) []agentProductImportApprovalActionItem {
+	if len(skipped) == 0 {
+		return nil
+	}
+	items := make([]agentProductImportApprovalActionItem, 0, len(skipped))
+	for _, skip := range skipped {
+		items = append(items, agentProductImportApprovalActionItem{
+			ApprovalID: skip.ApprovalID,
+			Result:     "skipped",
+			Reason:     skip.Reason,
+		})
+	}
+	return items
 }
 
 func ensureProductImportProposalApproval(ctx context.Context, r *http.Request, p aiChatProvider, tenantID string, artifact *agentstore.Artifact) (*agentstore.Approval, bool, error) {
@@ -736,6 +802,7 @@ func buildProductImportWorkbench(ctx context.Context, p aiChatProvider, tenantID
 		case agentstore.ArtifactKindProposal:
 			workbench.Counts["proposal"]++
 			row := productImportWorkbenchRowFromProposal(artifact, approvalsByArtifact[artifact.ID])
+			productImportUpdateWorkbenchSummary(&workbench.Summary, row)
 			if row.Approval != nil {
 				workbench.Counts["approval"]++
 			}
@@ -756,6 +823,41 @@ func buildProductImportWorkbench(ctx context.Context, p aiChatProvider, tenantID
 	workbench.Rows = pageProductImportWorkbenchRows(workbench.Rows, opts.RowLimit, opts.RowOffset)
 	workbench.Page.ReturnedRows = len(workbench.Rows)
 	return workbench, nil
+}
+
+func productImportUpdateWorkbenchSummary(summary *agentProductImportWorkbenchSummary, row agentProductImportWorkbenchRow) {
+	if summary == nil {
+		return
+	}
+	switch row.Status {
+	case agentstore.ArtifactStatusApplied:
+		summary.AppliedCount++
+	case agentstore.ArtifactStatusSkipped:
+		summary.SkippedCount++
+	default:
+		summary.ReviewableCount++
+	}
+	if row.Approval == nil {
+		summary.NoApprovalCount++
+		summary.ActionableCount++
+		return
+	}
+	switch row.Approval.Status {
+	case agentstore.ApprovalStatusPending:
+		summary.PendingApprovalCount++
+		summary.ActionableCount++
+	case agentstore.ApprovalStatusApproved:
+		summary.ApprovedCount++
+		summary.ActionableCount++
+	case agentstore.ApprovalStatusApplying:
+		summary.ApplyingCount++
+	case agentstore.ApprovalStatusApplied:
+	case agentstore.ApprovalStatusRejected:
+		summary.RejectedCount++
+	case agentstore.ApprovalStatusApplyFailed:
+		summary.ApplyFailedCount++
+		summary.ActionableCount++
+	}
 }
 
 func listProductImportRunArtifacts(ctx context.Context, p aiChatProvider, tenantID, runID string) ([]*agentstore.Artifact, error) {

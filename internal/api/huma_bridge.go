@@ -147,6 +147,24 @@ func nodeBridgeSuccessData(rr *httptest.ResponseRecorder) (any, error) {
 	return out, nil
 }
 
+// nodeBridgeSuccessTypedData unwraps the success envelope and decodes into T.
+func nodeBridgeSuccessTypedData[T any](rr *httptest.ResponseRecorder) (T, error) {
+	var zero T
+	data, err := nodeBridgeSuccessData(rr)
+	if err != nil {
+		return zero, err
+	}
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return zero, huma.Error500InternalServerError("invalid node response data")
+	}
+	var out T
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return zero, huma.Error500InternalServerError("invalid node response data")
+	}
+	return out, nil
+}
+
 // nodeBridgeNoContent calls a legacy handler that returns 204 No Content.
 func nodeBridgeNoContent(rr *httptest.ResponseRecorder) error {
 	if rr.Code >= http.StatusOK && rr.Code < http.StatusMultipleChoices {

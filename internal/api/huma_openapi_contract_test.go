@@ -66,6 +66,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaNotificationOperations(api)
 	g.registerNodeHumaWebhookOperations(api)
 	g.registerNodeHumaAIOperations(api)
+	g.registerNodeHumaAgentMemoryOperations(api)
 	g.registerNodeHumaShippingOperations(api)
 
 	rr := httptest.NewRecorder()
@@ -281,6 +282,9 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"agent-chat-sessions-get",
 		"agent-chat-stream-post",
 		"agent-artifact-approval-post",
+		"agent-memories-get",
+		"agent-memories-post",
+		"agent-memory-delete",
 		"agent-product-import-ingest-post",
 		"agent-product-import-run-approval-applications-post",
 		"agent-product-import-run-approval-decisions-post",

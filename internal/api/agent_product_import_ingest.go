@@ -69,6 +69,45 @@ type agentProductImportIngestResult struct {
 	ValidationArtifacts []*agentstore.Artifact `json:"validationArtifacts,omitempty"`
 }
 
+type agentProductImportAdvanceRequest struct {
+	SourceArtifactIDs    []string `json:"sourceArtifactIds,omitempty"`
+	CandidateArtifactIDs []string `json:"candidateArtifactIds,omitempty"`
+	CreateApprovals      bool     `json:"createApprovals,omitempty"`
+}
+
+type agentProductImportAdvanceResult struct {
+	SkillRun                 *agentstore.SkillRun                       `json:"skillRun"`
+	Workbench                *agentProductImportWorkbench               `json:"workbench,omitempty"`
+	CreatedProposalArtifacts []*agentstore.Artifact                     `json:"createdProposalArtifacts,omitempty"`
+	CreatedValidationReports []*agentstore.Artifact                     `json:"createdValidationReports,omitempty"`
+	ApprovalResult           *agentProductImportApprovalBatchResult     `json:"approvalResult,omitempty"`
+	NextActions              []agentProductImportAdvanceNextAction      `json:"nextActions,omitempty"`
+	Counts                   agentProductImportAdvanceCounts            `json:"counts"`
+	Skipped                  []agentProductImportAdvanceSkippedArtifact `json:"skipped,omitempty"`
+}
+
+type agentProductImportAdvanceNextAction struct {
+	Type             string `json:"type"`
+	SourceArtifactID string `json:"sourceArtifactId,omitempty"`
+	CandidateID      string `json:"candidateArtifactId,omitempty"`
+	Message          string `json:"message"`
+}
+
+type agentProductImportAdvanceCounts struct {
+	SourceCount              int `json:"sourceCount"`
+	CandidateCount           int `json:"candidateCount"`
+	ProposalCount            int `json:"proposalCount"`
+	ValidationCount          int `json:"validationCount"`
+	PendingAIExtractionCount int `json:"pendingAIExtractionCount"`
+	CreatedProposalCount     int `json:"createdProposalCount"`
+	CreatedValidationCount   int `json:"createdValidationCount"`
+}
+
+type agentProductImportAdvanceSkippedArtifact struct {
+	ArtifactID string `json:"artifactId,omitempty"`
+	Reason     string `json:"reason"`
+}
+
 type agentProductImportWorkbench struct {
 	SkillRun          *agentstore.SkillRun                    `json:"skillRun"`
 	Sources           []agentProductImportWorkbenchSource     `json:"sources"`
@@ -277,6 +316,36 @@ func productImportNonNegativeQueryInt(r *http.Request, name string) (int, error)
 	return value, nil
 }
 
+// handlePOSTAgentProductImportRunAdvance handles POST /v1/agent/product-import/runs/{runId}/advance.
+func (g *Gateway) handlePOSTAgentProductImportRunAdvance(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	req, err := parseProductImportAdvanceRequest(r)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	tenantID := agentChatTenantID(r, p)
+	runID := strings.TrimSpace(chi.URLParam(r, "runId"))
+	result, err := advanceProductImportRun(r.Context(), r, p, tenantID, runID, req)
+	if errors.Is(err, agentstore.ErrSkillRunNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "skill run not found")
+		return
+	}
+	if errors.Is(err, errProductImportApprovalInternal) {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to advance product import run")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	responsePkg.Success(w, sanitizeProductImportAdvanceResultForAPI(result))
+}
+
 // handlePOSTAgentArtifactApproval handles POST /v1/agent/artifacts/{artifactId}/approval.
 func (g *Gateway) handlePOSTAgentArtifactApproval(w http.ResponseWriter, r *http.Request) {
 	p, ok := getAIChatProvider(r)
@@ -436,6 +505,100 @@ func parseProductImportApprovalActionBatchRequest(r *http.Request) (agentProduct
 	}
 	req.Decision = strings.TrimSpace(req.Decision)
 	return req, nil
+}
+
+func parseProductImportAdvanceRequest(r *http.Request) (agentProductImportAdvanceRequest, error) {
+	var req agentProductImportAdvanceRequest
+	if r == nil || r.Body == nil || r.Body == http.NoBody {
+		return req, nil
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if errors.Is(err, io.EOF) {
+			return req, nil
+		}
+		return req, fmt.Errorf("invalid product import advance body")
+	}
+	req.SourceArtifactIDs = uniqueTrimmedStrings(req.SourceArtifactIDs)
+	req.CandidateArtifactIDs = uniqueTrimmedStrings(req.CandidateArtifactIDs)
+	if len(req.SourceArtifactIDs) > productImportMaxApprovalBatch {
+		return req, fmt.Errorf("too many sourceArtifactIds (max %d)", productImportMaxApprovalBatch)
+	}
+	if len(req.CandidateArtifactIDs) > productImportMaxApprovalBatch {
+		return req, fmt.Errorf("too many candidateArtifactIds (max %d)", productImportMaxApprovalBatch)
+	}
+	return req, nil
+}
+
+func advanceProductImportRun(ctx context.Context, r *http.Request, p aiChatProvider, tenantID, runID string, req agentProductImportAdvanceRequest) (*agentProductImportAdvanceResult, error) {
+	run, err := p.AgentStore().LoadSkillRun(ctx, tenantID, runID)
+	if err != nil {
+		return nil, err
+	}
+	if run.SkillID != productImportSkillID {
+		return nil, agentstore.ErrSkillRunNotFound
+	}
+	artifacts, err := listProductImportRunArtifacts(ctx, p, tenantID, runID)
+	if err != nil {
+		return nil, err
+	}
+	state := newProductImportAdvanceState(artifacts)
+	result := &agentProductImportAdvanceResult{
+		SkillRun: run,
+		Counts:   state.counts,
+	}
+
+	proposals, skipped, err := promoteProductImportCandidates(ctx, p, run, state, req.CandidateArtifactIDs)
+	if err != nil {
+		return nil, err
+	}
+	result.CreatedProposalArtifacts = proposals
+	result.Skipped = append(result.Skipped, skipped...)
+
+	validations, nextActions, err := ensureProductImportSourceNextActions(ctx, p, run, state, req.SourceArtifactIDs)
+	if err != nil {
+		return nil, err
+	}
+	result.CreatedValidationReports = validations
+	result.NextActions = nextActions
+
+	refreshedArtifacts, err := listProductImportRunArtifacts(ctx, p, tenantID, runID)
+	if err != nil {
+		return nil, err
+	}
+	refreshedState := newProductImportAdvanceState(refreshedArtifacts)
+	result.Counts = refreshedState.counts
+	result.Counts.CreatedProposalCount = len(result.CreatedProposalArtifacts)
+	result.Counts.CreatedValidationCount = len(result.CreatedValidationReports)
+
+	if req.CreateApprovals {
+		approvalReq := agentProductImportApprovalBatchRequest{
+			ProposalArtifactIDs: productImportProposalIDs(result.CreatedProposalArtifacts),
+		}
+		approvalResult, err := buildProductImportRunApprovals(ctx, r, p, tenantID, runID, approvalReq)
+		if err != nil {
+			return nil, err
+		}
+		result.ApprovalResult = approvalResult
+	}
+
+	workbench, err := buildProductImportWorkbench(ctx, p, tenantID, runID, agentProductImportWorkbenchOptions{})
+	if err != nil {
+		return nil, err
+	}
+	result.Workbench = workbench
+
+	status := productImportRunStatusFromAdvance(result)
+	if run.Status != status || run.Output == "" || result.Counts.CreatedProposalCount > 0 || result.Counts.CreatedValidationCount > 0 || result.ApprovalResult != nil {
+		run.Status = status
+		run.Output = marshalProductImportAdvanceOutput(result)
+		run.UpdatedAt = time.Now()
+		if err := p.AgentStore().SaveSkillRun(ctx, run); err != nil {
+			return nil, fmt.Errorf("%w: update skill run: %v", errProductImportApprovalInternal, err)
+		}
+		result.SkillRun = run
+	}
+	result.Workbench.SkillRun = result.SkillRun
+	return result, nil
 }
 
 func buildProductImportRunApprovals(ctx context.Context, r *http.Request, p aiChatProvider, tenantID, runID string, req agentProductImportApprovalBatchRequest) (*agentProductImportApprovalBatchResult, error) {
@@ -825,6 +988,327 @@ func buildProductImportWorkbench(ctx context.Context, p aiChatProvider, tenantID
 	return workbench, nil
 }
 
+type productImportAdvanceState struct {
+	sourcesByID            map[string]*agentstore.Artifact
+	candidatesByID         map[string]*agentstore.Artifact
+	proposalsByCandidateID map[string]*agentstore.Artifact
+	derivedBySourceID      map[string][]*agentstore.Artifact
+	validationCodeBySource map[string]map[string]struct{}
+	counts                 agentProductImportAdvanceCounts
+}
+
+func newProductImportAdvanceState(artifacts []*agentstore.Artifact) productImportAdvanceState {
+	state := productImportAdvanceState{
+		sourcesByID:            map[string]*agentstore.Artifact{},
+		candidatesByID:         map[string]*agentstore.Artifact{},
+		proposalsByCandidateID: map[string]*agentstore.Artifact{},
+		derivedBySourceID:      map[string][]*agentstore.Artifact{},
+		validationCodeBySource: map[string]map[string]struct{}{},
+	}
+	for _, artifact := range artifacts {
+		if artifact == nil {
+			continue
+		}
+		data := productImportArtifactData(artifact)
+		sourceID := stringFromAny(data["sourceArtifactId"])
+		switch artifact.Kind {
+		case agentstore.ArtifactKindSourceMaterial:
+			state.sourcesByID[artifact.ID] = artifact
+			state.counts.SourceCount++
+		case agentstore.ArtifactKindCandidate:
+			state.candidatesByID[artifact.ID] = artifact
+			state.counts.CandidateCount++
+			if sourceID != "" {
+				state.derivedBySourceID[sourceID] = append(state.derivedBySourceID[sourceID], artifact)
+			}
+		case agentstore.ArtifactKindProposal:
+			state.counts.ProposalCount++
+			candidateID := stringFromAny(data["candidateArtifactId"])
+			if candidateID != "" {
+				state.proposalsByCandidateID[candidateID] = artifact
+			}
+			if sourceID != "" {
+				state.derivedBySourceID[sourceID] = append(state.derivedBySourceID[sourceID], artifact)
+			}
+		case agentstore.ArtifactKindValidationReport:
+			state.counts.ValidationCount++
+			if sourceID != "" {
+				code := stringFromAny(data["code"])
+				if state.validationCodeBySource[sourceID] == nil {
+					state.validationCodeBySource[sourceID] = map[string]struct{}{}
+				}
+				state.validationCodeBySource[sourceID][code] = struct{}{}
+			}
+		}
+	}
+	for sourceID, source := range state.sourcesByID {
+		if productImportSourceNeedsAIExtraction(source) && !state.sourceHasDerivedWork(sourceID) {
+			state.counts.PendingAIExtractionCount++
+		}
+	}
+	return state
+}
+
+func (s productImportAdvanceState) sourceHasDerivedWork(sourceID string) bool {
+	return len(s.derivedBySourceID[sourceID]) > 0
+}
+
+func promoteProductImportCandidates(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, state productImportAdvanceState, candidateIDs []string) ([]*agentstore.Artifact, []agentProductImportAdvanceSkippedArtifact, error) {
+	selected := productImportSelectedArtifactIDs(candidateIDs)
+	explicit := len(selected) > 0
+	var created []*agentstore.Artifact
+	var skipped []agentProductImportAdvanceSkippedArtifact
+	seen := map[string]struct{}{}
+	for _, candidate := range state.candidatesByID {
+		if candidate == nil {
+			continue
+		}
+		if explicit {
+			if _, ok := selected[candidate.ID]; !ok {
+				continue
+			}
+			seen[candidate.ID] = struct{}{}
+		}
+		if _, ok := state.proposalsByCandidateID[candidate.ID]; ok {
+			continue
+		}
+		data, ok, reason := buildProductImportProposalDataFromCandidate(candidate)
+		if !ok {
+			skipped = append(skipped, agentProductImportAdvanceSkippedArtifact{ArtifactID: candidate.ID, Reason: reason})
+			continue
+		}
+		proposal, err := saveProductImportDataArtifact(ctx, p, run, agentstore.ArtifactKindProposal, agentstore.ArtifactStatusNeedsReview, fmt.Sprintf("%s proposal", candidate.Name), data)
+		if err != nil {
+			return nil, nil, err
+		}
+		created = append(created, proposal)
+	}
+	for _, candidateID := range candidateIDs {
+		if _, ok := seen[candidateID]; !ok {
+			if _, exists := state.candidatesByID[candidateID]; !exists {
+				skipped = append(skipped, agentProductImportAdvanceSkippedArtifact{ArtifactID: candidateID, Reason: "candidate artifact is not in this product import run"})
+			}
+		}
+	}
+	return created, skipped, nil
+}
+
+func ensureProductImportSourceNextActions(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, state productImportAdvanceState, sourceIDs []string) ([]*agentstore.Artifact, []agentProductImportAdvanceNextAction, error) {
+	selected := productImportSelectedArtifactIDs(sourceIDs)
+	explicit := len(selected) > 0
+	var validations []*agentstore.Artifact
+	var nextActions []agentProductImportAdvanceNextAction
+	for _, source := range state.sourcesByID {
+		if source == nil {
+			continue
+		}
+		if explicit {
+			if _, ok := selected[source.ID]; !ok {
+				continue
+			}
+		}
+		if !productImportSourceNeedsAIExtraction(source) || state.sourceHasDerivedWork(source.ID) {
+			continue
+		}
+		nextActions = append(nextActions, agentProductImportAdvanceNextAction{
+			Type:             "extract_candidates",
+			SourceArtifactID: source.ID,
+			Message:          "Use the product.import skill to inspect this source and create candidate artifacts with normalized fields or listing drafts.",
+		})
+		if productImportSourceHasValidationCode(state, source.ID, "ai_extraction_required") {
+			continue
+		}
+		validation, err := saveProductImportValidationForSourceArtifact(ctx, p, run, source, "ai_extraction_required", "This source needs AI extraction before reviewable product proposals can be created.")
+		if err != nil {
+			return nil, nil, err
+		}
+		validations = append(validations, validation)
+	}
+	return validations, nextActions, nil
+}
+
+func buildProductImportProposalDataFromCandidate(candidate *agentstore.Artifact) (map[string]any, bool, string) {
+	data := productImportArtifactData(candidate)
+	if len(data) == 0 {
+		return nil, false, "candidate data is empty or invalid"
+	}
+	normalized := mapFromAny(data["normalized"])
+	draft := mapFromAny(data["draft"])
+	if len(draft) == 0 {
+		draft = productImportDraftFromNormalized(normalized)
+	}
+	if len(draft) == 0 {
+		return nil, false, "candidate has no normalized fields or draft"
+	}
+	if stringFromAny(draft["title"]) == "" {
+		return nil, false, "candidate draft title is required"
+	}
+	sourceID := stringFromAny(data["sourceArtifactId"])
+	out := map[string]any{
+		"sourceArtifactId":    sourceID,
+		"candidateArtifactId": candidate.ID,
+		"sourceName":          productImportCandidateSourceName(candidate, data),
+		"rowNumber":           intFromAny(data["rowNumber"]),
+		"draft":               draft,
+	}
+	if fieldSources := mapFromAny(data["fieldSources"]); len(fieldSources) > 0 {
+		out["fieldSources"] = fieldSources
+	}
+	if validation := sliceFromAny(data["validation"]); len(validation) > 0 {
+		out["validation"] = validation
+	} else {
+		out["validation"] = productImportValidation(productImportNormalizedFromDraft(draft, normalized), "ai")
+	}
+	return out, true, ""
+}
+
+func productImportDraftFromNormalized(normalized map[string]any) map[string]any {
+	draft := map[string]any{}
+	if title := stringFromAny(normalized["title"]); title != "" {
+		draft["title"] = title
+	}
+	if description := stringFromAny(normalized["description"]); description != "" {
+		draft["description"] = description
+	}
+	if amountMinor, ok := productImportAmountMinor(stringFromAny(normalized["price"])); ok {
+		draft["price"] = map[string]any{
+			"amountMinor":  amountMinor,
+			"currencyCode": productImportCurrencyCode(stringFromAny(normalized["price"])),
+			"divisibility": 2,
+		}
+	}
+	if quantity, ok := productImportInt(stringFromAny(normalized["quantity"])); ok {
+		draft["inventory"] = map[string]any{"quantity": quantity}
+	}
+	return draft
+}
+
+func productImportNormalizedFromDraft(draft, normalized map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range normalized {
+		out[k] = v
+	}
+	if stringFromAny(out["title"]) == "" {
+		out["title"] = stringFromAny(draft["title"])
+	}
+	if stringFromAny(out["description"]) == "" {
+		out["description"] = stringFromAny(draft["description"])
+	}
+	if _, ok := out["price"]; !ok {
+		if price := mapFromAny(draft["price"]); len(price) > 0 {
+			out["price"] = fmt.Sprintf("%v", price["amountMinor"])
+		}
+	}
+	return out
+}
+
+func productImportCandidateSourceName(candidate *agentstore.Artifact, data map[string]any) string {
+	if sourceName := stringFromAny(data["sourceName"]); sourceName != "" {
+		return sourceName
+	}
+	if candidate.SourceName != "" {
+		return candidate.SourceName
+	}
+	return candidate.Name
+}
+
+func productImportSelectedArtifactIDs(ids []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		out[id] = struct{}{}
+	}
+	return out
+}
+
+func productImportSourceNeedsAIExtraction(source *agentstore.Artifact) bool {
+	data := productImportArtifactData(source)
+	inputKind := stringFromAny(mapFromAny(data["source"])["inputKind"])
+	switch inputKind {
+	case "csv", "xlsx", "zip":
+		return false
+	default:
+		return true
+	}
+}
+
+func productImportSourceHasValidationCode(state productImportAdvanceState, sourceID, code string) bool {
+	codes := state.validationCodeBySource[sourceID]
+	if codes == nil {
+		return false
+	}
+	_, ok := codes[code]
+	return ok
+}
+
+func saveProductImportValidationForSourceArtifact(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, sourceArtifact *agentstore.Artifact, code, message string) (*agentstore.Artifact, error) {
+	source := agentProductImportIngestSource{
+		SourceName:  sourceArtifact.SourceName,
+		ContentType: sourceArtifact.ContentType,
+	}
+	if source.SourceName == "" {
+		source.SourceName = sourceArtifact.Name
+	}
+	return saveProductImportValidationArtifactWithData(ctx, p, run, sourceArtifact, source, code, message, map[string]any{
+		"requiresAI":  true,
+		"nextAction":  "extract_candidates",
+		"instruction": "Create candidate artifacts for each product found in this source, then call agent_product_import_advance again to promote candidates into reviewable proposals.",
+	})
+}
+
+func productImportArtifactData(artifact *agentstore.Artifact) map[string]any {
+	out := map[string]any{}
+	if artifact == nil || strings.TrimSpace(artifact.Data) == "" {
+		return out
+	}
+	_ = json.Unmarshal([]byte(artifact.Data), &out)
+	return out
+}
+
+func productImportProposalIDs(items []*agentstore.Artifact) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if item != nil && item.Kind == agentstore.ArtifactKindProposal && item.ID != "" {
+			out = append(out, item.ID)
+		}
+	}
+	return out
+}
+
+func productImportRunStatusFromAdvance(result *agentProductImportAdvanceResult) string {
+	if result == nil {
+		return agentstore.SkillRunStatusCompleted
+	}
+	if result.ApprovalResult != nil && len(result.ApprovalResult.Approvals) > 0 {
+		return agentstore.SkillRunStatusWaitingForApproval
+	}
+	if result.Workbench != nil {
+		summary := result.Workbench.Summary
+		if summary.PendingApprovalCount > 0 || summary.ApprovedCount > 0 || summary.ApplyFailedCount > 0 || summary.ApplyingCount > 0 {
+			return agentstore.SkillRunStatusWaitingForApproval
+		}
+		if summary.ActionableCount > 0 {
+			return agentstore.SkillRunStatusWaitingForReview
+		}
+	}
+	if result.Counts.ProposalCount > 0 || result.Counts.ValidationCount > 0 || result.Counts.PendingAIExtractionCount > 0 {
+		return agentstore.SkillRunStatusWaitingForReview
+	}
+	return agentstore.SkillRunStatusCompleted
+}
+
+func marshalProductImportAdvanceOutput(result *agentProductImportAdvanceResult) string {
+	return mustMarshalAgentJSON(map[string]any{
+		"sourceCount":              result.Counts.SourceCount,
+		"candidateCount":           result.Counts.CandidateCount,
+		"proposalCount":            result.Counts.ProposalCount,
+		"validationCount":          result.Counts.ValidationCount,
+		"pendingAIExtractionCount": result.Counts.PendingAIExtractionCount,
+		"createdProposalCount":     result.Counts.CreatedProposalCount,
+		"createdValidationCount":   result.Counts.CreatedValidationCount,
+		"nextActionCount":          len(result.NextActions),
+	})
+}
+
 func productImportUpdateWorkbenchSummary(summary *agentProductImportWorkbenchSummary, row agentProductImportWorkbenchRow) {
 	if summary == nil {
 		return
@@ -1009,6 +1493,19 @@ func sanitizeProductImportIngestResultForAPI(result *agentProductImportIngestRes
 	out.CandidateArtifacts = sanitizeProductImportArtifactsForAPI(result.CandidateArtifacts)
 	out.ProposalArtifacts = sanitizeProductImportArtifactsForAPI(result.ProposalArtifacts)
 	out.ValidationArtifacts = sanitizeProductImportArtifactsForAPI(result.ValidationArtifacts)
+	return &out
+}
+
+func sanitizeProductImportAdvanceResultForAPI(result *agentProductImportAdvanceResult) *agentProductImportAdvanceResult {
+	if result == nil {
+		return nil
+	}
+	out := *result
+	out.CreatedProposalArtifacts = sanitizeProductImportArtifactsForAPI(result.CreatedProposalArtifacts)
+	out.CreatedValidationReports = sanitizeProductImportArtifactsForAPI(result.CreatedValidationReports)
+	if result.ApprovalResult != nil {
+		out.ApprovalResult = sanitizeProductImportApprovalBatchResultForAPI(result.ApprovalResult)
+	}
 	return &out
 }
 
@@ -1777,23 +2274,7 @@ func buildProductImportCandidateData(sourceArtifact *agentstore.Artifact, source
 func buildProductImportProposalData(sourceArtifact, candidateArtifact *agentstore.Artifact, source agentProductImportIngestSource, candidateData map[string]any, rowNumber int) map[string]any {
 	normalized, _ := candidateData["normalized"].(map[string]any)
 	fieldSources, _ := candidateData["fieldSources"].(map[string]any)
-	draft := map[string]any{}
-	if title := stringFromAny(normalized["title"]); title != "" {
-		draft["title"] = title
-	}
-	if description := stringFromAny(normalized["description"]); description != "" {
-		draft["description"] = description
-	}
-	if amountMinor, ok := productImportAmountMinor(stringFromAny(normalized["price"])); ok {
-		draft["price"] = map[string]any{
-			"amountMinor":  amountMinor,
-			"currencyCode": productImportCurrencyCode(stringFromAny(normalized["price"])),
-			"divisibility": 2,
-		}
-	}
-	if quantity, ok := productImportInt(stringFromAny(normalized["quantity"])); ok {
-		draft["inventory"] = map[string]any{"quantity": quantity}
-	}
+	draft := productImportDraftFromNormalized(normalized)
 	return map[string]any{
 		"sourceArtifactId":    sourceArtifact.ID,
 		"candidateArtifactId": candidateArtifact.ID,

@@ -1,6 +1,171 @@
 {
   "components": {
     "schemas": {
+      "AgentProductImportAdvanceCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "candidateCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdProposalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdValidationCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "pendingAIExtractionCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "proposalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "validationCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sourceCount",
+          "candidateCount",
+          "proposalCount",
+          "validationCount",
+          "pendingAIExtractionCount",
+          "createdProposalCount",
+          "createdValidationCount"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportAdvanceNextAction": {
+        "additionalProperties": false,
+        "properties": {
+          "candidateArtifactId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "sourceArtifactId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportAdvanceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "candidateArtifactIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "createApprovals": {
+            "type": "boolean"
+          },
+          "sourceArtifactIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "AgentProductImportAdvanceResult": {
+        "additionalProperties": false,
+        "properties": {
+          "approvalResult": {
+            "$ref": "#/components/schemas/AgentProductImportApprovalBatchResult"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/AgentProductImportAdvanceCounts"
+          },
+          "createdProposalArtifacts": {
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "createdValidationReports": {
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "nextActions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProductImportAdvanceNextAction"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "skillRun": {
+            "$ref": "#/components/schemas/SkillRun"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProductImportAdvanceSkippedArtifact"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "workbench": {
+            "$ref": "#/components/schemas/AgentProductImportWorkbench"
+          }
+        },
+        "required": [
+          "skillRun",
+          "counts"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportAdvanceSkippedArtifact": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
       "AgentProductImportApprovalActionBatchRequest": {
         "additionalProperties": false,
         "properties": {
@@ -144,6 +309,69 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "AgentProductImportApprovalBatchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "approvals": {
+            "items": {
+              "$ref": "#/components/schemas/Approval"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "created": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "page": {
+            "$ref": "#/components/schemas/AgentProductImportApprovalBatchResultPage"
+          },
+          "reused": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "skillRun": {
+            "$ref": "#/components/schemas/SkillRun"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProductImportApprovalBatchSkip"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "skillRun",
+          "approvals",
+          "created",
+          "reused",
+          "page"
+        ],
+        "type": "object"
+      },
+      "AgentProductImportApprovalBatchResultPage": {
+        "additionalProperties": false,
+        "properties": {
+          "selected": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalProposals": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalProposals",
+          "selected"
+        ],
         "type": "object"
       },
       "AgentProductImportApprovalBatchSkip": {
@@ -538,6 +766,73 @@
           "action",
           "summary",
           "request_hash",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "Artifact": {
+        "additionalProperties": false,
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "skill_id": {
+            "type": "string"
+          },
+          "skill_run_id": {
+            "type": "string"
+          },
+          "source_hash": {
+            "type": "string"
+          },
+          "source_name": {
+            "type": "string"
+          },
+          "source_uri": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "turn_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "kind",
           "status",
           "created_at",
           "updated_at"
@@ -2376,6 +2671,70 @@
           }
         ],
         "summary": "Ingest product import source material",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/product-import/runs/{runId}/advance": {
+      "post": {
+        "operationId": "agent-product-import-run-advance-post",
+        "parameters": [
+          {
+            "description": "Agent skill run ID.",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "description": "Agent skill run ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentProductImportAdvanceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProductImportAdvanceResult",
+                  "description": "Product import run advance result."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Advance a product import run",
         "tags": [
           "ai"
         ]

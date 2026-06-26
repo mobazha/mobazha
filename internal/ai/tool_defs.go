@@ -42,6 +42,11 @@ func SellerTools() []ToolDefinition {
 			Parameters:  mustJSON(`{"type":"object","properties":{"runId":{"type":"string","description":"Agent skill run ID"},"status":{"type":"string","enum":["created","running","waiting_for_review","waiting_for_approval","completed","failed"],"description":"Updated skill run status"},"output":{"type":"object","description":"Small structured output summary such as produced artifact IDs or counts"},"error":{"type":"string","description":"Short failure summary when status is failed"}},"required":["runId"]}`),
 		},
 		{
+			Name:        "agent_product_import_advance",
+			Description: "Advance a product.import run: promote extracted candidate artifacts into reviewable proposals, add next actions for sources that still need AI extraction, optionally create approval requests, and refresh workbench state.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"runId":{"type":"string","description":"Product import skill run ID"},"sourceArtifactIds":{"type":"array","items":{"type":"string"},"description":"Optional source artifacts to inspect for next actions"},"candidateArtifactIds":{"type":"array","items":{"type":"string"},"description":"Optional candidate artifacts to promote into proposals"},"createApprovals":{"type":"boolean","description":"Create approval requests for newly created proposals"}},"required":["runId"]}`),
+		},
+		{
 			Name:        "agent_artifacts_list",
 			Description: "List tenant-scoped agent artifacts for the current workspace, optionally filtered by skill run, kind, or review status. Use this to resume or inspect intermediate work without reading raw chat history.",
 			Parameters:  mustJSON(`{"type":"object","properties":{"skillRunId":{"type":"string","description":"Optional related skill run ID"},"kind":{"type":"string","enum":["source_material","candidate","proposal","validation_report"],"description":"Optional artifact category filter"},"status":{"type":"string","enum":["new","ready","needs_review","skipped"],"description":"Optional artifact review state filter"},"limit":{"type":"integer","description":"Max items (default 20)"},"offset":{"type":"integer","description":"Pagination offset"}}}`),

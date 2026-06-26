@@ -1567,6 +1567,202 @@ func TestHandlePOSTAgentProductImportIngest_TextSourceWaitsForReview(t *testing.
 	if len(resp.Data.SourceArtifacts) != 1 || len(resp.Data.ValidationArtifacts) != 1 || len(resp.Data.ProposalArtifacts) != 0 {
 		t.Fatalf("expected source and validation for text-only ingest, got %#v", resp.Data)
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/"+resp.Data.SkillRun.ID+"/advance", strings.NewReader(`{}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": resp.Data.SkillRun.ID})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunAdvance(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected advance 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var advanceResp struct {
+		Data agentProductImportAdvanceResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&advanceResp); err != nil {
+		t.Fatalf("decode advance response: %v", err)
+	}
+	if len(advanceResp.Data.NextActions) != 1 || advanceResp.Data.NextActions[0].SourceArtifactID != resp.Data.SourceArtifacts[0].ID {
+		t.Fatalf("text source should have AI extraction next action, got %#v", advanceResp.Data.NextActions)
+	}
+	if len(advanceResp.Data.CreatedValidationReports) != 1 || !strings.Contains(advanceResp.Data.CreatedValidationReports[0].Data, `"code":"ai_extraction_required"`) {
+		t.Fatalf("advance should add ai extraction validation, got %#v", advanceResp.Data.CreatedValidationReports)
+	}
+}
+
+func TestHandlePOSTAgentProductImportRunAdvance_PromotesAICandidateToProposal(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	now := time.Now()
+	run := &agentstore.SkillRun{
+		ID:            "skillrun_import",
+		TenantID:      "test-node",
+		ThreadID:      "thread_import",
+		SkillID:       string(kernel.SkillProductImport),
+		StoreID:       "store_1",
+		ActorID:       "actor_1",
+		ActingPersona: string(kernel.PersonaSeller),
+		Status:        agentstore.SkillRunStatusRunning,
+		StartedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := store.SaveSkillRun(context.Background(), run); err != nil {
+		t.Fatalf("save skill run: %v", err)
+	}
+	source := &agentstore.Artifact{
+		ID:          "art_source",
+		TenantID:    "test-node",
+		ThreadID:    "thread_import",
+		SkillRunID:  run.ID,
+		SkillID:     string(kernel.SkillProductImport),
+		Kind:        agentstore.ArtifactKindSourceMaterial,
+		Status:      agentstore.ArtifactStatusReady,
+		Name:        "supplier-notes.txt",
+		SourceName:  "supplier-notes.txt",
+		ContentType: "text/plain",
+		Data:        `{"source":{"name":"supplier-notes.txt","contentType":"text/plain","bytes":48,"inputKind":"text"},"text":"Linen Tote costs $45 and has 12 units."}`,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	candidate := &agentstore.Artifact{
+		ID:         "art_candidate",
+		TenantID:   "test-node",
+		ThreadID:   "thread_import",
+		SkillRunID: run.ID,
+		SkillID:    string(kernel.SkillProductImport),
+		Kind:       agentstore.ArtifactKindCandidate,
+		Status:     agentstore.ArtifactStatusReady,
+		Name:       "AI extracted Linen Tote candidate",
+		Data:       `{"sourceArtifactId":"art_source","sourceName":"supplier-notes.txt","normalized":{"title":"Linen Tote","price":"$45.00","quantity":"12"},"fieldSources":{"title":{"extraction":"llm","confidence":0.84}}}`,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	if err := store.SaveArtifact(context.Background(), source); err != nil {
+		t.Fatalf("save source: %v", err)
+	}
+	if err := store.SaveArtifact(context.Background(), candidate); err != nil {
+		t.Fatalf("save candidate: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/skillrun_import/advance", strings.NewReader(`{"candidateArtifactIds":["art_candidate"],"createApprovals":true}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "skillrun_import"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunAdvance(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentProductImportAdvanceResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode advance response: %v", err)
+	}
+	if resp.Data.SkillRun == nil || resp.Data.SkillRun.Status != agentstore.SkillRunStatusWaitingForApproval {
+		t.Fatalf("unexpected advanced run: %#v", resp.Data.SkillRun)
+	}
+	if len(resp.Data.CreatedProposalArtifacts) != 1 || resp.Data.Counts.CreatedProposalCount != 1 {
+		t.Fatalf("expected one created proposal, got %#v", resp.Data)
+	}
+	if resp.Data.ApprovalResult == nil || len(resp.Data.ApprovalResult.Approvals) != 1 {
+		t.Fatalf("advance should create approval for promoted proposal, got %#v", resp.Data.ApprovalResult)
+	}
+	proposal := resp.Data.CreatedProposalArtifacts[0]
+	for _, want := range []string{`"candidateArtifactId":"art_candidate"`, `"title":"Linen Tote"`, `"amountMinor":4500`, `"quantity":12`} {
+		if !strings.Contains(proposal.Data, want) {
+			t.Fatalf("proposal data missing %q: %s", want, proposal.Data)
+		}
+	}
+	if resp.Data.Workbench == nil || len(resp.Data.Workbench.Rows) != 1 || resp.Data.Workbench.Rows[0].ProposalArtifactID != proposal.ID {
+		t.Fatalf("workbench should include promoted proposal row, got %#v", resp.Data.Workbench)
+	}
+	if resp.Data.Workbench.Rows[0].Approval == nil || resp.Data.Workbench.Rows[0].Approval.Status != agentstore.ApprovalStatusPending {
+		t.Fatalf("workbench row should include pending approval, got %#v", resp.Data.Workbench.Rows[0])
+	}
+}
+
+func TestHandlePOSTAgentProductImportRunAdvance_AddsNextActionForUnstructuredSource(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	now := time.Now()
+	run := &agentstore.SkillRun{
+		ID:            "skillrun_import",
+		TenantID:      "test-node",
+		ThreadID:      "thread_import",
+		SkillID:       string(kernel.SkillProductImport),
+		StoreID:       "store_1",
+		ActorID:       "actor_1",
+		ActingPersona: string(kernel.PersonaSeller),
+		Status:        agentstore.SkillRunStatusRunning,
+		StartedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := store.SaveSkillRun(context.Background(), run); err != nil {
+		t.Fatalf("save skill run: %v", err)
+	}
+	source := &agentstore.Artifact{
+		ID:          "art_source",
+		TenantID:    "test-node",
+		ThreadID:    "thread_import",
+		SkillRunID:  run.ID,
+		SkillID:     string(kernel.SkillProductImport),
+		Kind:        agentstore.ArtifactKindSourceMaterial,
+		Status:      agentstore.ArtifactStatusReady,
+		Name:        "supplier-notes.txt",
+		SourceName:  "supplier-notes.txt",
+		ContentType: "text/plain",
+		Data:        `{"source":{"name":"supplier-notes.txt","contentType":"text/plain","bytes":48,"inputKind":"text"},"text":"Linen Tote costs $45 and has 12 units."}`,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := store.SaveArtifact(context.Background(), source); err != nil {
+		t.Fatalf("save source: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/skillrun_import/advance", strings.NewReader(`{}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "skillrun_import"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunAdvance(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentProductImportAdvanceResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode advance response: %v", err)
+	}
+	if len(resp.Data.NextActions) != 1 || resp.Data.NextActions[0].Type != "extract_candidates" {
+		t.Fatalf("expected extraction next action, got %#v", resp.Data.NextActions)
+	}
+	if len(resp.Data.CreatedValidationReports) != 1 || !strings.Contains(resp.Data.CreatedValidationReports[0].Data, `"code":"ai_extraction_required"`) {
+		t.Fatalf("expected ai extraction validation, got %#v", resp.Data.CreatedValidationReports)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/skillrun_import/advance", strings.NewReader(`{}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "skillrun_import"})
+	rr = httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunAdvance(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected second advance 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if count := productImportCountArtifactsByKind(store.artifacts, agentstore.ArtifactKindValidationReport); count != 1 {
+		t.Fatalf("advance should not duplicate ai extraction validation, got %d", count)
+	}
 }
 
 func TestHandlePOSTAgentArtifactApproval_CreatesListingsCreateApprovalFromProposal(t *testing.T) {
@@ -2915,6 +3111,16 @@ func containsString(items []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func productImportCountArtifactsByKind(items []*agentstore.Artifact, kind string) int {
+	count := 0
+	for _, item := range items {
+		if item != nil && item.Kind == kind {
+			count++
+		}
+	}
+	return count
 }
 
 func withURLParams(req *http.Request, params map[string]string) *http.Request {

@@ -36,6 +36,7 @@ func TestSellerToolMetadataApprovalBoundaries(t *testing.T) {
 	assertTool(t, byName["agent_skill_runs_list"], kernel.RiskRead, kernel.ApprovalNone)
 	assertTool(t, byName["agent_skill_runs_get"], kernel.RiskRead, kernel.ApprovalNone)
 	assertTool(t, byName["agent_skill_runs_update"], kernel.RiskDraft, kernel.ApprovalNone)
+	assertTool(t, byName["agent_product_import_advance"], kernel.RiskDraft, kernel.ApprovalNone)
 	assertTool(t, byName["agent_artifacts_list"], kernel.RiskRead, kernel.ApprovalNone)
 	assertTool(t, byName["agent_artifacts_get"], kernel.RiskRead, kernel.ApprovalNone)
 	assertTool(t, byName["agent_artifacts_create"], kernel.RiskDraft, kernel.ApprovalNone)
@@ -70,6 +71,13 @@ func TestSellerToolMetadataApprovalBoundaries(t *testing.T) {
 	}
 	if !hasCapability(skillRunCreate, kernel.CapabilityAgentArtifactWrite) {
 		t.Fatalf("agent_skill_runs_create should expose agent workspace write capability, got %#v", skillRunCreate.Capabilities)
+	}
+	advance := byName["agent_product_import_advance"]
+	if len(advance.AllowedSkills) != 1 || advance.AllowedSkills[0] != kernel.SkillProductImport {
+		t.Fatalf("agent_product_import_advance should be restricted to product.import, got %#v", advance.AllowedSkills)
+	}
+	if !hasCapability(advance, kernel.CapabilityAgentArtifactWrite) {
+		t.Fatalf("agent_product_import_advance should expose agent workspace write capability, got %#v", advance.Capabilities)
 	}
 	artifactList := byName["agent_artifacts_list"]
 	if len(artifactList.AllowedSkills) != 1 || artifactList.AllowedSkills[0] != kernel.SkillProductImport {
@@ -115,7 +123,7 @@ func TestSellerToolMetadataProductImportGrant(t *testing.T) {
 	}
 	for _, name := range []string{
 		"listings_get_template", "listings_list_mine", "listings_get",
-		"agent_skill_runs_create", "agent_skill_runs_list", "agent_skill_runs_get", "agent_skill_runs_update",
+		"agent_skill_runs_create", "agent_skill_runs_list", "agent_skill_runs_get", "agent_skill_runs_update", "agent_product_import_advance",
 		"agent_artifacts_list", "agent_artifacts_get", "agent_artifacts_create", "agent_artifacts_update",
 		"listings_create", "listings_update",
 		"collections_list", "collections_create", "exchange_rates_get",

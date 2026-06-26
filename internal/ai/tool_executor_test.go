@@ -66,6 +66,28 @@ func TestBuildRequestBody_DefaultFallback(t *testing.T) {
 	}
 }
 
+func TestBuildRequestBody_ProductImportAdvanceStripsRunID(t *testing.T) {
+	args := map[string]interface{}{
+		"runId":                "skillrun_1",
+		"candidateArtifactIds": []interface{}{"art_candidate"},
+		"createApprovals":      true,
+	}
+	body, err := buildRequestBody("agent_product_import_advance", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := parsed["runId"]; ok {
+		t.Fatalf("runId should be path-only, got %v", parsed)
+	}
+	if parsed["createApprovals"] != true {
+		t.Fatalf("advance body should preserve createApprovals, got %v", parsed)
+	}
+}
+
 func TestAppendQueryParams_WithParams(t *testing.T) {
 	args := map[string]interface{}{"limit": 10, "offset": 5}
 	url := appendQueryParams("http://localhost/v1/listings", "listings_list_mine", args)

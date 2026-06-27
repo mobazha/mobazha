@@ -114,5 +114,8 @@ func buildContextHints(ctx *ChatContext) string {
 	if ctx.Locale != "" {
 		hints += fmt.Sprintf("\n- User locale: %s", ctx.Locale)
 	}
+	if len(ctx.Attachments) > 0 {
+		hints += fmt.Sprintf("\n- User attached files in this turn: %d", len(ctx.Attachments))
+	}
 	return hints
 }

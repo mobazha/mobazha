@@ -16,11 +16,26 @@ const (
 
 // ChatMsg is a single message in a conversation, stored in DB and sent to LLM.
 type ChatMsg struct {
-	Role       ChatRole   `json:"role"`
-	Content    string     `json:"content,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	Name       string     `json:"name,omitempty"`
+	Role          ChatRole           `json:"role"`
+	Content       string             `json:"content,omitempty"`
+	ContentBlocks []ChatContentBlock `json:"contentBlocks,omitempty"`
+	ToolCalls     []ToolCall         `json:"tool_calls,omitempty"`
+	ToolCallID    string             `json:"tool_call_id,omitempty"`
+	Name          string             `json:"name,omitempty"`
+}
+
+// ChatContentBlock is a multimodal chat block for providers that support
+// text+image input.
+type ChatContentBlock struct {
+	Type     string        `json:"type"`
+	Text     string        `json:"text,omitempty"`
+	ImageURL *ChatImageURL `json:"image_url,omitempty"`
+}
+
+// ChatImageURL is an OpenAI-compatible image_url block payload.
+type ChatImageURL struct {
+	URL    string `json:"url"`
+	Detail string `json:"detail,omitempty"`
 }
 
 // ToolCall represents a function call requested by the LLM.
@@ -56,12 +71,27 @@ type ChatRequest struct {
 
 // ChatContext carries optional UI hints (not used for authz).
 type ChatContext struct {
-	CurrentPage      string   `json:"currentPage,omitempty"`
-	SelectedListSlug string   `json:"selectedListingSlug,omitempty"`
-	SelectedOrderID  string   `json:"selectedOrderId,omitempty"`
-	Locale           string   `json:"locale,omitempty"`
-	ArtifactIDs      []string `json:"artifactIds,omitempty"`
-	SkillRunIDs      []string `json:"skillRunIds,omitempty"`
+	CurrentPage      string           `json:"currentPage,omitempty"`
+	SelectedListSlug string           `json:"selectedListingSlug,omitempty"`
+	SelectedOrderID  string           `json:"selectedOrderId,omitempty"`
+	Locale           string           `json:"locale,omitempty"`
+	ArtifactIDs      []string         `json:"artifactIds,omitempty"`
+	SkillRunIDs      []string         `json:"skillRunIds,omitempty"`
+	Attachments      []ChatAttachment `json:"attachments,omitempty"`
+}
+
+// ChatAttachment describes a file the user attached to the current chat turn.
+// Binary payloads may be present for tool handoff, but prompts should only use
+// bounded metadata/excerpts.
+type ChatAttachment struct {
+	ID            string `json:"id,omitempty"`
+	Name          string `json:"name,omitempty"`
+	ContentType   string `json:"contentType,omitempty"`
+	URL           string `json:"url,omitempty"`
+	SourceURI     string `json:"sourceUri,omitempty"`
+	Size          int64  `json:"size,omitempty"`
+	Text          string `json:"text,omitempty"`
+	ContentBase64 string `json:"contentBase64,omitempty"`
 }
 
 // SSEEvent is a server-sent event payload for the chat stream.

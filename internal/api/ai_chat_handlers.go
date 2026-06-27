@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -49,6 +50,11 @@ func getLocalAPIURL(r *http.Request) string {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
+	}
+	if addr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok && addr != nil {
+		if local := strings.TrimSpace(addr.String()); local != "" {
+			return fmt.Sprintf("%s://%s", scheme, normalizeLoopbackAddr(local))
+		}
 	}
 	host := r.Host
 	if host == "" {

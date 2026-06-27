@@ -58,6 +58,9 @@ var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
 	"agent_skill_runs_update": func(a map[string]interface{}) toolRoute {
 		return toolRoute{"PATCH", "/v1/agent/skill-runs/" + sanitizePathParam(a["runId"])}
 	},
+	"agent_product_import_ingest": func(_ map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/agent/product-import/ingest"}
+	},
 	"agent_product_import_advance": func(a map[string]interface{}) toolRoute {
 		return toolRoute{"POST", "/v1/agent/product-import/runs/" + sanitizePathParam(a["runId"]) + "/advance"}
 	},
@@ -225,6 +228,19 @@ func buildRequestBody(toolName string, args map[string]interface{}) ([]byte, err
 			if k != "runId" {
 				payload[k] = v
 			}
+		}
+		return json.Marshal(payload)
+	case toolName == "agent_product_import_ingest":
+		payload := make(map[string]interface{}, len(args)+1)
+		for k, v := range args {
+			if k == "sources" {
+				payload["files"] = v
+				continue
+			}
+			payload[k] = v
+		}
+		if _, ok := payload["intent"]; !ok {
+			payload["intent"] = "product_import"
 		}
 		return json.Marshal(payload)
 	case toolName == "agent_product_import_advance":

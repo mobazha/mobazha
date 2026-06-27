@@ -30,11 +30,13 @@ import (
 
 type agentChatHTTPTestNode struct {
 	*aiStatusTestNode
-	proxy *aipkg.Proxy
-	store agentstore.Persistence
+	proxy       *aipkg.Proxy
+	rateLimiter *aipkg.DailyRateLimiter
+	store       agentstore.Persistence
 }
 
 func (n *agentChatHTTPTestNode) AIProxy() *aipkg.Proxy                  { return n.proxy }
+func (n *agentChatHTTPTestNode) AIRateLimiter() *aipkg.DailyRateLimiter { return n.rateLimiter }
 func (n *agentChatHTTPTestNode) AgentStore() agentstore.Persistence     { return n.store }
 func (n *agentChatHTTPTestNode) ProfileName() string                    { return "Test Store" }
 func (n *agentChatHTTPTestNode) ProductCatalog() []aipkg.ListingSummary { return nil }
@@ -394,7 +396,7 @@ func TestAgentChatTurnOptions_LoadsPrivateSkillProviderFromEnv(t *testing.T) {
 	}
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
 
-	opts, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "store_1")
+	opts, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "store_1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,7 +443,7 @@ func TestAgentChatTurnOptions_LoadsReferencedArtifactsAsContext(t *testing.T) {
 		Context: &aipkg.ChatContext{
 			ArtifactIDs: []string{"art_source", "art_source"},
 		},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "store_1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,7 +529,7 @@ func TestAgentChatTurnOptions_LoadsReferencedSkillRunAsContext(t *testing.T) {
 		Context: &aipkg.ChatContext{
 			SkillRunIDs: []string{"run_import", "run_import"},
 		},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "store_1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -569,7 +571,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedSkillRun(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "继续处理这批",
 		Context: &aipkg.ChatContext{SkillRunIDs: []string{"missing_run"}},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "store_1", nil)
 	if err == nil || !strings.Contains(err.Error(), "missing_run") {
 		t.Fatalf("expected missing skill run error, got %v", err)
 	}
@@ -586,7 +588,7 @@ func TestAgentChatTurnOptions_RejectsTooManyReferencedSkillRuns(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "继续处理这些批次",
 		Context: &aipkg.ChatContext{SkillRunIDs: []string{"run_1", "run_2", "run_3", "run_4"}},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "store_1", nil)
 	if err == nil || !strings.Contains(err.Error(), "too many skillRunIds") {
 		t.Fatalf("expected too many skillRunIds error, got %v", err)
 	}
@@ -603,7 +605,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "使用这个素材",
 		Context: &aipkg.ChatContext{ArtifactIDs: []string{"missing_artifact"}},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "store_1", nil)
 	if err == nil || !strings.Contains(err.Error(), "missing_artifact") {
 		t.Fatalf("expected missing artifact error, got %v", err)
 	}
@@ -615,7 +617,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", "")
 
-	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1", nil)
 	if err == nil || !strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
 		t.Fatalf("expected missing skills dir error, got %v", err)
 	}
@@ -624,14 +626,14 @@ func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 func TestAgentChatTurnOptions_RequiresAccessibleSellerSkillDir(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", filepath.Join(t.TempDir(), "missing"))
 
-	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1", nil)
 	if err == nil || !strings.Contains(err.Error(), "not accessible") {
 		t.Fatalf("expected inaccessible skills dir error, got %v", err)
 	}
 
 	emptyDir := t.TempDir()
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", emptyDir)
-	_, err = agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err = agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1", nil)
 	if err == nil || !strings.Contains(err.Error(), "no seller skills") {
 		t.Fatalf("expected empty seller skills dir error, got %v", err)
 	}
@@ -837,6 +839,205 @@ func TestHandlePOSTAgentChat_IncludesReferencedArtifactsInTurnContext(t *testing
 	}
 	if strings.Contains(system, "secret-token") {
 		t.Fatalf("system prompt should redact sensitive artifact data:\n%s", system)
+	}
+}
+
+func TestHandlePOSTAgentChat_ProductImportAttachmentUsesToolContextWithoutVisionBlocks(t *testing.T) {
+	skillsDir := t.TempDir()
+	writeProductImportSkill(t, skillsDir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", skillsDir)
+
+	var upstreamReq map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Fatalf("unexpected upstream path: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&upstreamReq); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"I can see the attachment metadata\"},\"finish_reason\":\"stop\"}]}\n\n")
+	}))
+	defer upstream.Close()
+
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{
+			Enabled:        true,
+			ActiveProvider: "custom",
+			Providers: map[string]aipkg.ProviderCredential{
+				"custom": {APIKey: "test-key", Model: "test-model", BaseURL: upstream.URL},
+			},
+		}, aipkg.PlatformProfile{}),
+		proxy: aipkg.NewProxy(upstream.Client()),
+		store: &agentChatMemoryStore{},
+	}
+	cacheKey := "test-node:" + node.ProfileName()
+	agentChatRuntimes.Delete(cacheKey)
+	defer agentChatRuntimes.Delete(cacheKey)
+
+	body := strings.NewReader(`{"message":"导入商品，可以从这个图片派生","sessionId":"thread-attachments","context":{"attachments":[{"id":"att_img_1","name":"future-palette-cover.jpg","contentType":"image/jpeg","url":"/v1/media/images/QmImage","size":12345,"contentBase64":"/9j/4AAQ"}]}}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/chat", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentChat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	system := firstOpenAIMessageContent(t, upstreamReq, "system")
+	for _, want := range []string{"Current UI context:", "User attached files in this turn: 1", "## Turn Context", "Attached files for this turn", "do not say no file or image was attached", "Attachment 1:", "id=att_img_1", "name=future-palette-cover.jpg", "contentType=image/jpeg", "inlineBinary: available"} {
+		if !strings.Contains(system, want) {
+			t.Fatalf("system prompt missing %q:\n%s", want, system)
+		}
+	}
+	messages, _ := upstreamReq["messages"].([]any)
+	last := messages[len(messages)-1].(map[string]any)
+	if _, ok := last["content"].([]any); ok {
+		t.Fatalf("product import attachment should route through tools without vision blocks, got %#v", last["content"])
+	}
+	if got := fmt.Sprint(last["content"]); !strings.Contains(got, "导入商品") {
+		t.Fatalf("expected plain user text content, got %#v", last["content"])
+	}
+}
+
+func TestHandlePOSTAgentChat_AttachmentVisionWithoutIDOrSize(t *testing.T) {
+	skillsDir := t.TempDir()
+	writeProductImportSkill(t, skillsDir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", skillsDir)
+
+	var upstreamReq map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Fatalf("unexpected upstream path: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&upstreamReq); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\n")
+	}))
+	defer upstream.Close()
+
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{
+			Enabled:        true,
+			ActiveProvider: "custom",
+			Providers: map[string]aipkg.ProviderCredential{
+				"custom": {APIKey: "test-key", Model: "test-model", BaseURL: upstream.URL},
+			},
+		}, aipkg.PlatformProfile{}),
+		proxy: aipkg.NewProxy(upstream.Client()),
+		store: &agentChatMemoryStore{},
+	}
+	cacheKey := "test-node:" + node.ProfileName()
+	agentChatRuntimes.Delete(cacheKey)
+	defer agentChatRuntimes.Delete(cacheKey)
+
+	body := strings.NewReader(`{"message":"请看看这个图片里有什么","sessionId":"thread-min-attach","context":{"attachments":[{"name":"product.jpg","contentType":"image/jpeg","contentBase64":"/9j/4AAQ"}]}}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/chat", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentChat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	system := firstOpenAIMessageContent(t, upstreamReq, "system")
+	for _, want := range []string{"User attached files in this turn: 1", "name=product.jpg", "contentType=image/jpeg", "inlineBinary: available"} {
+		if !strings.Contains(system, want) {
+			t.Fatalf("system prompt missing %q:\n%s", want, system)
+		}
+	}
+	if strings.Contains(system, "id=") {
+		t.Fatalf("system prompt should not require attachment id:\n%s", system)
+	}
+	blocks := lastOpenAIUserContentBlocks(t, upstreamReq)
+	if len(blocks) != 2 {
+		t.Fatalf("expected text + image blocks, got %#v", blocks)
+	}
+}
+
+func TestAgentChatProductImportIngestArgumentsWithAttachments_InjectsCurrentTurnImage(t *testing.T) {
+	args, err := agentChatProductImportIngestArgumentsWithAttachments(
+		`{"threadId":"thread_1","sources":[{"sourceName":"midnight-waves-cover.jpg","contentType":"image/jpeg"}]}`,
+		[]aipkg.ChatAttachment{{
+			ID:            "artifact_img",
+			Name:          "midnight-waves-cover.jpg",
+			ContentType:   "image/jpeg",
+			ContentBase64: "/9j/4AAQ",
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	sources, ok := parsed["sources"].([]any)
+	if !ok || len(sources) != 1 {
+		t.Fatalf("expected one source, got %s", args)
+	}
+	source, ok := sources[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected source map, got %#v", sources[0])
+	}
+	if source["contentBase64"] != "/9j/4AAQ" || source["attachmentId"] != "artifact_img" {
+		t.Fatalf("attachment payload was not injected: %#v", source)
+	}
+}
+
+func TestAgentChatProductImportIngestArgumentsWithAttachments_UsesAttachmentIDForMultipleFiles(t *testing.T) {
+	args, err := agentChatProductImportIngestArgumentsWithAttachments(
+		`{"sources":[{"attachmentId":"att_b","sourceName":"b.jpg"}]}`,
+		[]aipkg.ChatAttachment{
+			{ID: "att_a", Name: "a.jpg", ContentType: "image/jpeg", ContentBase64: "aaa"},
+			{ID: "att_b", Name: "b.jpg", ContentType: "image/jpeg", ContentBase64: "bbb"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	sources := parsed["sources"].([]any)
+	if len(sources) != 1 {
+		t.Fatalf("expected only the requested source, got %s", args)
+	}
+	first := sources[0].(map[string]any)
+	if first["contentBase64"] != "bbb" {
+		t.Fatalf("expected att_b payload on requested source, got %#v", first)
+	}
+}
+
+func TestAgentChatProductImportIngestArgumentsWithAttachments_DefaultsToCurrentTurnAttachments(t *testing.T) {
+	args, err := agentChatProductImportIngestArgumentsWithAttachments(
+		`{"threadId":"thread_1"}`,
+		[]aipkg.ChatAttachment{{
+			ID:            "att_only",
+			Name:          "product.png",
+			ContentType:   "image/png",
+			ContentBase64: "pngdata",
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	sources := parsed["sources"].([]any)
+	if len(sources) != 1 {
+		t.Fatalf("expected current-turn attachment source, got %s", args)
+	}
+	source := sources[0].(map[string]any)
+	if source["sourceName"] != "product.png" || source["contentBase64"] != "pngdata" {
+		t.Fatalf("unexpected default source: %#v", source)
 	}
 }
 
@@ -1225,6 +1426,9 @@ func TestHandlePOSTAgentProductImportIngest_CSVCreatesRunAndPreviewArtifacts(t *
 	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	if err := writer.WriteField("threadId", "thread_import"); err != nil {
 		t.Fatalf("write thread field: %v", err)
 	}
@@ -1301,6 +1505,42 @@ func TestHandlePOSTAgentProductImportIngest_CSVCreatesRunAndPreviewArtifacts(t *
 	}
 }
 
+func TestHandlePOSTAgentProductImportIngest_RequiresExplicitIntent(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "supplier.csv")
+	if err != nil {
+		t.Fatalf("create csv part: %v", err)
+	}
+	if _, err := part.Write([]byte("Item Name,Cost USD,Qty on hand\nLinen Tote,$45.00,12\n")); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "explicit product_import intent") {
+		t.Fatalf("expected explicit intent error, got %s", rr.Body.String())
+	}
+	if len(store.skillRuns) != 0 || len(store.artifacts) != 0 {
+		t.Fatalf("missing intent should not create product import work, runs=%#v artifacts=%#v", store.skillRuns, store.artifacts)
+	}
+}
+
 func TestHandlePOSTAgentProductImportIngest_LongCSVAddsPreviewLimitValidation(t *testing.T) {
 	store := &agentChatMemoryStore{}
 	node := &agentChatHTTPTestNode{
@@ -1314,6 +1554,9 @@ func TestHandlePOSTAgentProductImportIngest_LongCSVAddsPreviewLimitValidation(t 
 	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	part, err := writer.CreateFormFile("file", "supplier.csv")
 	if err != nil {
 		t.Fatalf("create csv part: %v", err)
@@ -1361,6 +1604,7 @@ func TestHandlePOSTAgentProductImportIngest_InternalErrorReturnsStage(t *testing
 		store:            store,
 	}
 	body := strings.NewReader(`{
+		"intent":"product_import",
 		"files":[{
 			"sourceName":"supplier.csv",
 			"text":"Item Name,Cost USD,Qty on hand\nLinen Tote,$45.00,12\n"
@@ -1419,6 +1663,9 @@ func TestHandlePOSTAgentProductImportIngest_ZIPExpandsEntries(t *testing.T) {
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	part, err := writer.CreateFormFile("file", "supplier.zip")
 	if err != nil {
 		t.Fatalf("create zip part: %v", err)
@@ -1521,6 +1768,9 @@ func TestHandlePOSTAgentProductImportIngest_XLSXCreatesPreviewArtifacts(t *testi
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	part, err := writer.CreateFormFile("file", "supplier.xlsx")
 	if err != nil {
 		t.Fatalf("create xlsx part: %v", err)
@@ -1565,6 +1815,7 @@ func TestHandlePOSTAgentProductImportIngest_TextSourceWaitsForReview(t *testing.
 		store:            store,
 	}
 	body := strings.NewReader(`{
+		"intent":"product_import",
 		"files":[{
 			"sourceName":"supplier-notes.txt",
 			"text":"Linen Tote costs $45 and has 12 units."
@@ -1613,6 +1864,76 @@ func TestHandlePOSTAgentProductImportIngest_TextSourceWaitsForReview(t *testing.
 	}
 	if len(advanceResp.Data.CreatedValidationReports) != 1 || !strings.Contains(advanceResp.Data.CreatedValidationReports[0].Data, `"code":"ai_extraction_required"`) {
 		t.Fatalf("advance should add ai extraction validation, got %#v", advanceResp.Data.CreatedValidationReports)
+	}
+}
+
+func TestHandlePOSTAgentProductImportIngest_ImageCreatesVisionProposal(t *testing.T) {
+	store := &agentChatMemoryStore{}
+	var sawImage bool
+	aiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Fatalf("unexpected AI path %s", r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode AI request: %v", err)
+		}
+		raw, _ := json.Marshal(body)
+		sawImage = strings.Contains(string(raw), `"image_url"`) && strings.Contains(string(raw), "data:image/png;base64,")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"title\":\"Midnight Waves Cover\",\"shortDescription\":\"Dark abstract cover art\",\"description\":\"<p>Dark abstract wave cover artwork.</p>\",\"tags\":[\"abstract-art\",\"cover-art\"],\"categories\":[\"Digital Art\"]}"}}]}`))
+	}))
+	defer aiServer.Close()
+	vision := &aipkg.Config{Provider: "openai", APIKey: "test-key", Model: "gpt-4o", BaseURL: aiServer.URL, Enabled: true, IsPlatform: true, DailyLimit: 20}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{Vision: vision}),
+		proxy:            aipkg.NewProxy(aiServer.Client()),
+		rateLimiter:      aipkg.NewDailyRateLimiter(),
+		store:            store,
+	}
+	body := strings.NewReader(`{
+		"intent":"product_import",
+		"files":[{
+			"sourceName":"midnight-waves-cover.png",
+			"contentType":"image/png",
+			"contentBase64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+		}]
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/ingest", body)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportIngest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !sawImage {
+		t.Fatal("expected product import image ingest to call vision model with an image_url data URL")
+	}
+	if got := node.rateLimiter.Usage("test-node"); got != 1 {
+		t.Fatalf("expected successful platform image extraction to increment AI usage, got %d", got)
+	}
+	var resp struct {
+		Data agentProductImportIngestResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode ingest response: %v", err)
+	}
+	if resp.Data.SkillRun == nil || resp.Data.SkillRun.Status != agentstore.SkillRunStatusWaitingForReview {
+		t.Fatalf("image ingest should create reviewable work, got %#v", resp.Data.SkillRun)
+	}
+	if len(resp.Data.SourceArtifacts) != 1 || len(resp.Data.CandidateArtifacts) != 1 || len(resp.Data.ProposalArtifacts) != 1 || len(resp.Data.ValidationArtifacts) != 0 {
+		t.Fatalf("expected source, candidate, proposal and no validation, got %#v", resp.Data)
+	}
+	if resp.Data.SourceArtifacts[0].Data != "" {
+		t.Fatalf("source material data should be sanitized from API response, got %q", resp.Data.SourceArtifacts[0].Data)
+	}
+	proposal := resp.Data.ProposalArtifacts[0]
+	for _, want := range []string{`"title":"Midnight Waves Cover"`, `"ai_vision_generate_from_images"`, `"price is missing"`} {
+		if !strings.Contains(proposal.Data, want) {
+			t.Fatalf("image proposal data missing %q: %s", want, proposal.Data)
+		}
 	}
 }
 
@@ -1931,6 +2252,9 @@ func TestHandleGETAgentProductImportWorkbench_AggregatesRowsAndApprovals(t *test
 	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	part, err := writer.CreateFormFile("file", "supplier.csv")
 	if err != nil {
 		t.Fatalf("create csv part: %v", err)
@@ -2031,6 +2355,9 @@ func TestHandleGETAgentProductImportWorkbench_PaginatesAndFiltersRows(t *testing
 	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	part, err := writer.CreateFormFile("file", "supplier.csv")
 	if err != nil {
 		t.Fatalf("create csv part: %v", err)
@@ -2147,6 +2474,9 @@ func TestHandlePOSTAgentProductImportRunApprovals_CreatesSelectedApprovals(t *te
 	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	part, err := writer.CreateFormFile("file", "supplier.csv")
 	if err != nil {
 		t.Fatalf("create csv part: %v", err)
@@ -2234,6 +2564,9 @@ func TestHandlePOSTAgentProductImportRunApprovalActions_DecidesAndAppliesRunAppr
 	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	part, err := writer.CreateFormFile("file", "supplier.csv")
 	if err != nil {
 		t.Fatalf("create csv part: %v", err)
@@ -2441,6 +2774,9 @@ func TestHandleGETAgentProductImportWorkbench_ReflectsAppliedProposal(t *testing
 	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("intent", "product_import"); err != nil {
+		t.Fatal(err)
+	}
 	part, err := writer.CreateFormFile("file", "supplier.csv")
 	if err != nil {
 		t.Fatalf("create csv part: %v", err)
@@ -3102,6 +3438,27 @@ func firstOpenAIMessageContent(t *testing.T, req map[string]any, role string) st
 	}
 	t.Fatalf("missing %s message in upstream request: %#v", role, req)
 	return ""
+}
+
+func lastOpenAIUserContentBlocks(t *testing.T, req map[string]any) []any {
+	t.Helper()
+	messages, ok := req["messages"].([]any)
+	if !ok {
+		t.Fatalf("missing messages in upstream request: %#v", req)
+	}
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg, ok := messages[i].(map[string]any)
+		if !ok || msg["role"] != "user" {
+			continue
+		}
+		blocks, ok := msg["content"].([]any)
+		if !ok {
+			t.Fatalf("last user content is not blocks: %#v", msg["content"])
+		}
+		return blocks
+	}
+	t.Fatalf("missing user message in upstream request: %#v", req)
+	return nil
 }
 
 func openAIToolNames(t *testing.T, req map[string]any) []string {

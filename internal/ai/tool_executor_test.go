@@ -88,6 +88,37 @@ func TestBuildRequestBody_ProductImportAdvanceStripsRunID(t *testing.T) {
 	}
 }
 
+func TestBuildRequestBody_ProductImportIngestAddsIntentAndMapsSources(t *testing.T) {
+	args := map[string]interface{}{
+		"threadId": "thread_1",
+		"sources": []interface{}{
+			map[string]interface{}{
+				"sourceName":  "supplier.csv",
+				"contentType": "text/csv",
+				"text":        "title,price\nLinen Tote,45\n",
+			},
+		},
+	}
+	body, err := buildRequestBody("agent_product_import_ingest", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if parsed["intent"] != "product_import" {
+		t.Fatalf("ingest body should include product_import intent, got %s", string(body))
+	}
+	if _, ok := parsed["sources"]; ok {
+		t.Fatalf("sources should be mapped to files for API compatibility, got %s", string(body))
+	}
+	files, ok := parsed["files"].([]interface{})
+	if !ok || len(files) != 1 {
+		t.Fatalf("ingest body should include one files entry, got %s", string(body))
+	}
+}
+
 func TestAppendQueryParams_WithParams(t *testing.T) {
 	args := map[string]interface{}{"limit": 10, "offset": 5}
 	url := appendQueryParams("http://localhost/v1/listings", "listings_list_mine", args)
@@ -254,6 +285,40 @@ func TestToolExecutor_ExecuteAgentArtifactReadTools(t *testing.T) {
 	}
 	if !strings.Contains(result, `"proposal"`) {
 		t.Fatalf("unexpected get result: %s", result)
+	}
+}
+
+func TestToolExecutor_ExecuteProductImportIngest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/agent/product-import/ingest" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var parsed map[string]interface{}
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if parsed["intent"] != "product_import" {
+			t.Fatalf("ingest body should include explicit intent, got %s", string(body))
+		}
+		if _, ok := parsed["files"]; !ok {
+			t.Fatalf("ingest body should map sources to files, got %s", string(body))
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"data":{"skillRun":{"id":"run_1","skillId":"product.import"}}}`))
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "")
+	result, err := executor.Execute(context.Background(), "agent_product_import_ingest", `{"threadId":"thread_1","sources":[{"sourceName":"supplier.csv","contentType":"text/csv","text":"title,price\nLinen Tote,45\n"}]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"run_1"`) {
+		t.Fatalf("unexpected result: %s", result)
 	}
 }
 

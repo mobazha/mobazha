@@ -94,3 +94,26 @@ func TestPlatformProfile_ForGenerate_BYOKVisionSupport(t *testing.T) {
 		t.Fatalf("expected BYOK key, got %q", cfg.APIKey)
 	}
 }
+
+func TestPlatformProfile_ForChat_RoutesImageBlocksToVision(t *testing.T) {
+	text := Config{Provider: "deepseek", APIKey: "text-key", Model: "deepseek-v4-flash", Enabled: true, IsPlatform: true}
+	vision := Config{Provider: "qwen", APIKey: "vision-key", Model: "qwen3-vl-flash", Enabled: true, IsPlatform: true}
+	profile := PlatformProfile{Text: &text, Vision: &vision}
+
+	cfg, err := profile.ForChat(Config{}, []ChatMsg{{
+		Role:    RoleUser,
+		Content: "Describe this",
+		ContentBlocks: []ChatContentBlock{{
+			Type: "image_url",
+			ImageURL: &ChatImageURL{
+				URL: "data:image/png;base64,abc",
+			},
+		}},
+	}})
+	if err != nil {
+		t.Fatalf("ForChat vision: %v", err)
+	}
+	if cfg.APIKey != "vision-key" {
+		t.Fatalf("expected vision key, got %q", cfg.APIKey)
+	}
+}

@@ -3,11 +3,33 @@
 package api
 
 import (
+	"context"
+	"net"
+	"net/http"
 	"strings"
 	"testing"
 
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 )
+
+func TestGetLocalAPIURL_PrefersServerLocalAddr(t *testing.T) {
+	req := httptestRequestWithHost("http://localhost:18080/v1/agent/chat", "localhost:18080")
+	req = req.WithContext(context.WithValue(req.Context(), http.LocalAddrContextKey, &net.TCPAddr{
+		IP:   net.IPv4zero,
+		Port: 8080,
+	}))
+
+	got := getLocalAPIURL(req)
+	if got != "http://127.0.0.1:8080" {
+		t.Fatalf("expected local listener address for server-side tool calls, got %q", got)
+	}
+}
+
+func httptestRequestWithHost(rawURL, host string) *http.Request {
+	req, _ := http.NewRequest(http.MethodPost, rawURL, nil)
+	req.Host = host
+	return req
+}
 
 func TestVisibleChatMessages_HidesInternalToolTraffic(t *testing.T) {
 	messages := []aipkg.ChatMsg{

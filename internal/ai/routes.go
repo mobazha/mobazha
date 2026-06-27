@@ -79,6 +79,11 @@ func ChatNeedsVision(messages []ChatMsg) bool {
 		if chatContentNeedsVision(msg.Content) {
 			return true
 		}
+		for _, block := range msg.ContentBlocks {
+			if block.Type == "image_url" && block.ImageURL != nil && strings.TrimSpace(block.ImageURL.URL) != "" {
+				return true
+			}
+		}
 	}
 	return false
 }

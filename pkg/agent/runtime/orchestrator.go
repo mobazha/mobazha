@@ -52,10 +52,24 @@ type threadCompactionCacheEntry struct {
 
 // Message is an agent conversation message sent to/from the LLM.
 type Message struct {
-	Role       string            `json:"role"`
-	Content    string            `json:"content"`
-	ToolCallID string            `json:"tool_call_id,omitempty"`
-	ToolCalls  []stream.ToolCall `json:"tool_calls,omitempty"`
+	Role          string                `json:"role"`
+	Content       string                `json:"content"`
+	ContentBlocks []MessageContentBlock `json:"content_blocks,omitempty"`
+	ToolCallID    string                `json:"tool_call_id,omitempty"`
+	ToolCalls     []stream.ToolCall     `json:"tool_calls,omitempty"`
+}
+
+// MessageContentBlock carries per-turn multimodal content. Runtime persists
+// plain text history; blocks are only sent to the LLM for the active turn.
+type MessageContentBlock struct {
+	Type     string           `json:"type"`
+	Text     string           `json:"text,omitempty"`
+	ImageURL *MessageImageURL `json:"image_url,omitempty"`
+}
+
+type MessageImageURL struct {
+	URL    string `json:"url"`
+	Detail string `json:"detail,omitempty"`
 }
 
 // ToolDef describes a tool the LLM can invoke.
@@ -241,27 +255,29 @@ type TurnResult struct {
 // intentionally per-turn, not global orchestrator state, to avoid cross-thread
 // leakage.
 type TurnOptions struct {
-	SkillProvider   agentskill.Provider
-	RequestedSkills []string
-	SkillFilter     agentskill.Filter
-	ContextBlocks   []string
-	ToolCatalog     kernel.ToolCatalog
-	MemoryStore     kernel.MemoryStore
-	Scope           kernel.Scope
+	SkillProvider     agentskill.Provider
+	RequestedSkills   []string
+	SkillFilter       agentskill.Filter
+	ContextBlocks     []string
+	UserContentBlocks []MessageContentBlock
+	ToolCatalog       kernel.ToolCatalog
+	MemoryStore       kernel.MemoryStore
+	Scope             kernel.Scope
 }
 
 type resolvedTurnContext struct {
-	availableSkills []string
-	activeSkills    []*agentskill.Skill
-	grantedTools    map[string][]kernel.ToolMetadata
-	baseTools       []ToolDef
-	tools           []ToolDef
-	toolResultModes map[string]string
-	contextBlocks   []string
-	skillProvider   agentskill.Provider
-	toolCatalog     kernel.ToolCatalog
-	memoryStore     kernel.MemoryStore
-	scope           kernel.Scope
+	availableSkills   []string
+	activeSkills      []*agentskill.Skill
+	grantedTools      map[string][]kernel.ToolMetadata
+	baseTools         []ToolDef
+	tools             []ToolDef
+	toolResultModes   map[string]string
+	contextBlocks     []string
+	userContentBlocks []MessageContentBlock
+	skillProvider     agentskill.Provider
+	toolCatalog       kernel.ToolCatalog
+	memoryStore       kernel.MemoryStore
+	scope             kernel.Scope
 }
 
 // RunTurn executes a single conversational turn:
@@ -402,21 +418,26 @@ func (o *Orchestrator) assembleHistory(ctx context.Context, tenantID, threadID, 
 		msgs = append(msgs, msg)
 	}
 
-	msgs = append(msgs, Message{Role: "user", Content: userMsg})
+	msgs = append(msgs, Message{
+		Role:          "user",
+		Content:       userMsg,
+		ContentBlocks: append([]MessageContentBlock(nil), resolved.userContentBlocks...),
+	})
 	return msgs, nil
 }
 
 func (o *Orchestrator) resolveTurnContext(ctx context.Context, opts TurnOptions) (resolvedTurnContext, error) {
 	resolved := resolvedTurnContext{
-		baseTools:       append([]ToolDef(nil), o.tools...),
-		tools:           append([]ToolDef(nil), o.tools...),
-		toolResultModes: map[string]string{},
-		contextBlocks:   append([]string(nil), opts.ContextBlocks...),
-		grantedTools:    map[string][]kernel.ToolMetadata{},
-		skillProvider:   opts.SkillProvider,
-		toolCatalog:     opts.ToolCatalog,
-		memoryStore:     opts.MemoryStore,
-		scope:           opts.Scope,
+		baseTools:         append([]ToolDef(nil), o.tools...),
+		tools:             append([]ToolDef(nil), o.tools...),
+		toolResultModes:   map[string]string{},
+		contextBlocks:     append([]string(nil), opts.ContextBlocks...),
+		userContentBlocks: append([]MessageContentBlock(nil), opts.UserContentBlocks...),
+		grantedTools:      map[string][]kernel.ToolMetadata{},
+		skillProvider:     opts.SkillProvider,
+		toolCatalog:       opts.ToolCatalog,
+		memoryStore:       opts.MemoryStore,
+		scope:             opts.Scope,
 	}
 	if opts.SkillProvider == nil {
 		return resolved, nil
@@ -958,6 +979,7 @@ func summarizeToolResult(toolName, content, resultMode string) string {
 			summary["type"] = "object"
 			summary["keys"] = sortedMapKeys(redacted, 12)
 			addToolResultDataShape(summary, redacted["data"])
+			addToolResultReferences(summary, redacted)
 			if compact, err := json.Marshal(redacted); err == nil {
 				summary["excerpt"] = compactToolResultRaw(string(compact), toolResultExcerptMaxLen)
 			}
@@ -965,6 +987,7 @@ func summarizeToolResult(toolName, content, resultMode string) string {
 			v, _ = redactToolResultValue(v).([]any)
 			summary["type"] = "array"
 			summary["itemCount"] = len(v)
+			addToolResultReferences(summary, v)
 			if compact, err := json.Marshal(v); err == nil {
 				summary["excerpt"] = compactToolResultRaw(string(compact), toolResultExcerptMaxLen)
 			}
@@ -979,6 +1002,84 @@ func summarizeToolResult(toolName, content, resultMode string) string {
 		summary["excerpt"] = compactToolResultRaw(content, toolResultExcerptMaxLen)
 	}
 	return marshalCompactToolResult(summary)
+}
+
+func addToolResultReferences(summary map[string]any, value any) {
+	refs := toolResultReferences(value, 8)
+	if len(refs) > 0 {
+		summary["references"] = refs
+	}
+}
+
+func toolResultReferences(value any, limit int) []map[string]any {
+	if limit <= 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, limit)
+	seen := map[string]struct{}{}
+	collectToolResultReferences(value, limit, &out, seen)
+	return out
+}
+
+func collectToolResultReferences(value any, limit int, out *[]map[string]any, seen map[string]struct{}) {
+	if len(*out) >= limit {
+		return
+	}
+	switch v := value.(type) {
+	case map[string]any:
+		if ref := toolResultReference(v); ref != nil {
+			key := fmt.Sprint(ref["id"])
+			if key != "" {
+				if _, ok := seen[key]; !ok {
+					seen[key] = struct{}{}
+					*out = append(*out, ref)
+				}
+			}
+		}
+		for _, key := range sortedMapKeys(v, len(v)) {
+			collectToolResultReferences(v[key], limit, out, seen)
+			if len(*out) >= limit {
+				return
+			}
+		}
+	case []any:
+		for _, item := range v {
+			collectToolResultReferences(item, limit, out, seen)
+			if len(*out) >= limit {
+				return
+			}
+		}
+	}
+}
+
+func toolResultReference(value map[string]any) map[string]any {
+	id := stringValue(value["id"])
+	if id == "" {
+		id = stringValue(value["artifactId"])
+	}
+	if id == "" {
+		return nil
+	}
+	ref := map[string]any{"id": id}
+	for _, key := range []string{"kind", "name", "status", "skill_run_id", "skillRunId", "source_name", "sourceName"} {
+		if val := stringValue(value[key]); val != "" {
+			ref[key] = val
+		}
+	}
+	return ref
+}
+
+func stringValue(value any) string {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case fmt.Stringer:
+		return strings.TrimSpace(v.String())
+	case float64, float32, int, int64, int32, uint, uint64, uint32:
+		return strings.TrimSpace(fmt.Sprint(v))
+	default:
+		return ""
+	}
 }
 
 func redactToolResultValue(value any) any {

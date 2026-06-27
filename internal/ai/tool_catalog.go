@@ -85,7 +85,7 @@ func sellerToolPolicy(name string) toolPolicy {
 		return read
 	case "agent_skill_runs_list", "agent_skill_runs_get":
 		return artifactRead
-	case "agent_skill_runs_create", "agent_skill_runs_update", "agent_product_import_advance":
+	case "agent_skill_runs_create", "agent_skill_runs_update", "agent_product_import_ingest", "agent_product_import_advance":
 		return artifactWrite
 	case "agent_artifacts_list", "agent_artifacts_get":
 		return artifactRead

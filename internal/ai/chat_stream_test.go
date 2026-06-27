@@ -196,6 +196,35 @@ func TestConvertToOpenAIMessages_WithToolCalls(t *testing.T) {
 	}
 }
 
+func TestConvertToOpenAIMessages_WithImageBlocks(t *testing.T) {
+	msgs := []ChatMsg{{
+		Role:    RoleUser,
+		Content: "Describe this image",
+		ContentBlocks: []ChatContentBlock{{
+			Type: "image_url",
+			ImageURL: &ChatImageURL{
+				URL:    "data:image/png;base64,abc",
+				Detail: "low",
+			},
+		}},
+	}}
+	result := convertToOpenAIMessages(msgs)
+	blocks, ok := result[0]["content"].([]map[string]interface{})
+	if !ok {
+		t.Fatalf("expected content blocks, got %#v", result[0]["content"])
+	}
+	if len(blocks) != 2 {
+		t.Fatalf("expected text + image blocks, got %#v", blocks)
+	}
+	if blocks[0]["type"] != "text" || blocks[1]["type"] != "image_url" {
+		t.Fatalf("unexpected blocks: %#v", blocks)
+	}
+	image, ok := blocks[1]["image_url"].(map[string]string)
+	if !ok || image["url"] != "data:image/png;base64,abc" || image["detail"] != "low" {
+		t.Fatalf("unexpected image block: %#v", blocks[1])
+	}
+}
+
 func TestConvertToAnthropicMessages_ExtractsSystem(t *testing.T) {
 	msgs := []ChatMsg{
 		{Role: RoleSystem, Content: "System prompt here"},
@@ -235,6 +264,58 @@ func TestConvertToAnthropicMessages_ToolResults(t *testing.T) {
 	}
 	if content[0]["type"] != "tool_result" {
 		t.Error("block type should be tool_result")
+	}
+}
+
+func TestConvertToAnthropicMessages_WithImageBlocks(t *testing.T) {
+	msgs := []ChatMsg{{
+		Role:    RoleUser,
+		Content: "Describe this image",
+		ContentBlocks: []ChatContentBlock{{
+			Type: "image_url",
+			ImageURL: &ChatImageURL{
+				URL: "https://example.test/image.png",
+			},
+		}},
+	}}
+	_, result := convertToAnthropicMessages(msgs)
+	blocks, ok := result[0]["content"].([]map[string]interface{})
+	if !ok {
+		t.Fatalf("expected content blocks, got %#v", result[0]["content"])
+	}
+	if len(blocks) != 2 {
+		t.Fatalf("expected text + image blocks, got %#v", blocks)
+	}
+	if blocks[1]["type"] != "image" {
+		t.Fatalf("expected image block, got %#v", blocks[1])
+	}
+	source, ok := blocks[1]["source"].(map[string]interface{})
+	if !ok || source["url"] != "https://example.test/image.png" {
+		t.Fatalf("unexpected image source: %#v", blocks[1])
+	}
+}
+
+func TestConvertToAnthropicMessages_WithDataImageBlock(t *testing.T) {
+	msgs := []ChatMsg{{
+		Role: RoleUser,
+		ContentBlocks: []ChatContentBlock{{
+			Type: "image_url",
+			ImageURL: &ChatImageURL{
+				URL: "data:image/png;base64,abc123",
+			},
+		}},
+	}}
+	_, result := convertToAnthropicMessages(msgs)
+	blocks, ok := result[0]["content"].([]map[string]interface{})
+	if !ok || len(blocks) != 1 {
+		t.Fatalf("expected one image block, got %#v", result[0]["content"])
+	}
+	source, ok := blocks[0]["source"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected source map, got %#v", blocks[0])
+	}
+	if source["type"] != "base64" || source["media_type"] != "image/png" || source["data"] != "abc123" {
+		t.Fatalf("unexpected data image source: %#v", source)
 	}
 }
 

@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -38,9 +39,11 @@ const (
 	productImportArtifactPageSize = 500
 	productImportApprovalPageSize = 500
 	productImportDefaultCurrency  = "USD"
+	productImportIngestIntent     = "product_import"
 )
 
 type agentProductImportIngestRequest struct {
+	Intent   string                         `json:"intent,omitempty"`
 	ThreadID string                         `json:"threadId,omitempty"`
 	StoreID  string                         `json:"storeId,omitempty"`
 	Files    []agentProductImportIngestFile `json:"files,omitempty"`
@@ -1461,6 +1464,10 @@ func (g *Gateway) handlePOSTAgentProductImportIngest(w http.ResponseWriter, r *h
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
 		return
 	}
+	if !agentProductImportIngestIntentExplicit(req.Intent) {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "product import ingest requires explicit product_import intent")
+		return
+	}
 	if len(sources) == 0 {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "at least one product import source is required")
 		return
@@ -1555,6 +1562,9 @@ func parseAgentProductImportIngestRequest(r *http.Request) (agentProductImportIn
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return req, nil, fmt.Errorf("invalid product import ingest body")
 	}
+	if !agentProductImportIngestIntentExplicit(req.Intent) {
+		return req, nil, nil
+	}
 	sources := make([]agentProductImportIngestSource, 0, len(req.Files))
 	for _, file := range req.Files {
 		source, err := productImportSourceFromJSONFile(file)
@@ -1571,8 +1581,12 @@ func parseMultipartProductImportIngestRequest(r *http.Request) (agentProductImpo
 		return agentProductImportIngestRequest{}, nil, fmt.Errorf("invalid multipart product import body")
 	}
 	req := agentProductImportIngestRequest{
+		Intent:   strings.TrimSpace(r.FormValue("intent")),
 		ThreadID: strings.TrimSpace(r.FormValue("threadId")),
 		StoreID:  strings.TrimSpace(r.FormValue("storeId")),
+	}
+	if !agentProductImportIngestIntentExplicit(req.Intent) {
+		return req, nil, nil
 	}
 	var sources []agentProductImportIngestSource
 	for _, headers := range r.MultipartForm.File {
@@ -1585,6 +1599,10 @@ func parseMultipartProductImportIngestRequest(r *http.Request) (agentProductImpo
 		}
 	}
 	return req, sources, nil
+}
+
+func agentProductImportIngestIntentExplicit(intent string) bool {
+	return strings.TrimSpace(intent) == productImportIngestIntent
 }
 
 func productImportSourceFromJSONFile(file agentProductImportIngestFile) (agentProductImportIngestSource, error) {
@@ -2015,6 +2033,9 @@ func readProductImportZipEntry(file *zip.File) ([]byte, error) {
 
 func saveProductImportPreviewArtifacts(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, sourceArtifact *agentstore.Artifact, source agentProductImportIngestSource) ([]*agentstore.Artifact, []*agentstore.Artifact, []*agentstore.Artifact, error) {
 	inputKind := productImportInputKind(source)
+	if inputKind == "image" {
+		return saveProductImportImagePreviewArtifacts(ctx, p, run, sourceArtifact, source)
+	}
 	if inputKind != "csv" && inputKind != "xlsx" {
 		validation, err := saveProductImportValidationArtifact(ctx, p, run, sourceArtifact, source, "parser_not_implemented", fmt.Sprintf("%s ingest is registered; parser will run in a later product.import step.", inputKind))
 		if err != nil {
@@ -2070,6 +2091,105 @@ func saveProductImportPreviewArtifacts(ctx context.Context, p aiChatProvider, ru
 		validations = append(validations, validation)
 	}
 	return candidates, proposals, validations, nil
+}
+
+func saveProductImportImagePreviewArtifacts(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, sourceArtifact *agentstore.Artifact, source agentProductImportIngestSource) ([]*agentstore.Artifact, []*agentstore.Artifact, []*agentstore.Artifact, error) {
+	resp, validationCode, validationMessage := generateProductImportListingFromImage(ctx, p, run, source)
+	if validationCode != "" {
+		validation, err := saveProductImportValidationArtifactWithData(ctx, p, run, sourceArtifact, source, validationCode, validationMessage, map[string]any{
+			"requiresAI": true,
+			"nextAction": "provide_product_details",
+		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return nil, nil, []*agentstore.Artifact{validation}, nil
+	}
+	candidateData := buildProductImportImageCandidateData(sourceArtifact, source, resp)
+	candidateArtifact, err := saveProductImportDataArtifact(ctx, p, run, agentstore.ArtifactKindCandidate, agentstore.ArtifactStatusReady, fmt.Sprintf("%s image candidate", source.SourceName), candidateData)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	proposalData := buildProductImportProposalData(sourceArtifact, candidateArtifact, source, candidateData, 1)
+	proposalArtifact, err := saveProductImportDataArtifact(ctx, p, run, agentstore.ArtifactKindProposal, agentstore.ArtifactStatusNeedsReview, fmt.Sprintf("%s image proposal", source.SourceName), proposalData)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return []*agentstore.Artifact{candidateArtifact}, []*agentstore.Artifact{proposalArtifact}, nil, nil
+}
+
+func generateProductImportListingFromImage(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, source agentProductImportIngestSource) (*aipkg.GenerateResponse, string, string) {
+	dataURL, err := productImportImageDataURL(source)
+	if err != nil {
+		return nil, "image_inline_failed", err.Error()
+	}
+	req := aipkg.GenerateRequest{
+		Action:       "generate_from_images",
+		Images:       []string{dataURL},
+		ContractType: "PHYSICAL_GOOD",
+		Language:     "zh",
+	}
+	cfg, err := p.AIConfigForGenerate(req)
+	if err != nil {
+		switch {
+		case errors.Is(err, aipkg.ErrVisionUnsupported):
+			return nil, "ai_vision_unsupported", "Configured AI provider does not support image input."
+		case errors.Is(err, aipkg.ErrVisionNotConfigured):
+			return nil, "ai_vision_not_configured", "AI vision model is not configured."
+		default:
+			return nil, "ai_config_unavailable", "AI configuration is unavailable for image extraction."
+		}
+	}
+	if !cfg.IsValid() {
+		return nil, "ai_not_configured", "AI is not configured for image extraction."
+	}
+	platformRateKey := ""
+	if cfg.IsPlatform {
+		platformRateKey = strings.TrimSpace(run.ActorID)
+		if platformRateKey == "" {
+			platformRateKey = run.TenantID
+		}
+		if rl := p.AIRateLimiter(); rl != nil {
+			if ok, _ := rl.Allow(platformRateKey, cfg.DailyLimit); !ok {
+				return nil, "ai_rate_limited", "Daily AI limit reached for image extraction."
+			}
+		}
+	}
+	proxy := p.AIProxy()
+	if proxy == nil {
+		return nil, "ai_proxy_unavailable", "AI proxy is not initialized."
+	}
+	resp, err := proxy.Generate(cfg, req)
+	if err != nil {
+		aiLog.Warningf("Product import image extraction failed for %s: %v", source.SourceName, err)
+		if strings.Contains(strings.ToLower(err.Error()), "authentication failed") {
+			return nil, "ai_vision_auth_failed", "AI vision provider authentication failed."
+		}
+		return nil, "ai_image_extraction_failed", "AI could not extract product details from this image."
+	}
+	if resp == nil || strings.TrimSpace(resp.Title) == "" {
+		return nil, "ai_image_extraction_incomplete", "AI did not return a usable product title from this image."
+	}
+	if cfg.IsPlatform {
+		if rl := p.AIRateLimiter(); rl != nil {
+			rl.Increment(platformRateKey)
+		}
+	}
+	return resp, "", ""
+}
+
+func productImportImageDataURL(source agentProductImportIngestSource) (string, error) {
+	if len(source.Data) == 0 {
+		return "", fmt.Errorf("image source has no content")
+	}
+	mime := strings.ToLower(strings.TrimSpace(strings.Split(source.ContentType, ";")[0]))
+	if mime == "" || mime == "application/octet-stream" {
+		mime = inferProductImportContentType(source.SourceName, "")
+	}
+	if !strings.HasPrefix(mime, "image/") {
+		return "", fmt.Errorf("source %s is not an image", source.SourceName)
+	}
+	return fmt.Sprintf("data:%s;base64,%s", mime, base64.StdEncoding.EncodeToString(source.Data)), nil
 }
 
 func saveProductImportValidationArtifact(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, sourceArtifact *agentstore.Artifact, source agentProductImportIngestSource, code, message string) (*agentstore.Artifact, error) {
@@ -2271,6 +2391,40 @@ func buildProductImportCandidateData(sourceArtifact *agentstore.Artifact, source
 	}
 }
 
+func buildProductImportImageCandidateData(sourceArtifact *agentstore.Artifact, source agentProductImportIngestSource, resp *aipkg.GenerateResponse) map[string]any {
+	normalized := map[string]any{}
+	fieldSources := map[string]any{}
+	if title := strings.TrimSpace(resp.Title); title != "" {
+		normalized["title"] = title
+		fieldSources["title"] = productImportImageFieldSource(sourceArtifact, source.SourceName, 0.68)
+	}
+	if description := strings.TrimSpace(resp.Description); description != "" {
+		normalized["description"] = description
+		fieldSources["description"] = productImportImageFieldSource(sourceArtifact, source.SourceName, 0.62)
+	}
+	if len(resp.Tags) > 0 {
+		normalized["tags"] = uniqueTrimmedStrings(resp.Tags)
+	}
+	if len(resp.Categories) > 0 {
+		normalized["categories"] = uniqueTrimmedStrings(resp.Categories)
+	}
+	return map[string]any{
+		"sourceArtifactId": sourceArtifact.ID,
+		"sourceName":       source.SourceName,
+		"rowNumber":        1,
+		"rawAI": map[string]any{
+			"title":            resp.Title,
+			"shortDescription": resp.ShortDescription,
+			"description":      resp.Description,
+			"tags":             resp.Tags,
+			"categories":       resp.Categories,
+		},
+		"normalized":   normalized,
+		"fieldSources": fieldSources,
+		"validation":   productImportValidation(normalized, productImportInputKind(source)),
+	}
+}
+
 func buildProductImportProposalData(sourceArtifact, candidateArtifact *agentstore.Artifact, source agentProductImportIngestSource, candidateData map[string]any, rowNumber int) map[string]any {
 	normalized, _ := candidateData["normalized"].(map[string]any)
 	fieldSources, _ := candidateData["fieldSources"].(map[string]any)
@@ -2317,6 +2471,17 @@ func productImportFieldSource(sourceArtifact *agentstore.Artifact, sourceName st
 	}
 }
 
+func productImportImageFieldSource(sourceArtifact *agentstore.Artifact, sourceName string, confidence float64) map[string]any {
+	return map[string]any{
+		"artifactId":  sourceArtifact.ID,
+		"sourceName":  sourceName,
+		"confidence":  confidence,
+		"extraction":  "ai_vision_generate_from_images",
+		"requiresAI":  true,
+		"reviewLevel": "seller",
+	}
+}
+
 func productImportValidation(normalized map[string]any, inputKind string) []map[string]any {
 	var validation []map[string]any
 	if stringFromAny(normalized["title"]) == "" {
@@ -2356,6 +2521,8 @@ func productImportInputKind(source agentProductImportIngestSource) string {
 		return "xlsx"
 	case strings.HasSuffix(name, ".zip") || strings.Contains(ct, "zip"):
 		return "zip"
+	case strings.HasPrefix(ct, "image/") || strings.HasSuffix(name, ".jpg") || strings.HasSuffix(name, ".jpeg") || strings.HasSuffix(name, ".png") || strings.HasSuffix(name, ".webp") || strings.HasSuffix(name, ".gif"):
+		return "image"
 	case strings.HasPrefix(ct, "text/") || strings.HasSuffix(name, ".txt") || strings.HasSuffix(name, ".md"):
 		return "text"
 	default:

@@ -20,11 +20,11 @@ type ToolDefinition struct {
 
 // StreamDelta represents an incremental chunk from the LLM stream.
 type StreamDelta struct {
-	Content   string     `json:"content,omitempty"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
-	StopReason string   `json:"stop_reason,omitempty"`
-	Done      bool       `json:"done,omitempty"`
-	Error     string     `json:"error,omitempty"`
+	Content    string     `json:"content,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	StopReason string     `json:"stop_reason,omitempty"`
+	Done       bool       `json:"done,omitempty"`
+	Error      string     `json:"error,omitempty"`
 }
 
 // StreamChat sends a streaming chat completion request to the configured AI provider.
@@ -344,7 +344,9 @@ func convertToOpenAIMessages(msgs []ChatMsg) []map[string]interface{} {
 	for _, m := range msgs {
 		msg := map[string]interface{}{"role": string(m.Role)}
 
-		if m.Content != "" {
+		if len(m.ContentBlocks) > 0 {
+			msg["content"] = openAIContentBlocks(m)
+		} else if m.Content != "" {
 			msg["content"] = m.Content
 		}
 
@@ -425,10 +427,94 @@ func convertToAnthropicMessages(msgs []ChatMsg) (system string, result []map[str
 			continue
 		}
 
+		if len(m.ContentBlocks) > 0 {
+			result = append(result, map[string]interface{}{
+				"role":    string(m.Role),
+				"content": anthropicContentBlocks(m),
+			})
+			continue
+		}
+
 		result = append(result, map[string]interface{}{
 			"role":    string(m.Role),
 			"content": m.Content,
 		})
 	}
 	return
+}
+
+func openAIContentBlocks(msg ChatMsg) []map[string]interface{} {
+	blocks := make([]map[string]interface{}, 0, len(msg.ContentBlocks)+1)
+	if msg.Content != "" {
+		blocks = append(blocks, map[string]interface{}{"type": "text", "text": msg.Content})
+	}
+	for _, block := range msg.ContentBlocks {
+		switch block.Type {
+		case "text":
+			if block.Text != "" {
+				blocks = append(blocks, map[string]interface{}{"type": "text", "text": block.Text})
+			}
+		case "image_url":
+			if block.ImageURL != nil && strings.TrimSpace(block.ImageURL.URL) != "" {
+				image := map[string]string{"url": block.ImageURL.URL}
+				if block.ImageURL.Detail != "" {
+					image["detail"] = block.ImageURL.Detail
+				}
+				blocks = append(blocks, map[string]interface{}{"type": "image_url", "image_url": image})
+			}
+		}
+	}
+	if len(blocks) == 0 {
+		return []map[string]interface{}{{"type": "text", "text": ""}}
+	}
+	return blocks
+}
+
+func anthropicContentBlocks(msg ChatMsg) []map[string]interface{} {
+	blocks := make([]map[string]interface{}, 0, len(msg.ContentBlocks)+1)
+	if msg.Content != "" {
+		blocks = append(blocks, map[string]interface{}{"type": "text", "text": msg.Content})
+	}
+	for _, block := range msg.ContentBlocks {
+		switch block.Type {
+		case "text":
+			if block.Text != "" {
+				blocks = append(blocks, map[string]interface{}{"type": "text", "text": block.Text})
+			}
+		case "image_url":
+			if block.ImageURL != nil && strings.TrimSpace(block.ImageURL.URL) != "" {
+				source := anthropicImageSource(block.ImageURL.URL)
+				blocks = append(blocks, map[string]interface{}{
+					"type":   "image",
+					"source": source,
+				})
+			}
+		}
+	}
+	if len(blocks) == 0 {
+		return []map[string]interface{}{{"type": "text", "text": ""}}
+	}
+	return blocks
+}
+
+func anthropicImageSource(rawURL string) map[string]interface{} {
+	rawURL = strings.TrimSpace(rawURL)
+	if strings.HasPrefix(strings.ToLower(rawURL), "data:image/") {
+		header, data, ok := strings.Cut(rawURL, ",")
+		if ok {
+			mediaType := strings.TrimPrefix(header, "data:")
+			mediaType = strings.TrimSuffix(mediaType, ";base64")
+			if mediaType != "" && data != "" {
+				return map[string]interface{}{
+					"type":       "base64",
+					"media_type": mediaType,
+					"data":       data,
+				}
+			}
+		}
+	}
+	return map[string]interface{}{
+		"type": "url",
+		"url":  rawURL,
+	}
 }

@@ -1344,6 +1344,30 @@ func TestRunTurn_RedactsRedactedToolResultsInHistory(t *testing.T) {
 	}
 }
 
+func TestCompactToolResultForHistory_PreservesArtifactReferences(t *testing.T) {
+	content := compactToolResultForHistory("agent_artifacts_create", `{
+		"data": {
+			"id": "art_candidate_1",
+			"kind": "candidate",
+			"name": "extracted candidates",
+			"status": "ready",
+			"skill_run_id": "run_1",
+			"data": {"candidates": [{"id": "candidate-001", "title": "Cap"}]}
+		}
+	}`, "summary", false)
+
+	for _, want := range []string{
+		`"references"`,
+		`"id":"art_candidate_1"`,
+		`"kind":"candidate"`,
+		`"skill_run_id":"run_1"`,
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("compacted tool content missing %q:\n%s", want, content)
+		}
+	}
+}
+
 func TestRunTurn_EmitsRedactedToolProgress(t *testing.T) {
 	llm := &mockLLM{
 		responses: []mockLLMResponse{

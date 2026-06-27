@@ -7,8 +7,8 @@ import (
 
 func TestSellerTools_Count(t *testing.T) {
 	tools := SellerTools()
-	if len(tools) != 35 {
-		t.Errorf("expected 35 seller tools, got %d", len(tools))
+	if len(tools) != 36 {
+		t.Errorf("expected 36 seller tools, got %d", len(tools))
 	}
 }
 
@@ -227,6 +227,32 @@ func TestSellerTools_IncludesProductImportAdvance(t *testing.T) {
 		return
 	}
 	t.Fatal("agent_product_import_advance should be available to product.import")
+}
+
+func TestSellerTools_IncludesProductImportIngest(t *testing.T) {
+	tools := SellerTools()
+	for _, tool := range tools {
+		if tool.Name != "agent_product_import_ingest" {
+			continue
+		}
+		var schema struct {
+			Required   []string               `json:"required"`
+			Properties map[string]interface{} `json:"properties"`
+		}
+		if err := json.Unmarshal(tool.Parameters, &schema); err != nil {
+			t.Fatalf("decode agent_product_import_ingest schema: %v", err)
+		}
+		if !sameStringSet(schema.Required, []string{"sources"}) {
+			t.Fatalf("unexpected required fields: %#v", schema.Required)
+		}
+		for _, field := range []string{"threadId", "storeId", "sources"} {
+			if _, ok := schema.Properties[field]; !ok {
+				t.Fatalf("agent_product_import_ingest schema missing %s", field)
+			}
+		}
+		return
+	}
+	t.Fatal("agent_product_import_ingest should be available to product.import")
 }
 
 func TestSellerTools_IncludesAgentArtifactUpdate(t *testing.T) {

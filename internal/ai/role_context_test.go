@@ -73,6 +73,9 @@ func TestBuildSystemPrompt_WithChatContext(t *testing.T) {
 		SelectedListSlug: "test-product",
 		SelectedOrderID:  "order-123",
 		Locale:           "zh-CN",
+		Attachments: []ChatAttachment{
+			{Name: "product.png", ContentType: "image/png"},
+		},
 	}
 	prompt := BuildSystemPrompt(UserRoleSeller, "My Store", ctx)
 
@@ -90,6 +93,9 @@ func TestBuildSystemPrompt_WithChatContext(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "User locale: zh-CN") {
 		t.Error("missing locale hint")
+	}
+	if !strings.Contains(prompt, "User attached files in this turn: 1") {
+		t.Error("missing attachment hint")
 	}
 }
 

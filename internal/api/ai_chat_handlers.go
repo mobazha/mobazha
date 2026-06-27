@@ -1054,13 +1054,65 @@ func agentChatVisibleMessages(messages []*agentstore.Message) []aipkg.ChatMsg {
 		if role != aipkg.RoleUser && role != aipkg.RoleAssistant {
 			continue
 		}
-		if role == aipkg.RoleAssistant && strings.TrimSpace(msg.Content) == "" {
+		if role == aipkg.RoleAssistant && strings.TrimSpace(msg.ToolCalls) != "" {
+			continue
+		}
+		deliveries := agentChatMessageDeliveries(msg.Deliveries)
+		if role == aipkg.RoleAssistant && strings.TrimSpace(msg.Content) == "" && len(deliveries) == 0 {
 			continue
 		}
 		out = append(out, aipkg.ChatMsg{
-			Role:    role,
-			Content: msg.Content,
+			Role:              role,
+			Content:           msg.Content,
+			AttachmentDisplay: agentChatMessageAttachmentDisplay(msg.AttachmentDisplay),
+			Deliveries:        deliveries,
 		})
+	}
+	return out
+}
+
+func agentChatMessageDeliveries(raw string) []aipkg.ChatDelivery {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var deliveries []aipkg.ChatDelivery
+	if err := json.Unmarshal([]byte(raw), &deliveries); err != nil {
+		return nil
+	}
+	out := make([]aipkg.ChatDelivery, 0, len(deliveries))
+	for _, delivery := range deliveries {
+		delivery.State = strings.TrimSpace(delivery.State)
+		delivery.SkillID = strings.TrimSpace(delivery.SkillID)
+		delivery.SkillRunID = strings.TrimSpace(delivery.SkillRunID)
+		delivery.MessageKey = strings.TrimSpace(delivery.MessageKey)
+		if delivery.State == "" || delivery.MessageKey == "" {
+			continue
+		}
+		out = append(out, delivery)
+	}
+	return out
+}
+
+func agentChatMessageAttachmentDisplay(raw string) []aipkg.ChatAttachmentDisplay {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var items []aipkg.ChatAttachmentDisplay
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return nil
+	}
+	out := make([]aipkg.ChatAttachmentDisplay, 0, len(items))
+	for _, item := range items {
+		item.ArtifactID = strings.TrimSpace(item.ArtifactID)
+		item.Name = strings.TrimSpace(item.Name)
+		item.ContentType = strings.TrimSpace(item.ContentType)
+		item.PreviewURL = strings.TrimSpace(item.PreviewURL)
+		if item.Name == "" && item.ArtifactID == "" {
+			continue
+		}
+		out = append(out, item)
 	}
 	return out
 }
@@ -1080,7 +1132,10 @@ func visibleChatMessages(messages []aipkg.ChatMsg) []aipkg.ChatMsg {
 		if msg.Role == aipkg.RoleTool || msg.Role == aipkg.RoleSystem {
 			continue
 		}
-		if msg.Role == aipkg.RoleAssistant && strings.TrimSpace(msg.Content) == "" {
+		if msg.Role == aipkg.RoleAssistant && len(msg.ToolCalls) > 0 {
+			continue
+		}
+		if msg.Role == aipkg.RoleAssistant && strings.TrimSpace(msg.Content) == "" && len(msg.Deliveries) == 0 {
 			continue
 		}
 		msg.ToolCalls = nil

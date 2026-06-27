@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
-var toolHTTPClient = &http.Client{
-	Timeout: 30 * time.Second,
-}
+// Per-tool contexts from the Agent Runtime are the timeout source of truth.
+// A fixed client timeout would otherwise cancel long-running media tools before
+// their catalog policy deadline.
+var toolHTTPClient = &http.Client{}
 
 // ToolExecutor calls the local Node API to execute tool functions.
 // It uses the same REST API that the MCP Server's HTTPBridge calls.

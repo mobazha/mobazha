@@ -46,6 +46,7 @@ type agentProductImportIngestRequest struct {
 	Intent   string                         `json:"intent,omitempty"`
 	ThreadID string                         `json:"threadId,omitempty"`
 	StoreID  string                         `json:"storeId,omitempty"`
+	Language string                         `json:"language,omitempty"`
 	Files    []agentProductImportIngestFile `json:"files,omitempty"`
 }
 
@@ -1861,7 +1862,7 @@ func (g *Gateway) ingestProductImportSources(ctx context.Context, p aiChatProvid
 					return nil, wrapProductImportIngestError("save_zip_entry_source_artifact", saveErr)
 				}
 				result.SourceArtifacts = append(result.SourceArtifacts, childArtifact)
-				candidates, proposals, validations, saveErr := saveProductImportPreviewArtifacts(ctx, p, run, childArtifact, child)
+				candidates, proposals, validations, saveErr := saveProductImportPreviewArtifacts(ctx, p, run, childArtifact, child, req.Language)
 				if saveErr != nil {
 					return nil, wrapProductImportIngestError("save_zip_entry_preview_artifacts", saveErr)
 				}
@@ -1871,7 +1872,7 @@ func (g *Gateway) ingestProductImportSources(ctx context.Context, p aiChatProvid
 			}
 			continue
 		}
-		candidates, proposals, validations, err := saveProductImportPreviewArtifacts(ctx, p, run, sourceArtifact, source)
+		candidates, proposals, validations, err := saveProductImportPreviewArtifacts(ctx, p, run, sourceArtifact, source, req.Language)
 		if err != nil {
 			return nil, wrapProductImportIngestError("save_preview_artifacts", err)
 		}
@@ -2031,10 +2032,10 @@ func readProductImportZipEntry(file *zip.File) ([]byte, error) {
 	return data, nil
 }
 
-func saveProductImportPreviewArtifacts(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, sourceArtifact *agentstore.Artifact, source agentProductImportIngestSource) ([]*agentstore.Artifact, []*agentstore.Artifact, []*agentstore.Artifact, error) {
+func saveProductImportPreviewArtifacts(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, sourceArtifact *agentstore.Artifact, source agentProductImportIngestSource, language string) ([]*agentstore.Artifact, []*agentstore.Artifact, []*agentstore.Artifact, error) {
 	inputKind := productImportInputKind(source)
 	if inputKind == "image" {
-		return saveProductImportImagePreviewArtifacts(ctx, p, run, sourceArtifact, source)
+		return saveProductImportImagePreviewArtifacts(ctx, p, run, sourceArtifact, source, language)
 	}
 	if inputKind != "csv" && inputKind != "xlsx" {
 		validation, err := saveProductImportValidationArtifact(ctx, p, run, sourceArtifact, source, "parser_not_implemented", fmt.Sprintf("%s ingest is registered; parser will run in a later product.import step.", inputKind))
@@ -2093,8 +2094,8 @@ func saveProductImportPreviewArtifacts(ctx context.Context, p aiChatProvider, ru
 	return candidates, proposals, validations, nil
 }
 
-func saveProductImportImagePreviewArtifacts(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, sourceArtifact *agentstore.Artifact, source agentProductImportIngestSource) ([]*agentstore.Artifact, []*agentstore.Artifact, []*agentstore.Artifact, error) {
-	resp, validationCode, validationMessage := generateProductImportListingFromImage(ctx, p, run, source)
+func saveProductImportImagePreviewArtifacts(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, sourceArtifact *agentstore.Artifact, source agentProductImportIngestSource, language string) ([]*agentstore.Artifact, []*agentstore.Artifact, []*agentstore.Artifact, error) {
+	resp, validationCode, validationMessage := generateProductImportListingFromImage(ctx, p, run, source, language)
 	if validationCode != "" {
 		validation, err := saveProductImportValidationArtifactWithData(ctx, p, run, sourceArtifact, source, validationCode, validationMessage, map[string]any{
 			"requiresAI": true,
@@ -2118,7 +2119,7 @@ func saveProductImportImagePreviewArtifacts(ctx context.Context, p aiChatProvide
 	return []*agentstore.Artifact{candidateArtifact}, []*agentstore.Artifact{proposalArtifact}, nil, nil
 }
 
-func generateProductImportListingFromImage(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, source agentProductImportIngestSource) (*aipkg.GenerateResponse, string, string) {
+func generateProductImportListingFromImage(ctx context.Context, p aiChatProvider, run *agentstore.SkillRun, source agentProductImportIngestSource, language string) (*aipkg.GenerateResponse, string, string) {
 	dataURL, err := productImportImageDataURL(source)
 	if err != nil {
 		return nil, "image_inline_failed", err.Error()
@@ -2127,7 +2128,7 @@ func generateProductImportListingFromImage(ctx context.Context, p aiChatProvider
 		Action:       "generate_from_images",
 		Images:       []string{dataURL},
 		ContractType: "PHYSICAL_GOOD",
-		Language:     "zh",
+		Language:     productImportGenerateLanguage(language),
 	}
 	cfg, err := p.AIConfigForGenerate(req)
 	if err != nil {
@@ -2176,6 +2177,17 @@ func generateProductImportListingFromImage(ctx context.Context, p aiChatProvider
 		}
 	}
 	return resp, "", ""
+}
+
+func productImportGenerateLanguage(language string) string {
+	language = strings.ToLower(strings.TrimSpace(language))
+	if language == "" {
+		return ""
+	}
+	if idx := strings.IndexAny(language, "-_"); idx > 0 {
+		language = language[:idx]
+	}
+	return language
 }
 
 func productImportImageDataURL(source agentProductImportIngestSource) (string, error) {

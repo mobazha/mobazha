@@ -396,7 +396,7 @@ func TestAgentChatTurnOptions_LoadsPrivateSkillProviderFromEnv(t *testing.T) {
 	}
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
 
-	opts, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "store_1")
+	opts, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func TestAgentChatTurnOptions_LoadsReferencedArtifactsAsContext(t *testing.T) {
 		Context: &aipkg.ChatContext{
 			ArtifactIDs: []string{"art_source", "art_source"},
 		},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +529,7 @@ func TestAgentChatTurnOptions_LoadsReferencedSkillRunAsContext(t *testing.T) {
 		Context: &aipkg.ChatContext{
 			SkillRunIDs: []string{"run_import", "run_import"},
 		},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -571,7 +571,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedSkillRun(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "继续处理这批",
 		Context: &aipkg.ChatContext{SkillRunIDs: []string{"missing_run"}},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "missing_run") {
 		t.Fatalf("expected missing skill run error, got %v", err)
 	}
@@ -588,7 +588,7 @@ func TestAgentChatTurnOptions_RejectsTooManyReferencedSkillRuns(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "继续处理这些批次",
 		Context: &aipkg.ChatContext{SkillRunIDs: []string{"run_1", "run_2", "run_3", "run_4"}},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "too many skillRunIds") {
 		t.Fatalf("expected too many skillRunIds error, got %v", err)
 	}
@@ -605,7 +605,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "使用这个素材",
 		Context: &aipkg.ChatContext{ArtifactIDs: []string{"missing_artifact"}},
-	}, "tenant_1", "actor_1", "store_1")
+	}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "missing_artifact") {
 		t.Fatalf("expected missing artifact error, got %v", err)
 	}
@@ -617,7 +617,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", "")
 
-	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
 		t.Fatalf("expected missing skills dir error, got %v", err)
 	}
@@ -626,14 +626,14 @@ func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 func TestAgentChatTurnOptions_RequiresAccessibleSellerSkillDir(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", filepath.Join(t.TempDir(), "missing"))
 
-	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "not accessible") {
 		t.Fatalf("expected inaccessible skills dir error, got %v", err)
 	}
 
 	emptyDir := t.TempDir()
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", emptyDir)
-	_, err = agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
+	_, err = agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "no seller skills") {
 		t.Fatalf("expected empty seller skills dir error, got %v", err)
 	}
@@ -715,6 +715,31 @@ func TestAgentChatSSEEventFromToolEvent_PreservesErrorResult(t *testing.T) {
 	}
 	if result["error"] != "backend returned 500: sales unavailable" {
 		t.Fatalf("unexpected error result: %#v", result)
+	}
+}
+
+func TestAgentChatSSEEventFromDeliveryEvent_PreservesStructuredOutcome(t *testing.T) {
+	event := agentChatSSEEventFromDeliveryEvent(&agentstream.DeliveryEvent{
+		State:      "needs_review",
+		SkillID:    "product.import",
+		SkillRunID: "run_1",
+		MessageKey: "product_import.needs_review",
+		Data:       json.RawMessage(`{"counts":{"proposalCount":1}}`),
+	})
+
+	if event.Type != aipkg.SSETypeDelivery {
+		t.Fatalf("event type = %q, want delivery", event.Type)
+	}
+	if event.State != "needs_review" || event.SkillID != "product.import" || event.SkillRunID != "run_1" || event.MessageKey != "product_import.needs_review" {
+		t.Fatalf("unexpected delivery event: %#v", event)
+	}
+	data, ok := event.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("expected delivery data map, got %#v", event.Data)
+	}
+	counts, ok := data["counts"].(map[string]any)
+	if !ok || counts["proposalCount"] != float64(1) {
+		t.Fatalf("unexpected delivery counts: %#v", data)
 	}
 }
 
@@ -993,9 +1018,31 @@ func TestAgentChatAttachmentsAnalyzeArgumentsWithAttachments_InjectsCurrentTurnA
 	}
 }
 
+func TestAgentChatAttachmentDisplayJSON_UsesArtifactIDsWhenAttachmentIDMissing(t *testing.T) {
+	raw := agentChatAttachmentDisplayJSON(&aipkg.ChatContext{
+		ArtifactIDs: []string{"art_img_1"},
+		Attachments: []aipkg.ChatAttachment{{
+			Name:        "cover.jpg",
+			ContentType: "image/jpeg",
+		}},
+	})
+	var items []aipkg.ChatAttachmentDisplay
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one attachment display item, got %#v", items)
+	}
+	if items[0].ArtifactID != "art_img_1" || items[0].Name != "cover.jpg" || items[0].ContentType != "image/jpeg" {
+		t.Fatalf("unexpected attachment display item: %#v", items[0])
+	}
+}
+
 func TestAgentChatProductImportIngestArgumentsWithAttachments_InjectsCurrentTurnImage(t *testing.T) {
 	args, err := agentChatProductImportIngestArgumentsWithAttachments(
-		`{"threadId":"thread_1","sources":[{"sourceName":"midnight-waves-cover.jpg","contentType":"image/jpeg"}]}`,
+		`{"threadId":"current","sources":[{"sourceName":"midnight-waves-cover.jpg","contentType":"image/jpeg"}]}`,
+		"thread_1",
+		"en",
 		[]aipkg.ChatAttachment{{
 			ID:            "artifact_img",
 			Name:          "midnight-waves-cover.jpg",
@@ -1021,11 +1068,19 @@ func TestAgentChatProductImportIngestArgumentsWithAttachments_InjectsCurrentTurn
 	if source["contentBase64"] != "/9j/4AAQ" || source["attachmentId"] != "artifact_img" {
 		t.Fatalf("attachment payload was not injected: %#v", source)
 	}
+	if parsed["threadId"] != "thread_1" {
+		t.Fatalf("expected runtime thread id to override model thread id, got %#v", parsed["threadId"])
+	}
+	if parsed["language"] != "en" {
+		t.Fatalf("expected runtime language to be injected, got %#v", parsed["language"])
+	}
 }
 
 func TestAgentChatProductImportIngestArgumentsWithAttachments_UsesAttachmentIDForMultipleFiles(t *testing.T) {
 	args, err := agentChatProductImportIngestArgumentsWithAttachments(
 		`{"sources":[{"attachmentId":"att_b","sourceName":"b.jpg"}]}`,
+		"thread_1",
+		"en",
 		[]aipkg.ChatAttachment{
 			{ID: "att_a", Name: "a.jpg", ContentType: "image/jpeg", ContentBase64: "aaa"},
 			{ID: "att_b", Name: "b.jpg", ContentType: "image/jpeg", ContentBase64: "bbb"},
@@ -1051,6 +1106,8 @@ func TestAgentChatProductImportIngestArgumentsWithAttachments_UsesAttachmentIDFo
 func TestAgentChatProductImportIngestArgumentsWithAttachments_DefaultsToCurrentTurnAttachments(t *testing.T) {
 	args, err := agentChatProductImportIngestArgumentsWithAttachments(
 		`{"threadId":"thread_1"}`,
+		"thread_1",
+		"en",
 		[]aipkg.ChatAttachment{{
 			ID:            "att_only",
 			Name:          "product.png",
@@ -1219,12 +1276,12 @@ func TestHandlePOSTAgentChat_ProductImportSkillRestrictsTools(t *testing.T) {
 		}
 	}
 	toolNames := openAIToolNames(t, upstreamReq)
-	for _, want := range []string{"listings_get_template", "listings_list_mine", "listings_get", "agent_skill_runs_create", "agent_skill_runs_list", "agent_skill_runs_get", "agent_skill_runs_update", "agent_artifacts_list", "agent_artifacts_get", "agent_artifacts_create", "agent_artifacts_update", "listings_create", "listings_update", "collections_list", "collections_create", "exchange_rates_get"} {
+	for _, want := range []string{"listings_get_template", "listings_list_mine", "listings_get", "agent_skill_runs_list", "agent_skill_runs_get", "agent_skill_runs_update", "agent_artifacts_list", "agent_artifacts_get", "agent_artifacts_create", "agent_artifacts_update", "listings_create", "listings_update", "collections_list", "collections_create", "exchange_rates_get"} {
 		if !containsString(toolNames, want) {
 			t.Fatalf("expected granted product import tool %s, got %#v", want, toolNames)
 		}
 	}
-	for _, forbidden := range []string{"orders_refund", "listings_delete", "chat_send_message"} {
+	for _, forbidden := range []string{"agent_skill_runs_create", "orders_refund", "listings_delete", "chat_send_message"} {
 		if containsString(toolNames, forbidden) {
 			t.Fatalf("tool %s should not be exposed for product.import, got %#v", forbidden, toolNames)
 		}
@@ -1927,6 +1984,7 @@ func TestHandlePOSTAgentProductImportIngest_ImageCreatesVisionProposal(t *testin
 	}
 	body := strings.NewReader(`{
 		"intent":"product_import",
+		"language":"en-US",
 		"files":[{
 			"sourceName":"midnight-waves-cover.png",
 			"contentType":"image/png",
@@ -1967,6 +2025,20 @@ func TestHandlePOSTAgentProductImportIngest_ImageCreatesVisionProposal(t *testin
 	for _, want := range []string{`"title":"Midnight Waves Cover"`, `"ai_vision_generate_from_images"`, `"price is missing"`} {
 		if !strings.Contains(proposal.Data, want) {
 			t.Fatalf("image proposal data missing %q: %s", want, proposal.Data)
+		}
+	}
+}
+
+func TestProductImportGenerateLanguage(t *testing.T) {
+	tests := map[string]string{
+		"":      "",
+		"zh-CN": "zh",
+		"en-US": "en",
+		"es_ES": "es",
+	}
+	for input, want := range tests {
+		if got := productImportGenerateLanguage(input); got != want {
+			t.Fatalf("productImportGenerateLanguage(%q) = %q, want %q", input, got, want)
 		}
 	}
 }

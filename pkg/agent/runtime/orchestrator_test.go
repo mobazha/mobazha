@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -678,10 +679,10 @@ Always create reviewable proposals before apply.
 		}
 	}
 	tools := llm.captured[0].tools
-	if len(tools) != 3 {
-		t.Fatalf("expected two granted tools plus use_skill_tool, got %#v", tools)
+	if len(tools) != 2 {
+		t.Fatalf("expected two granted tools, got %#v", tools)
 	}
-	if tools[0].Name != "listings_get_template" || tools[1].Name != "listings_create" || tools[2].Name != runtimeUseSkillToolName {
+	if tools[0].Name != "listings_get_template" || tools[1].Name != "listings_create" {
 		t.Fatalf("unexpected granted tool set: %#v", tools)
 	}
 	if strings.Contains(system.Content, "orders_refund") {
@@ -700,7 +701,7 @@ func TestRunTurnWithOptions_MissingSkillDoesNotSaveTurn(t *testing.T) {
 		}), 5*time.Second, 0),
 		persist,
 		&telemetry.BufferEmitter{},
-		nil,
+		&Config{MaxHistoryMsgs: 3},
 	)
 
 	_, err := orch.RunTurnWithOptions(context.Background(), "tenant_1", "th_1", "import products", TurnOptions{
@@ -846,10 +847,13 @@ Always create reviewable proposals before apply.
 		t.Fatalf("first turn should expose only use_skill_tool before skill activation, got %#v", firstTools)
 	}
 	secondTools := toolDefNames(llm.captured[1].tools)
-	for _, want := range []string{runtimeUseSkillToolName, "listings_get_template", "listings_create"} {
+	for _, want := range []string{"listings_get_template", "listings_create"} {
 		if !containsToolDef(secondTools, want) {
 			t.Fatalf("second turn missing %s, got %#v", want, secondTools)
 		}
+	}
+	if containsToolDef(secondTools, runtimeUseSkillToolName) {
+		t.Fatalf("skill router should be hidden after all available skills are active: %#v", secondTools)
 	}
 	if containsToolDef(secondTools, "orders_refund") {
 		t.Fatalf("second turn should not expose refund after product.import activation: %#v", secondTools)
@@ -1227,6 +1231,12 @@ func TestRunTurn_WithToolCalls(t *testing.T) {
 	}
 	if combined == "" {
 		t.Error("expected non-empty output")
+	}
+	if strings.Contains(combined, "Let me search") {
+		t.Fatalf("tool-call planning text should not be user-visible: %q", combined)
+	}
+	if !strings.Contains(combined, "Based on the search") {
+		t.Fatalf("expected final delivery text, got %q", combined)
 	}
 
 	batchEvents := emitter.ByType(telemetry.ToolCallBatch)
@@ -1613,6 +1623,391 @@ func TestRunTurn_MaxToolRoundsExceeded(t *testing.T) {
 	if streamErr == nil {
 		t.Fatal("expected max rounds error")
 	}
+}
+
+type testDeliveryResolver struct {
+	outcome *DeliveryOutcome
+}
+
+type testDeliveryResolverByTool map[string]*DeliveryOutcome
+
+func (r testDeliveryResolverByTool) ResolveDelivery(_ context.Context, result exec.ToolResult) (*DeliveryOutcome, error) {
+	return r[result.Name], nil
+}
+
+func (r testDeliveryResolver) ResolveDelivery(_ context.Context, result exec.ToolResult) (*DeliveryOutcome, error) {
+	if result.Name != "agent_product_import_advance" {
+		return nil, nil
+	}
+	return r.outcome, nil
+}
+
+func TestRunTurn_DeliveryOutcomeCompletesFromStructuredEvent(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "product.import")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "skill.md"), []byte(`---
+name: product.import
+description: Import local product materials.
+persona: seller
+capabilities: agent.artifact.read, agent.artifact.write
+---
+
+# Product Import
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const advanceToolName = "agent_product_import_advance"
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{
+				{ToolCalls: []stream.ToolCall{{ID: "tc_advance", Name: advanceToolName, Arguments: `{"runId":"run_1"}`}}},
+			}},
+			{chunks: []stream.Chunk{
+				{Delta: `Let me inspect the proposal details. <｜｜DSML｜｜tool_calls><｜｜DSML｜｜invoke name="agent_artifacts_get"><｜｜DSML｜｜parameter name="artifactId" string="true">art_1</｜｜DSML｜｜parameter></｜｜DSML｜｜invoke></｜｜DSML｜｜tool_calls>`},
+				{ToolCalls: []stream.ToolCall{{ID: "tc_get", Name: "agent_artifacts_get", Arguments: `{"artifactId":"art_1"}`}}},
+			}},
+		},
+	}
+	emitter := &telemetry.BufferEmitter{}
+	orch := newTestOrch(llm, emitter)
+	orch.RegisterTools([]ToolDef{
+		{Name: advanceToolName, Description: "Advance product import", Schema: `{}`},
+		{Name: "agent_artifacts_get", Description: "Get artifact", Schema: `{}`},
+		{Name: "agent_artifacts_update", Description: "Update artifact", Schema: `{}`},
+	})
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "t1", "th_terminal", "import products", TurnOptions{
+		SkillProvider:   agentskill.NewFilesystemProvider(dir),
+		RequestedSkills: []string{"product.import"},
+		DeliveryResolver: testDeliveryResolver{outcome: &DeliveryOutcome{
+			State:      DeliveryStateNeedsReview,
+			SkillID:    "product.import",
+			SkillRunID: "run_1",
+			MessageKey: "product_import.needs_review",
+			Context:    `{"status":"waiting_for_review","proposalCount":1}`,
+		}},
+		ToolCatalog: kernel.NewStaticToolCatalog([]kernel.ToolMetadata{
+			{
+				Name:            advanceToolName,
+				Description:     "Advance product import",
+				Risk:            kernel.RiskDraft,
+				Approval:        kernel.ApprovalNone,
+				SideEffect:      kernel.SideEffectMutable,
+				Capabilities:    []kernel.Capability{kernel.CapabilityAgentArtifactWrite},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "agent_artifacts_get",
+				Description:     "Get artifact",
+				Risk:            kernel.RiskRead,
+				Approval:        kernel.ApprovalNone,
+				SideEffect:      kernel.SideEffectNone,
+				Capabilities:    []kernel.Capability{kernel.CapabilityAgentArtifactRead},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+			{
+				Name:            "agent_artifacts_update",
+				Description:     "Update artifact",
+				Risk:            kernel.RiskDraft,
+				Approval:        kernel.ApprovalNone,
+				SideEffect:      kernel.SideEffectMutable,
+				Capabilities:    []kernel.Capability{kernel.CapabilityAgentArtifactWrite},
+				AllowedSkills:   []kernel.SkillID{kernel.SkillProductImport},
+				AllowedPersonas: []kernel.Persona{kernel.PersonaSeller},
+			},
+		}),
+		Scope: kernel.Scope{ActingPersona: kernel.PersonaSeller},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("unexpected stream error: %v", streamErr)
+	}
+	if len(llm.captured) != 1 {
+		t.Fatalf("expected one llm call, got %d", len(llm.captured))
+	}
+	initialTools := toolNames(llm.captured[0].tools)
+	for _, want := range []string{advanceToolName, "agent_artifacts_get", "agent_artifacts_update"} {
+		if !containsString(initialTools, want) {
+			t.Fatalf("expected first call tools to include %s, got %#v", want, initialTools)
+		}
+	}
+	text := collectStreamText(chunks)
+	if text != "" {
+		t.Fatalf("structured delivery should not emit backend-authored copy, got %q", text)
+	}
+	if strings.Contains(text, "DSML") || strings.Contains(text, "tool_calls") || strings.Contains(text, "agent_artifacts_get") {
+		t.Fatalf("internal tool markup leaked to stream: %q", text)
+	}
+	if strings.Contains(text, "Let me inspect") {
+		t.Fatalf("tool-call planning text should not be user-visible: %q", text)
+	}
+	var deliveryEvents []*stream.DeliveryEvent
+	for _, chunk := range chunks {
+		if chunk.DeliveryEvent != nil {
+			deliveryEvents = append(deliveryEvents, chunk.DeliveryEvent)
+		}
+	}
+	if len(deliveryEvents) != 1 || deliveryEvents[0].State != string(DeliveryStateNeedsReview) || deliveryEvents[0].SkillRunID != "run_1" || deliveryEvents[0].MessageKey != "product_import.needs_review" {
+		t.Fatalf("expected one structured delivery event, got %#v", deliveryEvents)
+	}
+	if string(deliveryEvents[0].Data) != `{"status":"waiting_for_review","proposalCount":1}` {
+		t.Fatalf("unexpected delivery data: %s", deliveryEvents[0].Data)
+	}
+	if blocked := emitter.ByType(telemetry.GuardrailBlocked); len(blocked) != 0 {
+		t.Fatalf("final model round should not run after structured delivery, got %#v", blocked)
+	}
+}
+
+func TestRunTurn_DeliveryOutcomeDoesNotWaitForFinalText(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{
+		{chunks: []stream.Chunk{{ToolCalls: []stream.ToolCall{{ID: "tc_advance", Name: "agent_product_import_advance", Arguments: `{}`}}}}},
+		{chunks: []stream.Chunk{{Delta: "Let me inspect the proposal details."}}},
+	}}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, call exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{CallID: call.ID, Name: call.Name, Content: `{"status":"waiting_for_review"}`}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		nil,
+	)
+	orch.RegisterTools([]ToolDef{{Name: "agent_product_import_advance", Description: "Advance workflow", Schema: `{}`}})
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "t1", "th_delivery_validation", "advance", TurnOptions{
+		DeliveryResolver: testDeliveryResolver{outcome: &DeliveryOutcome{
+			State:      DeliveryStateNeedsReview,
+			SkillID:    "product.import",
+			SkillRunID: "run_1",
+			MessageKey: "product_import.needs_review",
+			Context:    `{"status":"waiting_for_review","proposalCount":1}`,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("unexpected stream error: %v", streamErr)
+	}
+	if len(llm.captured) != 1 {
+		t.Fatalf("expected structured delivery to stop after one model call, got %d", len(llm.captured))
+	}
+	if text := collectStreamText(chunks); text != "" {
+		t.Fatalf("structured delivery should not emit backend-authored copy, got %q", text)
+	}
+}
+
+func TestRunTurn_MultipleDeliveryOutcomesPersistAndReplaySafely(t *testing.T) {
+	const (
+		firstTool  = "first_delivery_tool"
+		secondTool = "second_delivery_tool"
+	)
+	llm := &mockLLM{responses: []mockLLMResponse{
+		{chunks: []stream.Chunk{{ToolCalls: []stream.ToolCall{
+			{ID: "tc_first", Name: firstTool, Arguments: `{}`},
+			{ID: "tc_second", Name: secondTool, Arguments: `{}`},
+		}}}},
+		{chunks: []stream.Chunk{{Delta: "Follow-up complete."}}},
+	}}
+	persist := &fakePersistence{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, call exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{CallID: call.ID, Name: call.Name, Content: `{}`}, nil
+		}), 5*time.Second, 0),
+		persist,
+		&telemetry.BufferEmitter{},
+		nil,
+	)
+	orch.RegisterTools([]ToolDef{
+		{Name: firstTool, Description: "First delivery", Schema: `{}`},
+		{Name: secondTool, Description: "Second delivery", Schema: `{}`},
+	})
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "t1", "th_multi_delivery", "run both", TurnOptions{
+		DeliveryResolver: testDeliveryResolverByTool{
+			firstTool: {
+				State: DeliveryStateNeedsReview, SkillID: "product.import", SkillRunID: "run_1",
+				MessageKey: "product_import.needs_review", Context: `{"reviewableCount":1}`,
+			},
+			secondTool: {
+				State: DeliveryStateCompleted, SkillID: "product.import", SkillRunID: "run_2",
+				MessageKey: "product_import.completed", Context: `{"proposalCount":2}`,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("run delivery turn: %v", err)
+	}
+	chunks, err := stream.Collect(result.Output)
+	if err != nil {
+		t.Fatalf("collect delivery turn: %v", err)
+	}
+	var deliveryEvents []*stream.DeliveryEvent
+	for _, chunk := range chunks {
+		if chunk.DeliveryEvent != nil {
+			deliveryEvents = append(deliveryEvents, chunk.DeliveryEvent)
+		}
+	}
+	if len(deliveryEvents) != 2 || deliveryEvents[0].SkillRunID != "run_1" || deliveryEvents[1].SkillRunID != "run_2" {
+		t.Fatalf("expected both ordered delivery events, got %#v", deliveryEvents)
+	}
+
+	var persisted *store.Message
+	for _, message := range persist.messages {
+		if message.Deliveries != "" {
+			persisted = message
+			break
+		}
+	}
+	if persisted == nil {
+		t.Fatal("expected a persisted delivery-only assistant message")
+	}
+	var storedEvents []*stream.DeliveryEvent
+	if err := json.Unmarshal([]byte(persisted.Deliveries), &storedEvents); err != nil {
+		t.Fatalf("decode persisted deliveries: %v", err)
+	}
+	if len(storedEvents) != 2 || storedEvents[0].SkillRunID != "run_1" || storedEvents[1].SkillRunID != "run_2" {
+		t.Fatalf("unexpected persisted deliveries: %#v", storedEvents)
+	}
+
+	followUp, err := orch.RunTurn(context.Background(), "t1", "th_multi_delivery", "continue")
+	if err != nil {
+		t.Fatalf("run follow-up: %v", err)
+	}
+	if _, err := stream.Collect(followUp.Output); err != nil {
+		t.Fatalf("collect follow-up: %v", err)
+	}
+	foundToolCallMessage := false
+	for _, message := range llm.captured[1].messages {
+		if message.Role == "assistant" && strings.TrimSpace(message.Content) == "" && len(message.ToolCalls) == 0 {
+			t.Fatalf("delivery-only UI message must not enter model replay: %#v", llm.captured[1].messages)
+		}
+		if message.Role == "assistant" && len(message.ToolCalls) == 2 {
+			foundToolCallMessage = true
+		}
+	}
+	if !foundToolCallMessage {
+		t.Fatalf("delivery-only message must not consume replay limit: %#v", llm.captured[1].messages)
+	}
+}
+
+func TestRunTurn_StructuredDeliverySkipsFinalModelCall(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{
+		ToolCalls: []stream.ToolCall{{ID: "tc_advance", Name: "agent_product_import_advance", Arguments: `{}`}},
+	}}}}}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(_ context.Context, call exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{CallID: call.ID, Name: call.Name, Content: `{"status":"waiting_for_review"}`}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		nil,
+	)
+	orch.RegisterTools([]ToolDef{{Name: "agent_product_import_advance", Description: "Advance", Schema: `{}`}})
+
+	result, err := orch.RunTurnWithOptions(context.Background(), "t1", "th_deterministic_delivery", "import", TurnOptions{
+		DeliveryResolver: testDeliveryResolver{outcome: &DeliveryOutcome{
+			State:      DeliveryStateNeedsReview,
+			SkillID:    "product.import",
+			SkillRunID: "run_1",
+			MessageKey: "product_import.needs_review",
+			Context:    `{"status":"waiting_for_review"}`,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("unexpected stream error: %v", streamErr)
+	}
+	if len(llm.captured) != 1 {
+		t.Fatalf("expected one model call, got %d", len(llm.captured))
+	}
+	if text := collectStreamText(chunks); text != "" {
+		t.Fatalf("unexpected backend-authored delivery text: %q", text)
+	}
+	if events := emitter.ByType(telemetry.DeliveryResolved); len(events) != 1 {
+		t.Fatalf("expected delivery resolved telemetry, got %#v", events)
+	}
+}
+
+func TestRunTurn_InternalToolMarkupWithoutStructuredCallRetriesCleanly(t *testing.T) {
+	llm := &mockLLM{
+		responses: []mockLLMResponse{
+			{chunks: []stream.Chunk{
+				{Delta: `I will inspect it now. <｜｜DSML｜｜tool_calls><｜｜DSML｜｜invoke name="agent_artifacts_get"></｜｜DSML｜｜invoke></｜｜DSML｜｜tool_calls>`},
+			}},
+			{chunks: []stream.Chunk{
+				{Delta: "The import workflow has been updated and is ready for review."},
+			}},
+		},
+	}
+	emitter := &telemetry.BufferEmitter{}
+	orch := newTestOrch(llm, emitter)
+
+	result, err := orch.RunTurn(context.Background(), "t1", "th_markup_retry", "show import result")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunks, streamErr := stream.Collect(result.Output)
+	if streamErr != nil {
+		t.Fatalf("unexpected stream error: %v", streamErr)
+	}
+	if len(llm.captured) != 2 {
+		t.Fatalf("expected retry after blocked internal markup, got %d calls", len(llm.captured))
+	}
+	text := collectStreamText(chunks)
+	if !strings.Contains(text, "ready for review") {
+		t.Fatalf("expected clean retry response, got %q", text)
+	}
+	if strings.Contains(text, "DSML") || strings.Contains(text, "tool_calls") || strings.Contains(text, "agent_artifacts_get") {
+		t.Fatalf("internal tool markup leaked to stream: %q", text)
+	}
+	if blocked := emitter.ByType(telemetry.GuardrailBlocked); len(blocked) == 0 || blocked[0].Attrs["stage"] != "internal_tool_markup" {
+		t.Fatalf("expected internal tool markup guardrail telemetry, got %#v", blocked)
+	}
+}
+
+func toolNames(tools []ToolDef) []string {
+	out := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		out = append(out, tool.Name)
+	}
+	return out
+}
+
+func containsString(items []string, target string) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
+}
+
+func collectStreamText(chunks []stream.Chunk) string {
+	var text strings.Builder
+	for _, chunk := range chunks {
+		text.WriteString(chunk.Delta)
+	}
+	return text.String()
 }
 
 // --- New tests for P0 features ---

@@ -4,22 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
 )
 
 // Chunk represents an incremental output fragment from the LLM.
 type Chunk struct {
-	Delta      string     `json:"delta,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolEvent  *ToolEvent `json:"tool_event,omitempty"`
-	FinishFlag string     `json:"finish_flag,omitempty"`
-	Error      error      `json:"-"`
+	Delta         string         `json:"delta,omitempty"`
+	ToolCalls     []ToolCall     `json:"tool_calls,omitempty"`
+	ToolEvent     *ToolEvent     `json:"tool_event,omitempty"`
+	DeliveryEvent *DeliveryEvent `json:"delivery_event,omitempty"`
+	FinishFlag    string         `json:"finish_flag,omitempty"`
+	Error         error          `json:"-"`
 }
 
 // ToolCall represents a single tool invocation requested by the model.
 type ToolCall struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	Arguments string        `json:"arguments"`
+	Timeout   time.Duration `json:"-"`
 }
 
 // ToolEvent is a redacted progress event for UI transparency. Tool arguments and
@@ -30,6 +33,16 @@ type ToolEvent struct {
 	Name   string          `json:"name"`
 	Status string          `json:"status"`
 	Result json.RawMessage `json:"result,omitempty"`
+}
+
+// DeliveryEvent reports a resolved business outcome independently from the
+// assistant's textual rendering, so clients can render stable workflow UI.
+type DeliveryEvent struct {
+	State      string          `json:"state"`
+	SkillID    string          `json:"skillId,omitempty"`
+	SkillRunID string          `json:"skillRunId,omitempty"`
+	MessageKey string          `json:"messageKey,omitempty"`
+	Data       json.RawMessage `json:"data,omitempty"`
 }
 
 // Stream is a pull-based iterator over incremental chunks.

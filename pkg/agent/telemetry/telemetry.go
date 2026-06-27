@@ -22,6 +22,8 @@ const (
 	TurnCompleted          = "turn_completed"
 	TurnFailed             = "turn_failed"
 	GuardrailBlocked       = "guardrail_blocked"
+	DeliveryResolved       = "delivery_resolved"
+	DeliveryResolveFailed  = "delivery_resolve_failed"
 	LLMRetried             = "llm_retried"
 	MemoryRetrieved        = "memory_retrieved"
 	MemoryRetrievalFailed  = "memory_retrieval_failed"

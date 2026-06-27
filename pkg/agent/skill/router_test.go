@@ -34,6 +34,26 @@ func TestSkillRouter_PreselectsFromManifestExamples(t *testing.T) {
 	}
 }
 
+func TestSkillRouter_PreselectsFromExplicitSkillNameInRequest(t *testing.T) {
+	dir := t.TempDir()
+	writeSkillWithExamples(t, dir, "product.import", "seller", []string{"import product csv"})
+
+	router := NewSkillRouter(NewFilesystemProvider(dir))
+	decision, err := router.Route(context.Background(), RouteInput{
+		Text:   "Create a product import draft from the attached image",
+		Filter: Filter{Persona: "seller"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decision.RequestedSkills) != 1 || decision.RequestedSkills[0] != "product.import" {
+		t.Fatalf("expected product.import, got %#v", decision)
+	}
+	if len(decision.Preselected) != 1 || decision.Preselected[0].Source != "name" {
+		t.Fatalf("expected name preselection, got %#v", decision.Preselected)
+	}
+}
+
 func TestSkillRouter_SkipsAmbiguousMatches(t *testing.T) {
 	dir := t.TempDir()
 	writeSkillWithExamples(t, dir, "product.import", "seller", []string{"import product csv"})

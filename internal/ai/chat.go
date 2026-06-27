@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -16,12 +17,32 @@ const (
 
 // ChatMsg is a single message in a conversation, stored in DB and sent to LLM.
 type ChatMsg struct {
-	Role          ChatRole           `json:"role"`
-	Content       string             `json:"content,omitempty"`
-	ContentBlocks []ChatContentBlock `json:"contentBlocks,omitempty"`
-	ToolCalls     []ToolCall         `json:"tool_calls,omitempty"`
-	ToolCallID    string             `json:"tool_call_id,omitempty"`
-	Name          string             `json:"name,omitempty"`
+	Role              ChatRole                `json:"role"`
+	Content           string                  `json:"content,omitempty"`
+	ContentBlocks     []ChatContentBlock      `json:"contentBlocks,omitempty"`
+	AttachmentDisplay []ChatAttachmentDisplay `json:"attachmentDisplay,omitempty"`
+	Deliveries        []ChatDelivery          `json:"deliveries,omitempty"`
+	ToolCalls         []ToolCall              `json:"tool_calls,omitempty"`
+	ToolCallID        string                  `json:"tool_call_id,omitempty"`
+	Name              string                  `json:"name,omitempty"`
+}
+
+// ChatDelivery is a persisted structured business outcome rendered by chat clients.
+type ChatDelivery struct {
+	State      string          `json:"state"`
+	SkillID    string          `json:"skillId,omitempty"`
+	SkillRunID string          `json:"skillRunId,omitempty"`
+	MessageKey string          `json:"messageKey"`
+	Data       json.RawMessage `json:"data,omitempty"`
+}
+
+// ChatAttachmentDisplay is safe UI metadata for rendering user-turn
+// attachments in conversation history. It intentionally excludes file bytes.
+type ChatAttachmentDisplay struct {
+	ArtifactID  string `json:"artifactId,omitempty"`
+	Name        string `json:"name"`
+	ContentType string `json:"contentType,omitempty"`
+	PreviewURL  string `json:"previewUrl,omitempty"`
 }
 
 // ChatContentBlock is a multimodal chat block for providers that support
@@ -71,13 +92,14 @@ type ChatRequest struct {
 
 // ChatContext carries optional UI hints (not used for authz).
 type ChatContext struct {
-	CurrentPage      string           `json:"currentPage,omitempty"`
-	SelectedListSlug string           `json:"selectedListingSlug,omitempty"`
-	SelectedOrderID  string           `json:"selectedOrderId,omitempty"`
-	Locale           string           `json:"locale,omitempty"`
-	ArtifactIDs      []string         `json:"artifactIds,omitempty"`
-	SkillRunIDs      []string         `json:"skillRunIds,omitempty"`
-	Attachments      []ChatAttachment `json:"attachments,omitempty"`
+	CurrentPage       string           `json:"currentPage,omitempty"`
+	SelectedListSlug  string           `json:"selectedListingSlug,omitempty"`
+	SelectedOrderID   string           `json:"selectedOrderId,omitempty"`
+	Locale            string           `json:"locale,omitempty"`
+	LatestUserMessage string           `json:"-"`
+	ArtifactIDs       []string         `json:"artifactIds,omitempty"`
+	SkillRunIDs       []string         `json:"skillRunIds,omitempty"`
+	Attachments       []ChatAttachment `json:"attachments,omitempty"`
 }
 
 // ChatAttachment describes a file the user attached to the current chat turn.
@@ -96,14 +118,19 @@ type ChatAttachment struct {
 
 // SSEEvent is a server-sent event payload for the chat stream.
 type SSEEvent struct {
-	Type      string      `json:"type"`
-	Content   string      `json:"content,omitempty"`
-	Tool      string      `json:"tool,omitempty"`
-	ToolID    string      `json:"toolId,omitempty"`
-	Args      interface{} `json:"args,omitempty"`
-	Result    interface{} `json:"result,omitempty"`
-	SessionID string      `json:"sessionId,omitempty"`
-	Error     string      `json:"error,omitempty"`
+	Type       string      `json:"type"`
+	Content    string      `json:"content,omitempty"`
+	Tool       string      `json:"tool,omitempty"`
+	ToolID     string      `json:"toolId,omitempty"`
+	Args       interface{} `json:"args,omitempty"`
+	Result     interface{} `json:"result,omitempty"`
+	State      string      `json:"state,omitempty"`
+	SkillID    string      `json:"skillId,omitempty"`
+	SkillRunID string      `json:"skillRunId,omitempty"`
+	MessageKey string      `json:"messageKey,omitempty"`
+	Data       interface{} `json:"data,omitempty"`
+	SessionID  string      `json:"sessionId,omitempty"`
+	Error      string      `json:"error,omitempty"`
 }
 
 const (
@@ -111,6 +138,7 @@ const (
 	SSETypeContent    = "content"
 	SSETypeToolCall   = "tool_call"
 	SSETypeToolResult = "tool_result"
+	SSETypeDelivery   = "delivery"
 	SSETypeDone       = "done"
 	SSETypeError      = "error"
 )

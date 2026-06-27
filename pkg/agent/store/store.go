@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -822,8 +823,70 @@ func (p *GormPersistence) DeleteThread(_ context.Context, tenantID, threadID str
 
 func sanitizeMessage(m Message) Message {
 	m.Content = sanitizeJSONText(m.Content)
+	m.AttachmentDisplay = sanitizeAttachmentDisplay(m.AttachmentDisplay)
+	m.Deliveries = sanitizeDeliveries(m.Deliveries)
 	m.ToolCalls = sanitizeToolCalls(m.ToolCalls)
 	return m
+}
+
+type messageAttachmentDisplay struct {
+	ArtifactID  string `json:"artifactId,omitempty"`
+	Name        string `json:"name"`
+	ContentType string `json:"contentType,omitempty"`
+	PreviewURL  string `json:"previewUrl,omitempty"`
+}
+
+func sanitizeAttachmentDisplay(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var items []messageAttachmentDisplay
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return ""
+	}
+	out := make([]messageAttachmentDisplay, 0, min(len(items), 10))
+	for _, item := range items {
+		item.ArtifactID = truncateStoreText(redact.SanitizeEnvBlock(strings.TrimSpace(item.ArtifactID)), 128)
+		item.Name = truncateStoreText(redact.SanitizeEnvBlock(strings.TrimSpace(item.Name)), 256)
+		item.ContentType = truncateStoreText(redact.SanitizeEnvBlock(strings.TrimSpace(item.ContentType)), 128)
+		item.PreviewURL = sanitizeAttachmentPreviewURL(item.PreviewURL)
+		if item.Name == "" && item.ArtifactID == "" {
+			continue
+		}
+		out = append(out, item)
+		if len(out) >= 10 {
+			break
+		}
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	data, err := json.Marshal(out)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func sanitizeAttachmentPreviewURL(raw string) string {
+	raw = truncateStoreText(redact.SanitizeEnvBlock(strings.TrimSpace(raw)), 2048)
+	if raw == "" {
+		return ""
+	}
+	if strings.HasPrefix(raw, "/") && !strings.HasPrefix(raw, "//") {
+		return raw
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "http", "https":
+		return raw
+	default:
+		return ""
+	}
 }
 
 func sanitizeJSONText(content string) string {
@@ -862,6 +925,48 @@ func sanitizeToolCalls(raw string) string {
 		return raw
 	}
 	return string(data)
+}
+
+func sanitizeDeliveries(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var deliveries []any
+	if err := json.Unmarshal([]byte(raw), &deliveries); err != nil {
+		return ""
+	}
+	for i := range deliveries {
+		deliveries[i] = redactDeliveryValue(deliveries[i])
+	}
+	data, err := json.Marshal(deliveries)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func redactDeliveryValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for key, item := range typed {
+			if redact.IsSensitiveKey(key) {
+				out[key] = "[REDACTED]"
+				continue
+			}
+			out[key] = redactDeliveryValue(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(typed))
+		for i, item := range typed {
+			out[i] = redactDeliveryValue(item)
+		}
+		return out
+	default:
+		return value
+	}
 }
 
 func truncateStoreText(s string, max int) string {

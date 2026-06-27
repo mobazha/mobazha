@@ -171,6 +171,13 @@ func TestToolExecutor_Execute_Success(t *testing.T) {
 	}
 }
 
+func TestNewToolExecutorUsesContextControlledHTTPTimeout(t *testing.T) {
+	executor := NewToolExecutor("http://localhost", "")
+	if executor.httpClient.Timeout != 0 {
+		t.Fatalf("tool HTTP client timeout = %v, want context-controlled timeout", executor.httpClient.Timeout)
+	}
+}
+
 func TestToolExecutor_Execute_404(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)

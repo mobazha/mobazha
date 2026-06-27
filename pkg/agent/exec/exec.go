@@ -61,9 +61,6 @@ func (b *BatchExecutor) Execute(ctx context.Context, calls []ToolCall, mode Mode
 		return nil, nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, b.timeout)
-	defer cancel()
-
 	if mode == Serial {
 		return b.executeSerial(ctx, calls)
 	}
@@ -73,7 +70,9 @@ func (b *BatchExecutor) Execute(ctx context.Context, calls []ToolCall, mode Mode
 func (b *BatchExecutor) executeSerial(ctx context.Context, calls []ToolCall) ([]ToolResult, error) {
 	results := make([]ToolResult, len(calls))
 	for i, call := range calls {
-		result, err := b.executor.Execute(ctx, call)
+		callCtx, cancel := context.WithTimeout(ctx, b.timeoutForCall(call))
+		result, err := b.executor.Execute(callCtx, call)
+		cancel()
 		if err != nil {
 			results[i] = ToolResult{
 				CallID:  call.ID,
@@ -91,10 +90,10 @@ func (b *BatchExecutor) executeSerial(ctx context.Context, calls []ToolCall) ([]
 func (b *BatchExecutor) executeParallel(ctx context.Context, calls []ToolCall) ([]ToolResult, error) {
 	results := make([]ToolResult, len(calls))
 	var (
-		wg      sync.WaitGroup
-		errOnce sync.Once
+		wg       sync.WaitGroup
+		errOnce  sync.Once
 		firstErr error
-		sem     chan struct{}
+		sem      chan struct{}
 	)
 
 	if b.maxPar > 0 {
@@ -118,7 +117,9 @@ func (b *BatchExecutor) executeParallel(ctx context.Context, calls []ToolCall) (
 				defer func() { <-sem }()
 			}
 
-			result, err := b.executor.Execute(ctx, c)
+			callCtx, cancel := context.WithTimeout(ctx, b.timeoutForCall(c))
+			result, err := b.executor.Execute(callCtx, c)
+			cancel()
 			if err != nil {
 				results[idx] = ToolResult{
 					CallID:  c.ID,
@@ -134,6 +135,13 @@ func (b *BatchExecutor) executeParallel(ctx context.Context, calls []ToolCall) (
 	}
 	wg.Wait()
 	return results, firstErr
+}
+
+func (b *BatchExecutor) timeoutForCall(call ToolCall) time.Duration {
+	if call.Timeout > 0 {
+		return call.Timeout
+	}
+	return b.timeout
 }
 
 // ToolExecutorFunc is a convenience adapter for single-function executors.

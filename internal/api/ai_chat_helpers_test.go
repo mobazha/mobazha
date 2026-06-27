@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
 )
 
 func TestGetLocalAPIURL_PrefersServerLocalAddr(t *testing.T) {
@@ -36,7 +37,8 @@ func TestVisibleChatMessages_HidesInternalToolTraffic(t *testing.T) {
 		{Role: aipkg.RoleSystem, Content: "system prompt"},
 		{Role: aipkg.RoleUser, Content: "What should I focus on?"},
 		{
-			Role: aipkg.RoleAssistant,
+			Role:    aipkg.RoleAssistant,
+			Content: "Let me inspect the internal data.",
 			ToolCalls: []aipkg.ToolCall{{
 				ID: "call_1",
 				Function: aipkg.ToolCallFunc{
@@ -66,6 +68,74 @@ func TestVisibleChatMessages_HidesInternalToolTraffic(t *testing.T) {
 	}
 	if visible[1].ToolCalls != nil || visible[1].ToolCallID != "" || visible[1].Name != "" {
 		t.Fatalf("assistant internals should be stripped: %#v", visible[1])
+	}
+}
+
+func TestAgentChatVisibleMessages_PreservesAttachmentDisplay(t *testing.T) {
+	messages := []*agentstore.Message{
+		{
+			Role:              "user",
+			Content:           "Import from this image",
+			AttachmentDisplay: `[{"artifactId":"art_img","name":"cover.jpg","contentType":"image/jpeg"}]`,
+		},
+	}
+
+	visible := agentChatVisibleMessages(messages)
+	if len(visible) != 1 {
+		t.Fatalf("expected one visible message, got %d", len(visible))
+	}
+	if len(visible[0].AttachmentDisplay) != 1 {
+		t.Fatalf("expected attachment display metadata, got %#v", visible[0].AttachmentDisplay)
+	}
+	got := visible[0].AttachmentDisplay[0]
+	if got.ArtifactID != "art_img" || got.Name != "cover.jpg" || got.ContentType != "image/jpeg" {
+		t.Fatalf("unexpected attachment display: %#v", got)
+	}
+}
+
+func TestAgentChatVisibleMessages_PreservesDeliveryOnlyAssistantMessage(t *testing.T) {
+	messages := []*agentstore.Message{
+		{Role: "user", Content: "Import these products"},
+		{
+			Role:       "assistant",
+			Deliveries: `[{"state":"needs_review","skillId":"product.import","skillRunId":"run_1","messageKey":"product_import.needs_review","data":{"reviewableCount":2}}]`,
+		},
+	}
+
+	visible := agentChatVisibleMessages(messages)
+	if len(visible) != 2 {
+		t.Fatalf("expected user and delivery messages, got %d: %#v", len(visible), visible)
+	}
+	deliveries := visible[1].Deliveries
+	if len(deliveries) != 1 {
+		t.Fatalf("expected one persisted delivery, got %#v", deliveries)
+	}
+	if deliveries[0].SkillRunID != "run_1" || deliveries[0].MessageKey != "product_import.needs_review" {
+		t.Fatalf("unexpected delivery: %#v", deliveries[0])
+	}
+	if string(deliveries[0].Data) != `{"reviewableCount":2}` {
+		t.Fatalf("unexpected delivery data: %s", deliveries[0].Data)
+	}
+}
+
+func TestAgentChatVisibleMessages_HidesAssistantToolCallContent(t *testing.T) {
+	messages := []*agentstore.Message{
+		{Role: "user", Content: "Import this image"},
+		{
+			Role:      "assistant",
+			Content:   "Let me inspect the proposal details.",
+			ToolCalls: `[{"id":"call_1","name":"agent_artifacts_get","arguments":"{}"}]`,
+		},
+		{Role: "tool", Content: `{"data":{"summary":"internal"}}`, ToolCallID: "call_1"},
+		{Role: "assistant", Content: "The import proposal is ready for review."},
+	}
+
+	visible := agentChatVisibleMessages(messages)
+	if len(visible) != 2 {
+		t.Fatalf("expected user plus final assistant only, got %d: %#v", len(visible), visible)
+	}
+	if visible[1].Content != "The import proposal is ready for review." {
+		t.Fatalf("unexpected final assistant message: %#v", visible[1])
 	}
 }
 

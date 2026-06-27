@@ -167,6 +167,36 @@ func TestBatchExecutor_ContextCancellation(t *testing.T) {
 	}
 }
 
+func TestBatchExecutor_UsesPerCallTimeout(t *testing.T) {
+	var remaining []time.Duration
+	executor := ToolExecutorFunc(func(ctx context.Context, call ToolCall) (ToolResult, error) {
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			t.Fatalf("tool %s did not receive a deadline", call.Name)
+		}
+		remaining = append(remaining, time.Until(deadline))
+		return ToolResult{CallID: call.ID, Name: call.Name, Content: "ok"}, nil
+	})
+
+	be := NewBatchExecutor(executor, 5*time.Second, 0)
+	_, err := be.Execute(context.Background(), []ToolCall{
+		{ID: "1", Name: "slow", Timeout: 50 * time.Millisecond},
+		{ID: "2", Name: "default"},
+	}, Serial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remaining) != 2 {
+		t.Fatalf("expected 2 observed deadlines, got %d", len(remaining))
+	}
+	if remaining[0] <= 0 || remaining[0] > 500*time.Millisecond {
+		t.Fatalf("per-call timeout was not applied: %v", remaining[0])
+	}
+	if remaining[1] < 4*time.Second {
+		t.Fatalf("default timeout was not preserved: %v", remaining[1])
+	}
+}
+
 func TestBatchExecutor_EmptyCalls(t *testing.T) {
 	be := NewBatchExecutor(echoExecutor(), 5*time.Second, 0)
 	results, err := be.Execute(context.Background(), nil, Parallel)

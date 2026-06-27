@@ -27,17 +27,19 @@ type Turn struct {
 
 // Message is a single message within a turn.
 type Message struct {
-	ID         string    `gorm:"column:id;type:varchar(64);primaryKey" json:"id"`
-	TenantID   string    `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_messages_tenant_thread_created,priority:1" json:"tenant_id"`
-	ThreadID   string    `gorm:"column:thread_id;type:varchar(64);index:idx_agent_messages_tenant_thread_created,priority:2" json:"thread_id"`
-	TurnID     string    `gorm:"column:turn_id;type:varchar(64);index" json:"turn_id"`
-	Role       string    `json:"role"`
-	Content    string    `gorm:"type:text" json:"content"`
-	ToolCallID string    `json:"tool_call_id,omitempty"`
-	ToolCalls  string    `gorm:"type:text" json:"tool_calls,omitempty"` // JSON-serialized []ToolCall for assistant messages
-	Tokens     int       `json:"tokens"`
-	Bytes      int       `json:"bytes"`
-	CreatedAt  time.Time `gorm:"index:idx_agent_messages_tenant_thread_created,priority:3" json:"created_at"`
+	ID                string    `gorm:"column:id;type:varchar(64);primaryKey" json:"id"`
+	TenantID          string    `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_messages_tenant_thread_created,priority:1" json:"tenant_id"`
+	ThreadID          string    `gorm:"column:thread_id;type:varchar(64);index:idx_agent_messages_tenant_thread_created,priority:2" json:"thread_id"`
+	TurnID            string    `gorm:"column:turn_id;type:varchar(64);index" json:"turn_id"`
+	Role              string    `json:"role"`
+	Content           string    `gorm:"type:text" json:"content"`
+	AttachmentDisplay string    `gorm:"column:attachment_display;type:text" json:"attachment_display,omitempty"` // JSON-serialized safe UI attachment metadata
+	Deliveries        string    `gorm:"type:text" json:"deliveries,omitempty"`                                   // JSON-serialized structured business outcomes
+	ToolCallID        string    `json:"tool_call_id,omitempty"`
+	ToolCalls         string    `gorm:"type:text" json:"tool_calls,omitempty"` // JSON-serialized []ToolCall for assistant messages
+	Tokens            int       `json:"tokens"`
+	Bytes             int       `json:"bytes"`
+	CreatedAt         time.Time `gorm:"index:idx_agent_messages_tenant_thread_created,priority:3" json:"created_at"`
 }
 
 // SkillRun represents one durable execution of a business skill.

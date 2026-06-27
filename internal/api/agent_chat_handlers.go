@@ -43,6 +43,8 @@ type agentToolContext struct {
 	origin      string
 	tenantID    string
 	actorID     string
+	threadID    string
+	language    string
 }
 
 type agentToolContextKey struct{}
@@ -141,7 +143,8 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 
 	persist := p.AgentStore()
 
-	systemPrompt := aipkg.BuildSystemPrompt(aipkg.UserRoleSeller, p.ProfileName(), req.Context)
+	promptContext := agentChatPromptContext(req.Context, req.Message)
+	systemPrompt := aipkg.BuildSystemPrompt(aipkg.UserRoleSeller, p.ProfileName(), promptContext)
 	if catalogCtx := getCachedCatalog(tenantID, p); catalogCtx != "" {
 		systemPrompt += "\n\n" + catalogCtx
 	}
@@ -181,8 +184,10 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		origin:      origin,
 		tenantID:    tenantID,
 		actorID:     nodeID,
+		threadID:    threadID,
+		language:    agentChatToolLanguage(req.Context, req.Message),
 	})
-	turnOptions, err := agentChatTurnOptions(turnCtx, persist, req, tenantID, nodeID, p.ProfileName())
+	turnOptions, err := agentChatTurnOptions(turnCtx, persist, req, tenantID, nodeID, threadID, p.ProfileName())
 	if err != nil {
 		aiLog.Warningf("Agent chat skill routing failed: %v", err)
 		emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeError, Error: agentChatRouteErrorMessage(err)})
@@ -208,6 +213,9 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		if chunk.ToolEvent != nil {
 			emitSSE(agentChatSSEEventFromToolEvent(chunk.ToolEvent))
 		}
+		if chunk.DeliveryEvent != nil {
+			emitSSE(agentChatSSEEventFromDeliveryEvent(chunk.DeliveryEvent))
+		}
 		if chunk.Delta != "" {
 			emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeContent, Content: chunk.Delta})
 		}
@@ -232,6 +240,26 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		Type:      aipkg.SSETypeDone,
 		SessionID: threadID,
 	})
+}
+
+func agentChatSSEEventFromDeliveryEvent(deliveryEvent *agentstream.DeliveryEvent) aipkg.SSEEvent {
+	if deliveryEvent == nil {
+		return aipkg.SSEEvent{Type: aipkg.SSETypeDelivery}
+	}
+	event := aipkg.SSEEvent{
+		Type:       aipkg.SSETypeDelivery,
+		State:      deliveryEvent.State,
+		SkillID:    deliveryEvent.SkillID,
+		SkillRunID: deliveryEvent.SkillRunID,
+		MessageKey: deliveryEvent.MessageKey,
+	}
+	if len(deliveryEvent.Data) > 0 {
+		var data any
+		if err := json.Unmarshal(deliveryEvent.Data, &data); err == nil {
+			event.Data = data
+		}
+	}
+	return event
 }
 
 func agentChatSSEEventFromToolEvent(toolEvent *agentstream.ToolEvent) aipkg.SSEEvent {
@@ -272,7 +300,19 @@ func updateAgentChatThreadMetadata(ctx context.Context, persist agentstore.Persi
 	return persist.SaveThread(ctx, thread)
 }
 
-func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, req aipkg.ChatRequest, tenantID, actorID, storeID string) (agentruntime.TurnOptions, error) {
+func agentChatPromptContext(chatCtx *aipkg.ChatContext, latestUserMessage string) *aipkg.ChatContext {
+	if chatCtx == nil {
+		return &aipkg.ChatContext{LatestUserMessage: latestUserMessage}
+	}
+	cp := *chatCtx
+	cp.ArtifactIDs = append([]string(nil), chatCtx.ArtifactIDs...)
+	cp.SkillRunIDs = append([]string(nil), chatCtx.SkillRunIDs...)
+	cp.Attachments = append([]aipkg.ChatAttachment(nil), chatCtx.Attachments...)
+	cp.LatestUserMessage = latestUserMessage
+	return &cp
+}
+
+func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, req aipkg.ChatRequest, tenantID, actorID, threadID, storeID string) (agentruntime.TurnOptions, error) {
 	skillProvider, err := agentChatSkillProvider(ctx)
 	if err != nil {
 		return agentruntime.TurnOptions{}, err
@@ -292,20 +332,90 @@ func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, r
 		return agentruntime.TurnOptions{}, err
 	}
 	return agentruntime.TurnOptions{
-		SkillProvider:   skillProvider,
-		RequestedSkills: requestedSkills,
-		SkillFilter:     skillFilter,
-		ContextBlocks:   contextBlocks,
-		ToolCatalog:     kernel.NewStaticToolCatalog(aipkg.SellerToolMetadata()),
-		MemoryStore:     agentChatKernelMemoryStore(persist),
+		SkillProvider:         skillProvider,
+		RequestedSkills:       requestedSkills,
+		SkillFilter:           skillFilter,
+		ContextBlocks:         contextBlocks,
+		UserAttachmentDisplay: agentChatAttachmentDisplayJSON(req.Context),
+		ToolCatalog:           kernel.NewStaticToolCatalog(agentChatToolMetadata()),
+		MemoryStore:           agentChatKernelMemoryStore(persist),
+		DeliveryResolver: agentruntime.NewDeliveryResolverSet(
+			newAgentChatDeliveryResolver(),
+		),
 		Scope: kernel.Scope{
 			TenantID:      tenantID,
 			StoreID:       storeID,
+			ThreadID:      threadID,
 			ActorID:       actorID,
 			ActorRoles:    []kernel.Persona{kernel.PersonaSeller},
 			ActingPersona: kernel.PersonaSeller,
 		},
 	}, nil
+}
+
+func agentChatToolMetadata() []kernel.ToolMetadata {
+	tools := aipkg.SellerToolMetadata()
+	out := make([]kernel.ToolMetadata, 0, len(tools))
+	for _, tool := range tools {
+		// product.import ingest owns its durable run lifecycle. Exposing the
+		// generic creator here lets the model create an unused run first.
+		if tool.Name == "agent_skill_runs_create" {
+			continue
+		}
+		out = append(out, tool)
+	}
+	return out
+}
+
+func agentChatAttachmentDisplayJSON(chatCtx *aipkg.ChatContext) string {
+	if chatCtx == nil || len(chatCtx.Attachments) == 0 {
+		return ""
+	}
+	artifactIDs := uniqueTrimmedStrings(chatCtx.ArtifactIDs)
+	items := make([]aipkg.ChatAttachmentDisplay, 0, len(chatCtx.Attachments))
+	for i, attachment := range chatCtx.Attachments {
+		name := strings.TrimSpace(attachment.Name)
+		if name == "" {
+			name = strings.TrimSpace(attachment.ID)
+		}
+		if name == "" {
+			name = strings.TrimSpace(attachment.SourceURI)
+		}
+		if name == "" {
+			continue
+		}
+		artifactID := strings.TrimSpace(attachment.ID)
+		if artifactID == "" && i < len(artifactIDs) {
+			artifactID = artifactIDs[i]
+		}
+		items = append(items, aipkg.ChatAttachmentDisplay{
+			ArtifactID:  artifactID,
+			Name:        name,
+			ContentType: strings.TrimSpace(attachment.ContentType),
+			PreviewURL:  agentChatAttachmentPreviewURL(attachment),
+		})
+		if len(items) >= agentChatMaxContextAttachments {
+			break
+		}
+	}
+	if len(items) == 0 {
+		return ""
+	}
+	data, err := json.Marshal(items)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func agentChatAttachmentPreviewURL(attachment aipkg.ChatAttachment) string {
+	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(attachment.ContentType)), "image/") {
+		return ""
+	}
+	if url := strings.TrimSpace(attachment.URL); url != "" {
+		return url
+	}
+	return strings.TrimSpace(attachment.SourceURI)
 }
 
 func agentChatKernelMemoryStore(persist agentstore.Persistence) kernel.MemoryStore {
@@ -917,7 +1027,7 @@ func (agentChatToolExecutor) Execute(ctx context.Context, call agentexec.ToolCal
 		call.Arguments = arguments
 	}
 	if call.Name == "agent_product_import_ingest" {
-		arguments, err := agentChatProductImportIngestArgumentsWithAttachments(call.Arguments, toolCtx.attachments)
+		arguments, err := agentChatProductImportIngestArgumentsWithAttachments(call.Arguments, toolCtx.threadID, toolCtx.language, toolCtx.attachments)
 		if err != nil {
 			return agentexec.ToolResult{
 				CallID:  call.ID,
@@ -976,10 +1086,7 @@ func agentChatAttachmentsAnalyzeArgumentsWithAttachments(argsJSON string, attach
 	return string(data), nil
 }
 
-func agentChatProductImportIngestArgumentsWithAttachments(argsJSON string, attachments []aipkg.ChatAttachment) (string, error) {
-	if len(attachments) == 0 {
-		return argsJSON, nil
-	}
+func agentChatProductImportIngestArgumentsWithAttachments(argsJSON, threadID, language string, attachments []aipkg.ChatAttachment) (string, error) {
 	var args map[string]any
 	if strings.TrimSpace(argsJSON) != "" {
 		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
@@ -989,9 +1096,26 @@ func agentChatProductImportIngestArgumentsWithAttachments(argsJSON string, attac
 	if args == nil {
 		args = map[string]any{}
 	}
+	if threadID = strings.TrimSpace(threadID); threadID != "" {
+		args["threadId"] = threadID
+	}
+	if language = strings.TrimSpace(language); language != "" {
+		args["language"] = language
+	}
+	if len(attachments) == 0 {
+		data, err := json.Marshal(args)
+		if err != nil {
+			return "", fmt.Errorf("marshal product import ingest arguments: %w", err)
+		}
+		return string(data), nil
+	}
 	attachmentSources := agentChatProductImportAttachmentSources(attachments)
 	if len(attachmentSources) == 0 {
-		return argsJSON, nil
+		data, err := json.Marshal(args)
+		if err != nil {
+			return "", fmt.Errorf("marshal product import ingest arguments: %w", err)
+		}
+		return string(data), nil
 	}
 	args["sources"] = mergeAgentChatProductImportSources(args["sources"], attachmentSources)
 	data, err := json.Marshal(args)

@@ -2,6 +2,7 @@ package ai
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
 )
@@ -23,6 +24,22 @@ func TestSellerToolMetadataMirrorsSellerTools(t *testing.T) {
 		if _, ok := byName[def.Name]; !ok {
 			t.Fatalf("missing metadata for seller tool %s", def.Name)
 		}
+	}
+}
+
+func TestSellerToolMetadataUsesLongTimeoutsForMediaProcessing(t *testing.T) {
+	byName := map[string]kernel.ToolMetadata{}
+	for _, item := range SellerToolMetadata() {
+		byName[item.Name] = item
+	}
+
+	for _, name := range []string{"agent_product_import_ingest", "agent_attachments_analyze"} {
+		if got := byName[name].Timeout; got != 75*time.Second {
+			t.Fatalf("%s timeout = %v, want 75s", name, got)
+		}
+	}
+	if got := byName["agent_product_import_advance"].Timeout; got != 30*time.Second {
+		t.Fatalf("ordinary tool timeout = %v, want 30s", got)
 	}
 }
 

@@ -255,14 +255,16 @@ type TurnResult struct {
 // intentionally per-turn, not global orchestrator state, to avoid cross-thread
 // leakage.
 type TurnOptions struct {
-	SkillProvider     agentskill.Provider
-	RequestedSkills   []string
-	SkillFilter       agentskill.Filter
-	ContextBlocks     []string
-	UserContentBlocks []MessageContentBlock
-	ToolCatalog       kernel.ToolCatalog
-	MemoryStore       kernel.MemoryStore
-	Scope             kernel.Scope
+	SkillProvider         agentskill.Provider
+	RequestedSkills       []string
+	SkillFilter           agentskill.Filter
+	ContextBlocks         []string
+	UserContentBlocks     []MessageContentBlock
+	UserAttachmentDisplay string
+	ToolCatalog           kernel.ToolCatalog
+	MemoryStore           kernel.MemoryStore
+	DeliveryResolver      DeliveryResolver
+	Scope                 kernel.Scope
 }
 
 type resolvedTurnContext struct {
@@ -272,11 +274,13 @@ type resolvedTurnContext struct {
 	baseTools         []ToolDef
 	tools             []ToolDef
 	toolResultModes   map[string]string
+	toolTimeouts      map[string]time.Duration
 	contextBlocks     []string
 	userContentBlocks []MessageContentBlock
 	skillProvider     agentskill.Provider
 	toolCatalog       kernel.ToolCatalog
 	memoryStore       kernel.MemoryStore
+	deliveryResolver  DeliveryResolver
 	scope             kernel.Scope
 }
 
@@ -359,15 +363,16 @@ func (o *Orchestrator) RunTurnWithOptions(ctx context.Context, tenantID, threadI
 	}
 
 	if err := o.saveMessage(ctx, tenantID, threadID, &store.Message{
-		ID:        newMessageID(),
-		TenantID:  tenantID,
-		ThreadID:  threadID,
-		TurnID:    turnID,
-		Role:      "user",
-		Content:   userMsg,
-		Tokens:    budget.EstimateTokens(userMsg),
-		Bytes:     len(userMsg),
-		CreatedAt: time.Now(),
+		ID:                newMessageID(),
+		TenantID:          tenantID,
+		ThreadID:          threadID,
+		TurnID:            turnID,
+		Role:              "user",
+		Content:           userMsg,
+		AttachmentDisplay: opts.UserAttachmentDisplay,
+		Tokens:            budget.EstimateTokens(userMsg),
+		Bytes:             len(userMsg),
+		CreatedAt:         time.Now(),
 	}); err != nil {
 		if markErr := o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_user_message_failed", err); markErr != nil {
 			return nil, fmt.Errorf("%w; additionally failed to mark turn failed: %v", err, markErr)
@@ -402,7 +407,17 @@ func (o *Orchestrator) assembleHistory(ctx context.Context, tenantID, threadID, 
 		msgs = append(msgs, Message{Role: "system", Content: systemPrompt})
 	}
 
-	priorMessages := o.mem.GetMessages(tenantID, threadID)
+	storedMessages := o.mem.GetMessages(tenantID, threadID)
+	priorMessages := make([]*store.Message, 0, len(storedMessages))
+	for _, message := range storedMessages {
+		if message == nil {
+			continue
+		}
+		if message.Role == "assistant" && strings.TrimSpace(message.Content) == "" && strings.TrimSpace(message.ToolCalls) == "" {
+			continue
+		}
+		priorMessages = append(priorMessages, message)
+	}
 	if len(priorMessages) > o.cfg.MaxHistoryMsgs {
 		priorMessages = priorMessages[len(priorMessages)-o.cfg.MaxHistoryMsgs:]
 	}
@@ -431,12 +446,14 @@ func (o *Orchestrator) resolveTurnContext(ctx context.Context, opts TurnOptions)
 		baseTools:         append([]ToolDef(nil), o.tools...),
 		tools:             append([]ToolDef(nil), o.tools...),
 		toolResultModes:   map[string]string{},
+		toolTimeouts:      map[string]time.Duration{},
 		contextBlocks:     append([]string(nil), opts.ContextBlocks...),
 		userContentBlocks: append([]MessageContentBlock(nil), opts.UserContentBlocks...),
 		grantedTools:      map[string][]kernel.ToolMetadata{},
 		skillProvider:     opts.SkillProvider,
 		toolCatalog:       opts.ToolCatalog,
 		memoryStore:       opts.MemoryStore,
+		deliveryResolver:  opts.DeliveryResolver,
 		scope:             opts.Scope,
 	}
 	if opts.SkillProvider == nil {
@@ -448,7 +465,6 @@ func (o *Orchestrator) resolveTurnContext(ctx context.Context, opts TurnOptions)
 	}
 	sort.Strings(available)
 	resolved.availableSkills = available
-	resolved.tools = appendRuntimeSkillTool(nil)
 
 	for _, requested := range opts.RequestedSkills {
 		s, err := opts.SkillProvider.Load(ctx, requested)
@@ -460,6 +476,7 @@ func (o *Orchestrator) resolveTurnContext(ctx context.Context, opts TurnOptions)
 		}
 		resolved.activeSkills = append(resolved.activeSkills, s)
 	}
+	resolved.tools = appendRuntimeSkillToolForContext(&resolved, nil)
 	if opts.ToolCatalog == nil || len(resolved.activeSkills) == 0 {
 		if opts.ToolCatalog != nil && len(resolved.activeSkills) == 0 {
 			if err := recalculateInitialTools(ctx, &resolved); err != nil {
@@ -486,10 +503,10 @@ func recalculateInitialTools(ctx context.Context, resolved *resolvedTurnContext)
 	for _, tool := range catalogTools {
 		if initialToolAllowed(tool) {
 			allowedNames[tool.Name] = struct{}{}
-			rememberToolResultMode(resolved, tool)
+			rememberToolRuntimePolicy(resolved, tool)
 		}
 	}
-	resolved.tools = appendRuntimeSkillTool(filterToolDefs(resolved.baseTools, allowedNames))
+	resolved.tools = appendRuntimeSkillToolForContext(resolved, filterToolDefs(resolved.baseTools, allowedNames))
 	return nil
 }
 
@@ -501,14 +518,22 @@ func initialToolAllowed(tool kernel.ToolMetadata) bool {
 		tool.SideEffect == kernel.SideEffectNone
 }
 
-func rememberToolResultMode(resolved *resolvedTurnContext, tool kernel.ToolMetadata) {
-	if resolved == nil || tool.Name == "" || tool.ResultMode == "" {
+func rememberToolRuntimePolicy(resolved *resolvedTurnContext, tool kernel.ToolMetadata) {
+	if resolved == nil || tool.Name == "" {
 		return
 	}
-	if resolved.toolResultModes == nil {
-		resolved.toolResultModes = map[string]string{}
+	if tool.ResultMode != "" {
+		if resolved.toolResultModes == nil {
+			resolved.toolResultModes = map[string]string{}
+		}
+		resolved.toolResultModes[tool.Name] = tool.ResultMode
 	}
-	resolved.toolResultModes[tool.Name] = tool.ResultMode
+	if tool.Timeout > 0 {
+		if resolved.toolTimeouts == nil {
+			resolved.toolTimeouts = map[string]time.Duration{}
+		}
+		resolved.toolTimeouts[tool.Name] = tool.Timeout
+	}
 }
 
 func toolResultMode(resolved *resolvedTurnContext, toolName string) string {
@@ -516,6 +541,13 @@ func toolResultMode(resolved *resolvedTurnContext, toolName string) string {
 		return ""
 	}
 	return resolved.toolResultModes[toolName]
+}
+
+func toolTimeout(resolved *resolvedTurnContext, toolName string) time.Duration {
+	if resolved == nil || resolved.toolTimeouts == nil {
+		return 0
+	}
+	return resolved.toolTimeouts[toolName]
 }
 
 func (o *Orchestrator) memoryContextBlock(ctx context.Context, resolved resolvedTurnContext, userMsg string) string {
@@ -930,14 +962,14 @@ func recalculateGrantedTools(ctx context.Context, resolved *resolvedTurnContext)
 		resolved.grantedTools[s.ID] = granted
 		for _, tool := range granted {
 			allowedNames[tool.Name] = struct{}{}
-			rememberToolResultMode(resolved, tool)
+			rememberToolRuntimePolicy(resolved, tool)
 		}
 	}
 	if len(allowedNames) == 0 {
-		resolved.tools = appendRuntimeSkillTool(nil)
+		resolved.tools = appendRuntimeSkillToolForContext(resolved, nil)
 		return nil
 	}
-	resolved.tools = appendRuntimeSkillTool(filterToolDefs(resolved.baseTools, allowedNames))
+	resolved.tools = appendRuntimeSkillToolForContext(resolved, filterToolDefs(resolved.baseTools, allowedNames))
 	return nil
 }
 
@@ -1276,6 +1308,24 @@ func appendRuntimeSkillTool(tools []ToolDef) []ToolDef {
 	})
 }
 
+func appendRuntimeSkillToolForContext(resolved *resolvedTurnContext, tools []ToolDef) []ToolDef {
+	if resolved == nil || len(resolved.availableSkills) == 0 {
+		return tools
+	}
+	active := make(map[string]struct{}, len(resolved.activeSkills))
+	for _, skill := range resolved.activeSkills {
+		if skill != nil {
+			active[skill.ID] = struct{}{}
+		}
+	}
+	for _, skillID := range resolved.availableSkills {
+		if _, ok := active[skillID]; !ok {
+			return appendRuntimeSkillTool(tools)
+		}
+	}
+	return tools
+}
+
 func activateRuntimeSkillTool(ctx context.Context, resolved *resolvedTurnContext, arguments string) (string, error) {
 	if resolved == nil || resolved.skillProvider == nil {
 		return "", fmt.Errorf("skill provider is not available")
@@ -1429,7 +1479,7 @@ func (o *Orchestrator) runLoop(
 			return
 		}
 
-		chunks, toolCalls, assistantText, streamErr := o.drainLLMStream(llmStream, out)
+		chunks, toolCalls, assistantText, blockedInternalMarkup, streamErr := o.drainLLMStream(llmStream)
 		_ = chunks
 
 		if streamErr != nil {
@@ -1439,33 +1489,26 @@ func (o *Orchestrator) runLoop(
 			return
 		}
 
+		if blockedInternalMarkup {
+			o.emitter.Emit(ctx, telemetry.Event{
+				Type:     telemetry.GuardrailBlocked,
+				TenantID: tenantID,
+				ThreadID: threadID,
+				Attrs: map[string]any{
+					"stage": "internal_tool_markup",
+					"round": round + 1,
+				},
+			})
+		}
 		if len(toolCalls) == 0 {
-			if err := o.saveAssistantMessage(ctx, tenantID, threadID, turnID, assistantText); err != nil {
-				_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_assistant_message_failed", err)
-				out.SendError(err)
-				return
+			if blockedInternalMarkup {
+				history = append(history, Message{
+					Role:    "system",
+					Content: "Your previous response contained internal tool-call markup as plain text, so it was blocked before reaching the user. Do not emit DSML, tool-call markup, XML-like invoke tags, or internal tool syntax. Produce a concise user-facing response only, using the visible tool results and messages already available.",
+				})
+				continue
 			}
-
-			// Output guardrails run post-stream as audit/telemetry only.
-			// In streaming mode, content is already delivered to the consumer —
-			// blocking is not possible without buffering the full response first.
-			// Future: add a buffered mode for high-trust scenarios where output
-			// must be validated before delivery (at the cost of TTFB latency).
-			if len(o.outputGuardrails) > 0 {
-				result := RunOutputGuardrails(ctx, o.outputGuardrails, tenantID, threadID, assistantText)
-				if !result.Passed {
-					o.emitter.Emit(ctx, telemetry.Event{
-						Type:     telemetry.GuardrailBlocked,
-						TenantID: tenantID,
-						ThreadID: threadID,
-						Attrs:    map[string]any{"stage": "output", "reason": result.Reason},
-					})
-				}
-			}
-
-			if err := o.completeTurnSucceeded(ctx, tenantID, threadID, turnID, turnStartedAt, round+1); err != nil {
-				out.SendError(err)
-			}
+			o.finishTurn(ctx, tenantID, threadID, turnID, turnStartedAt, assistantText, round+1, out)
 			return
 		}
 
@@ -1634,7 +1677,12 @@ func (o *Orchestrator) runLoop(
 				}
 				continue
 			}
-			execCalls = append(execCalls, exec.ToolCall{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments})
+			execCalls = append(execCalls, exec.ToolCall{
+				ID:        tc.ID,
+				Name:      tc.Name,
+				Arguments: tc.Arguments,
+				Timeout:   toolTimeout(resolved, tc.Name),
+			})
 			toolNames[tc.ID] = tc.Name
 			out.Send(stream.Chunk{ToolEvent: &stream.ToolEvent{
 				ID:     tc.ID,
@@ -1651,6 +1699,7 @@ func (o *Orchestrator) runLoop(
 		duration := time.Since(start)
 
 		errCount := 0
+		var deliveries []*DeliveryOutcome
 		for _, r := range results {
 			if r.IsError {
 				errCount++
@@ -1709,8 +1758,51 @@ func (o *Orchestrator) runLoop(
 				out.SendError(err)
 				return
 			}
+			if status == "done" && resolved != nil && resolved.deliveryResolver != nil {
+				resolvedResult := r
+				resolvedResult.Name = toolName
+				outcome, err := resolved.deliveryResolver.ResolveDelivery(ctx, resolvedResult)
+				if err != nil {
+					o.emitter.Emit(ctx, telemetry.Event{
+						Type:     telemetry.DeliveryResolveFailed,
+						TenantID: tenantID,
+						ThreadID: threadID,
+						Attrs: map[string]any{
+							"tool":   toolName,
+							"reason": runtimeDiagnosticError(err),
+						},
+					})
+				} else if outcome.Valid() {
+					deliveries = upsertDeliveryOutcome(deliveries, outcome)
+				}
+			}
 		}
-
+		if len(deliveries) > 0 {
+			deliveryEvents := make([]*stream.DeliveryEvent, 0, len(deliveries))
+			for _, delivery := range deliveries {
+				deliveryEvents = append(deliveryEvents, deliveryStreamEvent(delivery))
+			}
+			if err := o.saveDeliveryMessage(ctx, tenantID, threadID, turnID, deliveryEvents); err != nil {
+				_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, turnStartedAt, "save_delivery_message_failed", err)
+				out.SendError(err)
+				return
+			}
+			for i, delivery := range deliveries {
+				out.Send(stream.Chunk{DeliveryEvent: deliveryEvents[i]})
+				o.emitter.Emit(ctx, telemetry.Event{
+					Type:     telemetry.DeliveryResolved,
+					TenantID: tenantID,
+					ThreadID: threadID,
+					Attrs: map[string]any{
+						"state":        delivery.State,
+						"skill_id":     delivery.SkillID,
+						"skill_run_id": delivery.SkillRunID,
+					},
+				})
+			}
+			o.finishTurn(ctx, tenantID, threadID, turnID, turnStartedAt, "", round+1, out)
+			return
+		}
 	}
 
 	turnErr := fmt.Errorf("exceeded max tool rounds (%d)", o.cfg.MaxToolRounds)
@@ -2199,6 +2291,38 @@ func (o *Orchestrator) completeTurnSucceeded(ctx context.Context, tenantID, thre
 	return nil
 }
 
+func (o *Orchestrator) finishTurn(
+	ctx context.Context,
+	tenantID, threadID, turnID string,
+	startedAt time.Time,
+	assistantText string,
+	rounds int,
+	out *stream.Buffered,
+) {
+	if assistantText != "" {
+		if err := o.saveAssistantMessage(ctx, tenantID, threadID, turnID, assistantText); err != nil {
+			_ = o.completeTurnFailed(ctx, tenantID, threadID, turnID, startedAt, "save_assistant_message_failed", err)
+			out.SendError(err)
+			return
+		}
+		if len(o.outputGuardrails) > 0 {
+			result := RunOutputGuardrails(ctx, o.outputGuardrails, tenantID, threadID, assistantText)
+			if !result.Passed {
+				o.emitter.Emit(ctx, telemetry.Event{
+					Type:     telemetry.GuardrailBlocked,
+					TenantID: tenantID,
+					ThreadID: threadID,
+					Attrs:    map[string]any{"stage": "output", "reason": result.Reason},
+				})
+			}
+		}
+		out.Send(stream.Chunk{Delta: assistantText})
+	}
+	if err := o.completeTurnSucceeded(ctx, tenantID, threadID, turnID, startedAt, rounds); err != nil {
+		out.SendError(err)
+	}
+}
+
 func (o *Orchestrator) completeTurnFailed(ctx context.Context, tenantID, threadID, turnID string, startedAt time.Time, reason string, cause error) error {
 	completedAt := time.Now()
 	errorText := turnFailureError(cause)
@@ -2341,13 +2465,31 @@ func (o *Orchestrator) saveAssistantMessage(ctx context.Context, tenantID, threa
 	})
 }
 
-// drainLLMStream reads all chunks from the LLM stream, forwarding text
-// deltas to the output stream and collecting tool calls.
+func (o *Orchestrator) saveDeliveryMessage(ctx context.Context, tenantID, threadID, turnID string, deliveries []*stream.DeliveryEvent) error {
+	data, err := json.Marshal(deliveries)
+	if err != nil {
+		return fmt.Errorf("agent runtime: marshal deliveries: %w", err)
+	}
+	return o.saveMessage(ctx, tenantID, threadID, &store.Message{
+		ID:         newMessageID(),
+		TenantID:   tenantID,
+		ThreadID:   threadID,
+		TurnID:     turnID,
+		Role:       "assistant",
+		Deliveries: string(data),
+		Bytes:      len(data),
+		CreatedAt:  time.Now(),
+	})
+}
+
+// drainLLMStream reads all chunks from the LLM stream, collecting text and tool
+// calls. The caller decides whether collected text is user-visible: assistant
+// messages that contain tool calls are internal planning steps, not final
+// delivery.
 // Returns any error from the LLM stream (e.g. SSE disconnect mid-response).
 func (o *Orchestrator) drainLLMStream(
 	llmStream stream.Stream,
-	out *stream.Buffered,
-) ([]stream.Chunk, []stream.ToolCall, string, error) {
+) ([]stream.Chunk, []stream.ToolCall, string, bool, error) {
 	var (
 		chunks    []stream.Chunk
 		toolCalls []stream.ToolCall
@@ -2363,14 +2505,42 @@ func (o *Orchestrator) drainLLMStream(
 
 		if c.Delta != "" {
 			text += c.Delta
-			out.Send(stream.Chunk{Delta: c.Delta})
 		}
 		if len(c.ToolCalls) > 0 {
 			toolCalls = append(toolCalls, c.ToolCalls...)
 		}
 	}
 
-	return chunks, toolCalls, text, llmStream.Err()
+	blockedInternalMarkup := containsInternalToolMarkup(text)
+	if blockedInternalMarkup {
+		text = ""
+	}
+
+	return chunks, toolCalls, text, blockedInternalMarkup, llmStream.Err()
+}
+
+func containsInternalToolMarkup(text string) bool {
+	if text == "" {
+		return false
+	}
+	normalized := strings.ToLower(text)
+	replacements := []struct {
+		old string
+		new string
+	}{
+		{"｜", "|"},
+		{"\n", ""},
+		{"\r", ""},
+		{"\t", ""},
+		{" ", ""},
+	}
+	for _, repl := range replacements {
+		normalized = strings.ReplaceAll(normalized, repl.old, repl.new)
+	}
+	return strings.Contains(normalized, "<||dsml||tool_calls") ||
+		strings.Contains(normalized, "</||dsml||tool_calls") ||
+		strings.Contains(normalized, "<||dsml||invoke") ||
+		(strings.Contains(normalized, "tool_calls>") && strings.Contains(normalized, "invoke") && strings.Contains(normalized, "agent_"))
 }
 
 func (o *Orchestrator) ensureThread(ctx context.Context, tenantID, threadID string) (*store.Thread, error) {

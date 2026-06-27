@@ -811,12 +811,13 @@ func TestGormPersistence_RedactsSensitiveJSON(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, persist.SaveThread(ctx, &Thread{ID: "th", TenantID: database.StandaloneTenantID, LastActive: time.Now()}))
 	require.NoError(t, persist.SaveMessage(ctx, &Message{
-		ID:        "msg",
-		TenantID:  database.StandaloneTenantID,
-		ThreadID:  "th",
-		Role:      "tool",
-		Content:   `{"token":"secret-token","value":"safe"}`,
-		ToolCalls: `[{"name":"x","arguments":"{\"api_key\":\"secret-key\",\"query\":\"safe\"}"}]`,
+		ID:         "msg",
+		TenantID:   database.StandaloneTenantID,
+		ThreadID:   "th",
+		Role:       "tool",
+		Content:    `{"token":"secret-token","value":"safe"}`,
+		ToolCalls:  `[{"name":"x","arguments":"{\"api_key\":\"secret-key\",\"query\":\"safe\"}"}]`,
+		Deliveries: `[{"state":"needs_review","messageKey":"product_import.needs_review","data":{"token":"delivery-secret","reviewableCount":1}}]`,
 	}))
 
 	msgs, err := persist.LoadMessages(ctx, database.StandaloneTenantID, "th")
@@ -826,6 +827,48 @@ func TestGormPersistence_RedactsSensitiveJSON(t *testing.T) {
 	require.NotContains(t, msgs[0].Content, "secret-token")
 	require.NotContains(t, msgs[0].ToolCalls, "secret-key")
 	require.Contains(t, msgs[0].ToolCalls, `[REDACTED]`)
+	require.NotContains(t, msgs[0].Deliveries, "delivery-secret")
+	require.Contains(t, msgs[0].Deliveries, `"reviewableCount":1`)
+	require.Contains(t, msgs[0].Deliveries, `[REDACTED]`)
+}
+
+func TestSanitizeAttachmentDisplay_AllowsManagedEscrowPreviewURLs(t *testing.T) {
+	raw := `[
+		{"artifactId":"art_1","name":"cover.jpg","contentType":"image/jpeg","previewUrl":"https://cdn.example.com/cover.jpg?sig=1"},
+		{"artifactId":"art_2","name":"local.jpg","previewUrl":"/v1/agent/artifacts/art_2/content"}
+	]`
+
+	got := sanitizeAttachmentDisplay(raw)
+	var items []messageAttachmentDisplay
+	require.NoError(t, json.Unmarshal([]byte(got), &items))
+	require.Len(t, items, 2)
+	require.Equal(t, "https://cdn.example.com/cover.jpg?sig=1", items[0].PreviewURL)
+	require.Equal(t, "/v1/agent/artifacts/art_2/content", items[1].PreviewURL)
+}
+
+func TestSanitizeAttachmentDisplay_RemovesUnsafePreviewURLs(t *testing.T) {
+	for _, previewURL := range []string{
+		"javascript:alert(1)",
+		"data:image/svg+xml,<svg onload=alert(1)>",
+		"blob:https://example.com/id",
+		"//evil.example/cover.jpg",
+		"cover.jpg",
+	} {
+		t.Run(previewURL, func(t *testing.T) {
+			raw, err := json.Marshal([]messageAttachmentDisplay{{
+				ArtifactID: "art_1",
+				Name:       "cover.jpg",
+				PreviewURL: previewURL,
+			}})
+			require.NoError(t, err)
+
+			got := sanitizeAttachmentDisplay(string(raw))
+			var items []messageAttachmentDisplay
+			require.NoError(t, json.Unmarshal([]byte(got), &items))
+			require.Len(t, items, 1)
+			require.Empty(t, items[0].PreviewURL)
+		})
+	}
 }
 
 func TestGormPersistence_ApprovalPayloadPreservesExecutionHash(t *testing.T) {

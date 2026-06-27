@@ -1,6 +1,10 @@
 package ai
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+	"unicode"
+)
 
 // UserRole is derived from the authenticated user's capabilities.
 type UserRole string
@@ -14,7 +18,7 @@ const (
 const baseSystemPrompt = `You are Mobazha AI assistant, helping users manage their decentralized e-commerce business.
 
 Behavior rules:
-- Always respond in the same language as the user's message (auto-detect; the frontend may include a locale hint)
+- Always respond in the required response language for the current turn. If no explicit response language is provided, use the same language as the latest user message.
 - Before calling a tool, briefly explain what you are about to do
 - For financial operations (payments, refunds, withdrawals), always confirm with the user before executing
 - Do not fabricate data — call the relevant tool to query if unsure
@@ -88,6 +92,9 @@ func BuildSystemPrompt(role UserRole, storeName string, ctx *ChatContext) string
 	}
 
 	if ctx != nil {
+		if language := responseLanguageInstruction(ctx); language != "" {
+			prompt += "\n\nResponse language:\n" + language
+		}
 		contextHints := buildContextHints(ctx)
 		if contextHints != "" {
 			prompt += "\n\nCurrent UI context:" + contextHints
@@ -95,6 +102,108 @@ func BuildSystemPrompt(role UserRole, storeName string, ctx *ChatContext) string
 	}
 
 	return prompt
+}
+
+func responseLanguageInstruction(ctx *ChatContext) string {
+	if ctx == nil {
+		return ""
+	}
+	if detected := detectUserMessageLanguage(ctx.LatestUserMessage); detected != "" {
+		return fmt.Sprintf("- Required: %s. The latest user message is in %s; answer in %s even if tools, artifacts, or prior messages contain another language.", detected, detected, detected)
+	}
+	if hasLatinLetters(ctx.LatestUserMessage) {
+		if language := latinLanguageNameForLocale(ctx.Locale); language != "" {
+			return fmt.Sprintf("- Required: %s. The latest user message uses Latin script and matches the UI locale; answer in %s even if tools, artifacts, or prior messages contain another language.", language, language)
+		}
+		return "- Required: English. The latest user message uses Latin script while the UI locale uses another script; answer in English even if tools, artifacts, or prior messages contain another language."
+	}
+	if language := languageNameForLocale(ctx.Locale); language != "" {
+		return fmt.Sprintf("- Required: %s. Use the UI locale as fallback because the latest user message language was not clear.", language)
+	}
+	return ""
+}
+
+func detectUserMessageLanguage(message string) string {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return ""
+	}
+	var han, kana, hangul, cyrillic int
+	for _, r := range message {
+		switch {
+		case unicode.In(r, unicode.Hiragana, unicode.Katakana):
+			kana++
+		case unicode.In(r, unicode.Hangul):
+			hangul++
+		case unicode.In(r, unicode.Han):
+			han++
+		case unicode.In(r, unicode.Cyrillic):
+			cyrillic++
+		}
+	}
+	switch {
+	case kana > 0:
+		return "Japanese"
+	case hangul > 0:
+		return "Korean"
+	case han > 0:
+		return "Chinese"
+	case cyrillic > 0:
+		return "Russian"
+	default:
+		return ""
+	}
+}
+
+func hasLatinLetters(message string) bool {
+	for _, r := range message {
+		if unicode.In(r, unicode.Latin) && unicode.IsLetter(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func latinLanguageNameForLocale(locale string) string {
+	language := languageNameForLocale(locale)
+	switch language {
+	case "English", "Spanish", "French", "German", "Portuguese":
+		return language
+	default:
+		return ""
+	}
+}
+
+func languageNameForLocale(locale string) string {
+	normalized := strings.ToLower(strings.TrimSpace(locale))
+	if normalized == "" {
+		return ""
+	}
+	if idx := strings.IndexAny(normalized, "-_"); idx >= 0 {
+		normalized = normalized[:idx]
+	}
+	switch normalized {
+	case "en":
+		return "English"
+	case "zh":
+		return "Chinese"
+	case "ja":
+		return "Japanese"
+	case "ko":
+		return "Korean"
+	case "es":
+		return "Spanish"
+	case "fr":
+		return "French"
+	case "de":
+		return "German"
+	case "ru":
+		return "Russian"
+	case "pt":
+		return "Portuguese"
+	default:
+		return ""
+	}
 }
 
 func buildContextHints(ctx *ChatContext) string {

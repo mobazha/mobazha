@@ -136,6 +136,18 @@ func bestCandidate(text string, s *Skill) RouteCandidate {
 		return RouteCandidate{}
 	}
 	best := RouteCandidate{SkillID: s.ID}
+	textPhrase := normalizePhrase(text)
+	for _, name := range []string{s.ID, s.Name} {
+		name = normalizePhrase(name)
+		if name != "" && strings.Contains(" "+textPhrase+" ", " "+name+" ") && routeStrongScore > best.Score {
+			best = RouteCandidate{
+				SkillID: s.ID,
+				Score:   routeStrongScore,
+				Source:  "name",
+				Example: name,
+			}
+		}
+	}
 	for _, example := range s.Examples() {
 		score := scoreExample(text, example)
 		if score > best.Score {

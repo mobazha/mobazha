@@ -16,10 +16,13 @@ import (
 // Content-Type, Content-Disposition and Cache-Control so Huma forwards
 // them to the client instead of defaulting to application/octet-stream.
 type nodeLegacyBinaryBody struct {
-	ContentType        string `header:"Content-Type" doc:"MIME type from legacy handler." required:"false"`
-	ContentDisposition string `header:"Content-Disposition" doc:"Attachment hint for downloads." required:"false"`
-	CacheControl       string `header:"Cache-Control" doc:"Cache directive." required:"false"`
-	Body               []byte
+	ContentType           string `header:"Content-Type" doc:"MIME type from legacy handler." required:"false"`
+	ContentDisposition    string `header:"Content-Disposition" doc:"Attachment hint for downloads." required:"false"`
+	CacheControl          string `header:"Cache-Control" doc:"Cache directive." required:"false"`
+	ETag                  string `header:"ETag" doc:"Entity tag from legacy handler." required:"false"`
+	ContentSecurityPolicy string `header:"Content-Security-Policy" doc:"Content security policy from legacy handler." required:"false"`
+	XContentTypeOptions   string `header:"X-Content-Type-Options" doc:"MIME sniffing policy from legacy handler." required:"false"`
+	Body                  []byte
 }
 
 func nodeBridgeRecorderBinary(rr *httptest.ResponseRecorder) (*nodeLegacyBinaryBody, error) {
@@ -29,10 +32,13 @@ func nodeBridgeRecorderBinary(rr *httptest.ResponseRecorder) (*nodeLegacyBinaryB
 	b := rr.Body.Bytes()
 	cp := append([]byte(nil), b...)
 	return &nodeLegacyBinaryBody{
-		ContentType:        rr.Header().Get("Content-Type"),
-		ContentDisposition: rr.Header().Get("Content-Disposition"),
-		CacheControl:       rr.Header().Get("Cache-Control"),
-		Body:               cp,
+		ContentType:           rr.Header().Get("Content-Type"),
+		ContentDisposition:    rr.Header().Get("Content-Disposition"),
+		CacheControl:          rr.Header().Get("Cache-Control"),
+		ETag:                  rr.Header().Get("ETag"),
+		ContentSecurityPolicy: rr.Header().Get("Content-Security-Policy"),
+		XContentTypeOptions:   rr.Header().Get("X-Content-Type-Options"),
+		Body:                  cp,
 	}, nil
 }
 

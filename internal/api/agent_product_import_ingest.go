@@ -38,6 +38,7 @@ const (
 	productImportMaxApprovalBatch = 100
 	productImportArtifactPageSize = 500
 	productImportApprovalPageSize = 500
+	productImportMaxSafeInteger   = int64(1<<53 - 1)
 	productImportDefaultCurrency  = "USD"
 	productImportIngestIntent     = "product_import"
 )
@@ -48,6 +49,23 @@ type agentProductImportIngestRequest struct {
 	StoreID  string                         `json:"storeId,omitempty"`
 	Language string                         `json:"language,omitempty"`
 	Files    []agentProductImportIngestFile `json:"files,omitempty"`
+}
+
+type agentProductImportDraftPatch struct {
+	Title       *string                                `json:"title,omitempty"`
+	Description *string                                `json:"description,omitempty"`
+	Price       *agentProductImportDraftPricePatch     `json:"price,omitempty"`
+	Inventory   *agentProductImportDraftInventoryPatch `json:"inventory,omitempty"`
+}
+
+type agentProductImportDraftPricePatch struct {
+	AmountMinor  *int64  `json:"amountMinor,omitempty"`
+	CurrencyCode *string `json:"currencyCode,omitempty"`
+	Divisibility *int    `json:"divisibility,omitempty"`
+}
+
+type agentProductImportDraftInventoryPatch struct {
+	Quantity *int64 `json:"quantity,omitempty"`
 }
 
 type agentProductImportIngestFile struct {
@@ -155,6 +173,7 @@ type agentProductImportWorkbenchSource struct {
 	ContentType string `json:"contentType,omitempty"`
 	Status      string `json:"status"`
 	Summary     string `json:"summary,omitempty"`
+	HasPreview  bool   `json:"hasPreview,omitempty" doc:"True when source image bytes are available for preview."`
 }
 
 type agentProductImportWorkbenchRow struct {
@@ -758,7 +777,7 @@ func applyProductImportRunApprovals(ctx context.Context, r *http.Request, p aiCh
 				})
 				continue
 			}
-			if errors.Is(err, errAgentApprovalApplyState) || errors.Is(err, errAgentApprovalHash) || errors.Is(err, errAgentApprovalApplying) {
+			if errors.Is(err, errAgentApprovalApplyState) || errors.Is(err, errAgentApprovalHash) || errors.Is(err, errAgentApprovalStale) || errors.Is(err, errAgentApprovalApplying) {
 				result.Skipped = append(result.Skipped, agentProductImportApprovalBatchSkip{ApprovalID: approval.ID, Reason: err.Error()})
 				result.Items = append(result.Items, agentProductImportApprovalActionItem{
 					ApprovalID: approval.ID,
@@ -778,7 +797,7 @@ func applyProductImportRunApprovals(ctx context.Context, r *http.Request, p aiCh
 			Result:     "processed",
 		})
 	}
-	if result.Processed == 0 && result.Failed == 0 {
+	if len(targets) == 0 {
 		return nil, fmt.Errorf("no approved product import approvals found")
 	}
 	return result, nil
@@ -909,7 +928,7 @@ func productImportExistingActiveApprovalForArtifact(ctx context.Context, p aiCha
 	}
 	var latest *agentstore.Approval
 	for _, approval := range approvals {
-		if approval == nil || approval.SkillID != productImportSkillID || approval.Status == agentstore.ApprovalStatusRejected {
+		if approval == nil || approval.SkillID != productImportSkillID || approval.Status == agentstore.ApprovalStatusRejected || approval.Status == agentstore.ApprovalStatusSuperseded {
 			continue
 		}
 		if !stringListContains(approvalArtifactIDs(approval), artifactID) {
@@ -957,13 +976,17 @@ func buildProductImportWorkbench(ctx context.Context, p aiChatProvider, tenantID
 		switch artifact.Kind {
 		case agentstore.ArtifactKindSourceMaterial:
 			workbench.Counts["source"]++
-			workbench.Sources = append(workbench.Sources, agentProductImportWorkbenchSource{
+			sourceView := agentProductImportWorkbenchSource{
 				ArtifactID:  artifact.ID,
 				SourceName:  artifact.SourceName,
 				ContentType: artifact.ContentType,
 				Status:      artifact.Status,
 				Summary:     artifact.Summary,
-			})
+			}
+			if productImportSourceArtifactHasPreview(artifact) {
+				sourceView.HasPreview = true
+			}
+			workbench.Sources = append(workbench.Sources, sourceView)
 		case agentstore.ArtifactKindCandidate:
 			workbench.Counts["candidate"]++
 		case agentstore.ArtifactKindProposal:
@@ -1430,7 +1453,7 @@ func listProductImportApprovalsForArtifactIDs(ctx context.Context, p aiChatProvi
 			return nil, err
 		}
 		for _, approval := range page {
-			if approval == nil || approval.SkillID != productImportSkillID {
+			if approval == nil || approval.SkillID != productImportSkillID || approval.Status == agentstore.ApprovalStatusSuperseded {
 				continue
 			}
 			if productImportApprovalReferencesAnyArtifact(approval, artifactIDs) {
@@ -1720,10 +1743,104 @@ func buildProductImportProposalApproval(r *http.Request, p aiChatProvider, artif
 	}, nil
 }
 
+func productImportProposalApprovalReady(artifact *agentstore.Artifact) (bool, error) {
+	if err := validateProductImportProposalArtifactIdentity(artifact); err != nil {
+		return false, err
+	}
+	var proposal map[string]any
+	if err := json.Unmarshal([]byte(artifact.Data), &proposal); err != nil {
+		return false, fmt.Errorf("invalid proposal data")
+	}
+	draft, ok := proposal["draft"].(map[string]any)
+	if !ok || len(draft) == 0 {
+		return false, fmt.Errorf("proposal draft is required")
+	}
+	return stringFromAny(draft["title"]) != "", nil
+}
+
+func mergeProductImportProposalDraft(data string, rawPatch json.RawMessage) (string, error) {
+	var patch agentProductImportDraftPatch
+	decoder := json.NewDecoder(bytes.NewReader(rawPatch))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&patch); err != nil {
+		return "", fmt.Errorf("invalid product import draft patch")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return "", fmt.Errorf("invalid product import draft patch")
+	}
+	if patch.Title == nil && patch.Description == nil && patch.Price == nil && patch.Inventory == nil {
+		return "", fmt.Errorf("product import draft patch is empty")
+	}
+
+	var proposal map[string]any
+	if err := json.Unmarshal([]byte(data), &proposal); err != nil {
+		return "", fmt.Errorf("invalid proposal data")
+	}
+	draft := mapFromAny(proposal["draft"])
+	if draft == nil {
+		draft = map[string]any{}
+	}
+	if patch.Title != nil {
+		draft["title"] = strings.TrimSpace(*patch.Title)
+	}
+	if patch.Description != nil {
+		draft["description"] = strings.TrimSpace(*patch.Description)
+	}
+	if patch.Price != nil {
+		if patch.Price.AmountMinor == nil && patch.Price.CurrencyCode == nil && patch.Price.Divisibility == nil {
+			return "", fmt.Errorf("product import price patch is empty")
+		}
+		price := mapFromAny(draft["price"])
+		if price == nil {
+			price = map[string]any{}
+		}
+		if patch.Price.AmountMinor != nil {
+			if *patch.Price.AmountMinor < 0 || *patch.Price.AmountMinor > productImportMaxSafeInteger {
+				return "", fmt.Errorf("product import price is invalid")
+			}
+			price["amountMinor"] = *patch.Price.AmountMinor
+		}
+		if patch.Price.CurrencyCode != nil {
+			currencyCode := strings.ToUpper(strings.TrimSpace(*patch.Price.CurrencyCode))
+			if currencyCode == "" || len(currencyCode) > 16 {
+				return "", fmt.Errorf("product import currency is invalid")
+			}
+			price["currencyCode"] = currencyCode
+		}
+		if patch.Price.Divisibility != nil {
+			if *patch.Price.Divisibility < 0 || *patch.Price.Divisibility > 18 {
+				return "", fmt.Errorf("product import price divisibility is invalid")
+			}
+			price["divisibility"] = *patch.Price.Divisibility
+		}
+		draft["price"] = price
+	}
+	if patch.Inventory != nil {
+		if patch.Inventory.Quantity == nil {
+			return "", fmt.Errorf("product import inventory patch is empty")
+		}
+		if *patch.Inventory.Quantity < 0 || *patch.Inventory.Quantity > productImportMaxSafeInteger {
+			return "", fmt.Errorf("product import quantity is invalid")
+		}
+		inventory := mapFromAny(draft["inventory"])
+		if inventory == nil {
+			inventory = map[string]any{}
+		}
+		inventory["quantity"] = *patch.Inventory.Quantity
+		draft["inventory"] = inventory
+	}
+	proposal["draft"] = draft
+	merged, err := json.Marshal(proposal)
+	if err != nil {
+		return "", fmt.Errorf("marshal product import draft: %w", err)
+	}
+	return string(merged), nil
+}
+
 func productImportApprovalsByArtifact(approvals []*agentstore.Approval) map[string]*agentstore.Approval {
 	out := map[string]*agentstore.Approval{}
 	for _, approval := range approvals {
-		if approval == nil || approval.SkillID != productImportSkillID {
+		if approval == nil || approval.SkillID != productImportSkillID || approval.Status == agentstore.ApprovalStatusSuperseded {
 			continue
 		}
 		for _, artifactID := range approvalArtifactIDs(approval) {
@@ -1930,7 +2047,20 @@ func saveProductImportSourceArtifact(ctx context.Context, p aiChatProvider, run 
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := p.AgentStore().SaveArtifact(ctx, artifact); err != nil {
+	var content *agentstore.ArtifactContent
+	if !productImportIsTextSource(source) && len(source.Data) > 0 {
+		content = &agentstore.ArtifactContent{
+			ArtifactID:  artifact.ID,
+			TenantID:    artifact.TenantID,
+			ThreadID:    artifact.ThreadID,
+			ContentType: artifact.ContentType,
+			ContentHash: artifact.SourceHash,
+			Data:        append([]byte(nil), source.Data...),
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+	}
+	if err := p.AgentStore().SaveArtifactWithContent(ctx, artifact, content); err != nil {
 		return nil, err
 	}
 	return artifact, nil
@@ -2545,6 +2675,24 @@ func productImportInputKind(source agentProductImportIngestSource) string {
 func productImportIsTextSource(source agentProductImportIngestSource) bool {
 	kind := productImportInputKind(source)
 	return kind == "csv" || strings.HasPrefix(strings.ToLower(source.ContentType), "text/")
+}
+
+func productImportSourceArtifactHasPreview(artifact *agentstore.Artifact) bool {
+	if artifact == nil || artifact.Kind != agentstore.ArtifactKindSourceMaterial || artifact.ContentBytes <= 0 {
+		return false
+	}
+	_, safe := managed_escrowProductImportPreviewContentType(artifact.ContentType)
+	return safe
+}
+
+func managed_escrowProductImportPreviewContentType(raw string) (string, bool) {
+	contentType := strings.ToLower(strings.TrimSpace(strings.SplitN(raw, ";", 2)[0]))
+	switch contentType {
+	case "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/bmp":
+		return contentType, true
+	default:
+		return "", false
+	}
 }
 
 func inferProductImportContentType(sourceName, contentType string) string {

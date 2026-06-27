@@ -71,8 +71,7 @@ func TestAllEventConstants(t *testing.T) {
 	constants := []string{
 		OverflowDetected, ReplayShaped, CompactionStarted,
 		CompactionSucceeded, CompactionFailed, ToolCallBatch,
-		PendingRequestCreated, PendingRequestResolved,
-		TurnStarted, TurnCompleted, TurnFailed, GuardrailBlocked, LLMRetried,
+		TurnStarted, TurnCompleted, TurnFailed, StaleTurnsRecovered, GuardrailBlocked, LLMRetried,
 		MemoryRetrieved, MemoryRetrievalFailed,
 		MemorySaved, MemorySaveFailed,
 		MemoryDeleted, MemoryDeleteFailed,

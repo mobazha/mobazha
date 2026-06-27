@@ -65,14 +65,15 @@ func TestAgentChatTenantID_PrefersDatabaseScope(t *testing.T) {
 }
 
 type agentChatMemoryStore struct {
-	thread          *agentstore.Thread
-	turns           []*agentstore.Turn
-	messages        []*agentstore.Message
-	skillRuns       []*agentstore.SkillRun
-	artifacts       []*agentstore.Artifact
-	approvals       []*agentstore.Approval
-	saveArtifactErr error
-	loadSkillRunN   int
+	thread           *agentstore.Thread
+	turns            []*agentstore.Turn
+	messages         []*agentstore.Message
+	skillRuns        []*agentstore.SkillRun
+	artifacts        []*agentstore.Artifact
+	artifactContents []*agentstore.ArtifactContent
+	approvals        []*agentstore.Approval
+	saveArtifactErr  error
+	loadSkillRunN    int
 }
 
 func (s *agentChatMemoryStore) SaveThread(_ context.Context, thread *agentstore.Thread) error {
@@ -91,6 +92,31 @@ func (s *agentChatMemoryStore) SaveMessage(_ context.Context, msg *agentstore.Me
 	cp := *msg
 	s.messages = append(s.messages, &cp)
 	return nil
+}
+
+func (s *agentChatMemoryStore) SaveCompactionCheckpoint(_ context.Context, checkpoint agentstore.CompactionCheckpoint) (bool, error) {
+	if s.thread == nil || s.thread.TenantID != checkpoint.TenantID || s.thread.ID != checkpoint.ThreadID {
+		return false, agentstore.ErrThreadNotFound
+	}
+	throughAt := checkpoint.ThroughCreatedAt
+	s.thread.CompactionSummary = checkpoint.Summary
+	s.thread.CompactionSourceHash = checkpoint.SourceHash
+	s.thread.CompactionThroughMessageID = checkpoint.ThroughMessageID
+	s.thread.CompactionThroughCreatedAt = &throughAt
+	return true, nil
+}
+
+func (s *agentChatMemoryStore) FinalizeTurn(ctx context.Context, turn *agentstore.Turn, messages []*agentstore.Message) error {
+	for _, message := range messages {
+		if err := s.SaveMessage(ctx, message); err != nil {
+			return err
+		}
+	}
+	return s.SaveTurn(ctx, turn)
+}
+
+func (s *agentChatMemoryStore) RecoverStaleTurns(context.Context, string, string, time.Time) (int64, error) {
+	return 0, nil
 }
 
 func (s *agentChatMemoryStore) SaveSkillRun(_ context.Context, run *agentstore.SkillRun) error {
@@ -117,6 +143,57 @@ func (s *agentChatMemoryStore) SaveArtifact(_ context.Context, artifact *agentst
 		}
 	}
 	s.artifacts = append(s.artifacts, &cp)
+	return nil
+}
+
+func (s *agentChatMemoryStore) SaveArtifactWithContent(ctx context.Context, artifact *agentstore.Artifact, content *agentstore.ArtifactContent) error {
+	if content != nil {
+		artifact.ContentBytes = int64(len(content.Data))
+	}
+	if err := s.SaveArtifact(ctx, artifact); err != nil {
+		return err
+	}
+	if content == nil {
+		return nil
+	}
+	cp := *content
+	cp.Data = append([]byte(nil), content.Data...)
+	cp.Bytes = int64(len(cp.Data))
+	for i, existing := range s.artifactContents {
+		if existing.TenantID == cp.TenantID && existing.ArtifactID == cp.ArtifactID {
+			s.artifactContents[i] = &cp
+			return nil
+		}
+	}
+	s.artifactContents = append(s.artifactContents, &cp)
+	return nil
+}
+
+func (s *agentChatMemoryStore) SaveArtifactAndRefreshApproval(ctx context.Context, artifact *agentstore.Artifact, toolCallID string, expectedUpdatedAt time.Time, replacement *agentstore.Approval) error {
+	for _, current := range s.artifacts {
+		if current.TenantID == artifact.TenantID && current.ID == artifact.ID && !current.UpdatedAt.Equal(expectedUpdatedAt) {
+			return agentstore.ErrArtifactVersionConflict
+		}
+	}
+	active := false
+	for _, approval := range s.approvals {
+		if approval.TenantID != artifact.TenantID || approval.ToolCallID != toolCallID {
+			continue
+		}
+		switch approval.Status {
+		case agentstore.ApprovalStatusApplying, agentstore.ApprovalStatusApplied:
+			return agentstore.ErrArtifactApprovalConflict
+		case agentstore.ApprovalStatusPending, agentstore.ApprovalStatusApproved, agentstore.ApprovalStatusApplyFailed:
+			approval.Status = agentstore.ApprovalStatusSuperseded
+			active = true
+		}
+	}
+	if err := s.SaveArtifact(ctx, artifact); err != nil {
+		return err
+	}
+	if active && replacement != nil {
+		return s.SaveApproval(ctx, replacement)
+	}
 	return nil
 }
 
@@ -151,6 +228,17 @@ func (s *agentChatMemoryStore) LoadMessages(_ context.Context, _, threadID strin
 		}
 	}
 	return out, nil
+}
+
+func (s *agentChatMemoryStore) LoadRecentMessages(ctx context.Context, tenantID, threadID string, limit int) ([]*agentstore.Message, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	messages, err := s.LoadMessages(ctx, tenantID, threadID)
+	if err != nil || len(messages) <= limit {
+		return messages, err
+	}
+	return messages[len(messages)-limit:], nil
 }
 
 func (s *agentChatMemoryStore) LoadSkillRun(_ context.Context, tenantID, runID string) (*agentstore.SkillRun, error) {
@@ -197,6 +285,17 @@ func (s *agentChatMemoryStore) LoadArtifact(_ context.Context, tenantID, artifac
 		}
 	}
 	return nil, agentstore.ErrArtifactNotFound
+}
+
+func (s *agentChatMemoryStore) LoadArtifactContent(_ context.Context, tenantID, artifactID string) (*agentstore.ArtifactContent, error) {
+	for _, content := range s.artifactContents {
+		if content.TenantID == tenantID && content.ArtifactID == artifactID {
+			cp := *content
+			cp.Data = append([]byte(nil), content.Data...)
+			return &cp, nil
+		}
+	}
+	return nil, agentstore.ErrArtifactContentNotFound
 }
 
 func (s *agentChatMemoryStore) ListArtifacts(_ context.Context, tenantID, skillRunID, kind, status string, limit, offset int) ([]*agentstore.Artifact, error) {
@@ -2066,6 +2165,20 @@ func TestHandlePOSTAgentProductImportIngest_ImageCreatesVisionProposal(t *testin
 	if resp.Data.SourceArtifacts[0].Data != "" {
 		t.Fatalf("source material data should be sanitized from API response, got %q", resp.Data.SourceArtifacts[0].Data)
 	}
+	storedSource, err := store.LoadArtifact(context.Background(), "test-node", resp.Data.SourceArtifacts[0].ID)
+	if err != nil {
+		t.Fatalf("load stored source artifact: %v", err)
+	}
+	if storedSource.ContentBytes == 0 || strings.Contains(storedSource.Data, "contentBase64") {
+		t.Fatalf("source artifact should reference private binary content without embedding base64: %#v", storedSource)
+	}
+	storedContent, err := store.LoadArtifactContent(context.Background(), "test-node", storedSource.ID)
+	if err != nil {
+		t.Fatalf("load stored source content: %v", err)
+	}
+	if len(storedContent.Data) != int(storedSource.ContentBytes) || storedContent.ContentType != "image/png" {
+		t.Fatalf("stored source content mismatch: %#v", storedContent)
+	}
 	proposal := resp.Data.ProposalArtifacts[0]
 	for _, want := range []string{`"title":"Midnight Waves Cover"`, `"ai_vision_generate_from_images"`, `"price is missing"`} {
 		if !strings.Contains(proposal.Data, want) {
@@ -2841,6 +2954,54 @@ func TestHandlePOSTAgentProductImportRunApprovalActions_DecidesAndAppliesRunAppr
 	}
 }
 
+func TestHandlePOSTAgentProductImportRunApprovalApplications_ReturnsStaleItem(t *testing.T) {
+	payload := `{"listing":{"title":"Old title"},"proposalArtifactId":"art_proposal"}`
+	approval := testAgentApproval(t, "appr_stale_batch", "test-node", agentstore.ApprovalStatusApproved, payload)
+	approval.ArtifactIDs = `["art_proposal"]`
+	store := &agentChatMemoryStore{
+		skillRuns: []*agentstore.SkillRun{{
+			ID: "run_import", TenantID: "test-node", SkillID: productImportSkillID,
+			Status: agentstore.SkillRunStatusWaitingForApproval,
+		}},
+		artifacts: []*agentstore.Artifact{{
+			ID: "art_proposal", TenantID: "test-node", SkillRunID: "run_import",
+			SkillID: productImportSkillID, Kind: agentstore.ArtifactKindProposal,
+			Status: agentstore.ArtifactStatusSkipped, Data: `{"draft":{"title":"Old title"}}`,
+		}},
+		approvals: []*agentstore.Approval{approval},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	oldExecute := executeAgentApprovalTool
+	executeAgentApprovalTool = func(context.Context, string, string, string, string) (string, error) {
+		t.Fatal("stale batch approval must not execute")
+		return "", nil
+	}
+	t.Cleanup(func() { executeAgentApprovalTool = oldExecute })
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/product-import/runs/run_import/approval-applications", strings.NewReader(`{"approvalIds":["appr_stale_batch"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"runId": "run_import"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentProductImportRunApprovalApplications(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected stale batch item response 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Data agentProductImportApprovalActionBatchResult `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode stale batch response: %v", err)
+	}
+	if len(resp.Data.Items) != 1 || resp.Data.Items[0].Result != "skipped" || !strings.Contains(resp.Data.Items[0].Reason, "proposal changed") {
+		t.Fatalf("expected stale per-item result, got %#v", resp.Data.Items)
+	}
+}
+
 func TestHandlePOSTAgentProductImportRunApprovals_RejectsEmptySelection(t *testing.T) {
 	store := &agentChatMemoryStore{
 		skillRuns: []*agentstore.SkillRun{
@@ -3199,6 +3360,178 @@ func TestHandlePATCHAgentArtifact_UpdatesReviewableFields(t *testing.T) {
 	}
 }
 
+func TestHandlePATCHAgentArtifact_ProductImportRefreshesExistingApproval(t *testing.T) {
+	oldPayload := `{"listing":{"title":"Old title"},"proposalArtifactId":"art_proposal"}`
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{{
+			ID: "art_proposal", TenantID: "test-node", ThreadID: "thread_import",
+			SkillRunID: "run_import", SkillID: productImportSkillID,
+			Kind: agentstore.ArtifactKindProposal, Status: agentstore.ArtifactStatusNeedsReview,
+			Name: "Imported product", Data: `{"draft":{"title":"Old title"}}`,
+		}},
+		approvals: []*agentstore.Approval{
+			testAgentApproval(t, "appr_old", "test-node", agentstore.ApprovalStatusApproved, oldPayload),
+		},
+	}
+	store.approvals[0].ToolCallID = "artifact:art_proposal"
+	store.approvals[0].ArtifactIDs = `["art_proposal"]`
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/artifacts/art_proposal", strings.NewReader(`{
+		"data":{"draft":{"title":"New title","price":{"amountMinor":2500,"currencyCode":"USD","divisibility":2}}}
+	}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_proposal"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentArtifact(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if len(store.approvals) != 2 {
+		t.Fatalf("expected refreshed approval, got %#v", store.approvals)
+	}
+	if store.approvals[0].Status != agentstore.ApprovalStatusSuperseded {
+		t.Fatalf("old approval should be superseded, got %#v", store.approvals[0])
+	}
+	refreshed := store.approvals[1]
+	if refreshed.Status != agentstore.ApprovalStatusPending || !strings.Contains(refreshed.Payload, `"title":"New title"`) {
+		t.Fatalf("expected pending approval with refreshed payload, got %#v", refreshed)
+	}
+}
+
+func TestHandlePATCHAgentArtifact_ProductImportDraftPatchMergesAtomically(t *testing.T) {
+	updatedAt := time.Date(2026, time.June, 28, 8, 30, 0, 123, time.UTC)
+	oldPayload := `{"listing":{"title":"Old title"},"proposalArtifactId":"art_proposal"}`
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{{
+			ID: "art_proposal", TenantID: "test-node", ThreadID: "thread_import",
+			SkillRunID: "run_import", SkillID: productImportSkillID,
+			Kind: agentstore.ArtifactKindProposal, Status: agentstore.ArtifactStatusNeedsReview,
+			Name: "Imported product", UpdatedAt: updatedAt,
+			Data: `{"sourceArtifactId":"art_source","draft":{"title":"Old title","description":"Keep me","price":{"amountMinor":1000,"currencyCode":"USD","divisibility":2}}}`,
+		}},
+		approvals: []*agentstore.Approval{
+			testAgentApproval(t, "appr_old", "test-node", agentstore.ApprovalStatusApproved, oldPayload),
+		},
+	}
+	store.approvals[0].ToolCallID = "artifact:art_proposal"
+	store.approvals[0].ArtifactIDs = `["art_proposal"]`
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	body := fmt.Sprintf(`{
+		"draftPatch":{
+			"price":{"amountMinor":2500,"currencyCode":"eur","divisibility":2},
+			"inventory":{"quantity":4}
+		},
+		"expectedUpdatedAt":%q
+	}`, updatedAt.Format(time.RFC3339Nano))
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/artifacts/art_proposal", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_proposal"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentArtifact(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var proposal map[string]any
+	if err := json.Unmarshal([]byte(store.artifacts[0].Data), &proposal); err != nil {
+		t.Fatalf("decode proposal: %v", err)
+	}
+	if stringFromAny(proposal["sourceArtifactId"]) != "art_source" {
+		t.Fatalf("source metadata should be preserved: %#v", proposal)
+	}
+	draft := mapFromAny(proposal["draft"])
+	if stringFromAny(draft["title"]) != "Old title" || stringFromAny(draft["description"]) != "Keep me" {
+		t.Fatalf("unpatched draft fields should be preserved: %#v", draft)
+	}
+	price := mapFromAny(draft["price"])
+	if intFromAny(price["amountMinor"]) != 2500 || stringFromAny(price["currencyCode"]) != "EUR" {
+		t.Fatalf("price patch not applied: %#v", price)
+	}
+	if intFromAny(mapFromAny(draft["inventory"])["quantity"]) != 4 {
+		t.Fatalf("inventory patch not applied: %#v", draft)
+	}
+	if len(store.approvals) != 2 || store.approvals[0].Status != agentstore.ApprovalStatusSuperseded || store.approvals[1].Status != agentstore.ApprovalStatusPending {
+		t.Fatalf("approval should be refreshed after draft patch: %#v", store.approvals)
+	}
+}
+
+func TestHandlePATCHAgentArtifact_ProductImportDraftPatchRejectsStaleVersion(t *testing.T) {
+	updatedAt := time.Date(2026, time.June, 28, 8, 30, 0, 0, time.UTC)
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{{
+			ID: "art_proposal", TenantID: "test-node", SkillID: productImportSkillID,
+			Kind: agentstore.ArtifactKindProposal, Status: agentstore.ArtifactStatusNeedsReview,
+			UpdatedAt: updatedAt, Data: `{"draft":{"title":"Current title"}}`,
+		}},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	body := fmt.Sprintf(
+		`{"draftPatch":{"title":"Stale title"},"expectedUpdatedAt":%q}`,
+		updatedAt.Add(-time.Second).Format(time.RFC3339Nano),
+	)
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/artifacts/art_proposal", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_proposal"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentArtifact(rr, req)
+
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(store.artifacts[0].Data, `"title":"Current title"`) {
+		t.Fatalf("stale patch should not change proposal: %s", store.artifacts[0].Data)
+	}
+}
+
+func TestHandlePATCHAgentArtifact_SkippedProductImportSupersedesApproval(t *testing.T) {
+	payload := `{"listing":{"title":"Skip me"},"proposalArtifactId":"art_proposal"}`
+	approval := testAgentApproval(t, "appr_pending", "test-node", agentstore.ApprovalStatusPending, payload)
+	approval.ToolCallID = "artifact:art_proposal"
+	approval.ArtifactIDs = `["art_proposal"]`
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{{
+			ID: "art_proposal", TenantID: "test-node", ThreadID: "thread_import",
+			SkillRunID: "run_import", SkillID: productImportSkillID,
+			Kind: agentstore.ArtifactKindProposal, Status: agentstore.ArtifactStatusNeedsReview,
+			Name: "Imported product", Data: `{"draft":{"title":"Skip me"}}`,
+		}},
+		approvals: []*agentstore.Approval{approval},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodPatch, "/v1/agent/artifacts/art_proposal", strings.NewReader(`{"status":"skipped"}`))
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_proposal"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePATCHAgentArtifact(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if len(store.approvals) != 1 || store.approvals[0].Status != agentstore.ApprovalStatusSuperseded {
+		t.Fatalf("skipping proposal should supersede approval without replacement, got %#v", store.approvals)
+	}
+	if store.artifacts[0].Status != agentstore.ArtifactStatusSkipped {
+		t.Fatalf("expected skipped proposal, got %#v", store.artifacts[0])
+	}
+}
+
 func TestHandlePATCHAgentArtifact_ValidatesStatus(t *testing.T) {
 	store := &agentChatMemoryStore{
 		artifacts: []*agentstore.Artifact{
@@ -3234,6 +3567,112 @@ func TestHandlePATCHAgentArtifact_ValidatesStatus(t *testing.T) {
 	}
 	if loaded.Status != agentstore.ArtifactStatusNew {
 		t.Fatalf("artifact status should not change, got %#v", loaded)
+	}
+}
+
+func TestHandleGETAgentArtifactContent_ReturnsManagedEscrowRasterPreview(t *testing.T) {
+	raw := []byte("png-preview")
+	contentHash := productImportSourceHash(raw)
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{{
+			ID:           "art_preview",
+			TenantID:     "test-node",
+			Kind:         agentstore.ArtifactKindSourceMaterial,
+			ContentType:  "image/png",
+			ContentBytes: int64(len(raw)),
+			SourceHash:   contentHash,
+		}},
+		artifactContents: []*agentstore.ArtifactContent{{
+			ArtifactID:  "art_preview",
+			TenantID:    "test-node",
+			ContentType: "image/png",
+			ContentHash: contentHash,
+			Bytes:       int64(len(raw)),
+			Data:        raw,
+		}},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/agent/artifacts/art_preview/content", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_preview"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentArtifactContent(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !bytes.Equal(rr.Body.Bytes(), raw) {
+		t.Fatalf("preview body = %q, want %q", rr.Body.Bytes(), raw)
+	}
+	if got := rr.Header().Get("Content-Type"); got != "image/png" {
+		t.Fatalf("Content-Type = %q, want image/png", got)
+	}
+	if got := rr.Header().Get("Content-Security-Policy"); got != "default-src 'none'; sandbox" {
+		t.Fatalf("Content-Security-Policy = %q", got)
+	}
+	if got := rr.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q, want nosniff", got)
+	}
+	if got := rr.Header().Get("ETag"); got != `"`+contentHash+`"` {
+		t.Fatalf("ETag = %q, want content hash", got)
+	}
+}
+
+func TestHandleGETAgentArtifactContent_RejectsCorruptedContent(t *testing.T) {
+	expected := []byte("expected")
+	corrupted := []byte("tampered")
+	contentHash := productImportSourceHash(expected)
+	store := &agentChatMemoryStore{
+		artifacts: []*agentstore.Artifact{{
+			ID: "art_corrupt", TenantID: "test-node", Kind: agentstore.ArtifactKindSourceMaterial,
+			ContentType: "image/png", ContentBytes: int64(len(corrupted)), SourceHash: contentHash,
+		}},
+		artifactContents: []*agentstore.ArtifactContent{{
+			ArtifactID: "art_corrupt", TenantID: "test-node", ContentType: "image/png",
+			ContentHash: contentHash, Bytes: int64(len(corrupted)), Data: corrupted,
+		}},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/agent/artifacts/art_corrupt/content", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_corrupt"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentArtifactContent(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected corrupted content to fail integrity check, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandleGETAgentArtifactContent_RejectsUnsafeImageType(t *testing.T) {
+	store := &agentChatMemoryStore{artifacts: []*agentstore.Artifact{{
+		ID:           "art_svg",
+		TenantID:     "test-node",
+		Kind:         agentstore.ArtifactKindSourceMaterial,
+		ContentType:  "image/svg+xml",
+		ContentBytes: int64(len(`<svg/>`)),
+	}}}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/agent/artifacts/art_svg/content", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"artifactId": "art_svg"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handleGETAgentArtifactContent(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected unsafe preview to be unavailable, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -3360,7 +3799,7 @@ func TestHandlePOSTAgentApprovalDecision_UpdatesPendingApproval(t *testing.T) {
 }
 
 func TestHandlePOSTAgentApprovalApply_ExecutesApprovedPayloadOnce(t *testing.T) {
-	payload := `{"listing":{"title":"Draft Shirt"}}`
+	payload := `{"listing":{"title":"Draft Shirt"},"proposalArtifactId":"art_proposal"}`
 	approval := testAgentApproval(t, "appr_apply", "test-node", agentstore.ApprovalStatusApproved, payload)
 	approval.ArtifactIDs = `["art_proposal","art_source"]`
 	store := &agentChatMemoryStore{
@@ -3371,7 +3810,7 @@ func TestHandlePOSTAgentApprovalApply_ExecutesApprovedPayloadOnce(t *testing.T) 
 				TenantID: "test-node",
 				Kind:     agentstore.ArtifactKindProposal,
 				Status:   agentstore.ArtifactStatusReady,
-				Data:     `{"title":"Draft Shirt"}`,
+				Data:     `{"draft":{"title":"Draft Shirt"}}`,
 			},
 			{
 				ID:       "art_source",
@@ -3459,6 +3898,80 @@ func TestHandlePOSTAgentApprovalApply_RejectsPendingApproval(t *testing.T) {
 	}
 	if store.approvals[0].Status != agentstore.ApprovalStatusPending {
 		t.Fatalf("pending approval should remain pending, got %#v", store.approvals[0])
+	}
+}
+
+func TestHandlePOSTAgentApprovalApply_RejectsStaleProductImportPayload(t *testing.T) {
+	payload := `{"listing":{"title":"Old title"},"proposalArtifactId":"art_proposal"}`
+	approval := testAgentApproval(t, "appr_stale", "test-node", agentstore.ApprovalStatusApproved, payload)
+	store := &agentChatMemoryStore{
+		approvals: []*agentstore.Approval{approval},
+		artifacts: []*agentstore.Artifact{{
+			ID: "art_proposal", TenantID: "test-node", Kind: agentstore.ArtifactKindProposal,
+			SkillID: productImportSkillID, Status: agentstore.ArtifactStatusNeedsReview,
+			Data: `{"draft":{"title":"New title"}}`,
+		}},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	oldExecute := executeAgentApprovalTool
+	executeAgentApprovalTool = func(context.Context, string, string, string, string) (string, error) {
+		t.Fatal("stale approval must not execute")
+		return "", nil
+	}
+	t.Cleanup(func() { executeAgentApprovalTool = oldExecute })
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/approvals/appr_stale/apply", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"approvalId": "appr_stale"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentApprovalApply(rr, req)
+
+	if rr.Code != http.StatusConflict || !strings.Contains(rr.Body.String(), "proposal changed") {
+		t.Fatalf("expected stale approval conflict, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if store.approvals[0].Status != agentstore.ApprovalStatusApproved {
+		t.Fatalf("stale approval should remain approved, got %#v", store.approvals[0])
+	}
+}
+
+func TestHandlePOSTAgentApprovalApply_RejectsSkippedProductImportProposal(t *testing.T) {
+	payload := `{"listing":{"title":"Skipped title"},"proposalArtifactId":"art_proposal"}`
+	approval := testAgentApproval(t, "appr_skipped", "test-node", agentstore.ApprovalStatusApproved, payload)
+	store := &agentChatMemoryStore{
+		approvals: []*agentstore.Approval{approval},
+		artifacts: []*agentstore.Artifact{{
+			ID: "art_proposal", TenantID: "test-node", Kind: agentstore.ArtifactKindProposal,
+			SkillID: productImportSkillID, Status: agentstore.ArtifactStatusSkipped,
+			Data: `{"draft":{"title":"Skipped title"}}`,
+		}},
+	}
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store:            store,
+	}
+	oldExecute := executeAgentApprovalTool
+	executeAgentApprovalTool = func(context.Context, string, string, string, string) (string, error) {
+		t.Fatal("skipped proposal approval must not execute")
+		return "", nil
+	}
+	t.Cleanup(func() { executeAgentApprovalTool = oldExecute })
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/approvals/appr_skipped/apply", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+	req = withURLParams(req, map[string]string{"approvalId": "appr_skipped"})
+	rr := httptest.NewRecorder()
+
+	(&Gateway{}).handlePOSTAgentApprovalApply(rr, req)
+
+	if rr.Code != http.StatusConflict || !strings.Contains(rr.Body.String(), "proposal changed") {
+		t.Fatalf("expected skipped proposal conflict, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if store.approvals[0].Status != agentstore.ApprovalStatusApproved {
+		t.Fatalf("skipped proposal approval should remain approved, got %#v", store.approvals[0])
 	}
 }
 

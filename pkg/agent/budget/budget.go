@@ -1,17 +1,18 @@
 package budget
 
 import (
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
 
 // Decision represents the outcome of a budget evaluation.
 type Decision struct {
-	Estimated   int  // estimated token count of the current context
-	Available   int  // remaining tokens before hitting limit
-	ShouldShape bool // true if replay shaping should be applied first
+	Estimated     int  // estimated token count of the current context
+	Available     int  // remaining tokens before hitting limit
+	ShouldShape   bool // true if lossy replay shaping is needed as a fallback
 	ShouldCompact bool // true if compaction (LLM summarization) is needed
-	Overflow    bool // true if even after compaction the context is too large
+	Overflow      bool // true if even after compaction the context is too large
 }
 
 // Config holds tuning parameters for the budget calculator.
@@ -22,7 +23,7 @@ type Config struct {
 	ShapeThreshold   float64 // fraction at which shaping triggers (default 0.60)
 }
 
-// DefaultConfig returns sensible defaults for GPT-4o class models.
+// DefaultConfig returns the runtime's conservative large-context defaults.
 func DefaultConfig() Config {
 	return Config{
 		MaxContextTokens: 128000,
@@ -30,6 +31,28 @@ func DefaultConfig() Config {
 		CompactThreshold: 0.75,
 		ShapeThreshold:   0.60,
 	}
+}
+
+// ConfigForModel returns a conservative internal budget for a model family.
+// These caps intentionally stay below some providers' advertised windows so
+// unknown gateways and aliases compact early instead of failing at inference.
+func ConfigForModel(model string) Config {
+	cfg := DefaultConfig()
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	switch {
+	case normalized == "":
+		cfg.MaxContextTokens = 32_000
+	case strings.Contains(normalized, "gpt-3.5"):
+		cfg.MaxContextTokens = 16_000
+	case strings.Contains(normalized, "deepseek"), strings.Contains(normalized, "qwen"):
+		cfg.MaxContextTokens = 64_000
+	case strings.Contains(normalized, "gpt-4"), strings.Contains(normalized, "gpt-5"),
+		strings.Contains(normalized, "claude"), strings.Contains(normalized, "gemini"):
+		cfg.MaxContextTokens = 128_000
+	default:
+		cfg.MaxContextTokens = 32_000
+	}
+	return cfg
 }
 
 // Calculator estimates token usage and decides on compaction strategy.

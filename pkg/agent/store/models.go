@@ -4,12 +4,27 @@ import "time"
 
 // Thread represents a multi-turn conversation session.
 type Thread struct {
-	ID         string    `gorm:"column:id;type:varchar(64);primaryKey" json:"id"`
-	TenantID   string    `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_threads_tenant_active,priority:1" json:"tenant_id"`
-	Persona    string    `gorm:"column:persona;type:varchar(64)" json:"persona"`
-	Title      string    `gorm:"column:title;type:varchar(256)" json:"title,omitempty"`
-	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
-	LastActive time.Time `gorm:"column:last_active;index:idx_agent_threads_tenant_active,priority:2,sort:desc" json:"last_active"`
+	ID                         string     `gorm:"column:id;type:varchar(64);primaryKey" json:"id"`
+	TenantID                   string     `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_threads_tenant_active,priority:1" json:"tenant_id"`
+	Persona                    string     `gorm:"column:persona;type:varchar(64)" json:"persona"`
+	Title                      string     `gorm:"column:title;type:varchar(256)" json:"title,omitempty"`
+	CompactionSummary          string     `gorm:"column:compaction_summary;type:text;not null;default:''" json:"-"`
+	CompactionSourceHash       string     `gorm:"column:compaction_source_hash;type:varchar(64);not null;default:''" json:"-"`
+	CompactionThroughMessageID string     `gorm:"column:compaction_through_message_id;type:varchar(64);not null;default:''" json:"-"`
+	CompactionThroughCreatedAt *time.Time `gorm:"column:compaction_through_created_at" json:"-"`
+	CreatedAt                  time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	LastActive                 time.Time  `gorm:"column:last_active;index:idx_agent_threads_tenant_active,priority:2,sort:desc" json:"last_active"`
+}
+
+// CompactionCheckpoint records the durable replay prefix represented by a
+// thread summary. The timestamp and message ID form an exclusive boundary.
+type CompactionCheckpoint struct {
+	TenantID         string
+	ThreadID         string
+	Summary          string
+	SourceHash       string
+	ThroughMessageID string
+	ThroughCreatedAt time.Time
 }
 
 // Turn represents a single user→model→(tool)→model cycle within a thread.
@@ -17,7 +32,6 @@ type Turn struct {
 	ID          string     `gorm:"column:id;type:varchar(64);primaryKey" json:"id"`
 	TenantID    string     `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_turns_tenant_thread,priority:1" json:"tenant_id"`
 	ThreadID    string     `gorm:"column:thread_id;type:varchar(64);index:idx_agent_turns_tenant_thread,priority:2" json:"thread_id"`
-	TurnIndex   int        `json:"turn_index"`
 	Status      string     `gorm:"column:status;type:varchar(32);index" json:"status"`
 	Error       string     `gorm:"column:error;type:text" json:"error,omitempty"`
 	StartedAt   time.Time  `json:"started_at"`
@@ -40,6 +54,7 @@ type Message struct {
 	Tokens            int       `json:"tokens"`
 	Bytes             int       `json:"bytes"`
 	CreatedAt         time.Time `gorm:"index:idx_agent_messages_tenant_thread_created,priority:3" json:"created_at"`
+	Checkpoint        bool      `gorm:"-" json:"-"`
 }
 
 // SkillRun represents one durable execution of a business skill.
@@ -64,23 +79,38 @@ type SkillRun struct {
 // Artifact represents a durable skill artifact such as source material,
 // extracted product candidates, drafts, validation reports, or previews.
 type Artifact struct {
-	ID          string    `gorm:"column:id;type:varchar(64);primaryKey" json:"id"`
-	TenantID    string    `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_artifacts_tenant_run_kind,priority:1" json:"tenant_id"`
-	ThreadID    string    `gorm:"column:thread_id;type:varchar(64);index" json:"thread_id,omitempty"`
-	TurnID      string    `gorm:"column:turn_id;type:varchar(64);index" json:"turn_id,omitempty"`
-	SkillRunID  string    `gorm:"column:skill_run_id;type:varchar(64);index:idx_agent_artifacts_tenant_run_kind,priority:2" json:"skill_run_id,omitempty"`
-	SkillID     string    `gorm:"column:skill_id;type:varchar(128);index" json:"skill_id,omitempty"`
-	Kind        string    `gorm:"column:kind;type:varchar(64);index:idx_agent_artifacts_tenant_run_kind,priority:3" json:"kind"`
-	Status      string    `gorm:"column:status;type:varchar(32);index" json:"status"`
-	Name        string    `gorm:"column:name;type:varchar(256)" json:"name,omitempty"`
-	ContentType string    `gorm:"column:content_type;type:varchar(128)" json:"content_type,omitempty"`
-	SourceURI   string    `gorm:"column:source_uri;type:text" json:"source_uri,omitempty"`
-	SourceName  string    `gorm:"column:source_name;type:varchar(256)" json:"source_name,omitempty"`
-	SourceHash  string    `gorm:"column:source_hash;type:varchar(128);index" json:"source_hash,omitempty"`
-	Summary     string    `gorm:"column:summary;type:text" json:"summary,omitempty"`
-	Data        string    `gorm:"column:data;type:text" json:"data,omitempty"`
-	CreatedAt   time.Time `gorm:"index" json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID           string    `gorm:"column:id;type:varchar(64);primaryKey" json:"id"`
+	TenantID     string    `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_artifacts_tenant_run_kind,priority:1" json:"tenant_id"`
+	ThreadID     string    `gorm:"column:thread_id;type:varchar(64);index" json:"thread_id,omitempty"`
+	TurnID       string    `gorm:"column:turn_id;type:varchar(64);index" json:"turn_id,omitempty"`
+	SkillRunID   string    `gorm:"column:skill_run_id;type:varchar(64);index:idx_agent_artifacts_tenant_run_kind,priority:2" json:"skill_run_id,omitempty"`
+	SkillID      string    `gorm:"column:skill_id;type:varchar(128);index" json:"skill_id,omitempty"`
+	Kind         string    `gorm:"column:kind;type:varchar(64);index:idx_agent_artifacts_tenant_run_kind,priority:3" json:"kind"`
+	Status       string    `gorm:"column:status;type:varchar(32);index" json:"status"`
+	Name         string    `gorm:"column:name;type:varchar(256)" json:"name,omitempty"`
+	ContentType  string    `gorm:"column:content_type;type:varchar(128)" json:"content_type,omitempty"`
+	ContentBytes int64     `gorm:"column:content_bytes;not null;default:0" json:"-"`
+	SourceURI    string    `gorm:"column:source_uri;type:text" json:"source_uri,omitempty"`
+	SourceName   string    `gorm:"column:source_name;type:varchar(256)" json:"source_name,omitempty"`
+	SourceHash   string    `gorm:"column:source_hash;type:varchar(128);index" json:"source_hash,omitempty"`
+	Summary      string    `gorm:"column:summary;type:text" json:"summary,omitempty"`
+	Data         string    `gorm:"column:data;type:text" json:"data,omitempty"`
+	CreatedAt    time.Time `gorm:"index" json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// ArtifactContent stores private binary source material separately from the
+// structured artifact payload. It is never serialized through artifact APIs.
+type ArtifactContent struct {
+	ArtifactID  string    `gorm:"column:artifact_id;type:varchar(64);primaryKey" json:"-"`
+	TenantID    string    `gorm:"column:tenant_id;type:varchar(255);primaryKey;index:idx_agent_artifact_contents_thread,priority:1" json:"-"`
+	ThreadID    string    `gorm:"column:thread_id;type:varchar(64);index:idx_agent_artifact_contents_thread,priority:2" json:"-"`
+	ContentType string    `gorm:"column:content_type;type:varchar(128)" json:"-"`
+	ContentHash string    `gorm:"column:content_hash;type:varchar(128);index" json:"-"`
+	Bytes       int64     `gorm:"column:bytes;not null" json:"-"`
+	Data        []byte    `gorm:"column:data;not null" json:"-"`
+	CreatedAt   time.Time `json:"-"`
+	UpdatedAt   time.Time `json:"-"`
 }
 
 // Approval represents a pending or decided human approval request.
@@ -140,6 +170,8 @@ func (Message) TableName() string { return "agent_messages" }
 func (SkillRun) TableName() string { return "agent_skill_runs" }
 
 func (Artifact) TableName() string { return "agent_artifacts" }
+
+func (ArtifactContent) TableName() string { return "agent_artifact_contents" }
 
 func (Approval) TableName() string { return "agent_approvals" }
 

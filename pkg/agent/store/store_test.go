@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -390,6 +391,164 @@ func TestGormPersistence_SkillRunsAndArtifacts(t *testing.T) {
 	require.ErrorIs(t, err, ErrArtifactNotFound)
 }
 
+func TestGormPersistence_ArtifactContentIsPrivateAndTenantScoped(t *testing.T) {
+	sharedDB, err := gorm.Open(sqlitedialect.Open(t.TempDir()+"/agent-artifact-content.db"), &gorm.Config{})
+	require.NoError(t, err)
+	dbA := newAgentStoreTestTenantDB(t, sharedDB, "tenant_a")
+	dbB := newAgentStoreTestTenantDB(t, sharedDB, "tenant_b")
+	require.NoError(t, MigrateModels(dbA))
+	persistA := NewGormPersistence(dbA)
+	persistB := NewGormPersistence(dbB)
+	ctx := context.Background()
+	raw := []byte("private-image-bytes")
+	artifact := &Artifact{
+		ID:          "art_image",
+		TenantID:    "tenant_a",
+		ThreadID:    "th_a",
+		SkillRunID:  "run_a",
+		SkillID:     "product.import",
+		Kind:        ArtifactKindSourceMaterial,
+		Status:      ArtifactStatusReady,
+		ContentType: "image/png",
+		Data:        `{"source":{"name":"private.png"}}`,
+	}
+	require.NoError(t, persistA.SaveArtifactWithContent(ctx, artifact, &ArtifactContent{
+		ArtifactID:  artifact.ID,
+		TenantID:    artifact.TenantID,
+		ThreadID:    artifact.ThreadID,
+		ContentType: artifact.ContentType,
+		ContentHash: "sha256",
+		Data:        raw,
+	}))
+
+	loadedArtifact, err := persistA.LoadArtifact(ctx, "tenant_a", artifact.ID)
+	require.NoError(t, err)
+	require.EqualValues(t, len(raw), loadedArtifact.ContentBytes)
+	require.NotContains(t, loadedArtifact.Data, "private-image-bytes")
+
+	loadedContent, err := persistA.LoadArtifactContent(ctx, "tenant_a", artifact.ID)
+	require.NoError(t, err)
+	require.Equal(t, raw, loadedContent.Data)
+	require.EqualValues(t, len(raw), loadedContent.Bytes)
+	_, err = persistB.LoadArtifactContent(ctx, "tenant_b", artifact.ID)
+	require.ErrorIs(t, err, ErrArtifactContentNotFound)
+}
+
+func TestGormPersistence_SaveArtifactAndRefreshApproval_RefreshesAtomically(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	tenantID := database.StandaloneTenantID
+	artifact := &Artifact{
+		ID: "art_refresh", TenantID: tenantID, Kind: ArtifactKindProposal,
+		Status: ArtifactStatusNeedsReview, Data: `{"draft":{"title":"Old"}}`,
+	}
+	require.NoError(t, persist.SaveArtifact(ctx, artifact))
+	storedArtifact, err := persist.LoadArtifact(ctx, tenantID, artifact.ID)
+	require.NoError(t, err)
+	require.NoError(t, persist.SaveApproval(ctx, &Approval{
+		ID: "appr_old", TenantID: tenantID, ToolCallID: "artifact:art_refresh",
+		SkillID: "product.import", Action: "listings_create", Status: ApprovalStatusApproved,
+		RequestHash: "old-hash", ArtifactIDs: `["art_refresh"]`,
+	}))
+
+	artifact.Data = `{"draft":{"title":"New"}}`
+	replacement := &Approval{
+		ID: "appr_new", TenantID: tenantID, ToolCallID: "artifact:art_refresh",
+		SkillID: "product.import", Action: "listings_create", Status: ApprovalStatusPending,
+		RequestHash: "new-hash", ArtifactIDs: `["art_refresh"]`,
+	}
+	artifact.UpdatedAt = time.Now()
+	require.NoError(t, persist.SaveArtifactAndRefreshApproval(ctx, artifact, "artifact:art_refresh", storedArtifact.UpdatedAt, replacement))
+
+	loaded, err := persist.LoadArtifact(ctx, tenantID, artifact.ID)
+	require.NoError(t, err)
+	require.Contains(t, loaded.Data, `"title":"New"`)
+	oldApproval, err := persist.LoadApproval(ctx, tenantID, "appr_old")
+	require.NoError(t, err)
+	require.Equal(t, ApprovalStatusSuperseded, oldApproval.Status)
+	newApproval, err := persist.LoadApproval(ctx, tenantID, "appr_new")
+	require.NoError(t, err)
+	require.Equal(t, ApprovalStatusPending, newApproval.Status)
+}
+
+func TestGormPersistence_SaveArtifactAndRefreshApproval_ApplyingApprovalRollsBack(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	tenantID := database.StandaloneTenantID
+	artifact := &Artifact{
+		ID: "art_busy", TenantID: tenantID, Kind: ArtifactKindProposal,
+		Status: ArtifactStatusNeedsReview, Data: `{"draft":{"title":"Old"}}`,
+	}
+	require.NoError(t, persist.SaveArtifact(ctx, artifact))
+	storedArtifact, err := persist.LoadArtifact(ctx, tenantID, artifact.ID)
+	require.NoError(t, err)
+	require.NoError(t, persist.SaveApproval(ctx, &Approval{
+		ID: "appr_busy", TenantID: tenantID, ToolCallID: "artifact:art_busy",
+		SkillID: "product.import", Action: "listings_create", Status: ApprovalStatusApplying,
+		RequestHash: "busy-hash", ArtifactIDs: `["art_busy"]`,
+	}))
+
+	artifact.Data = `{"draft":{"title":"New"}}`
+	artifact.UpdatedAt = time.Now()
+	err = persist.SaveArtifactAndRefreshApproval(ctx, artifact, "artifact:art_busy", storedArtifact.UpdatedAt, nil)
+	require.ErrorIs(t, err, ErrArtifactApprovalConflict)
+	loaded, err := persist.LoadArtifact(ctx, tenantID, artifact.ID)
+	require.NoError(t, err)
+	require.Contains(t, loaded.Data, `"title":"Old"`)
+}
+
+func TestGormPersistence_SaveArtifactAndRefreshApproval_StaleVersionRollsBack(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	tenantID := database.StandaloneTenantID
+	artifact := &Artifact{
+		ID: "art_stale", TenantID: tenantID, Kind: ArtifactKindProposal,
+		Status: ArtifactStatusNeedsReview, Data: `{"draft":{"title":"Old"}}`,
+	}
+	require.NoError(t, persist.SaveArtifact(ctx, artifact))
+	storedArtifact, err := persist.LoadArtifact(ctx, tenantID, artifact.ID)
+	require.NoError(t, err)
+	require.NoError(t, persist.SaveApproval(ctx, &Approval{
+		ID: "appr_stale", TenantID: tenantID, ToolCallID: "artifact:art_stale",
+		SkillID: "product.import", Action: "listings_create", Status: ApprovalStatusApproved,
+		RequestHash: "old-hash", ArtifactIDs: `["art_stale"]`,
+	}))
+
+	artifact.Data = `{"draft":{"title":"New"}}`
+	artifact.UpdatedAt = time.Now()
+	replacement := &Approval{
+		ID: "appr_replacement", TenantID: tenantID, ToolCallID: "artifact:art_stale",
+		SkillID: "product.import", Action: "listings_create", Status: ApprovalStatusPending,
+		RequestHash: "new-hash", ArtifactIDs: `["art_stale"]`,
+	}
+	err = persist.SaveArtifactAndRefreshApproval(
+		ctx,
+		artifact,
+		"artifact:art_stale",
+		storedArtifact.UpdatedAt.Add(-time.Second),
+		replacement,
+	)
+	require.ErrorIs(t, err, ErrArtifactVersionConflict)
+
+	loaded, err := persist.LoadArtifact(ctx, tenantID, artifact.ID)
+	require.NoError(t, err)
+	require.Contains(t, loaded.Data, `"title":"Old"`)
+	oldApproval, err := persist.LoadApproval(ctx, tenantID, "appr_stale")
+	require.NoError(t, err)
+	require.Equal(t, ApprovalStatusApproved, oldApproval.Status)
+	_, err = persist.LoadApproval(ctx, tenantID, "appr_replacement")
+	require.ErrorIs(t, err, ErrApprovalNotFound)
+}
+
 func TestGormPersistence_ApprovalQueueAndDecision(t *testing.T) {
 	sharedDB, err := gorm.Open(sqlitedialect.Open(t.TempDir()+"/agent-approvals.db"), &gorm.Config{})
 	require.NoError(t, err)
@@ -772,6 +931,150 @@ func TestGormPersistence_SaveTurnStatusAndError(t *testing.T) {
 	require.Contains(t, failed.Error, "provider failed")
 }
 
+func TestGormPersistence_FinalizeTurnAtomicallyPersistsMessageAndStatus(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	startedAt := time.Now().Add(-time.Minute)
+	require.NoError(t, persist.SaveTurn(ctx, &Turn{
+		ID: "turn_atomic", TenantID: database.StandaloneTenantID, ThreadID: "th", Status: TurnStatusRunning, StartedAt: startedAt,
+	}))
+
+	completedAt := time.Now()
+	require.NoError(t, persist.FinalizeTurn(ctx, &Turn{
+		ID: "turn_atomic", TenantID: database.StandaloneTenantID, ThreadID: "th",
+		Status: TurnStatusCompleted, StartedAt: startedAt, CompletedAt: &completedAt, Completed: true,
+	}, []*Message{{
+		ID: "msg_final", TenantID: database.StandaloneTenantID, ThreadID: "th", TurnID: "turn_atomic", Role: "assistant", Content: "done",
+	}}))
+
+	messages, err := persist.LoadMessages(ctx, database.StandaloneTenantID, "th")
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	require.Equal(t, "done", messages[0].Content)
+	var turn Turn
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", "turn_atomic").First(&turn).Error
+	}))
+	require.Equal(t, TurnStatusCompleted, turn.Status)
+	require.True(t, turn.Completed)
+	require.NotNil(t, turn.CompletedAt)
+}
+
+func TestGormPersistence_RecoverStaleTurnsOnlyUpdatesExpiredRunningTurns(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	now := time.Now()
+	for _, turn := range []*Turn{
+		{ID: "stale", TenantID: database.StandaloneTenantID, ThreadID: "th", Status: TurnStatusRunning, StartedAt: now.Add(-10 * time.Minute)},
+		{ID: "fresh", TenantID: database.StandaloneTenantID, ThreadID: "th", Status: TurnStatusRunning, StartedAt: now},
+		{ID: "other", TenantID: database.StandaloneTenantID, ThreadID: "other", Status: TurnStatusRunning, StartedAt: now.Add(-10 * time.Minute)},
+	} {
+		require.NoError(t, persist.SaveTurn(ctx, turn))
+	}
+
+	rows, err := persist.RecoverStaleTurns(ctx, database.StandaloneTenantID, "th", now.Add(-5*time.Minute))
+	require.NoError(t, err)
+	require.EqualValues(t, 1, rows)
+	turns := map[string]Turn{}
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		var records []Turn
+		if err := tx.Read().Find(&records).Error; err != nil {
+			return err
+		}
+		for _, record := range records {
+			turns[record.ID] = record
+		}
+		return nil
+	}))
+	require.Equal(t, TurnStatusFailed, turns["stale"].Status)
+	require.True(t, turns["stale"].Completed)
+	require.Contains(t, turns["stale"].Error, "interrupted")
+	require.Equal(t, TurnStatusRunning, turns["fresh"].Status)
+	require.Equal(t, TurnStatusRunning, turns["other"].Status)
+}
+
+func TestGormPersistence_LoadRecentMessagesPreservesUncompactedReplayOrder(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	base := time.Now().Add(-time.Hour)
+	for i := 1; i <= 5; i++ {
+		require.NoError(t, persist.SaveMessage(ctx, &Message{
+			ID: fmt.Sprintf("msg_%d", i), TenantID: database.StandaloneTenantID, ThreadID: "th",
+			Role: "user", Content: fmt.Sprintf("message %d", i), CreatedAt: base.Add(time.Duration(i) * time.Second),
+		}))
+	}
+	messages, err := persist.LoadRecentMessages(ctx, database.StandaloneTenantID, "th", 3)
+	require.NoError(t, err)
+	require.Len(t, messages, 5)
+	require.Equal(t, []string{"msg_1", "msg_2", "msg_3", "msg_4", "msg_5"}, []string{messages[0].ID, messages[1].ID, messages[2].ID, messages[3].ID, messages[4].ID})
+}
+
+func TestGormPersistence_CompactionCheckpointBoundsReplayAndAdvancesMonotonically(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, MigrateModels(db))
+	persist := NewGormPersistence(db)
+	ctx := context.Background()
+	tenantID := database.StandaloneTenantID
+	base := time.Now().UTC().Add(-time.Hour).Truncate(time.Millisecond)
+	require.NoError(t, persist.SaveThread(ctx, &Thread{
+		ID: "th_checkpoint", TenantID: tenantID, CreatedAt: base, LastActive: base,
+	}))
+	for i := 1; i <= 5; i++ {
+		require.NoError(t, persist.SaveMessage(ctx, &Message{
+			ID: fmt.Sprintf("msg_%d", i), TenantID: tenantID, ThreadID: "th_checkpoint",
+			Role: "user", Content: fmt.Sprintf("message %d", i), CreatedAt: base.Add(time.Duration(i) * time.Second),
+		}))
+	}
+	require.NoError(t, persist.SaveMessage(ctx, &Message{
+		ID: "msg_3z", TenantID: tenantID, ThreadID: "th_checkpoint",
+		Role: "assistant", Content: "same timestamp after boundary", CreatedAt: base.Add(3 * time.Second),
+	}))
+
+	boundaryAt := base.Add(3 * time.Second)
+	applied, err := persist.SaveCompactionCheckpoint(ctx, CompactionCheckpoint{
+		TenantID: tenantID, ThreadID: "th_checkpoint", Summary: "summary through message 3",
+		SourceHash: "source-hash-3", ThroughMessageID: "msg_3", ThroughCreatedAt: boundaryAt,
+	})
+	require.NoError(t, err)
+	require.True(t, applied)
+	messages, err := persist.LoadRecentMessages(ctx, tenantID, "th_checkpoint", 2)
+	require.NoError(t, err)
+	require.Len(t, messages, 4)
+	require.True(t, messages[0].Checkpoint)
+	require.Equal(t, "summary through message 3", messages[0].Content)
+	require.Equal(t, []string{"msg_3z", "msg_4", "msg_5"}, []string{messages[1].ID, messages[2].ID, messages[3].ID})
+
+	applied, err = persist.SaveCompactionCheckpoint(ctx, CompactionCheckpoint{
+		TenantID: tenantID, ThreadID: "th_checkpoint", Summary: "stale summary",
+		SourceHash: "source-hash-2", ThroughMessageID: "msg_2", ThroughCreatedAt: base.Add(2 * time.Second),
+	})
+	require.NoError(t, err)
+	require.False(t, applied)
+	thread, err := persist.LoadThread(ctx, tenantID, "th_checkpoint")
+	require.NoError(t, err)
+	require.Equal(t, "summary through message 3", thread.CompactionSummary)
+	require.Equal(t, "msg_3", thread.CompactionThroughMessageID)
+
+	require.NoError(t, persist.SaveThread(ctx, &Thread{
+		ID: "th_checkpoint", TenantID: tenantID, Persona: "seller", Title: "Updated title", LastActive: time.Now(),
+	}))
+	thread, err = persist.LoadThread(ctx, tenantID, "th_checkpoint")
+	require.NoError(t, err)
+	require.Equal(t, "Updated title", thread.Title)
+	require.Equal(t, "summary through message 3", thread.CompactionSummary)
+	require.Equal(t, "msg_3", thread.CompactionThroughMessageID)
+}
+
 func TestGormPersistence_DeleteThread(t *testing.T) {
 	db, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)
@@ -783,7 +1086,10 @@ func TestGormPersistence_DeleteThread(t *testing.T) {
 	require.NoError(t, persist.SaveTurn(ctx, &Turn{ID: "turn", TenantID: database.StandaloneTenantID, ThreadID: "th"}))
 	require.NoError(t, persist.SaveMessage(ctx, &Message{ID: "msg", TenantID: database.StandaloneTenantID, ThreadID: "th", Role: "user", Content: "hello"}))
 	require.NoError(t, persist.SaveSkillRun(ctx, &SkillRun{ID: "run", TenantID: database.StandaloneTenantID, ThreadID: "th", SkillID: "product.import"}))
-	require.NoError(t, persist.SaveArtifact(ctx, &Artifact{ID: "art", TenantID: database.StandaloneTenantID, ThreadID: "th", SkillRunID: "run", Kind: ArtifactKindProposal}))
+	require.NoError(t, persist.SaveArtifactWithContent(ctx,
+		&Artifact{ID: "art", TenantID: database.StandaloneTenantID, ThreadID: "th", SkillRunID: "run", Kind: ArtifactKindSourceMaterial, ContentType: "image/png"},
+		&ArtifactContent{ArtifactID: "art", TenantID: database.StandaloneTenantID, ThreadID: "th", ContentType: "image/png", Data: []byte("private")},
+	))
 	require.NoError(t, persist.SaveApproval(ctx, &Approval{
 		ID:          "appr",
 		TenantID:    database.StandaloneTenantID,
@@ -810,6 +1116,8 @@ func TestGormPersistence_DeleteThread(t *testing.T) {
 	artifacts, err := persist.ListArtifacts(ctx, database.StandaloneTenantID, "run", "", "", 10, 0)
 	require.NoError(t, err)
 	require.Empty(t, artifacts)
+	_, err = persist.LoadArtifactContent(ctx, database.StandaloneTenantID, "art")
+	require.ErrorIs(t, err, ErrArtifactContentNotFound)
 }
 
 func TestGormPersistence_RedactsSensitiveJSON(t *testing.T) {

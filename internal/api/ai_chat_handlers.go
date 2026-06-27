@@ -3,6 +3,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -86,6 +87,7 @@ var agentTenantStreamLimits sync.Map
 var (
 	errAgentApprovalApplyState = errors.New("agent approval is not approved for apply")
 	errAgentApprovalHash       = errors.New("agent approval request hash mismatch")
+	errAgentApprovalStale      = errors.New("agent approval proposal changed after review")
 	errAgentApprovalApplying   = errors.New("agent approval is already applying")
 )
 
@@ -409,10 +411,12 @@ type agentArtifactCreateRequest struct {
 }
 
 type agentArtifactUpdateRequest struct {
-	Status  *string         `json:"status,omitempty"`
-	Name    *string         `json:"name,omitempty"`
-	Summary *string         `json:"summary,omitempty"`
-	Data    json.RawMessage `json:"data,omitempty"`
+	Status            *string         `json:"status,omitempty"`
+	Name              *string         `json:"name,omitempty"`
+	Summary           *string         `json:"summary,omitempty"`
+	Data              json.RawMessage `json:"data,omitempty"`
+	DraftPatch        json.RawMessage `json:"draftPatch,omitempty"`
+	ExpectedUpdatedAt *time.Time      `json:"expectedUpdatedAt,omitempty"`
 }
 
 // handlePOSTAgentArtifact handles POST /v1/agent/artifacts.
@@ -531,6 +535,15 @@ func (g *Gateway) handlePATCHAgentArtifact(w http.ResponseWriter, r *http.Reques
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
 		return
 	}
+	draftPatch, hasDraftPatch, err := validatedOptionalRawJSON(req.DraftPatch, "product import draft patch")
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+		return
+	}
+	if hasData && hasDraftPatch {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "data and draftPatch cannot be updated together")
+		return
+	}
 	artifactID := strings.TrimSpace(chi.URLParam(r, "artifactId"))
 	tenantID := agentChatTenantID(r, p)
 	artifact, err := p.AgentStore().LoadArtifact(r.Context(), tenantID, artifactID)
@@ -541,6 +554,30 @@ func (g *Gateway) handlePATCHAgentArtifact(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load artifact")
 		return
+	}
+	expectedUpdatedAt := artifact.UpdatedAt
+	isProductImportProposal := artifact.Kind == agentstore.ArtifactKindProposal && artifact.SkillID == productImportSkillID
+	if hasDraftPatch {
+		if !isProductImportProposal {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "draftPatch is only valid for product import proposals")
+			return
+		}
+		if req.ExpectedUpdatedAt == nil {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "expectedUpdatedAt is required for product import draft updates")
+			return
+		}
+		expectedUpdatedAt = *req.ExpectedUpdatedAt
+		if !artifact.UpdatedAt.Equal(expectedUpdatedAt) {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "proposal changed while editing")
+			return
+		}
+		mergedData, err := mergeProductImportProposalDraft(artifact.Data, draftPatch)
+		if err != nil {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+			return
+		}
+		rawData = []byte(mergedData)
+		hasData = true
 	}
 	if req.Status != nil {
 		status := strings.TrimSpace(*req.Status)
@@ -560,6 +597,38 @@ func (g *Gateway) handlePATCHAgentArtifact(w http.ResponseWriter, r *http.Reques
 		artifact.Data = string(rawData)
 	}
 	artifact.UpdatedAt = time.Now()
+	shouldRefreshProductImportApproval := hasData || (req.Status != nil && artifact.Status == agentstore.ArtifactStatusSkipped)
+	if isProductImportProposal && shouldRefreshProductImportApproval {
+		if artifact.Status == agentstore.ArtifactStatusApplied {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "applied product import proposal cannot be edited")
+			return
+		}
+		var replacement *agentstore.Approval
+		if hasData {
+			approvalReady, err := productImportProposalApprovalReady(artifact)
+			if err != nil {
+				responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+				return
+			}
+			if approvalReady && artifact.Status != agentstore.ArtifactStatusSkipped {
+				replacement, err = buildProductImportProposalApproval(r, p, artifact)
+				if err != nil {
+					responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, err.Error())
+					return
+				}
+			}
+		}
+		if err := p.AgentStore().SaveArtifactAndRefreshApproval(r.Context(), artifact, "artifact:"+artifact.ID, expectedUpdatedAt, replacement); err != nil {
+			if errors.Is(err, agentstore.ErrArtifactApprovalConflict) || errors.Is(err, agentstore.ErrArtifactVersionConflict) {
+				responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "proposal changed while editing")
+				return
+			}
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save artifact")
+			return
+		}
+		responsePkg.Success(w, artifact)
+		return
+	}
 	if err := p.AgentStore().SaveArtifact(r.Context(), artifact); err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to save artifact")
 		return
@@ -612,6 +681,57 @@ func (g *Gateway) handleGETAgentArtifact(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	responsePkg.Success(w, artifact)
+}
+
+// handleGETAgentArtifactContent handles GET /v1/agent/artifacts/{artifactId}/content.
+func (g *Gateway) handleGETAgentArtifactContent(w http.ResponseWriter, r *http.Request) {
+	p, ok := getAIChatProvider(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "AI chat not available")
+		return
+	}
+	artifactID := chi.URLParam(r, "artifactId")
+	tenantID := agentChatTenantID(r, p)
+	artifact, err := p.AgentStore().LoadArtifact(r.Context(), tenantID, artifactID)
+	if errors.Is(err, agentstore.ErrArtifactNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "artifact not found")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load artifact")
+		return
+	}
+	contentType, safe := managed_escrowProductImportPreviewContentType(artifact.ContentType)
+	if !safe || !productImportSourceArtifactHasPreview(artifact) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "artifact content not available")
+		return
+	}
+	content, err := p.AgentStore().LoadArtifactContent(r.Context(), tenantID, artifactID)
+	if errors.Is(err, agentstore.ErrArtifactContentNotFound) {
+		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "artifact content not available")
+		return
+	}
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load artifact content")
+		return
+	}
+	if len(content.Data) == 0 || int64(len(content.Data)) != artifact.ContentBytes {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "artifact content is invalid")
+		return
+	}
+	contentHash := productImportSourceHash(content.Data)
+	if artifact.SourceHash == "" || content.ContentHash != artifact.SourceHash || contentHash != artifact.SourceHash {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "artifact content failed integrity check")
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(content.Data)))
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Header().Set("ETag", `"`+contentHash+`"`)
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content.Data)
 }
 
 // handleGETAgentApprovals handles GET /v1/agent/approvals.
@@ -717,7 +837,7 @@ func (g *Gateway) handlePOSTAgentApprovalApply(w http.ResponseWriter, r *http.Re
 		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "approval not found")
 		return
 	}
-	if errors.Is(err, errAgentApprovalApplyState) || errors.Is(err, errAgentApprovalHash) || errors.Is(err, errAgentApprovalApplying) {
+	if errors.Is(err, errAgentApprovalApplyState) || errors.Is(err, errAgentApprovalHash) || errors.Is(err, errAgentApprovalStale) || errors.Is(err, errAgentApprovalApplying) {
 		responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 		return
 	}
@@ -746,6 +866,9 @@ func applyAgentApproval(ctx context.Context, persist agentstore.Persistence, ten
 		return nil, errAgentApprovalApplyState
 	}
 	if err := verifyAgentApprovalHash(approval); err != nil {
+		return nil, err
+	}
+	if err := verifyProductImportApprovalCurrent(ctx, persist, tenantID, approval); err != nil {
 		return nil, err
 	}
 
@@ -834,6 +957,45 @@ func verifyAgentApprovalHash(approval *agentstore.Approval) error {
 	return nil
 }
 
+func verifyProductImportApprovalCurrent(ctx context.Context, persist agentstore.Persistence, tenantID string, approval *agentstore.Approval) error {
+	if approval == nil || approval.SkillID != productImportSkillID || approval.Action != "listings_create" {
+		return nil
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(approval.Payload), &payload); err != nil {
+		return errAgentApprovalStale
+	}
+	proposalID := stringFromAny(payload["proposalArtifactId"])
+	approvedDraft, ok := payload["listing"].(map[string]any)
+	if proposalID == "" || !ok {
+		return errAgentApprovalStale
+	}
+	artifact, err := persist.LoadArtifact(ctx, tenantID, proposalID)
+	if err != nil {
+		return errAgentApprovalStale
+	}
+	if artifact.Status == agentstore.ArtifactStatusApplied || artifact.Status == agentstore.ArtifactStatusSkipped {
+		return errAgentApprovalStale
+	}
+	var proposal map[string]any
+	if err := json.Unmarshal([]byte(artifact.Data), &proposal); err != nil {
+		return errAgentApprovalStale
+	}
+	currentDraft, ok := proposal["draft"].(map[string]any)
+	if !ok {
+		return errAgentApprovalStale
+	}
+	approvedJSON, err := json.Marshal(approvedDraft)
+	if err != nil {
+		return errAgentApprovalStale
+	}
+	currentJSON, err := json.Marshal(currentDraft)
+	if err != nil || !bytes.Equal(approvedJSON, currentJSON) {
+		return errAgentApprovalStale
+	}
+	return nil
+}
+
 func approvalHashRequest(approval *agentstore.Approval) (kernel.ApprovalRequest, error) {
 	if approval == nil {
 		return kernel.ApprovalRequest{}, agentstore.ErrApprovalNotFound
@@ -875,6 +1037,7 @@ func normalizeApprovalStatusQuery(status string) (string, bool) {
 	case agentstore.ApprovalStatusPending,
 		agentstore.ApprovalStatusApproved,
 		agentstore.ApprovalStatusRejected,
+		agentstore.ApprovalStatusSuperseded,
 		agentstore.ApprovalStatusApplying,
 		agentstore.ApprovalStatusApplied,
 		agentstore.ApprovalStatusApplyFailed:

@@ -900,7 +900,7 @@ func getAgentChatOrchestrator(cacheKey string, cfg aipkg.Config, systemPrompt st
 
 	orch := agentruntime.NewOrchestrator(
 		agentChatLLMClient{proxy: proxy, cfg: cfg},
-		budget.NewCalculator(budget.DefaultConfig()),
+		budget.NewCalculator(budget.ConfigForModel(cfg.EffectiveModel())),
 		agentexec.NewBatchExecutor(agentChatToolExecutor{}, 30*time.Second, 4),
 		persist,
 		telemetry.NewLogEmitter(nil),

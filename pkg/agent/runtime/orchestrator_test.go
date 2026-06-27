@@ -18,6 +18,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/agent/store"
 	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
 	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
+	"github.com/stretchr/testify/require"
 )
 
 // --- mock LLMClient ---
@@ -66,15 +67,21 @@ func (f *fakeThreadCompactor) CompactThread(_ context.Context, req ThreadCompact
 }
 
 type fakePersistence struct {
-	thread         *store.Thread
-	turns          []*store.Turn
-	messages       []*store.Message
-	skillRuns      []*store.SkillRun
-	artifacts      []*store.Artifact
-	approvals      []*store.Approval
-	saveMessageErr error
-	saveTurnErr    error
-	turnSaveCount  int
+	thread           *store.Thread
+	turns            []*store.Turn
+	messages         []*store.Message
+	skillRuns        []*store.SkillRun
+	artifacts        []*store.Artifact
+	approvals        []*store.Approval
+	saveMessageErr   error
+	saveTurnErr      error
+	turnSaveCount    int
+	recoverCount     int64
+	recoverErr       error
+	recoveredScope   kernel.Scope
+	recoveredBefore  time.Time
+	checkpoint       *store.CompactionCheckpoint
+	rejectCheckpoint bool
 }
 
 type fakeMemoryStore struct {
@@ -155,6 +162,45 @@ func (p *fakePersistence) SaveMessage(_ context.Context, m *store.Message) error
 	return nil
 }
 
+func (p *fakePersistence) SaveCompactionCheckpoint(_ context.Context, checkpoint store.CompactionCheckpoint) (bool, error) {
+	if p.rejectCheckpoint {
+		return false, nil
+	}
+	cp := checkpoint
+	p.checkpoint = &cp
+	if p.thread != nil && p.thread.TenantID == checkpoint.TenantID && p.thread.ID == checkpoint.ThreadID {
+		throughAt := checkpoint.ThroughCreatedAt
+		p.thread.CompactionSummary = checkpoint.Summary
+		p.thread.CompactionSourceHash = checkpoint.SourceHash
+		p.thread.CompactionThroughMessageID = checkpoint.ThroughMessageID
+		p.thread.CompactionThroughCreatedAt = &throughAt
+	}
+	return true, nil
+}
+
+func (p *fakePersistence) FinalizeTurn(_ context.Context, turn *store.Turn, messages []*store.Message) error {
+	p.turnSaveCount++
+	if p.saveTurnErr != nil && p.turnSaveCount > 1 {
+		return p.saveTurnErr
+	}
+	if p.saveMessageErr != nil && len(messages) > 0 {
+		return p.saveMessageErr
+	}
+	for _, message := range messages {
+		cp := *message
+		p.messages = append(p.messages, &cp)
+	}
+	cp := *turn
+	p.turns = append(p.turns, &cp)
+	return nil
+}
+
+func (p *fakePersistence) RecoverStaleTurns(_ context.Context, tenantID, threadID string, staleBefore time.Time) (int64, error) {
+	p.recoveredScope = kernel.Scope{TenantID: tenantID, ThreadID: threadID}
+	p.recoveredBefore = staleBefore
+	return p.recoverCount, p.recoverErr
+}
+
 func (p *fakePersistence) SaveSkillRun(_ context.Context, r *store.SkillRun) error {
 	if r == nil {
 		return nil
@@ -171,6 +217,27 @@ func (p *fakePersistence) SaveArtifact(_ context.Context, a *store.Artifact) err
 	cp := *a
 	p.artifacts = append(p.artifacts, &cp)
 	return nil
+}
+
+func (p *fakePersistence) SaveArtifactWithContent(ctx context.Context, a *store.Artifact, content *store.ArtifactContent) error {
+	if content != nil {
+		a.ContentBytes = int64(len(content.Data))
+	}
+	return p.SaveArtifact(ctx, a)
+}
+
+func (p *fakePersistence) SaveArtifactAndRefreshApproval(ctx context.Context, a *store.Artifact, _ string, _ time.Time, replacement *store.Approval) error {
+	if err := p.SaveArtifact(ctx, a); err != nil {
+		return err
+	}
+	if replacement != nil {
+		return p.SaveApproval(ctx, replacement)
+	}
+	return nil
+}
+
+func (p *fakePersistence) LoadArtifactContent(context.Context, string, string) (*store.ArtifactContent, error) {
+	return nil, store.ErrArtifactContentNotFound
 }
 
 func (p *fakePersistence) SaveApproval(_ context.Context, a *store.Approval) error {
@@ -208,6 +275,43 @@ func (p *fakePersistence) LoadMessages(_ context.Context, _, threadID string) ([
 		out = append(out, &cp)
 	}
 	return out, nil
+}
+
+func (p *fakePersistence) LoadRecentMessages(ctx context.Context, tenantID, threadID string, limit int) ([]*store.Message, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	messages, err := p.LoadMessages(ctx, tenantID, threadID)
+	if err != nil {
+		return messages, err
+	}
+	checkpoint := p.thread != nil &&
+		p.thread.TenantID == tenantID &&
+		p.thread.ID == threadID &&
+		p.thread.CompactionSummary != "" &&
+		p.thread.CompactionThroughCreatedAt != nil
+	if checkpoint {
+		filtered := messages[:0]
+		for _, message := range messages {
+			if message.CreatedAt.After(*p.thread.CompactionThroughCreatedAt) ||
+				(message.CreatedAt.Equal(*p.thread.CompactionThroughCreatedAt) && message.ID > p.thread.CompactionThroughMessageID) {
+				filtered = append(filtered, message)
+			}
+		}
+		messages = filtered
+	}
+	if checkpoint {
+		messages = append([]*store.Message{{
+			ID:         "checkpoint:" + p.thread.CompactionSourceHash,
+			TenantID:   tenantID,
+			ThreadID:   threadID,
+			Role:       "system",
+			Content:    p.thread.CompactionSummary,
+			CreatedAt:  *p.thread.CompactionThroughCreatedAt,
+			Checkpoint: true,
+		}}, messages...)
+	}
+	return messages, nil
 }
 
 func (p *fakePersistence) LoadSkillRun(_ context.Context, tenantID, runID string) (*store.SkillRun, error) {
@@ -482,6 +586,43 @@ func TestRunTurn_PersistsCompletedTurnStatus(t *testing.T) {
 	}
 	if len(emitter.ByType(telemetry.TurnCompleted)) != 1 {
 		t.Fatalf("expected turn_completed telemetry, got %#v", emitter.Events)
+	}
+}
+
+func TestRunTurn_RecoversStaleTurnsWhenHydratingThread(t *testing.T) {
+	persist := &fakePersistence{
+		thread:       &store.Thread{ID: "th_recover", TenantID: "tenant_1", LastActive: time.Now().Add(-time.Hour)},
+		recoverCount: 2,
+	}
+	emitter := &telemetry.BufferEmitter{}
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "done"}}}}}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		emitter,
+		&Config{StaleTurnAfter: 5 * time.Minute},
+	)
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "th_recover", "continue")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if persist.recoveredScope.TenantID != "tenant_1" || persist.recoveredScope.ThreadID != "th_recover" {
+		t.Fatalf("unexpected recovery scope: %#v", persist.recoveredScope)
+	}
+	if age := time.Since(persist.recoveredBefore); age < 4*time.Minute || age > 6*time.Minute {
+		t.Fatalf("unexpected stale cutoff age: %v", age)
+	}
+	events := emitter.ByType(telemetry.StaleTurnsRecovered)
+	if len(events) != 1 || events[0].Attrs["count"] != int64(2) {
+		t.Fatalf("expected stale recovery telemetry, got %#v", events)
 	}
 }
 
@@ -2161,6 +2302,42 @@ func TestRunTurn_DeterministicCompactionAddsSummary(t *testing.T) {
 	}
 }
 
+func TestRunTurn_MessageCountTriggersCompactionBelowTokenThreshold(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
+	emitter := &telemetry.BufferEmitter{}
+	orch := NewOrchestrator(
+		llm,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		nil,
+		emitter,
+		&Config{MaxHistoryMsgs: 10, ShapeKeepMsgs: 3},
+	)
+	base := time.Now().Add(-time.Hour)
+	for i := 0; i < 12; i++ {
+		orch.mem.AppendMessage("tenant_1", "thread_count_compact", &store.Message{
+			ID: fmt.Sprintf("msg_%02d", i), TenantID: "tenant_1", ThreadID: "thread_count_compact",
+			Role: "user", Content: "short", CreatedAt: base.Add(time.Duration(i) * time.Second),
+		})
+	}
+
+	result, err := orch.RunTurn(context.Background(), "tenant_1", "thread_count_compact", "current")
+	require.NoError(t, err)
+	_, err = stream.Collect(result.Output)
+	require.NoError(t, err)
+	require.NotEmpty(t, emitter.ByType(telemetry.CompactionSucceeded))
+	require.Len(t, llm.captured, 1)
+	foundSummary := false
+	for _, message := range llm.captured[0].messages {
+		if strings.Contains(message.Content, "Earlier conversation compacted deterministically") {
+			foundSummary = true
+		}
+	}
+	require.True(t, foundSummary)
+}
+
 func TestRunTurn_ThreadCompactorAddsSummary(t *testing.T) {
 	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "ok"}}}}}
 	emitter := &telemetry.BufferEmitter{}
@@ -2221,6 +2398,105 @@ func TestRunTurn_ThreadCompactorAddsSummary(t *testing.T) {
 	if len(events) == 0 || events[0].Attrs["mode"] != "thread_compactor" {
 		t.Fatalf("expected thread compactor success telemetry, got %#v", events)
 	}
+}
+
+func TestRunTurn_CompactionCheckpointSurvivesRuntimeRestart(t *testing.T) {
+	base := time.Now().UTC().Add(-time.Hour).Truncate(time.Millisecond)
+	persist := &fakePersistence{
+		thread: &store.Thread{
+			ID: "thread_checkpoint", TenantID: "tenant_1", CreatedAt: base, LastActive: base,
+		},
+	}
+	for i := 0; i < 12; i++ {
+		persist.messages = append(persist.messages, &store.Message{
+			ID: fmt.Sprintf("msg_%02d", i), TenantID: "tenant_1", ThreadID: "thread_checkpoint",
+			Role: "assistant", Content: fmt.Sprintf("historical answer %d", i), CreatedAt: base.Add(time.Duration(i) * time.Second),
+		})
+	}
+
+	firstLLM := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "first done"}}}}}
+	first := NewOrchestrator(
+		firstLLM,
+		budget.NewCalculator(budget.Config{
+			MaxContextTokens: 1000,
+			ReservedOutput:   1,
+			ShapeThreshold:   0.99,
+			CompactThreshold: 0.01,
+		}),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		telemetry.NoopEmitter{},
+		&Config{ShapeKeepMsgs: 3},
+	)
+	first.SetThreadCompactor(&fakeThreadCompactor{summary: "Durable summary of the earlier conversation."})
+	result, err := first.RunTurn(context.Background(), "tenant_1", "thread_checkpoint", "first current request")
+	require.NoError(t, err)
+	_, err = stream.Collect(result.Output)
+	require.NoError(t, err)
+	require.NotNil(t, persist.checkpoint)
+	require.Equal(t, "msg_09", persist.checkpoint.ThroughMessageID)
+	require.Contains(t, persist.checkpoint.Summary, "Durable summary of the earlier conversation.")
+
+	secondLLM := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "second done"}}}}}
+	second := NewOrchestrator(
+		secondLLM,
+		budget.NewCalculator(budget.DefaultConfig()),
+		exec.NewBatchExecutor(exec.ToolExecutorFunc(func(context.Context, exec.ToolCall) (exec.ToolResult, error) {
+			return exec.ToolResult{}, nil
+		}), 5*time.Second, 0),
+		persist,
+		telemetry.NoopEmitter{},
+		nil,
+	)
+	result, err = second.RunTurn(context.Background(), "tenant_1", "thread_checkpoint", "follow-up after restart")
+	require.NoError(t, err)
+	_, err = stream.Collect(result.Output)
+	require.NoError(t, err)
+	require.Len(t, secondLLM.captured, 1)
+
+	foundSummary := false
+	foundRecent := false
+	for _, message := range secondLLM.captured[0].messages {
+		if strings.Contains(message.Content, "Durable summary of the earlier conversation") {
+			foundSummary = true
+		}
+		if strings.Contains(message.Content, "historical answer 11") {
+			foundRecent = true
+		}
+		if strings.Contains(message.Content, "historical answer 0") {
+			t.Fatalf("message covered by checkpoint was replayed after restart: %#v", secondLLM.captured[0].messages)
+		}
+	}
+	require.True(t, foundSummary)
+	require.True(t, foundRecent)
+}
+
+func TestPersistReplayCheckpoint_DoesNotApplyRejectedCheckpointToMemory(t *testing.T) {
+	base := time.Now().UTC().Add(-time.Minute)
+	persist := &fakePersistence{
+		thread:           &store.Thread{ID: "thread_checkpoint_race", TenantID: "tenant_1", CreatedAt: base, LastActive: base},
+		rejectCheckpoint: true,
+	}
+	orch := NewOrchestrator(nil, nil, nil, persist, telemetry.NoopEmitter{}, nil)
+	orch.mem.UpdateThread(persist.thread)
+	orch.mem.AppendMessage("tenant_1", "thread_checkpoint_race", &store.Message{
+		ID: "msg_1", TenantID: "tenant_1", ThreadID: "thread_checkpoint_race",
+		Role: "assistant", Content: "keep me", CreatedAt: base,
+	})
+
+	orch.persistReplayCheckpoint(context.Background(), "tenant_1", "thread_checkpoint_race", []Message{{
+		Role: "assistant", Content: "old prefix", sourceID: "msg_1", sourceAt: base,
+	}}, "stale summary", "stale-source-hash")
+
+	thread, ok := orch.mem.GetThread("tenant_1", "thread_checkpoint_race")
+	require.True(t, ok)
+	require.Empty(t, thread.CompactionSummary)
+	messages := orch.mem.GetMessages("tenant_1", "thread_checkpoint_race")
+	require.Len(t, messages, 1)
+	require.False(t, messages[0].Checkpoint)
+	require.Equal(t, "keep me", messages[0].Content)
 }
 
 func TestRunTurn_ThreadCompactorFailureFallsBackDeterministically(t *testing.T) {
@@ -2365,12 +2641,73 @@ func TestReplayCompactionPreservesToolCallGroup(t *testing.T) {
 	if compacted[1].Role != "system" || !strings.Contains(compacted[1].Content, "Earlier conversation compacted deterministically") {
 		t.Fatalf("expected deterministic summary, got %#v", compacted)
 	}
+	if !compacted[1].checkpoint {
+		t.Fatalf("expected compacted summary to remain a checkpoint, got %#v", compacted[1])
+	}
 	if compacted[2].Role != "assistant" || len(compacted[2].ToolCalls) != 1 || compacted[2].ToolCalls[0].ID != "tc_1" {
 		t.Fatalf("expected assistant tool call before tool result, got %#v", compacted)
 	}
 	if compacted[3].Role != "tool" || compacted[3].ToolCallID != "tc_1" {
 		t.Fatalf("expected matching tool result after assistant call, got %#v", compacted)
 	}
+}
+
+func TestCompactReplayHistory_ResummarizesCheckpointWithoutBaseSystemPrompt(t *testing.T) {
+	history := []Message{
+		{Role: "system", Content: "older durable summary", checkpoint: true},
+		{Role: "user", Content: "newer question", sourceID: "msg_1", sourceAt: time.Now().Add(-time.Minute)},
+		{Role: "assistant", Content: "newer answer", sourceID: "msg_2", sourceAt: time.Now()},
+		{Role: "user", Content: "current question"},
+		{Role: "assistant", Content: "current answer"},
+	}
+	var summarized []Message
+	compacted, err := compactReplayHistoryWithSummary(history, 2, func(messages []Message) (string, error) {
+		summarized = append([]Message(nil), messages...)
+		return "advanced summary", nil
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, summarized)
+	require.True(t, summarized[0].checkpoint)
+	require.Equal(t, "older durable summary", summarized[0].Content)
+	require.Equal(t, "advanced summary", compacted[0].Content)
+	require.True(t, compacted[0].checkpoint)
+}
+
+func TestCompactThenShapeReplayHistory_PreservesSummary(t *testing.T) {
+	history := []Message{
+		{Role: "system", Content: "base system"},
+		{Role: "user", Content: "old question one"},
+		{Role: "assistant", Content: "old answer one"},
+		{Role: "user", Content: "old question two"},
+		{Role: "assistant", Content: "old answer two"},
+		{Role: "user", Content: "recent question"},
+		{Role: "assistant", Content: "recent answer"},
+	}
+
+	compacted := compactReplayHistory(history, 2)
+	shaped := shapeReplayHistory(compacted, 1)
+
+	require.Len(t, shaped, 3)
+	require.Equal(t, "base system", shaped[0].Content)
+	require.True(t, shaped[1].checkpoint)
+	require.Contains(t, shaped[1].Content, "Earlier conversation compacted deterministically")
+	require.Equal(t, "recent answer", shaped[2].Content)
+}
+
+func TestShapeReplayHistory_PreservesCheckpoint(t *testing.T) {
+	history := []Message{
+		{Role: "system", Content: "base system"},
+		{Role: "system", Content: "durable summary", checkpoint: true},
+		{Role: "user", Content: "old question"},
+		{Role: "assistant", Content: "recent answer"},
+		{Role: "user", Content: "current question"},
+	}
+	shaped := shapeReplayHistory(history, 2)
+	require.Len(t, shaped, 4)
+	require.Equal(t, "base system", shaped[0].Content)
+	require.True(t, shaped[1].checkpoint)
+	require.Equal(t, "recent answer", shaped[2].Content)
+	require.Equal(t, "current question", shaped[3].Content)
 }
 
 func TestRunTurnWithOptions_InjectsRetrievedMemory(t *testing.T) {
@@ -3147,31 +3484,6 @@ func TestRunTurn_LLMRetry(t *testing.T) {
 
 	if llm.callIndex != 2 {
 		t.Errorf("expected 2 LLM calls (1 fail + 1 success), got %d", llm.callIndex)
-	}
-}
-
-func TestPromptBuilder(t *testing.T) {
-	pb := NewPromptBuilder("You are a Mobazha commerce assistant.")
-	pb.AddInstruction("Help sellers optimize their listings.")
-	pb.AddInstruction("Respond in the seller's language.")
-	pb.AddContext("The seller has 15 products and $200 monthly revenue.")
-
-	result := pb.Build()
-
-	if !strings.Contains(result, "Mobazha commerce") {
-		t.Error("expected persona in output")
-	}
-	if !strings.Contains(result, "## Instructions") {
-		t.Error("expected Instructions section")
-	}
-	if !strings.Contains(result, "optimize their listings") {
-		t.Error("expected instruction content")
-	}
-	if !strings.Contains(result, "## Context") {
-		t.Error("expected Context section")
-	}
-	if !strings.Contains(result, "$200 monthly") {
-		t.Error("expected context content")
 	}
 }
 

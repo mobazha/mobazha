@@ -138,6 +138,29 @@ func TestNewCalculator_ZeroAndNegativeDefaults(t *testing.T) {
 	}
 }
 
+func TestConfigForModel_UsesConservativeFamilyBudgets(t *testing.T) {
+	tests := []struct {
+		model string
+		want  int
+	}{
+		{model: "gpt-4o", want: 128_000},
+		{model: "claude-sonnet-4", want: 128_000},
+		{model: "gemini-2.0-flash", want: 128_000},
+		{model: "deepseek-v4-flash", want: 64_000},
+		{model: "qwen3-vl-flash", want: 64_000},
+		{model: "gpt-3.5-turbo", want: 16_000},
+		{model: "custom-model", want: 32_000},
+		{model: "", want: 32_000},
+	}
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			if got := ConfigForModel(tt.model).MaxContextTokens; got != tt.want {
+				t.Fatalf("ConfigForModel(%q).MaxContextTokens = %d, want %d", tt.model, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDecide_EffectiveZeroOrNegative(t *testing.T) {
 	c := NewCalculator(Config{
 		MaxContextTokens: 100,

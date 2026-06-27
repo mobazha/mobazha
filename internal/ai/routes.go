@@ -70,7 +70,9 @@ func (p PlatformProfile) ForChat(userCfg Config, messages []ChatMsg) (Config, er
 
 // GenerateNeedsVision reports whether a generation request includes image input.
 func GenerateNeedsVision(req GenerateRequest) bool {
-	return req.Action == "generate_from_images" || len(req.Images) > 0
+	return req.Action == "generate_from_images" ||
+		req.Action == "analyze_image" ||
+		len(req.Images) > 0
 }
 
 // ChatNeedsVision reports whether chat messages contain image input.

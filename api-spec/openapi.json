@@ -2090,6 +2090,56 @@
         ]
       }
     },
+    "/v1/agent/attachments/analyze": {
+      "post": {
+        "operationId": "agent-attachments-analyze-post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Analyze a chat attachment on demand",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/v1/agent/chat": {
       "post": {
         "description": "Starts a seller AI assistant turn and streams server-sent events. Runtime is handled by a raw chi route so response chunks are not buffered by Huma.",

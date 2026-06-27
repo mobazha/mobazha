@@ -322,6 +322,41 @@ func TestToolExecutor_ExecuteProductImportIngest(t *testing.T) {
 	}
 }
 
+func TestToolExecutor_ExecuteAttachmentsAnalyze(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/agent/attachments/analyze" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var parsed map[string]interface{}
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if parsed["question"] != "Summarize this file" {
+			t.Fatalf("unexpected question: %s", string(body))
+		}
+		attachments, ok := parsed["attachments"].([]interface{})
+		if !ok || len(attachments) != 1 {
+			t.Fatalf("analyze body should include attachments, got %s", string(body))
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"data":{"mode":"text_excerpt","analysis":"Linen Tote"}}`))
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "")
+	result, err := executor.Execute(context.Background(), "agent_attachments_analyze", `{"question":"Summarize this file","attachments":[{"name":"supplier.csv","contentType":"text/csv","text":"title,price\nLinen Tote,45\n"}]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"Linen Tote"`) {
+		t.Fatalf("unexpected result: %s", result)
+	}
+}
+
 func TestToolExecutor_ExecuteAgentSkillRunLifecycleTools(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

@@ -72,6 +72,11 @@ func SellerTools() []ToolDefinition {
 			Parameters:  mustJSON(`{"type":"object","properties":{"artifactId":{"type":"string","description":"Artifact ID returned by agent_artifacts_create or listed in context"},"status":{"type":"string","enum":["new","ready","needs_review","skipped"],"description":"Review state for the artifact"},"name":{"type":"string","description":"Updated human-readable artifact name"},"summary":{"type":"string","description":"Updated short human-readable summary"},"data":{"type":"object","description":"Updated structured artifact payload such as extracted candidates, review proposals, field sources, or validation notes"}},"required":["artifactId"]}`),
 		},
 		{
+			Name:        "agent_attachments_analyze",
+			Description: "Analyze a file attached to the current chat turn when visual understanding or fuller text is needed. For images, runs vision on demand with your question. For text-like attachments, returns the available excerpt from context. Use when the user asks about attachment contents, wants a description, or needs copy/listing suggestions from an image. For product.import ingest or review workflows, call agent_product_import_ingest instead.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"attachmentId":{"type":"string","description":"Attachment ID from the current turn context, when multiple files are attached"},"sourceName":{"type":"string","description":"Attachment filename when ID is unknown"},"question":{"type":"string","description":"Focused question about the attachment, in the user's language"},"language":{"type":"string","description":"Optional response language code such as en or zh"}},"required":["question"]}`),
+		},
+		{
 			Name:        "listings_create",
 			Description: "Create a new product listing. The listing JSON should follow the template structure.",
 			Parameters:  mustJSON(`{"type":"object","properties":{"listing":{"type":"object","description":"Complete listing JSON following the template structure"}},"required":["listing"]}`),

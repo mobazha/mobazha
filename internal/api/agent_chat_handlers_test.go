@@ -396,7 +396,7 @@ func TestAgentChatTurnOptions_LoadsPrivateSkillProviderFromEnv(t *testing.T) {
 	}
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
 
-	opts, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "store_1", nil)
+	opts, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "store_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func TestAgentChatTurnOptions_LoadsReferencedArtifactsAsContext(t *testing.T) {
 		Context: &aipkg.ChatContext{
 			ArtifactIDs: []string{"art_source", "art_source"},
 		},
-	}, "tenant_1", "actor_1", "store_1", nil)
+	}, "tenant_1", "actor_1", "store_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +529,7 @@ func TestAgentChatTurnOptions_LoadsReferencedSkillRunAsContext(t *testing.T) {
 		Context: &aipkg.ChatContext{
 			SkillRunIDs: []string{"run_import", "run_import"},
 		},
-	}, "tenant_1", "actor_1", "store_1", nil)
+	}, "tenant_1", "actor_1", "store_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -571,7 +571,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedSkillRun(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "继续处理这批",
 		Context: &aipkg.ChatContext{SkillRunIDs: []string{"missing_run"}},
-	}, "tenant_1", "actor_1", "store_1", nil)
+	}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "missing_run") {
 		t.Fatalf("expected missing skill run error, got %v", err)
 	}
@@ -588,7 +588,7 @@ func TestAgentChatTurnOptions_RejectsTooManyReferencedSkillRuns(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "继续处理这些批次",
 		Context: &aipkg.ChatContext{SkillRunIDs: []string{"run_1", "run_2", "run_3", "run_4"}},
-	}, "tenant_1", "actor_1", "store_1", nil)
+	}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "too many skillRunIds") {
 		t.Fatalf("expected too many skillRunIds error, got %v", err)
 	}
@@ -605,7 +605,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "使用这个素材",
 		Context: &aipkg.ChatContext{ArtifactIDs: []string{"missing_artifact"}},
-	}, "tenant_1", "actor_1", "store_1", nil)
+	}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "missing_artifact") {
 		t.Fatalf("expected missing artifact error, got %v", err)
 	}
@@ -617,7 +617,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", "")
 
-	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1", nil)
+	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
 		t.Fatalf("expected missing skills dir error, got %v", err)
 	}
@@ -626,14 +626,14 @@ func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 func TestAgentChatTurnOptions_RequiresAccessibleSellerSkillDir(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", filepath.Join(t.TempDir(), "missing"))
 
-	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1", nil)
+	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "not accessible") {
 		t.Fatalf("expected inaccessible skills dir error, got %v", err)
 	}
 
 	emptyDir := t.TempDir()
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", emptyDir)
-	_, err = agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1", nil)
+	_, err = agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "no seller skills") {
 		t.Fatalf("expected empty seller skills dir error, got %v", err)
 	}
@@ -901,7 +901,7 @@ func TestHandlePOSTAgentChat_ProductImportAttachmentUsesToolContextWithoutVision
 	}
 }
 
-func TestHandlePOSTAgentChat_AttachmentVisionWithoutIDOrSize(t *testing.T) {
+func TestHandlePOSTAgentChat_AttachmentUsesLazyVisionWithoutUpfrontBlocks(t *testing.T) {
 	skillsDir := t.TempDir()
 	writeProductImportSkill(t, skillsDir)
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", skillsDir)
@@ -945,7 +945,7 @@ func TestHandlePOSTAgentChat_AttachmentVisionWithoutIDOrSize(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	system := firstOpenAIMessageContent(t, upstreamReq, "system")
-	for _, want := range []string{"User attached files in this turn: 1", "name=product.jpg", "contentType=image/jpeg", "inlineBinary: available"} {
+	for _, want := range []string{"User attached files in this turn: 1", "name=product.jpg", "contentType=image/jpeg", "inlineBinary: available", "agent_attachments_analyze"} {
 		if !strings.Contains(system, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, system)
 		}
@@ -953,9 +953,43 @@ func TestHandlePOSTAgentChat_AttachmentVisionWithoutIDOrSize(t *testing.T) {
 	if strings.Contains(system, "id=") {
 		t.Fatalf("system prompt should not require attachment id:\n%s", system)
 	}
-	blocks := lastOpenAIUserContentBlocks(t, upstreamReq)
-	if len(blocks) != 2 {
-		t.Fatalf("expected text + image blocks, got %#v", blocks)
+	messages, _ := upstreamReq["messages"].([]any)
+	last := messages[len(messages)-1].(map[string]any)
+	if _, ok := last["content"].([]any); ok {
+		t.Fatalf("lazy vision should not inject image blocks into the user message, got %#v", last["content"])
+	}
+	if got := fmt.Sprint(last["content"]); !strings.Contains(got, "请看看这个图片里有什么") {
+		t.Fatalf("expected plain user text content, got %#v", last["content"])
+	}
+}
+
+func TestAgentChatAttachmentsAnalyzeArgumentsWithAttachments_InjectsCurrentTurnAttachments(t *testing.T) {
+	args, err := agentChatAttachmentsAnalyzeArgumentsWithAttachments(
+		`{"question":"What is in this image?"}`,
+		[]aipkg.ChatAttachment{{
+			ID:            "att_img_1",
+			Name:          "product.jpg",
+			ContentType:   "image/jpeg",
+			ContentBase64: "/9j/4AAQ",
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	attachments, ok := parsed["attachments"].([]any)
+	if !ok || len(attachments) != 1 {
+		t.Fatalf("expected injected attachments, got %s", args)
+	}
+	first, ok := attachments[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected attachment map, got %#v", attachments[0])
+	}
+	if first["contentBase64"] != "/9j/4AAQ" || first["id"] != "att_img_1" {
+		t.Fatalf("attachment payload was not injected: %#v", first)
 	}
 }
 

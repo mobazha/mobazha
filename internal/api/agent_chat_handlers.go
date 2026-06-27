@@ -39,6 +39,10 @@ type agentToolContext struct {
 	baseURL     string
 	authToken   string
 	attachments []aipkg.ChatAttachment
+	provider    aiChatProvider
+	origin      string
+	tenantID    string
+	actorID     string
 }
 
 type agentToolContextKey struct{}
@@ -92,8 +96,7 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	origin := publicRequestOrigin(r)
-	userContentBlocks := agentChatAttachmentVisionBlocks(req, origin)
-	cfg, err := p.AIConfigForChat(agentChatConfigProbeMessages(req.Message, userContentBlocks))
+	cfg, err := p.AIConfigForChat(nil)
 	if err != nil {
 		if errors.Is(err, aipkg.ErrVisionNotConfigured) || errors.Is(err, aipkg.ErrVisionUnsupported) {
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "AI chat model is not configured for this input")
@@ -174,8 +177,12 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		baseURL:     getLocalAPIURL(r),
 		authToken:   getAuthToken(r),
 		attachments: agentChatContextAttachments(req.Context),
+		provider:    p,
+		origin:      origin,
+		tenantID:    tenantID,
+		actorID:     nodeID,
 	})
-	turnOptions, err := agentChatTurnOptions(turnCtx, persist, req, tenantID, nodeID, p.ProfileName(), userContentBlocks)
+	turnOptions, err := agentChatTurnOptions(turnCtx, persist, req, tenantID, nodeID, p.ProfileName())
 	if err != nil {
 		aiLog.Warningf("Agent chat skill routing failed: %v", err)
 		emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeError, Error: agentChatRouteErrorMessage(err)})
@@ -265,7 +272,7 @@ func updateAgentChatThreadMetadata(ctx context.Context, persist agentstore.Persi
 	return persist.SaveThread(ctx, thread)
 }
 
-func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, req aipkg.ChatRequest, tenantID, actorID, storeID string, userContentBlocks []agentruntime.MessageContentBlock) (agentruntime.TurnOptions, error) {
+func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, req aipkg.ChatRequest, tenantID, actorID, storeID string) (agentruntime.TurnOptions, error) {
 	skillProvider, err := agentChatSkillProvider(ctx)
 	if err != nil {
 		return agentruntime.TurnOptions{}, err
@@ -285,13 +292,12 @@ func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, r
 		return agentruntime.TurnOptions{}, err
 	}
 	return agentruntime.TurnOptions{
-		SkillProvider:     skillProvider,
-		RequestedSkills:   requestedSkills,
-		SkillFilter:       skillFilter,
-		ContextBlocks:     contextBlocks,
-		UserContentBlocks: userContentBlocks,
-		ToolCatalog:       kernel.NewStaticToolCatalog(aipkg.SellerToolMetadata()),
-		MemoryStore:       agentChatKernelMemoryStore(persist),
+		SkillProvider:   skillProvider,
+		RequestedSkills: requestedSkills,
+		SkillFilter:     skillFilter,
+		ContextBlocks:   contextBlocks,
+		ToolCatalog:     kernel.NewStaticToolCatalog(aipkg.SellerToolMetadata()),
+		MemoryStore:     agentChatKernelMemoryStore(persist),
 		Scope: kernel.Scope{
 			TenantID:      tenantID,
 			StoreID:       storeID,
@@ -389,7 +395,7 @@ func agentChatAttachmentContextBlocks(chatCtx *aipkg.ChatContext) ([]string, err
 	}
 	lines := make([]string, 0, len(chatCtx.Attachments)*7+3)
 	lines = append(lines, "Attached files for this turn:")
-	lines = append(lines, "The user attached these files with the current message. Attachment presence is reliable; do not say no file or image was attached. Use metadata and text excerpts as bounded context. If the user asks to import or organize product materials, call product.import tools instead of asking for the same files again.")
+	lines = append(lines, "The user attached these files with the current message. Attachment presence is reliable; do not say no file or image was attached. Text excerpts in context are truncated. For image visual understanding (describe, compare, read labels, listing copy ideas), call agent_attachments_analyze with the attachment id/name and a focused question. For product.import ingest or review workflows, call agent_product_import_ingest instead of manually analyzing images.")
 	for i, attachment := range chatCtx.Attachments {
 		lines = append(lines, formatAgentChatAttachmentContextBlock(i+1, attachment))
 	}
@@ -426,54 +432,6 @@ func formatAgentChatAttachmentContextBlock(index int, attachment aipkg.ChatAttac
 	return strings.Join(lines, "\n")
 }
 
-func agentChatAttachmentVisionBlocks(req aipkg.ChatRequest, origin string) []agentruntime.MessageContentBlock {
-	if agentChatShouldRouteAttachmentsThroughTools(req) {
-		return nil
-	}
-	chatCtx := req.Context
-	if chatCtx == nil || len(chatCtx.Attachments) == 0 {
-		return nil
-	}
-	blocks := make([]agentruntime.MessageContentBlock, 0, len(chatCtx.Attachments))
-	for _, attachment := range chatCtx.Attachments {
-		contentType := strings.ToLower(strings.TrimSpace(attachment.ContentType))
-		if !strings.HasPrefix(contentType, "image/") {
-			continue
-		}
-		imageURL := agentChatAttachmentImageURL(attachment, origin)
-		if imageURL == "" {
-			continue
-		}
-		blocks = append(blocks, agentruntime.MessageContentBlock{
-			Type: "image_url",
-			ImageURL: &agentruntime.MessageImageURL{
-				URL:    imageURL,
-				Detail: "low",
-			},
-		})
-	}
-	return blocks
-}
-
-func agentChatShouldRouteAttachmentsThroughTools(req aipkg.ChatRequest) bool {
-	if req.Context == nil || len(req.Context.Attachments) == 0 {
-		return false
-	}
-	text := strings.ToLower(req.Message + "\n" + req.Context.CurrentPage)
-	hasProductSignal := strings.Contains(text, "product") ||
-		strings.Contains(text, "listing") ||
-		strings.Contains(text, "商品") ||
-		strings.Contains(text, "货品")
-	hasImportSignal := strings.Contains(text, "import") ||
-		strings.Contains(text, "导入") ||
-		strings.Contains(text, "整理") ||
-		strings.Contains(text, "创建") ||
-		strings.Contains(text, "上架") ||
-		strings.Contains(text, "填充") ||
-		strings.Contains(text, "补充")
-	return hasProductSignal && hasImportSignal
-}
-
 func agentChatAttachmentImageURL(attachment aipkg.ChatAttachment, origin string) string {
 	contentType := strings.ToLower(strings.TrimSpace(attachment.ContentType))
 	if contentType == "" {
@@ -490,17 +448,6 @@ func agentChatAttachmentImageURL(attachment aipkg.ChatAttachment, origin string)
 		return ""
 	}
 	return aipkg.ResolveImageURLs([]string{rawURL}, origin)[0]
-}
-
-func agentChatConfigProbeMessages(userMsg string, blocks []agentruntime.MessageContentBlock) []aipkg.ChatMsg {
-	if len(blocks) == 0 {
-		return nil
-	}
-	return []aipkg.ChatMsg{{
-		Role:          aipkg.RoleUser,
-		Content:       userMsg,
-		ContentBlocks: agentChatContentBlocks(blocks),
-	}}
 }
 
 func agentChatArtifactContextBlocks(ctx context.Context, persist agentstore.Persistence, tenantID string, chatCtx *aipkg.ChatContext) ([]string, error) {
@@ -957,6 +904,18 @@ type agentChatToolExecutor struct{}
 func (agentChatToolExecutor) Execute(ctx context.Context, call agentexec.ToolCall) (agentexec.ToolResult, error) {
 	toolCtx, _ := ctx.Value(agentToolContextKey{}).(agentToolContext)
 	executor := aipkg.NewToolExecutor(toolCtx.baseURL, toolCtx.authToken)
+	if call.Name == "agent_attachments_analyze" {
+		arguments, err := agentChatAttachmentsAnalyzeArgumentsWithAttachments(call.Arguments, toolCtx.attachments)
+		if err != nil {
+			return agentexec.ToolResult{
+				CallID:  call.ID,
+				Name:    call.Name,
+				Content: fmt.Sprintf(`{"error":%q}`, "invalid attachment analyze arguments"),
+				IsError: true,
+			}, err
+		}
+		call.Arguments = arguments
+	}
 	if call.Name == "agent_product_import_ingest" {
 		arguments, err := agentChatProductImportIngestArgumentsWithAttachments(call.Arguments, toolCtx.attachments)
 		if err != nil {
@@ -990,6 +949,31 @@ func agentChatContextAttachments(chatCtx *aipkg.ChatContext) []aipkg.ChatAttachm
 		return nil
 	}
 	return append([]aipkg.ChatAttachment(nil), chatCtx.Attachments...)
+}
+
+func agentChatAttachmentsAnalyzeArgumentsWithAttachments(argsJSON string, attachments []aipkg.ChatAttachment) (string, error) {
+	if len(attachments) == 0 {
+		return argsJSON, nil
+	}
+	var args map[string]any
+	if strings.TrimSpace(argsJSON) != "" {
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("parse attachment analyze arguments: %w", err)
+		}
+	}
+	if args == nil {
+		args = map[string]any{}
+	}
+	if _, ok := args["attachments"]; !ok {
+		out := make([]aipkg.ChatAttachment, len(attachments))
+		copy(out, attachments)
+		args["attachments"] = out
+	}
+	data, err := json.Marshal(args)
+	if err != nil {
+		return "", fmt.Errorf("marshal attachment analyze arguments: %w", err)
+	}
+	return string(data), nil
 }
 
 func agentChatProductImportIngestArgumentsWithAttachments(argsJSON string, attachments []aipkg.ChatAttachment) (string, error) {

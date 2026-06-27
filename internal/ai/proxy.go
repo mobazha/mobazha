@@ -329,6 +329,59 @@ func (p *Proxy) Generate(cfg Config, req GenerateRequest) (*GenerateResponse, er
 	return &result, nil
 }
 
+// AnalyzeImageAttachment sends one image and a natural-language question to the
+// configured vision model and returns a plain-text answer.
+func (p *Proxy) AnalyzeImageAttachment(cfg Config, imageURL, question, language string) (string, error) {
+	if p == nil {
+		return "", fmt.Errorf("AI proxy is not initialized")
+	}
+	if !cfg.IsValid() {
+		return "", fmt.Errorf("AI is not configured")
+	}
+	question = strings.TrimSpace(question)
+	if question == "" {
+		return "", fmt.Errorf("question is required")
+	}
+	if err := validateImageURL(imageURL); err != nil {
+		return "", err
+	}
+
+	langInstruction := fmt.Sprintf("Respond in %s.", language)
+	if language == "zh" {
+		langInstruction = "Respond in Chinese (中文)."
+	} else if language == "" {
+		langInstruction = "Respond in the same language as the question when possible."
+	}
+
+	content := []interface{}{
+		map[string]string{
+			"type": "text",
+			"text": fmt.Sprintf(`You are helping a seller understand an attachment they uploaded in chat.
+Answer the question directly and concisely using only what is visible in the image.
+Do not invent product facts, prices, or inventory. %s
+
+Question: %s`, langInstruction, question),
+		},
+		map[string]interface{}{
+			"type":      "image_url",
+			"image_url": map[string]string{"url": imageURL, "detail": "low"},
+		},
+	}
+	messages := []chatMessage{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: content},
+	}
+	raw, err := p.callLLM(cfg, messages, 1200, 0.2, 60*time.Second)
+	if err != nil {
+		return "", fmt.Errorf("AI upstream error: %s", err)
+	}
+	out := strings.TrimSpace(raw)
+	if out == "" {
+		return "", fmt.Errorf("vision model returned an empty analysis")
+	}
+	return out, nil
+}
+
 var fencedJSONRegexp = regexp.MustCompile("(?s)```(?:json)?\\s*(.*?)```")
 
 func validateImageURL(rawURL string) error {

@@ -64,6 +64,9 @@ var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
 	"agent_product_import_advance": func(a map[string]interface{}) toolRoute {
 		return toolRoute{"POST", "/v1/agent/product-import/runs/" + sanitizePathParam(a["runId"]) + "/advance"}
 	},
+	"agent_attachments_analyze": func(_ map[string]interface{}) toolRoute {
+		return toolRoute{"POST", "/v1/agent/attachments/analyze"}
+	},
 	"agent_artifacts_list": func(_ map[string]interface{}) toolRoute {
 		return toolRoute{"GET", "/v1/agent/artifacts"}
 	},
@@ -251,6 +254,8 @@ func buildRequestBody(toolName string, args map[string]interface{}) ([]byte, err
 			}
 		}
 		return json.Marshal(payload)
+	case toolName == "agent_attachments_analyze":
+		return json.Marshal(args)
 	case toolName == "chat_send_message":
 		payload := map[string]interface{}{}
 		if body, ok := args["body"]; ok {

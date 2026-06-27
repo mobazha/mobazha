@@ -55,7 +55,9 @@ func NewBatchExecutor(executor ToolExecutor, timeout time.Duration, maxParallel 
 
 // Execute dispatches all tool calls and returns results in the same order.
 // In Parallel mode, calls run concurrently (bounded by maxPar).
-// In Serial mode, calls run one at a time, stopping on first error.
+// In Serial mode, calls run one at a time and stop executing after the first
+// error. Every call still receives a result so the model can correlate the
+// complete tool-call batch without running dependent operations after failure.
 func (b *BatchExecutor) Execute(ctx context.Context, calls []ToolCall, mode Mode) ([]ToolResult, error) {
 	if len(calls) == 0 {
 		return nil, nil
@@ -80,7 +82,15 @@ func (b *BatchExecutor) executeSerial(ctx context.Context, calls []ToolCall) ([]
 				Content: fmt.Sprintf("tool execution error: %v", err),
 				IsError: true,
 			}
-			return results[:i+1], err
+			for j := i + 1; j < len(calls); j++ {
+				results[j] = ToolResult{
+					CallID:  calls[j].ID,
+					Name:    calls[j].Name,
+					Content: "tool execution skipped because a prior serial call failed",
+					IsError: true,
+				}
+			}
+			return results, err
 		}
 		results[i] = result
 	}
@@ -106,6 +116,12 @@ func (b *BatchExecutor) executeParallel(ctx context.Context, calls []ToolCall) (
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
+				results[i] = ToolResult{
+					CallID:  call.ID,
+					Name:    call.Name,
+					Content: fmt.Sprintf("tool execution error: %v", ctx.Err()),
+					IsError: true,
+				}
 				wg.Done()
 				errOnce.Do(func() { firstErr = ctx.Err() })
 				continue

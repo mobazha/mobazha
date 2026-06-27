@@ -22,6 +22,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
 	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
+	"github.com/mobazha/mobazha3.0/pkg/database"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -75,8 +76,12 @@ func getAuthToken(r *http.Request) string {
 	return ""
 }
 
-// activeAIStreams enforces max 1 concurrent AI chat stream per tenant.
+// activeAIStreams enforces one active turn per thread.
 var activeAIStreams sync.Map
+
+// agentTenantStreamLimits bounds concurrent turns across different threads for
+// one tenant. Entries are bounded by the number of active tenant runtimes.
+var agentTenantStreamLimits sync.Map
 
 var (
 	errAgentApprovalApplyState = errors.New("agent approval is not approved for apply")
@@ -100,7 +105,7 @@ type catalogCacheEntry struct {
 const catalogCacheTTL = 30 * time.Second
 
 func getCachedCatalog(tenantID string, p aiChatProvider) string {
-	key := catalogCacheKey(tenantID, p.ProfileName())
+	key := catalogCacheKey(tenantID, tenantID)
 	if v, ok := catalogCache.Load(key); ok {
 		entry := v.(*catalogCacheEntry)
 		if time.Now().Before(entry.expiresAt) {
@@ -202,7 +207,7 @@ func (g *Gateway) handleDELETEAgentChatSession(w http.ResponseWriter, r *http.Re
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to delete session")
 		return
 	}
-	forgetAgentChatThread(tenantID+":"+p.ProfileName(), tenantID, sessionID)
+	forgetAgentChatThread(agentChatRuntimeCacheKey(tenantID, tenantID), tenantID, sessionID)
 	responsePkg.NoContent(w)
 }
 
@@ -249,7 +254,7 @@ func (g *Gateway) handlePOSTAgentSkillRun(w http.ResponseWriter, r *http.Request
 	tenantID := agentChatTenantID(r, p)
 	storeID := strings.TrimSpace(req.StoreID)
 	if storeID == "" {
-		storeID = p.ProfileName()
+		storeID = tenantID
 	}
 	run := &agentstore.SkillRun{
 		ID:            newAgentSkillRunID(),
@@ -884,7 +889,7 @@ func agentApprovalDecisionActor(r *http.Request, p aiChatProvider) string {
 	if nodeID != "" {
 		return nodeID
 	}
-	return p.ProfileName()
+	return agentChatTenantID(r, p)
 }
 
 func validRawJSONOrObject(raw json.RawMessage) json.RawMessage {
@@ -1017,11 +1022,21 @@ func newAgentArtifactID() string {
 }
 
 func agentChatTenantID(r *http.Request, p aiChatProvider) string {
+	if p != nil {
+		type tenantScopedStore interface {
+			TenantID() string
+		}
+		if scoped, ok := p.AgentStore().(tenantScopedStore); ok {
+			if tenantID := strings.TrimSpace(scoped.TenantID()); tenantID != "" {
+				return tenantID
+			}
+		}
+	}
 	nodeID := getIdentityService(r).GetNodeID()
 	if nodeID != "" {
 		return nodeID
 	}
-	return p.ProfileName()
+	return database.StandaloneTenantID
 }
 
 func agentChatRole(persona string) string {

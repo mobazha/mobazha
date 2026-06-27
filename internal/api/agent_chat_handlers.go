@@ -60,6 +60,8 @@ const (
 	agentChatSkillRunDataMaxLen    = 480
 	agentChatAttachmentTextMaxLen  = 1200
 	agentChatMaxRequestBytes       = 16 << 20
+	agentChatRuntimeIdleTTL        = 6 * time.Hour
+	agentChatMaxConcurrentTurns    = 4
 )
 
 const agentChatThreadCompactionPrompt = `Summarize the earlier part of this agent conversation for future context replay.
@@ -113,10 +115,11 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodeID := getIdentityService(r).GetNodeID()
+	tenantID := agentChatTenantID(r, p)
+	actorID := agentApprovalDecisionActor(r, p)
 	if cfg.IsPlatform {
 		if rl := p.AIRateLimiter(); rl != nil {
-			if ok, _ := rl.Allow(nodeID, cfg.DailyLimit); !ok {
+			if ok, _ := rl.Allow(tenantID, cfg.DailyLimit); !ok {
 				responsePkg.Error(w, http.StatusTooManyRequests, "RATE_LIMITED",
 					"Daily AI limit reached. Configure your own API key in Settings > Integrations for unlimited usage.")
 				return
@@ -124,32 +127,40 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tenantID := nodeID
-	if tenantID == "" {
-		tenantID = p.ProfileName()
-	}
-
-	streamKey := "agent-chat-" + tenantID + ":" + p.ProfileName()
-	if _, loaded := activeAIStreams.LoadOrStore(streamKey, true); loaded {
-		responsePkg.Error(w, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Another AI chat request is still in progress. Please wait.")
-		return
-	}
-	defer activeAIStreams.Delete(streamKey)
-
+	storeID := tenantID
 	threadID := req.SessionID
 	if threadID == "" {
 		threadID = uuid.New().String()
 	}
 
+	runtimeKey := agentChatRuntimeCacheKey(tenantID, storeID)
+	streamKey := "agent-chat-" + runtimeKey + "\x00" + threadID
+	if _, loaded := activeAIStreams.LoadOrStore(streamKey, true); loaded {
+		responsePkg.Error(w, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Another AI chat request is still running for this thread. Please wait.")
+		return
+	}
+	defer activeAIStreams.Delete(streamKey)
+
+	limitValue, _ := agentTenantStreamLimits.LoadOrStore(runtimeKey, make(chan struct{}, agentChatMaxConcurrentTurns))
+	tenantLimit := limitValue.(chan struct{})
+	select {
+	case tenantLimit <- struct{}{}:
+		defer func() { <-tenantLimit }()
+	default:
+		responsePkg.Error(w, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Too many AI chat requests are running for this store. Please wait.")
+		return
+	}
+
 	persist := p.AgentStore()
 
 	promptContext := agentChatPromptContext(req.Context, req.Message)
-	systemPrompt := aipkg.BuildSystemPrompt(aipkg.UserRoleSeller, p.ProfileName(), promptContext)
+	baseSystemPrompt := aipkg.BuildSystemPrompt(aipkg.UserRoleSeller, p.ProfileName(), nil)
+	turnSystemPrompt := aipkg.BuildSystemPrompt(aipkg.UserRoleSeller, p.ProfileName(), promptContext)
 	if catalogCtx := getCachedCatalog(tenantID, p); catalogCtx != "" {
-		systemPrompt += "\n\n" + catalogCtx
+		turnSystemPrompt += "\n\n" + catalogCtx
 	}
 
-	orch := getAgentChatOrchestrator(tenantID+":"+p.ProfileName(), cfg, systemPrompt, p.AIProxy(), persist)
+	orch := getAgentChatOrchestrator(runtimeKey, cfg, baseSystemPrompt, p.AIProxy(), persist)
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -183,16 +194,17 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		provider:    p,
 		origin:      origin,
 		tenantID:    tenantID,
-		actorID:     nodeID,
+		actorID:     actorID,
 		threadID:    threadID,
 		language:    agentChatToolLanguage(req.Context, req.Message),
 	})
-	turnOptions, err := agentChatTurnOptions(turnCtx, persist, req, tenantID, nodeID, threadID, p.ProfileName())
+	turnOptions, err := agentChatTurnOptions(turnCtx, persist, req, tenantID, actorID, threadID, storeID)
 	if err != nil {
 		aiLog.Warningf("Agent chat skill routing failed: %v", err)
 		emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeError, Error: agentChatRouteErrorMessage(err)})
 		return
 	}
+	turnOptions.SystemPrompt = turnSystemPrompt
 	result, err := orch.RunTurnWithOptions(turnCtx, tenantID, threadID, req.Message, turnOptions)
 	if err != nil {
 		aiLog.Warningf("Agent chat turn failed before streaming: %v", err)
@@ -228,7 +240,7 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 
 	if cfg.IsPlatform {
 		if rl := p.AIRateLimiter(); rl != nil {
-			rl.Increment(nodeID)
+			rl.Increment(tenantID)
 		}
 	}
 
@@ -881,6 +893,7 @@ func getAgentChatOrchestrator(cacheKey string, cfg aipkg.Config, systemPrompt st
 	if cached, ok := agentChatRuntimes.Load(cacheKey); ok {
 		entry := cached.(*agentChatRuntimeCacheEntry)
 		if entry.fingerprint == fingerprint {
+			entry.orch.CleanupIdleThreads(agentChatRuntimeIdleTTL)
 			return entry.orch
 		}
 	}
@@ -900,6 +913,10 @@ func getAgentChatOrchestrator(cacheKey string, cfg aipkg.Config, systemPrompt st
 	entry := &agentChatRuntimeCacheEntry{fingerprint: fingerprint, orch: orch}
 	agentChatRuntimes.Store(cacheKey, entry)
 	return orch
+}
+
+func agentChatRuntimeCacheKey(tenantID, storeID string) string {
+	return tenantID + "\x00" + storeID
 }
 
 func forgetAgentChatThread(cacheKey, tenantID, threadID string) {

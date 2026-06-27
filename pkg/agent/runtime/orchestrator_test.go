@@ -44,6 +44,14 @@ type fakeThreadCompactor struct {
 	requests []ThreadCompactionRequest
 }
 
+type fixedOutputGuardrail struct {
+	result GuardrailResult
+}
+
+func (g fixedOutputGuardrail) ValidateOutput(context.Context, string, string, string) GuardrailResult {
+	return g.result
+}
+
 func (f *fakeThreadCompactor) CompactThread(_ context.Context, req ThreadCompactionRequest) (string, error) {
 	cp := ThreadCompactionRequest{
 		TenantID: req.TenantID,
@@ -2396,12 +2404,12 @@ func TestRunTurnWithOptions_InjectsRetrievedMemory(t *testing.T) {
 	}
 	found := false
 	for _, msg := range llm.captured[0].messages {
-		if msg.Role == "system" && strings.Contains(msg.Content, "Relevant memory for this turn") && strings.Contains(msg.Content, "用户偏好中文回答") {
+		if msg.Role == "user" && strings.Contains(msg.Content, "Relevant memory for this turn") && strings.Contains(msg.Content, "用户偏好中文回答") {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("expected memory context in system prompt: %#v", llm.captured[0].messages)
+		t.Fatalf("expected memory context in untrusted user context: %#v", llm.captured[0].messages)
 	}
 }
 
@@ -2458,12 +2466,12 @@ tool_hints: search
 	}
 	foundSkillMemory := false
 	for _, msg := range llm.captured[0].messages {
-		if msg.Role == "system" && strings.Contains(msg.Content, "[skill/import-rules] Always create reviewable product proposals before apply.") {
+		if msg.Role == "user" && strings.Contains(msg.Content, "[skill/import-rules] Always create reviewable product proposals before apply.") {
 			foundSkillMemory = true
 		}
 	}
 	if !foundSkillMemory {
-		t.Fatalf("expected active skill memory in system prompt: %#v", llm.captured[0].messages)
+		t.Fatalf("expected active skill memory in untrusted user context: %#v", llm.captured[0].messages)
 	}
 	sawSkillQuery := false
 	for _, query := range memory.queries {
@@ -2519,12 +2527,12 @@ func TestRunTurnWithOptions_MemoryFallsBackWhenQueryMisses(t *testing.T) {
 	}
 	found := false
 	for _, msg := range llm.captured[0].messages {
-		if msg.Role == "system" && strings.Contains(msg.Content, "人工确认高风险操作") {
+		if msg.Role == "user" && strings.Contains(msg.Content, "人工确认高风险操作") {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("expected fallback memory context in system prompt: %#v", llm.captured[0].messages)
+		t.Fatalf("expected fallback memory context in untrusted user context: %#v", llm.captured[0].messages)
 	}
 }
 
@@ -2924,6 +2932,114 @@ func TestRunTurn_SystemPrompt(t *testing.T) {
 	}
 	if !strings.Contains(msgs[0].Content, "Spanish") {
 		t.Errorf("system prompt should contain 'Spanish', got %q", msgs[0].Content)
+	}
+}
+
+func TestRunTurnWithOptions_SystemPromptIsPerTurn(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{
+		{chunks: []stream.Chunk{{Delta: "one"}}},
+		{chunks: []stream.Chunk{{Delta: "two"}}},
+	}}
+	orch := newTestOrch(llm, nil)
+	orch.SetSystemPrompt("stable base prompt")
+
+	first, err := orch.RunTurnWithOptions(context.Background(), "t1", "th_prompt_1", "hello", TurnOptions{SystemPrompt: "answer in English"})
+	if err != nil {
+		t.Fatalf("first turn: %v", err)
+	}
+	if _, err := stream.Collect(first.Output); err != nil {
+		t.Fatalf("collect first turn: %v", err)
+	}
+	second, err := orch.RunTurnWithOptions(context.Background(), "t1", "th_prompt_2", "你好", TurnOptions{SystemPrompt: "answer in Chinese"})
+	if err != nil {
+		t.Fatalf("second turn: %v", err)
+	}
+	if _, err := stream.Collect(second.Output); err != nil {
+		t.Fatalf("collect second turn: %v", err)
+	}
+
+	if got := llm.captured[0].messages[0].Content; got != "answer in English" {
+		t.Fatalf("first per-turn prompt = %q", got)
+	}
+	if got := llm.captured[1].messages[0].Content; got != "answer in Chinese" {
+		t.Fatalf("second per-turn prompt = %q", got)
+	}
+	if orch.systemPrompt != "stable base prompt" {
+		t.Fatalf("per-turn prompt mutated orchestrator base prompt: %q", orch.systemPrompt)
+	}
+}
+
+func TestRunTurn_OutputGuardrailBlocksBeforePersistenceAndDelivery(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "unsafe output"}}}}}
+	persist := &fakePersistence{}
+	orch := newTestOrch(llm, nil)
+	orch.persist = persist
+	orch.AddOutputGuardrail(fixedOutputGuardrail{result: GuardrailResult{Passed: false, Reason: "blocked"}})
+
+	result, err := orch.RunTurn(context.Background(), "t1", "th_output_block", "hello")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	if _, err := stream.Collect(result.Output); err == nil {
+		t.Fatal("expected blocked output stream error")
+	}
+	for _, message := range persist.messages {
+		if message.Role == "assistant" && message.Content != "" {
+			t.Fatalf("blocked assistant output was persisted: %#v", message)
+		}
+	}
+	if got := persist.turns[len(persist.turns)-1].Status; got != store.TurnStatusFailed {
+		t.Fatalf("blocked turn status = %q, want failed", got)
+	}
+}
+
+func TestRunTurn_OutputGuardrailRewriteIsPersistedAndDelivered(t *testing.T) {
+	llm := &mockLLM{responses: []mockLLMResponse{{chunks: []stream.Chunk{{Delta: "raw output"}}}}}
+	persist := &fakePersistence{}
+	orch := newTestOrch(llm, nil)
+	orch.persist = persist
+	orch.AddOutputGuardrail(fixedOutputGuardrail{result: GuardrailResult{Passed: true, Rewrite: "safe output"}})
+
+	result, err := orch.RunTurn(context.Background(), "t1", "th_output_rewrite", "hello")
+	if err != nil {
+		t.Fatalf("run turn: %v", err)
+	}
+	chunks, err := stream.Collect(result.Output)
+	if err != nil {
+		t.Fatalf("collect stream: %v", err)
+	}
+	if got := collectStreamText(chunks); got != "safe output" {
+		t.Fatalf("delivered output = %q, want rewritten output", got)
+	}
+	found := false
+	for _, message := range persist.messages {
+		if message.Role == "assistant" && message.Content == "safe output" {
+			found = true
+		}
+		if message.Role == "assistant" && message.Content == "raw output" {
+			t.Fatal("raw output must not be persisted")
+		}
+	}
+	if !found {
+		t.Fatal("rewritten assistant output was not persisted")
+	}
+}
+
+func TestToolBatchMode_RespectsRuntimePolicy(t *testing.T) {
+	readPolicies := &resolvedTurnContext{toolPolicies: map[string]toolRuntimePolicy{
+		"read_a": {sideEffect: kernel.SideEffectNone, parallelizable: true},
+		"read_b": {sideEffect: kernel.SideEffectNone, parallelizable: true},
+	}}
+	if got := toolBatchMode(readPolicies, []exec.ToolCall{{Name: "read_a"}, {Name: "read_b"}}); got != exec.Parallel {
+		t.Fatalf("read-only batch mode = %v, want parallel", got)
+	}
+
+	readPolicies.toolPolicies["write"] = toolRuntimePolicy{sideEffect: kernel.SideEffectMutable, parallelizable: false}
+	if got := toolBatchMode(readPolicies, []exec.ToolCall{{Name: "read_a"}, {Name: "write"}}); got != exec.Serial {
+		t.Fatalf("mutable batch mode = %v, want serial", got)
+	}
+	if got := toolBatchMode(readPolicies, []exec.ToolCall{{Name: "read_a"}, {Name: "unknown"}}); got != exec.Serial {
+		t.Fatalf("unknown-policy batch mode = %v, want serial", got)
 	}
 }
 

@@ -91,6 +91,12 @@ func TestRedactMap(t *testing.T) {
 		"password": "hunter2",
 		"Token":    "abc123",
 		"amount":   42,
+		"nested": map[string]any{
+			"api_key": "nested-secret",
+			"items": []any{
+				map[string]any{"private_key": "array-secret", "name": "safe"},
+			},
+		},
 	}
 	got := RedactMap(m)
 	if got["username"] != "alice" {
@@ -104,6 +110,17 @@ func TestRedactMap(t *testing.T) {
 	}
 	if got["amount"] != 42 {
 		t.Error("amount should not be redacted")
+	}
+	nested := got["nested"].(map[string]any)
+	if nested["api_key"] != "[REDACTED]" {
+		t.Error("nested api_key should be redacted")
+	}
+	item := nested["items"].([]any)[0].(map[string]any)
+	if item["private_key"] != "[REDACTED]" || item["name"] != "safe" {
+		t.Fatalf("nested array item was not recursively redacted: %#v", item)
+	}
+	if m["nested"].(map[string]any)["api_key"] != "nested-secret" {
+		t.Fatal("RedactMap must not mutate the input")
 	}
 }
 

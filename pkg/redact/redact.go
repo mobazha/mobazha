@@ -109,8 +109,8 @@ func IsSensitiveKey(key string) bool {
 	return sensitiveKeys[strings.ToLower(key)]
 }
 
-// RedactMap returns a shallow copy of m with sensitive keys replaced by
-// "[REDACTED]". Non-sensitive values are copied as-is.
+// RedactMap returns a recursive copy of m with sensitive keys replaced by
+// "[REDACTED]". Nested JSON objects and arrays are sanitized as well.
 func RedactMap(m map[string]any) map[string]any {
 	if len(m) == 0 {
 		return m
@@ -120,10 +120,26 @@ func RedactMap(m map[string]any) map[string]any {
 		if IsSensitiveKey(k) {
 			out[k] = "[REDACTED]"
 		} else {
-			out[k] = v
+			out[k] = RedactValue(v)
 		}
 	}
 	return out
+}
+
+// RedactValue recursively sanitizes JSON-shaped values.
+func RedactValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return RedactMap(typed)
+	case []any:
+		out := make([]any, len(typed))
+		for i, item := range typed {
+			out[i] = RedactValue(item)
+		}
+		return out
+	default:
+		return value
+	}
 }
 
 // RedactMapJSON is a convenience wrapper that returns a JSON string

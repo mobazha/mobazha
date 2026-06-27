@@ -209,7 +209,7 @@ func agentMemoryVisibleScope(r *http.Request, p aiChatProvider) (kernel.Scope, e
 	scope := kernel.Scope{}
 	if p != nil {
 		scope.TenantID = agentChatTenantID(r, p)
-		scope.StoreID = p.ProfileName()
+		scope.StoreID = scope.TenantID
 		scope.ActorID = agentApprovalDecisionActor(r, p)
 	}
 	q := r.URL.Query()
@@ -230,11 +230,11 @@ func agentMemoryWriteScope(r *http.Request, p aiChatProvider, req agentMemoryCre
 	}
 	scope := kernel.Scope{
 		TenantID: agentChatTenantID(r, p),
-		StoreID:  p.ProfileName(),
 		ActorID:  agentApprovalDecisionActor(r, p),
 		ThreadID: strings.TrimSpace(req.ThreadID),
 		SkillID:  strings.TrimSpace(req.SkillID),
 	}
+	scope.StoreID = scope.TenantID
 	if storeID := strings.TrimSpace(req.StoreID); storeID != "" {
 		if scope.StoreID == "" || storeID != scope.StoreID {
 			return kernel.Scope{}, "", errors.New("storeId does not match current store")

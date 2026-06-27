@@ -35,11 +35,34 @@ type agentChatHTTPTestNode struct {
 	store       agentstore.Persistence
 }
 
+type tenantScopedAgentStore struct {
+	agentstore.Persistence
+	tenantID string
+}
+
+func (s tenantScopedAgentStore) TenantID() string { return s.tenantID }
+
 func (n *agentChatHTTPTestNode) AIProxy() *aipkg.Proxy                  { return n.proxy }
 func (n *agentChatHTTPTestNode) AIRateLimiter() *aipkg.DailyRateLimiter { return n.rateLimiter }
 func (n *agentChatHTTPTestNode) AgentStore() agentstore.Persistence     { return n.store }
 func (n *agentChatHTTPTestNode) ProfileName() string                    { return "Test Store" }
 func (n *agentChatHTTPTestNode) ProductCatalog() []aipkg.ListingSummary { return nil }
+
+func TestAgentChatTenantID_PrefersDatabaseScope(t *testing.T) {
+	node := &agentChatHTTPTestNode{
+		aiStatusTestNode: newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{}),
+		store: tenantScopedAgentStore{
+			Persistence: &agentChatMemoryStore{},
+			tenantID:    "database-tenant",
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/agent/chat", nil)
+	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, node))
+
+	if got := agentChatTenantID(req, node); got != "database-tenant" {
+		t.Fatalf("agentChatTenantID() = %q, want database-tenant", got)
+	}
+}
 
 type agentChatMemoryStore struct {
 	thread          *agentstore.Thread
@@ -664,7 +687,7 @@ func TestHandlePOSTAgentChat_StreamsSSE(t *testing.T) {
 		proxy: aipkg.NewProxy(upstream.Client()),
 		store: &agentChatMemoryStore{},
 	}
-	cacheKey := "test-node:" + node.ProfileName()
+	cacheKey := agentChatRuntimeCacheKey("test-node", "test-node")
 	agentChatRuntimes.Delete(cacheKey)
 	defer agentChatRuntimes.Delete(cacheKey)
 
@@ -842,7 +865,7 @@ func TestHandlePOSTAgentChat_IncludesReferencedArtifactsInTurnContext(t *testing
 		proxy: aipkg.NewProxy(upstream.Client()),
 		store: store,
 	}
-	cacheKey := "test-node:" + node.ProfileName()
+	cacheKey := agentChatRuntimeCacheKey("test-node", "test-node")
 	agentChatRuntimes.Delete(cacheKey)
 	defer agentChatRuntimes.Delete(cacheKey)
 
@@ -857,13 +880,17 @@ func TestHandlePOSTAgentChat_IncludesReferencedArtifactsInTurnContext(t *testing
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	system := firstOpenAIMessageContent(t, upstreamReq, "system")
+	if !strings.Contains(system, "## Context Safety") {
+		t.Fatalf("system prompt missing context safety policy:\n%s", system)
+	}
+	user := firstOpenAIMessageContent(t, upstreamReq, "user")
 	for _, want := range []string{"## Turn Context", "Referenced artifacts for this turn", "Use these artifacts as bounded context", "Artifact 1: id=art_ctx", "kind=source_material", "dataExcerpt(redacted/truncated)", "Two product notes from supplier chat", "[REDACTED]"} {
-		if !strings.Contains(system, want) {
-			t.Fatalf("system prompt missing %q:\n%s", want, system)
+		if !strings.Contains(user, want) {
+			t.Fatalf("user context missing %q:\n%s", want, user)
 		}
 	}
-	if strings.Contains(system, "secret-token") {
-		t.Fatalf("system prompt should redact sensitive artifact data:\n%s", system)
+	if strings.Contains(user, "secret-token") {
+		t.Fatalf("user context should redact sensitive artifact data:\n%s", user)
 	}
 }
 
@@ -896,7 +923,7 @@ func TestHandlePOSTAgentChat_ProductImportAttachmentUsesToolContextWithoutVision
 		proxy: aipkg.NewProxy(upstream.Client()),
 		store: &agentChatMemoryStore{},
 	}
-	cacheKey := "test-node:" + node.ProfileName()
+	cacheKey := agentChatRuntimeCacheKey("test-node", "test-node")
 	agentChatRuntimes.Delete(cacheKey)
 	defer agentChatRuntimes.Delete(cacheKey)
 
@@ -911,13 +938,19 @@ func TestHandlePOSTAgentChat_ProductImportAttachmentUsesToolContextWithoutVision
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	system := firstOpenAIMessageContent(t, upstreamReq, "system")
-	for _, want := range []string{"Current UI context:", "User attached files in this turn: 1", "## Turn Context", "Attached files for this turn", "do not say no file or image was attached", "Attachment 1:", "id=att_img_1", "name=future-palette-cover.jpg", "contentType=image/jpeg", "inlineBinary: available"} {
+	for _, want := range []string{"Current UI context:", "User attached files in this turn: 1", "## Context Safety"} {
 		if !strings.Contains(system, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, system)
 		}
 	}
 	messages, _ := upstreamReq["messages"].([]any)
 	last := messages[len(messages)-1].(map[string]any)
+	user := fmt.Sprint(last["content"])
+	for _, want := range []string{"## Turn Context", "Attached files for this turn", "do not say no file or image was attached", "Attachment 1:", "id=att_img_1", "name=future-palette-cover.jpg", "contentType=image/jpeg", "inlineBinary: available"} {
+		if !strings.Contains(user, want) {
+			t.Fatalf("user context missing %q:\n%s", want, user)
+		}
+	}
 	if _, ok := last["content"].([]any); ok {
 		t.Fatalf("product import attachment should route through tools without vision blocks, got %#v", last["content"])
 	}
@@ -955,7 +988,7 @@ func TestHandlePOSTAgentChat_AttachmentUsesLazyVisionWithoutUpfrontBlocks(t *tes
 		proxy: aipkg.NewProxy(upstream.Client()),
 		store: &agentChatMemoryStore{},
 	}
-	cacheKey := "test-node:" + node.ProfileName()
+	cacheKey := agentChatRuntimeCacheKey("test-node", "test-node")
 	agentChatRuntimes.Delete(cacheKey)
 	defer agentChatRuntimes.Delete(cacheKey)
 
@@ -970,16 +1003,22 @@ func TestHandlePOSTAgentChat_AttachmentUsesLazyVisionWithoutUpfrontBlocks(t *tes
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	system := firstOpenAIMessageContent(t, upstreamReq, "system")
-	for _, want := range []string{"User attached files in this turn: 1", "name=product.jpg", "contentType=image/jpeg", "inlineBinary: available", "agent_attachments_analyze"} {
+	for _, want := range []string{"User attached files in this turn: 1", "## Context Safety"} {
 		if !strings.Contains(system, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, system)
 		}
 	}
-	if strings.Contains(system, "id=") {
-		t.Fatalf("system prompt should not require attachment id:\n%s", system)
-	}
 	messages, _ := upstreamReq["messages"].([]any)
 	last := messages[len(messages)-1].(map[string]any)
+	user := fmt.Sprint(last["content"])
+	for _, want := range []string{"name=product.jpg", "contentType=image/jpeg", "inlineBinary: available", "agent_attachments_analyze"} {
+		if !strings.Contains(user, want) {
+			t.Fatalf("user context missing %q:\n%s", want, user)
+		}
+	}
+	if strings.Contains(user, "id=") {
+		t.Fatalf("user context should not require attachment id:\n%s", user)
+	}
 	if _, ok := last["content"].([]any); ok {
 		t.Fatalf("lazy vision should not inject image blocks into the user message, got %#v", last["content"])
 	}
@@ -1195,7 +1234,7 @@ func TestHandlePOSTAgentChat_IncludesReferencedSkillRunInTurnContext(t *testing.
 		proxy: aipkg.NewProxy(upstream.Client()),
 		store: store,
 	}
-	cacheKey := "test-node:" + node.ProfileName()
+	cacheKey := agentChatRuntimeCacheKey("test-node", "test-node")
 	agentChatRuntimes.Delete(cacheKey)
 	defer agentChatRuntimes.Delete(cacheKey)
 
@@ -1210,13 +1249,19 @@ func TestHandlePOSTAgentChat_IncludesReferencedSkillRunInTurnContext(t *testing.
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	system := firstOpenAIMessageContent(t, upstreamReq, "system")
-	for _, want := range []string{"## Turn Context", "Referenced skill runs for this turn", "SkillRun 1: id=run_ctx", "artifactCountsShown: proposal.needs_review=1", "Reviewable listing draft from non-standard source", "Product Import Skill", "[REDACTED]"} {
+	for _, want := range []string{"Product Import Skill", "## Context Safety"} {
 		if !strings.Contains(system, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, system)
 		}
 	}
-	if strings.Contains(system, "secret-token") {
-		t.Fatalf("system prompt should redact sensitive skill run data:\n%s", system)
+	user := firstOpenAIMessageContent(t, upstreamReq, "user")
+	for _, want := range []string{"## Turn Context", "Referenced skill runs for this turn", "SkillRun 1: id=run_ctx", "artifactCountsShown: proposal.needs_review=1", "Reviewable listing draft from non-standard source", "[REDACTED]"} {
+		if !strings.Contains(user, want) {
+			t.Fatalf("user context missing %q:\n%s", want, user)
+		}
+	}
+	if strings.Contains(user, "secret-token") {
+		t.Fatalf("user context should redact sensitive skill run data:\n%s", user)
 	}
 	toolNames := openAIToolNames(t, upstreamReq)
 	for _, want := range []string{"agent_skill_runs_get", "agent_artifacts_list", "agent_artifacts_update"} {
@@ -1255,7 +1300,7 @@ func TestHandlePOSTAgentChat_ProductImportSkillRestrictsTools(t *testing.T) {
 		proxy: aipkg.NewProxy(upstream.Client()),
 		store: &agentChatMemoryStore{},
 	}
-	cacheKey := "test-node:" + node.ProfileName()
+	cacheKey := agentChatRuntimeCacheKey("test-node", "test-node")
 	agentChatRuntimes.Delete(cacheKey)
 	defer agentChatRuntimes.Delete(cacheKey)
 

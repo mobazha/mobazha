@@ -127,6 +127,20 @@ func NewGormPersistence(db pkgdb.Database) *GormPersistence {
 	return &GormPersistence{db: db}
 }
 
+// TenantID returns the tenant scope enforced by the underlying database.
+func (p *GormPersistence) TenantID() string {
+	if p == nil || p.db == nil {
+		return ""
+	}
+	type tenantIDProvider interface {
+		TenantID() string
+	}
+	if scoped, ok := p.db.(tenantIDProvider); ok {
+		return scoped.TenantID()
+	}
+	return ""
+}
+
 // MigrateModels creates or updates the agent runtime tables.
 func MigrateModels(db pkgdb.Database) error {
 	return db.Update(func(tx pkgdb.Tx) error {
@@ -937,36 +951,13 @@ func sanitizeDeliveries(raw string) string {
 		return ""
 	}
 	for i := range deliveries {
-		deliveries[i] = redactDeliveryValue(deliveries[i])
+		deliveries[i] = redact.RedactValue(deliveries[i])
 	}
 	data, err := json.Marshal(deliveries)
 	if err != nil {
 		return ""
 	}
 	return string(data)
-}
-
-func redactDeliveryValue(value any) any {
-	switch typed := value.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(typed))
-		for key, item := range typed {
-			if redact.IsSensitiveKey(key) {
-				out[key] = "[REDACTED]"
-				continue
-			}
-			out[key] = redactDeliveryValue(item)
-		}
-		return out
-	case []any:
-		out := make([]any, len(typed))
-		for i, item := range typed {
-			out[i] = redactDeliveryValue(item)
-		}
-		return out
-	default:
-		return value
-	}
 }
 
 func truncateStoreText(s string, max int) string {

@@ -1674,7 +1674,7 @@ func buildProductImportProposalApproval(r *http.Request, p aiChatProvider, artif
 	actorID := agentApprovalDecisionActor(r, p)
 	scope := kernel.Scope{
 		TenantID:      artifact.TenantID,
-		StoreID:       p.ProfileName(),
+		StoreID:       artifact.TenantID,
 		ActorID:       actorID,
 		ActingPersona: kernel.PersonaSeller,
 	}
@@ -1808,7 +1808,7 @@ func productImportSourceFromMultipart(header *multipart.FileHeader) (agentProduc
 func (g *Gateway) ingestProductImportSources(ctx context.Context, p aiChatProvider, req agentProductImportIngestRequest, sources []agentProductImportIngestSource, tenantID, actorID string) (*agentProductImportIngestResult, error) {
 	storeID := strings.TrimSpace(req.StoreID)
 	if storeID == "" {
-		storeID = p.ProfileName()
+		storeID = tenantID
 	}
 	now := time.Now()
 	run := &agentstore.SkillRun{

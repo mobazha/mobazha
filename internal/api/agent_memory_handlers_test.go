@@ -92,7 +92,7 @@ func TestHandlePOSTAgentMemory_DefaultsToUserScope(t *testing.T) {
 		t.Fatalf("expected 1 saved memory, got %d", len(store.saves))
 	}
 	save := store.saves[0]
-	if save.scope.TenantID != "test-node" || save.scope.ActorID != "test-node" || save.scope.StoreID != "Test Store" {
+	if save.scope.TenantID != "test-node" || save.scope.ActorID != "test-node" || save.scope.StoreID != "test-node" {
 		t.Fatalf("unexpected write scope: %+v", save.scope)
 	}
 	if save.item.Scope != kernel.MemoryUser {
@@ -137,7 +137,7 @@ func TestHandleGETAgentMemories_SearchesVisibleScope(t *testing.T) {
 		t.Fatalf("expected 1 memory query, got %d", len(store.searchQueries))
 	}
 	query := store.searchQueries[0]
-	if query.Scope.TenantID != "test-node" || query.Scope.ActorID != "test-node" || query.Scope.StoreID != "Test Store" {
+	if query.Scope.TenantID != "test-node" || query.Scope.ActorID != "test-node" || query.Scope.StoreID != "test-node" {
 		t.Fatalf("unexpected visible scope: %+v", query.Scope)
 	}
 	if query.Scope.ThreadID != "thread_1" || query.Scope.SkillID != "product.import" {

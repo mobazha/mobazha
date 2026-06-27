@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -60,7 +61,7 @@ func TestBatchExecutor_Serial_Basic(t *testing.T) {
 	}
 }
 
-func TestBatchExecutor_Serial_StopsOnError(t *testing.T) {
+func TestBatchExecutor_Serial_ReportsErrorAndSkipsRemainingCalls(t *testing.T) {
 	callCount := 0
 	executor := ToolExecutorFunc(func(_ context.Context, call ToolCall) (ToolResult, error) {
 		callCount++
@@ -81,11 +82,14 @@ func TestBatchExecutor_Serial_StopsOnError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if len(results) != 2 {
-		t.Errorf("expected 2 results (stopped after fail), got %d", len(results))
+	if len(results) != 3 {
+		t.Errorf("expected 3 correlated results, got %d", len(results))
 	}
 	if callCount != 2 {
-		t.Errorf("expected 2 calls, got %d", callCount)
+		t.Errorf("expected execution to stop after 2 calls, got %d", callCount)
+	}
+	if !results[1].IsError || !results[2].IsError || !strings.Contains(results[2].Content, "skipped") {
+		t.Errorf("unexpected serial results: %#v", results)
 	}
 }
 
@@ -164,6 +168,34 @@ func TestBatchExecutor_ContextCancellation(t *testing.T) {
 	_, err := be.Execute(ctx, []ToolCall{{ID: "1", Name: "slow"}}, Parallel)
 	if err == nil {
 		t.Fatal("expected context cancellation error")
+	}
+}
+
+func TestBatchExecutor_ParallelCancellationCorrelatesUnstartedCalls(t *testing.T) {
+	executor := ToolExecutorFunc(func(ctx context.Context, call ToolCall) (ToolResult, error) {
+		<-ctx.Done()
+		return ToolResult{}, ctx.Err()
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+
+	be := NewBatchExecutor(executor, time.Second, 1)
+	calls := []ToolCall{
+		{ID: "1", Name: "first"},
+		{ID: "2", Name: "second"},
+		{ID: "3", Name: "third"},
+	}
+	results, err := be.Execute(ctx, calls, Parallel)
+	if err == nil {
+		t.Fatal("expected context cancellation error")
+	}
+	if len(results) != len(calls) {
+		t.Fatalf("expected %d correlated results, got %d", len(calls), len(results))
+	}
+	for i, result := range results {
+		if result.CallID != calls[i].ID || result.Name != calls[i].Name || !result.IsError {
+			t.Fatalf("result %d is not correlated to its cancelled call: %#v", i, result)
+		}
 	}
 }
 

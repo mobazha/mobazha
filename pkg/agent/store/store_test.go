@@ -711,6 +711,16 @@ func newAgentStoreTestTenantDB(t *testing.T, sharedDB *gorm.DB, tenantID string)
 	return db
 }
 
+func TestGormPersistence_TenantIDUsesDatabaseScope(t *testing.T) {
+	sharedDB, err := gorm.Open(sqlitedialect.Open(t.TempDir()+"/agent-tenant-id.db"), &gorm.Config{})
+	require.NoError(t, err)
+	db := newAgentStoreTestTenantDB(t, sharedDB, "tenant_scope")
+
+	if got := NewGormPersistence(db).TenantID(); got != "tenant_scope" {
+		t.Fatalf("TenantID() = %q, want tenant_scope", got)
+	}
+}
+
 func loadAgentMemoryRecord(t *testing.T, db database.Database, id string) Memory {
 	t.Helper()
 	var record Memory

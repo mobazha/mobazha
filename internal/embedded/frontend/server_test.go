@@ -112,10 +112,43 @@ func TestSPAHandler_RuntimeConfig_StandaloneAuthMode(t *testing.T) {
 	payload := parseRuntimeConfig(t, body)
 
 	assert.Equal(t, "application/javascript", resp.Header.Get("Content-Type"))
+	assert.Equal(t, float64(RuntimeConfigSchemaVersion), payload["schemaVersion"])
 	assert.Equal(t, "standalone", payload["authMode"])
 	assert.Equal(t, "https://app.mobazha.org", payload["saasUrl"])
 	assert.Equal(t, false, payload["guestCheckoutEnabled"], "no snapshot fn → default off")
 	assert.Equal(t, map[string]any{}, payload["features"], "nil callback → empty features map, not null")
+	assert.Equal(t, map[string]any{
+		"payments": map[string]any{"methods": []any{}},
+	}, payload["capabilities"], "nil callback → empty capabilities, not null")
+}
+
+func TestSPAHandler_RuntimeConfig_CapabilitiesSnapshotInjection(t *testing.T) {
+	capabilitiesFn := func(context.Context) RuntimeCapabilities {
+		return RuntimeCapabilities{Payments: PaymentCapabilities{Methods: []PaymentCapability{
+			{ID: "BTC", Kind: "crypto", Flow: "address-transfer"},
+			{ID: "ZEC", Kind: "crypto", Flow: "address-transfer", AddressMode: "transparent"},
+			{ID: "stripe", Kind: "fiat", Flow: "provider-session"},
+		}}}
+	}
+
+	h := NewRuntimeConfigHandler(ServerConfig{CapabilitiesSnapshotFn: capabilitiesFn})
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/runtime-config.js")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	payload := parseRuntimeConfig(t, body)
+	capabilities := payload["capabilities"].(map[string]any)
+	payments := capabilities["payments"].(map[string]any)
+	methods := payments["methods"].([]any)
+	require.Len(t, methods, 3)
+	assert.Equal(t, "BTC", methods[0].(map[string]any)["id"])
+	assert.Equal(t, "transparent", methods[1].(map[string]any)["addressMode"])
+	assert.Equal(t, "provider-session", methods[2].(map[string]any)["flow"])
 }
 
 func TestSPAHandler_RuntimeConfig_FeaturesSnapshotInjection(t *testing.T) {

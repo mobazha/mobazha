@@ -569,6 +569,10 @@
           "contentType": {
             "type": "string"
           },
+          "hasPreview": {
+            "description": "True when source image bytes are available for preview.",
+            "type": "boolean"
+          },
           "sourceName": {
             "type": "string"
           },
@@ -1555,12 +1559,12 @@
         "operationId": "agent-approvals-get",
         "parameters": [
           {
-            "description": "Approval status filter: pending, approved, rejected, applying, applied, apply_failed, or all.",
+            "description": "Approval status filter: pending, approved, rejected, superseded, applying, applied, apply_failed, or all.",
             "explode": false,
             "in": "query",
             "name": "status",
             "schema": {
-              "description": "Approval status filter: pending, approved, rejected, applying, applied, apply_failed, or all.",
+              "description": "Approval status filter: pending, approved, rejected, superseded, applying, applied, apply_failed, or all.",
               "type": "string"
             }
           },
@@ -2085,6 +2089,99 @@
           }
         ],
         "summary": "Create an approval from an agent proposal artifact",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/agent/artifacts/{artifactId}/content": {
+      "get": {
+        "operationId": "agent-artifact-content-get",
+        "parameters": [
+          {
+            "description": "Agent artifact ID.",
+            "in": "path",
+            "name": "artifactId",
+            "required": true,
+            "schema": {
+              "description": "Agent artifact ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "contentEncoding": "base64",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "description": "Cache directive.",
+                  "type": "string"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "description": "Attachment hint for downloads.",
+                  "type": "string"
+                }
+              },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "Content-Type": {
+                "schema": {
+                  "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Get binary content for an agent source artifact",
         "tags": [
           "ai"
         ]
@@ -4487,9 +4584,27 @@
                   "type": "string"
                 }
               },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
               "Content-Type": {
                 "schema": {
                   "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
                   "type": "string"
                 }
               }
@@ -11860,9 +11975,27 @@
                   "type": "string"
                 }
               },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
               "Content-Type": {
                 "schema": {
                   "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
                   "type": "string"
                 }
               }
@@ -12198,9 +12331,27 @@
                   "type": "string"
                 }
               },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
               "Content-Type": {
                 "schema": {
                   "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
                   "type": "string"
                 }
               }
@@ -12362,9 +12513,27 @@
                   "type": "string"
                 }
               },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
               "Content-Type": {
                 "schema": {
                   "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
                   "type": "string"
                 }
               }
@@ -13933,9 +14102,27 @@
                   "type": "string"
                 }
               },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
               "Content-Type": {
                 "schema": {
                   "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
                   "type": "string"
                 }
               }
@@ -16058,9 +16245,27 @@
                   "type": "string"
                 }
               },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
               "Content-Type": {
                 "schema": {
                   "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
                   "type": "string"
                 }
               }
@@ -16132,9 +16337,27 @@
                   "type": "string"
                 }
               },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
               "Content-Type": {
                 "schema": {
                   "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
                   "type": "string"
                 }
               }
@@ -16509,6 +16732,37 @@
         "summary": "Retrieve a normalized rating blob",
         "tags": [
           "ratings"
+        ]
+      }
+    },
+    "/v1/runtime-config": {
+      "get": {
+        "operationId": "runtime-config-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Frontend runtime features and capabilities",
+        "tags": [
+          "system"
         ]
       }
     },

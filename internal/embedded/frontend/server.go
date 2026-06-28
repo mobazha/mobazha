@@ -29,6 +29,31 @@ type FeatureSnapshot struct {
 	Overridable []string
 }
 
+// RuntimeConfigSchemaVersion identifies the public bootstrap contract shared
+// by the embedded frontend and GET /v1/runtime-config.
+const RuntimeConfigSchemaVersion = 2
+
+// PaymentCapability describes a payment method the running backend can
+// actually serve. It intentionally exposes product-level behavior only, not
+// provider credentials or internal implementation details.
+type PaymentCapability struct {
+	ID          string `json:"id"`
+	Kind        string `json:"kind"`
+	Flow        string `json:"flow"`
+	AddressMode string `json:"addressMode,omitempty"`
+}
+
+// PaymentCapabilities is the payment section of RuntimeCapabilities.
+type PaymentCapabilities struct {
+	Methods []PaymentCapability `json:"methods"`
+}
+
+// RuntimeCapabilities contains backend capabilities that the unified
+// frontend may project. Server-side authorization remains authoritative.
+type RuntimeCapabilities struct {
+	Payments PaymentCapabilities `json:"payments"`
+}
+
 // BrandSnapshot holds white-label branding values injected into
 // /runtime-config.js so the SPA can apply partner theming without
 // rebuilding. Nil means "use Mobazha defaults".
@@ -85,6 +110,10 @@ type ServerConfig struct {
 	// yields an empty features map (fail-closed).
 	FeaturesSnapshotFn func(context.Context) []FeatureSnapshot
 
+	// CapabilitiesSnapshotFn returns the product capabilities implemented by
+	// the running node. A nil callback yields an empty fail-closed snapshot.
+	CapabilitiesSnapshotFn func(context.Context) RuntimeCapabilities
+
 	// NeedsSetupShellFn, when set with PrivateDistributionMode, serves setup.html instead
 	// of the full SPA for /admin/* while initial setup is incomplete.
 	NeedsSetupShellFn func() bool
@@ -99,25 +128,39 @@ type ServerConfig struct {
 func NewHandler(cfg ServerConfig) http.Handler {
 	embeddedSub, _ := fs.Sub(DistFS, "dist")
 
+	return newSPAHandler(embeddedSub, cfg)
+}
+
+// NewRuntimeConfigHandler returns a handler for /runtime-config.js without
+// requiring the embedded SPA. Container deployments use this while Next.js
+// serves the application itself.
+func NewRuntimeConfigHandler(cfg ServerConfig) http.Handler {
+	h := newSPAHandler(nil, cfg)
+	return http.HandlerFunc(h.serveRuntimeConfig)
+}
+
+func newSPAHandler(embedded fs.FS, cfg ServerConfig) *spaHandler {
 	return &spaHandler{
-		embedded:           embeddedSub,
-		overrideDir:        cfg.OverrideDir,
-		saasURL:            cfg.SaaSURL,
-		private_distributionMode:        cfg.PrivateDistributionMode,
-		brand:              cfg.Brand,
-		featuresSnapshotFn: cfg.FeaturesSnapshotFn,
-		needsSetupShellFn:  cfg.NeedsSetupShellFn,
+		embedded:               embedded,
+		overrideDir:            cfg.OverrideDir,
+		saasURL:                cfg.SaaSURL,
+		private_distributionMode:            cfg.PrivateDistributionMode,
+		brand:                  cfg.Brand,
+		featuresSnapshotFn:     cfg.FeaturesSnapshotFn,
+		capabilitiesSnapshotFn: cfg.CapabilitiesSnapshotFn,
+		needsSetupShellFn:      cfg.NeedsSetupShellFn,
 	}
 }
 
 type spaHandler struct {
-	embedded           fs.FS
-	overrideDir        string
-	saasURL            string
-	private_distributionMode        bool
-	brand              *BrandSnapshot
-	featuresSnapshotFn func(context.Context) []FeatureSnapshot
-	needsSetupShellFn  func() bool
+	embedded               fs.FS
+	overrideDir            string
+	saasURL                string
+	private_distributionMode            bool
+	brand                  *BrandSnapshot
+	featuresSnapshotFn     func(context.Context) []FeatureSnapshot
+	capabilitiesSnapshotFn func(context.Context) RuntimeCapabilities
+	needsSetupShellFn      func() bool
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -281,30 +324,91 @@ func (h *spaHandler) setPrivateDistributionSecurityHeaders(w http.ResponseWriter
 	}
 }
 
-// runtimeFeatureEntry is the per-feature shape inside
+// RuntimeFeatureEntry is the per-feature shape inside
 // window.__RUNTIME_CONFIG__.features. Keep it aligned with
 // FEATURE_FLAG_ARCHITECTURE.md §4.3 and the frontend's
 // featureFlags.initialize() parser.
-type runtimeFeatureEntry struct {
+type RuntimeFeatureEntry struct {
 	Effective   bool     `json:"effective"`
 	Overridable []string `json:"overridable"`
 }
 
-// runtimeConfigPayload captures the fields embedded into
+// RuntimeConfigPayload captures the versioned fields embedded into
 // window.__RUNTIME_CONFIG__ on every page load.
 //
 // Deprecated fields (guestCheckoutEnabled) exist for backward compatibility
 // with older bundles that still read the flat boolean. Once the unified
 // featureFlags service ships (Phase B of ff-impl-frontend), these flat
 // fields move to TECHDEBT(TD-032) and get removed in Phase E.
-type runtimeConfigPayload struct {
+type RuntimeConfigPayload struct {
+	SchemaVersion            int                            `json:"schemaVersion"`
 	SaasURL                  string                         `json:"saasUrl,omitempty"`
 	AuthMode                 string                         `json:"authMode"`
 	GuestCheckoutEnabled     bool                           `json:"guestCheckoutEnabled"`
-	Features                 map[string]runtimeFeatureEntry `json:"features"`
+	Features                 map[string]RuntimeFeatureEntry `json:"features"`
+	Capabilities             RuntimeCapabilities            `json:"capabilities"`
 	PrivateDistributionMode              bool                           `json:"private_distributionMode,omitempty"`
 	DisableExternalResources bool                           `json:"disableExternalResources,omitempty"`
 	Brand                    *BrandSnapshot                 `json:"brand,omitempty"`
+}
+
+// BuildRuntimeConfigPayload resolves a complete frontend bootstrap snapshot.
+// Both the JavaScript bootstrap and the JSON API call this function so their
+// contracts cannot drift.
+func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeConfigPayload {
+	features := map[string]RuntimeFeatureEntry{}
+	guestCheckoutEnabled := false
+
+	if cfg.FeaturesSnapshotFn != nil {
+		for _, f := range cfg.FeaturesSnapshotFn(ctx) {
+			if f.Key == "" {
+				continue
+			}
+			overridable := f.Overridable
+			if overridable == nil {
+				overridable = []string{}
+			}
+			features[f.Key] = RuntimeFeatureEntry{
+				Effective:   f.Effective,
+				Overridable: overridable,
+			}
+			if f.Key == "guestCheckout" {
+				guestCheckoutEnabled = f.Effective
+			}
+		}
+	}
+
+	capabilities := RuntimeCapabilities{
+		Payments: PaymentCapabilities{Methods: []PaymentCapability{}},
+	}
+	if cfg.CapabilitiesSnapshotFn != nil {
+		capabilities = cfg.CapabilitiesSnapshotFn(ctx)
+		if capabilities.Payments.Methods == nil {
+			capabilities.Payments.Methods = []PaymentCapability{}
+		}
+	}
+
+	payload := RuntimeConfigPayload{
+		SchemaVersion:        RuntimeConfigSchemaVersion,
+		AuthMode:             "standalone",
+		GuestCheckoutEnabled: guestCheckoutEnabled,
+		Features:             features,
+		Capabilities:         capabilities,
+	}
+
+	if cfg.PrivateDistributionMode {
+		payload.GuestCheckoutEnabled = true
+		payload.PrivateDistributionMode = true
+		payload.DisableExternalResources = true
+		payload.Brand = cfg.Brand
+		return payload
+	}
+
+	payload.SaasURL = cfg.SaaSURL
+	if payload.SaasURL == "" {
+		payload.SaasURL = "https://app.mobazha.org"
+	}
+	return payload
 }
 
 // serveRuntimeConfig emits a JS snippet that assigns window.__RUNTIME_CONFIG__
@@ -319,64 +423,24 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) 
 		w.Header().Set("Cache-Control", "no-cache")
 	}
 
-	features := map[string]runtimeFeatureEntry{}
-	guestCheckoutEnabled := false
-
-	if h.featuresSnapshotFn != nil {
-		for _, f := range h.featuresSnapshotFn(r.Context()) {
-			if f.Key == "" {
-				continue
-			}
-			overridable := f.Overridable
-			if overridable == nil {
-				// json.Marshal emits `null` for nil slices; the frontend
-				// expects `[]` for "no overrides allowed", so normalize
-				// here to avoid client-side null checks.
-				overridable = []string{}
-			}
-			features[f.Key] = runtimeFeatureEntry{
-				Effective:   f.Effective,
-				Overridable: overridable,
-			}
-			if f.Key == "guestCheckout" {
-				guestCheckoutEnabled = f.Effective
-			}
-		}
-	}
-
-	var payload runtimeConfigPayload
-	if h.private_distributionMode {
-		payload = runtimeConfigPayload{
-			AuthMode:                 "standalone",
-			GuestCheckoutEnabled:     true,
-			Features:                 features,
-			PrivateDistributionMode:              true,
-			DisableExternalResources: true,
-			Brand:                    h.brand,
-		}
-	} else {
-		saasURL := h.saasURL
-		if saasURL == "" {
-			saasURL = "https://app.mobazha.org"
-		}
-		payload = runtimeConfigPayload{
-			SaasURL:              saasURL,
-			AuthMode:             "standalone",
-			GuestCheckoutEnabled: guestCheckoutEnabled,
-			Features:             features,
-		}
-	}
+	payload := BuildRuntimeConfigPayload(r.Context(), ServerConfig{
+		SaaSURL:                h.saasURL,
+		PrivateDistributionMode:            h.private_distributionMode,
+		Brand:                  h.brand,
+		FeaturesSnapshotFn:     h.featuresSnapshotFn,
+		CapabilitiesSnapshotFn: h.capabilitiesSnapshotFn,
+	})
 
 	body, err := json.Marshal(payload)
 	if err != nil {
 		if h.private_distributionMode {
-			fmt.Fprint(w, `window.__RUNTIME_CONFIG__={authMode:"standalone",guestCheckoutEnabled:true,private_distributionMode:true,disableExternalResources:true,features:{}};`)
+			fmt.Fprint(w, `window.__RUNTIME_CONFIG__={schemaVersion:2,authMode:"standalone",guestCheckoutEnabled:true,private_distributionMode:true,disableExternalResources:true,features:{},capabilities:{payments:{methods:[]}}};`)
 		} else {
 			saasURL := h.saasURL
 			if saasURL == "" {
 				saasURL = "https://app.mobazha.org"
 			}
-			fmt.Fprintf(w, `window.__RUNTIME_CONFIG__={saasUrl:%q,authMode:"standalone",guestCheckoutEnabled:false,features:{}};`, saasURL)
+			fmt.Fprintf(w, `window.__RUNTIME_CONFIG__={schemaVersion:2,saasUrl:%q,authMode:"standalone",guestCheckoutEnabled:false,features:{},capabilities:{payments:{methods:[]}}};`, saasURL)
 		}
 		return
 	}

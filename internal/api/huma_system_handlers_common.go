@@ -363,6 +363,23 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 // between the full build and the private_distribution build.
 func (g *Gateway) registerCommonSystemPublicOps(api huma.API) {
 	huma.Register(api, huma.Operation{
+		OperationID: "runtime-config-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/runtime-config",
+		Summary:     "Frontend runtime features and capabilities",
+		Tags:        []string{"system"},
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/runtime-config", nil)
+		rr := httptest.NewRecorder()
+		g.handleGETRuntimeConfig(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "system-setup-get",
 		Method:      http.MethodGet,
 		Path:        "/v1/system/setup",

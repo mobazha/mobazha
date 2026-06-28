@@ -26,6 +26,11 @@
 		}
 	}
 
+	# Runtime bootstrap is generated dynamically by the node.
+	handle /runtime-config.js {
+		reverse_proxy localhost:{{ .NodePort }}
+	}
+
 	# Node API
 	handle /v1/* {
 		reverse_proxy localhost:{{ .NodePort }}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sort"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	mcppkg "github.com/mobazha/mobazha3.0/pkg/mcp"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"gorm.io/gorm"
 )
 
@@ -248,18 +250,17 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 		}
 	}
 
+	runtimeFrontendConfig := g.runtimeFrontendConfig()
+	// Keep runtime bootstrap dynamic even when Next.js serves the application.
+	topMux.Handle("/runtime-config.js", frontend.NewRuntimeConfigHandler(runtimeFrontendConfig))
+
 	// SSR: register meta injection + embed routes for standalone mode.
 	// Activated when SPA directory exists (container deployment).
 	if ssrHandler := ssr.NewFromEnv(config.LocalPeerID); ssrHandler != nil {
 		ssrHandler.RegisterRoutes(topMux)
 	} else if frontend.HasContent() {
-		feHandler := frontend.NewHandler(frontend.ServerConfig{
-			OverrideDir:        config.FrontendOverrideDir,
-			PrivateDistributionMode:        detectDeploymentMode() == "private_distribution",
-			Brand:              config.Brand,
-			FeaturesSnapshotFn: featuresSnapshotFromNodeManager(nodeManager),
-			NeedsSetupShellFn:  g.needsSetupShell,
-		})
+		runtimeFrontendConfig.OverrideDir = config.FrontendOverrideDir
+		feHandler := frontend.NewHandler(runtimeFrontendConfig)
 		topMux.Handle("/", feHandler)
 		log.Info("Serving embedded Web UI on /")
 	}
@@ -597,6 +598,118 @@ func featuresSnapshotFromNodeManager(nm coreiface.NodeManagerIface) func(context
 			})
 		}
 		return out
+	}
+}
+
+func (g *Gateway) runtimeFrontendConfig() frontend.ServerConfig {
+	if g == nil || g.config == nil {
+		return frontend.ServerConfig{}
+	}
+	return frontend.ServerConfig{
+		SaaSURL:                g.config.SaaSAPIURL,
+		PrivateDistributionMode:            detectDeploymentMode() == "private_distribution",
+		Brand:                  g.config.Brand,
+		FeaturesSnapshotFn:     featuresSnapshotFromNodeManager(g.nodeManager),
+		CapabilitiesSnapshotFn: capabilitiesSnapshotFromNodeManager(g.nodeManager),
+		NeedsSetupShellFn:      g.needsSetupShell,
+	}
+}
+
+type fiatRegistryProvider interface {
+	FiatRegistry() contracts.FiatProviderRegistry
+}
+
+type walletOperatorProvider interface {
+	Multiwallet() contracts.WalletOperator
+}
+
+func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface) func(context.Context) frontend.RuntimeCapabilities {
+	return func(context.Context) frontend.RuntimeCapabilities {
+		result := frontend.RuntimeCapabilities{
+			Payments: frontend.PaymentCapabilities{Methods: []frontend.PaymentCapability{}},
+		}
+		if nm == nil {
+			return result
+		}
+
+		var node contracts.NodeService
+		var walletOperator contracts.WalletOperator
+		if def := nm.GetDefaultNode(); def != nil {
+			node = def
+			walletOperator = def.Multiwallet()
+		} else {
+			for _, candidate := range nm.GetNodes() {
+				node = candidate
+				if provider, ok := candidate.(walletOperatorProvider); ok {
+					walletOperator = provider.Multiwallet()
+				}
+				break
+			}
+		}
+
+		seen := make(map[string]struct{})
+		if walletOperator != nil {
+			for _, chain := range walletOperator.SupportedChains() {
+				if chain == iwallet.ChainMock || chain == iwallet.ChainFiat {
+					continue
+				}
+				id := chain.String()
+				if _, exists := seen["crypto:"+id]; exists {
+					continue
+				}
+				seen["crypto:"+id] = struct{}{}
+				capability := frontend.PaymentCapability{
+					ID:   id,
+					Kind: "crypto",
+					Flow: paymentFlowForChain(chain),
+				}
+				if chain == iwallet.ChainZCash {
+					capability.AddressMode = "transparent"
+				}
+				result.Payments.Methods = append(result.Payments.Methods, capability)
+			}
+		}
+
+		if provider, ok := node.(fiatRegistryProvider); ok && provider.FiatRegistry() != nil {
+			for _, id := range provider.FiatRegistry().Registered() {
+				if id == "" {
+					continue
+				}
+				key := "fiat:" + id
+				if _, exists := seen[key]; exists {
+					continue
+				}
+				seen[key] = struct{}{}
+				result.Payments.Methods = append(result.Payments.Methods, frontend.PaymentCapability{
+					ID:   id,
+					Kind: "fiat",
+					Flow: "provider-session",
+				})
+			}
+		}
+
+		sort.Slice(result.Payments.Methods, func(i, j int) bool {
+			left := result.Payments.Methods[i]
+			right := result.Payments.Methods[j]
+			if left.Kind == right.Kind {
+				return left.ID < right.ID
+			}
+			return left.Kind < right.Kind
+		})
+		return result
+	}
+}
+
+func paymentFlowForChain(chain iwallet.ChainType) string {
+	switch chain {
+	case iwallet.ChainBitcoin,
+		iwallet.ChainBitcoinCash,
+		iwallet.ChainLitecoin,
+		iwallet.ChainZCash,
+		iwallet.ChainExternalPayment:
+		return "address-transfer"
+	default:
+		return "external-wallet"
 	}
 }
 

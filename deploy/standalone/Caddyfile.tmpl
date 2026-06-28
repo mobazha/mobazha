@@ -42,6 +42,11 @@
 		}
 	}
 
+	# --- Runtime bootstrap: generated dynamically by the node ---
+	handle /runtime-config.js {
+		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}
+	}
+
 	# --- Node API: all /v1/* routes to local mobazha-node ---
 	handle /v1/* {
 		reverse_proxy 127.0.0.1:{$NODE_PORT:5102}

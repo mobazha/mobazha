@@ -10,16 +10,18 @@ import (
 // CollectiblePrimarySalePaidSignal is emitted when a collectible primary-sale
 // order has a verified payment and can be recorded in the hosting Hub ledger.
 type CollectiblePrimarySalePaidSignal struct {
-	OrderID      string
-	EscrowID     string
-	HubSlotID    string
-	NFTMint      string
-	CertNumber   string
-	BuyerPeerID  string
-	SellerPeerID string
-	PriceAmount  string
-	CurrencyCode string
-	PaidAt       time.Time
+	OrderID     string
+	EscrowID    string
+	HubSlotID   string
+	NFTMint     string
+	CertNumber  string
+	BuyerPeerID string
+	// BuyerSolanaAddress is the buyer wallet that should receive the primary-sale NFT.
+	BuyerSolanaAddress string
+	SellerPeerID       string
+	PriceAmount        string
+	CurrencyCode       string
+	PaidAt             time.Time
 }
 
 // CollectiblePrimarySalePaidHook bridges verified Node orders into hosting's

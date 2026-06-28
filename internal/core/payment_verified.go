@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	solana "github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -105,19 +106,35 @@ func (n *MobazhaNode) signalCollectiblePrimarySalePaid(ctx context.Context, orde
 		escrowID = strings.TrimSpace(paymentSent.GetToAddress())
 	}
 	if err := n.collectiblePrimarySalePaidHook(ctx, CollectiblePrimarySalePaidSignal{
-		OrderID:      orderID,
-		EscrowID:     escrowID,
-		HubSlotID:    meta.HubSlotID,
-		NFTMint:      meta.NFTMint,
-		CertNumber:   meta.CertNumber,
-		BuyerPeerID:  meta.BuyerPeerID,
-		SellerPeerID: meta.SellerPeerID,
-		PriceAmount:  strings.TrimSpace(paymentSent.GetAmount()),
-		CurrencyCode: strings.TrimSpace(paymentSent.GetCoin()),
-		PaidAt:       paidAt,
+		OrderID:            orderID,
+		EscrowID:           escrowID,
+		HubSlotID:          meta.HubSlotID,
+		NFTMint:            meta.NFTMint,
+		CertNumber:         meta.CertNumber,
+		BuyerPeerID:        meta.BuyerPeerID,
+		BuyerSolanaAddress: collectibleBuyerSolanaAddress(order),
+		SellerPeerID:       meta.SellerPeerID,
+		PriceAmount:        strings.TrimSpace(paymentSent.GetAmount()),
+		CurrencyCode:       strings.TrimSpace(paymentSent.GetCoin()),
+		PaidAt:             paidAt,
 	}); err != nil {
 		logger.LogWarningWithIDf(log, n.nodeID, "payment verified: signal collectible primary sale paid for order %s: %v", orderID, err)
 	}
+}
+
+func collectibleBuyerSolanaAddress(order *models.Order) string {
+	if order == nil {
+		return ""
+	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil || orderOpen == nil {
+		return ""
+	}
+	pubkeys := orderOpen.GetBuyerID().GetPubkeys()
+	if pubkeys == nil || len(pubkeys.Solana) != solana.PublicKeyLength {
+		return ""
+	}
+	return solana.PublicKeyFromBytes(pubkeys.Solana).String()
 }
 
 func (n *MobazhaNode) verifiedTransactionFromPaymentSent(ctx context.Context, paymentSent *pb.PaymentSent) (*iwallet.Transaction, bool) {

@@ -7,12 +7,14 @@ import (
 	"testing"
 	"time"
 
+	solana "github.com/gagliardetto/solana-go"
 	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func TestSignalCollectiblePrimarySalePaidFromVerifiedPayment(t *testing.T) {
@@ -24,6 +26,7 @@ func TestSignalCollectiblePrimarySalePaidFromVerifiedPayment(t *testing.T) {
 	svc := coreorder.NewTestOrderAppService(t, coreorder.OrderAppServiceConfig{DB: db})
 	orderID := "order-collectible-paid"
 	coreorder.SeedOrder(t, svc, orderID, string(models.RoleVendor), models.OrderState_AWAITING_PAYMENT)
+	buyerWallet := solana.NewWallet()
 
 	paidAt := time.Date(2026, 6, 25, 10, 30, 0, 0, time.UTC)
 	err = db.Update(func(tx database.Tx) error {
@@ -42,6 +45,19 @@ func TestSignalCollectiblePrimarySalePaidFromVerifiedPayment(t *testing.T) {
 		}); err != nil {
 			return err
 		}
+		orderOpen := &pb.OrderOpen{
+			BuyerID: &pb.ID{
+				PeerID: "buyer-peer",
+				Pubkeys: &pb.ID_Pubkeys{
+					Solana: buyerWallet.PublicKey().Bytes(),
+				},
+			},
+		}
+		serializedOrderOpen, err := protojson.Marshal(orderOpen)
+		if err != nil {
+			return err
+		}
+		order.SerializedOrderOpen = serializedOrderOpen
 		order.PaidAt = &paidAt
 		return tx.Save(&order)
 	})
@@ -76,5 +92,8 @@ func TestSignalCollectiblePrimarySalePaidFromVerifiedPayment(t *testing.T) {
 	}
 	if got.BuyerPeerID != "buyer-peer" || got.SellerPeerID != "seller-peer" || !got.PaidAt.Equal(paidAt) {
 		t.Fatalf("unexpected collectible signal parties/time: %#v", got)
+	}
+	if got.BuyerSolanaAddress != buyerWallet.PublicKey().String() {
+		t.Fatalf("buyer solana address = %q, want %q", got.BuyerSolanaAddress, buyerWallet.PublicKey().String())
 	}
 }

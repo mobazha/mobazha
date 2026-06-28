@@ -518,7 +518,7 @@ func TestAgentChatTurnOptions_LoadsPrivateSkillProviderFromEnv(t *testing.T) {
 	}
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
 
-	opts, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "thread_1", "store_1")
+	opts, err := agentChatTurnOptions(context.Background(), nil, nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -534,6 +534,67 @@ func TestAgentChatTurnOptions_LoadsPrivateSkillProviderFromEnv(t *testing.T) {
 	}
 	if skill.ID != "product.import" {
 		t.Fatalf("unexpected skill: %#v", skill)
+	}
+}
+
+func TestAgentChatTurnOptions_UsesInjectedSkillProviderWithoutEnv(t *testing.T) {
+	dir := t.TempDir()
+	writeProductImportSkill(t, dir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", "")
+
+	injected := agentskill.NewFilesystemProvider(dir)
+	opts, err := agentChatTurnOptions(context.Background(), injected, nil, aipkg.ChatRequest{Message: "import product csv"}, "tenant_1", "actor_1", "thread_1", "store_1")
+	if err != nil {
+		t.Fatalf("build turn options with injected provider: %v", err)
+	}
+	if opts.SkillProvider == nil {
+		t.Fatal("expected injected skill provider")
+	}
+	if len(opts.RequestedSkills) != 1 || opts.RequestedSkills[0] != string(kernel.SkillProductImport) {
+		t.Fatalf("expected injected product.import skill, got %#v", opts.RequestedSkills)
+	}
+}
+
+func TestAgentChatSkillProvider_FilesystemOverrideTakesPrecedence(t *testing.T) {
+	embeddedDir := t.TempDir()
+	overrideDir := t.TempDir()
+	writeAgentChatTestSkill(t, embeddedDir, "embedded")
+	writeAgentChatTestSkill(t, overrideDir, "filesystem")
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", overrideDir)
+
+	provider, err := agentChatSkillProvider(context.Background(), agentskill.NewFilesystemProvider(embeddedDir))
+	if err != nil {
+		t.Fatalf("build layered provider: %v", err)
+	}
+	skill, err := provider.Load(context.Background(), string(kernel.SkillProductImport))
+	if err != nil {
+		t.Fatalf("load product.import: %v", err)
+	}
+	if skill.Metadata["source"] != "filesystem" {
+		t.Fatalf("filesystem override should win, got %#v", skill.Metadata)
+	}
+}
+
+func TestAgentChatSkillProvider_InvalidFilesystemOverrideFailsClosed(t *testing.T) {
+	embeddedDir := t.TempDir()
+	writeProductImportSkill(t, embeddedDir)
+	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", filepath.Join(t.TempDir(), "missing"))
+
+	_, err := agentChatSkillProvider(context.Background(), agentskill.NewFilesystemProvider(embeddedDir))
+	if err == nil || !strings.Contains(err.Error(), "not accessible") {
+		t.Fatalf("expected invalid override to fail closed, got %v", err)
+	}
+}
+
+func writeAgentChatTestSkill(t *testing.T, root, source string) {
+	t.Helper()
+	dir := filepath.Join(root, string(kernel.SkillProductImport))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "---\nname: product.import\npersona: seller\nsource: " + source + "\nexamples:\n  - import product csv\n---\nbody"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -560,7 +621,7 @@ func TestAgentChatTurnOptions_LoadsReferencedArtifactsAsContext(t *testing.T) {
 		},
 	}
 
-	opts, err := agentChatTurnOptions(context.Background(), store, aipkg.ChatRequest{
+	opts, err := agentChatTurnOptions(context.Background(), nil, store, aipkg.ChatRequest{
 		Message: "帮我从素材里整理商品",
 		Context: &aipkg.ChatContext{
 			ArtifactIDs: []string{"art_source", "art_source"},
@@ -646,7 +707,7 @@ func TestAgentChatTurnOptions_LoadsReferencedSkillRunAsContext(t *testing.T) {
 		},
 	}
 
-	opts, err := agentChatTurnOptions(context.Background(), store, aipkg.ChatRequest{
+	opts, err := agentChatTurnOptions(context.Background(), nil, store, aipkg.ChatRequest{
 		Message: "继续处理这批",
 		Context: &aipkg.ChatContext{
 			SkillRunIDs: []string{"run_import", "run_import"},
@@ -690,7 +751,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedSkillRun(t *testing.T) {
 	writeProductImportSkill(t, dir)
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
 
-	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
+	_, err := agentChatTurnOptions(context.Background(), nil, &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "继续处理这批",
 		Context: &aipkg.ChatContext{SkillRunIDs: []string{"missing_run"}},
 	}, "tenant_1", "actor_1", "thread_1", "store_1")
@@ -707,7 +768,7 @@ func TestAgentChatTurnOptions_RejectsTooManyReferencedSkillRuns(t *testing.T) {
 	writeProductImportSkill(t, dir)
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
 
-	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
+	_, err := agentChatTurnOptions(context.Background(), nil, &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "继续处理这些批次",
 		Context: &aipkg.ChatContext{SkillRunIDs: []string{"run_1", "run_2", "run_3", "run_4"}},
 	}, "tenant_1", "actor_1", "thread_1", "store_1")
@@ -724,7 +785,7 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 	writeProductImportSkill(t, dir)
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", dir)
 
-	_, err := agentChatTurnOptions(context.Background(), &agentChatMemoryStore{}, aipkg.ChatRequest{
+	_, err := agentChatTurnOptions(context.Background(), nil, &agentChatMemoryStore{}, aipkg.ChatRequest{
 		Message: "使用这个素材",
 		Context: &aipkg.ChatContext{ArtifactIDs: []string{"missing_artifact"}},
 	}, "tenant_1", "actor_1", "thread_1", "store_1")
@@ -739,23 +800,26 @@ func TestAgentChatTurnOptions_RejectsMissingReferencedArtifact(t *testing.T) {
 func TestAgentChatTurnOptions_RequiresSkillProviderEnv(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", "")
 
-	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
+	_, err := agentChatTurnOptions(context.Background(), nil, nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
 		t.Fatalf("expected missing skills dir error, got %v", err)
+	}
+	if got := agentChatRouteErrorMessage(err); got != "AI assistant requires skill configuration" {
+		t.Fatalf("unexpected route error message %q", got)
 	}
 }
 
 func TestAgentChatTurnOptions_RequiresAccessibleSellerSkillDir(t *testing.T) {
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", filepath.Join(t.TempDir(), "missing"))
 
-	_, err := agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
+	_, err := agentChatTurnOptions(context.Background(), nil, nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "not accessible") {
 		t.Fatalf("expected inaccessible skills dir error, got %v", err)
 	}
 
 	emptyDir := t.TempDir()
 	t.Setenv("MOBAZHA_AGENT_SKILLS_DIR", emptyDir)
-	_, err = agentChatTurnOptions(context.Background(), nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
+	_, err = agentChatTurnOptions(context.Background(), nil, nil, aipkg.ChatRequest{Message: "hello"}, "tenant_1", "actor_1", "thread_1", "store_1")
 	if err == nil || !strings.Contains(err.Error(), "no seller skills") {
 		t.Fatalf("expected empty seller skills dir error, got %v", err)
 	}
@@ -3799,7 +3863,7 @@ func TestHandlePOSTAgentApprovalDecision_UpdatesPendingApproval(t *testing.T) {
 }
 
 func TestHandlePOSTAgentApprovalApply_ExecutesApprovedPayloadOnce(t *testing.T) {
-	payload := `{"listing":{"title":"Draft Shirt"},"proposalArtifactId":"art_proposal"}`
+	payload := `{"listing":{"title":"Draft Shirt","description":"Soft cotton shirt","price":{"amountMinor":4500,"currencyCode":"USD","divisibility":2},"inventory":{"quantity":12}},"proposalArtifactId":"art_proposal"}`
 	approval := testAgentApproval(t, "appr_apply", "test-node", agentstore.ApprovalStatusApproved, payload)
 	approval.ArtifactIDs = `["art_proposal","art_source"]`
 	store := &agentChatMemoryStore{
@@ -3810,7 +3874,7 @@ func TestHandlePOSTAgentApprovalApply_ExecutesApprovedPayloadOnce(t *testing.T) 
 				TenantID: "test-node",
 				Kind:     agentstore.ArtifactKindProposal,
 				Status:   agentstore.ArtifactStatusReady,
-				Data:     `{"draft":{"title":"Draft Shirt"}}`,
+				Data:     `{"draft":{"title":"Draft Shirt","description":"Soft cotton shirt","price":{"amountMinor":4500,"currencyCode":"USD","divisibility":2},"inventory":{"quantity":12}}}`,
 			},
 			{
 				ID:       "art_source",
@@ -3829,8 +3893,29 @@ func TestHandlePOSTAgentApprovalApply_ExecutesApprovedPayloadOnce(t *testing.T) 
 	oldExecute := executeAgentApprovalTool
 	executeAgentApprovalTool = func(_ context.Context, _, _, action, gotPayload string) (string, error) {
 		calls++
-		if action != "listings_create" || gotPayload != payload {
+		if action != "listings_create" {
 			t.Fatalf("unexpected tool execution action=%s payload=%s", action, gotPayload)
+		}
+		var executionPayload map[string]any
+		if err := json.Unmarshal([]byte(gotPayload), &executionPayload); err != nil {
+			t.Fatalf("decode tool execution payload: %v", err)
+		}
+		listing := mapFromAny(executionPayload["listing"])
+		item := mapFromAny(listing["item"])
+		metadata := mapFromAny(listing["metadata"])
+		if stringFromAny(listing["status"]) != "draft" || stringFromAny(item["title"]) != "Draft Shirt" {
+			t.Fatalf("product import draft was not converted to a listing draft: %s", gotPayload)
+		}
+		if stringFromAny(metadata["contractType"]) != "PHYSICAL_GOOD" || stringFromAny(metadata["format"]) != "FIXED_PRICE" {
+			t.Fatalf("product import listing metadata is incomplete: %s", gotPayload)
+		}
+		pricingCurrency := mapFromAny(metadata["pricingCurrency"])
+		skus := sliceFromAny(item["skus"])
+		if stringFromAny(item["price"]) != "4500" || stringFromAny(pricingCurrency["code"]) != "USD" || len(skus) != 1 {
+			t.Fatalf("product import price or inventory was not preserved: %s", gotPayload)
+		}
+		if quantity := stringFromAny(mapFromAny(skus[0])["quantity"]); quantity != "12" {
+			t.Fatalf("product import inventory quantity = %q, want 12", quantity)
 		}
 		return `{"data":{"slug":"draft-shirt"}}`, nil
 	}

@@ -217,21 +217,25 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 	if status == "" {
 		status = ListingStatusDefault
 	}
-
-	ld := &ListingMetadata{
-		CID:          cid.String(),
-		Slug:         listing.Slug,
-		Title:        listing.Item.Title,
-		ProductType:  listing.Item.ProductType,
-		NSFW:         listing.Item.Nsfw,
-		CoinType:     listing.Metadata.PricingCurrency.Code,
-		ContractType: listing.Metadata.ContractType.String(),
-		Description:  listing.Item.Description[:descriptionLength],
-		Thumbnail: ListingThumbnail{
+	thumbnail := ListingThumbnail{}
+	if len(listing.Item.Images) > 0 && listing.Item.Images[0] != nil {
+		thumbnail = ListingThumbnail{
 			Tiny:   listing.Item.Images[0].Tiny,
 			Small:  listing.Item.Images[0].Small,
 			Medium: listing.Item.Images[0].Medium,
-		},
+		}
+	}
+
+	ld := &ListingMetadata{
+		CID:                     cid.String(),
+		Slug:                    listing.Slug,
+		Title:                   listing.Item.Title,
+		ProductType:             listing.Item.ProductType,
+		NSFW:                    listing.Item.Nsfw,
+		CoinType:                listing.Metadata.PricingCurrency.Code,
+		ContractType:            listing.Metadata.ContractType.String(),
+		Description:             listing.Item.Description[:descriptionLength],
+		Thumbnail:               thumbnail,
 		IntroVideo:              introVideoHash,
 		AltIntroVideoLinks:      listing.Item.AltIntroVideoLinks,
 		Price:                   *cv,

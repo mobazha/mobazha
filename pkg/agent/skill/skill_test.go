@@ -6,7 +6,43 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 )
+
+func TestFSProvider_LoadEmbeddedSkill(t *testing.T) {
+	provider := NewFSProvider(fstest.MapFS{
+		"seller/product.import/SKILL.md": {
+			Data: []byte("---\nname: product.import\npersona: seller\nsource: embedded\n---\nembedded body"),
+		},
+		"ops/workspace.review/skill.md": {
+			Data: []byte("---\nname: workspace.review\npersona: ops\n---\nops body"),
+		},
+	})
+
+	skill, err := provider.Load(context.Background(), "product.import")
+	if err != nil {
+		t.Fatalf("load embedded skill: %v", err)
+	}
+	if skill.Location != "seller/product.import/SKILL.md" || skill.Metadata["source"] != "embedded" {
+		t.Fatalf("unexpected embedded skill: %#v", skill)
+	}
+
+	ids, err := provider.List(context.Background(), Filter{Persona: "seller"})
+	if err != nil {
+		t.Fatalf("list embedded skills: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "product.import" {
+		t.Fatalf("expected seller skill only, got %#v", ids)
+	}
+}
+
+func TestFSProvider_Load_PathTraversal(t *testing.T) {
+	provider := NewFSProvider(fstest.MapFS{})
+	_, err := provider.Load(context.Background(), "../../../etc/passwd")
+	if !errors.Is(err, ErrSkillNotFound) {
+		t.Fatalf("expected ErrSkillNotFound for path traversal, got %v", err)
+	}
+}
 
 func TestFilesystemProvider_Load(t *testing.T) {
 	dir := t.TempDir()

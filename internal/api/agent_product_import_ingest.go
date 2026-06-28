@@ -1743,6 +1743,107 @@ func buildProductImportProposalApproval(r *http.Request, p aiChatProvider, artif
 	}, nil
 }
 
+// productImportApprovalExecutionPayload converts the review workbench's
+// lightweight draft shape into the protobuf JSON shape accepted by POST
+// /v1/listings. The persisted approval payload remains unchanged so its
+// request hash continues to cover exactly what the seller reviewed.
+func productImportApprovalExecutionPayload(raw string) (string, error) {
+	var payload map[string]any
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	if err := decoder.Decode(&payload); err != nil {
+		return "", fmt.Errorf("decode product import approval payload: %w", err)
+	}
+	draft := mapFromAny(payload["listing"])
+	if len(draft) == 0 {
+		return "", fmt.Errorf("product import approval listing is required")
+	}
+	if len(mapFromAny(draft["item"])) > 0 {
+		return raw, nil
+	}
+
+	title := stringFromAny(draft["title"])
+	if title == "" {
+		return "", fmt.Errorf("product import approval listing title is required")
+	}
+	item := map[string]any{
+		"title":           title,
+		"condition":       "new",
+		"inventoryPolicy": "deny",
+	}
+	if description := stringFromAny(draft["description"]); description != "" {
+		item["description"] = description
+	}
+
+	price := mapFromAny(draft["price"])
+	currencyCode := strings.ToUpper(stringFromAny(price["currencyCode"]))
+	if currencyCode == "" {
+		currencyCode = productImportDefaultCurrency
+	}
+	divisibility := int64(2)
+	if value, ok := productImportApprovalIntegerString(price["divisibility"]); ok {
+		parsed, parseErr := strconv.ParseInt(value, 10, 32)
+		if parseErr != nil {
+			return "", fmt.Errorf("invalid product import price divisibility: %w", parseErr)
+		}
+		divisibility = parsed
+	}
+	if amount, ok := productImportApprovalIntegerString(price["amountMinor"]); ok {
+		item["price"] = amount
+	}
+
+	inventory := mapFromAny(draft["inventory"])
+	if quantity, ok := productImportApprovalIntegerString(inventory["quantity"]); ok {
+		item["skus"] = []any{map[string]any{"quantity": quantity}}
+	}
+	payload["listing"] = map[string]any{
+		"status": "draft",
+		"metadata": map[string]any{
+			"version":      1,
+			"contractType": "PHYSICAL_GOOD",
+			"format":       "FIXED_PRICE",
+			"pricingCurrency": map[string]any{
+				"code":         currencyCode,
+				"divisibility": divisibility,
+			},
+		},
+		"item": item,
+	}
+
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal product import approval payload: %w", err)
+	}
+	return string(normalized), nil
+}
+
+func productImportApprovalIntegerString(value any) (string, bool) {
+	var integer int64
+	switch v := value.(type) {
+	case json.Number:
+		parsed, err := strconv.ParseInt(v.String(), 10, 64)
+		if err != nil {
+			return "", false
+		}
+		integer = parsed
+	case int:
+		integer = int64(v)
+	case int64:
+		integer = v
+	case float64:
+		if v < 0 || v > float64(productImportMaxSafeInteger) || v != float64(int64(v)) {
+			return "", false
+		}
+		integer = int64(v)
+	default:
+		return "", false
+	}
+	if integer < 0 || integer > productImportMaxSafeInteger {
+		return "", false
+	}
+	return strconv.FormatInt(integer, 10), true
+}
+
 func productImportProposalApprovalReady(artifact *agentstore.Artifact) (bool, error) {
 	if err := validateProductImportProposalArtifactIdentity(artifact); err != nil {
 		return false, err

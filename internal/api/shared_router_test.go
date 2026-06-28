@@ -7,12 +7,32 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/fstest"
 
+	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 )
 
 type stubNodeService struct {
 	contracts.NodeService
+}
+
+func TestNewSharedRouter_InjectsSkillProvider(t *testing.T) {
+	provider := agentskill.NewFSProvider(fstest.MapFS{
+		"seller/default/SKILL.md": {Data: []byte("---\nname: default\npersona: seller\n---\nbody")},
+	})
+	sr, err := NewSharedRouter(SharedRouterConfig{
+		Resolver: func(r *http.Request) (contracts.NodeService, error) {
+			return &stubNodeService{}, nil
+		},
+		SkillProvider: provider,
+	})
+	if err != nil {
+		t.Fatalf("NewSharedRouter: %v", err)
+	}
+	if sr.gateway.config.SkillProvider != provider {
+		t.Fatal("expected shared router to retain injected skill provider")
+	}
 }
 
 func TestSharedRouter_ResolverInjectsNode(t *testing.T) {

@@ -187,3 +187,29 @@ func TestNewListingMetadataFromListing(t *testing.T) {
 		t.Errorf("Returned incorrect shipping regions. Expected %d, got %d", 1, len(ret.FreeShipping))
 	}
 }
+
+func TestNewListingMetadataFromListing_NoImages(t *testing.T) {
+	c, err := cid.Decode("QmfQkD8pBSBCBxWEwFSu4XaDVSWK6bjnNuaWZjMyQbyDub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listing := &pb.Listing{
+		Slug: "image-pending-draft",
+		Item: &pb.Listing_Item{
+			Title: "Image Pending Draft",
+			Price: "4500",
+		},
+		Metadata: &pb.Listing_Metadata{
+			PricingCurrency: &pb.Currency{Code: "USD", Divisibility: 2},
+		},
+		Status: ListingStatusDraft,
+	}
+
+	metadata, err := NewListingMetadataFromListing(listing, c)
+	if err != nil {
+		t.Fatalf("build metadata for image-less draft: %v", err)
+	}
+	if metadata.Thumbnail != (ListingThumbnail{}) {
+		t.Fatalf("image-less draft thumbnail = %#v, want empty", metadata.Thumbnail)
+	}
+}

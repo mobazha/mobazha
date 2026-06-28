@@ -49,7 +49,11 @@ type agentToolContext struct {
 
 type agentToolContextKey struct{}
 
-var agentChatRuntimes sync.Map
+var (
+	agentChatRuntimes                  sync.Map
+	errAgentSkillProviderRequired      = errors.New("agent skill provider is required")
+	errAgentSkillProviderNoSellerSkill = errors.New("agent skill provider has no seller skills")
+)
 
 const (
 	agentChatMaxContextArtifacts   = 10
@@ -198,7 +202,11 @@ func (g *Gateway) handlePOSTAgentChat(w http.ResponseWriter, r *http.Request) {
 		threadID:    threadID,
 		language:    agentChatToolLanguage(req.Context, req.Message),
 	})
-	turnOptions, err := agentChatTurnOptions(turnCtx, persist, req, tenantID, actorID, threadID, storeID)
+	var configuredSkillProvider agentskill.Provider
+	if g.config != nil {
+		configuredSkillProvider = g.config.SkillProvider
+	}
+	turnOptions, err := agentChatTurnOptions(turnCtx, configuredSkillProvider, persist, req, tenantID, actorID, threadID, storeID)
 	if err != nil {
 		aiLog.Warningf("Agent chat skill routing failed: %v", err)
 		emitSSE(aipkg.SSEEvent{Type: aipkg.SSETypeError, Error: agentChatRouteErrorMessage(err)})
@@ -324,8 +332,8 @@ func agentChatPromptContext(chatCtx *aipkg.ChatContext, latestUserMessage string
 	return &cp
 }
 
-func agentChatTurnOptions(ctx context.Context, persist agentstore.Persistence, req aipkg.ChatRequest, tenantID, actorID, threadID, storeID string) (agentruntime.TurnOptions, error) {
-	skillProvider, err := agentChatSkillProvider(ctx)
+func agentChatTurnOptions(ctx context.Context, configuredProvider agentskill.Provider, persist agentstore.Persistence, req aipkg.ChatRequest, tenantID, actorID, threadID, storeID string) (agentruntime.TurnOptions, error) {
+	skillProvider, err := agentChatSkillProvider(ctx, configuredProvider)
 	if err != nil {
 		return agentruntime.TurnOptions{}, err
 	}
@@ -832,8 +840,9 @@ func agentChatRouteErrorMessage(err error) string {
 	if err == nil {
 		return "AI assistant failed to route the request"
 	}
-	if strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
-		return "AI assistant requires private skill configuration (MOBAZHA_AGENT_SKILLS_DIR)"
+	if errors.Is(err, errAgentSkillProviderRequired) || errors.Is(err, errAgentSkillProviderNoSellerSkill) ||
+		strings.Contains(err.Error(), "MOBAZHA_AGENT_SKILLS_DIR") {
+		return "AI assistant requires skill configuration"
 	}
 	if strings.Contains(err.Error(), "skill run") || strings.Contains(err.Error(), "skillRunIds") {
 		return "Referenced skill run is not available"
@@ -844,25 +853,36 @@ func agentChatRouteErrorMessage(err error) string {
 	return "AI assistant failed to route the request"
 }
 
-func agentChatSkillProvider(ctx context.Context) (agentskill.Provider, error) {
+func agentChatSkillProvider(ctx context.Context, configuredProvider agentskill.Provider) (agentskill.Provider, error) {
+	providers := make([]agentskill.Provider, 0, 2)
 	dir := strings.TrimSpace(os.Getenv("MOBAZHA_AGENT_SKILLS_DIR"))
-	if dir == "" {
-		return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR is required for agent chat")
+	if dir != "" {
+		info, err := os.Stat(dir)
+		if err != nil {
+			return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR is not accessible: %w", err)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR must point to a directory")
+		}
+		providers = append(providers, agentskill.NewFilesystemProvider(dir))
 	}
-	info, err := os.Stat(dir)
-	if err != nil {
-		return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR is not accessible: %w", err)
+	if configuredProvider != nil {
+		providers = append(providers, configuredProvider)
 	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR must point to a directory")
+	if len(providers) == 0 {
+		return nil, fmt.Errorf("%w: inject a Provider or set MOBAZHA_AGENT_SKILLS_DIR", errAgentSkillProviderRequired)
 	}
-	provider := agentskill.NewFilesystemProvider(dir)
+
+	provider := providers[0]
+	if len(providers) > 1 {
+		provider = agentskill.NewMultiProvider(providers...)
+	}
 	ids, err := provider.List(ctx, agentskill.Filter{Persona: string(kernel.PersonaSeller)})
 	if err != nil {
 		return nil, err
 	}
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("MOBAZHA_AGENT_SKILLS_DIR has no seller skills")
+		return nil, errAgentSkillProviderNoSellerSkill
 	}
 	return provider, nil
 }

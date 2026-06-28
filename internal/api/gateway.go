@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/ssr"
+	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	"github.com/mobazha/mobazha3.0/pkg/apitoken"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -102,6 +103,10 @@ type GatewayConfig struct {
 	// When set (standalone mode), the gateway auto-creates the api_tokens
 	// table and enables /v1/auth/tokens CRUD + mbz_ token authentication.
 	GormDB *gorm.DB
+
+	// SkillProvider supplies built-in or deployment-specific Agent skills.
+	// MOBAZHA_AGENT_SKILLS_DIR, when set, is layered in front as an override.
+	SkillProvider agentskill.Provider
 }
 
 // Gateway represents an HTTP API gateway

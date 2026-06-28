@@ -897,7 +897,19 @@ func applyAgentApproval(ctx context.Context, persist agentstore.Persistence, ten
 		return nil, errAgentApprovalApplyState
 	}
 
-	result, execErr := executeAgentApprovalTool(ctx, baseURL, authToken, claimed.Action, claimed.Payload)
+	executionPayload := claimed.Payload
+	if claimed.SkillID == productImportSkillID && claimed.Action == "listings_create" {
+		executionPayload, err = productImportApprovalExecutionPayload(claimed.Payload)
+		if err != nil {
+			failed, markErr := persist.MarkApprovalApplyFailed(ctx, tenantID, approvalID, err.Error(), actorID)
+			if markErr != nil {
+				return nil, fmt.Errorf("mark approval apply failed: %w", markErr)
+			}
+			return failed, err
+		}
+	}
+
+	result, execErr := executeAgentApprovalTool(ctx, baseURL, authToken, claimed.Action, executionPayload)
 	if execErr != nil {
 		failed, markErr := persist.MarkApprovalApplyFailed(ctx, tenantID, approvalID, execErr.Error(), actorID)
 		if markErr != nil {

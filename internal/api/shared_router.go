@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi/v5"
+	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	"github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
@@ -15,6 +16,7 @@ import (
 type SharedRouterConfig struct {
 	Resolver       func(r *http.Request) (contracts.NodeService, error)
 	FeatureManager *config.FeatureManager
+	SkillProvider  agentskill.Provider
 	AllowCORS      bool
 
 	// PostResolverMiddleware, if set, is applied after the resolver middleware
@@ -30,7 +32,7 @@ type SharedRouterConfig struct {
 // getNodeService(r) works without any handler changes.
 func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 	g := &Gateway{
-		config:  &GatewayConfig{},
+		config:  &GatewayConfig{SkillProvider: cfg.SkillProvider},
 		hubs:    make(map[string]*hub),
 		hubsMtx: sync.RWMutex{},
 	}

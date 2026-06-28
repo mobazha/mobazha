@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	internalapi "github.com/mobazha/mobazha3.0/internal/api"
+	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/response"
@@ -37,6 +38,7 @@ type NodeResolver func(r *http.Request) (contracts.NodeService, error)
 type RouterConfig struct {
 	Resolver       NodeResolver
 	FeatureManager *pkgconfig.FeatureManager
+	SkillProvider  agentskill.Provider
 	AllowCORS      bool
 
 	// PostResolverMiddleware is applied after the resolver has populated the
@@ -57,6 +59,7 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 	sr, err := internalapi.NewSharedRouter(internalapi.SharedRouterConfig{
 		Resolver:               cfg.Resolver,
 		FeatureManager:         cfg.FeatureManager,
+		SkillProvider:          cfg.SkillProvider,
 		AllowCORS:              cfg.AllowCORS,
 		PostResolverMiddleware: cfg.PostResolverMiddleware,
 	})

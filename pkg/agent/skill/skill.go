@@ -3,6 +3,7 @@ package skill
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -84,6 +85,53 @@ func LoadDefinitionFromString(content, location string) (*Skill, error) {
 	return &skill, nil
 }
 
+// FSProvider loads Tier-0 skills from an fs.FS. It is suitable for embedded
+// skill packs as well as other read-only filesystem implementations.
+type FSProvider struct {
+	root fs.FS
+}
+
+// NewFSProvider creates a provider rooted at root.
+func NewFSProvider(root fs.FS) *FSProvider {
+	return &FSProvider{root: root}
+}
+
+func (p *FSProvider) Load(_ context.Context, skillID string) (*Skill, error) {
+	requested := strings.TrimSpace(skillID)
+	if requested == "" || strings.Contains(filepath.Clean(requested), "..") {
+		return nil, ErrSkillNotFound
+	}
+	skills, err := p.discover()
+	if err != nil {
+		return nil, err
+	}
+	for i := range skills {
+		if matches(requested, skills[i]) {
+			cp := skills[i]
+			return &cp, nil
+		}
+	}
+	return nil, ErrSkillNotFound
+}
+
+func (p *FSProvider) List(_ context.Context, filter Filter) ([]string, error) {
+	if filter.Tier != nil && *filter.Tier != Tier0PlainText {
+		return nil, nil
+	}
+	skills, err := p.discover()
+	if err != nil {
+		return nil, err
+	}
+	return filterSkillIDs(skills, filter), nil
+}
+
+func (p *FSProvider) discover() ([]Skill, error) {
+	if p == nil || p.root == nil {
+		return nil, nil
+	}
+	return discoverSkills(p.root)
+}
+
 // FilesystemProvider loads Tier-0 plain text skills from Markdown files.
 // It supports both WAE-style recursive skill.md files and Mobazha/Codex-style
 // <skill-id>/SKILL.md directories.
@@ -122,15 +170,7 @@ func (p *FilesystemProvider) List(_ context.Context, filter Filter) ([]string, e
 	if err != nil {
 		return nil, err
 	}
-	ids := make([]string, 0, len(skills))
-	for _, s := range skills {
-		if filter.Persona != "" && s.Metadata["persona"] != filter.Persona {
-			continue
-		}
-		ids = append(ids, s.ID)
-	}
-	sort.Strings(ids)
-	return ids, nil
+	return filterSkillIDs(skills, filter), nil
 }
 
 func (p *FilesystemProvider) discover() ([]Skill, error) {
@@ -144,7 +184,12 @@ func (p *FilesystemProvider) discover() ([]Skill, error) {
 		}
 		return nil, err
 	}
-	err := filepath.WalkDir(p.rootDir, func(path string, entry os.DirEntry, err error) error {
+	return discoverSkills(os.DirFS(p.rootDir))
+}
+
+func discoverSkills(root fs.FS) ([]Skill, error) {
+	var skills []Skill
+	err := fs.WalkDir(root, ".", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -154,7 +199,7 @@ func (p *FilesystemProvider) discover() ([]Skill, error) {
 		if !isSkillFile(entry.Name()) {
 			return nil
 		}
-		skill, err := loadMarkdownSkill(p.rootDir, path)
+		skill, err := loadMarkdownSkillFS(root, path)
 		if err != nil {
 			return err
 		}
@@ -168,20 +213,28 @@ func (p *FilesystemProvider) discover() ([]Skill, error) {
 	return skills, nil
 }
 
+func filterSkillIDs(skills []Skill, filter Filter) []string {
+	ids := make([]string, 0, len(skills))
+	for _, skill := range skills {
+		if filter.Persona != "" && skill.Metadata["persona"] != filter.Persona {
+			continue
+		}
+		ids = append(ids, skill.ID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
 func isSkillFile(name string) bool {
 	return strings.EqualFold(name, "skill.md")
 }
 
-func loadMarkdownSkill(rootDir, path string) (Skill, error) {
-	data, err := os.ReadFile(path)
+func loadMarkdownSkillFS(root fs.FS, path string) (Skill, error) {
+	data, err := fs.ReadFile(root, path)
 	if err != nil {
 		return Skill{}, err
 	}
-	rel, err := filepath.Rel(rootDir, path)
-	if err != nil {
-		rel = path
-	}
-	return parseMarkdownSkill(string(data), filepath.ToSlash(rel)), nil
+	return parseMarkdownSkill(string(data), filepath.ToSlash(path)), nil
 }
 
 func parseMarkdownSkill(content, location string) Skill {

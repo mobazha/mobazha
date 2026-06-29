@@ -1,16 +1,30 @@
-Mobazha 3.0
-Copyright (c) 2021-2026 Mobazha contributors.
+Mobazha Community Edition
 
-This distribution contains source derived from the original
-cpacia/openbazaar3.0 project, whose repository history begins in 2019 with
-work by Christopher Pacia and other contributors. Those original portions
+Originally developed by fengzie (https://github.com/fengzie) and maintained by
+the Mobazha contributors.
+
+Canonical source: https://github.com/mobazha/mobazha3.0
+
+Copyright (c) 2021-2026 fengzie and the respective contributors.
+
+This file contains attribution and license notices that form part of the Source
+Code Form notices described by Section 3.4 of the Mozilla Public License 2.0.
+
+Except for separately identified third-party material, Mobazha-authored source
+in this repository, including retained Mobazha history, is distributed under
+the Mozilla Public License 2.0 in the root LICENSE file.
+
+This repository incorporates portions derived from OpenBazaar. Those portions
 remain available under the MIT License reproduced in
-LICENSES/MIT-OpenBazaar.txt. Subsequent Mobazha-authored files and
-modifications are distributed under the Mozilla Public License 2.0 unless a
-file or subdirectory states a different license.
+LICENSES/MIT-OpenBazaar.txt:
 
-The repository also vendors third-party dependencies. Their copyright and
-license notices are retained with the corresponding source under vendor/.
+    Copyright (c) 2016-2018 OpenBazaar Developers
 
-The Mobazha name and logos are not licensed by the open-source software
-licenses in this repository.
+The OpenBazaar name and the names of its contributors are used only for
+attribution. Git authorship records do not imply endorsement of Mobazha or the
+Community Edition release.
+
+Individual dependencies, vendored code, generated artifacts, and assets may be
+governed by their own licenses. Their copyright and license notices remain the
+property of their respective owners. Binary redistributors must review and
+satisfy those terms independently.

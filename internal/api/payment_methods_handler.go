@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -27,7 +28,7 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 			continue
 		}
 		for _, c := range acct.AcceptedCurrencies() {
-			if !iwallet.IsPaymentCoinEnabled(c) {
+			if !iwallet.IsPaymentCoinEnabledForPolicy(c, g.editionPolicy) {
 				continue
 			}
 			if !seen[c] {
@@ -40,7 +41,7 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 	// PrivateDistribution: inject supported coins (e.g. EXTERNAL_PAYMENT) that are served by
 	// wallet-rpc subaddress generation rather than ReceivingAccount rows.
 	for _, c := range private_distributionExtraCoins(r) {
-		if !iwallet.IsPaymentCoinEnabled(c) {
+		if !iwallet.IsPaymentCoinEnabledForPolicy(c, g.editionPolicy) {
 			continue
 		}
 		if !seen[c] {
@@ -51,7 +52,7 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 
 	type fiatEntry struct{}
 	var fiat any
-	if svc, ok := getFiatService(r); ok {
+	if svc, ok := getFiatService(r); ok && (g.editionPolicy == nil || g.editionPolicy.Name() != edition.CommunityName) {
 		providers, fiatErr := svc.EnabledProviders(r.Context())
 		if fiatErr == nil {
 			fiat = providers

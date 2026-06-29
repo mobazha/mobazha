@@ -736,6 +736,9 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 	if err := paymentData.Coin.ValidateCanonicalPaymentCoin(); err != nil {
 		return fmt.Errorf("invalid payment coin: %w", err)
 	}
+	if !iwallet.IsPaymentCoinEnabled(string(paymentData.Coin)) {
+		return fmt.Errorf("payment coin %q is not enabled by this edition", paymentData.Coin)
+	}
 	if paymentData.Method == pb.PaymentSent_FIAT && !paymentData.Coin.IsFiatPayment() {
 		return fmt.Errorf("fiat payment method requires canonical fiat coin, got %q", paymentData.Coin)
 	}

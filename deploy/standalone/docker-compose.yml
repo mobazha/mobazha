@@ -32,6 +32,7 @@ services:
       - CONNECTIVITY=${CONNECTIVITY:-nat}
       - TLS_MODE=${TLS_MODE:-internal}
       - TESTNET=${TESTNET:-}
+      - MOBAZHA_EDITION=${MOBAZHA_EDITION:-community}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:5102/healthz"]
       interval: 15s

@@ -4,6 +4,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mobazha/mobazha3.0/pkg/edition"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCoinInfoFromCoinType_CanonicalAssetID(t *testing.T) {
@@ -202,6 +206,9 @@ func TestCoinType_ValidateCanonicalPaymentCoin(t *testing.T) {
 }
 
 func TestIsPaymentCoinEnabled(t *testing.T) {
+	require.NoError(t, edition.ConfigureCurrentPolicy(edition.CommunityName))
+	t.Cleanup(func() { require.NoError(t, edition.ConfigureCurrentPolicy(edition.FullName)) })
+
 	tests := []struct {
 		coin     string
 		expected bool
@@ -209,15 +216,18 @@ func TestIsPaymentCoinEnabled(t *testing.T) {
 		{"", true},
 		{"BCH", true},
 		{"crypto:bitcoincash:mainnet:native", true},
-		{"ZEC", false},
-		{"crypto:zcash:mainnet:native", false},
-		{" crypto:ZCASH:mainnet:native ", false},
+		{"ZEC", true},
+		{"crypto:zcash:mainnet:native", true},
+		{" crypto:ZCASH:mainnet:native ", true},
+		{"ETH", false},
+		{"SOL", false},
+		{"EXTERNAL_PAYMENT", false},
+		{"fiat:stripe:USD", false},
 	}
 	for _, tt := range tests {
-		got := IsPaymentCoinEnabled(tt.coin)
-		if got != tt.expected {
-			t.Fatalf("IsPaymentCoinEnabled(%q)=%v, want %v", tt.coin, got, tt.expected)
-		}
+		t.Run(tt.coin, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsPaymentCoinEnabled(tt.coin))
+		})
 	}
 }
 

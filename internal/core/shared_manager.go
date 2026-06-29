@@ -28,6 +28,7 @@ import (
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -57,6 +58,10 @@ type SharedManager struct {
 	// standaloneAPIKey is the API key for SaaS platform authentication
 	standaloneAPIKey string
 
+	// editionName is resolved once at the composition root and reused by all
+	// public projections so environment changes cannot create policy drift.
+	editionName string
+
 	// appDataDir is the top-level application data directory (cfg.DataDir).
 	// Platform connection files (saas_api_key, owner_user_id, casdoor_certificate)
 	// are persisted here so they are available at startup before any node is initialized.
@@ -75,7 +80,15 @@ var (
 
 // NewSharedManager creates a new SharedManager instance
 func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, error) {
+	editionName := configuredEditionName(cfg)
+	if _, err := edition.ResolvePolicy(editionName); err != nil {
+		return nil, fmt.Errorf("resolve edition policy: %w", err)
+	}
 	once.Do(func() {
+		if err := edition.ConfigureCurrentPolicy(editionName); err != nil {
+			log.Errorf("Failed to configure edition policy: %v", err)
+			return
+		}
 		repo.SetupLogging(cfg.LogDir, cfg.LogLevel)
 
 		// Profiling
@@ -222,11 +235,21 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			testnet:              cfg.Testnet,
 			saasAPIURL:           cfg.SaaSAPIURL,
 			standaloneAPIKey:     cfg.StandaloneAPIKey,
+			editionName:          editionName,
 			appDataDir:           cfg.DataDir,
 			ctx:                  ctx,
 		}
 	})
 	return SharedManagerInstance, nil
+}
+
+func configuredEditionName(_ *repo.Config) string {
+	if name := strings.TrimSpace(os.Getenv("MOBAZHA_EDITION")); name != "" {
+		return name
+	}
+	// Keep existing developer, private, and commercial installations
+	// backwards compatible. Community release artifacts opt in explicitly.
+	return edition.FullName
 }
 
 func applyInjectedManagedEscrowPaymentConfig(netConfig *mcfg.NetConfig, cfg *repo.Config) {
@@ -488,6 +511,7 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		StandaloneAPIKey:       cfg.StandaloneAPIKey,
 		StandaloneConnectivity: cfg.StandaloneConnectivity,
 		DataDir:                cfg.DataDir,
+		Edition:                im.editionName,
 	}
 
 	im.httpGateway, err = api.NewGateway(im, gwConfig)

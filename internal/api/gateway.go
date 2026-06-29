@@ -21,6 +21,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	mcppkg "github.com/mobazha/mobazha3.0/pkg/mcp"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -91,6 +92,10 @@ type GatewayConfig struct {
 	// Used by native binary mode to persist domain config when Docker
 	// hostconfig is unavailable.
 	DataDir string
+	// Edition selects the distribution capability policy. Empty preserves the
+	// unrestricted private composition for backwards compatibility. Standalone
+	// Community deployments pass "community" explicitly from the composition root.
+	Edition string
 
 	// FrontendOverrideDir serves static files from this directory before
 	// falling back to the embedded SPA. Used for white-label logo/favicon.
@@ -128,10 +133,15 @@ type Gateway struct {
 	featureManager    *pkgconfig.FeatureManager
 	guestOrderLimiter *rateLimiter
 	authLimiter       *authRateLimiter
+	editionPolicy     edition.Policy
 }
 
 // NewGateway instantiates a new gateway.
 func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (*Gateway, error) {
+	editionPolicy, err := edition.ResolvePolicy(config.Edition)
+	if err != nil {
+		return nil, fmt.Errorf("resolve edition policy: %w", err)
+	}
 	var (
 		g = &Gateway{
 			nodeManager:       nodeManager,
@@ -143,6 +153,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			featureManager:    pkgconfig.GetGlobalFeatureManager(),
 			guestOrderLimiter: newRateLimiter(10, time.Hour),
 			authLimiter:       newAuthRateLimiter(),
+			editionPolicy:     editionPolicy,
 		}
 		topMux = http.NewServeMux()
 	)
@@ -610,7 +621,7 @@ func (g *Gateway) runtimeFrontendConfig() frontend.ServerConfig {
 		PrivateDistributionMode:            detectDeploymentMode() == "private_distribution",
 		Brand:                  g.config.Brand,
 		FeaturesSnapshotFn:     featuresSnapshotFromNodeManager(g.nodeManager),
-		CapabilitiesSnapshotFn: capabilitiesSnapshotFromNodeManager(g.nodeManager),
+		CapabilitiesSnapshotFn: capabilitiesSnapshotFromNodeManager(g.nodeManager, g.editionPolicy),
 		NeedsSetupShellFn:      g.needsSetupShell,
 	}
 }
@@ -623,7 +634,7 @@ type walletOperatorProvider interface {
 	Multiwallet() contracts.WalletOperator
 }
 
-func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface) func(context.Context) frontend.RuntimeCapabilities {
+func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy edition.Policy) func(context.Context) frontend.RuntimeCapabilities {
 	return func(context.Context) frontend.RuntimeCapabilities {
 		result := frontend.RuntimeCapabilities{
 			Payments: frontend.PaymentCapabilities{Methods: []frontend.PaymentCapability{}},
@@ -688,6 +699,8 @@ func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface) func(con
 			}
 		}
 
+		result.Payments.Methods = filterPaymentCapabilities(result.Payments.Methods, policy)
+
 		sort.Slice(result.Payments.Methods, func(i, j int) bool {
 			left := result.Payments.Methods[i]
 			right := result.Payments.Methods[j]
@@ -698,6 +711,27 @@ func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface) func(con
 		})
 		return result
 	}
+}
+
+func filterPaymentCapabilities(methods []frontend.PaymentCapability, policy edition.Policy) []frontend.PaymentCapability {
+	if policy == nil {
+		return methods
+	}
+	filtered := make([]frontend.PaymentCapability, 0, len(methods))
+	for _, method := range methods {
+		if !policy.AllowsPaymentMethod(edition.PaymentMethod{
+			ID:          method.ID,
+			Kind:        method.Kind,
+			Flow:        method.Flow,
+			AddressMode: method.AddressMode,
+		}) {
+			continue
+		}
+		// Preserve the complete runtime projection so additive frontend fields
+		// cannot be lost when a method passes the edition gate.
+		filtered = append(filtered, method)
+	}
+	return filtered
 }
 
 func paymentFlowForChain(chain iwallet.ChainType) string {

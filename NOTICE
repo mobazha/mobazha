@@ -1,0 +1,16 @@
+Mobazha 3.0
+Copyright (c) 2021-2026 Mobazha contributors.
+
+This distribution contains source derived from the original
+cpacia/openbazaar3.0 project, whose repository history begins in 2019 with
+work by Christopher Pacia and other contributors. Those original portions
+remain available under the MIT License reproduced in
+LICENSES/MIT-OpenBazaar.txt. Subsequent Mobazha-authored files and
+modifications are distributed under the Mozilla Public License 2.0 unless a
+file or subdirectory states a different license.
+
+The repository also vendors third-party dependencies. Their copyright and
+license notices are retained with the corresponding source under vendor/.
+
+The Mobazha name and logos are not licensed by the open-source software
+licenses in this repository.

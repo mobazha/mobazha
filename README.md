@@ -1,88 +1,62 @@
 # Mobazha 3.0
 
-Mobazha 3.0 是一个去中心化的电子商务平台。
+Mobazha 3.0 is a self-hostable, decentralized marketplace node. It provides marketplace, order, messaging, wallet, payment, and embedded storefront services in one Go application.
 
-## 目录结构
+## Community Edition
 
-```
-/
-├── cmd/                    # 命令行入口
-│   ├── devnet.go          # 开发网络命令
-│   ├── init.go            # 初始化命令
-│   ├── start.go           # 启动命令
-│   └── status.go          # 状态命令
-├── internal/              # 内部包
-│   ├── api/               # API接口
-│   ├── channels/          # 通道相关
-│   ├── common/            # 通用工具
-│   ├── config/            # 配置
-│   ├── contracts/         # 智能合约
-│   ├── core/              # 核心业务逻辑
-│   ├── database/          # 数据库操作
-│   ├── events/            # 事件相关
-│   ├── logger/            # 日志
-│   ├── models/            # 数据模型
-│   ├── multiwallet/       # 多币种钱包
-│   ├── net/               # 网络相关
-│   ├── notifications/     # 通知相关
-│   ├── orders/            # 订单相关
-│   ├── posts/             # 帖子相关
-│   ├── repo/              # 仓库相关
-│   ├── version/           # 版本相关
-│   └── wallet/            # 钱包相关
-├── pkg/                   # 可对外暴露的包
-│   ├── onion-transport/   # 洋葱路由传输
-│   ├── proxyclient/       # 代理客户端
-│   └── store-and-forward/ # 存储转发
-├── mobile/               # 移动端相关
-├── dist/                 # 构建输出
-└── scripts/              # 脚本文件
+The Community Edition is built from the same backend architecture as other Mobazha editions. An explicit, server-side edition policy narrows the capabilities that a distribution may expose; frontend configuration and installed extensions may narrow that set further, but cannot widen it.
 
-## 依赖项目
+The first Community Edition payment allowlist is:
 
-- [obcrawler](https://github.com/mobazha/obcrawler) - Mobazha 的爬虫服务
+- Bitcoin (BTC)
+- Bitcoin Cash (BCH)
+- Litecoin (LTC)
+- Zcash transparent addresses (ZEC)
 
-## 构建和运行
+The canonical machine-readable policy is [`config/editions/community.json`](config/editions/community.json). Scope, history, licensing, and extension boundaries are described in [`docs/community/COMMUNITY_EDITION.md`](docs/community/COMMUNITY_EDITION.md).
 
-### 前置条件
+## Architecture
 
-- Go 1.22 或更高版本
+- `cmd/` — CLI commands and process entry points
+- `internal/` — application composition, APIs, marketplace domain, storage, networking, and bundled implementations
+- `pkg/` — public contracts and reusable packages
+- `libs/` — embedded libraries maintained with the node
+- `mobile/` — mobile bindings and integration code
+- `deploy/` — deployment assets
+- `docs/` — architecture decisions and operator/developer documentation
+
+Payment extensions use a versioned, provider-neutral boundary. See [`docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md`](docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md) and [`docs/adr/015-payment-plugin-boundary.md`](docs/adr/015-payment-plugin-boundary.md).
+
+## Requirements
+
+- Go 1.25.5 or newer
 - Git
 
-### 构建
+## Build and run
 
 ```bash
-make build
+go build -tags goolm -o mobazha .
+./mobazha start
 ```
 
-### 运行
+On first start, the node initializes its data directory and serves the web interface at `http://localhost:5102` by default.
+
+To run as a background service:
 
 ```bash
-./mobazha start    # First run auto-initializes; opens Web UI at http://localhost:5102
+mobazha service install
+mobazha service status
 ```
 
-后台运行：
-```bash
-mobazha service install   # Install as system service (systemd/launchd)
-mobazha service status    # Check service status
-```
+Community deployment assets set `MOBAZHA_EDITION=community`. Other existing installations default to the unrestricted composition for backward compatibility and should set their edition explicitly when packaging a release.
 
-## 开发
+## Test
 
-### 目录说明
-
-- `cmd/`: 包含所有命令行入口
-- `internal/`: 包含所有内部包，这些包不会被外部项目导入
-- `pkg/`: 包含可以被外部项目导入的包
-- `mobile/`: 包含移动端相关代码
-
-### 测试
-
-运行所有测试：
 ```bash
 make test
+./scripts/community/check-capabilities.sh
 ```
 
-## 许可证
+## License
 
-[MIT License](LICENSE) 
+Mobazha-authored source in this repository is licensed under the [Mozilla Public License 2.0](LICENSE). Historical upstream components retain their original licenses and notices; see [NOTICE](NOTICE) and vendored dependency license files. The payment plugin protocol/SDK may be distributed under Apache-2.0 where explicitly marked.

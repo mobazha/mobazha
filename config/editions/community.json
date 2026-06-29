@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "edition": "community",
+  "license": "MPL-2.0",
+  "paymentPluginSdkLicense": "Apache-2.0",
+  "payment": {
+    "chains": ["BTC", "BCH", "LTC", "ZEC"],
+    "rails": ["utxo_transparent"]
+  },
+  "deploymentTargets": ["standalone"],
+  "zcash": {
+    "transparentOnly": true,
+    "defaultDerivation": "transparent"
+  }
+}

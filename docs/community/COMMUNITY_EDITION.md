@@ -49,6 +49,12 @@ The current foundation implements the edition manifest, a fail-closed runtime an
 
 Adding a chain to Community Edition requires an ADR, capability-manifest change, security review, compatibility tests, frontend support, and an explicit license decision. Implementing a plugin alone does not make that chain part of the default edition.
 
+## Fees and paid services
+
+Running Community Edition independently does not, by itself, create a mandatory central Mobazha transaction fee. Operators and users may still pay infrastructure, network, payment-provider, plugin, tax, or optional service costs. Any Mobazha-operated hosting, managed transaction, distribution, or other paid service must be optional and disclosed before use.
+
+See [Community Fees and Paid Services](FEES_AND_PAID_SERVICES.md) for the durable public boundary. Current Mobazha-operated service status and prices belong on [mobazha.org/fees](https://mobazha.org/fees), not in the edition capability manifest.
+
 ## Documentation language
 
 English is the default and canonical language for documentation in this repository. Chinese is used only for a deliberately maintained Chinese edition, which should be clearly identified and linked to its corresponding English source unless the document explicitly declares a different canonical language.

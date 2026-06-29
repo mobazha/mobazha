@@ -8,14 +8,17 @@ import (
 	"testing"
 	"time"
 
+	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
 )
 
@@ -36,11 +39,13 @@ type mockFiatProvider struct {
 	refundCalls   []contracts.RefundParams
 	cancelErr     error
 	cancelCalls   []string
+	createCalls   int
 }
 
 func (m *mockFiatProvider) ProviderID() string { return m.id }
 
 func (m *mockFiatProvider) CreatePayment(_ context.Context, _ contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
+	m.createCalls++
 	return m.createResult, m.createErr
 }
 
@@ -396,6 +401,44 @@ func TestFiatService_CreatePayment_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "sess_ok", session.SessionID)
+}
+
+func TestFiatService_CreatePayment_RejectsManagedCollectibleBeforeProvider(t *testing.T) {
+	provider := &mockFiatProvider{
+		id:           "stripe",
+		createResult: &contracts.FiatProviderSession{SessionID: "must-not-exist"},
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	svc.AddProvisioningPolicy(corepayment.NewCollectibleFirstSaleProvisioningPolicy(nil))
+
+	open := &pb.OrderOpen{
+		Listings: []*pb.SignedListing{{Listing: &pb.Listing{
+			Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_RWA_TOKEN},
+			Item: &pb.Listing_Item{
+				Blockchain:    "SOL",
+				TokenStandard: "metaplex_pnft",
+			},
+		}}},
+		Items: []*pb.OrderOpen_Item{{OptionalFeatures: []string{
+			models.CollectibleOptionalFeature(models.CollectibleFeatureFulfillment, models.CollectibleFulfillmentNFT),
+			models.CollectibleOptionalFeature(models.CollectibleFeatureHubSlotID, "source-1"),
+			models.CollectibleOptionalFeature(models.CollectibleFeatureCertNumber, "PSA-1"),
+			models.CollectibleOptionalFeature(models.CollectibleFeatureHolderWallet, "11111111111111111111111111111111"),
+		}}},
+	}
+	rawOpen, err := protojson.Marshal(open)
+	require.NoError(t, err)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.Order{ID: models.OrderID("source-fiat-order"), SerializedOrderOpen: rawOpen})
+	}))
+
+	_, err = svc.CreatePayment(context.Background(), "stripe", contracts.CreatePaymentParams{
+		OrderID: "source-fiat-order", Amount: 2500, Currency: "USD",
+	})
+	require.ErrorIs(t, err, corepayment.ErrRWAPaymentSessionUnsupported)
+	require.Zero(t, provider.createCalls, "provider must not receive a source-custody fiat request")
 }
 
 // --- Tests: LoadAndRegisterProviders ---

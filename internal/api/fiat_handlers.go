@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
@@ -134,6 +135,10 @@ func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) 
 
 	session, err := svc.CreatePayment(r.Context(), providerID, params)
 	if err != nil {
+		if errors.Is(err, corepayment.ErrRWAPaymentSessionUnsupported) || errors.Is(err, corepayment.ErrCollectibleFirstSalePreflight) {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "This order requires an escrow-backed crypto payment")
+			return
+		}
 		log.Warningf("Fiat payment creation failed for %s: %v", providerID, err)
 		responsePkg.ErrorWithDetail(w, http.StatusInternalServerError, responsePkg.CodeProviderError,
 			"Payment creation failed. Please try again.",

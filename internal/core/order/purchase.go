@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	solana "github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	ordercontracttype "github.com/mobazha/mobazha3.0/internal/core/contracttype"
@@ -239,6 +240,13 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 		if listing.Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN || models.PurchaseItemHasCollectibleMetadata(item) {
 			if len(purchase.Items) != 1 || strings.TrimSpace(item.Quantity) != "1" {
 				return nil, nil, fmt.Errorf("%w: collectible NFT primary-sale orders must contain exactly one item with quantity 1", coreiface.ErrBadRequest)
+			}
+			holderWallet := strings.TrimSpace(item.HolderWallet)
+			if holderWallet == "" {
+				return nil, nil, fmt.Errorf("%w: collectible NFT primary-sale orders require a holderWallet", coreiface.ErrBadRequest)
+			}
+			if _, err := solana.PublicKeyFromBase58(holderWallet); err != nil {
+				return nil, nil, fmt.Errorf("%w: collectible holderWallet must be a valid Solana public key", coreiface.ErrBadRequest)
 			}
 		}
 		var sameType bool
@@ -561,6 +569,13 @@ func persistCollectibleOrderMetadata(tx database.Tx, orderID string, orderOpen *
 	meta, ok := models.CollectibleOrderMetadataFromOrderOpen(orderOpen)
 	if !ok {
 		return nil
+	}
+	holderWallet := strings.TrimSpace(meta.HolderWallet)
+	if holderWallet == "" {
+		return fmt.Errorf("%w: collectible order requires a holderWallet", coreiface.ErrBadRequest)
+	}
+	if _, err := solana.PublicKeyFromBase58(holderWallet); err != nil {
+		return fmt.Errorf("%w: collectible holderWallet must be a valid Solana public key", coreiface.ErrBadRequest)
 	}
 	var dbOrder models.Order
 	if err := tx.Read().Where("id = ?", orderID).First(&dbOrder).Error; err != nil {

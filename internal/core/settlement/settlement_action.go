@@ -189,10 +189,6 @@ func (s *SettlementService) executeSettlementActionForOrder(
 			return nil, coinType, err
 		}
 		refunder, ok := strategy.(payment.SellerDeclineRefunder)
-		if !ok {
-			return nil, coinType, fmt.Errorf("%w: coin %s does not support seller_decline_refund settlement action",
-				coreiface.ErrBadRequest, coinType)
-		}
 		out := payoutAddr
 		if out == "" {
 			refundResult := nodepayment.ResolveBuyerRefundForLocalNode(s.db, order, paymentSent, coinType, nil, false)
@@ -203,7 +199,18 @@ func (s *SettlementService) executeSettlementActionForOrder(
 			out = refundResult.Address
 		}
 		params.PayoutAddr = out
-		result, rerr := refunder.SellerDeclineRefund(ctx, params)
+		var result *payment.ActionResult
+		var rerr error
+		if ok {
+			// Some programs distinguish a seller-decline instruction from buyer
+			// cancel at the contract level (for example Solana Anchor).
+			result, rerr = refunder.SellerDeclineRefund(ctx, params)
+		} else {
+			// ManagedEscrow/EVM and other threshold-1 escrows use the same on-chain
+			// refund transaction for both intents. Authorization is enforced
+			// above by requiring the local vendor order role.
+			result, rerr = strategy.Cancel(ctx, params)
+		}
 		return s.normalizeSettlementActionResult(result, coinType, rerr)
 
 	default:
@@ -358,11 +365,25 @@ func (s *SettlementService) GetSettlementActionStatus(
 	if status.OrderID != "" && status.OrderID != orderID.String() {
 		return nil, coinType, fmt.Errorf("%w: settlement action does not belong to order %s", coreiface.ErrBadRequest, orderID)
 	}
-	if status.SettlementAction != "" && status.SettlementAction != action {
+	if status.SettlementAction != "" && !settlementActionStatusMatches(strategy, status.SettlementAction, action) {
 		return nil, coinType, fmt.Errorf("%w: settlement action %s does not match requested action %s",
 			coreiface.ErrBadRequest, status.SettlementAction, action)
 	}
 	return status, coinType, nil
+}
+
+func settlementActionStatusMatches(strategy payment.ChainEscrowV2, recordedAction, requestedAction string) bool {
+	if recordedAction == requestedAction {
+		return true
+	}
+	if requestedAction != payment.SettlementActionSellerDeclineRefund || recordedAction != payment.SettlementActionCancel {
+		return false
+	}
+	// ManagedEscrow/EVM expresses a seller-authorized default refund with the same
+	// on-chain cancel operation as a buyer cancellation. Chains exposing a
+	// dedicated seller-decline instruction must retain the distinct action.
+	_, hasDedicatedSellerDecline := strategy.(payment.SellerDeclineRefunder)
+	return !hasDedicatedSellerDecline
 }
 
 func (s *SettlementService) lookupSettlementActionStatusFromStore(actionID string) (*payment.ActionStatus, error) {

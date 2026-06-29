@@ -11,10 +11,11 @@ const (
 
 	CollectibleFeaturePrefix = "collectibles."
 
-	CollectibleFeatureFulfillment = "fulfillment"
-	CollectibleFeatureHubSlotID   = "hub_slot_id"
-	CollectibleFeatureNFTMint     = "nft_mint"
-	CollectibleFeatureCertNumber  = "cert_number"
+	CollectibleFeatureFulfillment  = "fulfillment"
+	CollectibleFeatureHubSlotID    = "hub_slot_id"
+	CollectibleFeatureNFTMint      = "nft_mint"
+	CollectibleFeatureCertNumber   = "cert_number"
+	CollectibleFeatureHolderWallet = "holder_wallet"
 
 	CollectibleMetadataTypePrimarySale = "collectible_primary_sale"
 
@@ -23,6 +24,7 @@ const (
 	CollectibleMetadataKeyHubSlotID     = "collectible_hub_slot_id"
 	CollectibleMetadataKeyNFTMint       = "collectible_nft_mint"
 	CollectibleMetadataKeyCertNumber    = "collectible_cert_number"
+	CollectibleMetadataKeyHolderWallet  = "collectible_holder_wallet"
 	CollectibleMetadataKeyListingHash   = "collectible_listing_hash"
 	CollectibleMetadataKeyListingSlug   = "collectible_listing_slug"
 	CollectibleMetadataKeyBuyerPeerID   = "collectible_buyer_peer_id"
@@ -40,6 +42,7 @@ type CollectibleOrderMetadata struct {
 	HubSlotID     string
 	NFTMint       string
 	CertNumber    string
+	HolderWallet  string
 	ListingHash   string
 	ListingSlug   string
 	BuyerPeerID   string
@@ -72,6 +75,7 @@ func PurchaseItemOptionalFeaturesWithCollectibleMetadata(item PurchaseItem) []st
 	features = appendCollectibleOptionalFeature(features, CollectibleFeatureHubSlotID, item.HubSlotID)
 	features = appendCollectibleOptionalFeature(features, CollectibleFeatureNFTMint, item.NFTMint)
 	features = appendCollectibleOptionalFeature(features, CollectibleFeatureCertNumber, item.CertNumber)
+	features = appendCollectibleOptionalFeature(features, CollectibleFeatureHolderWallet, item.HolderWallet)
 	return features
 }
 
@@ -81,7 +85,8 @@ func PurchaseItemHasCollectibleMetadata(item PurchaseItem) bool {
 	if strings.EqualFold(strings.TrimSpace(item.Fulfillment), CollectibleFulfillmentNFT) ||
 		strings.TrimSpace(item.HubSlotID) != "" ||
 		strings.TrimSpace(item.NFTMint) != "" ||
-		strings.TrimSpace(item.CertNumber) != "" {
+		strings.TrimSpace(item.CertNumber) != "" ||
+		strings.TrimSpace(item.HolderWallet) != "" {
 		return true
 	}
 	for _, feature := range item.OptionalFeatures {
@@ -156,6 +161,7 @@ func CollectibleOrderMetadataFromOrderOpen(orderOpen *pb.OrderOpen) (*Collectibl
 	fulfillment := strings.TrimSpace(features[CollectibleFeatureFulfillment])
 	hubSlotID := strings.TrimSpace(features[CollectibleFeatureHubSlotID])
 	nftMint := strings.TrimSpace(features[CollectibleFeatureNFTMint])
+	holderWallet := strings.TrimSpace(features[CollectibleFeatureHolderWallet])
 	if nftMint == "" {
 		nftMint = strings.TrimSpace(listing.GetItem().GetTokenAddress())
 	}
@@ -177,6 +183,7 @@ func CollectibleOrderMetadataFromOrderOpen(orderOpen *pb.OrderOpen) (*Collectibl
 		HubSlotID:     hubSlotID,
 		NFTMint:       nftMint,
 		CertNumber:    strings.TrimSpace(features[CollectibleFeatureCertNumber]),
+		HolderWallet:  holderWallet,
 		ListingSlug:   strings.TrimSpace(listing.GetSlug()),
 		BuyerPeerID:   strings.TrimSpace(orderOpen.GetBuyerID().GetPeerID()),
 		SellerPeerID:  strings.TrimSpace(listing.GetVendorID().GetPeerID()),
@@ -190,6 +197,53 @@ func CollectibleOrderMetadataFromOrderOpen(orderOpen *pb.OrderOpen) (*Collectibl
 	return meta, true
 }
 
+// IsManagedCollectibleFirstSale reports whether an order is the source-custody
+// first-sale shape owned by the Collectibles Hub. Keeping this classification
+// in models gives payment authorization and durable lifecycle delivery one
+// canonical definition.
+func IsManagedCollectibleFirstSale(orderOpen *pb.OrderOpen) bool {
+	if orderOpen == nil || len(orderOpen.GetListings()) != 1 || len(orderOpen.GetItems()) != 1 {
+		return false
+	}
+	listing := orderOpen.GetListings()[0].GetListing()
+	if listing == nil || listing.GetMetadata().GetContractType() != pb.Listing_Metadata_RWA_TOKEN {
+		return false
+	}
+	listingItem := listing.GetItem()
+	chain := strings.ToLower(strings.TrimSpace(listingItem.GetBlockchain()))
+	if chain != "sol" && chain != "solana" {
+		return false
+	}
+	standard := strings.ToLower(strings.TrimSpace(listingItem.GetTokenStandard()))
+	if standard != "metaplex_pnft" || strings.TrimSpace(listingItem.GetTokenAddress()) != "" {
+		return false
+	}
+
+	meta, ok := CollectibleOrderMetadataFromOrderOpen(orderOpen)
+	return ok &&
+		strings.EqualFold(strings.TrimSpace(meta.Fulfillment), CollectibleFulfillmentNFT) &&
+		strings.TrimSpace(meta.HubSlotID) != "" &&
+		strings.TrimSpace(meta.CertNumber) != "" &&
+		strings.TrimSpace(meta.HolderWallet) != ""
+}
+
+// IsHubManagedCollectiblePrimarySale reports whether an order carries the
+// complete Hub metadata required for post-payment collectible delivery. This
+// deliberately includes both source-custody RWA listings and legacy physical
+// listings whose purchase item selects a Hub slot. Payment authorization must
+// continue to use the narrower IsManagedCollectibleFirstSale predicate.
+func IsHubManagedCollectiblePrimarySale(orderOpen *pb.OrderOpen) bool {
+	if orderOpen == nil || len(orderOpen.GetListings()) != 1 || len(orderOpen.GetItems()) != 1 {
+		return false
+	}
+	meta, ok := CollectibleOrderMetadataFromOrderOpen(orderOpen)
+	return ok &&
+		strings.EqualFold(strings.TrimSpace(meta.Fulfillment), CollectibleFulfillmentNFT) &&
+		strings.TrimSpace(meta.HubSlotID) != "" &&
+		strings.TrimSpace(meta.CertNumber) != "" &&
+		strings.TrimSpace(meta.HolderWallet) != ""
+}
+
 // FiatMetadataMap flattens the collectible payload into Order.FiatMetadata.
 func (m CollectibleOrderMetadata) FiatMetadataMap() map[string]string {
 	out := map[string]string{
@@ -198,6 +252,7 @@ func (m CollectibleOrderMetadata) FiatMetadataMap() map[string]string {
 		CollectibleMetadataKeyHubSlotID:     m.HubSlotID,
 		CollectibleMetadataKeyNFTMint:       m.NFTMint,
 		CollectibleMetadataKeyCertNumber:    m.CertNumber,
+		CollectibleMetadataKeyHolderWallet:  m.HolderWallet,
 		CollectibleMetadataKeyListingHash:   m.ListingHash,
 		CollectibleMetadataKeyListingSlug:   m.ListingSlug,
 		CollectibleMetadataKeyBuyerPeerID:   m.BuyerPeerID,
@@ -226,6 +281,7 @@ func CollectibleOrderMetadataFromFiatMetadata(meta map[string]string) (*Collecti
 		HubSlotID:     strings.TrimSpace(meta[CollectibleMetadataKeyHubSlotID]),
 		NFTMint:       strings.TrimSpace(meta[CollectibleMetadataKeyNFTMint]),
 		CertNumber:    strings.TrimSpace(meta[CollectibleMetadataKeyCertNumber]),
+		HolderWallet:  strings.TrimSpace(meta[CollectibleMetadataKeyHolderWallet]),
 		ListingHash:   strings.TrimSpace(meta[CollectibleMetadataKeyListingHash]),
 		ListingSlug:   strings.TrimSpace(meta[CollectibleMetadataKeyListingSlug]),
 		BuyerPeerID:   strings.TrimSpace(meta[CollectibleMetadataKeyBuyerPeerID]),
@@ -264,7 +320,7 @@ func parseCollectibleFeature(feature string) (string, string) {
 	key = strings.TrimSpace(key)
 	value = strings.TrimSpace(value)
 	switch key {
-	case CollectibleFeatureFulfillment, CollectibleFeatureHubSlotID, CollectibleFeatureNFTMint, CollectibleFeatureCertNumber:
+	case CollectibleFeatureFulfillment, CollectibleFeatureHubSlotID, CollectibleFeatureNFTMint, CollectibleFeatureCertNumber, CollectibleFeatureHolderWallet:
 		return key, value
 	default:
 		return "", ""

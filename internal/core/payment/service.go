@@ -103,6 +103,11 @@ type PaymentAppService struct {
 
 	// escrowOps delegates money-out operations (setter-injected after construction).
 	escrowOps contracts.EscrowOperations
+
+	// provisioningPolicies guard the canonical funding-target boundary. Every
+	// crypto setup path reaches GeneratePaymentSetup, including compatibility
+	// callers that do not pass through PaymentSessionService.
+	provisioningPolicies []SessionProvisioningPolicy
 }
 
 // PaymentAppServiceConfig groups the dependencies for constructing PaymentAppService.
@@ -144,6 +149,14 @@ func NewPaymentAppService(cfg PaymentAppServiceConfig) *PaymentAppService {
 // SetEscrowOps injects the settlement port after construction (late wiring).
 func (s *PaymentAppService) SetEscrowOps(ops contracts.EscrowOperations) {
 	s.escrowOps = ops
+}
+
+// AddProvisioningPolicy registers an idempotent authorization that must pass
+// before a chain strategy can create or persist a funding target.
+func (s *PaymentAppService) AddProvisioningPolicy(policy SessionProvisioningPolicy) {
+	if policy != nil {
+		s.provisioningPolicies = append(s.provisioningPolicies, policy)
+	}
 }
 
 // SetObservationDispatcher injects the unified ObservationDispatcher, enabling
@@ -221,6 +234,9 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 	}
 	if coinInfo, coinErr := payment.SettlementCoinInfoForCoin(params.CoinType); coinErr == nil && payment.IsRetiredPaymentChain(coinInfo.Chain) {
 		return nil, fmt.Errorf("%w: coin %s", payment.ErrTRONPaymentRetired, params.CoinType)
+	}
+	if err := s.authorizePaymentSetup(ctx, params); err != nil {
+		return nil, err
 	}
 	strategy, err := s.paymentRegistry.ForCoinV2(params.CoinType)
 	if err != nil {
@@ -338,6 +354,40 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 	}
 
 	return setupResult, nil
+}
+
+func (s *PaymentAppService) authorizePaymentSetup(ctx context.Context, params payment.PaymentSetupParams) error {
+	if len(s.provisioningPolicies) == 0 {
+		return nil
+	}
+	order := params.OrderData
+	if order == nil {
+		var err error
+		order, err = s.FetchOrderByID(params.OrderID)
+		if err != nil {
+			return fmt.Errorf("authorize payment setup: load order %s: %w", params.OrderID, err)
+		}
+	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return fmt.Errorf("authorize payment setup: decode order %s: %w", params.OrderID, err)
+	}
+	expiresAt := time.Time{}
+	if order.ExpiresAt != nil {
+		expiresAt = order.ExpiresAt.UTC()
+	}
+	input := SessionProvisioningPolicyInput{
+		OrderID:     params.OrderID,
+		PaymentCoin: string(params.CoinType),
+		ExpiresAt:   expiresAt,
+		OrderOpen:   orderOpen,
+	}
+	for _, policy := range s.provisioningPolicies {
+		if err := policy.AuthorizeSessionProvisioning(ctx, input); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress

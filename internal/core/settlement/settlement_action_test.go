@@ -115,7 +115,6 @@ func TestExecuteSettlementAction_ReusesActiveDurableIntent(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
-
 	strategy := &utxoActionStatusStub{
 		model:         payment.PaymentModelMonitored,
 		confirmResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "unexpected-second-submit"},
@@ -157,6 +156,56 @@ func TestExecuteSettlementAction_ReusesActiveDurableIntent(t *testing.T) {
 	require.Zero(t, strategy.confirmCalls)
 }
 
+func TestExecuteSettlementAction_SellerDeclineRefundFallsBackToCancel(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	base := &utxoActionStatusStub{
+		model:        payment.PaymentModelMonitored,
+		cancelResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "act-managed_escrow-refund"},
+	}
+	strategy := &cancelOnlySettlementStrategy{ChainEscrowV2: base}
+	reg := payment.NewRegistry()
+	reg.RegisterV2(iwallet.ChainEthereum, strategy)
+
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	svc.SetRegistry(reg)
+	order := seedModeratedSettlementActionOrder(t, db, "order-managed_escrow-seller-refund", models.RoleVendor)
+
+	result, _, err := svc.ExecuteSettlementAction(
+		context.Background(),
+		payment.SettlementActionSellerDeclineRefund,
+		order.ID,
+		"0x4444444444444444444444444444444444444444",
+	)
+	require.NoError(t, err)
+	require.Equal(t, "act-managed_escrow-refund", result.ActionID)
+	require.Equal(t, order.ID.String(), base.lastCancel.OrderID)
+	require.Equal(t, "0x4444444444444444444444444444444444444444", base.lastCancel.PayoutAddr)
+}
+
+func TestSettlementActionStatusMatchesSellerDeclineCancelAlias(t *testing.T) {
+	base := &utxoActionStatusStub{model: payment.PaymentModelMonitored}
+	cancelOnly := &cancelOnlySettlementStrategy{ChainEscrowV2: base}
+
+	require.True(t, settlementActionStatusMatches(
+		cancelOnly,
+		payment.SettlementActionCancel,
+		payment.SettlementActionSellerDeclineRefund,
+	))
+	require.False(t, settlementActionStatusMatches(
+		base,
+		payment.SettlementActionCancel,
+		payment.SettlementActionSellerDeclineRefund,
+	), "a chain with a dedicated seller-decline action must not accept cancel status")
+	require.False(t, settlementActionStatusMatches(
+		cancelOnly,
+		payment.SettlementActionConfirm,
+		payment.SettlementActionSellerDeclineRefund,
+	))
+}
+
 func TestExecuteCollectiblePrimarySaleRelease_UsesConfirmSettlement(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
@@ -185,6 +234,31 @@ func TestExecuteCollectiblePrimarySaleRelease_UsesConfirmSettlement(t *testing.T
 	require.Equal(t, "act-primary-sale-release", result.ActionID)
 	require.Equal(t, order.ID.String(), strategy.lastConfirm.OrderID)
 	require.Equal(t, "0x5555555555555555555555555555555555555555", strategy.lastConfirm.PayoutAddr)
+}
+
+func TestExecuteCollectiblePrimarySaleRelease_AlreadyConfirmedIsIdempotent(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-primary-sale-confirmed", models.RoleVendor, true)
+	confirmation, err := anypb.New(&pb.OrderConfirmation{})
+	require.NoError(t, err)
+	require.NoError(t, order.PutMessage(&npb.OrderMessage{
+		OrderID:     order.ID.String(),
+		MessageType: npb.OrderMessage_ORDER_CONFIRMATION,
+		Message:     confirmation,
+	}))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	result, coinType, err := svc.ExecuteCollectiblePrimarySaleRelease(context.Background(), order.ID, "")
+	require.NoError(t, err)
+	require.Equal(t, "crypto:eip155:1:native", coinType.String())
+	require.NotNil(t, result)
+	require.Equal(t, payment.ActionModeCompleted, result.Mode)
 }
 
 func TestExecuteCollectiblePrimarySaleRelease_RejectsNonCollectibleOrder(t *testing.T) {
@@ -310,6 +384,12 @@ type utxoActionStatusStub struct {
 	lastConfirm         payment.ActionParams
 	lastCancel          payment.ActionParams
 	lastSellerDecline   payment.ActionParams
+}
+
+// Embedding the base interface deliberately hides the optional
+// SellerDeclineRefunder capability while preserving the full V2 contract.
+type cancelOnlySettlementStrategy struct {
+	payment.ChainEscrowV2
 }
 
 func (s *utxoActionStatusStub) Model() payment.PaymentModel { return s.model }

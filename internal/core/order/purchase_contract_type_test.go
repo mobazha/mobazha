@@ -204,3 +204,45 @@ func TestCreateOrder_RejectsCollectibleQuantityAboveOne(t *testing.T) {
 	assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
 	assert.Contains(t, err.Error(), "quantity 1")
 }
+
+func TestCreateOrder_RequiresValidCollectibleHolderWallet(t *testing.T) {
+	kp, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	pid, err := identity.PeerIDFromPublicKey(kp.PubKey)
+	require.NoError(t, err)
+	signer := contracts.NewKeyPairSigner(kp, pid)
+
+	listing := testSignedListingForContractType(t, "rwa-holder-card", pid.String(), pb.Listing_Metadata_RWA_TOKEN)
+	listingCID := listingCID(t, listing)
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		Signer: signer,
+		Listings: &contractTypeTestListings{
+			byCID: map[string]*pb.SignedListing{listingCID.String(): listing},
+			index: models.ListingIndex{{Slug: listing.Listing.Slug, CID: listingCID.String()}},
+		},
+	})
+
+	for _, tc := range []struct {
+		name   string
+		wallet string
+		want   string
+	}{
+		{name: "missing", want: "require a holderWallet"},
+		{name: "invalid", wallet: "not-a-solana-address", want: "valid Solana public key"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := svc.createOrder(context.Background(), &models.Purchase{
+				PricingCoin: "crypto:eip155:1:native",
+				Items: []models.PurchaseItem{{
+					ListingHash:  listingCID.String(),
+					Quantity:     "1",
+					HubSlotID:    "slot-holder",
+					HolderWallet: tc.wallet,
+				}},
+			})
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, coreiface.ErrBadRequest))
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}

@@ -722,7 +722,6 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 			logger.LogInfoWithID(log, nodeID, "LibP2P HTTP proxy handler registered")
 		}
 	}
-
 	obNode.applyOptions(append([]NodeOption{
 		WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
 	}, options...))
@@ -1323,7 +1322,6 @@ func newLightweightNode(
 		FeatureManager:       obNode.featureManager,
 		StateValidator:       &coreStateBridge{},
 	})
-
 	obNode.applyOptions(append([]NodeOption{
 		WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
 	}, options...))
@@ -1467,6 +1465,30 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 	}
 
 	svc := corePmt.NewPaymentSessionService(obNode.db)
+	var authorize corePmt.CollectibleFirstSaleAuthorizationHook
+	if obNode.collectibleFirstSaleAuthorizationHook != nil {
+		authorize = func(ctx context.Context, signal corePmt.CollectibleFirstSaleAuthorizationSignal) error {
+			return obNode.collectibleFirstSaleAuthorizationHook(ctx, CollectibleFirstSaleAuthorizationSignal{
+				OrderID:              signal.OrderID,
+				HubSlotID:            signal.HubSlotID,
+				CertNumber:           signal.CertNumber,
+				SellerPeerID:         signal.SellerPeerID,
+				PaymentCoin:          signal.PaymentCoin,
+				ReservationExpiresAt: signal.ReservationExpiresAt,
+			})
+		}
+	}
+	// Always register the policy. A managed source-custody order must fail closed
+	// when hosting did not provide an authorizer, while unrelated orders remain
+	// unaffected.
+	policy := corePmt.NewCollectibleFirstSaleProvisioningPolicy(authorize)
+	svc.AddProvisioningPolicy(policy)
+	if obNode.paymentService != nil {
+		obNode.paymentService.AddProvisioningPolicy(policy)
+	}
+	if obNode.fiatPaymentService != nil {
+		obNode.fiatPaymentService.AddProvisioningPolicy(policy)
+	}
 
 	// Phase B3: inject FiatPaymentFacade when fiat payments are available.
 	if obNode.fiatPaymentService != nil {
@@ -1493,6 +1515,7 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 	}
 
 	obNode.paymentSessionService = svc
+	obNode.startCollectibleReservationReleaseListener()
 	logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession subsystem initialized")
 }
 

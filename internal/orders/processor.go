@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/collectiblesdelivery"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
@@ -434,6 +435,9 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 	}
 	// If fsmResult is not valid (no validator, non-transition message, or unmapped event),
 	// BeforeSave() will fall back to DeriveState() as before.
+	if err := collectiblesdelivery.EnqueueTerminalEventTx(dbtx, order, event); err != nil {
+		return nil, err
+	}
 
 	return event, err
 }

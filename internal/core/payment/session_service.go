@@ -42,6 +42,7 @@ type PaymentSessionServiceImpl struct {
 	projector *PaymentSessionProjector
 	fiat      *FiatPaymentFacade // injected via SetFiatFacade (Phase B3)
 	crypto    *CryptoPaymentFacade
+	policies  []SessionProvisioningPolicy
 }
 
 // NewPaymentSessionService constructs the service.
@@ -66,6 +67,15 @@ func (s *PaymentSessionServiceImpl) SetFiatFacade(f *FiatPaymentFacade) {
 // Phase PS crypto closure.
 func (s *PaymentSessionServiceImpl) SetCryptoFacade(c *CryptoPaymentFacade) {
 	s.crypto = c
+}
+
+// AddProvisioningPolicy registers a policy that authorizes new funding targets.
+// Read-only session projections and already-provisioned idempotent reads do not
+// invoke policies.
+func (s *PaymentSessionServiceImpl) AddProvisioningPolicy(policy SessionProvisioningPolicy) {
+	if policy != nil {
+		s.policies = append(s.policies, policy)
+	}
 }
 
 // Ensure PaymentSessionServiceImpl satisfies the contracts interface at
@@ -136,7 +146,11 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		}
 	}
 
-	view, err := s.GetSession(ctx, req.OrderID)
+	input, err := s.projector.fetchProjectInput(req.OrderID)
+	if err != nil {
+		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
+	}
+	view, err := s.projector.Project(input)
 	if err != nil {
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
 	}
@@ -175,6 +189,7 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 	alreadyProvisioned := view.FundingTarget.Address != "" ||
 		fiatSessionIDFromView(view) != ""
 
+	coinSwitch := false
 	if alreadyProvisioned && req.PaymentCoin != "" {
 		// Guard: if the caller requests a different coin, reject instead of
 		// silently returning a session for the wrong rail. The one allowed
@@ -185,9 +200,7 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 				return nil, fmt.Errorf("%w: existing=%q requested=%q",
 					ErrPaymentCoinMismatch, view.PaymentCoin, req.PaymentCoin)
 			}
-			if err := s.clearUnfundedPaymentSessionState(ctx, req.OrderID); err != nil {
-				return nil, err
-			}
+			coinSwitch = true
 			alreadyProvisioned = false
 		}
 	}
@@ -200,6 +213,29 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			return s.crypto.UpdateCreateSessionRefundAddress(ctx, req)
 		}
 		return view, nil
+	}
+
+	if req.PaymentCoin != "" {
+		policyInput := SessionProvisioningPolicyInput{
+			OrderID:     req.OrderID,
+			PaymentCoin: req.PaymentCoin,
+			ExpiresAt:   view.ExpiresAt,
+			OrderOpen:   input.orderOpen,
+		}
+		for _, policy := range s.policies {
+			if err := policy.AuthorizeSessionProvisioning(ctx, policyInput); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Authorization, including an atomic source-card reservation update, must
+	// succeed before removing the previous funding target. If clearing or
+	// reprovisioning later fails, a retry can safely resume from durable state.
+	if coinSwitch {
+		if err := s.clearUnfundedPaymentSessionState(ctx, req.OrderID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Provisioning needed — route to the appropriate facade by coin prefix.

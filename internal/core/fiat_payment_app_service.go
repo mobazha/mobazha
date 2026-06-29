@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/paypal"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/stripe"
@@ -32,15 +33,16 @@ type FiatWebhookHandler func(ctx context.Context, event *contracts.WebhookEvent)
 
 // FiatPaymentAppService orchestrates fiat payment operations and implements contracts.FiatService.
 type FiatPaymentAppService struct {
-	registry       contracts.FiatProviderRegistry
-	db             database.Database
-	nodeID         string
-	testnet        bool
-	webhookHandler FiatWebhookHandler
-	orderRepo      contracts.OrderRepo
-	eventBus       events.Bus
-	platformMu     sync.RWMutex
-	platformIDs    map[string]struct{}
+	registry             contracts.FiatProviderRegistry
+	db                   database.Database
+	nodeID               string
+	testnet              bool
+	webhookHandler       FiatWebhookHandler
+	orderRepo            contracts.OrderRepo
+	eventBus             events.Bus
+	platformMu           sync.RWMutex
+	platformIDs          map[string]struct{}
+	provisioningPolicies []corepayment.SessionProvisioningPolicy
 }
 
 func NewFiatPaymentAppService(
@@ -75,6 +77,15 @@ func (s *FiatPaymentAppService) SetEventBus(bus events.Bus) {
 	s.eventBus = bus
 }
 
+// AddProvisioningPolicy registers a policy at the provider boundary. Legacy
+// provider-scoped REST routes and the unified payment-session facade both end
+// up in CreatePayment, so this is the fail-closed enforcement point for fiat.
+func (s *FiatPaymentAppService) AddProvisioningPolicy(policy corepayment.SessionProvisioningPolicy) {
+	if policy != nil {
+		s.provisioningPolicies = append(s.provisioningPolicies, policy)
+	}
+}
+
 func (s *FiatPaymentAppService) EnabledProviders(ctx context.Context) ([]contracts.ProviderInfo, error) {
 	registered := s.registry.Registered()
 	result := make([]contracts.ProviderInfo, 0, len(registered))
@@ -105,6 +116,9 @@ func (s *FiatPaymentAppService) EnabledProviders(ctx context.Context) ([]contrac
 }
 
 func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID string, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
+	if err := s.authorizePaymentCreation(ctx, providerID, params); err != nil {
+		return nil, err
+	}
 	provider, err := s.registry.ForProvider(providerID)
 	if err != nil {
 		return nil, err
@@ -138,6 +152,38 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 
 	logger.LogInfoWithIDf(log, s.nodeID, "fiat payment created: provider=%s session=%s order=%s", providerID, session.SessionID, params.OrderID)
 	return session, nil
+}
+
+func (s *FiatPaymentAppService) authorizePaymentCreation(ctx context.Context, providerID string, params contracts.CreatePaymentParams) error {
+	if len(s.provisioningPolicies) == 0 || strings.TrimSpace(params.OrderID) == "" {
+		return nil
+	}
+	var order models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", params.OrderID).First(&order).Error
+	}); err != nil {
+		return fmt.Errorf("authorize fiat payment: load order %s: %w", params.OrderID, err)
+	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return fmt.Errorf("authorize fiat payment: decode order %s: %w", params.OrderID, err)
+	}
+	expiresAt := time.Time{}
+	if order.ExpiresAt != nil {
+		expiresAt = order.ExpiresAt.UTC()
+	}
+	input := corepayment.SessionProvisioningPolicyInput{
+		OrderID:     strings.TrimSpace(params.OrderID),
+		PaymentCoin: "fiat:" + strings.ToLower(strings.TrimSpace(providerID)) + ":" + strings.ToUpper(strings.TrimSpace(params.Currency)),
+		ExpiresAt:   expiresAt,
+		OrderOpen:   orderOpen,
+	}
+	for _, policy := range s.provisioningPolicies {
+		if err := policy.AuthorizeSessionProvisioning(ctx, input); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *FiatPaymentAppService) CapturePayment(ctx context.Context, providerID string, sessionID string) (*contracts.PaymentResult, error) {

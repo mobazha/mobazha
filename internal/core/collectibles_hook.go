@@ -1,9 +1,8 @@
-//go:build !private_distribution
-
 package core
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -28,6 +27,34 @@ type CollectiblePrimarySalePaidSignal struct {
 // collectible_primary_sales table. It must be idempotent by OrderID.
 type CollectiblePrimarySalePaidHook func(context.Context, CollectiblePrimarySalePaidSignal) error
 
+// CollectibleFirstSaleAuthorizationSignal is emitted before any payment rail
+// provisions a funding target for a managed source-custody first sale.
+type CollectibleFirstSaleAuthorizationSignal struct {
+	OrderID              string
+	HubSlotID            string
+	CertNumber           string
+	SellerPeerID         string
+	PaymentCoin          string
+	ReservationExpiresAt time.Time
+}
+
+type CollectibleFirstSaleAuthorizationHook func(context.Context, CollectibleFirstSaleAuthorizationSignal) error
+
+type CollectibleFirstSaleReservationReleaseSignal struct {
+	OrderID string
+	Reason  string
+}
+
+type CollectibleFirstSaleReservationReleaseHook func(context.Context, CollectibleFirstSaleReservationReleaseSignal) error
+
+// Backwards-compatible aliases keep downstream option users source-compatible
+// while the hook's contract now performs an authoritative reservation.
+type CollectibleFirstSalePreflightSignal = CollectibleFirstSaleAuthorizationSignal
+type CollectibleFirstSalePreflightHook = CollectibleFirstSaleAuthorizationHook
+
 type collectiblesFields struct {
-	collectiblePrimarySalePaidHook CollectiblePrimarySalePaidHook
+	collectiblePrimarySalePaidHook             CollectiblePrimarySalePaidHook
+	collectibleFirstSaleAuthorizationHook      CollectibleFirstSaleAuthorizationHook
+	collectibleFirstSaleReservationReleaseHook CollectibleFirstSaleReservationReleaseHook
+	collectibleLifecycleDeliveryMu             sync.Mutex
 }

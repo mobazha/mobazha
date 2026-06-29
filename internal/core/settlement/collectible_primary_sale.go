@@ -47,6 +47,16 @@ func (s *SettlementService) ExecuteCollectiblePrimarySaleRelease(
 	if spec.GetMethod() != pb.PaymentSent_CANCELABLE {
 		return nil, "", fmt.Errorf("%w: collectible primary-sale release requires a cancelable escrow", coreiface.ErrBadRequest)
 	}
+	// The paid-order hook and the reconciliation worker can race. If another
+	// execution already confirmed the order, the seller-side escrow release is
+	// complete and the collectible release must remain idempotent.
+	if order.SerializedOrderConfirmation != nil {
+		coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
+		if err != nil {
+			return nil, "", err
+		}
+		return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
+	}
 
 	return s.executeSettlementActionForOrder(ctx, payment.SettlementActionConfirm, &order, payoutAddr)
 }

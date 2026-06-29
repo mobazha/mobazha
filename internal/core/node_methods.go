@@ -308,10 +308,11 @@ func (n *MobazhaNode) RunOrderTimeoutOnce(_ context.Context) {
 	}
 }
 
-func (n *MobazhaNode) RunOutboxPollOnce(_ context.Context) {
+func (n *MobazhaNode) RunOutboxPollOnce(ctx context.Context) {
 	if n.orderService != nil {
 		n.orderService.RunOutboxPollOnce()
 	}
+	n.runCollectibleLifecycleDeliveries(ctx)
 }
 
 func (n *MobazhaNode) RunOutboxCleanupOnce(_ context.Context) {

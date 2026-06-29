@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/collectiblesdelivery"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -113,19 +114,25 @@ func (s *PaymentAppService) verifyOrderPayment(order *models.Order) {
 			return nil
 		}
 		if s.paymentRecorder != nil {
-			return s.paymentRecorder.RecordVerifiedPayment(dbtx, &freshOrder, vp.Transaction)
-		}
-		if putErr := freshOrder.PutTransaction(vp.Transaction); putErr != nil {
-			if !models.IsDuplicateTransactionError(putErr) {
-				return putErr
+			if err := s.paymentRecorder.RecordVerifiedPayment(dbtx, &freshOrder, vp.Transaction); err != nil {
+				return err
+			}
+		} else {
+			if putErr := freshOrder.PutTransaction(vp.Transaction); putErr != nil {
+				if !models.IsDuplicateTransactionError(putErr) {
+					return putErr
+				}
+			}
+			freshOrder.MarkPaymentVerified()
+			if freshOrder.PaidAt == nil {
+				now := time.Now()
+				freshOrder.PaidAt = &now
+			}
+			if err := dbtx.Save(&freshOrder); err != nil {
+				return err
 			}
 		}
-		freshOrder.MarkPaymentVerified()
-		if freshOrder.PaidAt == nil {
-			now := time.Now()
-			freshOrder.PaidAt = &now
-		}
-		return dbtx.Save(&freshOrder)
+		return collectiblesdelivery.EnqueueTx(dbtx, &freshOrder, models.CollectibleLifecyclePaid, "")
 	})
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "Payment verification: failed to save verified order %s: %v", order.ID, err)

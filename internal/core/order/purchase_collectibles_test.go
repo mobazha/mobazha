@@ -5,6 +5,7 @@ package order
 import (
 	"testing"
 
+	solana "github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -15,6 +16,7 @@ import (
 func TestPersistCollectibleOrderMetadataMergesFiatMetadata(t *testing.T) {
 	db := newTestDatabase(t)
 	orderID := "order_collectible_1"
+	holderWallet := solana.NewWallet().PublicKey().String()
 	err := db.Update(func(tx database.Tx) error {
 		order := &models.Order{ID: models.OrderID(orderID), MyRole: string(models.RoleBuyer)}
 		if err := order.MergeFiatMetadata(map[string]string{"fiat_provider": "stripe"}); err != nil {
@@ -46,6 +48,7 @@ func TestPersistCollectibleOrderMetadataMergesFiatMetadata(t *testing.T) {
 			OptionalFeatures: []string{
 				models.CollectibleOptionalFeature(models.CollectibleFeatureHubSlotID, "slot-1"),
 				models.CollectibleOptionalFeature(models.CollectibleFeatureCertNumber, "cert-1"),
+				models.CollectibleOptionalFeature(models.CollectibleFeatureHolderWallet, holderWallet),
 			},
 		}},
 	}
@@ -82,6 +85,38 @@ func TestPersistCollectibleOrderMetadataMergesFiatMetadata(t *testing.T) {
 	}
 	if meta[models.CollectibleMetadataKeySellerPeerID] != "seller-peer" {
 		t.Fatalf("unexpected seller metadata: %#v", meta)
+	}
+	if meta[models.CollectibleMetadataKeyHolderWallet] != holderWallet {
+		t.Fatalf("unexpected holder wallet metadata: %#v", meta)
+	}
+}
+
+func TestPersistCollectibleOrderMetadataRejectsMissingHolderWallet(t *testing.T) {
+	db := newTestDatabase(t)
+	orderID := "order_collectible_missing_holder"
+	if err := db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.Order{ID: models.OrderID(orderID), MyRole: string(models.RoleVendor)})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	orderOpen := &pb.OrderOpen{
+		BuyerID: &pb.ID{PeerID: "buyer-peer"},
+		Listings: []*pb.SignedListing{{Listing: &pb.Listing{
+			VendorID: &pb.ID{PeerID: "seller-peer"},
+			Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_RWA_TOKEN},
+		}}},
+		Items: []*pb.OrderOpen_Item{{
+			ListingHash: "listing-hash",
+			OptionalFeatures: []string{
+				models.CollectibleOptionalFeature(models.CollectibleFeatureHubSlotID, "slot-1"),
+			},
+		}},
+	}
+	err := db.Update(func(tx database.Tx) error {
+		return persistCollectibleOrderMetadata(tx, orderID, orderOpen)
+	})
+	if err == nil {
+		t.Fatal("persistCollectibleOrderMetadata accepted a missing holder wallet")
 	}
 }
 
@@ -130,6 +165,7 @@ func TestPostProcessOrderOpenPersistsVendorCollectibleMetadata(t *testing.T) {
 	db := newTestDatabase(t)
 	svc := &OrderAppService{db: db}
 	orderID := "order_vendor_collectible_1"
+	holderWallet := solana.NewWallet().PublicKey().String()
 	err := db.Update(func(tx database.Tx) error {
 		return tx.Save(&models.Order{
 			ID:     models.OrderID(orderID),
@@ -155,6 +191,7 @@ func TestPostProcessOrderOpenPersistsVendorCollectibleMetadata(t *testing.T) {
 			ListingHash: "listing-hash",
 			OptionalFeatures: []string{
 				models.CollectibleOptionalFeature(models.CollectibleFeatureHubSlotID, "slot-vendor"),
+				models.CollectibleOptionalFeature(models.CollectibleFeatureHolderWallet, holderWallet),
 			},
 		}},
 	}
@@ -189,5 +226,8 @@ func TestPostProcessOrderOpenPersistsVendorCollectibleMetadata(t *testing.T) {
 	}
 	if meta[models.CollectibleMetadataKeySellerPeerID] != "seller-peer" {
 		t.Fatalf("vendor seller metadata missing: %#v", meta)
+	}
+	if meta[models.CollectibleMetadataKeyHolderWallet] != holderWallet {
+		t.Fatalf("vendor holder wallet metadata missing: %#v", meta)
 	}
 }

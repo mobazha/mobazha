@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/collectiblesdelivery"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -29,11 +30,14 @@ func WriteOutboxEvent(tx database.Tx, evt interface{}) error {
 	if err != nil {
 		return fmt.Errorf("outbox: marshal %s: %w", meta.Name, err)
 	}
-	return tx.Save(&models.OutboxEvent{
+	if err := tx.Save(&models.OutboxEvent{
 		EventName: meta.Name,
 		Payload:   payload,
 		CreatedAt: time.Now(),
-	})
+	}); err != nil {
+		return err
+	}
+	return collectiblesdelivery.EnqueueTerminalEventByLookupTx(tx, evt)
 }
 
 // RunOutboxPollOnce delivers pending outbox events in a single pass.

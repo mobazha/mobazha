@@ -28,13 +28,12 @@ type CryptoPaymentSetupService interface {
 // crypto funding targets (ManagedEscrow, UTXO, monitored flows) behind
 // PaymentSessionService.CreateSession.
 type CryptoPaymentFacade struct {
-	db          database.Database
-	projector   *PaymentSessionProjector
-	orderSvc    contracts.OrderService
-	setupSvc    CryptoPaymentSetupService
-	exchange    contracts.ExchangeRateService
-	storePolicy contracts.StorePolicyService
-
+	db                   database.Database
+	projector            *PaymentSessionProjector
+	orderSvc             contracts.OrderService
+	setupSvc             CryptoPaymentSetupService
+	exchange             contracts.ExchangeRateService
+	storePolicy          contracts.StorePolicyService
 	sellerPolicyResolver sellerStorePolicyResolver
 }
 
@@ -92,13 +91,6 @@ func (c *CryptoPaymentFacade) CreateSession(
 	orderOpen := input.orderOpen
 	if orderOpen == nil {
 		return nil, fmt.Errorf("crypto facade: order open unavailable for order %s", req.OrderID)
-	}
-
-	if len(orderOpen.Listings) > 0 &&
-		orderOpen.Listings[0].Listing != nil &&
-		orderOpen.Listings[0].Listing.Metadata != nil &&
-		orderOpen.Listings[0].Listing.Metadata.ContractType == porderpb.Listing_Metadata_RWA_TOKEN {
-		return nil, fmt.Errorf("%w", ErrRWAPaymentSessionUnsupported)
 	}
 
 	refundAddr, err := resolveCreateSessionRefundAddress(coin, req)
@@ -427,5 +419,6 @@ func buildPaymentSetupParamsFromOrder(
 		Moderator:     moderator,
 		CoinType:      coin,
 		Amount:        amt,
+		OrderData:     order,
 	}, nil
 }

@@ -81,6 +81,26 @@ func WithCollectiblePrimarySalePaidHook(hook CollectiblePrimarySalePaidHook) Nod
 	}
 }
 
+// WithCollectibleFirstSaleAuthorizationHook wires hosting's authoritative
+// source-deposit reservation into payment-session provisioning.
+func WithCollectibleFirstSaleAuthorizationHook(hook CollectibleFirstSaleAuthorizationHook) NodeOption {
+	return func(n *MobazhaNode) {
+		n.collectibleFirstSaleAuthorizationHook = hook
+	}
+}
+
+func WithCollectibleFirstSaleReservationReleaseHook(hook CollectibleFirstSaleReservationReleaseHook) NodeOption {
+	return func(n *MobazhaNode) {
+		n.collectibleFirstSaleReservationReleaseHook = hook
+	}
+}
+
+// WithCollectibleFirstSalePreflightHook is retained as a source-compatible
+// alias. The hook now reserves rather than merely validates.
+func WithCollectibleFirstSalePreflightHook(hook CollectibleFirstSalePreflightHook) NodeOption {
+	return WithCollectibleFirstSaleAuthorizationHook(hook)
+}
+
 // WithPlatformFeatureProvider overrides the default PlatformGlobalProvider
 // (which allows every feature). SaaS hosting injects an adapter that
 // reads app.yaml / runtime admin API to honor platform-wide kill switches.

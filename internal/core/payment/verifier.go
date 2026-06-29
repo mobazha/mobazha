@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/collectiblesdelivery"
 	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -184,16 +185,36 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 			return fmt.Errorf("aggregating verifier: raw DB unavailable")
 		}
 		err = raw.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-			return v.aggregateWithGorm(ctx, tx, func(order *models.Order) error {
+			if err := v.aggregateWithGorm(ctx, tx, func(order *models.Order) error {
 				return tx.Save(order).Error
-			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace, &emitBusinessEvents, &emitHandlerOrderID, &emitHandlerPayment)
+			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace, &emitBusinessEvents, &emitHandlerOrderID, &emitHandlerPayment); err != nil {
+				return err
+			}
+			if !emitVerified {
+				return nil
+			}
+			var order models.Order
+			if err := tx.Where("tenant_id = ? AND id = ?", tenantID, orderID).First(&order).Error; err != nil {
+				return err
+			}
+			return collectiblesdelivery.EnqueueGorm(tx, tenantID, &order, models.CollectibleLifecyclePaid, "")
 		})
 	} else {
 		err = v.db.Update(func(tx database.Tx) error {
 			gdb := tx.Read().WithContext(ctx)
-			return v.aggregateWithGorm(ctx, gdb, func(order *models.Order) error {
+			if err := v.aggregateWithGorm(ctx, gdb, func(order *models.Order) error {
 				return tx.Save(order)
-			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace, &emitBusinessEvents, &emitHandlerOrderID, &emitHandlerPayment)
+			}, tenantID, orderID, &emitVerified, &emitVerifiedNamespace, &emitBusinessEvents, &emitHandlerOrderID, &emitHandlerPayment); err != nil {
+				return err
+			}
+			if !emitVerified {
+				return nil
+			}
+			var order models.Order
+			if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
+				return err
+			}
+			return collectiblesdelivery.EnqueueTx(tx, &order, models.CollectibleLifecyclePaid, "")
 		})
 	}
 	if err != nil {

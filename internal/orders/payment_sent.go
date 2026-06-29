@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mobazha/mobazha3.0/internal/collectiblesdelivery"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -373,6 +374,14 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 	order *models.Order,
 	tx iwallet.Transaction,
 ) error {
+	saveOrder := func() error {
+		if order.IsPaymentVerified() {
+			if err := collectiblesdelivery.EnqueueTx(dbtx, order, models.CollectibleLifecyclePaid, ""); err != nil {
+				return err
+			}
+		}
+		return dbtx.Save(order)
+	}
 	alreadyVerified := order.IsPaymentVerified()
 	if err := order.PutTransaction(tx); err != nil {
 		if !models.IsDuplicateTransactionError(err) {
@@ -389,7 +398,7 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 		} else if !models.IsMessageNotExistError(err) {
 			return err
 		}
-		return dbtx.Save(order)
+		return saveOrder()
 	}
 	order.MarkPaymentVerified()
 	if order.PaidAt == nil {
@@ -403,11 +412,11 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 		if order.State != models.OrderState_AWAITING_PAYMENT {
 			order.SetFSMState(order.State)
 		}
-		return dbtx.Save(order)
+		return saveOrder()
 	}
 
 	if paymentVerificationShouldNotStartFulfillment(order) {
-		return dbtx.Save(order)
+		return saveOrder()
 	}
 
 	op.advanceToPendingAfterVerification(order)
@@ -420,11 +429,11 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
-		return dbtx.Save(order)
+		return saveOrder()
 	}
 
 	op.emitPaymentSentEvents(dbtx, order, orderOpen, paymentSent, &tx)
-	return dbtx.Save(order)
+	return saveOrder()
 }
 
 func (op *OrderProcessor) emitVerifiedPaymentSettlementRecovery(

@@ -38,6 +38,7 @@ type PurchaseItem struct {
 	HubSlotID        string                 `json:"hubSlotID,omitempty"`
 	NFTMint          string                 `json:"nftMint,omitempty"`
 	CertNumber       string                 `json:"certNumber,omitempty"`
+	HolderWallet     string                 `json:"holderWallet,omitempty"`
 }
 
 // ShoppingCartItem is information about the item in the shopping cart.

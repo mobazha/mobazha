@@ -12,10 +12,11 @@ func TestPurchaseItemOptionalFeaturesWithCollectibleMetadata(t *testing.T) {
 			"gift-wrap",
 			CollectibleOptionalFeature(CollectibleFeatureHubSlotID, "slot-existing"),
 		},
-		Fulfillment: CollectibleFulfillmentNFT,
-		HubSlotID:   "slot-new",
-		NFTMint:     "mint-1",
-		CertNumber:  "cert-1",
+		Fulfillment:  CollectibleFulfillmentNFT,
+		HubSlotID:    "slot-new",
+		NFTMint:      "mint-1",
+		CertNumber:   "cert-1",
+		HolderWallet: "holder-wallet-1",
 	}
 
 	features := PurchaseItemOptionalFeaturesWithCollectibleMetadata(item)
@@ -26,6 +27,7 @@ func TestPurchaseItemOptionalFeaturesWithCollectibleMetadata(t *testing.T) {
 		CollectibleOptionalFeature(CollectibleFeatureFulfillment, CollectibleFulfillmentNFT): true,
 		CollectibleOptionalFeature(CollectibleFeatureNFTMint, "mint-1"):                      true,
 		CollectibleOptionalFeature(CollectibleFeatureCertNumber, "cert-1"):                   true,
+		CollectibleOptionalFeature(CollectibleFeatureHolderWallet, "holder-wallet-1"):        true,
 	}
 	if len(features) != len(want) {
 		t.Fatalf("expected %d features, got %d: %#v", len(want), len(features), features)
@@ -87,6 +89,7 @@ func TestCollectibleOrderMetadataFromOrderOpen(t *testing.T) {
 				CollectibleOptionalFeature(CollectibleFeatureHubSlotID, "slot-1"),
 				CollectibleOptionalFeature(CollectibleFeatureNFTMint, "mint-from-feature"),
 				CollectibleOptionalFeature(CollectibleFeatureCertNumber, "cert-1"),
+				CollectibleOptionalFeature(CollectibleFeatureHolderWallet, "holder-wallet-1"),
 			},
 		}},
 	}
@@ -109,6 +112,9 @@ func TestCollectibleOrderMetadataFromOrderOpen(t *testing.T) {
 	}
 	if meta.CertNumber != "cert-1" {
 		t.Fatalf("unexpected cert number %q", meta.CertNumber)
+	}
+	if meta.HolderWallet != "holder-wallet-1" {
+		t.Fatalf("unexpected holder wallet %q", meta.HolderWallet)
 	}
 	if meta.ListingHash != "listing-hash" || meta.ListingSlug != "psa-card" {
 		t.Fatalf("unexpected listing metadata: %#v", meta)
@@ -137,6 +143,36 @@ func TestCollectibleOrderMetadataFromOrderOpenIgnoresNonCollectible(t *testing.T
 	}
 }
 
+func TestIsHubManagedCollectiblePrimarySaleIncludesLegacyHubListing(t *testing.T) {
+	orderOpen := &pb.OrderOpen{
+		BuyerID: &pb.ID{PeerID: "buyer-peer"},
+		Listings: []*pb.SignedListing{{
+			Listing: &pb.Listing{
+				Slug:     "legacy-hub-card",
+				VendorID: &pb.ID{PeerID: "seller-peer"},
+				Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_PHYSICAL_GOOD},
+				Item:     &pb.Listing_Item{Title: "Hub-held card"},
+			},
+		}},
+		Items: []*pb.OrderOpen_Item{{
+			ListingHash: "listing-hash",
+			OptionalFeatures: []string{
+				CollectibleOptionalFeature(CollectibleFeatureFulfillment, CollectibleFulfillmentNFT),
+				CollectibleOptionalFeature(CollectibleFeatureHubSlotID, "slot-1"),
+				CollectibleOptionalFeature(CollectibleFeatureCertNumber, "cert-1"),
+				CollectibleOptionalFeature(CollectibleFeatureHolderWallet, "holder-wallet-1"),
+			},
+		}},
+	}
+
+	if !IsHubManagedCollectiblePrimarySale(orderOpen) {
+		t.Fatal("expected complete Hub collectible metadata to enable lifecycle delivery")
+	}
+	if IsManagedCollectibleFirstSale(orderOpen) {
+		t.Fatal("legacy Hub listing must not bypass source-custody payment authorization")
+	}
+}
+
 func TestCollectibleOrderMetadataFromFiatMetadata(t *testing.T) {
 	meta, ok := CollectibleOrderMetadataFromFiatMetadata(map[string]string{
 		CollectibleMetadataKeyType:         CollectibleMetadataTypePrimarySale,
@@ -146,11 +182,12 @@ func TestCollectibleOrderMetadataFromFiatMetadata(t *testing.T) {
 		CollectibleMetadataKeyCertNumber:   "cert-1",
 		CollectibleMetadataKeyBuyerPeerID:  "buyer-peer",
 		CollectibleMetadataKeySellerPeerID: "seller-peer",
+		CollectibleMetadataKeyHolderWallet: "holder-wallet-1",
 	})
 	if !ok {
 		t.Fatal("expected collectible fiat metadata")
 	}
-	if meta.HubSlotID != "slot-1" || meta.NFTMint != "mint-1" || meta.BuyerPeerID != "buyer-peer" || meta.SellerPeerID != "seller-peer" {
+	if meta.HubSlotID != "slot-1" || meta.NFTMint != "mint-1" || meta.BuyerPeerID != "buyer-peer" || meta.SellerPeerID != "seller-peer" || meta.HolderWallet != "holder-wallet-1" {
 		t.Fatalf("unexpected metadata: %#v", meta)
 	}
 

@@ -25,10 +25,9 @@ type CheckoutSupplyListingReader interface {
 	GetMyListingBySlug(slug string) (*pb.SignedListing, error)
 }
 
-// CheckoutDigitalSupplyLineResolver resolves digital order metadata into supply lines.
-type CheckoutDigitalSupplyLineResolver interface {
-	SupplyAvailabilityLinesForOrderItems([]digital.OrderLineItem) ([]contracts.SupplyLine, error)
-}
+// CheckoutDigitalSupplyLineResolver preserves the checkout package API while
+// sharing one channel-neutral resolver contract across all order channels.
+type CheckoutDigitalSupplyLineResolver = contracts.DigitalSupplyLineResolver
 
 // CheckoutSupplyQuoteService performs channel-agnostic advisory supply quotes.
 type CheckoutSupplyQuoteService struct {

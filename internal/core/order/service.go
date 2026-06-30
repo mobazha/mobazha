@@ -13,7 +13,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/core/checkoutsupply"
-	"github.com/mobazha/mobazha3.0/internal/core/digital"
 	nodepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
 	"github.com/mobazha/mobazha3.0/internal/core/paymentintent"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -138,11 +137,9 @@ type OrderAppServiceConfig struct {
 	DigitalSupplyLines         DigitalSupplyLineResolver
 }
 
-// DigitalSupplyLineResolver resolves digital order metadata into supply lines
-// while keeping order lifecycle code independent of digital delivery internals.
-type DigitalSupplyLineResolver interface {
-	SupplyAvailabilityLinesForOrderItems([]digital.OrderLineItem) ([]contracts.SupplyLine, error)
-}
+// DigitalSupplyLineResolver preserves the order package API while sharing the
+// channel-neutral resolver contract with guest checkout and supply quoting.
+type DigitalSupplyLineResolver = contracts.DigitalSupplyLineResolver
 
 // NewOrderAppService constructs an OrderAppService with the given dependencies.
 func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {

@@ -73,11 +73,9 @@ type GuestOrderAppServiceConfig struct {
 	BillingHoldActive func() bool
 }
 
-// DigitalSupplyLineResolver resolves digital order items into provider-neutral
-// supply lines without making Guest Checkout depend on digital delivery.
-type DigitalSupplyLineResolver interface {
-	SupplyAvailabilityLinesForOrderItems([]digital.OrderLineItem) ([]contracts.SupplyLine, error)
-}
+// DigitalSupplyLineResolver preserves the guest package API while sharing the
+// channel-neutral resolver contract with standard orders and supply quoting.
+type DigitalSupplyLineResolver = contracts.DigitalSupplyLineResolver
 
 // ManagedEscrowGuestSettlementService is the Core orchestration surface used
 // by guest order state transitions. Concrete chain execution stays private.

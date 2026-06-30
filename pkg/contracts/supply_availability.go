@@ -80,6 +80,20 @@ type SupplyLine struct {
 	Metadata     map[string]string `json:"metadata,omitempty"`
 }
 
+// DigitalOrderLineItem is the channel-neutral input used to resolve digital
+// goods into supply lines.
+type DigitalOrderLineItem struct {
+	ListingSlug string
+	VariantSKU  string
+	Quantity    uint32
+}
+
+// DigitalSupplyLineResolver maps digital order metadata to the provider-neutral
+// supply contract shared by standard orders, guest checkout, and quote flows.
+type DigitalSupplyLineResolver interface {
+	SupplyAvailabilityLinesForOrderItems([]DigitalOrderLineItem) ([]SupplyLine, error)
+}
+
 // AvailabilityRequest asks a single provider for advisory availability.
 type AvailabilityRequest struct {
 	Line        SupplyLine `json:"line"`

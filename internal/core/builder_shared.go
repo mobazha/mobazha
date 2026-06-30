@@ -128,7 +128,25 @@ func (p *managed_escrowListingPublisher) RepublishListing(ctx context.Context, s
 	return p.node.listingService.RepublishListing(ctx, slug)
 }
 
-// initDigitalSubsystem initializes the per-node digital goods subsystem:
+// wireDigitalSupplyLineResolver installs the shared digital supply resolver on
+// every order service that exposes the capability in the selected distribution.
+func wireDigitalSupplyLineResolver(obNode *MobazhaNode, assetSvc *digital.DigitalAssetAppService) {
+	if obNode == nil || assetSvc == nil {
+		return
+	}
+	if setter, ok := any(obNode.orderService).(digitalSupplyLineResolverSetter); ok {
+		setter.SetDigitalSupplyLineResolver(assetSvc)
+	}
+	if setter, ok := any(obNode.guestOrderService).(digitalSupplyLineResolverSetter); ok {
+		setter.SetDigitalSupplyLineResolver(assetSvc)
+	}
+}
+
+type digitalSupplyLineResolverSetter interface {
+	SetDigitalSupplyLineResolver(pkgcontracts.DigitalSupplyLineResolver)
+}
+
+// initDigitalSubsystem initializes the per-node digital goods subsystem. It
 // creates DigitalAssetAppService + DigitalEntitlementAppService,
 // and starts the entitlement event listener.
 // Shared between full and private_distribution builds (no build tags).

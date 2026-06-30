@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -18,12 +19,9 @@ type OrderShipper interface {
 	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
 }
 
-// OrderLineItem represents one purchased item in a multi-line order.
-type OrderLineItem struct {
-	ListingSlug string
-	VariantSKU  string
-	Quantity    uint32
-}
+// OrderLineItem preserves the digital package API while the channel-neutral
+// supply contract owns the shared line-item shape.
+type OrderLineItem = pkgcontracts.DigitalOrderLineItem
 
 // OrderMetadata holds the subset of order fields needed by the entitlement
 // logic. Returned by OrderQuerier.GetOrderMetadata in a single query.

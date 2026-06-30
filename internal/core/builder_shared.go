@@ -134,16 +134,7 @@ func wireDigitalSupplyLineResolver(obNode *MobazhaNode, assetSvc *digital.Digita
 	if obNode == nil || assetSvc == nil {
 		return
 	}
-	if setter, ok := any(obNode.orderService).(digitalSupplyLineResolverSetter); ok {
-		setter.SetDigitalSupplyLineResolver(assetSvc)
-	}
-	if setter, ok := any(obNode.guestOrderService).(digitalSupplyLineResolverSetter); ok {
-		setter.SetDigitalSupplyLineResolver(assetSvc)
-	}
-}
-
-type digitalSupplyLineResolverSetter interface {
-	SetDigitalSupplyLineResolver(pkgcontracts.DigitalSupplyLineResolver)
+	wireDistributionDigitalSupplyLineResolvers(obNode, assetSvc)
 }
 
 // initDigitalSubsystem initializes the per-node digital goods subsystem. It

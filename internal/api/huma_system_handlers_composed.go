@@ -7,19 +7,10 @@ import "github.com/danielgtaylor/huma/v2"
 // are registered independently through TrustedHumaModule.
 func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 	g.registerCommonSystemAdminOps(api)
-	if registrar, ok := any(g).(fullNodeHumaSystemRegistrar); ok {
-		registrar.registerFullNodeHumaSystemAdminOperations(api)
-	}
+	g.registerDistributionHumaSystemAdminOperations(api)
 }
 
 func (g *Gateway) registerNodeHumaSystemPublicOperations(api huma.API) {
 	g.registerCommonSystemPublicOps(api)
-	if registrar, ok := any(g).(fullNodeHumaSystemRegistrar); ok {
-		registrar.registerFullNodeHumaSystemPublicOperations(api)
-	}
-}
-
-type fullNodeHumaSystemRegistrar interface {
-	registerFullNodeHumaSystemAdminOperations(huma.API)
-	registerFullNodeHumaSystemPublicOperations(huma.API)
+	g.registerDistributionHumaSystemPublicOperations(api)
 }

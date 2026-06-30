@@ -18,18 +18,5 @@ func (g *Gateway) registerPreHumaRoutes(r chi.Router) {
 	}
 	g.registerDigitalAssetStreamRoute(r)
 	g.registerBillingHoldRoutes(r)
-	if registrar, ok := any(g).(agentChatStreamRouteRegistrar); ok {
-		registrar.registerAgentChatStreamRoute(r)
-	}
-	if registrar, ok := any(g).(exportRouteRegistrar); ok {
-		registrar.registerExportRoutes(r)
-	}
-}
-
-type agentChatStreamRouteRegistrar interface {
-	registerAgentChatStreamRoute(chi.Router)
-}
-
-type exportRouteRegistrar interface {
-	registerExportRoutes(chi.Router)
+	g.registerDistributionPreHumaRoutes(r)
 }

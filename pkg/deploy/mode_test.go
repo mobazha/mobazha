@@ -42,3 +42,20 @@ func TestSetProcessMode_BackToStandalone(t *testing.T) {
 		t.Fatal("IsSaaS() should be false after reverting to Standalone")
 	}
 }
+
+func TestSetProcessMode_PrivateDistribution(t *testing.T) {
+	processMode.Store(int32(Standalone))
+	defer processMode.Store(int32(Standalone))
+
+	SetProcessMode(PrivateDistribution)
+
+	if got := GetProcessMode(); got != PrivateDistribution {
+		t.Fatalf("mode = %d, want PrivateDistribution (%d)", got, PrivateDistribution)
+	}
+	if !IsPrivateDistribution() {
+		t.Fatal("IsPrivateDistribution() should be true after SetProcessMode(PrivateDistribution)")
+	}
+	if IsSaaS() {
+		t.Fatal("IsSaaS() should be false in PrivateDistribution mode")
+	}
+}

@@ -1,11 +1,20 @@
-//go:build !private_distribution
-
 package api
 
-import "os"
+import (
+	"os"
 
-// detectDeploymentMode returns "docker", "native", or "saas".
+	"github.com/mobazha/mobazha3.0/pkg/deploy"
+)
+
+// detectDeploymentMode returns the configured distribution before inspecting
+// the standalone process environment.
 func detectDeploymentMode() string {
+	switch deploy.GetProcessMode() {
+	case deploy.SaaS:
+		return "saas"
+	case deploy.PrivateDistribution:
+		return "private_distribution"
+	}
 	if _, err := os.Stat("/.dockerenv"); err == nil {
 		return "docker"
 	}

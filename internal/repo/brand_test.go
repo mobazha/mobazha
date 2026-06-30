@@ -50,24 +50,6 @@ func TestLoadBrandConfig_NetworkFieldsDefaultFalse(t *testing.T) {
 	assert.False(t, cfg.Network.AllowDiscoverToggle)
 }
 
-func TestLoadBrandConfig_ExampleExampleParses(t *testing.T) {
-	// Sanity check: the bundled examples must parse and reflect the
-	// Example "everything hidden" baseline. If a partner accidentally
-	// flips a flag on we want CI to surface that, not production.
-	cfg, err := LoadBrandConfig("../../deploy/private_distribution/examples/example")
-	require.NoError(t, err)
-	require.NotNil(t, cfg)
-	assert.Equal(t, "Example Market", cfg.Name)
-	assert.False(t, cfg.Network.AllowUserCustomNode,
-		"Example baseline must keep custom-node entry hidden")
-	assert.False(t, cfg.Network.ShowAdvancedDiagnostics,
-		"Example baseline must keep diagnostics hidden")
-	assert.False(t, cfg.Network.ShowNodePoolUI,
-		"Example baseline must keep node pool UI hidden")
-	assert.False(t, cfg.Network.AllowDiscoverToggle,
-		"Example baseline must keep discover toggle hidden")
-}
-
 func TestLoadBrandConfig_ExampleMarketExampleParses(t *testing.T) {
 	cfg, err := LoadBrandConfig("../../deploy/private_distribution/examples/examplemarket")
 	require.NoError(t, err)

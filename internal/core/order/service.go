@@ -214,42 +214,41 @@ func (s *OrderAppService) SetCoTenantVerifiedPayment(fn contracts.CoTenantVerifi
 // by sending a PAYMENT_SENT P2P message via ReliablySendMessage.
 // In SaaS mode, the transport layer's DeliverToLocal automatically provides
 // in-process delivery; in standalone mode, it falls back to network + SNF.
-// Fire-and-forget: errors are logged but not returned.
+// The call returns after the durable transport handoff (or same-process
+// delivery) has been established. Callers that acknowledge an external event
+// should propagate the error so a provider can retry instead of silently
+// losing the counterparty transition.
 func (s *OrderAppService) RelayPaymentToCounterparty(
 	ctx context.Context, orderID string, targetPeerID peer.ID, pd *models.PaymentData,
-) {
-	s.relayPaymentToCounterparty(ctx, orderID, targetPeerID, pd, nil)
+) error {
+	return s.relayPaymentToCounterparty(ctx, orderID, targetPeerID, pd, nil)
 }
 
 func (s *OrderAppService) RelayPaymentToCounterpartyWithTransaction(
 	ctx context.Context, orderID string, targetPeerID peer.ID, pd *models.PaymentData, paymentTx *iwallet.Transaction,
-) {
-	s.relayPaymentToCounterparty(ctx, orderID, targetPeerID, pd, paymentTx)
+) error {
+	return s.relayPaymentToCounterparty(ctx, orderID, targetPeerID, pd, paymentTx)
 }
 
 func (s *OrderAppService) relayPaymentToCounterparty(
 	ctx context.Context, orderID string, targetPeerID peer.ID, pd *models.PaymentData, paymentTx *iwallet.Transaction,
-) {
+) error {
 	if pd == nil {
-		logger.LogWarningWithIDf(log, s.nodeID, "RelayPayment P2P: missing payment data for order %s", orderID)
-		return
+		return fmt.Errorf("relay payment for order %s: payment data is required", orderID)
 	}
 	order, err := s.fetchOrder(orderID)
 	if err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: fetch order %s: %v", orderID, err)
-		return
+		return fmt.Errorf("relay payment: fetch order %s: %w", orderID, err)
 	}
 
 	paymentSent, err := paymentSentForCounterpartyRelay(order, pd)
 	if err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: build proto for order %s: %v", orderID, err)
-		return
+		return fmt.Errorf("relay payment: build proto for order %s: %w", orderID, err)
 	}
 
 	orderAny, err := anypb.New(paymentSent)
 	if err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: marshal proto for order %s: %v", orderID, err)
-		return
+		return fmt.Errorf("relay payment: marshal proto for order %s: %w", orderID, err)
 	}
 
 	message := &npb.OrderMessage{
@@ -259,14 +258,12 @@ func (s *OrderAppService) relayPaymentToCounterparty(
 	}
 
 	if err := utils.SignOrderMessage(message, s.signer); err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: sign message for order %s: %v", orderID, err)
-		return
+		return fmt.Errorf("relay payment: sign message for order %s: %w", orderID, err)
 	}
 
 	payload, err := anypb.New(message)
 	if err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: marshal payload for order %s: %v", orderID, err)
-		return
+		return fmt.Errorf("relay payment: marshal payload for order %s: %w", orderID, err)
 	}
 
 	netMessage := newMessageWithID()
@@ -274,18 +271,18 @@ func (s *OrderAppService) relayPaymentToCounterparty(
 	netMessage.Payload = payload
 
 	if s.deliverVerifiedPaymentToCoTenant(ctx, order, targetPeerID, message, pd, paymentTx) {
-		return
+		return nil
 	}
 
 	if s.messenger == nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: messenger unavailable for order %s", orderID)
-		return
+		return fmt.Errorf("relay payment: messenger unavailable for order %s", orderID)
 	}
 	if err := s.db.Update(func(tx database.Tx) error {
 		return s.messenger.ReliablySendMessage(tx, targetPeerID, netMessage, nil)
 	}); err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPayment P2P: send to %s for order %s: %v", targetPeerID, orderID, err)
+		return fmt.Errorf("relay payment: durable handoff to %s for order %s: %w", targetPeerID, orderID, err)
 	}
+	return nil
 }
 
 func paymentSentForCounterpartyRelay(order *models.Order, pd *models.PaymentData) (*pb.PaymentSent, error) {
@@ -565,18 +562,16 @@ func (s *OrderAppService) ProcessVerifiedPaymentMessage(ctx context.Context, ord
 // resolves the buyer peer ID, and relays the payment event.
 // Encapsulates the common "fetch order → get buyer → relay" orchestration
 // so callers (webhook handler, verification hook) stay thin.
-func (s *OrderAppService) RelayPaymentToBuyer(ctx context.Context, orderID string, pd *models.PaymentData) {
+func (s *OrderAppService) RelayPaymentToBuyer(ctx context.Context, orderID string, pd *models.PaymentData) error {
 	order, err := s.fetchOrder(orderID)
 	if err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPaymentToBuyer: fetch order %s: %v", orderID, err)
-		return
+		return fmt.Errorf("relay payment to buyer: fetch order %s: %w", orderID, err)
 	}
 	buyerPeerID, err := order.Buyer()
 	if err != nil {
-		logger.LogInfoWithIDf(log, s.nodeID, "RelayPaymentToBuyer: get buyer for order %s: %v", orderID, err)
-		return
+		return fmt.Errorf("relay payment to buyer: resolve buyer for order %s: %w", orderID, err)
 	}
-	s.RelayPaymentToCounterparty(ctx, orderID, buyerPeerID, pd)
+	return s.RelayPaymentToCounterparty(ctx, orderID, buyerPeerID, pd)
 }
 
 // FetchOrder queries an order by ID without marking it as read.

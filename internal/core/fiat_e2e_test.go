@@ -632,8 +632,7 @@ func TestE2E_Stripe_WebhookToBuyerRelay(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
-		return nil
+		return sellerOrderSvc.RelayPaymentToBuyer(ctx, event.OrderID, pd)
 	})
 
 	piJSON, _ := json.Marshal(map[string]interface{}{
@@ -701,8 +700,7 @@ func TestE2E_PayPal_WebhookToBuyerRelay(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
-		return nil
+		return sellerOrderSvc.RelayPaymentToBuyer(ctx, event.OrderID, pd)
 	})
 
 	payload := fmt.Sprintf(`{
@@ -761,8 +759,7 @@ func TestE2E_Stripe_WebhookIdempotency_BuyerCalledOnce(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
-		return nil
+		return sellerOrderSvc.RelayPaymentToBuyer(ctx, event.OrderID, pd)
 	})
 
 	piJSON, _ := json.Marshal(map[string]interface{}{

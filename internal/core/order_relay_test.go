@@ -136,7 +136,7 @@ func TestBuildPaymentSentProto_NoOrderOpen_Error(t *testing.T) {
 
 // ── RelayPaymentToCounterparty ─────────────────────────────────────────
 
-func TestRelayPaymentToCounterparty_NoMessenger_NoPanic(t *testing.T) {
+func TestRelayPaymentToCounterparty_NoMessenger_ReturnsError(t *testing.T) {
 	svc := coreorder.NewTestOrderAppService(t, coreorder.OrderAppServiceConfig{})
 
 	buyerPeerID, _ := peer.Decode("QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG")
@@ -148,14 +148,13 @@ func TestRelayPaymentToCounterparty_NoMessenger_NoPanic(t *testing.T) {
 		Method:        pb.PaymentSent_FIAT,
 	}
 
-	assert.NotPanics(t, func() {
-		svc.RelayPaymentToCounterparty(context.Background(), "order-no-messenger", buyerPeerID, pd)
-	})
+	err := svc.RelayPaymentToCounterparty(context.Background(), "order-no-messenger", buyerPeerID, pd)
+	assert.Error(t, err)
 }
 
 // ── RelayPaymentToBuyer ────────────────────────────────────────────────
 
-func TestRelayPaymentToBuyer_OrderNotFound_NoPanic(t *testing.T) {
+func TestRelayPaymentToBuyer_OrderNotFound_ReturnsError(t *testing.T) {
 	svc := coreorder.NewTestOrderAppService(t, coreorder.OrderAppServiceConfig{})
 
 	pd := &models.PaymentData{
@@ -165,9 +164,8 @@ func TestRelayPaymentToBuyer_OrderNotFound_NoPanic(t *testing.T) {
 		Amount:        100,
 	}
 
-	assert.NotPanics(t, func() {
-		svc.RelayPaymentToBuyer(context.Background(), "nonexistent", pd)
-	})
+	err := svc.RelayPaymentToBuyer(context.Background(), "nonexistent", pd)
+	assert.Error(t, err)
 }
 
 // ── buildFiatPaymentData ───────────────────────────────────────────────

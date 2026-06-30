@@ -73,6 +73,13 @@ type Messenger struct {
 	recentlyProcessed   map[string]time.Time
 	recentlyProcessedMu sync.Mutex
 
+	// sendTails chains direct/offline delivery attempts per recipient. Database
+	// commit hooks enqueue in commit order, so related order messages cannot be
+	// observed out of order merely because their send goroutines were scheduled
+	// differently (for example ORDER_SHIPMENT before ORDER_CONFIRMATION).
+	sendQueueMu sync.Mutex
+	sendTails   map[peer.ID]chan struct{}
+
 	retryRunning    atomic.Bool // prevents overlapping retryAllMessages
 	downloadRunning atomic.Bool // prevents overlapping downloadMessages
 }
@@ -160,6 +167,7 @@ func NewMessenger(cfg *MessengerConfig) (*Messenger, error) {
 		done:               make(chan struct{}),
 		bootstrapDone:      bootstrapDone,
 		recentlyProcessed:  make(map[string]time.Time),
+		sendTails:          make(map[peer.ID]chan struct{}),
 	}
 	return m, nil
 }
@@ -255,7 +263,7 @@ func (m *Messenger) ReliablySendMessage(tx database.Tx, peer peer.ID, message *p
 
 	sent = true
 	tx.RegisterCommitHook(func() {
-		go m.trySendMessage(peer, message, done)
+		m.enqueueSend(peer, message, done)
 	})
 
 	return nil
@@ -310,7 +318,35 @@ func (m *Messenger) SendACK(messageID string, peer peer.ID) {
 		Payload:     payload,
 	}
 	sent = true
-	go m.trySendMessage(peer, msg, nil)
+	m.enqueueSend(peer, msg, nil)
+}
+
+// enqueueSend preserves FIFO delivery-attempt order for each recipient while
+// retaining asynchronous network I/O. The caller must already have reserved a
+// WaitGroup slot with trySendAdd; trySendMessage releases that slot.
+func (m *Messenger) enqueueSend(peerID peer.ID, message *pb.Message, done chan<- struct{}) {
+	m.sendQueueMu.Lock()
+	previous := m.sendTails[peerID]
+	current := make(chan struct{})
+	m.sendTails[peerID] = current
+	m.sendQueueMu.Unlock()
+
+	go func() {
+		defer func() {
+			close(current)
+			m.sendQueueMu.Lock()
+			if m.sendTails[peerID] == current {
+				delete(m.sendTails, peerID)
+			}
+			m.sendQueueMu.Unlock()
+		}()
+
+		if previous != nil {
+			<-previous
+		}
+
+		m.trySendMessage(peerID, message, done)
+	}()
 }
 
 // Start will start a recurring process which will attempt
@@ -486,7 +522,10 @@ func (m *Messenger) retryAllMessages() {
 		m.mtx.RLock()
 		defer m.mtx.RUnlock()
 
-		return tx.Read().Find(&messages).Error
+		// Preserve each recipient's persisted send order across process restarts.
+		// Recipient grouping also makes enqueueSend rebuild one FIFO chain at a
+		// time instead of depending on an unspecified database row order.
+		return tx.Read().Order("recipient ASC, timestamp ASC, id ASC").Find(&messages).Error
 	})
 	if err != nil {
 		logger.LogInfoWithIDf(log, m.NodeID, "Error loading outgoing messages from the database: %s", err)
@@ -508,7 +547,7 @@ func (m *Messenger) retryAllMessages() {
 			if !m.trySendAdd() {
 				return
 			}
-			go m.trySendMessage(pid, pmes, nil)
+			m.enqueueSend(pid, pmes, nil)
 
 			err = m.db.Update(func(tx database.Tx) error {
 				return tx.Update("last_attempt", time.Now(), nil, &message)
@@ -543,6 +582,7 @@ func (m *Messenger) downloadMessages() {
 		// This prevents processing the same logical message multiple times
 		// (sender retries create multiple encrypted copies with the same app message ID)
 		uniqueMessages := make(map[string]*messageWithPeer)
+		messages := make([]*messageWithPeer, 0, len(encryptedMessages))
 		decryptionFailures := 0
 
 		for _, enc := range encryptedMessages {
@@ -557,11 +597,15 @@ func (m *Messenger) downloadMessages() {
 				// Same application message, just track the enc.MessageID for ACK
 				existing.encIDs = append(existing.encIDs, enc.MessageID)
 			} else {
-				uniqueMessages[msg.MessageID] = &messageWithPeer{
+				mwp := &messageWithPeer{
 					m:      msg,
 					p:      p,
 					encIDs: [][]byte{enc.MessageID},
 				}
+				uniqueMessages[msg.MessageID] = mwp
+				// Keep first-seen storage order. Iterating the deduplication map
+				// here used to randomize all messages whose legacy sequence is 0.
+				messages = append(messages, mwp)
 			}
 		}
 
@@ -569,11 +613,9 @@ func (m *Messenger) downloadMessages() {
 			logger.LogDebugWithIDf(log, m.NodeID, "Decryption failed for %d messages (not for this node)", decryptionFailures)
 		}
 
-		// Convert to slice and sort by sequence
-		messages := make([]*messageWithPeer, 0, len(uniqueMessages))
-		for _, mwp := range uniqueMessages {
-			messages = append(messages, mwp)
-		}
+		// Stable sorting retains first-seen storage order for legacy/business
+		// messages whose sequence is zero while preserving explicit FOLLOW /
+		// UNFOLLOW sequence semantics.
 		sort.SliceStable(messages, func(i, j int) bool {
 			return messages[i].m.Sequence < messages[j].m.Sequence
 		})

@@ -308,8 +308,7 @@ func (n *MobazhaNode) wireServiceSetters() {
 			if err := n.orderService.ProcessOrderPayment(ctx, pd); err != nil {
 				return err
 			}
-			go n.orderService.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
-			return nil
+			return n.orderService.RelayPaymentToBuyer(ctx, event.OrderID, pd)
 		})
 	}
 }

@@ -156,6 +156,45 @@ func TestMessenger(t *testing.T) {
 	if len(messages2) > 0 {
 		t.Error("Failed to delete ACKed message from the db")
 	}
+
+	const orderedMessageCount = 32
+	ordered := make(chan string, orderedMessageCount)
+	service2.RegisterHandler(pb.Message_FOLLOW, func(_ peer.ID, msg *pb.Message) error {
+		ordered <- msg.MessageID
+		return nil
+	})
+	doneOrdered := make([]chan struct{}, orderedMessageCount)
+	err = db1.Update(func(tx database.Tx) error {
+		for i := range orderedMessageCount {
+			doneOrdered[i] = make(chan struct{})
+			if err := messenger1.ReliablySendMessage(tx, service2.host.ID(), &pb.Message{
+				MessageID:   fmt.Sprintf("ordered-%02d", i),
+				MessageType: pb.Message_FOLLOW,
+			}, doneOrdered[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range orderedMessageCount {
+		select {
+		case got := <-ordered:
+			want := fmt.Sprintf("ordered-%02d", i)
+			if got != want {
+				t.Fatalf("recipient observed messages out of order: got %s, want %s", got, want)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("timed out waiting for ordered message %d", i)
+		}
+		select {
+		case <-doneOrdered[i]:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("timed out waiting for ordered send %d", i)
+		}
+	}
 }
 
 func TestMessenger_retryAllMessages(t *testing.T) {

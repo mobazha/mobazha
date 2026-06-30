@@ -253,13 +253,15 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 	return SharedManagerInstance, nil
 }
 
-func configuredEditionName(_ *repo.Config) string {
-	if name := strings.TrimSpace(os.Getenv("MOBAZHA_EDITION")); name != "" {
-		return name
+func configuredEditionName(cfg *repo.Config) string {
+	if cfg != nil {
+		if name := strings.TrimSpace(cfg.Edition); name != "" {
+			return name
+		}
 	}
-	// Keep existing developer, private, and commercial installations
-	// backwards compatible. Community release artifacts opt in explicitly.
-	return edition.FullName
+	// This repository is the public Open Core composition. Private launchers
+	// must opt in to their broader policy explicitly at their composition root.
+	return ""
 }
 
 func applyInjectedManagedEscrowPaymentConfig(netConfig *mcfg.NetConfig, cfg *repo.Config) {

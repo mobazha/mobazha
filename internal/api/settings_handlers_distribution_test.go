@@ -6,16 +6,23 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/deploy"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 )
 
-func TestHandleGETExchangeRatesPrivateDistributionDoesNotRequireProvider(t *testing.T) {
-	defer deploy.SetProcessMode(deploy.Standalone)
-	deploy.SetProcessMode(deploy.PrivateDistribution)
+type restrictedProductSurfacePolicy struct{}
+
+func (restrictedProductSurfacePolicy) ExternalExchangeRatesEnabled() bool { return false }
+func (restrictedProductSurfacePolicy) MCPToolCatalog() string {
+	return distribution.MCPToolCatalogRestricted
+}
+
+func TestHandleGETExchangeRatesRestrictedPolicyDoesNotRequireProvider(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/exchange-rates", nil)
-	new(Gateway).handleGETExchangeRates(recorder, request)
+	(&Gateway{config: &GatewayConfig{
+		ProductSurfacePolicy: restrictedProductSurfacePolicy{},
+	}}).handleGETExchangeRates(recorder, request)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
@@ -27,6 +34,6 @@ func TestHandleGETExchangeRatesPrivateDistributionDoesNotRequireProvider(t *test
 		t.Fatalf("decode rates: %v", err)
 	}
 	if len(response.Data) != 0 {
-		t.Fatalf("PrivateDistribution rates = %v, want empty map", response.Data)
+		t.Fatalf("restricted rates = %v, want empty map", response.Data)
 	}
 }

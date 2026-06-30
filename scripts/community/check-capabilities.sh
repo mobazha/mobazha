@@ -78,9 +78,8 @@ if [[ ! -f "${repo_root}/LICENSES/MIT-OpenBazaar.txt" ]]; then
   exit 1
 fi
 
-if ! rg -q '^\s*-?\s*MOBAZHA_EDITION=.*community' \
-  "${repo_root}/deploy/standalone/docker-compose.yml"; then
-  echo "ERROR: Community deployment does not select the community edition" >&2
+if rg -q 'MOBAZHA_EDITION' "${repo_root}/deploy/standalone/docker-compose.yml"; then
+  echo "ERROR: public deployment exposes a runtime edition escalation switch" >&2
   exit 1
 fi
 

@@ -35,11 +35,7 @@ type SharedRouterConfig struct {
 func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 	distributionPolicy := cfg.DistributionPolicy
 	if distributionPolicy == nil {
-		var err error
-		distributionPolicy, err = edition.ResolvePolicy(edition.FullName)
-		if err != nil {
-			return nil, err
-		}
+		distributionPolicy = edition.DefaultPolicy()
 	}
 	g := &Gateway{
 		config:        &GatewayConfig{SkillProvider: cfg.SkillProvider},

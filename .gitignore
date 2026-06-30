@@ -55,6 +55,8 @@ deploy/standalone/.frontend-dist/
 
 # Solana test validator ledger
 test-ledger/
+# Local E2E identities are runtime secrets, never Open Core source artifacts.
+internal/chains/solana/keypairs/
 # OpenAPI spec generator binary
 /gen-openapi
 

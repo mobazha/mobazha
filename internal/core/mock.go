@@ -24,6 +24,7 @@ import (
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -37,6 +38,9 @@ import (
 // in-memory database, mock libp2p host, and mock network
 // service.
 func MockNode() (*MobazhaNode, error) {
+	if err := edition.ConfigureCurrentPolicy(edition.FullName); err != nil {
+		return nil, fmt.Errorf("configure mock edition: %w", err)
+	}
 	r, err := repo.MockRepo()
 	if err != nil {
 		return nil, err
@@ -236,6 +240,9 @@ type Mocknet struct {
 // LinkAll and ConnectAllButSelf are called during construction.
 func NewMocknet(numNodes int) (*Mocknet, error) {
 	ctx := context.Background()
+	if err := edition.ConfigureCurrentPolicy(edition.FullName); err != nil {
+		return nil, fmt.Errorf("configure mock edition: %w", err)
+	}
 
 	// create network
 	mn := mocknet.New()
@@ -252,6 +259,9 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 	sharedManager, err := NewSharedManager(ctx, cfg)
 	if err != nil {
 		return nil, err
+	}
+	if err := edition.ConfigureCurrentPolicy(edition.FullName); err != nil {
+		return nil, fmt.Errorf("restore mock edition: %w", err)
 	}
 
 	var nodes []*MobazhaNode

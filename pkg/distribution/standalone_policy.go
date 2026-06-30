@@ -17,10 +17,23 @@ type GuestPaymentPolicy interface {
 	ValidateCrossCurrencyCheckout(pricingCurrency, paymentSymbol string) error
 }
 
+const (
+	MCPToolCatalogFull       = "full"
+	MCPToolCatalogRestricted = "restricted"
+)
+
+// ProductSurfacePolicy owns distribution-level API decisions that cannot be
+// inferred from a chain or payment capability alone.
+type ProductSurfacePolicy interface {
+	ExternalExchangeRatesEnabled() bool
+	MCPToolCatalog() string
+}
+
 // PrivateDistributionPolicy contains product decisions while Core retains the listing and
 // order state machines that enforce them.
 type PrivateDistributionPolicy interface {
 	ListingPolicy
 	GuestPaymentPolicy
+	ProductSurfacePolicy
 	EnabledBackgroundJobs() []string
 }

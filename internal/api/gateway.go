@@ -21,7 +21,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/deploy"
 	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
@@ -94,9 +93,8 @@ type GatewayConfig struct {
 	// Used by native binary mode to persist domain config when Docker
 	// hostconfig is unavailable.
 	DataDir string
-	// Edition selects the distribution capability policy. Empty preserves the
-	// unrestricted private composition for backwards compatibility. Standalone
-	// Community deployments pass "community" explicitly from the composition root.
+	// Edition selects the distribution capability policy. Empty fails closed to
+	// Community. Private compositions select broader policies explicitly.
 	Edition string
 
 	// FrontendOverrideDir serves static files from this directory before
@@ -120,8 +118,9 @@ type GatewayConfig struct {
 	// TrustedHumaModules are first-party, build-time distribution extensions.
 	// The gateway supplies auth/security metadata and retains middleware,
 	// envelope, listener, and OpenAPI ownership.
-	TrustedHumaModules []distribution.TrustedHumaModule
-	GuestPaymentPolicy distribution.GuestPaymentPolicy
+	TrustedHumaModules   []distribution.TrustedHumaModule
+	GuestPaymentPolicy   distribution.GuestPaymentPolicy
+	ProductSurfacePolicy distribution.ProductSurfacePolicy
 }
 
 // Gateway represents an HTTP API gateway
@@ -229,8 +228,9 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 		}
 		loopbackURL := fmt.Sprintf("%s://%s", scheme, normalizeLoopbackAddr(config.Listener.Addr().String()))
 		toolProfile := mcppkg.ToolProfileFull
-		if deploy.IsPrivateDistribution() {
-			toolProfile = mcppkg.ToolProfilePrivateDistribution
+		if config.ProductSurfacePolicy != nil &&
+			config.ProductSurfacePolicy.MCPToolCatalog() == distribution.MCPToolCatalogRestricted {
+			toolProfile = mcppkg.ToolProfileRestricted
 		}
 		mcpOpts := &mcppkg.ServerOptions{
 			Transport:   "streamable-http",
@@ -635,6 +635,7 @@ func (g *Gateway) runtimeFrontendConfig() frontend.ServerConfig {
 	}
 	return frontend.ServerConfig{
 		SaaSURL:                g.config.SaaSAPIURL,
+		Edition:                g.editionPolicy.Name(),
 		PrivateDistributionMode:            detectDeploymentMode() == "private_distribution",
 		Brand:                  g.config.Brand,
 		FeaturesSnapshotFn:     featuresSnapshotFromNodeManager(g.nodeManager),

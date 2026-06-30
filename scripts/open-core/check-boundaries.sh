@@ -10,7 +10,7 @@ business_edition_refs="$({
   rg -n 'CommunityName|MOBAZHA_EDITION' internal pkg --glob '*.go' \
     --glob '!**/*_test.go' \
     --glob '!pkg/edition/**' || true
-} | rg -v '^internal/core/shared_manager\.go:.*MOBAZHA_EDITION' || true)"
+} || true)"
 if [[ -n "$business_edition_refs" ]]; then
   echo "ERROR: edition/profile names leaked outside composition and manifest code:" >&2
   echo "$business_edition_refs" >&2

@@ -84,6 +84,10 @@ type NetworkSnapshot struct {
 
 // ServerConfig configures the embedded frontend HTTP handler.
 type ServerConfig struct {
+	// Edition is the resolved distribution policy name exposed for diagnostics
+	// and release verification. Business behavior must not branch on it.
+	Edition string
+
 	// OverrideDir, when set, serves files from this directory first,
 	// falling back to the embedded DistFS. This allows operators to
 	// replace the frontend without rebuilding the binary.
@@ -342,6 +346,7 @@ type RuntimeFeatureEntry struct {
 // fields move to TECHDEBT(TD-032) and get removed in Phase E.
 type RuntimeConfigPayload struct {
 	SchemaVersion            int                            `json:"schemaVersion"`
+	Edition                  string                         `json:"edition,omitempty"`
 	SaasURL                  string                         `json:"saasUrl,omitempty"`
 	AuthMode                 string                         `json:"authMode"`
 	GuestCheckoutEnabled     bool                           `json:"guestCheckoutEnabled"`
@@ -390,6 +395,7 @@ func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeCon
 
 	payload := RuntimeConfigPayload{
 		SchemaVersion:        RuntimeConfigSchemaVersion,
+		Edition:              cfg.Edition,
 		AuthMode:             "standalone",
 		GuestCheckoutEnabled: guestCheckoutEnabled,
 		Features:             features,

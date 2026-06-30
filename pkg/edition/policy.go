@@ -56,25 +56,22 @@ type currentPolicyHolder struct {
 var currentPolicy atomic.Pointer[currentPolicyHolder]
 
 func init() {
-	currentPolicy.Store(&currentPolicyHolder{policy: unrestrictedPolicy(FullName)})
+	currentPolicy.Store(&currentPolicyHolder{policy: defaultPolicy()})
 }
 
-// ResolvePolicy returns the policy for a configured edition. Empty, full,
-// commercial, and private_distribution names preserve the private composition's existing
-// unrestricted behavior. Explicit unknown names fail startup.
+// ResolvePolicy returns the policy for a configured edition. An empty name is
+// the public composition default and therefore resolves to Community. Private
+// compositions must opt in to full capabilities explicitly.
 func ResolvePolicy(name string) (Policy, error) {
 	switch normalized := strings.ToLower(strings.TrimSpace(name)); normalized {
-	case "", FullName, "commercial", "private_distribution":
-		if normalized == "" {
-			normalized = FullName
-		}
-		return unrestrictedPolicy(normalized), nil
-	case CommunityName:
+	case "", CommunityName:
 		manifest, err := CommunityManifest()
 		if err != nil {
 			return nil, err
 		}
 		return NewPolicy(manifest)
+	case FullName, "commercial", "private_distribution":
+		return unrestrictedPolicy(normalized), nil
 	default:
 		return nil, fmt.Errorf("unknown Mobazha edition %q", name)
 	}
@@ -93,14 +90,33 @@ func ConfigureCurrentPolicy(name string) error {
 }
 
 // CurrentPolicy returns the process-wide policy. It always returns a non-nil
-// policy and defaults to the backwards-compatible full composition until the
-// application composition root configures an edition.
+// policy and fails closed to Community until a private composition root
+// explicitly selects its distribution.
 func CurrentPolicy() Policy {
 	holder := currentPolicy.Load()
 	if holder == nil || holder.policy == nil {
-		return unrestrictedPolicy(FullName)
+		return defaultPolicy()
 	}
 	return holder.policy
+}
+
+// DefaultPolicy returns the fail-closed policy for the public Open Core
+// composition. Callers should prefer this semantic default over depending on
+// a concrete distribution name.
+func DefaultPolicy() Policy {
+	return defaultPolicy()
+}
+
+func defaultPolicy() Policy {
+	manifest, err := CommunityManifest()
+	if err != nil {
+		return &policy{name: CommunityName}
+	}
+	resolved, err := NewPolicy(manifest)
+	if err != nil {
+		return &policy{name: CommunityName}
+	}
+	return resolved
 }
 
 // NewPolicy constructs a restrictive positive-allowlist policy from a

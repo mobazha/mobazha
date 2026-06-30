@@ -84,9 +84,13 @@ func TestHandleGETPaymentMethods_FiltersProductDisabledZEC(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodGet, "/v1/payment-methods/seller", nil)
 	req = req.WithContext(context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node)))
+	policy, err := edition.ResolvePolicy(edition.FullName)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	w := httptest.NewRecorder()
-	(&Gateway{}).handleGETPaymentMethods(w, req)
+	(&Gateway{editionPolicy: policy}).handleGETPaymentMethods(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
 	}

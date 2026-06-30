@@ -74,6 +74,6 @@ help: ## 显示帮助信息
 
 # Generate OpenAPI 3.1 spec from huma operations (AH-1.6).
 openapi:
-	$(GO) run ./cmd/gen-openapi/main.go
+	$(GO) run ./cmd/gen-openapi
 
 .DEFAULT_GOAL := help

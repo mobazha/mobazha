@@ -7,9 +7,11 @@ import (
 
 	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 )
 
 func TestInitFiatSubsystem_SetsOrderRepo(t *testing.T) {
+	requireFullPolicy(t)
 	db := newFiatTestDB(t)
 	node := &MobazhaNode{}
 	node.db = db
@@ -23,6 +25,18 @@ func TestInitFiatSubsystem_SetsOrderRepo(t *testing.T) {
 	if node.fiatPaymentService.orderRepo == nil {
 		t.Fatal("expected fiatPaymentService orderRepo to be wired")
 	}
+}
+
+func requireFullPolicy(t *testing.T) {
+	t.Helper()
+	if err := edition.ConfigureCurrentPolicy(edition.FullName); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := edition.ConfigureCurrentPolicy(edition.CommunityName); err != nil {
+			t.Errorf("restore Community policy: %v", err)
+		}
+	})
 }
 
 func TestWireServiceSetters_BackfillsOrderFiatOps(t *testing.T) {

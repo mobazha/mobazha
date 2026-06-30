@@ -17,13 +17,13 @@ type ToolRegistrar struct {
 	Handler server.ToolHandlerFunc
 }
 
-// ToolProfile selects the product-facing MCP surface without relying on build
-// tags. The zero value preserves the full Open Core/Hosting tool catalog.
+// ToolProfile selects a policy-facing MCP surface without relying on build
+// tags or concrete product names. The zero value preserves the full catalog.
 type ToolProfile string
 
 const (
-	ToolProfileFull    ToolProfile = ""
-	ToolProfilePrivateDistribution ToolProfile = "private_distribution"
+	ToolProfileFull       ToolProfile = ""
+	ToolProfileRestricted ToolProfile = "restricted"
 )
 
 // ServerOptions holds optional dependencies for MCP server construction.

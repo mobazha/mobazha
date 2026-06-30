@@ -45,6 +45,13 @@ func TestResolvePolicyRejectsUnknownExplicitEdition(t *testing.T) {
 	require.ErrorContains(t, err, "unknown Mobazha edition")
 }
 
+func TestResolvePolicyEmptyDefaultsToCommunity(t *testing.T) {
+	policy, err := ResolvePolicy("")
+	require.NoError(t, err)
+	require.Equal(t, CommunityName, policy.Name())
+	require.False(t, policy.AllowsCapability(CapabilityFiatPayments))
+}
+
 func TestFullPolicyPreservesRecognizedMethods(t *testing.T) {
 	policy, err := ResolvePolicy(FullName)
 	require.NoError(t, err)

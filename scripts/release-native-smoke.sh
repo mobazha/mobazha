@@ -3,7 +3,7 @@
 # release-native-smoke.sh — Post-build smoke test for release native binaries.
 #
 # Verifies the linux-amd64 (or host) artifact can start, serve /healthz,
-# expose setup API, and serve the embedded SPA root.
+# expose a Community capability snapshot, setup API, and the embedded SPA root.
 #
 # Usage:
 #   ./scripts/release-native-smoke.sh /path/to/mobazha-linux-amd64
@@ -71,6 +71,29 @@ if [ "$setup_code" != "200" ]; then
     exit 1
 fi
 echo "PASS: GET /v1/system/setup"
+
+runtime_code=$(curl -s -o /tmp/mobazha-runtime-config.json -w "%{http_code}" \
+    "http://127.0.0.1:${GATEWAY_PORT}/v1/runtime-config")
+if [ "$runtime_code" != "200" ]; then
+    echo "FAIL: GET /v1/runtime-config returned HTTP $runtime_code"
+    cat /tmp/mobazha-runtime-config.json 2>/dev/null || true
+    exit 1
+fi
+python3 - /tmp/mobazha-runtime-config.json <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)["data"]
+if payload.get("edition") != "community":
+    raise SystemExit(f"FAIL: native artifact default edition is {payload.get('edition')!r}, want 'community'")
+allowed = {"BTC", "BCH", "LTC", "ZEC"}
+methods = payload.get("capabilities", {}).get("payments", {}).get("methods", [])
+unexpected = [method for method in methods if method.get("id") not in allowed or method.get("kind") != "crypto"]
+if unexpected:
+    raise SystemExit(f"FAIL: Community runtime exposed non-allowlisted payment methods: {unexpected}")
+PY
+echo "PASS: Community runtime capability policy"
 
 root_code=$(curl -s -o /tmp/mobazha-root.html -w "%{http_code}" \
     "http://127.0.0.1:${GATEWAY_PORT}/")

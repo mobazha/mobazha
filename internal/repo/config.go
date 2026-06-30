@@ -81,6 +81,9 @@ var (
 //
 // See loadConfig for details on the configuration load process.
 type Config struct {
+	// Edition is selected programmatically by a trusted distribution
+	// composition. Empty means the public Community policy.
+	Edition                string
 	ConfigVersion          uint     `long:"configversion" description:"Configuration file version"`
 	ShowVersion            bool     `short:"v" long:"version" description:"Display version information and exit"`
 	ConfigFile             string   `short:"C" long:"configfile" description:"Path to configuration file"`

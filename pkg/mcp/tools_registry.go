@@ -1,8 +1,8 @@
 package mcp
 
 func getAllToolRegistrars(bf BridgeFactory, opts *ServerOptions) []ToolRegistrar {
-	if opts != nil && opts.ToolProfile == ToolProfilePrivateDistribution {
-		return getPrivateDistributionToolRegistrars(bf)
+	if opts != nil && opts.ToolProfile == ToolProfileRestricted {
+		return getRestrictedToolRegistrars(bf)
 	}
 
 	var all []ToolRegistrar
@@ -43,7 +43,7 @@ func getAllToolRegistrars(bf BridgeFactory, opts *ServerOptions) []ToolRegistrar
 	return all
 }
 
-func getPrivateDistributionToolRegistrars(bf BridgeFactory) []ToolRegistrar {
+func getRestrictedToolRegistrars(bf BridgeFactory) []ToolRegistrar {
 	var all []ToolRegistrar
 	all = append(all, profileToolRegistrars(bf)...)
 	all = append(all, listingsToolRegistrars(bf)...)

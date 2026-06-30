@@ -14,9 +14,7 @@ import (
 
 // registerNodeHumaSystemAdminOperations registers admin system operations
 // (config, health, publish, logs, MCP, etc.) that require authentication.
-func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
-	g.registerCommonSystemAdminOps(api)
-
+func (g *Gateway) registerFullNodeHumaSystemAdminOperations(api huma.API) {
 	type jsonBody struct {
 		Body json.RawMessage `json:",omitempty"`
 	}
@@ -175,6 +173,5 @@ func (g *Gateway) registerNodeHumaSystemAdminOperations(api huma.API) {
 
 // registerNodeHumaSystemPublicOperations registers public system operations
 // (GET-only) that do not require authentication.
-func (g *Gateway) registerNodeHumaSystemPublicOperations(api huma.API) {
-	g.registerCommonSystemPublicOps(api)
+func (g *Gateway) registerFullNodeHumaSystemPublicOperations(api huma.API) {
 }

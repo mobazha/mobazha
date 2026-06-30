@@ -59,7 +59,7 @@ jobs:
         run: go build -tags goolm -o /dev/null .
         working-directory: node
 
-  private_distribution-smoke:
+  private_distribution-core-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,25 +75,9 @@ jobs:
         run: |
           printf 'go %s\n\nuse (\n\t./node\n)\n' "${{ env.GO_VERSION }}" > go.work
 
-      - name: Build private_distribution binary
+      - name: Compile public PrivateDistribution composition contract
         working-directory: node
-        run: |
-          CGO_ENABLED=0 go build \
-            -tags "private_distribution purego_sqlite" \
-            -ldflags "-s -w" \
-            -o mobazha-private_distribution .
-
-      - name: Run network smoke test
-        working-directory: node
-        run: |
-          chmod +x scripts/private_distribution-network-smoke.sh
-          ./scripts/private_distribution-network-smoke.sh ./mobazha-private_distribution 20
-
-      - name: Run digital-assets write smoke test (TD-104 regression)
-        working-directory: node
-        run: |
-          chmod +x scripts/private_distribution-digital-assets-smoke.sh
-          ./scripts/private_distribution-digital-assets-smoke.sh ./mobazha-private_distribution
+        run: CGO_ENABLED=0 go build -tags "private_distribution purego_sqlite" ./pkg/core
 
   # Mirrors release-native build tags on main to catch embed_frontend drift before tagging.
   release-build-check:

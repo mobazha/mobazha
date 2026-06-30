@@ -1,4 +1,4 @@
-.PHONY: build build-private_distribution embed-private_distribution-frontend build-private_distribution-image smoke-private_distribution smoke-private_distribution-da test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
+.PHONY: build test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
 
 SYSTEM_GO := /usr/local/go/bin/go
 GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
@@ -7,22 +7,8 @@ GO_TEST_TAGS ?= goolm
 build: ## 构建项目
 	bash ./scripts/with-libolm-env.sh $(GO) build -o mobazha
 
-build-private_distribution: ## 构建 PrivateDistribution 精简版（CGO-free，隐私模式）
-	CGO_ENABLED=0 $(GO) build -tags "private_distribution purego_sqlite embed_frontend" -ldflags "-s -w" -o mobazha-private_distribution .
-
-embed-private_distribution-frontend: ## 构建 PrivateDistribution SPA + Brotli 嵌入（Tor / Managed pool）
-	bash ./scripts/embed-private_distribution-frontend.sh
-
-build-private_distribution-image: embed-private_distribution-frontend build-private_distribution ## PrivateDistribution 前端嵌入 + 二进制（本地 Docker 前置）
-
 test: ## 运行测试
 	$(GO) test -tags '$(GO_TEST_TAGS)' ./...
-
-smoke-private_distribution: build-private_distribution ## 构建 private_distribution 并运行网络隔离 smoke test
-	./scripts/private_distribution-network-smoke.sh ./mobazha-private_distribution 20
-
-smoke-private_distribution-da: build-private_distribution ## 构建 private_distribution 并运行 digital-assets 写入端点 smoke test (TD-104 回归)
-	./scripts/private_distribution-digital-assets-smoke.sh ./mobazha-private_distribution
 
 test-libolm: ## 使用 libolm(cgo) 运行测试
 	bash ./scripts/with-libolm-env.sh $(GO) test ./...

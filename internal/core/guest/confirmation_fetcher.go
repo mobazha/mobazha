@@ -60,11 +60,11 @@ func (f *chainTxFetcher) Label() string {
 // happen because we only construct this fetcher after a confirmed transfer
 // is observed, but Fetch tolerates it defensively).
 //
-// Bound to *pkgexternal_payment.Monitor (rather than the raw Source) to keep the EXTERNAL_PAYMENT
+// Bound to pkgexternal_payment.PaymentMonitor (rather than the raw Source) to keep the EXTERNAL_PAYMENT
 // boundary cohesive: the monitor already exposes GetHeight + IsHealthy so
 // the fetcher does not introduce a separate dependency.
 type external_paymentHeightFetcher struct {
-	monitor  *pkgexternal_payment.Monitor
+	monitor  pkgexternal_payment.PaymentMonitor
 	txHeight uint64
 }
 

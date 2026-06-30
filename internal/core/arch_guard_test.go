@@ -377,8 +377,9 @@ func TestArchGuard_PrivateDistributionCoinWhitelist(t *testing.T) {
 // private_distribution_supported_coins.go to be exercised when an expansion is
 // intentional.
 //
-// Allow-list: internal/chains/base (shared types) and
-// internal/chains/external_payment (the only chain private_distribution currently supports).
+// Allow-list: internal/chains/base (shared types). ExternalPayment's concrete
+// wallet-rpc and daemon implementation is injected by the private PrivateDistribution
+// distribution.
 //
 // Build-tag-agnostic — reads sources directly, runs in the default CI
 // build. Pairs with TD-115.
@@ -389,6 +390,7 @@ func TestArchGuard_PrivateDistributionNoForbiddenChainImports(t *testing.T) {
 	require.NoError(t, err)
 
 	forbidden := []string{
+		"github.com/mobazha/mobazha3.0/internal/chains/external_payment",
 		"github.com/mobazha/mobazha3.0/internal/chains/utxo",
 		"github.com/mobazha/mobazha3.0/internal/chains/electrum",
 		"github.com/mobazha/mobazha3.0/internal/chains/evm",

@@ -56,7 +56,7 @@ type GuestPaymentMonitor struct {
 	utxoMonitor   *pkgutxo.Monitor
 	chainOps      pkgutxo.ChainOperations
 	multiwallet   contracts.WalletOperator
-	external_paymentMonitor *pkgexternal_payment.Monitor
+	external_paymentMonitor pkgexternal_payment.PaymentMonitor
 	evmManagedEscrowWatch  EVMManagedEscrowWatcher
 	gracePeriod   time.Duration
 	// confirmationInterval is the tick used by pollConfirmationsLoop.
@@ -144,7 +144,7 @@ func (m *GuestPaymentMonitor) SetEVMManagedEscrowWatch(w EVMManagedEscrowWatcher
 // SetExternalPaymentMonitor injects the per-account ExternalPayment monitor that fans out
 // transfers to subaddress watches. The monitor must already be Started
 // (its lifecycle is owned by the builder, not the guest layer).
-func (m *GuestPaymentMonitor) SetExternalPaymentMonitor(mon *pkgexternal_payment.Monitor) {
+func (m *GuestPaymentMonitor) SetExternalPaymentMonitor(mon pkgexternal_payment.PaymentMonitor) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.external_paymentMonitor = mon

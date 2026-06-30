@@ -59,6 +59,31 @@ if [[ -n "$private_distribution_distribution_entrypoints" ]]; then
   failures=1
 fi
 
+external_payment_implementation_files="$(rg --files internal/chains/external_payment 2>/dev/null \
+  | rg '\.go$' || true)"
+if [[ -n "$external_payment_implementation_files" ]]; then
+  echo "ERROR: concrete PrivateDistribution ExternalPayment implementation leaked into Open Core:" >&2
+  echo "$external_payment_implementation_files" >&2
+  failures=1
+fi
+
+private_distribution_release_assets="$({
+  rg --files \
+    scripts/refresh-external_payment-seeds.py \
+    scripts/embed-private_distribution-frontend.sh \
+    scripts/private_distribution-network-smoke.sh \
+    scripts/private_distribution-digital-assets-smoke.sh \
+    .github/workflows/external_payment-seeds.yml \
+    deploy/private_distribution/Dockerfile.private_distribution \
+    deploy/private_distribution/examples/example \
+    2>/dev/null || true
+} | sort -u)"
+if [[ -n "$private_distribution_release_assets" ]]; then
+  echo "ERROR: private PrivateDistribution release asset leaked into Open Core:" >&2
+  echo "$private_distribution_release_assets" >&2
+  failures=1
+fi
+
 public_solana_relay_refs="$(rg -n 'SolanaRelayService|SolanaRelayRequest|RelaySolanaTransaction|GetSolanaChainClient|GetSolanaRelayService' \
   internal pkg cmd --glob '*.go' --glob '!**/*_test.go' || true)"
 if [[ -n "$public_solana_relay_refs" ]]; then

@@ -7,8 +7,8 @@ set -euo pipefail
 # Usage:
 #   ./scripts/embed-frontend.sh [SPA_DIST_DIR]
 #
-# PrivateDistribution (Tor / Managed pool): use embed-private_distribution-frontend.sh instead — it runs
-#   VITE_BUILD_TARGET=private_distribution build + denylist validation before embedding.
+# Distribution-specific frontends are built by their owning repository and
+# pass the validated output directory to this generic embedding utility.
 #
 # Standalone native binary: build with NEXT_PUBLIC_ENV_MODE=standalone, then:
 #   ./scripts/embed-frontend.sh path/to/dist
@@ -27,7 +27,7 @@ SPA_DIST="${1:-$(cd "$REPO_ROOT/../.." && pwd)/dev/openbazaar/mobazha-unified/ap
 if [ ! -d "$SPA_DIST" ]; then
     echo "ERROR: SPA dist directory not found: $SPA_DIST"
     echo "Run a frontend build first, e.g.:"
-    echo "  PrivateDistribution:  ./scripts/embed-private_distribution-frontend.sh"
+	echo "  Private distributions: run their repository-owned embed script"
     echo "  Standalone native: NEXT_PUBLIC_ENV_MODE=standalone pnpm --filter @mobazha/web build"
     exit 1
 fi
@@ -68,5 +68,4 @@ DIR_SIZE=$(du -sh "$EMBED_DIR" | cut -f1)
 echo "==> Done. Embedded $FILE_COUNT files ($DIR_SIZE)"
 echo ""
 echo "Now rebuild the binary:"
-echo "  PrivateDistribution:     CGO_ENABLED=0 go build -tags 'private_distribution purego_sqlite embed_frontend goolm' -o mobazha-private_distribution ."
 echo "  Standalone:  CGO_ENABLED=0 go build -tags 'goolm purego_sqlite embed_frontend' -o mobazha ."

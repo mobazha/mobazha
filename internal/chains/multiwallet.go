@@ -184,8 +184,8 @@ func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 			//   - on-chain transactions are not publicly visible (no
 			//     GetTransaction semantics);
 			//   - guest-checkout integration goes through
-			//     pkg/external_payment.Source (impl: internal/chains/external_payment.Client) +
-			//     pkg/external_payment.Monitor + DirectPaymentService instead.
+			//     an injected pkg/external_payment.Source + pkg/external_payment.Monitor +
+			//     DirectPaymentService instead.
 			// GetAllSupportedChainTypes() includes ChainExternalPayment so that
 			// ChainType.IsValid() and unrelated enumeration paths still treat
 			// it as a recognised chain, but we explicitly skip it here rather

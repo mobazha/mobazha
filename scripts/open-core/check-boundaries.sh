@@ -51,6 +51,14 @@ if [[ -n "$core_solana_implementation_files" ]]; then
   failures=1
 fi
 
+private_distribution_distribution_entrypoints="$(rg --files . 2>/dev/null \
+  | rg '(^|/)(mobazha_private_distribution\.go|cmd/start_private_distribution\.go|cmd/private_distribution_config_test\.go)$' || true)"
+if [[ -n "$private_distribution_distribution_entrypoints" ]]; then
+  echo "ERROR: private PrivateDistribution distribution entrypoint leaked into Open Core:" >&2
+  echo "$private_distribution_distribution_entrypoints" >&2
+  failures=1
+fi
+
 public_solana_relay_refs="$(rg -n 'SolanaRelayService|SolanaRelayRequest|RelaySolanaTransaction|GetSolanaChainClient|GetSolanaRelayService' \
   internal pkg cmd --glob '*.go' --glob '!**/*_test.go' || true)"
 if [[ -n "$public_solana_relay_refs" ]]; then

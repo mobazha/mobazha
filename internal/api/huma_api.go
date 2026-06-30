@@ -130,6 +130,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 		g.registerNodeHumaShippingOperations(api)
 		g.registerNodeHumaSellerDigitalOperations(api)
 	}
+	g.registerTrustedHumaModules(api)
 
 	return api
 }

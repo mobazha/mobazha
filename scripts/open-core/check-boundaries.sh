@@ -84,6 +84,15 @@ if [[ -n "$private_distribution_release_assets" ]]; then
   failures=1
 fi
 
+private_distribution_external_payment_api_files="$({
+  rg --files internal/api 2>/dev/null || true
+} | rg '(^|/)(huma_.*external_payment.*|external_payment_.*handler|payment_rpc_status_handler)\.go$' || true)"
+if [[ -n "$private_distribution_external_payment_api_files" ]]; then
+  echo "ERROR: private PrivateDistribution ExternalPayment API implementation leaked into Open Core:" >&2
+  echo "$private_distribution_external_payment_api_files" >&2
+  failures=1
+fi
+
 public_solana_relay_refs="$(rg -n 'SolanaRelayService|SolanaRelayRequest|RelaySolanaTransaction|GetSolanaChainClient|GetSolanaRelayService' \
   internal pkg cmd --glob '*.go' --glob '!**/*_test.go' || true)"
 if [[ -n "$public_solana_relay_refs" ]]; then

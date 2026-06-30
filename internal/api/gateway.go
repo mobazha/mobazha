@@ -21,6 +21,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	mcppkg "github.com/mobazha/mobazha3.0/pkg/mcp"
@@ -114,6 +115,11 @@ type GatewayConfig struct {
 	// SkillProvider supplies built-in or deployment-specific Agent skills.
 	// MOBAZHA_AGENT_SKILLS_DIR, when set, is layered in front as an override.
 	SkillProvider agentskill.Provider
+
+	// TrustedHumaModules are first-party, build-time distribution extensions.
+	// The gateway supplies auth/security metadata and retains middleware,
+	// envelope, listener, and OpenAPI ownership.
+	TrustedHumaModules []distribution.TrustedHumaModule
 }
 
 // Gateway represents an HTTP API gateway

@@ -22,4 +22,5 @@ type GuestPaymentPolicy interface {
 type PrivateDistributionPolicy interface {
 	ListingPolicy
 	GuestPaymentPolicy
+	EnabledBackgroundJobs() []string
 }

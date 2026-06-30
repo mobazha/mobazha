@@ -1,19 +1,21 @@
 # Mobazha 3.0
 
-Mobazha 3.0 is a self-hostable, decentralized marketplace node. It provides marketplace, order, messaging, wallet, payment, and embedded storefront services in one Go application.
+Mobazha 3.0 is the open-source commerce core and self-hosted distribution of Mobazha. It provides marketplace, order, messaging, wallet, payment, and embedded storefront services in one Go application.
 
-## Community Edition
+## Open source and self-hosted distribution
 
-The Community Edition is built from the same backend architecture as other Mobazha editions. An explicit, server-side edition policy narrows the capabilities that a distribution may expose; frontend configuration and installed extensions may narrow that set further, but cannot widen it.
+This repository is the public upstream for shared Mobazha domain logic, application services, public APIs, capability policy, and self-hosted operation. It is not a reduced commercial fork. Hosted and commercial products use separate compositions and release pipelines while conforming to the shared public contracts.
 
-The first Community Edition payment allowlist is:
+The public self-hosted release uses the `community` distribution profile. An explicit, server-side distribution policy narrows the capabilities that a release may expose; frontend configuration and installed extensions may narrow that set further, but cannot widen it. `community` is a packaging and policy identifier, not the identity of the core domain model.
+
+The first public self-hosted payment allowlist is:
 
 - Bitcoin (BTC)
 - Bitcoin Cash (BCH)
 - Litecoin (LTC)
 - Zcash transparent addresses (ZEC)
 
-The canonical machine-readable policy is [`config/editions/community.json`](config/editions/community.json). Scope, history, licensing, and extension boundaries are described in [`docs/community/COMMUNITY_EDITION.md`](docs/community/COMMUNITY_EDITION.md).
+The canonical machine-readable policy is [`config/editions/community.json`](config/editions/community.json). Scope, history, licensing, and extension boundaries are described in [`docs/community/COMMUNITY_EDITION.md`](docs/community/COMMUNITY_EDITION.md). Public API and cross-distribution compatibility commitments are documented in [`docs/community/COMPATIBILITY.md`](docs/community/COMPATIBILITY.md).
 
 ## Architecture
 
@@ -48,7 +50,7 @@ mobazha service install
 mobazha service status
 ```
 
-Community deployment assets set `MOBAZHA_EDITION=community`. Other existing installations default to the unrestricted composition for backward compatibility and should set their edition explicitly when packaging a release.
+Self-hosted deployment assets set `MOBAZHA_EDITION=community`. Every packaged distribution should select its policy explicitly; business logic should consume concrete capabilities rather than branch on the distribution name.
 
 ## Test
 

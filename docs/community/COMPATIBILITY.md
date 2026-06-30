@@ -1,0 +1,104 @@
+# Mobazha Open Core compatibility policy
+
+Status: Initial policy implemented; shared conformance automation active
+
+This document defines the public compatibility relationship between the Mobazha Open Core, the public self-hosted distribution, shared frontends, and compatible commercial distributions.
+
+## Repository and distribution identity
+
+The `mobazha3.0` repository is the public upstream for shared Mobazha commerce behavior. It also contains the default self-hosted composition.
+
+The name `community` identifies a distribution policy and publication boundary. It is used by manifests, packaging, tests, and release artifacts. It does not create a separate order model, payment state machine, or public API namespace.
+
+Compatible commercial products may compose additional private adapters and services. They have independent artifacts and release versions, but must conform to the public contracts for capabilities they claim to share.
+
+## Compatibility layers
+
+### Public wire contract
+
+The following are compatibility surfaces:
+
+- public `/v1/*` request methods, paths, and schemas;
+- response envelopes and stable error codes;
+- public event and webhook schemas;
+- order, payment, refund, dispute, and settlement states;
+- runtime capability schema and negotiation rules;
+- canonical asset and payment-method identifiers;
+- documented configuration and persisted public data needed for upgrades.
+
+An implementation is not compatible merely because JSON fields have the same names. State transitions, idempotency, confirmation rules, recovery behavior, and financial invariants are part of the contract.
+
+### Source and package compatibility
+
+Public Go packages explicitly documented as extension contracts follow their own version policy. Code under `internal/`, concrete constructors, database internals, and composition-root details are not public extension contracts.
+
+Private or third-party extensions must not import `internal/`, receive `MobazhaNode`, or access raw seed/private-key material. Use documented Ports or versioned out-of-process protocols.
+
+### Capability compatibility
+
+Recognized identifiers, distribution-enabled capabilities, operator configuration, and healthy runtime providers are distinct sets. Effective availability is their intersection.
+
+Clients must:
+
+- render and call only capabilities declared by the backend;
+- fail closed when capability data is unavailable;
+- tolerate additive unknown capability fields;
+- avoid inferring support from source files, frontend executors, or recognized identifiers.
+
+Servers must:
+
+- reject operations outside the effective capability set;
+- avoid branching on a distribution name when a concrete capability answers the decision;
+- expose additional commercial features through explicit capabilities, versions, or separate namespaces;
+- preserve shared semantics for every public capability they declare.
+
+## Versioning
+
+Public releases use semantic versioning where practical:
+
+- patch: compatible fixes and security updates;
+- minor: backward-compatible APIs, capability fields, events, or extension points;
+- major: breaking wire, state-machine, persisted-data, or public package changes.
+
+Additive JSON fields and optional capabilities are normally minor changes. Removing or renaming fields, changing a state's meaning, weakening an invariant, or requiring a previously optional capability is breaking.
+
+Every breaking proposal requires an RFC or ADR, migration guidance, updated conformance tests, and a declared support window.
+
+Commercial product versions do not need to match public self-hosted version numbers. A compatible commercial release must record the Open Core commit or tag and public contract version it implements.
+
+## Test topology
+
+Compatibility is verified at four levels:
+
+1. Open Core tests cover domain behavior, state machines, public APIs, events, migrations, and security invariants.
+2. Self-hosted E2E covers the public distribution without private Hosting, identity, search, payment-provider, or operations services.
+3. Commercial platform E2E is private and uses the Hosting control plane with a commercial Node distribution.
+4. Cross-distribution conformance runs the same black-box public contract against each distribution. Tests for undeclared capabilities are skipped by policy, not satisfied by mocks.
+
+Running the Hosting control plane against the Community distribution is not a supported deployment or a public release requirement. It may be used temporarily to diagnose contract drift.
+
+## Change process
+
+A change needs compatibility review when it modifies:
+
+- a public endpoint, schema, error, event, or state;
+- capability negotiation or effective-set rules;
+- a shared persisted model or migration;
+- a public Port, plugin protocol, or signing boundary;
+- behavior consumed by `mobazha-unified`.
+
+The review must identify the compatibility layer, affected distributions, rollout order, downgrade behavior, tests, documentation, and whether an RFC/ADR is required.
+
+Shared fixes should land in the public Open Core. A security fix may remain under a temporary embargo, but the public portion must be released once disclosure is managed_escrow. Permanent independent reimplementations of shared order or payment behavior are not supported.
+
+## Non-goals
+
+This policy does not require:
+
+- every commercial capability to be open source;
+- Community and commercial artifacts to release simultaneously;
+- identical internal database layouts for private extension tables;
+- private control-plane endpoints to be part of the public contract;
+- every private module to use the external payment-plugin protocol.
+
+It does require one long-term implementation of shared commerce behavior and explicit, testable boundaries for everything distribution-specific.

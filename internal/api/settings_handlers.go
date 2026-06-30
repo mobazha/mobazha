@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package api
 
 import (
@@ -7,11 +5,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	"github.com/mobazha/mobazha3.0/pkg/deploy"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request) {
+	if deploy.IsPrivateDistribution() {
+		// The private PrivateDistribution distribution is EXTERNAL_PAYMENT-only and must never initiate
+		// outbound fiat/crypto pricing requests.
+		sanitizedJSONResponse(w, map[string]iwallet.Amount{})
+		return
+	}
 	exchange := getExchangeRateService(r)
 
 	currencyCode := chi.URLParam(r, "currencyCode")

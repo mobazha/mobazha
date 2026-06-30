@@ -21,6 +21,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/deploy"
 	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
@@ -227,8 +228,13 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			scheme = "https"
 		}
 		loopbackURL := fmt.Sprintf("%s://%s", scheme, normalizeLoopbackAddr(config.Listener.Addr().String()))
+		toolProfile := mcppkg.ToolProfileFull
+		if deploy.IsPrivateDistribution() {
+			toolProfile = mcppkg.ToolProfilePrivateDistribution
+		}
 		mcpOpts := &mcppkg.ServerOptions{
-			Transport: "streamable-http",
+			Transport:   "streamable-http",
+			ToolProfile: toolProfile,
 			// Standalone identity endpoint. Required (with AuditLogger) for
 			// SSEIdentityFunc to resolve UserID/PeerID from request headers.
 			IdentityPath: "/v1/auth/identity",

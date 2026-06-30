@@ -1,8 +1,10 @@
-//go:build !private_distribution
-
 package mcp
 
 func getAllToolRegistrars(bf BridgeFactory, opts *ServerOptions) []ToolRegistrar {
+	if opts != nil && opts.ToolProfile == ToolProfilePrivateDistribution {
+		return getPrivateDistributionToolRegistrars(bf)
+	}
+
 	var all []ToolRegistrar
 	all = append(all, listingsToolRegistrars(bf)...)
 	all = append(all, ordersToolRegistrars(bf)...)
@@ -38,5 +40,15 @@ func getAllToolRegistrars(bf BridgeFactory, opts *ServerOptions) []ToolRegistrar
 		all = append(all, shoppingToolRegistrars(searchBridge, storeBridge, *opts.Shopping, signer)...)
 	}
 
+	return all
+}
+
+func getPrivateDistributionToolRegistrars(bf BridgeFactory) []ToolRegistrar {
+	var all []ToolRegistrar
+	all = append(all, profileToolRegistrars(bf)...)
+	all = append(all, listingsToolRegistrars(bf)...)
+	all = append(all, discountsToolRegistrars(bf)...)
+	all = append(all, collectionsToolRegistrars(bf)...)
+	all = append(all, settingsToolRegistrars(bf)...)
 	return all
 }

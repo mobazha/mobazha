@@ -17,10 +17,20 @@ type ToolRegistrar struct {
 	Handler server.ToolHandlerFunc
 }
 
+// ToolProfile selects the product-facing MCP surface without relying on build
+// tags. The zero value preserves the full Open Core/Hosting tool catalog.
+type ToolProfile string
+
+const (
+	ToolProfileFull    ToolProfile = ""
+	ToolProfilePrivateDistribution ToolProfile = "private_distribution"
+)
+
 // ServerOptions holds optional dependencies for MCP server construction.
 type ServerOptions struct {
 	AuditLogger AuditLogger
 	Transport   string
+	ToolProfile ToolProfile
 	IdentityFn  IdentityFunc
 	SearchURL   string // Base URL for the public Search API (mobazha.info). If empty, search tools are not registered.
 	// IdentityPath is the deployment-specific identity API path. REQUIRED when

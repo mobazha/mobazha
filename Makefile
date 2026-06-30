@@ -1,4 +1,4 @@
-.PHONY: build test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi
+.PHONY: build test test-libolm clean ios_framework android_framework protos sample-config docker push_docker openapi route-inventory route-inventory-check
 
 SYSTEM_GO := /usr/local/go/bin/go
 GO ?= $(if $(wildcard $(SYSTEM_GO)),$(SYSTEM_GO),go)
@@ -75,5 +75,13 @@ help: ## 显示帮助信息
 # Generate OpenAPI 3.1 spec from huma operations (AH-1.6).
 openapi:
 	$(GO) run ./cmd/gen-openapi
+
+# Generate the effective Community route inventory from the actual chi router.
+route-inventory:
+	$(GO) run ./cmd/gen-route-inventory
+
+# Fail when the checked-in route inventory differs from the registered router.
+route-inventory-check:
+	$(GO) run ./cmd/gen-route-inventory -check
 
 .DEFAULT_GOAL := help

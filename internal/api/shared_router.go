@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"net/http"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/go-chi/chi/v5"
@@ -83,13 +85,22 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 	r.HandleFunc("/ws/{nodeID}", g.WebsocketNodeHandler())
 	r.HandleFunc("/ws", g.WebsocketDefaultHandler())
 
-	return &SharedRouter{handler: r, gateway: g}, nil
+	return &SharedRouter{handler: r, routes: r, gateway: g}, nil
+}
+
+// RegisteredRoute describes one concrete method/path pair installed in the
+// effective router. It is intentionally derived from chi after all Huma,
+// pre-Huma, capability, and distribution-policy registration has completed.
+type RegisteredRoute struct {
+	Method string `json:"method"`
+	Path   string `json:"path"`
 }
 
 // SharedRouter wraps the chi.Router and the underlying Gateway instance
 // (needed for WebSocket hub access and event push).
 type SharedRouter struct {
 	handler http.Handler
+	routes  chi.Routes
 	gateway *Gateway
 }
 
@@ -106,4 +117,30 @@ func (sr *SharedRouter) Gateway() *Gateway {
 // NotifyWebsockets returns the WS push function for the given node.
 func (sr *SharedRouter) NotifyWebsockets(nodeID string) func(message interface{}) error {
 	return sr.gateway.NotifyWebsockets(nodeID)
+}
+
+// RegisteredRoutes returns a deterministic inventory of the routes installed
+// in this router. chi.Walk reports only concrete HTTP methods, so catch-all
+// handlers cannot masquerade as a valid public API operation.
+func (sr *SharedRouter) RegisteredRoutes() ([]RegisteredRoute, error) {
+	if sr == nil || sr.routes == nil {
+		return nil, nil
+	}
+	routes := make([]RegisteredRoute, 0, 256)
+	if err := chi.Walk(sr.routes, func(method, path string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		if !strings.HasPrefix(path, "/v1/") {
+			return nil
+		}
+		routes = append(routes, RegisteredRoute{Method: strings.ToUpper(method), Path: path})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	sort.Slice(routes, func(i, j int) bool {
+		if routes[i].Path != routes[j].Path {
+			return routes[i].Path < routes[j].Path
+		}
+		return routes[i].Method < routes[j].Method
+	})
+	return routes, nil
 }

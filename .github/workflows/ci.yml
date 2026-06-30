@@ -35,6 +35,10 @@ jobs:
         run: go vet -tags goolm ./...
         working-directory: node
 
+      - name: Verify effective Community route inventory
+        run: go run ./cmd/gen-route-inventory -check
+        working-directory: node
+
       - name: Test
         run: go test -tags goolm -race -count=1 -timeout 10m ./...
         working-directory: node

@@ -1,0 +1,1430 @@
+{
+  "schemaVersion": 1,
+  "edition": "community",
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/v1/admin/password"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/admin/version"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/approvals"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/approvals/{approvalId}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/approvals/{approvalId}/apply"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/approvals/{approvalId}/decision"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/artifacts"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/artifacts"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/artifacts/{artifactId}"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/agent/artifacts/{artifactId}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/artifacts/{artifactId}/approval"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/artifacts/{artifactId}/content"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/attachments/analyze"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/chat"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/chat/sessions"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/agent/chat/{sessionId}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/chat/{sessionId}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/memories"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/memories"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/agent/memories/{memoryId}"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/agent/memories/{memoryId}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/product-import/ingest"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/product-import/runs/{runId}/advance"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/product-import/runs/{runId}/approval-applications"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/product-import/runs/{runId}/approval-decisions"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/product-import/runs/{runId}/approvals"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/product-import/runs/{runId}/workbench"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/skill-runs"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agent/skill-runs"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agent/skill-runs/{runId}"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/agent/skill-runs/{runId}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/ai/generate"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/ai/status"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/analytics/stats"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/analytics/{peerID}/events"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/auth/identity"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/auth/scopes"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/auth/tokens"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/auth/tokens"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/auth/tokens/{tokenID}"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/blocklist/{peerID}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/blocklist/{peerID}"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/carts"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/carts"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/carts/count"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/carts/{peerID}/items"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/carts/{peerID}/items"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/carts/{peerID}/items"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/cases"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/cases"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/cases/{orderID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/blocked-users"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/invites"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/media/upload"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/media/{serverName}/{mediaID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/presence"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/presence"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/rooms"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/avatar"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/invite"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/join"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/kick"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/leave"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/rooms/{roomID}/members"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/rooms/{roomID}/messages"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/messages"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/chat/rooms/{roomID}/messages/{eventID}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/chat/rooms/{roomID}/messages/{eventID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/messages/{eventID}/reactions"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/rooms/{roomID}/settings"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/chat/rooms/{roomID}/settings"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/rooms/{roomID}/typing"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/settings"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/chat/settings"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chat/status"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/chat/users/{userID}/block"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/users/{userID}/block"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/verification/request"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/verification/{txnId}/accept"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/verification/{txnId}/cancel"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/verification/{txnId}/confirm"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/chat/verification/{txnId}/start-sas"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/collections"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/collections"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/collections/{collectionID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/collections/{collectionID}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/collections/{collectionID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/collections/{collectionID}/products"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/collections/{collectionID}/products/reorder"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/collections/{collectionID}/products/{slug}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/collections/{peerID}/published"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/collections/{peerID}/published/{collectionID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/config"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/crypto/hash"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/crypto/sign"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/crypto/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/digital-assets"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/digital-assets/license-key"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/digital-assets/license-keys"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/digital-assets/license-keys"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/digital-assets/license-keys/stats"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/digital-assets/license-keys/{keyID}/revoke"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/digital-assets/link"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/digital-assets/upload-stream"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/digital-assets/{assetID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/digital-assets/{assetID}"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/digital-assets/{assetID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/discounts"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/discounts"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/discounts/{discountID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/discounts/{discountID}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/discounts/{discountID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/discounts/{discountID}/codes"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/discounts/{discountID}/codes"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/discounts/{discountID}/codes/{codeID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/discounts/{discountID}/redemptions"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/discounts/{peerID}/applicable"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/discounts/{peerID}/calculate"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/discounts/{peerID}/validate"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/disputes/{orderID}/after-sale"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/disputes/{orderID}/close"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/disputes/{orderID}/instructions/release"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/disputes/{orderID}/open"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/disputes/{orderID}/release"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/disputes/{orderID}/release-after-timeout"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/docs"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exchange-rates"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exchange-rates/{currencyCode}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exports/customers"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exports/listings"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exports/sales"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/features"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/followers"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/followers/{peerID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/followers/{peerID}/check"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/following"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/following/{peerID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/following/{peerID}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/following/{peerID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/alerts"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/fulfillment/alerts/{alertID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/locations"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/locations/{locationID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/orders/{orderID}/status"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/fulfillment/products/{slug}/sync"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/providers"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/rules"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/fulfillment/rules"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/fulfillment/rules/{ruleID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/{providerID}/catalog"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/{providerID}/catalog/{productID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/fulfillment/{providerID}/connect"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/fulfillment/{providerID}/disconnect"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/fulfillment/{providerID}/import"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/fulfillment/{providerID}/shipping-estimates"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/{providerID}/status"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/{providerID}/store-products"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/{providerID}/store-products/{syncProductID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fulfillment/{providerID}/synced-products"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/fulfillment/{providerID}/synced-products/{mappingID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/fulfillment/{providerID}/webhooks/{webhookSecret}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/guest/orders"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/guest/orders"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/guest/orders/quote"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/guest/orders/{token}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/guest/orders/{token}/complete"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/guest/orders/{token}/detail"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/guest/orders/{token}/ship"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/listings"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/listings"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/listings/import"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/listings/import/gumroad"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/listings/import/json"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/listings/index"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/listings/index/{peerID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/listings/mine/{slugOrCID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/listings/supply-summary"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/listings/template"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/listings/{listingID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/listings/{peerID}/{slug}"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/listings/{slug}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/media/avatar"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/media/files"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/media/files/{fileID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/media/header"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/media/images"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/media/images/{imageID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/media/product-images"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/moderators"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/moderators"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/moderators"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/notifications"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/batch"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/notifications/channel-types"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/notifications/channels"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/channels"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/channels/detect-chat"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/notifications/channels/{id}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/notifications/channels/{id}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/channels/{id}/test"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/notifications/count"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/read"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/{notifID}/read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/openapi-3.0.json"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/openapi-3.0.yaml"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/openapi.json"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/openapi.yaml"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/checkout-breakdown"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/estimate"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/supply-quote"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/orders/{orderID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/cancel"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/complete"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/confirm"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/orders/{orderID}/digital-assets"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/orders/{orderID}/digital-delivery"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/digital-delivery/retry"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/orders/{orderID}/digital-download"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/extend-protection"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/instructions/cancel"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/instructions/complete"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/instructions/confirm"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/instructions/decline"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/instructions/refund"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/payment"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/orders/{orderID}/payment-session"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/payment-session"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/payment/cancel-partial"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/orders/{orderID}/payment/remaining"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/orders/{orderID}/payment/watch"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/rate"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/refund"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/refund-address"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/rwa-token/payment-info"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/settlement-actions/{action}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/orders/{orderID}/settlement-actions/{action}/status"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/ship"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/spend"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/payment-methods/{peerID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/peers"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/posts"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/posts/{peerID}/{slug}"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/posts/{slug}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/posts/{slug}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/preferences"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/preferences"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/preferences/currency"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/profiles"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/profiles"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/profiles"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/profiles/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/profiles/batch"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/profiles/{peerID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/profiles/{peerID}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/profiles/{peerID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/profiles/{peerID}/avatar/{size}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/profiles/{peerID}/header/{size}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/purchases"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/purchases"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/ratings/batch"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/ratings/index"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/ratings/index/{peerIDOrSlug}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/ratings/index/{peerID}/{slug}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/ratings/{ratingID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runtime-config"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sales"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sales"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/schemas/{schema}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/settings/ai"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/settings/ai"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/settings/ai/providers"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/settings/ai/test"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/settings/features/{key}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/settings/guest-checkout"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/settings/guest-checkout"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/settings/guest-checkout/readiness"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/settings/payment-policy"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/settings/payment-policy"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/settings/pgp-key"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/settings/pgp-key"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/settings/pgp-key"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/settings/storefront"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/settings/storefront"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/settings/storefront/{peerID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/shipping/locations"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/shipping/locations"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/shipping/locations/{locationID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/shipping/locations/{locationID}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/shipping/locations/{locationID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/shipping/profiles"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/shipping/profiles"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/shipping/profiles/{profileID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/shipping/profiles/{profileID}"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/shipping/profiles/{profileID}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/shipping/profiles/{profileID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/shipping/profiles/{profileID}/listings"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/shipping/profiles/{profileID}/set-default"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/shipping/refresh-snapshots"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/shipping/stale-listings"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/store-policy"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/store-policy/moderators"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/store-policy/moderators"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/store-policy/moderators"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/store-policy/moderators/{peerID}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/store-policy/{peerID}/published"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/stores/{storeID}/licenses/activate"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/stores/{storeID}/licenses/deactivate"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/stores/{storeID}/licenses/validate"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/billing-hold"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/system/billing-hold"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/system/cache"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/claim-store"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/connect-platform"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/diagnostics"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/doctor"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/domain"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/domain"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/health"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/huma-ping"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/info"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/logs"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/mcp/capability"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/mcp/clients"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/mcp/connect"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/mcp/connect/{client}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/mcp/disconnect"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/mcp/disconnect/{client}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/network"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/network"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/publish"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/setup"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/setup"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/shutdown"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/system/update-config"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/system/update-config"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/system/update-trigger"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/wallet/currencies"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/wallet/mnemonic"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/wallet/receiving-accounts"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/wallet/receiving-accounts"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/wallet/receiving-accounts"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/wallet/receiving-accounts/{id}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/wallet/spend"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/webhooks"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/webhooks"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/webhooks/{id}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/webhooks/{id}"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/webhooks/{id}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/webhooks/{id}/deliveries"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/webhooks/{id}/test"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/wishlists"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/wishlists"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/wishlists/{peerID}/{slug}"
+    }
+  ]
+}

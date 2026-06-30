@@ -6,11 +6,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"testing/fstest"
 
 	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 )
 
 type stubNodeService struct {
@@ -98,5 +100,36 @@ func TestSharedRouter_CORS_WhenEnabled(t *testing.T) {
 
 	if v := rr.Header().Get("Access-Control-Allow-Origin"); v == "" {
 		t.Error("expected CORS allow-origin header when AllowCORS=true")
+	}
+}
+
+func TestSharedRouter_RegisteredRoutesReflectCommunityComposition(t *testing.T) {
+	sr, err := NewSharedRouter(SharedRouterConfig{
+		Resolver: func(r *http.Request) (contracts.NodeService, error) {
+			return &stubNodeService{}, nil
+		},
+		DistributionPolicy: edition.DefaultPolicy(),
+	})
+	if err != nil {
+		t.Fatalf("NewSharedRouter: %v", err)
+	}
+
+	routes, err := sr.RegisteredRoutes()
+	if err != nil {
+		t.Fatalf("RegisteredRoutes: %v", err)
+	}
+	if len(routes) == 0 {
+		t.Fatal("expected registered /v1 routes")
+	}
+	if !slices.Contains(routes, RegisteredRoute{Method: http.MethodGet, Path: "/v1/runtime-config"}) {
+		t.Fatal("expected GET /v1/runtime-config in Community route inventory")
+	}
+	for _, route := range routes {
+		if route.Method == "" || route.Method == "*" || route.Method == "ANY" {
+			t.Fatalf("route has non-concrete method: %+v", route)
+		}
+		if route.Path == "/v1/fiat/providers" {
+			t.Fatalf("Community inventory exposed capability-gated route: %+v", route)
+		}
 	}
 }

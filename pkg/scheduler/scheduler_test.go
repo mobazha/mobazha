@@ -119,6 +119,22 @@ func TestJobs_CollectibleMaintenanceJobs(t *testing.T) {
 	}
 }
 
+func TestJobs_MarketplaceDomainVerification(t *testing.T) {
+	job, ok := Jobs["marketplace-domain-verification"]
+	if !ok {
+		t.Fatal("marketplace-domain-verification job is not registered")
+	}
+	if job.Interval != 10*time.Minute {
+		t.Fatalf("domain verification interval = %s, want 10m", job.Interval)
+	}
+	if job.OverlapPolicy != OverlapSkip || job.MaxConcurrency != 1 {
+		t.Fatalf("domain verification scheduling = overlap %q concurrency %d", job.OverlapPolicy, job.MaxConcurrency)
+	}
+	if job.PerNodeTimeout >= job.Interval {
+		t.Fatalf("domain verification timeout = %s must stay below interval %s", job.PerNodeTimeout, job.Interval)
+	}
+}
+
 func TestNew_RequiresHolderID(t *testing.T) {
 	_, err := New(Config{})
 	if err != ErrHolderIDRequired {

@@ -27,6 +27,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/identity"
@@ -59,6 +60,7 @@ type ListingAppService struct {
 	coTenantAllPeers   func() []peer.ID
 
 	shippingStore contracts.ShippingStore
+	listingPolicy distribution.ListingPolicy
 }
 
 type ListingAppServiceConfig struct {
@@ -80,6 +82,7 @@ type ListingAppServiceConfig struct {
 	CoTenantAllPeers   func() []peer.ID
 
 	ShippingStore contracts.ShippingStore
+	ListingPolicy distribution.ListingPolicy
 }
 
 func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
@@ -99,6 +102,7 @@ func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 		coTenantPublicData: cfg.CoTenantPublicData,
 		coTenantAllPeers:   cfg.CoTenantAllPeers,
 		shippingStore:      cfg.ShippingStore,
+		listingPolicy:      cfg.ListingPolicy,
 	}
 }
 
@@ -948,12 +952,13 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 	if sl.Listing.Metadata.Format > pb.Listing_Metadata_MARKET_PRICE {
 		return errors.New("invalid listing format")
 	}
-	// PrivateDistribution build rejects MARKET_PRICE (needs exchange-rate oracle) and
-	// RWA_TOKEN / CRYPTOCURRENCY contract types (need on-chain monitors).
-	// No-op on full builds. Runs before the PricingCurrency block so we
-	// catch MARKET_PRICE even when PricingCurrency is nil.
-	if err := validatePrivateDistributionListingFormat(sl.Listing.Metadata.Format, sl.Listing.Metadata.ContractType); err != nil {
-		return err
+	// A distribution may reject formats that require infrastructure it does
+	// not ship. Run before PricingCurrency so MARKET_PRICE can be rejected
+	// even when PricingCurrency is nil.
+	if s.listingPolicy != nil {
+		if err := s.listingPolicy.ValidateListingFormat(sl.Listing.Metadata.Format, sl.Listing.Metadata.ContractType); err != nil {
+			return err
+		}
 	}
 	if sl.Listing.Metadata.Expiry == nil {
 		return coreiface.ErrMissingField("metadata.expiry")
@@ -984,12 +989,12 @@ func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 		if sl.Listing.Metadata.PricingCurrency.Divisibility != uint32(def.Divisibility) {
 			return errors.New("divisibility differs from expected value")
 		}
-		// Crypto-native pricing guard: private_distribution builds reject any pricing
-		// currency outside the supported set (see private_distribution_supported_coins.go).
-		// This is a server-side defense against API bypass of the UI restriction
-		// in BasicInfoSection. No-op on full builds.
-		if err := validatePrivateDistributionPricingCurrency(sl.Listing.Metadata.PricingCurrency.Code); err != nil {
-			return err
+		// Distribution pricing policy is a server-side defense against API
+		// bypass of product-specific editor restrictions.
+		if s.listingPolicy != nil {
+			if err := s.listingPolicy.ValidateListingPricingCurrency(sl.Listing.Metadata.PricingCurrency.Code); err != nil {
+				return err
+			}
 		}
 	}
 

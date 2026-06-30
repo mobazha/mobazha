@@ -1,6 +1,7 @@
 package guest
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -11,6 +12,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type guestPaymentPolicyStub struct {
+	supported bool
+	err       error
+}
+
+func (policy guestPaymentPolicyStub) SupportsGuestPaymentCoin(iwallet.CoinType) bool {
+	return policy.supported
+}
+func (policy guestPaymentPolicyStub) ValidateGuestPaymentCoin(iwallet.CoinType) error {
+	return policy.err
+}
+func (guestPaymentPolicyStub) AdvertisedPaymentCoins() []iwallet.CoinType { return nil }
+func (guestPaymentPolicyStub) ValidateCrossCurrencyCheckout(string, string) error {
+	return nil
+}
 
 func TestRequiredConfsForCoin(t *testing.T) {
 	tests := []struct {
@@ -335,15 +352,15 @@ func TestValidateCoinAvailability(t *testing.T) {
 	external_paymentCoin := iwallet.CoinType("crypto:external_payment:mainnet:native")
 	external_paymentInfo, _ := iwallet.CoinInfoFromCoinType(external_paymentCoin)
 
-	t.Run("PrivateDistribution rejects EXTERNAL_PAYMENT without client", func(t *testing.T) {
+	t.Run("Core rejects EXTERNAL_PAYMENT without distribution policy", func(t *testing.T) {
 		err := private_distributionSvc.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "ExternalPayment wallet-rpc not configured")
+		assert.Contains(t, err.Error(), "no chain family handler")
 	})
 
 	external_paymentSvc := &GuestOrderAppService{
 		supportedUTXOChains: toChainSet([]iwallet.ChainType{iwallet.ChainLitecoin}),
-		external_paymentAvailable:     func() bool { return true },
+		guestPaymentPolicy:  guestPaymentPolicyStub{supported: true},
 	}
 	t.Run("EXTERNAL_PAYMENT allowed when client available and healthy", func(t *testing.T) {
 		err := external_paymentSvc.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
@@ -352,7 +369,10 @@ func TestValidateCoinAvailability(t *testing.T) {
 
 	external_paymentUnhealthy := &GuestOrderAppService{
 		supportedUTXOChains: toChainSet([]iwallet.ChainType{iwallet.ChainLitecoin}),
-		external_paymentAvailable:     func() bool { return false },
+		guestPaymentPolicy: guestPaymentPolicyStub{
+			supported: true,
+			err:       errors.New("ExternalPayment wallet-rpc unreachable"),
+		},
 	}
 	t.Run("EXTERNAL_PAYMENT rejected when client unhealthy", func(t *testing.T) {
 		err := external_paymentUnhealthy.validateCoinAvailability(external_paymentCoin, external_paymentInfo)

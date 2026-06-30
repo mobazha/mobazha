@@ -290,92 +290,11 @@ func TestArchGuard_PrivateDistributionServiceCoverage(t *testing.T) {
 			"Missing: %v", missing)
 }
 
-// TestArchGuard_PrivateDistributionCoinWhitelist asserts that private_distribution_supported_coins.go
-// remains the single source of truth for currencies accepted by the private_distribution
-// build, and that the whitelist still contains exactly the coins the
-// product owns today (EXTERNAL_PAYMENT-only after Phase C).
-//
-// This guard is build-tag-agnostic — it reads the source file directly
-// instead of importing the private_distribution-tagged symbol, so it runs in the
-// default CI build (where private_distribution-tagged test compilation is currently
-// blocked by unrelated pre-existing failures, e.g. mock helpers without
-// the `!private_distribution` tag).
-//
-// Re-adding a coin (e.g. LTC) is a deliberate product decision; follow
-// the checklist in private_distribution_supported_coins.go and update both the map
-// AND this guard intentionally. Pairs with TD-115 in docs/TECH_DEBT.md.
-func TestArchGuard_PrivateDistributionCoinWhitelist(t *testing.T) {
-	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "core", "private_distribution_supported_coins.go")
-	data, err := os.ReadFile(path)
-	require.NoError(t, err, "failed to read %s", path)
-
-	body := string(data)
-
-	// Confirm the file is still gated for private_distribution only.
-	assert.Contains(t, body, "//go:build private_distribution",
-		"private_distribution_supported_coins.go must remain gated by `//go:build private_distribution`")
-
-	// Extract the literal map keys between the PrivateDistributionSupportedCoinCodes
-	// declaration's outer `{` and matching `}`. We must brace-count
-	// because the type literal `map[string]struct{}{...}` itself
-	// contains `struct{}` which would confuse a naive first-`}` lookup.
-	declMarker := "PrivateDistributionSupportedCoinCodes = map[string]struct{}{"
-	declIdx := strings.Index(body, declMarker)
-	require.GreaterOrEqual(t, declIdx, 0,
-		"PrivateDistributionSupportedCoinCodes declaration not found — has the symbol been renamed?")
-	bodyAfter := body[declIdx+len(declMarker):]
-	depth := 1
-	end := -1
-	for i, r := range bodyAfter {
-		switch r {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				end = i
-			}
-		}
-		if end >= 0 {
-			break
-		}
-	}
-	require.GreaterOrEqual(t, end, 0,
-		"PrivateDistributionSupportedCoinCodes outer close brace not found")
-	window := bodyAfter[:end]
-
-	var found []string
-	for {
-		startQ := strings.Index(window, `"`)
-		if startQ < 0 {
-			break
-		}
-		rest := window[startQ+1:]
-		endQ := strings.Index(rest, `"`)
-		if endQ < 0 {
-			break
-		}
-		found = append(found, rest[:endQ])
-		window = rest[endQ+1:]
-	}
-
-	expected := []string{"EXTERNAL_PAYMENT"}
-	assert.Equal(t, expected, found,
-		"PrivateDistributionSupportedCoinCodes drifted — expected %v, got %v. "+
-			"Re-adding a coin requires walking the checklist in "+
-			"private_distribution_supported_coins.go (multiwallet wiring, electrum "+
-			"reconnect, key derivation, etc.) and updating this guard "+
-			"in the same change.", expected, found)
-}
-
 // TestArchGuard_PrivateDistributionNoForbiddenChainImports scans every .go file under
 // internal/core/ that compiles into the private_distribution binary (i.e. no
 // `//go:build !private_distribution` tag) and forbids imports of chain stacks Phase C
-// removed. This catches accidental re-introduction of LTC/EVM/Solana/TRON
-// support before reviewers notice — and forces the re-add checklist in
-// private_distribution_supported_coins.go to be exercised when an expansion is
-// intentional.
+// removed. This catches accidental re-introduction of concrete
+// LTC/EVM/Solana/TRON stacks before reviewers notice.
 //
 // Allow-list: internal/chains/base (shared types). ExternalPayment's concrete
 // wallet-rpc and daemon implementation is injected by the private PrivateDistribution
@@ -425,8 +344,7 @@ func TestArchGuard_PrivateDistributionNoForbiddenChainImports(t *testing.T) {
 
 	assert.Empty(t, violations,
 		"private_distribution build pulled in a forbidden chain stack — Phase C removed "+
-			"these intentionally (see docs/privacy/MOBAZHA_PRIVATE_DISTRIBUTION_DESIGN.md "+
-			"and private_distribution_supported_coins.go re-add checklist). Either gate "+
+			"these intentionally (see docs/privacy/MOBAZHA_PRIVATE_DISTRIBUTION_DESIGN.md). Either gate "+
 			"the new code with `//go:build !private_distribution`, or take the deliberate "+
 			"product decision to expand private_distribution support and update this "+
 			"guard. Violations: %+v", violations)

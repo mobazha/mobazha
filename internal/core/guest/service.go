@@ -68,14 +68,7 @@ type GuestOrderAppServiceConfig struct {
 	SupportedUTXOChains     []iwallet.ChainType
 	EVMObservationAvailable bool
 	SolanaMonitorAvailable  bool
-	// ExternalPaymentAvailable is a closure that reports whether EXTERNAL_PAYMENT guest checkout
-	// can serve a request *right now*. It typically combines two signals:
-	//   1. operator configured the wallet-rpc endpoint
-	//   2. wallet-rpc passes the current health probe (IsHealthy()).
-	// nil means EXTERNAL_PAYMENT is unavailable. The closure is consulted on every
-	// CreateGuestOrder call so transient wallet-rpc outages surface as
-	// ErrCoinUnavailable instead of a generic 500 on CreateAddress later.
-	ExternalPaymentAvailable func() bool
+	GuestPaymentPolicy      distribution.GuestPaymentPolicy
 	// BillingHoldActive reports L1 billing grace (checkout blocked).
 	BillingHoldActive func() bool
 }
@@ -126,10 +119,9 @@ type GuestOrderAppService struct {
 	evmManagedEscrowRelayReady          bool
 	evmManagedEscrowMonitorChains       map[iwallet.ChainType]struct{}
 	evmHealthProvider          distribution.ManagedEscrowHealthProvider
-	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
-	external_paymentAvailable      func() bool
-	billingHoldActive    func() bool
-	checkoutSupplyQuoter *checkoutsupply.CheckoutSupplyQuoteService
+	guestPaymentPolicy         distribution.GuestPaymentPolicy
+	billingHoldActive          func() bool
+	checkoutSupplyQuoter       *checkoutsupply.CheckoutSupplyQuoteService
 }
 
 // SetEVMManagedEscrowSettlement wires managed EVM escrow settlement after distribution registration.
@@ -166,7 +158,7 @@ func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppServi
 		supportedUTXOChains:     toChainSet(cfg.SupportedUTXOChains),
 		evmObservationAvailable: cfg.EVMObservationAvailable,
 		solanaMonitorAvailable:  cfg.SolanaMonitorAvailable,
-		external_paymentAvailable:         cfg.ExternalPaymentAvailable,
+		guestPaymentPolicy:      cfg.GuestPaymentPolicy,
 		billingHoldActive:       cfg.BillingHoldActive,
 	}
 }
@@ -1744,13 +1736,12 @@ func (s *GuestOrderAppService) convertToPaymentCoin(totalSmallest *big.Int, pric
 		return totalSmallest.String(), nil
 	}
 
-	// PrivateDistribution is intentionally crypto-native with no exchange-rate oracle
-	// (zero outbound dependency). When pricing and payment coins differ,
-	// private_distribution rejects the order with a user-facing message rather than
-	// surface the lower-level "exchange rate provider not configured"
-	// error. No-op in full builds.
-	if err := guardCrossCurrencyCheckoutOnPrivateDistribution(priceCurCode, coinInfo.Symbol); err != nil {
-		return "", err
+	// A standalone distribution without an exchange-rate authority can reject
+	// cross-currency checkout with a product-specific user-facing error.
+	if s.guestPaymentPolicy != nil {
+		if err := s.guestPaymentPolicy.ValidateCrossCurrencyCheckout(priceCurCode, coinInfo.Symbol); err != nil {
+			return "", err
+		}
 	}
 
 	if s.exchangeRates == nil {
@@ -1810,6 +1801,9 @@ func requiredConfsForCoin(coinType iwallet.CoinType) int {
 }
 
 func (s *GuestOrderAppService) validateCoinAvailability(coinType iwallet.CoinType, coinInfo iwallet.CoinInfo) error {
+	if s.guestPaymentPolicy != nil && s.guestPaymentPolicy.SupportsGuestPaymentCoin(coinType) {
+		return s.guestPaymentPolicy.ValidateGuestPaymentCoin(coinType)
+	}
 	switch {
 	case coinInfo.Chain.IsUTXOChain():
 		s.utxoMu.RLock()
@@ -1832,21 +1826,6 @@ func (s *GuestOrderAppService) validateCoinAvailability(coinType iwallet.CoinTyp
 	case coinInfo.Chain == iwallet.ChainSolana:
 		if !s.solanaMonitorAvailable {
 			return fmt.Errorf("%w: Solana reference checker not configured (coin %q)",
-				contracts.ErrCoinUnavailable, coinType)
-		}
-		return nil
-	case coinInfo.Chain == iwallet.ChainExternalPayment:
-		// Two failure modes need to surface as ErrCoinUnavailable:
-		//   - operator never wired wallet-rpc (closure is nil)
-		//   - wallet-rpc was wired but is currently unhealthy (closure returns false)
-		// Both should yield 503 at the API layer rather than letting the
-		// request proceed to CreateAddress and crash with a generic 500.
-		if s.external_paymentAvailable == nil {
-			return fmt.Errorf("%w: ExternalPayment wallet-rpc not configured (coin %q)",
-				contracts.ErrCoinUnavailable, coinType)
-		}
-		if !s.external_paymentAvailable() {
-			return fmt.Errorf("%w: ExternalPayment wallet-rpc unreachable (coin %q)",
 				contracts.ErrCoinUnavailable, coinType)
 		}
 		return nil

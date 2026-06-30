@@ -120,6 +120,7 @@ type GatewayConfig struct {
 	// The gateway supplies auth/security metadata and retains middleware,
 	// envelope, listener, and OpenAPI ownership.
 	TrustedHumaModules []distribution.TrustedHumaModule
+	GuestPaymentPolicy distribution.GuestPaymentPolicy
 }
 
 // Gateway represents an HTTP API gateway

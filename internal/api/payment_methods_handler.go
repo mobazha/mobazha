@@ -39,9 +39,14 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// PrivateDistribution: inject supported coins (e.g. EXTERNAL_PAYMENT) that are served by
-	// wallet-rpc subaddress generation rather than ReceivingAccount rows.
-	for _, c := range private_distributionExtraCoins(r) {
+	// Trusted distributions may advertise direct-payment coins that do not
+	// use ReceivingAccount rows. The policy owns availability and literals.
+	var additionalCoins []iwallet.CoinType
+	if g.config != nil && g.config.GuestPaymentPolicy != nil {
+		additionalCoins = g.config.GuestPaymentPolicy.AdvertisedPaymentCoins()
+	}
+	for _, coin := range additionalCoins {
+		c := string(coin)
 		if !iwallet.IsPaymentCoinEnabledForPolicy(c, g.editionPolicy) {
 			continue
 		}

@@ -93,6 +93,15 @@ if [[ -n "$private_distribution_external_payment_api_files" ]]; then
   failures=1
 fi
 
+private_distribution_product_policy_files="$({
+  rg --files internal pkg 2>/dev/null || true
+} | rg '(^|/)(private_distribution_supported_coins|listing_pricing_guard_(private_distribution|full)|checkout_currency_guard_(private_distribution|full)|payment_methods_coins_(private_distribution|full))\.go$' || true)"
+if [[ -n "$private_distribution_product_policy_files" ]]; then
+  echo "ERROR: private PrivateDistribution product policy leaked into Open Core build-tag files:" >&2
+  echo "$private_distribution_product_policy_files" >&2
+  failures=1
+fi
+
 public_solana_relay_refs="$(rg -n 'SolanaRelayService|SolanaRelayRequest|RelaySolanaTransaction|GetSolanaChainClient|GetSolanaRelayService' \
   internal pkg cmd --glob '*.go' --glob '!**/*_test.go' || true)"
 if [[ -n "$public_solana_relay_refs" ]]; then

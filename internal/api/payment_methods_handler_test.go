@@ -15,6 +15,52 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
+type paymentProjectionPolicyStub struct {
+	coins []iwallet.CoinType
+}
+
+func (paymentProjectionPolicyStub) SupportsGuestPaymentCoin(iwallet.CoinType) bool { return false }
+func (paymentProjectionPolicyStub) ValidateGuestPaymentCoin(iwallet.CoinType) error {
+	return nil
+}
+func (policy paymentProjectionPolicyStub) AdvertisedPaymentCoins() []iwallet.CoinType {
+	return append([]iwallet.CoinType(nil), policy.coins...)
+}
+func (paymentProjectionPolicyStub) ValidateCrossCurrencyCheckout(string, string) error {
+	return nil
+}
+
+func TestHandleGETPaymentMethods_IncludesDistributionProjection(t *testing.T) {
+	coin := iwallet.CoinType("crypto:external_payment:mainnet:native")
+	node := &mockNode{raListFunc: func() ([]models.ReceivingAccount, error) { return nil, nil }}
+	request := httptest.NewRequest(http.MethodGet, "/v1/payment-methods/seller", nil)
+	request = request.WithContext(context.WithValue(request.Context(), nodeContextKey, contracts.NodeService(node)))
+	policy, err := edition.ResolvePolicy(edition.FullName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+	(&Gateway{
+		config:        &GatewayConfig{GuestPaymentPolicy: paymentProjectionPolicyStub{coins: []iwallet.CoinType{coin}}},
+		editionPolicy: policy,
+	}).handleGETPaymentMethods(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		Data struct {
+			Crypto []string `json:"crypto"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Data.Crypto) != 1 || response.Data.Crypto[0] != string(coin) {
+		t.Fatalf("crypto = %#v, want %s", response.Data.Crypto, coin)
+	}
+}
+
 func TestHandleGETPaymentMethods_FiltersProductDisabledZEC(t *testing.T) {
 	zecAccount := models.ReceivingAccount{
 		ChainType: iwallet.ChainZCash,

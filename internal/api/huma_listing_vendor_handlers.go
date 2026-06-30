@@ -16,7 +16,7 @@ import (
 // (Gumroad today, Shopify/etc. eventually). These ship in the full SaaS /
 // Standalone build but not in PrivateDistribution — PrivateDistribution is the EXTERNAL_PAYMENT-only minimal
 // binary and bringing in vendor APIs would bloat it for no benefit.
-func (g *Gateway) registerListingImportVendorOps(api huma.API) {
+func (g *Gateway) registerListingImportVendorCapability(api huma.API) {
 	g.registerListingImportGumroad(api)
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-func (g *Gateway) registerListingSupplySummary(api huma.API) {
+func (g *Gateway) registerListingSupplySummaryCapability(api huma.API) {
 	type listingSupplySummaryInput struct {
 		Body json.RawMessage
 	}

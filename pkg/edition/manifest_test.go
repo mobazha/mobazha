@@ -52,3 +52,55 @@ func TestFullPolicyPreservesRecognizedMethods(t *testing.T) {
 	methods := []PaymentMethod{{ID: "SOL", Kind: "crypto", Flow: "external-wallet"}}
 	assert.Equal(t, methods, policy.FilterPaymentMethods(methods))
 }
+
+func TestPolicyBehaviorDoesNotDependOnEditionName(t *testing.T) {
+	manifest, err := CommunityManifest()
+	require.NoError(t, err)
+	manifest.Edition = "self-hosted"
+
+	policy, err := NewPolicy(manifest)
+	require.NoError(t, err)
+	require.True(t, policy.AllowsPaymentMethod(PaymentMethod{
+		ID: "BTC", Kind: "crypto", Flow: "address-transfer",
+	}))
+	require.False(t, policy.AllowsPaymentMethod(PaymentMethod{
+		ID: "ETH", Kind: "crypto", Flow: "external-wallet",
+	}))
+	require.False(t, policy.AllowsPaymentMethod(PaymentMethod{
+		ID: "stripe", Kind: "fiat", Flow: "provider-session",
+	}))
+	require.False(t, policy.AllowsCapability(CapabilityFiatPayments))
+	require.False(t, policy.AllowsCapability(CapabilityPlatformIntegration))
+	require.True(t, policy.AllowsCapability("ai"))
+	require.True(t, policy.AllowsCapability("analytics"))
+	require.True(t, policy.AllowsCapability("fulfillment"))
+	require.True(t, policy.AllowsCapability("webhooks"))
+}
+
+func TestFullPolicyUsesConcretePaymentCapabilities(t *testing.T) {
+	policy, err := ResolvePolicy(FullName)
+	require.NoError(t, err)
+	require.True(t, policy.AllowsPaymentMethod(PaymentMethod{
+		ID: "SOL", Kind: "crypto", Flow: "external-wallet",
+	}))
+	require.True(t, policy.AllowsPaymentMethod(PaymentMethod{
+		ID: "stripe", Kind: "fiat", Flow: "provider-session",
+	}))
+	require.False(t, policy.AllowsPaymentMethod(PaymentMethod{
+		ID: "ZEC", Kind: "crypto", Flow: "address-transfer", AddressMode: "transparent",
+	}))
+	require.True(t, policy.AllowsCapability(CapabilityFiatPayments))
+	require.True(t, policy.AllowsCapability(CapabilityPlatformIntegration))
+}
+
+func TestPolicyAllowsManifestCapabilityIndependentOfEditionName(t *testing.T) {
+	manifest, err := CommunityManifest()
+	require.NoError(t, err)
+	manifest.Edition = "self-hosted"
+	manifest.Capabilities = []string{CapabilityPlatformIntegration}
+
+	policy, err := NewPolicy(manifest)
+	require.NoError(t, err)
+	require.True(t, policy.AllowsCapability(CapabilityPlatformIntegration))
+	require.False(t, policy.AllowsCapability(CapabilityFiatPayments))
+}

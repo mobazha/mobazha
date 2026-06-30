@@ -82,6 +82,67 @@ func (r *Registry) RegisterV2(chain iwallet.ChainType, strategy ChainEscrowV2) {
 	r.strategiesV2[chain] = strategy
 }
 
+// RegisterV2Exclusive registers a V2-native strategy only when the chain does
+// not already have a V1 or V2 strategy. Distribution modules use this method so
+// they cannot replace Open Core bundled payment rails.
+func (r *Registry) RegisterV2Exclusive(chain iwallet.ChainType, strategy ChainEscrowV2) error {
+	return r.RegisterV2BatchExclusive(map[iwallet.ChainType]ChainEscrowV2{chain: strategy})
+}
+
+// RegisterV2BatchExclusive atomically registers a set of V2-native strategies.
+// The complete batch is validated under one lock before any entry is written,
+// so a duplicate or invalid entry leaves the registry unchanged.
+func (r *Registry) RegisterV2BatchExclusive(strategies map[iwallet.ChainType]ChainEscrowV2) error {
+	if r == nil {
+		return fmt.Errorf("payment registry is nil")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for chain, strategy := range strategies {
+		if chain == "" {
+			return fmt.Errorf("payment strategy chain is required")
+		}
+		if strategy == nil {
+			return fmt.Errorf("payment strategy for chain %s is nil", chain)
+		}
+		if _, exists := r.strategies[chain]; exists {
+			return fmt.Errorf("payment strategy already registered for chain %s", chain)
+		}
+		if _, exists := r.strategiesV2[chain]; exists {
+			return fmt.Errorf("payment strategy already registered for chain %s", chain)
+		}
+	}
+	for chain, strategy := range strategies {
+		r.strategiesV2[chain] = strategy
+	}
+	return nil
+}
+
+// UnregisterV2Batch removes a just-registered initialization batch. It is used
+// only to roll back trusted module activation before the registry is published.
+func (r *Registry) UnregisterV2Batch(chains []iwallet.ChainType) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, chain := range chains {
+		delete(r.strategiesV2, chain)
+	}
+}
+
+// HasChain reports whether either a V1 or V2 strategy is registered for chain.
+func (r *Registry) HasChain(chain iwallet.ChainType) bool {
+	if r == nil {
+		return false
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, hasV1 := r.strategies[chain]
+	_, hasV2 := r.strategiesV2[chain]
+	return hasV1 || hasV2
+}
+
 // ForChain returns the ChainEscrow registered for the given chain type.
 // Returns an error if no chain escrow is registered for the chain.
 func (r *Registry) ForChain(chain iwallet.ChainType) (ChainEscrow, error) {

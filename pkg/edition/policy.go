@@ -11,6 +11,13 @@ const (
 	paymentFlowAddress     = "address-transfer"
 	addressModeTransparent = "transparent"
 	communityUTXORail      = "utxo_transparent"
+
+	// CapabilityFiatPayments enables provider-backed fiat payment routes and
+	// services in a distribution composition.
+	CapabilityFiatPayments = "payment.fiat"
+	// CapabilityPlatformIntegration enables optional connections and reverse
+	// proxying from a standalone node to the Mobazha Hosting control plane.
+	CapabilityPlatformIntegration = "platform.integration"
 )
 
 // PaymentMethod is the provider-neutral capability shape evaluated by an
@@ -27,6 +34,7 @@ type PaymentMethod struct {
 // It is not a feature flag and must be applied before public projection.
 type Policy interface {
 	Name() string
+	AllowsCapability(string) bool
 	AllowsPaymentMethod(PaymentMethod) bool
 	FilterPaymentMethods([]PaymentMethod) []PaymentMethod
 }
@@ -36,6 +44,8 @@ type policy struct {
 	unrestricted  bool
 	allowedChains map[string]struct{}
 	allowedRails  map[string]struct{}
+	capabilities  map[string]struct{}
+	deniedChains  map[string]struct{}
 	zec           ZcashManifest
 }
 
@@ -103,6 +113,7 @@ func NewPolicy(manifest Manifest) (Policy, error) {
 		name:          manifest.Edition,
 		allowedChains: make(map[string]struct{}, len(manifest.Payment.Chains)),
 		allowedRails:  make(map[string]struct{}, len(manifest.Payment.Rails)),
+		capabilities:  make(map[string]struct{}, len(manifest.Capabilities)),
 		zec:           manifest.Zcash,
 	}
 	for _, chain := range manifest.Payment.Chains {
@@ -111,25 +122,59 @@ func NewPolicy(manifest Manifest) (Policy, error) {
 	for _, rail := range manifest.Payment.Rails {
 		p.allowedRails[rail] = struct{}{}
 	}
+	for _, capability := range manifest.Capabilities {
+		p.capabilities[strings.ToLower(strings.TrimSpace(capability))] = struct{}{}
+	}
 	return p, nil
 }
 
 func unrestrictedPolicy(name string) Policy {
-	return &policy{name: name, unrestricted: true}
+	// Zcash was not part of the pre-distribution commercial composition. Keep
+	// that concrete capability disabled until a composition explicitly supplies
+	// a policy which enables it. This is a capability decision, not a profile
+	// name check in business code.
+	return &policy{
+		name:         name,
+		unrestricted: true,
+		deniedChains: map[string]struct{}{"ZEC": {}},
+	}
 }
 
 func (p *policy) Name() string {
 	return p.name
 }
 
-func (p *policy) AllowsPaymentMethod(method PaymentMethod) bool {
-	if p == nil || p.unrestricted {
-		return true
-	}
-	if strings.ToLower(strings.TrimSpace(method.Kind)) != paymentKindCrypto {
+// AllowsCapability evaluates a provider-neutral distribution capability.
+// Missing policy or missing declarations fail closed; unrestricted legacy and
+// commercial compositions preserve their existing behavior.
+func (p *policy) AllowsCapability(capability string) bool {
+	if p == nil {
 		return false
 	}
+	if p.unrestricted {
+		return true
+	}
+	_, ok := p.capabilities[strings.ToLower(strings.TrimSpace(capability))]
+	return ok
+}
+
+func (p *policy) AllowsPaymentMethod(method PaymentMethod) bool {
+	if p == nil {
+		return false
+	}
+	kind := strings.ToLower(strings.TrimSpace(method.Kind))
 	id := strings.ToUpper(strings.TrimSpace(method.ID))
+	if kind == paymentKindCrypto {
+		if _, denied := p.deniedChains[id]; denied {
+			return false
+		}
+	}
+	if p.unrestricted {
+		return true
+	}
+	if kind != paymentKindCrypto {
+		return false
+	}
 	if _, allowed := p.allowedChains[id]; !allowed {
 		return false
 	}

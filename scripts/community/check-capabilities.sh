@@ -85,3 +85,5 @@ if ! rg -q '^\s*-?\s*MOBAZHA_EDITION=.*community' \
 fi
 
 echo "community architecture guards: OK"
+
+"${repo_root}/scripts/open-core/check-boundaries.sh"

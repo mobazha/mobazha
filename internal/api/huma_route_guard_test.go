@@ -12,16 +12,23 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 )
 
 // newTestGatewayForRouting creates a minimal Gateway that can register
 // routes without nil panics. No real node manager or auth is wired —
 // handler functions will panic if actually invoked, but route
 // registration itself is managed_escrow.
-func newTestGatewayForRouting() *Gateway {
+func newTestGatewayForRouting(t *testing.T) *Gateway {
+	t.Helper()
+	policy, err := edition.ResolvePolicy(edition.FullName)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return &Gateway{
 		config:            &GatewayConfig{},
 		guestOrderLimiter: newRateLimiter(100, time.Minute),
+		editionPolicy:     policy,
 	}
 }
 
@@ -109,7 +116,7 @@ func collectRouteCollisions(r chi.Router) []string {
 // TestAH14_NoRouteCollision_ActivatedDomains fails if any Huma-activated
 // domain still has a collision with legacy routes.
 func TestAH14_NoRouteCollision_ActivatedDomains(t *testing.T) {
-	g := newTestGatewayForRouting()
+	g := newTestGatewayForRouting(t)
 	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	g.registerHumaAPI(r)
@@ -137,11 +144,36 @@ func TestAH14_NoRouteCollision_ActivatedDomains(t *testing.T) {
 	}
 }
 
+func TestCommunityHumaRoutes_FiatCapabilityFailsClosed(t *testing.T) {
+	manifest, err := edition.CommunityManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, err := edition.NewPolicy(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := &Gateway{
+		config:            &GatewayConfig{},
+		guestOrderLimiter: newRateLimiter(100, time.Minute),
+		editionPolicy:     policy,
+	}
+	r := chi.NewMux()
+	g.registerHumaAPI(r)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/fiat/providers", nil)
+	recorder := httptest.NewRecorder()
+	r.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("GET /v1/fiat/providers status = %d, want 404; body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
 // TestAH14_ActivatedRoutesServedByHuma verifies that after legacy routes
 // are removed, representative endpoints from each activated domain are
 // still matched by the router (served by Huma handlers).
 func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
-	g := newTestGatewayForRouting()
+	g := newTestGatewayForRouting(t)
 	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	g.registerHumaAPI(r)

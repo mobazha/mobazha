@@ -11,6 +11,7 @@ import (
 	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -40,6 +41,9 @@ type RouterConfig struct {
 	FeatureManager *pkgconfig.FeatureManager
 	SkillProvider  agentskill.Provider
 	AllowCORS      bool
+	// DistributionPolicy is selected by the caller's composition root. Nil is
+	// retained as a backwards-compatible full policy for legacy bridge users.
+	DistributionPolicy edition.Policy
 
 	// PostResolverMiddleware is applied after the resolver has populated the
 	// request context but before route handlers. Use this for scope enforcement
@@ -61,6 +65,7 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 		FeatureManager:         cfg.FeatureManager,
 		SkillProvider:          cfg.SkillProvider,
 		AllowCORS:              cfg.AllowCORS,
+		DistributionPolicy:     cfg.DistributionPolicy,
 		PostResolverMiddleware: cfg.PostResolverMiddleware,
 	})
 	if err != nil {

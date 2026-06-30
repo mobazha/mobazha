@@ -23,18 +23,17 @@ func IsPaymentCoinEnabledForPolicy(raw string, policy edition.Policy) bool {
 	if policy == nil {
 		policy = edition.CurrentPolicy()
 	}
-	if policy.Name() != edition.CommunityName {
-		// Preserve the pre-edition behavior for existing private/commercial
-		// compositions. Community explicitly enables transparent ZEC below.
-		if normalized, ok := TryNormalizePaymentCoin(coin); ok {
-			coin = string(normalized)
-		}
-		return !strings.HasPrefix(strings.ToLower(coin), "crypto:zcash:")
-	}
 	if normalized, ok := TryNormalizePaymentCoin(coin); ok {
 		coin = string(normalized)
 	} else {
-		return false
+		// Legacy test/plugin coins are not canonicalizable. Ask the concrete
+		// policy instead of branching on a distribution name: unrestricted
+		// compositions preserve compatibility, restrictive manifests fail closed.
+		return policy.AllowsPaymentMethod(edition.PaymentMethod{
+			ID:   coin,
+			Kind: "legacy",
+			Flow: "unresolved",
+		})
 	}
 	coinType := CoinType(coin)
 	if coinType.IsFiatPayment() {

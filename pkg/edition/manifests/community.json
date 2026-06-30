@@ -3,6 +3,12 @@
   "edition": "community",
   "license": "MPL-2.0",
   "paymentPluginSdkLicense": "Apache-2.0",
+  "capabilities": [
+    "ai",
+    "analytics",
+    "fulfillment",
+    "webhooks"
+  ],
   "payment": {
     "chains": ["BTC", "BCH", "LTC", "ZEC"],
     "rails": ["utxo_transparent"]

@@ -231,6 +231,19 @@ func TestIsPaymentCoinEnabled(t *testing.T) {
 	}
 }
 
+func TestIsPaymentCoinEnabledForPolicy_LegacyCoinUsesCapabilityPolicy(t *testing.T) {
+	full, err := edition.ResolvePolicy(edition.FullName)
+	require.NoError(t, err)
+	assert.True(t, IsPaymentCoinEnabledForPolicy(string(CtMock), full))
+
+	manifest, err := edition.CommunityManifest()
+	require.NoError(t, err)
+	manifest.Edition = "self-hosted"
+	restrictive, err := edition.NewPolicy(manifest)
+	require.NoError(t, err)
+	assert.False(t, IsPaymentCoinEnabledForPolicy(string(CtMock), restrictive))
+}
+
 func TestCanonicalNativeCoinType(t *testing.T) {
 	tests := []struct {
 		chain    ChainType

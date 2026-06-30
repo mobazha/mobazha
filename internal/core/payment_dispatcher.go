@@ -20,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
@@ -38,8 +39,8 @@ import (
 // All chains are registered here — the dispatcher uses registry-only lookup
 // with no legacy fallback.
 //
-// UTXO and Solana register as V2-monitored adapters; EVM chains activate
-// via registerManagedEscrowAdapterShadow (ManagedEscrowAdapter V2). TRON is retired.
+// UTXO and Solana register as V2-monitored adapters; EVM chains are supplied
+// only by trusted distribution modules. TRON is retired.
 //
 // Dependencies are injected into adapters via explicit fields / callbacks,
 // not via a *MobazhaNode reference (hexagonal architecture Phase A).
@@ -62,37 +63,47 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.paymentRegistry.RegisterV2(chain, payment.NewV1AsV2(utxoStrategy))
 	}
 
+	commercialModulesHealthy := true
+	if err := n.registerDistributionPaymentModules(); err != nil {
+		commercialModulesHealthy = false
+		logger.LogErrorWithIDf(log, n.nodeID,
+			"Trusted payment module registration failed; optional commercial rails remain disabled: %v", err)
+	}
+
 	// ── EVM ─────────────────────────────────────────────────────
-	// Legacy V1 ClientSigned registration is retired. All Ready EVM chains
-	// activate via registerManagedEscrowAdapterShadow (ManagedEscrowAdapter V2 only).
+	// Legacy V1 ClientSigned registration is retired. Managed EVM escrow is
+	// registered only by a trusted distribution module.
 
 	// ── Solana ──────────────────────────────────────────────────
-	// Legacy V1 ClientSigned registration is retired. SolanaAnchorAdapter (V2)
-	// is the sole canonical path; solCompat remains internal to the anchor adapter.
-	solOps := &adapters.SolanaChainOps{
-		Keys:            n.keyProvider,
-		Multiwallet:     n.multiwallet,
-		BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
-		NodeID:          n.nodeID,
+	// This is the CN-3 transition fallback. A successfully registered external
+	// module takes precedence. If module registration fails, optional commercial
+	// rails stay disabled instead of silently falling back to bundled code.
+	if commercialModulesHealthy && !n.paymentRegistry.HasChain(iwallet.ChainSolana) {
+		solOps := &adapters.SolanaChainOps{
+			Keys:            n.keyProvider,
+			Multiwallet:     n.multiwallet,
+			BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
+			NodeID:          n.nodeID,
+		}
+		solCompat := adapters.NewSolanaLifecycleCompatAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
+		solActionStore, solActionRecorder := n.newSettlementActionStore("Solana Anchor")
+		var solRelayer adapters.SolanaInstructionRelayer
+		if n.settlementService != nil {
+			solRelayer = adapters.NewSolanaInstructionRelayer(
+				n.settlementService.RelaySolanaTransactionWithSigners,
+				n.settlementService.SolanaRelayAuthorityAddress,
+			)
+		}
+		n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
+			BuildInitEscrow: n.paymentService.BuildInitEscrowInstructions,
+			Compat:          solCompat,
+			Relayer:         solRelayer,
+			Store:           solActionStore,
+			Recorder:        solActionRecorder,
+			Keys:            n.keyProvider,
+			Wallets:         n.multiwallet,
+		}))
 	}
-	solCompat := adapters.NewSolanaLifecycleCompatAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
-	solActionStore, solActionRecorder := n.newSettlementActionStore("Solana Anchor")
-	var solRelayer adapters.SolanaInstructionRelayer
-	if n.settlementService != nil {
-		solRelayer = adapters.NewSolanaInstructionRelayer(
-			n.settlementService.RelaySolanaTransactionWithSigners,
-			n.settlementService.SolanaRelayAuthorityAddress,
-		)
-	}
-	n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
-		BuildInitEscrow: n.paymentService.BuildInitEscrowInstructions,
-		Compat:          solCompat,
-		Relayer:         solRelayer,
-		Store:           solActionStore,
-		Recorder:        solActionRecorder,
-		Keys:            n.keyProvider,
-		Wallets:         n.multiwallet,
-	}))
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
@@ -113,15 +124,103 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.orderService.SetRegistry(n.paymentRegistry)
 		n.orderService.SetReceiptVerifier(compositeVerifier)
 	}
+	if commercialModulesHealthy {
+		ctx := n.nodeCtx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		n.runDistributionPaymentModules(ctx)
+	}
 
-	n.registerManagedEscrowAdapterShadow()
 	n.registerUTXOObservationDispatcher()
 }
 
+type distributionPaymentRegistry struct {
+	registry *payment.Registry
+}
+
+func (r distributionPaymentRegistry) RegisterV2BatchExclusive(strategies map[iwallet.ChainType]payment.ChainEscrowV2) error {
+	return r.registry.RegisterV2BatchExclusive(strategies)
+}
+
+func (r distributionPaymentRegistry) UnregisterV2Batch(chains []iwallet.ChainType) {
+	r.registry.UnregisterV2Batch(chains)
+}
+
+func (n *MobazhaNode) registerDistributionPaymentModules() error {
+	if len(n.paymentModules) == 0 {
+		return nil
+	}
+	ctx := n.nodeCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	actionStore, actionRecorder := n.newSettlementActionStore("Distribution payment module")
+	guestSettlementSource := guest.NewManagedEscrowGuestSettlementSource(n.db)
+	runtime := distribution.PaymentRuntime{
+		EVMSigner:        distributionEVMDigestSigner{keys: n.keyProvider},
+		EVMReaders:       distributionEVMReaderProvider{wallets: n.multiwallet},
+		EVMLogs:          distributionEVMReaderProvider{wallets: n.multiwallet},
+		EVMRelay:         n.distributionEVMRelayService(),
+		FundingSink:      n.newDistributionFundingSink(),
+		AutoConfirmer:    distributionManagedEscrowAutoConfirmer{settlement: n.settlementService},
+		WatchSource:      distributionManagedEscrowWatchSource{node: n},
+		GuestSettlements: guestSettlementSource,
+		GuestRuntime: distributionManagedEscrowGuestRuntimeBinder{
+			node: n, source: guestSettlementSource,
+		},
+		Actions:        actionStore,
+		ActionRecorder: actionRecorder,
+	}
+	if n.paymentService != nil {
+		runtime.EscrowOwners = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}
+	}
+	if err := distribution.RegisterPaymentModules(
+		ctx,
+		runtime,
+		distributionPaymentRegistry{registry: n.paymentRegistry},
+		n.paymentModules...,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+type distributionManagedEscrowAutoConfirmer struct {
+	settlement *settlement.SettlementService
+}
+
+func (c distributionManagedEscrowAutoConfirmer) AutoConfirmManagedEscrow(
+	ctx context.Context,
+	event *events.CancelablePaymentReady,
+	chain iwallet.ChainType,
+) error {
+	if c.settlement == nil {
+		return fmt.Errorf("managed escrow auto confirmer: settlement service unavailable")
+	}
+	return c.settlement.AutoConfirmManagedEscrowCancelable(ctx, event, chain)
+}
+
+var _ distribution.ManagedEscrowAutoConfirmer = distributionManagedEscrowAutoConfirmer{}
+
+func (n *MobazhaNode) runDistributionPaymentModules(ctx context.Context) {
+	for _, module := range n.paymentModules {
+		runner, ok := module.(distribution.PaymentModuleRunner)
+		if !ok {
+			continue
+		}
+		moduleID := module.ID()
+		go func() {
+			if err := runner.Run(ctx); err != nil && ctx.Err() == nil {
+				logger.LogErrorWithIDf(log, n.nodeID, "Trusted payment module %s stopped: %v", moduleID, err)
+			}
+		}()
+	}
+}
+
 // registerManagedEscrowAdapterShadow constructs ManagedEscrowAdapter instances and
-// activates them as the canonical V2 escrow path for chains listed in
-// n.managed_escrowCapConfig.ManagedEscrowChains (Phase EVM-ManagedEscrow v0.3.0 — Sprint 3
-// grayscale routing).
+// activates them as the canonical V2 escrow path for chains enabled by the
+// distribution's payment capability provider.
 //
 // Routing semantics (EVM_HYBRID_STRATEGY.md §5.5 D-Hybrid-23):
 //   - Ready EVM chains: ForCoinV2 returns ManagedEscrowAdapter when relayer is
@@ -144,7 +243,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 //     adapters.NewRelayBridgeWithRecorder. Standalone: RelayAPIURL + Bearer from
 //     RelayAPIBearer, else pkg/relay.EnvPlatformRelayToken (same as Settlement HTTP).
 //     ManagedEscrowAdapter V2 is NOT registered when no real relayer is wired — matching
-//     hosting gateway (relay required before ManagedEscrowCapConfig). SetupPayment without
+//     hosting gateway (relay required before enabling the managed EVM escrow capability). SetupPayment without
 //     relay would only strand buyer funds in a ManagedEscrow that cannot settle.
 //     Note: settlement.IsEVMRelayAvailable() is a separate check for legacy
 //     ClientSigned relay HTTP paths; ManagedEscrow uses RelayerIsConfigured(managed_escrowRelayer).
@@ -171,7 +270,11 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 
 	store, recorder = n.newSettlementActionStore("ManagedEscrowAdapter V2")
 
-	activeChainsEarly := managed_escrow.ManagedEscrowEnabledChains(n.managed_escrowCapConfig)
+	activeChainsEarly := payment.EnabledChains(
+		n.paymentCapabilities,
+		payment.CapabilityManagedEVMEscrowV2,
+		managed_escrow.ReadyEVMChainTypes(),
+	)
 	if len(activeChainsEarly) > 0 && n.db == nil {
 		logger.LogWarningWithIDf(log, n.nodeID,
 			"ManagedEscrowAdapter V2: database unavailable — skipping ManagedEscrow-enabled chains (on-chain observation requires persistence)")
@@ -204,14 +307,12 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		return
 	}
 
-	codeAndNonce := &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet}
+	codeAndNonce := &paymentManagedEscrowNonceProvider{readers: distributionEVMReaderProvider{wallets: n.multiwallet}}
 	deps := adapters.ManagedEscrowAdapterDeps{
 		Relayer:       relayer,
-		Keys:          n.keyProvider,
-		Multiwallet:   n.multiwallet,
 		ActionStore:   store,
 		AutoConfirmer: managed_escrowCancelableAutoConfirmer{settlement: n.settlementService},
-		OwnerSigner:   &paymentManagedEscrowOwnerSigner{keys: n.keyProvider},
+		OwnerSigner:   &paymentManagedEscrowOwnerSigner{signer: distributionEVMDigestSigner{keys: n.keyProvider}},
 		NonceProvider: codeAndNonce,
 		CodeProvider:  codeAndNonce,
 		WalletTestnet: n.walletTestnet,
@@ -231,6 +332,11 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 	monitors := make(map[iwallet.ChainType]*managed_escrow.LiveMonitor, len(activeChainsEarly))
 	runtimeChainIDs := make(map[iwallet.ChainType]uint64, len(activeChainsEarly))
 	for _, chain := range activeChainsEarly {
+		if n.paymentRegistry.HasChain(chain) {
+			logger.LogInfoWithIDf(log, n.nodeID,
+				"ManagedEscrowAdapter transition fallback skipped for chain %s: distribution module already registered a strategy", chain)
+			continue
+		}
 		if n.db == nil {
 			continue
 		}
@@ -607,11 +713,11 @@ func (n *MobazhaNode) wireGuestEVMManagedEscrowSettlement() {
 	if n.db == nil || n.guestOrderService == nil || n.keyProvider == nil || n.multiwallet == nil || !managed_escrow.RelayerIsConfigured(n.managed_escrowRelayer) {
 		return
 	}
-	codeAndNonce := &paymentManagedEscrowNonceProvider{multiwallet: n.multiwallet}
+	codeAndNonce := &paymentManagedEscrowNonceProvider{readers: distributionEVMReaderProvider{wallets: n.multiwallet}}
 	svc := guest.NewEVMManagedEscrowSettlementService(guest.EVMManagedEscrowSettlementConfig{
 		DB:            n.db,
 		Relayer:       n.managed_escrowRelayer,
-		OwnerSigner:   &paymentManagedEscrowOwnerSigner{keys: n.keyProvider},
+		OwnerSigner:   &paymentManagedEscrowOwnerSigner{signer: distributionEVMDigestSigner{keys: n.keyProvider}},
 		NonceProvider: codeAndNonce,
 		CodeProvider:  codeAndNonce,
 		WalletTestnet: n.walletTestnet,

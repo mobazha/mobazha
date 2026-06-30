@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -50,16 +51,24 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	type fiatEntry struct{}
-	var fiat any
-	if svc, ok := getFiatService(r); ok && (g.editionPolicy == nil || g.editionPolicy.Name() != edition.CommunityName) {
+	fiat := make([]contracts.ProviderInfo, 0)
+	if svc, ok := getFiatService(r); ok {
 		providers, fiatErr := svc.EnabledProviders(r.Context())
 		if fiatErr == nil {
-			fiat = providers
+			policy := g.editionPolicy
+			if policy == nil {
+				policy = edition.CurrentPolicy()
+			}
+			for _, provider := range providers {
+				if policy.AllowsPaymentMethod(edition.PaymentMethod{
+					ID:   provider.ProviderID,
+					Kind: "fiat",
+					Flow: "provider-session",
+				}) {
+					fiat = append(fiat, provider)
+				}
+			}
 		}
-	}
-	if fiat == nil {
-		fiat = []fiatEntry{}
 	}
 	if crypto == nil {
 		crypto = []string{}

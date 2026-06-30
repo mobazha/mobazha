@@ -81,8 +81,18 @@ var (
 // NewSharedManager creates a new SharedManager instance
 func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, error) {
 	editionName := configuredEditionName(cfg)
-	if _, err := edition.ResolvePolicy(editionName); err != nil {
+	distributionPolicy, err := edition.ResolvePolicy(editionName)
+	if err != nil {
 		return nil, fmt.Errorf("resolve edition policy: %w", err)
+	}
+	platformIntegration := distributionPolicy.AllowsCapability(edition.CapabilityPlatformIntegration)
+	if !platformIntegration {
+		// Community/self-hosted remains operationally independent even when a
+		// legacy config or persisted data contains Hosting connection details.
+		cfg.SaaSAPIURL = ""
+		cfg.StandaloneAPIKey = ""
+		cfg.CasdoorCertificate = ""
+		cfg.OwnerUserID = ""
 	}
 	once.Do(func() {
 		if err := edition.ConfigureCurrentPolicy(editionName); err != nil {
@@ -199,12 +209,12 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		// provisioning, heartbeat, and exchange rates work out of the box.
 		// Hosting's infrastructure-only default node must not consume remote
 		// rates from itself (hairpin via public URL).
-		if !cfg.SaaSMode && cfg.SaaSAPIURL == "" && !cfg.InfrastructureOnly {
+		if platformIntegration && !cfg.SaaSMode && cfg.SaaSAPIURL == "" && !cfg.InfrastructureOnly {
 			cfg.SaaSAPIURL = "https://app.mobazha.org"
 		}
 
 		// Load persisted API key from disk if not provided via CLI.
-		if !cfg.SaaSMode && cfg.StandaloneAPIKey == "" && cfg.DataDir != "" {
+		if platformIntegration && !cfg.SaaSMode && cfg.StandaloneAPIKey == "" && cfg.DataDir != "" {
 			cfg.StandaloneAPIKey = loadPersistedAPIKey(cfg.DataDir)
 		}
 
@@ -217,7 +227,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		// Auto-configure HTTP proxy trusted peers from NetConfig so that
 		// native binary nodes accept LibP2P API proxy requests from SaaS
 		// without requiring a manual --httpproxytrustedpeer CLI flag.
-		if !cfg.SaaSMode && len(cfg.HTTPProxyTrustedPeers) == 0 {
+		if platformIntegration && !cfg.SaaSMode && len(cfg.HTTPProxyTrustedPeers) == 0 {
 			if pid, ok := netConfig.GetConfig("saasDefaultPeerID"); ok && pid != "" {
 				cfg.HTTPProxyTrustedPeers = []string{pid}
 				log.Infof("Auto-configured HTTP proxy trusted peer from NetConfig: %s", pid)
@@ -415,6 +425,12 @@ func (im *SharedManager) GetExchangeRateService() contracts.ExchangeRateService 
 }
 
 func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error) {
+	distributionPolicy, err := edition.ResolvePolicy(im.editionName)
+	if err != nil {
+		return nil, fmt.Errorf("resolve gateway edition policy: %w", err)
+	}
+	platformIntegration := distributionPolicy.AllowsCapability(edition.CapabilityPlatformIntegration)
+
 	// Resolve gateway listen address: CLI override > default.
 	gatewayAddr := cfg.GatewayAddr
 	if gatewayAddr == "" {
@@ -479,7 +495,7 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 
 	casdoorCert := cfg.CasdoorCertificate
 	ownerUserID := cfg.OwnerUserID
-	if !cfg.SaaSMode && cfg.DataDir != "" {
+	if platformIntegration && !cfg.SaaSMode && cfg.DataDir != "" {
 		persistedCert, persistedOwner := api.LoadPersistedPlatformConfig(cfg.DataDir)
 		if casdoorCert == "" && persistedCert != "" {
 			casdoorCert = persistedCert
@@ -521,7 +537,7 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 
 	// Auto-fetch Casdoor certificate on standalone startup when not yet available.
 	// This enables buyer login immediately after deployment without manual admin action.
-	if !cfg.SaaSMode && cfg.SaaSAPIURL != "" && casdoorCert == "" && cfg.DataDir != "" {
+	if platformIntegration && !cfg.SaaSMode && cfg.SaaSAPIURL != "" && casdoorCert == "" && cfg.DataDir != "" {
 		go im.autoFetchCasdoorCert(cfg.SaaSAPIURL, cfg.DataDir, localPeerID, ownerUserID)
 	}
 

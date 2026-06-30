@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "1.0.0",
+  "defaultClassification": "core",
+  "classifications": [
+    {
+      "classification": "standalone-only",
+      "patterns": [
+        "/v1/admin/**",
+        "/v1/system/**"
+      ]
+    },
+    {
+      "classification": "optional-service",
+      "patterns": [
+        "/v1/agent/**",
+        "/v1/ai/**",
+        "/v1/analytics/**",
+        "/v1/fiat/**",
+        "/v1/fulfillment/**",
+        "/v1/webhooks/**"
+      ]
+    },
+    {
+      "classification": "commercial-extension",
+      "patterns": [
+        "/platform/v1/**"
+      ]
+    }
+  ],
+  "capabilityGates": [
+    {
+      "patterns": ["/v1/agent/**", "/v1/ai/**"],
+      "capability": "ai"
+    },
+    {
+      "patterns": ["/v1/analytics/**"],
+      "capability": "analytics"
+    },
+    {
+      "patterns": ["/v1/fiat/**"],
+      "capability": "payment.fiat"
+    },
+    {
+      "patterns": ["/v1/fulfillment/**"],
+      "capability": "fulfillment"
+    },
+    {
+      "patterns": ["/v1/webhooks/**"],
+      "capability": "webhooks"
+    }
+  ],
+  "publicInvariants": {
+    "successEnvelope": "{data,meta?}",
+    "errorEnvelope": "{error:{code,message,details?}}",
+    "capabilityEndpoint": "/v1/runtime-config",
+    "openAPIEndpoint": "/v1/openapi.json"
+  }
+}

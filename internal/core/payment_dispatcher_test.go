@@ -12,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
@@ -441,6 +442,84 @@ func (s *autoConfirmRefunderProbeStrategy) SellerDeclineRefund(context.Context, 
 	return nil, nil
 }
 
+type paymentModuleProbe struct {
+	id       string
+	chain    iwallet.ChainType
+	strategy payment.ChainEscrowV2
+	err      error
+	runtime  distribution.PaymentRuntime
+}
+
+func (m *paymentModuleProbe) ID() string { return m.id }
+
+func (m *paymentModuleProbe) Register(_ context.Context, runtime distribution.PaymentRuntime, registrar distribution.PaymentRegistrar) error {
+	m.runtime = runtime
+	if m.err != nil {
+		return m.err
+	}
+	return registrar.RegisterV2(m.chain, m.strategy)
+}
+
+func TestRegisterDistributionPaymentModules_ExternalStrategyIsRegistered(t *testing.T) {
+	strategy := &autoConfirmProbeStrategy{called: make(chan struct{})}
+	module := &paymentModuleProbe{id: "commercial.solana", chain: iwallet.ChainSolana, strategy: strategy}
+	n := &MobazhaNode{
+		identityFields: identityFields{nodeCtx: context.Background()},
+		walletFields: walletFields{
+			paymentRegistry: payment.NewRegistry(),
+			paymentModules:  []distribution.PaymentModule{module},
+		},
+	}
+
+	if err := n.registerDistributionPaymentModules(); err != nil {
+		t.Fatalf("registerDistributionPaymentModules: %v", err)
+	}
+	got, err := n.paymentRegistry.ForChainV2(iwallet.ChainSolana)
+	if err != nil {
+		t.Fatalf("ForChainV2(Solana): %v", err)
+	}
+	if got != strategy {
+		t.Fatalf("ForChainV2(Solana) = %T, want module strategy", got)
+	}
+	if module.runtime.EVMSigner == nil || module.runtime.EVMReaders == nil {
+		t.Fatal("distribution module did not receive narrow EVM operation ports")
+	}
+	if module.runtime.Actions == nil || module.runtime.ActionRecorder == nil {
+		t.Fatal("distribution module did not receive settlement action ports")
+	}
+}
+
+func TestRegisterDistributionPaymentModules_CannotReplaceCoreStrategy(t *testing.T) {
+	registry := payment.NewRegistry()
+	coreStrategy := &autoConfirmProbeStrategy{called: make(chan struct{})}
+	registry.RegisterV2(iwallet.ChainBitcoin, coreStrategy)
+	n := &MobazhaNode{
+		identityFields: identityFields{nodeCtx: context.Background()},
+		walletFields: walletFields{
+			paymentRegistry: registry,
+			paymentModules: []distribution.PaymentModule{
+				&paymentModuleProbe{
+					id:       "invalid.override",
+					chain:    iwallet.ChainBitcoin,
+					strategy: &autoConfirmProbeStrategy{called: make(chan struct{})},
+				},
+			},
+		},
+	}
+
+	err := n.registerDistributionPaymentModules()
+	if err == nil {
+		t.Fatal("expected core strategy replacement to be rejected")
+	}
+	got, lookupErr := registry.ForChainV2(iwallet.ChainBitcoin)
+	if lookupErr != nil {
+		t.Fatalf("ForChainV2(Bitcoin): %v", lookupErr)
+	}
+	if got != coreStrategy {
+		t.Fatal("core strategy was replaced after rejected module registration")
+	}
+}
+
 func TestCancelablePaymentEventTargetsNode(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -515,8 +594,8 @@ func nodeWithManagedEscrowShadowMonitorDeps(t *testing.T) *MobazhaNode {
 		storageFields: storageFields{db: db},
 		networkFields: networkFields{eventBus: events.NewBus()},
 		walletFields: walletFields{
-			managed_escrowCapConfig: readyManagedEscrowCapConfig(t),
-			relayAPIURL:   "http://relay.test", // ManagedEscrowAdapter V2 requires a real relayer
+			paymentCapabilities: readyPaymentCapabilityProvider(t),
+			relayAPIURL:         "http://relay.test", // ManagedEscrowAdapter V2 requires a real relayer
 		},
 	}
 	n.keyProvider = &mockKeyProvider{}
@@ -555,20 +634,20 @@ func shadowRegisteredEVMChains(t *testing.T, n *MobazhaNode) []iwallet.ChainType
 	return out
 }
 
-func readyManagedEscrowCapConfig(t *testing.T) *managed_escrow.ChainCapabilityConfig {
+func readyPaymentCapabilityProvider(t *testing.T) payment.ChainCapabilityProvider {
 	t.Helper()
-	chains := readyEVMChains(t)
-	managed_escrowChains := make([]string, 0, len(chains))
-	for _, chain := range chains {
-		managed_escrowChains = append(managed_escrowChains, string(chain))
-	}
-	return &managed_escrow.ChainCapabilityConfig{ManagedEscrowChains: managed_escrowChains}
+	return payment.NewStaticChainCapabilityProvider(
+		map[payment.RuntimeCapability][]iwallet.ChainType{
+			payment.CapabilityManagedEVMEscrowV2: readyEVMChains(t),
+		},
+	)
 }
 
 func TestManagedEscrowAdapterShadow_SkipsRegistrationWithoutRelayer(t *testing.T) {
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.relayAPIURL = "" // simulate standalone without RelayAPIURL
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	if len(n.managedEscrowAdapters) != 0 {
 		t.Fatalf("managedEscrowAdapters = %d entries, want 0 without relayer", len(n.managedEscrowAdapters))
@@ -586,6 +665,7 @@ func TestManagedEscrowAdapterShadow_ForCoinV2UnavailableWithoutRelayer(t *testin
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.relayAPIURL = ""
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	_, err := n.paymentRegistry.ForCoinV2(testETHNativeCoin)
 	if err == nil {
@@ -596,6 +676,7 @@ func TestManagedEscrowAdapterShadow_ForCoinV2UnavailableWithoutRelayer(t *testin
 func TestManagedEscrowAdapterShadow_RegistersForReadyEVMChains(t *testing.T) {
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	if n.managed_escrowActionStore == nil {
 		t.Fatal("registerManagedEscrowAdapterShadow did not populate managed_escrowActionStore")
@@ -647,6 +728,7 @@ func TestManagedEscrowAdapterShadow_V1PathRetired(t *testing.T) {
 func TestManagedEscrowAdapterShadow_V2LookupReturnsManagedEscrowAdapter(t *testing.T) {
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	for chain, want := range n.managedEscrowAdapters {
 		got, err := n.paymentRegistry.ForChainV2(chain)
@@ -668,6 +750,7 @@ func TestManagedEscrowAdapterShadow_V2LookupReturnsManagedEscrowAdapter(t *testi
 func TestManagedEscrowAdapterShadow_RegistersManagedEscrowMonitorsWhenMonitorDepsAvailable(t *testing.T) {
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	want := shadowRegisteredEVMChains(t, n)
 	if got := len(n.managed_escrowMonitors); got != len(want) {
@@ -747,6 +830,7 @@ func TestRuntimeManagedEscrowChainID_DefaultsToMainnetWithoutRuntimeTestnet(t *t
 func TestManagedEscrowAdapterShadow_GetActionStatusReportsActionNotFound(t *testing.T) {
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	// Loop every Ready=true EVM chain so a per-chain wiring regression
 	// cannot slip past on a chain we did not name explicitly. zkSync
@@ -782,6 +866,7 @@ func TestManagedEscrowAdapterShadow_OwnerProviderInjectedWhenPaymentServiceAvail
 	// because registerManagedEscrowAdapterShadow only checks pointer presence.
 	n.paymentService = corepayment.NewPaymentAppService(corepayment.PaymentAppServiceConfig{NodeID: "test-shadow"})
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	if len(n.managedEscrowAdapters) == 0 {
 		t.Fatal("managedEscrowAdapters empty; shadow registration did not run with paymentService present")
@@ -809,6 +894,7 @@ func TestManagedEscrowAdapterShadow_OwnerProviderNilWhenPaymentServiceMissing(t 
 	// distinct and pinned.
 	n := nodeWithManagedEscrowShadowMonitorDeps(t)
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	if len(n.managedEscrowAdapters) == 0 {
 		t.Fatal("managedEscrowAdapters empty; deps-present shadow registration unexpectedly skipped")
@@ -829,6 +915,7 @@ func TestManagedEscrowAdapterShadow_SkippedWhenDepsMissing(t *testing.T) {
 	// cannot silently start requiring keyProvider/multiwallet here.
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-shadow-skipped"}}
 	n.registerPaymentStrategies()
+	n.registerManagedEscrowAdapterShadow()
 
 	if n.managed_escrowActionStore != nil {
 		t.Error("managed_escrowActionStore should be nil when shadow registration is skipped")

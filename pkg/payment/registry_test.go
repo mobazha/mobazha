@@ -251,3 +251,58 @@ func TestRegistry_ForCoinV2_V2NativeNotWrapped(t *testing.T) {
 		t.Fatal("native V2 strategy should not be wrapped")
 	}
 }
+
+func TestRegistry_RegisterV2Exclusive_RejectsExistingV1(t *testing.T) {
+	r := payment.NewRegistry()
+	r.Register(iwallet.ChainBitcoin, &mockStrategy{model: payment.PaymentModelMonitored})
+
+	err := r.RegisterV2Exclusive(iwallet.ChainBitcoin, &nativeV2Strategy{model: payment.PaymentModelMonitored})
+
+	if err == nil {
+		t.Fatal("RegisterV2Exclusive should reject an existing V1 strategy")
+	}
+}
+
+func TestRegistry_RegisterV2Exclusive_RegistersUnusedChain(t *testing.T) {
+	r := payment.NewRegistry()
+	strategy := &nativeV2Strategy{model: payment.PaymentModelMonitored}
+
+	if err := r.RegisterV2Exclusive(iwallet.ChainSolana, strategy); err != nil {
+		t.Fatalf("RegisterV2Exclusive: %v", err)
+	}
+	if !r.HasChain(iwallet.ChainSolana) {
+		t.Fatal("HasChain(Solana) = false after exclusive registration")
+	}
+	got, err := r.ForChainV2(iwallet.ChainSolana)
+	if err != nil {
+		t.Fatalf("ForChainV2(Solana): %v", err)
+	}
+	if got != strategy {
+		t.Fatalf("ForChainV2(Solana) returned %T, want registered strategy", got)
+	}
+}
+
+func TestRegistry_RegisterV2BatchExclusive_IsAtomic(t *testing.T) {
+	r := payment.NewRegistry()
+	existing := &nativeV2Strategy{model: payment.PaymentModelMonitored}
+	r.RegisterV2(iwallet.ChainBitcoin, existing)
+
+	err := r.RegisterV2BatchExclusive(map[iwallet.ChainType]payment.ChainEscrowV2{
+		iwallet.ChainEthereum: &nativeV2Strategy{model: payment.PaymentModelMonitored},
+		iwallet.ChainBitcoin:  &nativeV2Strategy{model: payment.PaymentModelMonitored},
+	})
+
+	if err == nil {
+		t.Fatal("RegisterV2BatchExclusive should reject a batch containing an existing chain")
+	}
+	if r.HasChain(iwallet.ChainEthereum) {
+		t.Fatal("RegisterV2BatchExclusive partially committed a rejected batch")
+	}
+	got, lookupErr := r.ForChainV2(iwallet.ChainBitcoin)
+	if lookupErr != nil {
+		t.Fatalf("ForChainV2(Bitcoin): %v", lookupErr)
+	}
+	if got != existing {
+		t.Fatal("RegisterV2BatchExclusive changed the existing strategy")
+	}
+}

@@ -247,7 +247,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	// Standalone mode: reverse-proxy /platform/* to the SaaS backend so
 	// that frontend calls to HOSTING_API (store-links, bots, domains, etc.)
 	// reach the platform instead of falling through to the SPA catch-all.
-	if config.SaaSAPIURL != "" {
+	if editionPolicy.AllowsCapability(edition.CapabilityPlatformIntegration) && config.SaaSAPIURL != "" {
 		if saasTarget, err := url.Parse(config.SaaSAPIURL); err == nil {
 			proxy := httputil.NewSingleHostReverseProxy(saasTarget)
 			topMux.Handle("/platform/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -259,6 +259,10 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			}))
 			log.Infof("Platform API proxy enabled: /platform/* → %s", config.SaaSAPIURL)
 		}
+	} else if !editionPolicy.AllowsCapability(edition.CapabilityPlatformIntegration) {
+		// Register an explicit negative route before the frontend catch-all so an
+		// embedded SPA can never turn a disabled control-plane call into HTTP 200.
+		topMux.Handle("/platform/", http.NotFoundHandler())
 	}
 
 	runtimeFrontendConfig := g.runtimeFrontendConfig()
@@ -715,7 +719,7 @@ func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy e
 
 func filterPaymentCapabilities(methods []frontend.PaymentCapability, policy edition.Policy) []frontend.PaymentCapability {
 	if policy == nil {
-		return methods
+		return []frontend.PaymentCapability{}
 	}
 	filtered := make([]frontend.PaymentCapability, 0, len(methods))
 	for _, method := range methods {

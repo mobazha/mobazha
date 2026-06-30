@@ -17,6 +17,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 )
 
 const (
@@ -85,7 +86,9 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 	g.registerNodeHumaMiscPublicOperations(api)
 	g.registerNodeHumaSocialPublicOperations(api)
 	g.registerNodeHumaOrderPublicOperations(api)
-	g.registerNodeHumaFiatPublicOperations(api)
+	if g.editionPolicy != nil && g.editionPolicy.AllowsCapability(edition.CapabilityFiatPayments) {
+		g.registerNodeHumaFiatPublicOperations(api)
+	}
 	g.registerNodeHumaFulfillmentPublicOperations(api)
 	g.registerNodeHumaSettingsPublicOperations(api)
 	g.registerNodeHumaAuthPublicOperations(api)
@@ -109,7 +112,9 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 		g.registerNodeHumaMiscAdminOperations(api)
 		g.registerNodeHumaSocialAdminOperations(api)
 		g.registerNodeHumaOrderAdminOperations(api)
-		g.registerNodeHumaFiatAdminOperations(api)
+		if g.editionPolicy != nil && g.editionPolicy.AllowsCapability(edition.CapabilityFiatPayments) {
+			g.registerNodeHumaFiatAdminOperations(api)
+		}
 		g.registerNodeHumaFulfillmentAdminOperations(api)
 		g.registerNodeHumaSettingsAdminOperations(api)
 		g.registerNodeHumaAuthAdminOperations(api)

@@ -48,6 +48,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/fulfillment"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
@@ -1458,6 +1459,10 @@ func finalizeSupplyChainSubsystem(obNode *MobazhaNode) {
 // migrates DB models, creates FiatProviderRegistry and FiatPaymentAppService.
 // Providers are registered later by hosting (SaaS) or node config (standalone).
 func initFiatSubsystem(obNode *MobazhaNode) {
+	if !edition.CurrentPolicy().AllowsCapability(edition.CapabilityFiatPayments) {
+		logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem disabled by distribution capability policy")
+		return
+	}
 	if err := dbgorm.MigrateFiatModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Fiat: failed to migrate models: %v", err)
 		return
@@ -1556,35 +1561,29 @@ func initEventDispatcher(
 // initPlatformAIConfig sets up the platform-provided AI fallback config
 // from repo.Config fields injected by hosting (SaaS) or standalone admin.
 func initPlatformAIConfig(obNode *MobazhaNode, cfg *repo.Config) {
-	profile := aipkg.PlatformProfile{
-		Text:   platformEndpointConfig(cfg.PlatformAI.Text, cfg.PlatformAI.DailyLimit),
-		Vision: platformEndpointConfig(cfg.PlatformAI.Vision, cfg.PlatformAI.DailyLimit),
+	profile := pkgcontracts.AIProfile{
+		Text:       contractAIEndpointConfig(cfg.PlatformAI.Text),
+		Vision:     contractAIEndpointConfig(cfg.PlatformAI.Vision),
+		DailyLimit: cfg.PlatformAI.DailyLimit,
 	}
-	if !profile.TextAvailable() && !profile.VisionAvailable() {
+	if profile.Text.Provider == "" && profile.Vision.Provider == "" {
 		return
 	}
-	obNode.SetPlatformAIProfile(profile)
+	obNode.SetAIProfile(profile)
 	logger.LogInfoWithIDf(log, obNode.nodeID, "Platform AI configured (text=%t, vision=%t, limit=%d/day)",
-		profile.TextAvailable(), profile.VisionAvailable(), cfg.PlatformAI.DailyLimit)
+		profile.Text.Provider != "", profile.Vision.Provider != "", cfg.PlatformAI.DailyLimit)
 }
 
-func platformEndpointConfig(endpoint repo.PlatformAIEndpointConfig, dailyLimit int) *aipkg.Config {
+func contractAIEndpointConfig(endpoint repo.PlatformAIEndpointConfig) pkgcontracts.AIEndpointConfig {
 	if endpoint.Provider == "" || endpoint.APIKey == "" {
-		return nil
+		return pkgcontracts.AIEndpointConfig{}
 	}
-	cfg := &aipkg.Config{
-		Provider:   endpoint.Provider,
-		APIKey:     endpoint.APIKey,
-		Model:      endpoint.Model,
-		BaseURL:    endpoint.BaseURL,
-		Enabled:    true,
-		IsPlatform: true,
-		DailyLimit: dailyLimit,
+	return pkgcontracts.AIEndpointConfig{
+		Provider: endpoint.Provider,
+		APIKey:   endpoint.APIKey,
+		Model:    endpoint.Model,
+		BaseURL:  endpoint.BaseURL,
 	}
-	if !cfg.IsValid() {
-		return nil
-	}
-	return cfg
 }
 
 // gatewayLocalAddr derives the local HTTP API address from cfg.GatewayAddr.

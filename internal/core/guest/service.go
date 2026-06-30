@@ -51,6 +51,7 @@ type GuestListingQuery = checkoutsupply.CheckoutSupplyListingReader
 
 // GuestOrderAppServiceConfig groups dependencies for GuestOrderAppService.
 type GuestOrderAppServiceConfig struct {
+	Context                 context.Context
 	DB                      database.Database
 	DirectPayment           *DirectPaymentService
 	SweepService            *AutoSweepService
@@ -84,10 +85,18 @@ type DigitalSupplyLineResolver interface {
 	SupplyAvailabilityLinesForOrderItems([]digital.OrderLineItem) ([]contracts.SupplyLine, error)
 }
 
+// ManagedEscrowGuestSettlementService is the Core orchestration surface used
+// by guest order state transitions. Concrete chain execution stays private.
+type ManagedEscrowGuestSettlementService interface {
+	SubmitReleaseForOrder(ctx context.Context, orderToken string) error
+	RecoverPendingSettlements(ctx context.Context)
+}
+
 // GuestOrderAppService manages the Guest Order lifecycle:
 // creation, payment detection, confirmation, shipping, expiry, and auto-completion.
 type GuestOrderAppService struct {
 	db                         database.Database
+	runtimeCtx                 context.Context
 	directPayment              *DirectPaymentService
 	sweepService               *AutoSweepService
 	eventBus                   events.Bus
@@ -108,7 +117,7 @@ type GuestOrderAppService struct {
 	solanaMonitorAvailable     bool
 	utxoMonitor                UTXOMonitorReadiness
 	multiwallet                contracts.WalletOperator
-	evmManagedEscrowSettlement          *EVMManagedEscrowSettlementService
+	evmManagedEscrowSettlement          ManagedEscrowGuestSettlementService
 	evmRuntimeMu               sync.RWMutex
 	evmManagedEscrowFundingReady        bool
 	evmManagedEscrowObservationReady    bool
@@ -116,26 +125,31 @@ type GuestOrderAppService struct {
 	evmManagedEscrowRelayReady          bool
 	evmManagedEscrowMonitorChains       map[iwallet.ChainType]struct{}
 	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
-	external_paymentAvailable func() bool
-	billingHoldActive func() bool
+	external_paymentAvailable      func() bool
+	billingHoldActive    func() bool
 	checkoutSupplyQuoter *checkoutsupply.CheckoutSupplyQuoteService
 }
 
-// SetEVMManagedEscrowSettlement wires Phase 3C ManagedEscrow relay settlement (after registerManagedEscrowAdapterShadow).
-func (s *GuestOrderAppService) SetEVMManagedEscrowSettlement(svc *EVMManagedEscrowSettlementService) {
+// SetEVMManagedEscrowSettlement wires managed EVM escrow settlement after distribution registration.
+func (s *GuestOrderAppService) SetEVMManagedEscrowSettlement(svc ManagedEscrowGuestSettlementService) {
 	if s == nil {
 		return
 	}
 	s.evmManagedEscrowSettlement = svc
-	if svc != nil {
-		svc.SetOnConfirmed(s.OnEVMManagedEscrowSettlementConfirmed)
+	if callback, ok := svc.(interface{ SetOnConfirmed(func(string)) }); ok {
+		callback.SetOnConfirmed(s.OnEVMManagedEscrowSettlementConfirmed)
 	}
 }
 
 // NewGuestOrderAppService constructs the service.
 func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppService {
+	runtimeCtx := cfg.Context
+	if runtimeCtx == nil {
+		runtimeCtx = context.Background()
+	}
 	return &GuestOrderAppService{
 		db:                      cfg.DB,
+		runtimeCtx:              runtimeCtx,
 		directPayment:           cfg.DirectPayment,
 		sweepService:            cfg.SweepService,
 		eventBus:                cfg.EventBus,
@@ -798,11 +812,11 @@ func (s *GuestOrderAppService) afterGuestOrderFunded(orderToken string) {
 				redact.Token(orderToken))
 			return
 		}
-		go func(token string) {
-			if err := s.evmManagedEscrowSettlement.SubmitReleaseForOrder(context.Background(), token); err != nil {
+		go func(ctx context.Context, token string) {
+			if err := s.evmManagedEscrowSettlement.SubmitReleaseForOrder(ctx, token); err != nil {
 				log.Warningf("guest managed EVM settlement for %s: %v", redact.Token(token), err)
 			}
-		}(orderToken)
+		}(s.runtimeCtx, orderToken)
 		return
 	}
 	s.emitGuestOrderFunded(orderToken)

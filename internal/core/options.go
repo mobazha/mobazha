@@ -25,10 +25,11 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/deploy"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/mobazha/mobazha3.0/pkg/relay"
-	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -54,16 +55,28 @@ func WithHostService(hs coreiface.HostService) NodeOption {
 	}
 }
 
-// WithManagedEscrowCapConfig sets the EVM-ManagedEscrow routing configuration. Legacy EVM
-// ClientSigned escrow is retired. Omit this option (nil cfg) to keep ManagedEscrow off;
-// pass a config with empty ManagedEscrowChains for all Ready EVM chains; pass a
-// non-empty ManagedEscrowChains list to limit ManagedEscrowAdapter activation.
-//
-// Injection point: hosting calls this only when evm_managed_escrow.managed_escrow_chains is set;
-// standalone start always passes ManagedEscrowCapabilityConfig() from repo config.
-func WithManagedEscrowCapConfig(cfg *managed_escrow.ChainCapabilityConfig) NodeOption {
+// WithPaymentCapabilityProvider injects the distribution's immutable payment
+// capability allowlist. Omit it to keep optional payment rails disabled.
+func WithPaymentCapabilityProvider(provider payment.ChainCapabilityProvider) NodeOption {
 	return func(n *MobazhaNode) {
-		n.managed_escrowCapConfig = cfg
+		n.paymentCapabilities = provider
+	}
+}
+
+// WithPaymentModules installs trusted, statically linked distribution modules.
+// The slice is copied so callers cannot mutate node composition after setup.
+func WithPaymentModules(modules ...distribution.PaymentModule) NodeOption {
+	owned := append([]distribution.PaymentModule(nil), modules...)
+	return func(n *MobazhaNode) {
+		n.paymentModules = append([]distribution.PaymentModule(nil), owned...)
+	}
+}
+
+// WithAIProfile injects distribution-provided AI routes through a
+// provider-neutral public contract.
+func WithAIProfile(profile contracts.AIProfile) NodeOption {
+	return func(n *MobazhaNode) {
+		n.SetAIProfile(profile)
 	}
 }
 
@@ -953,12 +966,13 @@ func (n *MobazhaNode) initGuestOrderService() {
 	supportedUTXO := n.detectGuestUTXOChains()
 
 	// EVM guest checkout uses ManagedEscrow observation (Phase 3B), not balance polling.
-	// Buyer visibility is gated at runtime by SetEVMManagedEscrowClosureRuntime after
-	// registerManagedEscrowAdapterShadow wires monitors, relay, and funding.
+	// Buyer visibility is gated at runtime by SetEVMManagedEscrowClosureRuntime after a
+	// trusted distribution module wires monitors, relay, and funding.
 	guestEvmAvailable := false
 	guestSolanaAvailable := false
 
 	n.guestOrderService = guest.NewGuestOrderAppService(guest.GuestOrderAppServiceConfig{
+		Context:                 n.nodeCtx,
 		DB:                      n.db,
 		DirectPayment:           n.directPaymentService,
 		SweepService:            n.autoSweepService,

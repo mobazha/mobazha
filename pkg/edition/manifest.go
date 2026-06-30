@@ -32,6 +32,7 @@ type Manifest struct {
 	Edition                 string          `json:"edition"`
 	License                 string          `json:"license"`
 	PaymentPluginSDKLicense string          `json:"paymentPluginSdkLicense"`
+	Capabilities            []string        `json:"capabilities"`
 	Payment                 PaymentManifest `json:"payment"`
 	DeploymentTargets       []string        `json:"deploymentTargets"`
 	Zcash                   ZcashManifest   `json:"zcash"`
@@ -89,6 +90,11 @@ func (m Manifest) Validate() error {
 	}
 	if err := validateUniqueTokens("deploymentTargets", m.DeploymentTargets, false); err != nil {
 		return err
+	}
+	if len(m.Capabilities) > 0 {
+		if err := validateUniqueTokens("capabilities", m.Capabilities, false); err != nil {
+			return err
+		}
 	}
 	if contains(m.Payment.Chains, "ZEC") {
 		if !m.Zcash.TransparentOnly || m.Zcash.DefaultDerivation != "transparent" {

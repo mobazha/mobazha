@@ -9,15 +9,17 @@ import (
 	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	"github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
 // SharedRouterConfig configures a SharedRouter.
 type SharedRouterConfig struct {
-	Resolver       func(r *http.Request) (contracts.NodeService, error)
-	FeatureManager *config.FeatureManager
-	SkillProvider  agentskill.Provider
-	AllowCORS      bool
+	Resolver           func(r *http.Request) (contracts.NodeService, error)
+	FeatureManager     *config.FeatureManager
+	SkillProvider      agentskill.Provider
+	AllowCORS          bool
+	DistributionPolicy edition.Policy
 
 	// PostResolverMiddleware, if set, is applied after the resolver middleware
 	// has populated the request context (NodeService + AuthIdentity) but before
@@ -31,10 +33,19 @@ type SharedRouterConfig struct {
 // middleware injects the NodeService into the request context so that
 // getNodeService(r) works without any handler changes.
 func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
+	distributionPolicy := cfg.DistributionPolicy
+	if distributionPolicy == nil {
+		var err error
+		distributionPolicy, err = edition.ResolvePolicy(edition.FullName)
+		if err != nil {
+			return nil, err
+		}
+	}
 	g := &Gateway{
-		config:  &GatewayConfig{SkillProvider: cfg.SkillProvider},
-		hubs:    make(map[string]*hub),
-		hubsMtx: sync.RWMutex{},
+		config:        &GatewayConfig{SkillProvider: cfg.SkillProvider},
+		hubs:          make(map[string]*hub),
+		hubsMtx:       sync.RWMutex{},
+		editionPolicy: distributionPolicy,
 	}
 	if cfg.FeatureManager != nil {
 		g.featureManager = cfg.FeatureManager

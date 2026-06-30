@@ -24,9 +24,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 var log = logging.MustGetLogger("CMD")
@@ -64,13 +61,7 @@ func (x *Start) Execute(args []string) error {
 	}
 
 	printSplashScreen()
-	capabilities := payment.NewStaticChainCapabilityProvider(
-		map[payment.RuntimeCapability][]iwallet.ChainType{
-			payment.CapabilityManagedEVMEscrowV2: managed_escrow.ManagedEscrowEnabledChains(cfg.ManagedEscrowCapabilityConfig()),
-		},
-	)
-	opts := []core.NodeOption{core.WithPaymentCapabilityProvider(capabilities)}
-	n, err := core.NewNodeWithOptions(context.Background(), cfg, repo.DefaultNodeID, nil, opts...)
+	n, err := core.NewNodeWithOptions(context.Background(), cfg, repo.DefaultNodeID, nil)
 	if err != nil {
 		return err
 	}

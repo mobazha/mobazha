@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/mobazha/mobazha3.0/pkg/assetid"
+	"github.com/mobazha/mobazha3.0/pkg/evm"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -44,8 +44,8 @@ func NormalizeSettlementPaymentCoin(raw string) (iwallet.CoinType, bool) {
 		strings.EqualFold(parts[1], "eip155") &&
 		strings.EqualFold(parts[3], "native") {
 		if chainID, err := strconv.ParseUint(parts[2], 10, 64); err == nil {
-			if chain, ok := managed_escrow.ChainTypeForChainID(chainID); ok {
-				canonicalChainID, _ := managed_escrow.ChainIDFor(chain)
+			if chain, ok := evm.ChainTypeForID(chainID); ok {
+				canonicalChainID, _ := evm.ChainIDForNetwork(chain, false)
 				if canonicalChainID != 0 && canonicalChainID != chainID {
 					if coin, ok := iwallet.CanonicalNativeCoinType(chain); ok {
 						return coin, true
@@ -71,7 +71,7 @@ func NormalizeSettlementPaymentCoin(raw string) (iwallet.CoinType, bool) {
 		strings.EqualFold(parts[1], "eip155") &&
 		strings.EqualFold(parts[3], "native") {
 		if chainID, err := strconv.ParseUint(parts[2], 10, 64); err == nil {
-			if chain, ok := managed_escrow.ChainTypeForChainID(chainID); ok {
+			if chain, ok := evm.ChainTypeForID(chainID); ok {
 				if coin, ok := iwallet.CanonicalNativeCoinType(chain); ok {
 					return coin, true
 				}
@@ -133,7 +133,7 @@ func runtimeEIP155ERC20Coin(raw string) (iwallet.CoinType, iwallet.ChainType, bo
 	if err != nil {
 		return "", "", false
 	}
-	chain, ok := managed_escrow.ChainTypeForChainID(chainID)
+	chain, ok := evm.ChainTypeForID(chainID)
 	if !ok || !common.IsHexAddress(parts[4]) {
 		return "", "", false
 	}
@@ -181,7 +181,7 @@ func PaymentCoinFromObservation(obs models.PaymentObservation) (iwallet.CoinType
 				return coin, true
 			}
 		}
-		if chain, ok := managed_escrow.ChainTypeForChainID(chainID); ok {
+		if chain, ok := evm.ChainTypeForID(chainID); ok {
 			return iwallet.CanonicalNativeCoinType(chain)
 		}
 		return "", false

@@ -66,7 +66,7 @@ func (n *MobazhaNode) newDistributionFundingSink() distribution.FundingObservati
 	return distributionFundingSink{dispatcher: corepayment.NewObservationDispatcher(
 		repository,
 		aggregator,
-		&managed_escrowOrderTenantResolver{db: n.db},
+		&paymentOrderTenantResolver{db: n.db},
 		n.nodeID,
 	)}
 }

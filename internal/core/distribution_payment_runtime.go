@@ -12,8 +12,8 @@ import (
 	evm "github.com/mobazha/mobazha3.0/internal/chains/evm"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/distribution"
+	pkgEVM "github.com/mobazha/mobazha3.0/pkg/evm"
 	"github.com/mobazha/mobazha3.0/pkg/relay"
-	protocol "github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -38,7 +38,7 @@ func (s distributionManagedEVMSigner) SignManagedManagedEscrowTransaction(
 	if request.Digest == ([32]byte{}) {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: zero digest is forbidden")
 	}
-	chain, ok := protocol.ChainTypeForChainID(request.ChainID)
+	chain, ok := pkgEVM.ChainTypeForID(request.ChainID)
 	if !ok || iwallet.ChainType(chain) != request.Chain {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: chain %s does not match chain ID %d", request.Chain, request.ChainID)
 	}

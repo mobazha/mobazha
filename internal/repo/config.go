@@ -16,7 +16,6 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
-	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	"github.com/natefinch/lumberjack"
 )
 
@@ -123,7 +122,6 @@ type Config struct {
 	NetDBEndpoint          string   `long:"netdbendpoint" description:"Override the default NetDB endpoint for search index sync"`
 	RelayAPIURL            string   `long:"relayapiurl" description:"Platform base URL for relay HTTP API (append /platform/v1/relay/execute). Required for standalone EVM checkout (ManagedEscrow V2); SaaS uses hosting relay when HostService is wired."`
 	RelayAPIBearer         string   `long:"relayapibearer" description:"Bearer JWT for platform relay HTTP API; if empty, MOBAZHA_PLATFORM_RELAY_TOKEN is used (same as ManagedEscrow HTTP relay path)"`
-	ManagedEscrowChains             []string `long:"safechain" description:"Limit ManagedEscrow-backed EVM routing to the given chain types (repeatable, e.g. ETH). When unset, all Ready EVM chains are enabled; ManagedEscrowAdapter still requires relayapiurl (standalone) or hosting relay (SaaS)."`
 
 	// GuestCheckout enables the guest (anonymous) checkout feature.
 	// When true, the node accepts orders from unauthenticated buyers
@@ -270,18 +268,6 @@ type PlatformAIProfileConfig struct {
 // ParseElectrumServers parses the repeatable "chain=host:port" entries into a map.
 func (c *Config) ParseElectrumServers() map[string]string {
 	return parseKeyValueSlice(c.ElectrumServers)
-}
-
-// ManagedEscrowCapabilityConfig returns the ManagedEscrow chain routing config for standalone nodes.
-// When repo ManagedEscrowChains is empty, returns DefaultChainCapabilityConfig() with an
-// explicit Ready-chain list (equivalent to non-nil cfg with empty ManagedEscrowChains).
-// A non-empty ManagedEscrowChains limits ManagedEscrowAdapter activation for operator rollout.
-// Actual registration still requires a configured relayer (see registerManagedEscrowAdapterShadow).
-func (c *Config) ManagedEscrowCapabilityConfig() *managed_escrow.ChainCapabilityConfig {
-	if len(c.ManagedEscrowChains) == 0 {
-		return managed_escrow.DefaultChainCapabilityConfig()
-	}
-	return &managed_escrow.ChainCapabilityConfig{ManagedEscrowChains: append([]string(nil), c.ManagedEscrowChains...)}
 }
 
 // ParseElectrumTLSFingerprints parses the repeatable "chain=fingerprint" entries into a map.

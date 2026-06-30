@@ -22,6 +22,11 @@ type distributionManagedEscrowWatchSource struct {
 	node *MobazhaNode
 }
 
+const (
+	defaultManagedEscrowRewatchTimeout = 48 * time.Hour
+	managedEscrowGuestRewatchGrace     = time.Hour
+)
+
 func (s distributionManagedEscrowWatchSource) ListManagedEscrowWatches(ctx context.Context) ([]distribution.ManagedEscrowWatch, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -78,12 +83,12 @@ func (s distributionManagedEscrowWatchSource) regularOrderWatch(order *models.Or
 	}
 	tokenAddress := ""
 	if !coinInfo.IsNative {
-		tokenAddress = coinInfo.ContractAddress(s.node.managed_escrowRuntimeUsesTestnet(coinInfo.Chain))
+		tokenAddress = coinInfo.ContractAddress(s.node.runtimeEVMUsesTestnet(coinInfo.Chain))
 		if !common.IsHexAddress(tokenAddress) || common.HexToAddress(tokenAddress) == (common.Address{}) {
 			return distribution.ManagedEscrowWatch{}, fmt.Errorf("missing token contract")
 		}
 	}
-	chainID := s.node.runtimeManagedEscrowChainID(coinInfo.Chain)
+	chainID := s.node.runtimeEVMChainID(coinInfo.Chain)
 	if chainID == 0 {
 		return distribution.ManagedEscrowWatch{}, fmt.Errorf("missing runtime chain ID")
 	}
@@ -91,7 +96,7 @@ func (s distributionManagedEscrowWatchSource) regularOrderWatch(order *models.Or
 		OrderID: order.ID.String(), Chain: coinInfo.Chain, ChainID: chainID,
 		Address: common.HexToAddress(info.Address).Hex(), TokenAddress: tokenAddress,
 		ExpectedAmount: strconv.FormatUint(info.Amount, 10),
-		Deadline:       time.Now().Add(defaultManagedEscrowRewatchFundingTimeout),
+		Deadline:       time.Now().Add(defaultManagedEscrowRewatchTimeout),
 	}, nil
 }
 
@@ -107,7 +112,7 @@ func (s distributionManagedEscrowWatchSource) guestOrderWatches() ([]distributio
 	}
 	watches := make([]distribution.ManagedEscrowWatch, 0, len(orders))
 	for i := range orders {
-		if !orders[i].HasEVMManagedEscrowFundingTarget() || time.Now().After(orders[i].ExpiresAt.Add(evmGuestManagedEscrowRewatchGrace)) {
+		if !orders[i].HasEVMManagedEscrowFundingTarget() || time.Now().After(orders[i].ExpiresAt.Add(managedEscrowGuestRewatchGrace)) {
 			continue
 		}
 		watch, err := guest.ManagedEscrowWatchForGuestOrder(&orders[i], s.node.walletTestnet)

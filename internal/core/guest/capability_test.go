@@ -120,10 +120,10 @@ func newEVMClosureTestService(t *testing.T, runtime EVMManagedEscrowClosureRunti
 		Address:     "0x1111111111111111111111111111111111111111",
 	}).Error)
 	dp := NewDirectPaymentService(db, nil)
-	dp.SetEVMManagedEscrowFunding(&EVMManagedEscrowFundingAdapter{})
+	dp.SetManagedEscrowFunding(testManagedEscrowProjector{}, testGuestOwnerResolver{})
 	svc := &GuestOrderAppService{
-		db:                  db,
-		directPayment:       dp,
+		db:                      db,
+		directPayment:           dp,
 		evmObservationAvailable: true,
 	}
 	svc.SetEVMManagedEscrowClosureRuntime(runtime)
@@ -178,7 +178,7 @@ func newEVMClosureReadyTestService(t *testing.T) *GuestOrderAppService {
 			iwallet.ChainEthereum: {},
 		},
 	})
-	svc.SetEVMManagedEscrowSettlement(&EVMManagedEscrowSettlementService{})
+	svc.SetEVMManagedEscrowSettlement(testManagedEscrowSettlementService{})
 	return svc
 }
 

@@ -61,7 +61,7 @@ func cloneChainSet(in map[iwallet.ChainType]struct{}) map[iwallet.ChainType]stru
 }
 
 func (s *GuestOrderAppService) HasEVMManagedEscrowSettlement() bool {
-	return s != nil && s.evmManagedEscrowSettlement != nil && guestEVMManagedEscrowSettlementActive
+	return s != nil && s.evmManagedEscrowSettlement != nil && managedEscrowGuestSettlementActive
 }
 
 func (s *GuestOrderAppService) evaluateEVMClosureReadiness(coinType iwallet.CoinType, coinInfo iwallet.CoinInfo) error {
@@ -69,9 +69,9 @@ func (s *GuestOrderAppService) evaluateEVMClosureReadiness(coinType iwallet.Coin
 		return fmt.Errorf("%w: EVM guest checkout strategy is not ManagedEscrow/PaymentSession", contracts.ErrCoinUnavailable)
 	}
 	s.evmRuntimeMu.RLock()
-	fundingReady := s.evmManagedEscrowFundingReady && s.directPayment != nil && s.directPayment.HasEVMManagedEscrowFunding()
+	fundingReady := s.evmManagedEscrowFundingReady && s.directPayment != nil && s.directPayment.HasManagedEscrowFunding()
 	obsReady := s.evmManagedEscrowObservationReady
-	settleReady := s.evmManagedEscrowSettlementReady && s.evmManagedEscrowSettlement != nil && guestEVMManagedEscrowSettlementActive
+	settleReady := s.evmManagedEscrowSettlementReady && s.evmManagedEscrowSettlement != nil && managedEscrowGuestSettlementActive
 	relayReady := s.evmManagedEscrowRelayReady
 	_, monitorOK := s.evmManagedEscrowMonitorChains[coinInfo.Chain]
 	_, relayGasOK := s.evmRelayGasHealthyChains[coinInfo.Chain]

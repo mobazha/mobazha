@@ -284,7 +284,7 @@ func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
 		case "1030":
 			return ChainConflux, nil
 		// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
-		// EIP-155 chain ids match chainMatrix (pkg/managedescrow/chains.go).
+		// EIP-155 chain ids match the public EVM network registry.
 		case "10":
 			return ChainOptimism, nil
 		case "100":

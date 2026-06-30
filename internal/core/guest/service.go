@@ -454,10 +454,9 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		order.AutoCompleteAfterShipDaysOverride = s.digitalGoodReviewWindowDays()
 	}
 
-	if payResult.EVMManagedEscrowMetadata != nil {
-		payResult.EVMManagedEscrowMetadata.ExpectedPaymentAmount = paymentAmount
-		if err := order.SetEVMManagedEscrowMetadata(payResult.EVMManagedEscrowMetadata); err != nil {
-			return nil, fmt.Errorf("set guest managed EVM metadata: %w", err)
+	if len(payResult.ManagedEscrowMetadata) > 0 {
+		if err := order.SetManagedEscrowGuestMetadata(payResult.ManagedEscrowMetadata); err != nil {
+			return nil, fmt.Errorf("set guest managed escrow metadata: %w", err)
 		}
 	}
 
@@ -694,10 +693,10 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 	return err
 }
 
-// shouldCreateGuestSweepTask returns false for EVM ManagedEscrow funding targets (Phase 3B–C:
-// settlement uses ManagedEscrow relay, not HD EOA sweep).
+// shouldCreateGuestSweepTask returns false for managed escrow funding targets;
+// settlement is owned by the bound provider rather than the HD sweep worker.
 func shouldCreateGuestSweepTask(order *models.GuestOrder) bool {
-	if order == nil || order.HasEVMManagedEscrowFundingTarget() {
+	if order == nil || order.HasManagedEscrowGuestFundingTarget() {
 		return false
 	}
 	return order.SweepToAddress != ""
@@ -825,7 +824,7 @@ func (s *GuestOrderAppService) afterGuestOrderFunded(orderToken string) {
 }
 
 func (s *GuestOrderAppService) orderRequiresEVMManagedEscrowSettlementBeforeEntitlement(orderToken string) (bool, error) {
-	if s == nil || !guestEVMManagedEscrowSettlementActive {
+	if s == nil || !managedEscrowGuestSettlementActive {
 		return false, nil
 	}
 	if s.db == nil {
@@ -837,7 +836,7 @@ func (s *GuestOrderAppService) orderRequiresEVMManagedEscrowSettlementBeforeEnti
 	}); err != nil {
 		return false, fmt.Errorf("load order: %w", err)
 	}
-	return order.HasEVMManagedEscrowFundingTarget(), nil
+	return order.HasManagedEscrowGuestFundingTarget(), nil
 }
 
 // RecoverEVMManagedEscrowPendingSettlements retries relay release for FUNDED guest ManagedEscrow orders.

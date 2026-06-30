@@ -35,11 +35,11 @@ func TestSetEVMManagedEscrowClosureRuntime_ObservationAvailableIdempotent(t *tes
 }
 
 func TestEvaluateEVMClosureReadiness_RelayGasUnhealthyIncludesReason(t *testing.T) {
+	directPayment := &DirectPaymentService{}
+	directPayment.SetManagedEscrowFunding(testManagedEscrowProjector{}, testGuestOwnerResolver{})
 	svc := &GuestOrderAppService{
-		directPayment: &DirectPaymentService{
-			evmManagedEscrowFunding: &EVMManagedEscrowFundingAdapter{},
-		},
-		evmManagedEscrowSettlement: &EVMManagedEscrowSettlementService{},
+		directPayment:     directPayment,
+		evmManagedEscrowSettlement: testManagedEscrowSettlementService{},
 	}
 	ethChain := map[iwallet.ChainType]struct{}{iwallet.ChainEthereum: {}}
 	const unhealthyReason = "gas wallet balance below low-watermark (0.01 ETH)"

@@ -4,7 +4,6 @@ import (
 	"sort"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -29,13 +28,6 @@ func (s *GuestOrderAppService) appendEVMReadiness(out *contracts.GuestCheckoutRe
 		return
 	}
 	chains := s.evmReadinessChainList()
-	if len(chains) == 0 {
-		// Report canonical ManagedEscrow-enabled EVM chains even when monitors are not wired yet.
-		// Non-nil empty config = all Ready chains (standalone default); nil would disable ManagedEscrow.
-		for _, chain := range managed_escrow.ManagedEscrowEnabledChains(&managed_escrow.ChainCapabilityConfig{}) {
-			chains = append(chains, chain)
-		}
-	}
 	s.evmRuntimeMu.RLock()
 	fundingReady := s.evmManagedEscrowFundingReady
 	obsReady := s.evmManagedEscrowObservationReady
@@ -81,8 +73,8 @@ func (s *GuestOrderAppService) appendEVMReadiness(out *contracts.GuestCheckoutRe
 			RelayReady:             chainRelayReady,
 			RelayGasHealthy:        chainRelayReady && relayGasOK,
 			RelayGasReason:         relayGasReason,
-			SettlementReady:        settleReady && guestEVMManagedEscrowSettlementActive,
-			FundingReady:           fundingReady && s.directPayment != nil && s.directPayment.HasEVMManagedEscrowFunding(),
+			SettlementReady:        settleReady && managedEscrowGuestSettlementActive,
+			FundingReady:           fundingReady && s.directPayment != nil && s.directPayment.HasManagedEscrowFunding(),
 			ObservationReady:       obsReady && monitorOK,
 			ReceivingAccountActive: s.hasActiveReceivingAccount(chain),
 		}

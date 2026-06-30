@@ -5,12 +5,15 @@ import (
 	"crypto/ed25519"
 	crypto_rand "crypto/rand"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/mr-tron/base58"
 	"gorm.io/gorm/clause"
 
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/external_payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -43,8 +46,8 @@ type PaymentAddressResult struct {
 	AddressIndex uint32
 	ReferenceKey string // Solana only: reference pubkey (base58)
 	SweepTo      string // seller receiving address (empty for Solana)
-	// EVMManagedEscrowMetadata is set for EVM guest orders using the ManagedEscrow funding path.
-	EVMManagedEscrowMetadata *models.GuestEVMManagedEscrowMetadata
+	// ManagedEscrowMetadata is opaque provider JSON persisted by Core.
+	ManagedEscrowMetadata []byte
 }
 
 // DirectPaymentService generates unique payment addresses for Guest Checkout orders.
@@ -52,11 +55,13 @@ type PaymentAddressResult struct {
 // seller-owned 1/1 predicted ManagedEscrow adapter when wired. Solana uses a one-time reference
 // key against the seller address. ExternalPayment creates subaddresses via external_payment-wallet-rpc.
 type DirectPaymentService struct {
-	db             database.Database
-	keyDeriver     BIP44KeyDeriver
-	evmManagedEscrowFunding *EVMManagedEscrowFundingAdapter
-	external_paymentSource   external_payment.Source
-	external_paymentAccount     uint32
+	db           database.Database
+	keyDeriver   BIP44KeyDeriver
+	projectorMu  sync.RWMutex
+	projector    distribution.ManagedEscrowGuestProjector
+	sellerOwner  GuestEVMSellerOwnerResolver
+	external_paymentSource external_payment.Source
+	external_paymentAccount   uint32
 }
 
 // NewDirectPaymentService creates a DirectPaymentService.
@@ -71,14 +76,29 @@ func NewDirectPaymentService(
 	}
 }
 
-// SetEVMManagedEscrowFunding wires the Phase 3A ManagedEscrow funding adapter for EVM guest orders.
-func (s *DirectPaymentService) SetEVMManagedEscrowFunding(adapter *EVMManagedEscrowFundingAdapter) {
-	s.evmManagedEscrowFunding = adapter
+// SetManagedEscrowFunding atomically binds or clears the provider-specific
+// guest funding projector and the Core-owned public owner resolver.
+func (s *DirectPaymentService) SetManagedEscrowFunding(
+	projector distribution.ManagedEscrowGuestProjector,
+	sellerOwner GuestEVMSellerOwnerResolver,
+) {
+	if s == nil {
+		return
+	}
+	s.projectorMu.Lock()
+	defer s.projectorMu.Unlock()
+	s.projector = projector
+	s.sellerOwner = sellerOwner
 }
 
-// HasEVMManagedEscrowFunding reports whether the ManagedEscrow funding path is wired.
-func (s *DirectPaymentService) HasEVMManagedEscrowFunding() bool {
-	return s != nil && s.evmManagedEscrowFunding != nil
+// HasManagedEscrowFunding reports whether the provider path is fully wired.
+func (s *DirectPaymentService) HasManagedEscrowFunding() bool {
+	if s == nil {
+		return false
+	}
+	s.projectorMu.RLock()
+	defer s.projectorMu.RUnlock()
+	return s.projector != nil && s.sellerOwner != nil
 }
 
 // SetExternalPaymentSource injects the ExternalPayment wallet-rpc source for subaddress generation.
@@ -100,7 +120,7 @@ func (s *DirectPaymentService) GeneratePaymentAddress(ctx context.Context, req P
 	case coinInfo.Chain.IsUTXOChain():
 		return s.derivePaymentAddress(ctx, coinInfo.Chain, req)
 	case coinInfo.IsEthTypeChain():
-		return s.generateEVMManagedEscrowFunding(ctx, req)
+		return s.generateManagedEscrowFunding(ctx, coinInfo, req)
 	case coinInfo.Chain == iwallet.ChainTRON:
 		return s.derivePaymentAddress(ctx, coinInfo.Chain, req)
 	case coinInfo.Chain == iwallet.ChainSolana:
@@ -112,14 +132,49 @@ func (s *DirectPaymentService) GeneratePaymentAddress(ctx context.Context, req P
 	}
 }
 
-func (s *DirectPaymentService) generateEVMManagedEscrowFunding(
+func (s *DirectPaymentService) generateManagedEscrowFunding(
 	ctx context.Context,
+	coinInfo iwallet.CoinInfo,
 	req PaymentAddressRequest,
 ) (*PaymentAddressResult, error) {
-	if s.evmManagedEscrowFunding == nil {
-		return nil, fmt.Errorf("EVM guest checkout requires ManagedEscrow funding adapter (not configured)")
+	s.projectorMu.RLock()
+	projector := s.projector
+	sellerOwner := s.sellerOwner
+	s.projectorMu.RUnlock()
+	if projector == nil || sellerOwner == nil {
+		return nil, fmt.Errorf("EVM guest checkout requires managed escrow provider (not configured)")
 	}
-	return s.evmManagedEscrowFunding.PrepareFundingTarget(ctx, req)
+
+	var receiving models.ReceivingAccount
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("chain_type = ? AND is_active = ?", string(coinInfo.Chain), true).First(&receiving).Error
+	}); err != nil {
+		return nil, fmt.Errorf("no active receiving account for chain %s: %w", coinInfo.Chain, err)
+	}
+	if !common.IsHexAddress(receiving.Address) || common.HexToAddress(receiving.Address) == (common.Address{}) {
+		return nil, fmt.Errorf("managed escrow settlement recipient %q is not a valid EVM address", receiving.Address)
+	}
+	owner, err := sellerOwner.SellerEVMOwnerAddress(ctx)
+	if err != nil {
+		return nil, err
+	}
+	target, err := projector.PrepareManagedEscrowGuestFunding(ctx, distribution.ManagedEscrowGuestFundingRequest{
+		OrderID: req.OrderToken, PaymentCoin: string(req.CoinType), PaymentAmount: req.Amount,
+		OwnerAddress: owner.Hex(), Recipient: receiving.Address, ExpiresAt: req.ExpiresAt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("prepare managed escrow guest funding: %w", err)
+	}
+	if !common.IsHexAddress(target.Address) || common.HexToAddress(target.Address) == (common.Address{}) {
+		return nil, fmt.Errorf("managed escrow provider returned invalid funding address %q", target.Address)
+	}
+	if len(target.Metadata) == 0 {
+		return nil, fmt.Errorf("managed escrow provider returned empty metadata")
+	}
+	return &PaymentAddressResult{
+		Address: target.Address, SweepTo: receiving.Address,
+		ManagedEscrowMetadata: append([]byte(nil), target.Metadata...),
+	}, nil
 }
 
 // derivePaymentAddress handles UTXO and TRON chains using node-managed HD derivation.

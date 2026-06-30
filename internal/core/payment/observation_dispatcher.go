@@ -41,7 +41,7 @@ import (
 //     paid status and emits the PaymentSent envelope when the order
 //     reaches the configured threshold.
 //
-// The dispatcher does NOT subsume the existing pkg/managedescrow.PaymentMonitor
+// The dispatcher does NOT subsume a provider-owned managed-escrow monitor
 // in-memory state machine. That layer survives as the chain watcher's
 // in-process registry (Watch / Stop / Snapshot, Sprint 1 D10). The
 // dispatcher subscribes to the watcher's per-event callback path and
@@ -501,7 +501,7 @@ func buyerObserver(buyerPeerID string) string {
 // requiredConfirmations is the chain-specific quorum that hosting passes
 // in (12 for ETH/BSC mainnet, 2 for L2s, 10 for BTC mainnet, ...). The
 // dispatcher does NOT hard-code these values — it would couple the
-// SaaS payment loop to chain-specific config that lives in pkg/managedescrow
+// SaaS payment loop to chain-specific config owned by the bound module
 // chain policies / coin metadata.
 //
 // Returns nil if RefreshConfirmations succeeds and no aggregator

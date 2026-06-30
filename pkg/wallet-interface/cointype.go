@@ -234,7 +234,7 @@ func (ct CoinInfo) IsEthTypeChain() bool {
 		ChainEthereum, ChainBSC, ChainBase, ChainPolygon, ChainConflux,
 		// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
 		// All use SchemeEVMCreate2 except ChainZkSyncEra which uses
-		// SchemeZkSyncCreate2 (see pkg/managedescrow/address.go).
+		// SchemeZkSyncCreate2 is reserved for provider-specific address derivation.
 		ChainArbitrum, ChainOptimism, ChainAvalanche, ChainGnosis,
 		ChainCelo, ChainMantle, ChainZkSyncEra, ChainScroll, ChainLinea,
 	}

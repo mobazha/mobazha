@@ -36,6 +36,15 @@ type testChainEscrow struct {
 	genCallCount int
 }
 
+type testManagedEscrowStrategy struct {
+	payment.ChainEscrowV2
+	policy payment.ManagedEscrowFeePolicy
+}
+
+func (s testManagedEscrowStrategy) ManagedEscrowFeePolicy() payment.ManagedEscrowFeePolicy {
+	return s.policy
+}
+
 func (s *testChainEscrow) Model() payment.PaymentModel { return s.model }
 func (s *testChainEscrow) Capabilities() payment.ChainCapabilities {
 	return payment.ChainCapabilities{}
@@ -472,7 +481,13 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowGasFees
 			},
 		},
 	}
-	reg.RegisterV2(iwallet.ChainEthereum, payment.NewV1AsV2(strategy))
+	reg.RegisterV2(iwallet.ChainEthereum, testManagedEscrowStrategy{
+		ChainEscrowV2: payment.NewV1AsV2(strategy),
+		policy: payment.ManagedEscrowFeePolicy{
+			ReleaseFeeUSDCents: 15,
+			ChargeCancellation: true,
+		},
+	})
 
 	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{
 		DB:              db,

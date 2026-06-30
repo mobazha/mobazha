@@ -294,7 +294,15 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 		result.PaymentData != nil &&
 		result.PaymentData.ToAddress != "" {
 
-		feeQuote, quoteErr := s.quoteManagedEscrowGasFees(params.CoinType, result.PaymentData.Amount)
+		feePolicyProvider, ok := strategy.(payment.ManagedEscrowFeePolicyProvider)
+		if !ok {
+			return nil, fmt.Errorf("managed EVM escrow strategy %T does not declare a fee policy", strategy)
+		}
+		feeQuote, quoteErr := s.quoteManagedEscrowFees(
+			params.CoinType,
+			result.PaymentData.Amount,
+			feePolicyProvider.ManagedEscrowFeePolicy(),
+		)
 		if quoteErr != nil {
 			return nil, quoteErr
 		}

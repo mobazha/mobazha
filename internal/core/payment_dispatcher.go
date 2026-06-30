@@ -153,9 +153,10 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 	}
 	actionStore, actionRecorder := n.newDurableSettlementActionStore("Distribution payment module")
 	guestSettlementSource := guest.NewManagedEscrowGuestSettlementSource(n.db)
+	guestWatchSource := &distributionManagedEscrowWatchSource{node: n}
 	evmRelay := n.distributionEVMRelayService()
 	n.evmRelay = evmRelay
-	guestRuntimeBinder := &distributionManagedEscrowGuestRuntimeBinder{node: n, source: guestSettlementSource}
+	guestRuntimeBinder := &distributionManagedEscrowGuestRuntimeBinder{node: n, source: guestSettlementSource, watchSource: guestWatchSource}
 	managedEVM := distribution.ManagedEVMRuntime{
 		EVMSigner:      distributionManagedEVMSigner{keys: n.keyProvider},
 		EVMReaders:     distributionEVMReaderProvider{wallets: n.multiwallet},
@@ -170,7 +171,7 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 		managedEVM.EscrowOwners = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}
 	}
 	guestRuntime := distribution.ManagedEscrowGuestRuntimePorts{
-		WatchSource:      distributionManagedEscrowWatchSource{node: n},
+		WatchSource:      guestWatchSource,
 		GuestSettlements: guestSettlementSource,
 		GuestRuntime:     guestRuntimeBinder,
 	}

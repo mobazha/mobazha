@@ -239,7 +239,7 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 
 	switch {
 	case coinInfo.IsEthTypeChain():
-		if order.HasEVMManagedEscrowFundingTarget() {
+		if order.HasManagedEscrowGuestFundingTarget() {
 			if m.evmManagedEscrowWatch == nil {
 				log.Warningf("no EVM ManagedEscrow watch registrar for order %s — will retry on RestoreWatches", redact.Token(order.OrderToken))
 				return

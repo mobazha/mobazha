@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,7 +20,21 @@ import (
 )
 
 type distributionManagedEscrowWatchSource struct {
-	node *MobazhaNode
+	node      *MobazhaNode
+	mu        sync.RWMutex
+	projector distribution.ManagedEscrowGuestProjector
+}
+
+func (s *distributionManagedEscrowWatchSource) setProjector(projector distribution.ManagedEscrowGuestProjector) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.projector = projector
+}
+
+func (s *distributionManagedEscrowWatchSource) guestProjector() distribution.ManagedEscrowGuestProjector {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.projector
 }
 
 const (
@@ -27,7 +42,7 @@ const (
 	managedEscrowGuestRewatchGrace     = time.Hour
 )
 
-func (s distributionManagedEscrowWatchSource) ListManagedEscrowWatches(ctx context.Context) ([]distribution.ManagedEscrowWatch, error) {
+func (s *distributionManagedEscrowWatchSource) ListManagedEscrowWatches(ctx context.Context) ([]distribution.ManagedEscrowWatch, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -38,14 +53,14 @@ func (s distributionManagedEscrowWatchSource) ListManagedEscrowWatches(ctx conte
 	if err != nil {
 		return nil, err
 	}
-	guestWatches, err := s.guestOrderWatches()
+	guestWatches, err := s.guestOrderWatches(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return append(watches, guestWatches...), nil
 }
 
-func (s distributionManagedEscrowWatchSource) regularOrderWatches() ([]distribution.ManagedEscrowWatch, error) {
+func (s *distributionManagedEscrowWatchSource) regularOrderWatches() ([]distribution.ManagedEscrowWatch, error) {
 	var orders []models.Order
 	if err := s.node.db.View(func(tx database.Tx) error {
 		return tx.Read().
@@ -69,7 +84,7 @@ func (s distributionManagedEscrowWatchSource) regularOrderWatches() ([]distribut
 	return watches, nil
 }
 
-func (s distributionManagedEscrowWatchSource) regularOrderWatch(order *models.Order) (distribution.ManagedEscrowWatch, error) {
+func (s *distributionManagedEscrowWatchSource) regularOrderWatch(order *models.Order) (distribution.ManagedEscrowWatch, error) {
 	info, err := order.GetPendingManagedEscrowPaymentInfo()
 	if err != nil || info == nil {
 		return distribution.ManagedEscrowWatch{}, err
@@ -100,7 +115,11 @@ func (s distributionManagedEscrowWatchSource) regularOrderWatch(order *models.Or
 	}, nil
 }
 
-func (s distributionManagedEscrowWatchSource) guestOrderWatches() ([]distribution.ManagedEscrowWatch, error) {
+func (s *distributionManagedEscrowWatchSource) guestOrderWatches(ctx context.Context) ([]distribution.ManagedEscrowWatch, error) {
+	projector := s.guestProjector()
+	if projector == nil {
+		return nil, fmt.Errorf("managed escrow watch source: guest projector unavailable")
+	}
 	var orders []models.GuestOrder
 	if err := s.node.db.View(func(tx database.Tx) error {
 		return tx.Read().
@@ -112,12 +131,21 @@ func (s distributionManagedEscrowWatchSource) guestOrderWatches() ([]distributio
 	}
 	watches := make([]distribution.ManagedEscrowWatch, 0, len(orders))
 	for i := range orders {
-		if !orders[i].HasEVMManagedEscrowFundingTarget() || time.Now().After(orders[i].ExpiresAt.Add(managedEscrowGuestRewatchGrace)) {
+		if !orders[i].HasManagedEscrowGuestFundingTarget() || time.Now().After(orders[i].ExpiresAt.Add(managedEscrowGuestRewatchGrace)) {
 			continue
 		}
-		watch, err := guest.ManagedEscrowWatchForGuestOrder(&orders[i], s.node.walletTestnet)
+		projection, err := guest.ManagedEscrowGuestProjection(&orders[i])
+		if err != nil {
+			logger.LogWarningWithIDf(log, s.node.nodeID, "Managed escrow guest projection skipped for %s: %v", orders[i].OrderToken, err)
+			continue
+		}
+		watch, err := projector.ProjectManagedEscrowGuestWatch(ctx, projection)
 		if err != nil {
 			logger.LogWarningWithIDf(log, s.node.nodeID, "Managed escrow guest watch skipped for %s: %v", orders[i].OrderToken, err)
+			continue
+		}
+		if watch.OrderID != projection.OrderID || !strings.EqualFold(watch.Address, projection.PaymentAddress) || watch.ExpectedAmount != projection.PaymentAmount {
+			logger.LogWarningWithIDf(log, s.node.nodeID, "Managed escrow guest watch skipped for %s: projector changed immutable fields", orders[i].OrderToken)
 			continue
 		}
 		watches = append(watches, watch)
@@ -125,4 +153,4 @@ func (s distributionManagedEscrowWatchSource) guestOrderWatches() ([]distributio
 	return watches, nil
 }
 
-var _ distribution.ManagedEscrowWatchSource = distributionManagedEscrowWatchSource{}
+var _ distribution.ManagedEscrowWatchSource = (*distributionManagedEscrowWatchSource)(nil)

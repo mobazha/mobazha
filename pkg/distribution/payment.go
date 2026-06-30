@@ -110,6 +110,46 @@ type ManagedEscrowWatchRegistrar interface {
 	StopManagedEscrowWatch(orderID string) error
 }
 
+// ManagedEscrowGuestFundingRequest contains Core-owned, policy-validated
+// inputs for creating a guest managed-escrow funding target. OwnerAddress and
+// Recipient are public EVM addresses; private keys and persistence handles are
+// never exposed to the module.
+type ManagedEscrowGuestFundingRequest struct {
+	OrderID       string
+	PaymentCoin   string
+	PaymentAmount string
+	OwnerAddress  string
+	Recipient     string
+	ExpiresAt     time.Time
+}
+
+// ManagedEscrowGuestFundingTarget is an opaque provider result persisted by
+// Core. Metadata must be deterministic JSON sufficient for later validation,
+// watch restoration, and settlement projection.
+type ManagedEscrowGuestFundingTarget struct {
+	Address  string
+	Metadata []byte
+}
+
+// ManagedEscrowGuestProjection contains immutable Core order state supplied
+// when restoring or settling a previously created managed escrow.
+type ManagedEscrowGuestProjection struct {
+	OrderID        string
+	PaymentCoin    string
+	PaymentAmount  string
+	PaymentAddress string
+	Metadata       []byte
+	ExpiresAt      time.Time
+}
+
+// ManagedEscrowGuestProjector owns provider-specific funding address and
+// metadata algorithms while Core retains order policy and persistence.
+type ManagedEscrowGuestProjector interface {
+	PrepareManagedEscrowGuestFunding(ctx context.Context, request ManagedEscrowGuestFundingRequest) (ManagedEscrowGuestFundingTarget, error)
+	ProjectManagedEscrowGuestWatch(ctx context.Context, request ManagedEscrowGuestProjection) (ManagedEscrowWatch, error)
+	ProjectManagedEscrowGuestSettlement(ctx context.Context, request ManagedEscrowGuestProjection) (ManagedEscrowGuestSettlementRequest, error)
+}
+
 // ManagedEscrowGuestSettlementRequest is the immutable, policy-validated
 // input for settling a guest managed escrow. Amount and salt use base-10
 // strings so the contract does not share mutable big.Int values.
@@ -157,8 +197,10 @@ type ManagedEscrowHealthProvider interface {
 // ManagedEscrowGuestRuntime describes the private runtime capabilities bound
 // into Core guest-checkout orchestration after module registration succeeds.
 type ManagedEscrowGuestRuntime struct {
+	Projector          ManagedEscrowGuestProjector
 	WatchRegistrar     ManagedEscrowWatchRegistrar
 	SettlementExecutor ManagedEscrowGuestSettlementExecutor
+	ReceiptValidator   payment.ManagedEscrowReceiptValidator
 	HealthProvider     ManagedEscrowHealthProvider
 	MonitorChains      []iwallet.ChainType
 }

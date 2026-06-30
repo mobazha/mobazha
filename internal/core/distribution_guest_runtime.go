@@ -15,12 +15,13 @@ import (
 )
 
 type distributionManagedEscrowGuestRuntimeBinder struct {
-	mu         sync.Mutex
-	node       *MobazhaNode
-	source     distribution.ManagedEscrowGuestSettlementSource
-	bound      bool
-	started    bool
-	settlement *guest.DistributionManagedEscrowGuestSettlementService
+	mu          sync.Mutex
+	node        *MobazhaNode
+	source      *guest.ManagedEscrowGuestSettlementSource
+	watchSource *distributionManagedEscrowWatchSource
+	bound       bool
+	started     bool
+	settlement  *guest.DistributionManagedEscrowGuestSettlementService
 }
 
 func (b *distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRuntime(
@@ -30,11 +31,14 @@ func (b *distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRunt
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if b.node == nil || b.node.guestOrderService == nil || b.node.guestPaymentMonitor == nil {
+	if b.node == nil || b.node.guestOrderService == nil || b.node.guestPaymentMonitor == nil || b.node.directPaymentService == nil {
 		return fmt.Errorf("managed escrow guest runtime: guest checkout services are unavailable")
 	}
-	if b.source == nil || runtime.WatchRegistrar == nil || runtime.SettlementExecutor == nil || runtime.HealthProvider == nil {
-		return fmt.Errorf("managed escrow guest runtime: source, watch registrar, settlement executor, and health provider are required")
+	if b.source == nil || b.watchSource == nil || runtime.Projector == nil || runtime.WatchRegistrar == nil || runtime.SettlementExecutor == nil || runtime.ReceiptValidator == nil || runtime.HealthProvider == nil {
+		return fmt.Errorf("managed escrow guest runtime: projector, sources, watch registrar, settlement executor, receipt validator, and health provider are required")
+	}
+	if b.node.keyProvider == nil {
+		return fmt.Errorf("managed escrow guest runtime: key provider is required")
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -51,12 +55,16 @@ func (b *distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRunt
 	if len(chainSet) == 0 {
 		return fmt.Errorf("managed escrow guest runtime: at least one monitor chain is required")
 	}
-	watcher := guest.NewDistributionManagedEscrowWatcher(runtime.WatchRegistrar, b.node.walletTestnet)
+	watcher := guest.NewDistributionManagedEscrowWatcher(runtime.WatchRegistrar, runtime.Projector)
 	settlement := guest.NewDistributionManagedEscrowGuestSettlementService(b.source, runtime.SettlementExecutor)
+	b.source.SetProjector(runtime.Projector)
+	b.watchSource.setProjector(runtime.Projector)
+	b.node.directPaymentService.SetManagedEscrowFunding(runtime.Projector, &guest.NodeEVMSellerOwnerResolver{Keys: b.node.keyProvider})
+	b.node.managedEscrowReceiptValidator = runtime.ReceiptValidator
 	b.node.guestPaymentMonitor.SetEVMManagedEscrowWatch(watcher)
 	b.node.guestOrderService.SetEVMManagedEscrowSettlement(settlement)
 	b.node.guestOrderService.SetEVMManagedEscrowClosureRuntime(guest.EVMManagedEscrowClosureRuntime{
-		FundingReady:      b.node.directPaymentService != nil && b.node.directPaymentService.HasEVMManagedEscrowFunding(),
+		FundingReady:      b.node.directPaymentService.HasManagedEscrowFunding(),
 		ObservationReady:  true,
 		SettlementReady:   true,
 		RelayReady:        true,
@@ -112,6 +120,10 @@ func (b *distributionManagedEscrowGuestRuntimeBinder) UnbindManagedEscrowGuestRu
 	b.node.guestPaymentMonitor.SetEVMManagedEscrowWatch(nil)
 	b.node.guestOrderService.SetEVMManagedEscrowSettlement(nil)
 	b.node.guestOrderService.SetEVMManagedEscrowClosureRuntime(guest.EVMManagedEscrowClosureRuntime{})
+	b.node.directPaymentService.SetManagedEscrowFunding(nil, nil)
+	b.node.managedEscrowReceiptValidator = nil
+	b.source.SetProjector(nil)
+	b.watchSource.setProjector(nil)
 	b.settlement = nil
 	b.bound = false
 	b.started = false

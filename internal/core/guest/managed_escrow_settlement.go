@@ -23,16 +23,41 @@ import (
 )
 
 const (
-	guestSettlementIntentVersion = "v1"
-	guestSettlementLeaseDuration = 10 * time.Minute
-	guestSettlementRecoveryEvery = time.Minute
-	guestSettlementWorkers       = 4
+	managedEscrowGuestSettlementActive = true
+	guestSettlementIntentVersion       = "v1"
+	guestSettlementLeaseDuration       = 10 * time.Minute
+	guestSettlementRecoveryEvery       = time.Minute
+	guestSettlementWorkers             = 4
 )
+
+var guestSettlementEligibleStates = []models.GuestOrderState{
+	models.GuestOrderFunded,
+	models.GuestOrderShipped,
+	models.GuestOrderCompleted,
+}
 
 // ManagedEscrowGuestSettlementSource projects private guest-order state into
 // immutable, chain-neutral settlement requests for a trusted distribution.
 type ManagedEscrowGuestSettlementSource struct {
-	db database.Database
+	db        database.Database
+	mu        sync.RWMutex
+	projector distribution.ManagedEscrowGuestProjector
+}
+
+// SetProjector atomically binds or clears the provider projection logic.
+func (s *ManagedEscrowGuestSettlementSource) SetProjector(projector distribution.ManagedEscrowGuestProjector) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.projector = projector
+}
+
+func (s *ManagedEscrowGuestSettlementSource) guestProjector() distribution.ManagedEscrowGuestProjector {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.projector
 }
 
 // NewManagedEscrowGuestSettlementSource constructs a Core-owned source.
@@ -63,57 +88,68 @@ func (s *ManagedEscrowGuestSettlementSource) ClaimManagedEscrowGuestSettlement(
 	}); err != nil {
 		return nil, fmt.Errorf("managed escrow guest settlement: load order %s: %w", orderID, err)
 	}
-	if !order.HasEVMManagedEscrowFundingTarget() || !guestOrderEligibleForSettlement(order.State) {
+	if !order.HasManagedEscrowGuestFundingTarget() || !guestOrderEligibleForSettlement(order.State) {
 		return nil, nil
 	}
-	meta, err := RecoverGuestEVMManagedEscrowMetadata(&order)
-	if err != nil {
-		return nil, fmt.Errorf("managed escrow guest settlement: recover metadata for %s: %w", orderID, err)
+	projector := s.guestProjector()
+	if projector == nil {
+		return nil, fmt.Errorf("managed escrow guest settlement: projector unavailable")
 	}
-	coinInfo, err := validateGuestEVMManagedEscrowMetadataCoin(meta)
+	projection, err := ManagedEscrowGuestProjection(&order)
 	if err != nil {
 		return nil, err
 	}
-	predicted, err := PredictGuestEVMManagedEscrowAddress(meta)
-	if err != nil {
-		return nil, fmt.Errorf("managed escrow guest settlement: predict address for %s: %w", orderID, err)
-	}
-	escrowAddress := common.HexToAddress(meta.ManagedEscrowAddress)
-	if escrowAddress == (common.Address{}) || escrowAddress != predicted {
-		return nil, fmt.Errorf("managed escrow guest settlement: invalid escrow address for %s", orderID)
-	}
-	owner := common.HexToAddress(meta.SellerOwnerAddress)
-	recipient := common.HexToAddress(meta.SettlementRecipient)
-	if owner == (common.Address{}) || recipient == (common.Address{}) {
-		return nil, fmt.Errorf("managed escrow guest settlement: owner and recipient are required for %s", orderID)
-	}
-	salt, ok := new(big.Int).SetString(strings.TrimSpace(meta.SaltNonce), 10)
-	if !ok || salt.Sign() < 0 {
-		return nil, fmt.Errorf("managed escrow guest settlement: invalid salt nonce for %s", orderID)
-	}
-	amount := guestEVMManagedEscrowSettlementAmount(&order)
+	amount := managedEscrowGuestSettlementAmount(&order)
 	parsedAmount, ok := new(big.Int).SetString(strings.TrimSpace(amount), 10)
 	if !ok || parsedAmount.Sign() <= 0 {
 		return nil, fmt.Errorf("managed escrow guest settlement: invalid payment amount for %s", orderID)
 	}
 
-	request := &distribution.ManagedEscrowGuestSettlementRequest{
-		IntentID:      managedEscrowGuestSettlementIntentID(orderID),
-		OrderID:       orderID,
-		Chain:         coinInfo.Chain,
-		ChainID:       meta.ChainID,
-		PaymentCoin:   meta.Coin,
-		PaymentAmount: parsedAmount.String(),
-		EscrowAddress: escrowAddress.Hex(),
-		OwnerAddress:  owner.Hex(),
-		SaltNonce:     salt.String(),
-		Recipient:     recipient.Hex(),
+	projection.PaymentAmount = parsedAmount.String()
+	projected, err := projector.ProjectManagedEscrowGuestSettlement(ctx, projection)
+	if err != nil {
+		return nil, fmt.Errorf("managed escrow guest settlement: project %s: %w", orderID, err)
 	}
+	if projected.OrderID != orderID || projected.PaymentCoin != projection.PaymentCoin || projected.PaymentAmount != projection.PaymentAmount {
+		return nil, fmt.Errorf("managed escrow guest settlement: projector changed immutable order fields for %s", orderID)
+	}
+	if projected.Chain == "" || projected.ChainID == 0 ||
+		!common.IsHexAddress(projected.EscrowAddress) || !common.IsHexAddress(projected.OwnerAddress) ||
+		!common.IsHexAddress(projected.Recipient) {
+		return nil, fmt.Errorf("managed escrow guest settlement: projector returned invalid chain or addresses for %s", orderID)
+	}
+	projected.IntentID = managedEscrowGuestSettlementIntentID(orderID)
+	projected.ClaimToken = ""
+	request := &projected
 	claimed, err := s.claimSettlementIntent(ctx, request)
 	if err != nil || !claimed {
 		return nil, err
 	}
 	return request, nil
+}
+
+func managedEscrowGuestSettlementAmount(order *models.GuestOrder) string {
+	if order == nil {
+		return ""
+	}
+	expected, ok := new(big.Int).SetString(strings.TrimSpace(order.PaymentAmount), 10)
+	if !ok || expected.Sign() < 0 {
+		return order.PaymentAmount
+	}
+	received, ok := new(big.Int).SetString(strings.TrimSpace(order.TotalReceived), 10)
+	if !ok || received.Cmp(expected) < 0 {
+		return order.PaymentAmount
+	}
+	return received.String()
+}
+
+func guestOrderEligibleForSettlement(state models.GuestOrderState) bool {
+	for _, eligible := range guestSettlementEligibleStates {
+		if state == eligible {
+			return true
+		}
+	}
+	return false
 }
 
 // ListPendingManagedEscrowGuestSettlementOrderIDs returns candidates only.

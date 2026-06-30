@@ -4,10 +4,43 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
+
+// ManagedEscrowFeePolicy is provider-owned pricing policy returned by a
+// managed-escrow strategy. Core converts the USD-minor amount into the locked
+// payment asset and persists the resulting fee with the payment intent.
+type ManagedEscrowFeePolicy struct {
+	ReleaseFeeUSDCents uint64
+	ChargeCancellation bool
+}
+
+// ManagedEscrowFeePolicyProvider is implemented by managed-escrow strategies
+// that require a service fee locked at payment-intent creation.
+type ManagedEscrowFeePolicyProvider interface {
+	ManagedEscrowFeePolicy() ManagedEscrowFeePolicy
+}
+
+// ManagedEscrowReceiptValidationRequest carries immutable relay projection
+// context and its mined EVM receipt to the strategy that created the action.
+type ManagedEscrowReceiptValidationRequest struct {
+	ActionID      string
+	OrderID       string
+	ActionKind    string
+	ChainID       uint64
+	EscrowAddress string
+	TxHash        string
+	Receipt       *types.Receipt
+}
+
+// ManagedEscrowReceiptValidator lets a managed-escrow strategy validate
+// provider-specific execution evidence before Core confirms an action.
+type ManagedEscrowReceiptValidator interface {
+	ValidateManagedEscrowReceipt(ctx context.Context, request ManagedEscrowReceiptValidationRequest) error
+}
 
 // ChainEscrowV2 is the action-centric counterpart to ChainEscrow (V1).
 //

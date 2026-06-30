@@ -7,9 +7,9 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func TestRequiredConfsForCoin(t *testing.T) {
@@ -253,15 +253,15 @@ func TestHandlePaymentDetected_EXTERNAL_PAYMENT_DirectConfirmed(t *testing.T) {
 
 func TestValidateCoinAvailability(t *testing.T) {
 	private_distributionSvc := &GuestOrderAppService{
-		supportedUTXOChains:    toChainSet(nil),
+		supportedUTXOChains:     toChainSet(nil),
 		evmObservationAvailable: false,
-		solanaMonitorAvailable: false,
+		solanaMonitorAvailable:  false,
 	}
 
 	fullBuildSvc := &GuestOrderAppService{
-		supportedUTXOChains:    toChainSet([]iwallet.ChainType{iwallet.ChainBitcoin, iwallet.ChainLitecoin, iwallet.ChainBitcoinCash, iwallet.ChainZCash}),
+		supportedUTXOChains:     toChainSet([]iwallet.ChainType{iwallet.ChainBitcoin, iwallet.ChainLitecoin, iwallet.ChainBitcoinCash, iwallet.ChainZCash}),
 		evmObservationAvailable: true,
-		solanaMonitorAvailable: true,
+		solanaMonitorAvailable:  true,
 	}
 
 	ltcCoin := iwallet.CoinType("crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native")

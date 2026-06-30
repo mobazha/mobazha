@@ -10,8 +10,6 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -20,7 +18,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/identity"
 	"github.com/mobazha/mobazha3.0/pkg/media"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/multiformats/go-multihash"
 )
@@ -240,38 +237,6 @@ func (m *mockEVMWallet) GetTransaction(id iwallet.TransactionID, coinType iwalle
 	return m.chainClient.GetTransaction(id, coinType)
 }
 func (m *mockEVMWallet) GetChainClient() iwallet.ChainClient { return m.chainClient }
-
-type mockManagedEscrowLogSubscriber struct {
-	subscribeCalls int
-}
-
-var _ managed_escrow.LogSubscriber = (*mockManagedEscrowLogSubscriber)(nil)
-var _ iwallet.ChainClient = (*mockManagedEscrowLogSubscriber)(nil)
-
-func (m *mockManagedEscrowLogSubscriber) SubscribeFilterLogs(_ context.Context, _ ethereum.FilterQuery, _ chan<- types.Log) (ethereum.Subscription, error) {
-	m.subscribeCalls++
-	return &mockEthSubscription{errCh: make(chan error)}, nil
-}
-func (m *mockManagedEscrowLogSubscriber) FilterLogs(_ context.Context, _ ethereum.FilterQuery) ([]types.Log, error) {
-	return nil, nil
-}
-func (m *mockManagedEscrowLogSubscriber) BlockNumber(_ context.Context) (uint64, error) {
-	return 0, nil
-}
-func (m *mockManagedEscrowLogSubscriber) GetTransaction(_ iwallet.TransactionID, _ iwallet.CoinType) (*iwallet.Transaction, error) {
-	return nil, errMockWalletUnsupported
-}
-func (m *mockManagedEscrowLogSubscriber) EstimateFee(_ int) (map[iwallet.FeeLevel]iwallet.EstimateFeeRes, error) {
-	return nil, errMockWalletUnsupported
-}
-func (m *mockManagedEscrowLogSubscriber) Broadcast(_ []byte) error { return errMockWalletUnsupported }
-
-type mockEthSubscription struct {
-	errCh chan error
-}
-
-func (s *mockEthSubscription) Err() <-chan error { return s.errCh }
-func (s *mockEthSubscription) Unsubscribe()      {}
 
 // ── helpers ─────────────────────────────────────────────────────
 

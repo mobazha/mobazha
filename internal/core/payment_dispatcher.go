@@ -157,11 +157,13 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 	}
 	actionStore, actionRecorder := n.newSettlementActionStore("Distribution payment module")
 	guestSettlementSource := guest.NewManagedEscrowGuestSettlementSource(n.db)
+	evmRelay := n.distributionEVMRelayService()
+	n.evmRelay = evmRelay
 	runtime := distribution.PaymentRuntime{
 		EVMSigner:        distributionEVMDigestSigner{keys: n.keyProvider},
 		EVMReaders:       distributionEVMReaderProvider{wallets: n.multiwallet},
 		EVMLogs:          distributionEVMReaderProvider{wallets: n.multiwallet},
-		EVMRelay:         n.distributionEVMRelayService(),
+		EVMRelay:         evmRelay,
 		FundingSink:      n.newDistributionFundingSink(),
 		AutoConfirmer:    distributionManagedEscrowAutoConfirmer{settlement: n.settlementService},
 		WatchSource:      distributionManagedEscrowWatchSource{node: n},

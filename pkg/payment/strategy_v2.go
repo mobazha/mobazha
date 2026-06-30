@@ -226,6 +226,25 @@ type ActionSigner interface {
 	SignAction(ctx context.Context, action string, params ActionParams) ([]ActionOwnerSignature, error)
 }
 
+// ActionReconciler is an optional private-module capability that confirms or
+// retries one durable backend action. Core supplies only the opaque action ID;
+// provider-specific intent decoding and chain status checks stay in the module.
+type ActionReconciler interface {
+	ReconcileAction(ctx context.Context, actionID string) (*ActionStatus, error)
+}
+
+// DepositTransactionVerifier is an optional strategy capability for managed
+// chains whose transaction RPC and protocol interpretation live outside Open
+// Core. Implementations return a generic transaction only after validating the
+// reported transaction, recipient, asset, and minimum amount.
+//
+// PaymentVerificationService prefers this capability over the legacy
+// multiwallet lookup. This keeps Core provider-neutral while preserving the
+// same VerifiedPayment contract consumed by the order state machine.
+type DepositTransactionVerifier interface {
+	FetchAndVerifyDeposit(ctx context.Context, params DepositVerifyParams) (*iwallet.Transaction, error)
+}
+
 // SellerDeclineRefunder is an optional V2 capability for chains whose on-chain
 // program distinguishes seller-initiated refunds from buyer cancel.
 type SellerDeclineRefunder interface {

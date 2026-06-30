@@ -62,7 +62,7 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 		if cerr != nil {
 			return "", payoutAddress, cerr
 		}
-		if coinInfo.Chain == iwallet.ChainSolana && s.IsSolanaRelayAvailable() {
+		if coinInfo.Chain == iwallet.ChainSolana {
 			if payoutAddress == "" {
 				addr, err := s.GetPayoutAddress(coinType.String())
 				if err != nil {
@@ -95,9 +95,6 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 		}
 		if coinInfo.IsEthTypeChain() && s.IsEVMRelayAvailable() {
 			return s.releaseViaRelay(order, &coinInfo, payoutAddress)
-		}
-		if coinInfo.Chain == iwallet.ChainSolana && s.IsSolanaRelayAvailable() {
-			return s.releaseSolanaViaRelay(order, payoutAddress)
 		}
 		return "", payoutAddress, nil
 	default:
@@ -225,42 +222,6 @@ func (s *SettlementService) releaseViaRelay(order *models.Order, coinInfo *iwall
 	return iwallet.TransactionID(txHashStr), payoutAddress, nil
 }
 
-func (s *SettlementService) releaseSolanaViaRelay(order *models.Order, payoutAddress string) (iwallet.TransactionID, string, error) {
-	logger.LogInfoWithIDf(log, s.nodeID, "Releasing Solana CANCELABLE funds for order %s via relay", order.ID)
-
-	paymentSent, err := order.PaymentSentMessage()
-	if err != nil {
-		return "", "", fmt.Errorf("solana relay release: failed to get PaymentSent message for order %s: %w", order.ID, err)
-	}
-	if payoutAddress == "" {
-		coinType, coinErr := payment.SettlementCoinFromPaymentSent(paymentSent)
-		if coinErr != nil {
-			return "", "", coinErr
-		}
-		addr, err := s.GetPayoutAddress(coinType.String())
-		if err != nil {
-			return "", "", fmt.Errorf("failed to get payout address: %w", err)
-		}
-		payoutAddress = addr.String()
-	}
-
-	_, instructions, err := s.GetLegacyConfirmOrderInstructions(order.ID, "", payoutAddress)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get confirm order instructions: %w", err)
-	}
-	if instructions == nil {
-		return "", "", fmt.Errorf("no instructions returned for Solana CANCELABLE order")
-	}
-
-	txSig, err := s.RelaySolanaTransaction(context.Background(), string(order.ID), instructions)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to relay Solana transaction: %w", err)
-	}
-
-	logger.LogInfoWithIDf(log, s.nodeID, "Successfully released Solana CANCELABLE payment for order %s via relay (sig=%s)", order.ID, txSig)
-	return iwallet.TransactionID(txSig), payoutAddress, nil
-}
-
 // ── EscrowOperations port: RelayInstructions ────────────────────────────
 
 // RelayInstructions dispatches instructions to the appropriate relay service.
@@ -282,13 +243,6 @@ func (s *SettlementService) RelayInstructions(orderID string, coinType iwallet.C
 			return "", fmt.Errorf("invalid EVM transaction data type: %T", instructions)
 		}
 		return s.RelayEVMTransactionWithRetry(context.Background(), orderID, string(coinInfo.Chain), string(coinType), txData)
-	}
-
-	if coinInfo.Chain == iwallet.ChainSolana {
-		if !s.IsSolanaRelayAvailable() {
-			return "", fmt.Errorf("Solana relay service not available")
-		}
-		return s.RelaySolanaTransaction(context.Background(), orderID, instructions)
 	}
 
 	return "", fmt.Errorf("unsupported chain for relay: %s", coinInfo.Chain)
@@ -531,45 +485,4 @@ func (s *SettlementService) RelayEVMTransactionWithRetry(ctx context.Context, or
 	}
 
 	return "", fmt.Errorf("relay failed after %d attempts for order %s: %w", relayMaxRetries, orderID, lastErr)
-}
-
-// ── Solana Relay Infrastructure ─────────────────────────────────────────
-
-// RelaySolanaTransaction sends Solana instructions to the platform relay service
-// for fee-payer signing and broadcasting.
-func (s *SettlementService) RelaySolanaTransaction(ctx context.Context, orderID string, instructions any) (string, error) {
-	return s.RelaySolanaTransactionWithSigners(ctx, orderID, "", "", instructions, nil)
-}
-
-func (s *SettlementService) RelaySolanaTransactionWithSigners(
-	ctx context.Context,
-	orderID string,
-	settlementAction string,
-	clientActionID string,
-	instructions any,
-	signers any,
-) (string, error) {
-	if !s.IsSolanaRelayAvailable() {
-		return "", fmt.Errorf("Solana relay service not available")
-	}
-
-	logger.LogInfoWithIDf(log, s.nodeID, "Relaying Solana transaction for order %s via HostService relay", orderID)
-	resp, err := s.solanaRelayService.Execute(ctx, &relay.SolanaRelayRequest{
-		Instructions:     instructions,
-		Signers:          signers,
-		OrderID:          orderID,
-		SettlementAction: settlementAction,
-		ClientActionID:   clientActionID,
-	})
-	if err != nil {
-		return "", fmt.Errorf("solana relay failed: %w", err)
-	}
-	return resp.TxSignature, nil
-}
-
-func (s *SettlementService) SolanaRelayAuthorityAddress() string {
-	if s == nil || s.solanaRelayService == nil {
-		return ""
-	}
-	return s.solanaRelayService.GetFeePayerAddress()
 }

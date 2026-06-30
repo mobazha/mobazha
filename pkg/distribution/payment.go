@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/mobazha/mobazha3.0/pkg/relay"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -42,6 +43,79 @@ type ManagedEVMSignRequest struct {
 // node's private key or a generic signing oracle to a distribution module.
 type ManagedEVMSigner interface {
 	SignManagedManagedEscrowTransaction(ctx context.Context, request ManagedEVMSignRequest) (common.Address, []byte, error)
+}
+
+// ManagedSolanaSignPurpose is an allow-listed Solana owner authorization.
+// It signs deterministic program messages, never arbitrary transactions.
+type ManagedSolanaSignPurpose string
+
+const (
+	// ManagedSolanaSignAnchorSettlement authorizes an Anchor escrow settlement
+	// message. The commercial module embeds the signature in an Ed25519 verify
+	// instruction; Hosting separately signs and submits the transaction as fee
+	// payer.
+	ManagedSolanaSignAnchorSettlement ManagedSolanaSignPurpose = "managed_solana_anchor_settlement"
+)
+
+// ManagedSolanaSignRequest describes one typed, auditable owner-message
+// signature. AuthorizedSigners is the immutable escrow owner set projected
+// from Core order state; Message is the deterministic protocol payload built
+// by the trusted commercial module.
+type ManagedSolanaSignRequest struct {
+	Chain             iwallet.ChainType
+	OrderID           string
+	ActionKind        string
+	ProgramAddress    string
+	EscrowAddress     string
+	AuthorizedSigners []string
+	Message           []byte
+	Purpose           ManagedSolanaSignPurpose
+	CorrelationID     string
+}
+
+// ManagedSolanaSigner exposes only an allow-listed owner-message signature.
+// It never returns a private key and cannot sign a serialized transaction.
+type ManagedSolanaSigner interface {
+	ManagedSolanaPublicKey(ctx context.Context) (string, error)
+	SignManagedSolanaMessage(ctx context.Context, request ManagedSolanaSignRequest) (string, []byte, error)
+}
+
+// ManagedSolanaSetupConfig contains public deployment addresses selected by
+// the private composition. It contains no credential or RPC authority.
+type ManagedSolanaSetupConfig struct {
+	ProgramAddress       string
+	PlatformAuthority    string
+	PlatformFeeCollector string
+	RentCollector        string
+	Testnet              bool
+}
+
+// ManagedSolanaSetupIntent is Core's immutable order-policy projection. The
+// private module uses EscrowInfo to derive the PDA and build Anchor
+// instructions, then returns only the build result for persistence.
+type ManagedSolanaSetupIntent struct {
+	EscrowInfo  iwallet.EscrowInfo
+	PaymentData *models.PaymentData
+}
+
+// ManagedSolanaSetupBuildResult is the private protocol result committed by
+// Core after validating the derived address.
+type ManagedSolanaSetupBuildResult struct {
+	EscrowAddress string
+	Script        []byte
+}
+
+// ManagedSolanaSetupService retains order policy and persistence inside Core,
+// while private code owns PDA derivation and instruction construction.
+type ManagedSolanaSetupService interface {
+	PrepareManagedSolanaSetup(ctx context.Context, params payment.PaymentSetupParams, config ManagedSolanaSetupConfig) (*ManagedSolanaSetupIntent, error)
+	CommitManagedSolanaSetup(ctx context.Context, intent ManagedSolanaSetupIntent, result ManagedSolanaSetupBuildResult) (*models.PaymentData, error)
+}
+
+// ManagedSolanaOrderSource loads the minimum Core-owned order snapshot needed
+// to reconstruct a durable private-module settlement retry.
+type ManagedSolanaOrderSource interface {
+	LoadManagedSolanaOrder(ctx context.Context, orderID string) (*models.Order, error)
 }
 
 // EVMContractReader is the read-only EVM surface needed by managed escrow
@@ -245,6 +319,19 @@ type ManagedEVMRuntime struct {
 	ActionRecorder payment.ActionRecorder
 }
 
+// ManagedSolanaRuntime is the Core authority granted to the private Solana
+// payment module. RPC clients, Anchor program code, fee-payer custody, and
+// transaction submission remain private composition dependencies and are not
+// exposed by Open Core.
+type ManagedSolanaRuntime struct {
+	Signer         ManagedSolanaSigner
+	Setup          ManagedSolanaSetupService
+	Orders         ManagedSolanaOrderSource
+	FundingSink    FundingObservationSink
+	Actions        payment.ActionStore
+	ActionRecorder payment.ActionRecorder
+}
+
 // ManagedEscrowGuestRuntimePorts is the guest-checkout authority granted only
 // to modules that explicitly declare the capability.
 type ManagedEscrowGuestRuntimePorts struct {
@@ -259,6 +346,7 @@ type PaymentModuleCapability string
 
 const (
 	CapabilityManagedEVMExecution PaymentModuleCapability = "managed_evm_execution"
+	CapabilityManagedSolana       PaymentModuleCapability = "managed_solana_execution"
 	CapabilityManagedEscrowGuest  PaymentModuleCapability = "managed_escrow_guest"
 )
 
@@ -271,21 +359,23 @@ type PaymentModuleDescriptor struct {
 // PaymentRuntimeAuthority is retained by Core and can mint a scoped runtime
 // for one validated module descriptor. Distribution modules never receive it.
 type PaymentRuntimeAuthority struct {
-	managedEVM ManagedEVMRuntime
-	guest      ManagedEscrowGuestRuntimePorts
+	managedEVM    ManagedEVMRuntime
+	managedSolana ManagedSolanaRuntime
+	guest         ManagedEscrowGuestRuntimePorts
 }
 
 // NewPaymentRuntimeAuthority constructs Core's trusted runtime authority.
-func NewPaymentRuntimeAuthority(managedEVM ManagedEVMRuntime, guest ManagedEscrowGuestRuntimePorts) PaymentRuntimeAuthority {
-	return PaymentRuntimeAuthority{managedEVM: managedEVM, guest: guest}
+func NewPaymentRuntimeAuthority(managedEVM ManagedEVMRuntime, managedSolana ManagedSolanaRuntime, guest ManagedEscrowGuestRuntimePorts) PaymentRuntimeAuthority {
+	return PaymentRuntimeAuthority{managedEVM: managedEVM, managedSolana: managedSolana, guest: guest}
 }
 
 // PaymentRuntime is a module-specific, capability-scoped grant. Its ports are
 // private so modules cannot bypass the declared capability set.
 type PaymentRuntime struct {
-	capabilities map[PaymentModuleCapability]struct{}
-	managedEVM   ManagedEVMRuntime
-	guest        ManagedEscrowGuestRuntimePorts
+	capabilities  map[PaymentModuleCapability]struct{}
+	managedEVM    ManagedEVMRuntime
+	managedSolana ManagedSolanaRuntime
+	guest         ManagedEscrowGuestRuntimePorts
 }
 
 // ManagedEVM returns the managed EVM grant when explicitly declared.
@@ -294,6 +384,14 @@ func (r PaymentRuntime) ManagedEVM() (ManagedEVMRuntime, error) {
 		return ManagedEVMRuntime{}, fmt.Errorf("payment module lacks %s capability", CapabilityManagedEVMExecution)
 	}
 	return r.managedEVM, nil
+}
+
+// ManagedSolana returns the managed Solana grant when explicitly declared.
+func (r PaymentRuntime) ManagedSolana() (ManagedSolanaRuntime, error) {
+	if _, ok := r.capabilities[CapabilityManagedSolana]; !ok {
+		return ManagedSolanaRuntime{}, fmt.Errorf("payment module lacks %s capability", CapabilityManagedSolana)
+	}
+	return r.managedSolana, nil
 }
 
 // ManagedEscrowGuest returns guest orchestration only when declared.
@@ -313,7 +411,7 @@ func (a PaymentRuntimeAuthority) RuntimeFor(descriptor PaymentModuleDescriptor) 
 	granted := make(map[PaymentModuleCapability]struct{}, len(descriptor.Capabilities))
 	for _, capability := range descriptor.Capabilities {
 		switch capability {
-		case CapabilityManagedEVMExecution, CapabilityManagedEscrowGuest:
+		case CapabilityManagedEVMExecution, CapabilityManagedSolana, CapabilityManagedEscrowGuest:
 		default:
 			return PaymentRuntime{}, fmt.Errorf("payment module %q requests unknown capability %q", descriptor.ID, capability)
 		}
@@ -322,7 +420,10 @@ func (a PaymentRuntimeAuthority) RuntimeFor(descriptor PaymentModuleDescriptor) 
 		}
 		granted[capability] = struct{}{}
 	}
-	return PaymentRuntime{capabilities: granted, managedEVM: a.managedEVM, guest: a.guest}, nil
+	return PaymentRuntime{
+		capabilities: granted, managedEVM: a.managedEVM,
+		managedSolana: a.managedSolana, guest: a.guest,
+	}, nil
 }
 
 // PaymentRegistrar records V2 payment strategies contributed by a module.

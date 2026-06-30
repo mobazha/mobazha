@@ -9,7 +9,6 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	"github.com/mobazha/mobazha3.0/internal/chains/evm"
-	"github.com/mobazha/mobazha3.0/internal/chains/solana"
 	tronWal "github.com/mobazha/mobazha3.0/internal/chains/tron"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoincash"
@@ -143,17 +142,9 @@ func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 			multiwallet[chain] = w
 
 		case iwallet.ChainSolana:
-			w, err := solana.NewSolanaWallet(&base.WalletConfig{
-				NodeID:    cfg.NodeID,
-				Logger:    logger,
-				KeyStore:  keyStore,
-				Testnet:   cfg.UseTestnet,
-				NetConfig: cfg.NetConfig,
-			})
-			if err != nil {
-				return nil, nil, err
-			}
-			multiwallet[chain] = w
+			// Solana is recognized for wire compatibility but its wallet/runtime
+			// implementation is supplied only by the commercial module.
+			continue
 		case iwallet.ChainTRON:
 			w, err := tronWal.NewTronWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,

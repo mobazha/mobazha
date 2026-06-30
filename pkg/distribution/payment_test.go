@@ -17,7 +17,7 @@ import (
 
 func TestPaymentRuntime_DoesNotExposePrivilegedState(t *testing.T) {
 	runtimeType := reflect.TypeOf(PaymentRuntime{})
-	require.Equal(t, 3, runtimeType.NumField())
+	require.Equal(t, 4, runtimeType.NumField())
 	for index := 0; index < runtimeType.NumField(); index++ {
 		field := runtimeType.Field(index)
 		assert.False(t, field.IsExported(), "runtime field %s must not be exported", field.Name)
@@ -196,13 +196,24 @@ func TestRegisterPaymentModules_LaterBindFailureUnbindsEarlierModule(t *testing.
 }
 
 func TestPaymentRuntime_EnforcesDeclaredCapabilities(t *testing.T) {
-	authority := NewPaymentRuntimeAuthority(ManagedEVMRuntime{}, ManagedEscrowGuestRuntimePorts{})
+	authority := NewPaymentRuntimeAuthority(ManagedEVMRuntime{}, ManagedSolanaRuntime{}, ManagedEscrowGuestRuntimePorts{})
 	runtime, err := authority.RuntimeFor(PaymentModuleDescriptor{ID: "managed-evm", Capabilities: []PaymentModuleCapability{CapabilityManagedEVMExecution}})
 	require.NoError(t, err)
 	_, err = runtime.ManagedEVM()
 	require.NoError(t, err)
 	_, err = runtime.ManagedEscrowGuest()
 	require.ErrorContains(t, err, string(CapabilityManagedEscrowGuest))
+	_, err = runtime.ManagedSolana()
+	require.ErrorContains(t, err, string(CapabilityManagedSolana))
+
+	solanaRuntime, err := authority.RuntimeFor(PaymentModuleDescriptor{
+		ID: "managed-solana", Capabilities: []PaymentModuleCapability{CapabilityManagedSolana},
+	})
+	require.NoError(t, err)
+	_, err = solanaRuntime.ManagedSolana()
+	require.NoError(t, err)
+	_, err = solanaRuntime.ManagedEVM()
+	require.ErrorContains(t, err, string(CapabilityManagedEVMExecution))
 }
 
 func TestRegisterPaymentModules_ModuleFailure_LeavesRegistryUnchanged(t *testing.T) {

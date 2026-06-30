@@ -74,7 +74,22 @@ func (c *CryptoPaymentFacade) CreateSession(
 	}
 	order := input.order
 	if models.BuyerAwaitingPaymentReadiness(order) {
-		return c.UpdateCreateSessionRefundAddress(ctx, req)
+		view, err := c.UpdateCreateSessionRefundAddress(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		// ORDER_OPEN acknowledgement can race this request. If readiness became
+		// ready while the refund address was saved, continue provisioning in the
+		// same call; returning a ready session without a funding target violates
+		// the PaymentSession contract and makes clients stop retrying.
+		if view.PaymentReadiness.Status != paypb.PaymentReadinessReadyToPay || view.FundingTarget.Address != "" {
+			return view, nil
+		}
+		input, err = c.projector.fetchProjectInput(req.OrderID)
+		if err != nil {
+			return nil, fmt.Errorf("crypto facade: re-load ready order %s: %w", req.OrderID, err)
+		}
+		order = input.order
 	}
 	orderOpen := input.orderOpen
 	if orderOpen == nil {

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
-	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -21,8 +20,8 @@ import (
 //
 // These tests verify coin → chain classification and registry-driven dispatch.
 //
-// All chains (UTXO, EVM, Solana) are registered in the payment registry.
-// The legacy fallback switch has been eliminated — dispatch is registry-only.
+// Public UTXO chains and explicitly composed distribution modules register in
+// the payment registry. The legacy fallback switch has been eliminated.
 
 // chainCategory classifies the dispatch target for a given coin.
 // This mirrors the dispatch logic: registry first, then legacy fallback.
@@ -256,22 +255,12 @@ func TestRegistryDispatch_SolanaRegistered(t *testing.T) {
 	}
 }
 
-func TestRegistryDispatch_SolanaForCoinV2UsesAnchorAdapter(t *testing.T) {
+func TestRegistryDispatch_SolanaRequiresDistributionModule(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
-	strategy, err := n.paymentRegistry.ForCoinV2(testSOLNativeCoin)
-	if err != nil {
-		t.Fatalf("ForCoinV2(SOL): unexpected error: %v", err)
-	}
-	if _, ok := strategy.(*adapters.SolanaAnchorAdapter); !ok {
-		t.Fatalf("ForCoinV2(SOL) returned %T, want *adapters.SolanaAnchorAdapter", strategy)
-	}
-	if strategy.Model() != payment.PaymentModelMonitored {
-		t.Errorf("solana V2 strategy.Model() = %s, want %s", strategy.Model(), payment.PaymentModelMonitored)
-	}
-	if strategy.Capabilities().HasClientSignedEscrow {
-		t.Error("solana V2 strategy must not advertise client-signed escrow")
+	if _, err := n.paymentRegistry.ForCoinV2(testSOLNativeCoin); err == nil {
+		t.Fatal("ForCoinV2(SOL): expected error without a private distribution module")
 	}
 }
 
@@ -280,9 +269,10 @@ func TestRegistryDispatch_ChainCount(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	chains := n.paymentRegistry.Chains()
-	// Legacy V1 registration retired for UTXO/Solana/EVM/TRON. Expected: UTXO (4) + Solana (1) = 5.
-	if len(chains) != 5 {
-		t.Errorf("registry has %d chains, want 5 (4 UTXO + 1 Solana)", len(chains))
+	// Open Core registers only the public UTXO allowlist. Commercial rails are
+	// contributed by trusted distribution modules.
+	if len(chains) != 4 {
+		t.Errorf("registry has %d chains, want 4 public UTXO chains", len(chains))
 	}
 }
 
@@ -292,7 +282,6 @@ func TestRegistryDispatch_AllSupportedCoinsInRegistry(t *testing.T) {
 
 	utxoCoins := []iwallet.CoinType{
 		testBTCNativeCoin, testBCHNativeCoin, testLTCNativeCoin, testZECNativeCoin,
-		testSOLNativeCoin,
 	}
 	for _, coin := range utxoCoins {
 		if _, err := n.paymentRegistry.ForCoin(coin); err == nil {
@@ -301,6 +290,9 @@ func TestRegistryDispatch_AllSupportedCoinsInRegistry(t *testing.T) {
 		if _, err := n.paymentRegistry.ForCoinV2(coin); err != nil {
 			t.Errorf("ForCoinV2(%s): expected success, got error: %v", coin, err)
 		}
+	}
+	if _, err := n.paymentRegistry.ForCoinV2(testSOLNativeCoin); err == nil {
+		t.Error("ForCoinV2(SOL): expected error without a private distribution module")
 	}
 
 	evmCoins := []iwallet.CoinType{

@@ -315,9 +315,16 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 		if err != nil {
 			return err
 		}
-		wallet, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
+		strategy, err := s.v2StrategyForCoin(coinType)
 		if err != nil {
-			return fmt.Errorf("failed to get wallet: %w", err)
+			return err
+		}
+		var wallet iwallet.Wallet
+		if !releaseUsesBalanceEscrow(&order, paymentSent, strategy) {
+			wallet, err = s.multiwallet.WalletForCurrencyCode(string(coinType))
+			if err != nil {
+				return fmt.Errorf("failed to get wallet: %w", err)
+			}
 		}
 
 		paymentAddr := iwallet.NewAddress(shipments[0].ReceivingAccountAddress, coinType)
@@ -329,13 +336,10 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 		if iwallet.NewAmount(paymentSent.PlatformAmount).Cmp(iwallet.NewAmount(0)) > 0 {
 			nOuts = 2
 		}
-		feeStrat, stratErr := s.v2StrategyForCoin(coinType)
 		fee := iwallet.NewAmount(0)
-		if stratErr == nil {
-			fee, err = feeStrat.EstimateEscrowFee(string(coinType), countEscrowReleaseInputs(&order, paymentSent), nOuts, iwallet.FlNormal)
-			if err != nil {
-				return err
-			}
+		fee, err = strategy.EstimateEscrowFee(string(coinType), countEscrowReleaseInputs(&order, paymentSent), nOuts, iwallet.FlNormal)
+		if err != nil {
+			return err
 		}
 
 		release, err := s.buildEscrowRelease(&order, wallet, paymentAddr, fee,

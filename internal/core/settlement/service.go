@@ -41,10 +41,9 @@ type SettlementService struct {
 	utxoKeyDeriver contracts.UTXOKeyDeriver
 
 	// Relay infrastructure
-	evmRelayService    relay.EVMRelayService
-	solanaRelayService relay.SolanaRelayService
-	relayAPIURL        string
-	relayAPIBearer     string
+	evmRelayService relay.EVMRelayService
+	relayAPIURL     string
+	relayAPIBearer  string
 
 	// Receipt verification (abstracts away EVM-specific types)
 	receiptVerifier contracts.ReceiptVerifier
@@ -66,10 +65,9 @@ type SettlementServiceConfig struct {
 	EscrowMasterPubKey *btcec.PublicKey
 	UTXOKeyDeriver     contracts.UTXOKeyDeriver
 
-	EVMRelayService    relay.EVMRelayService
-	SolanaRelayService relay.SolanaRelayService
-	RelayAPIURL        string
-	RelayAPIBearer     string
+	EVMRelayService relay.EVMRelayService
+	RelayAPIURL     string
+	RelayAPIBearer  string
 }
 
 // NewSettlementService constructs a SettlementService with the given dependencies.
@@ -85,7 +83,6 @@ func NewSettlementService(cfg SettlementServiceConfig) *SettlementService {
 		escrowMasterPubKey: cfg.EscrowMasterPubKey,
 		utxoKeyDeriver:     cfg.UTXOKeyDeriver,
 		evmRelayService:    cfg.EVMRelayService,
-		solanaRelayService: cfg.SolanaRelayService,
 		relayAPIURL:        cfg.RelayAPIURL,
 		relayAPIBearer:     cfg.RelayAPIBearer,
 	}
@@ -191,11 +188,6 @@ func (s *SettlementService) IsEVMRelayAvailable() bool {
 		return true
 	}
 	return s.relayAPIURL != ""
-}
-
-// IsSolanaRelayAvailable checks if Solana relay service is available.
-func (s *SettlementService) IsSolanaRelayAvailable() bool {
-	return s.solanaRelayService != nil && s.solanaRelayService.IsAvailable()
 }
 
 // calculateTotalPaidToAddress sums all transaction outputs sent to a specific address.

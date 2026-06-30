@@ -738,10 +738,8 @@ func (n *MobazhaNode) initSettlementService() {
 	}
 
 	var evmRelay relay.EVMRelayService
-	var solanaRelay relay.SolanaRelayService
 	if n.hostService != nil {
 		evmRelay = n.hostService.GetEVMRelayService()
-		solanaRelay = n.hostService.GetSolanaRelayService()
 	}
 
 	n.settlementService = coresettlement.NewSettlementService(coresettlement.SettlementServiceConfig{
@@ -754,7 +752,6 @@ func (n *MobazhaNode) initSettlementService() {
 		EscrowMasterPubKey: n.escrowMasterKey.PubKey(),
 		UTXOKeyDeriver:     n.paymentService,
 		EVMRelayService:    evmRelay,
-		SolanaRelayService: solanaRelay,
 		RelayAPIURL:        n.relayAPIURL,
 		RelayAPIBearer:     n.relayAPIBearer,
 	})

@@ -150,7 +150,18 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			if s.crypto == nil {
 				return nil, ErrProvisioningNotImplemented
 			}
-			return s.crypto.UpdateCreateSessionRefundAddress(ctx, req)
+			updated, err := s.crypto.UpdateCreateSessionRefundAddress(ctx, req)
+			if err != nil {
+				return nil, err
+			}
+			// The seller acknowledgement may land while the refund update is in
+			// flight. A ready session without an address is not actionable, so
+			// finish provisioning in this request instead of requiring a client
+			// to detect and retry an invalid intermediate projection.
+			if updated.PaymentReadiness.Status == payment.PaymentReadinessReadyToPay && updated.FundingTarget.Address == "" {
+				return s.crypto.CreateSession(ctx, req)
+			}
+			return updated, nil
 		}
 		return view, nil
 	}

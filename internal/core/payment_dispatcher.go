@@ -31,8 +31,8 @@ import (
 // All chains are registered here — the dispatcher uses registry-only lookup
 // with no legacy fallback.
 //
-// UTXO and Solana register as V2-monitored adapters; EVM chains are supplied
-// only by trusted distribution modules. TRON is retired.
+// UTXO registers as the public V2-monitored adapter. Managed EVM and Solana
+// chains are supplied only by trusted distribution modules. TRON is retired.
 //
 // Dependencies are injected into adapters via explicit fields / callbacks,
 // not via a *MobazhaNode reference (hexagonal architecture Phase A).
@@ -67,39 +67,8 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	// registered only by a trusted distribution module.
 
 	// ── Solana ──────────────────────────────────────────────────
-	// This is the CN-3 transition fallback. A successfully registered external
-	// module takes precedence. If module registration fails, optional commercial
-	// rails stay disabled instead of silently falling back to bundled code.
-	if commercialModulesHealthy && !n.paymentRegistry.HasChain(iwallet.ChainSolana) {
-		solOps := &adapters.SolanaChainOps{
-			Keys:            n.keyProvider,
-			Multiwallet:     n.multiwallet,
-			BuildReleaseTxn: n.orderService.BuildDisputeReleaseTransaction,
-			NodeID:          n.nodeID,
-		}
-		solCompat := adapters.NewSolanaLifecycleCompatAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
-		solActionStore, solActionRecorder := n.newSettlementActionStore("Solana Anchor")
-		if solActionStore == nil || solActionRecorder == nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Solana Anchor disabled: durable settlement action store is required")
-		} else {
-			var solRelayer adapters.SolanaInstructionRelayer
-			if n.settlementService != nil {
-				solRelayer = adapters.NewSolanaInstructionRelayer(
-					n.settlementService.RelaySolanaTransactionWithSigners,
-					n.settlementService.SolanaRelayAuthorityAddress,
-				)
-			}
-			n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
-				BuildInitEscrow: n.paymentService.BuildInitEscrowInstructions,
-				Compat:          solCompat,
-				Relayer:         solRelayer,
-				Store:           solActionStore,
-				Recorder:        solActionRecorder,
-				Keys:            n.keyProvider,
-				Wallets:         n.multiwallet,
-			}))
-		}
-	}
+	// Solana has no Open Core fallback. A distribution that does not compose
+	// the private module does not advertise or register the chain.
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
@@ -167,6 +136,14 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 		Actions:        actionStore,
 		ActionRecorder: actionRecorder,
 	}
+	managedSolana := distribution.ManagedSolanaRuntime{
+		Signer:         distributionManagedSolanaSigner{keys: n.keyProvider},
+		Setup:          distributionManagedSolanaSetupService{service: n.paymentService},
+		Orders:         distributionManagedSolanaOrderSource{db: n.db},
+		FundingSink:    n.newDistributionFundingSink(),
+		Actions:        actionStore,
+		ActionRecorder: actionRecorder,
+	}
 	if n.paymentService != nil {
 		managedEVM.EscrowOwners = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}
 	}
@@ -175,7 +152,7 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 		GuestSettlements: guestSettlementSource,
 		GuestRuntime:     guestRuntimeBinder,
 	}
-	authority := distribution.NewPaymentRuntimeAuthority(managedEVM, guestRuntime)
+	authority := distribution.NewPaymentRuntimeAuthority(managedEVM, managedSolana, guestRuntime)
 	if err := distribution.RegisterPaymentModules(
 		ctx,
 		authority,
@@ -275,10 +252,6 @@ func (n *MobazhaNode) newDurableSettlementActionStore(component string) (adapter
 
 func (n *MobazhaNode) handleCancelablePaymentForEVM(event *events.CancelablePaymentReady, chainType string) {
 	n.settlementService.HandleCancelablePaymentForEVM(event, chainType)
-}
-
-func (n *MobazhaNode) handleCancelablePaymentForSolana(event *events.CancelablePaymentReady) {
-	n.settlementService.HandleCancelablePaymentForSolana(event)
 }
 
 // ── Cancelable payment event dispatching ─────────────────────────────────

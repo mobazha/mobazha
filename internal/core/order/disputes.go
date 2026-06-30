@@ -412,9 +412,26 @@ func (s *OrderAppService) validateDisputeContract(from peer.ID, contract []byte,
 		return validationErrors, nil
 	}
 
-	wal, err := s.multiwallet.WalletForCurrencyCode(string(coinType))
-	if err != nil {
-		return nil, fmt.Errorf("cannot validate order. coin not supported by moderator. %w", err)
+	var wal iwallet.Wallet
+	settlementSpec, hasSettlementSpec := payment.ResolveSettlementSpec(nil, paymentSent)
+	usesManagedValidation := hasSettlementSpec && (settlementSpec.UsesManagedEscrow() || settlementSpec.UsesSolanaEscrow())
+	if usesManagedValidation {
+		strategy, strategyErr := s.v2StrategyForCoin(coinType)
+		if strategyErr != nil {
+			return nil, fmt.Errorf("cannot validate managed dispute payment: %w", strategyErr)
+		}
+		if validationErr := strategy.ValidatePaymentMessage(payment.PaymentMessageParams{
+			OrderOpen: orderOpen, PaymentSent: paymentSent,
+			ExpectedPaymentAmount: paymentSent.Amount,
+			ExpectedPaymentCoin:   paymentSent.Coin,
+		}); validationErr != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("order payment is invalid: %s", validationErr.Error()))
+		}
+	} else {
+		wal, err = s.multiwallet.WalletForCurrencyCode(string(coinType))
+		if err != nil {
+			return nil, fmt.Errorf("cannot validate order. coin not supported by moderator. %w", err)
+		}
 	}
 
 	for i, listing := range orderOpen.Listings {
@@ -453,7 +470,11 @@ func (s *OrderAppService) validateDisputeContract(from peer.ID, contract []byte,
 		validationErrors = append(validationErrors, fmt.Errorf("invalid payment coin: %s", priceErr.Error()))
 	} else {
 		isCrossCurrency := pricingCoin != "" && pricingCoin != paymentCoin
-		if !isCrossCurrency {
+		if !isCrossCurrency && usesManagedValidation {
+			if err := utils.ValidatePaymentAmount(orderOpen.Amount, paymentSent.Amount); err != nil {
+				validationErrors = append(validationErrors, fmt.Errorf("order payment is invalid: %s", err.Error()))
+			}
+		} else if !isCrossCurrency {
 			if err := utils.ValidatePayment(orderOpen, paymentSent, escrowTimeoutHours, wal); err != nil {
 				validationErrors = append(validationErrors, fmt.Errorf("order payment is invalid: %s", err.Error()))
 			}

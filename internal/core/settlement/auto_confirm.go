@@ -139,12 +139,6 @@ func (s *SettlementService) autoConfirmEVMCancelablePayment(order *models.Order,
 			logger.LogErrorWithIDf(log, s.nodeID, "Failed to relay EVM transaction for order %s: %v", order.ID, err)
 			return
 		}
-	} else if coinInfo.Chain == iwallet.ChainSolana {
-		txHash, err = s.RelaySolanaTransaction(context.Background(), order.ID.String(), instructions)
-		if err != nil {
-			logger.LogErrorWithIDf(log, s.nodeID, "Failed to relay Solana transaction for order %s: %v", order.ID, err)
-			return
-		}
 	} else {
 		logger.LogErrorWithIDf(log, s.nodeID, "Unsupported chain type for relay: %s", coinInfo.Chain)
 		return
@@ -229,84 +223,6 @@ func (s *SettlementService) AutoConfirmManagedEscrowCancelable(ctx context.Conte
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Emitted OrderAutoConfirmRequest for ManagedEscrow EVM CANCELABLE order %s", order.ID)
 	return nil
-}
-
-// ── Solana Auto-Confirm ─────────────────────────────────────────────────
-
-// HandleCancelablePaymentForSolana handles CancelablePaymentReady event for Solana
-// chains. Anchor escrow preserves the seller decision window after payment is
-// verified: seller confirm releases to the seller, while seller decline refunds
-// through the dedicated seller_decline_refund action.
-func (s *SettlementService) HandleCancelablePaymentForSolana(event *events.CancelablePaymentReady) {
-	logger.LogInfoWithIDf(log, s.nodeID,
-		"Skipping Solana CANCELABLE auto-confirm for order %s; awaiting seller confirm or seller_decline_refund", event.OrderID)
-}
-
-func (s *SettlementService) autoConfirmSolanaCancelablePayment(order *models.Order) {
-	unlock := s.TryLockAutoConfirm(order.ID.String())
-	if unlock == nil {
-		return
-	}
-	defer unlock()
-
-	logger.LogInfoWithIDf(log, s.nodeID, "Auto-confirming Solana CANCELABLE payment for order %s via platform relay", order.ID)
-
-	if !order.CanConfirm() {
-		logger.LogWarningWithIDf(log, s.nodeID, "Order %s cannot be confirmed (state=%s)", order.ID, order.State)
-		return
-	}
-
-	coinType, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainSolana)
-	if !ok {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to resolve canonical native SOL coin for auto-confirm order %s", order.ID)
-		return
-	}
-	if paymentSent, err := order.PaymentSentMessage(); err == nil {
-		if resolved, rerr := payment.SettlementCoinFromPaymentSent(paymentSent); rerr == nil {
-			coinType = resolved
-		} else {
-			logger.LogWarningWithIDf(log, s.nodeID, "Failed to resolve Solana payment coin for order %s, using native SOL: %v", order.ID, rerr)
-		}
-	} else {
-		logger.LogWarningWithIDf(log, s.nodeID, "Failed to get PaymentSent for Solana order %s, using native SOL: %v", order.ID, err)
-	}
-
-	payoutAddress, err := s.GetPayoutAddress(string(coinType))
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Failed to get payout address for order %s: %v", order.ID, err)
-		return
-	}
-
-	if s.paymentRegistry == nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Payment registry not initialized for Solana auto-confirm order %s", order.ID)
-		return
-	}
-	strategy, err := s.paymentRegistry.ForCoinV2(coinType)
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "No Solana V2 chain escrow for coin %s (order %s): %v", coinType, order.ID, err)
-		return
-	}
-
-	result, _, err := s.ExecuteSettlementAction(context.Background(), "confirm", order.ID, payoutAddress.String())
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "Solana settlement-action confirm failed for order %s: %v", order.ID, err)
-		return
-	}
-
-	txSig := settlementActionTxHash(context.Background(), strategy, result)
-	if txSig == "" {
-		logger.LogErrorWithIDf(log, s.nodeID, "Solana settlement-action confirm for order %s completed without tx hash", order.ID)
-		return
-	}
-	logger.LogInfoWithIDf(log, s.nodeID, "Successfully relayed Solana transaction for order %s, sig=%s", order.ID, txSig)
-
-	s.eventBus.Emit(&events.OrderAutoConfirmRequest{
-		OrderID:       order.ID.String(),
-		TxID:          txSig,
-		PayoutAddress: payoutAddress.String(),
-	})
-
-	logger.LogInfoWithIDf(log, s.nodeID, "Emitted OrderAutoConfirmRequest for Solana CANCELABLE order %s", order.ID)
 }
 
 // ── FIAT Auto-Confirm ───────────────────────────────────────────────────

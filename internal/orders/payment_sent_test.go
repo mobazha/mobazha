@@ -222,6 +222,28 @@ func TestProcessPaymentSentMessage_ManagedEscrowEnvelopeSkipsLegacyEscrowValidat
 	}
 }
 
+func TestValidatePaymentSent_ManagedSolanaSkipsLegacyWalletValidation(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	orderOpen, _, err := factory.NewOrder()
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentSent := &pb.PaymentSent{
+		Coin: "crypto:solana:mainnet:native",
+		SettlementSpec: &pb.PaymentSent_SettlementSpec{
+			Method: pb.PaymentSent_CANCELABLE, PayMode: "address_monitored", EscrowType: "solana_escrow",
+		},
+	}
+	if err := op.validatePaymentSent(iwallet.CoinType(paymentSent.Coin), orderOpen, paymentSent); err != nil {
+		t.Fatalf("managed Solana envelope should use prior V2 validation: %v", err)
+	}
+}
+
 func TestProcessPaymentSentMessage_BalancePollFundingFactDuplicate(t *testing.T) {
 	op, teardown, err := newMockOrderProcessor()
 	if err != nil {

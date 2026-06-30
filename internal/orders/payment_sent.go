@@ -237,8 +237,15 @@ func canonicalPaymentSentFundingFactValue(chainNamespace, value string) string {
 // is nil (pure mode), this is a no-op since the orchestration layer has already validated.
 func (op *OrderProcessor) validatePaymentSent(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent) error {
 	specProto := paymentSent.GetSettlementSpec()
-	if specProto != nil && specProto.GetEscrowType() == string(payment.EscrowTypeManagedEscrow) {
-		return nil
+	if specProto != nil {
+		switch payment.EscrowType(specProto.GetEscrowType()) {
+		case payment.EscrowTypeManagedEscrow, payment.EscrowTypeSolanaEscrow:
+			// The orchestration layer already invoked the registered V2
+			// strategy's ValidatePaymentMessage. Managed rails deliberately have
+			// no concrete wallet in Open Core, so legacy wallet validation must
+			// not be re-entered here.
+			return nil
+		}
 	}
 	if op.multiwallet == nil {
 		return nil

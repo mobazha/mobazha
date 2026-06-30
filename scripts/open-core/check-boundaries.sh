@@ -25,6 +25,40 @@ if [[ -n "$commercial_option_refs" ]]; then
   failures=1
 fi
 
+# Official managed-Solana protocol, RPC, wallet, monitor, and relay code is a
+# private distribution concern. Open Core retains only neutral contracts,
+# order projections, restricted signing authority, and wire compatibility.
+solana_implementation_files="$({
+  rg --files \
+    internal/chains/solana \
+    internal/payment/solana \
+    pkg/solana \
+    cmd/solana-config-init \
+    internal/payment/adapters \
+    2>/dev/null || true
+} | rg '(^internal/chains/solana/.*\.go$|^internal/payment/solana/.*\.go$|^pkg/solana/.*\.go$|^cmd/solana-config-init/.*\.go$|^internal/payment/adapters/solana.*\.go$)' || true)"
+if [[ -n "$solana_implementation_files" ]]; then
+  echo "ERROR: concrete managed-Solana implementation leaked into Open Core:" >&2
+  echo "$solana_implementation_files" >&2
+  failures=1
+fi
+
+core_solana_implementation_files="$(rg --files internal/core 2>/dev/null \
+  | rg '(^|/)(chain_solana|payment_monitor_solana|solana_settlement_confirmation)(_[^/]*)?\.go$' || true)"
+if [[ -n "$core_solana_implementation_files" ]]; then
+  echo "ERROR: concrete managed-Solana Core orchestration leaked into Open Core:" >&2
+  echo "$core_solana_implementation_files" >&2
+  failures=1
+fi
+
+public_solana_relay_refs="$(rg -n 'SolanaRelayService|SolanaRelayRequest|RelaySolanaTransaction|GetSolanaChainClient|GetSolanaRelayService' \
+  internal pkg cmd --glob '*.go' --glob '!**/*_test.go' || true)"
+if [[ -n "$public_solana_relay_refs" ]]; then
+  echo "ERROR: concrete Solana relay/client authority leaked into Open Core:" >&2
+  echo "$public_solana_relay_refs" >&2
+  failures=1
+fi
+
 if [[ $failures -ne 0 ]]; then
   exit 1
 fi

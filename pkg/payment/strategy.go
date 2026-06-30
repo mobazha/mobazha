@@ -386,6 +386,11 @@ type DepositVerifyParams struct {
 	// ContractAddr is the escrow contract address.
 	ContractAddr string
 
+	// PaymentAddress is the exact chain address that must receive the deposit.
+	// Managed backends use it to verify transaction evidence without requiring
+	// Core to construct a concrete chain wallet or RPC client.
+	PaymentAddress string
+
 	// PaymentAmount is the expected payment amount in the payment coin's
 	// minimal units (wei for ETH, lamports for SOL). This must be in the
 	// same currency as the on-chain deposit — NOT the pricing currency.

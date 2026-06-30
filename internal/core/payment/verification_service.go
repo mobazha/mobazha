@@ -171,6 +171,33 @@ func (s *PaymentVerificationService) FetchAndVerify(
 	}
 
 	providerID := coinType.FiatProviderID()
+	depositParams := payment.DepositVerifyParams{
+		CoinType:       coinType,
+		TxHash:         paymentSent.TransactionID,
+		Script:         paymentSent.Script,
+		ContractAddr:   paymentSent.ContractAddress,
+		PaymentAddress: paymentAddress,
+		PaymentAmount:  paymentSent.Amount,
+	}
+
+	// Managed strategies own their chain RPC and protocol evidence. Prefer the
+	// optional evidence capability before consulting Core's legacy multiwallet;
+	// this is provider-neutral and avoids reintroducing concrete managed-chain
+	// clients into Open Core.
+	if !isFiat && s.registry != nil {
+		if strategy, strategyErr := s.registry.ForCoinV2(coinType); strategyErr == nil {
+			if verifier, ok := strategy.(payment.DepositTransactionVerifier); ok {
+				tx, verifyErr := verifier.FetchAndVerifyDeposit(ctx, depositParams)
+				if verifyErr != nil {
+					return nil, fmt.Errorf("deposit verification failed: %w", verifyErr)
+				}
+				if tx == nil {
+					return nil, fmt.Errorf("deposit verification failed: %w", ErrPaymentNotConfirmed)
+				}
+				return &contracts.VerifiedPayment{Transaction: *tx, CoinType: coinType}, nil
+			}
+		}
+	}
 
 	tx, err := s.FetchTransaction(ctx, coinType, paymentSent.TransactionID, providerID)
 	if err != nil {
@@ -192,13 +219,7 @@ func (s *PaymentVerificationService) FetchAndVerify(
 
 		if s.registry != nil {
 			if strategy, sErr := s.registry.ForCoinV2(coinType); sErr == nil {
-				if vErr := strategy.VerifyDeposit(ctx, payment.DepositVerifyParams{
-					CoinType:      coinType,
-					TxHash:        paymentSent.TransactionID,
-					Script:        paymentSent.Script,
-					ContractAddr:  paymentSent.ContractAddress,
-					PaymentAmount: paymentSent.Amount,
-				}); vErr != nil {
+				if vErr := strategy.VerifyDeposit(ctx, depositParams); vErr != nil {
 					return nil, fmt.Errorf("deposit verification failed: %w", vErr)
 				}
 			}

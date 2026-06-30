@@ -86,6 +86,18 @@ type recordingManagedEscrowVerifier struct {
 	lastMessageParams paymentpkg.PaymentMessageParams
 }
 
+type recordingDepositTransactionVerifier struct {
+	*recordingManagedEscrowVerifier
+	result     *iwallet.Transaction
+	err        error
+	lastParams paymentpkg.DepositVerifyParams
+}
+
+func (v *recordingDepositTransactionVerifier) FetchAndVerifyDeposit(_ context.Context, params paymentpkg.DepositVerifyParams) (*iwallet.Transaction, error) {
+	v.lastParams = params
+	return v.result, v.err
+}
+
 func (*recordingManagedEscrowVerifier) Model() paymentpkg.PaymentModel {
 	return paymentpkg.PaymentModelMonitored
 }
@@ -283,6 +295,38 @@ func TestPaymentVerificationService_FetchAndVerify_CanonicalStripeCoinUsesFiatQu
 	assert.Equal(t, "ORDER-CANONICAL-001", query.lastPaymentID)
 	assert.Equal(t, iwallet.TransactionID("CAP-CANONICAL-001"), vp.Transaction.ID)
 	assert.Equal(t, int64(1999), vp.Transaction.Value.Int64())
+}
+
+func TestPaymentVerificationService_FetchAndVerify_ManagedStrategyOwnsDepositEvidence(t *testing.T) {
+	coin, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainSolana)
+	require.NoError(t, err)
+	paymentAddress := "managed-solana-escrow"
+	strategy := &recordingDepositTransactionVerifier{
+		recordingManagedEscrowVerifier: &recordingManagedEscrowVerifier{},
+		result: &iwallet.Transaction{
+			ID:    iwallet.TransactionID("solana-deposit-signature"),
+			To:    []iwallet.SpendInfo{{Address: iwallet.NewAddress(paymentAddress, coin), Amount: iwallet.NewAmount("12345")}},
+			Value: iwallet.NewAmount("12345"),
+		},
+	}
+	registry := paymentpkg.NewRegistry()
+	registry.RegisterV2(iwallet.ChainSolana, strategy)
+	svc := NewPaymentVerificationService(registry, nil, nil)
+	paymentSent := &pb.PaymentSent{
+		TransactionID:   "solana-deposit-signature",
+		Coin:            coin.String(),
+		ContractAddress: "solana-program",
+		Amount:          "12345",
+		SettlementSpec:  paymentpkg.NewSolanaEscrowSpec(false).ToPaymentSent(),
+	}
+
+	verified, err := svc.FetchAndVerify(context.Background(), &pb.OrderOpen{}, paymentSent, paymentAddress)
+	require.NoError(t, err)
+	require.NotNil(t, verified)
+	assert.Equal(t, iwallet.TransactionID(paymentSent.TransactionID), verified.Transaction.ID)
+	assert.Equal(t, paymentAddress, strategy.lastParams.PaymentAddress)
+	assert.Equal(t, paymentSent.Amount, strategy.lastParams.PaymentAmount)
+	assert.Equal(t, paymentSent.ContractAddress, strategy.lastParams.ContractAddr)
 }
 
 func TestPaymentVerificationService_FetchAndVerify_MonitorRelayedManagedEscrowPayment(t *testing.T) {

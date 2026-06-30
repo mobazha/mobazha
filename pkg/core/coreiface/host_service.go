@@ -34,20 +34,6 @@ type HostService interface {
 	// 返回 nil 表示该链不支持或尚未初始化
 	GetEVMChainClient(chain iwallet.ChainType) iwallet.ChainClient
 
-	// GetSolanaChainClient 获取共享的 Solana 链客户端（RPC+WS）
-	// SaaS 节点通过此方法共享 Solana 客户端，避免 per-tenant RPC 连接
-	// 返回 nil 表示 Solana 不支持或尚未初始化
-	GetSolanaChainClient() iwallet.ChainClient
-
-	// GetSolanaEscrowProgramID 获取预解析的 Solana escrow 程序 ID
-	// 由 HostService 启动时通过 ContractManager 查询并缓存
-	// 返回空字符串表示尚未初始化
-	GetSolanaEscrowProgramID() string
-
-	// GetSolanaRelayService 获取共享的 Solana Relay 服务（代付 fee）
-	// 返回 nil 表示 Solana Relay 不支持或尚未初始化
-	GetSolanaRelayService() relay.SolanaRelayService
-
 	// GetDiscountAccessForPeer returns the DiscountService and DiscountStore
 	// scoped to the vendor identified by peerID. In SaaS mode this crosses
 	// tenant boundaries via the NodeManager, enabling buyer-side discount

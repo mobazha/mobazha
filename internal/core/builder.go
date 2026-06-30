@@ -24,7 +24,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/chains"
-	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
 	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
 	corePmt "github.com/mobazha/mobazha3.0/internal/core/payment"
@@ -489,7 +488,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	var mwCfg chains.Config
 	_ = mwCfg.Apply(append([]chains.Option{chains.Defaults}, opts...)...)
 	evmConfigs := extractEVMConfigs(mwCfg.ChainAPIs, walletTestnet)
-	solanaConfig := extractSolanaConfig(mwCfg.ChainAPIs, walletTestnet)
 	tronConfig := extractTronConfig(mwCfg.ChainAPIs, walletTestnet)
 
 	globalBlockedIds := []peer.ID{}
@@ -571,9 +569,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			relayAPIBearer: cfg.RelayAPIBearer,
 		},
 		chainFields: chainFields{
-			evmChainConfigs:   evmConfigs,
-			solanaChainConfig: solanaConfig,
-			tronChainConfig:   tronConfig,
+			evmChainConfigs: evmConfigs,
+			tronChainConfig: tronConfig,
 		},
 		ipnsFields: ipnsFields{
 			netDB:     netDB,
@@ -838,66 +835,41 @@ func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creation
 		return fmt.Errorf("cannot decode key, %v", err)
 	}
 
-	// 获取 SOL 私钥
-	var dbSolKey models.Key
-	err = db.View(func(tx database.Tx) error {
-		return tx.Read().Where("name = ?", "solana").First(&dbSolKey).Error
-	})
-	if err != nil {
-		return fmt.Errorf("can not initialize solana wallet: solana key does not exist in database")
-	}
-
-	solPrivKey := solana.PrivateKey(dbSolKey.Value)
-
 	for chain, wallet := range mw {
-		if chain == iwallet.ChainSolana {
-			// 对于 SOL 钱包，使用 solPrivKey
-			solWallet, ok := wallet.(*solanaWal.SolanaWallet)
-			if !ok {
-				return fmt.Errorf("wallet is not a SolanaWallet")
+		// Solana, Fiat, and ExternalPayment are intentionally excluded from the public
+		// Multiwallet map. Remaining wallets use the shared BIP44 key.
+		if !wallet.WalletExists() {
+			canonicalNative := iwallet.CoinType("")
+			if chain == iwallet.ChainMock {
+				// ChainMock is test-only and intentionally outside canonical asset registry.
+				canonicalNative = iwallet.CtMock
+			} else {
+				canonicalNative, err = iwallet.RequireCanonicalNativeCoinType(chain)
+				if err != nil {
+					return err
+				}
 			}
-			// 直接使用 solPrivKey 初始化钱包
-			if err := solWallet.InitializeWithKey(solPrivKey, creationDate); err != nil {
+			pricingCode, err := canonicalNative.PricingCurrencyCode()
+			if err != nil {
 				return err
 			}
-		} else {
-			// 其他钱包使用 bip44Key
-			// Note: ChainFiat and ChainExternalPayment are intentionally excluded from
-			// the Multiwallet map (see internal/chains/multiwallet.go), so
-			// they cannot appear in this loop and need no special branch.
-			if !wallet.WalletExists() {
-				canonicalNative := iwallet.CoinType("")
-				if chain == iwallet.ChainMock {
-					// ChainMock is test-only and intentionally outside canonical asset registry.
-					canonicalNative = iwallet.CtMock
-				} else {
-					canonicalNative, err = iwallet.RequireCanonicalNativeCoinType(chain)
-					if err != nil {
-						return err
-					}
-				}
-				pricingCode, err := canonicalNative.PricingCurrencyCode()
-				if err != nil {
-					return err
-				}
-				def, err := models.CurrencyDefinitions.Lookup(pricingCode)
-				if err != nil {
-					return err
-				}
+			def, err := models.CurrencyDefinitions.Lookup(pricingCode)
+			if err != nil {
+				return err
+			}
 
-				coinTypeKey, err := bip44Key.Derive(hdkeychain.HardenedKeyStart + uint32(def.Bip44Code))
-				if err != nil {
-					return err
-				}
+			coinTypeKey, err := bip44Key.Derive(hdkeychain.HardenedKeyStart + uint32(def.Bip44Code))
+			if err != nil {
+				return err
+			}
 
-				accountKey, err := coinTypeKey.Derive(hdkeychain.HardenedKeyStart + 0)
-				if err != nil {
-					return err
-				}
+			accountKey, err := coinTypeKey.Derive(hdkeychain.HardenedKeyStart + 0)
+			if err != nil {
+				return err
+			}
 
-				if err := wallet.CreateWallet(*accountKey, creationDate); err != nil {
-					return err
-				}
+			if err := wallet.CreateWallet(*accountKey, creationDate); err != nil {
+				return err
 			}
 		}
 	}
@@ -1167,7 +1139,6 @@ func newLightweightNode(
 
 	// Chain client injection is deferred to MobazhaNode.Start():
 	//   - EVM: startEVMChainClients()
-	//   - Solana: startSolanaChainClients()
 	//   - UTXO: startUTXOPaymentMonitor()
 	// Both SaaS and standalone modes inject during Start(), not at construction time.
 

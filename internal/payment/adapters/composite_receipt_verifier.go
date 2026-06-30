@@ -20,7 +20,8 @@ type ReceiptVerifierRegistry struct {
 	verifiers map[iwallet.ChainType]contracts.ReceiptVerifier
 }
 
-// NewReceiptVerifierRegistry creates a registry with EVM (all chains) + Solana + TRON verifiers.
+// NewReceiptVerifierRegistry creates the Open Core verifier registry. Private
+// distribution chains verify through their own V2 strategies.
 func NewReceiptVerifierRegistry(mw contracts.WalletOperator) *ReceiptVerifierRegistry {
 	evmVerifier := NewEVMReceiptVerifier(mw)
 	return &ReceiptVerifierRegistry{
@@ -30,7 +31,6 @@ func NewReceiptVerifierRegistry(mw contracts.WalletOperator) *ReceiptVerifierReg
 			iwallet.ChainPolygon:  evmVerifier,
 			iwallet.ChainBase:     evmVerifier,
 			iwallet.ChainConflux:  evmVerifier,
-			iwallet.ChainSolana:   NewSolanaReceiptVerifier(mw),
 			iwallet.ChainTRON:     NewTRONReceiptVerifier(mw),
 		},
 	}

@@ -1399,8 +1399,9 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 }
 
 // TestOrderLifecycle_RegistryCoversAllProductionChains verifies that the
-// payment registry covers all production chains and that ChainMock integrates
-// correctly alongside them.
+// public payment registry covers Open Core production chains and that
+// ChainMock integrates correctly alongside them. Private distributions own
+// managed EVM and Solana registration.
 func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-lifecycle-registry"}}
 	n.registerPaymentStrategies()
@@ -1408,12 +1409,11 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	// Register ChainMock with a stub adapter (no wallet needed for registry coverage)
 	registerChainMockV2(n, newStubUTXOAdapter())
 
-	// Verify chains always registered at startup (V2 UTXO/Solana; TRON retired).
-	// EVM ManagedEscrowAdapter chains appear only after registerManagedEscrowAdapterShadow succeeds.
+	// Verify public chains always registered at startup (V2 UTXO; TRON retired).
 	chains := n.paymentRegistry.Chains()
 	expectedChains := []iwallet.ChainType{
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash, iwallet.ChainLitecoin, iwallet.ChainZCash,
-		iwallet.ChainSolana, iwallet.ChainMock,
+		iwallet.ChainMock,
 	}
 	chainSet := make(map[iwallet.ChainType]bool)
 	for _, c := range chains {
@@ -1494,19 +1494,13 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	}
 	t.Log("✓ Ready EVM chains (BSC/ETH/MATIC/BASE) use PaymentModelMonitored via ManagedEscrowAdapter V2")
 
-	// ── Verify Solana uses PaymentModelMonitored via V2 ─────────
+	// Solana is deliberately absent from an Open Core-only composition.
 	if _, err := n.paymentRegistry.ForChain(iwallet.ChainSolana); err == nil {
 		t.Fatal("ForChain(SOL): legacy V1 Solana registration is retired")
 	}
-	solStrategy, err := n.paymentRegistry.ForChainV2(iwallet.ChainSolana)
-	if err != nil {
-		t.Fatalf("ForChainV2(SOL) failed: %v", err)
+	if _, err := n.paymentRegistry.ForChainV2(iwallet.ChainSolana); err == nil {
+		t.Fatal("ForChainV2(SOL): private Solana module must not be registered by Open Core")
 	}
-	if solStrategy.Model() != payment.PaymentModelMonitored {
-		t.Errorf("Solana: model = %s, want %s",
-			solStrategy.Model(), payment.PaymentModelMonitored)
-	}
-	t.Log("✓ Solana uses PaymentModelMonitored via SolanaAnchorAdapter V2")
 
 	// ── Verify UTXO chains use PaymentModelMonitored via V2 ─────
 	testUtxoChains := []iwallet.ChainType{
@@ -2205,7 +2199,8 @@ func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
 }
 
 // TestOrderLifecycle_MonitoredInstructionMatrix validates monitored chains return
-// nil frontend instructions. EVM/Solana require V2 registration; TRON is retired.
+// nil frontend instructions. Private EVM/Solana modules are outside this
+// Open Core-only matrix; TRON is retired.
 func TestOrderLifecycle_MonitoredInstructionMatrix(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-instruction-matrix"}}
 	n.registerPaymentStrategies()
@@ -2224,7 +2219,6 @@ func TestOrderLifecycle_MonitoredInstructionMatrix(t *testing.T) {
 		{iwallet.ChainBitcoinCash, true, payment.PaymentModelMonitored, false},
 		{iwallet.ChainZCash, true, payment.PaymentModelMonitored, false},
 		{iwallet.ChainMock, true, payment.PaymentModelMonitored, false},
-		{iwallet.ChainSolana, true, payment.PaymentModelMonitored, false},
 	}
 
 	ctx := context.Background()

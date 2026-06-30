@@ -6,12 +6,10 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm" // registers EVM factory via init()
-	"github.com/mobazha/mobazha3.0/internal/chains/solana"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/zcash"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
-	pkgsolana "github.com/mobazha/mobazha3.0/pkg/solana"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -77,23 +75,6 @@ func TestNewETHWallet_NilChainClient(t *testing.T) {
 	}
 }
 
-func TestNewSolanaWallet_NilChainClient(t *testing.T) {
-	w, err := solana.NewSolanaWallet(&base.WalletConfig{
-		NodeID:  "test-node",
-		Testnet: true,
-	})
-	if err != nil {
-		t.Fatalf("NewSolanaWallet failed: %v", err)
-	}
-	if w == nil {
-		t.Fatal("wallet should not be nil")
-	}
-	// ChainClient should be nil at construction (injected during Start)
-	if w.ChainClient != nil {
-		t.Error("ChainClient should be nil at construction")
-	}
-}
-
 // ── Config tests ────────────────────────────────────────────────────────
 
 func TestDefaultConfig_HasChainAPIs(t *testing.T) {
@@ -149,32 +130,6 @@ func TestEscrowAddresses(t *testing.T) {
 func TestEVMClientFactory_Registration(t *testing.T) {
 	if evm.DefaultFactory == nil {
 		t.Fatal("DefaultFactory should be registered via init()")
-	}
-}
-
-// ── Solana Client Factory tests ─────────────────────────────────────────
-
-func TestSolanaClientFactory_Registration(t *testing.T) {
-	if pkgsolana.DefaultFactory == nil {
-		t.Fatal("Solana DefaultFactory should be registered via init()")
-	}
-}
-
-func TestSolanaDefaultConfig(t *testing.T) {
-	const escrowProgramID = "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX"
-
-	cfg := pkgsolana.GetDefaultConfig(true)
-	if cfg == nil {
-		t.Fatal("GetDefaultConfig(testnet=true) returned nil")
-	}
-	if cfg.RpcURL == "" {
-		t.Error("RpcURL should not be empty")
-	}
-	if cfg.RegistryAddress != "" {
-		t.Errorf("RegistryAddress = %q, want empty to avoid legacy ContractManager path", cfg.RegistryAddress)
-	}
-	if cfg.EscrowAddress != escrowProgramID {
-		t.Errorf("EscrowAddress = %q, want %q", cfg.EscrowAddress, escrowProgramID)
 	}
 }
 

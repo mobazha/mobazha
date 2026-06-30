@@ -9,10 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/config"
@@ -458,9 +456,9 @@ func (s *PaymentAppService) persistSharedPaymentPolicySnapshot(orderID, moderato
 	})
 }
 
-// BuildInitEscrowInstructions builds escrow initialization instructions for
-// contract/program chains. EVM setup is retired (ManagedEscrow V2 only); Solana builds
-// Anchor create instructions that the V2 adapter submits through the backend relay.
+// BuildInitEscrowInstructions is retained for source compatibility with the
+// legacy Node contract. All formerly supported contract/program rails now use
+// V2 strategies, so Core must never build chain-specific initialization data.
 func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
 	coinInfo, err := payment.SettlementCoinInfoForCoin(params.CoinType)
 	if err != nil {
@@ -472,147 +470,10 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 	if coinInfo.IsEthTypeChain() {
 		return nil, iwallet.Address{}, nil, fmt.Errorf("%w", ErrLegacyEVMPaymentRetired)
 	}
-
-	wallet, err := s.multiwallet.WalletForCurrencyCode(string(params.CoinType))
-	if err != nil {
-		return nil, iwallet.Address{}, nil, fmt.Errorf("%s chain is not enabled: %w", coinInfo.Chain, err)
-	}
-	escrowProcessor, ok := wallet.(iwallet.EscrowProcessor)
-	if !ok {
-		return nil, iwallet.Address{}, nil, fmt.Errorf("%s does not support escrow", coinInfo.Chain)
-	}
-	if escrowProcessor == nil {
-		return nil, iwallet.Address{}, nil, errors.New("failed to get escrow processor")
-	}
-
-	orderInfo, err := s.GetOrderInfo(models.OrderID(params.OrderID), params.CoinType)
-	if err != nil {
-		return nil, iwallet.Address{}, nil, err
-	}
-	refundAddress := params.RefundAddress
-	if refundAddress == "" {
-		refundAddress = orderInfo.BuyerAddress
-	}
-	var unlockTime int64
-	var fundingDeadline int64
-	platformAuthority := ""
-	platformFeeCollector := ""
-	rentCollector := ""
 	if coinInfo.Chain == iwallet.ChainSolana {
-		now := time.Now().UTC()
-		unlockTime = now.Add(time.Duration(orderInfo.UnlockHours) * time.Hour).Unix()
-		fundingDeadline = unlockTime
-		// Until explicit Solana fee/rent collector config exists, the relay
-		// payer owns rent recovery and a zero service-fee collector slot.
-		platformAuthority = params.PayerAddress
-		platformFeeCollector = params.PayerAddress
-		rentCollector = params.PayerAddress
+		return nil, iwallet.Address{}, nil, fmt.Errorf("%w", ErrLegacySolanaPaymentRetired)
 	}
-	paymentMethod, moderatorAddress, requiredSignatures, err := s.GetModeratorEscrowInfo(ctx, params.Moderator, params.CoinType)
-	if err != nil {
-		return nil, iwallet.Address{}, nil, err
-	}
-
-	var payerBytes []byte
-	if coinInfo.Chain == iwallet.ChainSolana {
-		payer, err := solana.PublicKeyFromBase58(params.PayerAddress)
-		if err != nil {
-			return nil, iwallet.Address{}, nil, err
-		}
-		payerBytes = payer.Bytes()
-	} else if coinInfo.IsEthTypeChain() {
-		payerBytes = common.HexToAddress(params.PayerAddress).Bytes()
-	}
-
-	contractAddress, err := escrowProcessor.GetContractAddress()
-	if err != nil {
-		return nil, iwallet.Address{}, nil, err
-	}
-
-	initParams := iwallet.EscrowInfo{
-		ContractAddress:      contractAddress.String(),
-		PayerAddress:         params.PayerAddress,
-		PlatformAuthority:    platformAuthority,
-		BuyerAddress:         orderInfo.BuyerAddress,
-		RefundAddress:        refundAddress,
-		SellerAddress:        orderInfo.VendorAddress,
-		ModeratorAddress:     moderatorAddress,
-		PlatformFeeCollector: platformFeeCollector,
-		RentCollector:        rentCollector,
-		UniqueId:             orderInfo.UniqueId,
-		RequiredSignatures:   uint8(requiredSignatures),
-		UnlockHours:          uint64(orderInfo.UnlockHours),
-		UnlockTime:           unlockTime,
-		FundingDeadline:      fundingDeadline,
-		CoinType:             params.CoinType,
-		Amount:               params.Amount,
-		Testnet:              wallet.IsTestnet(),
-	}
-
-	escrowAccount, instructions, script, err := escrowProcessor.BuildInitEscrowInstructions(initParams)
-	if err != nil {
-		return nil, iwallet.Address{}, nil, err
-	}
-
-	var escrowPubkeyBytes []byte
-	if coinInfo.Chain == iwallet.ChainSolana {
-		escrowPubkey := solana.MustPublicKeyFromBase58(escrowAccount.String())
-		escrowPubkeyBytes = escrowPubkey.Bytes()
-	} else if coinInfo.IsEthTypeChain() {
-		escrowPubkeyBytes = common.HexToAddress(escrowAccount.String()).Bytes()
-	}
-
-	paymentTokenAddress := ""
-	if coinInfo.IsNative {
-		paymentTokenAddress = "0x0000000000000000000000000000000000000000"
-	} else {
-		paymentTokenAddress = coinInfo.ContractAddress(wallet.IsTestnet())
-	}
-
-	var escrowSpec payment.SettlementSpec
-	if coinInfo.Chain == iwallet.ChainSolana {
-		escrowSpec = payment.NewSolanaEscrowSpec(paymentMethod == pb.PaymentSent_MODERATED)
-	} else {
-		escrowSpec = payment.NewLegacyEVMContractSpec(paymentMethod == pb.PaymentSent_MODERATED)
-	}
-
-	paymentData := models.PaymentData{
-		OrderID:             params.OrderID,
-		Coin:                params.CoinType,
-		Method:              paymentMethod,
-		SettlementSpec:      escrowSpec.ToPending(),
-		ContractAddress:     contractAddress.String(),
-		PayerAddress:        params.PayerAddress,
-		Moderator:           params.Moderator,
-		ModeratorAddress:    moderatorAddress,
-		Amount:              params.Amount,
-		FromID:              padOrTruncateBytes(payerBytes, 36),
-		ToAddress:           escrowAccount.String(),
-		ToID:                padOrTruncateBytes(escrowPubkeyBytes, 36),
-		UnlockHours:         uint32(orderInfo.UnlockHours),
-		UnlockTime:          unlockTime,
-		FundingDeadline:     fundingDeadline,
-		PlatformAddr:        platformFeeCollector,
-		RentCollector:       rentCollector,
-		RefundAddress:       refundAddress,
-		Script:              hex.EncodeToString(script),
-		PaymentTokenAddress: paymentTokenAddress,
-	}
-
-	if coinInfo.Chain == iwallet.ChainSolana {
-		metadata, err := encodeSolanaAnchorPendingMetadata(&paymentData)
-		if err != nil {
-			logger.LogWarningWithIDf(log, s.nodeID, "BuildInitEscrowInstructions: failed to encode Solana pending metadata for order %s: %v", params.OrderID, err)
-		} else {
-			paymentData.Script = metadata
-		}
-	}
-
-	if persistErr := s.persistEscrowPaymentInfo(params.OrderID, &paymentData); persistErr != nil {
-		logger.LogWarningWithIDf(log, s.nodeID, "BuildInitEscrowInstructions: failed to persist escrow pending for order %s: %v", params.OrderID, persistErr)
-	}
-
-	return &paymentData, escrowAccount, instructions, nil
+	return nil, iwallet.Address{}, nil, fmt.Errorf("%s does not support legacy escrow setup", coinInfo.Chain)
 }
 
 func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
@@ -637,6 +498,20 @@ func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(data), nil
+}
+
+// CommitManagedSolanaSetup persists the private module's validated PDA result
+// using the same Core-owned payment projection as every other setup path.
+func (s *PaymentAppService) CommitManagedSolanaSetup(pd *models.PaymentData) error {
+	if pd == nil || strings.TrimSpace(pd.OrderID) == "" || strings.TrimSpace(pd.ToAddress) == "" {
+		return errors.New("managed Solana setup requires payment data, order ID, and escrow address")
+	}
+	metadata, err := encodeSolanaAnchorPendingMetadata(pd)
+	if err != nil {
+		return fmt.Errorf("encode managed Solana pending metadata: %w", err)
+	}
+	pd.Script = metadata
+	return s.persistEscrowPaymentInfo(pd.OrderID, pd)
 }
 
 func (s *PaymentAppService) persistEscrowPaymentInfo(orderID string, pd *models.PaymentData) error {

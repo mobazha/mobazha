@@ -61,6 +61,7 @@ func (t *featureTestTx) Save(i interface{}) error {
 	}
 	return t.db.Save(i).Error
 }
+func (t *featureTestTx) Create(i interface{}) error { return t.db.Create(i).Error }
 
 func (t *featureTestTx) Update(key string, value interface{}, where map[string]interface{}, model interface{}) error {
 	q := t.db.Model(model)

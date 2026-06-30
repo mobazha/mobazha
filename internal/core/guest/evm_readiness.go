@@ -44,6 +44,7 @@ func (s *GuestOrderAppService) appendEVMReadiness(out *contracts.GuestCheckoutRe
 	monitors := s.evmManagedEscrowMonitorChains
 	relayGasHealthy := s.evmRelayGasHealthyChains
 	relayGasReasons := s.evmRelayGasUnhealthyReason
+	healthProvider := s.evmHealthProvider
 	s.evmRuntimeMu.RUnlock()
 
 	seen := make(map[iwallet.ChainType]struct{}, len(chains))
@@ -63,15 +64,22 @@ func (s *GuestOrderAppService) appendEVMReadiness(out *contracts.GuestCheckoutRe
 		_, monitorOK := monitors[chain]
 		_, relayGasOK := relayGasHealthy[chain]
 		relayGasReason := relayGasReasons[chain]
-		if relayReady && !relayGasOK && relayGasReason == "" {
+		chainRelayReady := relayReady
+		if healthProvider != nil {
+			health := healthProvider.ManagedEscrowHealth(chain)
+			chainRelayReady = health.RelayReady
+			relayGasOK = health.RelayGasHealthy
+			relayGasReason = health.Reason
+		}
+		if chainRelayReady && !relayGasOK && relayGasReason == "" {
 			relayGasReason = "relay gas wallet not healthy"
 		}
 		entry := contracts.GuestEVMChainReadiness{
 			Chain:                  string(chain),
 			Coin:                   string(coinType),
 			ManagedEscrowMonitorActive:      monitorOK,
-			RelayReady:             relayReady,
-			RelayGasHealthy:        relayReady && relayGasOK,
+			RelayReady:             chainRelayReady,
+			RelayGasHealthy:        chainRelayReady && relayGasOK,
 			RelayGasReason:         relayGasReason,
 			SettlementReady:        settleReady && guestEVMManagedEscrowSettlementActive,
 			FundingReady:           fundingReady && s.directPayment != nil && s.directPayment.HasEVMManagedEscrowFunding(),

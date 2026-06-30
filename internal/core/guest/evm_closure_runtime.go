@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -16,6 +17,7 @@ type EVMManagedEscrowClosureRuntime struct {
 	ManagedEscrowMonitorChains       map[iwallet.ChainType]struct{}
 	RelayGasHealthyChains   map[iwallet.ChainType]struct{}
 	RelayGasUnhealthyReason map[iwallet.ChainType]string
+	HealthProvider          distribution.ManagedEscrowHealthProvider
 }
 
 // SetEVMManagedEscrowClosureRuntime updates EVM ManagedEscrow closure wiring (called after ManagedEscrow shadow registration).
@@ -32,6 +34,7 @@ func (s *GuestOrderAppService) SetEVMManagedEscrowClosureRuntime(cfg EVMManagedE
 	s.evmManagedEscrowMonitorChains = cloneChainSet(cfg.ManagedEscrowMonitorChains)
 	s.evmRelayGasHealthyChains = cloneChainSet(cfg.RelayGasHealthyChains)
 	s.evmRelayGasUnhealthyReason = cloneChainReasons(cfg.RelayGasUnhealthyReason)
+	s.evmHealthProvider = cfg.HealthProvider
 	s.evmObservationAvailable = cfg.ObservationReady && len(s.evmManagedEscrowMonitorChains) > 0
 }
 
@@ -73,7 +76,14 @@ func (s *GuestOrderAppService) evaluateEVMClosureReadiness(coinType iwallet.Coin
 	_, monitorOK := s.evmManagedEscrowMonitorChains[coinInfo.Chain]
 	_, relayGasOK := s.evmRelayGasHealthyChains[coinInfo.Chain]
 	relayGasReason := s.evmRelayGasUnhealthyReason[coinInfo.Chain]
+	healthProvider := s.evmHealthProvider
 	s.evmRuntimeMu.RUnlock()
+	if healthProvider != nil {
+		health := healthProvider.ManagedEscrowHealth(coinInfo.Chain)
+		relayReady = health.RelayReady
+		relayGasOK = health.RelayGasHealthy
+		relayGasReason = health.Reason
+	}
 
 	if !fundingReady {
 		return fmt.Errorf("%w: EVM ManagedEscrow funding adapter is not configured", contracts.ErrCoinUnavailable)

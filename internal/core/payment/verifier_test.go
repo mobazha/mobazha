@@ -67,8 +67,9 @@ func (d *vTestDB) Close() error                            { return nil }
 
 type vTestTx struct{ db *gorm.DB }
 
-func (t *vTestTx) Read() *gorm.DB           { return t.db }
-func (t *vTestTx) Save(i interface{}) error { return t.db.Save(i).Error }
+func (t *vTestTx) Read() *gorm.DB             { return t.db }
+func (t *vTestTx) Save(i interface{}) error   { return t.db.Save(i).Error }
+func (t *vTestTx) Create(i interface{}) error { return t.db.Create(i).Error }
 func (t *vTestTx) Update(key string, value interface{}, where map[string]interface{}, model interface{}) error {
 	q := t.db.Model(model)
 	for k, v := range where {

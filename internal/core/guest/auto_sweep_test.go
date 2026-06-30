@@ -34,7 +34,7 @@ func (d *sweepTestDB) Update(fn func(database.Tx) error) error {
 }
 
 func (d *sweepTestDB) ComputePublicDataHash() (cid.Cid, error) { return cid.Undef, nil }
-func (d *sweepTestDB) Close() error                             { return nil }
+func (d *sweepTestDB) Close() error                            { return nil }
 
 type sweepTestTx struct {
 	testTx
@@ -77,6 +77,7 @@ func (t *sweepTestTx) Save(i interface{}) error {
 	}
 	return t.db.Clauses(clause.OnConflict{Columns: cols, UpdateAll: true}).Create(i).Error
 }
+func (t *sweepTestTx) Create(i interface{}) error { return t.db.Create(i).Error }
 
 func seedSweepGuestOrder(t *testing.T, db *sweepTestDB, id int, order models.GuestOrder) {
 	t.Helper()

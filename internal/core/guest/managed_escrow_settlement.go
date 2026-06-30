@@ -2,9 +2,16 @@ package guest
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/mobazha/mobazha3.0/pkg/database"
@@ -12,6 +19,14 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	"github.com/mobazha/mobazha3.0/pkg/redact"
+	"gorm.io/gorm"
+)
+
+const (
+	guestSettlementIntentVersion = "v1"
+	guestSettlementLeaseDuration = 10 * time.Minute
+	guestSettlementRecoveryEvery = time.Minute
+	guestSettlementWorkers       = 4
 )
 
 // ManagedEscrowGuestSettlementSource projects private guest-order state into
@@ -25,9 +40,9 @@ func NewManagedEscrowGuestSettlementSource(db database.Database) *ManagedEscrowG
 	return &ManagedEscrowGuestSettlementSource{db: db}
 }
 
-// ManagedEscrowGuestSettlement returns a request only when the order is
-// eligible and no active deployment or settlement action already exists.
-func (s *ManagedEscrowGuestSettlementSource) ManagedEscrowGuestSettlement(
+// ClaimManagedEscrowGuestSettlement returns a request only after atomically
+// acquiring the durable execution lease for the order's deterministic intent.
+func (s *ManagedEscrowGuestSettlementSource) ClaimManagedEscrowGuestSettlement(
 	ctx context.Context,
 	orderID string,
 ) (*distribution.ManagedEscrowGuestSettlementRequest, error) {
@@ -51,14 +66,6 @@ func (s *ManagedEscrowGuestSettlementSource) ManagedEscrowGuestSettlement(
 	if !order.HasEVMManagedEscrowFundingTarget() || !guestOrderEligibleForSettlement(order.State) {
 		return nil, nil
 	}
-	hasActive, err := s.hasActiveAction(ctx, orderID)
-	if err != nil {
-		return nil, err
-	}
-	if hasActive {
-		return nil, nil
-	}
-
 	meta, err := RecoverGuestEVMManagedEscrowMetadata(&order)
 	if err != nil {
 		return nil, fmt.Errorf("managed escrow guest settlement: recover metadata for %s: %w", orderID, err)
@@ -90,7 +97,8 @@ func (s *ManagedEscrowGuestSettlementSource) ManagedEscrowGuestSettlement(
 		return nil, fmt.Errorf("managed escrow guest settlement: invalid payment amount for %s", orderID)
 	}
 
-	return &distribution.ManagedEscrowGuestSettlementRequest{
+	request := &distribution.ManagedEscrowGuestSettlementRequest{
+		IntentID:      managedEscrowGuestSettlementIntentID(orderID),
 		OrderID:       orderID,
 		Chain:         coinInfo.Chain,
 		ChainID:       meta.ChainID,
@@ -100,15 +108,20 @@ func (s *ManagedEscrowGuestSettlementSource) ManagedEscrowGuestSettlement(
 		OwnerAddress:  owner.Hex(),
 		SaltNonce:     salt.String(),
 		Recipient:     recipient.Hex(),
-	}, nil
+	}
+	claimed, err := s.claimSettlementIntent(ctx, request)
+	if err != nil || !claimed {
+		return nil, err
+	}
+	return request, nil
 }
 
-// ListPendingManagedEscrowGuestSettlements returns all currently eligible
-// requests. Invalid persisted metadata fails closed instead of reaching a
-// private chain implementation.
-func (s *ManagedEscrowGuestSettlementSource) ListPendingManagedEscrowGuestSettlements(
+// ListPendingManagedEscrowGuestSettlementOrderIDs returns candidates only.
+// Each candidate is validated and atomically claimed by workers separately so
+// one corrupt row cannot poison the entire recovery batch.
+func (s *ManagedEscrowGuestSettlementSource) ListPendingManagedEscrowGuestSettlementOrderIDs(
 	ctx context.Context,
-) ([]distribution.ManagedEscrowGuestSettlementRequest, error) {
+) ([]string, error) {
 	if s == nil || s.db == nil {
 		return nil, fmt.Errorf("managed escrow guest settlement: database not configured")
 	}
@@ -121,20 +134,17 @@ func (s *ManagedEscrowGuestSettlementSource) ListPendingManagedEscrowGuestSettle
 	}); err != nil {
 		return nil, fmt.Errorf("managed escrow guest settlement: list pending orders: %w", err)
 	}
-	requests := make([]distribution.ManagedEscrowGuestSettlementRequest, 0, len(orders))
+	orderIDs := make([]string, 0, len(orders))
 	for i := range orders {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		request, err := s.ManagedEscrowGuestSettlement(ctx, orders[i].OrderToken)
-		if err != nil {
-			return nil, err
-		}
-		if request != nil {
-			requests = append(requests, *request)
+		orderID := strings.TrimSpace(orders[i].OrderToken)
+		if orderID != "" {
+			orderIDs = append(orderIDs, orderID)
 		}
 	}
-	return requests, nil
+	return orderIDs, nil
 }
 
 // ListConfirmedManagedEscrowGuestSettlements returns confirmed order IDs so
@@ -172,25 +182,91 @@ func (s *ManagedEscrowGuestSettlementSource) ListConfirmedManagedEscrowGuestSett
 	return orderIDs, nil
 }
 
-func (s *ManagedEscrowGuestSettlementSource) hasActiveAction(ctx context.Context, orderID string) (bool, error) {
+func managedEscrowGuestSettlementIntentID(orderID string) string {
+	digest := sha256.Sum256([]byte(guestSettlementIntentVersion + "\x00" + payment.ManagedEscrowGuestSettlementAction + "\x00" + strings.TrimSpace(orderID)))
+	return "guest-release-" + hex.EncodeToString(digest[:])
+}
+
+func newGuestSettlementClaimToken() (string, error) {
+	var token [24]byte
+	if _, err := rand.Read(token[:]); err != nil {
+		return "", fmt.Errorf("generate claim token: %w", err)
+	}
+	return hex.EncodeToString(token[:]), nil
+}
+
+func (s *ManagedEscrowGuestSettlementSource) claimSettlementIntent(
+	ctx context.Context,
+	request *distribution.ManagedEscrowGuestSettlementRequest,
+) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	var count int64
-	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Model(&models.SettlementAction{}).
-			Where("order_id = ?", orderID).
-			Where(
-				"(action_kind = ? AND state IN ?) OR (action_kind = ? AND state IN ?)",
-				payment.ManagedEscrowGuestSettlementAction, guestReleaseActiveStates,
-				payment.ManagedEscrowGuestDeployAction, guestDeployActiveStates,
-			).
-			Count(&count).Error
+	token, err := newGuestSettlementClaimToken()
+	if err != nil {
+		return false, err
+	}
+	now := time.Now().UTC()
+	leaseUntil := now.Add(guestSettlementLeaseDuration)
+	immutable := *request
+	immutable.ClaimToken = ""
+	raw, err := json.Marshal(immutable)
+	if err != nil {
+		return false, fmt.Errorf("managed escrow guest settlement: encode intent: %w", err)
+	}
+	row := models.SettlementAction{
+		ActionID: request.IntentID, IntentKey: request.IntentID, OrderID: request.OrderID,
+		ActionKind: payment.ManagedEscrowGuestSettlementAction, ChainID: request.ChainID,
+		IntentPayload: string(raw), State: "claimed", Attempts: 1, LeaseToken: token,
+		LeaseExpiresAt: &leaseUntil, SettlementCoin: request.PaymentCoin,
+		GrossAmount: request.PaymentAmount, CreatedAt: now, UpdatedAt: now,
+	}
+	err = s.db.Update(func(tx database.Tx) error { return tx.Create(&row) })
+	if err == nil {
+		request.ClaimToken = token
+		return true, nil
+	}
+
+	var existing models.SettlementAction
+	if loadErr := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("action_id = ?", request.IntentID).First(&existing).Error
+	}); loadErr != nil {
+		if errors.Is(loadErr, gorm.ErrRecordNotFound) {
+			return false, fmt.Errorf("managed escrow guest settlement: create intent: %w", err)
+		}
+		return false, fmt.Errorf("managed escrow guest settlement: load intent: %w", loadErr)
+	}
+	if existing.IntentKey != request.IntentID || existing.OrderID != request.OrderID ||
+		existing.ActionKind != payment.ManagedEscrowGuestSettlementAction || existing.IntentPayload != string(raw) {
+		return false, fmt.Errorf("managed escrow guest settlement: intent identity conflict")
+	}
+	if existing.State != "claimed" && existing.State != "failed" {
+		return false, nil
+	}
+	if existing.LeaseExpiresAt != nil && existing.LeaseExpiresAt.After(now) {
+		return false, nil
+	}
+	var affected int64
+	err = s.db.Update(func(tx database.Tx) error {
+		where := map[string]interface{}{
+			"action_id = ?": request.IntentID, "state = ?": existing.State,
+			"lease_token = ?": existing.LeaseToken,
+		}
+		rows, updateErr := tx.UpdateColumns(map[string]interface{}{
+			"state": "claimed", "lease_token": token, "lease_expires_at": leaseUntil,
+			"attempts": existing.Attempts + 1, "last_error": "", "updated_at": now,
+		}, where, &models.SettlementAction{})
+		affected = rows
+		return updateErr
 	})
 	if err != nil {
-		return false, fmt.Errorf("managed escrow guest settlement: inspect actions for %s: %w", orderID, err)
+		return false, fmt.Errorf("managed escrow guest settlement: reclaim intent: %w", err)
 	}
-	return count > 0, nil
+	if affected != 1 {
+		return false, nil
+	}
+	request.ClaimToken = token
+	return true, nil
 }
 
 // DistributionManagedEscrowGuestSettlementService keeps Core orchestration
@@ -213,7 +289,7 @@ func (s *DistributionManagedEscrowGuestSettlementService) SubmitReleaseForOrder(
 	if s == nil || s.source == nil || s.executor == nil {
 		return fmt.Errorf("managed escrow guest settlement: source and executor are required")
 	}
-	request, err := s.source.ManagedEscrowGuestSettlement(ctx, orderID)
+	request, err := s.source.ClaimManagedEscrowGuestSettlement(ctx, orderID)
 	if err != nil || request == nil {
 		return err
 	}
@@ -225,15 +301,76 @@ func (s *DistributionManagedEscrowGuestSettlementService) RecoverPendingSettleme
 	if s == nil || s.source == nil || s.executor == nil {
 		return
 	}
-	requests, err := s.source.ListPendingManagedEscrowGuestSettlements(ctx)
+	orderIDs, err := s.source.ListPendingManagedEscrowGuestSettlementOrderIDs(ctx)
 	if err != nil {
 		log.Warningf("managed escrow guest settlement recovery: %v", err)
 		return
 	}
-	for i := range requests {
-		if err := s.executor.SubmitManagedEscrowGuestSettlement(ctx, requests[i]); err != nil {
-			log.Warningf("managed escrow guest settlement recovery for %s: %v",
-				redact.Token(requests[i].OrderID), err)
+	jobs := make(chan string)
+	var workers sync.WaitGroup
+	workerCount := guestSettlementWorkers
+	if len(orderIDs) < workerCount {
+		workerCount = len(orderIDs)
+	}
+	for i := 0; i < workerCount; i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for orderID := range jobs {
+				request, claimErr := s.source.ClaimManagedEscrowGuestSettlement(ctx, orderID)
+				if claimErr != nil {
+					log.Warningf("managed escrow guest settlement recovery claim for %s: %v", redact.Token(orderID), claimErr)
+					continue
+				}
+				if request == nil {
+					continue
+				}
+				if submitErr := s.executor.SubmitManagedEscrowGuestSettlement(ctx, *request); submitErr != nil {
+					log.Warningf("managed escrow guest settlement recovery for %s: %v", redact.Token(orderID), submitErr)
+				}
+			}
+		}()
+	}
+	for _, orderID := range orderIDs {
+		select {
+		case jobs <- orderID:
+		case <-ctx.Done():
+			close(jobs)
+			workers.Wait()
+			return
+		}
+	}
+	close(jobs)
+	workers.Wait()
+}
+
+// RunPendingSettlementRecovery continuously reconciles eligible guest
+// settlements until shutdown. A single startup scan is insufficient: an RPC
+// outage can leave a durable failed/expired claim after the process is already
+// running, with no second order event available to trigger it again.
+func (s *DistributionManagedEscrowGuestSettlementService) RunPendingSettlementRecovery(ctx context.Context) {
+	s.runPendingSettlementRecovery(ctx, guestSettlementRecoveryEvery)
+}
+
+func (s *DistributionManagedEscrowGuestSettlementService) runPendingSettlementRecovery(
+	ctx context.Context,
+	interval time.Duration,
+) {
+	if interval <= 0 {
+		interval = guestSettlementRecoveryEvery
+	}
+	if ctx.Err() != nil {
+		return
+	}
+	s.RecoverPendingSettlements(ctx)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.RecoverPendingSettlements(ctx)
 		}
 	}
 }

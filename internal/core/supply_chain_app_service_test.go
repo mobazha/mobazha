@@ -138,6 +138,7 @@ func (t *scTestTx) Save(i interface{}) error {
 	// Use Clauses for SQLite composite PK upsert (production uses PostgreSQL)
 	return t.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(i).Error
 }
+func (t *scTestTx) Create(i interface{}) error { return t.db.Create(i).Error }
 func (t *scTestTx) Update(key string, value interface{}, where map[string]interface{}, model interface{}) error {
 	q := t.db.Model(model)
 	for k, v := range where {

@@ -17,9 +17,10 @@ import (
 
 func TestPaymentRuntime_DoesNotExposePrivilegedState(t *testing.T) {
 	runtimeType := reflect.TypeOf(PaymentRuntime{})
-	require.Equal(t, 12, runtimeType.NumField())
+	require.Equal(t, 3, runtimeType.NumField())
 	for index := 0; index < runtimeType.NumField(); index++ {
 		field := runtimeType.Field(index)
+		assert.False(t, field.IsExported(), "runtime field %s must not be exported", field.Name)
 		typeName := field.Type.String()
 		assert.False(t, strings.Contains(typeName, "KeyProvider"), "runtime field %s exposes raw keys", field.Name)
 		assert.False(t, strings.Contains(typeName, "WalletOperator"), "runtime field %s exposes the whole wallet operator", field.Name)
@@ -115,14 +116,25 @@ type testPaymentModule struct {
 	called      bool
 	activated   bool
 	activateErr error
+	unbound     bool
+	rolledBack  bool
 }
 
-func (m *testPaymentModule) Activate(context.Context) error {
+func (m *testPaymentModule) Bind(context.Context) error {
 	m.activated = true
 	return m.activateErr
 }
 
-func (m *testPaymentModule) ID() string { return m.id }
+func (m *testPaymentModule) Unbind(context.Context) error { m.unbound = true; return nil }
+
+func (m *testPaymentModule) RollbackRegistration(context.Context) error {
+	m.rolledBack = true
+	return nil
+}
+
+func (m *testPaymentModule) Descriptor() PaymentModuleDescriptor {
+	return PaymentModuleDescriptor{ID: m.id}
+}
 
 func (m *testPaymentModule) Register(_ context.Context, _ PaymentRuntime, registrar PaymentRegistrar) error {
 	m.called = true
@@ -143,7 +155,7 @@ func TestRegisterPaymentModules_ValidModule_CommitsStrategy(t *testing.T) {
 		strategy: &testPaymentStrategy{},
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntime{}, registry, module)
+	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, module)
 
 	require.NoError(t, err)
 	assert.True(t, module.called)
@@ -158,11 +170,39 @@ func TestRegisterPaymentModules_ActivationFailure_RollsBackStrategies(t *testing
 		activateErr: errors.New("guest runtime unavailable"),
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntime{}, registry, module)
+	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, module)
 
 	require.ErrorContains(t, err, "guest runtime unavailable")
 	assert.True(t, module.activated)
+	assert.True(t, module.unbound)
+	assert.True(t, module.rolledBack)
 	assert.Empty(t, registry.strategies)
+}
+
+func TestRegisterPaymentModules_LaterBindFailureUnbindsEarlierModule(t *testing.T) {
+	registry := newTestPaymentRegistry()
+	first := &testPaymentModule{id: "commercial.managed", chain: iwallet.ChainEthereum, strategy: &testPaymentStrategy{}}
+	second := &testPaymentModule{id: "commercial.solana", chain: iwallet.ChainSolana, strategy: &testPaymentStrategy{}, activateErr: errors.New("bind failed")}
+
+	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, first, second)
+
+	require.ErrorContains(t, err, "bind failed")
+	assert.True(t, first.activated)
+	assert.True(t, first.unbound)
+	assert.True(t, second.unbound)
+	assert.True(t, first.rolledBack)
+	assert.True(t, second.rolledBack)
+	assert.Empty(t, registry.strategies)
+}
+
+func TestPaymentRuntime_EnforcesDeclaredCapabilities(t *testing.T) {
+	authority := NewPaymentRuntimeAuthority(ManagedEVMRuntime{}, ManagedEscrowGuestRuntimePorts{})
+	runtime, err := authority.RuntimeFor(PaymentModuleDescriptor{ID: "managed-evm", Capabilities: []PaymentModuleCapability{CapabilityManagedEVMExecution}})
+	require.NoError(t, err)
+	_, err = runtime.ManagedEVM()
+	require.NoError(t, err)
+	_, err = runtime.ManagedEscrowGuest()
+	require.ErrorContains(t, err, string(CapabilityManagedEscrowGuest))
 }
 
 func TestRegisterPaymentModules_ModuleFailure_LeavesRegistryUnchanged(t *testing.T) {
@@ -172,10 +212,13 @@ func TestRegisterPaymentModules_ModuleFailure_LeavesRegistryUnchanged(t *testing
 		&testPaymentModule{id: "commercial.solana", err: errors.New("missing relay")},
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntime{}, registry, modules...)
+	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, modules...)
 
 	require.ErrorContains(t, err, "missing relay")
 	assert.Empty(t, registry.strategies)
+	for _, module := range modules {
+		assert.True(t, module.(*testPaymentModule).rolledBack)
+	}
 }
 
 func TestRegisterPaymentModules_DuplicateID_LeavesRegistryUnchanged(t *testing.T) {
@@ -185,7 +228,7 @@ func TestRegisterPaymentModules_DuplicateID_LeavesRegistryUnchanged(t *testing.T
 		&testPaymentModule{id: "commercial.managed", chain: iwallet.ChainSolana, strategy: &testPaymentStrategy{}},
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntime{}, registry, modules...)
+	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, modules...)
 
 	require.ErrorContains(t, err, "registered more than once")
 	assert.Empty(t, registry.strategies)
@@ -199,7 +242,7 @@ func TestRegisterPaymentModules_ExistingCoreChain_RejectsWholeSet(t *testing.T) 
 		&testPaymentModule{id: "invalid.override", chain: iwallet.ChainBitcoin, strategy: &testPaymentStrategy{}},
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntime{}, registry, modules...)
+	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, modules...)
 
 	require.ErrorContains(t, err, "already registered")
 	assert.Len(t, registry.strategies, 1)
@@ -210,7 +253,7 @@ func TestRegisterPaymentModules_TypedNilModule_IsRejected(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	var module *testPaymentModule
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntime{}, registry, module)
+	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, module)
 
 	require.ErrorContains(t, err, "is nil")
 	assert.Empty(t, registry.strategies)

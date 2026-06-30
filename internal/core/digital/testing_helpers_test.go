@@ -54,6 +54,7 @@ func (t *testTx) Save(i interface{}) error {
 	injectTestTenantID(i)
 	return t.db.Save(i).Error
 }
+func (t *testTx) Create(i interface{}) error { injectTestTenantID(i); return t.db.Create(i).Error }
 
 // injectTestTenantID mimics production Tx.Save behavior: set a non-empty
 // TenantID so GORM recognises the composite PK as "existing" and emits

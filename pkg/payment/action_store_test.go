@@ -60,3 +60,17 @@ func TestMemoryActionStore_RejectsEmptyIDAndHonorsContext(t *testing.T) {
 	_, err := store.Lookup(ctx, "action-1")
 	require.ErrorIs(t, err, context.Canceled)
 }
+
+func TestMemoryActionStore_RejectsImmutableIntentMutation(t *testing.T) {
+	store := NewMemoryActionStore()
+	require.NoError(t, store.Put(ActionRecord{
+		ActionID: "intent-1", IntentKey: "intent-1", IntentPayload: "payload-1",
+		OrderID: "order-1", Action: ManagedEscrowGuestSettlementAction, ChainID: 1,
+		SettlementCoin: "ETH", GrossAmount: "42", LeaseToken: "lease-1",
+	}))
+	err := store.Put(ActionRecord{
+		ActionID: "intent-1", IntentKey: "intent-1", IntentPayload: "payload-2",
+		LeaseToken: "lease-1", State: "submitting",
+	})
+	require.ErrorIs(t, err, ErrActionIntentConflict)
+}

@@ -21,6 +21,8 @@ const (
 // persistence implementations; API callers receive the narrower ActionStatus.
 type ActionRecord struct {
 	ActionID        string
+	IntentKey       string
+	IntentPayload   string
 	OrderID         string
 	Action          string
 	ChainID         uint64
@@ -33,6 +35,8 @@ type ActionRecord struct {
 	Attempts        int
 	Confirmations   int
 	LastError       string
+	LeaseToken      string
+	LeaseExpiresAt  *time.Time
 	SettlementCoin  string
 	GrossAmount     string
 	PlannedLines    []models.SettlementPayoutLine
@@ -56,6 +60,14 @@ type ActionRecorder interface {
 
 // ErrActionRecordNotFound is returned when a settlement action is unknown.
 var ErrActionRecordNotFound = errors.New("action store: record not found")
+
+// ErrActionLeaseLost is returned when a recorder attempts to mutate an
+// intent claimed by another execution lease.
+var ErrActionLeaseLost = errors.New("action store: execution lease lost")
+
+// ErrActionIntentConflict is returned when an incremental projection attempts
+// to rewrite immutable business identity captured by a durable intent.
+var ErrActionIntentConflict = errors.New("action store: immutable intent conflict")
 
 // MemoryActionStore is a goroutine-safe, in-memory ActionStore and
 // ActionRecorder for tests and non-durable standalone use.
@@ -98,6 +110,24 @@ func (s *MemoryActionStore) Put(record ActionRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if existing, ok := s.records[record.ActionID]; ok {
+		if existing.LeaseToken != "" && record.LeaseToken != existing.LeaseToken {
+			return ErrActionLeaseLost
+		}
+		if actionRecordIntentConflict(existing, record) {
+			return ErrActionIntentConflict
+		}
+		if record.IntentKey == "" {
+			record.IntentKey = existing.IntentKey
+		}
+		if record.IntentPayload == "" {
+			record.IntentPayload = existing.IntentPayload
+		}
+		if record.LeaseToken == "" {
+			record.LeaseToken = existing.LeaseToken
+		}
+		if record.LeaseExpiresAt == nil {
+			record.LeaseExpiresAt = existing.LeaseExpiresAt
+		}
 		if record.CreatedAt.IsZero() {
 			record.CreatedAt = existing.CreatedAt
 		}
@@ -126,6 +156,19 @@ func (s *MemoryActionStore) Put(record ActionRecord) error {
 	record.ObservedLines = append([]models.SettlementPayoutLine(nil), record.ObservedLines...)
 	s.records[record.ActionID] = record
 	return nil
+}
+
+func actionRecordIntentConflict(existing, incoming ActionRecord) bool {
+	if existing.IntentKey == "" {
+		return false
+	}
+	return (incoming.IntentKey != "" && incoming.IntentKey != existing.IntentKey) ||
+		(incoming.IntentPayload != "" && incoming.IntentPayload != existing.IntentPayload) ||
+		(incoming.OrderID != "" && incoming.OrderID != existing.OrderID) ||
+		(incoming.Action != "" && incoming.Action != existing.Action) ||
+		(incoming.ChainID != 0 && incoming.ChainID != existing.ChainID) ||
+		(incoming.SettlementCoin != "" && incoming.SettlementCoin != existing.SettlementCoin) ||
+		(incoming.GrossAmount != "" && incoming.GrossAmount != existing.GrossAmount)
 }
 
 // Len returns the number of stored projections.

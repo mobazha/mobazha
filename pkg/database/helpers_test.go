@@ -19,8 +19,9 @@ type mockReadSaver struct {
 	db *gorm.DB
 }
 
-func (m *mockReadSaver) Read() *gorm.DB           { return m.db }
-func (m *mockReadSaver) Save(i interface{}) error { return m.db.Save(i).Error }
+func (m *mockReadSaver) Read() *gorm.DB             { return m.db }
+func (m *mockReadSaver) Save(i interface{}) error   { return m.db.Save(i).Error }
+func (m *mockReadSaver) Create(i interface{}) error { return m.db.Create(i).Error }
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()

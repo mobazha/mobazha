@@ -4,8 +4,10 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/mobazha/mobazha3.0/internal/core/guest"
 	"github.com/mobazha/mobazha3.0/pkg/distribution"
@@ -13,11 +15,15 @@ import (
 )
 
 type distributionManagedEscrowGuestRuntimeBinder struct {
-	node   *MobazhaNode
-	source distribution.ManagedEscrowGuestSettlementSource
+	mu         sync.Mutex
+	node       *MobazhaNode
+	source     distribution.ManagedEscrowGuestSettlementSource
+	bound      bool
+	started    bool
+	settlement *guest.DistributionManagedEscrowGuestSettlementService
 }
 
-func (b distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRuntime(
+func (b *distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRuntime(
 	ctx context.Context,
 	runtime distribution.ManagedEscrowGuestRuntime,
 ) error {
@@ -27,8 +33,13 @@ func (b distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRunti
 	if b.node == nil || b.node.guestOrderService == nil || b.node.guestPaymentMonitor == nil {
 		return fmt.Errorf("managed escrow guest runtime: guest checkout services are unavailable")
 	}
-	if b.source == nil || runtime.WatchRegistrar == nil || runtime.SettlementExecutor == nil {
-		return fmt.Errorf("managed escrow guest runtime: source, watch registrar, and settlement executor are required")
+	if b.source == nil || runtime.WatchRegistrar == nil || runtime.SettlementExecutor == nil || runtime.HealthProvider == nil {
+		return fmt.Errorf("managed escrow guest runtime: source, watch registrar, settlement executor, and health provider are required")
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.bound {
+		return fmt.Errorf("managed escrow guest runtime: already bound")
 	}
 	chainSet := make(map[iwallet.ChainType]struct{}, len(runtime.MonitorChains))
 	for _, chain := range runtime.MonitorChains {
@@ -40,35 +51,71 @@ func (b distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRunti
 	if len(chainSet) == 0 {
 		return fmt.Errorf("managed escrow guest runtime: at least one monitor chain is required")
 	}
-	for chain := range runtime.RelayGasHealthyChains {
-		if _, ok := chainSet[chain]; !ok {
-			return fmt.Errorf("managed escrow guest runtime: gas health reported for unmonitored chain %s", chain)
-		}
-	}
-	confirmed, err := b.source.ListConfirmedManagedEscrowGuestSettlements(ctx)
-	if err != nil {
-		return fmt.Errorf("managed escrow guest runtime: replay confirmed settlements: %w", err)
-	}
-
 	watcher := guest.NewDistributionManagedEscrowWatcher(runtime.WatchRegistrar, b.node.walletTestnet)
 	settlement := guest.NewDistributionManagedEscrowGuestSettlementService(b.source, runtime.SettlementExecutor)
 	b.node.guestPaymentMonitor.SetEVMManagedEscrowWatch(watcher)
 	b.node.guestOrderService.SetEVMManagedEscrowSettlement(settlement)
 	b.node.guestOrderService.SetEVMManagedEscrowClosureRuntime(guest.EVMManagedEscrowClosureRuntime{
-		FundingReady:            b.node.directPaymentService != nil && b.node.directPaymentService.HasEVMManagedEscrowFunding(),
-		ObservationReady:        true,
-		SettlementReady:         true,
-		RelayReady:              runtime.RelayReady,
-		ManagedEscrowMonitorChains:       chainSet,
-		RelayGasHealthyChains:   runtime.RelayGasHealthyChains,
-		RelayGasUnhealthyReason: runtime.RelayGasUnhealthyReason,
+		FundingReady:      b.node.directPaymentService != nil && b.node.directPaymentService.HasEVMManagedEscrowFunding(),
+		ObservationReady:  true,
+		SettlementReady:   true,
+		RelayReady:        true,
+		ManagedEscrowMonitorChains: chainSet,
+		HealthProvider:    runtime.HealthProvider,
 	})
-
-	for _, orderID := range confirmed {
-		b.node.guestOrderService.OnEVMManagedEscrowSettlementConfirmed(orderID)
-	}
-	go settlement.RecoverPendingSettlements(ctx)
+	b.settlement = settlement
+	b.bound = true
 	return nil
 }
 
-var _ distribution.ManagedEscrowGuestRuntimeBinder = distributionManagedEscrowGuestRuntimeBinder{}
+func (b *distributionManagedEscrowGuestRuntimeBinder) StartManagedEscrowGuestRuntime(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	b.mu.Lock()
+	if !b.bound || b.settlement == nil {
+		b.mu.Unlock()
+		return fmt.Errorf("managed escrow guest runtime: must be bound before start")
+	}
+	if b.started {
+		b.mu.Unlock()
+		return nil
+	}
+	b.started = true
+	settlement := b.settlement
+	source := b.source
+	node := b.node
+	b.mu.Unlock()
+	confirmed, err := source.ListConfirmedManagedEscrowGuestSettlements(ctx)
+	if err != nil {
+		b.mu.Lock()
+		b.started = false
+		b.mu.Unlock()
+		return fmt.Errorf("managed escrow guest runtime: replay confirmed settlements: %w", err)
+	}
+	for _, orderID := range confirmed {
+		node.guestOrderService.OnEVMManagedEscrowSettlementConfirmed(orderID)
+	}
+	go settlement.RunPendingSettlementRecovery(ctx)
+	return nil
+}
+
+func (b *distributionManagedEscrowGuestRuntimeBinder) UnbindManagedEscrowGuestRuntime(ctx context.Context) error {
+	if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.bound {
+		return nil
+	}
+	b.node.guestPaymentMonitor.SetEVMManagedEscrowWatch(nil)
+	b.node.guestOrderService.SetEVMManagedEscrowSettlement(nil)
+	b.node.guestOrderService.SetEVMManagedEscrowClosureRuntime(guest.EVMManagedEscrowClosureRuntime{})
+	b.settlement = nil
+	b.bound = false
+	b.started = false
+	return nil
+}
+
+var _ distribution.ManagedEscrowGuestRuntimeBinder = (*distributionManagedEscrowGuestRuntimeBinder)(nil)

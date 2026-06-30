@@ -345,10 +345,11 @@ type matrixCredentialsTestTx struct {
 	db *gorm.DB
 }
 
-func (tx matrixCredentialsTestTx) Commit() error          { return nil }
-func (tx matrixCredentialsTestTx) Rollback() error        { return nil }
-func (tx matrixCredentialsTestTx) Read() *gorm.DB         { return tx.db }
-func (tx matrixCredentialsTestTx) Save(interface{}) error { return nil }
+func (tx matrixCredentialsTestTx) Commit() error            { return nil }
+func (tx matrixCredentialsTestTx) Rollback() error          { return nil }
+func (tx matrixCredentialsTestTx) Read() *gorm.DB           { return tx.db }
+func (tx matrixCredentialsTestTx) Save(interface{}) error   { return nil }
+func (tx matrixCredentialsTestTx) Create(interface{}) error { return nil }
 func (tx matrixCredentialsTestTx) Update(string, interface{}, map[string]interface{}, interface{}) error {
 	return nil
 }

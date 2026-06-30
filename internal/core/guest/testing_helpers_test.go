@@ -46,6 +46,7 @@ func (t *testTx) Save(i interface{}) error {
 	injectTestTenantID(i)
 	return t.db.Save(i).Error
 }
+func (t *testTx) Create(i interface{}) error { injectTestTenantID(i); return t.db.Create(i).Error }
 
 func injectTestTenantID(i interface{}) {
 	v := reflect.ValueOf(i)

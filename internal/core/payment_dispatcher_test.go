@@ -450,7 +450,13 @@ type paymentModuleProbe struct {
 	runtime  distribution.PaymentRuntime
 }
 
-func (m *paymentModuleProbe) ID() string { return m.id }
+func (m *paymentModuleProbe) Descriptor() distribution.PaymentModuleDescriptor {
+	return distribution.PaymentModuleDescriptor{ID: m.id, Capabilities: []distribution.PaymentModuleCapability{
+		distribution.CapabilityManagedEVMExecution,
+	}}
+}
+
+func (m *paymentModuleProbe) RollbackRegistration(context.Context) error { return nil }
 
 func (m *paymentModuleProbe) Register(_ context.Context, runtime distribution.PaymentRuntime, registrar distribution.PaymentRegistrar) error {
 	m.runtime = runtime
@@ -481,11 +487,15 @@ func TestRegisterDistributionPaymentModules_ExternalStrategyIsRegistered(t *test
 	if got != strategy {
 		t.Fatalf("ForChainV2(Solana) = %T, want module strategy", got)
 	}
-	if module.runtime.EVMSigner == nil || module.runtime.EVMReaders == nil {
+	managedEVM, err := module.runtime.ManagedEVM()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if managedEVM.EVMSigner == nil || managedEVM.EVMReaders == nil {
 		t.Fatal("distribution module did not receive narrow EVM operation ports")
 	}
-	if module.runtime.Actions == nil || module.runtime.ActionRecorder == nil {
-		t.Fatal("distribution module did not receive settlement action ports")
+	if managedEVM.Actions != nil || managedEVM.ActionRecorder != nil {
+		t.Fatal("distribution module must not receive an in-memory settlement action fallback")
 	}
 }
 

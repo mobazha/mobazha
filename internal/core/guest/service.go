@@ -22,6 +22,7 @@ import (
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -124,6 +125,7 @@ type GuestOrderAppService struct {
 	evmManagedEscrowSettlementReady     bool
 	evmManagedEscrowRelayReady          bool
 	evmManagedEscrowMonitorChains       map[iwallet.ChainType]struct{}
+	evmHealthProvider          distribution.ManagedEscrowHealthProvider
 	// external_paymentAvailable is consulted on each request — see GuestOrderAppServiceConfig.
 	external_paymentAvailable      func() bool
 	billingHoldActive    func() bool

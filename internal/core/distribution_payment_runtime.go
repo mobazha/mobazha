@@ -13,16 +13,17 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/relay"
+	protocol "github.com/mobazha/mobazha3.0/pkg/managedescrow"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-type distributionEVMDigestSigner struct {
+type distributionManagedEVMSigner struct {
 	keys contracts.KeyProvider
 }
 
-func (s distributionEVMDigestSigner) SignEVMDigest(
+func (s distributionManagedEVMSigner) SignManagedManagedEscrowTransaction(
 	ctx context.Context,
-	request distribution.EVMDigestSignRequest,
+	request distribution.ManagedEVMSignRequest,
 ) (common.Address, []byte, error) {
 	if err := ctx.Err(); err != nil {
 		return common.Address{}, nil, err
@@ -30,8 +31,19 @@ func (s distributionEVMDigestSigner) SignEVMDigest(
 	if s.keys == nil {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: key provider unavailable")
 	}
-	if request.Chain == "" || request.Purpose == "" || request.CorrelationID == "" {
-		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: chain, purpose, and correlation ID are required")
+	if request.Chain == "" || request.ChainID == 0 || request.ManagedEscrowAddress == (common.Address{}) ||
+		request.Purpose != distribution.ManagedEVMSignManagedEscrowTransaction || strings.TrimSpace(request.CorrelationID) == "" {
+		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: valid chain, ManagedEscrow, purpose, and correlation ID are required")
+	}
+	if request.Digest == ([32]byte{}) {
+		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: zero digest is forbidden")
+	}
+	chain, ok := protocol.ChainTypeForChainID(request.ChainID)
+	if !ok || iwallet.ChainType(chain) != request.Chain {
+		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: chain %s does not match chain ID %d", request.Chain, request.ChainID)
+	}
+	if request.Threshold == 0 || request.Threshold > uint64(len(request.Owners)) || len(request.Owners) == 0 {
+		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: invalid owner threshold")
 	}
 	key, err := s.keys.EVMMasterKey()
 	if err != nil {
@@ -41,12 +53,28 @@ func (s distributionEVMDigestSigner) SignEVMDigest(
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: convert EVM key: %w", err)
 	}
+	address := crypto.PubkeyToAddress(ecdsaKey.PublicKey)
+	localOwner := false
+	seen := make(map[common.Address]struct{}, len(request.Owners))
+	for _, owner := range request.Owners {
+		if owner == (common.Address{}) {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: zero owner is forbidden")
+		}
+		if _, exists := seen[owner]; exists {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: duplicate owner %s", owner.Hex())
+		}
+		seen[owner] = struct{}{}
+		localOwner = localOwner || owner == address
+	}
+	if !localOwner {
+		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: local owner %s is outside the authorized owner set", address.Hex())
+	}
 	signature, err := crypto.Sign(request.Digest[:], ecdsaKey)
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: sign digest: %w", err)
 	}
 	signature[64] += 27
-	return crypto.PubkeyToAddress(ecdsaKey.PublicKey), signature, nil
+	return address, signature, nil
 }
 
 type distributionEVMReaderProvider struct {
@@ -96,7 +124,7 @@ func (p distributionEVMReaderProvider) chainClient(chain iwallet.ChainType) (iwa
 }
 
 var (
-	_ distribution.EVMDigestSigner           = distributionEVMDigestSigner{}
+	_ distribution.ManagedEVMSigner          = distributionManagedEVMSigner{}
 	_ distribution.EVMContractReaderProvider = distributionEVMReaderProvider{}
 	_ distribution.EVMLogSubscriberProvider  = distributionEVMReaderProvider{}
 )

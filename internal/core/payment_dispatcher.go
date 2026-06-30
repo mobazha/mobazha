@@ -87,22 +87,26 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		}
 		solCompat := adapters.NewSolanaLifecycleCompatAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
 		solActionStore, solActionRecorder := n.newSettlementActionStore("Solana Anchor")
-		var solRelayer adapters.SolanaInstructionRelayer
-		if n.settlementService != nil {
-			solRelayer = adapters.NewSolanaInstructionRelayer(
-				n.settlementService.RelaySolanaTransactionWithSigners,
-				n.settlementService.SolanaRelayAuthorityAddress,
-			)
+		if solActionStore == nil || solActionRecorder == nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "Solana Anchor disabled: durable settlement action store is required")
+		} else {
+			var solRelayer adapters.SolanaInstructionRelayer
+			if n.settlementService != nil {
+				solRelayer = adapters.NewSolanaInstructionRelayer(
+					n.settlementService.RelaySolanaTransactionWithSigners,
+					n.settlementService.SolanaRelayAuthorityAddress,
+				)
+			}
+			n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
+				BuildInitEscrow: n.paymentService.BuildInitEscrowInstructions,
+				Compat:          solCompat,
+				Relayer:         solRelayer,
+				Store:           solActionStore,
+				Recorder:        solActionRecorder,
+				Keys:            n.keyProvider,
+				Wallets:         n.multiwallet,
+			}))
 		}
-		n.paymentRegistry.RegisterV2(iwallet.ChainSolana, adapters.NewSolanaAnchorAdapter(adapters.SolanaAnchorAdapterDeps{
-			BuildInitEscrow: n.paymentService.BuildInitEscrowInstructions,
-			Compat:          solCompat,
-			Relayer:         solRelayer,
-			Store:           solActionStore,
-			Recorder:        solActionRecorder,
-			Keys:            n.keyProvider,
-			Wallets:         n.multiwallet,
-		}))
 	}
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
@@ -155,31 +159,33 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	actionStore, actionRecorder := n.newSettlementActionStore("Distribution payment module")
+	actionStore, actionRecorder := n.newDurableSettlementActionStore("Distribution payment module")
 	guestSettlementSource := guest.NewManagedEscrowGuestSettlementSource(n.db)
 	evmRelay := n.distributionEVMRelayService()
 	n.evmRelay = evmRelay
-	runtime := distribution.PaymentRuntime{
-		EVMSigner:        distributionEVMDigestSigner{keys: n.keyProvider},
-		EVMReaders:       distributionEVMReaderProvider{wallets: n.multiwallet},
-		EVMLogs:          distributionEVMReaderProvider{wallets: n.multiwallet},
-		EVMRelay:         evmRelay,
-		FundingSink:      n.newDistributionFundingSink(),
-		AutoConfirmer:    distributionManagedEscrowAutoConfirmer{settlement: n.settlementService},
-		WatchSource:      distributionManagedEscrowWatchSource{node: n},
-		GuestSettlements: guestSettlementSource,
-		GuestRuntime: distributionManagedEscrowGuestRuntimeBinder{
-			node: n, source: guestSettlementSource,
-		},
+	guestRuntimeBinder := &distributionManagedEscrowGuestRuntimeBinder{node: n, source: guestSettlementSource}
+	managedEVM := distribution.ManagedEVMRuntime{
+		EVMSigner:      distributionManagedEVMSigner{keys: n.keyProvider},
+		EVMReaders:     distributionEVMReaderProvider{wallets: n.multiwallet},
+		EVMLogs:        distributionEVMReaderProvider{wallets: n.multiwallet},
+		EVMRelay:       evmRelay,
+		FundingSink:    n.newDistributionFundingSink(),
+		AutoConfirmer:  distributionManagedEscrowAutoConfirmer{settlement: n.settlementService},
 		Actions:        actionStore,
 		ActionRecorder: actionRecorder,
 	}
 	if n.paymentService != nil {
-		runtime.EscrowOwners = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}
+		managedEVM.EscrowOwners = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}
 	}
+	guestRuntime := distribution.ManagedEscrowGuestRuntimePorts{
+		WatchSource:      distributionManagedEscrowWatchSource{node: n},
+		GuestSettlements: guestSettlementSource,
+		GuestRuntime:     guestRuntimeBinder,
+	}
+	authority := distribution.NewPaymentRuntimeAuthority(managedEVM, guestRuntime)
 	if err := distribution.RegisterPaymentModules(
 		ctx,
-		runtime,
+		authority,
 		distributionPaymentRegistry{registry: n.paymentRegistry},
 		n.paymentModules...,
 	); err != nil {
@@ -211,10 +217,15 @@ func (n *MobazhaNode) runDistributionPaymentModules(ctx context.Context) {
 		if !ok {
 			continue
 		}
-		moduleID := module.ID()
+		moduleID := module.Descriptor().ID
 		go func() {
-			if err := runner.Run(ctx); err != nil && ctx.Err() == nil {
+			if err := runner.Start(ctx); err != nil && ctx.Err() == nil {
 				logger.LogErrorWithIDf(log, n.nodeID, "Trusted payment module %s stopped: %v", moduleID, err)
+			}
+			stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := runner.Stop(stopCtx); err != nil {
+				logger.LogErrorWithIDf(log, n.nodeID, "Trusted payment module %s cleanup failed: %v", moduleID, err)
 			}
 		}()
 	}
@@ -314,7 +325,7 @@ func (n *MobazhaNode) registerManagedEscrowAdapterShadow() {
 		Relayer:       relayer,
 		ActionStore:   store,
 		AutoConfirmer: managed_escrowCancelableAutoConfirmer{settlement: n.settlementService},
-		OwnerSigner:   &paymentManagedEscrowOwnerSigner{signer: distributionEVMDigestSigner{keys: n.keyProvider}},
+		OwnerSigner:   &paymentManagedEscrowOwnerSigner{signer: distributionManagedEVMSigner{keys: n.keyProvider}},
 		NonceProvider: codeAndNonce,
 		CodeProvider:  codeAndNonce,
 		WalletTestnet: n.walletTestnet,
@@ -449,13 +460,27 @@ func (n *MobazhaNode) registerUTXOObservationDispatcher() {
 func (n *MobazhaNode) newSettlementActionStore(component string) (adapters.ActionStore, adapters.ActionRecorder) {
 	if n != nil && n.db != nil {
 		if err := dbgorm.MigrateSettlementActionModels(n.db); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "%s settlement actions: migrate failed (non-fatal): %v", component, err)
+			logger.LogErrorWithIDf(log, n.nodeID, "%s settlement actions: durable store unavailable: %v", component, err)
 		} else if sqlStore := NewSettlementActionStore(n.db); sqlStore != nil {
 			return sqlStore, sqlStore
 		}
 	}
+	// Compatibility-only fallback for the bundled Solana transition path and
+	// legacy tests. Trusted commercial modules must use
+	// newDurableSettlementActionStore and never receive this store.
 	mem := adapters.NewMemoryActionStore()
 	return mem, mem
+}
+
+func (n *MobazhaNode) newDurableSettlementActionStore(component string) (adapters.ActionStore, adapters.ActionRecorder) {
+	if n != nil && n.db != nil {
+		if err := dbgorm.MigrateSettlementActionModels(n.db); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "%s settlement actions: durable store unavailable: %v", component, err)
+		} else if sqlStore := NewSettlementActionStore(n.db); sqlStore != nil {
+			return sqlStore, sqlStore
+		}
+	}
+	return nil, nil
 }
 
 func (n *MobazhaNode) rewatchPendingManagedEscrowPayments(monitors map[iwallet.ChainType]*managed_escrow.LiveMonitor) {
@@ -719,7 +744,7 @@ func (n *MobazhaNode) wireGuestEVMManagedEscrowSettlement() {
 	svc := guest.NewEVMManagedEscrowSettlementService(guest.EVMManagedEscrowSettlementConfig{
 		DB:            n.db,
 		Relayer:       n.managed_escrowRelayer,
-		OwnerSigner:   &paymentManagedEscrowOwnerSigner{signer: distributionEVMDigestSigner{keys: n.keyProvider}},
+		OwnerSigner:   &paymentManagedEscrowOwnerSigner{signer: distributionManagedEVMSigner{keys: n.keyProvider}},
 		NonceProvider: codeAndNonce,
 		CodeProvider:  codeAndNonce,
 		WalletTestnet: n.walletTestnet,

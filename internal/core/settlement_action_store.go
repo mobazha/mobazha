@@ -48,6 +48,8 @@ func (s *SettlementActionStore) Lookup(ctx context.Context, actionID string) (*a
 	}
 	out := &adapters.ActionRecord{
 		ActionID:        row.ActionID,
+		IntentKey:       row.IntentKey,
+		IntentPayload:   row.IntentPayload,
 		OrderID:         row.OrderID,
 		Action:          row.ActionKind,
 		ChainID:         row.ChainID,
@@ -60,6 +62,8 @@ func (s *SettlementActionStore) Lookup(ctx context.Context, actionID string) (*a
 		Attempts:        row.Attempts,
 		Confirmations:   row.Confirmations,
 		LastError:       row.LastError,
+		LeaseToken:      row.LeaseToken,
+		LeaseExpiresAt:  row.LeaseExpiresAt,
 		SettlementCoin:  row.SettlementCoin,
 		GrossAmount:     row.GrossAmount,
 		PlannedLines:    models.DecodeSettlementPayoutLines(row.PlannedLines),
@@ -79,6 +83,8 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 	now := time.Now().UTC()
 	row := models.SettlementAction{
 		ActionID:        rec.ActionID,
+		IntentKey:       rec.IntentKey,
+		IntentPayload:   rec.IntentPayload,
 		OrderID:         rec.OrderID,
 		ActionKind:      rec.Action,
 		ChainID:         rec.ChainID,
@@ -91,6 +97,8 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		Attempts:        rec.Attempts,
 		Confirmations:   rec.Confirmations,
 		LastError:       rec.LastError,
+		LeaseToken:      rec.LeaseToken,
+		LeaseExpiresAt:  rec.LeaseExpiresAt,
 		SettlementCoin:  rec.SettlementCoin,
 		GrossAmount:     rec.GrossAmount,
 		PlannedLines:    models.EncodeSettlementPayoutLines(rec.PlannedLines),
@@ -110,6 +118,24 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		}
 		if rec.CreatedAt.IsZero() {
 			row.CreatedAt = existing.CreatedAt
+		}
+		if existing.LeaseToken != "" && rec.LeaseToken != existing.LeaseToken {
+			return adapters.ErrActionLeaseLost
+		}
+		if settlementActionIntentConflict(existing, rec) {
+			return adapters.ErrActionIntentConflict
+		}
+		if row.IntentKey == "" {
+			row.IntentKey = existing.IntentKey
+		}
+		if row.IntentPayload == "" {
+			row.IntentPayload = existing.IntentPayload
+		}
+		if row.LeaseToken == "" {
+			row.LeaseToken = existing.LeaseToken
+		}
+		if row.LeaseExpiresAt == nil {
+			row.LeaseExpiresAt = existing.LeaseExpiresAt
 		}
 		if row.TxHash == "" {
 			row.TxHash = existing.TxHash
@@ -148,9 +174,48 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		row.CreatedAt = now
 	}
 	row.UpdatedAt = now
+	if existing.ActionID != "" && existing.LeaseToken != "" {
+		rows, err := s.updateActionColumns(settlementActionValues(row), map[string]interface{}{
+			"action_id = ?":   row.ActionID,
+			"lease_token = ?": existing.LeaseToken,
+		})
+		if err != nil {
+			return err
+		}
+		if rows != 1 {
+			return adapters.ErrActionLeaseLost
+		}
+		return nil
+	}
 	return s.db.Update(func(tx pkgdb.Tx) error {
 		return tx.Save(&row)
 	})
+}
+
+func settlementActionIntentConflict(existing models.SettlementAction, incoming adapters.ActionRecord) bool {
+	if existing.IntentKey == "" {
+		return false
+	}
+	return (incoming.IntentKey != "" && incoming.IntentKey != existing.IntentKey) ||
+		(incoming.IntentPayload != "" && incoming.IntentPayload != existing.IntentPayload) ||
+		(incoming.OrderID != "" && incoming.OrderID != existing.OrderID) ||
+		(incoming.Action != "" && incoming.Action != existing.ActionKind) ||
+		(incoming.ChainID != 0 && incoming.ChainID != existing.ChainID) ||
+		(incoming.SettlementCoin != "" && incoming.SettlementCoin != existing.SettlementCoin) ||
+		(incoming.GrossAmount != "" && incoming.GrossAmount != existing.GrossAmount)
+}
+
+func settlementActionValues(row models.SettlementAction) map[string]interface{} {
+	return map[string]interface{}{
+		"intent_key": row.IntentKey, "intent_payload": row.IntentPayload, "order_id": row.OrderID, "action_kind": row.ActionKind,
+		"chain_id": row.ChainID, "to_address": row.To, "call_data": row.Data,
+		"state": row.State, "tx_hash": row.TxHash, "attempt_tx_hashes": row.AttemptTxHashes,
+		"relay_task_id": row.RelayTaskID, "attempts": row.Attempts, "confirmations": row.Confirmations,
+		"last_error": row.LastError, "lease_token": row.LeaseToken, "lease_expires_at": row.LeaseExpiresAt,
+		"settlement_coin": row.SettlementCoin, "gross_amount": row.GrossAmount,
+		"planned_lines": row.PlannedLines, "observed_lines": row.ObservedLines,
+		"confirmed_at": row.ConfirmedAt, "updated_at": row.UpdatedAt,
+	}
 }
 
 func (s *SettlementActionStore) ClaimRetry(row models.SettlementAction, nextAttempt int) (string, bool, error) {

@@ -274,6 +274,17 @@ func (t *tenantTx) Save(model interface{}) error {
 	return compositePKSave(t.rawTx, model)
 }
 
+// Create inserts a model once, with the same tenant injection guarantee as
+// Save. A uniqueness conflict is returned to the caller and is never changed
+// into an update.
+func (t *tenantTx) Create(model interface{}) error {
+	if !t.isForWrites {
+		return ErrReadOnly
+	}
+	setTenantID(model, t.tenantID)
+	return t.rawTx.Create(model).Error
+}
+
 // Update updates the given column with tenant scoping.
 // Uses rawTx with explicit tenant WHERE to avoid session condition accumulation.
 func (t *tenantTx) Update(key string, value interface{}, where map[string]interface{}, model interface{}) error {

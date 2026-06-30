@@ -4,6 +4,7 @@ package distribution
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -19,19 +20,28 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// EVMDigestSignRequest describes an auditable EVM digest-signing operation.
-// Digest must already be domain-separated by the requesting payment module.
-type EVMDigestSignRequest struct {
+// ManagedEVMSignPurpose is an allow-listed commercial signing operation.
+type ManagedEVMSignPurpose string
+
+const ManagedEVMSignManagedEscrowTransaction ManagedEVMSignPurpose = "managed_escrow_managed_escrow_transaction"
+
+// ManagedEVMSignRequest describes a typed, auditable ManagedEscrow transaction signing
+// operation. Core validates the chain identity and owner policy before signing.
+type ManagedEVMSignRequest struct {
 	Chain         iwallet.ChainType
+	ChainID       uint64
+	ManagedEscrowAddress   common.Address
+	Owners        []common.Address
+	Threshold     uint64
 	Digest        [32]byte
-	Purpose       string
+	Purpose       ManagedEVMSignPurpose
 	CorrelationID string
 }
 
-// EVMDigestSigner signs a pre-hashed, domain-separated EVM message without
-// exposing the node's private key to a distribution module.
-type EVMDigestSigner interface {
-	SignEVMDigest(ctx context.Context, request EVMDigestSignRequest) (common.Address, []byte, error)
+// ManagedEVMSigner signs an allow-listed ManagedEscrow transaction without exposing the
+// node's private key or a generic signing oracle to a distribution module.
+type ManagedEVMSigner interface {
+	SignManagedManagedEscrowTransaction(ctx context.Context, request ManagedEVMSignRequest) (common.Address, []byte, error)
 }
 
 // EVMContractReader is the read-only EVM surface needed by managed escrow
@@ -104,6 +114,8 @@ type ManagedEscrowWatchRegistrar interface {
 // input for settling a guest managed escrow. Amount and salt use base-10
 // strings so the contract does not share mutable big.Int values.
 type ManagedEscrowGuestSettlementRequest struct {
+	IntentID      string
+	ClaimToken    string
 	OrderID       string
 	Chain         iwallet.ChainType
 	ChainID       uint64
@@ -118,8 +130,8 @@ type ManagedEscrowGuestSettlementRequest struct {
 // ManagedEscrowGuestSettlementSource owns guest-order policy and persistence.
 // A nil request means the order does not currently require submission.
 type ManagedEscrowGuestSettlementSource interface {
-	ManagedEscrowGuestSettlement(ctx context.Context, orderID string) (*ManagedEscrowGuestSettlementRequest, error)
-	ListPendingManagedEscrowGuestSettlements(ctx context.Context) ([]ManagedEscrowGuestSettlementRequest, error)
+	ClaimManagedEscrowGuestSettlement(ctx context.Context, orderID string) (*ManagedEscrowGuestSettlementRequest, error)
+	ListPendingManagedEscrowGuestSettlementOrderIDs(ctx context.Context) ([]string, error)
 	ListConfirmedManagedEscrowGuestSettlements(ctx context.Context) ([]string, error)
 }
 
@@ -129,21 +141,34 @@ type ManagedEscrowGuestSettlementExecutor interface {
 	SubmitManagedEscrowGuestSettlement(ctx context.Context, request ManagedEscrowGuestSettlementRequest) error
 }
 
+// ManagedEscrowHealth is a cached, non-blocking runtime health snapshot.
+type ManagedEscrowHealth struct {
+	RelayReady      bool
+	RelayGasHealthy bool
+	Reason          string
+}
+
+// ManagedEscrowHealthProvider exposes live cached health without performing
+// network I/O on checkout request paths.
+type ManagedEscrowHealthProvider interface {
+	ManagedEscrowHealth(chain iwallet.ChainType) ManagedEscrowHealth
+}
+
 // ManagedEscrowGuestRuntime describes the private runtime capabilities bound
 // into Core guest-checkout orchestration after module registration succeeds.
 type ManagedEscrowGuestRuntime struct {
-	WatchRegistrar          ManagedEscrowWatchRegistrar
-	SettlementExecutor      ManagedEscrowGuestSettlementExecutor
-	MonitorChains           []iwallet.ChainType
-	RelayReady              bool
-	RelayGasHealthyChains   map[iwallet.ChainType]struct{}
-	RelayGasUnhealthyReason map[iwallet.ChainType]string
+	WatchRegistrar     ManagedEscrowWatchRegistrar
+	SettlementExecutor ManagedEscrowGuestSettlementExecutor
+	HealthProvider     ManagedEscrowHealthProvider
+	MonitorChains      []iwallet.ChainType
 }
 
 // ManagedEscrowGuestRuntimeBinder lets a trusted module attach only its
 // validated observation and settlement operations to Core guest orchestration.
 type ManagedEscrowGuestRuntimeBinder interface {
 	BindManagedEscrowGuestRuntime(ctx context.Context, runtime ManagedEscrowGuestRuntime) error
+	StartManagedEscrowGuestRuntime(ctx context.Context) error
+	UnbindManagedEscrowGuestRuntime(ctx context.Context) error
 }
 
 // EscrowOwnerSet is the chain-address owner policy resolved from an order.
@@ -164,22 +189,98 @@ type EscrowOwnerProvider interface {
 	OwnersForPayment(ctx context.Context, params payment.PaymentSetupParams) (EscrowOwnerSet, error)
 }
 
-// PaymentRuntime contains narrow public ports available to trusted, statically
-// linked payment modules. Raw key providers, databases, the concrete node, and
-// internal application services are never exposed through this contract.
-type PaymentRuntime struct {
-	EVMSigner        EVMDigestSigner
-	EVMReaders       EVMContractReaderProvider
-	EVMLogs          EVMLogSubscriberProvider
-	EscrowOwners     EscrowOwnerProvider
-	EVMRelay         relay.EVMRelayService
-	FundingSink      FundingObservationSink
-	AutoConfirmer    ManagedEscrowAutoConfirmer
+// ManagedEVMRuntime is the cohesive authority required by a managed EVM
+// payment module. It deliberately excludes guest-checkout orchestration.
+type ManagedEVMRuntime struct {
+	EVMSigner      ManagedEVMSigner
+	EVMReaders     EVMContractReaderProvider
+	EVMLogs        EVMLogSubscriberProvider
+	EscrowOwners   EscrowOwnerProvider
+	EVMRelay       relay.EVMRelayService
+	FundingSink    FundingObservationSink
+	AutoConfirmer  ManagedEscrowAutoConfirmer
+	Actions        payment.ActionStore
+	ActionRecorder payment.ActionRecorder
+}
+
+// ManagedEscrowGuestRuntimePorts is the guest-checkout authority granted only
+// to modules that explicitly declare the capability.
+type ManagedEscrowGuestRuntimePorts struct {
 	WatchSource      ManagedEscrowWatchSource
 	GuestSettlements ManagedEscrowGuestSettlementSource
 	GuestRuntime     ManagedEscrowGuestRuntimeBinder
-	Actions          payment.ActionStore
-	ActionRecorder   payment.ActionRecorder
+}
+
+// PaymentModuleCapability is an auditable authority requested by a trusted
+// in-process module.
+type PaymentModuleCapability string
+
+const (
+	CapabilityManagedEVMExecution PaymentModuleCapability = "managed_evm_execution"
+	CapabilityManagedEscrowGuest  PaymentModuleCapability = "managed_escrow_guest"
+)
+
+// PaymentModuleDescriptor declares module identity and least-privilege grants.
+type PaymentModuleDescriptor struct {
+	ID           string
+	Capabilities []PaymentModuleCapability
+}
+
+// PaymentRuntimeAuthority is retained by Core and can mint a scoped runtime
+// for one validated module descriptor. Distribution modules never receive it.
+type PaymentRuntimeAuthority struct {
+	managedEVM ManagedEVMRuntime
+	guest      ManagedEscrowGuestRuntimePorts
+}
+
+// NewPaymentRuntimeAuthority constructs Core's trusted runtime authority.
+func NewPaymentRuntimeAuthority(managedEVM ManagedEVMRuntime, guest ManagedEscrowGuestRuntimePorts) PaymentRuntimeAuthority {
+	return PaymentRuntimeAuthority{managedEVM: managedEVM, guest: guest}
+}
+
+// PaymentRuntime is a module-specific, capability-scoped grant. Its ports are
+// private so modules cannot bypass the declared capability set.
+type PaymentRuntime struct {
+	capabilities map[PaymentModuleCapability]struct{}
+	managedEVM   ManagedEVMRuntime
+	guest        ManagedEscrowGuestRuntimePorts
+}
+
+// ManagedEVM returns the managed EVM grant when explicitly declared.
+func (r PaymentRuntime) ManagedEVM() (ManagedEVMRuntime, error) {
+	if _, ok := r.capabilities[CapabilityManagedEVMExecution]; !ok {
+		return ManagedEVMRuntime{}, fmt.Errorf("payment module lacks %s capability", CapabilityManagedEVMExecution)
+	}
+	return r.managedEVM, nil
+}
+
+// ManagedEscrowGuest returns guest orchestration only when declared.
+func (r PaymentRuntime) ManagedEscrowGuest() (ManagedEscrowGuestRuntimePorts, error) {
+	if _, ok := r.capabilities[CapabilityManagedEscrowGuest]; !ok {
+		return ManagedEscrowGuestRuntimePorts{}, fmt.Errorf("payment module lacks %s capability", CapabilityManagedEscrowGuest)
+	}
+	return r.guest, nil
+}
+
+// RuntimeFor validates a descriptor and mints its scoped grant.
+func (a PaymentRuntimeAuthority) RuntimeFor(descriptor PaymentModuleDescriptor) (PaymentRuntime, error) {
+	descriptor.ID = strings.TrimSpace(descriptor.ID)
+	if descriptor.ID == "" {
+		return PaymentRuntime{}, fmt.Errorf("payment module descriptor ID is required")
+	}
+	granted := make(map[PaymentModuleCapability]struct{}, len(descriptor.Capabilities))
+	for _, capability := range descriptor.Capabilities {
+		switch capability {
+		case CapabilityManagedEVMExecution, CapabilityManagedEscrowGuest:
+		default:
+			return PaymentRuntime{}, fmt.Errorf("payment module %q requests unknown capability %q", descriptor.ID, capability)
+		}
+		if _, exists := granted[capability]; exists {
+			return PaymentRuntime{}, fmt.Errorf("payment module %q requests capability %q more than once", descriptor.ID, capability)
+		}
+		granted[capability] = struct{}{}
+	}
+	return PaymentRuntime{capabilities: granted, managedEVM: a.managedEVM, guest: a.guest}, nil
 }
 
 // PaymentRegistrar records V2 payment strategies contributed by a module.
@@ -199,22 +300,24 @@ type PaymentRegistry interface {
 // PaymentModule is a trusted first-party Go module linked into a distribution
 // binary. Third-party plugins use the separately versioned out-of-process API.
 type PaymentModule interface {
-	ID() string
+	Descriptor() PaymentModuleDescriptor
 	Register(ctx context.Context, runtime PaymentRuntime, registrar PaymentRegistrar) error
+	RollbackRegistration(ctx context.Context) error
 }
 
-// PaymentModuleRunner is an optional long-running lifecycle implemented by a
-// trusted payment module after its strategies have been registered. Run must
-// block until ctx is cancelled or the module can no longer operate.
+// PaymentModuleRunner owns the post-wiring lifecycle. Start may block until
+// cancellation; Stop must be idempotent and release module-owned resources.
 type PaymentModuleRunner interface {
-	Run(ctx context.Context) error
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
 }
 
-// PaymentModuleActivator performs post-registration runtime binding. Register
-// must remain side-effect free outside module-owned state so a rejected batch
-// cannot mutate live Core services.
-type PaymentModuleActivator interface {
-	Activate(ctx context.Context) error
+// PaymentModuleBinder performs reversible, side-effect-free Core binding after
+// the strategy batch commits. Business replay, network probes, watches, and
+// transaction submission belong in Start, never Bind.
+type PaymentModuleBinder interface {
+	Bind(ctx context.Context) error
+	Unbind(ctx context.Context) error
 }
 
 type paymentRegistration struct {
@@ -251,7 +354,7 @@ func (r *collectingPaymentRegistrar) RegisterV2(chain iwallet.ChainType, strateg
 // leaves the target unchanged.
 func RegisterPaymentModules(
 	ctx context.Context,
-	runtime PaymentRuntime,
+	authority PaymentRuntimeAuthority,
 	target PaymentRegistry,
 	modules ...PaymentModule,
 ) error {
@@ -264,20 +367,43 @@ func RegisterPaymentModules(
 
 	seenIDs := make(map[string]struct{}, len(modules))
 	collector := newCollectingPaymentRegistrar()
+	attempted := make([]PaymentModule, 0, len(modules))
+	rollback := func(cause error) error {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		rollbackErrors := []error{cause}
+		for index := len(attempted) - 1; index >= 0; index-- {
+			if err := attempted[index].RollbackRegistration(cleanupCtx); err != nil {
+				rollbackErrors = append(rollbackErrors, fmt.Errorf(
+					"rollback payment module %q registration: %w",
+					attempted[index].Descriptor().ID,
+					err,
+				))
+			}
+		}
+		return errors.Join(rollbackErrors...)
+	}
 	for index, module := range modules {
 		if isNilInterface(module) {
-			return fmt.Errorf("payment module at index %d is nil", index)
+			return rollback(fmt.Errorf("payment module at index %d is nil", index))
 		}
-		id := strings.TrimSpace(module.ID())
+		descriptor := module.Descriptor()
+		id := strings.TrimSpace(descriptor.ID)
 		if id == "" {
-			return fmt.Errorf("payment module at index %d has an empty ID", index)
+			return rollback(fmt.Errorf("payment module at index %d has an empty ID", index))
 		}
 		if _, exists := seenIDs[id]; exists {
-			return fmt.Errorf("payment module ID %q is registered more than once", id)
+			return rollback(fmt.Errorf("payment module ID %q is registered more than once", id))
 		}
 		seenIDs[id] = struct{}{}
+		descriptor.ID = id
+		runtime, err := authority.RuntimeFor(descriptor)
+		if err != nil {
+			return rollback(err)
+		}
+		attempted = append(attempted, module)
 		if err := module.Register(ctx, runtime, collector); err != nil {
-			return fmt.Errorf("register payment module %q: %w", id, err)
+			return rollback(fmt.Errorf("register payment module %q: %w", id, err))
 		}
 	}
 
@@ -286,21 +412,34 @@ func RegisterPaymentModules(
 		strategies[registration.chain] = registration.strategy
 	}
 	if err := target.RegisterV2BatchExclusive(strategies); err != nil {
-		return fmt.Errorf("commit payment module strategies: %w", err)
+		return rollback(fmt.Errorf("commit payment module strategies: %w", err))
 	}
 	chains := make([]iwallet.ChainType, 0, len(strategies))
 	for chain := range strategies {
 		chains = append(chains, chain)
 	}
+	bound := make([]PaymentModuleBinder, 0, len(modules))
 	for _, module := range modules {
-		activator, ok := module.(PaymentModuleActivator)
+		binder, ok := module.(PaymentModuleBinder)
 		if !ok {
 			continue
 		}
-		if err := activator.Activate(ctx); err != nil {
+		if err := binder.Bind(ctx); err != nil {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			cleanupErrors := []error{fmt.Errorf("bind payment module %q: %w", module.Descriptor().ID, err)}
+			if cleanupErr := binder.Unbind(cleanupCtx); cleanupErr != nil {
+				cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind failed payment module %q: %w", module.Descriptor().ID, cleanupErr))
+			}
+			for index := len(bound) - 1; index >= 0; index-- {
+				if cleanupErr := bound[index].Unbind(cleanupCtx); cleanupErr != nil {
+					cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind payment module: %w", cleanupErr))
+				}
+			}
+			cancel()
 			target.UnregisterV2Batch(chains)
-			return fmt.Errorf("activate payment module %q: %w", module.ID(), err)
+			return rollback(errors.Join(cleanupErrors...))
 		}
+		bound = append(bound, binder)
 	}
 	return nil
 }

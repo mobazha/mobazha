@@ -144,6 +144,11 @@ type Tx interface {
 	// it will be overridden.
 	Save(i interface{}) error
 
+	// Create inserts the passed model and fails when its primary or unique key
+	// already exists. Unlike Save it never overwrites an existing row. Use this
+	// for durable idempotency claims and other insert-once invariants.
+	Create(i interface{}) error
+
 	// Update will update the given key to the value for the given model. The
 	// where map can be used to impose extra conditions on which specific model
 	// gets updated. The map key must be of the format "key = ?". This allows

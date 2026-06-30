@@ -63,6 +63,48 @@ func TestSettlementActionStore_PutLookupRoundTrip(t *testing.T) {
 	require.Equal(t, rec.PlannedLines, got.PlannedLines)
 }
 
+func TestSettlementActionStore_PutRequiresCurrentExecutionLease(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
+	store := NewSettlementActionStore(db)
+	leaseUntil := time.Now().Add(time.Minute)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.SettlementAction{ActionID: "leased-action", IntentKey: "leased-action", OrderID: "order-1", ActionKind: "guest_release", State: "claimed", LeaseToken: "lease-a", LeaseExpiresAt: &leaseUntil})
+	}))
+
+	err = store.Put(adapters.ActionRecord{ActionID: "leased-action", State: "submitting", LeaseToken: "lease-b"})
+	require.ErrorIs(t, err, adapters.ErrActionLeaseLost)
+
+	require.NoError(t, store.Put(adapters.ActionRecord{ActionID: "leased-action", State: "submitting", LeaseToken: "lease-a"}))
+	got, err := store.Lookup(context.Background(), "leased-action")
+	require.NoError(t, err)
+	require.Equal(t, "submitting", got.State)
+	require.Equal(t, "lease-a", got.LeaseToken)
+}
+
+func TestSettlementActionStore_RejectsImmutableIntentMutation(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
+	store := NewSettlementActionStore(db)
+	leaseUntil := time.Now().Add(time.Minute)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.SettlementAction{
+			ActionID: "intent-action", IntentKey: "intent-action", IntentPayload: "payload-1",
+			OrderID: "order-1", ActionKind: "guest_release", ChainID: 1,
+			SettlementCoin: "ETH", GrossAmount: "42", State: "claimed",
+			LeaseToken: "lease-a", LeaseExpiresAt: &leaseUntil,
+		})
+	}))
+
+	err = store.Put(adapters.ActionRecord{
+		ActionID: "intent-action", IntentKey: "intent-action", IntentPayload: "payload-2",
+		LeaseToken: "lease-a", State: "submitting",
+	})
+	require.ErrorIs(t, err, adapters.ErrActionIntentConflict)
+}
+
 func TestSettlementActionStore_RecordStatusConfirmedCopiesObservedLines(t *testing.T) {
 	db, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)

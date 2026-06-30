@@ -13,5 +13,7 @@ type (
 
 var (
 	ErrActionRecordNotFound = payment.ErrActionRecordNotFound
+	ErrActionLeaseLost      = payment.ErrActionLeaseLost
+	ErrActionIntentConflict = payment.ErrActionIntentConflict
 	NewMemoryActionStore    = payment.NewMemoryActionStore
 )

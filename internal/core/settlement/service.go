@@ -50,7 +50,8 @@ type SettlementService struct {
 
 	// autoConfirmLock tracks orders currently being auto-confirmed to prevent
 	// concurrent processing. Keys are "nodeID:orderID".
-	autoConfirmLock sync.Map
+	autoConfirmLock    sync.Map
+	settlementActionMu sync.Mutex
 }
 
 // SettlementServiceConfig groups the dependencies for constructing SettlementService.

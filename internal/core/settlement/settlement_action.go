@@ -71,6 +71,12 @@ func (s *SettlementService) executeSettlementActionForOrder(
 	order *models.Order,
 	payoutAddr string,
 ) (*payment.ActionResult, iwallet.CoinType, error) {
+	// Explicit API actions and event-driven auto-confirm share this execution
+	// path. Serialize the durable intent check and backend submission so the
+	// same ManagedEscrow nonce cannot be signed and relayed twice concurrently.
+	s.settlementActionMu.Lock()
+	defer s.settlementActionMu.Unlock()
+
 	normalizedAction, err := normalizeSettlementAction(action)
 	if err != nil {
 		return nil, "", err
@@ -94,6 +100,11 @@ func (s *SettlementService) executeSettlementActionForOrder(
 	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, "", err
+	}
+	if existing, err := s.existingSettlementActionResult(order.ID.String(), action, coinType); err != nil {
+		return nil, coinType, err
+	} else if existing != nil {
+		return existing, coinType, nil
 	}
 
 	params := payment.ActionParams{
@@ -200,6 +211,35 @@ func (s *SettlementService) executeSettlementActionForOrder(
 	default:
 		return nil, coinType, fmt.Errorf("%w: unsupported settlement action", coreiface.ErrBadRequest)
 	}
+}
+
+// existingSettlementActionResult makes backend settlement submission
+// idempotent across API retries and automatic workers. Failed actions are not
+// reused, so an operator or retry loop can recover after a genuine backend
+// failure.
+func (s *SettlementService) existingSettlementActionResult(orderID, action string, coinType iwallet.CoinType) (*payment.ActionResult, error) {
+	var row models.SettlementAction
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("order_id = ? AND action_kind = ? AND state IN ?", orderID, action, []string{"submitting", "submitted", "confirmed"}).
+			Order("created_at DESC").
+			Limit(1).
+			Find(&row).Error
+	})
+	if err != nil {
+		return nil, fmt.Errorf("lookup existing settlement action for order %s action %s: %w", orderID, action, err)
+	}
+	if row.ActionID == "" {
+		return nil, nil
+	}
+	return &payment.ActionResult{
+		Mode:            payment.ActionModeSubmitted,
+		ActionID:        row.ActionID,
+		SubmittedTxHash: row.TxHash,
+		SettlementCoin:  coinType.String(),
+		GrossAmount:     row.GrossAmount,
+		PlannedLines:    models.DecodeSettlementPayoutLines(row.PlannedLines),
+	}, nil
 }
 
 func (s *SettlementService) settlementActionStrategy(coinType iwallet.CoinType) (payment.ChainEscrowV2, error) {

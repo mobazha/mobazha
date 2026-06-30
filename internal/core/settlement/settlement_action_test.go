@@ -113,6 +113,52 @@ func TestExecuteSettlementAction_SellerDeclineRefundUsesOptionalStrategy(t *test
 	require.Equal(t, "0x4444444444444444444444444444444444444444", strategy.lastSellerDecline.PayoutAddr)
 }
 
+func TestExecuteSettlementAction_ReusesActiveDurableIntent(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	strategy := &utxoActionStatusStub{
+		model:         payment.PaymentModelMonitored,
+		confirmResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "unexpected-second-submit"},
+	}
+	reg := payment.NewRegistry()
+	reg.RegisterV2(iwallet.ChainEthereum, strategy)
+
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	svc.SetRegistry(reg)
+	order := seedModeratedSettlementActionOrder(t, db, "order-idempotent-confirm", models.RoleVendor)
+	require.NoError(t, order.SetPaymentSent(&pb.PaymentSent{
+		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPaymentSent(),
+		Amount:         "1000",
+		Coin:           "crypto:eip155:11155111:native",
+		PayerAddress:   "0x1111111111111111111111111111111111111111",
+		RefundAddress:  "0x1111111111111111111111111111111111111111",
+	}))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		return tx.Save(&models.SettlementAction{
+			ActionID:   "existing-confirm-action",
+			OrderID:    order.ID.String(),
+			ActionKind: payment.SettlementActionConfirm,
+			State:      "submitted",
+			TxHash:     "0xabc",
+		})
+	}))
+
+	result, coinType, err := svc.ExecuteSettlementAction(
+		context.Background(), payment.SettlementActionConfirm, order.ID,
+		"0x2222222222222222222222222222222222222222",
+	)
+	require.NoError(t, err)
+	require.Equal(t, "crypto:eip155:1:native", coinType.String())
+	require.Equal(t, "existing-confirm-action", result.ActionID)
+	require.Equal(t, "0xabc", result.SubmittedTxHash)
+	require.Zero(t, strategy.confirmCalls)
+}
+
 func seedModeratedSettlementActionOrder(
 	t *testing.T,
 	db database.Database,
@@ -164,8 +210,10 @@ func seedModeratedSettlementActionOrder(
 
 type utxoActionStatusStub struct {
 	model               payment.PaymentModel
+	confirmResult       *payment.ActionResult
 	cancelResult        *payment.ActionResult
 	sellerDeclineResult *payment.ActionResult
+	confirmCalls        int
 	lastCancel          payment.ActionParams
 	lastSellerDecline   payment.ActionParams
 }
@@ -181,7 +229,12 @@ func (s *utxoActionStatusStub) GetActionStatus(context.Context, string) (*paymen
 func (s *utxoActionStatusStub) SetupPayment(context.Context, payment.PaymentSetupParams) (*payment.ActionResult, error) {
 	return nil, payment.ErrUnsupportedAction
 }
+
 func (s *utxoActionStatusStub) Confirm(context.Context, payment.ActionParams) (*payment.ActionResult, error) {
+	s.confirmCalls++
+	if s.confirmResult != nil {
+		return s.confirmResult, nil
+	}
 	return nil, payment.ErrUnsupportedAction
 }
 func (s *utxoActionStatusStub) Cancel(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {

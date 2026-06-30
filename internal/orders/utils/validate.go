@@ -246,7 +246,7 @@ func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 	}
 
 	if paymentSent.ToAddress != address.String() {
-		return errors.New("invalid escrow payment address")
+		return fmt.Errorf("invalid escrow payment address: got %q, expected %q", paymentSent.ToAddress, address.String())
 	}
 
 	return nil
@@ -329,7 +329,7 @@ func validateBTCEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, c
 	}
 
 	if paymentSent.ToAddress != address.String() {
-		return errors.New("invalid escrow payment address")
+		return fmt.Errorf("invalid escrow payment address: got %q, expected %q", paymentSent.ToAddress, address.String())
 	}
 	if paymentSent.Script != hex.EncodeToString(script) {
 		return errors.New("invalid escrow payment script")

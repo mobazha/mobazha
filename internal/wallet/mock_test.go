@@ -210,6 +210,11 @@ func TestMockWallet_CreateMultisigAddress(t *testing.T) {
 		t.Errorf("Redeem scripts are not equal. %v, %v", rs2, rs3)
 	}
 
+	baseTime := time.Unix(1_700_000_000, 0)
+	w1.now = func() time.Time { return baseTime }
+	w2.now = func() time.Time { return baseTime.Add(30 * time.Second) }
+	w3.now = func() time.Time { return baseTime.Add(time.Hour) }
+
 	addr1, rs1, err = w1.CreateMultisigWithTimeout([]btcec.PublicKey{*k1.PubKey(), *k2.PubKey(), *k3.PubKey()}, []byte{}, 2, time.Hour, *k1.PubKey())
 	if err != nil {
 		t.Fatal(err)

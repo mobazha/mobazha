@@ -157,6 +157,8 @@ type MockWallet struct {
 
 	utxos map[string]mockUtxo
 
+	multisigTimeouts map[[sha256.Size]byte]time.Time
+
 	blockchainInfo iwallet.BlockInfo
 
 	outgoing chan iwallet.Transaction
@@ -170,19 +172,22 @@ type MockWallet struct {
 
 	bus events.Bus
 
+	now  func() time.Time
 	done chan struct{}
 }
 
 // NewMockWallet creates and returns a new mock wallet.
 func NewMockWallet() *MockWallet {
 	mw := &MockWallet{
-		addrs:        make(map[iwallet.Address]bool),
-		watchedAddrs: make(map[iwallet.Address]struct{}),
-		transactions: make(map[iwallet.TransactionID]iwallet.Transaction),
-		utxos:        make(map[string]mockUtxo),
-		incoming:     make(chan iwallet.Transaction),
-		block:        make(chan iwallet.BlockInfo),
-		done:         make(chan struct{}),
+		addrs:            make(map[iwallet.Address]bool),
+		watchedAddrs:     make(map[iwallet.Address]struct{}),
+		transactions:     make(map[iwallet.TransactionID]iwallet.Transaction),
+		utxos:            make(map[string]mockUtxo),
+		multisigTimeouts: make(map[[sha256.Size]byte]time.Time),
+		incoming:         make(chan iwallet.Transaction),
+		block:            make(chan iwallet.BlockInfo),
+		now:              time.Now,
+		done:             make(chan struct{}),
 	}
 
 	for i := 0; i < 10; i++ {
@@ -979,6 +984,9 @@ func (w *MockWallet) CreateMultisigAddress(keys []btcec.PublicKey, chaincode []b
 //   - m of n signatures are provided (or)
 //   - timeout has passed and a signature for timeoutKey is provided.
 func (w *MockWallet) CreateMultisigWithTimeout(keys []btcec.PublicKey, chaincode []byte, threshold int, timeout time.Duration, timeoutKey btcec.PublicKey) (iwallet.Address, []byte, error) {
+	if timeout <= 0 {
+		return iwallet.Address{}, nil, errors.New("multisig timeout must be positive")
+	}
 	var redeemScript []byte
 	for _, key := range keys {
 		redeemScript = append(redeemScript, key.SerializeCompressed()...)
@@ -987,12 +995,16 @@ func (w *MockWallet) CreateMultisigWithTimeout(keys []btcec.PublicKey, chaincode
 	binary.BigEndian.PutUint32(t, uint32(threshold))
 	redeemScript = append(redeemScript, t...)
 	redeemScript = append(redeemScript, timeoutKey.SerializeCompressed()...)
-	u := time.Now().Add(timeout).Unix()
-	expiry := make([]byte, 8)
-	binary.BigEndian.PutUint64(expiry, uint64(u))
-	redeemScript = append(redeemScript, expiry...)
+	timeoutBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(timeoutBytes, uint64(timeout))
+	redeemScript = append(redeemScript, timeoutBytes...)
 
 	h := sha256.Sum256(redeemScript)
+	w.mtx.Lock()
+	if _, exists := w.multisigTimeouts[h]; !exists {
+		w.multisigTimeouts[h] = w.now().Add(timeout)
+	}
+	w.mtx.Unlock()
 	addr := iwallet.NewAddress(hex.EncodeToString(h[:]), iwallet.CtMock)
 	return addr, redeemScript, nil
 }
@@ -1009,10 +1021,12 @@ func (w *MockWallet) ReleaseFundsAfterTimeout(tx iwallet.Tx, txn iwallet.Transac
 	rand.Read(txidBytes)
 	txn.ID = iwallet.TransactionID(hex.EncodeToString(txidBytes))
 
-	expiry := binary.BigEndian.Uint64(redeemScript[len(redeemScript)-8:])
-	ts := time.Unix(int64(expiry), 0)
-
-	if ts.After(time.Now()) {
+	scriptID := sha256.Sum256(redeemScript)
+	deadline, ok := w.multisigTimeouts[scriptID]
+	if !ok {
+		return txn.ID, errors.New("multisig timeout metadata not found")
+	}
+	if w.now().Before(deadline) {
 		return txn.ID, errors.New("timeout has not yet passed")
 	}
 

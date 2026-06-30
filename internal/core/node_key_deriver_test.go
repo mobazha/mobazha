@@ -22,7 +22,7 @@ import (
 func testMultiwallet(t *testing.T, masterKey *hdkeychain.ExtendedKey) contracts.WalletOperator {
 	t.Helper()
 	cfg := &repo.Config{LogLevel: "error"}
-	mw, err := loadPrivateDistributionMultiwallet(masterKey, cfg, nil, false, t.TempDir())
+	mw, err := loadTestMultiwallet(masterKey, cfg, nil, false, t.TempDir())
 	if err != nil {
 		t.Fatalf("testMultiwallet: %v", err)
 	}

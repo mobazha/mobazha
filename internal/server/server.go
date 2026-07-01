@@ -75,8 +75,15 @@ type Server struct {
 // New creates a unified server with the given configuration.
 func New(cfg Config) *Server {
 	feHandler := frontend.NewHandler(frontend.ServerConfig{
-		OverrideDir:        cfg.FrontendOverrideDir,
-		PrivateDistributionMode:        cfg.PrivateDistributionMode,
+		OverrideDir: cfg.FrontendOverrideDir,
+		Deployment: frontend.RuntimeDeployment{
+			Mode: func() string {
+				if cfg.PrivateDistributionMode {
+					return frontend.RuntimeDeploymentPrivateDistribution
+				}
+				return frontend.RuntimeDeploymentStandalone
+			}(),
+		},
 		Brand:              cfg.Brand,
 		FeaturesSnapshotFn: cfg.FeaturesSnapshotFn,
 	})

@@ -115,11 +115,73 @@ func TestSPAHandler_RuntimeConfig_StandaloneAuthMode(t *testing.T) {
 	assert.Equal(t, float64(RuntimeConfigSchemaVersion), payload["schemaVersion"])
 	assert.Equal(t, "standalone", payload["authMode"])
 	assert.Equal(t, "https://app.mobazha.org", payload["saasUrl"])
-	assert.Equal(t, false, payload["guestCheckoutEnabled"], "no snapshot fn → default off")
+	assert.Equal(t, map[string]any{
+		"mode":                   "standalone",
+		"allowExternalResources": true,
+	}, payload["deployment"])
+	assert.Equal(t, map[string]any{"kind": "store"}, payload["experience"])
 	assert.Equal(t, map[string]any{}, payload["features"], "nil callback → empty features map, not null")
 	assert.Equal(t, map[string]any{
+		"commerce": map[string]any{
+			"storefront": true,
+			"storeAdmin": true,
+			"checkout":   true,
+		},
+		"marketplace": map[string]any{
+			"discovery":         false,
+			"operator":          false,
+			"curation":          false,
+			"sellerReview":      false,
+			"customDomains":     false,
+			"releasePublishing": false,
+			"attribution":       false,
+		},
+		"private_distribution": map[string]any{
+			"isolatedRuntime": false,
+			"managedFleet":    false,
+		},
 		"payments": map[string]any{"methods": []any{}},
 	}, payload["capabilities"], "nil callback → empty capabilities, not null")
+}
+
+func TestSPAHandler_RuntimeConfig_HostedProductComposition(t *testing.T) {
+	h := NewRuntimeConfigHandler(ServerConfig{
+		Deployment: RuntimeDeployment{Mode: RuntimeDeploymentHosted},
+	})
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/runtime-config.js")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	payload := parseRuntimeConfig(t, body)
+
+	assert.Equal(t, "hosted", payload["authMode"])
+	assert.Equal(t, map[string]any{
+		"mode":                   "hosted",
+		"allowExternalResources": true,
+	}, payload["deployment"])
+	assert.Equal(t, map[string]any{"kind": "platform"}, payload["experience"])
+	marketplace := payload["capabilities"].(map[string]any)["marketplace"].(map[string]any)
+	assert.Equal(t, true, marketplace["discovery"])
+	assert.Equal(t, true, marketplace["operator"])
+	assert.Equal(t, true, marketplace["releasePublishing"])
+}
+
+func TestSPAHandler_RuntimeConfig_DedicatedMarketplaceExperience(t *testing.T) {
+	payload := BuildRuntimeConfigPayload(context.Background(), ServerConfig{
+		Deployment: RuntimeDeployment{Mode: RuntimeDeploymentHosted},
+		Experience: RuntimeExperience{
+			Kind:                  RuntimeExperienceMarketplace,
+			MarketplaceIdentifier: "m2-wilson",
+		},
+	})
+
+	assert.Equal(t, RuntimeExperienceMarketplace, payload.Experience.Kind)
+	assert.Equal(t, "m2-wilson", payload.Experience.MarketplaceIdentifier)
 }
 
 func TestSPAHandler_RuntimeConfig_CapabilitiesSnapshotInjection(t *testing.T) {
@@ -178,9 +240,6 @@ func TestSPAHandler_RuntimeConfig_FeaturesSnapshotInjection(t *testing.T) {
 	features, ok := payload["features"].(map[string]any)
 	require.True(t, ok, "features must be an object")
 
-	// guestCheckout mirrored onto legacy flat flag
-	assert.Equal(t, true, payload["guestCheckoutEnabled"])
-
 	gc, ok := features["guestCheckout"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, true, gc["effective"])
@@ -209,7 +268,10 @@ func TestSPAHandler_RuntimeConfig_BrandNetworkSnapshot(t *testing.T) {
 			AllowDiscoverToggle:     true,
 		},
 	}
-	h := NewHandler(ServerConfig{PrivateDistributionMode: true, Brand: brand})
+	h := NewHandler(ServerConfig{
+		Deployment: RuntimeDeployment{Mode: RuntimeDeploymentPrivateDistribution},
+		Brand:      brand,
+	})
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 
@@ -219,6 +281,9 @@ func TestSPAHandler_RuntimeConfig_BrandNetworkSnapshot(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	payload := parseRuntimeConfig(t, body)
+	assert.Equal(t, "private_distribution", payload["deployment"].(map[string]any)["mode"])
+	assert.Equal(t, false, payload["deployment"].(map[string]any)["allowExternalResources"])
+	assert.Equal(t, true, payload["capabilities"].(map[string]any)["private_distribution"].(map[string]any)["isolatedRuntime"])
 
 	brandObj, ok := payload["brand"].(map[string]any)
 	require.True(t, ok, "brand must serialize as a JSON object")
@@ -239,7 +304,10 @@ func TestSPAHandler_RuntimeConfig_BrandWithoutNetworkSection(t *testing.T) {
 	// be omitted entirely so an attacker can't distinguish "feature
 	// gated off" from "feature absent" by reading runtime-config.js.
 	brand := &BrandSnapshot{Name: "Example Market"}
-	h := NewHandler(ServerConfig{PrivateDistributionMode: true, Brand: brand})
+	h := NewHandler(ServerConfig{
+		Deployment: RuntimeDeployment{Mode: RuntimeDeploymentPrivateDistribution},
+		Brand:      brand,
+	})
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 

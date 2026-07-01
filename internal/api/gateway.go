@@ -634,10 +634,16 @@ func (g *Gateway) runtimeFrontendConfig() frontend.ServerConfig {
 	if g == nil || g.config == nil {
 		return frontend.ServerConfig{}
 	}
+	deploymentMode := frontend.RuntimeDeploymentStandalone
+	if mode := detectDeploymentMode(); mode == "saas" {
+		deploymentMode = frontend.RuntimeDeploymentHosted
+	} else if mode == "private_distribution" {
+		deploymentMode = frontend.RuntimeDeploymentPrivateDistribution
+	}
 	return frontend.ServerConfig{
 		SaaSURL:                g.config.SaaSAPIURL,
 		Edition:                g.editionPolicy.Name(),
-		PrivateDistributionMode:            detectDeploymentMode() == "private_distribution",
+		Deployment:             frontend.RuntimeDeployment{Mode: deploymentMode},
 		Brand:                  g.config.Brand,
 		FeaturesSnapshotFn:     featuresSnapshotFromNodeManager(g.nodeManager),
 		CapabilitiesSnapshotFn: capabilitiesSnapshotFromNodeManager(g.nodeManager, g.editionPolicy),

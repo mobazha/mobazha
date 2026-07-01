@@ -31,7 +31,17 @@ type FeatureSnapshot struct {
 
 // RuntimeConfigSchemaVersion identifies the public bootstrap contract shared
 // by the embedded frontend and GET /v1/runtime-config.
-const RuntimeConfigSchemaVersion = 2
+const RuntimeConfigSchemaVersion = 3
+
+const (
+	RuntimeDeploymentHosted     = "hosted"
+	RuntimeDeploymentStandalone = "standalone"
+	RuntimeDeploymentPrivateDistribution    = "private_distribution"
+
+	RuntimeExperiencePlatform    = "platform"
+	RuntimeExperienceStore       = "store"
+	RuntimeExperienceMarketplace = "marketplace"
+)
 
 // PaymentCapability describes a payment method the running backend can
 // actually serve. It intentionally exposes product-level behavior only, not
@@ -48,10 +58,48 @@ type PaymentCapabilities struct {
 	Methods []PaymentCapability `json:"methods"`
 }
 
+// RuntimeDeployment describes how the shared frontend is hosted. It is
+// independent from authentication and from the buyer-facing experience.
+type RuntimeDeployment struct {
+	Mode                   string `json:"mode"`
+	AllowExternalResources bool   `json:"allowExternalResources"`
+}
+
+// RuntimeExperience selects the default product shell rendered at root.
+// MarketplaceIdentifier is required only for a dedicated marketplace shell.
+type RuntimeExperience struct {
+	Kind                  string `json:"kind"`
+	MarketplaceIdentifier string `json:"marketplaceIdentifier,omitempty"`
+}
+
+type CommerceCapabilities struct {
+	Storefront bool `json:"storefront"`
+	StoreAdmin bool `json:"storeAdmin"`
+	Checkout   bool `json:"checkout"`
+}
+
+type MarketplaceCapabilities struct {
+	Discovery         bool `json:"discovery"`
+	Operator          bool `json:"operator"`
+	Curation          bool `json:"curation"`
+	SellerReview      bool `json:"sellerReview"`
+	CustomDomains     bool `json:"customDomains"`
+	ReleasePublishing bool `json:"releasePublishing"`
+	Attribution       bool `json:"attribution"`
+}
+
+type PrivateDistributionCapabilities struct {
+	IsolatedRuntime bool `json:"isolatedRuntime"`
+	ManagedFleet    bool `json:"managedFleet"`
+}
+
 // RuntimeCapabilities contains backend capabilities that the unified
 // frontend may project. Server-side authorization remains authoritative.
 type RuntimeCapabilities struct {
-	Payments PaymentCapabilities `json:"payments"`
+	Commerce    CommerceCapabilities    `json:"commerce"`
+	Marketplace MarketplaceCapabilities `json:"marketplace"`
+	PrivateDistribution     PrivateDistributionCapabilities     `json:"private_distribution"`
+	Payments    PaymentCapabilities     `json:"payments"`
 }
 
 // BrandSnapshot holds white-label branding values injected into
@@ -88,6 +136,11 @@ type ServerConfig struct {
 	// and release verification. Business behavior must not branch on it.
 	Edition string
 
+	// Deployment and Experience are orthogonal product-composition axes.
+	// Empty values default to a standalone store.
+	Deployment RuntimeDeployment
+	Experience RuntimeExperience
+
 	// OverrideDir, when set, serves files from this directory first,
 	// falling back to the embedded DistFS. This allows operators to
 	// replace the frontend without rebuilding the binary.
@@ -97,10 +150,6 @@ type ServerConfig struct {
 	// When set, the handler serves a dynamic /runtime-config.js that
 	// switches the frontend to standalone mode.
 	SaaSURL string
-
-	// PrivateDistributionMode enables extreme privacy headers (CSP, no-store,
-	// no-referrer) and a stripped-down runtime-config.js payload.
-	PrivateDistributionMode bool
 
 	// Brand holds white-label overrides from brand.yaml. When nil
 	// the SPA renders Mobazha default branding.
@@ -118,7 +167,7 @@ type ServerConfig struct {
 	// the running node. A nil callback yields an empty fail-closed snapshot.
 	CapabilitiesSnapshotFn func(context.Context) RuntimeCapabilities
 
-	// NeedsSetupShellFn, when set with PrivateDistributionMode, serves setup.html instead
+	// NeedsSetupShellFn, when set for an PrivateDistribution deployment, serves setup.html instead
 	// of the full SPA for /admin/* while initial setup is incomplete.
 	NeedsSetupShellFn func() bool
 }
@@ -147,8 +196,10 @@ func newSPAHandler(embedded fs.FS, cfg ServerConfig) *spaHandler {
 	return &spaHandler{
 		embedded:               embedded,
 		overrideDir:            cfg.OverrideDir,
+		edition:                cfg.Edition,
 		saasURL:                cfg.SaaSURL,
-		private_distributionMode:            cfg.PrivateDistributionMode,
+		deployment:             normalizeRuntimeDeployment(cfg.Deployment),
+		experience:             normalizeRuntimeExperience(cfg.Experience, cfg.Deployment),
 		brand:                  cfg.Brand,
 		featuresSnapshotFn:     cfg.FeaturesSnapshotFn,
 		capabilitiesSnapshotFn: cfg.CapabilitiesSnapshotFn,
@@ -159,8 +210,10 @@ func newSPAHandler(embedded fs.FS, cfg ServerConfig) *spaHandler {
 type spaHandler struct {
 	embedded               fs.FS
 	overrideDir            string
+	edition                string
 	saasURL                string
-	private_distributionMode            bool
+	deployment             RuntimeDeployment
+	experience             RuntimeExperience
 	brand                  *BrandSnapshot
 	featuresSnapshotFn     func(context.Context) []FeatureSnapshot
 	capabilitiesSnapshotFn func(context.Context) RuntimeCapabilities
@@ -168,7 +221,7 @@ type spaHandler struct {
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h.private_distributionMode {
+	if h.deployment.Mode == RuntimeDeploymentPrivateDistribution {
 		h.setPrivateDistributionSecurityHeaders(w, r)
 	}
 
@@ -267,7 +320,7 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *spaHandler) shouldServeSetupShell(urlPath string) bool {
-	if !h.private_distributionMode || h.needsSetupShellFn == nil || !h.needsSetupShellFn() {
+	if h.deployment.Mode != RuntimeDeploymentPrivateDistribution || h.needsSetupShellFn == nil || !h.needsSetupShellFn() {
 		return false
 	}
 	return urlPath == "/admin" || strings.HasPrefix(urlPath, "/admin/")
@@ -339,22 +392,71 @@ type RuntimeFeatureEntry struct {
 
 // RuntimeConfigPayload captures the versioned fields embedded into
 // window.__RUNTIME_CONFIG__ on every page load.
-//
-// Deprecated fields (guestCheckoutEnabled) exist for backward compatibility
-// with older bundles that still read the flat boolean. Once the unified
-// featureFlags service ships (Phase B of ff-impl-frontend), these flat
-// fields move to TECHDEBT(TD-032) and get removed in Phase E.
 type RuntimeConfigPayload struct {
-	SchemaVersion            int                            `json:"schemaVersion"`
-	Edition                  string                         `json:"edition,omitempty"`
-	SaasURL                  string                         `json:"saasUrl,omitempty"`
-	AuthMode                 string                         `json:"authMode"`
-	GuestCheckoutEnabled     bool                           `json:"guestCheckoutEnabled"`
-	Features                 map[string]RuntimeFeatureEntry `json:"features"`
-	Capabilities             RuntimeCapabilities            `json:"capabilities"`
-	PrivateDistributionMode              bool                           `json:"private_distributionMode,omitempty"`
-	DisableExternalResources bool                           `json:"disableExternalResources,omitempty"`
-	Brand                    *BrandSnapshot                 `json:"brand,omitempty"`
+	SchemaVersion int                            `json:"schemaVersion"`
+	Edition       string                         `json:"edition,omitempty"`
+	SaasURL       string                         `json:"saasUrl,omitempty"`
+	AuthMode      string                         `json:"authMode"`
+	Deployment    RuntimeDeployment              `json:"deployment"`
+	Experience    RuntimeExperience              `json:"experience"`
+	Features      map[string]RuntimeFeatureEntry `json:"features"`
+	Capabilities  RuntimeCapabilities            `json:"capabilities"`
+	Brand         *BrandSnapshot                 `json:"brand,omitempty"`
+}
+
+func normalizeRuntimeDeployment(deployment RuntimeDeployment) RuntimeDeployment {
+	switch deployment.Mode {
+	case RuntimeDeploymentHosted:
+		deployment.AllowExternalResources = true
+	case RuntimeDeploymentPrivateDistribution:
+		deployment.AllowExternalResources = false
+	default:
+		deployment.Mode = RuntimeDeploymentStandalone
+		deployment.AllowExternalResources = true
+	}
+	return deployment
+}
+
+func normalizeRuntimeExperience(experience RuntimeExperience, deployment RuntimeDeployment) RuntimeExperience {
+	switch experience.Kind {
+	case RuntimeExperienceMarketplace:
+		if strings.TrimSpace(experience.MarketplaceIdentifier) != "" {
+			return experience
+		}
+	case RuntimeExperiencePlatform, RuntimeExperienceStore:
+		return experience
+	}
+	if normalizeRuntimeDeployment(deployment).Mode == RuntimeDeploymentHosted {
+		return RuntimeExperience{Kind: RuntimeExperiencePlatform}
+	}
+	return RuntimeExperience{Kind: RuntimeExperienceStore}
+}
+
+func baseRuntimeCapabilities(deployment RuntimeDeployment) RuntimeCapabilities {
+	deployment = normalizeRuntimeDeployment(deployment)
+	capabilities := RuntimeCapabilities{
+		Commerce: CommerceCapabilities{
+			Storefront: true,
+			StoreAdmin: true,
+			Checkout:   true,
+		},
+		Payments: PaymentCapabilities{Methods: []PaymentCapability{}},
+	}
+	if deployment.Mode == RuntimeDeploymentHosted {
+		capabilities.Marketplace = MarketplaceCapabilities{
+			Discovery:         true,
+			Operator:          true,
+			Curation:          true,
+			SellerReview:      true,
+			CustomDomains:     true,
+			ReleasePublishing: true,
+			Attribution:       true,
+		}
+	}
+	if deployment.Mode == RuntimeDeploymentPrivateDistribution {
+		capabilities.PrivateDistribution.IsolatedRuntime = true
+	}
+	return capabilities
 }
 
 // BuildRuntimeConfigPayload resolves a complete frontend bootstrap snapshot.
@@ -362,7 +464,6 @@ type RuntimeConfigPayload struct {
 // contracts cannot drift.
 func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeConfigPayload {
 	features := map[string]RuntimeFeatureEntry{}
-	guestCheckoutEnabled := false
 
 	if cfg.FeaturesSnapshotFn != nil {
 		for _, f := range cfg.FeaturesSnapshotFn(ctx) {
@@ -377,36 +478,36 @@ func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeCon
 				Effective:   f.Effective,
 				Overridable: overridable,
 			}
-			if f.Key == "guestCheckout" {
-				guestCheckoutEnabled = f.Effective
-			}
 		}
 	}
 
-	capabilities := RuntimeCapabilities{
-		Payments: PaymentCapabilities{Methods: []PaymentCapability{}},
-	}
+	deployment := normalizeRuntimeDeployment(cfg.Deployment)
+	experience := normalizeRuntimeExperience(cfg.Experience, deployment)
+	capabilities := baseRuntimeCapabilities(deployment)
 	if cfg.CapabilitiesSnapshotFn != nil {
-		capabilities = cfg.CapabilitiesSnapshotFn(ctx)
-		if capabilities.Payments.Methods == nil {
-			capabilities.Payments.Methods = []PaymentCapability{}
-		}
+		snapshot := cfg.CapabilitiesSnapshotFn(ctx)
+		capabilities.Payments = snapshot.Payments
+	}
+	if capabilities.Payments.Methods == nil {
+		capabilities.Payments.Methods = []PaymentCapability{}
+	}
+	authMode := "standalone"
+	if deployment.Mode == RuntimeDeploymentHosted {
+		authMode = "hosted"
 	}
 
 	payload := RuntimeConfigPayload{
-		SchemaVersion:        RuntimeConfigSchemaVersion,
-		Edition:              cfg.Edition,
-		AuthMode:             "standalone",
-		GuestCheckoutEnabled: guestCheckoutEnabled,
-		Features:             features,
-		Capabilities:         capabilities,
+		SchemaVersion: RuntimeConfigSchemaVersion,
+		Edition:       cfg.Edition,
+		AuthMode:      authMode,
+		Deployment:    deployment,
+		Experience:    experience,
+		Features:      features,
+		Capabilities:  capabilities,
+		Brand:         cfg.Brand,
 	}
 
-	if cfg.PrivateDistributionMode {
-		payload.GuestCheckoutEnabled = true
-		payload.PrivateDistributionMode = true
-		payload.DisableExternalResources = true
-		payload.Brand = cfg.Brand
+	if deployment.Mode == RuntimeDeploymentPrivateDistribution {
 		return payload
 	}
 
@@ -423,15 +524,17 @@ func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeCon
 // escaped — do not revert to fmt.Fprintf string interpolation.
 func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/javascript")
-	if h.private_distributionMode {
+	if h.deployment.Mode == RuntimeDeploymentPrivateDistribution {
 		w.Header().Set("Cache-Control", "no-store")
 	} else {
 		w.Header().Set("Cache-Control", "no-cache")
 	}
 
 	payload := BuildRuntimeConfigPayload(r.Context(), ServerConfig{
+		Edition:                h.edition,
 		SaaSURL:                h.saasURL,
-		PrivateDistributionMode:            h.private_distributionMode,
+		Deployment:             h.deployment,
+		Experience:             h.experience,
 		Brand:                  h.brand,
 		FeaturesSnapshotFn:     h.featuresSnapshotFn,
 		CapabilitiesSnapshotFn: h.capabilitiesSnapshotFn,
@@ -439,15 +542,7 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) 
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		if h.private_distributionMode {
-			fmt.Fprint(w, `window.__RUNTIME_CONFIG__={schemaVersion:2,authMode:"standalone",guestCheckoutEnabled:true,private_distributionMode:true,disableExternalResources:true,features:{},capabilities:{payments:{methods:[]}}};`)
-		} else {
-			saasURL := h.saasURL
-			if saasURL == "" {
-				saasURL = "https://app.mobazha.org"
-			}
-			fmt.Fprintf(w, `window.__RUNTIME_CONFIG__={schemaVersion:2,saasUrl:%q,authMode:"standalone",guestCheckoutEnabled:false,features:{},capabilities:{payments:{methods:[]}}};`, saasURL)
-		}
+		fmt.Fprint(w, `window.__RUNTIME_CONFIG__={"schemaVersion":3,"authMode":"standalone","deployment":{"mode":"standalone","allowExternalResources":true},"experience":{"kind":"store"},"features":{},"capabilities":{"commerce":{"storefront":true,"storeAdmin":true,"checkout":true},"marketplace":{"discovery":false,"operator":false,"curation":false,"sellerReview":false,"customDomains":false,"releasePublishing":false,"attribution":false},"private_distribution":{"isolatedRuntime":false,"managedFleet":false},"payments":{"methods":[]}}};`)
 		return
 	}
 

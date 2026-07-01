@@ -214,11 +214,13 @@ func TestIsPaymentCoinEnabled(t *testing.T) {
 		expected bool
 	}{
 		{"", true},
+		{"BTC", true},
 		{"BCH", true},
 		{"crypto:bitcoincash:mainnet:native", true},
-		{"ZEC", true},
-		{"crypto:zcash:mainnet:native", true},
-		{" crypto:ZCASH:mainnet:native ", true},
+		{"LTC", true},
+		{"ZEC", false},
+		{"crypto:zcash:mainnet:native", false},
+		{" crypto:ZCASH:mainnet:native ", false},
 		{"ETH", false},
 		{"SOL", false},
 		{"EXTERNAL_PAYMENT", false},

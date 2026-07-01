@@ -63,3 +63,6 @@ internal/chains/solana/keypairs/
 # Go workspace (machine-specific local paths)
 go.work
 go.work.sum
+
+# Generated shielded-rail proof artifacts
+samples/zcash-shielded-rail/fixtures/out/

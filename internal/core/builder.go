@@ -782,7 +782,7 @@ func NewNodeWithOptions(ctx context.Context, cfg *repo.Config, nodeID string,
 		return nil, err
 	}
 	if buildOptions.sovereign != nil {
-		return newSovereignNode(ctx, cfg, nodeID, hs, *buildOptions.sovereign, opts)
+		return newResourceProfileNode(ctx, cfg, nodeID, hs, *buildOptions.sovereign, opts)
 	}
 	return newNode(ctx, cfg, nodeID, opts, hs)
 }

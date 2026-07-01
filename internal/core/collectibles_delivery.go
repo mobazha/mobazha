@@ -48,7 +48,7 @@ func (n *MobazhaNode) deliverCollectibleLifecycleJob(ctx context.Context, job *m
 		err = n.deliverCollectiblePrimarySalePaid(ctx, job.OrderID)
 	case models.CollectibleLifecycleRelease:
 		if n.collectibleFirstSaleReservationReleaseHook == nil {
-			err = fmt.Errorf("hosting reservation release hook is unavailable")
+			err = fmt.Errorf("collectible reservation release hook is unavailable")
 		} else {
 			err = n.collectibleFirstSaleReservationReleaseHook(ctx, CollectibleFirstSaleReservationReleaseSignal{
 				OrderID: job.OrderID,

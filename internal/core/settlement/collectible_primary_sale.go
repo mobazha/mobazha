@@ -13,7 +13,7 @@ import (
 )
 
 // ExecuteCollectiblePrimarySaleRelease releases the seller side of a verified
-// collectible primary-sale escrow after hosting has confirmed Hub intake.
+// collectible primary-sale escrow after the distribution has confirmed intake.
 func (s *SettlementService) ExecuteCollectiblePrimarySaleRelease(
 	ctx context.Context,
 	orderID models.OrderID,

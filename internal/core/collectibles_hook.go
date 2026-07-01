@@ -7,7 +7,7 @@ import (
 )
 
 // CollectiblePrimarySalePaidSignal is emitted when a collectible primary-sale
-// order has a verified payment and can be recorded in the hosting Hub ledger.
+// order has a verified payment and can be recorded by a distribution adapter.
 type CollectiblePrimarySalePaidSignal struct {
 	OrderID     string
 	EscrowID    string
@@ -23,8 +23,8 @@ type CollectiblePrimarySalePaidSignal struct {
 	PaidAt             time.Time
 }
 
-// CollectiblePrimarySalePaidHook bridges verified Node orders into hosting's
-// collectible_primary_sales table. It must be idempotent by OrderID.
+// CollectiblePrimarySalePaidHook bridges verified Node orders into a
+// distribution-provided lifecycle adapter. It must be idempotent by OrderID.
 type CollectiblePrimarySalePaidHook func(context.Context, CollectiblePrimarySalePaidSignal) error
 
 // CollectibleFirstSaleAuthorizationSignal is emitted before any payment rail

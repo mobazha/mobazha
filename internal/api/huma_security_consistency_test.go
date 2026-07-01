@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 // huma_security_consistency_test.go — TD-117 contract guard.
 //
 // The Huma per-operation `Security` declaration is the OpenAPI contract:
@@ -152,5 +150,5 @@ func TestHumaSecurity_RouteScopeConsistency(t *testing.T) {
 }
 
 // helpers (securityIncludesAPIToken / routeScopeMapCovers) live in
-// huma_security_consistency_helpers_test.go so the private_distribution build can
-// share them.
+// huma_security_consistency_helpers_test.go so each distribution-profile
+// snapshot can share them.

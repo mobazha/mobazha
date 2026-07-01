@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -39,6 +37,12 @@ const (
 //
 // This cannot be called with the database lock held.
 func (n *MobazhaNode) Publish(done chan<- struct{}) {
+	if n.sovereign {
+		if done != nil {
+			close(done)
+		}
+		return
+	}
 	go func() {
 		<-n.initialBootstrapChan
 		n.publishChan <- pubCloser{done}
@@ -184,6 +188,12 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 // PublishFile will publish the given file to SNF servers and followers for storage.
 // It will interrupt the publish if a shutdown happens during.
 func (n *MobazhaNode) PublishFile(ctx context.Context, cid cid.Cid, done chan<- struct{}) {
+	if n.sovereign {
+		if done != nil {
+			close(done)
+		}
+		return
+	}
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 

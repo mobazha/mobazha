@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -76,8 +74,12 @@ var (
 	ProtocolDHT protocol.ID
 )
 
-// NewNode constructs and returns an MobazhaNode using the given cfg.
+// NewNode constructs and returns a MobazhaNode using the given cfg.
 func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService ...coreiface.HostService) (*MobazhaNode, error) {
+	return newNode(ctx, cfg, nodeID, nil, hostService...)
+}
+
+func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []NodeOption, hostService ...coreiface.HostService) (*MobazhaNode, error) {
 	var hs coreiface.HostService
 	if len(hostService) > 0 {
 		hs = hostService[0]
@@ -172,7 +174,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	// Instead create a minimal libp2p Host (identity only, no listen addrs)
 	// and share the default node's infrastructure for content ops.
 	if cfg.SaaSMode {
-		return newLightweightNode(ctx, cfg, nodeID, obRepo, sharedManager, shutdownTorFunc, hs)
+		return newLightweightNode(ctx, cfg, nodeID, obRepo, sharedManager, shutdownTorFunc, hs, options)
 	}
 
 	// ── Full node path ─────────────────────────────────────────────────
@@ -363,9 +365,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		initFiatSubsystem(obNode)
 		initSupplyChainSubsystem(obNode)
 		initShippingSubsystem(obNode)
-		obNode.applyOptions([]NodeOption{
+		obNode.applyOptions(append([]NodeOption{
 			WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
-		})
+		}, options...))
 		// Post-applyOptions wiring. Order matters minimally here, but
 		// these all depend on services produced by applyOptions:
 		//   - Digital: featureResolver (DigitalEntitlementAppService
@@ -721,9 +723,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	}
 
-	obNode.applyOptions([]NodeOption{
+	obNode.applyOptions(append([]NodeOption{
 		WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
-	})
+	}, options...))
 	// Post-applyOptions wiring (see CreateInfrastructureOnlyNode for
 	// rationale): Digital depends on featureResolver; SupplyChain depends
 	// on orderService + featureResolver.
@@ -776,14 +778,14 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 //	)
 func NewNodeWithOptions(ctx context.Context, cfg *repo.Config, nodeID string,
 	hs coreiface.HostService, opts ...NodeOption) (*MobazhaNode, error) {
-	node, err := NewNode(ctx, cfg, nodeID, hs)
+	buildOptions, err := resolveNodeBuildOptions(opts)
 	if err != nil {
 		return nil, err
 	}
-	for _, opt := range opts {
-		opt(node)
+	if buildOptions.sovereign != nil {
+		return newSovereignNode(ctx, cfg, nodeID, hs, *buildOptions.sovereign, opts)
 	}
-	return node, nil
+	return newNode(ctx, cfg, nodeID, opts, hs)
 }
 
 // coreStateBridge wraps mobazha-core order state machine for transition validation.
@@ -980,6 +982,7 @@ func newLightweightNode(
 	sharedManager *SharedManager,
 	shutdownTorFunc func() error,
 	hs coreiface.HostService,
+	options []NodeOption,
 ) (*MobazhaNode, error) {
 	netConfig := sharedManager.NetConfig
 
@@ -1321,9 +1324,9 @@ func newLightweightNode(
 		StateValidator:       &coreStateBridge{},
 	})
 
-	obNode.applyOptions([]NodeOption{
+	obNode.applyOptions(append([]NodeOption{
 		WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
-	})
+	}, options...))
 	// Post-applyOptions wiring (see CreateInfrastructureOnlyNode for
 	// rationale): Digital depends on featureResolver; SupplyChain depends
 	// on orderService + featureResolver.
@@ -1355,7 +1358,7 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Webhook subsystem initialized")
 }
 
-// initCollectionSubsystem moved to builder_shared.go (shared between full and private_distribution builds).
+// initCollectionSubsystem moved to builder_shared.go (shared between standard and sovereign profiles).
 
 // initSupplyChainSubsystem initializes the per-node supply chain subsystem:
 // migrates DB models, creates FulfillmentProviderRegistry and SupplyChainAppService.
@@ -1493,10 +1496,10 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession subsystem initialized")
 }
 
-// initDiscountSubsystem moved to builder_shared.go (shared between full and private_distribution builds).
+// initDiscountSubsystem moved to builder_shared.go (shared between standard and sovereign profiles).
 
 // initShippingSubsystem / managed_escrowListingPublisher are in builder_shared.go
-// (shared between full and private_distribution builds — no build tags).
+// (shared between standard and sovereign profiles — no build tags).
 
 // initEventDispatcher creates the unified EventDispatcher with NotificationSink,
 // WebhookSink, and ChannelNotificationSink. Provides error isolation between sinks.

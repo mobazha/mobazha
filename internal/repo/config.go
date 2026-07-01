@@ -165,7 +165,7 @@ type Config struct {
 	// When both EXTERNAL_PAYMENTDaemonSeeds and EXTERNAL_PAYMENTSeedFile are provided, EXTERNAL_PAYMENTDaemonSeeds is
 	// appended on top of the YAML-loaded list.
 	//
-	// Only meaningful in the private_distribution build; the validator rejects it otherwise.
+	// Only meaningful to the private PrivateDistribution composition; Open Core rejects it.
 	// See docs/privacy/PRIVATE_DISTRIBUTION_EXTERNAL_PAYMENTD_NETWORK_DESIGN.md §2.4 for the seed list
 	// schema.
 	EXTERNAL_PAYMENTDaemonSeeds []string `long:"external_paymentdaemonseeds" description:"Inline external_paymentd seed endpoints (comma-separated host:port; private_distribution only)"`
@@ -174,7 +174,7 @@ type Config struct {
 	// seed list. The file is loaded at startup; its format is documented in
 	// docs/privacy/PRIVATE_DISTRIBUTION_EXTERNAL_PAYMENTD_NETWORK_DESIGN.md §2.4.
 	//
-	// Only meaningful in the private_distribution build; the validator rejects it otherwise.
+	// Only meaningful to the private PrivateDistribution composition; Open Core rejects it.
 	EXTERNAL_PAYMENTSeedFile string `long:"external_paymentseedfile" description:"Path to YAML external_paymentd seed list (private_distribution only)"`
 
 	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.

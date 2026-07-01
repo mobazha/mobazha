@@ -240,139 +240,49 @@ func TestArchGuard_NoNewTickerInCore(t *testing.T) {
 			"use Run*Once methods instead. Violations: %v", violations)
 }
 
-// TestArchGuard_PrivateDistributionServiceCoverage scans applyOptions in options.go for all
-// n.initXxx() calls, then verifies that builder_private_distribution.go's initPrivateDistributionServices
-// doc comment has a corresponding "initXxx" line marked as "covered" or
-// "excluded". This prevents silent omissions when new services are added.
-func TestArchGuard_PrivateDistributionServiceCoverage(t *testing.T) {
+// TestArchGuard_NoPrivateDistributionBuildFork prevents a product-wide build tag from
+// recreating a shadow Node type or lifecycle. Product code belongs in a
+// private module behind public composition ports.
+func TestArchGuard_NoPrivateDistributionBuildFork(t *testing.T) {
 	root := repoRoot(t)
-
-	optionsData, err := os.ReadFile(filepath.Join(root, "internal", "core", "options.go"))
-	require.NoError(t, err)
-
-	private_distributionData, err := os.ReadFile(filepath.Join(root, "internal", "core", "builder_private_distribution.go"))
-	require.NoError(t, err)
-
-	private_distributionContent := string(private_distributionData)
-
-	var initCalls []string
-	inApplyOptions := false
-	braceDepth := 0
-	for _, line := range strings.Split(string(optionsData), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !inApplyOptions && strings.Contains(trimmed, "func (n *MobazhaNode) applyOptions(") {
-			inApplyOptions = true
-			braceDepth = 0
+	legacyShells := map[string]bool{
+		"builder_private_distribution.go":        true,
+		"node_fields_private_distribution.go":    true,
+		"node_lifecycle_private_distribution.go": true,
+		"node_methods_private_distribution.go":   true,
+		"node_accessors_private_distribution.go": true,
+		"node_stubs_private_distribution.go":     true,
+	}
+	var violations []string
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
 		}
-		if inApplyOptions {
-			braceDepth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
-			if (strings.HasPrefix(trimmed, "n.init") || strings.HasPrefix(trimmed, "n.wire")) &&
-				strings.Contains(trimmed, "(") {
-				name := trimmed[2:strings.Index(trimmed, "(")]
-				initCalls = append(initCalls, name)
+		if entry.IsDir() {
+			if entry.Name() == ".git" || entry.Name() == "vendor" {
+				return filepath.SkipDir
 			}
-			if braceDepth <= 0 {
-				break
-			}
+			return nil
 		}
-	}
-	require.NotEmpty(t, initCalls, "failed to parse applyOptions — no initXxx calls found")
-
-	var missing []string
-	for _, call := range initCalls {
-		if !strings.Contains(private_distributionContent, call) {
-			missing = append(missing, call)
+		if filepath.Ext(path) != ".go" {
+			return nil
 		}
-	}
-	assert.Empty(t, missing,
-		"options.go applyOptions has initXxx calls not mentioned in builder_private_distribution.go. "+
-			"Add each to the initPrivateDistributionServices doc comment as 'covered' or 'excluded: <reason>'. "+
-			"Missing: %v", missing)
-}
-
-// TestArchGuard_PrivateDistributionNoForbiddenChainImports scans every .go file under
-// internal/core/ that compiles into the private_distribution binary (i.e. no
-// `//go:build !private_distribution` tag) and forbids imports of chain stacks Phase C
-// removed. This catches accidental re-introduction of concrete
-// LTC/EVM/Solana/TRON stacks before reviewers notice.
-//
-// Allow-list: internal/chains/base (shared types). ExternalPayment's concrete
-// wallet-rpc and daemon implementation is injected by the private PrivateDistribution
-// distribution.
-//
-// Build-tag-agnostic — reads sources directly, runs in the default CI
-// build. Pairs with TD-115.
-func TestArchGuard_PrivateDistributionNoForbiddenChainImports(t *testing.T) {
-	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "core")
-	entries, err := os.ReadDir(dir)
-	require.NoError(t, err)
-
-	forbidden := []string{
-		"github.com/mobazha/mobazha3.0/internal/chains/external_payment",
-		"github.com/mobazha/mobazha3.0/internal/chains/utxo",
-		"github.com/mobazha/mobazha3.0/internal/chains/electrum",
-		"github.com/mobazha/mobazha3.0/internal/chains/evm",
-		"github.com/mobazha/mobazha3.0/internal/chains/solana",
-		"github.com/mobazha/mobazha3.0/internal/chains/tron",
-	}
-
-	type violation struct {
-		file string
-		imp  string
-	}
-	var violations []violation
-
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
+		if legacyShells[entry.Name()] {
+			violations = append(violations, path)
 		}
-		path := filepath.Join(dir, name)
-		data, err := os.ReadFile(path)
-		require.NoError(t, err)
-		body := string(data)
-		if isExcludedFromPrivateDistribution(body) {
-			continue
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
 		}
-		for _, imp := range forbidden {
-			if strings.Contains(body, `"`+imp+`"`) {
-				violations = append(violations, violation{file: name, imp: imp})
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "//go:build") && strings.Contains(line, "private_distribution") {
+				violations = append(violations, path+": "+strings.TrimSpace(line))
 			}
 		}
-	}
-
-	assert.Empty(t, violations,
-		"private_distribution build pulled in a forbidden chain stack — Phase C removed "+
-			"these intentionally (see docs/privacy/MOBAZHA_PRIVATE_DISTRIBUTION_DESIGN.md). Either gate "+
-			"the new code with `//go:build !private_distribution`, or take the deliberate "+
-			"product decision to expand private_distribution support and update this "+
-			"guard. Violations: %+v", violations)
-}
-
-// isExcludedFromPrivateDistribution recognises the build-tag forms that exclude a file
-// from the private_distribution build. A file is considered excluded only if its
-// `//go:build` directive contains `!private_distribution` AND does not also contain a
-// disjunction that re-includes private_distribution (e.g. `private_distribution || !private_distribution` is
-// effectively unconditional, so we err on the side of "included").
-func isExcludedFromPrivateDistribution(body string) bool {
-	for _, line := range strings.Split(body, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "//go:build") {
-			// Naive but sufficient: the only excluding form we use in
-			// this repo is `//go:build !private_distribution`. Any usage with a
-			// trailing `||` would re-include private_distribution — the test
-			// surface we care about doesn't combine them.
-			return strings.Contains(trimmed, "!private_distribution")
-		}
-		if strings.HasPrefix(trimmed, "package ") {
-			return false
-		}
-	}
-	return false
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Empty(t, violations, "product build fork detected: %v", violations)
 }
 
 func TestArchGuard_QueriesDoNotImportInternal(t *testing.T) {

@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 // Package api — huma_api.go
 //
 // AH-1.4: Establishes the huma v2 + humachi base wiring for the Node
@@ -17,6 +15,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
 )
 
@@ -30,14 +29,24 @@ const (
 // registerHumaAPI installs the huma adapter onto the V1 router and
 // registers all huma-managed operations.
 func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
-	cfg := huma.DefaultConfig(nodeHumaAPITitle, nodeHumaAPIVersion)
-	cfg.Info.Description = nodeHumaAPIDescription
+	apiTitle := nodeHumaAPITitle
+	apiDescription := nodeHumaAPIDescription
+	serverDescription := "Node gateway"
+	if g.restrictedProductSurface() {
+		if g.config.Brand != nil && g.config.Brand.Name != "" {
+			apiTitle = g.config.Brand.Name + " API"
+		}
+		apiDescription = "Local-first sovereign commerce node API."
+		serverDescription = "Sovereign node"
+	}
+	cfg := huma.DefaultConfig(apiTitle, nodeHumaAPIVersion)
+	cfg.Info.Description = apiDescription
 
 	cfg.OpenAPIPath = "/v1/openapi"
 	cfg.DocsPath = "/v1/docs"
 	cfg.SchemasPath = "/v1/schemas"
 
-	cfg.Servers = []*huma.Server{{URL: "/", Description: "Node gateway"}}
+	cfg.Servers = []*huma.Server{{URL: "/", Description: serverDescription}}
 
 	if cfg.Components == nil {
 		cfg.Components = &huma.Components{}
@@ -73,6 +82,11 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 	api := humachi.New(r, cfg)
 
 	g.installNodeHumaMiddlewares(api)
+	if g.restrictedProductSurface() {
+		g.registerRestrictedHumaOperations(api)
+		g.registerTrustedHumaModules(api)
+		return api
+	}
 
 	// Public storefront routes — always registered, even in PublicOnly mode.
 	g.registerNodeHumaSmokeRoutes(api)
@@ -132,4 +146,57 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 	g.registerTrustedHumaModules(api)
 
 	return api
+}
+
+func (g *Gateway) restrictedProductSurface() bool {
+	return g != nil && g.config != nil && g.config.ProductSurfacePolicy != nil &&
+		g.config.ProductSurfacePolicy.CoreAPISurface() == distribution.CoreAPISurfaceRestricted
+}
+
+// registerRestrictedHumaOperations is the explicit, fail-closed contract for
+// local-first distributions. Private modules can extend this surface through
+// TrustedHumaModules, but unselected Open Core domains are never registered.
+func (g *Gateway) registerRestrictedHumaOperations(api huma.API) {
+	g.registerNodeHumaSmokeRoutes(api)
+	g.registerNodeHumaListingPublicOperations(api)
+	g.registerNodeHumaMediaPublicOperations(api)
+	g.registerNodeHumaProfilePublicOperations(api)
+	g.registerNodeHumaDiscountPublicOperations(api)
+	g.registerNodeHumaCollectionPublicOperations(api)
+	g.registerNodeHumaStorePolicyPublicOperations(api)
+	g.registerNodeHumaSystemPublicOperations(api)
+	g.registerNodeHumaSettingsPublicOperations(api)
+	g.registerNodeHumaAuthPublicOperations(api)
+	g.registerGuestOrderQuotePublic(api)
+	g.registerGuestOrderPostPublic(api)
+	g.registerGuestOrderGetPublic(api)
+	g.registerPaymentMethodsGet(api)
+	g.registerPGPKeyGet(api)
+	g.registerNodeHumaMiscPublicOperations(api)
+	g.registerNodeHumaDigitalOperations(api)
+
+	if g.config.PublicOnly {
+		return
+	}
+	g.registerNodeHumaListingAdminOperations(api)
+	g.registerNodeHumaMediaAdminOperations(api)
+	g.registerNodeHumaProfileAdminOperations(api)
+	g.registerNodeHumaDiscountAdminOperations(api)
+	g.registerNodeHumaCollectionAdminOperations(api)
+	g.registerNodeHumaStorePolicyAdminOperations(api)
+	g.registerNodeHumaSystemAdminOperations(api)
+	g.registerNodeHumaSettingsAdminOperations(api)
+	g.registerNodeHumaAuthAdminOperations(api)
+	g.registerNodeHumaShippingOperations(api)
+	g.registerNodeHumaCartOperations(api)
+	g.registerGuestOrdersListAuth(api)
+	g.registerGuestOrderShip(api)
+	g.registerGuestOrderComplete(api)
+	g.registerGuestOrderAdminDetail(api)
+	g.registerPGPKeyPut(api)
+	g.registerPGPKeyDelete(api)
+	g.registerNodeHumaReceivingAccountOperations(api)
+	g.registerNodeHumaNotificationCoreOperations(api)
+	g.registerNodeHumaSellerDigitalOperations(api)
+	g.registerAIHTTPCapabilities(api)
 }

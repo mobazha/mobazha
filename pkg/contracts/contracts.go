@@ -438,7 +438,7 @@ type NodeService interface {
 	GuestOrder() GuestOrderService
 	ReceivingAccounts() ReceivingAccountService
 	// PaymentSession returns the unified payment session service (Phase PS / B1).
-	// Returns nil on private_distribution builds or when the subsystem is disabled.
+	// Returns nil when the selected profile does not compose the subsystem.
 	PaymentSession() PaymentSessionService
 
 	// Cross-cutting methods (kept directly on NodeService)
@@ -646,8 +646,8 @@ type ExternalPaymentSweepAllResult struct {
 
 // ExternalPaymentWalletSetupProvider is implemented by nodes that expose the
 // first-run wallet provisioning surface for EXTERNAL_PAYMENT. It is admin-only and
-// available only on private_distribution builds with a working external_payment-wallet-rpc
-// sidecar; SaaS nodes return ErrExternalPaymentWalletUnavailable.
+// available only through a private distribution module with a working
+// external_payment-wallet-rpc sidecar.
 //
 // Lifecycle from a fresh wallet-rpc process:
 //  1. GetEXTERNAL_PAYMENTWalletSetupStatus reports Exists=false
@@ -733,8 +733,8 @@ var ErrEXTERNAL_PAYMENTInvalidSeed = errors.New("external_payment seed")
 // external_payment-wallet-rpc on every call — the server never caches the seed or
 // view key.
 //
-// Available only on private_distribution builds with a working external_payment-wallet-rpc
-// sidecar; SaaS / full nodes return ErrExternalPaymentWalletUnavailable.
+// Available only through a private distribution module with a working
+// external_payment-wallet-rpc sidecar.
 type ExternalPaymentSecretsProvider interface {
 	GetEXTERNAL_PAYMENTMnemonic(ctx context.Context) (ExternalPaymentMnemonicResult, error)
 	GetEXTERNAL_PAYMENTViewOnlyKeys(ctx context.Context) (ExternalPaymentViewOnlyKeysResult, error)
@@ -792,8 +792,8 @@ type ExternalPaymentViewOnlyKeysResult struct {
 // outgoing transfers reveal recipient addresses (the operator's payout
 // targets / counterparties). Anonymous reads are explicitly forbidden.
 //
-// Available only on private_distribution builds with a working external_payment-wallet-rpc
-// sidecar; SaaS / full nodes return ErrExternalPaymentWalletUnavailable.
+// Available only through a private distribution module with a working
+// external_payment-wallet-rpc sidecar.
 type ExternalPaymentHistoryProvider interface {
 	ListEXTERNAL_PAYMENTTransfers(ctx context.Context, req ListEXTERNAL_PAYMENTTransfersRequest) (ListEXTERNAL_PAYMENTTransfersResult, error)
 }

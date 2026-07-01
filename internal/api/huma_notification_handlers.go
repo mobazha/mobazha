@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package api
 
 import (
@@ -15,9 +13,9 @@ import (
 
 // registerNodeHumaNotificationOperations registers bridged notification + channel OpenAPI ops (AH-1.4 Batch 4).
 //
-// Core notification list/count/read/batch ops are registered in huma_notification_core.go
-// (shared across private_distribution / full builds). Channel ops (Telegram/Discord) require external
-// outbound delivery and remain gated to non-private_distribution builds.
+// Core notification list/count/read/batch ops are registered in
+// huma_notification_core.go. Channel ops require outbound delivery and are
+// omitted by the restricted product-surface profile.
 func (g *Gateway) registerNodeHumaNotificationOperations(api huma.API) {
 	g.registerNodeHumaNotificationCoreOperations(api)
 

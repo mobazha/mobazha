@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -61,9 +59,11 @@ func TestInitFeatureResolver_HonoursInjectedProviders(t *testing.T) {
 	tenant := pkgconfig.NoopTenantStore{}
 	node := pkgconfig.AllowAllNodeProvider{}
 
-	WithPlatformFeatureProvider(platform)(n)
-	WithTenantFeatureStore(tenant)(n)
-	WithNodeFeatureProvider(node)(n)
+	applyNodeOptions(n, []NodeOption{
+		WithPlatformFeatureProvider(platform),
+		WithTenantFeatureStore(tenant),
+		WithNodeFeatureProvider(node),
+	})
 
 	n.initFeatureResolver()
 

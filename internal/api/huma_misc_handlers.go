@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package api
 
 import (
@@ -256,6 +254,10 @@ func (g *Gateway) registerNodeHumaMiscPublicOperations(api huma.API) {
 		}
 		return &nodeDataOutput{Body: data}, nil
 	})
+
+	if g.restrictedProductSurface() {
+		return
+	}
 
 	huma.Register(api, huma.Operation{
 		OperationID: "peers-get",

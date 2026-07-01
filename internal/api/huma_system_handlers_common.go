@@ -12,7 +12,7 @@ import (
 )
 
 // registerCommonSystemAdminOps registers system admin endpoints shared between
-// the full build and the private_distribution build. Callers still register build-specific
+// the standard and sovereign profiles. Callers still register profile-specific
 // endpoints (publish, network, domain, etc.) separately.
 func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 	type jsonBody struct {
@@ -360,7 +360,7 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 }
 
 // registerCommonSystemPublicOps registers public system endpoints shared
-// between the full build and the private_distribution build.
+// between the standard and sovereign profiles.
 func (g *Gateway) registerCommonSystemPublicOps(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "runtime-config-get",

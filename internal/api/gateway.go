@@ -591,10 +591,8 @@ func featuresSnapshotFromNodeManager(nm coreiface.NodeManagerIface) func(context
 			fp, _ = def.(contracts.FeaturesProvider)
 		}
 
-		// PrivateDistribution mode: GetDefaultNode returns nil because MobazhaNode in the
-		// private_distribution build does not satisfy CoreIface (missing wallet/P2P methods).
-		// Fall back to iterating GetNodes(), which returns contracts.NodeService
-		// — the private_distribution MobazhaNode implements both NodeService and FeaturesProvider.
+		// Defensive fallback for custom managers that expose only the narrower
+		// NodeService collection.
 		if fp == nil {
 			for _, n := range nm.GetNodes() {
 				if p, ok := n.(contracts.FeaturesProvider); ok {

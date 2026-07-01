@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -28,6 +26,7 @@ import (
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	ma "github.com/multiformats/go-multiaddr"
@@ -71,12 +70,53 @@ type SharedManager struct {
 	ctx context.Context
 
 	NetConfig *mcfg.NetConfig
+
+	sovereign bool
 }
 
 var (
 	SharedManagerInstance *SharedManager
 	once                  sync.Once
 )
+
+// NewSovereignSharedManager creates the local-first manager without loading
+// network bootstrap, SaaS integration, exchange-rate, or P2P infrastructure.
+func NewSovereignSharedManager(
+	ctx context.Context,
+	cfg *repo.Config,
+	modules []distribution.TrustedHumaModule,
+	policy distribution.SovereignNodePolicy,
+) (*SharedManager, error) {
+	if err := edition.ConfigureCurrentPolicy(edition.FullName); err != nil {
+		return nil, fmt.Errorf("configure sovereign edition policy: %w", err)
+	}
+	var initErr error
+	once.Do(func() {
+		repo.SetupLogging(cfg.LogDir, cfg.LogLevel)
+		manager := &SharedManager{
+			clients:     make(map[string]contracts.NodeService),
+			testnet:     cfg.Testnet,
+			editionName: edition.FullName,
+			appDataDir:  cfg.DataDir,
+			ctx:         ctx,
+			sovereign:   true,
+		}
+		gateway, err := manager.initSovereignHTTPGateway(cfg, modules, policy)
+		if err != nil {
+			initErr = fmt.Errorf("sovereign HTTP gateway: %w", err)
+			return
+		}
+		manager.httpGateway = gateway
+		SharedManagerInstance = manager
+	})
+	if initErr != nil {
+		return nil, initErr
+	}
+	if SharedManagerInstance == nil || !SharedManagerInstance.sovereign {
+		return nil, fmt.Errorf("shared manager already initialized for another runtime profile")
+	}
+	return SharedManagerInstance, nil
+}
 
 // NewSharedManager creates a new SharedManager instance
 func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, error) {
@@ -544,6 +584,102 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 	}
 
 	return im.httpGateway, nil
+}
+
+func (im *SharedManager) initSovereignHTTPGateway(
+	cfg *repo.Config,
+	modules []distribution.TrustedHumaModule,
+	policy distribution.SovereignNodePolicy,
+) (*api.Gateway, error) {
+	listener, err := net.Listen("tcp", gatewayListenAddr(cfg.GatewayAddr))
+	if err != nil {
+		return nil, fmt.Errorf("listen gateway: %w", err)
+	}
+
+	username, passwordHash := api.LoadCredentials(cfg.DataDir, cfg.APIUsername, cfg.APIPassword)
+	if (username == "" || passwordHash == "") && cfg.APICookie == "" {
+		username, passwordHash, err = api.EnsureStandaloneAuth(cfg.DataDir)
+		if err != nil {
+			_ = listener.Close()
+			return nil, fmt.Errorf("initialize standalone auth: %w", err)
+		}
+	}
+
+	var brandSnapshot *frontend.BrandSnapshot
+	if brand, brandErr := repo.LoadBrandConfig(cfg.DataDir); brandErr != nil {
+		log.Warningf("Failed to load brand.yaml: %v", brandErr)
+	} else if brand != nil {
+		brandSnapshot = &frontend.BrandSnapshot{
+			Name:          brand.Name,
+			ShortName:     brand.ShortName,
+			Tagline:       brand.Tagline,
+			Description:   brand.Description,
+			PrimaryColor:  brand.PrimaryColor,
+			AccentColor:   brand.AccentColor,
+			LogoURL:       brand.LogoURL,
+			FaviconURL:    brand.FaviconURL,
+			PrivacyNotice: brand.PrivacyNotice,
+			HidePoweredBy: brand.HidePoweredBy,
+		}
+		if brand.Network.AllowUserCustomNode || brand.Network.ShowAdvancedDiagnostics ||
+			brand.Network.ShowNodePoolUI || brand.Network.AllowDiscoverToggle {
+			brandSnapshot.Network = &frontend.NetworkSnapshot{
+				AllowUserCustomNode:     brand.Network.AllowUserCustomNode,
+				ShowAdvancedDiagnostics: brand.Network.ShowAdvancedDiagnostics,
+				ShowNodePoolUI:          brand.Network.ShowNodePoolUI,
+				AllowDiscoverToggle:     brand.Network.AllowDiscoverToggle,
+			}
+		}
+	}
+
+	overrideDir := filepath.Join(cfg.DataDir, "frontend-override")
+	if _, statErr := os.Stat(overrideDir); os.IsNotExist(statErr) {
+		overrideDir = ""
+	}
+
+	gateway, err := api.NewGateway(im, &api.GatewayConfig{
+		Listener:             listener,
+		Username:             username,
+		Password:             passwordHash,
+		Cookie:               cfg.APICookie,
+		PublicOnly:           cfg.APIPublicGateway,
+		HashFile:             api.AdminPasswordHashPath(cfg.DataDir),
+		PlainFile:            api.AdminPasswordPlaintextPath(cfg.DataDir),
+		DataDir:              cfg.DataDir,
+		Edition:              edition.FullName,
+		FrontendOverrideDir:  overrideDir,
+		Brand:                brandSnapshot,
+		TrustedHumaModules:   append([]distribution.TrustedHumaModule(nil), modules...),
+		GuestPaymentPolicy:   policy,
+		ProductSurfacePolicy: policy,
+		AIHTTPPolicy:         policy,
+	})
+	if err != nil {
+		_ = listener.Close()
+		return nil, err
+	}
+	return gateway, nil
+}
+
+func gatewayListenAddr(gatewayAddr string) string {
+	if gatewayAddr == "" {
+		return "127.0.0.1:" + repo.DefaultGatewayPort
+	}
+	host, port := "", repo.DefaultGatewayPort
+	parts := strings.Split(gatewayAddr, "/")
+	for index, part := range parts {
+		switch part {
+		case "ip4", "ip6":
+			if index+1 < len(parts) {
+				host = parts[index+1]
+			}
+		case "tcp":
+			if index+1 < len(parts) {
+				port = parts[index+1]
+			}
+		}
+	}
+	return net.JoinHostPort(host, port)
 }
 
 // autoFetchCasdoorCert fetches the Casdoor signing certificate from the SaaS

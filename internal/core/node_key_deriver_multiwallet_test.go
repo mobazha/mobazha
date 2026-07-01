@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (

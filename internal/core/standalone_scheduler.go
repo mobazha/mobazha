@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -42,5 +40,9 @@ func (n *MobazhaNode) startStandaloneScheduler(ctx context.Context) {
 		"supply-chain-price-drift":     func(ctx context.Context) error { n.RunSupplyChainPriceDriftOnce(ctx); return nil },
 	}
 
-	n.startStandaloneSchedulerPlan(ctx, nil, hookFns)
+	var enabled []string
+	if n.sovereignPolicy != nil {
+		enabled = n.sovereignPolicy.EnabledBackgroundJobs()
+	}
+	n.startStandaloneSchedulerPlan(ctx, enabled, hookFns)
 }

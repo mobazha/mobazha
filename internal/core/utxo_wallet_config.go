@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -23,9 +21,8 @@ func isSweepableP2WPKHChain(chain iwallet.ChainType) bool {
 // by the node's multiwallet. Each wallet receives its chain-specific client
 // backed by the shared ChainOperations (typically the UTXO Monitor).
 //
-// Full build only (tagged !private_distribution). PrivateDistribution is EXTERNAL_PAYMENT-only since Phase C and
-// has no multiwallet or Electrum infrastructure. See private_distribution_supported_coins.go
-// for the restoration checklist if UTXO support is re-added.
+// The standard self-hosted profile initializes this infrastructure;
+// restricted profiles leave the multiwallet absent.
 func (n *MobazhaNode) configureUTXOWallets(ops utxo.ChainOperations) {
 	if n.multiwallet == nil || ops == nil {
 		return

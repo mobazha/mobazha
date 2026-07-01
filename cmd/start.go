@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package cmd
 
 import (
@@ -42,14 +40,14 @@ func (x *Start) Execute(args []string) error {
 		return err
 	}
 
-	// EXTERNAL_PAYMENTDaemonSeeds / EXTERNAL_PAYMENTSeedFile are only meaningful in the private_distribution build
-	// (they feed the I2P-Only ExternalPayment NodePool). Reject them in full builds
+	// EXTERNAL_PAYMENTDaemonSeeds / EXTERNAL_PAYMENTSeedFile are owned by the private PrivateDistribution command
+	// (they feed the I2P-only ExternalPayment NodePool). Reject them in Open Core
 	// so misconfiguration is caught at startup rather than silently ignored.
 	if len(cfg.EXTERNAL_PAYMENTDaemonSeeds) > 0 {
-		return fmt.Errorf("--external_paymentdaemonseeds is only supported in the private_distribution build")
+		return fmt.Errorf("--external_paymentdaemonseeds is only supported by the private PrivateDistribution distribution")
 	}
 	if cfg.EXTERNAL_PAYMENTSeedFile != "" {
-		return fmt.Errorf("--external_paymentseedfile is only supported in the private_distribution build")
+		return fmt.Errorf("--external_paymentseedfile is only supported by the private PrivateDistribution distribution")
 	}
 
 	if !repo.IsRepoInitialized(cfg.DataDir) {

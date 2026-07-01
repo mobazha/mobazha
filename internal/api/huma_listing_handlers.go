@@ -31,7 +31,7 @@ func (g *Gateway) registerNodeHumaListingAdminOperations(api huma.API) {
 	g.registerListingDelete(api)
 	g.registerListingImportJSON(api)
 	g.registerListingImportMultipart(api)
-	g.registerListingImportVendorOps(api) // build-tagged: gumroad on !private_distribution only
+	g.registerListingImportVendorOps(api) // omitted by restricted product profiles
 }
 
 // --- Auth ---

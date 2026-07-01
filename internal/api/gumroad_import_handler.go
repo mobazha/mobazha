@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package api
 
 import (
@@ -40,8 +38,7 @@ import (
 //     server-side, and even if it were we'd be exfiltrating files the user
 //     already has on their machine.
 //
-// Build tag: !private_distribution — PrivateDistribution is the EXTERNAL_PAYMENT-only minimal build and doesn't
-// need vendor migration tools.
+// Restricted product surfaces omit this vendor migration integration.
 
 const (
 	gumroadAPIBase = "https://api.gumroad.com/v2"

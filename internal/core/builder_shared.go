@@ -22,7 +22,7 @@ import (
 
 // initDiscountSubsystem initializes the per-node discount subsystem:
 // migrates DB models, creates DiscountStore, and wires up DiscountAppService.
-// Shared between full and private_distribution builds (no build tags).
+// Shared between standard and sovereign profiles (no build tags).
 func initDiscountSubsystem(obNode *MobazhaNode) {
 	if err := database.MigrateDiscountModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Discount: failed to migrate models: %v", err)
@@ -35,7 +35,7 @@ func initDiscountSubsystem(obNode *MobazhaNode) {
 
 // initCollectionSubsystem initializes the per-node collection subsystem:
 // migrates DB models, creates CollectionStore, and wires up CollectionAppService.
-// Shared between full and private_distribution builds (no build tags).
+// Shared between standard and sovereign profiles (no build tags).
 func initCollectionSubsystem(obNode *MobazhaNode) {
 	if err := database.MigrateCollectionModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Collection: failed to migrate models: %v", err)
@@ -82,7 +82,7 @@ func supplyAvailabilityProvidersForNode(obNode *MobazhaNode) []pkgcontracts.Supp
 
 // initStorePolicySubsystem initializes the per-node store policy subsystem:
 // migrates policy models, creates StorePolicyStore, and wires StorePolicyAppService.
-// Shared between full and private_distribution builds (no build tags).
+// Shared between standard and sovereign profiles (no build tags).
 func initStorePolicySubsystem(obNode *MobazhaNode) {
 	if err := database.MigrateStorePolicyModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "StorePolicy: failed to migrate models: %v", err)
@@ -95,7 +95,7 @@ func initStorePolicySubsystem(obNode *MobazhaNode) {
 
 // initShippingSubsystem initializes the per-node shipping subsystem:
 // migrates DB models, creates ShippingStore, and wires up ShippingAppService.
-// Shared between full and private_distribution builds (no build tags).
+// Shared between standard and sovereign profiles (no build tags).
 func initShippingSubsystem(obNode *MobazhaNode) {
 	if err := database.MigrateShippingModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Shipping: failed to migrate models: %v", err)
@@ -115,8 +115,8 @@ func initShippingSubsystem(obNode *MobazhaNode) {
 }
 
 // managed_escrowListingPublisher wraps MobazhaNode to implement contracts.ListingPublisher
-// using closure-style deferred evaluation with nil-safety. Works in both full
-// and private_distribution builds.
+// using closure-style deferred evaluation with nil-safety. Works in every
+// runtime profile.
 type managed_escrowListingPublisher struct {
 	node *MobazhaNode
 }
@@ -140,7 +140,7 @@ func wireDigitalSupplyLineResolver(obNode *MobazhaNode, assetSvc *digital.Digita
 // initDigitalSubsystem initializes the per-node digital goods subsystem. It
 // creates DigitalAssetAppService + DigitalEntitlementAppService,
 // and starts the entitlement event listener.
-// Shared between full and private_distribution builds (no build tags).
+// Shared between standard and sovereign profiles (no build tags).
 func initDigitalSubsystem(obNode *MobazhaNode) {
 	var blob pkgcontracts.BlobStore
 	blob = getHostBlobStore(obNode)

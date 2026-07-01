@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 // Command gen-route-inventory records the effective Community HTTP surface
 // after the real chi/Huma router composition has completed.
 package main

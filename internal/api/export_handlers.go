@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package api
 
 import (
@@ -23,7 +21,7 @@ import (
 // in CSV or JSON. Implements the "Your store, your data, your customers"
 // product contract from DIGITAL_DELIVERY_DESIGN.md §2.4.
 //
-// Endpoints (all !private_distribution; EXTERNAL_PAYMENT-only PrivateDistribution ships with its own minimal flows):
+// Endpoints (registered only by the standard product surface):
 //   - GET /v1/exports/listings?format=csv|json
 //   - GET /v1/exports/sales?format=csv|json
 //   - GET /v1/exports/customers?format=csv|json

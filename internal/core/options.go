@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -33,60 +31,54 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// NodeOption configures optional dependencies on a MobazhaNode after
-// construction. Used by NewNodeWithOptions to allow hosting (SaaS) to
-// inject custom adapters (e.g. KeyVaultProvider) without modifying the
-// core construction flow.
-type NodeOption func(*MobazhaNode)
-
 // WithKeyProvider overrides the default fileKeyProvider.
 // SaaS mode uses this to inject a KeyVault-backed implementation.
 func WithKeyProvider(kp contracts.KeyProvider) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.keyProvider = kp
-	}
+	}}
 }
 
 // WithHostService sets the HostService for SaaS integration.
 // This is extracted from the variadic parameter of NewNode for cleaner API.
 func WithHostService(hs coreiface.HostService) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.hostService = hs
-	}
+	}}
 }
 
 // WithPaymentCapabilityProvider injects the distribution's immutable payment
 // capability allowlist. Omit it to keep optional payment rails disabled.
 func WithPaymentCapabilityProvider(provider payment.ChainCapabilityProvider) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.paymentCapabilities = provider
-	}
+	}}
 }
 
 // WithPaymentModules installs trusted, statically linked distribution modules.
 // The slice is copied so callers cannot mutate node composition after setup.
 func WithPaymentModules(modules ...distribution.PaymentModule) NodeOption {
 	owned := append([]distribution.PaymentModule(nil), modules...)
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.paymentModules = append([]distribution.PaymentModule(nil), owned...)
-	}
+	}}
 }
 
 // WithAIProfile injects distribution-provided AI routes through a
 // provider-neutral public contract.
 func WithAIProfile(profile contracts.AIProfile) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.SetAIProfile(profile)
-	}
+	}}
 }
 
 // WithPlatformFeatureProvider overrides the default PlatformGlobalProvider
 // (which allows every feature). SaaS hosting injects an adapter that
 // reads app.yaml / runtime admin API to honor platform-wide kill switches.
 func WithPlatformFeatureProvider(p pkgconfig.PlatformGlobalProvider) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.platformFeatureProvider = p
-	}
+	}}
 }
 
 // WithTenantFeatureStore overrides the default FeatureOverrideStore.
@@ -94,18 +86,18 @@ func WithPlatformFeatureProvider(p pkgconfig.PlatformGlobalProvider) NodeOption 
 // central multi-tenant store; standalone nodes use the local
 // feature_overrides GORM table.
 func WithTenantFeatureStore(s pkgconfig.TenantFeatureStore) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.tenantFeatureStore = s
-	}
+	}}
 }
 
 // WithNodeFeatureProvider overrides the default ConfigNodeFeatureProvider
 // (which reads repo.Config CLI flags). Tests and SaaS tenant nodes can
 // substitute a NoopAllowAllNodeProvider or an in-memory implementation.
 func WithNodeFeatureProvider(p pkgconfig.NodeFeatureProvider) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.nodeFeatureProvider = p
-	}
+	}}
 }
 
 // applyOptions applies NodeOption functions and sets defaults for
@@ -147,9 +139,7 @@ func WithNodeFeatureProvider(p pkgconfig.NodeFeatureProvider) NodeOption {
 //  4. Update the dependency graph table above
 //  5. Run: go build ./... && go test ./internal/core/...
 func (n *MobazhaNode) applyOptions(opts []NodeOption) {
-	for _, opt := range opts {
-		opt(n)
-	}
+	applyNodeOptions(n, opts)
 	if n.keyProvider == nil {
 		n.keyProvider = newFileKeyProvider(
 			n.ethMasterKey,

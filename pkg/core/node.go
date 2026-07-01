@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -58,6 +56,12 @@ func WithPaymentModules(modules ...distribution.PaymentModule) NodeOption {
 // provider-neutral contract.
 func WithAIProfile(profile contracts.AIProfile) NodeOption {
 	return core.WithAIProfile(profile)
+}
+
+// WithSovereignNode selects the local-first single-node composition before
+// any runtime resources are created.
+func WithSovereignNode(config distribution.SovereignNodeConfig) NodeOption {
+	return core.WithSovereignNode(config)
 }
 
 // SetAIProfile updates distribution-provided AI routes on a running node.

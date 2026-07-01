@@ -15,6 +15,9 @@ func (restrictedProductSurfacePolicy) ExternalExchangeRatesEnabled() bool { retu
 func (restrictedProductSurfacePolicy) MCPToolCatalog() string {
 	return distribution.MCPToolCatalogRestricted
 }
+func (restrictedProductSurfacePolicy) CoreAPISurface() string {
+	return distribution.CoreAPISurfaceRestricted
+}
 
 func TestHandleGETExchangeRatesRestrictedPolicyDoesNotRequireProvider(t *testing.T) {
 

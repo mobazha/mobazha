@@ -40,8 +40,7 @@ type MobazhaNode struct {
 }
 
 // identityFields, storageFields, cryptoFields, networkFields, walletFields,
-// chainFields, ipnsFields, and platformFields are defined in
-// node_fields_full.go (!private_distribution) / node_fields_private_distribution.go (private_distribution).
+// chainFields, ipnsFields, and platformFields are defined in node_fields.go.
 
 // modeFlags groups boolean mode switches.
 type modeFlags struct {
@@ -49,6 +48,7 @@ type modeFlags struct {
 	walletTestnet      bool
 	torOnly            bool
 	infrastructureOnly bool
+	sovereign          bool
 }
 
 // lifecycleFields groups runtime lifecycle state.
@@ -127,9 +127,8 @@ func (n *MobazhaNode) IsDefaultNode() bool {
 	return n.nodeID == repo.DefaultNodeID
 }
 
-// Start, Stop, SetCoTenantPublicData, coTenantPublicDataDeferred are defined
-// in node_lifecycle_full.go (!private_distribution) / node_lifecycle_private_distribution.go (private_distribution) and
-// node_methods_full.go (!private_distribution) / node_methods_private_distribution.go (private_distribution).
+// Lifecycle and cross-tenant methods are shared by every distribution. The
+// selected runtime profile controls which workers they start.
 
 func (n *MobazhaNode) checkRepoMigration() error {
 	version, err := n.repo.ReadVersion()
@@ -251,5 +250,5 @@ func MigrateNodeSettings(db database.Database) error {
 	})
 }
 
-// AgentStore, ProfileName, ProductCatalog, and SchedulerHooks are defined
-// in node_methods_full.go (!private_distribution) / node_methods_private_distribution.go (private_distribution).
+// AgentStore, ProfileName, ProductCatalog, and SchedulerHooks are defined in
+// node_methods.go.

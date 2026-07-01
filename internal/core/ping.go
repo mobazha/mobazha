@@ -1,9 +1,8 @@
-//go:build !private_distribution
-
 package core
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -18,6 +17,9 @@ const maxPongDelay = time.Second * 10
 // connect and receive an PONG message back we return nil. If we don't receive a
 // PONG message back an error is returned.
 func (n *MobazhaNode) PingNode(ctx context.Context, peer peer.ID) error {
+	if n.sovereign {
+		return fmt.Errorf("P2P ping disabled for sovereign nodes")
+	}
 	sub, err := n.eventBus.Subscribe(&events.PongReceived{})
 	if err != nil {
 		return err

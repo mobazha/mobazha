@@ -2,9 +2,8 @@ package api
 
 import "github.com/danielgtaylor/huma/v2"
 
-// Optional listing surfaces are selected by the build composition. Their
-// implementations stay in full-only files, so PrivateDistribution does not link the
-// integrations.
+// Optional listing surfaces are selected by the runtime composition policy.
+// Restricted distributions keep the implementations unregistered.
 func (g *Gateway) registerListingImportVendorOps(api huma.API) {
 	g.registerDistributionListingImportVendorOperations(api)
 }

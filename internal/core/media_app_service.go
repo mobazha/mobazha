@@ -68,7 +68,7 @@ func NewMediaAppService(cfg MediaAppServiceConfig) *MediaAppService {
 
 // MediaUploader is the subset of MediaAppService needed by services that
 // download external images and upload them into the local media pipeline.
-// Defined here (no build tag) so both full and private_distribution builds can reference it.
+// Defined here (no build tag) so both standard and sovereign profiles can reference it.
 type MediaUploader interface {
 	UploadMedia(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error)
 	// UploadFromURL downloads an image from an external URL and uploads it

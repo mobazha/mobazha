@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package core
 
 import (
@@ -340,18 +338,35 @@ type profileServiceFacade struct {
 }
 
 func (f *profileServiceFacade) SetSelfAsModerator(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error {
+	if f.moderation == nil {
+		return fmt.Errorf("moderation service not available")
+	}
 	return f.moderation.SetSelfAsModerator(ctx, modInfo, done)
 }
 func (f *profileServiceFacade) RemoveSelfAsModerator(ctx context.Context, done chan<- struct{}) error {
+	if f.moderation == nil {
+		return fmt.Errorf("moderation service not available")
+	}
 	return f.moderation.RemoveSelfAsModerator(ctx, done)
 }
 func (f *profileServiceFacade) GetModerators(ctx context.Context) []peer.ID {
+	if f.moderation == nil {
+		return nil
+	}
 	return f.moderation.GetModerators(ctx)
 }
 func (f *profileServiceFacade) GetModeratorsAsync(ctx context.Context) <-chan peer.ID {
+	if f.moderation == nil {
+		ch := make(chan peer.ID)
+		close(ch)
+		return ch
+	}
 	return f.moderation.GetModeratorsAsync(ctx)
 }
 func (f *profileServiceFacade) GetVerifiedModerators(ctx context.Context) []peer.ID {
+	if f.moderation == nil {
+		return nil
+	}
 	return f.moderation.GetVerifiedModerators(ctx)
 }
 

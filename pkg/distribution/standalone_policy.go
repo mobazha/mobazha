@@ -20,6 +20,8 @@ type GuestPaymentPolicy interface {
 const (
 	MCPToolCatalogFull       = "full"
 	MCPToolCatalogRestricted = "restricted"
+	CoreAPISurfaceFull       = "full"
+	CoreAPISurfaceRestricted = "restricted"
 )
 
 // ProductSurfacePolicy owns distribution-level API decisions that cannot be
@@ -27,11 +29,12 @@ const (
 type ProductSurfacePolicy interface {
 	ExternalExchangeRatesEnabled() bool
 	MCPToolCatalog() string
+	CoreAPISurface() string
 }
 
-// PrivateDistributionPolicy contains product decisions while Core retains the listing and
-// order state machines that enforce them.
-type PrivateDistributionPolicy interface {
+// SovereignNodePolicy contains local-first product decisions while Core
+// retains the listing and order state machines that enforce them.
+type SovereignNodePolicy interface {
 	ListingPolicy
 	GuestPaymentPolicy
 	ProductSurfacePolicy

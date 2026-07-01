@@ -12,15 +12,15 @@ import (
 )
 
 // registerNodeHumaNotificationCoreOperations registers the local notification
-// query/mutation operations that are valid in both full and private_distribution builds.
+// query/mutation operations valid in standard and restricted profiles.
 //
 // All ops here read/write a node-local SQLite table (NotificationRecord) and
-// require no P2P, federation, or outbound delivery. Sellers running an private_distribution
+// require no P2P, federation, or outbound delivery. Local-first sellers
 // rely on these for local event surfacing (new guest order, payment detected,
 // payment confirmed, auto-sweep status, system health alerts).
 //
 // Outbound channels (Telegram/Discord delivery) are registered separately in
-// huma_notification_handlers.go behind a !private_distribution build tag.
+// huma_notification_handlers.go and are omitted by the restricted profile.
 func (g *Gateway) registerNodeHumaNotificationCoreOperations(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "notifications-get-count",

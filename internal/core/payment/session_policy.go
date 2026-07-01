@@ -17,6 +17,8 @@ type SessionProvisioningPolicy interface {
 	AuthorizeSessionProvisioning(context.Context, SessionProvisioningPolicyInput) error
 }
 
+// SessionProvisioningPolicyInput contains the signed order data needed to
+// authorize creation of a new payment funding target.
 type SessionProvisioningPolicyInput struct {
 	OrderID     string
 	PaymentCoin string
@@ -26,6 +28,7 @@ type SessionProvisioningPolicyInput struct {
 
 // CollectibleFirstSaleAuthorizationSignal asks hosting to atomically reserve a
 // source-custody collectible for this order before any funding target exists.
+// CollectibleFirstSaleAuthorizationSignal is the policy-layer reservation payload.
 type CollectibleFirstSaleAuthorizationSignal struct {
 	OrderID              string
 	HubSlotID            string
@@ -35,12 +38,16 @@ type CollectibleFirstSaleAuthorizationSignal struct {
 	ReservationExpiresAt time.Time
 }
 
+// CollectibleFirstSaleAuthorizationHook authorizes and reserves a managed
+// collectible before payment provisioning.
 type CollectibleFirstSaleAuthorizationHook func(context.Context, CollectibleFirstSaleAuthorizationSignal) error
 
 type collectibleFirstSaleProvisioningPolicy struct {
 	authorize CollectibleFirstSaleAuthorizationHook
 }
 
+// NewCollectibleFirstSaleProvisioningPolicy creates the fail-closed policy for
+// managed source-custody collectible orders.
 func NewCollectibleFirstSaleProvisioningPolicy(authorize CollectibleFirstSaleAuthorizationHook) SessionProvisioningPolicy {
 	return &collectibleFirstSaleProvisioningPolicy{authorize: authorize}
 }

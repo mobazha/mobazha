@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// EnqueueTx writes an idempotent lifecycle job in the caller's Node transaction.
 func EnqueueTx(tx database.Tx, order *models.Order, kind, reason string) error {
 	if tx == nil || order == nil || strings.TrimSpace(order.ID.String()) == "" {
 		return nil
@@ -37,6 +38,7 @@ func EnqueueTx(tx database.Tx, order *models.Order, kind, reason string) error {
 	})
 }
 
+// EnqueueGorm writes an idempotent lifecycle job through a scoped GORM transaction.
 func EnqueueGorm(tx *gorm.DB, tenantID string, order *models.Order, kind, reason string) error {
 	if tx == nil || order == nil || strings.TrimSpace(order.ID.String()) == "" {
 		return nil
@@ -55,6 +57,7 @@ func EnqueueGorm(tx *gorm.DB, tenantID string, order *models.Order, kind, reason
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(record).Error
 }
 
+// EnqueueTerminalEventTx converts a supported terminal order event into a release job.
 func EnqueueTerminalEventTx(tx database.Tx, order *models.Order, event interface{}) error {
 	_, reason, ok := TerminalEvent(event)
 	if !ok {
@@ -63,6 +66,7 @@ func EnqueueTerminalEventTx(tx database.Tx, order *models.Order, event interface
 	return EnqueueTx(tx, order, models.CollectibleLifecycleRelease, reason)
 }
 
+// EnqueueTerminalEventByLookupTx loads the event's order before enqueueing a release job.
 func EnqueueTerminalEventByLookupTx(tx database.Tx, event interface{}) error {
 	orderID, reason, ok := TerminalEvent(event)
 	if !ok || strings.TrimSpace(orderID) == "" {
@@ -78,6 +82,7 @@ func EnqueueTerminalEventByLookupTx(tx database.Tx, event interface{}) error {
 	return EnqueueTx(tx, &order, models.CollectibleLifecycleRelease, reason)
 }
 
+// TerminalEvent extracts the order and audit reason from a supported terminal event.
 func TerminalEvent(event interface{}) (orderID, reason string, ok bool) {
 	switch e := event.(type) {
 	case *events.OrderCancel:

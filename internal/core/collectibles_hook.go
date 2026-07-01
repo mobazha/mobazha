@@ -29,6 +29,8 @@ type CollectiblePrimarySalePaidHook func(context.Context, CollectiblePrimarySale
 
 // CollectibleFirstSaleAuthorizationSignal is emitted before any payment rail
 // provisions a funding target for a managed source-custody first sale.
+// CollectibleFirstSaleAuthorizationSignal describes a managed collectible
+// reservation request at the payment-provisioning boundary.
 type CollectibleFirstSaleAuthorizationSignal struct {
 	OrderID              string
 	HubSlotID            string
@@ -38,13 +40,18 @@ type CollectibleFirstSaleAuthorizationSignal struct {
 	ReservationExpiresAt time.Time
 }
 
+// CollectibleFirstSaleAuthorizationHook reserves source-custody inventory
+// before a payment rail provisions a funding target.
 type CollectibleFirstSaleAuthorizationHook func(context.Context, CollectibleFirstSaleAuthorizationSignal) error
 
+// CollectibleFirstSaleReservationReleaseSignal identifies a terminal order
+// whose source-custody reservation can be released.
 type CollectibleFirstSaleReservationReleaseSignal struct {
 	OrderID string
 	Reason  string
 }
 
+// CollectibleFirstSaleReservationReleaseHook releases a prior first-sale reservation.
 type CollectibleFirstSaleReservationReleaseHook func(context.Context, CollectibleFirstSaleReservationReleaseSignal) error
 
 // Backwards-compatible aliases keep downstream option users source-compatible

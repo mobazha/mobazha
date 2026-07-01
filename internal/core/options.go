@@ -89,6 +89,8 @@ func WithCollectibleFirstSaleAuthorizationHook(hook CollectibleFirstSaleAuthoriz
 	}}
 }
 
+// WithCollectibleFirstSaleReservationReleaseHook wires the terminal-order
+// reservation release adapter supplied by the distribution composition root.
 func WithCollectibleFirstSaleReservationReleaseHook(hook CollectibleFirstSaleReservationReleaseHook) NodeOption {
 	return NodeOption{apply: func(n *MobazhaNode) {
 		n.collectibleFirstSaleReservationReleaseHook = hook

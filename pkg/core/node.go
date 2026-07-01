@@ -93,10 +93,14 @@ func WithCollectibleFirstSalePreflightHook(hook CollectibleFirstSalePreflightHoo
 	return core.WithCollectibleFirstSalePreflightHook(hook)
 }
 
+// WithCollectibleFirstSaleAuthorizationHook reserves source-custody inventory
+// before Node provisions a payment target.
 func WithCollectibleFirstSaleAuthorizationHook(hook CollectibleFirstSaleAuthorizationHook) NodeOption {
 	return core.WithCollectibleFirstSaleAuthorizationHook(hook)
 }
 
+// WithCollectibleFirstSaleReservationReleaseHook releases reservations after
+// terminal order events.
 func WithCollectibleFirstSaleReservationReleaseHook(hook CollectibleFirstSaleReservationReleaseHook) NodeOption {
 	return core.WithCollectibleFirstSaleReservationReleaseHook(hook)
 }

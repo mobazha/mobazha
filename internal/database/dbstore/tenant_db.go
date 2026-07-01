@@ -131,6 +131,9 @@ func (tdb *TenantDB) managed_escrowTxExec(tx *tenantTx, fn func(tx database.Tx) 
 // ComputePublicDataHash returns a CID-compatible hash of all structured
 // public data records for this tenant, used for publish change detection.
 func (tdb *TenantDB) ComputePublicDataHash() (cid.Cid, error) {
+	tdb.mtx.Lock()
+	defer tdb.mtx.Unlock()
+
 	if dbpd, ok := tdb.publicData.(*DBPublicData); ok {
 		return dbpd.ComputeContentHash()
 	}

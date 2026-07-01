@@ -11,7 +11,6 @@ type fakeStore struct {
 	getPendingCalls atomic.Int64
 	cleanupCalls    atomic.Int64
 }
-
 func (s *fakeStore) GetPending(limit int) ([]Delivery, error) {
 	s.getPendingCalls.Add(1)
 	return nil, nil
@@ -70,4 +69,3 @@ func TestRunCleanupOnce(t *testing.T) {
 		t.Fatalf("RunCleanupOnce should call CleanupOld exactly once; got %d", got)
 	}
 }
-

@@ -23,7 +23,6 @@ func (f *fakeKeyProvider) DigitalContentMasterKey(version int) ([]byte, error) {
 	copy(out, f.master)
 	return out, nil
 }
-
 func (f *fakeKeyProvider) EVMMasterKey() (*btcec.PrivateKey, error)    { return nil, errNYI }
 func (f *fakeKeyProvider) SolanaMasterKey() (*solana.PrivateKey, error) { return nil, errNYI }
 func (f *fakeKeyProvider) EscrowMasterKey() (*btcec.PrivateKey, error)  { return nil, errNYI }
@@ -216,4 +215,3 @@ func TestStreamRejectsInvalidHeader(t *testing.T) {
 		})
 	}
 }
-

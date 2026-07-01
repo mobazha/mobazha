@@ -128,7 +128,7 @@ func TestJobs_MarketplaceDomainVerification(t *testing.T) {
 		t.Fatalf("domain verification interval = %s, want 10m", job.Interval)
 	}
 	if job.OverlapPolicy != OverlapSkip || job.MaxConcurrency != 1 {
-		t.Fatalf("domain verification scheduling = overlap %q concurrency %d", job.OverlapPolicy, job.MaxConcurrency)
+		t.Fatalf("domain verification scheduling = overlap %v concurrency %d", job.OverlapPolicy, job.MaxConcurrency)
 	}
 	if job.PerNodeTimeout >= job.Interval {
 		t.Fatalf("domain verification timeout = %s must stay below interval %s", job.PerNodeTimeout, job.Interval)

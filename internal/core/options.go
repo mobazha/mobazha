@@ -76,23 +76,23 @@ func WithAIProfile(profile contracts.AIProfile) NodeOption {
 // bridge. Nil leaves collectible payment verification as a local metadata-only
 // no-op, which is the standalone-safe default.
 func WithCollectiblePrimarySalePaidHook(hook CollectiblePrimarySalePaidHook) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.collectiblePrimarySalePaidHook = hook
-	}
+	}}
 }
 
 // WithCollectibleFirstSaleAuthorizationHook wires hosting's authoritative
 // source-deposit reservation into payment-session provisioning.
 func WithCollectibleFirstSaleAuthorizationHook(hook CollectibleFirstSaleAuthorizationHook) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.collectibleFirstSaleAuthorizationHook = hook
-	}
+	}}
 }
 
 func WithCollectibleFirstSaleReservationReleaseHook(hook CollectibleFirstSaleReservationReleaseHook) NodeOption {
-	return func(n *MobazhaNode) {
+	return NodeOption{apply: func(n *MobazhaNode) {
 		n.collectibleFirstSaleReservationReleaseHook = hook
-	}
+	}}
 }
 
 // WithCollectibleFirstSalePreflightHook is retained as a source-compatible

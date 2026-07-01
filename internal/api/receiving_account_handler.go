@@ -2,14 +2,35 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
+
+func receivingAccountErrorResponse(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, models.ErrReceivingAccountNameInUse),
+		errors.Is(err, models.ErrReceivingAccountAddressInUse):
+		responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		ErrorResponse(w, http.StatusNotFound, "account not found")
+	default:
+		msg := err.Error()
+		if strings.Contains(msg, "cannot be empty") {
+			ErrorResponse(w, http.StatusBadRequest, msg)
+			return
+		}
+		ErrorResponse(w, http.StatusInternalServerError, msg)
+	}
+}
 
 // GetReceivingAccounts 获取用户的收款账户信息
 func (g *Gateway) GetReceivingAccounts(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +117,7 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 		account, err = svc.Add(account)
 	}
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		receivingAccountErrorResponse(w, err)
 		return
 	}
 
@@ -140,7 +161,7 @@ func (g *Gateway) DeleteReceivingAccount(w http.ResponseWriter, r *http.Request)
 
 	err = svc.Delete(id)
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		receivingAccountErrorResponse(w, err)
 		return
 	}
 

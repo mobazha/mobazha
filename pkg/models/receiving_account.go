@@ -10,6 +10,13 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
+var (
+	// ErrReceivingAccountNameInUse is returned when the display name is taken on the same chain.
+	ErrReceivingAccountNameInUse = errors.New("name already used by another account on this network")
+	// ErrReceivingAccountAddressInUse is returned when the address belongs to another account.
+	ErrReceivingAccountAddressInUse = errors.New("address already used by another account")
+)
+
 // ReceivingAccount 表示用户的收款账户信息
 type ReceivingAccount struct {
 	TenantMixin

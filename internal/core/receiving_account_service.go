@@ -39,14 +39,14 @@ func (s *receivingAccountService) findExistingByAddress(tx database.Tx, chainTyp
 	return nil, err
 }
 
-func (s *receivingAccountService) checkNameExists(tx database.Tx, name string, excludeID int) error {
+func (s *receivingAccountService) checkNameExists(tx database.Tx, name string, chainType iwallet.ChainType, excludeID int) error {
 	var nameCheck models.ReceivingAccount
-	query := tx.Read().Where("name = ?", name)
+	query := tx.Read().Where("name = ? AND chain_type = ?", name, chainType)
 	if excludeID > 0 {
 		query = query.Where("id != ?", excludeID)
 	}
 	if err := query.First(&nameCheck).Error; err == nil {
-		return errors.New("name already used by another account")
+		return models.ErrReceivingAccountNameInUse
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
@@ -75,7 +75,7 @@ func (s *receivingAccountService) saveAccount(tx database.Tx, account *models.Re
 	if err := account.NormalizeActiveTokens(); err != nil {
 		return fmt.Errorf("normalize active tokens: %w", err)
 	}
-	if err := s.checkNameExists(tx, account.Name, account.ID); err != nil {
+	if err := s.checkNameExists(tx, account.Name, account.ChainType, account.ID); err != nil {
 		return err
 	}
 	if account.IsActive {
@@ -130,7 +130,7 @@ func (s *receivingAccountService) Update(account *models.ReceivingAccount) (*mod
 				return err
 			}
 			if other != nil && other.ID != account.ID {
-				return errors.New("address already used by another account")
+				return models.ErrReceivingAccountAddressInUse
 			}
 		}
 		return s.saveAccount(tx, account, true)

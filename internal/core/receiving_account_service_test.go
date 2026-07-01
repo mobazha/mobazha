@@ -186,3 +186,53 @@ func TestReceivingAccountService_GetAcceptedCurrencies_WithAccounts(t *testing.T
 	assert.NotEmpty(t, currencies)
 	assert.Contains(t, currencies, string(iwallet.ChainEthereum))
 }
+
+func TestReceivingAccountService_Add_DuplicateNameSameChain(t *testing.T) {
+	svc := newTestReceivingAccountService(t)
+
+	acc := &models.ReceivingAccount{
+		Name:      "Main Wallet",
+		ChainType: iwallet.ChainEthereum,
+		Address:   "0xaaa",
+		IsActive:  true,
+	}
+	_ = acc.SetActiveTokens([]string{iwallet.NATIVE_SYMBOL})
+	_, err := svc.Add(acc)
+	require.NoError(t, err)
+
+	acc2 := &models.ReceivingAccount{
+		Name:      "Main Wallet",
+		ChainType: iwallet.ChainEthereum,
+		Address:   "0xbbb",
+		IsActive:  true,
+	}
+	_ = acc2.SetActiveTokens([]string{iwallet.NATIVE_SYMBOL})
+	_, err = svc.Add(acc2)
+	require.ErrorIs(t, err, models.ErrReceivingAccountNameInUse)
+}
+
+func TestReceivingAccountService_Add_SameNameDifferentChain(t *testing.T) {
+	svc := newTestReceivingAccountService(t)
+
+	for _, spec := range []struct {
+		chain   iwallet.ChainType
+		address string
+	}{
+		{iwallet.ChainBitcoin, "bc1qtest"},
+		{iwallet.ChainBSC, "0xbbb"},
+	} {
+		acc := &models.ReceivingAccount{
+			Name:      "My Bitcoin Wallet",
+			ChainType: spec.chain,
+			Address:   spec.address,
+			IsActive:  true,
+		}
+		_ = acc.SetActiveTokens([]string{iwallet.NATIVE_SYMBOL})
+		_, err := svc.Add(acc)
+		require.NoError(t, err, "chain %s", spec.chain)
+	}
+
+	accounts, err := svc.List()
+	require.NoError(t, err)
+	assert.Len(t, accounts, 2)
+}

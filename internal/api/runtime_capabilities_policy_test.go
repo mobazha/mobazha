@@ -9,6 +9,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,6 +42,25 @@ func TestFilterPaymentCapabilitiesFullComposition(t *testing.T) {
 func TestFilterPaymentCapabilitiesMissingPolicyFailsClosed(t *testing.T) {
 	methods := []frontend.PaymentCapability{{ID: "BTC", Kind: "crypto", Flow: "address-transfer"}}
 	assert.Empty(t, filterPaymentCapabilities(methods, nil))
+}
+
+func TestActiveCryptoPaymentCapabilitiesIntersectsWalletAndRegistry(t *testing.T) {
+	methods := activeCryptoPaymentCapabilities(
+		[]iwallet.ChainType{iwallet.ChainBitcoin, iwallet.ChainEthereum, iwallet.ChainZCash, iwallet.ChainBitcoin},
+		[]iwallet.ChainType{iwallet.ChainBitcoin, iwallet.ChainZCash, iwallet.ChainSolana},
+	)
+	require.Len(t, methods, 2)
+	assert.Equal(t, "BTC", methods[0].ID)
+	assert.Equal(t, "ZEC", methods[1].ID)
+	assert.Equal(t, "transparent", methods[1].AddressMode)
+}
+
+func TestActiveCryptoPaymentCapabilitiesMissingRegistryFailsClosed(t *testing.T) {
+	methods := activeCryptoPaymentCapabilities(
+		[]iwallet.ChainType{iwallet.ChainBitcoin, iwallet.ChainEthereum},
+		nil,
+	)
+	assert.Empty(t, methods)
 }
 
 func TestNewGatewayRejectsUnknownEdition(t *testing.T) {

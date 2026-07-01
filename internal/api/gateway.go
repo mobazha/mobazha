@@ -659,6 +659,10 @@ type walletOperatorProvider interface {
 	Multiwallet() contracts.WalletOperator
 }
 
+type activePaymentChainProvider interface {
+	ActivePaymentChains() []iwallet.ChainType
+}
+
 func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy edition.Policy) func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
 	return func(_ context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
 		result := baseline
@@ -684,24 +688,15 @@ func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy e
 
 		seen := make(map[string]struct{})
 		if walletOperator != nil {
-			for _, chain := range walletOperator.SupportedChains() {
-				if chain == iwallet.ChainMock || chain == iwallet.ChainFiat {
-					continue
+			activeProvider, ok := node.(activePaymentChainProvider)
+			if ok {
+				for _, capability := range activeCryptoPaymentCapabilities(
+					walletOperator.SupportedChains(),
+					activeProvider.ActivePaymentChains(),
+				) {
+					seen["crypto:"+capability.ID] = struct{}{}
+					result.Payments.Methods = append(result.Payments.Methods, capability)
 				}
-				id := chain.String()
-				if _, exists := seen["crypto:"+id]; exists {
-					continue
-				}
-				seen["crypto:"+id] = struct{}{}
-				capability := frontend.PaymentCapability{
-					ID:   id,
-					Kind: "crypto",
-					Flow: paymentFlowForChain(chain),
-				}
-				if chain == iwallet.ChainZCash {
-					capability.AddressMode = "transparent"
-				}
-				result.Payments.Methods = append(result.Payments.Methods, capability)
 			}
 		}
 
@@ -735,6 +730,37 @@ func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy e
 		})
 		return result
 	}
+}
+
+func activeCryptoPaymentCapabilities(walletChains, registeredChains []iwallet.ChainType) []frontend.PaymentCapability {
+	registered := make(map[iwallet.ChainType]struct{}, len(registeredChains))
+	for _, chain := range registeredChains {
+		registered[chain] = struct{}{}
+	}
+	seen := make(map[iwallet.ChainType]struct{}, len(walletChains))
+	capabilities := make([]frontend.PaymentCapability, 0, len(walletChains))
+	for _, chain := range walletChains {
+		if chain == iwallet.ChainMock || chain == iwallet.ChainFiat {
+			continue
+		}
+		if _, active := registered[chain]; !active {
+			continue
+		}
+		if _, duplicate := seen[chain]; duplicate {
+			continue
+		}
+		seen[chain] = struct{}{}
+		capability := frontend.PaymentCapability{
+			ID:   chain.String(),
+			Kind: "crypto",
+			Flow: paymentFlowForChain(chain),
+		}
+		if chain == iwallet.ChainZCash {
+			capability.AddressMode = "transparent"
+		}
+		capabilities = append(capabilities, capability)
+	}
+	return capabilities
 }
 
 func filterPaymentCapabilities(methods []frontend.PaymentCapability, policy edition.Policy) []frontend.PaymentCapability {

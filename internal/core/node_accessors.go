@@ -173,6 +173,17 @@ func (n *MobazhaNode) Fiat() contracts.FiatService {
 // Hosting (SaaS) uses this to register platform-level providers after node creation.
 func (n *MobazhaNode) FiatRegistry() contracts.FiatProviderRegistry { return n.fiatRegistry }
 
+// ActivePaymentChains returns the payment strategies that are currently
+// registered and eligible for runtime capability projection. Wallet presence
+// alone is not sufficient: distribution module registration and lifecycle
+// failures must fail closed before a chain is advertised to clients.
+func (n *MobazhaNode) ActivePaymentChains() []iwallet.ChainType {
+	if n == nil || n.paymentRegistry == nil {
+		return []iwallet.ChainType{}
+	}
+	return n.paymentRegistry.Chains()
+}
+
 // SupplyChainProvider implementation — supply chain fulfillment subsystem.
 func (n *MobazhaNode) SupplyChain() contracts.SupplyChainService {
 	if n.supplyChainService == nil {

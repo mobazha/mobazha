@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -437,6 +438,22 @@ type paymentModuleProbe struct {
 	runtime  distribution.PaymentRuntime
 }
 
+type paymentModuleRunnerProbe struct {
+	*paymentModuleProbe
+	startErr error
+	stopped  chan struct{}
+}
+
+func (m *paymentModuleRunnerProbe) Start(context.Context) error { return m.startErr }
+
+func (m *paymentModuleRunnerProbe) Stop(context.Context) error {
+	select {
+	case m.stopped <- struct{}{}:
+	default:
+	}
+	return nil
+}
+
 func (m *paymentModuleProbe) Descriptor() distribution.PaymentModuleDescriptor {
 	return distribution.PaymentModuleDescriptor{ID: m.id, Capabilities: []distribution.PaymentModuleCapability{
 		distribution.CapabilityManagedEVMExecution,
@@ -514,6 +531,38 @@ func TestRegisterDistributionPaymentModules_CannotReplaceCoreStrategy(t *testing
 	}
 	if got != coreStrategy {
 		t.Fatal("core strategy was replaced after rejected module registration")
+	}
+}
+
+func TestRunDistributionPaymentModules_FailureUnregistersOnlyDistributionChains(t *testing.T) {
+	registry := payment.NewRegistry()
+	strategy := &autoConfirmProbeStrategy{called: make(chan struct{})}
+	registry.RegisterV2(iwallet.ChainBitcoin, strategy)
+	registry.RegisterV2(iwallet.ChainSolana, strategy)
+	runner := &paymentModuleRunnerProbe{
+		paymentModuleProbe: &paymentModuleProbe{id: "commercial.runner"},
+		startErr:           errors.New("monitor failed"),
+		stopped:            make(chan struct{}, 1),
+	}
+	n := &MobazhaNode{
+		identityFields: identityFields{nodeID: "test-registry"},
+		walletFields: walletFields{
+			paymentRegistry: registry,
+			paymentModules:  []distribution.PaymentModule{runner},
+		},
+	}
+
+	n.runDistributionPaymentModules(context.Background(), []iwallet.ChainType{iwallet.ChainSolana})
+	select {
+	case <-runner.stopped:
+	case <-time.After(time.Second):
+		t.Fatal("failed module was not stopped")
+	}
+	if registry.HasChain(iwallet.ChainSolana) {
+		t.Fatal("failed distribution chain remained registered")
+	}
+	if !registry.HasChain(iwallet.ChainBitcoin) {
+		t.Fatal("Open Core chain was removed with failed distribution chains")
 	}
 }
 

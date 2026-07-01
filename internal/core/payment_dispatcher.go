@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/core/guest"
@@ -53,6 +54,10 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.paymentRegistry.RegisterV2(chain, payment.NewV1AsV2(utxoStrategy))
 	}
 
+	coreChains := make(map[iwallet.ChainType]struct{}, len(n.paymentRegistry.Chains()))
+	for _, chain := range n.paymentRegistry.Chains() {
+		coreChains[chain] = struct{}{}
+	}
 	commercialModulesHealthy := true
 	if err := n.registerDistributionPaymentModules(); err != nil {
 		commercialModulesHealthy = false
@@ -88,11 +93,17 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.orderService.SetReceiptVerifier(compositeVerifier)
 	}
 	if commercialModulesHealthy {
+		distributionChains := make([]iwallet.ChainType, 0)
+		for _, chain := range n.paymentRegistry.Chains() {
+			if _, isCore := coreChains[chain]; !isCore {
+				distributionChains = append(distributionChains, chain)
+			}
+		}
 		ctx := n.nodeCtx
 		if ctx == nil {
 			ctx = context.Background()
 		}
-		n.runDistributionPaymentModules(ctx)
+		n.runDistributionPaymentModules(ctx, distributionChains)
 	}
 
 	n.registerUTXOObservationDispatcher()
@@ -179,23 +190,53 @@ func (c distributionManagedEscrowAutoConfirmer) AutoConfirmManagedEscrow(
 
 var _ distribution.ManagedEscrowAutoConfirmer = distributionManagedEscrowAutoConfirmer{}
 
-func (n *MobazhaNode) runDistributionPaymentModules(ctx context.Context) {
+func (n *MobazhaNode) runDistributionPaymentModules(ctx context.Context, chains []iwallet.ChainType) {
+	var deactivateOnce sync.Once
+	deactivate := func(moduleID string, startErr error) {
+		deactivateOnce.Do(func() {
+			n.paymentRegistry.UnregisterV2Batch(chains)
+			logger.LogErrorWithIDf(log, n.nodeID,
+				"Trusted payment module set disabled after %s stopped: %v", moduleID, startErr)
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			for _, candidate := range n.paymentModules {
+				if runner, ok := candidate.(distribution.PaymentModuleRunner); ok {
+					if err := runner.Stop(cleanupCtx); err != nil {
+						logger.LogErrorWithIDf(log, n.nodeID,
+							"Trusted payment module %s cleanup failed: %v", candidate.Descriptor().ID, err)
+					}
+					continue
+				}
+				if binder, ok := candidate.(distribution.PaymentModuleBinder); ok {
+					if err := binder.Unbind(cleanupCtx); err != nil {
+						logger.LogErrorWithIDf(log, n.nodeID,
+							"Trusted payment module %s unbind failed: %v", candidate.Descriptor().ID, err)
+					}
+				}
+			}
+		})
+	}
 	for _, module := range n.paymentModules {
 		runner, ok := module.(distribution.PaymentModuleRunner)
 		if !ok {
 			continue
 		}
 		moduleID := module.Descriptor().ID
-		go func() {
-			if err := runner.Start(ctx); err != nil && ctx.Err() == nil {
-				logger.LogErrorWithIDf(log, n.nodeID, "Trusted payment module %s stopped: %v", moduleID, err)
+		go func(moduleID string, runner distribution.PaymentModuleRunner) {
+			err := runner.Start(ctx)
+			if ctx.Err() == nil {
+				if err == nil {
+					err = fmt.Errorf("module returned before node shutdown")
+				}
+				deactivate(moduleID, err)
+				return
 			}
 			stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := runner.Stop(stopCtx); err != nil {
 				logger.LogErrorWithIDf(log, n.nodeID, "Trusted payment module %s cleanup failed: %v", moduleID, err)
 			}
-		}()
+		}(moduleID, runner)
 	}
 }
 

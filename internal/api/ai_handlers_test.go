@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package api
 
 import (
@@ -13,6 +11,7 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 )
 
 type aiStatusTestIdentity struct{}
@@ -73,7 +72,7 @@ func newAIStatusRequest(t *testing.T, node contracts.NodeService) *http.Request 
 }
 
 func TestHandleGETAIStatus_PlatformTextVisionAvailability(t *testing.T) {
-	g := &Gateway{}
+	g := &Gateway{aiHTTPPolicy: distribution.NewAIHTTPPolicy(true, true, true, true)}
 	text := &aipkg.Config{Provider: "deepseek", APIKey: "text-key", Model: "deepseek-v4-flash", Enabled: true, IsPlatform: true, DailyLimit: 50}
 	vision := &aipkg.Config{Provider: "qwen", APIKey: "vision-key", Model: "qwen3-vl-flash", Enabled: true, IsPlatform: true, DailyLimit: 50}
 	node := newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{Text: text, Vision: vision})
@@ -93,8 +92,22 @@ func TestHandleGETAIStatus_PlatformTextVisionAvailability(t *testing.T) {
 	}
 }
 
+func TestHandleGETAIStatus_CommunityIgnoresPlatformFallback(t *testing.T) {
+	g := &Gateway{aiHTTPPolicy: distribution.NewAIHTTPPolicy(true, true, false, true)}
+	text := &aipkg.Config{Provider: "deepseek", APIKey: "text-key", Model: "deepseek-v4-flash", Enabled: true, IsPlatform: true}
+	node := newAIStatusTestNode(aipkg.MultiConfig{}, aipkg.PlatformProfile{Text: text})
+
+	rr := httptest.NewRecorder()
+	g.handleGETAIStatus(rr, newAIStatusRequest(t, node))
+
+	resp := decodeAIStatusResponse(t, rr)
+	if resp.Available || resp.Source != "none" {
+		t.Fatalf("community policy exposed platform fallback: %+v", resp)
+	}
+}
+
 func TestHandleGETAIStatus_BYOKNonVisionOverridesPlatformVision(t *testing.T) {
-	g := &Gateway{}
+	g := &Gateway{aiHTTPPolicy: distribution.NewAIHTTPPolicy(true, true, true, true)}
 	vision := &aipkg.Config{Provider: "qwen", APIKey: "vision-key", Model: "qwen3-vl-flash", Enabled: true, IsPlatform: true}
 	node := newAIStatusTestNode(aipkg.MultiConfig{
 		Enabled:        true,
@@ -120,7 +133,7 @@ func TestHandleGETAIStatus_BYOKNonVisionOverridesPlatformVision(t *testing.T) {
 }
 
 func TestHandleGETAIStatus_BYOKVisionModelReportsVision(t *testing.T) {
-	g := &Gateway{}
+	g := &Gateway{aiHTTPPolicy: distribution.NewAIHTTPPolicy(true, true, true, true)}
 	node := newAIStatusTestNode(aipkg.MultiConfig{
 		Enabled:        true,
 		ActiveProvider: "qwen",

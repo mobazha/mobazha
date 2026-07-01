@@ -17,6 +17,13 @@ Hosted and commercial Mobazha products have separate compositions, artifacts, re
 
 The machine-readable allowlist is `config/editions/community.json`. In addition to the four payment chains, it explicitly permits the public AI/BYOK, analytics, fulfillment-extension, and webhook contracts. It does not declare `payment.fiat` or `platform.integration`: Fiat services and routes remain disabled, and the node neither defaults to nor proxies the Hosting control plane. Runtime availability is the intersection of distribution capabilities and capabilities actually composed and configured in the node. Once external plugins are activated, their negotiated capabilities and health add another narrowing gate. Frontends may narrow this set but never widen it.
 
+AI HTTP composition follows the same rule. The Community policy registers the
+shared settings, generation, and Agent workspace contracts and permits
+operator-provided BYOK endpoints, but it does not permit a Hosting-provided
+platform fallback. Commercial and privacy-focused distributions select their
+own `AIHTTPPolicy` explicitly; the latter may further restrict endpoints to
+trusted local services and omit the Agent workspace without forking handlers.
+
 ## Not included in the first release
 
 - Payment capabilities outside the four-chain allowlist above

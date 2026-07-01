@@ -35,5 +35,6 @@ type PrivateDistributionPolicy interface {
 	ListingPolicy
 	GuestPaymentPolicy
 	ProductSurfacePolicy
+	AIHTTPPolicy
 	EnabledBackgroundJobs() []string
 }

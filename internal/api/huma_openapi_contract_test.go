@@ -65,8 +65,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaCartOperations(api)
 	g.registerNodeHumaNotificationOperations(api)
 	g.registerNodeHumaWebhookOperations(api)
-	g.registerNodeHumaAIOperations(api)
-	g.registerNodeHumaAgentMemoryOperations(api)
+	g.registerAIHTTPCapabilities(api)
 	g.registerNodeHumaShippingOperations(api)
 
 	rr := httptest.NewRecorder()

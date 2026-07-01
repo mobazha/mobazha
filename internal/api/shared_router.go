@@ -11,6 +11,7 @@ import (
 	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	"github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -22,6 +23,7 @@ type SharedRouterConfig struct {
 	SkillProvider      agentskill.Provider
 	AllowCORS          bool
 	DistributionPolicy edition.Policy
+	AIHTTPPolicy       distribution.AIHTTPPolicy
 
 	// PostResolverMiddleware, if set, is applied after the resolver middleware
 	// has populated the request context (NodeService + AuthIdentity) but before
@@ -44,6 +46,7 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 		hubs:          make(map[string]*hub),
 		hubsMtx:       sync.RWMutex{},
 		editionPolicy: distributionPolicy,
+		aiHTTPPolicy:  resolveAIHTTPPolicy(cfg.AIHTTPPolicy, distributionPolicy),
 	}
 	if cfg.FeatureManager != nil {
 		g.featureManager = cfg.FeatureManager

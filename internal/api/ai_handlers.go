@@ -1,5 +1,3 @@
-//go:build !private_distribution
-
 package api
 
 import (
@@ -8,6 +6,7 @@ import (
 	"net/http"
 
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/logging"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -16,13 +15,15 @@ var aiLog = logging.MustGetLogger("AI")
 
 type aiConfigProvider interface {
 	AIConfig() aipkg.Config
-	AIConfigForGenerate(aipkg.GenerateRequest) (aipkg.Config, error)
-	AIConfigForChat([]aipkg.ChatMsg) (aipkg.Config, error)
 	AIMultiConfig() aipkg.MultiConfig
 	SaveAIMultiConfig(aipkg.MultiConfig) error
 	AIProxy() *aipkg.Proxy
 	AIRateLimiter() *aipkg.DailyRateLimiter
 	PlatformAIConfig() *aipkg.Config
+}
+
+type aiPlatformConfigProvider interface {
+	AIConfigForGenerate(aipkg.GenerateRequest) (aipkg.Config, error)
 	PlatformAIProfile() aipkg.PlatformProfile
 }
 
@@ -32,6 +33,24 @@ func getAIProvider(r *http.Request) aiConfigProvider {
 		return p
 	}
 	return nil
+}
+
+func aiConfigValidForPolicy(cfg aipkg.Config, policy distribution.AIHTTPPolicy) bool {
+	if policy.AllowsRemoteAIEndpoints() {
+		return cfg.IsValid()
+	}
+	return cfg.Enabled && aipkg.IsTrustedLocalLLMEndpoint(cfg.EffectiveBaseURL())
+}
+
+func localAIProviders() []aipkg.ProviderInfo {
+	return []aipkg.ProviderInfo{{
+		ID:             "custom",
+		Label:          "Local LLM (Ollama)",
+		DefaultModel:   "llama3.2",
+		DefaultBaseURL: "http://localhost:11434/v1",
+		Models:         []string{"llama3.2", "llama3.1", "llama4", "qwen2.5", "mistral", "deepseek-r1", "gemma2"},
+		HelpURL:        "https://ollama.com/download",
+	}}
 }
 
 func (g *Gateway) handleGETAIConfig(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +86,19 @@ func (g *Gateway) handlePUTAIConfig(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Invalid request body")
 		return
+	}
+	policy := g.activeAIHTTPPolicy()
+	if !policy.AllowsRemoteAIEndpoints() {
+		if input.BaseURL != "" && !aipkg.IsTrustedLocalLLMEndpoint(input.BaseURL) {
+			responsePkg.Error(w, http.StatusForbidden, responsePkg.CodeForbidden,
+				"This distribution only allows trusted local AI endpoints")
+			return
+		}
+		if input.Provider != "" && input.Provider != "custom" && input.BaseURL == "" {
+			responsePkg.Error(w, http.StatusForbidden, responsePkg.CodeForbidden,
+				"This distribution requires an explicit local base_url for built-in providers")
+			return
+		}
 	}
 
 	mc := p.AIMultiConfig()
@@ -120,6 +152,13 @@ func (g *Gateway) handlePOSTAITestConnection(w http.ResponseWriter, r *http.Requ
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Invalid request body")
 		return
 	}
+	policy := g.activeAIHTTPPolicy()
+	if !policy.AllowsRemoteAIEndpoints() &&
+		(input.BaseURL == "" || !aipkg.IsTrustedLocalLLMEndpoint(input.BaseURL)) {
+		responsePkg.Error(w, http.StatusForbidden, responsePkg.CodeForbidden,
+			"This distribution requires an explicit trusted local AI base_url")
+		return
+	}
 
 	apiKey := input.APIKey
 	if apiKey == "" {
@@ -128,7 +167,7 @@ func (g *Gateway) handlePOSTAITestConnection(w http.ResponseWriter, r *http.Requ
 			apiKey = cred.APIKey
 		}
 	}
-	if apiKey == "" {
+	if apiKey == "" && policy.AllowsRemoteAIEndpoints() {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "API key is required")
 		return
 	}
@@ -158,6 +197,10 @@ func (g *Gateway) handlePOSTAITestConnection(w http.ResponseWriter, r *http.Requ
 }
 
 func (g *Gateway) handleGETAIProviders(w http.ResponseWriter, r *http.Request) {
+	if !g.activeAIHTTPPolicy().AllowsRemoteAIEndpoints() {
+		responsePkg.Success(w, localAIProviders())
+		return
+	}
 	responsePkg.Success(w, aipkg.SupportedProviders())
 }
 
@@ -185,7 +228,26 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 	allowLoopbackGateway := allowLoopbackGatewayForRequest(r)
 	req.Images = aipkg.ResolveImageURLs(req.Images, origin)
 
-	cfg, err := p.AIConfigForGenerate(req)
+	policy := g.activeAIHTTPPolicy()
+	var cfg aipkg.Config
+	var err error
+	if policy.AllowsPlatformAIFallback() {
+		platformProvider, ok := p.(aiPlatformConfigProvider)
+		if !ok {
+			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
+				"AI platform routing is not available")
+			return
+		}
+		cfg, err = platformProvider.AIConfigForGenerate(req)
+	} else if policy.AllowsRemoteAIEndpoints() {
+		multiConfig := p.AIMultiConfig()
+		cfg, err = (aipkg.PlatformProfile{}).ForGenerate(multiConfig.ActiveConfig(), req)
+	} else {
+		cfg = p.AIConfig()
+		if !aiConfigValidForPolicy(cfg, policy) {
+			err = errors.New("trusted local AI endpoint is not configured")
+		}
+	}
 	if err != nil {
 		switch {
 		case errors.Is(err, aipkg.ErrVisionUnsupported):
@@ -200,7 +262,7 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if !cfg.IsValid() {
+	if !aiConfigValidForPolicy(cfg, policy) {
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "AI is not configured. Please set up your AI provider in Settings > Integrations.")
 		return
 	}
@@ -259,12 +321,27 @@ func (g *Gateway) handleGETAIStatus(w http.ResponseWriter, r *http.Request) {
 
 	mc := p.AIMultiConfig()
 	userCfg := mc.ActiveConfig()
-	byokConfigured := userCfg.IsValid()
-	profile := p.PlatformAIProfile()
+	policy := g.activeAIHTTPPolicy()
+	byokConfigured := aiConfigValidForPolicy(userCfg, policy)
+	profile := aipkg.PlatformProfile{}
+	if policy.AllowsPlatformAIFallback() {
+		if platformProvider, ok := p.(aiPlatformConfigProvider); ok {
+			profile = platformProvider.PlatformAIProfile()
+		}
+	}
 	textAvailable := byokConfigured || profile.TextAvailable()
 	visionAvailable := profile.VisionAvailable()
 	if byokConfigured {
-		visionAvailable = aipkg.ConfigSupportsVision(userCfg)
+		if policy.AllowsRemoteAIEndpoints() {
+			visionAvailable = aipkg.ConfigSupportsVision(userCfg)
+		} else {
+			var probeHTTPClient *http.Client
+			if proxy := p.AIProxy(); proxy != nil {
+				probeHTTPClient = proxy.HTTPClient()
+			}
+			visionAvailable = aipkg.ProbeOllamaSupportsVision(
+				probeHTTPClient, userCfg.EffectiveBaseURL(), userCfg.EffectiveModel())
+		}
 	}
 
 	var source string
@@ -294,5 +371,6 @@ func (g *Gateway) handleGETAIStatus(w http.ResponseWriter, r *http.Request) {
 		"byok_configured":  byokConfigured,
 		"text_available":   textAvailable,
 		"vision_available": visionAvailable,
+		"supports_vision":  visionAvailable,
 	})
 }

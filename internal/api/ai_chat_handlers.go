@@ -31,6 +31,8 @@ const agentArtifactMaterialTextMaxLen = 1 << 20
 
 type aiChatProvider interface {
 	aiConfigProvider
+	aiPlatformConfigProvider
+	AIConfigForChat([]aipkg.ChatMsg) (aipkg.Config, error)
 	AgentStore() agentstore.Persistence
 	ProfileName() string
 	ProductCatalog() []aipkg.ListingSummary

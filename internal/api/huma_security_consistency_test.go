@@ -85,7 +85,7 @@ func TestHumaSecurity_RouteScopeConsistency(t *testing.T) {
 	g.registerNodeHumaCartOperations(api)
 	g.registerNodeHumaNotificationOperations(api)
 	g.registerNodeHumaWebhookOperations(api)
-	g.registerNodeHumaAIOperations(api)
+	g.registerAIHTTPCapabilities(api)
 	g.registerNodeHumaShippingOperations(api)
 
 	rr := httptest.NewRecorder()

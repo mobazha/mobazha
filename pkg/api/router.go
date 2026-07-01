@@ -11,6 +11,7 @@ import (
 	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/edition"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -44,6 +45,9 @@ type RouterConfig struct {
 	// DistributionPolicy is selected by the caller's composition root. Nil is
 	// retained as a backwards-compatible full policy for legacy bridge users.
 	DistributionPolicy edition.Policy
+	// AIHTTPPolicy explicitly selects the AI route and endpoint trust surface.
+	// Nil derives a fail-closed policy from DistributionPolicy.
+	AIHTTPPolicy distribution.AIHTTPPolicy
 
 	// PostResolverMiddleware is applied after the resolver has populated the
 	// request context but before route handlers. Use this for scope enforcement
@@ -66,6 +70,7 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 		SkillProvider:          cfg.SkillProvider,
 		AllowCORS:              cfg.AllowCORS,
 		DistributionPolicy:     cfg.DistributionPolicy,
+		AIHTTPPolicy:           cfg.AIHTTPPolicy,
 		PostResolverMiddleware: cfg.PostResolverMiddleware,
 	})
 	if err != nil {

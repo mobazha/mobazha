@@ -121,6 +121,7 @@ type GatewayConfig struct {
 	TrustedHumaModules   []distribution.TrustedHumaModule
 	GuestPaymentPolicy   distribution.GuestPaymentPolicy
 	ProductSurfacePolicy distribution.ProductSurfacePolicy
+	AIHTTPPolicy         distribution.AIHTTPPolicy
 }
 
 // Gateway represents an HTTP API gateway
@@ -141,6 +142,7 @@ type Gateway struct {
 	guestOrderLimiter *rateLimiter
 	authLimiter       *authRateLimiter
 	editionPolicy     edition.Policy
+	aiHTTPPolicy      distribution.AIHTTPPolicy
 }
 
 // NewGateway instantiates a new gateway.
@@ -161,6 +163,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			guestOrderLimiter: newRateLimiter(10, time.Hour),
 			authLimiter:       newAuthRateLimiter(),
 			editionPolicy:     editionPolicy,
+			aiHTTPPolicy:      resolveAIHTTPPolicy(config.AIHTTPPolicy, editionPolicy),
 		}
 		topMux = http.NewServeMux()
 	)

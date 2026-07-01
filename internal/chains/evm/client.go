@@ -35,12 +35,7 @@ import (
 */
 
 const (
-	// EtherScanAPIKey is needed for all Eherscan requests
-	EtherScanAPIKey = "REDACTED"
-	// BscScanAPIKey is needed for all Bscscan requests
-	BscScanAPIKey = "REDACTED"
-	PolyScanAPIKey = "REDACTED"
-	maxGasLimit    = 3000000
+	maxGasLimit = 3000000
 
 	EscrowContractName = "escrow"
 )

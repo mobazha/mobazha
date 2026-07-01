@@ -79,9 +79,9 @@ var (
 	once                  sync.Once
 )
 
-// NewSovereignSharedManager creates the local-first manager without loading
+// NewResourceProfileSharedManager creates the local-first manager without loading
 // network bootstrap, SaaS integration, exchange-rate, or P2P infrastructure.
-func NewSovereignSharedManager(
+func NewResourceProfileSharedManager(
 	ctx context.Context,
 	cfg *repo.Config,
 	modules []distribution.TrustedHumaModule,

@@ -28,6 +28,10 @@ func (m *mockUTXOWallet) DerivePaymentAddressFromPubKey(_ *btcec.PublicKey) (str
 	return "", nil, nil
 }
 
+func (m *mockUTXOWallet) BuildSweepTx(_ []iwallet.SweepInput, _ btcec.PrivateKey, _ string, _ int64) ([]byte, string, error) {
+	return []byte{0x01}, "mock-sweep", nil
+}
+
 type mockWalletOperator struct {
 	wallet *mockUTXOWallet
 }

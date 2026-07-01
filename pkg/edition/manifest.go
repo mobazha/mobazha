@@ -100,6 +100,8 @@ func (m Manifest) Validate() error {
 		if !m.Zcash.TransparentOnly || m.Zcash.DefaultDerivation != "transparent" {
 			return fmt.Errorf("edition %q: ZEC requires transparent-only derivation", m.Edition)
 		}
+	} else if m.Zcash.TransparentOnly || strings.TrimSpace(m.Zcash.DefaultDerivation) != "" {
+		return fmt.Errorf("edition %q: zcash policy requires ZEC in payment.chains", m.Edition)
 	}
 	return nil
 }

@@ -37,7 +37,7 @@ if data.get("paymentPluginSdkLicense") != "Apache-2.0":
     errors.append("plugin SDK license must be Apache-2.0")
 
 payment = data.get("payment", {})
-expected_chains = ["BTC", "BCH", "LTC", "ZEC"]
+expected_chains = ["BTC", "BCH", "LTC"]
 if set(payment) != {"chains", "rails"}:
     errors.append("payment may contain only positive chains and rails allowlists")
 if payment.get("chains") != expected_chains:
@@ -47,11 +47,8 @@ if payment.get("rails") != ["utxo_transparent"]:
 if data.get("deploymentTargets") != ["standalone"]:
     errors.append("deploymentTargets must be exactly ['standalone']")
 
-zcash = data.get("zcash", {})
-if zcash.get("transparentOnly") is not True:
-    errors.append("zcash.transparentOnly must be true")
-if zcash.get("defaultDerivation") != "transparent":
-    errors.append("zcash.defaultDerivation must be transparent")
+if data.get("zcash"):
+    errors.append("zcash policy must be omitted when ZEC is not enabled")
 
 if errors:
     for error in errors:

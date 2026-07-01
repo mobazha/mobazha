@@ -13,9 +13,8 @@ Hosted and commercial Mobazha products have separate compositions, artifacts, re
 - Bitcoin (BTC)
 - Bitcoin Cash (BCH)
 - Litecoin (LTC)
-- Zcash transparent addresses (ZEC)
 
-The machine-readable allowlist is `config/editions/community.json`. In addition to the four payment chains, it explicitly permits the public AI/BYOK, analytics, fulfillment-extension, and webhook contracts. It does not declare `payment.fiat` or `platform.integration`: Fiat services and routes remain disabled, and the node neither defaults to nor proxies the Hosting control plane. Runtime availability is the intersection of distribution capabilities and capabilities actually composed and configured in the node. Once external plugins are activated, their negotiated capabilities and health add another narrowing gate. Frontends may narrow this set but never widen it.
+The machine-readable allowlist is `config/editions/community.json`. In addition to the three payment chains, it explicitly permits the public AI/BYOK, analytics, fulfillment-extension, and webhook contracts. It does not declare `payment.fiat` or `platform.integration`: Fiat services and routes remain disabled, and the node neither defaults to nor proxies the Hosting control plane. Runtime availability is the intersection of distribution capabilities and capabilities actually composed and configured in the node. Once external plugins are activated, their negotiated capabilities and health add another narrowing gate. Frontends may narrow this set but never widen it.
 
 AI HTTP composition follows the same rule. The Community policy registers the
 shared settings, generation, and Agent workspace contracts and permits
@@ -26,7 +25,7 @@ trusted local services and omit the Agent workspace without forking handlers.
 
 ## Not included in the first release
 
-- Payment capabilities outside the four-chain allowlist above
+- Payment capabilities outside the three-chain allowlist above
 - Bundled fiat payment providers
 
 Unsupported identifiers may remain recognizable for wire/data compatibility, but they are not enabled payment capabilities and cannot create new self-hosted distribution payments.
@@ -54,7 +53,7 @@ The public core owns order state, capability policy, verification, audit, and ke
 
 Plugins never receive raw seed/private-key material or import Mobazha internal packages. See `docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md` and ADR-015.
 
-The current foundation implements the edition manifest, a fail-closed runtime and payment-ingress allowlist, and the public plugin manifest/health registry. The first release may bundle BTC/BCH/LTC/ZEC implementations behind compatibility adapters. Process supervision and RPC remain later SDK milestones.
+The current foundation implements the edition manifest, a fail-closed runtime and payment-ingress allowlist, and the public plugin manifest/health registry. The first release may bundle BTC/BCH/LTC implementations behind compatibility adapters. ZEC remains recognizable for historical compatibility but is not enabled by Community v0.3. Process supervision and RPC remain later SDK milestones.
 
 ## Contribution boundary
 

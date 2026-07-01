@@ -19,7 +19,7 @@ Go's in-process plugin mechanism has platform, toolchain, dependency, and failur
 5. Require capability negotiation and explicit API versions; unknown required capabilities fail activation.
 6. Require manifest, checksums, declared permissions, health endpoints, and compatibility tests.
 7. Keep frontend v1 schema-driven; no executable plugin JavaScript.
-8. Bundle BTC/BCH/LTC/ZEC initially, even if an in-process compatibility adapter is needed during migration.
+8. Bundle BTC/BCH/LTC initially, even if an in-process compatibility adapter is needed during migration; ZEC remains outside v0.3 until its production settlement path is complete.
 
 ## Security invariants
 

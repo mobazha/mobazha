@@ -106,7 +106,7 @@ func TestHandleGETPaymentMethods_FiltersProductDisabledZEC(t *testing.T) {
 	}
 }
 
-func TestHandleGETPaymentMethods_CommunityAllowsTransparentZEC(t *testing.T) {
+func TestHandleGETPaymentMethods_CommunityRejectsZEC(t *testing.T) {
 	zecAccount := models.ReceivingAccount{ChainType: iwallet.ChainZCash, IsActive: true}
 	if err := zecAccount.SetActiveTokens([]string{iwallet.NATIVE_SYMBOL}); err != nil {
 		t.Fatal(err)
@@ -134,8 +134,8 @@ func TestHandleGETPaymentMethods_CommunityAllowsTransparentZEC(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Data.Crypto) != 1 || res.Data.Crypto[0] != string(iwallet.ChainZCash) {
-		t.Fatalf("crypto = %#v, want ZEC", res.Data.Crypto)
+	if len(res.Data.Crypto) != 0 {
+		t.Fatalf("crypto = %#v, want no Community ZEC capability", res.Data.Crypto)
 	}
 }
 

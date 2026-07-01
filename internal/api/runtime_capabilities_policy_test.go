@@ -27,7 +27,7 @@ func TestFilterPaymentCapabilitiesCommunityAllowlist(t *testing.T) {
 		{ID: "stripe", Kind: "fiat", Flow: "provider-session"},
 	}
 
-	assert.Equal(t, methods[:4], filterPaymentCapabilities(methods, policy))
+	assert.Equal(t, methods[:3], filterPaymentCapabilities(methods, policy))
 }
 
 func TestFilterPaymentCapabilitiesFullComposition(t *testing.T) {

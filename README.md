@@ -13,7 +13,6 @@ The first public self-hosted payment allowlist is:
 - Bitcoin (BTC)
 - Bitcoin Cash (BCH)
 - Litecoin (LTC)
-- Zcash transparent addresses (ZEC)
 
 The canonical machine-readable policy is [`config/editions/community.json`](config/editions/community.json). Scope, history, licensing, and extension boundaries are described in [`docs/community/COMMUNITY_EDITION.md`](docs/community/COMMUNITY_EDITION.md). Public API and cross-distribution compatibility commitments are documented in [`docs/community/COMPATIBILITY.md`](docs/community/COMPATIBILITY.md).
 

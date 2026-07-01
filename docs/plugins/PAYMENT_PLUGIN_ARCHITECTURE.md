@@ -178,7 +178,7 @@ Every plugin passes:
 - malformed RPC and resource-limit tests;
 - license and artifact-integrity checks.
 
-Chain suites add consensus/transaction fixtures. ZEC community tests prove transparent-only behavior.
+Chain suites add consensus and transaction fixtures for every bundled Community chain.
 
 ## 11. Migration sequence
 

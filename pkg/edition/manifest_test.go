@@ -37,7 +37,18 @@ func TestCommunityPolicyFiltersNonCommunityPaymentMethods(t *testing.T) {
 		{ID: "stripe", Kind: "fiat", Flow: "provider-session"},
 	}
 
-	assert.Equal(t, methods[:4], policy.FilterPaymentMethods(methods))
+	assert.Equal(t, methods[:3], policy.FilterPaymentMethods(methods))
+}
+
+func TestManifestRejectsZcashPolicyWithoutEnabledChain(t *testing.T) {
+	manifest, err := CommunityManifest()
+	require.NoError(t, err)
+	manifest.Zcash = ZcashManifest{
+		TransparentOnly:   true,
+		DefaultDerivation: "transparent",
+	}
+
+	require.ErrorContains(t, manifest.Validate(), "zcash policy requires ZEC")
 }
 
 func TestResolvePolicyRejectsUnknownExplicitEdition(t *testing.T) {

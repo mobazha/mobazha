@@ -10,12 +10,8 @@
     "webhooks"
   ],
   "payment": {
-    "chains": ["BTC", "BCH", "LTC", "ZEC"],
+    "chains": ["BTC", "BCH", "LTC"],
     "rails": ["utxo_transparent"]
   },
-  "deploymentTargets": ["standalone"],
-  "zcash": {
-    "transparentOnly": true,
-    "defaultDerivation": "transparent"
-  }
+  "deploymentTargets": ["standalone"]
 }

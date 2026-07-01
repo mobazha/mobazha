@@ -56,8 +56,8 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	//   1. UTXO monitor → guestPaymentMonitor (so WatchAddress works).
 	//   2. ChainOperations (monitor) → autoSweepService (confirmation polling).
 	//   3. Wire UTXOSweepBroadcaster for sweepable chains.
-	//   4. EnableUTXOChain for every UTXO chain whose wallet is loaded and
-	//      whose sweeper is supported (P2WPKH today).
+	//   4. EnableUTXOChain for every UTXO chain whose loaded wallet implements
+	//      the chain-specific UTXOSweeper contract.
 	if n.guestPaymentMonitor != nil {
 		if mon, ok := n.monitorService.(*utxo.Monitor); ok {
 			n.guestPaymentMonitor.SetUTXOMonitor(mon)
@@ -75,7 +75,14 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	}
 	if n.guestOrderService != nil && n.multiwallet != nil {
 		for _, chain := range n.multiwallet.SupportedChains() {
-			if !chain.IsUTXOChain() || !isSweepableP2WPKHChain(chain) {
+			if !chain.IsUTXOChain() {
+				continue
+			}
+			wallet, loaded := n.multiwallet.WalletForChain(chain)
+			if !loaded {
+				continue
+			}
+			if _, sweepable := wallet.(iwallet.UTXOSweeper); !sweepable {
 				continue
 			}
 			n.guestOrderService.EnableUTXOChain(chain)

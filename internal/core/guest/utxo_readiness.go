@@ -47,16 +47,18 @@ func (s *GuestOrderAppService) evaluateUTXOClosureReadiness(coinType iwallet.Coi
 	if err := s.validateCoinAvailability(coinType, coinInfo); err != nil {
 		return err
 	}
-	if !isSweepableUTXOChain(coinInfo.Chain) {
-		return fmt.Errorf("%w: auto-sweep is not supported for chain %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
-	}
 	if s.sweepService == nil {
 		return fmt.Errorf("%w: UTXO sweep service is not configured", contracts.ErrCoinUnavailable)
 	}
-	if s.multiwallet != nil {
-		if _, loaded := s.multiwallet.WalletForChain(coinInfo.Chain); !loaded {
-			return fmt.Errorf("%w: wallet for %s is not loaded", contracts.ErrCoinUnavailable, coinInfo.Chain)
-		}
+	if s.multiwallet == nil {
+		return fmt.Errorf("%w: multiwallet is not configured", contracts.ErrCoinUnavailable)
+	}
+	wallet, loaded := s.multiwallet.WalletForChain(coinInfo.Chain)
+	if !loaded {
+		return fmt.Errorf("%w: wallet for %s is not loaded", contracts.ErrCoinUnavailable, coinInfo.Chain)
+	}
+	if _, sweepable := wallet.(iwallet.UTXOSweeper); !sweepable {
+		return fmt.Errorf("%w: auto-sweep is not supported for chain %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
 	}
 	if s.utxoMonitor == nil {
 		return fmt.Errorf("%w: UTXO monitor is not configured", contracts.ErrCoinUnavailable)

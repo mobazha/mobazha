@@ -27,12 +27,6 @@ type GuestPaymentCapability struct {
 // guestEVMSettlementEnabled enables buyer-visible EVM when evaluateEVMClosureReadiness passes.
 const guestEVMSettlementEnabled = true
 
-// isSweepableUTXOChain reports whether guest auto-sweep can sign for the chain's
-// default address type (P2WPKH / BIP-143). Mirrors internal/core.isSweepableP2WPKHChain.
-func isSweepableUTXOChain(chain iwallet.ChainType) bool {
-	return chain.GetDefaultDerivationType() == iwallet.DerivationNativeSegwit
-}
-
 func (s *GuestOrderAppService) evaluateGuestPaymentCapability(coinType iwallet.CoinType, coinInfo iwallet.CoinInfo) GuestPaymentCapability {
 	cap := GuestPaymentCapability{
 		Coin:  string(coinType),

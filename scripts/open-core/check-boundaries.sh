@@ -40,6 +40,14 @@ if [[ -n "$commercial_option_refs" ]]; then
   failures=1
 fi
 
+managed_escrow_core_orchestration_refs="$(rg -n 'AutoConfirmManagedEscrowCancelable|ManagedEscrow-backed EVM CANCELABLE|managed settlement-action' \
+  internal/core --glob '*.go' || true)"
+if [[ -n "$managed_escrow_core_orchestration_refs" ]]; then
+  echo "ERROR: ManagedEscrow-specific orchestration leaked into Open Core:" >&2
+  echo "$managed_escrow_core_orchestration_refs" >&2
+  failures=1
+fi
+
 # Official managed-Solana protocol, RPC, wallet, monitor, and relay code is a
 # private distribution concern. Open Core retains only neutral contracts,
 # order projections, restricted signing authority, and wire compatibility.

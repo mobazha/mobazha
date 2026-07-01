@@ -185,7 +185,7 @@ func (c distributionManagedEscrowAutoConfirmer) AutoConfirmManagedEscrow(
 	if c.settlement == nil {
 		return fmt.Errorf("managed escrow auto confirmer: settlement service unavailable")
 	}
-	return c.settlement.AutoConfirmManagedEscrowCancelable(ctx, event, chain)
+	return c.settlement.AutoConfirmManagedEscrow(ctx, event, chain)
 }
 
 var _ distribution.ManagedEscrowAutoConfirmer = distributionManagedEscrowAutoConfirmer{}

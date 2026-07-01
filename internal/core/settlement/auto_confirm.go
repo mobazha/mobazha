@@ -167,12 +167,14 @@ func settlementActionTxHash(ctx context.Context, strategy payment.ChainEscrowV2,
 	return status.TxHash
 }
 
-func (s *SettlementService) AutoConfirmManagedEscrowCancelable(ctx context.Context, event *events.CancelablePaymentReady, chain iwallet.ChainType) error {
-	logger.LogInfoWithIDf(log, s.nodeID, "Handling ManagedEscrow CANCELABLE payment ready event for order %s (chain=%s)", event.OrderID, chain)
+// AutoConfirmManagedEscrow applies the chain-neutral order transition after a
+// managed escrow module reports that a CANCELABLE payment is ready.
+func (s *SettlementService) AutoConfirmManagedEscrow(ctx context.Context, event *events.CancelablePaymentReady, chain iwallet.ChainType) error {
+	logger.LogInfoWithIDf(log, s.nodeID, "Handling managed escrow CANCELABLE payment for order %s (chain=%s)", event.OrderID, chain)
 
 	order, err := s.fetchVendorOrderByTenant(event.OrderID, event.TenantID)
 	if err != nil {
-		return fmt.Errorf("failed to get order %s for ManagedEscrow CANCELABLE auto-confirm: %w", event.OrderID, err)
+		return fmt.Errorf("failed to get order %s for managed escrow auto-confirm: %w", event.OrderID, err)
 	}
 
 	unlock := s.TryLockAutoConfirm(order.TenantID + ":" + order.ID.String())
@@ -200,16 +202,16 @@ func (s *SettlementService) AutoConfirmManagedEscrowCancelable(ctx context.Conte
 		return fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
-	logger.LogInfoWithIDf(log, s.nodeID, "Auto-confirming ManagedEscrow-backed EVM CANCELABLE payment for order %s via settlement action", order.ID)
+	logger.LogInfoWithIDf(log, s.nodeID, "Auto-confirming managed escrow CANCELABLE payment for order %s via settlement action", order.ID)
 
 	result, _, err := s.executeSettlementActionForOrder(ctx, "confirm", order, payoutAddress.String())
 	if err != nil {
-		return fmt.Errorf("managed settlement-action confirm for order %s: %w", order.ID, err)
+		return fmt.Errorf("managed escrow settlement-action confirm for order %s: %w", order.ID, err)
 	}
 
 	txHash := settlementActionTxHash(ctx, strategy, result)
 	if txHash == "" {
-		return fmt.Errorf("managed settlement-action confirm for order %s completed without tx hash", order.ID)
+		return fmt.Errorf("managed escrow settlement-action confirm for order %s completed without tx hash", order.ID)
 	}
 
 	s.eventBus.Emit(&events.OrderAutoConfirmRequest{
@@ -219,7 +221,7 @@ func (s *SettlementService) AutoConfirmManagedEscrowCancelable(ctx context.Conte
 		PayoutAddress: payoutAddress.String(),
 	})
 
-	logger.LogInfoWithIDf(log, s.nodeID, "Emitted OrderAutoConfirmRequest for ManagedEscrow EVM CANCELABLE order %s", order.ID)
+	logger.LogInfoWithIDf(log, s.nodeID, "Emitted OrderAutoConfirmRequest for managed escrow order %s", order.ID)
 	return nil
 }
 

@@ -63,7 +63,7 @@ jobs:
         run: go build -tags goolm -o /dev/null .
         working-directory: node
 
-  private_distribution-core-contract:
+  sovereign-profile-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,9 +79,11 @@ jobs:
         run: |
           printf 'go %s\n\nuse (\n\t./node\n)\n' "${{ env.GO_VERSION }}" > go.work
 
-      - name: Compile public PrivateDistribution composition contract
+      - name: Compile public sovereign composition contract
         working-directory: node
-        run: CGO_ENABLED=0 go build -tags "private_distribution purego_sqlite" ./pkg/core
+        run: |
+          CGO_ENABLED=0 go build -tags "purego_sqlite" ./pkg/core
+          go test -tags goolm ./internal/api -run Sovereign -count=1
 
   # Mirrors release-native build tags on main to catch embed_frontend drift before tagging.
   release-build-check:

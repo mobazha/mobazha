@@ -6,6 +6,21 @@ cd "$repo_root"
 
 failures=0
 
+legacy_private_distribution_build_tags="$(rg -n '^//go:build .*\bprivate_distribution\b' --glob '*.go' . || true)"
+if [[ -n "$legacy_private_distribution_build_tags" ]]; then
+  echo "ERROR: the private PrivateDistribution product must not fork Open Core through Go build tags:" >&2
+  echo "$legacy_private_distribution_build_tags" >&2
+  failures=1
+fi
+
+legacy_private_distribution_shells="$(rg --files internal pkg 2>/dev/null \
+  | rg '(^|/)(node|builder|shared_manager|composition_contracts|huma_api|stubs)_private_distribution(_test)?\\.go$' || true)"
+if [[ -n "$legacy_private_distribution_shells" ]]; then
+  echo "ERROR: legacy parallel PrivateDistribution runtime shells remain in Open Core:" >&2
+  echo "$legacy_private_distribution_shells" >&2
+  failures=1
+fi
+
 business_edition_refs="$({
   rg -n 'CommunityName|MOBAZHA_EDITION' internal pkg --glob '*.go' \
     --glob '!**/*_test.go' \

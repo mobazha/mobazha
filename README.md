@@ -29,6 +29,10 @@ The canonical machine-readable policy is [`config/editions/community.json`](conf
 
 Payment extensions use a versioned, provider-neutral boundary. See [`docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md`](docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md) and [`docs/adr/015-payment-plugin-boundary.md`](docs/adr/015-payment-plugin-boundary.md).
 
+First-party commercial products compose the same Node runtime through an
+explicit distribution profile; they do not replace Core files with product
+build tags. See [`docs/adr/016-in-process-distribution-composition.md`](docs/adr/016-in-process-distribution-composition.md).
+
 ## Requirements
 
 - Go 1.25.5 or newer

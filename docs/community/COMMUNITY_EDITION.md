@@ -1,72 +1,15 @@
-# Mobazha Self-Hosted / Community Distribution
+# Mobazha Community Edition
 
-Status: Foundation implemented; external plugin runtime planned
+Mobazha Community Edition is the public, self-hostable marketplace node. The initial release enables Bitcoin, Bitcoin Cash, and Litecoin payments.
 
-This repository is the public Mobazha Open Core and the source of the self-hosted marketplace node and unified storefront. It is the shared upstream for public domain logic, application services, APIs, capability policy, and extension contracts; it is not a reduced commercial fork.
+The machine-readable allowlist is `config/editions/community.json`. Runtime availability is the intersection of the edition allowlist and seller configuration. A frontend may narrow the set but must never widen it.
 
-`community` is the distribution-profile identifier used by the first public self-hosted release. It defines the bundled capability allowlist and publication boundary. It should not be used as a domain type, API namespace, or substitute for capability checks.
+Identifiers and adapters for additional chains may remain in the source for data migration and protocol compatibility. Their presence does not enable those chains in Community Edition and does not constitute a compatibility commitment.
 
-Hosted and commercial Mobazha products have separate compositions, artifacts, release versions, and platform tests. They may add private adapters and services, but shared public behavior remains governed by the Open Core contracts. The Hosting control plane does not run the Community distribution as its production backend.
+Mobazha-authored Community Edition source, including retained Mobazha history, is licensed under MPL-2.0. Portions derived from OpenBazaar remain available under the OpenBazaar MIT terms; see `NOTICE` and `LICENSES/MIT-OpenBazaar.txt`. The future payment-plugin protocol, SDK, schemas, and examples are intended to use Apache-2.0. Third-party notices must be complete before the first public release.
 
-## Included payment capabilities
+Zcash is outside the initial release while its production monitoring and seller-settlement journey is completed. Bundled fiat providers are not enabled in the initial Community Edition runtime.
 
-- Bitcoin (BTC)
-- Bitcoin Cash (BCH)
-- Litecoin (LTC)
+Additional payment capabilities are intended to evolve as independently versioned, out-of-process plugins. Core retains edition policy, order state, verification, audit, and key custody; plugins do not receive raw seed or private-key material. See `docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md` and ADR-015.
 
-The machine-readable allowlist is `config/editions/community.json`. In addition to the three payment chains, it explicitly permits the public AI/BYOK, analytics, fulfillment-extension, and webhook contracts. It does not declare `payment.fiat` or `platform.integration`: Fiat services and routes remain disabled, and the node neither defaults to nor proxies the Hosting control plane. Runtime availability is the intersection of distribution capabilities and capabilities actually composed and configured in the node. Once external plugins are activated, their negotiated capabilities and health add another narrowing gate. Frontends may narrow this set but never widen it.
-
-AI HTTP composition follows the same rule. The Community policy registers the
-shared settings, generation, and Agent workspace contracts and permits
-operator-provided BYOK endpoints, but it does not permit a Hosting-provided
-platform fallback. Commercial and privacy-focused distributions select their
-own `AIHTTPPolicy` explicitly; the latter may further restrict endpoints to
-trusted local services and omit the Agent workspace without forking handlers.
-
-## Not included in the first release
-
-- Payment capabilities outside the three-chain allowlist above
-- Bundled fiat payment providers
-
-Unsupported identifiers may remain recognizable for wire/data compatibility, but they are not enabled payment capabilities and cannot create new self-hosted distribution payments.
-
-Legacy adapters present at the approved source-history anchor may remain for migration and protocol compatibility. Their presence in source does not enable them in the public distribution or constitute a compatibility commitment.
-
-## License targets
-
-- Community node and unified frontend: MPL-2.0
-- Payment plugin protocol, SDK, schemas, and examples: Apache-2.0
-- Individual plugins: declared per plugin
-- Mobazha name and logos: governed separately from source-code licenses
-
-The root license and third-party notices remain the authoritative legal files. Historical upstream portions retain their original notices as documented in `NOTICE`.
-
-## Public repository history
-
-The public repository may retain existing commits that pass source-boundary, secret, license, and reachable-object audits. If existing ancestry cannot be published safely, the public history may be rebuilt from an approved sanitized time anchor while preserving truthful source authorship and author/committer dates. Rewritten commits have new object IDs and auditable private provenance mappings.
-
-Retaining history never expands the public distribution capability allowlist. Only approved branches, tags, commits, trees, blobs, and other reachable Git objects may be published.
-
-## Plugin direction
-
-The public core owns order state, capability policy, verification, audit, and key custody. Payment plugins provide chain metadata, address validation, payment setup/observation, unsigned transaction construction, fee estimation, and settlement operations through a versioned protocol.
-
-Plugins never receive raw seed/private-key material or import Mobazha internal packages. See `docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md` and ADR-015.
-
-The current foundation implements the edition manifest, a fail-closed runtime and payment-ingress allowlist, and the public plugin manifest/health registry. The first release may bundle BTC/BCH/LTC implementations behind compatibility adapters. ZEC remains recognizable for historical compatibility but is not enabled by Community v0.3. Process supervision and RPC remain later SDK milestones.
-
-## Contribution boundary
-
-Adding a chain to the public self-hosted distribution requires an ADR, capability-manifest change, security review, compatibility tests, frontend support, and an explicit license decision. Implementing a plugin alone does not make that chain part of the default distribution.
-
-Public API, event, state-machine, capability, and versioning commitments are defined in [Compatibility](COMPATIBILITY.md). Shared code should test the capability it needs rather than compare the active distribution name.
-
-## Fees and paid services
-
-Running Mobazha Self-Hosted independently does not, by itself, create a mandatory central Mobazha transaction fee. Operators and users may still pay infrastructure, network, payment-provider, plugin, tax, or optional service costs. Any Mobazha-operated hosting, managed transaction, distribution, or other paid service must be optional and disclosed before use.
-
-See [Community Fees and Paid Services](FEES_AND_PAID_SERVICES.md) for the durable public boundary. Current Mobazha-operated service status and prices belong on [mobazha.org/fees](https://mobazha.org/fees), not in the edition capability manifest.
-
-## Documentation language
-
-English is the default and canonical language for documentation in this repository. Chinese is used only for a deliberately maintained Chinese edition, which should be clearly identified and linked to its corresponding English source unless the document explicitly declares a different canonical language.
+English is the default language for repository documentation unless a document is explicitly maintained as a Chinese edition.

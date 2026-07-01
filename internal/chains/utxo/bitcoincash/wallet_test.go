@@ -778,3 +778,155 @@ func TestBitcoinCashWallet_AddressToScriptPubKey_Invalid(t *testing.T) {
 		t.Errorf("expected error for invalid address")
 	}
 }
+
+func TestBitcoinCashWallet_BuildSweepTx(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyBytes, err := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	if err != nil {
+		t.Fatal(err)
+	}
+	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
+	_, sourceScript, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const inputAmount int64 = 1_000_000
+	inputs := []iwallet.SweepInput{{
+		TxHash:      "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d",
+		OutputIndex: 0,
+		Value:       inputAmount,
+	}}
+
+	rawTx, txHash, err := w.BuildSweepTx(inputs, *privKey, testBCHTestnetAddr, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rawTx) == 0 {
+		t.Fatal("expected non-empty raw transaction")
+	}
+
+	var msgTx wire.MsgTx
+	if err := msgTx.BchDecode(bytes.NewReader(rawTx), wire.ProtocolVersion, wire.BaseEncoding); err != nil {
+		t.Fatal(err)
+	}
+	if got := msgTx.TxHash().String(); txHash != got {
+		t.Fatalf("transaction hash mismatch: got %s, want %s", txHash, got)
+	}
+	if len(msgTx.TxIn) != 1 {
+		t.Fatalf("expected 1 input, got %d", len(msgTx.TxIn))
+	}
+	if len(msgTx.TxOut) != 1 {
+		t.Fatalf("expected 1 output, got %d", len(msgTx.TxOut))
+	}
+
+	const expectedFee int64 = (10 + 148 + 34) * 2
+	if got := msgTx.TxOut[0].Value; got != inputAmount-expectedFee {
+		t.Fatalf("unexpected output value: got %d, want %d", got, inputAmount-expectedFee)
+	}
+
+	vm, err := txscript.NewEngine(sourceScript, &msgTx, 0, txscript.StandardVerifyFlags, nil, nil, nil, inputAmount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.Execute(); err != nil {
+		t.Fatalf("BCH ForkID signature verification failed: %v", err)
+	}
+}
+
+func TestBitcoinCashWallet_BuildSweepTx_MultiInput(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyBytes, err := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	if err != nil {
+		t.Fatal(err)
+	}
+	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
+	_, sourceScript, err := w.DerivePaymentAddressFromPubKey(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	inputs := []iwallet.SweepInput{
+		{TxHash: "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d", OutputIndex: 0, Value: 500_000},
+		{TxHash: "adb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d", OutputIndex: 1, Value: 300_000},
+	}
+
+	rawTx, _, err := w.BuildSweepTx(inputs, *privKey, testBCHTestnetAddr, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var msgTx wire.MsgTx
+	if err := msgTx.BchDecode(bytes.NewReader(rawTx), wire.ProtocolVersion, wire.BaseEncoding); err != nil {
+		t.Fatal(err)
+	}
+	if len(msgTx.TxIn) != len(inputs) {
+		t.Fatalf("expected %d inputs, got %d", len(inputs), len(msgTx.TxIn))
+	}
+	if len(msgTx.TxOut) != 1 {
+		t.Fatalf("expected 1 output, got %d", len(msgTx.TxOut))
+	}
+
+	const totalInput int64 = 800_000
+	const expectedFee int64 = (10 + 2*148 + 34) * 2
+	if got := msgTx.TxOut[0].Value; got != totalInput-expectedFee {
+		t.Fatalf("unexpected output value: got %d, want %d", got, totalInput-expectedFee)
+	}
+
+	for i, input := range inputs {
+		vm, err := txscript.NewEngine(sourceScript, &msgTx, i, txscript.StandardVerifyFlags, nil, nil, nil, input.Value)
+		if err != nil {
+			t.Fatalf("create script engine for input %d: %v", i, err)
+		}
+		if err := vm.Execute(); err != nil {
+			t.Fatalf("verify BCH ForkID signature for input %d: %v", i, err)
+		}
+	}
+}
+
+func TestBitcoinCashWallet_BuildSweepTx_RejectsInvalidInputs(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyBytes, err := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	if err != nil {
+		t.Fatal(err)
+	}
+	privKey, _ := btcec.PrivKeyFromBytes(keyBytes)
+	validInput := iwallet.SweepInput{
+		TxHash:      "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d",
+		OutputIndex: 0,
+		Value:       1_000_000,
+	}
+
+	tests := []struct {
+		name        string
+		inputs      []iwallet.SweepInput
+		destination string
+		feePerByte  int64
+	}{
+		{name: "no inputs", inputs: nil, destination: testBCHTestnetAddr, feePerByte: 2},
+		{name: "invalid transaction id", inputs: []iwallet.SweepInput{{TxHash: "invalid", Value: 1_000_000}}, destination: testBCHTestnetAddr, feePerByte: 2},
+		{name: "zero input value", inputs: []iwallet.SweepInput{{TxHash: validInput.TxHash}}, destination: testBCHTestnetAddr, feePerByte: 2},
+		{name: "fee exceeds input", inputs: []iwallet.SweepInput{{TxHash: validInput.TxHash, Value: 100}}, destination: testBCHTestnetAddr, feePerByte: 2},
+		{name: "invalid destination", inputs: []iwallet.SweepInput{validInput}, destination: testInvalidAddress, feePerByte: 2},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, _, err := w.BuildSweepTx(test.inputs, *privKey, test.destination, test.feePerByte); err == nil {
+				t.Fatal("expected an error")
+			}
+		})
+	}
+}

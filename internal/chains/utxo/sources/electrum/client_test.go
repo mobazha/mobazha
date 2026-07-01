@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -134,6 +135,10 @@ func TestClientConnect(t *testing.T) {
 
 	// Collect results
 	for result := range results {
+		if os.Getenv("MOBAZHA_REQUIRE_EXTERNAL_UTXO") != "" && !strings.HasSuffix(result, ": OK") {
+			t.Error(result)
+			continue
+		}
 		t.Log(result)
 	}
 }
@@ -502,6 +507,12 @@ func TestGetServers(t *testing.T) {
 		t.Error("Expected LTC mainnet servers")
 	}
 	t.Logf("LTC mainnet: %d servers", len(ltcMainnet))
+
+	bchMainnet := GetDefaultServers("BCH", false)
+	if len(bchMainnet) == 0 {
+		t.Error("Expected BCH mainnet servers")
+	}
+	t.Logf("BCH mainnet: %d servers", len(bchMainnet))
 
 	// Test testnet
 	btcTestnet := GetDefaultServers("BTC", true)

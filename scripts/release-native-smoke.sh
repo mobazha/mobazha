@@ -87,7 +87,7 @@ with open(sys.argv[1], encoding="utf-8") as handle:
     payload = json.load(handle)["data"]
 if payload.get("edition") != "community":
     raise SystemExit(f"FAIL: native artifact default edition is {payload.get('edition')!r}, want 'community'")
-allowed = {"BTC", "BCH", "LTC", "ZEC"}
+allowed = {"BTC", "BCH", "LTC"}
 methods = payload.get("capabilities", {}).get("payments", {}).get("methods", [])
 unexpected = [method for method in methods if method.get("id") not in allowed or method.get("kind") != "crypto"]
 if unexpected:

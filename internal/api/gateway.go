@@ -659,11 +659,10 @@ type walletOperatorProvider interface {
 	Multiwallet() contracts.WalletOperator
 }
 
-func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy edition.Policy) func(context.Context) frontend.RuntimeCapabilities {
-	return func(context.Context) frontend.RuntimeCapabilities {
-		result := frontend.RuntimeCapabilities{
-			Payments: frontend.PaymentCapabilities{Methods: []frontend.PaymentCapability{}},
-		}
+func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy edition.Policy) func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+	return func(_ context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+		result := baseline
+		result.Payments = frontend.PaymentCapabilities{Methods: []frontend.PaymentCapability{}}
 		if nm == nil {
 			return result
 		}

@@ -120,6 +120,7 @@ func TestSPAHandler_RuntimeConfig_StandaloneAuthMode(t *testing.T) {
 		"allowExternalResources": true,
 	}, payload["deployment"])
 	assert.Equal(t, map[string]any{"kind": "store"}, payload["experience"])
+	assert.Equal(t, true, payload["capabilitiesReady"])
 	assert.Equal(t, map[string]any{}, payload["features"], "nil callback → empty features map, not null")
 	assert.Equal(t, map[string]any{
 		"commerce": map[string]any{
@@ -130,6 +131,7 @@ func TestSPAHandler_RuntimeConfig_StandaloneAuthMode(t *testing.T) {
 		"marketplace": map[string]any{
 			"discovery":         false,
 			"operator":          false,
+			"selling":           false,
 			"curation":          false,
 			"sellerReview":      false,
 			"customDomains":     false,
@@ -168,6 +170,7 @@ func TestSPAHandler_RuntimeConfig_HostedProductComposition(t *testing.T) {
 	marketplace := payload["capabilities"].(map[string]any)["marketplace"].(map[string]any)
 	assert.Equal(t, true, marketplace["discovery"])
 	assert.Equal(t, true, marketplace["operator"])
+	assert.Equal(t, true, marketplace["selling"])
 	assert.Equal(t, true, marketplace["releasePublishing"])
 }
 
@@ -185,15 +188,20 @@ func TestSPAHandler_RuntimeConfig_DedicatedMarketplaceExperience(t *testing.T) {
 }
 
 func TestSPAHandler_RuntimeConfig_CapabilitiesSnapshotInjection(t *testing.T) {
-	capabilitiesFn := func(context.Context) RuntimeCapabilities {
-		return RuntimeCapabilities{Payments: PaymentCapabilities{Methods: []PaymentCapability{
+	capabilitiesFn := func(_ context.Context, baseline RuntimeCapabilities) RuntimeCapabilities {
+		baseline.Marketplace.Curation = false
+		baseline.Payments = PaymentCapabilities{Methods: []PaymentCapability{
 			{ID: "BTC", Kind: "crypto", Flow: "address-transfer"},
 			{ID: "ZEC", Kind: "crypto", Flow: "address-transfer", AddressMode: "transparent"},
 			{ID: "stripe", Kind: "fiat", Flow: "provider-session"},
-		}}}
+		}}
+		return baseline
 	}
 
-	h := NewRuntimeConfigHandler(ServerConfig{CapabilitiesSnapshotFn: capabilitiesFn})
+	h := NewRuntimeConfigHandler(ServerConfig{
+		Deployment:             RuntimeDeployment{Mode: RuntimeDeploymentHosted},
+		CapabilitiesSnapshotFn: capabilitiesFn,
+	})
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 
@@ -205,6 +213,9 @@ func TestSPAHandler_RuntimeConfig_CapabilitiesSnapshotInjection(t *testing.T) {
 	require.NoError(t, err)
 	payload := parseRuntimeConfig(t, body)
 	capabilities := payload["capabilities"].(map[string]any)
+	marketplace := capabilities["marketplace"].(map[string]any)
+	assert.Equal(t, true, marketplace["operator"])
+	assert.Equal(t, false, marketplace["curation"])
 	payments := capabilities["payments"].(map[string]any)
 	methods := payments["methods"].([]any)
 	require.Len(t, methods, 3)

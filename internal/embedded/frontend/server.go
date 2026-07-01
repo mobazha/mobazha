@@ -81,6 +81,7 @@ type CommerceCapabilities struct {
 type MarketplaceCapabilities struct {
 	Discovery         bool `json:"discovery"`
 	Operator          bool `json:"operator"`
+	Selling           bool `json:"selling"`
 	Curation          bool `json:"curation"`
 	SellerReview      bool `json:"sellerReview"`
 	CustomDomains     bool `json:"customDomains"`
@@ -163,9 +164,10 @@ type ServerConfig struct {
 	// yields an empty features map (fail-closed).
 	FeaturesSnapshotFn func(context.Context) []FeatureSnapshot
 
-	// CapabilitiesSnapshotFn returns the product capabilities implemented by
-	// the running node. A nil callback yields an empty fail-closed snapshot.
-	CapabilitiesSnapshotFn func(context.Context) RuntimeCapabilities
+	// CapabilitiesSnapshotFn composes the deployment baseline with capabilities
+	// implemented or entitled by the running node. The baseline argument must be
+	// returned with any desired narrowing or additions applied.
+	CapabilitiesSnapshotFn func(context.Context, RuntimeCapabilities) RuntimeCapabilities
 
 	// NeedsSetupShellFn, when set for an PrivateDistribution deployment, serves setup.html instead
 	// of the full SPA for /admin/* while initial setup is incomplete.
@@ -216,7 +218,7 @@ type spaHandler struct {
 	experience             RuntimeExperience
 	brand                  *BrandSnapshot
 	featuresSnapshotFn     func(context.Context) []FeatureSnapshot
-	capabilitiesSnapshotFn func(context.Context) RuntimeCapabilities
+	capabilitiesSnapshotFn func(context.Context, RuntimeCapabilities) RuntimeCapabilities
 	needsSetupShellFn      func() bool
 }
 
@@ -393,15 +395,16 @@ type RuntimeFeatureEntry struct {
 // RuntimeConfigPayload captures the versioned fields embedded into
 // window.__RUNTIME_CONFIG__ on every page load.
 type RuntimeConfigPayload struct {
-	SchemaVersion int                            `json:"schemaVersion"`
-	Edition       string                         `json:"edition,omitempty"`
-	SaasURL       string                         `json:"saasUrl,omitempty"`
-	AuthMode      string                         `json:"authMode"`
-	Deployment    RuntimeDeployment              `json:"deployment"`
-	Experience    RuntimeExperience              `json:"experience"`
-	Features      map[string]RuntimeFeatureEntry `json:"features"`
-	Capabilities  RuntimeCapabilities            `json:"capabilities"`
-	Brand         *BrandSnapshot                 `json:"brand,omitempty"`
+	SchemaVersion     int                            `json:"schemaVersion"`
+	Edition           string                         `json:"edition,omitempty"`
+	SaasURL           string                         `json:"saasUrl,omitempty"`
+	AuthMode          string                         `json:"authMode"`
+	Deployment        RuntimeDeployment              `json:"deployment"`
+	Experience        RuntimeExperience              `json:"experience"`
+	CapabilitiesReady bool                           `json:"capabilitiesReady"`
+	Features          map[string]RuntimeFeatureEntry `json:"features"`
+	Capabilities      RuntimeCapabilities            `json:"capabilities"`
+	Brand             *BrandSnapshot                 `json:"brand,omitempty"`
 }
 
 func normalizeRuntimeDeployment(deployment RuntimeDeployment) RuntimeDeployment {
@@ -446,6 +449,7 @@ func baseRuntimeCapabilities(deployment RuntimeDeployment) RuntimeCapabilities {
 		capabilities.Marketplace = MarketplaceCapabilities{
 			Discovery:         true,
 			Operator:          true,
+			Selling:           true,
 			Curation:          true,
 			SellerReview:      true,
 			CustomDomains:     true,
@@ -485,8 +489,7 @@ func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeCon
 	experience := normalizeRuntimeExperience(cfg.Experience, deployment)
 	capabilities := baseRuntimeCapabilities(deployment)
 	if cfg.CapabilitiesSnapshotFn != nil {
-		snapshot := cfg.CapabilitiesSnapshotFn(ctx)
-		capabilities.Payments = snapshot.Payments
+		capabilities = cfg.CapabilitiesSnapshotFn(ctx, capabilities)
 	}
 	if capabilities.Payments.Methods == nil {
 		capabilities.Payments.Methods = []PaymentCapability{}
@@ -497,14 +500,15 @@ func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeCon
 	}
 
 	payload := RuntimeConfigPayload{
-		SchemaVersion: RuntimeConfigSchemaVersion,
-		Edition:       cfg.Edition,
-		AuthMode:      authMode,
-		Deployment:    deployment,
-		Experience:    experience,
-		Features:      features,
-		Capabilities:  capabilities,
-		Brand:         cfg.Brand,
+		SchemaVersion:     RuntimeConfigSchemaVersion,
+		Edition:           cfg.Edition,
+		AuthMode:          authMode,
+		Deployment:        deployment,
+		Experience:        experience,
+		CapabilitiesReady: true,
+		Features:          features,
+		Capabilities:      capabilities,
+		Brand:             cfg.Brand,
 	}
 
 	if deployment.Mode == RuntimeDeploymentPrivateDistribution {
@@ -542,7 +546,7 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) 
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Fprint(w, `window.__RUNTIME_CONFIG__={"schemaVersion":3,"authMode":"standalone","deployment":{"mode":"standalone","allowExternalResources":true},"experience":{"kind":"store"},"features":{},"capabilities":{"commerce":{"storefront":true,"storeAdmin":true,"checkout":true},"marketplace":{"discovery":false,"operator":false,"curation":false,"sellerReview":false,"customDomains":false,"releasePublishing":false,"attribution":false},"private_distribution":{"isolatedRuntime":false,"managedFleet":false},"payments":{"methods":[]}}};`)
+		fmt.Fprint(w, `window.__RUNTIME_CONFIG__={"schemaVersion":3,"authMode":"standalone","deployment":{"mode":"standalone","allowExternalResources":true},"experience":{"kind":"store"},"capabilitiesReady":true,"features":{},"capabilities":{"commerce":{"storefront":true,"storeAdmin":true,"checkout":true},"marketplace":{"discovery":false,"operator":false,"selling":false,"curation":false,"sellerReview":false,"customDomains":false,"releasePublishing":false,"attribution":false},"private_distribution":{"isolatedRuntime":false,"managedFleet":false},"payments":{"methods":[]}}};`)
 		return
 	}
 

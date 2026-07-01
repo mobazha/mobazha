@@ -109,15 +109,14 @@ var FeatureGroupMarketplaceEnabled = registerFeature(Feature{
 // Collectibles
 // ---------------------------------------------------------------------------
 
-// FeatureCollectiblesHubEnabled — 第一方收藏卡 Hub+NFT 最小闭环。
+// FeatureCollectiblesHubEnabled controls the optional Collectibles Hub surface.
 //
-// Scope：仅 PlatformGlobal — collectibles 是 SaaS 第一方自营垂直，Standalone/
-// Sovereign 不应自行启用该域。生产开放前还需完成 Gate 3c 法务/Hub/Solana
-// escrow 检查；当前默认关闭，用于 devnet/mock/API-only 推进。
+// Scope is PlatformGlobal because the capability requires a distribution
+// adapter. Standalone deployments cannot enable it through local overrides.
 var FeatureCollectiblesHubEnabled = registerFeature(Feature{
 	Key:           "collectiblesHubEnabled",
 	DisplayName:   "Collectibles Hub",
-	Description:   "Enables first-party collectibles Hub, Solana NFT mint/burn, and redemption endpoints on the hosting gateway.",
+	Description:   "Enables distribution-provided collectibles intake, NFT lifecycle, and redemption endpoints.",
 	Category:      "collectibles",
 	Stability:     StabilityExperimental,
 	DefaultValue:  false,

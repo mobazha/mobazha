@@ -1030,11 +1030,9 @@ func (n *MobazhaNode) initGuestOrderService() {
 }
 
 // detectGuestUTXOChains returns the UTXO chains that should be enabled for
-// guest checkout in the full build, based on which UTXO wallets the
-// multiwallet has loaded AND for which a sweeper exists today. BCH/ZEC are
-// excluded because the sweep path only signs P2WPKH (BIP-143) — see
-// node_lifecycle_sovereign.go for the matching gate. When a P2PKH-capable
-// sweeper is added, drop the isSweepableP2WPKHChain filter here.
+// guest checkout based on loaded wallet capabilities. Address derivation type
+// is not a proxy for sweep support: BCH uses CashAddr/P2PKH and provides its
+// own ForkID-aware UTXOSweeper implementation.
 func (n *MobazhaNode) detectGuestUTXOChains() []iwallet.ChainType {
 	if n.multiwallet == nil {
 		return nil
@@ -1044,7 +1042,11 @@ func (n *MobazhaNode) detectGuestUTXOChains() []iwallet.ChainType {
 		if !chain.IsUTXOChain() {
 			continue
 		}
-		if !isSweepableP2WPKHChain(chain) {
+		wallet, loaded := n.multiwallet.WalletForChain(chain)
+		if !loaded {
+			continue
+		}
+		if _, sweepable := wallet.(iwallet.UTXOSweeper); !sweepable {
 			continue
 		}
 		out = append(out, chain)

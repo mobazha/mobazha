@@ -96,18 +96,16 @@
 
 ### `collectiblesHubEnabled`
 
-- **Owner**: mobazha_hosting (Collectibles RWA P1)
+- **Owner**: Collectibles distribution
 - **Default**: false
 - **Stability**: experimental
 - **Lifecycle**: experimental (since collectibles-rwa-p1)
 - **Scopes**: PlatformGlobal
 - **Consumers**:
-  - mobazha_hosting/api/huma_api.go — Huma collectibles operation group
-  - mobazha_hosting/api/huma_collectibles_handlers.go — Hub intake, mint, NFT, burn, redemption endpoints
-  - mobazha_hosting/internal/collectibles/ — Hub/NFT/redemption service
-  - mobazha-unified/apps/web/src/app/collectibles/ — future first-party collectibles UI
-- **Kill Path**: 设 false → collectibles Huma operations return feature-disabled response; production entry stays hidden
-- **Dependencies**: Solana NFT mint/burn service, Hub operating process, Gate 3c production checklist
+  - distribution-provided Collectibles API operations
+  - compatible clients that declare the runtime capability
+- **Kill Path**: false disables Collectibles operations and keeps client entry points hidden
+- **Dependencies**: a distribution-provided lifecycle adapter
 
 ---
 

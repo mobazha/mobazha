@@ -47,9 +47,9 @@ type Config struct {
 	// directory instead of the embedded SPA.
 	FrontendOverrideDir string
 
-	// PrivateDistributionMode, when true, enables extreme privacy headers (CSP,
+	// SovereignMode, when true, enables extreme privacy headers (CSP,
 	// no-store, no-referrer) and a stripped-down runtime-config.js payload.
-	PrivateDistributionMode bool
+	SovereignMode bool
 
 	// Brand holds white-label overrides from brand.yaml. Passed to the
 	// embedded frontend handler for /runtime-config.js injection.
@@ -78,8 +78,8 @@ func New(cfg Config) *Server {
 		OverrideDir: cfg.FrontendOverrideDir,
 		Deployment: frontend.RuntimeDeployment{
 			Mode: func() string {
-				if cfg.PrivateDistributionMode {
-					return frontend.RuntimeDeploymentPrivateDistribution
+				if cfg.SovereignMode {
+					return frontend.RuntimeDeploymentSovereign
 				}
 				return frontend.RuntimeDeploymentStandalone
 			}(),

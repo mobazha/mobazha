@@ -56,14 +56,13 @@ type BrandFields struct {
 	HidePoweredBy bool `yaml:"hidePoweredBy,omitempty" json:"hidePoweredBy,omitempty"`
 
 	// Network controls UI visibility of network/node-pool features for
-	// white-label deployments (PrivateDistribution / Example / Example Market).
+	// restricted-egress and white-label deployments.
 	// All flags default to false (hide) so partners get the locked-down
 	// baseline by default; opt-in is explicit per partner.
 	//
 	// Protocol-layer decisions (i2pProxy/torProxy fallback) are NOT
 	// configured here — those live in the system layer. Brand only
-	// controls what the user sees and can edit. See
-	// PRIVATE_DISTRIBUTION_EXTERNAL_PAYMENTD_NETWORK_DESIGN.md §3.2 for rationale.
+	// controls what the user sees and can edit.
 	Network NetworkFields `yaml:"network,omitempty" json:"network,omitempty"`
 }
 
@@ -94,7 +93,7 @@ type NetworkFields struct {
 	// AllowDiscoverToggle exposes the on/off switch for Tier 3 P2P
 	// self-discovery (`get_peer_list` polling). Off by default —
 	// discovery runs silently per the build's compiled defaults. Only
-	// general-purpose PrivateDistributions (not white-label) typically expose this.
+	// general-purpose self-hosted distributions typically expose this.
 	AllowDiscoverToggle bool `yaml:"allowDiscoverToggle,omitempty" json:"allowDiscoverToggle,omitempty"`
 }
 

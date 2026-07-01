@@ -637,8 +637,8 @@ func (g *Gateway) runtimeFrontendConfig() frontend.ServerConfig {
 	deploymentMode := frontend.RuntimeDeploymentStandalone
 	if mode := detectDeploymentMode(); mode == "saas" {
 		deploymentMode = frontend.RuntimeDeploymentHosted
-	} else if mode == "private_distribution" {
-		deploymentMode = frontend.RuntimeDeploymentPrivateDistribution
+	} else if mode == "sovereign" {
+		deploymentMode = frontend.RuntimeDeploymentSovereign
 	}
 	return frontend.ServerConfig{
 		SaaSURL:                g.config.SaaSAPIURL,

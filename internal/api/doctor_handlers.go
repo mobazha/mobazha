@@ -15,7 +15,7 @@ func (g *Gateway) handleGETSystemDoctor(w http.ResponseWriter, r *http.Request) 
 	cfg := doctor.DefaultConfig()
 	cfg.DataDir = g.setupDataDir()
 
-	if detectDeploymentMode() == "private_distribution" {
+	if detectDeploymentMode() == "sovereign" {
 		cfg.SkipNetworkChecks = true
 	} else {
 		if portStr := os.Getenv("NODE_PORT"); portStr != "" {
@@ -45,7 +45,7 @@ func (g *Gateway) handleGETSystemDiagnostics(w http.ResponseWriter, r *http.Requ
 	cfg := doctor.DefaultConfig()
 	cfg.DataDir = dataDir
 
-	if detectDeploymentMode() == "private_distribution" {
+	if detectDeploymentMode() == "sovereign" {
 		cfg.SkipNetworkChecks = true
 	} else {
 		if portStr := os.Getenv("NODE_PORT"); portStr != "" {

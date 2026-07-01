@@ -15,7 +15,7 @@ import (
 )
 
 // featureTestDatabase is a tiny database.Database implementation used by
-// private_distribution-safe store tests that need direct access to an in-memory GORM DB.
+// sovereign-safe store tests that need direct access to an in-memory GORM DB.
 type featureTestDatabase struct {
 	gormDB *gorm.DB
 }

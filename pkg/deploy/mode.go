@@ -10,8 +10,8 @@ const (
 	Standalone Mode = iota
 	// SaaS indicates a multi-tenant hosting process managing many nodes.
 	SaaS
-	// PrivateDistribution indicates the private privacy-focused distribution.
-	PrivateDistribution
+	// Sovereign indicates a restricted-egress self-hosted composition.
+	Sovereign
 )
 
 var processMode atomic.Int32
@@ -27,5 +27,5 @@ func GetProcessMode() Mode { return Mode(processMode.Load()) }
 // IsSaaS is a convenience for GetProcessMode() == SaaS.
 func IsSaaS() bool { return GetProcessMode() == SaaS }
 
-// IsPrivateDistribution is a convenience for GetProcessMode() == PrivateDistribution.
-func IsPrivateDistribution() bool { return GetProcessMode() == PrivateDistribution }
+// IsSovereign is a convenience for GetProcessMode() == Sovereign.
+func IsSovereign() bool { return GetProcessMode() == Sovereign }

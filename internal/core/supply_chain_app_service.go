@@ -57,7 +57,7 @@ type SupplyChainListingOps interface {
 
 // SupplyChainMediaOps aliases MediaUploader for backward compatibility within
 // this file. MediaUploader is defined in media_app_service.go (no build tag)
-// so both full and private_distribution builds can reference it.
+// so both full and sovereign builds can reference it.
 type SupplyChainMediaOps = MediaUploader
 
 // SupplyChainAppService orchestrates supply chain operations:

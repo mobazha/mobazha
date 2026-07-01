@@ -20,7 +20,7 @@ func probeClient(client *http.Client) *http.Client {
 
 // NewLocalhostOnlyClient returns an *http.Client whose transport refuses to
 // dial any address that does not resolve to a loopback IP. This is a
-// defense-in-depth measure for PrivateDistribution mode: even if handler-level URL
+// defense-in-depth measure for Sovereign mode: even if handler-level URL
 // validation is bypassed (e.g. DNS rebinding), the network layer blocks
 // outbound connections to non-loopback hosts.
 func NewLocalhostOnlyClient() *http.Client {

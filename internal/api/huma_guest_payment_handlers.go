@@ -13,7 +13,7 @@ import (
 
 // Guest Checkout + PaymentMethods Huma registration functions.
 // Build-neutral — extracted from huma_order_handlers.go (OP-1.3 Step 4a)
-// so both the full-build order aggregation and the private_distribution aggregation
+// so both the full-build order aggregation and the sovereign aggregation
 // can call them.
 
 func (g *Gateway) registerGuestOrdersListAuth(api huma.API) {

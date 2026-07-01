@@ -17,7 +17,7 @@ import (
 // simply closes the connection (HTTP/1.1) or sends a GOAWAY (HTTP/2),
 // which surfaces as "Empty reply from server" for clients — with no
 // application-level log entry. TD-104 demonstrated that this makes
-// PrivateDistribution runtime failures nearly impossible to diagnose.
+// Sovereign runtime failures nearly impossible to diagnose.
 func panicRecoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)

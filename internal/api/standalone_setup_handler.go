@@ -208,10 +208,10 @@ func (g *Gateway) handlePOSTSetup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// needsSetupShell reports whether PrivateDistribution should serve the lightweight setup.html
+// needsSetupShell reports whether Sovereign should serve the lightweight setup.html
 // shell instead of the full SPA for /admin/* routes.
 func (g *Gateway) needsSetupShell() bool {
-	if detectDeploymentMode() != "private_distribution" {
+	if detectDeploymentMode() != "sovereign" {
 		return false
 	}
 	dataDir := g.setupDataDir()

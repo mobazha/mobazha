@@ -70,7 +70,7 @@ func ResolvePolicy(name string) (Policy, error) {
 			return nil, err
 		}
 		return NewPolicy(manifest)
-	case FullName, "commercial", "private_distribution":
+	case FullName, "commercial", "sovereign":
 		return unrestrictedPolicy(normalized), nil
 	default:
 		return nil, fmt.Errorf("unknown Mobazha edition %q", name)

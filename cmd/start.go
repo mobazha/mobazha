@@ -40,16 +40,6 @@ func (x *Start) Execute(args []string) error {
 		return err
 	}
 
-	// EXTERNAL_PAYMENTDaemonSeeds / EXTERNAL_PAYMENTSeedFile are owned by the private PrivateDistribution command
-	// (they feed the I2P-only ExternalPayment NodePool). Reject them in Open Core
-	// so misconfiguration is caught at startup rather than silently ignored.
-	if len(cfg.EXTERNAL_PAYMENTDaemonSeeds) > 0 {
-		return fmt.Errorf("--external_paymentdaemonseeds is only supported by the private PrivateDistribution distribution")
-	}
-	if cfg.EXTERNAL_PAYMENTSeedFile != "" {
-		return fmt.Errorf("--external_paymentseedfile is only supported by the private PrivateDistribution distribution")
-	}
-
 	if !repo.IsRepoInitialized(cfg.DataDir) {
 		log.Info("Data directory not initialized, running first-time setup...")
 		if err := autoInit(cfg); err != nil {

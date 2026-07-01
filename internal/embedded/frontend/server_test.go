@@ -138,7 +138,7 @@ func TestSPAHandler_RuntimeConfig_StandaloneAuthMode(t *testing.T) {
 			"releasePublishing": false,
 			"attribution":       false,
 		},
-		"private_distribution": map[string]any{
+		"sovereign": map[string]any{
 			"isolatedRuntime": false,
 			"managedFleet":    false,
 		},
@@ -280,7 +280,7 @@ func TestSPAHandler_RuntimeConfig_BrandNetworkSnapshot(t *testing.T) {
 		},
 	}
 	h := NewHandler(ServerConfig{
-		Deployment: RuntimeDeployment{Mode: RuntimeDeploymentPrivateDistribution},
+		Deployment: RuntimeDeployment{Mode: RuntimeDeploymentSovereign},
 		Brand:      brand,
 	})
 	srv := httptest.NewServer(h)
@@ -292,9 +292,9 @@ func TestSPAHandler_RuntimeConfig_BrandNetworkSnapshot(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	payload := parseRuntimeConfig(t, body)
-	assert.Equal(t, "private_distribution", payload["deployment"].(map[string]any)["mode"])
+	assert.Equal(t, "sovereign", payload["deployment"].(map[string]any)["mode"])
 	assert.Equal(t, false, payload["deployment"].(map[string]any)["allowExternalResources"])
-	assert.Equal(t, true, payload["capabilities"].(map[string]any)["private_distribution"].(map[string]any)["isolatedRuntime"])
+	assert.Equal(t, true, payload["capabilities"].(map[string]any)["sovereign"].(map[string]any)["isolatedRuntime"])
 
 	brandObj, ok := payload["brand"].(map[string]any)
 	require.True(t, ok, "brand must serialize as a JSON object")
@@ -316,7 +316,7 @@ func TestSPAHandler_RuntimeConfig_BrandWithoutNetworkSection(t *testing.T) {
 	// gated off" from "feature absent" by reading runtime-config.js.
 	brand := &BrandSnapshot{Name: "Example Market"}
 	h := NewHandler(ServerConfig{
-		Deployment: RuntimeDeployment{Mode: RuntimeDeploymentPrivateDistribution},
+		Deployment: RuntimeDeployment{Mode: RuntimeDeploymentSovereign},
 		Brand:      brand,
 	})
 	srv := httptest.NewServer(h)

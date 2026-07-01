@@ -16,7 +16,7 @@ type KeyMaterial struct {
 
 // SolanaKeyMaterial holds raw ed25519 private key bytes for Solana.
 // Uses []byte instead of solana.PrivateKey to avoid pulling solana-go
-// into the base package (keeps PrivateDistribution binary lean).
+// into the base package (keeps Sovereign binary lean).
 type SolanaKeyMaterial struct {
 	PrivKey []byte
 }

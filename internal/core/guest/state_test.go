@@ -269,7 +269,7 @@ func TestHandlePaymentDetected_EXTERNAL_PAYMENT_DirectConfirmed(t *testing.T) {
 }
 
 func TestValidateCoinAvailability(t *testing.T) {
-	private_distributionSvc := &GuestOrderAppService{
+	sovereignSvc := &GuestOrderAppService{
 		supportedUTXOChains:     toChainSet(nil),
 		evmObservationAvailable: false,
 		solanaMonitorAvailable:  false,
@@ -293,32 +293,32 @@ func TestValidateCoinAvailability(t *testing.T) {
 	solInfo, _ := iwallet.CoinInfoFromCoinType(solCoin)
 	tronInfo, _ := iwallet.CoinInfoFromCoinType(tronCoin)
 
-	t.Run("PrivateDistribution rejects LTC (EXTERNAL_PAYMENT-only)", func(t *testing.T) {
-		err := private_distributionSvc.validateCoinAvailability(ltcCoin, ltcInfo)
+	t.Run("Sovereign rejects LTC (EXTERNAL_PAYMENT-only)", func(t *testing.T) {
+		err := sovereignSvc.validateCoinAvailability(ltcCoin, ltcInfo)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not configured")
 	})
 
-	t.Run("PrivateDistribution rejects BTC", func(t *testing.T) {
-		err := private_distributionSvc.validateCoinAvailability(btcCoin, btcInfo)
+	t.Run("Sovereign rejects BTC", func(t *testing.T) {
+		err := sovereignSvc.validateCoinAvailability(btcCoin, btcInfo)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not configured")
 	})
 
-	t.Run("PrivateDistribution rejects ETH", func(t *testing.T) {
-		err := private_distributionSvc.validateCoinAvailability(ethCoin, ethInfo)
+	t.Run("Sovereign rejects ETH", func(t *testing.T) {
+		err := sovereignSvc.validateCoinAvailability(ethCoin, ethInfo)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "EVM ManagedEscrow observation is not configured")
 	})
 
-	t.Run("PrivateDistribution rejects SOL", func(t *testing.T) {
-		err := private_distributionSvc.validateCoinAvailability(solCoin, solInfo)
+	t.Run("Sovereign rejects SOL", func(t *testing.T) {
+		err := sovereignSvc.validateCoinAvailability(solCoin, solInfo)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Solana reference checker not configured")
 	})
 
-	t.Run("PrivateDistribution rejects TRON", func(t *testing.T) {
-		err := private_distributionSvc.validateCoinAvailability(tronCoin, tronInfo)
+	t.Run("Sovereign rejects TRON", func(t *testing.T) {
+		err := sovereignSvc.validateCoinAvailability(tronCoin, tronInfo)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "TRON balance monitor not configured")
 	})
@@ -353,7 +353,7 @@ func TestValidateCoinAvailability(t *testing.T) {
 	external_paymentInfo, _ := iwallet.CoinInfoFromCoinType(external_paymentCoin)
 
 	t.Run("Core rejects EXTERNAL_PAYMENT without distribution policy", func(t *testing.T) {
-		err := private_distributionSvc.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
+		err := sovereignSvc.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no chain family handler")
 	})
@@ -456,7 +456,7 @@ func TestHandleConfirmationUpdate_ReachesThreshold_EmitsOrderConfirmation(t *tes
 }
 
 // TestHandlePaymentDetected_NilEventBus_NoCrash guards against accidental
-// regressions: the helper must tolerate a nil eventBus (e.g. tests / private_distribution
+// regressions: the helper must tolerate a nil eventBus (e.g. tests / sovereign
 // init order). If this regresses, every guest payment crashes the node.
 func TestHandlePaymentDetected_NilEventBus_NoCrash(t *testing.T) {
 	db := newGuestTestDB(t)

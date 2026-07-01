@@ -32,7 +32,7 @@ func NewMonitorWithDefaultSources(ctx context.Context, testnet bool) (*Monitor, 
 }
 
 // ElectrumOverride allows overriding the default Electrum servers for a chain.
-// Used by private_distribution mode (user-configured endpoints with TLS pinning) and
+// Used by sovereign mode (user-configured endpoints with TLS pinning) and
 // E2E tests (local electrs on regtest).
 type ElectrumOverride struct {
 	Servers        []string

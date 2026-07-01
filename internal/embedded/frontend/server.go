@@ -36,7 +36,7 @@ const RuntimeConfigSchemaVersion = 3
 const (
 	RuntimeDeploymentHosted     = "hosted"
 	RuntimeDeploymentStandalone = "standalone"
-	RuntimeDeploymentPrivateDistribution    = "private_distribution"
+	RuntimeDeploymentSovereign  = "sovereign"
 
 	RuntimeExperiencePlatform    = "platform"
 	RuntimeExperienceStore       = "store"
@@ -89,7 +89,7 @@ type MarketplaceCapabilities struct {
 	Attribution       bool `json:"attribution"`
 }
 
-type PrivateDistributionCapabilities struct {
+type SovereignCapabilities struct {
 	IsolatedRuntime bool `json:"isolatedRuntime"`
 	ManagedFleet    bool `json:"managedFleet"`
 }
@@ -99,7 +99,7 @@ type PrivateDistributionCapabilities struct {
 type RuntimeCapabilities struct {
 	Commerce    CommerceCapabilities    `json:"commerce"`
 	Marketplace MarketplaceCapabilities `json:"marketplace"`
-	PrivateDistribution     PrivateDistributionCapabilities     `json:"private_distribution"`
+	Sovereign   SovereignCapabilities   `json:"sovereign"`
 	Payments    PaymentCapabilities     `json:"payments"`
 }
 
@@ -169,7 +169,7 @@ type ServerConfig struct {
 	// returned with any desired narrowing or additions applied.
 	CapabilitiesSnapshotFn func(context.Context, RuntimeCapabilities) RuntimeCapabilities
 
-	// NeedsSetupShellFn, when set for an PrivateDistribution deployment, serves setup.html instead
+	// NeedsSetupShellFn, when set for a sovereign deployment, serves setup.html instead
 	// of the full SPA for /admin/* while initial setup is incomplete.
 	NeedsSetupShellFn func() bool
 }
@@ -223,8 +223,8 @@ type spaHandler struct {
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h.deployment.Mode == RuntimeDeploymentPrivateDistribution {
-		h.setPrivateDistributionSecurityHeaders(w, r)
+	if h.deployment.Mode == RuntimeDeploymentSovereign {
+		h.setSovereignSecurityHeaders(w, r)
 	}
 
 	if r.URL.Path == "/runtime-config.js" {
@@ -322,7 +322,7 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *spaHandler) shouldServeSetupShell(urlPath string) bool {
-	if h.deployment.Mode != RuntimeDeploymentPrivateDistribution || h.needsSetupShellFn == nil || !h.needsSetupShellFn() {
+	if h.deployment.Mode != RuntimeDeploymentSovereign || h.needsSetupShellFn == nil || !h.needsSetupShellFn() {
 		return false
 	}
 	return urlPath == "/admin" || strings.HasPrefix(urlPath, "/admin/")
@@ -352,10 +352,10 @@ func (h *spaHandler) serveSetupShell(w http.ResponseWriter, r *http.Request) {
 	h.serveIndex(w, r)
 }
 
-// private_distributionCSP is the Content-Security-Policy for PrivateDistribution mode.
+// sovereignCSP is the Content-Security-Policy for the restricted-egress mode.
 // It blocks all external resource loading — only same-origin and
 // local RPC endpoints (127.0.0.1) are permitted.
-const private_distributionCSP = "default-src 'self'; " +
+const sovereignCSP = "default-src 'self'; " +
 	"connect-src 'self' http://127.0.0.1:*; " +
 	"img-src 'self' data: blob:; " +
 	"media-src 'self' blob:; " +
@@ -369,8 +369,8 @@ const private_distributionCSP = "default-src 'self'; " +
 	"object-src 'none'; " +
 	"base-uri 'self'"
 
-func (h *spaHandler) setPrivateDistributionSecurityHeaders(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Security-Policy", private_distributionCSP)
+func (h *spaHandler) setSovereignSecurityHeaders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Security-Policy", sovereignCSP)
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
@@ -411,7 +411,7 @@ func normalizeRuntimeDeployment(deployment RuntimeDeployment) RuntimeDeployment 
 	switch deployment.Mode {
 	case RuntimeDeploymentHosted:
 		deployment.AllowExternalResources = true
-	case RuntimeDeploymentPrivateDistribution:
+	case RuntimeDeploymentSovereign:
 		deployment.AllowExternalResources = false
 	default:
 		deployment.Mode = RuntimeDeploymentStandalone
@@ -457,8 +457,8 @@ func baseRuntimeCapabilities(deployment RuntimeDeployment) RuntimeCapabilities {
 			Attribution:       true,
 		}
 	}
-	if deployment.Mode == RuntimeDeploymentPrivateDistribution {
-		capabilities.PrivateDistribution.IsolatedRuntime = true
+	if deployment.Mode == RuntimeDeploymentSovereign {
+		capabilities.Sovereign.IsolatedRuntime = true
 	}
 	return capabilities
 }
@@ -511,7 +511,7 @@ func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeCon
 		Brand:             cfg.Brand,
 	}
 
-	if deployment.Mode == RuntimeDeploymentPrivateDistribution {
+	if deployment.Mode == RuntimeDeploymentSovereign {
 		return payload
 	}
 
@@ -528,7 +528,7 @@ func BuildRuntimeConfigPayload(ctx context.Context, cfg ServerConfig) RuntimeCon
 // escaped — do not revert to fmt.Fprintf string interpolation.
 func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/javascript")
-	if h.deployment.Mode == RuntimeDeploymentPrivateDistribution {
+	if h.deployment.Mode == RuntimeDeploymentSovereign {
 		w.Header().Set("Cache-Control", "no-store")
 	} else {
 		w.Header().Set("Cache-Control", "no-cache")
@@ -546,7 +546,7 @@ func (h *spaHandler) serveRuntimeConfig(w http.ResponseWriter, r *http.Request) 
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Fprint(w, `window.__RUNTIME_CONFIG__={"schemaVersion":3,"authMode":"standalone","deployment":{"mode":"standalone","allowExternalResources":true},"experience":{"kind":"store"},"capabilitiesReady":true,"features":{},"capabilities":{"commerce":{"storefront":true,"storeAdmin":true,"checkout":true},"marketplace":{"discovery":false,"operator":false,"selling":false,"curation":false,"sellerReview":false,"customDomains":false,"releasePublishing":false,"attribution":false},"private_distribution":{"isolatedRuntime":false,"managedFleet":false},"payments":{"methods":[]}}};`)
+		fmt.Fprint(w, `window.__RUNTIME_CONFIG__={"schemaVersion":3,"authMode":"standalone","deployment":{"mode":"standalone","allowExternalResources":true},"experience":{"kind":"store"},"capabilitiesReady":true,"features":{},"capabilities":{"commerce":{"storefront":true,"storeAdmin":true,"checkout":true},"marketplace":{"discovery":false,"operator":false,"selling":false,"curation":false,"sellerReview":false,"customDomains":false,"releasePublishing":false,"attribution":false},"sovereign":{"isolatedRuntime":false,"managedFleet":false},"payments":{"methods":[]}}};`)
 		return
 	}
 

@@ -4,4 +4,4 @@ package repo
 // Override at build time via:
 //
 //	-ldflags "-X github.com/mobazha/mobazha3.0/internal/repo.defaultProductName=ExampleMarket"
-var defaultProductName = "Mobazha PrivateDistribution"
+var defaultProductName = "Mobazha"

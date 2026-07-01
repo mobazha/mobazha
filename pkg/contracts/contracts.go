@@ -460,7 +460,7 @@ type NodeService interface {
 }
 
 // PaymentRPCStatusProvider is implemented by nodes that can report local
-// payment sidecar availability (for example PrivateDistribution's external_payment-wallet-rpc).
+// payment sidecar availability (for example Sovereign's external_payment-wallet-rpc).
 type PaymentRPCStatusProvider interface {
 	PaymentRPCStatus(ctx context.Context) PaymentRPCStatus
 }
@@ -478,10 +478,10 @@ type PaymentRPCStatusEntry struct {
 }
 
 // ExternalPaymentNodePoolProvider is implemented by nodes that expose the ExternalPayment
-// daemon node pool for admin / setup wizard management (PrivateDistribution only).
+// daemon node pool for admin / setup wizard management (Sovereign only).
 //
 // All methods are safe to call when the pool is not configured (e.g. the
-// private_distribution is in legacy single-daemon mode or NodePool bootstrap failed) —
+// sovereign is in legacy single-daemon mode or NodePool bootstrap failed) —
 // ExternalPaymentNodes returns an empty snapshot and mutating methods return
 // ErrExternalPaymentNodePoolUnavailable.
 type ExternalPaymentNodePoolProvider interface {
@@ -491,7 +491,7 @@ type ExternalPaymentNodePoolProvider interface {
 	SwitchExternalPaymentNode(ctx context.Context, address string) error
 }
 
-// ErrExternalPaymentNodePoolUnavailable signals that the private_distribution is not running with
+// ErrExternalPaymentNodePoolUnavailable signals that the sovereign is not running with
 // a NodePool (legacy single-daemon mode, or bootstrap failed).
 var ErrExternalPaymentNodePoolUnavailable = errors.New("external_payment NodePool: not available on this node")
 
@@ -542,7 +542,7 @@ type ExternalPaymentNodeAddRequest struct {
 }
 
 // ExternalPaymentWalletProvider is implemented by nodes that expose EXTERNAL_PAYMENT wallet-level
-// operations (balance / transfer / sweep_all). Available only on private_distribution
+// operations (balance / transfer / sweep_all). Available only on sovereign
 // builds with a working external_payment-wallet-rpc sidecar.
 type ExternalPaymentWalletProvider interface {
 	GetEXTERNAL_PAYMENTBalance(ctx context.Context, accountIndex *uint32) (ExternalPaymentBalance, error)
@@ -571,7 +571,7 @@ type ExternalPaymentBalance struct {
 	AccountIndex    uint32 `json:"accountIndex"`
 }
 
-// ErrExternalPaymentWalletUnavailable signals that the private_distribution node has no
+// ErrExternalPaymentWalletUnavailable signals that the sovereign node has no
 // configured external_payment-wallet-rpc client (legacy boot without EXTERNAL_PAYMENT config,
 // or wallet RPC connection failed during startup).
 var ErrExternalPaymentWalletUnavailable = errors.New("external_payment wallet: RPC client not available on this node")
@@ -592,7 +592,7 @@ var ErrEXTERNAL_PAYMENTInvalidAmount = errors.New("external_payment amount")
 // Amount is a decimal string of piconero (1 EXTERNAL_PAYMENT = 10^12 piconero). It is a
 // string instead of uint64 because JavaScript Number's managed_escrow-integer range
 // (2^53 ≈ 9.007e15 piconero ≈ 9007 EXTERNAL_PAYMENT) is below the realistic EXTERNAL_PAYMENT balance
-// of a long-running private_distribution — using uint64 over the wire would silently
+// of a long-running sovereign — using uint64 over the wire would silently
 // truncate large withdrawals. This matches the existing models.SpendRequest
 // convention for UTXO/EVM chains.
 //
@@ -602,7 +602,7 @@ var ErrEXTERNAL_PAYMENTInvalidAmount = errors.New("external_payment amount")
 // AccountIndex is a pointer so the wire can distinguish "unset" (use the
 // node's startup-flag default) from an explicit 0 (the primary account on
 // every standard ExternalPayment wallet). Most callers send a non-nil 0 or omit it
-// entirely; multi-account private_distributions may target specific indices.
+// entirely; multi-account sovereigns may target specific indices.
 type ExternalPaymentWithdrawRequest struct {
 	Address      string  `json:"address"`
 	Amount       string  `json:"amount"`
@@ -804,7 +804,7 @@ type ExternalPaymentHistoryProvider interface {
 // ListEXTERNAL_PAYMENTTransfersRequest is the body for GET /v1/wallet/external_payment/transfers.
 //
 // AccountIndex is a pointer for the same reason as ExternalPaymentWithdrawRequest:
-// nil means "use the node's startup default" so multi-account private_distributions
+// nil means "use the node's startup default" so multi-account sovereigns
 // can rely on the same default everywhere. Most callers omit it.
 //
 // In/Out/Pool/Pending/Failed mirror the wallet-rpc get_transfers bucket
@@ -839,7 +839,7 @@ type ListEXTERNAL_PAYMENTTransfersResult struct {
 // (clients consuming the contract shouldn't have to import pkg/external_payment).
 //
 // Amount + Fee are decimal piconero strings, same rationale as
-// ExternalPaymentWithdrawRequest.Amount: a long-running private_distribution can accumulate
+// ExternalPaymentWithdrawRequest.Amount: a long-running sovereign can accumulate
 // > 9007 EXTERNAL_PAYMENT, beyond JS Number managed_escrow-integer range. UI MUST format from
 // strings; never parse to Number for display.
 type EXTERNAL_PAYMENTTransferEntry struct {

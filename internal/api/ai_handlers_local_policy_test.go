@@ -36,7 +36,7 @@ func (n *localPolicyAITestNode) SaveAIMultiConfig(mc aipkg.MultiConfig) error {
 	return nil
 }
 
-func newPrivateDistributionAIRequest(t *testing.T, method, target, body string, node contracts.NodeService) *http.Request {
+func newSovereignAIRequest(t *testing.T, method, target, body string, node contracts.NodeService) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -47,7 +47,7 @@ func newPrivateDistributionAIRequest(t *testing.T, method, target, body string, 
 func TestHandlePUTAIConfig_AllowsTrustedPlainHTTP(t *testing.T) {
 	g := &Gateway{aiHTTPPolicy: distribution.NewAIHTTPPolicy(true, false, false, false)}
 	node := &localPolicyAITestNode{}
-	req := newPrivateDistributionAIRequest(t, http.MethodPut, "/v1/settings/ai", `{
+	req := newSovereignAIRequest(t, http.MethodPut, "/v1/settings/ai", `{
 		"provider":"custom",
 		"base_url":"http://ollama:11434/v1",
 		"model":"llama3.2",
@@ -68,7 +68,7 @@ func TestHandlePUTAIConfig_AllowsTrustedPlainHTTP(t *testing.T) {
 func TestHandlePUTAIConfig_RejectsRemoteEndpoint(t *testing.T) {
 	g := &Gateway{aiHTTPPolicy: distribution.NewAIHTTPPolicy(true, false, false, false)}
 	node := &localPolicyAITestNode{}
-	req := newPrivateDistributionAIRequest(t, http.MethodPut, "/v1/settings/ai", `{
+	req := newSovereignAIRequest(t, http.MethodPut, "/v1/settings/ai", `{
 		"provider":"openai",
 		"base_url":"https://api.openai.com/v1",
 		"model":"gpt-4o",
@@ -106,7 +106,7 @@ func TestHandleGETAIStatus_AllowsDockerInternalNoKey(t *testing.T) {
 			}),
 		}),
 	}
-	req := newPrivateDistributionAIRequest(t, http.MethodGet, "/v1/ai/status", "", node)
+	req := newSovereignAIRequest(t, http.MethodGet, "/v1/ai/status", "", node)
 	rr := httptest.NewRecorder()
 
 	g.handleGETAIStatus(rr, req)
@@ -144,7 +144,7 @@ func TestHandlePOSTAITestConnection_AllowsLocalNoKey(t *testing.T) {
 
 	g := &Gateway{aiHTTPPolicy: distribution.NewAIHTTPPolicy(true, false, false, false)}
 	node := &localPolicyAITestNode{proxy: aipkg.NewProxy(server.Client())}
-	req := newPrivateDistributionAIRequest(t, http.MethodPost, "/v1/settings/ai/test", `{
+	req := newSovereignAIRequest(t, http.MethodPost, "/v1/settings/ai/test", `{
 		"provider":"custom",
 		"base_url":"`+server.URL+`",
 		"model":"llama3.2"

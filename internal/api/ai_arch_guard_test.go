@@ -16,9 +16,9 @@ func TestAIHTTPArchitecture_HasNoDistributionSpecificHandlerVariants(t *testing.
 	dir := filepath.Dir(currentFile)
 
 	for _, name := range []string{
-		"ai_handlers_private_distribution.go",
-		"ai_handlers_private_distribution_test.go",
-		"huma_ai_handlers_private_distribution.go",
+		"ai_handlers_sovereign.go",
+		"ai_handlers_sovereign_test.go",
+		"huma_ai_handlers_sovereign.go",
 	} {
 		_, err := os.Stat(filepath.Join(dir, name))
 		require.ErrorIs(t, err, os.ErrNotExist, "%s must not return; use AIHTTPPolicy composition", name)
@@ -27,7 +27,7 @@ func TestAIHTTPArchitecture_HasNoDistributionSpecificHandlerVariants(t *testing.
 	for _, name := range []string{"ai_handlers.go", "huma_ai_http_handlers.go"} {
 		content, err := os.ReadFile(filepath.Join(dir, name))
 		require.NoError(t, err)
-		require.False(t, strings.Contains(string(content), "//go:build private_distribution"),
+		require.False(t, strings.Contains(string(content), "//go:build sovereign"),
 			"%s must remain distribution-neutral", name)
 	}
 }

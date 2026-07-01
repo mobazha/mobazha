@@ -49,16 +49,3 @@ func TestLoadBrandConfig_NetworkFieldsDefaultFalse(t *testing.T) {
 	assert.False(t, cfg.Network.ShowNodePoolUI)
 	assert.False(t, cfg.Network.AllowDiscoverToggle)
 }
-
-func TestLoadBrandConfig_ExampleMarketExampleParses(t *testing.T) {
-	cfg, err := LoadBrandConfig("../../deploy/private_distribution/examples/examplemarket")
-	require.NoError(t, err)
-	require.NotNil(t, cfg)
-	assert.Equal(t, "Example Market", cfg.Name)
-	// TMP opts in to diagnostics + node pool UI but NOT to custom node.
-	assert.False(t, cfg.Network.AllowUserCustomNode,
-		"TMP keeps custom-node entry off — arbitrary RPC paste is a phishing vector")
-	assert.True(t, cfg.Network.ShowAdvancedDiagnostics)
-	assert.True(t, cfg.Network.ShowNodePoolUI)
-	assert.True(t, cfg.Network.AllowDiscoverToggle)
-}

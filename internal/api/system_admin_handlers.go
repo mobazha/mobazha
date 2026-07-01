@@ -12,8 +12,8 @@ func detectDeploymentMode() string {
 	switch deploy.GetProcessMode() {
 	case deploy.SaaS:
 		return "saas"
-	case deploy.PrivateDistribution:
-		return "private_distribution"
+	case deploy.Sovereign:
+		return "sovereign"
 	}
 	if _, err := os.Stat("/.dockerenv"); err == nil {
 		return "docker"

@@ -17,7 +17,7 @@ type receivingAccountBodyInput struct {
 
 // registerNodeHumaReceivingAccountOperations registers Huma operations for
 // ReceivingAccount CRUD. Build-neutral — called by both the full-build
-// wallet aggregation and the private_distribution admin aggregation.
+// wallet aggregation and the sovereign admin aggregation.
 func (g *Gateway) registerNodeHumaReceivingAccountOperations(api huma.API) {
 	g.registerWalletReceivingAccountsList(api)
 	g.registerWalletReceivingAccountsCreate(api)

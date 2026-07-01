@@ -19,7 +19,7 @@ import (
 // DG-1.10 unit tests cover the pure helpers (format negotiation, customer
 // aggregation, CSV/JSON writers) and the HTTP-level error responses.
 // End-to-end coverage with a real OrderService is intentionally left for
-// the integration test layer — that's where PrivateDistribution-equivalent fixtures
+// the integration test layer — that's where Sovereign-equivalent fixtures
 // live, and where we can assert seller-scoped row content.
 
 func TestParseExportFormat(t *testing.T) {

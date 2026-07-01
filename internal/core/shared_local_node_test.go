@@ -53,7 +53,7 @@ func waitDone(t *testing.T, done <-chan struct{}) {
 	}
 }
 
-func newSharedPrivateDistributionListing(t *testing.T, slug string) *pb.Listing {
+func newSharedSovereignListing(t *testing.T, slug string) *pb.Listing {
 	t.Helper()
 
 	listing := factory.NewPhysicalListing(slug)
@@ -165,7 +165,7 @@ func TestSharedNode_SavePreferences(t *testing.T) {
 	node := newSharedLocalNode(t)
 
 	done := make(chan struct{})
-	if err := node.Listing().SaveListing(newSharedPrivateDistributionListing(t, "ron-swanson-shirt"), done); err != nil {
+	if err := node.Listing().SaveListing(newSharedSovereignListing(t, "ron-swanson-shirt"), done); err != nil {
 		t.Fatal(err)
 	}
 	waitDone(t, done)
@@ -216,7 +216,7 @@ func TestSharedNode_SaveListing(t *testing.T) {
 	node := newSharedLocalNode(t)
 
 	done := make(chan struct{})
-	if err := node.Listing().SaveListing(newSharedPrivateDistributionListing(t, "ron-swanson-shirt"), done); err != nil {
+	if err := node.Listing().SaveListing(newSharedSovereignListing(t, "ron-swanson-shirt"), done); err != nil {
 		t.Fatal(err)
 	}
 	waitDone(t, done)
@@ -245,8 +245,8 @@ func TestSharedNode_SaveListing(t *testing.T) {
 func TestSharedNode_UpdateAndDeleteListing(t *testing.T) {
 	node := newSharedLocalNode(t)
 
-	listing1 := newSharedPrivateDistributionListing(t, "ron-swanson-shirt")
-	listing2 := newSharedPrivateDistributionListing(t, "bag-of-shit")
+	listing1 := newSharedSovereignListing(t, "ron-swanson-shirt")
+	listing2 := newSharedSovereignListing(t, "bag-of-shit")
 	for _, listing := range []*pb.Listing{listing1, listing2} {
 		done := make(chan struct{})
 		if err := node.Listing().SaveListing(listing, done); err != nil {
@@ -303,7 +303,7 @@ func TestSharedNode_GenerateListingSlug(t *testing.T) {
 	node := newSharedLocalNode(t)
 
 	done := make(chan struct{})
-	if err := node.Listing().SaveListing(newSharedPrivateDistributionListing(t, "ron-swanson-shirt"), done); err != nil {
+	if err := node.Listing().SaveListing(newSharedSovereignListing(t, "ron-swanson-shirt"), done); err != nil {
 		t.Fatal(err)
 	}
 	waitDone(t, done)

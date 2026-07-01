@@ -267,7 +267,7 @@ func (g *Gateway) collectSalesRows(r *http.Request) ([]saleExportRow, error) {
 	}
 
 	// Guest orders. The service returns nil when Guest Checkout is not
-	// enabled (PrivateDistribution / pre-PM-2 deployments) — we silently skip in that
+	// enabled (Sovereign / pre-PM-2 deployments) — we silently skip in that
 	// case so SaaS / Standalone exports always include guests when the
 	// feature is on.
 	if guestSvc := getGuestOrderService(r); guestSvc != nil {

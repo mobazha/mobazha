@@ -112,7 +112,7 @@ var FeatureGroupMarketplaceEnabled = registerFeature(Feature{
 // FeatureCollectiblesHubEnabled — 第一方收藏卡 Hub+NFT 最小闭环。
 //
 // Scope：仅 PlatformGlobal — collectibles 是 SaaS 第一方自营垂直，Standalone/
-// PrivateDistribution 不应自行启用该域。生产开放前还需完成 Gate 3c 法务/Hub/Solana
+// Sovereign 不应自行启用该域。生产开放前还需完成 Gate 3c 法务/Hub/Solana
 // escrow 检查；当前默认关闭，用于 devnet/mock/API-only 推进。
 var FeatureCollectiblesHubEnabled = registerFeature(Feature{
 	Key:           "collectiblesHubEnabled",

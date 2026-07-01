@@ -84,7 +84,7 @@ func CreateMonitor(ctx context.Context, testnet bool) (*pkgutxo.Monitor, error) 
 
 // CreateMonitorWithOverrides creates a monitor using custom Electrum servers
 // for the chains listed in overrides. Other chains use the compiled-in defaults.
-// Override-only chains (e.g. BCH, ZEC in private_distribution mode) are added even if they
+// Override-only chains (e.g. BCH, ZEC in sovereign mode) are added even if they
 // are not in the default chain list.
 func (f *defaultMonitorFactory) CreateMonitorWithOverrides(ctx context.Context, testnet bool, overrides map[iwallet.ChainType]pkgutxo.ElectrumOverride) (*pkgutxo.Monitor, error) {
 	config := pkgutxo.DefaultMonitorConfig()

@@ -240,18 +240,18 @@ func TestArchGuard_NoNewTickerInCore(t *testing.T) {
 			"use Run*Once methods instead. Violations: %v", violations)
 }
 
-// TestArchGuard_NoPrivateDistributionBuildFork prevents a product-wide build tag from
+// TestArchGuard_NoSovereignBuildFork prevents a product-wide build tag from
 // recreating a shadow Node type or lifecycle. Product code belongs in a
 // private module behind public composition ports.
-func TestArchGuard_NoPrivateDistributionBuildFork(t *testing.T) {
+func TestArchGuard_NoSovereignBuildFork(t *testing.T) {
 	root := repoRoot(t)
 	legacyShells := map[string]bool{
-		"builder_private_distribution.go":        true,
-		"node_fields_private_distribution.go":    true,
-		"node_lifecycle_private_distribution.go": true,
-		"node_methods_private_distribution.go":   true,
-		"node_accessors_private_distribution.go": true,
-		"node_stubs_private_distribution.go":     true,
+		"builder_sovereign.go":        true,
+		"node_fields_sovereign.go":    true,
+		"node_lifecycle_sovereign.go": true,
+		"node_methods_sovereign.go":   true,
+		"node_accessors_sovereign.go": true,
+		"node_stubs_sovereign.go":     true,
 	}
 	var violations []string
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
@@ -275,7 +275,7 @@ func TestArchGuard_NoPrivateDistributionBuildFork(t *testing.T) {
 			return readErr
 		}
 		for _, line := range strings.Split(string(data), "\n") {
-			if strings.HasPrefix(strings.TrimSpace(line), "//go:build") && strings.Contains(line, "private_distribution") {
+			if strings.HasPrefix(strings.TrimSpace(line), "//go:build") && strings.Contains(line, "sovereign") {
 				violations = append(violations, path+": "+strings.TrimSpace(line))
 			}
 		}

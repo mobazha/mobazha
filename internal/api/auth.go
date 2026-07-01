@@ -112,7 +112,7 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 		}
 
 		// isBlocked is enforced only after a credential failure (below);
-		// up-front blocking locks out shared-IP deployments (PrivateDistribution / Docker /
+		// up-front blocking locks out shared-IP deployments (Sovereign / Docker /
 		// NAT) where a real operator can't recover after a few stray 401s.
 		// Correct credentials reset the counter via ResetAuthFailure().
 

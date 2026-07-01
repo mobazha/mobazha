@@ -6,18 +6,18 @@ cd "$repo_root"
 
 failures=0
 
-legacy_private_distribution_build_tags="$(rg -n '^//go:build .*\bprivate_distribution\b' --glob '*.go' . || true)"
-if [[ -n "$legacy_private_distribution_build_tags" ]]; then
-  echo "ERROR: the private PrivateDistribution product must not fork Open Core through Go build tags:" >&2
-  echo "$legacy_private_distribution_build_tags" >&2
+distribution_build_tags="$(rg -n '^//go:build .*\bsovereign\b' --glob '*.go' . || true)"
+if [[ -n "$distribution_build_tags" ]]; then
+  echo "ERROR: a distribution profile must not fork Open Core through Go build tags:" >&2
+  echo "$distribution_build_tags" >&2
   failures=1
 fi
 
-legacy_private_distribution_shells="$(rg --files internal pkg 2>/dev/null \
-  | rg '(^|/)(node|builder|shared_manager|composition_contracts|huma_api|stubs)_private_distribution(_test)?\\.go$' || true)"
-if [[ -n "$legacy_private_distribution_shells" ]]; then
-  echo "ERROR: legacy parallel PrivateDistribution runtime shells remain in Open Core:" >&2
-  echo "$legacy_private_distribution_shells" >&2
+distribution_runtime_shells="$(rg --files internal pkg 2>/dev/null \
+  | rg '(^|/)(node|builder|shared_manager|composition_contracts|huma_api|stubs)_sovereign(_test)?\\.go$' || true)"
+if [[ -n "$distribution_runtime_shells" ]]; then
+  echo "ERROR: parallel distribution runtime shells remain in Open Core:" >&2
+  echo "$distribution_runtime_shells" >&2
   failures=1
 fi
 
@@ -66,54 +66,54 @@ if [[ -n "$core_solana_implementation_files" ]]; then
   failures=1
 fi
 
-private_distribution_distribution_entrypoints="$(rg --files . 2>/dev/null \
-  | rg '(^|/)(mobazha_private_distribution\.go|cmd/start_private_distribution\.go|cmd/private_distribution_config_test\.go)$' || true)"
-if [[ -n "$private_distribution_distribution_entrypoints" ]]; then
-  echo "ERROR: private PrivateDistribution distribution entrypoint leaked into Open Core:" >&2
-  echo "$private_distribution_distribution_entrypoints" >&2
+sovereign_distribution_entrypoints="$(rg --files . 2>/dev/null \
+  | rg '(^|/)(mobazha_sovereign\.go|cmd/start_sovereign\.go|cmd/sovereign_config_test\.go)$' || true)"
+if [[ -n "$sovereign_distribution_entrypoints" ]]; then
+  echo "ERROR: private distribution entrypoint leaked into Open Core:" >&2
+  echo "$sovereign_distribution_entrypoints" >&2
   failures=1
 fi
 
 external_payment_implementation_files="$(rg --files internal/chains/external_payment 2>/dev/null \
   | rg '\.go$' || true)"
 if [[ -n "$external_payment_implementation_files" ]]; then
-  echo "ERROR: concrete PrivateDistribution ExternalPayment implementation leaked into Open Core:" >&2
+  echo "ERROR: concrete private-distribution ExternalPayment implementation leaked into Open Core:" >&2
   echo "$external_payment_implementation_files" >&2
   failures=1
 fi
 
-private_distribution_release_assets="$({
+sovereign_release_assets="$({
   rg --files \
     scripts/refresh-external_payment-seeds.py \
-    scripts/embed-private_distribution-frontend.sh \
-    scripts/private_distribution-network-smoke.sh \
-    scripts/private_distribution-digital-assets-smoke.sh \
+    scripts/embed-sovereign-frontend.sh \
+    scripts/sovereign-network-smoke.sh \
+    scripts/sovereign-digital-assets-smoke.sh \
     .github/workflows/external_payment-seeds.yml \
-    deploy/private_distribution/Dockerfile.private_distribution \
-    deploy/private_distribution/examples/example \
+    deploy/sovereign/Dockerfile.sovereign \
+    deploy/sovereign/examples/example \
     2>/dev/null || true
 } | sort -u)"
-if [[ -n "$private_distribution_release_assets" ]]; then
-  echo "ERROR: private PrivateDistribution release asset leaked into Open Core:" >&2
-  echo "$private_distribution_release_assets" >&2
+if [[ -n "$sovereign_release_assets" ]]; then
+  echo "ERROR: private distribution release asset leaked into Open Core:" >&2
+  echo "$sovereign_release_assets" >&2
   failures=1
 fi
 
-private_distribution_external_payment_api_files="$({
+sovereign_external_payment_api_files="$({
   rg --files internal/api 2>/dev/null || true
 } | rg '(^|/)(huma_.*external_payment.*|external_payment_.*handler|payment_rpc_status_handler)\.go$' || true)"
-if [[ -n "$private_distribution_external_payment_api_files" ]]; then
-  echo "ERROR: private PrivateDistribution ExternalPayment API implementation leaked into Open Core:" >&2
-  echo "$private_distribution_external_payment_api_files" >&2
+if [[ -n "$sovereign_external_payment_api_files" ]]; then
+  echo "ERROR: private-distribution ExternalPayment API implementation leaked into Open Core:" >&2
+  echo "$sovereign_external_payment_api_files" >&2
   failures=1
 fi
 
-private_distribution_product_policy_files="$({
+sovereign_product_policy_files="$({
   rg --files internal pkg 2>/dev/null || true
-} | rg '(^|/)(private_distribution_supported_coins|listing_pricing_guard_(private_distribution|full)|checkout_currency_guard_(private_distribution|full)|payment_methods_coins_(private_distribution|full))\.go$' || true)"
-if [[ -n "$private_distribution_product_policy_files" ]]; then
-  echo "ERROR: private PrivateDistribution product policy leaked into Open Core build-tag files:" >&2
-  echo "$private_distribution_product_policy_files" >&2
+} | rg '(^|/)(sovereign_supported_coins|listing_pricing_guard_(sovereign|full)|checkout_currency_guard_(sovereign|full)|payment_methods_coins_(sovereign|full))\.go$' || true)"
+if [[ -n "$sovereign_product_policy_files" ]]; then
+  echo "ERROR: private distribution policy leaked into Open Core build-tag files:" >&2
+  echo "$sovereign_product_policy_files" >&2
   failures=1
 fi
 

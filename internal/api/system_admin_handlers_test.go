@@ -14,8 +14,8 @@ func TestDetectDeploymentModePrefersConfiguredDistribution(t *testing.T) {
 		t.Fatalf("SaaS deployment mode = %q, want %q", got, "saas")
 	}
 
-	deploy.SetProcessMode(deploy.PrivateDistribution)
-	if got := detectDeploymentMode(); got != "private_distribution" {
-		t.Fatalf("PrivateDistribution deployment mode = %q, want %q", got, "private_distribution")
+	deploy.SetProcessMode(deploy.Sovereign)
+	if got := detectDeploymentMode(); got != "sovereign" {
+		t.Fatalf("Sovereign deployment mode = %q, want %q", got, "sovereign")
 	}
 }

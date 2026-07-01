@@ -283,8 +283,8 @@ func (c *Config) IsValid() bool {
 		return false
 	}
 	// Generic config validity only treats loopback endpoints as key-less.
-	// Broader plain-HTTP trust decisions (e.g. Docker-internal Ollama in private_distribution
-	// mode) are handled by private_distribution-specific validation paths.
+	// Broader plain-HTTP trust decisions (e.g. Docker-internal Ollama in sovereign
+	// mode) are handled by sovereign-specific validation paths.
 	if IsLocalEndpointURL(effectiveURL) {
 		return true
 	}
@@ -300,7 +300,7 @@ func IsPlainHTTPURL(rawURL string) bool {
 	return parsed.Scheme == "http"
 }
 
-// IsTrustedLocalLLMEndpoint returns true for AI endpoints that private_distribution mode can
+// IsTrustedLocalLLMEndpoint returns true for AI endpoints that sovereign mode can
 // treat as local/trusted without requiring an API key.
 func IsTrustedLocalLLMEndpoint(rawURL string) bool {
 	if IsLocalEndpointURL(rawURL) {

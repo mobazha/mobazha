@@ -1,5 +1,5 @@
 // huma_security_consistency_helpers_test.go — helpers shared by the
-// full-build and private_distribution-build TD-117 contract tests. Kept in a
+// full-build and sovereign-build TD-117 contract tests. Kept in a
 // _test.go file (no build tag) so it compiles into both test binaries.
 package api
 

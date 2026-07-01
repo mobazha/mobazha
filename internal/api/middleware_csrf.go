@@ -11,7 +11,7 @@ import (
 // csrfOriginCheckMiddleware validates that state-changing requests (POST, PUT,
 // DELETE, PATCH) carry an Origin or Referer header matching the request Host.
 //
-// This defends standalone/private_distribution deployments against CSRF when the browser
+// This defends standalone/sovereign deployments against CSRF when the browser
 // auto-attaches Basic Auth credentials. Bearer tokens (API tokens or JWTs)
 // are explicitly sent by code, never auto-attached by browsers, so they skip
 // this check. Requests with no Origin/Referer are assumed to come from

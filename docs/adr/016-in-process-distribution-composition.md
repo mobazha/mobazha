@@ -7,8 +7,8 @@ Date: 2026-07-01
 ## Context
 
 Mobazha ships a public self-hosted distribution, a private Hosting backend,
-and private products such as PrivateDistribution. Earlier PrivateDistribution integration selected a
-second Node implementation with a Go build tag. That duplicated fields,
+and private products composed from public extension points. An earlier private
+distribution selected a second Node implementation with a Go build tag. That duplicated fields,
 lifecycle methods, API registration, accessors, and empty domain stubs. The
 two binaries could compile while silently implementing different state
 machines and route semantics.
@@ -48,7 +48,7 @@ boundary.
 
 ## Invariants
 
-- No `private_distribution` Go build tag exists in Open Core or the private product.
+- No distribution-specific Go build tag exists in Open Core or private products.
 - No parallel Node field, lifecycle, accessor, or empty-stub implementation is
   selected per product.
 - Distribution configuration is copied and validated before a repository,

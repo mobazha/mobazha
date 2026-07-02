@@ -58,14 +58,15 @@ if errors:
 print("community capability manifest: OK")
 PY
 
-if rg -n 'github\.com/mobazha/mobazha3\.0/internal/' \
-  "${repo_root}/pkg/paymentplugin" --glob '*.go'; then
+if grep -R -n --include='*.go' \
+  'github\.com/mobazha/mobazha3\.0/internal/' \
+  "${repo_root}/pkg/paymentplugin"; then
   echo "ERROR: public payment plugin contract imports internal packages" >&2
   exit 1
 fi
 
 if [[ ! -f "${repo_root}/LICENSE" ]] || \
-  ! rg -q '^Mozilla Public License Version 2\.0$' "${repo_root}/LICENSE"; then
+  ! grep -q '^Mozilla Public License Version 2\.0$' "${repo_root}/LICENSE"; then
   echo "ERROR: root LICENSE must contain MPL-2.0" >&2
   exit 1
 fi
@@ -75,7 +76,7 @@ if [[ ! -f "${repo_root}/LICENSES/MIT-OpenBazaar.txt" ]]; then
   exit 1
 fi
 
-if rg -q 'MOBAZHA_EDITION' "${repo_root}/deploy/standalone/docker-compose.yml"; then
+if grep -q 'MOBAZHA_EDITION' "${repo_root}/deploy/standalone/docker-compose.yml"; then
   echo "ERROR: public deployment exposes a runtime edition escalation switch" >&2
   exit 1
 fi

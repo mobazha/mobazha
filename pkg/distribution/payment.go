@@ -471,9 +471,10 @@ type PaymentModule interface {
 	RollbackRegistration(ctx context.Context) error
 }
 
-// PaymentModuleRunner owns the post-wiring lifecycle. Start calls ready exactly
-// once after required observers and recovery work are live, then may block
-// until cancellation. Stop must be idempotent and release module resources.
+// PaymentModuleRunner owns the post-wiring lifecycle. Start must call ready
+// exactly when synchronous initialization has completed and the module can
+// serve its declared rails, then block until cancellation or runtime failure.
+// Stop must be idempotent, release module-owned resources, and unblock Start.
 type PaymentModuleRunner interface {
 	Start(ctx context.Context, ready func()) error
 	Stop(ctx context.Context) error
@@ -519,110 +520,159 @@ func (r *collectingPaymentRegistrar) RegisterV2(chain iwallet.ChainType, strateg
 // paymentModuleRegistration records the exact live contribution owned by one
 // module. Lifecycle failure must never unregister another module's chains.
 type paymentModuleRegistration struct {
-	module PaymentModule
-	chains []iwallet.ChainType
+	descriptor PaymentModuleDescriptor
+	module     PaymentModule
+	chains     []iwallet.ChainType
 }
 
-// registerPaymentModules validates and applies modules without exposing the
-// live Registry during module execution. Validation or registration failure
-// leaves the target unchanged.
+type paymentModuleRegistrationFailure struct {
+	descriptor PaymentModuleDescriptor
+	err        error
+}
+
+// registerPaymentModules prepares, commits, and binds each module in dependency
+// order. Each module's complete chain set is committed atomically. Optional and
+// setup-gated failures are isolated to that module; a required failure rolls
+// back every earlier contribution and aborts composition.
 func registerPaymentModules(
 	ctx context.Context,
 	authority PaymentRuntimeAuthority,
 	target PaymentRegistry,
 	modules ...PaymentModule,
-) ([]paymentModuleRegistration, error) {
+) ([]paymentModuleRegistration, []paymentModuleRegistrationFailure, error) {
 	if len(modules) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if target == nil {
-		return nil, fmt.Errorf("payment module registry is required")
+		return nil, nil, fmt.Errorf("payment module registry is required")
 	}
 
-	seenIDs := make(map[string]struct{}, len(modules))
-	collector := newCollectingPaymentRegistrar()
 	registrations := make([]paymentModuleRegistration, 0, len(modules))
-	attempted := make([]PaymentModule, 0, len(modules))
-	rollback := func(cause error) error {
+	failures := make([]paymentModuleRegistrationFailure, 0)
+	available := make(map[string]bool, len(modules))
+	rollbackAll := func(cause error) error {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
 		rollbackErrors := []error{cause}
-		for index := len(attempted) - 1; index >= 0; index-- {
-			if err := attempted[index].RollbackRegistration(cleanupCtx); err != nil {
-				rollbackErrors = append(rollbackErrors, fmt.Errorf(
-					"rollback payment module %q registration: %w",
-					attempted[index].Descriptor().ID,
-					err,
-				))
+		for index := len(registrations) - 1; index >= 0; index-- {
+			if err := rollbackCommittedPaymentModule(cleanupCtx, target, registrations[index]); err != nil {
+				rollbackErrors = append(rollbackErrors, err)
 			}
 		}
 		return errors.Join(rollbackErrors...)
 	}
-	for index, module := range modules {
-		if isNilInterface(module) {
-			return nil, rollback(fmt.Errorf("payment module at index %d is nil", index))
+	recordFailure := func(descriptor PaymentModuleDescriptor, cause error) error {
+		if descriptor.Activation == PaymentModuleRequired {
+			return rollbackAll(cause)
 		}
-		descriptor := module.Descriptor()
-		id := strings.TrimSpace(descriptor.ID)
-		if id == "" {
-			return nil, rollback(fmt.Errorf("payment module at index %d has an empty ID", index))
-		}
-		if _, exists := seenIDs[id]; exists {
-			return nil, rollback(fmt.Errorf("payment module ID %q is registered more than once", id))
-		}
-		seenIDs[id] = struct{}{}
-		descriptor.ID = id
-		runtime, err := authority.RuntimeFor(descriptor)
-		if err != nil {
-			return nil, rollback(err)
-		}
-		attempted = append(attempted, module)
-		registrationStart := len(collector.registrations)
-		if err := module.Register(ctx, runtime, collector); err != nil {
-			return nil, rollback(fmt.Errorf("register payment module %q: %w", id, err))
-		}
-		ownedChains := make([]iwallet.ChainType, 0, len(collector.registrations)-registrationStart)
-		for _, registration := range collector.registrations[registrationStart:] {
-			ownedChains = append(ownedChains, registration.chain)
-		}
-		registrations = append(registrations, paymentModuleRegistration{module: module, chains: ownedChains})
+		failures = append(failures, paymentModuleRegistrationFailure{descriptor: descriptor, err: cause})
+		available[descriptor.ID] = false
+		return nil
 	}
 
-	strategies := make(map[iwallet.ChainType]payment.ChainEscrowV2, len(collector.registrations))
-	for _, registration := range collector.registrations {
-		strategies[registration.chain] = registration.strategy
-	}
-	if err := target.RegisterV2BatchExclusive(strategies); err != nil {
-		return nil, rollback(fmt.Errorf("commit payment module strategies: %w", err))
-	}
-	chains := make([]iwallet.ChainType, 0, len(strategies))
-	for chain := range strategies {
-		chains = append(chains, chain)
-	}
-	bound := make([]PaymentModuleBinder, 0, len(modules))
-	for _, module := range modules {
-		binder, ok := module.(PaymentModuleBinder)
-		if !ok {
+	for index, module := range modules {
+		if err := ctx.Err(); err != nil {
+			return nil, failures, rollbackAll(err)
+		}
+		if isNilInterface(module) {
+			return nil, failures, rollbackAll(fmt.Errorf("payment module at index %d is nil", index))
+		}
+		descriptor := normalizedPaymentModuleDescriptor(module.Descriptor())
+		var unavailableDependency string
+		for _, dependency := range descriptor.Dependencies {
+			if !available[dependency] {
+				unavailableDependency = dependency
+				break
+			}
+		}
+		if unavailableDependency != "" {
+			cause := fmt.Errorf("payment module %q dependency %q is unavailable", descriptor.ID, unavailableDependency)
+			if err := recordFailure(descriptor, cause); err != nil {
+				return nil, failures, err
+			}
 			continue
 		}
-		if err := binder.Bind(ctx); err != nil {
-			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-			cleanupErrors := []error{fmt.Errorf("bind payment module %q: %w", module.Descriptor().ID, err)}
-			if cleanupErr := binder.Unbind(cleanupCtx); cleanupErr != nil {
-				cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind failed payment module %q: %w", module.Descriptor().ID, cleanupErr))
+
+		runtime, err := authority.RuntimeFor(descriptor)
+		if err != nil {
+			if failureErr := recordFailure(descriptor, err); failureErr != nil {
+				return nil, failures, failureErr
 			}
-			for index := len(bound) - 1; index >= 0; index-- {
-				if cleanupErr := bound[index].Unbind(cleanupCtx); cleanupErr != nil {
-					cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind payment module: %w", cleanupErr))
-				}
+			continue
+		}
+		collector := newCollectingPaymentRegistrar()
+		if err := module.Register(ctx, runtime, collector); err != nil {
+			cause := fmt.Errorf("register payment module %q: %w", descriptor.ID, err)
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			if cleanupErr := module.RollbackRegistration(cleanupCtx); cleanupErr != nil {
+				cause = errors.Join(cause, fmt.Errorf("rollback payment module %q registration: %w", descriptor.ID, cleanupErr))
 			}
 			cancel()
-			target.UnregisterV2Batch(chains)
-			return nil, rollback(errors.Join(cleanupErrors...))
+			if ctx.Err() != nil {
+				return nil, failures, rollbackAll(cause)
+			}
+			if failureErr := recordFailure(descriptor, cause); failureErr != nil {
+				return nil, failures, failureErr
+			}
+			continue
 		}
-		bound = append(bound, binder)
+
+		ownedChains := make([]iwallet.ChainType, 0, len(collector.registrations))
+		strategies := make(map[iwallet.ChainType]payment.ChainEscrowV2, len(collector.registrations))
+		for _, registration := range collector.registrations {
+			ownedChains = append(ownedChains, registration.chain)
+			strategies[registration.chain] = registration.strategy
+		}
+		registration := paymentModuleRegistration{descriptor: descriptor, module: module, chains: ownedChains}
+		if err := target.RegisterV2BatchExclusive(strategies); err != nil {
+			cause := fmt.Errorf("commit payment module %q strategies: %w", descriptor.ID, err)
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			if cleanupErr := module.RollbackRegistration(cleanupCtx); cleanupErr != nil {
+				cause = errors.Join(cause, fmt.Errorf("rollback payment module %q registration: %w", descriptor.ID, cleanupErr))
+			}
+			cancel()
+			if failureErr := recordFailure(descriptor, cause); failureErr != nil {
+				return nil, failures, failureErr
+			}
+			continue
+		}
+		if binder, ok := module.(PaymentModuleBinder); ok {
+			if err := binder.Bind(ctx); err != nil {
+				cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+				cleanupErrors := []error{fmt.Errorf("bind payment module %q: %w", descriptor.ID, err)}
+				if cleanupErr := binder.Unbind(cleanupCtx); cleanupErr != nil {
+					cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind failed payment module %q: %w", descriptor.ID, cleanupErr))
+				}
+				target.UnregisterV2Batch(ownedChains)
+				if cleanupErr := module.RollbackRegistration(cleanupCtx); cleanupErr != nil {
+					cleanupErrors = append(cleanupErrors, fmt.Errorf("rollback payment module %q: %w", descriptor.ID, cleanupErr))
+				}
+				cancel()
+				cause := errors.Join(cleanupErrors...)
+				if failureErr := recordFailure(descriptor, cause); failureErr != nil {
+					return nil, failures, failureErr
+				}
+				continue
+			}
+		}
+		registrations = append(registrations, registration)
+		available[descriptor.ID] = true
 	}
-	return registrations, nil
+	return registrations, failures, nil
+}
+
+func rollbackCommittedPaymentModule(ctx context.Context, target PaymentRegistry, registration paymentModuleRegistration) error {
+	var cleanupErrors []error
+	target.UnregisterV2Batch(registration.chains)
+	if binder, ok := registration.module.(PaymentModuleBinder); ok {
+		if err := binder.Unbind(ctx); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind payment module %q: %w", registration.descriptor.ID, err))
+		}
+	}
+	if err := registration.module.RollbackRegistration(ctx); err != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Errorf("rollback payment module %q: %w", registration.descriptor.ID, err))
+	}
+	return errors.Join(cleanupErrors...)
 }
 
 func isNilInterface(value any) bool {

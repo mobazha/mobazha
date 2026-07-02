@@ -20,10 +20,11 @@ import (
 type PaymentModuleState string
 
 const (
-	PaymentModuleStopped  PaymentModuleState = "stopped"
-	PaymentModuleStarting PaymentModuleState = "starting"
-	PaymentModuleReady    PaymentModuleState = "ready"
-	PaymentModuleDegraded PaymentModuleState = "degraded"
+	PaymentModuleStopped    PaymentModuleState = "stopped"
+	PaymentModuleStarting   PaymentModuleState = "starting"
+	PaymentModuleReady      PaymentModuleState = "ready"
+	PaymentModuleNeedsSetup PaymentModuleState = "needs_setup"
+	PaymentModuleDegraded   PaymentModuleState = "degraded"
 )
 
 // PaymentModuleHealth is an immutable manager snapshot suitable for product
@@ -42,15 +43,21 @@ type TrustedPaymentModuleManager struct {
 	target    PaymentRegistry
 	modules   []PaymentModule
 
-	mu            sync.RWMutex
-	registrations []paymentModuleRegistration
-	health        map[string]PaymentModuleHealth
-	active        map[string]bool
-	registered    bool
-	started       bool
-	stopOnce      sync.Once
-	done          chan struct{}
-	onHealth      func(PaymentModuleHealth)
+	lifecycleMu     sync.Mutex
+	stopMu          sync.Mutex
+	mu              sync.RWMutex
+	registrations   []paymentModuleRegistration
+	health          map[string]PaymentModuleHealth
+	active          map[string]bool
+	cleanupComplete map[string]bool
+	registered      bool
+	started         bool
+	stopped         bool
+	runCancel       context.CancelFunc
+	runWG           sync.WaitGroup
+	doneOnce        sync.Once
+	done            chan struct{}
+	onHealth        func(PaymentModuleHealth)
 }
 
 // NewTrustedPaymentModuleManager validates descriptors and establishes a
@@ -73,20 +80,24 @@ func NewTrustedPaymentModuleManager(
 		health[descriptor.ID] = PaymentModuleHealth{Descriptor: descriptor, State: PaymentModuleStopped}
 	}
 	return &TrustedPaymentModuleManager{
-		authority: authority,
-		target:    target,
-		modules:   ordered,
-		health:    health,
-		active:    make(map[string]bool, len(ordered)),
-		done:      make(chan struct{}),
+		authority:       authority,
+		target:          target,
+		modules:         ordered,
+		health:          health,
+		active:          make(map[string]bool, len(ordered)),
+		cleanupComplete: make(map[string]bool, len(ordered)),
+		done:            make(chan struct{}),
 	}, nil
 }
 
-// Register prepares every module and atomically commits the full strategy set.
+// Register prepares modules in dependency order and atomically commits each
+// module's complete strategy set according to its activation policy.
 func (m *TrustedPaymentModuleManager) Register(ctx context.Context) error {
 	if m == nil {
 		return fmt.Errorf("trusted payment module manager is nil")
 	}
+	m.lifecycleMu.Lock()
+	defer m.lifecycleMu.Unlock()
 	m.mu.Lock()
 	if m.registered {
 		m.mu.Unlock()
@@ -94,7 +105,7 @@ func (m *TrustedPaymentModuleManager) Register(ctx context.Context) error {
 	}
 	m.mu.Unlock()
 
-	registrations, err := registerPaymentModules(ctx, m.authority, m.target, m.modules...)
+	registrations, failures, err := registerPaymentModules(ctx, m.authority, m.target, m.modules...)
 	if err != nil {
 		return err
 	}
@@ -102,11 +113,17 @@ func (m *TrustedPaymentModuleManager) Register(ctx context.Context) error {
 	m.registrations = registrations
 	m.registered = true
 	for _, registration := range registrations {
-		id := strings.TrimSpace(registration.module.Descriptor().ID)
+		id := registration.descriptor.ID
 		health := m.health[id]
 		health.Chains = append([]iwallet.ChainType(nil), registration.chains...)
 		m.health[id] = health
 		m.active[id] = true
+	}
+	for _, failure := range failures {
+		health := m.health[failure.descriptor.ID]
+		health.State = unavailablePaymentModuleState(failure.descriptor.Activation)
+		health.Error = failure.err.Error()
+		m.health[failure.descriptor.ID] = health
 	}
 	m.mu.Unlock()
 	return nil
@@ -118,33 +135,78 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 	if m == nil {
 		return fmt.Errorf("trusted payment module manager is nil")
 	}
+	m.lifecycleMu.Lock()
+	defer m.lifecycleMu.Unlock()
 	m.mu.Lock()
 	if !m.registered {
 		m.mu.Unlock()
 		return fmt.Errorf("trusted payment modules are not registered")
 	}
+	if m.stopped {
+		m.mu.Unlock()
+		return fmt.Errorf("trusted payment modules are stopped")
+	}
 	if m.started {
 		m.mu.Unlock()
 		return fmt.Errorf("trusted payment modules are already started")
 	}
+	runCtx, cancel := context.WithCancel(ctx)
+	m.runCancel = cancel
 	m.started = true
 	m.onHealth = onHealth
 	registrations := append([]paymentModuleRegistration(nil), m.registrations...)
 	m.mu.Unlock()
+	if onHealth != nil {
+		for _, health := range m.Health() {
+			if health.State == PaymentModuleDegraded || health.State == PaymentModuleNeedsSetup {
+				onHealth(health)
+			}
+		}
+	}
 
 	for _, registration := range registrations {
-		id := strings.TrimSpace(registration.module.Descriptor().ID)
+		id := registration.descriptor.ID
+		if dependency := m.unavailableDependency(registration.descriptor); dependency != "" {
+			cause := fmt.Errorf("payment module %q dependency %q is unavailable", id, dependency)
+			m.deactivateCascade(registration, cause)
+			if registration.descriptor.Activation == PaymentModuleRequired {
+				return m.abortStart(runCtx, cause)
+			}
+			continue
+		}
 		m.publish(id, PaymentModuleStarting, "")
 		runner, ok := registration.module.(PaymentModuleRunner)
 		if !ok {
 			m.publish(id, PaymentModuleReady, "")
 			continue
 		}
-		go m.run(ctx, registration, runner)
+		ready := make(chan struct{})
+		result := make(chan error, 1)
+		var readyOnce sync.Once
+		m.runWG.Add(1)
+		go func() {
+			defer m.runWG.Done()
+			result <- runner.Start(runCtx, func() { readyOnce.Do(func() { close(ready) }) })
+		}()
+		select {
+		case <-ready:
+			m.publish(id, PaymentModuleReady, "")
+			go m.watchRunner(runCtx, registration, result)
+		case err := <-result:
+			if err == nil {
+				err = fmt.Errorf("module returned before reporting readiness")
+			}
+			m.deactivateCascade(registration, err)
+			if registration.descriptor.Activation == PaymentModuleRequired {
+				return m.abortStart(runCtx, err)
+			}
+		case <-runCtx.Done():
+			return m.abortStart(runCtx, runCtx.Err())
+		}
 	}
 	go func() {
 		select {
-		case <-ctx.Done():
+		case <-runCtx.Done():
 		case <-m.done:
 			return
 		}
@@ -155,67 +217,45 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 	return nil
 }
 
-func (m *TrustedPaymentModuleManager) run(ctx context.Context, registration paymentModuleRegistration, runner PaymentModuleRunner) {
-	id := strings.TrimSpace(registration.module.Descriptor().ID)
-	err := runner.Start(ctx, func() { m.publishReady(id) })
-	if ctx.Err() != nil {
-		return
-	}
-	if err == nil {
-		err = fmt.Errorf("module returned before node shutdown")
-	}
-	m.deactivate(registration, err)
-}
-
-func (m *TrustedPaymentModuleManager) publishReady(id string) {
-	m.mu.Lock()
-	if !m.active[id] {
-		m.mu.Unlock()
-		return
-	}
-	health := m.health[id]
-	if health.State != PaymentModuleStarting {
-		m.mu.Unlock()
-		return
-	}
-	health.State = PaymentModuleReady
-	health.Error = ""
-	m.health[id] = health
-	callback := m.onHealth
-	m.mu.Unlock()
-	if callback != nil {
-		callback(health)
+func (m *TrustedPaymentModuleManager) watchRunner(ctx context.Context, registration paymentModuleRegistration, result <-chan error) {
+	select {
+	case err := <-result:
+		if ctx.Err() != nil {
+			return
+		}
+		if err == nil {
+			err = fmt.Errorf("module returned before node shutdown")
+		}
+		m.deactivateCascade(registration, err)
+	case <-ctx.Done():
 	}
 }
 
-func (m *TrustedPaymentModuleManager) deactivate(registration paymentModuleRegistration, cause error) {
-	id := strings.TrimSpace(registration.module.Descriptor().ID)
-	m.mu.Lock()
-	if !m.active[id] {
-		m.mu.Unlock()
-		return
+func (m *TrustedPaymentModuleManager) deactivateCascade(registration paymentModuleRegistration, cause error) {
+	m.stopMu.Lock()
+	defer m.stopMu.Unlock()
+	affected := map[string]error{registration.descriptor.ID: cause}
+	for _, candidate := range m.registrations {
+		for _, dependency := range candidate.descriptor.Dependencies {
+			if dependencyCause, ok := affected[dependency]; ok {
+				affected[candidate.descriptor.ID] = fmt.Errorf("dependency %q failed: %w", dependency, dependencyCause)
+				break
+			}
+		}
 	}
-	m.active[id] = false
-	m.mu.Unlock()
-
-	m.target.UnregisterV2Batch(registration.chains)
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	cleanupErrors := []error{cause}
-	if runner, ok := registration.module.(PaymentModuleRunner); ok {
-		if err := runner.Stop(cleanupCtx); err != nil {
-			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop module %q: %w", id, err))
+	for index := len(m.registrations) - 1; index >= 0; index-- {
+		candidate := m.registrations[index]
+		candidateCause, ok := affected[candidate.descriptor.ID]
+		if !ok {
+			continue
+		}
+		cleanupErr := m.cleanupRegistration(cleanupCtx, candidate, PaymentModuleDegraded, candidateCause.Error())
+		if cleanupErr != nil {
+			m.publish(candidate.descriptor.ID, PaymentModuleDegraded, errors.Join(candidateCause, cleanupErr).Error())
 		}
 	}
-	if binder, ok := registration.module.(PaymentModuleBinder); ok {
-		if err := binder.Unbind(cleanupCtx); err != nil {
-			cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind module %q: %w", id, err))
-		}
-	}
-	if err := registration.module.RollbackRegistration(cleanupCtx); err != nil {
-		cleanupErrors = append(cleanupErrors, fmt.Errorf("rollback module %q: %w", id, err))
-	}
-	m.publish(id, PaymentModuleDegraded, errors.Join(cleanupErrors...).Error())
 }
 
 // Stop shuts down active modules in reverse dependency order.
@@ -223,42 +263,139 @@ func (m *TrustedPaymentModuleManager) Stop(ctx context.Context) error {
 	if m == nil {
 		return nil
 	}
-	var result error
-	m.stopOnce.Do(func() {
-		close(m.done)
-		m.mu.RLock()
-		registrations := append([]paymentModuleRegistration(nil), m.registrations...)
-		m.mu.RUnlock()
-		var cleanupErrors []error
-		for index := len(registrations) - 1; index >= 0; index-- {
-			registration := registrations[index]
-			id := strings.TrimSpace(registration.module.Descriptor().ID)
-			m.mu.Lock()
-			active := m.active[id]
-			m.active[id] = false
-			m.mu.Unlock()
-			if !active {
-				continue
-			}
-			m.target.UnregisterV2Batch(registration.chains)
-			if runner, ok := registration.module.(PaymentModuleRunner); ok {
-				if err := runner.Stop(ctx); err != nil {
-					cleanupErrors = append(cleanupErrors, fmt.Errorf("stop module %q: %w", id, err))
-				}
-			}
-			if binder, ok := registration.module.(PaymentModuleBinder); ok {
-				if err := binder.Unbind(ctx); err != nil {
-					cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind module %q: %w", id, err))
-				}
-			}
-			if err := registration.module.RollbackRegistration(ctx); err != nil {
-				cleanupErrors = append(cleanupErrors, fmt.Errorf("rollback module %q: %w", id, err))
-			}
+	m.lifecycleMu.Lock()
+	defer m.lifecycleMu.Unlock()
+	return m.stop(ctx)
+}
+
+func (m *TrustedPaymentModuleManager) abortStart(_ context.Context, cause error) error {
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return errors.Join(cause, m.stop(cleanupCtx))
+}
+
+func (m *TrustedPaymentModuleManager) stop(ctx context.Context) error {
+	m.doneOnce.Do(func() { close(m.done) })
+	m.mu.Lock()
+	if m.runCancel != nil {
+		m.runCancel()
+	}
+	registrations := append([]paymentModuleRegistration(nil), m.registrations...)
+	m.mu.Unlock()
+
+	m.stopMu.Lock()
+	var cleanupErrors []error
+	for index := len(registrations) - 1; index >= 0; index-- {
+		if err := m.cleanupRegistration(ctx, registrations[index], PaymentModuleStopped, ""); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
+	}
+	m.stopMu.Unlock()
+
+	if err := m.waitForRunners(ctx); err != nil {
+		cleanupErrors = append(cleanupErrors, err)
+	}
+	m.mu.Lock()
+	allClean := true
+	for _, registration := range registrations {
+		if !m.cleanupComplete[registration.descriptor.ID] {
+			allClean = false
+			break
+		}
+	}
+	if allClean {
+		m.started = false
+		m.stopped = true
+	}
+	m.mu.Unlock()
+	return errors.Join(cleanupErrors...)
+}
+
+func (m *TrustedPaymentModuleManager) cleanupRegistration(
+	ctx context.Context,
+	registration paymentModuleRegistration,
+	state PaymentModuleState,
+	detail string,
+) error {
+	id := registration.descriptor.ID
+	m.mu.Lock()
+	if m.cleanupComplete[id] {
+		m.mu.Unlock()
+		if state == PaymentModuleStopped {
 			m.publish(id, PaymentModuleStopped, "")
 		}
-		result = errors.Join(cleanupErrors...)
-	})
-	return result
+		return nil
+	}
+	active := m.active[id]
+	m.active[id] = false
+	m.mu.Unlock()
+
+	if active {
+		m.target.UnregisterV2Batch(registration.chains)
+	}
+	var cleanupErrors []error
+	if runner, ok := registration.module.(PaymentModuleRunner); ok {
+		if err := runner.Stop(ctx); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop module %q: %w", id, err))
+		}
+	}
+	if binder, ok := registration.module.(PaymentModuleBinder); ok {
+		if err := binder.Unbind(ctx); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("unbind module %q: %w", id, err))
+		}
+	}
+	if err := registration.module.RollbackRegistration(ctx); err != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Errorf("rollback module %q: %w", id, err))
+	}
+	cleanupErr := errors.Join(cleanupErrors...)
+	m.mu.Lock()
+	if cleanupErr == nil {
+		m.cleanupComplete[id] = true
+	}
+	m.mu.Unlock()
+	publishedState := state
+	if cleanupErr != nil {
+		publishedState = PaymentModuleDegraded
+		if detail == "" {
+			detail = cleanupErr.Error()
+		} else {
+			detail = errors.Join(errors.New(detail), cleanupErr).Error()
+		}
+	}
+	m.publish(id, publishedState, detail)
+	return cleanupErr
+}
+
+func (m *TrustedPaymentModuleManager) waitForRunners(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		m.runWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("wait for payment module runners: %w", ctx.Err())
+	}
+}
+
+func (m *TrustedPaymentModuleManager) unavailableDependency(descriptor PaymentModuleDescriptor) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, dependency := range descriptor.Dependencies {
+		if !m.active[dependency] {
+			return dependency
+		}
+	}
+	return ""
+}
+
+func unavailablePaymentModuleState(activation PaymentModuleActivation) PaymentModuleState {
+	if activation == PaymentModuleSetupGated {
+		return PaymentModuleNeedsSetup
+	}
+	return PaymentModuleDegraded
 }
 
 // Health returns stable, ID-sorted snapshots.
@@ -270,6 +407,7 @@ func (m *TrustedPaymentModuleManager) Health() []PaymentModuleHealth {
 	result := make([]PaymentModuleHealth, 0, len(m.health))
 	for _, health := range m.health {
 		health.Chains = append([]iwallet.ChainType(nil), health.Chains...)
+		health.Descriptor = clonePaymentModuleDescriptor(health.Descriptor)
 		result = append(result, health)
 	}
 	m.mu.RUnlock()
@@ -284,9 +422,12 @@ func (m *TrustedPaymentModuleManager) publish(id string, state PaymentModuleStat
 	health.Error = detail
 	m.health[id] = health
 	callback := m.onHealth
+	snapshot := health
+	snapshot.Descriptor = clonePaymentModuleDescriptor(snapshot.Descriptor)
+	snapshot.Chains = append([]iwallet.ChainType(nil), snapshot.Chains...)
 	m.mu.Unlock()
 	if callback != nil {
-		callback(health)
+		callback(snapshot)
 	}
 }
 
@@ -346,11 +487,19 @@ func orderPaymentModules(modules []PaymentModule) ([]PaymentModule, error) {
 }
 
 func normalizedPaymentModuleDescriptor(descriptor PaymentModuleDescriptor) PaymentModuleDescriptor {
+	descriptor = clonePaymentModuleDescriptor(descriptor)
 	descriptor.ID = strings.TrimSpace(descriptor.ID)
 	descriptor.Version = strings.TrimSpace(descriptor.Version)
 	for index := range descriptor.Dependencies {
 		descriptor.Dependencies[index] = strings.TrimSpace(descriptor.Dependencies[index])
 	}
+	return descriptor
+}
+
+func clonePaymentModuleDescriptor(descriptor PaymentModuleDescriptor) PaymentModuleDescriptor {
+	descriptor.Rails = append([]PaymentRailKind(nil), descriptor.Rails...)
+	descriptor.Capabilities = append([]PaymentModuleCapability(nil), descriptor.Capabilities...)
+	descriptor.Dependencies = append([]string(nil), descriptor.Dependencies...)
 	return descriptor
 }
 

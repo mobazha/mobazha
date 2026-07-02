@@ -11,8 +11,10 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -432,9 +434,16 @@ func TestDispatchCancelablePayment_SkipsManagedCollectibleFirstSaleAutoConfirm(t
 }
 
 func TestDispatchCancelablePayment_StillAutoConfirmsNonRefunderStrategy(t *testing.T) {
+	db := newTestDatabase(t)
+	serializedOrderOpen, err := protojson.Marshal(&pb.OrderOpen{})
+	require.NoError(t, err)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.Order{ID: models.OrderID("btc-order"), SerializedOrderOpen: serializedOrderOpen})
+	}))
 	called := make(chan struct{})
 	n := &MobazhaNode{
 		identityFields: identityFields{nodeID: "seller-node"},
+		storageFields:  storageFields{db: db},
 		walletFields:   walletFields{paymentRegistry: payment.NewRegistry()},
 	}
 	n.paymentRegistry.RegisterV2(iwallet.ChainBitcoin, &autoConfirmProbeStrategy{called: called})
@@ -451,6 +460,36 @@ func TestDispatchCancelablePayment_StillAutoConfirmsNonRefunderStrategy(t *testi
 	case <-called:
 	case <-time.After(time.Second):
 		t.Fatal("expected non-refunder strategy to receive AutoConfirm")
+	}
+}
+
+func TestDispatchCancelablePayment_UnreadableOrderPolicyFailsClosed(t *testing.T) {
+	db := newTestDatabase(t)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.Order{
+			ID:                  models.OrderID("unreadable-order"),
+			SerializedOrderOpen: []byte("not-json"),
+		})
+	}))
+	called := make(chan struct{})
+	n := &MobazhaNode{
+		identityFields: identityFields{nodeID: "seller-node"},
+		storageFields:  storageFields{db: db},
+		walletFields:   walletFields{paymentRegistry: payment.NewRegistry()},
+	}
+	n.paymentRegistry.RegisterV2(iwallet.ChainBitcoin, &autoConfirmProbeStrategy{called: called})
+
+	n.dispatchCancelablePayment(&events.CancelablePaymentReady{
+		OrderID:  "unreadable-order",
+		Coin:     string(testBTCNativeCoin),
+		Amount:   "1000",
+		TenantID: "seller-node",
+	})
+
+	select {
+	case <-called:
+		t.Fatal("auto-confirm must fail closed when managed-order policy cannot be decoded")
+	case <-time.After(50 * time.Millisecond):
 	}
 }
 
@@ -552,7 +591,7 @@ func TestRegisterDistributionPaymentModules_ExternalStrategyIsRegistered(t *test
 	}
 }
 
-func TestRegisterDistributionPaymentModules_CannotReplaceCoreStrategy(t *testing.T) {
+func TestRegisterDistributionPaymentModules_OptionalConflictIsIsolated(t *testing.T) {
 	registry := payment.NewRegistry()
 	coreStrategy := &autoConfirmProbeStrategy{called: make(chan struct{})}
 	registry.RegisterV2(iwallet.ChainBitcoin, coreStrategy)
@@ -571,8 +610,8 @@ func TestRegisterDistributionPaymentModules_CannotReplaceCoreStrategy(t *testing
 	}
 
 	err := n.registerDistributionPaymentModules()
-	if err == nil {
-		t.Fatal("expected core strategy replacement to be rejected")
+	if err != nil {
+		t.Fatalf("optional conflict should not abort composition: %v", err)
 	}
 	got, lookupErr := registry.ForChainV2(iwallet.ChainBitcoin)
 	if lookupErr != nil {
@@ -580,6 +619,10 @@ func TestRegisterDistributionPaymentModules_CannotReplaceCoreStrategy(t *testing
 	}
 	if got != coreStrategy {
 		t.Fatal("core strategy was replaced after rejected module registration")
+	}
+	health := n.paymentModuleManager.Health()
+	if len(health) != 1 || health[0].State != distribution.PaymentModuleDegraded {
+		t.Fatalf("conflicting optional module health = %#v, want degraded", health)
 	}
 }
 

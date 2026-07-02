@@ -1,6 +1,8 @@
 package core
 
 import (
+	"context"
+	"errors"
 	"sync/atomic"
 	"time"
 
@@ -52,7 +54,13 @@ func (n *MobazhaNode) Start() {
 
 		n.startTRONChainClients()
 
-		n.registerPaymentStrategies()
+		if err := n.registerPaymentStrategies(); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "Payment strategy startup failed: %v", err)
+			if stopErr := n.Stop(true); stopErr != nil {
+				logger.LogErrorWithIDf(log, n.nodeID, "Node cleanup after payment strategy startup failure failed: %v", stopErr)
+			}
+			return
+		}
 
 		n.startCancelablePaymentMonitor()
 
@@ -110,6 +118,17 @@ func (n *MobazhaNode) Stop(force bool) error {
 	}
 	if !atomic.CompareAndSwapInt32(&n.stopped, 0, 1) {
 		return nil
+	}
+	var stopErr error
+	if n.paymentModuleManager != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		stopErr = n.paymentModuleManager.Stop(ctx)
+		cancel()
+		if stopErr != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "stop trusted payment modules: %v", stopErr)
+			atomic.StoreInt32(&n.stopped, 0)
+			return stopErr
+		}
 	}
 
 	if n.IsDefaultNode() {
@@ -175,7 +194,7 @@ func (n *MobazhaNode) Stop(force bool) error {
 			if n.eventBus != nil {
 				n.eventBus.Emit(&events.P2PShutdown{})
 			}
-			return coreiface.ErrP2PDelayedShutdown
+			return errors.Join(stopErr, coreiface.ErrP2PDelayedShutdown)
 		case <-stop:
 			if n.eventBus != nil {
 				n.eventBus.Emit(&events.P2PShutdown{})
@@ -189,7 +208,7 @@ func (n *MobazhaNode) Stop(force bool) error {
 			n.eventBus.Emit(&events.P2PShutdown{})
 		}
 	}
-	return nil
+	return stopErr
 }
 
 // startSovereign starts the deliberately small local-first runtime. The

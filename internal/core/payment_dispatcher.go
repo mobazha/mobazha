@@ -33,7 +33,7 @@ import (
 //
 // Dependencies are injected into adapters via explicit fields / callbacks,
 // not via a *MobazhaNode reference (hexagonal architecture Phase A).
-func (n *MobazhaNode) registerPaymentStrategies() {
+func (n *MobazhaNode) registerPaymentStrategies() error {
 	n.paymentRegistry = payment.NewRegistry()
 
 	// ── UTXO ────────────────────────────────────────────────────
@@ -52,11 +52,8 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.paymentRegistry.RegisterV2(chain, payment.NewV1AsV2(utxoStrategy))
 	}
 
-	commercialModulesHealthy := true
 	if err := n.registerDistributionPaymentModules(); err != nil {
-		commercialModulesHealthy = false
-		logger.LogErrorWithIDf(log, n.nodeID,
-			"Trusted payment module registration failed; optional commercial rails remain disabled: %v", err)
+		return fmt.Errorf("register trusted payment modules: %w", err)
 	}
 
 	// ── EVM ─────────────────────────────────────────────────────
@@ -86,15 +83,16 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.orderService.SetRegistry(n.paymentRegistry)
 		n.orderService.SetReceiptVerifier(compositeVerifier)
 	}
-	if commercialModulesHealthy {
-		ctx := n.nodeCtx
-		if ctx == nil {
-			ctx = context.Background()
-		}
-		n.runDistributionPaymentModules(ctx)
+	ctx := n.nodeCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := n.runDistributionPaymentModules(ctx); err != nil {
+		return err
 	}
 
 	n.registerUTXOObservationDispatcher()
+	return nil
 }
 
 type distributionPaymentRegistry struct {
@@ -183,19 +181,28 @@ func (c distributionManagedEscrowAutoConfirmer) AutoConfirmManagedEscrow(
 
 var _ distribution.ManagedEscrowAutoConfirmer = distributionManagedEscrowAutoConfirmer{}
 
-func (n *MobazhaNode) runDistributionPaymentModules(ctx context.Context) {
+func (n *MobazhaNode) runDistributionPaymentModules(ctx context.Context) error {
 	if n.paymentModuleManager == nil {
-		return
+		return nil
 	}
 	if err := n.paymentModuleManager.Start(ctx, func(health distribution.PaymentModuleHealth) {
 		if health.State == distribution.PaymentModuleDegraded {
 			logger.LogErrorWithIDf(log, n.nodeID,
 				"Trusted payment module %s degraded; only its owned rails were disabled: %s",
 				health.Descriptor.ID, health.Error)
+			if health.Descriptor.Activation == distribution.PaymentModuleRequired {
+				go func() {
+					if stopErr := n.Stop(true); stopErr != nil {
+						logger.LogErrorWithIDf(log, n.nodeID,
+							"stop node after required payment module %s failed: %v", health.Descriptor.ID, stopErr)
+					}
+				}()
+			}
 		}
 	}); err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Trusted payment module manager failed to start: %v", err)
+		return fmt.Errorf("start trusted payment modules: %w", err)
 	}
+	return nil
 }
 
 // registerUTXOObservationDispatcher wires address-monitored UTXO payments into
@@ -299,7 +306,13 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 		return
 	}
 
-	if n.isManagedCollectibleFirstSaleOrder(event.OrderID) {
+	managedCollectible, err := n.isManagedCollectibleFirstSaleOrder(event.OrderID)
+	if err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID,
+			"Cannot establish managed collectible policy for order %s; auto-confirm denied: %v", event.OrderID, err)
+		return
+	}
+	if managedCollectible {
 		logger.LogInfoWithIDf(log, n.nodeID,
 			"Skipping auto-confirm for managed collectible first-sale order %s; awaiting Hub settle or default refund", event.OrderID)
 		return
@@ -359,22 +372,23 @@ func cancelablePaymentEventTargetsNode(eventTenantID, nodeID, localTenantID stri
 	}
 }
 
-func (n *MobazhaNode) isManagedCollectibleFirstSaleOrder(orderID string) bool {
+func (n *MobazhaNode) isManagedCollectibleFirstSaleOrder(orderID string) (bool, error) {
 	if n == nil || n.db == nil {
-		return false
+		return false, fmt.Errorf("order database is unavailable")
 	}
 
 	var order models.Order
 	if err := n.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID).First(&order).Error
 	}); err != nil {
-		logger.LogWarningWithIDf(log, n.nodeID,
-			"Collectible first-sale check: cannot fetch order %s: %v", orderID, err)
-		return false
+		return false, fmt.Errorf("load order: %w", err)
 	}
 
 	orderOpen, err := order.OrderOpenMessage()
-	return err == nil && models.IsManagedCollectibleFirstSale(orderOpen)
+	if err != nil {
+		return false, fmt.Errorf("decode order open: %w", err)
+	}
+	return models.IsManagedCollectibleFirstSale(orderOpen), nil
 }
 
 func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) bool {

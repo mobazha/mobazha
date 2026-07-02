@@ -150,7 +150,7 @@ func newManagedEscrowOrderForTests(t *testing.T, coinType iwallet.CoinType) (*mo
 	t.Helper()
 
 	order := &models.Order{
-		ID:             models.OrderID("safe-order-test"),
+		ID:             models.OrderID("managed-order-test"),
 		PaymentAddress: "0x9999999999999999999999999999999999999999",
 	}
 	paymentSent := &pb.PaymentSent{

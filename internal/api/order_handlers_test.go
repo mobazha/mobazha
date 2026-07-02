@@ -32,7 +32,7 @@ func TestOrderHandlers(t *testing.T) {
 			},
 		},
 		{
-			name:   "legacy confirm instructions safe misuse returns 400",
+			name:   "legacy confirm instructions managed escrow misuse returns 400",
 			path:   "/v1/orders/order-managed/instructions/confirm",
 			method: http.MethodPost,
 			body:   []byte(`{"payoutAddress":"0x1111111111111111111111111111111111111111"}`),
@@ -64,7 +64,7 @@ func TestOrderHandlers(t *testing.T) {
 			},
 		},
 		{
-			name:   "legacy dispute release instructions safe misuse returns 400",
+			name:   "legacy dispute release instructions managed escrow misuse returns 400",
 			path:   "/v1/disputes/order-managed/instructions/release",
 			method: http.MethodPost,
 			body:   []byte(`{}`),

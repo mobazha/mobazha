@@ -6,6 +6,11 @@ cd "${repo_root}"
 
 failures=0
 
+# This pattern identifies one private EVM settlement scheme without rejecting
+# ordinary uses of "safe" (for example, "safe to call" or safeTxExec).
+private_scheme_pattern='(gnosis[[:space:]_/-]*safe|evm[[:space:]_/-]*safe|native[[:space:]]+safe|safe[-_[:space:]/]*(backed|adapter|monitor|relay|escrow|payment|runtime|settlement|owner|transaction|action|address|envelope|fallback|moderated|moderator|pending|amounts?|uses|rejects|skips|deploy|solana|v[0-9])|safe[[:space:]]*,[[:space:]]*(utxo|solana)|safe[[:space:]]+or[[:space:]]+solana|safe[[:space:]]+(wei|http[[:space:]]+relay)|safe[[:space:]]*/[[:space:]]*smart-wallet|pending[-_[:space:]]*safe|getpendingsafe|setpendingsafe|evmsafe|commercial[./_-]*safe|guest evm safe|distinguishes[-_[:space:]]*safe|infers?[-_[:space:]]*safe|formats?[-_[:space:]]*safe|locked[-_[:space:]]*safe|no[-_[:space:]]*safe|type[[:space:]]*[:=][[:space:]]*"safe"|always[[:space:]]*"safe"|hint\.type[[:space:]]*!=[[:space:]]*"safe")'
+source_paths=('internal/**/*.go' 'pkg/**/*.go' 'cmd/**/*.go' 'api-spec/**')
+
 reject_matches() {
   local message="$1"
   local matches="$2"
@@ -36,6 +41,30 @@ reject_matches \
   "$({
       git ls-files -- internal/api || true
     } | grep -E '(^|/)(huma_.*xmr.*|monero_.*handler|payment_rpc_status_handler)\.go$' || true)"
+
+reject_matches \
+  "private provider implementation paths are present" \
+  "$(git ls-files -- internal pkg cmd \
+      | grep -E -i '(^|/)(safe|monero|private-product)([/_.-]|$)' || true)"
+
+reject_matches \
+  "private settlement scheme identity leaked into the current source tree" \
+  "$(git grep -n -i -E "${private_scheme_pattern}" -- "${source_paths[@]}" || true)"
+
+reject_matches \
+  "private settlement scheme identity leaked into commit messages" \
+  "$(git log --format='%s%n%b' HEAD | grep -n -i -E "${private_scheme_pattern}" || true)"
+
+reject_matches \
+  "private settlement scheme paths remain reachable in public history" \
+  "$(git log --format= --name-only HEAD -- internal pkg cmd api-spec \
+      | grep -E -i '(^|/)(safe|monero|private-product)([/_.-]|$)' \
+      | sort -u || true)"
+
+reject_matches \
+  "private settlement scheme identity remains reachable in public source history" \
+  "$(git log -p --format= HEAD -- internal pkg cmd api-spec \
+      | grep -n -i -E "${private_scheme_pattern}" || true)"
 
 reject_matches \
   "concrete relay/client authority leaked into Open Core" \

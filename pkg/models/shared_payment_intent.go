@@ -49,7 +49,7 @@ func (s *SharedPaymentIntent) SetPendingManagedEscrowInfo(info *PendingManagedEs
 		s.PendingPaymentInfo = nil
 		return nil
 	}
-	info.Type = "managed_escrow"
+	info.Type = pendingManagedEscrowType
 	data, err := json.Marshal(info)
 	if err != nil {
 		return fmt.Errorf("marshal shared pending managed escrow payment info: %w", err)
@@ -60,23 +60,17 @@ func (s *SharedPaymentIntent) SetPendingManagedEscrowInfo(info *PendingManagedEs
 
 // GetPendingManagedEscrowInfo loads managed escrow payment info from PendingPaymentInfo.
 func (s *SharedPaymentIntent) GetPendingManagedEscrowInfo() (*PendingManagedEscrowInfo, error) {
-	if s == nil || len(s.PendingPaymentInfo) == 0 {
+	if s == nil {
 		return nil, nil
 	}
-	var hint struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(s.PendingPaymentInfo, &hint); err != nil {
-		return nil, fmt.Errorf("unmarshal shared pending payment info type: %w", err)
-	}
-	if hint.Type != "managed_escrow" {
-		return nil, nil
-	}
-	var info PendingManagedEscrowInfo
-	if err := json.Unmarshal(s.PendingPaymentInfo, &info); err != nil {
+	info, matches, err := decodePendingManagedEscrowInfo(s.PendingPaymentInfo)
+	if err != nil {
 		return nil, fmt.Errorf("unmarshal shared pending managed escrow payment info: %w", err)
 	}
-	return &info, nil
+	if !matches {
+		return nil, nil
+	}
+	return info, nil
 }
 
 // HydrateOrder fills missing shared payment-route fields onto the order copy.

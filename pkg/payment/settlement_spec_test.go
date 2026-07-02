@@ -39,12 +39,12 @@ func TestSettlementSpec_Validate(t *testing.T) {
 }
 
 func TestSettlementSpec_Helpers(t *testing.T) {
-	safe := NewManagedEscrowSpec(true)
-	require.True(t, safe.IsModerated())
-	require.True(t, safe.RequiresModerator())
-	require.True(t, safe.IsAddressMonitored())
-	require.True(t, safe.UsesManagedEscrow())
-	require.False(t, safe.IsDirect())
+	managed := NewManagedEscrowSpec(true)
+	require.True(t, managed.IsModerated())
+	require.True(t, managed.RequiresModerator())
+	require.True(t, managed.IsAddressMonitored())
+	require.True(t, managed.UsesManagedEscrow())
+	require.False(t, managed.IsDirect())
 
 	solanaEscrow := NewSolanaEscrowSpec(false)
 	require.True(t, solanaEscrow.IsAddressMonitored())

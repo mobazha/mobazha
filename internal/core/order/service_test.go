@@ -223,11 +223,11 @@ func TestOrderAppService_GetOrder_Found(t *testing.T) {
 
 func TestOrderAppService_GetOrder_AttachesSettlementActions(t *testing.T) {
 	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
-	seedOrder(t, svc, "order-get-safe", "buyer", models.OrderState_PENDING)
+	seedOrder(t, svc, "order-get-managed", "buyer", models.OrderState_PENDING)
 	err := svc.db.Update(func(tx database.Tx) error {
 		return tx.Save(&models.SettlementAction{
 			ActionID:    "act-1",
-			OrderID:     "order-get-safe",
+			OrderID:     "order-get-managed",
 			ActionKind:  "complete",
 			State:       "submitted",
 			TxHash:      "0xabc",
@@ -238,7 +238,7 @@ func TestOrderAppService_GetOrder_AttachesSettlementActions(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	order, err := svc.GetOrder("order-get-safe")
+	order, err := svc.GetOrder("order-get-managed")
 	require.NoError(t, err)
 	require.Len(t, order.SettlementActions, 1)
 	assert.Equal(t, "act-1", order.SettlementActions[0].ActionID)

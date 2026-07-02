@@ -1152,7 +1152,7 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 // instructions.
 //
 // UTXO monitored routes still return nil instructions because the backend
-// finalizes those directly. backend-managed EVM routes are excluded and must use
+// finalizes those directly. Backend-managed EVM routes are excluded and must use
 // ExecuteSettlementAction("cancel").
 func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	return s.GetLegacyRefundOrderInstructions(orderID, initiatorAddress)
@@ -1160,7 +1160,7 @@ func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, ini
 
 // GetLegacyRefundOrderInstructions is the internal legacy-only refund
 // instructions surface retained for client-signed chains and fiat
-// informational responses. backend-managed EVM routes must use settlement-actions.
+// informational responses. Backend-managed EVM routes must use settlement-actions.
 func (s *OrderAppService) GetLegacyRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
@@ -1236,7 +1236,7 @@ func orderRequiresClientSignedInstructions(order *models.Order, paymentSent *pb.
 // legacy client-signed ChainEscrow implementation.
 //
 // Address-monitored UTXO routes still return nil instructions because the
-// backend handles them directly. backend-managed EVM routes are rejected and must
+// backend handles them directly. Backend-managed EVM routes are rejected and must
 // use backend settlement actions instead of escrow_v1-style instructions.
 func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, initiatorAddress string, toAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	return s.GetLegacyEscrowReleaseInstructions(orderID, initiatorAddress, toAddress)
@@ -1310,7 +1310,7 @@ func (s *OrderAppService) buyerRefundPayoutAddr(order *models.Order, paymentSent
 }
 
 // refundBuildResult carries the refund order message plus the optional wallet
-// transaction lifecycle that backs it. managed-relay-backed refunds do not own a
+// transaction lifecycle that backs it. Managed relay-backed refunds do not own a
 // wallet tx, so WalletTx may be nil even on success.
 type refundBuildResult struct {
 	WalletTx iwallet.Tx

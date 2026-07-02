@@ -619,7 +619,7 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 //
 // Field policy:
 //
-//   - TransactionID: only populated from a real chain tx hash. native managed escrow
+//   - TransactionID: only populated from a real chain tx hash. Native managed
 //     balance polling may produce an internal observation id when no exact tx
 //     can be attributed; that id is valid for verification/dedupe but must not
 //     become a user-facing transaction hash.

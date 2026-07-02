@@ -47,16 +47,16 @@ type SolanaReferenceChecker interface {
 // Each order in AWAITING_PAYMENT or PAYMENT_DETECTED state gets a goroutine
 // that periodically checks the payment address balance or reference key.
 type GuestPaymentMonitor struct {
-	db           database.Database
-	guestService contracts.GuestOrderService
-	balanceCheck ChainBalanceChecker
-	solanaCheck  SolanaReferenceChecker
-	utxoMonitor  *pkgutxo.Monitor
-	chainOps     pkgutxo.ChainOperations
-	multiwallet  contracts.WalletOperator
-	externalPay  distribution.ExternalPaymentRuntime
+	db                    database.Database
+	guestService          contracts.GuestOrderService
+	balanceCheck          ChainBalanceChecker
+	solanaCheck           SolanaReferenceChecker
+	utxoMonitor           *pkgutxo.Monitor
+	chainOps              pkgutxo.ChainOperations
+	multiwallet           contracts.WalletOperator
+	externalPay           distribution.ExternalPaymentRuntime
 	evmManagedEscrowWatch EVMManagedEscrowWatcher
-	gracePeriod  time.Duration
+	gracePeriod           time.Duration
 	// confirmationInterval is the tick used by pollConfirmationsLoop.
 	// Defaults to confirmationPollInterval (30s); test-only setter shrinks it
 	// so suite runtime stays under a second instead of multi-minute waits.
@@ -126,7 +126,7 @@ func (m *GuestPaymentMonitor) SetMultiwallet(mw contracts.WalletOperator) {
 	m.multiwallet = mw
 }
 
-// EVMManagedEscrowWatcher registers guest managed EVM addresses with the chain managed escrow monitor.
+// EVMManagedEscrowWatcher registers guest EVM funding addresses with the managed escrow monitor.
 type EVMManagedEscrowWatcher interface {
 	RegisterWatch(ctx context.Context, order *models.GuestOrder) error
 	StopWatch(orderToken string)

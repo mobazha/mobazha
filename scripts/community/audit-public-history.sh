@@ -21,14 +21,21 @@ if git -C "${repo_root}" log --format='%B' HEAD \
   fail "public history contains private provenance trailers"
 fi
 
-[[ ! -e "${repo_root}/.community-export.json" ]] \
-  || fail "source-mapping metadata must not be published"
+if git -C "${repo_root}" ls-files \
+  | grep -Eiq '(^|/)(\.community-export\.json|source[-_]?map|commit[-_]?map|extraction[-_]?provenance)(\.|/|$)'; then
+  fail "source-mapping metadata must not be published"
+fi
 [[ ! -e "${repo_root}/.gitmodules" ]] \
   || fail "submodule references require a separate publication review"
 
 if git -C "${repo_root}" for-each-ref --format='%(refname)' refs/replace refs/notes \
   | grep -q .; then
   fail "replace or notes refs are not allowed in the publication repository"
+fi
+
+if git -C "${repo_root}" for-each-ref --format='%(refname)' \
+  | grep -Eiq '^refs/(original|codex-backup)/|^refs/remotes/(archive|audit-|private)(/|$)'; then
+  fail "private, archive, or history-rewrite refs are not allowed in the publication repository"
 fi
 
 git -C "${repo_root}" fsck --full --no-dangling >/dev/null

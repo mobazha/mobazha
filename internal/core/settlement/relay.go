@@ -78,7 +78,7 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 			}
 			return iwallet.TransactionID(txHash), payoutAddress, nil
 		}
-		// backend-managed EVM orders no longer share the legacy seller-confirm path.
+		// Backend-managed EVM orders no longer share the legacy seller-confirm path.
 		// They require the unified settlement-action flow so the caller can
 		// obtain a pollable ActionID instead of forcing an implicit relay.
 		if coinInfo.IsEthTypeChain() {
@@ -251,9 +251,9 @@ func (s *SettlementService) RelayInstructions(orderID string, coinType iwallet.C
 // GetConfirmOrderInstructions generates confirm instructions for legacy
 // client-signed CANCELABLE routes only.
 //
-// backend-managed EVM orders must not go through this entrypoint; they use
+// Backend-managed EVM orders must not go through this entrypoint; they use
 // ExecuteSettlementAction("confirm") so the backend can submit and track a
-// managed settlement action instead of emitting escrow_v1-style instructions.
+// managed action instead of emitting escrow_v1-style instructions.
 func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	return s.GetLegacyConfirmOrderInstructions(orderID, initiatorAddress, payoutAddress)
 }

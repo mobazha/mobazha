@@ -818,6 +818,8 @@ type PendingManagedEscrowInfo struct {
 	SettlementSpec *PendingSettlementSpec `json:"settlementSpec,omitempty"`
 }
 
+const pendingManagedEscrowType = "managed_escrow"
+
 // SetPendingManagedEscrowInfo stores managed EVM payment info in PendingPaymentInfo.
 // It overwrites any previous UTXO or managed escrow info for this order.
 func (o *Order) SetPendingManagedEscrowInfo(info *PendingManagedEscrowInfo) error {
@@ -825,7 +827,7 @@ func (o *Order) SetPendingManagedEscrowInfo(info *PendingManagedEscrowInfo) erro
 		o.PendingPaymentInfo = nil
 		return nil
 	}
-	info.Type = "managed_escrow" // enforce discriminator
+	info.Type = pendingManagedEscrowType
 	data, err := json.Marshal(info)
 	if err != nil {
 		return fmt.Errorf("marshal pending managed escrow payment info: %w", err)
@@ -837,23 +839,48 @@ func (o *Order) SetPendingManagedEscrowInfo(info *PendingManagedEscrowInfo) erro
 // GetPendingManagedEscrowInfo retrieves managed EVM payment info from PendingPaymentInfo.
 // Returns (nil, nil) when the field is empty or belongs to a non-managed escrow order.
 func (o *Order) GetPendingManagedEscrowInfo() (*PendingManagedEscrowInfo, error) {
-	if len(o.PendingPaymentInfo) == 0 {
-		return nil, nil
+	info, matches, err := decodePendingManagedEscrowInfo(o.PendingPaymentInfo)
+	if err != nil || !matches {
+		return nil, err
+	}
+	return info, nil
+}
+
+func decodePendingManagedEscrowInfo(raw []byte) (*PendingManagedEscrowInfo, bool, error) {
+	if len(raw) == 0 {
+		return nil, false, nil
 	}
 	var hint struct {
 		Type string `json:"type"`
 	}
-	if err := json.Unmarshal(o.PendingPaymentInfo, &hint); err != nil {
-		return nil, fmt.Errorf("unmarshal pending payment info type: %w", err)
+	if err := json.Unmarshal(raw, &hint); err != nil {
+		return nil, false, fmt.Errorf("unmarshal pending payment info type: %w", err)
 	}
-	if hint.Type != "managed_escrow" {
-		return nil, nil // UTXO or other type
+	if strings.TrimSpace(hint.Type) == "" {
+		return nil, false, nil
 	}
+
 	var info PendingManagedEscrowInfo
-	if err := json.Unmarshal(o.PendingPaymentInfo, &info); err != nil {
-		return nil, fmt.Errorf("unmarshal pending managed escrow payment info: %w", err)
+	if err := json.Unmarshal(raw, &info); err != nil {
+		return nil, false, fmt.Errorf("unmarshal pending managed escrow payment info: %w", err)
 	}
-	return &info, nil
+	if hint.Type != pendingManagedEscrowType && !hasManagedEscrowRoute(&info) {
+		return nil, false, nil
+	}
+	info.Type = pendingManagedEscrowType
+	return &info, true, nil
+}
+
+func hasManagedEscrowRoute(info *PendingManagedEscrowInfo) bool {
+	if info == nil || info.SettlementSpec == nil || strings.TrimSpace(info.Address) == "" {
+		return false
+	}
+	spec := info.SettlementSpec
+	if strings.TrimSpace(spec.PayMode) != "address_monitored" || strings.TrimSpace(spec.EscrowType) != "managed" {
+		return false
+	}
+	method := strings.TrimSpace(spec.Method)
+	return method == pb.PaymentSent_CANCELABLE.String() || method == pb.PaymentSent_MODERATED.String()
 }
 
 // SetPendingPaymentInfo stores temporary UTXO payment info as JSON

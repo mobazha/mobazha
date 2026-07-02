@@ -33,6 +33,42 @@ func TestPendingManagedEscrowInfo_SettlementSpecJSONRoundTrip(t *testing.T) {
 	require.Equal(t, got.SettlementSpec, decoded.SettlementSpec)
 }
 
+func TestPendingManagedEscrowInfo_LegacyTypedRouteIsRecognizedStructurally(t *testing.T) {
+	order := &Order{PendingPaymentInfo: []byte(`{
+		"type":"legacy_typed_route",
+		"coin":"crypto:eip155:1:native",
+		"address":"0xabc",
+		"settlementSpec":{
+			"method":"CANCELABLE",
+			"payMode":"address_monitored",
+			"escrowType":"managed"
+		}
+	}`)}
+
+	got, err := order.GetPendingManagedEscrowInfo()
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, pendingManagedEscrowType, got.Type)
+	require.Equal(t, "0xabc", got.Address)
+}
+
+func TestPendingManagedEscrowInfo_UnrelatedTypedRouteIsIgnored(t *testing.T) {
+	order := &Order{PendingPaymentInfo: []byte(`{
+		"type":"another_route",
+		"coin":"crypto:solana:mainnet:native",
+		"address":"example-address",
+		"settlementSpec":{
+			"method":"CANCELABLE",
+			"payMode":"address_monitored",
+			"escrowType":"program_escrow"
+		}
+	}`)}
+
+	got, err := order.GetPendingManagedEscrowInfo()
+	require.NoError(t, err)
+	require.Nil(t, got)
+}
+
 func TestPendingUTXOPaymentInfo_SettlementSpecJSONRoundTrip(t *testing.T) {
 	order := &Order{}
 	require.NoError(t, order.SetPendingPaymentInfo(&PendingUTXOPaymentInfo{

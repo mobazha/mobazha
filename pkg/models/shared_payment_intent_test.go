@@ -14,6 +14,24 @@ func TestSharedPaymentIntentGetPendingManagedEscrowInfo_InvalidJSONErrors(t *tes
 	require.Nil(t, info)
 }
 
+func TestSharedPaymentIntentGetPendingManagedEscrowInfo_LegacyTypedRoute(t *testing.T) {
+	intent := &SharedPaymentIntent{PendingPaymentInfo: []byte(`{
+		"type":"legacy_typed_route",
+		"coin":"crypto:eip155:1:native",
+		"address":"0xabc",
+		"settlementSpec":{
+			"method":"MODERATED",
+			"payMode":"address_monitored",
+			"escrowType":"managed"
+		}
+	}`)}
+
+	info, err := intent.GetPendingManagedEscrowInfo()
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.Equal(t, pendingManagedEscrowType, info.Type)
+}
+
 func TestSharedPaymentIntentHydrateOrder_InvalidOrderPendingInfoErrors(t *testing.T) {
 	intent := &SharedPaymentIntent{}
 	require.NoError(t, intent.SetPendingManagedEscrowInfo(&PendingManagedEscrowInfo{

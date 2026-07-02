@@ -80,7 +80,7 @@ func (s SettlementSpec) Validate() error {
 			case EscrowTypeUTXOScript, EscrowTypeManaged, EscrowTypeSolanaEscrow:
 				return nil
 			default:
-				return fmt.Errorf("%s with address_monitored requires utxo_script, safe, or solana_escrow, got %s", s.Method, s.EscrowType)
+				return fmt.Errorf("%s with address_monitored requires utxo_script, managed, or solana_escrow, got %s", s.Method, s.EscrowType)
 			}
 		case PayModeClientSigned:
 			switch s.EscrowType {

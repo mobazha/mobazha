@@ -123,8 +123,8 @@ type Config struct {
 	DHTClientOnly          bool     `long:"dhtclientonly" description:"Disable participating in serving data in the DHT. This should be used if your node is undialable."`
 	NetConfigEndpoint      string   `long:"netconfigendpoint" description:"Override the default net config endpoint with the provided value"`
 	NetDBEndpoint          string   `long:"netdbendpoint" description:"Override the default NetDB endpoint for search index sync"`
-	RelayAPIURL            string   `long:"relayapiurl" description:"Platform base URL for relay HTTP API (append /platform/v1/relay/execute). Required for standalone EVM checkout (managed EVM); SaaS uses hosting relay when HostService is wired."`
-	RelayAPIBearer         string   `long:"relayapibearer" description:"Bearer JWT for platform relay HTTP API; if empty, MOBAZHA_PLATFORM_RELAY_TOKEN is used (same as managed HTTP relay path)"`
+	RelayAPIURL            string   `long:"relayapiurl" description:"Platform base URL for relay HTTP API (append /platform/v1/relay/execute). Required for standalone managed EVM checkout; SaaS uses hosting relay when HostService is wired."`
+	RelayAPIBearer         string   `long:"relayapibearer" description:"Bearer JWT for platform relay HTTP API; if empty, MOBAZHA_PLATFORM_RELAY_TOKEN is used for the managed relay path"`
 
 	// GuestCheckout enables the guest (anonymous) checkout feature.
 	// When true, the node accepts orders from unauthenticated buyers

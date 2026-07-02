@@ -895,7 +895,7 @@ func TestAggregateAndEmit_PendingManagedEscrowAmountOverridesOrderOpenAmount(t *
 	got := loadOrder(t, db, "order-managed-amount")
 	require.True(t, got.IsPaymentVerified())
 	require.Equal(t, "1000", got.TotalReceived)
-	require.Empty(t, got.OverpaidAmount, "OrderOpen.Amount is pricing amount, not managed escrow units")
+	require.Empty(t, got.OverpaidAmount, "OrderOpen.Amount is pricing amount, not managed escrow wei")
 
 	ps, err := got.PaymentSentMessage()
 	require.NoError(t, err)
@@ -1740,7 +1740,7 @@ func TestAggregateAndEmit_SharedPaymentIntentAlignsHostedEnvelope(t *testing.T) 
 	bus := &recordingBus{}
 	v := NewAggregatingVerifier(db, bus)
 
-	const sharedID = "order-mirror-safe"
+	const sharedID = "order-mirror-managed"
 	const tenantBuyer = "tenant-buyer"
 	const tenantVendor = "tenant-vendor"
 
@@ -1770,7 +1770,7 @@ func TestAggregateAndEmit_SharedPaymentIntentAlignsHostedEnvelope(t *testing.T) 
 
 	insertObs(t, db, models.PaymentObservation{
 		TenantID:       tenantVendor,
-		ID:             "obs-mirror-safe",
+		ID:             "obs-mirror-managed",
 		OrderID:        sharedID,
 		ChainNamespace: "eip155",
 		ChainReference: "1",

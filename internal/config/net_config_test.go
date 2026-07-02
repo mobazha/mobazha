@@ -85,18 +85,18 @@ func TestNetConfig_PlatformAddrOverrideFallsBackPerChain(t *testing.T) {
 	}
 }
 
-func TestNetConfig_ManagedEscrowGasReleaseFeeConfig(t *testing.T) {
+func TestNetConfig_ManagedEscrowReleaseFeeConfig(t *testing.T) {
 	netConfig := DefaultNetConfig()
-	key := ManagedEscrowGasReleaseFeeUSDCentsKey(iwallet.ChainEthereum)
+	key := ManagedEscrowReleaseFeeUSDCentsKey(iwallet.ChainEthereum)
 	netConfig.SetConfig(key, "500")
 
-	fee, ok := netConfig.GetManagedEscrowGasReleaseFeeUSDCents(iwallet.ChainEthereum)
+	fee, ok := netConfig.GetManagedEscrowReleaseFeeUSDCents(iwallet.ChainEthereum)
 	if !ok || fee != 500 {
 		t.Fatalf("expected ETH release fee 500, got fee=%d ok=%v", fee, ok)
 	}
 
 	netConfig.SetConfig(key, "")
-	if _, ok := netConfig.GetManagedEscrowGasReleaseFeeUSDCents(iwallet.ChainEthereum); ok {
+	if _, ok := netConfig.GetManagedEscrowReleaseFeeUSDCents(iwallet.ChainEthereum); ok {
 		t.Fatal("expected cleared release fee override to be absent")
 	}
 }

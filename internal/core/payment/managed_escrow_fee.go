@@ -34,7 +34,7 @@ func (s *PaymentAppService) quoteManagedEscrowFees(
 	if s.netConfig != nil {
 		// This persisted config key retains its historical name for backward
 		// compatibility; the pricing behavior is provider-neutral here.
-		if override, ok := s.netConfig.GetManagedEscrowGasReleaseFeeUSDCents(coinInfo.Chain); ok {
+		if override, ok := s.netConfig.GetManagedEscrowReleaseFeeUSDCents(coinInfo.Chain); ok {
 			feeCents = override
 		}
 	}

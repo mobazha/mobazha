@@ -185,15 +185,15 @@ func (config *NetConfig) defaultPlatformAddr(chainType iwallet.ChainType) string
 	return defaultMainnetPlatformAddrs[chainType]
 }
 
-func ManagedEscrowGasReleaseFeeUSDCentsKey(chainType iwallet.ChainType) string {
-	return pkgconfig.ManagedEscrowGasReleaseFeeUSDCentsKey(chainType)
+func ManagedEscrowReleaseFeeUSDCentsKey(chainType iwallet.ChainType) string {
+	return pkgconfig.ManagedEscrowReleaseFeeUSDCentsKey(chainType)
 }
 
-func (config *NetConfig) GetManagedEscrowGasReleaseFeeUSDCents(chainType iwallet.ChainType) (uint64, bool) {
+func (config *NetConfig) GetManagedEscrowReleaseFeeUSDCents(chainType iwallet.ChainType) (uint64, bool) {
 	if config == nil {
 		return 0, false
 	}
-	raw, ok := config.GetConfig(ManagedEscrowGasReleaseFeeUSDCentsKey(chainType))
+	raw, ok := config.GetConfig(ManagedEscrowReleaseFeeUSDCentsKey(chainType))
 	if !ok || raw == "" {
 		return 0, false
 	}

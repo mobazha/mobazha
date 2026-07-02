@@ -174,7 +174,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			log.Infof("Failed to load net config from %s: %s, using defaults", endpoint, err)
 		}
 		netConfig.Testnet = cfg.Testnet
-		applyInjectedManagedEscrowPaymentConfig(netConfig, cfg)
+		applyInjectedManagedEscrowConfig(netConfig, cfg)
 
 		if aiJSON := netConfig.GetAIProviders(); aiJSON != "" {
 			if err := ai.LoadRemoteProviders(aiJSON); err != nil {
@@ -304,7 +304,7 @@ func configuredEditionName(cfg *repo.Config) string {
 	return ""
 }
 
-func applyInjectedManagedEscrowPaymentConfig(netConfig *mcfg.NetConfig, cfg *repo.Config) {
+func applyInjectedManagedEscrowConfig(netConfig *mcfg.NetConfig, cfg *repo.Config) {
 	if netConfig == nil || cfg == nil {
 		return
 	}
@@ -323,7 +323,7 @@ func applyInjectedManagedEscrowPaymentConfig(netConfig *mcfg.NetConfig, cfg *rep
 			if !chain.IsValid() {
 				continue
 			}
-			netConfig.SetConfig(mcfg.ManagedEscrowGasReleaseFeeUSDCentsKey(chain), strconv.FormatUint(fee, 10))
+			netConfig.SetConfig(mcfg.ManagedEscrowReleaseFeeUSDCentsKey(chain), strconv.FormatUint(fee, 10))
 		}
 	}
 }

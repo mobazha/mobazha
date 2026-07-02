@@ -226,7 +226,7 @@ type Config struct {
 	// When the tenant hasn't configured BYOK, AIConfigFor* falls back to this.
 	PlatformAI PlatformAIProfileConfig `no-flag:"true"`
 
-	// ManagedEscrow payment platform settings injected by hosting/platform-console.
+	// Managed escrow platform settings injected by hosting/platform-console.
 	// Keys are iwallet.ChainType strings (for example "ETH", "BSC").
 	ManagedEscrowPlatformAddrs      map[string]string `no-flag:"true"`
 	ManagedEscrowReleaseFeeUSDCents map[string]uint64 `no-flag:"true"`

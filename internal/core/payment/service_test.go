@@ -3,6 +3,7 @@ package payment
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -471,6 +472,47 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 	require.NotNil(t, info)
 	require.Equal(t, uint64(1000), info.Amount)
 	require.Equal(t, "crypto:eip155:11155111:native", info.Coin)
+}
+
+func TestPaymentAppService_PersistEscrowPaymentInfo_PreservesModeratorAddress(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	paymentData := &models.PaymentData{
+		OrderID:          "order-solana-moderated",
+		Coin:             iwallet.CoinType("crypto:solana:mainnet:native"),
+		Amount:           1000,
+		ContractAddress:  "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX",
+		ToAddress:        "RT38nT6ABNLfotNxwseiNNKukCKAXpFkZctJGn4EbFe",
+		Moderator:        "moderator-peer-id",
+		ModeratorAddress: "Mod11111111111111111111111111111111111111111",
+		UnlockTime:       12345,
+		FundingDeadline:  12000,
+		SettlementSpec:   payment.NewSolanaEscrowSpec(true).ToPending(),
+	}
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{DB: db})
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.Order{ID: models.OrderID(paymentData.OrderID)})
+	}))
+	require.NoError(t, svc.persistEscrowPaymentInfo(paymentData.OrderID, paymentData))
+
+	var order models.Order
+	require.NoError(t, svc.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", paymentData.OrderID).First(&order).Error
+	}))
+	info, err := order.GetPendingEscrowPaymentInfo()
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.Equal(t, paymentData.ModeratorAddress, info.ModeratorAddress)
+
+	encoded, err := encodeSolanaAnchorPendingMetadata(paymentData)
+	require.NoError(t, err)
+	rawMetadata, err := hex.DecodeString(encoded)
+	require.NoError(t, err)
+	var metadata models.PendingEscrowPaymentInfo
+	require.NoError(t, json.Unmarshal(rawMetadata, &metadata))
+	require.Equal(t, paymentData.ModeratorAddress, metadata.ModeratorAddress)
 }
 
 func TestPaymentAppService_PersistSharedPaymentPolicySnapshot(t *testing.T) {

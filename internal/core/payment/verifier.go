@@ -856,6 +856,9 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 		if strings.TrimSpace(escrowInfo.Moderator) != "" {
 			intent.moderator = escrowInfo.Moderator
 		}
+		if strings.TrimSpace(escrowInfo.ModeratorAddress) != "" {
+			intent.moderatorAddress = escrowInfo.ModeratorAddress
+		}
 		return intent
 	}
 

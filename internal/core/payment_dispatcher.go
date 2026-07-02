@@ -341,6 +341,12 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 		return
 	}
 
+	if n.isManagedCollectibleFirstSaleOrder(event.OrderID) {
+		logger.LogInfoWithIDf(log, n.nodeID,
+			"Skipping auto-confirm for managed collectible first-sale order %s; awaiting Hub settle or default refund", event.OrderID)
+		return
+	}
+
 	if n.isSupplyChainManagedOrder(event.OrderID) {
 		logger.LogInfoWithIDf(log, n.nodeID,
 			"Skipping auto-confirm for supply-chain-managed order %s, waiting for supplier shipment", event.OrderID)
@@ -393,6 +399,24 @@ func cancelablePaymentEventTargetsNode(eventTenantID, nodeID, localTenantID stri
 	default:
 		return nodeID != "" && localTenantID == ""
 	}
+}
+
+func (n *MobazhaNode) isManagedCollectibleFirstSaleOrder(orderID string) bool {
+	if n == nil || n.db == nil {
+		return false
+	}
+
+	var order models.Order
+	if err := n.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&order).Error
+	}); err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID,
+			"Collectible first-sale check: cannot fetch order %s: %v", orderID, err)
+		return false
+	}
+
+	orderOpen, err := order.OrderOpenMessage()
+	return err == nil && models.IsManagedCollectibleFirstSale(orderOpen)
 }
 
 func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) bool {

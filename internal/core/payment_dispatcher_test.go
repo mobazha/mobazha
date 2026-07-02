@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // ── Chain categorization ────────────────────────────────────────────────
@@ -385,6 +386,47 @@ func TestDispatchCancelablePayment_SkipsSolanaSellerDeclineRefunderAutoConfirm(t
 	select {
 	case <-called:
 		t.Fatal("Solana seller_decline_refund strategy should preserve seller decision window instead of auto-confirming")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestDispatchCancelablePayment_SkipsManagedCollectibleFirstSaleAutoConfirm(t *testing.T) {
+	db := newTestDatabase(t)
+	orderOpen := collectibleLifecycleOrderOpen("holder-wallet", []byte("buyer-identity-key"))
+	serializedOrderOpen, err := protojson.Marshal(orderOpen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orderID := models.OrderID("managed-collectible-order")
+	if err := db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.Order{
+			ID:                  orderID,
+			MyRole:              string(models.RoleVendor),
+			SerializedOrderOpen: serializedOrderOpen,
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	called := make(chan struct{})
+	n := &MobazhaNode{
+		identityFields: identityFields{nodeID: "seller-node"},
+		storageFields:  storageFields{db: db},
+		walletFields:   walletFields{paymentRegistry: payment.NewRegistry()},
+	}
+	n.paymentRegistry.RegisterV2(iwallet.ChainEthereum, &autoConfirmProbeStrategy{called: called})
+
+	n.dispatchCancelablePayment(&events.CancelablePaymentReady{
+		OrderID:       orderID.String(),
+		TransactionID: "tx",
+		Coin:          string(testETHNativeCoin),
+		Amount:        "1000",
+		TenantID:      "seller-node",
+	})
+
+	select {
+	case <-called:
+		t.Fatal("managed collectible first sale should preserve escrow until Hub settle or default")
 	case <-time.After(50 * time.Millisecond):
 	}
 }

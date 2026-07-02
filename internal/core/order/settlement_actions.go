@@ -331,7 +331,7 @@ func (s *OrderAppService) canSellerDeclineFundedRefund(order *models.Order) (boo
 		return false, err
 	}
 	method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
-	if !ok || !payment.MethodIsCancelable(method) {
+	if !ok || (!payment.MethodIsCancelable(method) && !payment.MethodIsModerated(method)) {
 		return false, nil
 	}
 	_, ok = s.settlementActionForIntent(order, paymentSent, method, coinType, settlementIntentSellerDeclineFundedRefund)

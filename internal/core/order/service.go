@@ -695,14 +695,20 @@ func (s *OrderAppService) DeclineOrder(orderID models.OrderID, txid iwallet.Tran
 			if !ok {
 				return fmt.Errorf("payment settlement spec is missing")
 			}
-			if action, ok := s.settlementActionForIntent(&order, paymentSent, method, coinType, settlementIntentSellerDeclineFundedRefund); payment.MethodIsCancelable(method) && ok {
+			if action, ok := s.settlementActionForIntent(&order, paymentSent, method, coinType, settlementIntentSellerDeclineFundedRefund); (payment.MethodIsCancelable(method) || payment.MethodIsModerated(method)) && ok {
 				var settlementTxID iwallet.TransactionID
 				var handled bool
 				switch action {
 				case payment.SettlementActionSellerDeclineRefund:
 					settlementTxID, _, handled, err = s.submitSettlementSellerDeclineRefundAction(context.Background(), &order, coinType, paymentSent, "")
 				case payment.SettlementActionCancel:
-					settlementTxID, _, handled, err = s.submitSettlementCancelAction(context.Background(), &order, coinType, paymentSent, "")
+					// MODERATED Escrow refunds need another owner's signature, so
+					// prepareRefundMessage must build the signed release instead of
+					// submitting Cancel here. CANCELABLE refunds can be submitted
+					// immediately because they do not require a second signature.
+					if payment.MethodIsCancelable(method) {
+						settlementTxID, _, handled, err = s.submitSettlementCancelAction(context.Background(), &order, coinType, paymentSent, "")
+					}
 				default:
 					err = fmt.Errorf("%w: unsupported seller decline settlement action %s", payment.ErrUnsupportedAction, action)
 				}
@@ -1537,6 +1543,23 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 			refundResp.Message = refundAny
 			return &refundBuildResult{Message: refundResp}, nil
 		case payment.MethodIsModerated(method):
+			if refundTxID != "" {
+				refund := &pb.Refund{
+					RefundInfo: &pb.Refund_TransactionID{
+						TransactionID: refundTxID.String(),
+					},
+					Amount:    paymentSent.Amount,
+					Timestamp: timestamppb.Now(),
+				}
+
+				refundAny := &anypb.Any{}
+				if err := refundAny.MarshalFrom(refund); err != nil {
+					return nil, fmt.Errorf("failed to marshal moderated refund: %w", err)
+				}
+
+				refundResp.Message = refundAny
+				return &refundBuildResult{Message: refundResp}, nil
+			}
 			if s.shouldSubmitSettlementCancel(order, paymentSent, method, coinType) {
 				payoutAddr, err := s.buyerRefundPayoutAddr(order, paymentSent, coinType, refundObservations)
 				if err != nil {

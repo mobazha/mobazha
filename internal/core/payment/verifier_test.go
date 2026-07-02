@@ -1158,6 +1158,28 @@ func TestResolveAggregatedPaymentIntent_EscrowFallsBackToEscrowAddressForLegacyR
 	require.Equal(t, "0xescrow", intent.contractAddress)
 }
 
+func TestResolveAggregatedPaymentIntent_EscrowPreservesModeratorAddress(t *testing.T) {
+	order := &models.Order{}
+	require.NoError(t, order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
+		Coin:             "crypto:solana:mainnet:native",
+		ContractAddress:  "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX",
+		EscrowAddress:    "RT38nT6ABNLfotNxwseiNNKukCKAXpFkZctJGn4EbFe",
+		Moderator:        "moderator-peer-id",
+		ModeratorAddress: "Mod11111111111111111111111111111111111111111",
+		SettlementSpec: &models.PendingSettlementSpec{
+			Method:     "MODERATED",
+			PayMode:    "address_monitored",
+			EscrowType: "solana_escrow",
+		},
+	}))
+
+	intent := resolveAggregatedPaymentIntent(order, []models.PaymentObservation{{
+		ChainNamespace: "solana",
+	}})
+	require.Equal(t, "moderator-peer-id", intent.moderator)
+	require.Equal(t, "Mod11111111111111111111111111111111111111111", intent.moderatorAddress)
+}
+
 func TestBuildAggregatedPaymentSent_SolanaEscrowPreservesProgramID(t *testing.T) {
 	const programID = "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX"
 	const escrowAddress = "RT38nT6ABNLfotNxwseiNNKukCKAXpFkZctJGn4EbFe"

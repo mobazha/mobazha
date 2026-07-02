@@ -265,3 +265,70 @@ func TestDeclineOrderViaRelay_ManagedEscrowModeratedBeforeConfirmUsesSettlementC
 	require.Len(t, refunds[0].GetReleaseInfo().EscrowSignatures, 1)
 	assert.False(t, stored.Open)
 }
+
+func TestDeclineOrderViaRelay_SolanaModeratedBeforeConfirmUsesSellerDeclineRefund(t *testing.T) {
+	sellerSigner, sellerPeerID := testSigner(t)
+	_, buyerPeerID := testSigner(t)
+	bus := events.NewBus()
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	op := orders.NewOrderProcessor(&orders.Config{
+		NodeID:    "solana-decline-relay-test",
+		Db:        db,
+		Signer:    sellerSigner,
+		Messenger: noopMessenger{},
+		EventBus:  bus,
+	})
+	reg := payment.NewRegistry()
+	strategy := &fakeRefunderStrategy{
+		fakeManagedEscrowStrategy: fakeManagedEscrowStrategy{
+			model:        payment.PaymentModelMonitored,
+			actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "solana-seller-decline-action"},
+			actionStatus: &payment.ActionStatus{TxHash: "solana-seller-decline-tx"},
+		},
+	}
+	reg.RegisterV2(iwallet.ChainSolana, strategy)
+
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{
+		DB:              db,
+		Signer:          sellerSigner,
+		OrderProcessor:  op,
+		Messenger:       noopMessenger{},
+		EventBus:        bus,
+		NodeID:          "solana-decline-relay-test",
+		PaymentRegistry: reg,
+	})
+
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainSolana)
+	require.NoError(t, err)
+	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
+	order.ID = models.OrderID("solana-moderated-decline-via-relay")
+	order.MyRole = string(models.RoleVendor)
+	order.PaymentAddress = "4EPetAS58DkvcU1Ftx3Y7ULnqB6Q93ckhawvSWNZB3xJ"
+	order.SerializedOrderOpen = signedOrderOpen(t, buyerPeerID, sellerPeerID)
+	order.SetFSMState(models.OrderState_PENDING)
+	paymentSent.ToAddress = order.PaymentAddress
+	paymentSent.SettlementSpec = payment.NewSolanaEscrowSpec(true).ToPaymentSent()
+	paymentSent.RefundAddress = "7YttLkHDo3xZ6XKgoFZvp5HjMpPM7jpUe7PWBCz8UQkB"
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	order.MarkPaymentVerified()
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+
+	require.NoError(t, svc.DeclineOrderViaRelay(order.ID, "seller declined before confirm", nil))
+	assert.Equal(t, 1, strategy.sellerDeclineCalls)
+	assert.Zero(t, strategy.cancelCalls)
+	assert.Equal(t, paymentSent.RefundAddress, strategy.lastParams.PayoutAddr)
+
+	var stored models.Order
+	require.NoError(t, svc.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", order.ID.String()).First(&stored).Error
+	}))
+	decline, err := stored.OrderDeclineMessage()
+	require.NoError(t, err)
+	assert.Equal(t, "solana-seller-decline-tx", decline.TransactionID)
+	assert.False(t, stored.Open)
+}

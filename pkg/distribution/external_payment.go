@@ -50,6 +50,25 @@ type ExternalPaymentWatch struct {
 	OnPayment      func(ExternalPaymentEvent)
 }
 
+// ExternalPaymentHealthState is the setup-aware lifecycle state of a direct
+// observed rail. Only ready may be advertised for checkout.
+type ExternalPaymentHealthState string
+
+const (
+	ExternalPaymentStopped    ExternalPaymentHealthState = "stopped"
+	ExternalPaymentNeedsSetup ExternalPaymentHealthState = "needs_setup"
+	ExternalPaymentDegraded   ExternalPaymentHealthState = "degraded"
+	ExternalPaymentReady      ExternalPaymentHealthState = "ready"
+)
+
+// ExternalPaymentHealth is a provider-neutral, product-safe health snapshot.
+type ExternalPaymentHealth struct {
+	State  ExternalPaymentHealthState
+	Detail string
+}
+
+func (health ExternalPaymentHealth) Ready() bool { return health.State == ExternalPaymentReady }
+
 // ExternalPaymentRuntime is the provider-neutral direct observed rail used by
 // trusted first-party distributions. Wallet administration remains outside
 // this port; implementations expose only address allocation, observation,
@@ -57,7 +76,7 @@ type ExternalPaymentWatch struct {
 type ExternalPaymentRuntime interface {
 	Start(ctx context.Context) error
 	Close() error
-	PaymentAvailable(ctx context.Context) bool
+	PaymentHealth(ctx context.Context) ExternalPaymentHealth
 	CreatePaymentAddress(ctx context.Context, request ExternalPaymentAddressRequest) (ExternalPaymentAddress, error)
 	WatchPayment(watch *ExternalPaymentWatch) error
 	UnwatchPayment(addressIndex uint32)
@@ -65,5 +84,4 @@ type ExternalPaymentRuntime interface {
 	PaymentPollInterval() time.Duration
 	PaymentGracePeriod() time.Duration
 	PaymentHeight(ctx context.Context) (uint64, error)
-	PaymentHealthy() bool
 }

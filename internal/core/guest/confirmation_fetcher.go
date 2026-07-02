@@ -2,6 +2,7 @@ package guest
 
 import (
 	"context"
+	"time"
 
 	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -81,7 +82,12 @@ func (f *external_paymentHeightFetcher) Fetch(ctx context.Context) (int, error) 
 }
 
 func (f *external_paymentHeightFetcher) Healthy() bool {
-	return f.monitor != nil && f.monitor.PaymentHealthy()
+	if f.monitor == nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return f.monitor.PaymentHealth(ctx).Ready()
 }
 
 func (f *external_paymentHeightFetcher) Label() string {

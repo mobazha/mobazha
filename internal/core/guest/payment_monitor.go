@@ -756,7 +756,7 @@ type directObservedMonitor interface {
 	ReapPayment(uint32)
 	PaymentPollInterval() time.Duration
 	PaymentHeight(context.Context) (uint64, error)
-	PaymentHealthy() bool
+	PaymentHealth(context.Context) distribution.ExternalPaymentHealth
 }
 
 func (m *GuestPaymentMonitor) directObservedMonitor() directObservedMonitor {

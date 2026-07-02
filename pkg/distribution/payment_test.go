@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -133,7 +134,9 @@ func (m *testPaymentModule) RollbackRegistration(context.Context) error {
 }
 
 func (m *testPaymentModule) Descriptor() PaymentModuleDescriptor {
-	return PaymentModuleDescriptor{ID: m.id}
+	return PaymentModuleDescriptor{
+		ID: m.id, Version: "test", Rails: []PaymentRailKind{PaymentRailEscrow}, Activation: PaymentModuleOptional,
+	}
 }
 
 func (m *testPaymentModule) Register(_ context.Context, _ PaymentRuntime, registrar PaymentRegistrar) error {
@@ -147,7 +150,15 @@ func (m *testPaymentModule) Register(_ context.Context, _ PaymentRuntime, regist
 	return registrar.RegisterV2(m.chain, m.strategy)
 }
 
-func TestRegisterPaymentModules_ValidModule_CommitsStrategy(t *testing.T) {
+func registerTestPaymentModules(ctx context.Context, registry PaymentRegistry, modules ...PaymentModule) (*TrustedPaymentModuleManager, error) {
+	manager, err := NewTrustedPaymentModuleManager(PaymentRuntimeAuthority{}, registry, modules...)
+	if err != nil {
+		return nil, err
+	}
+	return manager, manager.Register(ctx)
+}
+
+func TestTrustedPaymentModuleManager_ValidModule_CommitsStrategy(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	module := &testPaymentModule{
 		id:       "commercial.managed",
@@ -155,7 +166,7 @@ func TestRegisterPaymentModules_ValidModule_CommitsStrategy(t *testing.T) {
 		strategy: &testPaymentStrategy{},
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, module)
+	_, err := registerTestPaymentModules(context.Background(), registry, module)
 
 	require.NoError(t, err)
 	assert.True(t, module.called)
@@ -163,14 +174,14 @@ func TestRegisterPaymentModules_ValidModule_CommitsStrategy(t *testing.T) {
 	assert.True(t, registry.HasChain(iwallet.ChainEthereum))
 }
 
-func TestRegisterPaymentModules_ActivationFailure_RollsBackStrategies(t *testing.T) {
+func TestTrustedPaymentModuleManager_ActivationFailure_RollsBackStrategies(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	module := &testPaymentModule{
 		id: "commercial.managed", chain: iwallet.ChainEthereum, strategy: &testPaymentStrategy{},
 		activateErr: errors.New("guest runtime unavailable"),
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, module)
+	_, err := registerTestPaymentModules(context.Background(), registry, module)
 
 	require.ErrorContains(t, err, "guest runtime unavailable")
 	assert.True(t, module.activated)
@@ -179,12 +190,12 @@ func TestRegisterPaymentModules_ActivationFailure_RollsBackStrategies(t *testing
 	assert.Empty(t, registry.strategies)
 }
 
-func TestRegisterPaymentModules_LaterBindFailureUnbindsEarlierModule(t *testing.T) {
+func TestTrustedPaymentModuleManager_LaterBindFailureUnbindsEarlierModule(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	first := &testPaymentModule{id: "commercial.managed", chain: iwallet.ChainEthereum, strategy: &testPaymentStrategy{}}
 	second := &testPaymentModule{id: "commercial.solana", chain: iwallet.ChainSolana, strategy: &testPaymentStrategy{}, activateErr: errors.New("bind failed")}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, first, second)
+	_, err := registerTestPaymentModules(context.Background(), registry, first, second)
 
 	require.ErrorContains(t, err, "bind failed")
 	assert.True(t, first.activated)
@@ -216,14 +227,14 @@ func TestPaymentRuntime_EnforcesDeclaredCapabilities(t *testing.T) {
 	require.ErrorContains(t, err, string(CapabilityManagedEVMExecution))
 }
 
-func TestRegisterPaymentModules_ModuleFailure_LeavesRegistryUnchanged(t *testing.T) {
+func TestTrustedPaymentModuleManager_ModuleFailure_LeavesRegistryUnchanged(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	modules := []PaymentModule{
 		&testPaymentModule{id: "commercial.managed", chain: iwallet.ChainEthereum, strategy: &testPaymentStrategy{}},
 		&testPaymentModule{id: "commercial.solana", err: errors.New("missing relay")},
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, modules...)
+	_, err := registerTestPaymentModules(context.Background(), registry, modules...)
 
 	require.ErrorContains(t, err, "missing relay")
 	assert.Empty(t, registry.strategies)
@@ -232,20 +243,20 @@ func TestRegisterPaymentModules_ModuleFailure_LeavesRegistryUnchanged(t *testing
 	}
 }
 
-func TestRegisterPaymentModules_DuplicateID_LeavesRegistryUnchanged(t *testing.T) {
+func TestTrustedPaymentModuleManager_DuplicateID_LeavesRegistryUnchanged(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	modules := []PaymentModule{
 		&testPaymentModule{id: "commercial.managed", chain: iwallet.ChainEthereum, strategy: &testPaymentStrategy{}},
 		&testPaymentModule{id: "commercial.managed", chain: iwallet.ChainSolana, strategy: &testPaymentStrategy{}},
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, modules...)
+	_, err := registerTestPaymentModules(context.Background(), registry, modules...)
 
 	require.ErrorContains(t, err, "registered more than once")
 	assert.Empty(t, registry.strategies)
 }
 
-func TestRegisterPaymentModules_ExistingCoreChain_RejectsWholeSet(t *testing.T) {
+func TestTrustedPaymentModuleManager_ExistingCoreChain_RejectsWholeSet(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	registry.strategies[iwallet.ChainBitcoin] = &testPaymentStrategy{}
 	modules := []PaymentModule{
@@ -253,19 +264,82 @@ func TestRegisterPaymentModules_ExistingCoreChain_RejectsWholeSet(t *testing.T) 
 		&testPaymentModule{id: "invalid.override", chain: iwallet.ChainBitcoin, strategy: &testPaymentStrategy{}},
 	}
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, modules...)
+	_, err := registerTestPaymentModules(context.Background(), registry, modules...)
 
 	require.ErrorContains(t, err, "already registered")
 	assert.Len(t, registry.strategies, 1)
 	assert.False(t, registry.HasChain(iwallet.ChainEthereum))
 }
 
-func TestRegisterPaymentModules_TypedNilModule_IsRejected(t *testing.T) {
+func TestTrustedPaymentModuleManager_TypedNilModule_IsRejected(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	var module *testPaymentModule
 
-	err := RegisterPaymentModules(context.Background(), PaymentRuntimeAuthority{}, registry, module)
+	_, err := registerTestPaymentModules(context.Background(), registry, module)
 
 	require.ErrorContains(t, err, "is nil")
 	assert.Empty(t, registry.strategies)
+}
+
+type lifecycleTestModule struct {
+	*testPaymentModule
+	dependencies []string
+	stopOrder    *[]string
+	stopMu       *sync.Mutex
+	stopped      chan struct{}
+}
+
+func (m *lifecycleTestModule) Descriptor() PaymentModuleDescriptor {
+	descriptor := m.testPaymentModule.Descriptor()
+	descriptor.Dependencies = append([]string(nil), m.dependencies...)
+	return descriptor
+}
+
+func (m *lifecycleTestModule) Start(context.Context) error {
+	<-m.stopped
+	return nil
+}
+
+func (m *lifecycleTestModule) Stop(context.Context) error {
+	m.stopMu.Lock()
+	*m.stopOrder = append(*m.stopOrder, m.id)
+	m.stopMu.Unlock()
+	select {
+	case <-m.stopped:
+	default:
+		close(m.stopped)
+	}
+	return nil
+}
+
+func TestTrustedPaymentModuleManager_StopsInReverseDependencyOrder(t *testing.T) {
+	registry := newTestPaymentRegistry()
+	var stopOrder []string
+	var stopMu sync.Mutex
+	base := &lifecycleTestModule{
+		testPaymentModule: &testPaymentModule{id: "base", chain: iwallet.ChainEthereum, strategy: &testPaymentStrategy{}},
+		stopOrder:         &stopOrder, stopMu: &stopMu, stopped: make(chan struct{}),
+	}
+	dependent := &lifecycleTestModule{
+		testPaymentModule: &testPaymentModule{id: "dependent", chain: iwallet.ChainSolana, strategy: &testPaymentStrategy{}},
+		dependencies:      []string{"base"}, stopOrder: &stopOrder, stopMu: &stopMu, stopped: make(chan struct{}),
+	}
+	manager, err := NewTrustedPaymentModuleManager(PaymentRuntimeAuthority{}, registry, dependent, base)
+	require.NoError(t, err)
+	require.NoError(t, manager.Register(context.Background()))
+	require.NoError(t, manager.Start(context.Background(), nil))
+	require.NoError(t, manager.Stop(context.Background()))
+	require.Equal(t, []string{"dependent", "base"}, stopOrder)
+	health := manager.Health()
+	require.Len(t, health, 2)
+	require.Equal(t, PaymentModuleStopped, health[0].State)
+	require.Equal(t, PaymentModuleStopped, health[1].State)
+}
+
+func TestTrustedPaymentModuleManager_RejectsDependencyCycle(t *testing.T) {
+	registry := newTestPaymentRegistry()
+	first := &lifecycleTestModule{testPaymentModule: &testPaymentModule{id: "first"}, dependencies: []string{"second"}}
+	second := &lifecycleTestModule{testPaymentModule: &testPaymentModule{id: "second"}, dependencies: []string{"first"}}
+	_, err := NewTrustedPaymentModuleManager(PaymentRuntimeAuthority{}, registry, first, second)
+	require.ErrorContains(t, err, "dependency cycle")
 }

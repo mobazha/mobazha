@@ -9,8 +9,8 @@ type externalPaymentRuntimeStub struct{}
 
 func (externalPaymentRuntimeStub) Start(context.Context) error { return nil }
 func (externalPaymentRuntimeStub) Close() error                { return nil }
-func (externalPaymentRuntimeStub) PaymentAvailable(context.Context) bool {
-	return true
+func (externalPaymentRuntimeStub) PaymentHealth(context.Context) ExternalPaymentHealth {
+	return ExternalPaymentHealth{State: ExternalPaymentReady}
 }
 func (externalPaymentRuntimeStub) CreatePaymentAddress(context.Context, ExternalPaymentAddressRequest) (ExternalPaymentAddress, error) {
 	return ExternalPaymentAddress{}, nil
@@ -23,6 +23,5 @@ func (externalPaymentRuntimeStub) PaymentGracePeriod() time.Duration        { re
 func (externalPaymentRuntimeStub) PaymentHeight(context.Context) (uint64, error) {
 	return 1, nil
 }
-func (externalPaymentRuntimeStub) PaymentHealthy() bool { return true }
 
 var _ ExternalPaymentRuntime = externalPaymentRuntimeStub{}

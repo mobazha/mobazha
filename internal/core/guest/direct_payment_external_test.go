@@ -16,8 +16,8 @@ type directPaymentExternalRuntimeStub struct {
 
 func (*directPaymentExternalRuntimeStub) Start(context.Context) error { return nil }
 func (*directPaymentExternalRuntimeStub) Close() error                { return nil }
-func (*directPaymentExternalRuntimeStub) PaymentAvailable(context.Context) bool {
-	return true
+func (*directPaymentExternalRuntimeStub) PaymentHealth(context.Context) distribution.ExternalPaymentHealth {
+	return distribution.ExternalPaymentHealth{State: distribution.ExternalPaymentReady}
 }
 func (s *directPaymentExternalRuntimeStub) CreatePaymentAddress(_ context.Context, request distribution.ExternalPaymentAddressRequest) (distribution.ExternalPaymentAddress, error) {
 	s.request = request
@@ -33,8 +33,6 @@ func (*directPaymentExternalRuntimeStub) PaymentGracePeriod() time.Duration  { r
 func (*directPaymentExternalRuntimeStub) PaymentHeight(context.Context) (uint64, error) {
 	return 1, nil
 }
-func (*directPaymentExternalRuntimeStub) PaymentHealthy() bool { return true }
-
 func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 	runtime := &directPaymentExternalRuntimeStub{}
 	service := NewDirectPaymentService(nil, nil)

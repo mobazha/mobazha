@@ -534,7 +534,7 @@ func TestPaymentAppService_PersistSharedPaymentPolicySnapshot(t *testing.T) {
 	require.Equal(t, uint64(42), shared.StorePolicyRevision)
 }
 
-func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowGasFees(t *testing.T) {
+func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowReleaseFees(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })

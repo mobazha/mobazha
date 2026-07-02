@@ -1,7 +1,5 @@
-// Package distribution defines the stable build-time composition boundary for
-// trusted Mobazha distributions. Existing interfaces remain backward
-// compatible; new behavior is exposed through optional capability interfaces
-// instead of adding methods to established ports.
+// Package distribution defines the build-time composition boundary for
+// trusted Mobazha distributions.
 package distribution
 
 import (
@@ -352,10 +350,33 @@ const (
 	CapabilityManagedEscrowGuest  PaymentModuleCapability = "managed_escrow_guest"
 )
 
+// PaymentRailKind identifies the payment model contributed by a module.
+type PaymentRailKind string
+
+const (
+	PaymentRailEscrow          PaymentRailKind = "escrow"
+	PaymentRailDirectObserved  PaymentRailKind = "direct_observed"
+	PaymentRailProviderSession PaymentRailKind = "provider_session"
+)
+
+// PaymentModuleActivation controls whether a composition may continue when a
+// module cannot be activated.
+type PaymentModuleActivation string
+
+const (
+	PaymentModuleRequired   PaymentModuleActivation = "required"
+	PaymentModuleOptional   PaymentModuleActivation = "optional"
+	PaymentModuleSetupGated PaymentModuleActivation = "setup_gated"
+)
+
 // PaymentModuleDescriptor declares module identity and least-privilege grants.
 type PaymentModuleDescriptor struct {
 	ID           string
+	Version      string
+	Rails        []PaymentRailKind
 	Capabilities []PaymentModuleCapability
+	Dependencies []string
+	Activation   PaymentModuleActivation
 }
 
 // PaymentRuntimeAuthority is retained by Core and can mint a scoped runtime
@@ -494,24 +515,32 @@ func (r *collectingPaymentRegistrar) RegisterV2(chain iwallet.ChainType, strateg
 	return nil
 }
 
-// RegisterPaymentModules validates and applies modules without exposing the
+// paymentModuleRegistration records the exact live contribution owned by one
+// module. Lifecycle failure must never unregister another module's chains.
+type paymentModuleRegistration struct {
+	module PaymentModule
+	chains []iwallet.ChainType
+}
+
+// registerPaymentModules validates and applies modules without exposing the
 // live Registry during module execution. Validation or registration failure
 // leaves the target unchanged.
-func RegisterPaymentModules(
+func registerPaymentModules(
 	ctx context.Context,
 	authority PaymentRuntimeAuthority,
 	target PaymentRegistry,
 	modules ...PaymentModule,
-) error {
+) ([]paymentModuleRegistration, error) {
 	if len(modules) == 0 {
-		return nil
+		return nil, nil
 	}
 	if target == nil {
-		return fmt.Errorf("payment module registry is required")
+		return nil, fmt.Errorf("payment module registry is required")
 	}
 
 	seenIDs := make(map[string]struct{}, len(modules))
 	collector := newCollectingPaymentRegistrar()
+	registrations := make([]paymentModuleRegistration, 0, len(modules))
 	attempted := make([]PaymentModule, 0, len(modules))
 	rollback := func(cause error) error {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -530,26 +559,32 @@ func RegisterPaymentModules(
 	}
 	for index, module := range modules {
 		if isNilInterface(module) {
-			return rollback(fmt.Errorf("payment module at index %d is nil", index))
+			return nil, rollback(fmt.Errorf("payment module at index %d is nil", index))
 		}
 		descriptor := module.Descriptor()
 		id := strings.TrimSpace(descriptor.ID)
 		if id == "" {
-			return rollback(fmt.Errorf("payment module at index %d has an empty ID", index))
+			return nil, rollback(fmt.Errorf("payment module at index %d has an empty ID", index))
 		}
 		if _, exists := seenIDs[id]; exists {
-			return rollback(fmt.Errorf("payment module ID %q is registered more than once", id))
+			return nil, rollback(fmt.Errorf("payment module ID %q is registered more than once", id))
 		}
 		seenIDs[id] = struct{}{}
 		descriptor.ID = id
 		runtime, err := authority.RuntimeFor(descriptor)
 		if err != nil {
-			return rollback(err)
+			return nil, rollback(err)
 		}
 		attempted = append(attempted, module)
+		registrationStart := len(collector.registrations)
 		if err := module.Register(ctx, runtime, collector); err != nil {
-			return rollback(fmt.Errorf("register payment module %q: %w", id, err))
+			return nil, rollback(fmt.Errorf("register payment module %q: %w", id, err))
 		}
+		ownedChains := make([]iwallet.ChainType, 0, len(collector.registrations)-registrationStart)
+		for _, registration := range collector.registrations[registrationStart:] {
+			ownedChains = append(ownedChains, registration.chain)
+		}
+		registrations = append(registrations, paymentModuleRegistration{module: module, chains: ownedChains})
 	}
 
 	strategies := make(map[iwallet.ChainType]payment.ChainEscrowV2, len(collector.registrations))
@@ -557,7 +592,7 @@ func RegisterPaymentModules(
 		strategies[registration.chain] = registration.strategy
 	}
 	if err := target.RegisterV2BatchExclusive(strategies); err != nil {
-		return rollback(fmt.Errorf("commit payment module strategies: %w", err))
+		return nil, rollback(fmt.Errorf("commit payment module strategies: %w", err))
 	}
 	chains := make([]iwallet.ChainType, 0, len(strategies))
 	for chain := range strategies {
@@ -582,11 +617,11 @@ func RegisterPaymentModules(
 			}
 			cancel()
 			target.UnregisterV2Batch(chains)
-			return rollback(errors.Join(cleanupErrors...))
+			return nil, rollback(errors.Join(cleanupErrors...))
 		}
 		bound = append(bound, binder)
 	}
-	return nil
+	return registrations, nil
 }
 
 func isNilInterface(value any) bool {

@@ -497,9 +497,11 @@ func (m *paymentModuleRunnerProbe) Stop(context.Context) error {
 }
 
 func (m *paymentModuleProbe) Descriptor() distribution.PaymentModuleDescriptor {
-	return distribution.PaymentModuleDescriptor{ID: m.id, Capabilities: []distribution.PaymentModuleCapability{
-		distribution.CapabilityManagedEVMExecution,
-	}}
+	return distribution.PaymentModuleDescriptor{
+		ID: m.id, Version: "test", Rails: []distribution.PaymentRailKind{distribution.PaymentRailEscrow},
+		Activation:   distribution.PaymentModuleOptional,
+		Capabilities: []distribution.PaymentModuleCapability{distribution.CapabilityManagedEVMExecution},
+	}
 }
 
 func (m *paymentModuleProbe) RollbackRegistration(context.Context) error { return nil }
@@ -576,16 +578,16 @@ func TestRegisterDistributionPaymentModules_CannotReplaceCoreStrategy(t *testing
 	}
 }
 
-func TestRunDistributionPaymentModules_FailureUnregistersOnlyDistributionChains(t *testing.T) {
+func TestRunDistributionPaymentModules_FailureUnregistersOnlyFailedModuleChains(t *testing.T) {
 	registry := payment.NewRegistry()
 	strategy := &autoConfirmProbeStrategy{called: make(chan struct{})}
 	registry.RegisterV2(iwallet.ChainBitcoin, strategy)
-	registry.RegisterV2(iwallet.ChainSolana, strategy)
 	runner := &paymentModuleRunnerProbe{
-		paymentModuleProbe: &paymentModuleProbe{id: "commercial.runner"},
+		paymentModuleProbe: &paymentModuleProbe{id: "commercial.runner", chain: iwallet.ChainSolana, strategy: strategy},
 		startErr:           errors.New("monitor failed"),
 		stopped:            make(chan struct{}, 1),
 	}
+	healthy := &paymentModuleProbe{id: "commercial.healthy", chain: iwallet.ChainEthereum, strategy: strategy}
 	n := &MobazhaNode{
 		identityFields: identityFields{nodeID: "test-registry"},
 		walletFields: walletFields{
@@ -593,8 +595,18 @@ func TestRunDistributionPaymentModules_FailureUnregistersOnlyDistributionChains(
 			paymentModules:  []distribution.PaymentModule{runner},
 		},
 	}
+	manager, err := distribution.NewTrustedPaymentModuleManager(
+		distribution.PaymentRuntimeAuthority{}, distributionPaymentRegistry{registry: registry}, runner, healthy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Register(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	n.paymentModuleManager = manager
 
-	n.runDistributionPaymentModules(context.Background(), []iwallet.ChainType{iwallet.ChainSolana})
+	n.runDistributionPaymentModules(context.Background())
 	select {
 	case <-runner.stopped:
 	case <-time.After(time.Second):
@@ -605,6 +617,9 @@ func TestRunDistributionPaymentModules_FailureUnregistersOnlyDistributionChains(
 	}
 	if !registry.HasChain(iwallet.ChainBitcoin) {
 		t.Fatal("Open Core chain was removed with failed distribution chains")
+	}
+	if !registry.HasChain(iwallet.ChainEthereum) {
+		t.Fatal("healthy module chain was removed with failed module")
 	}
 }
 

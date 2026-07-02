@@ -88,6 +88,7 @@ type walletFields struct {
 	managedEscrowReceiptValidator payment.ManagedEscrowReceiptValidator
 	paymentCapabilities           payment.ChainCapabilityProvider
 	paymentModules                []distribution.PaymentModule
+	paymentModuleManager          *distribution.TrustedPaymentModuleManager
 }
 
 // chainFields groups blockchain client configuration.

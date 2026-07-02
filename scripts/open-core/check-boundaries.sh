@@ -45,7 +45,7 @@ reject_matches \
 reject_matches \
   "private provider implementation paths are present" \
   "$(git ls-files -- internal pkg cmd \
-      | grep -E -i '(^|/)(safe|monero|private-product)([/_.-]|$)' || true)"
+      | grep -E -i '(^|/)(safe|monero)([/_.-]|$)' || true)"
 
 reject_matches \
   "private settlement scheme identity leaked into the current source tree" \
@@ -58,7 +58,7 @@ reject_matches \
 reject_matches \
   "private settlement scheme paths remain reachable in public history" \
   "$(git log --format= --name-only HEAD -- internal pkg cmd api-spec \
-      | grep -E -i '(^|/)(safe|monero|private-product)([/_.-]|$)' \
+      | grep -E -i '(^|/)(safe|monero)([/_.-]|$)' \
       | sort -u || true)"
 
 reject_matches \

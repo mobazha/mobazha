@@ -140,7 +140,6 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 			m.publish(id, PaymentModuleReady, "")
 			continue
 		}
-		m.publish(id, PaymentModuleReady, "")
 		go m.run(ctx, registration, runner)
 	}
 	go func() {
@@ -157,7 +156,8 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 }
 
 func (m *TrustedPaymentModuleManager) run(ctx context.Context, registration paymentModuleRegistration, runner PaymentModuleRunner) {
-	err := runner.Start(ctx)
+	id := strings.TrimSpace(registration.module.Descriptor().ID)
+	err := runner.Start(ctx, func() { m.publishReady(id) })
 	if ctx.Err() != nil {
 		return
 	}
@@ -165,6 +165,27 @@ func (m *TrustedPaymentModuleManager) run(ctx context.Context, registration paym
 		err = fmt.Errorf("module returned before node shutdown")
 	}
 	m.deactivate(registration, err)
+}
+
+func (m *TrustedPaymentModuleManager) publishReady(id string) {
+	m.mu.Lock()
+	if !m.active[id] {
+		m.mu.Unlock()
+		return
+	}
+	health := m.health[id]
+	if health.State != PaymentModuleStarting {
+		m.mu.Unlock()
+		return
+	}
+	health.State = PaymentModuleReady
+	health.Error = ""
+	m.health[id] = health
+	callback := m.onHealth
+	m.mu.Unlock()
+	if callback != nil {
+		callback(health)
+	}
 }
 
 func (m *TrustedPaymentModuleManager) deactivate(registration paymentModuleRegistration, cause error) {

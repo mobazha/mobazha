@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
@@ -287,6 +288,8 @@ type lifecycleTestModule struct {
 	stopOrder    *[]string
 	stopMu       *sync.Mutex
 	stopped      chan struct{}
+	started      chan struct{}
+	readyGate    <-chan struct{}
 }
 
 func (m *lifecycleTestModule) Descriptor() PaymentModuleDescriptor {
@@ -295,7 +298,18 @@ func (m *lifecycleTestModule) Descriptor() PaymentModuleDescriptor {
 	return descriptor
 }
 
-func (m *lifecycleTestModule) Start(context.Context) error {
+func (m *lifecycleTestModule) Start(ctx context.Context, ready func()) error {
+	if m.started != nil {
+		close(m.started)
+	}
+	if m.readyGate != nil {
+		select {
+		case <-m.readyGate:
+		case <-ctx.Done():
+			return nil
+		}
+	}
+	ready()
 	<-m.stopped
 	return nil
 }
@@ -334,6 +348,39 @@ func TestTrustedPaymentModuleManager_StopsInReverseDependencyOrder(t *testing.T)
 	require.Len(t, health, 2)
 	require.Equal(t, PaymentModuleStopped, health[0].State)
 	require.Equal(t, PaymentModuleStopped, health[1].State)
+}
+
+func TestTrustedPaymentModuleManager_WaitsForRunnerReadiness(t *testing.T) {
+	registry := newTestPaymentRegistry()
+	var stopOrder []string
+	var stopMu sync.Mutex
+	readyGate := make(chan struct{})
+	module := &lifecycleTestModule{
+		testPaymentModule: &testPaymentModule{id: "managed", chain: iwallet.ChainEthereum, strategy: &testPaymentStrategy{}},
+		stopOrder:         &stopOrder,
+		stopMu:            &stopMu,
+		stopped:           make(chan struct{}),
+		started:           make(chan struct{}),
+		readyGate:         readyGate,
+	}
+	manager, err := NewTrustedPaymentModuleManager(PaymentRuntimeAuthority{}, registry, module)
+	require.NoError(t, err)
+	require.NoError(t, manager.Register(context.Background()))
+	require.NoError(t, manager.Start(context.Background(), nil))
+	require.Eventually(t, func() bool {
+		select {
+		case <-module.started:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, time.Millisecond)
+	require.Equal(t, PaymentModuleStarting, manager.Health()[0].State)
+	close(readyGate)
+	require.Eventually(t, func() bool {
+		return manager.Health()[0].State == PaymentModuleReady
+	}, time.Second, time.Millisecond)
+	require.NoError(t, manager.Stop(context.Background()))
 }
 
 func TestTrustedPaymentModuleManager_RejectsDependencyCycle(t *testing.T) {

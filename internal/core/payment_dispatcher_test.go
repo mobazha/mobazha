@@ -486,7 +486,12 @@ type paymentModuleRunnerProbe struct {
 	stopped  chan struct{}
 }
 
-func (m *paymentModuleRunnerProbe) Start(context.Context) error { return m.startErr }
+func (m *paymentModuleRunnerProbe) Start(_ context.Context, ready func()) error {
+	if m.startErr == nil {
+		ready()
+	}
+	return m.startErr
+}
 
 func (m *paymentModuleRunnerProbe) Stop(context.Context) error {
 	select {

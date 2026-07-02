@@ -471,10 +471,11 @@ type PaymentModule interface {
 	RollbackRegistration(ctx context.Context) error
 }
 
-// PaymentModuleRunner owns the post-wiring lifecycle. Start may block until
-// cancellation; Stop must be idempotent and release module-owned resources.
+// PaymentModuleRunner owns the post-wiring lifecycle. Start calls ready exactly
+// once after required observers and recovery work are live, then may block
+// until cancellation. Stop must be idempotent and release module resources.
 type PaymentModuleRunner interface {
-	Start(ctx context.Context) error
+	Start(ctx context.Context, ready func()) error
 	Stop(ctx context.Context) error
 }
 

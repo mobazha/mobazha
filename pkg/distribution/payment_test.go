@@ -444,6 +444,31 @@ func TestTrustedPaymentModuleManager_StartWaitsForReadiness(t *testing.T) {
 	require.NoError(t, manager.Stop(context.Background()))
 }
 
+func TestTrustedPaymentModuleManager_StopInterruptsReadinessWait(t *testing.T) {
+	registry := newTestPaymentRegistry()
+	readyGate := make(chan struct{})
+	module := &lifecycleTestModule{
+		testPaymentModule: &testPaymentModule{id: "slow", chain: iwallet.ChainEthereum, strategy: &testPaymentStrategy{}},
+		stopped:           make(chan struct{}),
+		readyGate:         readyGate,
+	}
+	manager, err := NewTrustedPaymentModuleManager(PaymentRuntimeAuthority{}, registry, module)
+	require.NoError(t, err)
+	require.NoError(t, manager.Register(context.Background()))
+
+	started := make(chan error, 1)
+	go func() { started <- manager.Start(context.Background(), nil) }()
+	require.Eventually(t, func() bool {
+		return manager.Health()[0].State == PaymentModuleStarting
+	}, time.Second, time.Millisecond)
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, manager.Stop(stopCtx))
+	require.ErrorIs(t, <-started, context.Canceled)
+	assert.Equal(t, PaymentModuleStopped, manager.Health()[0].State)
+}
+
 func TestTrustedPaymentModuleManager_RuntimeFailure_DeactivatesDependents(t *testing.T) {
 	registry := newTestPaymentRegistry()
 	fail := make(chan error, 1)

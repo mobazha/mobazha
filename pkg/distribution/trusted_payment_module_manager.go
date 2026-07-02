@@ -150,6 +150,12 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 		m.mu.Unlock()
 		return fmt.Errorf("trusted payment modules are already started")
 	}
+	select {
+	case <-m.done:
+		m.mu.Unlock()
+		return fmt.Errorf("trusted payment modules are stopping")
+	default:
+	}
 	runCtx, cancel := context.WithCancel(ctx)
 	m.runCancel = cancel
 	m.started = true
@@ -165,6 +171,11 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 	}
 
 	for _, registration := range registrations {
+		select {
+		case <-m.done:
+			return m.abortStart(runCtx, context.Canceled)
+		default:
+		}
 		id := registration.descriptor.ID
 		if dependency := m.unavailableDependency(registration.descriptor); dependency != "" {
 			cause := fmt.Errorf("payment module %q dependency %q is unavailable", id, dependency)
@@ -202,7 +213,14 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 			}
 		case <-runCtx.Done():
 			return m.abortStart(runCtx, runCtx.Err())
+		case <-m.done:
+			return m.abortStart(runCtx, context.Canceled)
 		}
+	}
+	select {
+	case <-m.done:
+		return m.abortStart(runCtx, context.Canceled)
+	default:
 	}
 	go func() {
 		select {
@@ -263,6 +281,10 @@ func (m *TrustedPaymentModuleManager) Stop(ctx context.Context) error {
 	if m == nil {
 		return nil
 	}
+	// Signal an in-progress Start before waiting for lifecycleMu. Start may be
+	// blocked waiting for a runner to report readiness, and stop() cannot cancel
+	// that runner until the lifecycle lock is available.
+	m.doneOnce.Do(func() { close(m.done) })
 	m.lifecycleMu.Lock()
 	defer m.lifecycleMu.Unlock()
 	return m.stop(ctx)

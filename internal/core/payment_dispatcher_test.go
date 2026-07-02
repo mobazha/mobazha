@@ -493,6 +493,40 @@ func TestDispatchCancelablePayment_UnreadableOrderPolicyFailsClosed(t *testing.T
 	}
 }
 
+func TestDispatchCancelablePayment_UnavailableSupplyChainPolicyFailsClosed(t *testing.T) {
+	db := newTestDatabase(t)
+	serializedOrderOpen, err := protojson.Marshal(&pb.OrderOpen{})
+	require.NoError(t, err)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.Order{
+			ID:                  models.OrderID("supply-chain-policy-order"),
+			SerializedOrderOpen: serializedOrderOpen,
+		})
+	}))
+
+	called := make(chan struct{})
+	n := &MobazhaNode{
+		identityFields: identityFields{nodeID: "seller-node"},
+		storageFields:  storageFields{db: db},
+		walletFields:   walletFields{paymentRegistry: payment.NewRegistry()},
+		appServices:    appServices{supplyChainService: &SupplyChainAppService{}},
+	}
+	n.paymentRegistry.RegisterV2(iwallet.ChainBitcoin, &autoConfirmProbeStrategy{called: called})
+
+	n.dispatchCancelablePayment(&events.CancelablePaymentReady{
+		OrderID:  "supply-chain-policy-order",
+		Coin:     string(testBTCNativeCoin),
+		Amount:   "1000",
+		TenantID: "seller-node",
+	})
+
+	select {
+	case <-called:
+		t.Fatal("auto-confirm must fail closed when supply-chain policy cannot be loaded")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 type autoConfirmProbeStrategy struct {
 	payment.ChainEscrowV2
 	called chan struct{}

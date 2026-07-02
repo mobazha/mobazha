@@ -318,7 +318,13 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 		return
 	}
 
-	if n.isSupplyChainManagedOrder(event.OrderID) {
+	supplyChainManaged, err := n.isSupplyChainManagedOrder(event.OrderID)
+	if err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID,
+			"Cannot establish supply-chain payment policy for order %s; auto-confirm denied: %v", event.OrderID, err)
+		return
+	}
+	if supplyChainManaged {
 		logger.LogInfoWithIDf(log, n.nodeID,
 			"Skipping auto-confirm for supply-chain-managed order %s, waiting for supplier shipment", event.OrderID)
 		return
@@ -391,9 +397,12 @@ func (n *MobazhaNode) isManagedCollectibleFirstSaleOrder(orderID string) (bool, 
 	return models.IsManagedCollectibleFirstSale(orderOpen), nil
 }
 
-func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) bool {
+func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) (bool, error) {
 	if n.supplyChainService == nil {
-		return false
+		return false, nil
+	}
+	if n.repo == nil || n.repo.DB() == nil {
+		return false, fmt.Errorf("order repository is unavailable")
 	}
 
 	var order models.Order
@@ -401,9 +410,7 @@ func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) bool {
 		return tx.Read().Where("id = ?", orderID).First(&order).Error
 	})
 	if err != nil {
-		logger.LogWarningWithIDf(log, n.nodeID,
-			"SupplyChain check: cannot fetch order %s: %v", orderID, err)
-		return false
+		return false, fmt.Errorf("load order: %w", err)
 	}
 
 	return n.isOrderManagedBySupplier(&order)
@@ -441,14 +448,20 @@ func (n *MobazhaNode) startFiatPaymentMonitor() {
 	}()
 }
 
-func (n *MobazhaNode) isOrderManagedBySupplier(order *models.Order) bool {
+func (n *MobazhaNode) isOrderManagedBySupplier(order *models.Order) (bool, error) {
 	if n.supplyChainService == nil {
-		return false
+		return false, nil
+	}
+	if order == nil {
+		return false, fmt.Errorf("order is required")
 	}
 
 	oo, err := order.OrderOpenMessage()
-	if err != nil || oo == nil {
-		return false
+	if err != nil {
+		return false, fmt.Errorf("decode order open: %w", err)
+	}
+	if oo == nil {
+		return false, fmt.Errorf("order open is unavailable")
 	}
 
 	var slugs []string
@@ -461,5 +474,5 @@ func (n *MobazhaNode) isOrderManagedBySupplier(order *models.Order) bool {
 			slugs = append(slugs, slug)
 		}
 	}
-	return len(slugs) > 0 && n.supplyChainService.IsOrderAutoFulfillable(slugs)
+	return len(slugs) > 0 && n.supplyChainService.IsOrderAutoFulfillable(slugs), nil
 }

@@ -190,7 +190,7 @@ func TestProcessPaymentSentMessage_ManagedEscrowEnvelopeSkipsLegacyEscrowValidat
 	paymentSent := &pb.PaymentSent{
 		TransactionID:   "0xmanagedescrow",
 		Coin:            "crypto:eip155:1:native",
-		SettlementSpec:  &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_CANCELABLE, PayMode: "address_monitored", EscrowType: "managed_escrow"},
+		SettlementSpec:  &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_CANCELABLE, PayMode: "address_monitored", EscrowType: "managed"},
 		ContractAddress: managed_escrowAddress,
 		ToAddress:       managed_escrowAddress,
 		Amount:          "1000",
@@ -254,7 +254,7 @@ func TestProcessPaymentSentMessage_BalancePollFundingFactDuplicate(t *testing.T)
 	managed_escrowAddress := "0x213B0Ed1555B1A63C58C53367C1Cc8bB6d1b705f"
 	base := &pb.PaymentSent{
 		Coin:                "crypto:eip155:1:native",
-		SettlementSpec:      &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_MODERATED, PayMode: "address_monitored", EscrowType: "managed_escrow"},
+		SettlementSpec:      &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_MODERATED, PayMode: "address_monitored", EscrowType: "managed"},
 		ContractAddress:     managed_escrowAddress,
 		ToAddress:           managed_escrowAddress,
 		Amount:              "15549097616162482",

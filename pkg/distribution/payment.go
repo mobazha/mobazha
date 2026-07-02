@@ -26,14 +26,14 @@ import (
 // ManagedEVMSignPurpose is an allow-listed commercial signing operation.
 type ManagedEVMSignPurpose string
 
-const ManagedEVMSignManagedEscrowTransaction ManagedEVMSignPurpose = "managed_escrow_managed_escrow_transaction"
+const ManagedEVMSignSettlementTransaction ManagedEVMSignPurpose = "managed_escrow_settlement_transaction"
 
 // ManagedEVMSignRequest describes a typed, auditable ManagedEscrow transaction signing
 // operation. Core validates the chain identity and owner policy before signing.
 type ManagedEVMSignRequest struct {
 	Chain         iwallet.ChainType
 	ChainID       uint64
-	ManagedEscrowAddress   common.Address
+	EscrowAddress common.Address
 	Owners        []common.Address
 	Threshold     uint64
 	Digest        [32]byte
@@ -41,10 +41,10 @@ type ManagedEVMSignRequest struct {
 	CorrelationID string
 }
 
-// ManagedEVMSigner signs an allow-listed ManagedEscrow transaction without exposing the
-// node's private key or a generic signing oracle to a distribution module.
-type ManagedEVMSigner interface {
-	SignManagedManagedEscrowTransaction(ctx context.Context, request ManagedEVMSignRequest) (common.Address, []byte, error)
+// ManagedSettlementSigner is the provider-neutral typed EVM signing port for
+// trusted first-party settlement modules.
+type ManagedSettlementSigner interface {
+	SignManagedSettlementTransaction(ctx context.Context, request ManagedEVMSignRequest) (common.Address, []byte, error)
 }
 
 // ManagedSolanaSignPurpose is an allow-listed Solana owner authorization.
@@ -310,15 +310,15 @@ type EscrowOwnerProvider interface {
 // ManagedEVMRuntime is the cohesive authority required by a managed EVM
 // payment module. It deliberately excludes guest-checkout orchestration.
 type ManagedEVMRuntime struct {
-	EVMSigner      ManagedEVMSigner
-	EVMReaders     EVMContractReaderProvider
-	EVMLogs        EVMLogSubscriberProvider
-	EscrowOwners   EscrowOwnerProvider
-	EVMRelay       relay.EVMRelayService
-	FundingSink    FundingObservationSink
-	AutoConfirmer  ManagedEscrowAutoConfirmer
-	Actions        payment.ActionStore
-	ActionRecorder payment.ActionRecorder
+	SettlementSigner ManagedSettlementSigner
+	EVMReaders       EVMContractReaderProvider
+	EVMLogs          EVMLogSubscriberProvider
+	EscrowOwners     EscrowOwnerProvider
+	EVMRelay         relay.EVMRelayService
+	FundingSink      FundingObservationSink
+	AutoConfirmer    ManagedEscrowAutoConfirmer
+	Actions          payment.ActionStore
+	ActionRecorder   payment.ActionRecorder
 }
 
 // ManagedSolanaRuntime is the Core authority granted to the private Solana

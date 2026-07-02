@@ -387,7 +387,7 @@ func TestStopAll_DoubleCallNoPanic(t *testing.T) {
 
 // TestComputeWatcherDeadline_AddsSlackInPollIntervalUnits is the regression
 // guard for the architectural fix that prevents UnwatchSubaddress from
-// racing pkg/external_payment.Monitor's reapExpired callback. The watcher's local
+// racing the direct observed runtime's expiry callback. The watcher's local
 // expiryTimer must always fire AFTER the monitor has had at least one
 // reap cycle past the order's logical deadline; otherwise late
 // Partial/Expired events are silently dropped.

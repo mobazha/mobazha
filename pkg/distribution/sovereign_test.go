@@ -1,22 +1,11 @@
 package distribution
 
 import (
-	"context"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/external_payment"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
-
-type sovereignRuntimeTestStub struct{}
-
-func (*sovereignRuntimeTestStub) Start(context.Context) error           { return nil }
-func (*sovereignRuntimeTestStub) Close() error                          { return nil }
-func (*sovereignRuntimeTestStub) PaymentSource() external_payment.Source          { return nil }
-func (*sovereignRuntimeTestStub) PaymentMonitor() external_payment.PaymentMonitor { return nil }
-func (*sovereignRuntimeTestStub) PaymentAccountIndex() uint32           { return 0 }
-func (*sovereignRuntimeTestStub) PaymentAvailable(context.Context) bool { return true }
 
 type sovereignPolicyTestStub struct{ StaticAIHTTPPolicy }
 
@@ -38,15 +27,15 @@ type sovereignModuleTestStub struct{}
 func (*sovereignModuleTestStub) RegisterTrustedHuma(TrustedHumaRegistration) {}
 
 func TestSovereignNodeConfigValidateRejectsPartialAndTypedNilPorts(t *testing.T) {
-	runtime := &sovereignRuntimeTestStub{}
+	runtime := externalPaymentRuntimeStub{}
 	policy := &sovereignPolicyTestStub{}
 
 	tests := []SovereignNodeConfig{
 		{},
-		{PaymentRuntime: runtime},
-		{PaymentRuntime: (*sovereignRuntimeTestStub)(nil), Policy: policy},
-		{PaymentRuntime: runtime, Policy: (*sovereignPolicyTestStub)(nil)},
-		{PaymentRuntime: runtime, Policy: policy, TrustedHumaModules: []TrustedHumaModule{(*sovereignModuleTestStub)(nil)}},
+		{ExternalPaymentRuntime: runtime},
+		{ExternalPaymentRuntime: (*externalPaymentRuntimeStub)(nil), Policy: policy},
+		{ExternalPaymentRuntime: runtime, Policy: (*sovereignPolicyTestStub)(nil)},
+		{ExternalPaymentRuntime: runtime, Policy: policy, TrustedHumaModules: []TrustedHumaModule{(*sovereignModuleTestStub)(nil)}},
 	}
 	for index, config := range tests {
 		if err := config.Validate(); err == nil {
@@ -56,16 +45,16 @@ func TestSovereignNodeConfigValidateRejectsPartialAndTypedNilPorts(t *testing.T)
 }
 
 func TestSovereignNodeConfigCloneOwnsModuleSlice(t *testing.T) {
-	runtime := &sovereignRuntimeTestStub{}
+	runtime := externalPaymentRuntimeStub{}
 	policy := &sovereignPolicyTestStub{}
 	first := &sovereignModuleTestStub{}
 	second := &sovereignModuleTestStub{}
 	modules := []TrustedHumaModule{first}
 
 	clone := (SovereignNodeConfig{
-		PaymentRuntime:     runtime,
-		Policy:             policy,
-		TrustedHumaModules: modules,
+		ExternalPaymentRuntime: runtime,
+		Policy:                 policy,
+		TrustedHumaModules:     modules,
 	}).Clone()
 	modules[0] = second
 
@@ -74,5 +63,15 @@ func TestSovereignNodeConfigCloneOwnsModuleSlice(t *testing.T) {
 	}
 	if err := clone.Validate(); err != nil {
 		t.Fatalf("valid clone rejected: %v", err)
+	}
+}
+
+func TestSovereignNodeConfigAcceptsExternalPaymentRuntime(t *testing.T) {
+	config := SovereignNodeConfig{
+		ExternalPaymentRuntime: externalPaymentRuntimeStub{},
+		Policy:                 &sovereignPolicyTestStub{},
+	}
+	if err := config.Validate(); err != nil {
+		t.Fatalf("external payment runtime rejected: %v", err)
 	}
 }

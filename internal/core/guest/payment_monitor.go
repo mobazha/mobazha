@@ -9,8 +9,8 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pkgexternal_payment "github.com/mobazha/mobazha3.0/pkg/external_payment"
 	"github.com/mobazha/mobazha3.0/pkg/redact"
 	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -27,10 +27,8 @@ const (
 	evmGracePeriod           = 1 * time.Hour
 	solanaGracePeriod        = 30 * time.Minute
 	utxoGracePeriod          = 1 * time.Hour
-	// external_paymentGracePeriod is the legacy constant retained for the watcher's
-	// confirmation deadline computation. Subaddress reaping inside the
-	// pkg/external_payment monitor uses its own GracePeriod from MonitorConfig
-	// (defaulted to the same 2h to preserve historical behaviour).
+	// external_paymentGracePeriod is the order-policy grace window. The injected direct
+	// observed runtime owns its internal reaping schedule.
 	external_paymentGracePeriod = 2 * time.Hour
 )
 
@@ -49,16 +47,16 @@ type SolanaReferenceChecker interface {
 // Each order in AWAITING_PAYMENT or PAYMENT_DETECTED state gets a goroutine
 // that periodically checks the payment address balance or reference key.
 type GuestPaymentMonitor struct {
-	db            database.Database
-	guestService  contracts.GuestOrderService
-	balanceCheck  ChainBalanceChecker
-	solanaCheck   SolanaReferenceChecker
-	utxoMonitor   *pkgutxo.Monitor
-	chainOps      pkgutxo.ChainOperations
-	multiwallet   contracts.WalletOperator
-	external_paymentMonitor pkgexternal_payment.PaymentMonitor
-	evmManagedEscrowWatch  EVMManagedEscrowWatcher
-	gracePeriod   time.Duration
+	db           database.Database
+	guestService contracts.GuestOrderService
+	balanceCheck ChainBalanceChecker
+	solanaCheck  SolanaReferenceChecker
+	utxoMonitor  *pkgutxo.Monitor
+	chainOps     pkgutxo.ChainOperations
+	multiwallet  contracts.WalletOperator
+	externalPay  distribution.ExternalPaymentRuntime
+	evmManagedEscrowWatch EVMManagedEscrowWatcher
+	gracePeriod  time.Duration
 	// confirmationInterval is the tick used by pollConfirmationsLoop.
 	// Defaults to confirmationPollInterval (30s); test-only setter shrinks it
 	// so suite runtime stays under a second instead of multi-minute waits.
@@ -141,13 +139,12 @@ func (m *GuestPaymentMonitor) SetEVMManagedEscrowWatch(w EVMManagedEscrowWatcher
 	m.evmManagedEscrowWatch = w
 }
 
-// SetExternalPaymentMonitor injects the per-account ExternalPayment monitor that fans out
-// transfers to subaddress watches. The monitor must already be Started
-// (its lifecycle is owned by the builder, not the guest layer).
-func (m *GuestPaymentMonitor) SetExternalPaymentMonitor(mon pkgexternal_payment.PaymentMonitor) {
+// SetExternalPaymentRuntime injects a provider-neutral direct observation
+// runtime. Its lifecycle is owned by the composition root.
+func (m *GuestPaymentMonitor) SetExternalPaymentRuntime(runtime distribution.ExternalPaymentRuntime) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.external_paymentMonitor = mon
+	m.externalPay = runtime
 }
 
 // WatchOrder starts monitoring a newly created guest order for incoming payments.
@@ -279,7 +276,7 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 		}
 
 	case coinInfo.Chain == iwallet.ChainExternalPayment:
-		if m.external_paymentMonitor != nil {
+		if m.externalPay != nil {
 			ctx, cancel := context.WithCancel(context.Background())
 			m.watches[order.OrderToken] = cancel
 			go m.watchExternalPaymentOrder(ctx, order)
@@ -608,14 +605,14 @@ const watcherSettleSlack = 4
 // computeWatcherDeadline returns the local expiryTimer deadline used by
 // watchExternalPaymentOrder. Extracted so the slack contract can be unit tested
 // without spinning up a full Monitor + Source stack. monitorPollInterval
-// is whatever pkg/external_payment.Monitor is currently configured with.
+// comes from the injected direct observed runtime.
 func computeWatcherDeadline(orderDeadline time.Time, monitorPollInterval time.Duration) time.Time {
 	return orderDeadline.Add(time.Duration(watcherSettleSlack) * monitorPollInterval)
 }
 
 // watchExternalPaymentOrder is a thin watcher shell symmetric to watchUTXOOrder.
-// All polling and state machine work happens inside pkg/external_payment.Monitor —
-// this function just translates external_payment.PaymentEvent into the GuestOrderService
+// All polling happens inside the direct observed runtime — this function
+// translates normalized events into the GuestOrderService
 // contract and drives confirmation polling once the order is funded.
 //
 // Lifecycle:
@@ -658,15 +655,20 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 	detected := make(chan detection, 1)
 	terminated := make(chan struct{})
 
-	wa := &pkgexternal_payment.WatchedSubaddress{
-		SubAddrIndex:   order.AddressIndex,
+	monitor := m.directObservedMonitor()
+	if monitor == nil {
+		log.Warningf("no direct observed payment runtime for order %s", redact.Token(order.OrderToken))
+		return
+	}
+	wa := &distribution.ExternalPaymentWatch{
+		AddressIndex:   order.AddressIndex,
 		OrderID:        order.OrderToken,
 		ExpectedAmount: expectedAmount,
 		ExpiresAt:      order.ExpiresAt,
-		OnPayment: func(evt pkgexternal_payment.PaymentEvent) {
+		OnPayment: func(evt distribution.ExternalPaymentEvent) {
 			switch evt.Status {
-			case pkgexternal_payment.PaymentStatusConfirmed, pkgexternal_payment.PaymentStatusOverpay:
-				if evt.Status == pkgexternal_payment.PaymentStatusOverpay {
+			case distribution.ExternalPaymentConfirmed, distribution.ExternalPaymentOverpaid:
+				if evt.Status == distribution.ExternalPaymentOverpaid {
 					log.Warningf("EXTERNAL_PAYMENT overpayment for guest order %s: paid=%d expected=%d",
 						redact.Token(order.OrderToken), evt.TotalConfirmed, expectedAmount)
 				}
@@ -680,7 +682,7 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 				default:
 				}
 
-			case pkgexternal_payment.PaymentStatusPool:
+			case distribution.ExternalPaymentPending:
 				// Pool tx is mempool-only — record as a UX hint without
 				// changing order state. State remains AWAITING_PAYMENT
 				// until reapExpired (Partial/Expired) or a confirmed
@@ -688,17 +690,17 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 				// PAYMENT_DETECTED implies an on-chain tx and lets
 				// CleanupExpiredOrders sweep pool-evicted orders on the
 				// AWAITING_PAYMENT path without special casing.
-				if err := m.guestService.HandlePoolPayment(order.OrderToken, evt.LastTxHash, evt.TotalPool); err != nil {
+				if err := m.guestService.HandlePoolPayment(order.OrderToken, evt.LastTxHash, evt.TotalPending); err != nil {
 					log.Warningf("handle EXTERNAL_PAYMENT pool payment for %s: %v", redact.Token(order.OrderToken), err)
 				}
 
-			case pkgexternal_payment.PaymentStatusPartial, pkgexternal_payment.PaymentStatusExpired:
+			case distribution.ExternalPaymentPartial, distribution.ExternalPaymentExpired:
 				status := "expired"
-				if evt.Status == pkgexternal_payment.PaymentStatusPartial {
+				if evt.Status == distribution.ExternalPaymentPartial {
 					status = "partial"
 				}
 				log.Warningf("EXTERNAL_PAYMENT watch for %s ended (%s); confirmed=%d pool=%d expected=%d",
-					redact.Token(order.OrderToken), status, evt.TotalConfirmed, evt.TotalPool, expectedAmount)
+					redact.Token(order.OrderToken), status, evt.TotalConfirmed, evt.TotalPending, expectedAmount)
 				if err := m.guestService.HandleLatePayment(order.OrderToken, evt.LastTxHash, status, evt.TotalConfirmed, expectedAmount); err != nil {
 					log.Warningf("record EXTERNAL_PAYMENT %s payment for %s: %v", status, redact.Token(order.OrderToken), err)
 				}
@@ -711,16 +713,16 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 		},
 	}
 
-	if err := m.external_paymentMonitor.WatchSubaddress(wa); err != nil {
+	if err := monitor.WatchPayment(wa); err != nil {
 		log.Warningf("watch EXTERNAL_PAYMENT subaddr for %s: %v", redact.Token(order.OrderToken), err)
 		return
 	}
-	defer m.external_paymentMonitor.UnwatchSubaddress(order.AddressIndex)
+	defer monitor.UnwatchPayment(order.AddressIndex)
 
 	// Watcher deadline = monitor's logical deadline + slack so reapExpired
 	// has time to deliver Partial/Expired before we unwatch. See
 	// watcherSettleSlack docs and computeWatcherDeadline.
-	watcherDeadline := computeWatcherDeadline(deadline, m.external_paymentMonitor.PollInterval())
+	watcherDeadline := computeWatcherDeadline(deadline, monitor.PaymentPollInterval())
 	expiryTimer := time.NewTimer(time.Until(watcherDeadline))
 	defer expiryTimer.Stop()
 
@@ -738,12 +740,25 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 		// pool/partial state).
 		log.Warningf("EXTERNAL_PAYMENT watcher for %s past deadline+slack; reaping",
 			redact.Token(order.OrderToken))
-		m.external_paymentMonitor.ReapWatch(order.AddressIndex)
+		monitor.ReapPayment(order.AddressIndex)
 		return
 	case <-terminated:
 		return
 	case d := <-detected:
-		fetcher := &external_paymentHeightFetcher{monitor: m.external_paymentMonitor, txHeight: d.height}
+		fetcher := &external_paymentHeightFetcher{monitor: monitor, txHeight: d.height}
 		m.pollConfirmationsLoop(ctx, order.OrderToken, order.RequiredConfs, fetcher, deadline)
 	}
+}
+
+type directObservedMonitor interface {
+	WatchPayment(*distribution.ExternalPaymentWatch) error
+	UnwatchPayment(uint32)
+	ReapPayment(uint32)
+	PaymentPollInterval() time.Duration
+	PaymentHeight(context.Context) (uint64, error)
+	PaymentHealthy() bool
+}
+
+func (m *GuestPaymentMonitor) directObservedMonitor() directObservedMonitor {
+	return m.externalPay
 }

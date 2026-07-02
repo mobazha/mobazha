@@ -17,7 +17,7 @@ func TestPendingManagedEscrowPaymentInfo_SettlementSpecJSONRoundTrip(t *testing.
 		SettlementSpec: &PendingSettlementSpec{
 			Method:     "MODERATED",
 			PayMode:    "address_monitored",
-			EscrowType: "managed_escrow",
+			EscrowType: "managed",
 		},
 	}))
 

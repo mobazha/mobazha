@@ -163,7 +163,7 @@ func (s *PaymentVerificationService) FetchAndVerify(
 		if len(paymentSent.GetFundingFacts()) > 0 {
 			return s.verifyFundingFacts(ctx, coinType, paymentSent, paymentAddress)
 		}
-		if spec.GetEscrowType() == string(payment.EscrowTypeManagedEscrow) {
+		if spec.GetEscrowType() == string(payment.EscrowTypeManaged) {
 			return s.verifyMonitorRelayedManagedEscrowPayment(ctx, coinType, paymentSent)
 		}
 	}

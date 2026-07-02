@@ -15,7 +15,7 @@ func TestEscrowUsesBackendSubmittedRelease(t *testing.T) {
 		want       bool
 	}{
 		{string(payment.EscrowTypeUTXOScript), true},
-		{string(payment.EscrowTypeManagedEscrow), true},
+		{string(payment.EscrowTypeManaged), true},
 		{string(payment.EscrowTypeSolanaEscrow), true},
 		{"none", false},
 	}

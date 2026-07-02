@@ -42,7 +42,7 @@ func TestBuildOrderSettlementBreakdown_ConfirmedActionLines(t *testing.T) {
 		SettlementSpec: &pb.PaymentSent_SettlementSpec{
 			Method:     pb.PaymentSent_CANCELABLE,
 			PayMode:    "address_monitored",
-			EscrowType: "managed_escrow",
+			EscrowType: "managed",
 		},
 	}); err != nil {
 		t.Fatalf("SetPaymentSent: %v", err)
@@ -216,7 +216,7 @@ func TestBuildOrderSettlementBreakdown_PrefersNewestConfirmedOverProtobufDispute
 		SettlementSpec: &pb.PaymentSent_SettlementSpec{
 			Method:     pb.PaymentSent_MODERATED,
 			PayMode:    "address_monitored",
-			EscrowType: "managed_escrow",
+			EscrowType: "managed",
 		},
 	}); err != nil {
 		t.Fatalf("SetPaymentSent: %v", err)

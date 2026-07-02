@@ -3,7 +3,6 @@ package guest
 import (
 	"context"
 
-	pkgexternal_payment "github.com/mobazha/mobazha3.0/pkg/external_payment"
 	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -64,12 +63,12 @@ func (f *chainTxFetcher) Label() string {
 // boundary cohesive: the monitor already exposes GetHeight + IsHealthy so
 // the fetcher does not introduce a separate dependency.
 type external_paymentHeightFetcher struct {
-	monitor  pkgexternal_payment.PaymentMonitor
+	monitor  directObservedMonitor
 	txHeight uint64
 }
 
 func (f *external_paymentHeightFetcher) Fetch(ctx context.Context) (int, error) {
-	currentHeight, err := f.monitor.GetHeight(ctx)
+	currentHeight, err := f.monitor.PaymentHeight(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -82,7 +81,7 @@ func (f *external_paymentHeightFetcher) Fetch(ctx context.Context) (int, error) 
 }
 
 func (f *external_paymentHeightFetcher) Healthy() bool {
-	return f.monitor != nil && f.monitor.IsHealthy()
+	return f.monitor != nil && f.monitor.PaymentHealthy()
 }
 
 func (f *external_paymentHeightFetcher) Label() string {

@@ -15,7 +15,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/distribution"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/external_payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -55,13 +54,12 @@ type PaymentAddressResult struct {
 // seller-owned 1/1 predicted ManagedEscrow adapter when wired. Solana uses a one-time reference
 // key against the seller address. ExternalPayment creates subaddresses via external_payment-wallet-rpc.
 type DirectPaymentService struct {
-	db           database.Database
-	keyDeriver   BIP44KeyDeriver
-	projectorMu  sync.RWMutex
-	projector    distribution.ManagedEscrowGuestProjector
-	sellerOwner  GuestEVMSellerOwnerResolver
-	external_paymentSource external_payment.Source
-	external_paymentAccount   uint32
+	db          database.Database
+	keyDeriver  BIP44KeyDeriver
+	projectorMu sync.RWMutex
+	projector   distribution.ManagedEscrowGuestProjector
+	sellerOwner GuestEVMSellerOwnerResolver
+	externalPay distribution.ExternalPaymentRuntime
 }
 
 // NewDirectPaymentService creates a DirectPaymentService.
@@ -101,12 +99,10 @@ func (s *DirectPaymentService) HasManagedEscrowFunding() bool {
 	return s.projector != nil && s.sellerOwner != nil
 }
 
-// SetExternalPaymentSource injects the ExternalPayment wallet-rpc source for subaddress generation.
-// Pass the same Source the Monitor was built against to keep address generation
-// and payment detection bound to one wallet account.
-func (s *DirectPaymentService) SetExternalPaymentSource(source external_payment.Source, accountIndex uint32) {
-	s.external_paymentSource = source
-	s.external_paymentAccount = accountIndex
+// SetExternalPaymentRuntime injects the provider-neutral direct observed rail
+// used for fresh address allocation. The runtime owns its account selection.
+func (s *DirectPaymentService) SetExternalPaymentRuntime(runtime distribution.ExternalPaymentRuntime) {
+	s.externalPay = runtime
 }
 
 // GeneratePaymentAddress creates a payment address for a Guest Order.
@@ -250,20 +246,15 @@ func (s *DirectPaymentService) generateSolanaReference(
 // Note: SweepTo is intentionally empty — EXTERNAL_PAYMENT auto-sweep is not supported in Phase B.
 // Funds stay in the wallet-rpc subaddress until manual withdrawal by the seller.
 func (s *DirectPaymentService) generateExternalPaymentSubaddress(ctx context.Context, req PaymentAddressRequest) (*PaymentAddressResult, error) {
-	if s.external_paymentSource == nil {
-		return nil, fmt.Errorf("external_payment wallet-rpc client not configured")
-	}
-
 	label := fmt.Sprintf("guest_%s", req.OrderToken)
-	addr, addrIndex, err := s.external_paymentSource.CreateAddress(ctx, s.external_paymentAccount, label)
-	if err != nil {
-		return nil, fmt.Errorf("create EXTERNAL_PAYMENT subaddress: %w", err)
+	if s.externalPay != nil {
+		address, err := s.externalPay.CreatePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{Label: label})
+		if err != nil {
+			return nil, fmt.Errorf("create external payment address: %w", err)
+		}
+		return &PaymentAddressResult{Address: address.Address, AddressIndex: address.Index}, nil
 	}
-
-	return &PaymentAddressResult{
-		Address:      addr,
-		AddressIndex: addrIndex,
-	}, nil
+	return nil, fmt.Errorf("external payment runtime not configured")
 }
 
 func (s *DirectPaymentService) getOrCreateCounter(tx database.Tx, chainKey string) (*models.DirectPaymentAddressCounter, error) {

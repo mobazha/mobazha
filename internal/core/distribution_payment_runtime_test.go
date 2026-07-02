@@ -28,27 +28,25 @@ func TestDistributionEVMDigestSigner_SignsWithoutExposingKey(t *testing.T) {
 	require.NoError(t, err)
 	owner := crypto.PubkeyToAddress(ecdsaKey.PublicKey)
 	signer := distributionManagedEVMSigner{keys: provider}
-	request := distribution.ManagedEVMSignRequest{
+
+	address, signature, err := signer.SignManagedSettlementTransaction(context.Background(), distribution.ManagedEVMSignRequest{
 		Chain:         iwallet.ChainEthereum,
 		ChainID:       1,
-		ManagedEscrowAddress:   common.HexToAddress("0x1111111111111111111111111111111111111111"),
+		EscrowAddress: common.HexToAddress("0x2222222222222222222222222222222222222222"),
 		Owners:        []common.Address{owner},
 		Threshold:     1,
-		Digest:        [32]byte{1, 2, 3},
-		Purpose:       distribution.ManagedEVMSignManagedEscrowTransaction,
-		CorrelationID: "order-1",
-	}
-
-	address, signature, err := signer.SignManagedManagedEscrowTransaction(context.Background(), request)
+		Digest:        [32]byte{4, 5, 6},
+		Purpose:       distribution.ManagedEVMSignSettlementTransaction,
+		CorrelationID: "order-neutral-1",
+	})
 	require.NoError(t, err)
-	assert.NotZero(t, address)
+	assert.Equal(t, owner, address)
 	require.Len(t, signature, 65)
-	assert.Contains(t, []byte{27, 28}, signature[64])
 }
 
 func TestDistributionEVMDigestSigner_RejectsUnauditableRequest(t *testing.T) {
 	signer := distributionManagedEVMSigner{keys: &mockKeyProvider{}}
-	_, _, err := signer.SignManagedManagedEscrowTransaction(context.Background(), distribution.ManagedEVMSignRequest{
+	_, _, err := signer.SignManagedSettlementTransaction(context.Background(), distribution.ManagedEVMSignRequest{
 		Chain:  iwallet.ChainEthereum,
 		Digest: [32]byte{1},
 	})
@@ -58,7 +56,7 @@ func TestDistributionEVMDigestSigner_RejectsUnauditableRequest(t *testing.T) {
 func TestDistributionEVMDigestSigner_HonorsCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, _, err := (distributionManagedEVMSigner{keys: &mockKeyProvider{}}).SignManagedManagedEscrowTransaction(
+	_, _, err := (distributionManagedEVMSigner{keys: &mockKeyProvider{}}).SignManagedSettlementTransaction(
 		ctx,
 		distribution.ManagedEVMSignRequest{
 			Chain:         iwallet.ChainEthereum,

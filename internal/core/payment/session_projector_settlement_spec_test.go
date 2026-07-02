@@ -25,7 +25,7 @@ func TestDerivePaymentInfo_ManagedEscrowPendingUsesSettlementSpecMethod(t *testi
 		SettlementSpec: &models.PendingSettlementSpec{
 			Method:     "MODERATED",
 			PayMode:    "address_monitored",
-			EscrowType: "managed_escrow",
+			EscrowType: "managed",
 		},
 		Moderated: false,
 	}))

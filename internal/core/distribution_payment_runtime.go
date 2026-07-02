@@ -19,9 +19,18 @@ type distributionManagedEVMSigner struct {
 	keys contracts.KeyProvider
 }
 
-func (s distributionManagedEVMSigner) SignManagedManagedEscrowTransaction(
+func (s distributionManagedEVMSigner) SignManagedSettlementTransaction(
 	ctx context.Context,
 	request distribution.ManagedEVMSignRequest,
+) (common.Address, []byte, error) {
+	return s.signManagedSettlement(ctx, request, request.EscrowAddress, distribution.ManagedEVMSignSettlementTransaction)
+}
+
+func (s distributionManagedEVMSigner) signManagedSettlement(
+	ctx context.Context,
+	request distribution.ManagedEVMSignRequest,
+	escrowAddress common.Address,
+	purpose distribution.ManagedEVMSignPurpose,
 ) (common.Address, []byte, error) {
 	if err := ctx.Err(); err != nil {
 		return common.Address{}, nil, err
@@ -29,9 +38,9 @@ func (s distributionManagedEVMSigner) SignManagedManagedEscrowTransaction(
 	if s.keys == nil {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: key provider unavailable")
 	}
-	if request.Chain == "" || request.ChainID == 0 || request.ManagedEscrowAddress == (common.Address{}) ||
-		request.Purpose != distribution.ManagedEVMSignManagedEscrowTransaction || strings.TrimSpace(request.CorrelationID) == "" {
-		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: valid chain, ManagedEscrow, purpose, and correlation ID are required")
+	if request.Chain == "" || request.ChainID == 0 || escrowAddress == (common.Address{}) ||
+		request.Purpose != purpose || strings.TrimSpace(request.CorrelationID) == "" {
+		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: valid chain, escrow, purpose, and correlation ID are required")
 	}
 	if request.Digest == ([32]byte{}) {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: zero digest is forbidden")
@@ -122,7 +131,7 @@ func (p distributionEVMReaderProvider) chainClient(chain iwallet.ChainType) (iwa
 }
 
 var (
-	_ distribution.ManagedEVMSigner          = distributionManagedEVMSigner{}
+	_ distribution.ManagedSettlementSigner   = distributionManagedEVMSigner{}
 	_ distribution.EVMContractReaderProvider = distributionEVMReaderProvider{}
 	_ distribution.EVMLogSubscriberProvider  = distributionEVMReaderProvider{}
 )

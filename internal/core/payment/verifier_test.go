@@ -486,7 +486,7 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 			SettlementSpec: &models.PendingSettlementSpec{
 				Method:     "CANCELABLE",
 				PayMode:    "address_monitored",
-				EscrowType: "managed_escrow",
+				EscrowType: "managed",
 			},
 		}); err != nil {
 			return err
@@ -642,7 +642,7 @@ func TestAggregateAndEmit_VendorVerifiedPaymentEmitsOrderFunded(t *testing.T) {
 			SettlementSpec: &models.PendingSettlementSpec{
 				Method:     "CANCELABLE",
 				PayMode:    "address_monitored",
-				EscrowType: "managed_escrow",
+				EscrowType: "managed",
 			},
 		}); err != nil {
 			return err
@@ -743,7 +743,7 @@ func TestAggregateAndEmit_BuyerVerifiedPaymentEmitsPaymentReceived(t *testing.T)
 			SettlementSpec: &models.PendingSettlementSpec{
 				Method:     "DIRECT",
 				PayMode:    "address_monitored",
-				EscrowType: "managed_escrow",
+				EscrowType: "managed",
 			},
 		}); err != nil {
 			return err
@@ -1030,7 +1030,7 @@ func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesSettlementSpecWhenPrese
 		SettlementSpec: &models.PendingSettlementSpec{
 			Method:     "MODERATED",
 			PayMode:    "address_monitored",
-			EscrowType: "managed_escrow",
+			EscrowType: "managed",
 		},
 	}))
 
@@ -1760,7 +1760,7 @@ func TestAggregateAndEmit_SharedPaymentIntentAlignsHostedEnvelope(t *testing.T) 
 			SettlementSpec: &models.PendingSettlementSpec{
 				Method:     "CANCELABLE",
 				PayMode:    "address_monitored",
-				EscrowType: "managed_escrow",
+				EscrowType: "managed",
 			},
 		}); err != nil {
 			return err

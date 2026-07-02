@@ -537,7 +537,7 @@ func TestRegisterDistributionPaymentModules_ExternalStrategyIsRegistered(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if managedEVM.EVMSigner == nil || managedEVM.EVMReaders == nil {
+	if managedEVM.SettlementSigner == nil || managedEVM.EVMReaders == nil {
 		t.Fatal("distribution module did not receive narrow EVM operation ports")
 	}
 	if managedEVM.Actions != nil || managedEVM.ActionRecorder != nil {

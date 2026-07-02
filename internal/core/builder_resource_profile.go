@@ -61,7 +61,7 @@ func newResourceProfileNode(ctx context.Context, cfg *repo.Config, nodeID string
 			return
 		}
 		if runtimeStarted {
-			_ = composition.PaymentRuntime.Close()
+			_ = composition.ExternalPaymentRuntime.Close()
 		}
 		if nodeCancel != nil {
 			nodeCancel()
@@ -108,8 +108,8 @@ func newResourceProfileNode(ctx context.Context, cfg *repo.Config, nodeID string
 			eventBus: bus,
 		},
 		chainFields: chainFields{
-			sovereignPayment: composition.PaymentRuntime,
-			sovereignPolicy:  composition.Policy,
+			externalPayment: composition.ExternalPaymentRuntime,
+			sovereignPolicy: composition.Policy,
 		},
 		modeFlags: modeFlags{
 			testnet:   cfg.Testnet,
@@ -127,10 +127,10 @@ func newResourceProfileNode(ctx context.Context, cfg *repo.Config, nodeID string
 		n.contentStore = &cidContentStore{}
 	}
 
-	if n.sovereignPayment != nil {
-		if startErr := n.sovereignPayment.Start(n.nodeCtx); startErr != nil {
-			_ = n.sovereignPayment.Close()
-			return nil, fmt.Errorf("start sovereign payment runtime: %w", startErr)
+	if n.externalPayment != nil {
+		if startErr := n.externalPayment.Start(n.nodeCtx); startErr != nil {
+			_ = n.externalPayment.Close()
+			return nil, fmt.Errorf("start external payment runtime: %w", startErr)
 		}
 		runtimeStarted = true
 	}
@@ -346,14 +346,11 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 	})
 	n.guestOrderService.SetCheckoutSupplyQuoter(checkoutSupplyQuoter)
 
-	if n.sovereignPayment != nil {
+	if n.externalPayment != nil {
 		if n.directPaymentService != nil {
-			n.directPaymentService.SetExternalPaymentSource(
-				n.sovereignPayment.PaymentSource(),
-				n.sovereignPayment.PaymentAccountIndex(),
-			)
+			n.directPaymentService.SetExternalPaymentRuntime(n.externalPayment)
 		}
-		n.guestPaymentMonitor.SetExternalPaymentMonitor(n.sovereignPayment.PaymentMonitor())
+		n.guestPaymentMonitor.SetExternalPaymentRuntime(n.externalPayment)
 	}
 
 	initDigitalSubsystem(n)

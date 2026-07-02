@@ -44,7 +44,7 @@ func TestCancelablePaymentReadyEvent_RequiresVerifiedPayment(t *testing.T) {
 		SettlementSpec: &pb.PaymentSent_SettlementSpec{
 			Method:     pb.PaymentSent_CANCELABLE,
 			PayMode:    "address_monitored",
-			EscrowType: string(EscrowTypeManagedEscrow),
+			EscrowType: string(EscrowTypeManaged),
 		},
 	}
 	if got := CancelablePaymentReadyEvent(order, ps, big.NewInt(1000)); got != nil {
@@ -106,7 +106,7 @@ func TestCancelablePaymentReadyEvent_PreservesLargeWeiAmount(t *testing.T) {
 		SettlementSpec: &pb.PaymentSent_SettlementSpec{
 			Method:     pb.PaymentSent_CANCELABLE,
 			PayMode:    "address_monitored",
-			EscrowType: string(EscrowTypeManagedEscrow),
+			EscrowType: string(EscrowTypeManaged),
 		},
 	}
 	large := new(big.Int)

@@ -995,7 +995,7 @@ func TestErrBalanceMonitoredEscrowRequiresSettlementAction_UsesPaymentSentWhenOr
 		SettlementSpec: &pb.PaymentSent_SettlementSpec{
 			Method:     pb.PaymentSent_MODERATED,
 			PayMode:    "address_monitored",
-			EscrowType: string(payment.EscrowTypeManagedEscrow),
+			EscrowType: string(payment.EscrowTypeManaged),
 		},
 	}
 	err := errBalanceMonitoredEscrowRequiresSettlementAction(nil, ps, "dispute_release")

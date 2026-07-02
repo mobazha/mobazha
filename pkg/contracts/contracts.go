@@ -834,9 +834,9 @@ type ListEXTERNAL_PAYMENTTransfersResult struct {
 	AccountIndex uint32             `json:"accountIndex"`
 }
 
-// EXTERNAL_PAYMENTTransferEntry mirrors pkg/external_payment.TransferDetail but lives in the
-// public contracts package so the OpenAPI schema stays self-contained
-// (clients consuming the contract shouldn't have to import pkg/external_payment).
+// EXTERNAL_PAYMENTTransferEntry is the administration projection exposed through the
+// public contracts package. Payment observation uses the provider-neutral
+// distribution runtime instead.
 //
 // Amount + Fee are decimal piconero strings, same rationale as
 // ExternalPaymentWithdrawRequest.Amount: a long-running sovereign can accumulate

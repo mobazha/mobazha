@@ -167,11 +167,11 @@ const (
 
 // EventType values (well-known set; new chains may add more).
 const (
-	PaymentEventManagedEscrowReceived   = "managed_escrow_received"
-	PaymentEventERC20Transfer  = "erc20_transfer"
-	PaymentEventEXTERNAL_PAYMENTDeposit     = "external_payment_deposit"
-	PaymentEventUTXOFunding    = "utxo_funding"
-	PaymentEventSolanaTransfer = "solana_transfer"
+	PaymentEventManagedEscrowReceived = "managed_escrow_received"
+	PaymentEventERC20Transfer         = "erc20_transfer"
+	PaymentEventEXTERNAL_PAYMENTDeposit            = "external_payment_deposit"
+	PaymentEventUTXOFunding           = "utxo_funding"
+	PaymentEventSolanaTransfer        = "solana_transfer"
 )
 
 // TxHashSource values.

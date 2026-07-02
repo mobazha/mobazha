@@ -244,9 +244,9 @@ func (n *MobazhaNode) stopSovereign() error {
 		n.guestPaymentMonitor.StopAll()
 	}
 	var closeErr error
-	if n.sovereignPayment != nil {
-		if err := n.sovereignPayment.Close(); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "close sovereign payment runtime: %v", err)
+	if n.externalPayment != nil {
+		if err := n.externalPayment.Close(); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "close external payment runtime: %v", err)
 			closeErr = err
 		}
 	}

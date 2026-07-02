@@ -240,7 +240,7 @@ func (op *OrderProcessor) validatePaymentSent(coinType iwallet.CoinType, orderOp
 	specProto := paymentSent.GetSettlementSpec()
 	if specProto != nil {
 		switch payment.EscrowType(specProto.GetEscrowType()) {
-		case payment.EscrowTypeManagedEscrow, payment.EscrowTypeSolanaEscrow:
+		case payment.EscrowTypeManaged, payment.EscrowTypeSolanaEscrow:
 			// The orchestration layer already invoked the registered V2
 			// strategy's ValidatePaymentMessage. Managed rails deliberately have
 			// no concrete wallet in Open Core, so legacy wallet validation must

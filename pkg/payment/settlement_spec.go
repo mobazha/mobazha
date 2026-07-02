@@ -28,7 +28,7 @@ const (
 	EscrowTypeEVMContract   EscrowType = "evm_contract"
 	EscrowTypeSolanaProgram EscrowType = "solana_program"
 	EscrowTypeSolanaEscrow  EscrowType = "solana_escrow"
-	EscrowTypeManagedEscrow          EscrowType = "managed_escrow"
+	EscrowTypeManaged       EscrowType = "managed"
 	EscrowTypeFiatProvider  EscrowType = "fiat_provider"
 )
 
@@ -55,7 +55,7 @@ func (s SettlementSpec) IsClientSigned() bool { return s.PayMode == PayModeClien
 
 func (s SettlementSpec) IsEscrow() bool { return s.EscrowType != EscrowTypeNone }
 
-func (s SettlementSpec) UsesManagedEscrow() bool { return s.EscrowType == EscrowTypeManagedEscrow }
+func (s SettlementSpec) UsesManagedEscrow() bool { return s.EscrowType == EscrowTypeManaged }
 
 func (s SettlementSpec) UsesUTXOScript() bool { return s.EscrowType == EscrowTypeUTXOScript }
 
@@ -77,7 +77,7 @@ func (s SettlementSpec) Validate() error {
 		switch s.PayMode {
 		case PayModeAddressMonitored:
 			switch s.EscrowType {
-			case EscrowTypeUTXOScript, EscrowTypeManagedEscrow, EscrowTypeSolanaEscrow:
+			case EscrowTypeUTXOScript, EscrowTypeManaged, EscrowTypeSolanaEscrow:
 				return nil
 			default:
 				return fmt.Errorf("%s with address_monitored requires utxo_script, safe, or solana_escrow, got %s", s.Method, s.EscrowType)
@@ -188,7 +188,7 @@ func NewUTXOSpec(moderated bool) SettlementSpec {
 	}
 }
 
-// NewManagedEscrowSpec returns address-monitored ManagedEscrow escrow spec.
+// NewManagedEscrowSpec returns an address-monitored managed escrow spec.
 func NewManagedEscrowSpec(moderated bool) SettlementSpec {
 	method := pb.PaymentSent_CANCELABLE
 	if moderated {
@@ -197,7 +197,7 @@ func NewManagedEscrowSpec(moderated bool) SettlementSpec {
 	return SettlementSpec{
 		Method:     method,
 		PayMode:    PayModeAddressMonitored,
-		EscrowType: EscrowTypeManagedEscrow,
+		EscrowType: EscrowTypeManaged,
 	}
 }
 
@@ -215,7 +215,8 @@ func NewSolanaEscrowSpec(moderated bool) SettlementSpec {
 }
 
 // NewLegacyEVMContractSpec returns the legacy frontend-signed EVM contract
-// escrow spec. ManagedEscrow escrow must use NewManagedEscrowSpec instead.
+// escrow spec. Managed address-monitored escrow must use
+// NewManagedEscrowSpec instead.
 func NewLegacyEVMContractSpec(moderated bool) SettlementSpec {
 	method := pb.PaymentSent_CANCELABLE
 	if moderated {

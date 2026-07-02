@@ -1,39 +1,20 @@
 package distribution
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/external_payment"
 )
-
-// SovereignPaymentRuntime is the narrow payment lifecycle required by a
-// local-first node composition. Open Core owns the guest-order state machine;
-// the injected runtime owns its chain client, account allocation, payment
-// observation, and background lifecycle.
-//
-// Start is called exactly once during node construction. Close is called on a
-// failed start and during node shutdown. Implementations must make Close
-// idempotent.
-type SovereignPaymentRuntime interface {
-	Start(ctx context.Context) error
-	Close() error
-	PaymentSource() external_payment.Source
-	PaymentMonitor() external_payment.PaymentMonitor
-	PaymentAccountIndex() uint32
-	PaymentAvailable(ctx context.Context) bool
-}
 
 // SovereignNodeConfig is an atomic local-first composition. Product-specific
 // wallet administration remains in TrustedHumaModules; Core receives only the
 // payment lifecycle and provider-neutral policies it must enforce.
 type SovereignNodeConfig struct {
-	PaymentRuntime     SovereignPaymentRuntime
-	Policy             SovereignNodePolicy
-	TrustedHumaModules []TrustedHumaModule
-	ContentStore       contracts.ContentStore
+	ExternalPaymentRuntime ExternalPaymentRuntime
+	Policy                 SovereignNodePolicy
+	TrustedHumaModules     []TrustedHumaModule
+	ContentStore           contracts.ContentStore
 }
 
 // Clone returns an owned configuration safe from caller slice mutation.
@@ -44,8 +25,8 @@ func (config SovereignNodeConfig) Clone() SovereignNodeConfig {
 
 // Validate rejects partial sovereign compositions before resources are opened.
 func (config SovereignNodeConfig) Validate() error {
-	if nilCompositionPort(config.PaymentRuntime) {
-		return fmt.Errorf("sovereign payment runtime is required")
+	if nilCompositionPort(config.ExternalPaymentRuntime) {
+		return fmt.Errorf("sovereign external payment runtime is required")
 	}
 	if nilCompositionPort(config.Policy) {
 		return fmt.Errorf("sovereign node policy is required")

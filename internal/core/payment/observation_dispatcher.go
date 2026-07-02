@@ -30,8 +30,8 @@ import (
 // layers:
 //
 //  1. chain watcher (per-chain RPC subscription / polling) — produces
-//     FundingEvent values from native ManagedEscrowReceived / ERC-20 Transfer /
-//     SPL transfer / EXTERNAL_PAYMENT deposit logs;
+//     FundingEvent values from native managed-escrow / ERC-20 Transfer /
+//     SPL transfer / XMR deposit logs;
 //  2. ObservationDispatcher — this type. INSERT-only persistence into
 //     payment_observations + verifier kick;
 //  3. VerificationService.AggregateAndEmit (Sprint 2A step 4) — DISTINCT
@@ -134,16 +134,14 @@ type PaymentAggregator interface {
 }
 
 // TenantResolver maps an OrderID to the tenant that owns it. The
-// dispatcher needs the tenant id to scope the observation row; safe
-// EventHandler callbacks do not carry tenant context (a ManagedEscrow address
-// is shared across tenants only when the same ManagedEscrow is bound to multiple
+// dispatcher needs the tenant id to scope the observation row; chain
+// callbacks do not carry tenant context (a managed escrow address
+// is shared across tenants only when the same address is bound to multiple
 // orders, which the data model already disallows).
 //
 // Implementations may hit the order DB, an in-process LRU cache, or a
 // hybrid. They MUST return ErrUnknownOrder for orders that are not
-// (yet) registered — the dispatcher treats unknown orders as "not a
-// Mobazha-managed ManagedEscrow" and ignores the event, matching the design
-// doc's "不是 Mobazha 管理的 ManagedEscrow，忽略" semantics.
+// (yet) registered — the dispatcher ignores unrelated events.
 type TenantResolver interface {
 	ResolveTenant(ctx context.Context, orderID string) (tenantID string, err error)
 }
@@ -173,9 +171,9 @@ var (
 )
 
 // FundingEvent is the chain-agnostic representation of a single inbound
-// transfer to a watched ManagedEscrow / smart-wallet / address. Adapters in
+// transfer to a watched smart wallet or address. Adapters in
 // internal/payment/adapters convert their native chain log structures
-// (eth Log + filtered Transfer; SPL Transfer ix; EXTERNAL_PAYMENT get_transfers
+// (eth Log + filtered Transfer; SPL Transfer ix; XMR get_transfers
 // row; UTXO Vout match) into FundingEvent before invoking the
 // dispatcher.
 //
@@ -185,7 +183,7 @@ type FundingEvent struct {
 	OrderID string
 
 	// CAIP-2 chain identification.
-	ChainNamespace string // e.g. "eip155", "solana", "external_payment", "bip122"
+	ChainNamespace string // e.g. "eip155", "solana", "xmr", "bip122"
 	ChainReference string // e.g. "1" (mainnet ETH), "mainnet" (Solana)
 
 	TxHash       string
@@ -193,9 +191,9 @@ type FundingEvent struct {
 	EventIndex   int    // 0 for native receive; log index for ERC-20 Transfer; SPL ix index for SPL.
 	EventType    string // see PaymentEventManagedEscrowReceived / PaymentEventERC20Transfer / ...
 
-	// Address fields. ToAddress is the watched recipient (the ManagedEscrow);
+	// Address fields. ToAddress is the watched recipient;
 	// FromAddress is evidence-only and may be empty (CEX-direct-pay,
-	// EXTERNAL_PAYMENT — sender is intentionally not observable). TokenAddress is
+	// XMR — sender is intentionally not observable). TokenAddress is
 	// empty for native gas-asset transfers and the ERC-20 / SPL token
 	// contract otherwise.
 	FromAddress  string
@@ -264,7 +262,7 @@ func (e FundingEvent) validate() error {
 //
 //  1. validate evt structurally;
 //  2. resolve tenantID via TenantResolver — unknown orders are silently
-//     ignored (event was not for a Mobazha-managed ManagedEscrow);
+//     ignored (event was not for a Mobazha-managed escrow);
 //  3. INSERT a row with Source = "monitor" and a per-worker Observer;
 //  4. duplicate inserts (UNIQUE on the dedupe tuple) collapse to a
 //     silent no-op so chain RPC replay / worker restart is safe;
@@ -283,7 +281,7 @@ func (d *ObservationDispatcher) OnFundingEvent(ctx context.Context, evt FundingE
 	tenantIDs, err := d.resolveTenants(ctx, evt.OrderID)
 	if err != nil {
 		if errors.Is(err, ErrUnknownOrder) {
-			// Not a Mobazha-managed ManagedEscrow — ignore the event so noise
+			// Not a Mobazha-managed escrow — ignore the event so noise
 			// from unrelated funding does not surface up the stack.
 			return nil
 		}

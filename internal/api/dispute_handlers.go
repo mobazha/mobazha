@@ -158,7 +158,7 @@ func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request
 
 func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *http.Request) {
 	// Legacy instructions surface for client-signed moderated dispute
-	// payouts. ManagedEscrow-backed moderated dispute resolution stays on the backend
+	// payouts. backend-managed moderated dispute resolution stays on the backend
 	// close/release path instead of using this endpoint as the primary
 	// contract.
 	orderID := chi.URLParam(r, "orderID")

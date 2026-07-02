@@ -48,7 +48,7 @@ func TestPaymentObservation_AmountBigInt(t *testing.T) {
 }
 
 // TestPaymentObservation_SetAmountBigInt_RoundTrip confirms encoder/decoder
-// symmetry for representative chain amounts (BTC sat, ETH wei, EXTERNAL_PAYMENT atomic
+// symmetry for representative chain amounts (BTC sat, ETH wei, XMR atomic
 // units) plus the boundary uint256 max, then re-decodes via AmountBigInt
 // to guard against asymmetric encoding bugs.
 func TestPaymentObservation_SetAmountBigInt_RoundTrip(t *testing.T) {
@@ -99,7 +99,7 @@ func TestPaymentObservation_NilReceiver(t *testing.T) {
 }
 
 // TestPaymentObservation_TableName pins the GORM table name. The migration
-// path (autoMigrateDatabase / autoMigrateDatabaseManagedEscrow in internal/repo/repo.go)
+// path (autoMigrateDatabase / autoMigrateDatabaseSafe in internal/repo/repo.go)
 // and any hand-written SQL in MONITOR_DRIVEN_PAYMENT.md (DISTINCT ON / ROW_NUMBER
 // aggregation queries) all assume this exact name. Renaming silently would
 // drop the existing data in production.
@@ -126,7 +126,7 @@ func TestPaymentObservation_KnownConstants(t *testing.T) {
 		{"status=reverted", PaymentObservationStatusReverted, "reverted"},
 		{"event=managed_escrow_received", PaymentEventManagedEscrowReceived, "managed_escrow_received"},
 		{"event=erc20_transfer", PaymentEventERC20Transfer, "erc20_transfer"},
-		{"event=external_payment_deposit", PaymentEventEXTERNAL_PAYMENTDeposit, "external_payment_deposit"},
+		{"event=xmr_deposit", PaymentEventXMRDeposit, "xmr_deposit"},
 		{"event=utxo_funding", PaymentEventUTXOFunding, "utxo_funding"},
 		{"event=solana_transfer", PaymentEventSolanaTransfer, "solana_transfer"},
 		{"tx_hash_source=chain_tx", PaymentTxHashSourceChainTx, "chain_tx"},

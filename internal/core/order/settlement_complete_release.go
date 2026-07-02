@@ -14,7 +14,7 @@ import (
 )
 
 // ExecuteSettlementCompleteAction submits backend escrow release for moderated
-// ManagedEscrow / Solana Anchor (relay) or UTXO (sync sign+broadcast) orders via
+// backend-managed contract (relay) or UTXO (sync sign+broadcast) orders via
 // settlement-actions/complete.
 func (s *OrderAppService) ExecuteSettlementCompleteAction(
 	ctx context.Context,

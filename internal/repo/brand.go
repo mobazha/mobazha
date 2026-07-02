@@ -72,7 +72,7 @@ type BrandFields struct {
 // Each flag is independent so partners can opt in to advanced visibility
 // piecemeal without unlocking custom-node entry.
 type NetworkFields struct {
-	// AllowUserCustomNode lets the user paste their own external_paymentd RPC
+	// AllowUserCustomNode lets the user paste their own monerod RPC
 	// address into Settings → Network. Off by default — restricted-egress
 	// devices ship a curated pool only. Independent of ShowNodePoolUI:
 	// a partner may show the curated pool (read-only) without allowing
@@ -85,7 +85,7 @@ type NetworkFields struct {
 	// works" UX hide all of this.
 	ShowAdvancedDiagnostics bool `yaml:"showAdvancedDiagnostics,omitempty" json:"showAdvancedDiagnostics,omitempty"`
 
-	// ShowNodePoolUI exposes Settings → Network → ExternalPayment Nodes (the
+	// ShowNodePoolUI exposes Settings → Network → Monero Nodes (the
 	// node pool management page). Off by default — without this the
 	// user has no per-node visibility; the system rotates silently.
 	ShowNodePoolUI bool `yaml:"showNodePoolUI,omitempty" json:"showNodePoolUI,omitempty"`

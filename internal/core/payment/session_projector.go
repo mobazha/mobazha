@@ -68,7 +68,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 
 	// ── Expected amount ───────────────────────────────────────────────────
 	// Use the order's canonical expected-amount resolver so address-monitored
-	// rails (UTXO / ManagedEscrow) project only their locked pending amount instead of
+	// rails (UTXO / managed EVM) project only their locked pending amount instead of
 	// the signed listing amount from OrderOpen, which may be a different coin.
 	expectedAmountRaw := strings.TrimSpace(order.ExpectedPaymentAmountString())
 	expectedAmount := payment.FormatSessionAmount(expectedAmountRaw, paymentCoin)
@@ -209,8 +209,8 @@ func (p *PaymentSessionProjector) derivePaymentInfo(
 }
 
 func pendingPaymentCoin(order *models.Order) string {
-	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil && managed_escrowInfo.Coin != "" {
-		return normalizeCoinBestEffort(managed_escrowInfo.Coin)
+	if managedInfo, err := order.GetPendingManagedEscrowInfo(); err == nil && managedInfo != nil && managedInfo.Coin != "" {
+		return normalizeCoinBestEffort(managedInfo.Coin)
 	}
 	if escrowInfo, err := order.GetPendingEscrowPaymentInfo(); err == nil && escrowInfo != nil && escrowInfo.Coin != "" {
 		return normalizeCoinBestEffort(escrowInfo.Coin)

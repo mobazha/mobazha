@@ -190,7 +190,7 @@ func TestQuote_ReturnsUnknownWhenFeatureDisabled(t *testing.T) {
 	require.Equal(t, contracts.SupplyAvailabilityUnknown, resp.Items[0].Status)
 }
 
-func TestQuote_ReturnsBuyerManagedEscrowAvailability(t *testing.T) {
+func TestQuote_ReturnsBuyerManagedAvailability(t *testing.T) {
 	recorder := &recordingSupplyAvailability{
 		quoteResult: &contracts.SupplyQuoteResult{
 			CanSell: true,

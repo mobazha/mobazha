@@ -29,7 +29,7 @@ func (paymentProjectionPolicyStub) ValidateCrossCurrencyCheckout(string, string)
 }
 
 func TestHandleGETPaymentMethods_IncludesDistributionProjection(t *testing.T) {
-	coin := iwallet.CoinType("crypto:external_payment:mainnet:native")
+	coin := iwallet.CoinType("crypto:monero:mainnet:native")
 	node := &mockNode{raListFunc: func() ([]models.ReceivingAccount, error) { return nil, nil }}
 	request := httptest.NewRequest(http.MethodGet, "/v1/payment-methods/seller", nil)
 	request = request.WithContext(context.WithValue(request.Context(), nodeContextKey, contracts.NodeService(node)))

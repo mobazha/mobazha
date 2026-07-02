@@ -25,7 +25,7 @@ func TestSettlementCoinFromPaymentSent_RejectsPricingCurrencyWithoutProvider(t *
 
 func TestPendingPaymentCoinFromOrder_ReadsLockedManagedEscrowPaymentIntent(t *testing.T) {
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           "crypto:eip155:1:native",
 		Address:        "0xmanagedescrow",
 		SettlementSpec: NewManagedEscrowSpec(false).ToPending(),
@@ -57,7 +57,7 @@ func TestNormalizeSettlementPaymentCoin_MapsKnownEVMTestnetToCanonicalChain(t *t
 	require.Equal(t, iwallet.CoinType("crypto:eip155:1:native"), coin)
 }
 
-func TestNormalizeSettlementPaymentCoin_AcceptsRuntimeManagedEscrowERC20Coin(t *testing.T) {
+func TestNormalizeSettlementPaymentCoin_AcceptsRuntimeSafeERC20Coin(t *testing.T) {
 	coin, ok := NormalizeSettlementPaymentCoin("crypto:eip155:1:erc20:0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0")
 
 	require.True(t, ok)
@@ -73,7 +73,7 @@ func TestNormalizeSettlementPaymentCoin_AcceptsRuntimeSPLCoin(t *testing.T) {
 	require.Equal(t, iwallet.CoinType("crypto:solana:devnet:spl:"+mint), coin)
 }
 
-func TestSettlementChainForCoin_ResolvesRuntimeManagedEscrowERC20Coin(t *testing.T) {
+func TestSettlementChainForCoin_ResolvesRuntimeSafeERC20Coin(t *testing.T) {
 	chain, err := SettlementChainForCoin("crypto:eip155:1:erc20:0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0")
 
 	require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestSettlementChainForCoin_ResolvesRuntimeSPLCoin(t *testing.T) {
 	require.Equal(t, iwallet.ChainSolana, chain)
 }
 
-func TestSettlementCoinInfoForCoin_ResolvesRuntimeManagedEscrowERC20Coin(t *testing.T) {
+func TestSettlementCoinInfoForCoin_ResolvesRuntimeSafeERC20Coin(t *testing.T) {
 	info, err := SettlementCoinInfoForCoin("crypto:eip155:1:erc20:0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0")
 
 	require.NoError(t, err)

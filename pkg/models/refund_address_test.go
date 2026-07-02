@@ -38,7 +38,7 @@ const (
 	canonicalLTC = iwallet.CoinType("crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native")
 	canonicalSOL = iwallet.CoinType("crypto:solana:mainnet:native")
 	canonicalTRX = iwallet.CoinType("crypto:tron:mainnet:native")
-	canonicalEXTERNAL_PAYMENT = iwallet.CoinType("crypto:external_payment:mainnet:native")
+	canonicalXMR = iwallet.CoinType("crypto:monero:mainnet:native")
 )
 
 // TestValidateRefundAddress_EmptyCrypto verifies that crypto orders require
@@ -187,8 +187,8 @@ func TestValidateRefundAddress_UTXO(t *testing.T) {
 	}
 }
 
-// TestValidateRefundAddress_ExternalPayment covers the EXTERNAL_PAYMENT length + prefix sanity rules.
-func TestValidateRefundAddress_ExternalPayment(t *testing.T) {
+// TestValidateRefundAddress_Monero covers the XMR length + prefix sanity rules.
+func TestValidateRefundAddress_Monero(t *testing.T) {
 	const valid = "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A"
 	cases := []struct {
 		name    string
@@ -201,7 +201,7 @@ func TestValidateRefundAddress_ExternalPayment(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateRefundAddress(canonicalEXTERNAL_PAYMENT, tc.addr)
+			err := ValidateRefundAddress(canonicalXMR, tc.addr)
 			if tc.wantErr {
 				if !errors.Is(err, ErrRefundAddressInvalid) {
 					t.Fatalf("expected ErrRefundAddressInvalid, got %v", err)

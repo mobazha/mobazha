@@ -6,14 +6,14 @@ import (
 )
 
 // TestOrder_GetCancelFeeAmount covers the Tier 1 / Tier 2 cancel fee semantics
-// introduced by Phase EVM-ManagedEscrow v0.3.0 (D-Hybrid-29 Path Lite Tiered).
+// introduced by Phase managed EVM v0.3.0 (D-Hybrid-29 Path Lite Tiered).
 func TestOrder_GetCancelFeeAmount(t *testing.T) {
 	tests := []struct {
-		name    string
-		stored  string
-		want    *big.Int
-		wantOK  bool
-		hasFee  bool
+		name   string
+		stored string
+		want   *big.Int
+		wantOK bool
+		hasFee bool
 	}{
 		{
 			name:   "tier 2 absorbed empty string",

@@ -1325,8 +1325,8 @@ type PaymentSent struct {
 	Timestamp           *timestamppb.Timestamp      `protobuf:"bytes,19,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	PaymentTokenAddress string                      `protobuf:"bytes,20,opt,name=paymentTokenAddress,proto3" json:"paymentTokenAddress,omitempty"` // 支付代币合约地址（通用，适用于所有 Token 支付，ETH为零地址）
 	BuyerReceiveAddress string                      `protobuf:"bytes,21,opt,name=buyerReceiveAddress,proto3" json:"buyerReceiveAddress,omitempty"` // 买家接收 Token 的地址（支持多链地址格式，多商品共用）
-	SettlementSpec      *PaymentSent_SettlementSpec `protobuf:"bytes,22,opt,name=settlementSpec,proto3" json:"settlementSpec,omitempty"`           // 显式结算路由，避免接收端从地址/脚本字段推导 ManagedEscrow / legacy 路径
-	CancelFeeAmount     string                      `protobuf:"bytes,23,opt,name=cancelFeeAmount,proto3" json:"cancelFeeAmount,omitempty"`         // 创建支付意图时锁定的 ManagedEscrow Tier 1 cancel/refund 平台费
+	SettlementSpec      *PaymentSent_SettlementSpec `protobuf:"bytes,22,opt,name=settlementSpec,proto3" json:"settlementSpec,omitempty"`           // 显式结算路由，避免接收端从地址/脚本字段推导 managed escrow / legacy 路径
+	CancelFeeAmount     string                      `protobuf:"bytes,23,opt,name=cancelFeeAmount,proto3" json:"cancelFeeAmount,omitempty"`         // 创建支付意图时锁定的 managed escrow Tier 1 cancel/refund 平台费
 	// Deduplicated funding facts that contributed to this payment. This is the
 	// cross-node verification surface for monitored crypto payments; receivers
 	// should verify these facts against chain data instead of treating
@@ -3252,7 +3252,7 @@ type PaymentSent_SettlementSpec struct {
 
 	Method     PaymentSent_Method `protobuf:"varint,1,opt,name=method,proto3,enum=mbzpb.PaymentSent_Method" json:"method,omitempty"` // trust semantics
 	PayMode    string             `protobuf:"bytes,2,opt,name=payMode,proto3" json:"payMode,omitempty"`                              // address_monitored / client_signed / provider
-	EscrowType string             `protobuf:"bytes,3,opt,name=escrowType,proto3" json:"escrowType,omitempty"`                        // none / utxo_script / evm_contract / solana_program / safe / fiat_provider
+	EscrowType string             `protobuf:"bytes,3,opt,name=escrowType,proto3" json:"escrowType,omitempty"`                        // none / utxo_script / evm_contract / solana_program / managed_escrow / fiat_provider
 }
 
 func (x *PaymentSent_SettlementSpec) Reset() {

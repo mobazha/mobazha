@@ -974,7 +974,7 @@ func lookupCurrencyDivisibility(currencyCode string) int {
 		return 6
 	case "SOL":
 		return 9
-	case "EXTERNAL_PAYMENT":
+	case "XMR":
 		return 12
 	default:
 		return 0

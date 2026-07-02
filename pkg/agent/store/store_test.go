@@ -573,7 +573,7 @@ func TestGormPersistence_ApprovalQueueAndDecision(t *testing.T) {
 		Risk:           "write",
 		Action:         "listings_create",
 		Summary:        "Create listing",
-		Payload:        `{"api_key":"secret","title":"ManagedEscrow"}`,
+		Payload:        `{"api_key":"secret","title":"Example"}`,
 		RequestHash:    "hash_a",
 		IdempotencyKey: "th_a:turn_a:call_a",
 		Status:         ApprovalStatusPending,
@@ -1150,7 +1150,7 @@ func TestGormPersistence_RedactsSensitiveJSON(t *testing.T) {
 	require.Contains(t, msgs[0].Deliveries, `[REDACTED]`)
 }
 
-func TestSanitizeAttachmentDisplay_AllowsManagedEscrowPreviewURLs(t *testing.T) {
+func TestSanitizeAttachmentDisplay_AllowsSafePreviewURLs(t *testing.T) {
 	raw := `[
 		{"artifactId":"art_1","name":"cover.jpg","contentType":"image/jpeg","previewUrl":"https://cdn.example.com/cover.jpg?sig=1"},
 		{"artifactId":"art_2","name":"local.jpg","previewUrl":"/v1/agent/artifacts/art_2/content"}
@@ -1197,7 +1197,7 @@ func TestGormPersistence_ApprovalPayloadPreservesExecutionHash(t *testing.T) {
 	persist := NewGormPersistence(db)
 	ctx := context.Background()
 
-	payload := `{"api_key":"secret-value","title":"ManagedEscrow"}`
+	payload := `{"api_key":"secret-value","title":"Example"}`
 	req := kernel.ApprovalRequest{
 		ID:      "appr_hash",
 		SkillID: kernel.SkillProductImport,

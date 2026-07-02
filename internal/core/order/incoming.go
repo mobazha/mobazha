@@ -173,7 +173,7 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 		return nil, nil
 	}
 
-	if err := s.ensureIncomingManagedEscrowPaymentIntent(&order, paymentSent); err != nil {
+	if err := s.ensureIncomingManagedEscrowIntent(&order, paymentSent); err != nil {
 		return nil, fmt.Errorf("payment validation failed for order %s: %w", orderMsg.OrderID, err)
 	}
 
@@ -224,7 +224,7 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 	return &PreProcessContext{VerifiedPayment: vp}, nil
 }
 
-func (s *OrderAppService) ensureIncomingManagedEscrowPaymentIntent(order *models.Order, paymentSent *pb.PaymentSent) error {
+func (s *OrderAppService) ensureIncomingManagedEscrowIntent(order *models.Order, paymentSent *pb.PaymentSent) error {
 	if order == nil || paymentSent == nil {
 		return nil
 	}
@@ -232,13 +232,13 @@ func (s *OrderAppService) ensureIncomingManagedEscrowPaymentIntent(order *models
 	if !ok || !spec.UsesManagedEscrow() {
 		return nil
 	}
-	if existing, err := order.GetPendingManagedEscrowPaymentInfo(); err != nil {
+	if existing, err := order.GetPendingManagedEscrowInfo(); err != nil {
 		return err
 	} else if existing != nil {
 		return nil
 	}
 
-	info, refundAddress, err := pendingManagedEscrowPaymentInfoFromPaymentSent(paymentSent, spec)
+	info, refundAddress, err := pendingManagedEscrowInfoFromPaymentSent(paymentSent, spec)
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func (s *OrderAppService) ensureIncomingManagedEscrowPaymentIntent(order *models
 		if err := tx.Read().Where("id = ?", order.ID.String()).First(&current).Error; err != nil {
 			return err
 		}
-		if existing, err := current.GetPendingManagedEscrowPaymentInfo(); err != nil {
+		if existing, err := current.GetPendingManagedEscrowInfo(); err != nil {
 			return err
 		} else if existing != nil {
 			*order = current
@@ -260,7 +260,7 @@ func (s *OrderAppService) ensureIncomingManagedEscrowPaymentIntent(order *models
 		if refundAddress != "" {
 			current.RefundAddress = refundAddress
 		}
-		if err := current.SetPendingManagedEscrowPaymentInfo(info); err != nil {
+		if err := current.SetPendingManagedEscrowInfo(info); err != nil {
 			return err
 		}
 		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), current.ID.String(), info.Address, refundAddress, info); err != nil {
@@ -274,7 +274,7 @@ func (s *OrderAppService) ensureIncomingManagedEscrowPaymentIntent(order *models
 	})
 }
 
-func pendingManagedEscrowPaymentInfoFromPaymentSent(paymentSent *pb.PaymentSent, spec payment.SettlementSpec) (*models.PendingManagedEscrowPaymentInfo, string, error) {
+func pendingManagedEscrowInfoFromPaymentSent(paymentSent *pb.PaymentSent, spec payment.SettlementSpec) (*models.PendingManagedEscrowInfo, string, error) {
 	coin := strings.TrimSpace(paymentSent.Coin)
 	if coin == "" {
 		return nil, "", errors.New("managed escrow payment coin is required")
@@ -287,18 +287,18 @@ func pendingManagedEscrowPaymentInfoFromPaymentSent(paymentSent *pb.PaymentSent,
 	if err != nil || amount == 0 {
 		return nil, "", fmt.Errorf("managed escrow payment amount %q is invalid", paymentSent.Amount)
 	}
-	managed_escrowAddress := strings.TrimSpace(paymentSent.ContractAddress)
-	if managed_escrowAddress == "" {
-		managed_escrowAddress = strings.TrimSpace(paymentSent.ToAddress)
+	escrowAddress := strings.TrimSpace(paymentSent.ContractAddress)
+	if escrowAddress == "" {
+		escrowAddress = strings.TrimSpace(paymentSent.ToAddress)
 	}
-	if managed_escrowAddress == "" {
+	if escrowAddress == "" {
 		return nil, "", errors.New("managed escrow payment address is required")
 	}
 
-	info := &models.PendingManagedEscrowPaymentInfo{
+	info := &models.PendingManagedEscrowInfo{
 		Coin:             string(normalizedCoin),
 		Amount:           amount,
-		Address:          managed_escrowAddress,
+		Address:          escrowAddress,
 		Moderated:        payment.MethodIsModerated(spec.Method),
 		Moderator:        strings.TrimSpace(paymentSent.Moderator),
 		ModeratorAddress: strings.TrimSpace(paymentSent.ModeratorAddress),
@@ -548,9 +548,9 @@ func (s *OrderAppService) preProcessRefund(ctx context.Context, orderMsg *npb.Or
 			_, settlementTx, handled, err := s.submitSettlementCancelAction(ctx, &order, coinType, paymentSent, release.GetToAddress(), release)
 			if err != nil {
 				logger.LogInfoWithIDf(log, s.nodeID,
-					"Error releasing ManagedEscrow escrow during refund processing for order %s: %v",
+					"Error releasing managed EVM escrow during refund processing for order %s: %v",
 					orderMsg.OrderID, err)
-				return nil, fmt.Errorf("refund ManagedEscrow escrow release failed for order %s: %w", orderMsg.OrderID, err)
+				return nil, fmt.Errorf("refund managed EVM escrow release failed for order %s: %w", orderMsg.OrderID, err)
 			}
 			if handled {
 				return &PreProcessContext{OutgoingTx: settlementTx}, nil

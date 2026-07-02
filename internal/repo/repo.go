@@ -111,10 +111,10 @@ func NewRepoWithSharedDB(nodeID string, dataDir string, sharedDB *gorm.DB, ident
 	}
 
 	// Schema migration for shared DB runs only once (DDL is global, not per-tenant).
-	// Uses autoMigrateDatabaseManagedEscrow which avoids DROP TABLE — destructive DDL would
+	// Uses autoMigrateDatabaseSafe which avoids DROP TABLE — destructive DDL would
 	// affect all tenants sharing the database.
 	sharedDBMigrateOnce.Do(func() {
-		sharedDBMigrateErr = autoMigrateDatabaseManagedEscrow(db)
+		sharedDBMigrateErr = autoMigrateDatabaseSafe(db)
 	})
 	if sharedDBMigrateErr != nil {
 		return nil, fmt.Errorf("failed to auto-migrate shared DB: %w", sharedDBMigrateErr)
@@ -555,7 +555,7 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.LicenseActivation{},
 		&models.DownloadGrant{},
 		&models.DigitalDownloadLog{},
-		// Phase EVM-ManagedEscrow v0.3.0 — append-only fact table for the
+		// Phase managed EVM v0.3.0 — append-only fact table for the
 		// monitor-driven payment model. See
 		// docs/escrow/MONITOR_DRIVEN_PAYMENT.md (v2.0).
 		&models.PaymentObservation{},
@@ -752,12 +752,12 @@ func completeV4PKMigration(tx database.Tx, backups []v4BackupTable) error {
 	return nil
 }
 
-// autoMigrateDatabaseManagedEscrow is the shared-DB variant of autoMigrateDatabase.
+// autoMigrateDatabaseSafe is the shared-DB variant of autoMigrateDatabase.
 // It creates all tables using AutoMigrate only — no DROP TABLE, no PRAGMA table_info.
 // This is safe for multi-tenant shared databases where destructive DDL would affect
 // all tenants. The shared DB is always freshly created by initSharedNodeDB, so legacy
 // schema migration is unnecessary.
-func autoMigrateDatabaseManagedEscrow(db database.Database) error {
+func autoMigrateDatabaseSafe(db database.Database) error {
 	allModels := []interface{}{
 		&models.Key{},
 		&models.OutgoingMessage{},
@@ -794,7 +794,7 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		&models.LicenseActivation{},
 		&models.DownloadGrant{},
 		&models.DigitalDownloadLog{},
-		// Phase EVM-ManagedEscrow v0.3.0 — append-only fact table for the
+		// Phase managed EVM v0.3.0 — append-only fact table for the
 		// monitor-driven payment model. See
 		// docs/escrow/MONITOR_DRIVEN_PAYMENT.md (v2.0).
 		&models.PaymentObservation{},

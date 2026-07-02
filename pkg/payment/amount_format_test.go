@@ -76,7 +76,7 @@ func TestSessionAmountDecimals(t *testing.T) {
 			wantOK:      true,
 		},
 		{
-			name:        "safe sepolia native",
+			name:        "managed sepolia native",
 			paymentCoin: "crypto:eip155:11155111:native",
 			want:        18,
 			wantOK:      true,

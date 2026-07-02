@@ -65,7 +65,7 @@ func (d *Dispatcher) Start() error {
 }
 
 // Stop gracefully shuts down the dispatcher and waits for all workers to finish.
-// ManagedEscrow to call multiple times.
+// Safe to call multiple times.
 func (d *Dispatcher) Stop() {
 	d.once.Do(func() {
 		close(d.done)

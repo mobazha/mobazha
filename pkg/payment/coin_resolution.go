@@ -35,7 +35,7 @@ func SettlementCoinFromPaymentSent(paymentSent *pb.PaymentSent) (iwallet.CoinTyp
 
 // NormalizeSettlementPaymentCoin converts a persisted payment coin hint into the
 // canonical coin used by chain adapters. Runtime testnet native EVM assets map
-// back to their canonical ManagedEscrow chain family because the backend settlement
+// back to their canonical managed escrow chain family because the backend settlement
 // registry is keyed by chain family, not a per-testnet asset ID.
 func NormalizeSettlementPaymentCoin(raw string) (iwallet.CoinType, bool) {
 	parts := strings.Split(strings.TrimSpace(raw), ":")
@@ -149,8 +149,8 @@ func PendingPaymentCoinFromOrder(order *models.Order) (iwallet.CoinType, bool) {
 	if order == nil {
 		return "", false
 	}
-	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
-		if coin, ok := NormalizeSettlementPaymentCoin(managed_escrowInfo.Coin); ok {
+	if managedInfo, err := order.GetPendingManagedEscrowInfo(); err == nil && managedInfo != nil {
+		if coin, ok := NormalizeSettlementPaymentCoin(managedInfo.Coin); ok {
 			return coin, true
 		}
 	}

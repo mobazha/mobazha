@@ -61,7 +61,7 @@ func (t *orderOpTiming) finish() {
 }
 
 // GetCompleteOrderInstructions preserves the legacy client-signed
-// completion surface. Backend-owned completion routes such as ManagedEscrow-backed
+// completion surface. Backend-owned completion routes such as backend-managed
 // moderated orders do not use this instructions contract.
 func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	return s.GetLegacyCompleteOrderInstructions(orderID, initiatorAddress)
@@ -69,7 +69,7 @@ func (s *OrderAppService) GetCompleteOrderInstructions(orderID models.OrderID, i
 
 // GetLegacyCompleteOrderInstructions is the internal legacy-only moderated
 // completion instructions path. Address-monitored UTXO routes are handled
-// without frontend instructions and therefore return nil here; ManagedEscrow-backed
+// without frontend instructions and therefore return nil here; backend-managed
 // moderated completion is a backend-owned action and must not fall through as
 // a legacy no-instructions response.
 func (s *OrderAppService) GetLegacyCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {

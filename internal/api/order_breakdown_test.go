@@ -11,7 +11,7 @@ import (
 
 func TestBuildOrderSettlementBreakdown_ConfirmedActionLines(t *testing.T) {
 	order := &models.Order{
-		ID: models.OrderID("order-managed_escrow-confirm"),
+		ID: models.OrderID("order-safe-confirm"),
 		SettlementActions: []models.SettlementActionSnapshot{{
 			ActionID:         "act-confirm",
 			Action:           "confirm",

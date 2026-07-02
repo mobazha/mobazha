@@ -296,7 +296,7 @@ type Order struct {
 	OrderCompleteAcked      bool
 
 	// SettlementActions surfaces backend-submitted settlement action state
-	// (ManagedEscrow relay projections) on GET /orders responses. Read-only, never
+	// (managed relay projections) on GET /orders responses. Read-only, never
 	// persisted on the order row itself.
 	SettlementActions []SettlementActionSnapshot `gorm:"-" json:"settlementActions,omitempty"`
 
@@ -380,7 +380,7 @@ func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
 		o.State = o.DeriveState()
 	} else {
 		// Phase 1 monitoring: compare FSM-authoritative state with legacy DeriveState.
-		// Mismatches are logged but FSM wins. ManagedEscrow to remove DeriveState once
+		// Mismatches are logged but FSM wins. DeriveState can be removed once
 		// monitoring confirms zero mismatches over a full release cycle.
 		if derived := o.DeriveState(); derived != o.State {
 			log.Warningf("[DeriveState-mismatch] order=%s FSM=%s Derived=%s", o.ID, o.State, derived)
@@ -661,7 +661,7 @@ func (o *Order) OrderOpenMessage() (*pb.OrderOpen, error) {
 // PaymentProgressInfo summarizes the running tally of confirmed-and-deduplicated
 // payments toward an order's expected amount. The dashboard renders a
 // "you've paid X of Y" progress bar from these fields while the order sits
-// in PENDING / partial state (Phase EVM-ManagedEscrow v0.3.0 §4.2, D-Hybrid-19).
+// in PENDING / partial state (Phase managed EVM v0.3.0 §4.2, D-Hybrid-19).
 //
 // All amounts are decimal strings in the payment asset's smallest unit:
 // address-monitored flows use the locked PendingPaymentInfo amount, while
@@ -745,7 +745,7 @@ func (o *Order) ComputePaymentProgress() *PaymentProgressInfo {
 // payment asset's smallest unit.
 //
 // Resolution order:
-//  1. Locked pending ManagedEscrow amount
+//  1. Locked pending managed escrow amount
 //  2. Locked pending escrow amount
 //  3. Locked pending UTXO amount
 //  4. Immutable PaymentSent amount (for already-paid orders after pending
@@ -755,9 +755,9 @@ func (o *Order) ExpectedPaymentAmountString() string {
 	if o == nil {
 		return ""
 	}
-	if managed_escrowInfo, err := o.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
-		if managed_escrowInfo.Amount > 0 {
-			return strconv.FormatUint(managed_escrowInfo.Amount, 10)
+	if managedInfo, err := o.GetPendingManagedEscrowInfo(); err == nil && managedInfo != nil {
+		if managedInfo.Amount > 0 {
+			return strconv.FormatUint(managedInfo.Amount, 10)
 		}
 		return ""
 	}
@@ -790,23 +790,23 @@ func (o *Order) Chaincode() (string, error) {
 	return orderOpen.Chaincode, nil
 }
 
-// PendingManagedEscrowPaymentInfo stores the predicted ManagedEscrow address for an EVM ManagedEscrow order.
+// PendingManagedEscrowInfo stores the predicted managed escrow address for a managed EVM order.
 // Stored as JSON in Order.PendingPaymentInfo with Type="managed_escrow" to distinguish from
 // PendingUTXOPaymentInfo (which has no "type" field).
 //
 // Written by PaymentAppService.GeneratePaymentInstructions immediately after
-// ManagedEscrowAdapter.SetupPayment predicts the ManagedEscrow address. This enables
-// PaymentSessionProjector to classify ManagedEscrow EVM orders as address_monitored
+// ManagedEscrowAdapter.SetupPayment predicts the managed escrow address. This enables
+// PaymentSessionProjector to classify managed EVM orders as address_monitored
 // without waiting for PaymentSent.
-type PendingManagedEscrowPaymentInfo struct {
+type PendingManagedEscrowInfo struct {
 	Type             string `json:"type"`           // always "managed_escrow"
 	Coin             string `json:"coin,omitempty"` // canonical coin type (e.g. "crypto:eth:eth")
 	Amount           uint64 `json:"amount,omitempty"`
-	Address          string `json:"address"` // predicted ManagedEscrow address (hex, "0x…")
+	Address          string `json:"address"` // predicted managed escrow address (hex, "0x…")
 	Moderated        bool   `json:"moderated"`
 	Moderator        string `json:"moderator,omitempty"`
 	ModeratorAddress string `json:"moderatorAddress,omitempty"`
-	// PlatformAmount / PlatformAddr lock the ManagedEscrow release Gas Service Fee
+	// PlatformAmount / PlatformAddr lock the managed escrow release Gas Service Fee
 	// at payment-intent creation. Settlement actions consume these values
 	// verbatim and must not re-price gas later.
 	PlatformAmount string `json:"platformAmount,omitempty"`
@@ -818,9 +818,9 @@ type PendingManagedEscrowPaymentInfo struct {
 	SettlementSpec *PendingSettlementSpec `json:"settlementSpec,omitempty"`
 }
 
-// SetPendingManagedEscrowPaymentInfo stores ManagedEscrow EVM payment info in PendingPaymentInfo.
-// It overwrites any previous UTXO or ManagedEscrow info for this order.
-func (o *Order) SetPendingManagedEscrowPaymentInfo(info *PendingManagedEscrowPaymentInfo) error {
+// SetPendingManagedEscrowInfo stores managed EVM payment info in PendingPaymentInfo.
+// It overwrites any previous UTXO or managed escrow info for this order.
+func (o *Order) SetPendingManagedEscrowInfo(info *PendingManagedEscrowInfo) error {
 	if info == nil {
 		o.PendingPaymentInfo = nil
 		return nil
@@ -834,9 +834,9 @@ func (o *Order) SetPendingManagedEscrowPaymentInfo(info *PendingManagedEscrowPay
 	return nil
 }
 
-// GetPendingManagedEscrowPaymentInfo retrieves ManagedEscrow EVM payment info from PendingPaymentInfo.
-// Returns (nil, nil) when the field is empty or belongs to a non-ManagedEscrow order.
-func (o *Order) GetPendingManagedEscrowPaymentInfo() (*PendingManagedEscrowPaymentInfo, error) {
+// GetPendingManagedEscrowInfo retrieves managed EVM payment info from PendingPaymentInfo.
+// Returns (nil, nil) when the field is empty or belongs to a non-managed escrow order.
+func (o *Order) GetPendingManagedEscrowInfo() (*PendingManagedEscrowInfo, error) {
 	if len(o.PendingPaymentInfo) == 0 {
 		return nil, nil
 	}
@@ -849,7 +849,7 @@ func (o *Order) GetPendingManagedEscrowPaymentInfo() (*PendingManagedEscrowPayme
 	if hint.Type != "managed_escrow" {
 		return nil, nil // UTXO or other type
 	}
-	var info PendingManagedEscrowPaymentInfo
+	var info PendingManagedEscrowInfo
 	if err := json.Unmarshal(o.PendingPaymentInfo, &info); err != nil {
 		return nil, fmt.Errorf("unmarshal pending managed escrow payment info: %w", err)
 	}

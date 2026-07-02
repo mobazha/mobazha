@@ -76,7 +76,7 @@ func (q *recordingFiatQuery) GetPayment(_ context.Context, providerID string, pa
 	return q.result, q.err
 }
 
-type recordingManagedEscrowVerifier struct {
+type recordingManagedVerifier struct {
 	verifyCalls       int
 	lastParams        paymentpkg.DepositVerifyParams
 	params            []paymentpkg.DepositVerifyParams
@@ -85,7 +85,7 @@ type recordingManagedEscrowVerifier struct {
 }
 
 type recordingDepositTransactionVerifier struct {
-	*recordingManagedEscrowVerifier
+	*recordingManagedVerifier
 	result     *iwallet.Transaction
 	err        error
 	lastParams paymentpkg.DepositVerifyParams
@@ -96,51 +96,51 @@ func (v *recordingDepositTransactionVerifier) FetchAndVerifyDeposit(_ context.Co
 	return v.result, v.err
 }
 
-func (*recordingManagedEscrowVerifier) Model() paymentpkg.PaymentModel {
+func (*recordingManagedVerifier) Model() paymentpkg.PaymentModel {
 	return paymentpkg.PaymentModelMonitored
 }
-func (*recordingManagedEscrowVerifier) Capabilities() paymentpkg.ChainCapabilities {
+func (*recordingManagedVerifier) Capabilities() paymentpkg.ChainCapabilities {
 	return paymentpkg.ChainCapabilities{}
 }
-func (*recordingManagedEscrowVerifier) SetupPayment(context.Context, paymentpkg.PaymentSetupParams) (*paymentpkg.ActionResult, error) {
+func (*recordingManagedVerifier) SetupPayment(context.Context, paymentpkg.PaymentSetupParams) (*paymentpkg.ActionResult, error) {
 	return nil, nil
 }
-func (*recordingManagedEscrowVerifier) Confirm(context.Context, paymentpkg.ActionParams) (*paymentpkg.ActionResult, error) {
+func (*recordingManagedVerifier) Confirm(context.Context, paymentpkg.ActionParams) (*paymentpkg.ActionResult, error) {
 	return nil, nil
 }
-func (*recordingManagedEscrowVerifier) Cancel(context.Context, paymentpkg.ActionParams) (*paymentpkg.ActionResult, error) {
+func (*recordingManagedVerifier) Cancel(context.Context, paymentpkg.ActionParams) (*paymentpkg.ActionResult, error) {
 	return nil, nil
 }
-func (*recordingManagedEscrowVerifier) Complete(context.Context, paymentpkg.ActionParams) (*paymentpkg.ActionResult, error) {
+func (*recordingManagedVerifier) Complete(context.Context, paymentpkg.ActionParams) (*paymentpkg.ActionResult, error) {
 	return nil, nil
 }
-func (*recordingManagedEscrowVerifier) DisputeRelease(context.Context, paymentpkg.ActionParams) (*paymentpkg.ActionResult, error) {
+func (*recordingManagedVerifier) DisputeRelease(context.Context, paymentpkg.ActionParams) (*paymentpkg.ActionResult, error) {
 	return nil, nil
 }
-func (*recordingManagedEscrowVerifier) GetActionStatus(context.Context, string) (*paymentpkg.ActionStatus, error) {
+func (*recordingManagedVerifier) GetActionStatus(context.Context, string) (*paymentpkg.ActionStatus, error) {
 	return nil, nil
 }
-func (*recordingManagedEscrowVerifier) AutoConfirm(context.Context, *events.CancelablePaymentReady) error {
+func (*recordingManagedVerifier) AutoConfirm(context.Context, *events.CancelablePaymentReady) error {
 	return nil
 }
-func (*recordingManagedEscrowVerifier) SignEscrowRelease(context.Context, paymentpkg.SignEscrowParams) ([]iwallet.EscrowSignature, error) {
+func (*recordingManagedVerifier) SignEscrowRelease(context.Context, paymentpkg.SignEscrowParams) ([]iwallet.EscrowSignature, error) {
 	return nil, nil
 }
-func (*recordingManagedEscrowVerifier) EstimateEscrowFee(string, int, int, iwallet.FeeLevel) (iwallet.Amount, error) {
+func (*recordingManagedVerifier) EstimateEscrowFee(string, int, int, iwallet.FeeLevel) (iwallet.Amount, error) {
 	return iwallet.NewAmount(0), nil
 }
-func (v *recordingManagedEscrowVerifier) VerifyDeposit(_ context.Context, params paymentpkg.DepositVerifyParams) error {
+func (v *recordingManagedVerifier) VerifyDeposit(_ context.Context, params paymentpkg.DepositVerifyParams) error {
 	v.verifyCalls++
 	v.lastParams = params
 	v.params = append(v.params, params)
 	return nil
 }
-func (v *recordingManagedEscrowVerifier) ValidatePaymentMessage(params paymentpkg.PaymentMessageParams) error {
+func (v *recordingManagedVerifier) ValidatePaymentMessage(params paymentpkg.PaymentMessageParams) error {
 	v.validateMsgCalls++
 	v.lastMessageParams = params
 	return nil
 }
-func (*recordingManagedEscrowVerifier) VerifyPreRelease(context.Context, paymentpkg.PreReleaseParams) error {
+func (*recordingManagedVerifier) VerifyPreRelease(context.Context, paymentpkg.PreReleaseParams) error {
 	return nil
 }
 
@@ -240,7 +240,7 @@ func TestPaymentVerificationService_ValidateMessage_RejectsFiatMethodMismatch(t 
 
 func TestPaymentVerificationService_ValidateMessage_ForwardsLockedExpectedPayment(t *testing.T) {
 	registry := paymentpkg.NewRegistry()
-	verifier := &recordingManagedEscrowVerifier{}
+	verifier := &recordingManagedVerifier{}
 	registry.RegisterV2(iwallet.ChainEthereum, verifier)
 	svc := NewPaymentVerificationService(registry, nil, nil)
 
@@ -300,7 +300,7 @@ func TestPaymentVerificationService_FetchAndVerify_ManagedStrategyOwnsDepositEvi
 	require.NoError(t, err)
 	paymentAddress := "managed-solana-escrow"
 	strategy := &recordingDepositTransactionVerifier{
-		recordingManagedEscrowVerifier: &recordingManagedEscrowVerifier{},
+		recordingManagedVerifier: &recordingManagedVerifier{},
 		result: &iwallet.Transaction{
 			ID:    iwallet.TransactionID("solana-deposit-signature"),
 			To:    []iwallet.SpendInfo{{Address: iwallet.NewAddress(paymentAddress, coin), Amount: iwallet.NewAmount("12345")}},
@@ -329,7 +329,7 @@ func TestPaymentVerificationService_FetchAndVerify_ManagedStrategyOwnsDepositEvi
 
 func TestPaymentVerificationService_FetchAndVerify_MonitorRelayedManagedEscrowPayment(t *testing.T) {
 	registry := paymentpkg.NewRegistry()
-	verifier := &recordingManagedEscrowVerifier{}
+	verifier := &recordingManagedVerifier{}
 	registry.RegisterV2(iwallet.ChainEthereum, verifier)
 	svc := NewPaymentVerificationService(registry, nil, nil)
 
@@ -391,7 +391,7 @@ func TestPaymentVerificationService_FetchAndVerify_MonitorRelayedManagedEscrowPa
 
 func TestPaymentVerificationService_FetchAndVerify_FundingFactsVerifyIndividually(t *testing.T) {
 	registry := paymentpkg.NewRegistry()
-	verifier := &recordingManagedEscrowVerifier{}
+	verifier := &recordingManagedVerifier{}
 	registry.RegisterV2(iwallet.ChainEthereum, verifier)
 	svc := NewPaymentVerificationService(registry, nil, nil)
 

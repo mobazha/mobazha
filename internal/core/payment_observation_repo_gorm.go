@@ -76,7 +76,7 @@ func NewGormPaymentObservationRepo(db database.Database, raw *gorm.DB) *GormPaym
 // InsertObservation appends a single observation row.
 //
 // The implementation writes through the raw DB handle so obs.TenantID is
-// preserved exactly. This is intentional: ManagedEscrow and shared chain monitors are
+// preserved exactly. This is intentional: managed-escrow and shared chain monitors are
 // chain-global, while the order rows they update are tenant-scoped. A single
 // funding event may need to be materialized for both buyer and vendor tenants.
 // Because the caller allocates a fresh UUID per call, the (tenant_id, id)

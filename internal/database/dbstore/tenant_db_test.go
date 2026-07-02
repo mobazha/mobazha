@@ -594,7 +594,7 @@ func TestSetTenantID_NonStruct(t *testing.T) {
 // GetKeysFromDB (which queries Key model) failed with "record not found" because
 // the GORM Statement.Schema was polluted by the first query.
 // TestTenantDB_SaveInjectsTenantID verifies that tx.Save() automatically
-// injects the correct TenantID into the model. This is the MANAGED_ESCROW path.
+// injects the correct TenantID into the model. This is the SAFE path.
 func TestTenantDB_SaveInjectsTenantID(t *testing.T) {
 	sharedDB := newTestSharedDB(t)
 	db := newTestTenantDB(t, sharedDB, "tenant-save-test")

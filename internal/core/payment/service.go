@@ -81,7 +81,7 @@ type PaymentAppService struct {
 	// Exchange rates for UTXO order total calculation
 	exchangeRates *wallet.ExchangeRateProvider
 
-	// netConfig provides platform fee collector addresses used when ManagedEscrow
+	// netConfig provides platform fee collector addresses used when managed EVM
 	// payment intents lock Gas Service Fee amounts at setup time.
 	netConfig *config.NetConfig
 
@@ -296,9 +296,9 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 		}
 	}
 
-	// Phase PS B2: ManagedEscrow EVM orders use address-monitored funding.
-	// Persist the predicted ManagedEscrow address into Order.PaymentAddress and
-	// PendingManagedEscrowPaymentInfo so the PaymentSessionProjector can classify
+	// Phase PS B2: managed EVM orders use address-monitored funding.
+	// Persist the predicted managed escrow address into Order.PaymentAddress and
+	// the legacy pending-payment envelope so PaymentSessionProjector can classify
 	// this order as SettlementModeAddressMonitored immediately (without
 	// waiting for a PaymentSent message to arrive).
 	if coinErr == nil &&
@@ -340,7 +340,7 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 			feeQuote.PlatformAddr,
 			feeQuote.CancelFeeAmount,
 		); persistErr != nil {
-			return nil, fmt.Errorf("persist ManagedEscrow payment intent for order %s: %w", params.OrderID, persistErr)
+			return nil, fmt.Errorf("persist managed EVM payment intent for order %s: %w", params.OrderID, persistErr)
 		}
 	}
 	if coinErr == nil &&
@@ -350,7 +350,7 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 		result.PaymentData.ToAddress != "" {
 
 		if persistErr := s.persistEscrowPaymentInfo(params.OrderID, result.PaymentData); persistErr != nil {
-			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist Solana Anchor escrow for order %s: %v", params.OrderID, persistErr)
+			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist managed Solana escrow for order %s: %v", params.OrderID, persistErr)
 		}
 	}
 
@@ -391,15 +391,15 @@ func (s *PaymentAppService) authorizePaymentSetup(ctx context.Context, params pa
 	return nil
 }
 
-// persistManagedEscrowPaymentAddress stores the predicted ManagedEscrow address in Order.PaymentAddress
+// persistManagedEscrowPaymentAddress stores the predicted managed escrow address in Order.PaymentAddress
 // and Order.PendingPaymentInfo so the PaymentSessionProjector can classify the order
 // as address_monitored (SettlementModeAddressMonitored) without waiting for PaymentSent.
-func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, managed_escrowAddress string, amount uint64, refundAddress string, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string) error {
+func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, escrowAddress string, amount uint64, refundAddress string, moderated bool, moderator, moderatorAddress, platformAmount, platformAddr, cancelFeeAmount string) error {
 	refundAddress = strings.TrimSpace(refundAddress)
-	info := &models.PendingManagedEscrowPaymentInfo{
+	info := &models.PendingManagedEscrowInfo{
 		Coin:             coin,
 		Amount:           amount,
-		Address:          managed_escrowAddress,
+		Address:          escrowAddress,
 		Moderated:        moderated,
 		Moderator:        moderator,
 		ModeratorAddress: moderatorAddress,
@@ -414,7 +414,7 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 			return fmt.Errorf("load orders: raw DB unavailable")
 		}
 		return raw.Transaction(func(tx *gorm.DB) error {
-			if err := paymentintent.UpsertSharedPaymentIntent(tx, orderID, managed_escrowAddress, refundAddress, info); err != nil {
+			if err := paymentintent.UpsertSharedPaymentIntent(tx, orderID, escrowAddress, refundAddress, info); err != nil {
 				return fmt.Errorf("save shared payment intent: %w", err)
 			}
 			var orders []models.Order
@@ -425,12 +425,12 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 				return fmt.Errorf("load orders: order %s not found", orderID)
 			}
 			for i := range orders {
-				orders[i].PaymentAddress = managed_escrowAddress
+				orders[i].PaymentAddress = escrowAddress
 				orders[i].CancelFeeAmount = cancelFeeAmount
 				if refundAddress != "" {
 					orders[i].RefundAddress = refundAddress
 				}
-				if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
+				if err := orders[i].SetPendingManagedEscrowInfo(info); err != nil {
 					return fmt.Errorf("set pending managed escrow payment info: %w", err)
 				}
 				if err := tx.Save(&orders[i]).Error; err != nil {
@@ -442,7 +442,7 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 	}
 
 	return s.db.Update(func(tx database.Tx) error {
-		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), orderID, managed_escrowAddress, refundAddress, info); err != nil {
+		if err := paymentintent.UpsertSharedPaymentIntent(tx.Read(), orderID, escrowAddress, refundAddress, info); err != nil {
 			return fmt.Errorf("save shared payment intent: %w", err)
 		}
 		var orders []models.Order
@@ -453,12 +453,12 @@ func (s *PaymentAppService) persistManagedEscrowPaymentAddress(orderID, coin, ma
 			return fmt.Errorf("load orders: order %s not found", orderID)
 		}
 		for i := range orders {
-			orders[i].PaymentAddress = managed_escrowAddress
+			orders[i].PaymentAddress = escrowAddress
 			orders[i].CancelFeeAmount = cancelFeeAmount
 			if refundAddress != "" {
 				orders[i].RefundAddress = refundAddress
 			}
-			if err := orders[i].SetPendingManagedEscrowPaymentInfo(info); err != nil {
+			if err := orders[i].SetPendingManagedEscrowInfo(info); err != nil {
 				return fmt.Errorf("set pending managed escrow payment info: %w", err)
 			}
 			if err := tx.Save(&orders[i]); err != nil {
@@ -617,14 +617,14 @@ func (s *PaymentAppService) GetOrderInfo(orderID models.OrderID, coinType iwalle
 // moderator's profile pubkey; requiredSignatures matches the threshold (1 or 2).
 //
 // An empty moderatorID returns CANCELABLE / "" / 1 — callers MUST treat this
-// as the no-moderator path (ManagedEscrow 1-of-2). Profile fetch / pubkey decode errors
+// as the no-moderator managed-escrow path. Profile fetch / pubkey decode errors
 // are surfaced verbatim so the dispatcher can classify them as 5xx.
 //
-// Exposed for the ManagedEscrowAdapter dispatcher (Sprint 2 D18a) which needs the same
+// Exposed for the managed EVM adapter dispatcher (Sprint 2 D18a) which needs the same
 // moderator resolution as the legacy V1 escrow path. V1
 // BuildInitEscrowInstructions continues to call this method as well —
 // the rename keeps a single source of truth for moderator address derivation
-// across V1 and ManagedEscrow lifecycles.
+// across legacy and managed EVM lifecycles.
 func (s *PaymentAppService) GetModeratorEscrowInfo(ctx context.Context, moderatorID string, coinType iwallet.CoinType) (pb.PaymentSent_Method, string, int, error) {
 	requiredSignatures := 2
 	paymentMethod := pb.PaymentSent_CANCELABLE

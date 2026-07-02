@@ -51,8 +51,8 @@ type PaymentAddressResult struct {
 
 // DirectPaymentService generates unique payment addresses for Guest Checkout orders.
 // UTXO and TRON use HD derivation from the node's BIP-44 master key; EVM uses the
-// seller-owned 1/1 predicted ManagedEscrow adapter when wired. Solana uses a one-time reference
-// key against the seller address. ExternalPayment creates subaddresses via external_payment-wallet-rpc.
+// seller-owned 1/1 predicted managed escrow adapter when wired. Solana uses a one-time reference
+// key against the seller address. Monero creates subaddresses via monero-wallet-rpc.
 type DirectPaymentService struct {
 	db          database.Database
 	keyDeriver  BIP44KeyDeriver
@@ -121,8 +121,8 @@ func (s *DirectPaymentService) GeneratePaymentAddress(ctx context.Context, req P
 		return s.derivePaymentAddress(ctx, coinInfo.Chain, req)
 	case coinInfo.Chain == iwallet.ChainSolana:
 		return s.generateSolanaReference(ctx, coinInfo.Chain, req)
-	case coinInfo.Chain == iwallet.ChainExternalPayment:
-		return s.generateExternalPaymentSubaddress(ctx, req)
+	case coinInfo.Chain == iwallet.ChainMonero:
+		return s.generateMoneroSubaddress(ctx, req)
 	default:
 		return nil, fmt.Errorf("unsupported chain for guest checkout: %s", coinInfo.Chain)
 	}
@@ -241,11 +241,11 @@ func (s *DirectPaymentService) generateSolanaReference(
 	}, nil
 }
 
-// generateExternalPaymentSubaddress creates a new subaddress via external_payment-wallet-rpc.
+// generateMoneroSubaddress creates a new subaddress via monero-wallet-rpc.
 // The subaddress index is stored in AddressIndex for later transfer matching.
-// Note: SweepTo is intentionally empty — EXTERNAL_PAYMENT auto-sweep is not supported in Phase B.
+// Note: SweepTo is intentionally empty — XMR auto-sweep is not supported in Phase B.
 // Funds stay in the wallet-rpc subaddress until manual withdrawal by the seller.
-func (s *DirectPaymentService) generateExternalPaymentSubaddress(ctx context.Context, req PaymentAddressRequest) (*PaymentAddressResult, error) {
+func (s *DirectPaymentService) generateMoneroSubaddress(ctx context.Context, req PaymentAddressRequest) (*PaymentAddressResult, error) {
 	label := fmt.Sprintf("guest_%s", req.OrderToken)
 	if s.externalPay != nil {
 		address, err := s.externalPay.CreatePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{Label: label})

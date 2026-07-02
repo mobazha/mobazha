@@ -96,7 +96,7 @@ func (tdb *TenantDB) View(fn func(tx database.Tx) error) error {
 	defer tdb.mtx.Unlock()
 
 	tx := tdb.readTx()
-	err := tdb.managed_escrowTxExec(tx, fn)
+	err := tdb.safeTxExec(tx, fn)
 	return err
 }
 
@@ -107,13 +107,13 @@ func (tdb *TenantDB) Update(fn func(tx database.Tx) error) error {
 	defer tdb.mtx.Unlock()
 
 	tx := tdb.writeTx()
-	err := tdb.managed_escrowTxExec(tx, fn)
+	err := tdb.safeTxExec(tx, fn)
 	return err
 }
 
-// managed_escrowTxExec executes fn within the transaction, recovering from panics
+// safeTxExec executes fn within the transaction, recovering from panics
 // to ensure the transaction is always rolled back and connections are not leaked.
-func (tdb *TenantDB) managed_escrowTxExec(tx *tenantTx, fn func(tx database.Tx) error) (retErr error) {
+func (tdb *TenantDB) safeTxExec(tx *tenantTx, fn func(tx database.Tx) error) (retErr error) {
 	defer func() {
 		if p := recover(); p != nil {
 			tx.Rollback()

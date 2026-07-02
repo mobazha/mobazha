@@ -68,7 +68,7 @@ func (w fundingBuildWallet) CreateWallet(hd.ExtendedKey, time.Time) error { retu
 func (w fundingBuildWallet) OpenWallet() error                            { return nil }
 func (w fundingBuildWallet) CloseWallet() error                           { return nil }
 
-type fakeManagedEscrowStrategy struct {
+type fakeManagedStrategy struct {
 	model           payment.PaymentModel
 	signatures      []payment.ActionOwnerSignature
 	signActionCalls int
@@ -82,53 +82,53 @@ type fakeManagedEscrowStrategy struct {
 	actionStatus  *payment.ActionStatus
 }
 
-func (f *fakeManagedEscrowStrategy) Model() payment.PaymentModel { return f.model }
-func (f *fakeManagedEscrowStrategy) Capabilities() payment.ChainCapabilities {
+func (f *fakeManagedStrategy) Model() payment.PaymentModel { return f.model }
+func (f *fakeManagedStrategy) Capabilities() payment.ChainCapabilities {
 	return payment.ChainCapabilities{}
 }
-func (f *fakeManagedEscrowStrategy) SetupPayment(context.Context, payment.PaymentSetupParams) (*payment.ActionResult, error) {
+func (f *fakeManagedStrategy) SetupPayment(context.Context, payment.PaymentSetupParams) (*payment.ActionResult, error) {
 	return nil, nil
 }
-func (f *fakeManagedEscrowStrategy) Confirm(context.Context, payment.ActionParams) (*payment.ActionResult, error) {
+func (f *fakeManagedStrategy) Confirm(context.Context, payment.ActionParams) (*payment.ActionResult, error) {
 	return nil, nil
 }
-func (f *fakeManagedEscrowStrategy) Cancel(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
+func (f *fakeManagedStrategy) Cancel(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
 	f.cancelCalls++
 	f.lastParams = params
 	return f.actionResult, nil
 }
-func (f *fakeManagedEscrowStrategy) Complete(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
+func (f *fakeManagedStrategy) Complete(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
 	f.completeCalls++
 	f.lastParams = params
 	return f.actionResult, nil
 }
-func (f *fakeManagedEscrowStrategy) DisputeRelease(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
+func (f *fakeManagedStrategy) DisputeRelease(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
 	f.disputeCalls++
 	f.lastParams = params
 	return f.actionResult, nil
 }
-func (f *fakeManagedEscrowStrategy) GetActionStatus(context.Context, string) (*payment.ActionStatus, error) {
+func (f *fakeManagedStrategy) GetActionStatus(context.Context, string) (*payment.ActionStatus, error) {
 	return f.actionStatus, nil
 }
-func (f *fakeManagedEscrowStrategy) AutoConfirm(context.Context, *events.CancelablePaymentReady) error {
+func (f *fakeManagedStrategy) AutoConfirm(context.Context, *events.CancelablePaymentReady) error {
 	return nil
 }
-func (f *fakeManagedEscrowStrategy) SignEscrowRelease(context.Context, payment.SignEscrowParams) ([]iwallet.EscrowSignature, error) {
+func (f *fakeManagedStrategy) SignEscrowRelease(context.Context, payment.SignEscrowParams) ([]iwallet.EscrowSignature, error) {
 	return nil, nil
 }
-func (f *fakeManagedEscrowStrategy) EstimateEscrowFee(string, int, int, iwallet.FeeLevel) (iwallet.Amount, error) {
+func (f *fakeManagedStrategy) EstimateEscrowFee(string, int, int, iwallet.FeeLevel) (iwallet.Amount, error) {
 	return iwallet.NewAmount(0), nil
 }
-func (f *fakeManagedEscrowStrategy) VerifyDeposit(context.Context, payment.DepositVerifyParams) error {
+func (f *fakeManagedStrategy) VerifyDeposit(context.Context, payment.DepositVerifyParams) error {
 	return nil
 }
-func (f *fakeManagedEscrowStrategy) ValidatePaymentMessage(payment.PaymentMessageParams) error {
+func (f *fakeManagedStrategy) ValidatePaymentMessage(payment.PaymentMessageParams) error {
 	return nil
 }
-func (f *fakeManagedEscrowStrategy) VerifyPreRelease(context.Context, payment.PreReleaseParams) error {
+func (f *fakeManagedStrategy) VerifyPreRelease(context.Context, payment.PreReleaseParams) error {
 	return nil
 }
-func (f *fakeManagedEscrowStrategy) SignAction(_ context.Context, action string, params payment.ActionParams) ([]payment.ActionOwnerSignature, error) {
+func (f *fakeManagedStrategy) SignAction(_ context.Context, action string, params payment.ActionParams) ([]payment.ActionOwnerSignature, error) {
 	f.signActionCalls++
 	f.lastAction = action
 	f.lastParams = params
@@ -136,7 +136,7 @@ func (f *fakeManagedEscrowStrategy) SignAction(_ context.Context, action string,
 }
 
 type fakeRefunderStrategy struct {
-	fakeManagedEscrowStrategy
+	fakeManagedStrategy
 	sellerDeclineCalls int
 }
 
@@ -150,14 +150,14 @@ func newManagedEscrowOrderForTests(t *testing.T, coinType iwallet.CoinType) (*mo
 	t.Helper()
 
 	order := &models.Order{
-		ID:             models.OrderID("managed_escrow-order-test"),
+		ID:             models.OrderID("safe-order-test"),
 		PaymentAddress: "0x9999999999999999999999999999999999999999",
 	}
 	paymentSent := &pb.PaymentSent{
 		Coin:         coinType.String(),
 		Amount:       "1000000000000000000",
 		ToAddress:    order.PaymentAddress,
-		Moderator:    "12D3KooWManagedEscrowModerator",
+		Moderator:    "12D3KooWManagedModerator",
 		Chaincode:    "abcd",
 		Script:       "beef",
 		PlatformAddr: "0x7777777777777777777777777777777777777777",
@@ -190,7 +190,7 @@ func TestBuildEscrowRelease_UsesFundingFactsForUTXOModerated(t *testing.T) {
 	)
 	coinType := iwallet.CoinType("BCH")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored}
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
 	reg.RegisterV2(iwallet.ChainBitcoinCash, strategy)
 
 	order := &models.Order{
@@ -253,7 +253,7 @@ func TestBuildEscrowRelease_UsesSettlementActionSigner(t *testing.T) {
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model: payment.PaymentModelMonitored,
 		signatures: []payment.ActionOwnerSignature{{
 			From:      "0x1111111111111111111111111111111111111111",
@@ -296,7 +296,7 @@ func TestBuildEscrowRelease_ManagedSolanaDoesNotRequireWallet(t *testing.T) {
 
 	coinType, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainSolana)
 	require.NoError(t, err)
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model: payment.PaymentModelMonitored,
 		signatures: []payment.ActionOwnerSignature{{
 			From: "solana-owner", Signature: []byte{0xaa}, Index: 0,
@@ -329,7 +329,7 @@ func TestRunMonitoredSettlementComplete_UsesActionStatusTxHash(t *testing.T) {
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model:        payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "complete-action"},
 		actionStatus: &payment.ActionStatus{TxHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
@@ -367,7 +367,7 @@ func TestSubmitSettlementCancelAction_UsesActionStatusTxHash(t *testing.T) {
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model:        payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "cancel-action"},
 		actionStatus: &payment.ActionStatus{TxHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
@@ -380,7 +380,7 @@ func TestSubmitSettlementCancelAction_UsesActionStatusTxHash(t *testing.T) {
 	if err := order.SetPaymentSent(paymentSent); err != nil {
 		t.Fatalf("SetPaymentSent: %v", err)
 	}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
@@ -411,7 +411,7 @@ func TestPreProcessOrderDecline_BuyerFallbackUsesCancelWhenRefunderSupported(t *
 	require.NoError(t, err)
 	reg := payment.NewRegistry()
 	strategy := &fakeRefunderStrategy{
-		fakeManagedEscrowStrategy: fakeManagedEscrowStrategy{
+		fakeManagedStrategy: fakeManagedStrategy{
 			model:        payment.PaymentModelMonitored,
 			actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "buyer-cancel-action"},
 			actionStatus: &payment.ActionStatus{TxHash: "solana-buyer-cancel-tx"},
@@ -464,7 +464,7 @@ func TestCanSellerDeclineFundedRefund_RejectsConfirmedCancelableOrder(t *testing
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	reg.RegisterV2(iwallet.ChainEthereum, &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored})
+	reg.RegisterV2(iwallet.ChainEthereum, &fakeManagedStrategy{model: payment.PaymentModelMonitored})
 
 	svc := &OrderAppService{paymentRegistry: reg}
 	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
@@ -647,7 +647,7 @@ func TestBuildRefundMessage_ManagedEscrowCancelable_UsesSettlementCancelAction(t
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model:        payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "refund-cancel-action"},
 		actionStatus: &payment.ActionStatus{TxHash: "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
@@ -659,7 +659,7 @@ func TestBuildRefundMessage_ManagedEscrowCancelable_UsesSettlementCancelAction(t
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	paymentSent.RefundAddress = "0x1111111111111111111111111111111111111111"
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
@@ -677,10 +677,10 @@ func TestBuildRefundMessage_ManagedEscrowCancelable_UsesSettlementCancelAction(t
 	require.Equal(t, 1, strategy.cancelCalls)
 }
 
-func TestBuildRefundMessage_ManagedEscrowModerated_HydratesRefundAddressFromSharedIntent(t *testing.T) {
+func TestBuildRefundMessage_ManagedModerated_HydratesRefundAddressFromSharedIntent(t *testing.T) {
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model:        payment.PaymentModelMonitored,
 		signatures:   []payment.ActionOwnerSignature{{From: "0x2222222222222222222222222222222222222222", Signature: []byte{0xaa}, Index: 1}},
 		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "moderated-refund-action"},
@@ -690,13 +690,13 @@ func TestBuildRefundMessage_ManagedEscrowModerated_HydratesRefundAddressFromShar
 
 	svc := newTestOrderAppService(t, OrderAppServiceConfig{PaymentRegistry: reg})
 	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
-	order.ID = models.OrderID("managed_escrow-moderated-shared-refund")
+	order.ID = models.OrderID("managed-moderated-shared-refund")
 	order.RefundAddress = ""
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(true).ToPaymentSent()
 	paymentSent.RefundAddress = ""
 	paymentSent.PayerAddress = ""
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		Moderated:      true,
@@ -713,7 +713,7 @@ func TestBuildRefundMessage_ManagedEscrowModerated_HydratesRefundAddressFromShar
 		order.ID.String(),
 		order.PaymentAddress,
 		"0x1111111111111111111111111111111111111111",
-		&models.PendingManagedEscrowPaymentInfo{
+		&models.PendingManagedEscrowInfo{
 			Coin:           paymentSent.Coin,
 			Address:        order.PaymentAddress,
 			Moderated:      true,
@@ -745,7 +745,7 @@ func TestBuildRefundMessage_ManagedEscrowCancelable_UsesProvidedSettlementTx(t *
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model: payment.PaymentModelMonitored,
 	}
 	reg.RegisterV2(iwallet.ChainEthereum, strategy)
@@ -755,7 +755,7 @@ func TestBuildRefundMessage_ManagedEscrowCancelable_UsesProvidedSettlementTx(t *
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	paymentSent.RefundAddress = "0x1111111111111111111111111111111111111111"
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
@@ -779,7 +779,7 @@ func TestSubmitSettlementCancelAction_ErrorsWhenTxHashMissing(t *testing.T) {
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model:        payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "cancel-no-hash"},
 		actionStatus: &payment.ActionStatus{TxHash: ""},
@@ -791,7 +791,7 @@ func TestSubmitSettlementCancelAction_ErrorsWhenTxHashMissing(t *testing.T) {
 	order.RefundAddress = "0x1111111111111111111111111111111111111111"
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
@@ -809,7 +809,7 @@ func TestSubmitSettlementCancelAction_PrefersSubmittedTxHash(t *testing.T) {
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	const relayHash = "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model: payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{
 			Mode:            payment.ActionModeSubmitted,
@@ -825,7 +825,7 @@ func TestSubmitSettlementCancelAction_PrefersSubmittedTxHash(t *testing.T) {
 	order.RefundAddress = "0x1111111111111111111111111111111111111111"
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
@@ -844,7 +844,7 @@ func TestRunMonitoredSettlementDisputeRelease_UsesActionStatusTxHash(t *testing.
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model:        payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "dispute-action"},
 		actionStatus: &payment.ActionStatus{TxHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
@@ -887,7 +887,7 @@ func TestOrderRequiresMonitoredSettlementActions_IncludesUTXOScript(t *testing.T
 	t.Parallel()
 
 	reg := payment.NewRegistry()
-	reg.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored})
+	reg.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedStrategy{model: payment.PaymentModelMonitored})
 
 	order := &models.Order{ID: models.OrderID("utxo-complete-gate")}
 	paymentSent := &pb.PaymentSent{

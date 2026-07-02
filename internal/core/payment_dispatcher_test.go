@@ -54,7 +54,7 @@ func mustNativeCoin(chain iwallet.ChainType) iwallet.CoinType {
 	return coin
 }
 
-func TestManagedEscrowOrderTenantResolver_ResolveTenants_GuestOrder(t *testing.T) {
+func TestManagedOrderTenantResolver_ResolveTenants_GuestOrder(t *testing.T) {
 	db := newTestDatabase(t)
 	if err := db.gormDB.AutoMigrate(&models.GuestOrder{}); err != nil {
 		t.Fatalf("AutoMigrate GuestOrder: %v", err)
@@ -77,7 +77,7 @@ func TestManagedEscrowOrderTenantResolver_ResolveTenants_GuestOrder(t *testing.T
 	}
 }
 
-func TestManagedEscrowOrderTenantResolver_ResolveTenants_GuestOrderStandaloneDefault(t *testing.T) {
+func TestManagedOrderTenantResolver_ResolveTenants_GuestOrderStandaloneDefault(t *testing.T) {
 	db := newTestDatabase(t)
 	if err := db.gormDB.AutoMigrate(&models.GuestOrder{}); err != nil {
 		t.Fatalf("AutoMigrate GuestOrder: %v", err)
@@ -99,9 +99,9 @@ func TestManagedEscrowOrderTenantResolver_ResolveTenants_GuestOrderStandaloneDef
 	}
 }
 
-func TestManagedEscrowOrderTenantResolver_ResolveTenants_OrderMirrors(t *testing.T) {
+func TestManagedOrderTenantResolver_ResolveTenants_OrderMirrors(t *testing.T) {
 	db := newTestDatabase(t)
-	orderID := "QmSharedManagedEscrowOrder"
+	orderID := "QmSharedManagedOrder"
 	for _, tenantID := range []string{"tenant-buyer", "tenant-vendor"} {
 		if err := db.gormDB.Create(&models.Order{
 			TenantMixin: models.TenantMixin{TenantID: tenantID},
@@ -241,7 +241,7 @@ func TestRegistryDispatch_EVMLegacyV1Retired(t *testing.T) {
 			t.Errorf("ForCoin(%s): legacy V1 EVM registration is retired, expected error", coin)
 		}
 		if _, err := n.paymentRegistry.ForCoinV2(coin); err == nil {
-			t.Errorf("ForCoinV2(%s): expected error without ManagedEscrowAdapter registration", coin)
+			t.Errorf("ForCoinV2(%s): expected error without managed EVM adapter registration", coin)
 		}
 	}
 }
@@ -303,7 +303,7 @@ func TestRegistryDispatch_AllSupportedCoinsInRegistry(t *testing.T) {
 			t.Errorf("ForCoin(%s): legacy V1 EVM registration is retired, expected error", coin)
 		}
 		if _, err := n.paymentRegistry.ForCoinV2(coin); err == nil {
-			t.Errorf("ForCoinV2(%s): expected error without ManagedEscrowAdapter registration", coin)
+			t.Errorf("ForCoinV2(%s): expected error without managed EVM adapter registration", coin)
 		}
 	}
 }

@@ -26,7 +26,7 @@ var nodeAuthSecurity = []map[string][]string{
 
 // adminOnlyAuthSecurity is used for first-run / lifecycle-critical
 // operations that must NOT be reachable via mbz_ API tokens — e.g. the
-// admin password setup, the EXTERNAL_PAYMENT wallet setup wizard, and other "operator
+// admin password setup, the XMR wallet setup wizard, and other "operator
 // at the keyboard" actions. Excluding apiToken keeps OpenAPI honest:
 // machines that follow the spec won't waste a round-trip trying tokens
 // that the scope middleware would deny-by-default anyway.

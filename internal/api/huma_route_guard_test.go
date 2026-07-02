@@ -16,7 +16,7 @@ import (
 // newTestGatewayForRouting creates a minimal Gateway that can register
 // routes without nil panics. No real node manager or auth is wired —
 // handler functions will panic if actually invoked, but route
-// registration itself is managed_escrow.
+// registration itself is safe.
 func newTestGatewayForRouting(t *testing.T) *Gateway {
 	t.Helper()
 	policy, err := edition.ResolvePolicy(edition.FullName)

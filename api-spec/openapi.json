@@ -8414,7 +8414,7 @@
     },
     "/v1/disputes/{orderID}/instructions/release": {
       "post": {
-        "description": "Compatibility endpoint for client-signed moderated dispute payouts. ManagedEscrow-backed moderated dispute resolution stays on the backend close/release path and should not use this instructions contract as its primary entrypoint.",
+        "description": "Compatibility endpoint for client-signed moderated dispute payouts. backend-managed moderated dispute resolution stays on the backend close/release path and should not use this instructions contract as its primary entrypoint.",
         "operationId": "disputes-post-instructions-release",
         "parameters": [
           {
@@ -14264,7 +14264,7 @@
     },
     "/v1/orders/{orderID}/instructions/complete": {
       "post": {
-        "description": "Compatibility endpoint for client-signed moderated completion flows. ManagedEscrow-backed moderated completion stays on the backend-owned completion path and does not use this instructions contract as its primary entrypoint.",
+        "description": "Compatibility endpoint for client-signed moderated completion flows. backend-managed moderated completion stays on the backend-owned completion path and does not use this instructions contract as its primary entrypoint.",
         "operationId": "orders-post-instructions-complete",
         "parameters": [
           {
@@ -14575,7 +14575,7 @@
     },
     "/v1/orders/{orderID}/payment-session": {
       "get": {
-        "description": "Returns a PaymentSession projection built from existing order, payment, and fiat metadata. Settlement modes include address_monitored (UTXO, ExternalPayment, ManagedEscrow-backed EVM, and Solana escrow when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), and provider_checkout (Stripe/PayPal).",
+        "description": "Returns a PaymentSession projection built from existing order, payment, and fiat metadata. Settlement modes include address_monitored (UTXO, Monero, backend-managed EVM, and Solana escrow when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), and provider_checkout (Stripe/PayPal).",
         "operationId": "orders-get-payment-session",
         "parameters": [
           {
@@ -15110,7 +15110,7 @@
     },
     "/v1/orders/{orderID}/settlement-actions/{action}": {
       "post": {
-        "description": "Runs backend-submitted settlement for crypto orders (ManagedEscrow EVM, Solana Anchor, UTXO sync). Supported actions: confirm, cancel, seller-decline-refund, complete, dispute-release. Client-signed legacy chains use instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
+        "description": "Runs backend-submitted settlement for crypto orders (managed EVM, Solana Anchor, UTXO sync). Supported actions: confirm, cancel, seller-decline-refund, complete, dispute-release. Client-signed legacy chains use instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
         "operationId": "orders-post-settlement-action",
         "parameters": [
           {
@@ -15184,7 +15184,7 @@
     },
     "/v1/orders/{orderID}/settlement-actions/{action}/status": {
       "get": {
-        "description": "Returns the latest status for a previously issued backend settlement action. ManagedEscrow-backed flows expose relay task correlation and confirmations through this endpoint.",
+        "description": "Returns the latest status for a previously issued backend settlement action. backend-managed flows expose relay task correlation and confirmations through this endpoint.",
         "operationId": "orders-get-settlement-action-status",
         "parameters": [
           {

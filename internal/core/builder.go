@@ -837,7 +837,7 @@ func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creation
 	}
 
 	for chain, wallet := range mw {
-		// Solana, Fiat, and ExternalPayment are intentionally excluded from the public
+		// Solana, Fiat, and Monero are intentionally excluded from the public
 		// Multiwallet map. Remaining wallets use the shared BIP44 key.
 		if !wallet.WalletExists() {
 			canonicalNative := iwallet.CoinType("")
@@ -1521,7 +1521,7 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 
 // initDiscountSubsystem moved to builder_shared.go (shared between standard and sovereign profiles).
 
-// initShippingSubsystem / managed_escrowListingPublisher are in builder_shared.go
+// initShippingSubsystem / safeListingPublisher are in builder_shared.go
 // (shared between standard and sovereign profiles — no build tags).
 
 // initEventDispatcher creates the unified EventDispatcher with NotificationSink,

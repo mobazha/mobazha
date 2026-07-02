@@ -426,7 +426,7 @@ func seedSovereignFeatureFlags(n *MobazhaNode, cfg *repo.Config) {
 // initDiscountSubsystem / initCollectionSubsystem are in builder_shared.go
 // (shared by standard and sovereign profiles).
 
-// initShippingSubsystem / managed_escrowListingPublisher are in builder_shared.go
+// initShippingSubsystem / safeListingPublisher are in builder_shared.go
 // (shared by standard and sovereign profiles).
 
 // initSovereignEventDispatcher creates a minimal local EventDispatcher:

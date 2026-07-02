@@ -107,21 +107,21 @@ func initShippingSubsystem(obNode *MobazhaNode) {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Shipping: data migration failed (non-fatal): %v", err)
 	}
 
-	publisher := &managed_escrowListingPublisher{node: obNode}
+	publisher := &safeListingPublisher{node: obNode}
 	svc := NewShippingAppService(store, publisher)
 	svc.SetEventBus(obNode.eventBus)
 	obNode.shippingService = svc
 	logger.LogInfoWithID(log, obNode.nodeID, "Shipping subsystem initialized")
 }
 
-// managed_escrowListingPublisher wraps MobazhaNode to implement contracts.ListingPublisher
+// safeListingPublisher wraps MobazhaNode to implement contracts.ListingPublisher
 // using closure-style deferred evaluation with nil-safety. Works in every
 // runtime profile.
-type managed_escrowListingPublisher struct {
+type safeListingPublisher struct {
 	node *MobazhaNode
 }
 
-func (p *managed_escrowListingPublisher) RepublishListing(ctx context.Context, slug string) error {
+func (p *safeListingPublisher) RepublishListing(ctx context.Context, slug string) error {
 	if p.node == nil || p.node.listingService == nil {
 		return nil
 	}

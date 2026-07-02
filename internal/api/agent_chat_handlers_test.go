@@ -3632,7 +3632,7 @@ func TestHandlePATCHAgentArtifact_ValidatesStatus(t *testing.T) {
 	}
 }
 
-func TestHandleGETAgentArtifactContent_ReturnsManagedEscrowRasterPreview(t *testing.T) {
+func TestHandleGETAgentArtifactContent_ReturnsSafeRasterPreview(t *testing.T) {
 	raw := []byte("png-preview")
 	contentHash := productImportSourceHash(raw)
 	store := &agentChatMemoryStore{

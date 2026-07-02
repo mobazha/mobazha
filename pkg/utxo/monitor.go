@@ -215,7 +215,7 @@ func (m *Monitor) SetSubscribeAllSources(enabled bool) {
 
 // Stop stops the transaction monitor
 // If isShared is true, this is a no-op (use ForceStop() for HostService shutdown)
-// ManagedEscrow to call multiple times - subsequent calls are no-ops
+// Safe to call multiple times - subsequent calls are no-ops
 func (m *Monitor) Stop() {
 	if m.isShared {
 		return // Shared monitor - use ForceStop() to actually stop

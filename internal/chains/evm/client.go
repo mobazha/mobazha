@@ -42,9 +42,9 @@ const (
 
 // ErrV1ChainNotSupported is returned by GetRecommendedContractVersion
 // when the chain has no V1 ContractManager Registry deployed (Phase
-// EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set: Arbitrum, Optimism,
+// managed EVM v0.3.0 Sprint 1 D8 — promoted EVM L2 set: Arbitrum, Optimism,
 // Avalanche, Gnosis, Celo, Mantle, zkSync Era, Scroll, Linea). On these
-// chains order creation MUST route through the V2 ManagedEscrowAdapter; hitting
+// chains order creation MUST route through the V2 managed EVM adapter; hitting
 // V1 is a routing bug, not a recoverable fault. Callers map this error
 // to CHAIN_NOT_SUPPORTED at the user-visible boundary.
 //
@@ -54,7 +54,7 @@ const (
 // sentinel instead of dispatching an eth_call against the zero
 // address (which would return empty data and surface as a confusing
 // generic decode error).
-var ErrV1ChainNotSupported = errors.New("chain has no V1 ContractManager Registry — V1 escrow paths must not be used on this chain (route via ManagedEscrowAdapter V2 instead)")
+var ErrV1ChainNotSupported = errors.New("chain has no V1 ContractManager Registry — V1 escrow paths must not be used on this chain (route via managed EVM adapter V2 instead)")
 
 // EthClient represents the eth client
 type EthClient struct {
@@ -73,7 +73,7 @@ type EthClient struct {
 	// wsClient is an optional separate WebSocket connection used for
 	// eth_subscribe (log subscriptions). When set, SubscribeFilterLogs
 	// uses this client instead of the primary HTTP-based Client. This
-	// allows ManagedEscrow LiveMonitor to use WSS for real-time events while
+	// allows managed EVM live monitor to use WSS for real-time events while
 	// the primary client handles RPC reads/writes over HTTPS.
 	wsClient *ethclient.Client
 
@@ -129,7 +129,7 @@ func NewEthClient(coinType iwallet.CoinType, testnet bool, rpcUrl string, regist
 		return client, nil
 	}
 
-	// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — chains without a deployed
+	// Phase managed EVM v0.3.0 Sprint 1 D8 — chains without a deployed
 	// V1 ContractManager Registry (zero-address sentinel from
 	// pkg/evm/defaults.go) skip the Registry binding entirely.
 	// Subsequent V1 lookups via GetRecommendedContractVersion fail
@@ -139,7 +139,7 @@ func NewEthClient(coinType iwallet.CoinType, testnet bool, rpcUrl string, regist
 	// a Registry binding pointing at the zero address.
 	if registryAddress == "" || common.HexToAddress(registryAddress) == (common.Address{}) {
 		if logger != nil {
-			logger.Infof("[%s] V1 ContractManager Registry not deployed (zero-address sentinel) — V1 escrow paths will fail closed; ManagedEscrowAdapter V2 is the supported route", coinType)
+			logger.Infof("[%s] V1 ContractManager Registry not deployed (zero-address sentinel) — V1 escrow paths will fail closed; managed EVM adapter V2 is the supported route", coinType)
 		}
 		return client, nil
 	}
@@ -185,7 +185,7 @@ func WithWsURL(wsURL string) EthClientOption {
 }
 
 // SubscribeFilterLogs overrides the embedded ethclient.Client's method to
-// prefer the dedicated WSS connection when available. This enables ManagedEscrow
+// prefer the dedicated WSS connection when available. This enables managed EVM
 // LiveMonitor to get real-time log events over WebSocket while the primary
 // HTTPS client handles balance queries, receipt lookups, and broadcasts.
 func (client *EthClient) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
@@ -350,13 +350,13 @@ func (client *EthClient) GetRecommendedContractVersion() (struct {
 		}, nil
 	}
 	if client.registry == nil {
-		// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set
+		// Phase managed EVM v0.3.0 Sprint 1 D8 — promoted EVM L2 set
 		// has no V1 ContractManager Registry, so registry is nil
 		// here and any caller still routing through V1 (e.g.,
 		// EVMChainOps strategies that haven't been migrated to
-		// ManagedEscrowAdapter V2) gets a clear ErrV1ChainNotSupported
+		// managed EVM adapter V2) gets a clear ErrV1ChainNotSupported
 		// instead of a generic empty-call decode error. Routing
-		// the order via ManagedEscrowAdapter V2 is the supported path.
+		// the order via managed EVM adapter V2 is the supported path.
 		return struct {
 			VersionName    string
 			Status         uint8

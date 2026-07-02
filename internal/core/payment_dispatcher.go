@@ -143,7 +143,7 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 		ActionRecorder: actionRecorder,
 	}
 	if n.paymentService != nil {
-		managedEVM.EscrowOwners = &paymentManagedEscrowOwnerProvider{svc: n.paymentService}
+		managedEVM.EscrowOwners = &paymentEscrowOwnerProvider{svc: n.paymentService}
 	}
 	guestRuntime := distribution.ManagedEscrowGuestRuntimePorts{
 		WatchSource:      guestWatchSource,
@@ -324,7 +324,7 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 	if chain == iwallet.ChainSolana {
 		if _, ok := strategyV2.(payment.SellerDeclineRefunder); ok {
 			logger.LogInfoWithIDf(log, n.nodeID,
-				"Skipping Solana Anchor auto-confirm for order %s; awaiting seller confirm or seller_decline_refund", event.OrderID)
+				"Skipping managed Solana auto-confirm for order %s; awaiting seller confirm or seller_decline_refund", event.OrderID)
 			return
 		}
 	}

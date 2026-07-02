@@ -89,7 +89,7 @@ func clientIPFromContext(ctx context.Context) string {
 //
 // This function is the single runtime gate that turns Operation.Security
 // into a real access decision. Without it, a token holding ScopeWalletRead
-// could read the 25-word seed via GET /v1/wallet/external_payment/secrets/mnemonic
+// could read the 25-word seed via GET /v1/wallet/xmr/secrets/mnemonic
 // because the route prefix-matches GET /v1/wallet → ScopeWalletRead.
 func operationAcceptsAPIToken(op *huma.Operation) bool {
 	if op == nil {

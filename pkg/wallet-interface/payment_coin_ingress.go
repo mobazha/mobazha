@@ -94,7 +94,7 @@ var legacyTickerToChain = map[string]ChainType{
 	"bch":   ChainBitcoinCash,
 	"ltc":   ChainLitecoin,
 	"zec":   ChainZCash,
-	"external_payment":   ChainExternalPayment,
+	"xmr":   ChainMonero,
 	"eth":   ChainEthereum,
 	"bnb":   ChainBSC,
 	"sol":   ChainSolana,

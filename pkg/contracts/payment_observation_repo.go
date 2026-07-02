@@ -50,7 +50,7 @@ type OrderRef struct {
 //     rows whose block has reached chain quorum, returning the affected
 //     (tenant, order) tuples so callers can re-trigger aggregation.
 //
-// Reorg handling (MarkReverted), order-by-ManagedEscrow-address lookup, and chain-head
+// Reorg handling (MarkReverted), order-by-managed-escrow-address lookup, and chain-head
 // tracking live in step 3 (PaymentMonitor) and intentionally are NOT part of
 // this port. Keeping the surface narrow lets us evolve the implementation
 // (Go-side dedupe → window-function dedupe, single-row UPDATE → batched

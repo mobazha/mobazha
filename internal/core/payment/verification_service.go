@@ -413,10 +413,10 @@ func (s *PaymentVerificationService) verifyMonitorRelayedManagedEscrowPayment(
 	paymentSent *pb.PaymentSent,
 ) (*contracts.VerifiedPayment, error) {
 	if paymentSent.TransactionID == "" {
-		return nil, fmt.Errorf("%w: ManagedEscrow payment is missing transaction ID", ErrPaymentNotConfirmed)
+		return nil, fmt.Errorf("%w: managed escrow payment is missing transaction ID", ErrPaymentNotConfirmed)
 	}
 	if s.registry == nil {
-		return nil, fmt.Errorf("chain escrow registry not configured for ManagedEscrow payment verification")
+		return nil, fmt.Errorf("chain escrow registry not configured for managed escrow payment verification")
 	}
 	strategy, err := s.registry.ForCoinV2(coinType)
 	if err != nil {

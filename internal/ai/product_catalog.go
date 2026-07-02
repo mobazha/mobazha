@@ -97,7 +97,7 @@ func FormatAmountForDisplay(amountStr string, divisibility uint) string {
 }
 
 // truncateDescription normalizes whitespace and truncates to maxLen runes,
-// breaking at a word boundary when possible. ManagedEscrow for multi-byte UTF-8.
+// breaking at a word boundary when possible. Safe for multi-byte UTF-8.
 func truncateDescription(s string, maxLen int) string {
 	s = strings.TrimSpace(s)
 	if s == "" {

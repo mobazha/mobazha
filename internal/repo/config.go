@@ -123,8 +123,8 @@ type Config struct {
 	DHTClientOnly          bool     `long:"dhtclientonly" description:"Disable participating in serving data in the DHT. This should be used if your node is undialable."`
 	NetConfigEndpoint      string   `long:"netconfigendpoint" description:"Override the default net config endpoint with the provided value"`
 	NetDBEndpoint          string   `long:"netdbendpoint" description:"Override the default NetDB endpoint for search index sync"`
-	RelayAPIURL            string   `long:"relayapiurl" description:"Platform base URL for relay HTTP API (append /platform/v1/relay/execute). Required for standalone EVM checkout (ManagedEscrow V2); SaaS uses hosting relay when HostService is wired."`
-	RelayAPIBearer         string   `long:"relayapibearer" description:"Bearer JWT for platform relay HTTP API; if empty, MOBAZHA_PLATFORM_RELAY_TOKEN is used (same as ManagedEscrow HTTP relay path)"`
+	RelayAPIURL            string   `long:"relayapiurl" description:"Platform base URL for relay HTTP API (append /platform/v1/relay/execute). Required for standalone EVM checkout (managed EVM); SaaS uses hosting relay when HostService is wired."`
+	RelayAPIBearer         string   `long:"relayapibearer" description:"Bearer JWT for platform relay HTTP API; if empty, MOBAZHA_PLATFORM_RELAY_TOKEN is used (same as managed HTTP relay path)"`
 
 	// GuestCheckout enables the guest (anonymous) checkout feature.
 	// When true, the node accepts orders from unauthenticated buyers
@@ -142,19 +142,19 @@ type Config struct {
 	// Each entry is "chain=sha256hex". Repeatable.
 	ElectrumTLSFingerprints []string `long:"electrumtls" description:"Per-chain Electrum TLS fingerprint (chain=sha256hex, repeatable)"`
 
-	// EXTERNAL_PAYMENTWalletRPCAddr is the external_payment-wallet-rpc JSON-RPC endpoint
-	// (e.g. "http://127.0.0.1:18082/json_rpc"). When empty, EXTERNAL_PAYMENT guest checkout is disabled.
-	EXTERNAL_PAYMENTWalletRPCAddr string `long:"external_paymentwalletrpc" description:"external_payment-wallet-rpc JSON-RPC endpoint (e.g. http://127.0.0.1:18082/json_rpc)"`
+	// XMRWalletRPCAddr is the monero-wallet-rpc JSON-RPC endpoint
+	// (e.g. "http://127.0.0.1:18082/json_rpc"). When empty, XMR guest checkout is disabled.
+	XMRWalletRPCAddr string `long:"xmrwalletrpc" description:"monero-wallet-rpc JSON-RPC endpoint (e.g. http://127.0.0.1:18082/json_rpc)"`
 
-	// EXTERNAL_PAYMENTWalletRPCUser is the HTTP Digest auth username for external_payment-wallet-rpc.
-	EXTERNAL_PAYMENTWalletRPCUser string `long:"external_paymentwalletrpcuser" description:"external_payment-wallet-rpc Digest auth username"`
+	// XMRWalletRPCUser is the HTTP Digest auth username for monero-wallet-rpc.
+	XMRWalletRPCUser string `long:"xmrwalletrpcuser" description:"monero-wallet-rpc Digest auth username"`
 
-	// EXTERNAL_PAYMENTWalletRPCPass is the HTTP Digest auth password for external_payment-wallet-rpc.
-	EXTERNAL_PAYMENTWalletRPCPass string `long:"external_paymentwalletrpcpass" description:"external_payment-wallet-rpc Digest auth password"`
+	// XMRWalletRPCPass is the HTTP Digest auth password for monero-wallet-rpc.
+	XMRWalletRPCPass string `long:"xmrwalletrpcpass" description:"monero-wallet-rpc Digest auth password"`
 
-	// EXTERNAL_PAYMENTAccountIndex is the ExternalPayment wallet account index for guest checkout
+	// XMRAccountIndex is the Monero wallet account index for guest checkout
 	// subaddress generation. Default 0.
-	EXTERNAL_PAYMENTAccountIndex uint32 `long:"external_paymentaccount" description:"ExternalPayment wallet account index (default 0)"`
+	XMRAccountIndex uint32 `long:"xmraccount" description:"Monero wallet account index (default 0)"`
 
 	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.
 	// When set, the node uses this key instead of generating one from a mnemonic.

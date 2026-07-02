@@ -283,7 +283,7 @@ func TestQuoteGuestOrderSupplyReturnsUnknownWhenFeatureDisabled(t *testing.T) {
 	require.Equal(t, contracts.SupplyAvailabilityUnknown, resp.Items[0].Status)
 }
 
-func TestQuoteGuestOrderSupplyReturnsBuyerManagedEscrowAvailability(t *testing.T) {
+func TestQuoteGuestOrderSupplyReturnsBuyerManagedAvailability(t *testing.T) {
 	recorder := &recordingSupplyAvailability{
 		quoteResult: &contracts.SupplyQuoteResult{
 			CanSell: true,

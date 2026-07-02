@@ -74,7 +74,7 @@ func EscrowUsesBackendSubmittedRelease(spec payment.SettlementSpec) bool {
 }
 
 // EscrowUsesRelayRelease reports escrow types whose release is submitted
-// asynchronously via relay + action store (ManagedEscrow, Solana Anchor).
+// asynchronously via relay + action store (backend-managed contract rails).
 func EscrowUsesRelayRelease(spec payment.SettlementSpec) bool {
 	return spec.UsesManagedEscrow() || spec.UsesSolanaEscrow()
 }

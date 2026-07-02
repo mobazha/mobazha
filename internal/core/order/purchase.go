@@ -465,7 +465,7 @@ func validatePurchaseRefundAddress(purchase *models.Purchase) error {
 	}
 
 	// Allow empty refund address for crypto orders. The buyer may not know
-	// their refund address at checkout time (e.g. UTXO/ManagedEscrow address-monitored
+	// their refund address at checkout time (e.g. UTXO/managed escrow address-monitored
 	// flows). It can be supplied later via payment-session (payerAddress /
 	// payFromCustodial + refundAddress), POST /refund-address, or inferred
 	// locally after verification via ResolveBuyerRefundAddress (never embedded

@@ -9,7 +9,7 @@ import (
 type EVMClientConfig struct {
 	ChainType       iwallet.ChainType
 	RpcURL          string // HTTPS RPC endpoint (balance, receipt, broadcast)
-	WsURL           string // Optional WSS endpoint for eth_subscribe (ManagedEscrow LiveMonitor prefers this)
+	WsURL           string // Optional WSS endpoint for eth_subscribe (managed escrow LiveMonitor prefers this)
 	RegistryAddress string // ContractManager contract address (for dynamic escrow lookup)
 	EscrowAddress   string // Optional pre-resolved escrow address (skips Registry query)
 	Testnet         bool

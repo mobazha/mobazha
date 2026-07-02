@@ -12,7 +12,7 @@ import (
 //
 // In multi-tenant hosting, buyer/vendor order rows are projections of the same
 // commercial order. Fields that represent the shared payment route itself
-// (predicted ManagedEscrow address, buyer refund target, pending monitored-payment
+// (predicted managed escrow address, buyer refund target, pending monitored-payment
 // metadata) belong to the business order, not to any single tenant mirror.
 //
 // The row is intentionally tenant-less and keyed only by OrderID so both
@@ -30,7 +30,7 @@ type SharedPaymentIntent struct {
 	ModeratorPeerID     string `gorm:"column:moderator_peer_id;type:text"`
 	StorePolicyRevision uint64 `gorm:"column:store_policy_revision;not null;default:0"`
 
-	// PendingPaymentInfo currently stores ManagedEscrow monitored-payment metadata using
+	// PendingPaymentInfo currently stores managed escrow monitored-payment metadata using
 	// the same discriminator-based JSON format as Order.PendingPaymentInfo.
 	// Keeping the wire format aligned lets the projection be future-extended to
 	// other payment rails without another schema hop.
@@ -40,8 +40,8 @@ type SharedPaymentIntent struct {
 	UpdatedAt time.Time
 }
 
-// SetPendingManagedEscrowPaymentInfo stores ManagedEscrow payment info in PendingPaymentInfo.
-func (s *SharedPaymentIntent) SetPendingManagedEscrowPaymentInfo(info *PendingManagedEscrowPaymentInfo) error {
+// SetPendingManagedEscrowInfo stores managed escrow payment info in PendingPaymentInfo.
+func (s *SharedPaymentIntent) SetPendingManagedEscrowInfo(info *PendingManagedEscrowInfo) error {
 	if s == nil {
 		return fmt.Errorf("shared payment intent is nil")
 	}
@@ -58,8 +58,8 @@ func (s *SharedPaymentIntent) SetPendingManagedEscrowPaymentInfo(info *PendingMa
 	return nil
 }
 
-// GetPendingManagedEscrowPaymentInfo loads ManagedEscrow payment info from PendingPaymentInfo.
-func (s *SharedPaymentIntent) GetPendingManagedEscrowPaymentInfo() (*PendingManagedEscrowPaymentInfo, error) {
+// GetPendingManagedEscrowInfo loads managed escrow payment info from PendingPaymentInfo.
+func (s *SharedPaymentIntent) GetPendingManagedEscrowInfo() (*PendingManagedEscrowInfo, error) {
 	if s == nil || len(s.PendingPaymentInfo) == 0 {
 		return nil, nil
 	}
@@ -72,7 +72,7 @@ func (s *SharedPaymentIntent) GetPendingManagedEscrowPaymentInfo() (*PendingMana
 	if hint.Type != "managed_escrow" {
 		return nil, nil
 	}
-	var info PendingManagedEscrowPaymentInfo
+	var info PendingManagedEscrowInfo
 	if err := json.Unmarshal(s.PendingPaymentInfo, &info); err != nil {
 		return nil, fmt.Errorf("unmarshal shared pending managed escrow payment info: %w", err)
 	}
@@ -91,15 +91,15 @@ func (s *SharedPaymentIntent) HydrateOrder(order *Order) error {
 	if strings.TrimSpace(order.RefundAddress) == "" && strings.TrimSpace(s.RefundAddress) != "" {
 		order.RefundAddress = strings.TrimSpace(s.RefundAddress)
 	}
-	if info, err := s.GetPendingManagedEscrowPaymentInfo(); err != nil {
+	if info, err := s.GetPendingManagedEscrowInfo(); err != nil {
 		return err
 	} else if info != nil {
-		existing, err := order.GetPendingManagedEscrowPaymentInfo()
+		existing, err := order.GetPendingManagedEscrowInfo()
 		if err != nil {
 			return fmt.Errorf("read order pending managed escrow payment info: %w", err)
 		}
 		if existing == nil {
-			if err := order.SetPendingManagedEscrowPaymentInfo(info); err != nil {
+			if err := order.SetPendingManagedEscrowInfo(info); err != nil {
 				return err
 			}
 		}

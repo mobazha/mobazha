@@ -83,7 +83,7 @@ func (s *distributionManagedEscrowWatchSource) regularOrderWatches() ([]distribu
 }
 
 func (s *distributionManagedEscrowWatchSource) regularOrderWatch(order *models.Order) (distribution.ManagedEscrowWatch, error) {
-	info, err := order.GetPendingManagedEscrowPaymentInfo()
+	info, err := order.GetPendingManagedEscrowInfo()
 	if err != nil || info == nil {
 		return distribution.ManagedEscrowWatch{}, err
 	}
@@ -122,7 +122,7 @@ func (s *distributionManagedEscrowWatchSource) guestOrderWatches(ctx context.Con
 	if err := s.node.db.View(func(tx database.Tx) error {
 		return tx.Read().
 			Where("state IN ?", []int{int(models.GuestOrderAwaitingPayment), int(models.GuestOrderPaymentDetected)}).
-			Where("evm_managed_escrow_metadata IS NOT NULL AND evm_managed_escrow_metadata <> ''").
+			Where("managed_escrow_metadata IS NOT NULL AND managed_escrow_metadata <> ''").
 			Find(&orders).Error
 	}); err != nil {
 		return nil, fmt.Errorf("managed escrow watch source: load pending guest orders: %w", err)

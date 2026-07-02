@@ -55,13 +55,13 @@ func Validate(coin iwallet.CoinType, addr string) error {
 		}
 		return nil
 
-	case info.Chain == iwallet.ChainExternalPayment:
+	case info.Chain == iwallet.ChainMonero:
 		if len(addr) < 95 || len(addr) > 110 {
-			return fmt.Errorf("%w: external_payment address length %d outside 95-110 range", ErrInvalid, len(addr))
+			return fmt.Errorf("%w: monero address length %d outside 95-110 range", ErrInvalid, len(addr))
 		}
 		first := addr[0]
 		if first != '4' && first != '8' {
-			return fmt.Errorf("%w: external_payment address must start with '4' or '8'", ErrInvalid)
+			return fmt.Errorf("%w: monero address must start with '4' or '8'", ErrInvalid)
 		}
 		return nil
 

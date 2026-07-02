@@ -29,17 +29,17 @@ type instrumentedV1 struct {
 	errOnAction error
 
 	calls struct {
-		setupPayment    int
-		confirm         int
-		cancel          int
-		complete        int
-		disputeRelease  int
-		signEscrow      int
-		estimateFee     int
-		verifyDeposit   int
-		validatePayMsg  int
+		setupPayment     int
+		confirm          int
+		cancel           int
+		complete         int
+		disputeRelease   int
+		signEscrow       int
+		estimateFee      int
+		verifyDeposit    int
+		validatePayMsg   int
 		verifyPreRelease int
-		autoConfirm     int
+		autoConfirm      int
 	}
 
 	lastReleaseInfo *pb.EscrowRelease
@@ -341,8 +341,10 @@ type nativeV2Strategy struct {
 	id    string
 }
 
-func (s *nativeV2Strategy) Model() payment.PaymentModel             { return s.model }
-func (s *nativeV2Strategy) Capabilities() payment.ChainCapabilities { return payment.ChainCapabilities{} }
+func (s *nativeV2Strategy) Model() payment.PaymentModel { return s.model }
+func (s *nativeV2Strategy) Capabilities() payment.ChainCapabilities {
+	return payment.ChainCapabilities{}
+}
 func (s *nativeV2Strategy) SetupPayment(_ context.Context, _ payment.PaymentSetupParams) (*payment.ActionResult, error) {
 	return &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "act-" + s.id}, nil
 }
@@ -382,7 +384,7 @@ func TestRegistry_RegisterV2_TakesPrecedenceOverV1(t *testing.T) {
 	r := payment.NewRegistry()
 
 	r.Register(iwallet.ChainEthereum, &instrumentedV1{model: payment.PaymentModelClientSigned})
-	v2 := &nativeV2Strategy{model: payment.PaymentModelMonitored, id: "safe"}
+	v2 := &nativeV2Strategy{model: payment.PaymentModelMonitored, id: "managed_escrow"}
 	r.RegisterV2(iwallet.ChainEthereum, v2)
 
 	got, err := r.ForChainV2(iwallet.ChainEthereum)
@@ -393,7 +395,7 @@ func TestRegistry_RegisterV2_TakesPrecedenceOverV1(t *testing.T) {
 		t.Error("V2-native registration must take precedence over the auto-wrapped V1 entry")
 	}
 	if got.Model() != payment.PaymentModelMonitored {
-		t.Errorf("Model() = %s, want monitored (ManagedEscrow)", got.Model())
+		t.Errorf("Model() = %s, want monitored (managed escrow)", got.Model())
 	}
 }
 
@@ -419,7 +421,7 @@ func TestRegistry_ForChainV2_UnknownChainReturnsError(t *testing.T) {
 
 func TestRegistry_Chains_IncludesV2OnlyEntries(t *testing.T) {
 	r := payment.NewRegistry()
-	r.RegisterV2(iwallet.ChainEthereum, &nativeV2Strategy{model: payment.PaymentModelMonitored, id: "safe"})
+	r.RegisterV2(iwallet.ChainEthereum, &nativeV2Strategy{model: payment.PaymentModelMonitored, id: "managed_escrow"})
 
 	chains := r.Chains()
 	if len(chains) != 1 || chains[0] != iwallet.ChainEthereum {

@@ -71,7 +71,7 @@ type ChainCapabilities struct {
 	// per-order route triple used to recover payment semantics from persisted
 	// order intent.
 	//
-	// Values: "multisig" (UTXO), "smart-contract" (EVM/Solana/TRON/ManagedEscrow).
+	// Values: "multisig" (UTXO), "smart-contract" (EVM/Solana/TRON/managed escrow).
 	EscrowType string
 }
 
@@ -177,7 +177,7 @@ type PaymentSetupParams struct {
 	Amount uint64
 
 	// OrderData carries a caller-supplied order snapshot when the
-	// setup/action flow already has one materialized. ManagedEscrow-backed
+	// setup/action flow already has one materialized. backend-managed
 	// action re-resolution uses this to stay independent from whether
 	// the current node persists a local orders row for the order.
 	OrderData *models.Order
@@ -188,10 +188,10 @@ type PaymentSetupResult struct {
 	// PaymentModel indicates which payment paradigm this result follows.
 	PaymentModel PaymentModel
 
-	// IsManagedEscrowOrder is true when the strategy is a ManagedEscrow EVM adapter
+	// IsManagedEscrowOrder is true when the strategy is a managed EVM adapter
 	// (Model == PaymentModelMonitored but the chain is EVM, not UTXO).
-	// Handlers use this to distinguish ManagedEscrow monitored from UTXO monitored
-	// response shapes — ManagedEscrow has no Script / ScriptHash fields.
+	// Handlers use this to distinguish managed escrow monitored from UTXO monitored
+	// response shapes — managed escrow has no Script / ScriptHash fields.
 	IsManagedEscrowOrder bool
 
 	// PaymentData carries chain-specific payment data.

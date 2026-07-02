@@ -87,7 +87,7 @@ func TestOrderAppService_GetEscrowReleaseInstructions_ManagedEscrowRejectsLegacy
 	order, paymentSent := newManagedEscrowOrderForTests(t, iwallet.CoinType("crypto:eip155:11155111:native"))
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
@@ -119,7 +119,7 @@ func TestOrderAppService_GetRefundOrderInstructions_ManagedEscrowRejectsLegacyPa
 	})))
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(false).ToPaymentSent()
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPending(),
@@ -154,7 +154,7 @@ func TestOrderAppService_GetCompleteOrderInstructions_ManagedEscrowRejectsLegacy
 		}},
 	})))
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
@@ -186,7 +186,7 @@ func TestOrderAppService_GetReleaseFundsInstructions_ManagedEscrowRejectsLegacyP
 		Verdict: "resolved",
 	})))
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),

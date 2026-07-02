@@ -1,0 +1,38 @@
+[extend]
+useDefault = true
+
+# These are deterministic, non-secret fixtures. Keep the exceptions tied to
+# both the fixture path and the line shape so future credentials in the same
+# files are still reported.
+[[allowlists]]
+description = "Reviewed deterministic test and example fixtures"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''internal/api/auth_test\.go''',
+  '''internal/api/huma_bridge_test\.go''',
+  '''internal/api/standalone_password\.go''',
+  '''internal/api/sanitize_test\.go''',
+  '''internal/api/store_policy_handlers_test\.go''',
+  '''internal/core/digital/digital_test\.go''',
+  '''internal/core/fiat_payment_app_service_test\.go''',
+  '''internal/core/matrix_chat_rooms_test\.go''',
+  '''internal/orders/utils/keys_test\.go''',
+  '''internal/payment/evm/escrow_anvil_test\.go''',
+  '''internal/repo/identity_test\.go''',
+  '''internal/repo/sample-mobazha\.conf''',
+  '''internal/storage/local_fs_test\.go''',
+  '''pkg/mcp/tools_shopping_test\.go''',
+  '''pkg/redact/redact_test\.go''',
+]
+regexes = [
+  '''(?:Password|passwordHash):\s*"[0-9a-f]+"''',
+  '''passwordCharset\s*=\s*"''',
+  '''(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9_]+''',
+  '''(?:storePolicyAPIPeer[AB]|directRoomTargetPeerIDMetaKey|orderToken)\s*(?::=|=|:)''',
+  '''(?:privKeyHex|keyHex|expectedKey[0-2]|anvilKey[0-3])\s*(?::=|=)''',
+  '''(?:SecretKey|WebhookSecret):\s*"''',
+  '''key\s*:=\s*"(?:bafkrei|bafkre)''',
+  ''';api(?:password|cookie)=''',
+  '''(?:"orderToken"|"order_token")\s*:''',
+]

@@ -209,7 +209,7 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		// Progress carries the running "you've paid X of Y" card derived
 		// from OrderPaymentState.TotalReceived + OrderOpen.Amount. The
 		// AggregatingVerifier refreshes TotalReceived on every pass
-		// (Phase EVM-ManagedEscrow v0.3.0 §4.2), so the dashboard can render a
+		// (Phase managed EVM v0.3.0 §4.2), so the dashboard can render a
 		// live progress bar even before the order flips to "verified"
 		// and again afterwards if a late deposit lands. Omitted when
 		// there is no OrderOpen or no positive expected amount.
@@ -842,7 +842,7 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleGETOrderConfirmationInstructions serves the legacy instructions surface
-// for client-signed confirm / decline flows. ManagedEscrow-backed EVM callers must use
+// for client-signed confirm / decline flows. backend-managed EVM callers must use
 // /v1/orders/{orderID}/settlement-actions/{action} instead.
 func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, r *http.Request) {
 	type Params struct {
@@ -907,7 +907,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 
 	if instructions == nil {
 		// Legacy endpoint compatibility: UTXO and other backend-handled routes
-		// still answer "hasInstructions=false" here. ManagedEscrow-backed EVM does not
+		// still answer "hasInstructions=false" here. backend-managed EVM does not
 		// fall through to this branch because core now rejects that misuse with
 		// ErrBadRequest and points callers at settlement-actions.
 		response := ConfirmationResponse{
@@ -1087,7 +1087,7 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 
 func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *http.Request) {
 	// Legacy instructions surface for client-signed moderated completion.
-	// ManagedEscrow-backed moderated completion stays on the backend-owned completion
+	// backend-managed moderated completion stays on the backend-owned completion
 	// path and therefore does not use this endpoint as its primary contract.
 	g.handleOrderInstructions(w, r, func(orderSvc contracts.OrderService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 		return orderSvc.GetCompleteOrderInstructions(orderID, initiatorAddress)

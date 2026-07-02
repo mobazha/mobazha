@@ -319,7 +319,7 @@ func (g *Gateway) InitTokenStore(db *gorm.DB) error {
 }
 
 // getJWTValidator returns the current jwtValidator under read-lock.
-// ManagedEscrow for concurrent use with EnableJWTAuth.
+// Safe for concurrent use with EnableJWTAuth.
 func (g *Gateway) getJWTValidator() *JWTValidator {
 	g.mu.RLock()
 	jv := g.jwtValidator
@@ -329,7 +329,7 @@ func (g *Gateway) getJWTValidator() *JWTValidator {
 
 // EnableJWTAuth initializes (or replaces) the jwtValidator at runtime.
 // Called asynchronously after startup when the Casdoor certificate is
-// fetched from the SaaS platform. Thread-managed_escrow.
+// fetched from the SaaS platform. Thread-safe.
 func (g *Gateway) EnableJWTAuth(certPEM, localPeerID, ownerUserID string) error {
 	jv, err := NewJWTValidator(certPEM, localPeerID, ownerUserID)
 	if err != nil {
@@ -341,7 +341,7 @@ func (g *Gateway) EnableJWTAuth(certPEM, localPeerID, ownerUserID string) error 
 	return nil
 }
 
-// Close shutsdown the Gateway listener. ManagedEscrow to call multiple times.
+// Close shutsdown the Gateway listener. Safe to call multiple times.
 func (g *Gateway) Close() error {
 	var err error
 	g.closeOnce.Do(func() {
@@ -790,7 +790,7 @@ func paymentFlowForChain(chain iwallet.ChainType) string {
 		iwallet.ChainBitcoinCash,
 		iwallet.ChainLitecoin,
 		iwallet.ChainZCash,
-		iwallet.ChainExternalPayment:
+		iwallet.ChainMonero:
 		return "address-transfer"
 	default:
 		return "external-wallet"

@@ -115,12 +115,12 @@ func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 			multiwallet[chain] = w
 
 		case iwallet.ChainBSC, iwallet.ChainEthereum, iwallet.ChainPolygon, iwallet.ChainBase, iwallet.ChainConflux,
-			// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
+			// Phase managed EVM v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
 			// Wallets construct successfully but their chain client's V1
 			// ContractManager Registry is intentionally not deployed
 			// (RegistryAddress zero-address sentinel in chain config).
 			// Order creation on V1 paths fails closed via the EVM client
-			// guard in internal/chains/evm/client.go; V2 ManagedEscrowAdapter
+			// guard in internal/chains/evm/client.go; V2 managed EVM adapter
 			// shadow registration handles the V2 path.
 			iwallet.ChainArbitrum, iwallet.ChainOptimism, iwallet.ChainAvalanche,
 			iwallet.ChainGnosis, iwallet.ChainCelo, iwallet.ChainMantle,
@@ -159,7 +159,7 @@ func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 			multiwallet[chain] = w
 		case iwallet.ChainFiat:
 			// Fiat is intentionally not part of Multiwallet, aligned with
-			// ChainExternalPayment handling below:
+			// ChainMonero handling below:
 			//   - no cryptographic keys (Stripe/PayPal manage tokens
 			//     server-side), so the iwallet.Wallet contract
 			//     (Spend/Sweep/HasKey/Balance/HD-derive) is a category
@@ -175,18 +175,18 @@ func NewMultiwallet(opts ...Option) (Multiwallet, *base.KeyStore, error) {
 			// it as a recognised chain; we explicitly skip wallet
 			// instantiation here.
 			continue
-		case iwallet.ChainExternalPayment:
-			// ExternalPayment is intentionally not part of Multiwallet:
-			//   - keys live inside the external_payment-wallet-rpc sidecar (not a shared
+		case iwallet.ChainMonero:
+			// Monero is intentionally not part of Multiwallet:
+			//   - keys live inside the monero-wallet-rpc sidecar (not a shared
 			//     in-process KeyStore), so the iwallet.Wallet contract
 			//     (Spend/Sweep/HasKey/Balance) cannot be honoured here without
-			//     leaking abstractions or breaking EXTERNAL_PAYMENT's privacy model;
+			//     leaking abstractions or breaking XMR's privacy model;
 			//   - on-chain transactions are not publicly visible (no
 			//     GetTransaction semantics);
 			//   - guest-checkout integration goes through
 			//     an injected distribution.ExternalPaymentRuntime +
 			//     DirectPaymentService instead.
-			// GetAllSupportedChainTypes() includes ChainExternalPayment so that
+			// GetAllSupportedChainTypes() includes ChainMonero so that
 			// ChainType.IsValid() and unrelated enumeration paths still treat
 			// it as a recognised chain, but we explicitly skip it here rather
 			// than fall through to the "implementation missing" error.

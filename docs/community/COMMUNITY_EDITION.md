@@ -6,7 +6,7 @@ The machine-readable allowlist is `config/editions/community.json`. Runtime avai
 
 Identifiers and adapters for additional chains may remain in the source for data migration and protocol compatibility. Their presence does not enable those chains in Community Edition and does not constitute a compatibility commitment.
 
-Mobazha-authored Community Edition source, including retained Mobazha history, is licensed under MPL-2.0. Portions derived from OpenBazaar remain available under the OpenBazaar MIT terms; see `NOTICE` and `LICENSES/MIT-OpenBazaar.txt`. The future payment-plugin protocol, SDK, schemas, and examples are intended to use Apache-2.0. Third-party notices must be complete before the first public release.
+Mobazha-authored Community Edition source is licensed under MPL-2.0. Portions derived from OpenBazaar remain available under the OpenBazaar MIT terms; see `NOTICE` and `LICENSES/MIT-OpenBazaar.txt`. The future payment-plugin protocol, SDK, schemas, and examples are intended to use Apache-2.0. Third-party notices must be complete before the first public release.
 
 Zcash is outside the initial release while its production monitoring and seller-settlement journey is completed. Bundled fiat providers are not enabled in the initial Community Edition runtime.
 

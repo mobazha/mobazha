@@ -916,7 +916,7 @@ func explicitMemoryForgetQuery(text string) (string, bool) {
 	}
 	for _, marker := range markers {
 		if strings.HasPrefix(normalized, marker) {
-			if query := cleanExplicitMemoryContent(normalized[len(marker):]); managed_escrowForgetQuery(query) {
+			if query := cleanExplicitMemoryContent(normalized[len(marker):]); safeForgetQuery(query) {
 				return query, true
 			}
 			return "", false
@@ -940,7 +940,7 @@ func explicitMemoryForgetQuery(text string) (string, bool) {
 	}
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(lower, prefix) {
-			if query := cleanExplicitMemoryContent(normalized[len(prefix):]); managed_escrowForgetQuery(query) {
+			if query := cleanExplicitMemoryContent(normalized[len(prefix):]); safeForgetQuery(query) {
 				return query, true
 			}
 			return "", false
@@ -949,7 +949,7 @@ func explicitMemoryForgetQuery(text string) (string, bool) {
 	return "", false
 }
 
-func managed_escrowForgetQuery(query string) bool {
+func safeForgetQuery(query string) bool {
 	query = strings.TrimSpace(strings.ToLower(query))
 	if query == "" {
 		return false
@@ -1927,7 +1927,7 @@ func shapeReplayHistory(history []Message, keepLast int) []Message {
 	}
 	system := firstSystemMessage(history)
 	checkpoint := firstCheckpointMessage(history)
-	tailStart := managed_escrowReplayTailStart(history, len(history)-keepLast)
+	tailStart := safeReplayTailStart(history, len(history)-keepLast)
 	tail := append([]Message(nil), history[tailStart:]...)
 	out := make([]Message, 0, len(tail)+2)
 	if system != nil && !messageSliceContains(tail, system) {
@@ -2119,7 +2119,7 @@ func compactReplayHistoryWithSummary(history []Message, keepLast int, summarize 
 	if system != nil {
 		start = 1
 	}
-	prefixEnd := managed_escrowReplayTailStart(history, len(history)-keepLast)
+	prefixEnd := safeReplayTailStart(history, len(history)-keepLast)
 	if prefixEnd <= start {
 		return history, nil
 	}
@@ -2141,7 +2141,7 @@ func compactReplayHistoryWithSummary(history []Message, keepLast int, summarize 
 	return out, nil
 }
 
-func managed_escrowReplayTailStart(history []Message, desiredStart int) int {
+func safeReplayTailStart(history []Message, desiredStart int) int {
 	if desiredStart <= 0 {
 		return 0
 	}

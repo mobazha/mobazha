@@ -88,7 +88,7 @@ type OrderService interface {
 	RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	// GetConfirmOrderInstructions is a legacy client-signed-only surface.
-	// ManagedEscrow-backed EVM and other backend-submitted settlement routes must use
+	// backend-managed EVM and other backend-submitted settlement routes must use
 	// ExecuteSettlementAction instead of the old instructions flow.
 	GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	// ExecuteSettlementAction runs backend-driven settlement intents
@@ -103,11 +103,11 @@ type OrderService interface {
 	GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error)
 	// GetRefundOrderInstructions is a legacy instructions surface. It remains
 	// valid for client-signed chains and fiat informational responses only.
-	// ManagedEscrow-backed EVM refund/cancel flows must use ExecuteSettlementAction.
+	// backend-managed EVM refund/cancel flows must use ExecuteSettlementAction.
 	GetRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ShipOrder(orderID models.OrderID, shipments []models.Shipment, done chan struct{}) error
 	// GetCompleteOrderInstructions is a legacy instructions surface for
-	// client-signed moderated completion flows only. ManagedEscrow-backed moderated
+	// client-signed moderated completion flows only. backend-managed moderated
 	// completion stays on the backend-owned completion path instead of the
 	// old instructions contract.
 	GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
@@ -136,8 +136,8 @@ type OrderService interface {
 	OpenAfterSaleDispute(orderID models.OrderID, reason string, description string) error
 	CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
 	// GetReleaseFundsInstructions remains a legacy instruction endpoint for
-	// client-signed moderated payouts. ManagedEscrow-backed moderated payouts should
-	// flow through backend close/release handling and ManagedEscrow owner-signature
+	// client-signed moderated payouts. backend-managed moderated payouts should
+	// flow through backend close/release handling and escrow owner-signature
 	// paths instead of the old instructions contract.
 	GetReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
@@ -356,13 +356,13 @@ type AnalyticsProvider interface {
 
 // PaymentDetectedOpts carries chain-specific metadata for HandlePaymentDetected.
 // nil for chains that don't need extra metadata (UTXO/EVM/Solana — txHash
-// alone identifies the payment). Currently only ExternalPayment populates this:
-// EXTERNAL_PAYMENT has no global tx index, so the watcher must communicate the block
+// alone identifies the payment). Currently only Monero populates this:
+// XMR has no global tx index, so the watcher must communicate the block
 // height for downstream confirmation polling. If a second chain needs
 // chain-specific metadata, evaluate switching to a typed-per-chain method
-// (e.g. HandleEXTERNAL_PAYMENTPaymentConfirmed) or a generic map[string]any.
+// (e.g. HandleXMRPaymentConfirmed) or a generic map[string]any.
 type PaymentDetectedOpts struct {
-	// TxBlockHeight is the block height of the confirmed EXTERNAL_PAYMENT transfer.
+	// TxBlockHeight is the block height of the confirmed XMR transfer.
 	// 0 means the transfer was first observed in the mempool (pool phase).
 	TxBlockHeight uint64
 }
@@ -388,7 +388,7 @@ type GuestOrderService interface {
 	HandlePaymentDetected(orderToken, txHash string, opts *PaymentDetectedOpts) error
 	HandleConfirmationUpdate(orderToken string, confs int) error
 	// HandlePoolPayment records a mempool-only payment observation (currently
-	// EXTERNAL_PAYMENT-only). It does NOT change order state — the order remains in
+	// XMR-only). It does NOT change order state — the order remains in
 	// AWAITING_PAYMENT until the transfer is mined and HandlePaymentDetected
 	// fires. This preserves the invariant that PAYMENT_DETECTED implies an
 	// on-chain tx, while still surfacing a "we saw your pool tx" hint to
@@ -460,13 +460,13 @@ type NodeService interface {
 }
 
 // PaymentRPCStatusProvider is implemented by nodes that can report local
-// payment sidecar availability (for example Sovereign's external_payment-wallet-rpc).
+// payment sidecar availability (for example Sovereign's monero-wallet-rpc).
 type PaymentRPCStatusProvider interface {
 	PaymentRPCStatus(ctx context.Context) PaymentRPCStatus
 }
 
 type PaymentRPCStatus struct {
-	EXTERNAL_PAYMENT *PaymentRPCStatusEntry `json:"external_payment,omitempty"`
+	XMR *PaymentRPCStatusEntry `json:"xmr,omitempty"`
 }
 
 type PaymentRPCStatusEntry struct {
@@ -477,30 +477,30 @@ type PaymentRPCStatusEntry struct {
 	Error        string `json:"error,omitempty"`
 }
 
-// ExternalPaymentNodePoolProvider is implemented by nodes that expose the ExternalPayment
+// MoneroNodePoolProvider is implemented by nodes that expose the Monero
 // daemon node pool for admin / setup wizard management (Sovereign only).
 //
 // All methods are safe to call when the pool is not configured (e.g. the
 // sovereign is in legacy single-daemon mode or NodePool bootstrap failed) —
-// ExternalPaymentNodes returns an empty snapshot and mutating methods return
-// ErrExternalPaymentNodePoolUnavailable.
-type ExternalPaymentNodePoolProvider interface {
-	ExternalPaymentNodes(ctx context.Context) ExternalPaymentNodePoolSnapshot
-	AddExternalPaymentNode(ctx context.Context, req ExternalPaymentNodeAddRequest) (ExternalPaymentNodeInfo, error)
-	RemoveExternalPaymentNode(ctx context.Context, address string) error
-	SwitchExternalPaymentNode(ctx context.Context, address string) error
+// MoneroNodes returns an empty snapshot and mutating methods return
+// ErrMoneroNodePoolUnavailable.
+type MoneroNodePoolProvider interface {
+	MoneroNodes(ctx context.Context) MoneroNodePoolSnapshot
+	AddMoneroNode(ctx context.Context, req MoneroNodeAddRequest) (MoneroNodeInfo, error)
+	RemoveMoneroNode(ctx context.Context, address string) error
+	SwitchMoneroNode(ctx context.Context, address string) error
 }
 
-// ErrExternalPaymentNodePoolUnavailable signals that the sovereign is not running with
+// ErrMoneroNodePoolUnavailable signals that the sovereign is not running with
 // a NodePool (legacy single-daemon mode, or bootstrap failed).
-var ErrExternalPaymentNodePoolUnavailable = errors.New("external_payment NodePool: not available on this node")
+var ErrMoneroNodePoolUnavailable = errors.New("monero NodePool: not available on this node")
 
-// ExternalPaymentNodePoolSnapshot is the JSON envelope returned by
-// GET /v1/system/external_payment-nodes.
-type ExternalPaymentNodePoolSnapshot struct {
+// MoneroNodePoolSnapshot is the JSON envelope returned by
+// GET /v1/system/monero-nodes.
+type MoneroNodePoolSnapshot struct {
 	// Available indicates whether a NodePool is wired up for this node.
 	// When false, Active/Candidates are empty and write operations will
-	// return ErrExternalPaymentNodePoolUnavailable.
+	// return ErrMoneroNodePoolUnavailable.
 	Available bool `json:"available"`
 
 	// Healthy is the NodePool.IsHealthy() verdict (active node bound,
@@ -513,16 +513,16 @@ type ExternalPaymentNodePoolSnapshot struct {
 	MonitorOn bool `json:"monitorOn"`
 
 	// Active is the daemon currently bound by wallet-rpc, if any.
-	Active *ExternalPaymentNodeInfo `json:"active,omitempty"`
+	Active *MoneroNodeInfo `json:"active,omitempty"`
 
 	// Candidates is the full pool snapshot in insertion order
 	// (seed-embedded → discovered → user-added). The Active node also
 	// appears here.
-	Candidates []ExternalPaymentNodeInfo `json:"candidates"`
+	Candidates []MoneroNodeInfo `json:"candidates"`
 }
 
-// ExternalPaymentNodeInfo is the read-only snapshot of a pool candidate.
-type ExternalPaymentNodeInfo struct {
+// MoneroNodeInfo is the read-only snapshot of a pool candidate.
+type MoneroNodeInfo struct {
 	Address       string `json:"address"`
 	Operator      string `json:"operator,omitempty"`
 	Source        string `json:"source"` // seed-embedded / discovered / user-added
@@ -532,66 +532,66 @@ type ExternalPaymentNodeInfo struct {
 	LastChecked   string `json:"lastChecked,omitempty"` // RFC3339; empty if never checked
 }
 
-// ExternalPaymentNodeAddRequest is the body for POST /v1/system/external_payment-nodes.
-type ExternalPaymentNodeAddRequest struct {
-	// Address is the I2P / Tor / clearnet host:port of external_paymentd RPC, e.g.
+// MoneroNodeAddRequest is the body for POST /v1/system/monero-nodes.
+type MoneroNodeAddRequest struct {
+	// Address is the I2P / Tor / clearnet host:port of monerod RPC, e.g.
 	// "node.example.b32.i2p:18089". Required.
 	Address string `json:"address"`
-	// Operator is a human-readable label (e.g. "ExternalPaymentWorld"). Optional.
+	// Operator is a human-readable label (e.g. "MoneroWorld"). Optional.
 	Operator string `json:"operator,omitempty"`
 }
 
-// ExternalPaymentWalletProvider is implemented by nodes that expose EXTERNAL_PAYMENT wallet-level
+// MoneroWalletProvider is implemented by nodes that expose XMR wallet-level
 // operations (balance / transfer / sweep_all). Available only on sovereign
-// builds with a working external_payment-wallet-rpc sidecar.
-type ExternalPaymentWalletProvider interface {
-	GetEXTERNAL_PAYMENTBalance(ctx context.Context, accountIndex *uint32) (ExternalPaymentBalance, error)
-	WithdrawEXTERNAL_PAYMENT(ctx context.Context, req ExternalPaymentWithdrawRequest) (ExternalPaymentWithdrawResult, error)
-	SweepAllEXTERNAL_PAYMENT(ctx context.Context, req ExternalPaymentSweepAllRequest) (ExternalPaymentSweepAllResult, error)
+// builds with a working monero-wallet-rpc sidecar.
+type MoneroWalletProvider interface {
+	GetXMRBalance(ctx context.Context, accountIndex *uint32) (MoneroBalance, error)
+	WithdrawXMR(ctx context.Context, req MoneroWithdrawRequest) (MoneroWithdrawResult, error)
+	SweepAllXMR(ctx context.Context, req MoneroSweepAllRequest) (MoneroSweepAllResult, error)
 }
 
-// ExternalPaymentBalance reports the account-level balance for the EXTERNAL_PAYMENT wallet.
+// MoneroBalance reports the account-level balance for the XMR wallet.
 //
 // Balance is the total (locked + unlocked) and UnlockedBalance is the
-// portion that can be spent right now — ExternalPayment locks every incoming
+// portion that can be spent right now — Monero locks every incoming
 // output for 10 confirmations (~20 min) and temporarily locks change
 // outputs after sends. UI must withdraw against UnlockedBalance, never
 // Balance, or wallet-rpc will reject the transfer.
 //
 // Both fields are decimal piconero strings (same JS-Number rationale as
-// ExternalPaymentWithdrawRequest.Amount). BlocksToUnlock is the wallet-rpc hint
+// MoneroWithdrawRequest.Amount). BlocksToUnlock is the wallet-rpc hint
 // for the next-batch unlock countdown; 0 when nothing is pending.
 //
 // AccountIndex echoes which account this balance refers to so the
 // frontend doesn't have to track the request/response pairing itself.
-type ExternalPaymentBalance struct {
+type MoneroBalance struct {
 	Balance         string `json:"balance"`
 	UnlockedBalance string `json:"unlockedBalance"`
 	BlocksToUnlock  uint64 `json:"blocksToUnlock,omitempty"`
 	AccountIndex    uint32 `json:"accountIndex"`
 }
 
-// ErrExternalPaymentWalletUnavailable signals that the sovereign node has no
-// configured external_payment-wallet-rpc client (legacy boot without EXTERNAL_PAYMENT config,
+// ErrMoneroWalletUnavailable signals that the sovereign node has no
+// configured monero-wallet-rpc client (legacy boot without XMR config,
 // or wallet RPC connection failed during startup).
-var ErrExternalPaymentWalletUnavailable = errors.New("external_payment wallet: RPC client not available on this node")
+var ErrMoneroWalletUnavailable = errors.New("monero wallet: RPC client not available on this node")
 
-// ErrEXTERNAL_PAYMENTInvalidAddress is wrapped by validation failures on the EXTERNAL_PAYMENT
+// ErrXMRInvalidAddress is wrapped by validation failures on the XMR
 // destination address (empty / wrong length). Handlers unwrap with
 // errors.Is to map to HTTP 400. The wrapping error supplies the
 // human-readable reason; this sentinel only carries the prefix.
-var ErrEXTERNAL_PAYMENTInvalidAddress = errors.New("external_payment address")
+var ErrXMRInvalidAddress = errors.New("xmr address")
 
-// ErrEXTERNAL_PAYMENTInvalidAmount is wrapped by validation failures on the EXTERNAL_PAYMENT
+// ErrXMRInvalidAmount is wrapped by validation failures on the XMR
 // amount field (non-numeric, zero, overflow). Handlers unwrap with
 // errors.Is to map to HTTP 400.
-var ErrEXTERNAL_PAYMENTInvalidAmount = errors.New("external_payment amount")
+var ErrXMRInvalidAmount = errors.New("xmr amount")
 
-// ExternalPaymentWithdrawRequest is the body for POST /v1/wallet/external_payment/withdraw.
+// MoneroWithdrawRequest is the body for POST /v1/wallet/xmr/withdraw.
 //
-// Amount is a decimal string of piconero (1 EXTERNAL_PAYMENT = 10^12 piconero). It is a
-// string instead of uint64 because JavaScript Number's managed_escrow-integer range
-// (2^53 ≈ 9.007e15 piconero ≈ 9007 EXTERNAL_PAYMENT) is below the realistic EXTERNAL_PAYMENT balance
+// Amount is a decimal string of piconero (1 XMR = 10^12 piconero). It is a
+// string instead of uint64 because JavaScript Number's safe-integer range
+// (2^53 ≈ 9.007e15 piconero ≈ 9007 XMR) is below the realistic XMR balance
 // of a long-running sovereign — using uint64 over the wire would silently
 // truncate large withdrawals. This matches the existing models.SpendRequest
 // convention for UTXO/EVM chains.
@@ -601,81 +601,81 @@ var ErrEXTERNAL_PAYMENTInvalidAmount = errors.New("external_payment amount")
 //
 // AccountIndex is a pointer so the wire can distinguish "unset" (use the
 // node's startup-flag default) from an explicit 0 (the primary account on
-// every standard ExternalPayment wallet). Most callers send a non-nil 0 or omit it
+// every standard Monero wallet). Most callers send a non-nil 0 or omit it
 // entirely; multi-account sovereigns may target specific indices.
-type ExternalPaymentWithdrawRequest struct {
+type MoneroWithdrawRequest struct {
 	Address      string  `json:"address"`
 	Amount       string  `json:"amount"`
 	Priority     uint32  `json:"priority,omitempty"`
 	AccountIndex *uint32 `json:"accountIndex,omitempty"`
 }
 
-// ExternalPaymentWithdrawResult is the response payload for a successful withdrawal.
+// MoneroWithdrawResult is the response payload for a successful withdrawal.
 // Amount + Fee are decimal piconero strings (same rationale as the request).
 // TxKey lets the sender prove the payment off-chain to the recipient; the
 // frontend should surface it as "Save this key — only share with the
 // recipient if proof is needed".
-type ExternalPaymentWithdrawResult struct {
+type MoneroWithdrawResult struct {
 	TxHash string `json:"txHash"`
 	TxKey  string `json:"txKey,omitempty"`
 	Amount string `json:"amount"`
 	Fee    string `json:"fee"`
 }
 
-// ExternalPaymentSweepAllRequest is the body for POST /v1/wallet/external_payment/sweep-all.
+// MoneroSweepAllRequest is the body for POST /v1/wallet/xmr/sweep-all.
 //
 // SubaddrIndices, when non-empty, restricts the sweep to the listed
 // subaddress minor indices of AccountIndex. Empty means sweep all
 // subaddresses of the account.
 //
-// AccountIndex is a pointer for the same reason as ExternalPaymentWithdrawRequest.
-type ExternalPaymentSweepAllRequest struct {
+// AccountIndex is a pointer for the same reason as MoneroWithdrawRequest.
+type MoneroSweepAllRequest struct {
 	Address        string   `json:"address"`
 	Priority       uint32   `json:"priority,omitempty"`
 	AccountIndex   *uint32  `json:"accountIndex,omitempty"`
 	SubaddrIndices []uint32 `json:"subaddrIndices,omitempty"`
 }
 
-// ExternalPaymentSweepAllResult lists the transactions produced by a sweep.
+// MoneroSweepAllResult lists the transactions produced by a sweep.
 // sweep_all commonly produces multiple transactions when the wallet
 // has many outputs; all parallel slices have the same length.
 // Amounts / Fees are decimal piconero strings.
-type ExternalPaymentSweepAllResult struct {
+type MoneroSweepAllResult struct {
 	TxHashes []string `json:"txHashes"`
 	TxKeys   []string `json:"txKeys,omitempty"`
 	Amounts  []string `json:"amounts"`
 	Fees     []string `json:"fees"`
 }
 
-// ExternalPaymentWalletSetupProvider is implemented by nodes that expose the
-// first-run wallet provisioning surface for EXTERNAL_PAYMENT. It is admin-only and
+// MoneroWalletSetupProvider is implemented by nodes that expose the
+// first-run wallet provisioning surface for XMR. It is admin-only and
 // available only through a private distribution module with a working
-// external_payment-wallet-rpc sidecar.
+// monero-wallet-rpc sidecar.
 //
 // Lifecycle from a fresh wallet-rpc process:
-//  1. GetEXTERNAL_PAYMENTWalletSetupStatus reports Exists=false
-//  2. CreateEXTERNAL_PAYMENTWallet (or RestoreEXTERNAL_PAYMENTWallet) provisions the wallet,
+//  1. GetXMRWalletSetupStatus reports Exists=false
+//  2. CreateXMRWallet (or RestoreXMRWallet) provisions the wallet,
 //     persists local metadata, and returns the 25-word seed
-//  3. Frontend shows seed + backup quiz, then calls ConfirmEXTERNAL_PAYMENTWalletBackup
+//  3. Frontend shows seed + backup quiz, then calls ConfirmXMRWalletBackup
 //  4. On every subsequent boot, the node auto-opens the wallet using the
-//     metadata; GetEXTERNAL_PAYMENTWalletSetupStatus reports Exists=true.
-type ExternalPaymentWalletSetupProvider interface {
-	GetEXTERNAL_PAYMENTWalletSetupStatus(ctx context.Context) (ExternalPaymentWalletSetupStatus, error)
-	CreateEXTERNAL_PAYMENTWallet(ctx context.Context, req ExternalPaymentCreateWalletRequest) (ExternalPaymentCreateWalletResult, error)
-	RestoreEXTERNAL_PAYMENTWallet(ctx context.Context, req ExternalPaymentRestoreWalletRequest) (ExternalPaymentRestoreWalletResult, error)
-	ConfirmEXTERNAL_PAYMENTWalletBackup(ctx context.Context) error
+//     metadata; GetXMRWalletSetupStatus reports Exists=true.
+type MoneroWalletSetupProvider interface {
+	GetXMRWalletSetupStatus(ctx context.Context) (MoneroWalletSetupStatus, error)
+	CreateXMRWallet(ctx context.Context, req MoneroCreateWalletRequest) (MoneroCreateWalletResult, error)
+	RestoreXMRWallet(ctx context.Context, req MoneroRestoreWalletRequest) (MoneroRestoreWalletResult, error)
+	ConfirmXMRWalletBackup(ctx context.Context) error
 }
 
-// ExternalPaymentWalletSetupStatus is the response payload for
-// GET /v1/system/setup-wizard/external_payment-wallet.
+// MoneroWalletSetupStatus is the response payload for
+// GET /v1/system/setup-wizard/xmr-wallet.
 //
-// Exists reflects on-disk metadata (external_payment-wallet.json) — it does NOT round-
+// Exists reflects on-disk metadata (xmr-wallet.json) — it does NOT round-
 // trip to wallet-rpc, so transient RPC outages don't make the wizard
 // reappear and prompt the operator to overwrite. WalletOpen is the
 // best-effort runtime signal that wallet-rpc currently has the wallet
 // loaded (true after a successful open_wallet at startup or right after
 // create/restore).
-type ExternalPaymentWalletSetupStatus struct {
+type MoneroWalletSetupStatus struct {
 	Exists          bool   `json:"exists"`
 	WalletOpen      bool   `json:"walletOpen"`
 	Address         string `json:"address,omitempty"`
@@ -683,68 +683,68 @@ type ExternalPaymentWalletSetupStatus struct {
 	CreatedAt       int64  `json:"createdAt,omitempty"`
 }
 
-// ExternalPaymentCreateWalletRequest is the body for the "create" action of
-// POST /v1/system/setup-wizard/external_payment-wallet. Language picks the seed
+// MoneroCreateWalletRequest is the body for the "create" action of
+// POST /v1/system/setup-wizard/xmr-wallet. Language picks the seed
 // wordlist; the MVP supports only "English" to keep the backup
 // verification UI simple.
-type ExternalPaymentCreateWalletRequest struct {
+type MoneroCreateWalletRequest struct {
 	Language string `json:"language,omitempty"`
 }
 
-// ExternalPaymentCreateWalletResult returns the new seed + address. The seed MUST
+// MoneroCreateWalletResult returns the new seed + address. The seed MUST
 // be displayed to the operator exactly once — the server never persists
 // it, and re-fetching after the wizard finishes would require querying
 // wallet-rpc with admin auth which we explicitly do not expose.
-type ExternalPaymentCreateWalletResult struct {
+type MoneroCreateWalletResult struct {
 	Mnemonic string `json:"mnemonic"`
 	Address  string `json:"address"`
 }
 
-// ExternalPaymentRestoreWalletRequest is the body for the "restore" action.
+// MoneroRestoreWalletRequest is the body for the "restore" action.
 // Seed is the 25-word deterministic seed in the wordlist of `Language`
 // (defaults to English). RestoreHeight tells wallet-rpc which block to
 // resume scanning from; 0 means scan from genesis (very slow). Operators
 // recovering a known wallet should provide the original creation height.
-type ExternalPaymentRestoreWalletRequest struct {
+type MoneroRestoreWalletRequest struct {
 	Seed          string `json:"seed"`
 	Language      string `json:"language,omitempty"`
 	RestoreHeight uint64 `json:"restoreHeight,omitempty"`
 }
 
-// ExternalPaymentRestoreWalletResult is returned by a successful restore. We do
+// MoneroRestoreWalletResult is returned by a successful restore. We do
 // NOT echo back the seed — the caller already has it — to minimise the
 // risk of accidentally logging it on the response path.
-type ExternalPaymentRestoreWalletResult struct {
+type MoneroRestoreWalletResult struct {
 	Address string `json:"address"`
 }
 
-// ErrEXTERNAL_PAYMENTWalletAlreadyExists is returned when a create/restore attempt
+// ErrXMRWalletAlreadyExists is returned when a create/restore attempt
 // would clobber an existing wallet. Handlers unwrap to HTTP 409 Conflict.
-var ErrEXTERNAL_PAYMENTWalletAlreadyExists = errors.New("external_payment wallet already exists")
+var ErrXMRWalletAlreadyExists = errors.New("xmr wallet already exists")
 
-// ErrEXTERNAL_PAYMENTInvalidSeed wraps malformed seed input (wrong word count, empty).
+// ErrXMRInvalidSeed wraps malformed seed input (wrong word count, empty).
 // Handlers unwrap to HTTP 400.
-var ErrEXTERNAL_PAYMENTInvalidSeed = errors.New("external_payment seed")
+var ErrXMRInvalidSeed = errors.New("xmr seed")
 
-// ExternalPaymentSecretsProvider is implemented by nodes that expose the EXTERNAL_PAYMENT
+// MoneroSecretsProvider is implemented by nodes that expose the XMR
 // wallet's user-sovereignty surface — the operations OP-MP-6 needs so
 // the merchant can re-derive a backup, restore on another machine, or
 // hand a view-only copy to a trusted bookkeeper.
 //
 // Both methods are admin-only and live behind the same security tier as
 // the wallet setup wizard (no apiToken). They MUST round-trip to
-// external_payment-wallet-rpc on every call — the server never caches the seed or
+// monero-wallet-rpc on every call — the server never caches the seed or
 // view key.
 //
 // Available only through a private distribution module with a working
-// external_payment-wallet-rpc sidecar.
-type ExternalPaymentSecretsProvider interface {
-	GetEXTERNAL_PAYMENTMnemonic(ctx context.Context) (ExternalPaymentMnemonicResult, error)
-	GetEXTERNAL_PAYMENTViewOnlyKeys(ctx context.Context) (ExternalPaymentViewOnlyKeysResult, error)
+// monero-wallet-rpc sidecar.
+type MoneroSecretsProvider interface {
+	GetXMRMnemonic(ctx context.Context) (MoneroMnemonicResult, error)
+	GetXMRViewOnlyKeys(ctx context.Context) (MoneroViewOnlyKeysResult, error)
 }
 
-// ExternalPaymentMnemonicResult is the response payload for
-// GET /v1/wallet/external_payment/secrets/mnemonic.
+// MoneroMnemonicResult is the response payload for
+// GET /v1/wallet/xmr/secrets/mnemonic.
 //
 // Mnemonic is the 25-word deterministic seed — the single source of
 // truth for the wallet. Anyone who sees it permanently controls the
@@ -755,18 +755,18 @@ type ExternalPaymentSecretsProvider interface {
 // CreatedAt + Address are echoed so the operator can sanity-check the
 // seed they're about to write down belongs to the wallet they think it
 // does. Both come from local metadata, not wallet-rpc.
-type ExternalPaymentMnemonicResult struct {
+type MoneroMnemonicResult struct {
 	Mnemonic  string `json:"mnemonic"`
 	Address   string `json:"address,omitempty"`
 	CreatedAt int64  `json:"createdAt,omitempty"`
 }
 
-// ExternalPaymentViewOnlyKeysResult is the response payload for
-// GET /v1/wallet/external_payment/secrets/view-only.
+// MoneroViewOnlyKeysResult is the response payload for
+// GET /v1/wallet/xmr/secrets/view-only.
 //
 // PrimaryAddress + PrivateViewKey + RestoreHeight is the canonical
 // view-only triplet: feed the three into a fresh wallet (CLI:
-// `external_payment-wallet-cli --generate-from-view-key`, GUI: "Restore wallet
+// `monero-wallet-cli --generate-from-view-key`, GUI: "Restore wallet
 // from keys") and the new wallet sees every incoming payment without
 // being able to spend.
 //
@@ -774,36 +774,36 @@ type ExternalPaymentMnemonicResult struct {
 // returned, so the receiver knows the absolute upper bound the audit
 // view is up to date with — without it the operator would have to
 // open another tool to determine the chain tip. RestoreHeight is the
-// historical scan-from anchor stored in external_payment-wallet.json (0 = scan from
+// historical scan-from anchor stored in xmr-wallet.json (0 = scan from
 // genesis, very slow). The receiver should pick max(restoreHeight, 0)
 // for a comprehensive audit; for short-window auditing they may pass a
 // later height to skip historical re-scan.
-type ExternalPaymentViewOnlyKeysResult struct {
+type MoneroViewOnlyKeysResult struct {
 	PrimaryAddress string `json:"primaryAddress"`
 	PrivateViewKey string `json:"privateViewKey"`
 	RestoreHeight  uint64 `json:"restoreHeight"`
 	CurrentHeight  uint64 `json:"currentHeight"`
 }
 
-// ExternalPaymentHistoryProvider is implemented by nodes that expose the EXTERNAL_PAYMENT
+// MoneroHistoryProvider is implemented by nodes that expose the XMR
 // wallet's transaction history. Used by the OP-MP-6 history page so the
 // operator can audit incoming payments + outgoing withdrawals without
-// running a separate ExternalPayment CLI.
+// running a separate Monero CLI.
 //
-// Like ExternalPaymentWalletProvider, this is admin-only — incoming transfers
+// Like MoneroWalletProvider, this is admin-only — incoming transfers
 // reveal subaddresses (which can be correlated to past orders) and
 // outgoing transfers reveal recipient addresses (the operator's payout
 // targets / counterparties). Anonymous reads are explicitly forbidden.
 //
 // Available only through a private distribution module with a working
-// external_payment-wallet-rpc sidecar.
-type ExternalPaymentHistoryProvider interface {
-	ListEXTERNAL_PAYMENTTransfers(ctx context.Context, req ListEXTERNAL_PAYMENTTransfersRequest) (ListEXTERNAL_PAYMENTTransfersResult, error)
+// monero-wallet-rpc sidecar.
+type MoneroHistoryProvider interface {
+	ListXMRTransfers(ctx context.Context, req ListXMRTransfersRequest) (ListXMRTransfersResult, error)
 }
 
-// ListEXTERNAL_PAYMENTTransfersRequest is the body for GET /v1/wallet/external_payment/transfers.
+// ListXMRTransfersRequest is the body for GET /v1/wallet/xmr/transfers.
 //
-// AccountIndex is a pointer for the same reason as ExternalPaymentWithdrawRequest:
+// AccountIndex is a pointer for the same reason as MoneroWithdrawRequest:
 // nil means "use the node's startup default" so multi-account sovereigns
 // can rely on the same default everywhere. Most callers omit it.
 //
@@ -813,7 +813,7 @@ type ExternalPaymentHistoryProvider interface {
 // from the client are honoured and may produce an empty list. At least
 // one bucket flag must end up true after defaulting; otherwise the
 // handler returns 400 (lifted from the underlying client guard).
-type ListEXTERNAL_PAYMENTTransfersRequest struct {
+type ListXMRTransfersRequest struct {
 	AccountIndex *uint32 `json:"accountIndex,omitempty"`
 	In           bool    `json:"in"`
 	Out          bool    `json:"out"`
@@ -822,27 +822,27 @@ type ListEXTERNAL_PAYMENTTransfersRequest struct {
 	Failed       bool    `json:"failed"`
 }
 
-// ListEXTERNAL_PAYMENTTransfersResult lists the matching transfers in wallet-rpc
+// ListXMRTransfersResult lists the matching transfers in wallet-rpc
 // order (in→out→pool→pending→failed). The frontend is responsible for
 // any user-driven sort (e.g. timestamp-desc) — keeping the wire format
 // stable means the contract test stays simple.
 //
 // AccountIndex echoes which account the response refers to so the
 // frontend doesn't have to track the request/response pairing itself.
-type ListEXTERNAL_PAYMENTTransfersResult struct {
-	Transfers    []EXTERNAL_PAYMENTTransferEntry `json:"transfers"`
+type ListXMRTransfersResult struct {
+	Transfers    []XMRTransferEntry `json:"transfers"`
 	AccountIndex uint32             `json:"accountIndex"`
 }
 
-// EXTERNAL_PAYMENTTransferEntry is the administration projection exposed through the
+// XMRTransferEntry is the administration projection exposed through the
 // public contracts package. Payment observation uses the provider-neutral
 // distribution runtime instead.
 //
 // Amount + Fee are decimal piconero strings, same rationale as
-// ExternalPaymentWithdrawRequest.Amount: a long-running sovereign can accumulate
-// > 9007 EXTERNAL_PAYMENT, beyond JS Number managed_escrow-integer range. UI MUST format from
+// MoneroWithdrawRequest.Amount: a long-running sovereign can accumulate
+// > 9007 XMR, beyond JS Number safe-integer range. UI MUST format from
 // strings; never parse to Number for display.
-type EXTERNAL_PAYMENTTransferEntry struct {
+type XMRTransferEntry struct {
 	TxHash        string                 `json:"txHash"`
 	Direction     string                 `json:"direction"` // in / out / pool / pending / failed
 	Amount        string                 `json:"amount"`    // piconero, decimal string
@@ -851,13 +851,13 @@ type EXTERNAL_PAYMENTTransferEntry struct {
 	Confirmations uint64                 `json:"confirmations"`
 	Timestamp     int64                  `json:"timestamp"` // unix seconds; 0 if unknown
 	SubAddrIndex  uint32                 `json:"subAddrIndex"`
-	Destinations  []EXTERNAL_PAYMENTTransferRecipient `json:"destinations,omitempty"` // outgoing only
+	Destinations  []XMRTransferRecipient `json:"destinations,omitempty"` // outgoing only
 	Note          string                 `json:"note,omitempty"`
 }
 
-// EXTERNAL_PAYMENTTransferRecipient is one destination leg of an outgoing transfer.
-// Amount is a decimal piconero string (same rationale as EXTERNAL_PAYMENTTransferEntry).
-type EXTERNAL_PAYMENTTransferRecipient struct {
+// XMRTransferRecipient is one destination leg of an outgoing transfer.
+// Amount is a decimal piconero string (same rationale as XMRTransferEntry).
+type XMRTransferRecipient struct {
 	Address string `json:"address"`
 	Amount  string `json:"amount"`
 }

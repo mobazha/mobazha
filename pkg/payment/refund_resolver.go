@@ -19,8 +19,8 @@ const (
 	RefundAddressSourcePayer           RefundAddressSource = "payer"
 	RefundAddressSourceNone            RefundAddressSource = "none"
 
-	RefundResolveReasonExchangeDeclared = "exchange_declared"
-	RefundResolveReasonNoManagedEscrowFallback   = "no_managed_escrow_fallback"
+	RefundResolveReasonExchangeDeclared  = "exchange_declared"
+	RefundResolveReasonNoManagedFallback = "no_managed_fallback"
 )
 
 // RefundResolveResult is the structured result of buyer refund address routing.
@@ -94,7 +94,7 @@ func ResolveBuyerRefundAddress(params ResolveBuyerRefundAddressParams) RefundRes
 		}
 	}
 
-	return refundRequired(RefundResolveReasonNoManagedEscrowFallback)
+	return refundRequired(RefundResolveReasonNoManagedFallback)
 }
 
 func refundResolved(address string, source RefundAddressSource) RefundResolveResult {
@@ -106,7 +106,7 @@ func refundResolved(address string, source RefundAddressSource) RefundResolveRes
 
 func refundRequired(reason string) RefundResolveResult {
 	if strings.TrimSpace(reason) == "" {
-		reason = RefundResolveReasonNoManagedEscrowFallback
+		reason = RefundResolveReasonNoManagedFallback
 	}
 	return RefundResolveResult{
 		Source:            RefundAddressSourceNone,

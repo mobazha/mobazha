@@ -317,9 +317,9 @@ func TestGenerateNodeKeys_WithCustomMnemonic(t *testing.T) {
 	}
 }
 
-func TestAutoMigrateDatabaseManagedEscrow(t *testing.T) {
+func TestAutoMigrateDatabaseSafe(t *testing.T) {
 	sharedDB := testSharedDB(t)
-	dataDir := path.Join(os.TempDir(), "mobazha", "migrate-managed_escrow-test")
+	dataDir := path.Join(os.TempDir(), "mobazha", "migrate-safe-test")
 	os.MkdirAll(dataDir, os.ModePerm)
 	t.Cleanup(func() { os.RemoveAll(dataDir) })
 

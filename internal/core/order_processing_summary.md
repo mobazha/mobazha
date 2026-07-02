@@ -74,20 +74,20 @@ Payment Registry（ChainType → ChainEscrow 映射）
 - 发送 ORDER_REJECT + REFUND 消息给买家
 
 ### 2.4 订单确认（`order_confirm.go` / `settlement_action.go`）
-- **默认入口**: `ExecuteSettlementAction("confirm")`（后端提交型链路，含 ManagedEscrow-backed EVM）
+- **默认入口**: `ExecuteSettlementAction("confirm")`（后端提交型链路，含 backend-managed EVM）
 - **兼容入口**: `GetConfirmOrderInstructions`（仅 client-signed legacy）
 - 卖家确认订单并释放 CANCELABLE 资金
 - UTXO：`releaseFromCancelableAddress` → 后端签名广播
-- ManagedEscrow-backed EVM：`ExecuteSettlementAction("confirm")` → ManagedEscrow action submit / poll
+- backend-managed EVM：`ExecuteSettlementAction("confirm")` → managed action submit / poll
 - Solana / legacy client-signed EVM：`GetConfirmOrderInstructions` → 构建指令 → 前端钱包签名或 Relay
 - 发送 ORDER_CONFIRMATION 消息给买家
 
 ### 2.5 订单取消（`order_cancel.go` / `settlement_action.go`）
-- **默认入口**: `ExecuteSettlementAction("cancel")`（后端提交型链路，含 ManagedEscrow-backed EVM）
+- **默认入口**: `ExecuteSettlementAction("cancel")`（后端提交型链路，含 backend-managed EVM）
 - **兼容入口**: `GetEscrowReleaseInstructions`（仅 client-signed legacy）
 - 仅限 CANCELABLE 订单，买家发起
 - UTXO：后端自动释放回买家地址
-- ManagedEscrow-backed EVM：`ExecuteSettlementAction("cancel")` → ManagedEscrow cancel action submit / poll
+- backend-managed EVM：`ExecuteSettlementAction("cancel")` → managed cancel action submit / poll
 - Solana / legacy client-signed EVM：前端获取指令后钱包签名
 - 发送 ORDER_CANCEL 消息给卖家
 
@@ -101,18 +101,18 @@ Payment Registry（ChainType → ChainEscrow 映射）
 - 可多次调用（部分履行 → 完全履行）
 
 ### 2.7 订单完成（`order_completion.go`）
-- **默认入口**: `CompleteOrder`（含 ManagedEscrow-backed moderated 的后端提交/签名聚合路径）
+- **默认入口**: `CompleteOrder`（含 backend-managed moderated 的后端提交/签名聚合路径）
 - **兼容入口**: `GetCompleteOrderInstructions`（仅 client-signed legacy）
 - 买家确认收货、评价商品
-- ManagedEscrow-backed moderated：`CompleteOrder` 内部聚合 owner signatures / submit ManagedEscrow complete action
+- backend-managed moderated：`CompleteOrder` 内部聚合 owner signatures / submit managed escrow complete action
 - Legacy EVM/Solana：`GetCompleteOrderInstructions` → 前端钱包签名
 - 发送 ORDER_COMPLETE（含评价 + EscrowRelease）给卖家
 
 ### 2.8 退款（`order_refund.go`）
 - **入口**: `RefundOrder` / `GetRefundOrderInstructions` / `RefundOrderViaRelay`
 - 卖家主动退款
-- **ManagedEscrow-backed EVM CANCELABLE**：
-  - 默认走 `ExecuteSettlementAction("cancel")` / ManagedEscrow cancel action
+- **backend-managed EVM CANCELABLE**：
+  - 默认走 `ExecuteSettlementAction("cancel")` / managed cancel action
   - 不再通过 `GetRefundOrderInstructions` / `GetEscrowReleaseInstructions` 这类 legacy instructions 路径
 - **Legacy EVM/Solana**（client-signed）：
   - 路由：`GetRefundOrderInstructions` → `GetEscrowReleaseInstructions` → `GetCancelInstructions` → `BuildCancelableEscrowReleaseInstructions`
@@ -140,7 +140,7 @@ Payment Registry（ChainType → ChainEscrow 映射）
 - **接受裁决**: `ReleaseFunds` — 买家/卖家接受仲裁结果并执行释放
 - **超时释放**: `ReleaseFundsAfterTimeout` — 争议超时后，仅限 UTXO 链支持 escrow timeout
 - **兼容指令入口**: `GetReleaseFundsInstructions`（仅 client-signed legacy）
-- ManagedEscrow-backed moderated：`CloseDispute` / `ReleaseFunds` 内部走 ManagedEscrow owner-signature / submit dispute release action
+- backend-managed moderated：`CloseDispute` / `ReleaseFunds` 内部走 escrow owner-signature / submit dispute release action
 - Legacy EVM/Solana：`GetReleaseFundsInstructions` → 前端钱包签名
 
 ## 3. Escrow 签名流程
@@ -183,7 +183,7 @@ UTXO:   escrowWallet.SignMultisigTransaction(txn, key, script) → chain-native
 
 | Node 方法 | 用途 | 对应文件 |
 |-----------|------|----------|
-| `ExecuteSettlementAction(confirm/cancel)` | 后端提交型 settlement（ManagedEscrow-backed EVM 默认入口） | `settlement_action.go` |
+| `ExecuteSettlementAction(confirm/cancel)` | 后端提交型 settlement（backend-managed EVM 默认入口） | `settlement_action.go` |
 | `GetConfirmOrderInstructions` | 确认 CANCELABLE 订单（legacy client-signed） | `order_confirm.go` |
 | `GetEscrowReleaseInstructions` | 取消 CANCELABLE 订单（legacy client-signed） | `order_cancel.go` |
 | `GetCompleteOrderInstructions` | 完成 MODERATED 订单（legacy client-signed） | `order_completion.go` |
@@ -196,7 +196,7 @@ Legacy instructions 方法通过 Registry 分发到对应 ChainEscrow，返回 `
 - `nil` Instructions → 后端处理（UTXO）
 - 非 `nil` Instructions → 前端签名提交（EVM/Solana）
 
-ManagedEscrow-backed EVM 不再以 `InstructionResult` 作为默认动作返回值，而是通过
+backend-managed EVM 不再以 `InstructionResult` 作为默认动作返回值，而是通过
 `ChainEscrowV2` action 接口返回 `ActionResult` + `ActionID`。
 
 | ChainEscrow 方法 | 用途 | UTXO | EVM/Solana |

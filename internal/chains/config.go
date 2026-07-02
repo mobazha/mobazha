@@ -146,13 +146,13 @@ var Defaults = func(cfg *Config) error {
 			MainnetRpc: []string{"https://api.trongrid.io", "https://api.tronstack.io"},
 			TestnetRpc: []string{"https://api.shasta.trongrid.io"},
 		},
-		// ── Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set ──
+		// ── Phase managed EVM v0.3.0 Sprint 1 D8 — promoted EVM L2 set ──
 		// MainnetRegistryAddress is intentionally the zero address.
 		// V1 ContractManager Registry has not been deployed on these
 		// chains by Mobazha — the EVM client guard in
 		// internal/chains/evm/client.go rejects V1 escrow lookups
 		// with ErrChainNotSupported when the registry slot is empty
-		// or zero. V2 ManagedEscrowAdapter shadow registration consumes the
+		// or zero. V2 managed EVM adapter shadow registration consumes the
 		// chain client without going through the V1 path.
 		// Mainnet RPCs are public chainlist.org endpoints; operators
 		// SHOULD override via repo config for production traffic.

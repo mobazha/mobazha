@@ -33,7 +33,7 @@ func TestOrderHandlers(t *testing.T) {
 		},
 		{
 			name:   "legacy confirm instructions safe misuse returns 400",
-			path:   "/v1/orders/order-managed_escrow/instructions/confirm",
+			path:   "/v1/orders/order-managed/instructions/confirm",
 			method: http.MethodPost,
 			body:   []byte(`{"payoutAddress":"0x1111111111111111111111111111111111111111"}`),
 			setNodeMethods: func(n *mockNode) {
@@ -55,7 +55,7 @@ func TestOrderHandlers(t *testing.T) {
 				}
 				n.getConfirmOrderInstructionsFunc = func(orderID models.OrderID, initiatorAddress string, payoutAddress string) (iwallet.CoinType, any, error) {
 					return iwallet.CoinType("crypto:eip155:1:native"), nil,
-						fmt.Errorf("%w: ManagedEscrow-backed EVM confirm must use POST /v1/orders/{orderID}/settlement-actions/confirm", coreiface.ErrBadRequest)
+						fmt.Errorf("%w: backend-managed EVM confirm must use POST /v1/orders/{orderID}/settlement-actions/confirm", coreiface.ErrBadRequest)
 				}
 			},
 			statusCode: http.StatusBadRequest,
@@ -65,13 +65,13 @@ func TestOrderHandlers(t *testing.T) {
 		},
 		{
 			name:   "legacy dispute release instructions safe misuse returns 400",
-			path:   "/v1/disputes/order-managed_escrow/instructions/release",
+			path:   "/v1/disputes/order-managed/instructions/release",
 			method: http.MethodPost,
 			body:   []byte(`{}`),
 			setNodeMethods: func(n *mockNode) {
 				n.getReleaseFundsInstructionsFunc = func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 					return iwallet.CoinType("crypto:eip155:1:native"), nil,
-						fmt.Errorf("%w: ManagedEscrow-backed moderated dispute payouts must use POST /v1/disputes/{orderID}/close or /v1/disputes/{orderID}/release", coreiface.ErrBadRequest)
+						fmt.Errorf("%w: backend-managed moderated dispute payouts must use POST /v1/disputes/{orderID}/close or /v1/disputes/{orderID}/release", coreiface.ErrBadRequest)
 				}
 			},
 			statusCode: http.StatusBadRequest,

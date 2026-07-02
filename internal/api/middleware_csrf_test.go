@@ -12,7 +12,7 @@ func okHandler() http.Handler {
 	})
 }
 
-func TestCSRFMiddleware_AllowsManagedEscrowMethod(t *testing.T) {
+func TestCSRFMiddleware_AllowsSafeMethod(t *testing.T) {
 	for _, method := range []string{"GET", "HEAD", "OPTIONS"} {
 		req := httptest.NewRequest(method, "http://localhost:5104/v1/listings", nil)
 		req.Header.Set("Origin", "http://evil.example.com")

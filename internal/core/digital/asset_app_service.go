@@ -300,7 +300,7 @@ func (s *DigitalAssetAppService) ImportLicenseKeys(
 // if a key was already dispensed for the same order+SKU, the existing key is
 // returned without consuming another pool slot.
 //
-// Race protection: allocation uses a tenant-safe conditional UPDATE
+// Race protection: allocation uses a tenant-managed conditional UPDATE
 // (`status = available`) and checks RowsAffected. Under READ COMMITTED two
 // concurrent transactions may SELECT the same candidate, but only one UPDATE
 // can claim it; the loser retries.

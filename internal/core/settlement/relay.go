@@ -78,11 +78,11 @@ func (s *SettlementService) ReleaseCancelableFunds(order *models.Order, payoutAd
 			}
 			return iwallet.TransactionID(txHash), payoutAddress, nil
 		}
-		// ManagedEscrow-backed EVM orders no longer share the legacy seller-confirm path.
+		// backend-managed EVM orders no longer share the legacy seller-confirm path.
 		// They require the unified settlement-action flow so the caller can
 		// obtain a pollable ActionID instead of forcing an implicit relay.
 		if coinInfo.IsEthTypeChain() {
-			return "", payoutAddress, fmt.Errorf("%w: ManagedEscrow-backed EVM orders must use POST /v1/orders/{orderID}/settlement-actions/confirm",
+			return "", payoutAddress, fmt.Errorf("%w: backend-managed EVM orders must use POST /v1/orders/{orderID}/settlement-actions/confirm",
 				coreiface.ErrBadRequest)
 		}
 		return s.releaseMonitoredCancelableFunds(order, payoutAddress)
@@ -236,7 +236,7 @@ func (s *SettlementService) RelayInstructions(orderID string, coinType iwallet.C
 		txData, ok := instructions.(*ethWal.TransactionData)
 		if !ok {
 			if _, isMap := instructions.(map[string]any); isMap {
-				return "", fmt.Errorf("%w: ManagedEscrow-backed EVM instructions require the unified settlement-action submit flow", coreiface.ErrBadRequest)
+				return "", fmt.Errorf("%w: backend-managed EVM instructions require the unified settlement-action submit flow", coreiface.ErrBadRequest)
 			}
 			return "", fmt.Errorf("invalid EVM transaction data type: %T", instructions)
 		}
@@ -251,9 +251,9 @@ func (s *SettlementService) RelayInstructions(orderID string, coinType iwallet.C
 // GetConfirmOrderInstructions generates confirm instructions for legacy
 // client-signed CANCELABLE routes only.
 //
-// ManagedEscrow-backed EVM orders must not go through this entrypoint; they use
+// backend-managed EVM orders must not go through this entrypoint; they use
 // ExecuteSettlementAction("confirm") so the backend can submit and track a
-// ManagedEscrow action instead of emitting escrow_v1-style instructions.
+// managed settlement action instead of emitting escrow_v1-style instructions.
 func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	return s.GetLegacyConfirmOrderInstructions(orderID, initiatorAddress, payoutAddress)
 }
@@ -290,7 +290,7 @@ func (s *SettlementService) GetLegacyConfirmOrderInstructions(orderID models.Ord
 	}
 	if !payment.UsesClientSignedPayMode(&order, paymentSent) {
 		if spec, ok := payment.ResolveSettlementSpec(&order, paymentSent); ok && spec.UsesManagedEscrow() {
-			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed EVM confirm must use POST /v1/orders/{orderID}/settlement-actions/confirm",
+			return coinType, nil, fmt.Errorf("%w: backend-managed EVM confirm must use POST /v1/orders/{orderID}/settlement-actions/confirm",
 				coreiface.ErrBadRequest)
 		}
 		logger.LogInfoWithIDf(log, s.nodeID, "%s uses address-monitored settlement flow, no instructions needed", orderID)

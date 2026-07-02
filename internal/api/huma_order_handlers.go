@@ -200,7 +200,7 @@ func (g *Gateway) registerOrdersInstructionComplete(api huma.API) {
 		Path:        "/v1/orders/{orderID}/instructions/complete",
 		Summary:     "Legacy completion payout instructions",
 		Description: "Compatibility endpoint for client-signed moderated completion flows. " +
-			"ManagedEscrow-backed moderated completion stays on the backend-owned completion path " +
+			"backend-managed moderated completion stays on the backend-owned completion path " +
 			"and does not use this instructions contract as its primary entrypoint.",
 		Tags:     []string{"orders"},
 		Security: nodeAuthSecurity,
@@ -906,7 +906,7 @@ func (g *Gateway) registerOrderPaymentSessionGet(api huma.API) {
 		Path:        "/v1/orders/{orderID}/payment-session",
 		Summary:     "Unified payment session view for an order",
 		Description: "Returns a PaymentSession projection built from existing order, payment, and " +
-			"fiat metadata. Settlement modes include address_monitored (UTXO, ExternalPayment, ManagedEscrow-backed EVM, " +
+			"fiat metadata. Settlement modes include address_monitored (UTXO, Monero, backend-managed EVM, " +
 			"and Solana escrow when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), " +
 			"and provider_checkout (Stripe/PayPal).",
 		Tags:     []string{"orders", "payments"},
@@ -1000,7 +1000,7 @@ func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 		Method:      http.MethodPost,
 		Path:        "/v1/orders/{orderID}/settlement-actions/{action}",
 		Summary:     "Execute backend settlement action",
-		Description: "Runs backend-submitted settlement for crypto orders (ManagedEscrow EVM, Solana Anchor, UTXO sync). " +
+		Description: "Runs backend-submitted settlement for crypto orders (managed EVM, Solana Anchor, UTXO sync). " +
 			"Supported actions: confirm, cancel, seller-decline-refund, complete, dispute-release. " +
 			"Client-signed legacy chains use instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
 		Tags:     []string{"orders", "payments"},
@@ -1036,7 +1036,7 @@ func (g *Gateway) registerOrderSettlementActionStatusGet(api huma.API) {
 		Path:        "/v1/orders/{orderID}/settlement-actions/{action}/status",
 		Summary:     "Read unified settlement action status",
 		Description: "Returns the latest status for a previously issued backend settlement action. " +
-			"ManagedEscrow-backed flows expose relay task correlation and confirmations through this endpoint.",
+			"backend-managed flows expose relay task correlation and confirmations through this endpoint.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {

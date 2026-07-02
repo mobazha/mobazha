@@ -59,7 +59,7 @@ func IsPaymentCoinEnabledForPolicy(raw string, policy edition.Policy) bool {
 }
 
 func paymentFlowForEdition(chain ChainType) string {
-	if chain.IsUTXOChain() || chain == ChainExternalPayment {
+	if chain.IsUTXOChain() || chain == ChainMonero {
 		return "address-transfer"
 	}
 	return "external-wallet"

@@ -36,7 +36,7 @@ type SettlementActionSnapshot struct {
 }
 
 // SettlementAction persists backend-submitted settlement action projections.
-// Rows cover ManagedEscrow, Solana, UTXO, and future backend-submitted settlement
+// Rows cover managed escrow, Solana, UTXO, and future backend-submitted settlement
 // actions.
 //
 // Rows are tenant-scoped like other node-local projections; standalone uses

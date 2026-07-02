@@ -11,7 +11,7 @@ import (
 
 // CancelableAutoConfirmReady reports whether a verified CANCELABLE payment has
 // the settlement inputs required for auto-confirm (e.g. UTXO release needs
-// PaymentSent funding facts). ManagedEscrow and Solana monitored paths do not require
+// PaymentSent funding facts). managed escrow and Solana monitored paths do not require
 // UTXO-style funding facts.
 func CancelableAutoConfirmReady(order *models.Order, paymentSent *pb.PaymentSent) bool {
 	if order == nil || paymentSent == nil {

@@ -14,7 +14,7 @@ import (
 // TestHumaSecurity_RouteScopeConsistency_Sovereign is the sovereign-build
 // counterpart of the same test in huma_security_consistency_test.go.
 // Sovereign ships a stripped operation surface (no chat/fiat/fulfillment
-// etc.) plus a few sovereign-only endpoints (ExternalPayment NodePool, EXTERNAL_PAYMENT wallet),
+// etc.) plus a few sovereign-only endpoints (Monero NodePool, XMR wallet),
 // so we re-run the consistency invariant against the registered set.
 //
 // The invariant is: every Huma operation declaring apiToken in Security

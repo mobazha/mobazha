@@ -16,10 +16,10 @@ func testProjectInput(order *models.Order) *projectOrderInput {
 	return &projectOrderInput{order: order}
 }
 
-func TestDerivePaymentInfo_ManagedEscrowPendingUsesSettlementSpecMethod(t *testing.T) {
+func TestDerivePaymentInfo_ManagedPendingUsesSettlementSpecMethod(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:    "crypto:eth:eth",
 		Address: "0xmanagedescrow",
 		SettlementSpec: &models.PendingSettlementSpec{
@@ -35,10 +35,10 @@ func TestDerivePaymentInfo_ManagedEscrowPendingUsesSettlementSpecMethod(t *testi
 	require.Equal(t, pkpayment.ProductModeModerated, mode)
 }
 
-func TestDeriveFundingTarget_ManagedEscrowPendingUsesAddressMonitored(t *testing.T) {
+func TestDeriveFundingTarget_ManagedPendingUsesAddressMonitored(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "0xmanagedescrow"}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Type:           "managed_escrow",
 		Address:        "0xmanagedescrow",
 		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),
@@ -276,7 +276,7 @@ func TestProject_UsesPaymentSentFundingFactsForPaymentProgress(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{ID: models.OrderID("order-facts"), PaymentAddress: "0xmanagedescrow"}
 	order.PaymentVerificationStatus = models.PaymentVerificationStatusVerified
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           "crypto:eip155:1:native",
 		Address:        "0xmanagedescrow",
 		Amount:         1000,
@@ -446,7 +446,7 @@ func TestProject_FormatsManagedEscrowAmountsAsDecimalStrings(t *testing.T) {
 	order := &models.Order{
 		PaymentAddress: "0xmanagedescrow",
 	}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Type:           "managed_escrow",
 		Address:        "0xmanagedescrow",
 		Coin:           "crypto:eip155:11155111:native",
@@ -468,10 +468,10 @@ func TestProject_FormatsManagedEscrowAmountsAsDecimalStrings(t *testing.T) {
 	require.Equal(t, "0.007022669176100452", session.PaymentProgress.RequiredAmount)
 }
 
-func TestProject_UsesLockedManagedEscrowPendingAmountOverOrderOpenAmount(t *testing.T) {
+func TestProject_UsesLockedManagedPendingAmountOverOrderOpenAmount(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{PaymentAddress: "0xmanagedescrow"}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Type:           "managed_escrow",
 		Address:        "0xmanagedescrow",
 		Coin:           "crypto:eip155:11155111:native",
@@ -545,7 +545,7 @@ func TestDerivePaymentInfo_CryptoPendingOverridesStaleFiatMetadata(t *testing.T)
 func TestDerivePaymentInfo_PendingManagedEscrowOverridesPaymentSentEnvelope(t *testing.T) {
 	p := &PaymentSessionProjector{}
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           "crypto:eip155:1:native",
 		Address:        "0xmanagedescrow",
 		SettlementSpec: pkpayment.NewManagedEscrowSpec(false).ToPending(),

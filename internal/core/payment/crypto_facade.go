@@ -25,7 +25,7 @@ type CryptoPaymentSetupService interface {
 }
 
 // CryptoPaymentFacade wraps the canonical payment setup service to populate
-// crypto funding targets (ManagedEscrow, UTXO, monitored flows) behind
+// crypto funding targets (managed EVM, UTXO, monitored flows) behind
 // PaymentSessionService.CreateSession.
 type CryptoPaymentFacade struct {
 	db                   database.Database

@@ -7,7 +7,7 @@ import (
 )
 
 // TestGetDefaultConfigs_TestnetSubsetSmallerThanMainnet verifies testnet mode only
-// registers chains with explicit testnet RPC URLs (ManagedEscrow runtime subset guard).
+// registers chains with explicit testnet RPC URLs (managed escrow runtime subset guard).
 func TestGetDefaultConfigs_TestnetSubsetSmallerThanMainnet(t *testing.T) {
 	mainnet := GetDefaultConfigs(false)
 	testnet := GetDefaultConfigs(true)

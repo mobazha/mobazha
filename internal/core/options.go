@@ -975,8 +975,8 @@ func (n *MobazhaNode) initGuestOrderService() {
 	// settlement paths are implemented.
 	supportedUTXO := n.detectGuestUTXOChains()
 
-	// EVM guest checkout uses ManagedEscrow observation (Phase 3B), not balance polling.
-	// Buyer visibility is gated at runtime by SetEVMManagedEscrowClosureRuntime after a
+	// EVM guest checkout uses managed escrow observation (Phase 3B), not balance polling.
+	// Buyer visibility is gated at runtime by SetManagedEscrowClosureRuntime after a
 	// trusted distribution module wires monitors, relay, and funding.
 	guestEvmAvailable := false
 	guestSolanaAvailable := false

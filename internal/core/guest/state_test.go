@@ -43,7 +43,7 @@ func TestRequiredConfsForCoin(t *testing.T) {
 		{"SOL native", iwallet.CoinType("crypto:solana:mainnet:native"), 0},
 		{"BSC native", iwallet.CoinType("crypto:eip155:56:native"), 0},
 		{"TRON native", iwallet.CoinType("crypto:tron:mainnet:native"), 0},
-		{"EXTERNAL_PAYMENT native", iwallet.CoinType("crypto:external_payment:mainnet:native"), 10},
+		{"XMR native", iwallet.CoinType("crypto:monero:mainnet:native"), 10},
 		{"unknown fallback", iwallet.CoinType("INVALID"), 1},
 	}
 	for _, tt := range tests {
@@ -185,7 +185,7 @@ func TestHandlePaymentDetected_WrongState_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "state mismatch")
 }
 
-// TestHandlePoolPayment_KeepsAwaitingState exercises the EXTERNAL_PAYMENT pool-stage UX
+// TestHandlePoolPayment_KeepsAwaitingState exercises the XMR pool-stage UX
 // hint contract: HandlePoolPayment must NOT transition state out of
 // AWAITING_PAYMENT, must populate the pool-stage fields for the buyer-facing
 // status response, and must be idempotent across repeated polls.
@@ -194,21 +194,21 @@ func TestHandlePoolPayment_KeepsAwaitingState(t *testing.T) {
 	svc := &GuestOrderAppService{db: db}
 
 	seedGuestOrder(t, db, 300, models.GuestOrder{
-		OrderToken:    "gst_external_payment_pool",
+		OrderToken:    "gst_xmr_pool",
 		State:         models.GuestOrderAwaitingPayment,
-		PaymentCoin:   "crypto:external_payment:mainnet:native",
+		PaymentCoin:   "crypto:monero:mainnet:native",
 		RequiredConfs: 10,
 		ExpiresAt:     time.Now().Add(time.Hour),
 	})
 
 	// Phase 1: pool detection — state must stay AWAITING_PAYMENT,
 	// PoolTxHash + PoolAmount + PoolDetectedAt populated.
-	err := svc.HandlePoolPayment("gst_external_payment_pool", "external_paymenttxhash001", 50_000_000_000)
+	err := svc.HandlePoolPayment("gst_xmr_pool", "xmrtxhash001", 50_000_000_000)
 	require.NoError(t, err)
-	order := loadGuestOrder(t, db, "gst_external_payment_pool")
+	order := loadGuestOrder(t, db, "gst_xmr_pool")
 	assert.Equal(t, models.GuestOrderAwaitingPayment, order.State,
 		"pool observation must NOT transition state — preserves CleanupExpiredOrders sweep semantics")
-	assert.Equal(t, "external_paymenttxhash001", order.PoolTxHash)
+	assert.Equal(t, "xmrtxhash001", order.PoolTxHash)
 	assert.Equal(t, uint64(50_000_000_000), order.PoolAmount)
 	require.NotNil(t, order.PoolDetectedAt)
 	firstDetectedAt := *order.PoolDetectedAt
@@ -216,9 +216,9 @@ func TestHandlePoolPayment_KeepsAwaitingState(t *testing.T) {
 	// Phase 1 idempotent: same (txHash, amount) is a no-op; PoolDetectedAt
 	// must NOT churn to keep the buyer-facing timestamp stable across polls.
 	time.Sleep(2 * time.Millisecond)
-	err = svc.HandlePoolPayment("gst_external_payment_pool", "external_paymenttxhash001", 50_000_000_000)
+	err = svc.HandlePoolPayment("gst_xmr_pool", "xmrtxhash001", 50_000_000_000)
 	require.NoError(t, err)
-	order = loadGuestOrder(t, db, "gst_external_payment_pool")
+	order = loadGuestOrder(t, db, "gst_xmr_pool")
 	require.NotNil(t, order.PoolDetectedAt)
 	assert.True(t, firstDetectedAt.Equal(*order.PoolDetectedAt),
 		"identical pool observations must be no-ops to keep PoolDetectedAt stable")
@@ -226,46 +226,46 @@ func TestHandlePoolPayment_KeepsAwaitingState(t *testing.T) {
 	// Phase 2: confirmed detection upgrades state and persists block height.
 	// PoolDetectedAt is preserved (it's a UX hint about when we first saw the tx).
 	opts := &contracts.PaymentDetectedOpts{TxBlockHeight: 12345}
-	err = svc.HandlePaymentDetected("gst_external_payment_pool", "external_paymenttxhash001", opts)
+	err = svc.HandlePaymentDetected("gst_xmr_pool", "xmrtxhash001", opts)
 	require.NoError(t, err)
-	order = loadGuestOrder(t, db, "gst_external_payment_pool")
+	order = loadGuestOrder(t, db, "gst_xmr_pool")
 	assert.Equal(t, models.GuestOrderPaymentDetected, order.State,
 		"state advances on confirmed detection")
-	assert.Equal(t, uint64(12345), order.ExternalPaymentTxHeight)
-	assert.Equal(t, "external_paymenttxhash001", order.PaymentTxHash)
+	assert.Equal(t, uint64(12345), order.MoneroTxHeight)
+	assert.Equal(t, "xmrtxhash001", order.PaymentTxHash)
 	require.NotNil(t, order.PoolDetectedAt, "PoolDetectedAt is preserved post-confirmation")
 
 	// Phase 3: pool poll fires AFTER confirmed (race during poll cadence).
 	// HandlePoolPayment must be a no-op on non-AWAITING orders to avoid
 	// stomping on the on-chain state machine.
-	err = svc.HandlePoolPayment("gst_external_payment_pool", "external_paymenttxhash001", 60_000_000_000)
+	err = svc.HandlePoolPayment("gst_xmr_pool", "xmrtxhash001", 60_000_000_000)
 	require.NoError(t, err)
-	order = loadGuestOrder(t, db, "gst_external_payment_pool")
+	order = loadGuestOrder(t, db, "gst_xmr_pool")
 	assert.Equal(t, models.GuestOrderPaymentDetected, order.State, "state unchanged")
 	assert.Equal(t, uint64(50_000_000_000), order.PoolAmount,
 		"PoolAmount frozen post-confirmation — on-chain state owns truth")
 }
 
-func TestHandlePaymentDetected_EXTERNAL_PAYMENT_DirectConfirmed(t *testing.T) {
+func TestHandlePaymentDetected_XMR_DirectConfirmed(t *testing.T) {
 	db := newGuestTestDB(t)
 	svc := &GuestOrderAppService{db: db}
 
 	seedGuestOrder(t, db, 301, models.GuestOrder{
-		OrderToken:    "gst_external_payment_direct",
+		OrderToken:    "gst_xmr_direct",
 		State:         models.GuestOrderAwaitingPayment,
-		PaymentCoin:   "crypto:external_payment:mainnet:native",
+		PaymentCoin:   "crypto:monero:mainnet:native",
 		RequiredConfs: 10,
 		ExpiresAt:     time.Now().Add(time.Hour),
 	})
 
 	// Skip pool, go directly to confirmed detection
 	opts := &contracts.PaymentDetectedOpts{TxBlockHeight: 99000}
-	err := svc.HandlePaymentDetected("gst_external_payment_direct", "external_paymenttxhash002", opts)
+	err := svc.HandlePaymentDetected("gst_xmr_direct", "xmrtxhash002", opts)
 	require.NoError(t, err)
-	order := loadGuestOrder(t, db, "gst_external_payment_direct")
+	order := loadGuestOrder(t, db, "gst_xmr_direct")
 	assert.Equal(t, models.GuestOrderPaymentDetected, order.State)
-	assert.Equal(t, uint64(99000), order.ExternalPaymentTxHeight)
-	assert.Equal(t, "external_paymenttxhash002", order.PaymentTxHash)
+	assert.Equal(t, uint64(99000), order.MoneroTxHeight)
+	assert.Equal(t, "xmrtxhash002", order.PaymentTxHash)
 }
 
 func TestValidateCoinAvailability(t *testing.T) {
@@ -293,7 +293,7 @@ func TestValidateCoinAvailability(t *testing.T) {
 	solInfo, _ := iwallet.CoinInfoFromCoinType(solCoin)
 	tronInfo, _ := iwallet.CoinInfoFromCoinType(tronCoin)
 
-	t.Run("Sovereign rejects LTC (EXTERNAL_PAYMENT-only)", func(t *testing.T) {
+	t.Run("Sovereign rejects LTC (XMR-only)", func(t *testing.T) {
 		err := sovereignSvc.validateCoinAvailability(ltcCoin, ltcInfo)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not configured")
@@ -308,7 +308,7 @@ func TestValidateCoinAvailability(t *testing.T) {
 	t.Run("Sovereign rejects ETH", func(t *testing.T) {
 		err := sovereignSvc.validateCoinAvailability(ethCoin, ethInfo)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "EVM ManagedEscrow observation is not configured")
+		assert.Contains(t, err.Error(), "managed EVM observation is not configured")
 	})
 
 	t.Run("Sovereign rejects SOL", func(t *testing.T) {
@@ -349,35 +349,35 @@ func TestValidateCoinAvailability(t *testing.T) {
 		assert.Contains(t, err.Error(), "TRON balance monitor not configured")
 	})
 
-	external_paymentCoin := iwallet.CoinType("crypto:external_payment:mainnet:native")
-	external_paymentInfo, _ := iwallet.CoinInfoFromCoinType(external_paymentCoin)
+	xmrCoin := iwallet.CoinType("crypto:monero:mainnet:native")
+	xmrInfo, _ := iwallet.CoinInfoFromCoinType(xmrCoin)
 
-	t.Run("Core rejects EXTERNAL_PAYMENT without distribution policy", func(t *testing.T) {
-		err := sovereignSvc.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
+	t.Run("Core rejects XMR without distribution policy", func(t *testing.T) {
+		err := sovereignSvc.validateCoinAvailability(xmrCoin, xmrInfo)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no chain family handler")
 	})
 
-	external_paymentSvc := &GuestOrderAppService{
+	xmrSvc := &GuestOrderAppService{
 		supportedUTXOChains: toChainSet([]iwallet.ChainType{iwallet.ChainLitecoin}),
 		guestPaymentPolicy:  guestPaymentPolicyStub{supported: true},
 	}
-	t.Run("EXTERNAL_PAYMENT allowed when client available and healthy", func(t *testing.T) {
-		err := external_paymentSvc.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
+	t.Run("XMR allowed when client available and healthy", func(t *testing.T) {
+		err := xmrSvc.validateCoinAvailability(xmrCoin, xmrInfo)
 		assert.NoError(t, err)
 	})
 
-	external_paymentUnhealthy := &GuestOrderAppService{
+	xmrUnhealthy := &GuestOrderAppService{
 		supportedUTXOChains: toChainSet([]iwallet.ChainType{iwallet.ChainLitecoin}),
 		guestPaymentPolicy: guestPaymentPolicyStub{
 			supported: true,
-			err:       errors.New("ExternalPayment wallet-rpc unreachable"),
+			err:       errors.New("Monero wallet-rpc unreachable"),
 		},
 	}
-	t.Run("EXTERNAL_PAYMENT rejected when client unhealthy", func(t *testing.T) {
-		err := external_paymentUnhealthy.validateCoinAvailability(external_paymentCoin, external_paymentInfo)
+	t.Run("XMR rejected when client unhealthy", func(t *testing.T) {
+		err := xmrUnhealthy.validateCoinAvailability(xmrCoin, xmrInfo)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "ExternalPayment wallet-rpc unreachable")
+		assert.Contains(t, err.Error(), "Monero wallet-rpc unreachable")
 	})
 }
 
@@ -417,7 +417,7 @@ func TestHandlePaymentDetected_ZeroConfs_EmitsOrderConfirmation(t *testing.T) {
 }
 
 // TestHandleConfirmationUpdate_ReachesThreshold_EmitsOrderConfirmation
-// verifies the same bridge for the multi-confirmation path (UTXO/EXTERNAL_PAYMENT).
+// verifies the same bridge for the multi-confirmation path (UTXO/XMR).
 func TestHandleConfirmationUpdate_ReachesThreshold_EmitsOrderConfirmation(t *testing.T) {
 	db := newGuestTestDB(t)
 	bus := events.NewBus()

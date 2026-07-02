@@ -403,7 +403,7 @@ func TestEVMWallet_BusinessRoundtrip_CreateEscrowAddress_NoClient(t *testing.T) 
 	t.Logf("EVM CreateEscrowAddress works without ChainClient: %s", addr.String())
 }
 
-func TestEVMWallet_BusinessRoundtrip_SetChainClient_TypeManagedEscrow(t *testing.T) {
+func TestEVMWallet_BusinessRoundtrip_SetChainClient_TypeSafe(t *testing.T) {
 	// Verify the injection path: SetChainClient sets ChainClient correctly,
 	// and the wallet can then type-assert to *EthClient.
 	w := newTestETHWallet(t, iwallet.ChainBSC)

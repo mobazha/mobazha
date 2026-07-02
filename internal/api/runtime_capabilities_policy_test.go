@@ -23,7 +23,7 @@ func TestFilterPaymentCapabilitiesCommunityAllowlist(t *testing.T) {
 		{ID: "BCH", Kind: "crypto", Flow: "address-transfer"},
 		{ID: "LTC", Kind: "crypto", Flow: "address-transfer"},
 		{ID: "ZEC", Kind: "crypto", Flow: "address-transfer", AddressMode: "transparent"},
-		{ID: "EXTERNAL_PAYMENT", Kind: "crypto", Flow: "address-transfer"},
+		{ID: "XMR", Kind: "crypto", Flow: "address-transfer"},
 		{ID: "ETH", Kind: "crypto", Flow: "external-wallet"},
 		{ID: "stripe", Kind: "fiat", Flow: "provider-session"},
 	}

@@ -115,7 +115,7 @@ func (g *Gateway) handlePOSTDigitalAssetUploadStream(w http.ResponseWriter, r *h
 			return
 		}
 
-		fileName := managed_escrowFormFileName(part.FileName())
+		fileName := safeFormFileName(part.FileName())
 		mimeType := formMime
 		if mimeType == "" {
 			if ct := part.Header.Get("Content-Type"); ct != "" {
@@ -168,9 +168,9 @@ func readFormText(r io.Reader, max int64) (string, error) {
 	return strings.TrimSpace(string(buf)), nil
 }
 
-// managed_escrowFormFileName mirrors the Content-Disposition sanitization of the
+// safeFormFileName mirrors the Content-Disposition sanitization of the
 // download path so the stored filename round-trips cleanly.
-func managed_escrowFormFileName(name string) string {
+func safeFormFileName(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "upload.bin"

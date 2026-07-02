@@ -160,7 +160,7 @@ func Test_processPaymentSentMessage(t *testing.T) {
 	}
 }
 
-func TestProcessPaymentSentMessage_ManagedEscrowEnvelopeSkipsLegacyEscrowValidation(t *testing.T) {
+func TestProcessPaymentSentMessage_ManagedEnvelopeSkipsLegacyEscrowValidation(t *testing.T) {
 	op, teardown, err := newMockOrderProcessor()
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +173,7 @@ func TestProcessPaymentSentMessage_ManagedEscrowEnvelopeSkipsLegacyEscrowValidat
 	}
 
 	order := &models.Order{
-		ID:     "managed_escrow-payment-sent",
+		ID:     "managed-escrow-payment-sent",
 		MyRole: string(models.RoleVendor),
 	}
 	order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
@@ -186,13 +186,13 @@ func TestProcessPaymentSentMessage_ManagedEscrowEnvelopeSkipsLegacyEscrowValidat
 		t.Fatal(err)
 	}
 
-	managed_escrowAddress := "0x1111111111111111111111111111111111111111"
+	managedEscrowAddress := "0x1111111111111111111111111111111111111111"
 	paymentSent := &pb.PaymentSent{
 		TransactionID:   "0xmanagedescrow",
 		Coin:            "crypto:eip155:1:native",
 		SettlementSpec:  &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_CANCELABLE, PayMode: "address_monitored", EscrowType: "managed"},
-		ContractAddress: managed_escrowAddress,
-		ToAddress:       managed_escrowAddress,
+		ContractAddress: managedEscrowAddress,
+		ToAddress:       managedEscrowAddress,
 		Amount:          "1000",
 	}
 	orderMsg := &npb.OrderMessage{
@@ -251,12 +251,12 @@ func TestProcessPaymentSentMessage_BalancePollFundingFactDuplicate(t *testing.T)
 	}
 	defer teardown()
 
-	managed_escrowAddress := "0x213B0Ed1555B1A63C58C53367C1Cc8bB6d1b705f"
+	managedEscrowAddress := "0x213B0Ed1555B1A63C58C53367C1Cc8bB6d1b705f"
 	base := &pb.PaymentSent{
 		Coin:                "crypto:eip155:1:native",
 		SettlementSpec:      &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_MODERATED, PayMode: "address_monitored", EscrowType: "managed"},
-		ContractAddress:     managed_escrowAddress,
-		ToAddress:           managed_escrowAddress,
+		ContractAddress:     managedEscrowAddress,
+		ToAddress:           managedEscrowAddress,
 		Amount:              "15549097616162482",
 		CancelFeeAmount:     "268087889933835",
 		PlatformAmount:      "268087889933835",
@@ -267,11 +267,11 @@ func TestProcessPaymentSentMessage_BalancePollFundingFactDuplicate(t *testing.T)
 	}
 	persisted := protoClonePaymentSent(base)
 	persisted.FundingFacts = []*pb.PaymentSent_FundingFact{
-		balancePollFact("local-observation-id", managed_escrowAddress, "15549097616162482"),
+		balancePollFact("local-observation-id", managedEscrowAddress, "15549097616162482"),
 	}
 	incoming := protoClonePaymentSent(base)
 	incoming.FundingFacts = []*pb.PaymentSent_FundingFact{
-		balancePollFact("relayed-observation-id", managed_escrowAddress, "15549097616162482"),
+		balancePollFact("relayed-observation-id", managedEscrowAddress, "15549097616162482"),
 	}
 
 	order := &models.Order{ID: "balance-poll-duplicate"}

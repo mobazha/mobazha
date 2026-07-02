@@ -142,7 +142,7 @@ python3 scripts/community/collect-go-module-licenses.py \
 
 ## Licensing
 
-Mobazha-authored source in this repository, including retained Mobazha history, is licensed under the [Mozilla Public License 2.0](LICENSE).
+Mobazha-authored source in this repository is licensed under the [Mozilla Public License 2.0](LICENSE).
 
 Portions derived from OpenBazaar remain available under the [OpenBazaar MIT License](LICENSES/MIT-OpenBazaar.txt). Third-party dependencies and assets remain subject to their respective licenses. See [NOTICE](NOTICE) for attribution and scope.
 

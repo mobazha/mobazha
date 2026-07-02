@@ -110,7 +110,7 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 	require.Equal(t, "solana-fact-1", relayedPaymentSent.GetFundingFacts()[0].GetId())
 }
 
-func TestPreProcessPaymentSent_HydratesIncomingManagedEscrowIntentBeforeValidation(t *testing.T) {
+func TestPreProcessPaymentSent_HydratesIncomingManagedIntentBeforeValidation(t *testing.T) {
 	db, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)
 	require.NoError(t, db.Update(func(tx database.Tx) error {
@@ -120,7 +120,7 @@ func TestPreProcessPaymentSent_HydratesIncomingManagedEscrowIntentBeforeValidati
 		return tx.Migrate(&models.SharedPaymentIntent{})
 	}))
 
-	orderID := "incoming-managed_escrow-intent"
+	orderID := "incoming-managed-intent"
 	orderOpenAny, err := anypb.New(&pb.OrderOpen{
 		Timestamp:   timestamppb.Now(),
 		Amount:      "1000",
@@ -140,7 +140,7 @@ func TestPreProcessPaymentSent_HydratesIncomingManagedEscrowIntentBeforeValidati
 	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(order) }))
 
 	paymentSent := &pb.PaymentSent{
-		TransactionID:      "0xmanagedescrow",
+		TransactionID:      "0xmanagedescrowtx",
 		ContractAddress:    "0x2222222222222222222222222222222222222222",
 		ToAddress:          "0x2222222222222222222222222222222222222222",
 		Amount:             "21000000000000000",
@@ -158,7 +158,7 @@ func TestPreProcessPaymentSent_HydratesIncomingManagedEscrowIntentBeforeValidati
 	verifier := &capturingPaymentVerifier{}
 	svc := &OrderAppService{
 		db:              db,
-		nodeID:          "incoming-managed_escrow-test",
+		nodeID:          "incoming-managed-test",
 		paymentVerifier: verifier,
 	}
 
@@ -176,7 +176,7 @@ func TestPreProcessPaymentSent_HydratesIncomingManagedEscrowIntentBeforeValidati
 	require.NoError(t, db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID).First(&stored).Error
 	}))
-	info, err := stored.GetPendingManagedEscrowPaymentInfo()
+	info, err := stored.GetPendingManagedEscrowInfo()
 	require.NoError(t, err)
 	require.NotNil(t, info)
 	require.Equal(t, "0x2222222222222222222222222222222222222222", info.Address)

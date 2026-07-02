@@ -223,7 +223,7 @@ func TestIsPaymentCoinEnabled(t *testing.T) {
 		{" crypto:ZCASH:mainnet:native ", false},
 		{"ETH", false},
 		{"SOL", false},
-		{"EXTERNAL_PAYMENT", false},
+		{"XMR", false},
 		{"fiat:stripe:USD", false},
 	}
 	for _, tt := range tests {

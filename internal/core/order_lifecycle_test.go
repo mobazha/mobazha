@@ -1482,7 +1482,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 		}
 		evmStrategy, err := n.paymentRegistry.ForChainV2(chain)
 		if err != nil {
-			t.Logf("ForChainV2(%s) unavailable without ManagedEscrowAdapter deps: %v", chain, err)
+			t.Logf("ForChainV2(%s) unavailable without managed EVM adapter deps: %v", chain, err)
 			continue
 		}
 		if evmStrategy.Model() != payment.PaymentModelMonitored {
@@ -1490,7 +1490,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 				chain, evmStrategy.Model(), payment.PaymentModelMonitored)
 		}
 	}
-	t.Log("✓ Ready EVM chains (BSC/ETH/MATIC/BASE) use PaymentModelMonitored via ManagedEscrowAdapter V2")
+	t.Log("✓ Ready EVM chains (BSC/ETH/MATIC/BASE) use PaymentModelMonitored via managed EVM adapter V2")
 
 	// Solana is deliberately absent from an Open Core-only composition.
 	if _, err := n.paymentRegistry.ForChain(iwallet.ChainSolana); err == nil {
@@ -1525,7 +1525,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	// ── Summary: Model semantics table ──────────────────────────
 	t.Log("Model semantics verified:")
 	t.Log("  UTXO (BTC/BCH/LTC/ZEC/Mock): Monitored — backend auto-confirms, instructions=nil")
-	t.Log("  EVM (BSC/ETH/MATIC/BASE): Monitored — ManagedEscrow address + backend settlement actions")
+	t.Log("  EVM (BSC/ETH/MATIC/BASE): Monitored — managed escrow address + backend settlement actions")
 	t.Log("  Solana (SOL): Monitored — Anchor escrow + backend relay")
 }
 

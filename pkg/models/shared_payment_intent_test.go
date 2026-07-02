@@ -6,17 +6,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSharedPaymentIntentGetPendingManagedEscrowPaymentInfo_InvalidJSONErrors(t *testing.T) {
+func TestSharedPaymentIntentGetPendingManagedEscrowInfo_InvalidJSONErrors(t *testing.T) {
 	intent := &SharedPaymentIntent{PendingPaymentInfo: []byte(`{`)}
 
-	info, err := intent.GetPendingManagedEscrowPaymentInfo()
+	info, err := intent.GetPendingManagedEscrowInfo()
 	require.Error(t, err)
 	require.Nil(t, info)
 }
 
 func TestSharedPaymentIntentHydrateOrder_InvalidOrderPendingInfoErrors(t *testing.T) {
 	intent := &SharedPaymentIntent{}
-	require.NoError(t, intent.SetPendingManagedEscrowPaymentInfo(&PendingManagedEscrowPaymentInfo{
+	require.NoError(t, intent.SetPendingManagedEscrowInfo(&PendingManagedEscrowInfo{
 		Coin:    "crypto:eip155:1:native",
 		Address: "0xmanagedescrow",
 	}))

@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func seedManagedEscrowModeratedDecidedOrderForDisputeRelease(
+func seedManagedModeratedDecidedOrderForDisputeRelease(
 	t *testing.T,
 	svc *OrderAppService,
 	orderID string,
@@ -45,10 +45,10 @@ func seedManagedEscrowModeratedDecidedOrderForDisputeRelease(
 		Listings: []*pb.SignedListing{{
 			Listing: &pb.Listing{
 				VendorID: &pb.ID{PeerID: sellerPeerID.String()},
-				Slug:     "managed_escrow-dispute-release-test",
+				Slug:     "managed-dispute-release-test",
 				Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_PHYSICAL_GOOD},
 				Item: &pb.Listing_Item{
-					Title: "ManagedEscrow dispute item",
+					Title: "Managed dispute item",
 					Images: []*pb.Image{{
 						Tiny:  "ipfs://tiny",
 						Small: "ipfs://small",
@@ -63,14 +63,14 @@ func seedManagedEscrowModeratedDecidedOrderForDisputeRelease(
 		Coin:           coinType.String(),
 		Amount:         "1000000000000000000",
 		ToAddress:      order.PaymentAddress,
-		Moderator:      "12D3KooWManagedEscrowModerator",
+		Moderator:      "12D3KooWManagedModerator",
 		Chaincode:      "abcd",
 		Script:         "beef",
 		PlatformAddr:   "0x7777777777777777777777777777777777777777",
 		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPaymentSent(),
 	}
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
@@ -112,9 +112,9 @@ func seedSettlementDisputeReleaseAction(
 	}))
 }
 
-func newManagedEscrowDisputeReleaseTestService(
+func newManagedDisputeReleaseTestService(
 	t *testing.T,
-	strategy *fakeManagedEscrowStrategy,
+	strategy *fakeManagedStrategy,
 	buyerSigner contracts.Signer,
 	buyerPeerID peer.ID,
 ) *OrderAppService {
@@ -133,7 +133,7 @@ func newManagedEscrowDisputeReleaseTestService(
 
 	bus := events.NewBus()
 	op := orders.NewOrderProcessor(&orders.Config{
-		NodeID:    "managed_escrow-dispute-release-test",
+		NodeID:    "managed-dispute-release-test",
 		Db:        db,
 		Signer:    buyerSigner,
 		Messenger: noopMessenger{},
@@ -147,21 +147,21 @@ func newManagedEscrowDisputeReleaseTestService(
 		OrderProcessor:  op,
 		Messenger:       noopMessenger{},
 		EventBus:        bus,
-		NodeID:          "managed_escrow-dispute-release-test",
+		NodeID:          "managed-dispute-release-test",
 		PeerID:          func() peer.ID { return buyerPeerID },
 	})
 }
 
-func TestReleaseFunds_ManagedEscrowMonitored_RejectsPendingSettlementRelease(t *testing.T) {
+func TestReleaseFunds_ManagedMonitored_RejectsPendingSettlementRelease(t *testing.T) {
 	t.Parallel()
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored}
-	svc := newManagedEscrowDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
+	svc := newManagedDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
 
-	const orderID = "managed_escrow-dispute-pending"
-	seedManagedEscrowModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
+	const orderID = "managed-dispute-pending"
+	seedManagedModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
 	seedSettlementDisputeReleaseAction(t, svc, orderID, "dispute-act-pending", "submitted", "")
 
 	err := svc.ReleaseFunds(models.OrderID(orderID), "", nil)
@@ -171,19 +171,19 @@ func TestReleaseFunds_ManagedEscrowMonitored_RejectsPendingSettlementRelease(t *
 	assert.Equal(t, 0, strategy.disputeCalls)
 }
 
-func TestReleaseFunds_ManagedEscrowMonitored_SkipsInlineReleaseWhenSettlementTxHashReady(t *testing.T) {
+func TestReleaseFunds_ManagedMonitored_SkipsInlineReleaseWhenSettlementTxHashReady(t *testing.T) {
 	t.Parallel()
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored}
-	svc := newManagedEscrowDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
+	svc := newManagedDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
 
 	const (
-		orderID = "managed_escrow-dispute-ready"
+		orderID = "managed-dispute-ready"
 		txHash  = "0xdisputeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 	)
-	seedManagedEscrowModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
+	seedManagedModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
 	seedSettlementDisputeReleaseAction(t, svc, orderID, "dispute-act-ready", "submitted", txHash)
 
 	err := svc.ReleaseFunds(models.OrderID(orderID), iwallet.TransactionID(txHash), nil)
@@ -205,17 +205,17 @@ func TestExecuteSettlementDisputeReleaseAction_ReturnsActionIDWithoutTxHash(t *t
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model: payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{
 			Mode:     payment.ActionModeSubmitted,
 			ActionID: "dispute-act-async",
 		},
 	}
-	svc := newManagedEscrowDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
+	svc := newManagedDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
 
-	const orderID = "managed_escrow-dispute-async-action"
-	seedManagedEscrowModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
+	const orderID = "managed-dispute-async-action"
+	seedManagedModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
 
 	result, coinType, err := svc.ExecuteSettlementDisputeReleaseAction(context.Background(), models.OrderID(orderID))
 	require.NoError(t, err)
@@ -232,20 +232,20 @@ func TestExecuteSettlementDisputeReleaseAction_IdempotentWhenActionReady(t *test
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model: payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{
 			Mode:     payment.ActionModeSubmitted,
 			ActionID: "should-not-be-called",
 		},
 	}
-	svc := newManagedEscrowDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
+	svc := newManagedDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
 
 	const (
-		orderID = "managed_escrow-dispute-idempotent-ready"
+		orderID = "managed-dispute-idempotent-ready"
 		txHash  = "0xdisputeidempotenteeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 	)
-	seedManagedEscrowModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
+	seedManagedModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
 	seedSettlementDisputeReleaseAction(t, svc, orderID, "dispute-act-existing", "submitted", txHash)
 
 	result, _, err := svc.ExecuteSettlementDisputeReleaseAction(context.Background(), models.OrderID(orderID))
@@ -261,11 +261,11 @@ func TestExecuteSettlementDisputeReleaseAction_IdempotentWhenActionPending(t *te
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored}
-	svc := newManagedEscrowDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
+	svc := newManagedDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
 
-	const orderID = "managed_escrow-dispute-idempotent-pending"
-	seedManagedEscrowModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
+	const orderID = "managed-dispute-idempotent-pending"
+	seedManagedModeratedDecidedOrderForDisputeRelease(t, svc, orderID, buyerPeerID, sellerPeerID)
 	seedSettlementDisputeReleaseAction(t, svc, orderID, "dispute-act-pending-retry", "submitted", "")
 
 	result, _, err := svc.ExecuteSettlementDisputeReleaseAction(context.Background(), models.OrderID(orderID))
@@ -343,7 +343,7 @@ func seedSolanaModeratedDecidedOrderForDisputeRelease(
 
 func newSolanaDisputeReleaseTestService(
 	t *testing.T,
-	strategy *fakeManagedEscrowStrategy,
+	strategy *fakeManagedStrategy,
 	buyerSigner contracts.Signer,
 	buyerPeerID peer.ID,
 ) *OrderAppService {
@@ -386,7 +386,7 @@ func TestReleaseFunds_SolanaMonitored_SkipsInlineReleaseWhenSettlementTxHashRead
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored}
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
 	svc := newSolanaDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
 
 	const (
@@ -415,7 +415,7 @@ func TestExecuteSettlementDisputeReleaseAction_Solana_SubmitsRelease(t *testing.
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model: payment.PaymentModelMonitored,
 		actionResult: &payment.ActionResult{
 			Mode:            payment.ActionModeSubmitted,
@@ -507,7 +507,7 @@ func newUTXODisputeReleaseTestService(
 	t.Helper()
 
 	reg := payment.NewRegistry()
-	reg.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored})
+	reg.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedStrategy{model: payment.PaymentModelMonitored})
 
 	db, err := repo.MockDB()
 	require.NoError(t, err)

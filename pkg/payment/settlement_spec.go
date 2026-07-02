@@ -386,8 +386,8 @@ func ResolveSettlementSpecFromOrder(order *models.Order) (SettlementSpec, bool) 
 	if order == nil {
 		return SettlementSpec{}, false
 	}
-	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
-		return ResolveSettlementSpecFromPendingManagedEscrow(managed_escrowInfo)
+	if managedEscrowInfo, err := order.GetPendingManagedEscrowInfo(); err == nil && managedEscrowInfo != nil {
+		return ResolveSettlementSpecFromPendingManagedEscrow(managedEscrowInfo)
 	}
 	if escrowInfo, err := order.GetPendingEscrowPaymentInfo(); err == nil && escrowInfo != nil {
 		return ResolveSettlementSpecFromPendingEscrow(escrowInfo)
@@ -421,14 +421,14 @@ func ResolveSettlementSpec(order *models.Order, ps *pb.PaymentSent) (SettlementS
 }
 
 // UsesAddressMonitoredPayMode reports whether funding is address-monitored
-// (UTXO, ManagedEscrow, Solana escrow, direct).
+// (UTXO, managed escrow, Solana escrow, direct).
 func UsesAddressMonitoredPayMode(order *models.Order, ps *pb.PaymentSent) bool {
 	spec, ok := ResolveSettlementSpec(order, ps)
 	return ok && spec.IsAddressMonitored()
 }
 
 // UsesUTXOScriptEscrow reports whether the order is backed by a UTXO redeem script.
-// Address-monitored is not sufficient here: ManagedEscrow and Solana escrow funding are
+// Address-monitored is not sufficient here: managed and Solana escrow funding are
 // monitored too, but their release/refund paths do not use UTXO script spend.
 func UsesUTXOScriptEscrow(order *models.Order, ps *pb.PaymentSent) bool {
 	spec, ok := ResolveSettlementSpec(order, ps)
@@ -470,7 +470,7 @@ func SettlementSpecFromPaymentData(pd *models.PaymentData) (SettlementSpec, bool
 }
 
 // ResolveSettlementSpecFromPendingManagedEscrow reads an explicit spec or derives from legacy fields.
-func ResolveSettlementSpecFromPendingManagedEscrow(info *models.PendingManagedEscrowPaymentInfo) (SettlementSpec, bool) {
+func ResolveSettlementSpecFromPendingManagedEscrow(info *models.PendingManagedEscrowInfo) (SettlementSpec, bool) {
 	if info == nil {
 		return SettlementSpec{}, false
 	}

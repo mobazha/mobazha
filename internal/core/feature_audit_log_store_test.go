@@ -163,7 +163,7 @@ func TestFeatureAuditLogStore_List_RespectsLimit(t *testing.T) {
 	assert.Len(t, rows, 3)
 }
 
-func TestFeatureAuditLogStore_Nil_ManagedEscrow(t *testing.T) {
+func TestFeatureAuditLogStore_Nil_Safe(t *testing.T) {
 	var s *FeatureAuditLogStore
 	// Nil receiver: AppendAudit should return error, not panic.
 	err := s.AppendAudit(context.Background(), &models.FeatureFlagAuditLog{

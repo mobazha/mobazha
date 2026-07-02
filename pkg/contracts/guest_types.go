@@ -107,7 +107,7 @@ type GuestOrderStatusResponse struct {
 	FundedAt          *time.Time              `json:"fundedAt,omitempty"`
 	ShippedAt         *time.Time              `json:"shippedAt,omitempty"`
 	CompletedAt       *time.Time              `json:"completedAt,omitempty"`
-	// Pool-stage UX hint (currently EXTERNAL_PAYMENT only). When PoolDetected is true,
+	// Pool-stage UX hint (currently XMR only). When PoolDetected is true,
 	// a mempool transfer has been observed but is not yet mined; the order
 	// is still in AWAITING_PAYMENT and may transition to PAYMENT_DETECTED
 	// (if mined) or EXPIRED (if evicted / never mined). Frontends use this
@@ -146,20 +146,20 @@ type GuestUTXOChainReadiness struct {
 	Reason                 string `json:"reason,omitempty"`
 }
 
-// GuestEVMChainReadiness is per-chain guest EVM ManagedEscrow closure status for operators.
+// GuestEVMChainReadiness is per-chain guest managed EVM closure status for operators.
 type GuestEVMChainReadiness struct {
-	Chain                  string `json:"chain"`
-	Coin                   string `json:"coin"`
-	FundingReady           bool   `json:"fundingReady"`
-	ObservationReady       bool   `json:"observationReady"`
-	SettlementReady        bool   `json:"settlementReady"`
-	RelayReady             bool   `json:"relayReady"`
-	RelayGasHealthy        bool   `json:"relayGasHealthy"`
-	RelayGasReason         string `json:"relayGasReason,omitempty"`
-	ManagedEscrowMonitorActive      bool   `json:"managed_escrowMonitorActive"`
-	ReceivingAccountActive bool   `json:"receivingAccountActive"`
-	BuyerVisible           bool   `json:"buyerVisible"`
-	Reason                 string `json:"reason,omitempty"`
+	Chain                      string `json:"chain"`
+	Coin                       string `json:"coin"`
+	FundingReady               bool   `json:"fundingReady"`
+	ObservationReady           bool   `json:"observationReady"`
+	SettlementReady            bool   `json:"settlementReady"`
+	RelayReady                 bool   `json:"relayReady"`
+	RelayGasHealthy            bool   `json:"relayGasHealthy"`
+	RelayGasReason             string `json:"relayGasReason,omitempty"`
+	ManagedEscrowMonitorActive bool   `json:"managedEscrowMonitorActive"`
+	ReceivingAccountActive     bool   `json:"receivingAccountActive"`
+	BuyerVisible               bool   `json:"buyerVisible"`
+	Reason                     string `json:"reason,omitempty"`
 }
 
 // GuestCheckoutReadiness summarizes guest checkout runtime health.

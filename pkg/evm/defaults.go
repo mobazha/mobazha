@@ -10,7 +10,7 @@ import (
 type defaultEVMChainDef struct {
 	Chain           iwallet.ChainType
 	MainnetRpc      string
-	MainnetWs       string // Optional WSS endpoint for eth_subscribe (ManagedEscrow LiveMonitor)
+	MainnetWs       string // Optional WSS endpoint for eth_subscribe (managed escrow LiveMonitor)
 	MainnetRegistry string
 	TestnetRpc      string
 	TestnetWs       string // Optional WSS endpoint for testnet
@@ -54,7 +54,7 @@ var defaultEVMChains = []defaultEVMChainDef{
 		TestnetRpc:      "https://evmtestnet.confluxrpc.com",
 		TestnetRegistry: "0x93ecc969ff6C9e822F4AFD80acb59848eB9b9bf7",
 	},
-	// ── Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set ──
+	// ── Phase managed EVM v0.3.0 Sprint 1 D8 — promoted EVM L2 set ──
 	// V1 ContractManager Registry is intentionally zero-address.
 	// internal/chains/evm/client.go rejects GetRecommendedContractVersion
 	// when the registry slot is empty/zero so V1 paths fail closed
@@ -75,7 +75,7 @@ var defaultEVMChains = []defaultEVMChainDef{
 
 // zeroEVMRegistry is the sentinel registry address marking a chain
 // whose V1 ContractManager Registry has NOT been deployed (Phase
-// EVM-ManagedEscrow v0.3.0 Sprint 1 D8 promoted set). The EVM client guard
+// managed EVM v0.3.0 Sprint 1 D8 promoted set). The EVM client guard
 // in internal/chains/evm/client.go treats this exact value as a
 // V1-unsupported signal: any GetRecommendedContractVersion call
 // returns ErrChainNotSupported instead of triggering an empty

@@ -89,7 +89,7 @@ A change needs compatibility review when it modifies:
 
 The review must identify the compatibility layer, affected distributions, rollout order, downgrade behavior, tests, documentation, and whether an RFC/ADR is required.
 
-Shared fixes should land in the public Open Core. A security fix may remain under a temporary embargo, but the public portion must be released once disclosure is managed_escrow. Permanent independent reimplementations of shared order or payment behavior are not supported.
+Shared fixes should land in the public Open Core. A security fix may remain under a temporary embargo, but the public portion must be released once disclosure is safe. Permanent independent reimplementations of shared order or payment behavior are not supported.
 
 ## Non-goals
 

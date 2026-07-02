@@ -96,7 +96,7 @@ func TestOperationAcceptsAPIToken_NilOp(t *testing.T) {
 func TestAdminOnlyAuthSecurity_ConstantShape(t *testing.T) {
 	if operationAcceptsAPIToken(&huma.Operation{Security: adminOnlyAuthSecurity}) {
 		t.Fatal("adminOnlyAuthSecurity must NOT include apiToken — " +
-			"endpoints relying on it (EXTERNAL_PAYMENT seed export, wallet setup, " +
+			"endpoints relying on it (XMR seed export, wallet setup, " +
 			"view-only export, transfer history) would become reachable " +
 			"via mbz_ wallet:read tokens via routeScopeMap prefix match")
 	}

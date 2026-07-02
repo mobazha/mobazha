@@ -54,7 +54,7 @@ type Stream interface {
 	Next() *Chunk
 	// Err returns the first non-EOF error encountered, if any.
 	Err() error
-	// Close releases resources. ManagedEscrow to call multiple times.
+	// Close releases resources. Safe to call multiple times.
 	Close()
 }
 
@@ -117,7 +117,7 @@ func (s *Buffered) SendError(err error) {
 	s.Finish()
 }
 
-// Finish signals no more data. ManagedEscrow to call multiple times.
+// Finish signals no more data. Safe to call multiple times.
 func (s *Buffered) Finish() {
 	s.once.Do(func() {
 		s.mu.Lock()

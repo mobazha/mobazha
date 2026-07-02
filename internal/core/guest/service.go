@@ -87,49 +87,49 @@ type ManagedEscrowGuestSettlementService interface {
 // GuestOrderAppService manages the Guest Order lifecycle:
 // creation, payment detection, confirmation, shipping, expiry, and auto-completion.
 type GuestOrderAppService struct {
-	db                         database.Database
-	runtimeCtx                 context.Context
-	directPayment              *DirectPaymentService
-	sweepService               *AutoSweepService
-	eventBus                   events.Bus
-	nodeID                     string
-	peerID                     string
-	shutdown                   <-chan struct{}
-	watcher                    PaymentWatcher
-	listings                   GuestListingQuery
-	exchangeRates              wallet.ExchangeRateQuerier
-	resolver                   pkgconfig.ResolverInterface
-	supplyAvailability         contracts.SupplyAvailabilityService
-	digitalSupplyLines         DigitalSupplyLineResolver
-	utxoMu                     sync.RWMutex
-	supportedUTXOChains        map[iwallet.ChainType]struct{}
-	evmObservationAvailable    bool
-	evmRelayGasHealthyChains   map[iwallet.ChainType]struct{}
-	evmRelayGasUnhealthyReason map[iwallet.ChainType]string
-	solanaMonitorAvailable     bool
-	utxoMonitor                UTXOMonitorReadiness
-	multiwallet                contracts.WalletOperator
-	evmManagedEscrowSettlement          ManagedEscrowGuestSettlementService
-	evmRuntimeMu               sync.RWMutex
-	evmManagedEscrowFundingReady        bool
-	evmManagedEscrowObservationReady    bool
-	evmManagedEscrowSettlementReady     bool
-	evmManagedEscrowRelayReady          bool
-	evmManagedEscrowMonitorChains       map[iwallet.ChainType]struct{}
-	evmHealthProvider          distribution.ManagedEscrowHealthProvider
-	guestPaymentPolicy         distribution.GuestPaymentPolicy
-	billingHoldActive          func() bool
-	checkoutSupplyQuoter       *checkoutsupply.CheckoutSupplyQuoteService
+	db                            database.Database
+	runtimeCtx                    context.Context
+	directPayment                 *DirectPaymentService
+	sweepService                  *AutoSweepService
+	eventBus                      events.Bus
+	nodeID                        string
+	peerID                        string
+	shutdown                      <-chan struct{}
+	watcher                       PaymentWatcher
+	listings                      GuestListingQuery
+	exchangeRates                 wallet.ExchangeRateQuerier
+	resolver                      pkgconfig.ResolverInterface
+	supplyAvailability            contracts.SupplyAvailabilityService
+	digitalSupplyLines            DigitalSupplyLineResolver
+	utxoMu                        sync.RWMutex
+	supportedUTXOChains           map[iwallet.ChainType]struct{}
+	evmObservationAvailable       bool
+	evmRelayGasHealthyChains      map[iwallet.ChainType]struct{}
+	evmRelayGasUnhealthyReason    map[iwallet.ChainType]string
+	solanaMonitorAvailable        bool
+	utxoMonitor                   UTXOMonitorReadiness
+	multiwallet                   contracts.WalletOperator
+	managedEscrowSettlement       ManagedEscrowGuestSettlementService
+	evmRuntimeMu                  sync.RWMutex
+	managedEscrowFundingReady     bool
+	managedEscrowObservationReady bool
+	managedEscrowSettlementReady  bool
+	managedEscrowRelayReady       bool
+	evmManagedEscrowMonitorChains map[iwallet.ChainType]struct{}
+	evmHealthProvider             distribution.ManagedEscrowHealthProvider
+	guestPaymentPolicy            distribution.GuestPaymentPolicy
+	billingHoldActive             func() bool
+	checkoutSupplyQuoter          *checkoutsupply.CheckoutSupplyQuoteService
 }
 
-// SetEVMManagedEscrowSettlement wires managed EVM escrow settlement after distribution registration.
-func (s *GuestOrderAppService) SetEVMManagedEscrowSettlement(svc ManagedEscrowGuestSettlementService) {
+// SetManagedEscrowSettlement wires managed EVM escrow settlement after distribution registration.
+func (s *GuestOrderAppService) SetManagedEscrowSettlement(svc ManagedEscrowGuestSettlementService) {
 	if s == nil {
 		return
 	}
-	s.evmManagedEscrowSettlement = svc
+	s.managedEscrowSettlement = svc
 	if callback, ok := svc.(interface{ SetOnConfirmed(func(string)) }); ok {
-		callback.SetOnConfirmed(s.OnEVMManagedEscrowSettlementConfirmed)
+		callback.SetOnConfirmed(s.OnManagedEscrowSettlementConfirmed)
 	}
 }
 
@@ -199,14 +199,14 @@ func (s *GuestOrderAppService) SetPaymentWatcher(w PaymentWatcher) {
 	s.watcher = w
 }
 
-// SetEVMObservationAvailable enables EVM guest ManagedEscrow observation after registerManagedEscrowAdapterShadow.
-// Legacy balance polling must not set this; use SetEVMManagedEscrowClosureRuntime instead.
+// SetEVMObservationAvailable enables managed EVM guest observation after module registration.
+// Legacy balance polling must not set this; use SetManagedEscrowClosureRuntime instead.
 func (s *GuestOrderAppService) SetEVMObservationAvailable(available bool) {
 	s.evmObservationAvailable = available
 }
 
 // EnableUTXOChain dynamically marks a UTXO chain as available for guest
-// checkout. ManagedEscrow for concurrent use.
+// checkout. Safe for concurrent use.
 func (s *GuestOrderAppService) EnableUTXOChain(chain iwallet.ChainType) {
 	s.utxoMu.Lock()
 	defer s.utxoMu.Unlock()
@@ -612,7 +612,7 @@ func (s *GuestOrderAppService) CompleteGuestOrder(_ context.Context, token strin
 }
 
 // HandlePaymentDetected is called when a matching transaction is first seen on-chain.
-// opts carries chain-specific metadata (e.g. EXTERNAL_PAYMENT block height); nil for UTXO/EVM/Solana.
+// opts carries chain-specific metadata (e.g. XMR block height); nil for UTXO/EVM/Solana.
 func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, opts *contracts.PaymentDetectedOpts) error {
 	var becameFunded bool
 	err := s.db.Update(func(tx database.Tx) error {
@@ -628,9 +628,9 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 			order.State == models.GuestOrderFunded ||
 			order.State == models.GuestOrderShipped ||
 			order.State == models.GuestOrderCompleted {
-			// EXTERNAL_PAYMENT pool→confirmed upgrade: persist height even if already detected.
-			if opts != nil && opts.TxBlockHeight > 0 && order.ExternalPaymentTxHeight == 0 {
-				order.ExternalPaymentTxHeight = opts.TxBlockHeight
+			// XMR pool→confirmed upgrade: persist height even if already detected.
+			if opts != nil && opts.TxBlockHeight > 0 && order.MoneroTxHeight == 0 {
+				order.MoneroTxHeight = opts.TxBlockHeight
 				return tx.Save(&order)
 			}
 			return nil
@@ -646,7 +646,7 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 		order.State = models.GuestOrderPaymentDetected
 		order.PaymentTxHash = txHash
 		if opts != nil && opts.TxBlockHeight > 0 {
-			order.ExternalPaymentTxHeight = opts.TxBlockHeight
+			order.MoneroTxHeight = opts.TxBlockHeight
 		}
 
 		if order.RequiredConfs > 0 {
@@ -786,26 +786,26 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 	return err
 }
 
-// afterGuestOrderFunded triggers EVM ManagedEscrow relay settlement or emits entitlement immediately.
+// afterGuestOrderFunded triggers EVM managed relay settlement or emits entitlement immediately.
 func (s *GuestOrderAppService) afterGuestOrderFunded(orderToken string) {
 	if s == nil {
 		return
 	}
-	requires, err := s.orderRequiresEVMManagedEscrowSettlementBeforeEntitlement(orderToken)
+	requires, err := s.orderRequiresManagedEscrowSettlementBeforeEntitlement(orderToken)
 	if err != nil {
-		log.Errorf("guest managed EVM settlement check for %s: %v; withholding entitlement",
+		log.Errorf("guest EVM managed escrow settlement check for %s: %v; withholding entitlement",
 			redact.Token(orderToken), err)
 		return
 	}
 	if requires {
-		if s.evmManagedEscrowSettlement == nil {
-			log.Errorf("guest managed EVM settlement required for %s but service not configured; withholding entitlement",
+		if s.managedEscrowSettlement == nil {
+			log.Errorf("guest EVM managed escrow settlement required for %s but service not configured; withholding entitlement",
 				redact.Token(orderToken))
 			return
 		}
 		go func(ctx context.Context, token string) {
-			if err := s.evmManagedEscrowSettlement.SubmitReleaseForOrder(ctx, token); err != nil {
-				log.Warningf("guest managed EVM settlement for %s: %v", redact.Token(token), err)
+			if err := s.managedEscrowSettlement.SubmitReleaseForOrder(ctx, token); err != nil {
+				log.Warningf("guest EVM managed escrow settlement for %s: %v", redact.Token(token), err)
 			}
 		}(s.runtimeCtx, orderToken)
 		return
@@ -813,7 +813,7 @@ func (s *GuestOrderAppService) afterGuestOrderFunded(orderToken string) {
 	s.emitGuestOrderFunded(orderToken)
 }
 
-func (s *GuestOrderAppService) orderRequiresEVMManagedEscrowSettlementBeforeEntitlement(orderToken string) (bool, error) {
+func (s *GuestOrderAppService) orderRequiresManagedEscrowSettlementBeforeEntitlement(orderToken string) (bool, error) {
 	if s == nil || !managedEscrowGuestSettlementActive {
 		return false, nil
 	}
@@ -822,24 +822,24 @@ func (s *GuestOrderAppService) orderRequiresEVMManagedEscrowSettlementBeforeEnti
 	}
 	var order models.GuestOrder
 	if err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("order_token = ?", orderToken).Select("evm_managed_escrow_metadata").First(&order).Error
+		return tx.Read().Where("order_token = ?", orderToken).Select("managed_escrow_metadata").First(&order).Error
 	}); err != nil {
 		return false, fmt.Errorf("load order: %w", err)
 	}
 	return order.HasManagedEscrowGuestFundingTarget(), nil
 }
 
-// RecoverEVMManagedEscrowPendingSettlements retries relay release for FUNDED guest ManagedEscrow orders.
+// RecoverManagedEscrowPendingSettlements retries relay release for FUNDED guest managed-escrow orders.
 // Called at startup and from the shared settlement-action-confirmations scheduler tick.
 func (s *GuestOrderAppService) RecoverEVMManagedEscrowPendingSettlements(ctx context.Context) {
-	if s == nil || s.evmManagedEscrowSettlement == nil {
+	if s == nil || s.managedEscrowSettlement == nil {
 		return
 	}
-	s.evmManagedEscrowSettlement.RecoverPendingSettlements(ctx)
+	s.managedEscrowSettlement.RecoverPendingSettlements(ctx)
 }
 
-// OnEVMManagedEscrowSettlementConfirmed emits buyer entitlement after relay settlement confirms.
-func (s *GuestOrderAppService) OnEVMManagedEscrowSettlementConfirmed(orderToken string) {
+// OnManagedEscrowSettlementConfirmed emits buyer entitlement after relay settlement confirms.
+func (s *GuestOrderAppService) OnManagedEscrowSettlementConfirmed(orderToken string) {
 	if s == nil {
 		return
 	}
@@ -847,7 +847,7 @@ func (s *GuestOrderAppService) OnEVMManagedEscrowSettlementConfirmed(orderToken 
 	if err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("order_token = ?", orderToken).First(&order).Error
 	}); err != nil {
-		log.Warningf("guest managed EVM settlement confirmed for missing order %s: %v", redact.Token(orderToken), err)
+		log.Warningf("guest EVM managed escrow settlement confirmed for missing order %s: %v", redact.Token(orderToken), err)
 		return
 	}
 	if order.State != models.GuestOrderFunded &&
@@ -941,7 +941,7 @@ func (s *GuestOrderAppService) ListActiveOrders(_ context.Context) ([]*models.Gu
 // by pollConfirmationsLoop (which includes a grace period beyond expires_at).
 //
 // Per-coin grace: an order whose ExpiresAt has passed may still receive an
-// in-flight payment during the watcher's grace window (e.g. an EXTERNAL_PAYMENT pool tx
+// in-flight payment during the watcher's grace window (e.g. an XMR pool tx
 // observed before expiry mining 30min later, or a UTXO mempool tx confirming
 // just past expiry). Cleanup honors the same grace period the watcher uses
 // (gracePeriodForCoin). This eliminates the race where:
@@ -1769,14 +1769,14 @@ func (s *GuestOrderAppService) convertToPaymentCoin(totalSmallest *big.Int, pric
 // Chain-by-chain rationale:
 //   - UTXO chains: BTC/BCH/ZEC = 1, LTC = 3 (LTC has higher orphan rate);
 //     watchUTXOOrder polls confirmations after PAYMENT_DETECTED.
-//   - ExternalPayment: 10 (matches ExternalPayment ecosystem convention; pollConfirmationsLoop
-//     polls block height after pool→confirmed transition via external_paymentHeightFetcher).
+//   - Monero: 10 (matches Monero ecosystem convention; pollConfirmationsLoop
+//     polls block height after pool→confirmed transition via moneroHeightFetcher).
 //   - EVM/Solana/TRON: 0 — pollEVMLoop / pollSolanaLoop have no confirmation
 //     polling step, so any non-zero value would strand orders in
 //     PAYMENT_DETECTED forever. This is a known design compromise: balance/
 //     reference-key checks ARE the finality signal for these chains. Adding
 //     1-block reorg defense here requires implementing per-chain receipt
-//     polling first (tracked separately from Phase B EXTERNAL_PAYMENT work).
+//     polling first (tracked separately from Phase B XMR work).
 //   - Unknown coin: 1 (safe default).
 func requiredConfsForCoin(coinType iwallet.CoinType) int {
 	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
@@ -1790,7 +1790,7 @@ func requiredConfsForCoin(coinType iwallet.CoinType) int {
 		return 1
 	case coinInfo.Chain == iwallet.ChainBitcoinCash, coinInfo.Chain == iwallet.ChainZCash:
 		return 1
-	case coinInfo.Chain == iwallet.ChainExternalPayment:
+	case coinInfo.Chain == iwallet.ChainMonero:
 		return 10
 	default:
 		// EVM / Solana / TRON / unknown — see godoc above.
@@ -1814,7 +1814,7 @@ func (s *GuestOrderAppService) validateCoinAvailability(coinType iwallet.CoinTyp
 		return nil
 	case coinInfo.IsEthTypeChain():
 		if !s.evmObservationAvailable {
-			return fmt.Errorf("%w: EVM ManagedEscrow observation is not configured (coin %q)",
+			return fmt.Errorf("%w: managed EVM observation is not configured (coin %q)",
 				contracts.ErrCoinUnavailable, coinType)
 		}
 		return nil
@@ -1942,7 +1942,7 @@ func (s *GuestOrderAppService) validateMaxOrderAmount(cfg *models.GuestCheckoutC
 // GetGuestCheckoutConfig returns the current guest checkout configuration.
 // The returned value includes a computed AvailableCoins field that contains
 // only the subset of AcceptedCoins serviceable by the running node right now
-// (e.g. EXTERNAL_PAYMENT is excluded when external_payment-wallet-rpc is not configured). Buyer-
+// (e.g. XMR is excluded when monero-wallet-rpc is not configured). Buyer-
 // facing UIs must use AvailableCoins; the admin settings editor should use
 // AcceptedCoins so the stored configuration is not silently mutated.
 func (s *GuestOrderAppService) GetGuestCheckoutConfig(ctx context.Context) (*models.GuestCheckoutConfig, error) {

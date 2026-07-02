@@ -66,7 +66,7 @@ type CreatePaymentSessionRequest struct {
 }
 
 // PaymentSessionService creates, reads, and refreshes unified payment
-// sessions across all supported payment rails (ManagedEscrow, UTXO, Stripe, PayPal,
+// sessions across all supported payment rails (managed escrow, UTXO, Stripe, PayPal,
 // and future Squads / guest checkout).
 //
 // # Design philosophy

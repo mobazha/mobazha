@@ -251,8 +251,8 @@ message PaymentSent {
     google.protobuf.Timestamp timestamp = 19;
     string paymentTokenAddress          = 20; // 支付代币合约地址（通用，适用于所有 Token 支付，ETH为零地址）
     string buyerReceiveAddress          = 21; // 买家接收 Token 的地址（支持多链地址格式，多商品共用）
-    SettlementSpec settlementSpec       = 22; // 显式结算路由，避免接收端从地址/脚本字段推导 ManagedEscrow / legacy 路径
-    string cancelFeeAmount              = 23; // 创建支付意图时锁定的 ManagedEscrow Tier 1 cancel/refund 平台费
+    SettlementSpec settlementSpec       = 22; // 显式结算路由，避免接收端从地址/脚本字段推导 managed escrow / legacy 路径
+    string cancelFeeAmount              = 23; // 创建支付意图时锁定的 managed escrow Tier 1 cancel/refund 平台费
     // Deduplicated funding facts that contributed to this payment. This is the
     // cross-node verification surface for monitored crypto payments; receivers
     // should verify these facts against chain data instead of treating
@@ -280,7 +280,7 @@ message PaymentSent {
     message SettlementSpec {
         Method method      = 1; // trust semantics
         string payMode     = 2; // address_monitored / client_signed / provider
-        string escrowType  = 3; // none / utxo_script / evm_contract / solana_program / safe / fiat_provider
+        string escrowType  = 3; // none / utxo_script / evm_contract / solana_program / managed_escrow / fiat_provider
     }
 
     message FundingFact {

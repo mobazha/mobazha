@@ -228,10 +228,10 @@ func TestPaymentAppService_FetchOrderByID_Found(t *testing.T) {
 
 func TestPaymentAppService_GeneratePaymentInstructions_Success(t *testing.T) {
 	reg := payment.NewRegistry()
-	managed_escrowAddr := "0x111122223333444455556666777788889999aaaa"
+	managedEscrowAddr := "0x111122223333444455556666777788889999aaaa"
 	expectedResult := &payment.PaymentSetupResult{
 		PaymentModel: payment.PaymentModelMonitored,
-		EscrowAddr:   managed_escrowAddr,
+		EscrowAddr:   managedEscrowAddr,
 	}
 	strategy := &testChainEscrow{
 		model:     payment.PaymentModelMonitored,
@@ -250,7 +250,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, payment.PaymentModelMonitored, result.PaymentModel)
-	assert.Equal(t, managed_escrowAddr, result.EscrowAddr)
+	assert.Equal(t, managedEscrowAddr, result.EscrowAddr)
 	assert.Equal(t, 1, strategy.genCallCount)
 }
 
@@ -392,7 +392,7 @@ func TestPaymentAppService_GeneratePaymentSetup_FailsWhenEVMStrategyNotRegistere
 	})
 
 	_, err := svc.GeneratePaymentSetup(context.Background(), payment.PaymentSetupParams{
-		OrderID:  "order-no-managed-route",
+		OrderID:  "order-no-managed",
 		CoinType: iwallet.CoinType("crypto:eip155:1:native"),
 	})
 	require.Error(t, err)
@@ -423,16 +423,16 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 
 	require.NoError(t, raw.Create(&models.Order{
 		TenantMixin: models.TenantMixin{TenantID: "tenant-buyer"},
-		ID:          models.OrderID("order-safe"),
+		ID:          models.OrderID("order-managed"),
 	}).Error)
 	require.NoError(t, raw.Create(&models.Order{
 		TenantMixin: models.TenantMixin{TenantID: "tenant-vendor"},
-		ID:          models.OrderID("order-safe"),
+		ID:          models.OrderID("order-managed"),
 	}).Error)
 
 	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{DB: db})
 	require.NoError(t, svc.persistManagedEscrowPaymentAddress(
-		"order-safe",
+		"order-managed",
 		"crypto:eip155:11155111:native",
 		"0xmanagedescrow",
 		1000,
@@ -447,14 +447,14 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 
 	var orders []models.Order
 	require.NoError(t, raw.
-		Where("id = ?", "order-safe").
+		Where("id = ?", "order-managed").
 		Order("tenant_id ASC").
 		Find(&orders).Error)
 	require.Len(t, orders, 2)
 	for i := range orders {
 		require.Equal(t, "0xmanagedescrow", orders[i].PaymentAddress)
 		require.Equal(t, "0x1111111111111111111111111111111111111111", orders[i].RefundAddress)
-		info, err := orders[i].GetPendingManagedEscrowPaymentInfo()
+		info, err := orders[i].GetPendingManagedEscrowInfo()
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, uint64(1000), info.Amount)
@@ -464,10 +464,10 @@ func TestPaymentAppService_PersistManagedEscrowPaymentAddress_UpdatesAllTenantRo
 	}
 
 	var shared models.SharedPaymentIntent
-	require.NoError(t, raw.Where("order_id = ?", "order-safe").First(&shared).Error)
+	require.NoError(t, raw.Where("order_id = ?", "order-managed").First(&shared).Error)
 	require.Equal(t, "0xmanagedescrow", shared.PaymentAddress)
 	require.Equal(t, "0x1111111111111111111111111111111111111111", shared.RefundAddress)
-	info, err := shared.GetPendingManagedEscrowPaymentInfo()
+	info, err := shared.GetPendingManagedEscrowInfo()
 	require.NoError(t, err)
 	require.NotNil(t, info)
 	require.Equal(t, uint64(1000), info.Amount)
@@ -544,8 +544,8 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowRelease
 	raw := rawProvider.RawDB()
 	require.NotNil(t, raw)
 	require.NoError(t, raw.Create(&models.Order{
-		TenantMixin: models.TenantMixin{TenantID: "tenant-safe"},
-		ID:          models.OrderID("order-managed_escrow-fee"),
+		TenantMixin: models.TenantMixin{TenantID: "tenant-managed"},
+		ID:          models.OrderID("order-managed-fee"),
 	}).Error)
 
 	const (
@@ -558,7 +558,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowRelease
 		genResult: &payment.PaymentSetupResult{
 			PaymentModel: payment.PaymentModelMonitored,
 			PaymentData: &models.PaymentData{
-				OrderID:   "order-managed_escrow-fee",
+				OrderID:   "order-managed-fee",
 				Coin:      iwallet.CoinType("crypto:eip155:1:native"),
 				Method:    pb.PaymentSent_CANCELABLE,
 				Amount:    1_000_000_000_000_000_000,
@@ -586,7 +586,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowRelease
 	})
 
 	result, err := svc.GeneratePaymentInstructions(context.Background(), models.InitializeEscrowData{
-		OrderID:  "order-managed_escrow-fee",
+		OrderID:  "order-managed-fee",
 		CoinType: iwallet.CoinType("crypto:eip155:1:native"),
 		Amount:   1_000_000_000_000_000_000,
 	})
@@ -597,9 +597,9 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowRelease
 	require.Equal(t, feeWei, result.PaymentData.CancelFeeAmount)
 
 	var order models.Order
-	require.NoError(t, raw.Where("id = ?", "order-managed_escrow-fee").First(&order).Error)
+	require.NoError(t, raw.Where("id = ?", "order-managed-fee").First(&order).Error)
 	require.Equal(t, feeWei, order.CancelFeeAmount)
-	info, err := order.GetPendingManagedEscrowPaymentInfo()
+	info, err := order.GetPendingManagedEscrowInfo()
 	require.NoError(t, err)
 	require.NotNil(t, info)
 	require.Equal(t, feeWei, info.PlatformAmount)
@@ -667,7 +667,7 @@ func TestPaymentAppService_GeneratePaymentInstructions_MultipleChains(t *testing
 		expected payment.PaymentModel
 	}{
 		{"BTC dispatches to UTXO strategy", iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native"), payment.PaymentModelMonitored},
-		{"ETH dispatches to ManagedEscrow-monitored strategy", iwallet.CoinType("crypto:eip155:1:native"), payment.PaymentModelMonitored},
+		{"ETH dispatches to managed-escrow strategy", iwallet.CoinType("crypto:eip155:1:native"), payment.PaymentModelMonitored},
 	}
 
 	for _, tt := range tests {

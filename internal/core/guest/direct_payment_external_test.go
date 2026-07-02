@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 fengzie and the respective contributors.
+
 package guest
 
 import (
@@ -39,7 +42,7 @@ func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 	service.SetExternalPaymentRuntime(runtime)
 
 	result, err := service.GeneratePaymentAddress(context.Background(), PaymentAddressRequest{
-		CoinType:   iwallet.CoinType("crypto:external_payment:mainnet:native"),
+		CoinType:   iwallet.CoinType("crypto:monero:mainnet:native"),
 		OrderToken: "gst_order_7",
 	})
 	require.NoError(t, err)

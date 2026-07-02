@@ -163,7 +163,7 @@ func TestExecuteSettlementAction_SellerDeclineRefundFallsBackToCancel(t *testing
 
 	base := &utxoActionStatusStub{
 		model:        payment.PaymentModelMonitored,
-		cancelResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "act-managed_escrow-refund"},
+		cancelResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "act-managed-refund"},
 	}
 	strategy := &cancelOnlySettlementStrategy{ChainEscrowV2: base}
 	reg := payment.NewRegistry()
@@ -171,7 +171,7 @@ func TestExecuteSettlementAction_SellerDeclineRefundFallsBackToCancel(t *testing
 
 	svc := NewSettlementService(SettlementServiceConfig{DB: db})
 	svc.SetRegistry(reg)
-	order := seedModeratedSettlementActionOrder(t, db, "order-managed_escrow-seller-refund", models.RoleVendor)
+	order := seedModeratedSettlementActionOrder(t, db, "order-managed-seller-refund", models.RoleVendor)
 
 	result, _, err := svc.ExecuteSettlementAction(
 		context.Background(),
@@ -180,7 +180,7 @@ func TestExecuteSettlementAction_SellerDeclineRefundFallsBackToCancel(t *testing
 		"0x4444444444444444444444444444444444444444",
 	)
 	require.NoError(t, err)
-	require.Equal(t, "act-managed_escrow-refund", result.ActionID)
+	require.Equal(t, "act-managed-refund", result.ActionID)
 	require.Equal(t, order.ID.String(), base.lastCancel.OrderID)
 	require.Equal(t, "0x4444444444444444444444444444444444444444", base.lastCancel.PayoutAddr)
 }

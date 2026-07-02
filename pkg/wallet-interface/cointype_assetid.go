@@ -283,7 +283,7 @@ func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
 			return ChainBase, nil
 		case "1030":
 			return ChainConflux, nil
-		// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
+		// Phase managed EVM v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
 		// EIP-155 chain ids match the public EVM network registry.
 		case "10":
 			return ChainOptimism, nil
@@ -326,11 +326,11 @@ func chainTypeFromAssetID(id assetid.ID) (ChainType, error) {
 			return "", fmt.Errorf("unsupported zcash chain_ref %q", id.ChainRef)
 		}
 		return ChainZCash, nil
-	case assetid.NamespaceExternalPayment:
+	case assetid.NamespaceMonero:
 		if id.ChainRef != "mainnet" {
-			return "", fmt.Errorf("unsupported external_payment chain_ref %q", id.ChainRef)
+			return "", fmt.Errorf("unsupported monero chain_ref %q", id.ChainRef)
 		}
-		return ChainExternalPayment, nil
+		return ChainMonero, nil
 	default:
 		return "", fmt.Errorf("unsupported namespace %q", id.Namespace)
 	}

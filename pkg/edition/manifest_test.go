@@ -33,7 +33,7 @@ func TestCommunityPolicyFiltersNonCommunityPaymentMethods(t *testing.T) {
 		{ID: "ZEC", Kind: "crypto", Flow: "address-transfer", AddressMode: "transparent"},
 		{ID: "ZEC", Kind: "crypto", Flow: "address-transfer", AddressMode: "shielded"},
 		{ID: "ETH", Kind: "crypto", Flow: "external-wallet"},
-		{ID: "EXTERNAL_PAYMENT", Kind: "crypto", Flow: "address-transfer"},
+		{ID: "XMR", Kind: "crypto", Flow: "address-transfer"},
 		{ID: "stripe", Kind: "fiat", Flow: "provider-session"},
 	}
 

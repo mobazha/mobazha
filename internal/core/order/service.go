@@ -1152,7 +1152,7 @@ func (s *OrderAppService) refundCryptoOrder(order *models.Order, paymentSent *pb
 // instructions.
 //
 // UTXO monitored routes still return nil instructions because the backend
-// finalizes those directly. ManagedEscrow-backed EVM routes are excluded and must use
+// finalizes those directly. backend-managed EVM routes are excluded and must use
 // ExecuteSettlementAction("cancel").
 func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	return s.GetLegacyRefundOrderInstructions(orderID, initiatorAddress)
@@ -1160,7 +1160,7 @@ func (s *OrderAppService) GetRefundOrderInstructions(orderID models.OrderID, ini
 
 // GetLegacyRefundOrderInstructions is the internal legacy-only refund
 // instructions surface retained for client-signed chains and fiat
-// informational responses. ManagedEscrow-backed EVM routes must use settlement-actions.
+// informational responses. backend-managed EVM routes must use settlement-actions.
 func (s *OrderAppService) GetLegacyRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
@@ -1225,7 +1225,7 @@ func resolveFiatProvider(order *models.Order, paymentSent *pb.PaymentSent) strin
 
 // orderRequiresClientSignedInstructions reports whether the current order still
 // expects frontend/relay instruction payloads rather than a direct backend
-// action. Address-monitored routes (ManagedEscrow, UTXO, direct) deliberately return
+// action. Address-monitored routes (managed escrow, UTXO, direct) deliberately return
 // false even when the chain is EVM.
 func orderRequiresClientSignedInstructions(order *models.Order, paymentSent *pb.PaymentSent) bool {
 	spec, ok := payment.ResolveSettlementSpec(order, paymentSent)
@@ -1236,7 +1236,7 @@ func orderRequiresClientSignedInstructions(order *models.Order, paymentSent *pb.
 // legacy client-signed ChainEscrow implementation.
 //
 // Address-monitored UTXO routes still return nil instructions because the
-// backend handles them directly. ManagedEscrow-backed EVM routes are rejected and must
+// backend handles them directly. backend-managed EVM routes are rejected and must
 // use backend settlement actions instead of escrow_v1-style instructions.
 func (s *OrderAppService) GetEscrowReleaseInstructions(orderID models.OrderID, initiatorAddress string, toAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	return s.GetLegacyEscrowReleaseInstructions(orderID, initiatorAddress, toAddress)
@@ -1264,7 +1264,7 @@ func (s *OrderAppService) GetLegacyEscrowReleaseInstructions(orderID models.Orde
 	}
 	if !orderRequiresClientSignedInstructions(&order, paymentSent) {
 		if spec, ok := payment.ResolveSettlementSpec(&order, paymentSent); ok && spec.UsesManagedEscrow() {
-			return coinType, nil, fmt.Errorf("%w: ManagedEscrow-backed EVM refund/cancel must use POST /v1/orders/{orderID}/settlement-actions/cancel",
+			return coinType, nil, fmt.Errorf("%w: backend-managed EVM refund/cancel must use POST /v1/orders/{orderID}/settlement-actions/cancel",
 				coreiface.ErrBadRequest)
 		}
 		return coinType, nil, nil
@@ -1310,7 +1310,7 @@ func (s *OrderAppService) buyerRefundPayoutAddr(order *models.Order, paymentSent
 }
 
 // refundBuildResult carries the refund order message plus the optional wallet
-// transaction lifecycle that backs it. ManagedEscrow/relay-backed refunds do not own a
+// transaction lifecycle that backs it. managed-relay-backed refunds do not own a
 // wallet tx, so WalletTx may be nil even on success.
 type refundBuildResult struct {
 	WalletTx iwallet.Tx
@@ -1521,7 +1521,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 				return nil, fmt.Errorf("failed to release settlement CANCELABLE escrow for refund: %w", err)
 			}
 			if !handled {
-				return nil, errors.New("automatic refund for unconfirmed CANCELABLE orders requires ManagedEscrow or Solana escrow via settlement-actions; UTXO uses inline escrow release")
+				return nil, errors.New("automatic refund for unconfirmed CANCELABLE orders requires managed EVM or Solana escrow via settlement-actions; UTXO uses inline escrow release")
 			}
 			if settlementTxid == "" {
 				return nil, fmt.Errorf("settlement cancelable refund for order %s returned no transaction id", order.ID)
@@ -2068,7 +2068,7 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 
 // releaseUsesBalanceEscrow reports strategies whose release projection is
 // derived from immutable PaymentSent amounts rather than wallet-fetched UTXOs.
-// Managed ManagedEscrow/Solana strategies deliberately have no concrete Core wallet.
+// Managed EVM/Solana strategies deliberately have no concrete Core wallet.
 func releaseUsesBalanceEscrow(order *models.Order, paymentSent *pb.PaymentSent, strategy payment.ChainEscrowV2) bool {
 	if strategy == nil {
 		return false

@@ -17,11 +17,11 @@ import (
 // evmChains lists the EVM chains that need shared client injection.
 // CFX (Conflux) is excluded — low usage and noisy RPC errors.
 //
-// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 promoted 9 additional chains.
+// Phase managed EVM v0.3.0 Sprint 1 D8 promoted 9 additional chains.
 // They share the same shared-client pattern as the original four —
 // the only difference is their V1 ContractManager Registry slot is
 // empty (zero-address sentinel in pkg/evm/defaults.go), so V1 escrow
-// paths fail closed and orders MUST route via the V2 ManagedEscrowAdapter.
+// paths fail closed and orders MUST route via the V2 managed EVM adapter.
 var evmChains = []iwallet.ChainType{
 	iwallet.ChainBSC,
 	iwallet.ChainEthereum,
@@ -192,7 +192,7 @@ func (n *MobazhaNode) configureGuestEVMBalanceChecker() {
 	}
 	checker := &hostEVMNativeBalanceChecker{hostService: n.hostService}
 	n.guestPaymentMonitor.SetCheckers(checker, nil)
-	// Buyer-visible EVM is gated by ManagedEscrow closure runtime (Phase 3D), not balance polling.
+	// Buyer-visible EVM is gated by managed-escrow runtime readiness (Phase 3D), not balance polling.
 	logger.LogInfoWithIDf(log, n.nodeID, "Configured guest checkout EVM balance checker (legacy poll path only)")
 }
 

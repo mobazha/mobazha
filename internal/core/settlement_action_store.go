@@ -15,7 +15,7 @@ import (
 
 // SettlementActionStore implements adapters.ActionStore and adapters.ActionRecorder
 // on top of the node's tenant-scoped SQL store. Rows track backend-submitted
-// settlement actions across ManagedEscrow, Solana Anchor, UTXO, and guest relay flows.
+// settlement actions across backend-managed contract rails, UTXO, and guest relay flows.
 type SettlementActionStore struct {
 	db pkgdb.Database
 }

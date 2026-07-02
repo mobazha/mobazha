@@ -336,8 +336,8 @@ func (n *MobazhaNode) RunSettlementActionConfirmationsOnce(ctx context.Context) 
 	n.runSettlementActionConfirmationsOnce(ctx)
 }
 
-func (n *MobazhaNode) RunManagedEscrowRelayConfirmationsOnce(ctx context.Context) {
-	n.runManagedEscrowRelayConfirmationsOnce(ctx)
+func (n *MobazhaNode) RunManagedRelayConfirmationsOnce(ctx context.Context) {
+	n.runManagedRelayConfirmationsOnce(ctx)
 }
 
 func (n *MobazhaNode) RunWebhookDeliveryOnce(_ context.Context) {

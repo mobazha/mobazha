@@ -55,7 +55,7 @@ type EVMRelayService interface {
 
 	// GetGasWalletAddress returns the hex-encoded gas wallet EOA for
 	// the given EVM chainID. ManagedEscrowAdapter calls this before signing a
-	// ManagedEscrowTx to lock the refundReceiver field.
+	// EscrowTx to lock the refundReceiver field.
 	GetGasWalletAddress(ctx context.Context, chainID uint64) (string, error)
 
 	// GetGasWalletStatus returns the operational health of the gas
@@ -66,7 +66,7 @@ type EVMRelayService interface {
 
 	// ChainTypeForID resolves a numeric EVM chainID (e.g. 56) to the
 	// relay-service config key (e.g. "bsc"). Adapters that build an
-	// EVMRelayRequest from a ManagedEscrowTx (which carries chainID) use this
+	// EVMRelayRequest from a EscrowTx (which carries chainID) use this
 	// to avoid hard-coding a parallel chainID→chainType map that would
 	// drift from hosting's RelayConfig over time.
 	// The HTTP standalone implementation prefers GET /platform/v1/relay/status

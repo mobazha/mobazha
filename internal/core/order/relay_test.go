@@ -190,7 +190,7 @@ func TestCancelOrderViaRelay_UnfundedOrderBypassesPaymentSent(t *testing.T) {
 	assert.False(t, stored.Open)
 }
 
-func TestDeclineOrderViaRelay_ManagedEscrowModeratedBeforeConfirmUsesSettlementCancel(t *testing.T) {
+func TestDeclineOrderViaRelay_ManagedModeratedBeforeConfirmUsesSettlementCancel(t *testing.T) {
 	sellerSigner, sellerPeerID := testSigner(t)
 	_, buyerPeerID := testSigner(t)
 	bus := events.NewBus()
@@ -206,10 +206,10 @@ func TestDeclineOrderViaRelay_ManagedEscrowModeratedBeforeConfirmUsesSettlementC
 		EventBus:  bus,
 	})
 	reg := payment.NewRegistry()
-	strategy := &fakeManagedEscrowStrategy{
+	strategy := &fakeManagedStrategy{
 		model:        payment.PaymentModelMonitored,
 		signatures:   []payment.ActionOwnerSignature{{From: "0x2222222222222222222222222222222222222222", Signature: []byte{0xaa}, Index: 1}},
-		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "managed_escrow-cancel-action"},
+		actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "managed-cancel-action"},
 		actionStatus: &payment.ActionStatus{TxHash: "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
 	}
 	reg.RegisterV2(iwallet.ChainEthereum, strategy)
@@ -226,14 +226,14 @@ func TestDeclineOrderViaRelay_ManagedEscrowModeratedBeforeConfirmUsesSettlementC
 
 	coinType := iwallet.CoinType("crypto:eip155:1:native")
 	order, paymentSent := newManagedEscrowOrderForTests(t, coinType)
-	order.ID = models.OrderID("managed_escrow-moderated-decline-via-relay")
+	order.ID = models.OrderID("managed-moderated-decline-via-relay")
 	order.MyRole = string(models.RoleVendor)
 	order.SerializedOrderOpen = signedOrderOpen(t, buyerPeerID, sellerPeerID)
 	order.SetFSMState(models.OrderState_PENDING)
 	paymentSent.SettlementSpec = payment.NewManagedEscrowSpec(true).ToPaymentSent()
 	paymentSent.RefundAddress = "0x1111111111111111111111111111111111111111"
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
@@ -283,7 +283,7 @@ func TestDeclineOrderViaRelay_SolanaModeratedBeforeConfirmUsesSellerDeclineRefun
 	})
 	reg := payment.NewRegistry()
 	strategy := &fakeRefunderStrategy{
-		fakeManagedEscrowStrategy: fakeManagedEscrowStrategy{
+		fakeManagedStrategy: fakeManagedStrategy{
 			model:        payment.PaymentModelMonitored,
 			actionResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "solana-seller-decline-action"},
 			actionStatus: &payment.ActionStatus{TxHash: "solana-seller-decline-tx"},

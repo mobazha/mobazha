@@ -47,7 +47,7 @@ var (
 	// ErrLegacyEVMPaymentRetired is returned when code attempts to provision
 	// legacy ClientSigned EVM escrow funding (redeem-script hash path).
 	ErrLegacyEVMPaymentRetired = errors.New(
-		"payment session: legacy EVM contract escrow is retired; ManagedEscrow adapter required",
+		"payment session: legacy EVM contract escrow is retired; managed EVM adapter required",
 	)
 
 	// ErrLegacySolanaPaymentRetired is returned when Solana setup resolves to

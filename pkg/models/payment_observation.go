@@ -9,7 +9,7 @@ import (
 // PaymentObservation is the append-only fact table that records every chain
 // event observed by either an on-chain monitor or a buyer-reported PaymentSent
 // envelope. It is the source of truth for payment verification under the
-// Monitor-Driven Payment model introduced in Phase EVM-ManagedEscrow v0.3.0.
+// Monitor-Driven Payment model introduced in Phase managed EVM v0.3.0.
 //
 // The model intentionally avoids any UPSERT/UPDATE semantics for content
 // fields. Each (observer, chain event) pair gets exactly one row; the
@@ -30,7 +30,7 @@ import (
 //   - tenant_id: hard cross-tenant isolation; Tenant A's observations cannot
 //     collide with Tenant B's even if they share the same chain event.
 //   - chain_namespace + chain_reference: CAIP-2 (eip155:1, solana:mainnet,
-//     external_payment:mainnet, bip122:<genesis>...). Lets all chains share one table.
+//     xmr:mainnet, bip122:<genesis>...). Lets all chains share one table.
 //   - tx_hash + event_index: identifies the exact log/event within a tx
 //     (event_index = 0 for native transfers, log index for ERC-20 Transfer,
 //     etc.).
@@ -78,15 +78,15 @@ type PaymentObservation struct {
 	OrderID string `gorm:"column:order_id;type:varchar(64);not null;index:idx_payment_obs_order,priority:2" json:"orderID"`
 
 	// CAIP-2 chain identification. ChainNamespace is e.g. "eip155", "solana",
-	// "external_payment", "bip122". ChainReference is the chain instance id within that
-	// namespace (EVM chainID string, Solana cluster, EXTERNAL_PAYMENT network, UTXO genesis
+	// "xmr", "bip122". ChainReference is the chain instance id within that
+	// namespace (EVM chainID string, Solana cluster, XMR network, UTXO genesis
 	// hash). Combined they identify a chain unambiguously across all rows.
 	ChainNamespace string `gorm:"column:chain_namespace;type:varchar(16);not null;uniqueIndex:idx_payment_obs_dedupe,priority:2;index:idx_payment_obs_chain_tx,priority:1" json:"chainNamespace"`
 	ChainReference string `gorm:"column:chain_reference;type:varchar(64);not null;uniqueIndex:idx_payment_obs_dedupe,priority:3;index:idx_payment_obs_chain_tx,priority:2" json:"chainReference"`
 
 	// Transaction-level identity. TxHash holds whatever the chain natively
 	// uses (32-byte hex for EVM, 88-byte base58 for Solana, 32-byte hex for
-	// EXTERNAL_PAYMENT txid, 32-byte hex for UTXO). When TxHashSource is "balance_poll",
+	// XMR txid, 32-byte hex for UTXO). When TxHashSource is "balance_poll",
 	// TxHash is an internal observation id and MUST NOT be surfaced as a chain
 	// transaction hash or explorer link. EventIndex disambiguates multiple
 	// events within a single tx (e.g. multiple ERC-20 Transfer logs); native
@@ -102,7 +102,7 @@ type PaymentObservation struct {
 
 	// Event classification. Free-form string so future chains can add new
 	// event types without schema migrations. Established values today:
-	// "managed_escrow_received", "erc20_transfer", "external_payment_deposit", "utxo_funding",
+	// "managed_escrow_received", "erc20_transfer", "xmr_deposit", "utxo_funding",
 	// "solana_transfer".
 	EventType string `gorm:"column:event_type;type:varchar(32);not null" json:"eventType"`
 
@@ -169,7 +169,7 @@ const (
 const (
 	PaymentEventManagedEscrowReceived = "managed_escrow_received"
 	PaymentEventERC20Transfer         = "erc20_transfer"
-	PaymentEventEXTERNAL_PAYMENTDeposit            = "external_payment_deposit"
+	PaymentEventXMRDeposit            = "xmr_deposit"
 	PaymentEventUTXOFunding           = "utxo_funding"
 	PaymentEventSolanaTransfer        = "solana_transfer"
 )

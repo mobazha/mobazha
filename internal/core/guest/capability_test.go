@@ -93,7 +93,7 @@ func TestEvaluateGuestPaymentCapability_UTXOHiddenWithoutReceivingAccount(t *tes
 func TestFilterAvailableCoins_HidesEVMAndRequiresUTXOClosure(t *testing.T) {
 	svc := newUTXOCapableService(t, true, true)
 
-	got := svc.filterAvailableCoins("ETH,LTC,TRX,EXTERNAL_PAYMENT,NOTREAL")
+	got := svc.filterAvailableCoins("ETH,LTC,TRX,XMR,NOTREAL")
 	if got != "LTC" {
 		t.Fatalf("filterAvailableCoins() = %q, want LTC", got)
 	}
@@ -108,7 +108,7 @@ func TestFilterAvailableCoins_HidesLTCWhenMonitorUnhealthy(t *testing.T) {
 	}
 }
 
-func newEVMClosureTestService(t *testing.T, runtime EVMManagedEscrowClosureRuntime) *GuestOrderAppService {
+func newEVMClosureTestService(t *testing.T, runtime ManagedEscrowClosureRuntime) *GuestOrderAppService {
 	t.Helper()
 	db := newGuestTestDB(t)
 	require.NoError(t, db.gormDB.AutoMigrate(&models.ReceivingAccount{}))
@@ -126,18 +126,18 @@ func newEVMClosureTestService(t *testing.T, runtime EVMManagedEscrowClosureRunti
 		directPayment:           dp,
 		evmObservationAvailable: true,
 	}
-	svc.SetEVMManagedEscrowClosureRuntime(runtime)
+	svc.SetManagedEscrowClosureRuntime(runtime)
 	return svc
 }
 
 func TestEvaluateGuestPaymentCapability_EVMHiddenWithoutClosureRuntime(t *testing.T) {
-	svc := newEVMClosureTestService(t, EVMManagedEscrowClosureRuntime{})
+	svc := newEVMClosureTestService(t, ManagedEscrowClosureRuntime{})
 	eth := iwallet.CoinType("crypto:eip155:1:native")
 	info, _ := iwallet.CoinInfoFromCoinType(eth)
 
 	cap := svc.evaluateGuestPaymentCapability(eth, info)
 	if cap.BuyerVisible {
-		t.Fatal("EVM must stay hidden until ManagedEscrow closure runtime is ready")
+		t.Fatal("EVM must stay hidden until managed-escrow runtime readiness is ready")
 	}
 	if !errors.Is(cap.Err, contracts.ErrCoinUnavailable) {
 		t.Fatalf("cap.Err = %v, want ErrCoinUnavailable", cap.Err)
@@ -155,7 +155,7 @@ func TestEvaluateGuestPaymentCapability_EVMVisibleWhenClosureReady(t *testing.T)
 }
 
 func TestValidateBuyerVisibleCoin_ETHRequiresClosureRuntime(t *testing.T) {
-	svc := newEVMClosureTestService(t, EVMManagedEscrowClosureRuntime{})
+	svc := newEVMClosureTestService(t, ManagedEscrowClosureRuntime{})
 	eth := iwallet.CoinType("crypto:eip155:1:native")
 	info, _ := iwallet.CoinInfoFromCoinType(eth)
 
@@ -166,7 +166,7 @@ func TestValidateBuyerVisibleCoin_ETHRequiresClosureRuntime(t *testing.T) {
 
 func newEVMClosureReadyTestService(t *testing.T) *GuestOrderAppService {
 	t.Helper()
-	svc := newEVMClosureTestService(t, EVMManagedEscrowClosureRuntime{
+	svc := newEVMClosureTestService(t, ManagedEscrowClosureRuntime{
 		FundingReady:     true,
 		ObservationReady: true,
 		SettlementReady:  true,
@@ -178,7 +178,7 @@ func newEVMClosureReadyTestService(t *testing.T) *GuestOrderAppService {
 			iwallet.ChainEthereum: {},
 		},
 	})
-	svc.SetEVMManagedEscrowSettlement(testManagedEscrowSettlementService{})
+	svc.SetManagedEscrowSettlement(testManagedEscrowSettlementService{})
 	return svc
 }
 

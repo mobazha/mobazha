@@ -25,7 +25,7 @@ type Registry struct {
 	mu         sync.RWMutex
 	strategies map[iwallet.ChainType]ChainEscrow
 
-	// strategiesV2 holds V2-native registrations (Phase EVM-ManagedEscrow v0.3.0).
+	// strategiesV2 holds V2-native registrations (Phase managed EVM v0.3.0).
 	// When a chain is registered via RegisterV2 the value is stored here
 	// directly; ForCoinV2 / ForChainV2 prefer this map and fall back to
 	// wrapping the V1 entry for chains that haven't migrated yet.
@@ -69,7 +69,7 @@ func (r *Registry) Register(chain iwallet.ChainType, strategy ChainEscrow) {
 }
 
 // RegisterV2 adds or replaces a V2-native ChainEscrowV2 implementation
-// for the given chain (Phase EVM-ManagedEscrow v0.3.0). V2 registrations take
+// for the given chain (Phase managed EVM v0.3.0). V2 registrations take
 // precedence over V1 entries on V2 lookups; V1 lookups remain
 // unaffected unless the V2 implementation also satisfies ChainEscrow
 // (e.g., via embedding or a hand-written V2-to-V1 adapter).

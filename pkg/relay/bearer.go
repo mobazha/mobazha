@@ -9,7 +9,7 @@ import (
 const EnvPlatformRelayToken = "MOBAZHA_PLATFORM_RELAY_TOKEN"
 
 // BearerFromConfigOrEnv returns trimmed configured Bearer JWT, or the platform-relay
-// env token when empty. Matches standalone ManagedEscrow + Settlement HTTP relay wiring.
+// env token when empty. Matches standalone managed escrow + Settlement HTTP relay wiring.
 func BearerFromConfigOrEnv(configured string) string {
 	b := strings.TrimSpace(configured)
 	if b != "" {

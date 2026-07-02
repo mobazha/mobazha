@@ -30,7 +30,7 @@ var ErrLockLost = errors.New("scheduler: lock lost")
 // MigrateLocks creates or upgrades the scheduler_locks table.
 //
 // Callers should run this once at process start before Scheduler.Start().
-// ManagedEscrow to call repeatedly; AutoMigrate is idempotent.
+// Safe to call repeatedly; AutoMigrate is idempotent.
 func MigrateLocks(db *gorm.DB) error {
 	return db.AutoMigrate(&SchedulerLock{})
 }

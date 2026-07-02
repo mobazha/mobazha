@@ -13,7 +13,7 @@ import (
 
 // schemaDB opens an in-memory SQLite DB and AutoMigrates only the
 // PaymentObservation model. This keeps schema-shape tests isolated from the
-// (much heavier) full-model migration covered by TestAutoMigrateDatabaseManagedEscrow,
+// (much heavier) full-model migration covered by TestAutoMigrateDatabasemanaged EVM,
 // while still exercising the same dialect and GORM index parser used in
 // production.
 func schemaDB(t *testing.T) *gorm.DB {
@@ -210,12 +210,12 @@ func TestPaymentObservation_DedupeUnique_DifferentChainAccepted(t *testing.T) {
 		t.Fatalf("BSC insert with same tx hash MUST succeed: %v", err)
 	}
 
-	external_payment := makeObs("obs-external_payment")
-	external_payment.ChainNamespace = "external_payment"
-	external_payment.ChainReference = "mainnet"
-	external_payment.EventType = models.PaymentEventEXTERNAL_PAYMENTDeposit
-	if err := db.Create(&external_payment).Error; err != nil {
-		t.Fatalf("EXTERNAL_PAYMENT insert across CAIP-2 namespaces MUST succeed: %v", err)
+	xmr := makeObs("obs-xmr")
+	xmr.ChainNamespace = "xmr"
+	xmr.ChainReference = "mainnet"
+	xmr.EventType = models.PaymentEventXMRDeposit
+	if err := db.Create(&xmr).Error; err != nil {
+		t.Fatalf("XMR insert across CAIP-2 namespaces MUST succeed: %v", err)
 	}
 }
 

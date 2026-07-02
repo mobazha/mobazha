@@ -12,6 +12,7 @@
     {"name": "github.com/dchest/blake256", "version": "v1.1.0", "licenseConcluded": "CC0-1.0", "evidence": "Go source file headers link to the CC0 1.0 dedication", "licenseFiles": ["LICENSES/third-party/CC0-1.0.txt"]},
     {"name": "github.com/dustin/go-humanize", "version": "v1.0.1", "licenseConcluded": "MIT", "evidence": "Go module LICENSE"},
     {"name": "github.com/ethereum/c-kzg-4844/v2", "version": "v2.1.5", "licenseConcluded": "Apache-2.0", "evidence": "Go module LICENSE"},
+    {"name": "github.com/gagliardetto/treeout", "version": "v0.1.4", "licenseConcluded": "MIT", "evidence": "Upstream LICENSE commit b7876d08adf1; v0.1.4 and licensed master share treeout.go blob 4755f0beecf65f291788d46c76e6b8249bc9ab7e", "licenseFiles": ["LICENSES/third-party/treeout-MIT.txt"]},
     {"name": "github.com/glebarez/go-sqlite", "version": "v1.21.2", "licenseConcluded": "BSD-3-Clause", "evidence": "Go module LICENSE"},
     {"name": "github.com/glebarez/sqlite", "version": "v1.11.0", "licenseConcluded": "MIT", "evidence": "Go module License"},
     {"name": "github.com/go-ole/go-ole", "version": "v1.3.0", "licenseConcluded": "MIT", "evidence": "Go module LICENSE"},

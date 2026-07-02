@@ -279,7 +279,7 @@ func TestSovereignOpenAPI_OperationIDSnapshot(t *testing.T) {
 }
 
 // TestSovereignOpenAPI_SensitiveOpsRefuseAPIToken pins the security
-// declaration for endpoints whose payload (EXTERNAL_PAYMENT seed, private view key,
+// declaration for endpoints whose payload (XMR seed, private view key,
 // full transfer history, wallet setup) must never be reachable via a
 // scoped mbz_ API token. The runtime gate in nodeHumaAuthMiddleware
 // honours this declaration; this test is the contract that prevents a

@@ -44,14 +44,14 @@ type ManagedEscrowReceiptValidator interface {
 
 // ChainEscrowV2 is the action-centric counterpart to ChainEscrow (V1).
 //
-// Background — Phase EVM-ManagedEscrow v0.3.0 (D-Hybrid-17 A+ scheme):
+// Background — Phase managed EVM v0.3.0 (D-Hybrid-17 A+ scheme):
 //
 // V1 ChainEscrow exposes per-action GetXxxInstructions() returning
 // frontend-signable payloads. That works for ClientSigned chains
 // (Solana / TRON) where the frontend wallet signs and submits the tx,
-// but does not fit the ManagedEscrow v1.4.1 path: nodes do not hold private
+// but does not fit the managed escrow v1.4.1 path: nodes do not hold private
 // keys for the SaaS Relay's gas wallet; the backend submits the
-// transaction itself after collecting ManagedEscrow owner signatures. Solana
+// transaction itself after collecting escrow owner signatures. Solana
 // Anchor follows the same V2 rule: the backend relays program
 // instructions instead of returning settlement instructions to the
 // frontend.
@@ -59,7 +59,7 @@ type ManagedEscrowReceiptValidator interface {
 // V2 raises the abstraction one notch — callers express *intent*
 // ("cancel this order") and the adapter decides the model:
 //
-//   - ManagedEscrow (Monitored): backend builds + relays the ManagedEscrowTx; the
+//   - managed escrow (Monitored): backend builds + relays the EscrowTx; the
 //     ActionResult carries an ActionID so the frontend can poll status.
 //   - ClientSigned (V1AsV2 wrap): the adapter returns its V1
 //     instructions in ActionResult.Instructions and signals
@@ -144,7 +144,7 @@ const (
 	// action without a frontend signature. Caller MUST forward
 	// Instructions to the user and follow up with the existing
 	// "submit signed tx" flow. Used by V1AsV2 wrapping legacy
-	// ClientSigned chains (TRON and non-ManagedEscrow EVM).
+	// ClientSigned chains (TRON and non-managed EVM).
 	ActionModeInstructionsRequired ActionMode = "instructions_required"
 
 	// ActionModeSubmitted — the adapter has submitted (or queued) the
@@ -187,7 +187,7 @@ type ActionResult struct {
 
 	// SubmittedTxHash is the relay/broadcast tx hash when Mode is
 	// ActionModeSubmitted and the adapter already knows the hash
-	// synchronously (e.g. ManagedEscrow relay). Callers should prefer this over
+	// synchronously (e.g. managed relay). Callers should prefer this over
 	// polling GetActionStatus immediately after submit.
 	SubmittedTxHash string
 
@@ -210,13 +210,13 @@ type ActionOwnerSignature struct {
 	Signature []byte
 
 	// Index is the owner ordinal when the chain has a stable owner list.
-	// ManagedEscrow uses it as an audit hint; UTXO-style escrows may ignore it.
+	// managed escrow uses it as an audit hint; UTXO-style escrows may ignore it.
 	Index uint32
 }
 
 // ActionSigner is an optional V2 capability implemented by backends that can
 // produce a local owner signature for a specific settlement action without
-// broadcasting it yet. ManagedEscrow uses this for threshold>1 flows:
+// broadcasting it yet. managed escrow uses this for threshold>1 flows:
 //   - seller pre-signs "complete" into ORDER_SHIPMENT.ReleaseInfo
 //   - moderator pre-signs "dispute_release" into DISPUTE_CLOSE.ReleaseInfo
 //
@@ -253,7 +253,7 @@ type SellerDeclineRefunder interface {
 
 // ActionParams is the V2 input shape for confirm/cancel/complete/
 // dispute-release. It is a strict superset of V1's InstructionParams,
-// adding the policy and refund hints that ManagedEscrow-style adapters need
+// adding the policy and refund hints that managed escrow-style adapters need
 // without polluting the V1 interface.
 type ActionParams struct {
 	// OrderID identifies the order.
@@ -261,7 +261,7 @@ type ActionParams struct {
 
 	// InitiatorAddr is the legacy wallet address hint of the caller.
 	// ClientSigned chains still use it as the frontend signer address.
-	// ManagedEscrow-backed chains must not rely on it for authorization or owner
+	// backend-managed chains must not rely on it for authorization or owner
 	// selection; the backend resolves the local node owner separately.
 	InitiatorAddr string
 

@@ -619,7 +619,7 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 //
 // Field policy:
 //
-//   - TransactionID: only populated from a real chain tx hash. Native ManagedEscrow
+//   - TransactionID: only populated from a real chain tx hash. native managed escrow
 //     balance polling may produce an internal observation id when no exact tx
 //     can be attributed; that id is valid for verification/dedupe but must not
 //     become a user-facing transaction hash.
@@ -628,7 +628,7 @@ func sumObservations(rows []models.PaymentObservation) (*big.Int, error) {
 //     Order.RefundAddress; when that is empty, the verifier only infers a
 //     refund target if all deduped observations have the same non-empty sender.
 //   - ToAddress: also taken from the representative row — this is the
-//     watched ManagedEscrow / smart-wallet / address the chain reported.
+//     watched managed escrow / smart-wallet / address the chain reported.
 //   - Amount: the aggregated total (NOT the representative row's
 //     amount). This is the value that crosses the verification
 //     threshold; the seller's order processor uses it as the canonical
@@ -826,20 +826,20 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 		return intent
 	}
 
-	if managed_escrowInfo, err := order.GetPendingManagedEscrowPaymentInfo(); err == nil && managed_escrowInfo != nil {
-		if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingManagedEscrow(managed_escrowInfo); ok {
+	if managedEscrowInfo, err := order.GetPendingManagedEscrowInfo(); err == nil && managedEscrowInfo != nil {
+		if spec, ok := paymentmetrics.ResolveSettlementSpecFromPendingManagedEscrow(managedEscrowInfo); ok {
 			intent.settlementSpec = spec
-		} else if managed_escrowInfo.Moderated {
+		} else if managedEscrowInfo.Moderated {
 			intent.settlementSpec = paymentmetrics.NewManagedEscrowSpec(true)
 		} else {
 			intent.settlementSpec = paymentmetrics.NewManagedEscrowSpec(false)
 		}
-		intent.contractAddress = managed_escrowInfo.Address
-		intent.moderator = managed_escrowInfo.Moderator
-		intent.moderatorAddress = managed_escrowInfo.ModeratorAddress
-		intent.platformAmount = managed_escrowInfo.PlatformAmount
-		intent.platformAddr = managed_escrowInfo.PlatformAddr
-		intent.cancelFeeAmount = managed_escrowInfo.CancelFeeAmount
+		intent.contractAddress = managedEscrowInfo.Address
+		intent.moderator = managedEscrowInfo.Moderator
+		intent.moderatorAddress = managedEscrowInfo.ModeratorAddress
+		intent.platformAmount = managedEscrowInfo.PlatformAmount
+		intent.platformAddr = managedEscrowInfo.PlatformAddr
+		intent.cancelFeeAmount = managedEscrowInfo.CancelFeeAmount
 		return intent
 	}
 
@@ -949,7 +949,7 @@ func hydrateSharedManagedEscrowMetadata(gdb *gorm.DB, order *models.Order) error
 		return nil
 	}
 
-	if hasPendingManagedEscrowPaymentInfo(order) && strings.TrimSpace(order.PaymentAddress) != "" && strings.TrimSpace(order.RefundAddress) != "" {
+	if hasPendingManagedEscrowInfo(order) && strings.TrimSpace(order.PaymentAddress) != "" && strings.TrimSpace(order.RefundAddress) != "" {
 		return nil
 	}
 	return paymentintent.HydrateOrderFromSharedIntent(gdb, order)
@@ -1004,11 +1004,11 @@ func utxoPendingAcceptsMempool(order *models.Order) bool {
 	return models.NormalizePaymentConfirmationPolicy(info.ConfirmationPolicy) == models.PaymentConfirmationPolicyMempoolAccepted
 }
 
-func hasPendingManagedEscrowPaymentInfo(order *models.Order) bool {
+func hasPendingManagedEscrowInfo(order *models.Order) bool {
 	if order == nil {
 		return false
 	}
-	info, err := order.GetPendingManagedEscrowPaymentInfo()
+	info, err := order.GetPendingManagedEscrowInfo()
 	return err == nil && info != nil
 }
 

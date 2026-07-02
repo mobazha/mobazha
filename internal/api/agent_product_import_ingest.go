@@ -2780,11 +2780,11 @@ func productImportSourceArtifactHasPreview(artifact *agentstore.Artifact) bool {
 	if artifact == nil || artifact.Kind != agentstore.ArtifactKindSourceMaterial || artifact.ContentBytes <= 0 {
 		return false
 	}
-	_, safe := managed_escrowProductImportPreviewContentType(artifact.ContentType)
+	_, safe := safeProductImportPreviewContentType(artifact.ContentType)
 	return safe
 }
 
-func managed_escrowProductImportPreviewContentType(raw string) (string, bool) {
+func safeProductImportPreviewContentType(raw string) (string, bool) {
 	contentType := strings.ToLower(strings.TrimSpace(strings.SplitN(raw, ";", 2)[0]))
 	switch contentType {
 	case "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/bmp":

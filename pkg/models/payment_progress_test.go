@@ -168,14 +168,14 @@ func TestComputePaymentProgress_ExactMatch_Clamps100(t *testing.T) {
 	}
 }
 
-func TestComputePaymentProgress_PendingManagedEscrowAmountOverridesOrderOpenAmount(t *testing.T) {
+func TestComputePaymentProgress_PendingManagedAmountOverridesOrderOpenAmount(t *testing.T) {
 	order := putOrderOpenWithAmount(t, "1500")
-	if err := order.SetPendingManagedEscrowPaymentInfo(&PendingManagedEscrowPaymentInfo{
+	if err := order.SetPendingManagedEscrowInfo(&PendingManagedEscrowInfo{
 		Coin:    "crypto:eip155:1:native",
 		Amount:  1000,
 		Address: "0xmanagedescrow",
 	}); err != nil {
-		t.Fatalf("SetPendingManagedEscrowPaymentInfo failed: %v", err)
+		t.Fatalf("SetPendingManagedEscrowInfo failed: %v", err)
 	}
 	order.TotalReceived = "1000"
 
@@ -184,28 +184,28 @@ func TestComputePaymentProgress_PendingManagedEscrowAmountOverridesOrderOpenAmou
 		t.Fatal("expected non-nil progress")
 	}
 	if got.ExpectedAmount != "1000" {
-		t.Errorf("expected pending ManagedEscrow amount to win, got %q", got.ExpectedAmount)
+		t.Errorf("expected pending managed escrow amount to win, got %q", got.ExpectedAmount)
 	}
 	if got.Percentage != 100 {
 		t.Errorf("expected percentage=100, got %d", got.Percentage)
 	}
 	if got.OverpaidAmount != "" {
-		t.Errorf("exact pending ManagedEscrow match must not surface overpaid, got %q", got.OverpaidAmount)
+		t.Errorf("exact pending managed escrow match must not surface overpaid, got %q", got.OverpaidAmount)
 	}
 }
 
-func TestComputePaymentProgress_PendingManagedEscrowRequiresLockedAmount(t *testing.T) {
+func TestComputePaymentProgress_PendingManagedRequiresLockedAmount(t *testing.T) {
 	order := putOrderOpenWithAmount(t, "1500")
-	if err := order.SetPendingManagedEscrowPaymentInfo(&PendingManagedEscrowPaymentInfo{
+	if err := order.SetPendingManagedEscrowInfo(&PendingManagedEscrowInfo{
 		Coin:    "crypto:eip155:1:native",
 		Address: "0xmanagedescrow",
 	}); err != nil {
-		t.Fatalf("SetPendingManagedEscrowPaymentInfo failed: %v", err)
+		t.Fatalf("SetPendingManagedEscrowInfo failed: %v", err)
 	}
 	order.TotalReceived = "1500"
 
 	if got := order.ComputePaymentProgress(); got != nil {
-		t.Fatalf("expected nil progress when ManagedEscrow pending amount is missing, got %+v", got)
+		t.Fatalf("expected nil progress when managed escrow pending amount is missing, got %+v", got)
 	}
 }
 

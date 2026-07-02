@@ -116,7 +116,7 @@ type Spender interface {
 }
 
 // UTXOEscrow is functions related to the Mobazha escrow system. This interface should
-// be implemented but it's technically optional as some coins like ExternalPayment have a
+// be implemented but it's technically optional as some coins like Monero have a
 // hard time implementing escrow. If it's not implemented then this coin will not
 // be selectable for either escrow payments or offline payments.
 type UTXOEscrow interface {

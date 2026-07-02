@@ -302,7 +302,7 @@ func (s *SupplyChainAppService) evaluateMarginGate(
 
 	// Pass 2: prorate post-discount revenue onto the supply-chain portion.
 	// Discount amount lives in OrderOpen.PricingCoin's smallest unit, which
-	// must match the listing currency for direct subtraction to be managed_escrow.
+	// must match the listing currency for direct subtraction to be safe.
 	// When currencies differ and ExchangeRates is available, we convert each
 	// discount amount from PricingCoin → scListingCurrency before prorate.
 	pricingCoin := strings.ToUpper(strings.TrimSpace(in.oo.GetPricingCoin()))

@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func seedManagedEscrowModeratedShippedOrderForComplete(
+func seedManagedModeratedShippedOrderForComplete(
 	t *testing.T,
 	svc *OrderAppService,
 	orderID string,
@@ -44,10 +44,10 @@ func seedManagedEscrowModeratedShippedOrderForComplete(
 		Listings: []*pb.SignedListing{{
 			Listing: &pb.Listing{
 				VendorID: &pb.ID{PeerID: sellerPeerID.String()},
-				Slug:     "managed_escrow-complete-test",
+				Slug:     "managed-complete-test",
 				Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_PHYSICAL_GOOD},
 				Item: &pb.Listing_Item{
-					Title: "ManagedEscrow complete item",
+					Title: "Managed settlement item",
 					Images: []*pb.Image{{
 						Tiny:  "ipfs://tiny",
 						Small: "ipfs://small",
@@ -70,14 +70,14 @@ func seedManagedEscrowModeratedShippedOrderForComplete(
 		Coin:           coinType.String(),
 		Amount:         "1000000000000000000",
 		ToAddress:      order.PaymentAddress,
-		Moderator:      "12D3KooWManagedEscrowModerator",
+		Moderator:      "12D3KooWManagedModerator",
 		Chaincode:      "abcd",
 		Script:         "beef",
 		PlatformAddr:   "0x7777777777777777777777777777777777777777",
 		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPaymentSent(),
 	}
 	require.NoError(t, order.SetPaymentSent(paymentSent))
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:           paymentSent.Coin,
 		Address:        order.PaymentAddress,
 		SettlementSpec: payment.NewManagedEscrowSpec(true).ToPending(),
@@ -107,9 +107,9 @@ func seedSettlementCompleteAction(
 	}))
 }
 
-func newManagedEscrowCompleteTestService(
+func newManagedCompleteTestService(
 	t *testing.T,
-	strategy *fakeManagedEscrowStrategy,
+	strategy *fakeManagedStrategy,
 	buyerSigner contracts.Signer,
 	buyerPeerID peer.ID,
 ) *OrderAppService {
@@ -128,7 +128,7 @@ func newManagedEscrowCompleteTestService(
 
 	bus := events.NewBus()
 	op := orders.NewOrderProcessor(&orders.Config{
-		NodeID:    "managed_escrow-complete-test",
+		NodeID:    "managed-complete-test",
 		Db:        db,
 		Signer:    buyerSigner,
 		Messenger: noopMessenger{},
@@ -142,21 +142,21 @@ func newManagedEscrowCompleteTestService(
 		OrderProcessor:  op,
 		Messenger:       noopMessenger{},
 		EventBus:        bus,
-		NodeID:          "managed_escrow-complete-test",
+		NodeID:          "managed-complete-test",
 		PeerID:          func() peer.ID { return buyerPeerID },
 	})
 }
 
-func TestCompleteOrder_ManagedEscrowMonitored_RejectsPendingSettlementRelease(t *testing.T) {
+func TestCompleteOrder_ManagedMonitored_RejectsPendingSettlementRelease(t *testing.T) {
 	t.Parallel()
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored}
-	svc := newManagedEscrowCompleteTestService(t, strategy, buyerSigner, buyerPeerID)
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
+	svc := newManagedCompleteTestService(t, strategy, buyerSigner, buyerPeerID)
 
-	const orderID = "managed_escrow-complete-pending"
-	seedManagedEscrowModeratedShippedOrderForComplete(t, svc, orderID, buyerPeerID, sellerPeerID)
+	const orderID = "managed-complete-pending"
+	seedManagedModeratedShippedOrderForComplete(t, svc, orderID, buyerPeerID, sellerPeerID)
 	seedSettlementCompleteAction(t, svc, orderID, "complete-act-pending", "submitted", "")
 
 	err := svc.CompleteOrder(models.OrderID(orderID), "", nil, false, nil)
@@ -166,19 +166,19 @@ func TestCompleteOrder_ManagedEscrowMonitored_RejectsPendingSettlementRelease(t 
 	assert.Equal(t, 0, strategy.completeCalls)
 }
 
-func TestCompleteOrder_ManagedEscrowMonitored_SkipsInlineReleaseWhenSettlementTxHashReady(t *testing.T) {
+func TestCompleteOrder_ManagedMonitored_SkipsInlineReleaseWhenSettlementTxHashReady(t *testing.T) {
 	t.Parallel()
 
 	buyerSigner, buyerPeerID := testSigner(t)
 	_, sellerPeerID := testSigner(t)
-	strategy := &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored}
-	svc := newManagedEscrowCompleteTestService(t, strategy, buyerSigner, buyerPeerID)
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
+	svc := newManagedCompleteTestService(t, strategy, buyerSigner, buyerPeerID)
 
 	const (
-		orderID = "managed_escrow-complete-ready"
+		orderID = "managed-complete-ready"
 		txHash  = "0xcompleteeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 	)
-	seedManagedEscrowModeratedShippedOrderForComplete(t, svc, orderID, buyerPeerID, sellerPeerID)
+	seedManagedModeratedShippedOrderForComplete(t, svc, orderID, buyerPeerID, sellerPeerID)
 	seedSettlementCompleteAction(t, svc, orderID, "complete-act-ready", "submitted", txHash)
 
 	err := svc.CompleteOrder(models.OrderID(orderID), iwallet.TransactionID(txHash), nil, false, nil)
@@ -262,7 +262,7 @@ func newUTXOCompleteTestService(
 	t.Helper()
 
 	reg := payment.NewRegistry()
-	reg.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedEscrowStrategy{model: payment.PaymentModelMonitored})
+	reg.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedStrategy{model: payment.PaymentModelMonitored})
 
 	db, err := repo.MockDB()
 	require.NoError(t, err)

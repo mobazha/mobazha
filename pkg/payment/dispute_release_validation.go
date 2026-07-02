@@ -46,7 +46,7 @@ func ValidateDisputeReleaseFunding(release *pb.DisputeClose_ModeratedEscrowRelea
 
 // ValidateDisputeReleaseBalance ensures a UTXO-style dispute release never
 // spends more than its escrow inputs. Releases without outpoints are balance
-// escrows (ManagedEscrow/Solana) and are validated by their settlement adapters.
+// escrows (managed escrow/Solana) and are validated by their settlement adapters.
 func ValidateDisputeReleaseBalance(release *pb.DisputeClose_ModeratedEscrowRelease) error {
 	if release == nil {
 		return fmt.Errorf("dispute release info is missing")

@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPendingManagedEscrowPaymentInfo_SettlementSpecJSONRoundTrip(t *testing.T) {
+func TestPendingManagedEscrowInfo_SettlementSpecJSONRoundTrip(t *testing.T) {
 	order := &Order{}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&PendingManagedEscrowInfo{
 		Type:      "managed_escrow",
 		Coin:      "crypto:eth:eth",
 		Address:   "0xabc",
@@ -21,14 +21,14 @@ func TestPendingManagedEscrowPaymentInfo_SettlementSpecJSONRoundTrip(t *testing.
 		},
 	}))
 
-	got, err := order.GetPendingManagedEscrowPaymentInfo()
+	got, err := order.GetPendingManagedEscrowInfo()
 	require.NoError(t, err)
 	require.NotNil(t, got.SettlementSpec)
 	require.Equal(t, "MODERATED", got.SettlementSpec.Method)
 
 	raw, err := json.Marshal(got)
 	require.NoError(t, err)
-	var decoded PendingManagedEscrowPaymentInfo
+	var decoded PendingManagedEscrowInfo
 	require.NoError(t, json.Unmarshal(raw, &decoded))
 	require.Equal(t, got.SettlementSpec, decoded.SettlementSpec)
 }

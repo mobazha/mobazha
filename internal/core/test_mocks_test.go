@@ -146,7 +146,7 @@ func (m *mockKeyProvider) DigitalContentMasterKey(version int) ([]byte, error) {
 // ── mockWalletOperator ──────────────────────────────────────────
 //
 // A no-op contracts.WalletOperator used when tests need to satisfy
-// the dependency surface (e.g., ManagedEscrowAdapter shadow registration in
+// the dependency surface (e.g., managed EVM adapter shadow registration in
 // registerPaymentStrategies) without standing up a real multiwallet.
 // Every wallet lookup returns errMockWalletUnsupported so any unintended
 // payment path fails loudly rather than silently no-oping.

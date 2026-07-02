@@ -165,7 +165,7 @@ func (s *ManagedEscrowGuestSettlementSource) ListPendingManagedEscrowGuestSettle
 	if err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().
 			Where("state IN ?", guestSettlementEligibleStates).
-			Where("evm_managed_escrow_metadata IS NOT NULL AND evm_managed_escrow_metadata <> ''").
+			Where("managed_escrow_metadata IS NOT NULL AND managed_escrow_metadata <> ''").
 			Find(&orders).Error
 	}); err != nil {
 		return nil, fmt.Errorf("managed escrow guest settlement: list pending orders: %w", err)

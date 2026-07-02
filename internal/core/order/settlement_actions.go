@@ -131,7 +131,7 @@ func errBalanceMonitoredEscrowRequiresSettlementAction(order *models.Order, paym
 	}
 	switch {
 	case spec.UsesManagedEscrow():
-		return fmt.Errorf("%w: ManagedEscrow-backed orders must use POST /v1/orders/{orderID}/settlement-actions/%s",
+		return fmt.Errorf("%w: backend-managed orders must use POST /v1/orders/{orderID}/settlement-actions/%s",
 			coreiface.ErrBadRequest, payment.SettlementActionPathSegment(action))
 	case spec.UsesSolanaEscrow():
 		return fmt.Errorf("%w: Solana escrow orders must use POST /v1/orders/{orderID}/settlement-actions/%s",

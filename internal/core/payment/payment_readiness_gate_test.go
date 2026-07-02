@@ -33,7 +33,7 @@ func TestPaymentSessionProjector_GatesBuyerFundingTarget(t *testing.T) {
 		MyRole:         string(models.RoleBuyer),
 		PaymentAddress: "0xmanagedescrow",
 	}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:    "crypto:ethereum:mainnet:native",
 		Address: "0xmanagedescrow",
 	}))
@@ -54,7 +54,7 @@ func TestPaymentSessionProjector_BuyerReadyExposesFundingTarget(t *testing.T) {
 		PaymentAddress: "0xmanagedescrow",
 		PaymentReadyAt: &readyAt,
 	}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:    "crypto:ethereum:mainnet:native",
 		Address: "0xmanagedescrow",
 	}))
@@ -140,7 +140,7 @@ func TestPaymentSessionServiceImpl_CoinSwitchAuthorizesBeforeClearingExistingTar
 		ID: models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true,
 		PaymentReadyAt: &readyAt, PaymentAddress: oldAddress,
 	}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin: "crypto:eip155:1:native", Address: oldAddress,
 	}))
 	require.NoError(t, db.Update(func(tx database.Tx) error {

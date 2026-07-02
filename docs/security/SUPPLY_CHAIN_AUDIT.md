@@ -30,7 +30,7 @@ syft dir:. -o spdx-json=mobazha-community.spdx.json
 
 ## License review
 
-- Mobazha-authored Community Edition source, including retained Mobazha history: MPL-2.0. OpenBazaar-derived portions retain their original MIT terms; see `NOTICE` and `LICENSES/MIT-OpenBazaar.txt`.
+- Mobazha-authored Community Edition source: MPL-2.0. OpenBazaar-derived portions retain their original MIT terms; see `NOTICE` and `LICENSES/MIT-OpenBazaar.txt`.
 - Syft `NOASSERTION` results are resolved only through the exact-version manifest in `config/community/license-conclusions.json`; see `docs/security/LICENSE_CONCLUSIONS.md` and `scripts/community/apply-license-conclusions.py`.
 - The future payment-plugin SDK target: Apache-2.0.
 - `go-ethereum` library packages are LGPL-3.0 according to the upstream project. Binary redistribution obligations and notices require explicit final review even though the related payment capability is not enabled by the Community Edition policy.

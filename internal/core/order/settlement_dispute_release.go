@@ -14,7 +14,7 @@ import (
 )
 
 // ExecuteSettlementDisputeReleaseAction submits backend escrow release for
-// DECIDED moderated ManagedEscrow / Solana Anchor (relay) or UTXO (sync) disputes via
+// DECIDED moderated backend-managed contract (relay) or UTXO (sync) disputes via
 // settlement-actions/dispute-release.
 func (s *OrderAppService) ExecuteSettlementDisputeReleaseAction(
 	ctx context.Context,

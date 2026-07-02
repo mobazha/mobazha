@@ -874,7 +874,7 @@ func TestEvaluateMarginGate_CrossCurrencyDiscountConverted(t *testing.T) {
 
 // TestEvaluateMarginGate_SameCurrencyDiscountStillProrates verifies the
 // unit gate does NOT block the common case (USD listing, USD payment via
-// Stripe/PayPal): same currency → direct subtract is managed_escrow.
+// Stripe/PayPal): same currency → direct subtract is safe.
 func TestEvaluateMarginGate_SameCurrencyDiscountStillProrates(t *testing.T) {
 	tdb := newSCTestDatabase(t)
 	seedSyncedProduct(t, tdb, "tee", "p1", "500", nil)

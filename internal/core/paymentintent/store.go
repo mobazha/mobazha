@@ -12,7 +12,7 @@ import (
 // UpsertSharedPaymentIntent persists the canonical shared funding route for a
 // business order. Empty fields are treated as "preserve existing" for partial
 // updates such as refund-address writes.
-func UpsertSharedPaymentIntent(gdb *gorm.DB, orderID string, paymentAddress string, refundAddress string, info *models.PendingManagedEscrowPaymentInfo) error {
+func UpsertSharedPaymentIntent(gdb *gorm.DB, orderID string, paymentAddress string, refundAddress string, info *models.PendingManagedEscrowInfo) error {
 	if gdb == nil {
 		return fmt.Errorf("shared payment intent: db is nil")
 	}
@@ -28,7 +28,7 @@ func UpsertSharedPaymentIntent(gdb *gorm.DB, orderID string, paymentAddress stri
 		RefundAddress:  strings.TrimSpace(refundAddress),
 	}
 	if info != nil {
-		if err := intent.SetPendingManagedEscrowPaymentInfo(info); err != nil {
+		if err := intent.SetPendingManagedEscrowInfo(info); err != nil {
 			return err
 		}
 	}
@@ -101,7 +101,7 @@ func LoadSharedPaymentIntent(gdb *gorm.DB, orderID string) (*models.SharedPaymen
 	return &intent, nil
 }
 
-// HydrateOrderFromSharedIntent fills missing ManagedEscrow route fields from the
+// HydrateOrderFromSharedIntent fills missing managed-escrow route fields from the
 // canonical shared intent row when present.
 func HydrateOrderFromSharedIntent(gdb *gorm.DB, order *models.Order) error {
 	if gdb == nil || order == nil {

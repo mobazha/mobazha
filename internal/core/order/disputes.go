@@ -1260,7 +1260,7 @@ func (s *OrderAppService) GetReleaseFundsInstructions(orderID models.OrderID, in
 }
 
 // GetLegacyReleaseFundsInstructions is the internal legacy-only dispute
-// release instructions path. ManagedEscrow-backed moderated payouts must stay on the
+// release instructions path. backend-managed moderated payouts must stay on the
 // backend close/release flow instead of the old instruction contract.
 func (s *OrderAppService) GetLegacyReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	order, _, paymentSent, _, err := s.getOrderAndPaymentInfo(orderID)

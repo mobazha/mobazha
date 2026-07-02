@@ -701,7 +701,7 @@ func (g *Gateway) handleGETAgentArtifactContent(w http.ResponseWriter, r *http.R
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "failed to load artifact")
 		return
 	}
-	contentType, safe := managed_escrowProductImportPreviewContentType(artifact.ContentType)
+	contentType, safe := safeProductImportPreviewContentType(artifact.ContentType)
 	if !safe || !productImportSourceArtifactHasPreview(artifact) {
 		responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "artifact content not available")
 		return

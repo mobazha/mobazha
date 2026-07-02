@@ -57,7 +57,7 @@ func TestValidateAcceptedCoin_AcceptsAliasAndCanonicalEquivalent(t *testing.T) {
 	if err := svc.validateAcceptedCoin(cfg, "crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native"); err != nil {
 		t.Fatalf("validateAcceptedCoin canonical ltc equivalent: %v", err)
 	}
-	if err := svc.validateAcceptedCoin(cfg, "crypto:external_payment:mainnet:native"); err == nil {
+	if err := svc.validateAcceptedCoin(cfg, "crypto:monero:mainnet:native"); err == nil {
 		t.Fatal("validateAcceptedCoin accepted an unconfigured coin")
 	}
 }
@@ -65,7 +65,7 @@ func TestValidateAcceptedCoin_AcceptsAliasAndCanonicalEquivalent(t *testing.T) {
 func TestFilterAvailableCoins_PreservesConfigCodesForVisibleCoins(t *testing.T) {
 	svc := newUTXOCapableService(t, true, true)
 
-	got := svc.filterAvailableCoins("ETH,LTC,TRX,EXTERNAL_PAYMENT,NOTREAL")
+	got := svc.filterAvailableCoins("ETH,LTC,TRX,XMR,NOTREAL")
 	if got != "LTC" {
 		t.Fatalf("filterAvailableCoins() = %q, want LTC", got)
 	}

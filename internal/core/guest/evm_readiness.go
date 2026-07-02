@@ -29,10 +29,10 @@ func (s *GuestOrderAppService) appendEVMReadiness(out *contracts.GuestCheckoutRe
 	}
 	chains := s.evmReadinessChainList()
 	s.evmRuntimeMu.RLock()
-	fundingReady := s.evmManagedEscrowFundingReady
-	obsReady := s.evmManagedEscrowObservationReady
-	settleReady := s.evmManagedEscrowSettlementReady
-	relayReady := s.evmManagedEscrowRelayReady
+	fundingReady := s.managedEscrowFundingReady
+	obsReady := s.managedEscrowObservationReady
+	settleReady := s.managedEscrowSettlementReady
+	relayReady := s.managedEscrowRelayReady
 	monitors := s.evmManagedEscrowMonitorChains
 	relayGasHealthy := s.evmRelayGasHealthyChains
 	relayGasReasons := s.evmRelayGasUnhealthyReason
@@ -67,16 +67,16 @@ func (s *GuestOrderAppService) appendEVMReadiness(out *contracts.GuestCheckoutRe
 			relayGasReason = "relay gas wallet not healthy"
 		}
 		entry := contracts.GuestEVMChainReadiness{
-			Chain:                  string(chain),
-			Coin:                   string(coinType),
-			ManagedEscrowMonitorActive:      monitorOK,
-			RelayReady:             chainRelayReady,
-			RelayGasHealthy:        chainRelayReady && relayGasOK,
-			RelayGasReason:         relayGasReason,
-			SettlementReady:        settleReady && managedEscrowGuestSettlementActive,
-			FundingReady:           fundingReady && s.directPayment != nil && s.directPayment.HasManagedEscrowFunding(),
-			ObservationReady:       obsReady && monitorOK,
-			ReceivingAccountActive: s.hasActiveReceivingAccount(chain),
+			Chain:                      string(chain),
+			Coin:                       string(coinType),
+			ManagedEscrowMonitorActive: monitorOK,
+			RelayReady:                 chainRelayReady,
+			RelayGasHealthy:            chainRelayReady && relayGasOK,
+			RelayGasReason:             relayGasReason,
+			SettlementReady:            settleReady && managedEscrowGuestSettlementActive,
+			FundingReady:               fundingReady && s.directPayment != nil && s.directPayment.HasManagedEscrowFunding(),
+			ObservationReady:           obsReady && monitorOK,
+			ReceivingAccountActive:     s.hasActiveReceivingAccount(chain),
 		}
 		cap := s.evaluateGuestPaymentCapability(coinType, coinInfo)
 		entry.BuyerVisible = cap.BuyerVisible

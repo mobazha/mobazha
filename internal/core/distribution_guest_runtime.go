@@ -60,14 +60,14 @@ func (b *distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRunt
 	b.node.directPaymentService.SetManagedEscrowFunding(runtime.Projector, &guest.NodeEVMSellerOwnerResolver{Keys: b.node.keyProvider})
 	b.node.managedEscrowReceiptValidator = runtime.ReceiptValidator
 	b.node.guestPaymentMonitor.SetEVMManagedEscrowWatch(watcher)
-	b.node.guestOrderService.SetEVMManagedEscrowSettlement(settlement)
-	b.node.guestOrderService.SetEVMManagedEscrowClosureRuntime(guest.EVMManagedEscrowClosureRuntime{
-		FundingReady:      b.node.directPaymentService.HasManagedEscrowFunding(),
-		ObservationReady:  true,
-		SettlementReady:   true,
-		RelayReady:        true,
+	b.node.guestOrderService.SetManagedEscrowSettlement(settlement)
+	b.node.guestOrderService.SetManagedEscrowClosureRuntime(guest.ManagedEscrowClosureRuntime{
+		FundingReady:               b.node.directPaymentService.HasManagedEscrowFunding(),
+		ObservationReady:           true,
+		SettlementReady:            true,
+		RelayReady:                 true,
 		ManagedEscrowMonitorChains: chainSet,
-		HealthProvider:    runtime.HealthProvider,
+		HealthProvider:             runtime.HealthProvider,
 	})
 	b.settlement = settlement
 	b.bound = true
@@ -100,7 +100,7 @@ func (b *distributionManagedEscrowGuestRuntimeBinder) StartManagedEscrowGuestRun
 		return fmt.Errorf("managed escrow guest runtime: replay confirmed settlements: %w", err)
 	}
 	for _, orderID := range confirmed {
-		node.guestOrderService.OnEVMManagedEscrowSettlementConfirmed(orderID)
+		node.guestOrderService.OnManagedEscrowSettlementConfirmed(orderID)
 	}
 	go settlement.RunPendingSettlementRecovery(ctx)
 	return nil
@@ -116,8 +116,8 @@ func (b *distributionManagedEscrowGuestRuntimeBinder) UnbindManagedEscrowGuestRu
 		return nil
 	}
 	b.node.guestPaymentMonitor.SetEVMManagedEscrowWatch(nil)
-	b.node.guestOrderService.SetEVMManagedEscrowSettlement(nil)
-	b.node.guestOrderService.SetEVMManagedEscrowClosureRuntime(guest.EVMManagedEscrowClosureRuntime{})
+	b.node.guestOrderService.SetManagedEscrowSettlement(nil)
+	b.node.guestOrderService.SetManagedEscrowClosureRuntime(guest.ManagedEscrowClosureRuntime{})
 	b.node.directPaymentService.SetManagedEscrowFunding(nil, nil)
 	b.node.managedEscrowReceiptValidator = nil
 	b.source.SetProjector(nil)

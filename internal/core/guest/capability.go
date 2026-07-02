@@ -74,13 +74,13 @@ func (s *GuestOrderAppService) evaluateGuestPaymentCapability(coinType iwallet.C
 		cap.Reason = cap.Err.Error()
 		return cap
 
-	case coinInfo.Chain == iwallet.ChainExternalPayment:
+	case coinInfo.Chain == iwallet.ChainMonero:
 		if err := s.validateCoinAvailability(coinType, coinInfo); err != nil {
 			cap.Err = err
 			cap.Reason = err.Error()
 			return cap
 		}
-		// EXTERNAL_PAYMENT pays directly to seller subaddresses; no UTXO/EVM sweep task.
+		// XMR pays directly to seller subaddresses; no UTXO/EVM sweep task.
 		cap.CanAllocateAddress = true
 		cap.CanDetectPayment = true
 		cap.CanConfirmPayment = true

@@ -73,11 +73,11 @@ func TestInitFeatureResolver_HonoursInjectedProviders(t *testing.T) {
 	require.NotNil(t, n.Features())
 }
 
-// TestMobazhaNode_Features_NilReceiverManagedEscrow documents the contract that
+// TestMobazhaNode_Features_NilReceiverSafe documents the contract that
 // handlers can safely call (*MobazhaNode)(nil).Features() without panicking.
 // This is the escape hatch for code paths that run before applyOptions
 // (mostly unit-test mocks constructed via &MobazhaNode{...}).
-func TestMobazhaNode_Features_NilReceiverManagedEscrow(t *testing.T) {
+func TestMobazhaNode_Features_NilReceiverSafe(t *testing.T) {
 	var n *MobazhaNode
 	require.NotPanics(t, func() { _ = n.Features() })
 	require.Nil(t, n.Features())

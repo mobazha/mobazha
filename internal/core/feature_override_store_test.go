@@ -83,7 +83,7 @@ func TestFeatureOverrideStore_SetRejectsEmptyKey(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestFeatureOverrideStore_NilReceiverIsManagedEscrow(t *testing.T) {
+func TestFeatureOverrideStore_NilReceiverIsSafe(t *testing.T) {
 	var store *FeatureOverrideStore
 
 	value, configured, err := store.Get(context.Background(), "_default", "guestCheckout")

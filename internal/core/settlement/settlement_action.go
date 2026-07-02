@@ -19,9 +19,9 @@ import (
 // ExecuteSettlementAction runs a chain escrow V2 lifecycle action for crypto orders.
 //
 // Supported actions on this SettlementService surface:
-//   - "confirm" — cancelable payout / buyer acceptance (ManagedEscrow/Solana relay).
+//   - "confirm" — cancelable payout / buyer acceptance (managed EVM/Solana relay).
 //   - "cancel" — cancelable buyer cancel or pre-confirm moderated seller refund
-//     (ManagedEscrow/Solana relay).
+//     (managed EVM/Solana relay).
 //   - "seller_decline_refund" — seller-authorized refund for chains whose
 //     on-chain program separates seller decline from buyer cancel.
 //
@@ -71,7 +71,7 @@ func (s *SettlementService) executeSettlementActionForOrder(
 ) (*payment.ActionResult, iwallet.CoinType, error) {
 	// Explicit API actions and event-driven auto-confirm share this execution
 	// path. Serialize the durable intent check and backend submission so the
-	// same ManagedEscrow nonce cannot be signed and relayed twice concurrently.
+	// same managed escrow nonce cannot be signed and relayed twice concurrently.
 	s.settlementActionMu.Lock()
 	defer s.settlementActionMu.Unlock()
 
@@ -203,10 +203,10 @@ func (s *SettlementService) executeSettlementActionForOrder(
 		var rerr error
 		if ok {
 			// Some programs distinguish a seller-decline instruction from buyer
-			// cancel at the contract level (for example Solana Anchor).
+			// cancel at the contract level (for example managed Solana).
 			result, rerr = refunder.SellerDeclineRefund(ctx, params)
 		} else {
-			// ManagedEscrow/EVM and other threshold-1 escrows use the same on-chain
+			// Managed EVM and other threshold-1 escrows use the same on-chain
 			// refund transaction for both intents. Authorization is enforced
 			// above by requiring the local vendor order role.
 			result, rerr = strategy.Cancel(ctx, params)
@@ -379,7 +379,7 @@ func settlementActionStatusMatches(strategy payment.ChainEscrowV2, recordedActio
 	if requestedAction != payment.SettlementActionSellerDeclineRefund || recordedAction != payment.SettlementActionCancel {
 		return false
 	}
-	// ManagedEscrow/EVM expresses a seller-authorized default refund with the same
+	// Managed EVM expresses a seller-authorized default refund with the same
 	// on-chain cancel operation as a buyer cancellation. Chains exposing a
 	// dedicated seller-decline instruction must retain the distinct action.
 	_, hasDedicatedSellerDecline := strategy.(payment.SellerDeclineRefunder)

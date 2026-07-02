@@ -28,7 +28,7 @@ import (
 //   - payoutAddress — vendor payout (confirm) or buyer refund override (cancel).
 //
 // This is the primary settlement entrypoint for backend-submitted routes such
-// as ManagedEscrow-backed EVM. Client-signed legacy chains stay on the instructions
+// as backend-managed EVM. Client-signed legacy chains stay on the instructions
 // endpoints.
 func (g *Gateway) handlePOSTOrderSettlementAction(w http.ResponseWriter, r *http.Request) {
 	orderID := chi.URLParam(r, "orderID")

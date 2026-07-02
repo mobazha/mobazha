@@ -14,7 +14,7 @@ import (
 // into response.Error / responsePkg.Error calls that return non-safe error
 // codes (INTERNAL_ERROR, PROVIDER_ERROR, CONFLICT, etc.).
 //
-// ManagedEscrow codes (CodeBadRequest, CodeValidation, CodeNotFound, CodeUnauthorized,
+// Safe codes (CodeBadRequest, CodeValidation, CodeNotFound, CodeUnauthorized,
 // CodeNotImplemented, CodeConflict) are allowed because their messages are
 // either user-supplied validation details or well-defined sentinel strings.
 //
@@ -62,7 +62,7 @@ func scanForRawErrorResponses(t *testing.T, filename string) []string {
 		t.Fatalf("parse %s: %v", filename, err)
 	}
 
-	managed_escrowCodeSuffixes := []string{
+	safeCodeSuffixes := []string{
 		"CodeBadRequest",
 		"CodeValidation",
 		"CodeNotFound",
@@ -89,7 +89,7 @@ func scanForRawErrorResponses(t *testing.T, filename string) []string {
 
 		codeArg := call.Args[2]
 		codeSrc := exprString(codeArg)
-		for _, safe := range managed_escrowCodeSuffixes {
+		for _, safe := range safeCodeSuffixes {
 			if strings.HasSuffix(codeSrc, safe) {
 				return true
 			}

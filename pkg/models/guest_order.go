@@ -60,7 +60,7 @@ func ParseGuestOrderState(s string) (GuestOrderState, bool) {
 }
 
 // GuestOrder represents an anonymous buyer's order on a standalone store.
-// UTXO/TRON use HD derivation; EVM uses seller-owned 1/1 predicted ManagedEscrow (when enabled).
+// UTXO/TRON use HD derivation; EVM uses seller-owned 1/1 predicted managed escrow (when enabled).
 type GuestOrder struct {
 	TenantMixin
 	ID         int             `gorm:"primaryKey;autoIncrement:false" json:"id"`
@@ -88,11 +88,11 @@ type GuestOrder struct {
 	RequiredConfs  int    `json:"requiredConfs"`
 	AddressIndex   uint32 `json:"-"`
 	// ManagedEscrowMetadata is opaque provider JSON for per-order managed EVM
-	// funding targets. The legacy column name is preserved for data migration.
-	ManagedEscrowMetadata []byte `gorm:"column:evm_managed_escrow_metadata" json:"-"`
-	ExternalPaymentTxHeight        uint64 `json:"-"`
+	// funding targets.
+	ManagedEscrowMetadata []byte `gorm:"column:managed_escrow_metadata" json:"-"`
+	MoneroTxHeight        uint64 `json:"-"`
 
-	// Pool-stage tracking (currently only populated by ExternalPayment, where
+	// Pool-stage tracking (currently only populated by Monero, where
 	// mempool transfers are visible via wallet-rpc). These fields are a
 	// UX hint only — the order remains in AWAITING_PAYMENT until the
 	// transfer is mined and HandlePaymentDetected fires. This keeps the

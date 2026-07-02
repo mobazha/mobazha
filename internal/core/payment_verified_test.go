@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestPaymentDataFromVerifiedPaymentSent_PreservesManagedEscrowFields(t *testing.T) {
+func TestPaymentDataFromVerifiedPaymentSent_PreservesManagedFields(t *testing.T) {
 	ts := time.Unix(1710000000, 0).UTC()
 	ps := &mbzpb.PaymentSent{
 		TransactionID:       "0xtx",
@@ -58,7 +58,7 @@ func TestPaymentDataFromVerifiedPaymentSent_PreservesManagedEscrowFields(t *test
 		t.Fatalf("critical payment routing fields lost: %+v", pd)
 	}
 	if pd.ContractAddress != "0xcontract" || pd.ModeratorAddress != "0xmod" || pd.PaymentTokenAddress != "0xtoken" {
-		t.Fatalf("auxiliary safe fields lost: %+v", pd)
+		t.Fatalf("auxiliary settlement fields lost: %+v", pd)
 	}
 	if pd.Amount != 123 || pd.UnlockHours != 720 || !pd.Timestamp.Equal(ts) {
 		t.Fatalf("numeric/timestamp fields wrong: amount=%d unlock=%d ts=%s", pd.Amount, pd.UnlockHours, pd.Timestamp)

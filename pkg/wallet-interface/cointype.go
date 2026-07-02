@@ -25,7 +25,7 @@ const (
 	ChainPolygon     ChainType = "MATIC"
 	ChainBase        ChainType = "BASE"
 	ChainConflux     ChainType = "CFX"
-	// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted from chainMatrix
+	// Phase managed EVM v0.3.0 Sprint 1 D8 — promoted from chainMatrix
 	// not-ready bucket. These chains route through the V2 ManagedEscrowAdapter
 	// only; their V1 ContractManager Registry is intentionally absent
 	// (see pkg/evm/defaults.go zero-address sentinel + EVM client
@@ -42,7 +42,7 @@ const (
 	ChainLinea     ChainType = "LINEA"
 	ChainSolana    ChainType = "SOL"
 	ChainTRON      ChainType = "TRX"
-	ChainExternalPayment    ChainType = "EXTERNAL_PAYMENT"
+	ChainMonero    ChainType = "XMR"
 
 	ChainFiat ChainType = "Fiat"
 )
@@ -73,7 +73,7 @@ func GetAllSupportedChainTypes() []ChainType {
 		ChainLinea,
 		ChainSolana,
 		ChainTRON,
-		ChainExternalPayment,
+		ChainMonero,
 		ChainFiat,
 	}
 }
@@ -232,7 +232,7 @@ func (ct CoinInfo) BlockInterval() time.Duration {
 func (ct CoinInfo) IsEthTypeChain() bool {
 	ethTypeChains := []ChainType{
 		ChainEthereum, ChainBSC, ChainBase, ChainPolygon, ChainConflux,
-		// Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
+		// Phase managed EVM v0.3.0 Sprint 1 D8 — promoted EVM L2 set.
 		// All use SchemeEVMCreate2 except ChainZkSyncEra which uses
 		// SchemeZkSyncCreate2 is reserved for provider-specific address derivation.
 		ChainArbitrum, ChainOptimism, ChainAvalanche, ChainGnosis,
@@ -392,7 +392,7 @@ func (c ChainType) AvgBlockTimeSec() uint32 {
 		return 600
 	case ChainZCash:
 		return 75
-	case ChainExternalPayment:
+	case ChainMonero:
 		return 120
 	default:
 		return 0

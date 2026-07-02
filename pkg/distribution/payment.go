@@ -26,7 +26,7 @@ type ManagedEVMSignPurpose string
 
 const ManagedEVMSignSettlementTransaction ManagedEVMSignPurpose = "managed_escrow_settlement_transaction"
 
-// ManagedEVMSignRequest describes a typed, auditable ManagedEscrow transaction signing
+// ManagedEVMSignRequest describes a typed, auditable managed settlement transaction signing
 // operation. Core validates the chain identity and owner policy before signing.
 type ManagedEVMSignRequest struct {
 	Chain         iwallet.ChainType

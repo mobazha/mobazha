@@ -479,7 +479,7 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 			First(&order).Error; err != nil {
 			return err
 		}
-		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		if err := order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 			Coin:    testUSDCAsset,
 			Amount:  1000,
 			Address: "0xmanagedescrow",
@@ -559,7 +559,7 @@ func TestAggregateAndEmit_ExactAmount_VerifiesAndEmits(t *testing.T) {
 
 func TestBuildAggregatedPaymentSent_UsesDeterministicObservationTimestamp(t *testing.T) {
 	order := &models.Order{ID: models.OrderID("order-deterministic-ts")}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:      "crypto:eip155:1:native",
 		Amount:    1000,
 		Address:   "0xmanagedescrow",
@@ -590,7 +590,7 @@ func TestBuildAggregatedPaymentSent_UsesDeterministicObservationTimestamp(t *tes
 
 func TestBuildAggregatedPaymentSent_PrefersExistingSharedRefundAddress(t *testing.T) {
 	order := &models.Order{ID: models.OrderID("order-shared-refund"), RefundAddress: "0xbuyer-local-only"}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin:      "crypto:eip155:1:native",
 		Amount:    1000,
 		Address:   "0xmanagedescrow",
@@ -635,7 +635,7 @@ func TestAggregateAndEmit_VendorVerifiedPaymentEmitsOrderFunded(t *testing.T) {
 			First(&order).Error; err != nil {
 			return err
 		}
-		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		if err := order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 			Coin:    testUSDCAsset,
 			Amount:  1000,
 			Address: "0xmanagedescrow",
@@ -736,7 +736,7 @@ func TestAggregateAndEmit_BuyerVerifiedPaymentEmitsPaymentReceived(t *testing.T)
 			First(&order).Error; err != nil {
 			return err
 		}
-		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		if err := order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 			Coin:    testUSDCAsset,
 			Amount:  1000,
 			Address: "0xmanagedescrow",
@@ -861,15 +861,15 @@ func TestAggregateAndEmit_PendingManagedEscrowAmountOverridesOrderOpenAmount(t *
 	bus := &recordingBus{}
 	v := NewAggregatingVerifier(db, bus)
 
-	seedOrder(t, db, "order-managed_escrow-amount", "1500", "0xrefund")
+	seedOrder(t, db, "order-managed-amount", "1500", "0xrefund")
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		var order models.Order
 		if err := tx.Read().
-			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, "order-managed_escrow-amount").
+			Where("tenant_id = ? AND id = ?", database.StandaloneTenantID, "order-managed-amount").
 			First(&order).Error; err != nil {
 			return err
 		}
-		if err := order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		if err := order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 			Coin:    "crypto:eip155:1:native",
 			Amount:  1000,
 			Address: "0xmanagedescrow",
@@ -879,8 +879,8 @@ func TestAggregateAndEmit_PendingManagedEscrowAmountOverridesOrderOpenAmount(t *
 		return tx.Save(&order)
 	}))
 	insertObs(t, db, models.PaymentObservation{
-		ID:             "obs-managed_escrow-amount",
-		OrderID:        "order-managed_escrow-amount",
+		ID:             "obs-managed-amount",
+		OrderID:        "order-managed-amount",
 		ChainNamespace: "eip155",
 		ChainReference: "11155111",
 		TxHash:         "0xmanagedescrow",
@@ -890,12 +890,12 @@ func TestAggregateAndEmit_PendingManagedEscrowAmountOverridesOrderOpenAmount(t *
 		Amount:         "1000",
 	})
 
-	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-managed_escrow-amount"))
+	require.NoError(t, v.AggregateAndEmit(context.Background(), database.StandaloneTenantID, "order-managed-amount"))
 
-	got := loadOrder(t, db, "order-managed_escrow-amount")
+	got := loadOrder(t, db, "order-managed-amount")
 	require.True(t, got.IsPaymentVerified())
 	require.Equal(t, "1000", got.TotalReceived)
-	require.Empty(t, got.OverpaidAmount, "OrderOpen.Amount is pricing amount, not ManagedEscrow wei")
+	require.Empty(t, got.OverpaidAmount, "OrderOpen.Amount is pricing amount, not managed escrow units")
 
 	ps, err := got.PaymentSentMessage()
 	require.NoError(t, err)
@@ -1024,7 +1024,7 @@ func TestAggregateAndEmit_PendingUTXOCoinOverridesOrderOpenPricingCoin(t *testin
 
 func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesSettlementSpecWhenPresent(t *testing.T) {
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Address:   "0xmanagedescrow",
 		Moderated: false,
 		SettlementSpec: &models.PendingSettlementSpec{
@@ -1042,7 +1042,7 @@ func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesSettlementSpecWhenPrese
 
 func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesPendingTrustModel(t *testing.T) {
 	order := &models.Order{}
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Address:   "0xmanagedescrow",
 		Moderated: false,
 	}))
@@ -1053,7 +1053,7 @@ func TestResolveAggregatedPaymentIntent_ManagedEscrowUsesPendingTrustModel(t *te
 	require.Equal(t, pb.PaymentSent_CANCELABLE, intent.settlementSpec.Method)
 	require.Equal(t, "0xmanagedescrow", intent.contractAddress)
 
-	require.NoError(t, order.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Address:          "0xmanagedescrow",
 		Moderated:        true,
 		Moderator:        "mod-peer",
@@ -1753,7 +1753,7 @@ func TestAggregateAndEmit_SharedPaymentIntentAlignsHostedEnvelope(t *testing.T) 
 			PaymentAddress: "0xmanagedescrow",
 			RefundAddress:  "0xbuyer-refund",
 		}
-		if err := intent.SetPendingManagedEscrowPaymentInfo(&models.PendingManagedEscrowPaymentInfo{
+		if err := intent.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 			Coin:    testUSDCAsset,
 			Amount:  1000,
 			Address: "0xmanagedescrow",

@@ -7,7 +7,7 @@ import (
 )
 
 // IsValidEVMFundingAddress reports whether addr is a 20-byte hex address
-// suitable for address-monitored ManagedEscrow/EOA funding. Legacy redeem-script hashes
+// suitable for address-monitored smart-wallet/EOA funding. Legacy redeem-script hashes
 // (32-byte / 66-char strings) are rejected.
 func IsValidEVMFundingAddress(addr string) bool {
 	addr = strings.TrimSpace(addr)

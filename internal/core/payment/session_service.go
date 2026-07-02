@@ -179,7 +179,7 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 	}
 
 	// Determine whether a session has already been provisioned:
-	//   - Crypto: PaymentAddress is set (ManagedEscrow/UTXO address persisted after GeneratePaymentInstructions).
+	//   - Crypto: PaymentAddress is set (managed EVM/UTXO address persisted after GeneratePaymentInstructions).
 	//   - Fiat:   sessionID key exists in ProviderData (written after CreatePayment returns).
 	//
 	// NOTE: ProviderData may contain only "providerID" (from coin metadata alone)
@@ -248,7 +248,7 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			return s.fiat.CreateSession(ctx, req)
 		}
 
-		// Crypto orders (ManagedEscrow + UTXO): "crypto:{chain}:{token}"
+		// Crypto orders (managed EVM + UTXO): "crypto:{chain}:{token}"
 		if strings.HasPrefix(req.PaymentCoin, "crypto:") {
 			if s.crypto == nil {
 				return nil, ErrProvisioningNotImplemented

@@ -220,7 +220,7 @@ var defaultDefinitions = []Definition{
 	{Code: "MATIC", AssetID: "crypto:eip155:137:native", Pricing: pricingMeta("MATIC", "matic-network", PriceSource{Provider: "binance", ID: "MATICUSDT"}), DisplaySymbol: "MATIC", DisplayName: "Polygon", Decimals: 18, Runtime: runtimeMeta(3*time.Second, 60)},
 	{Code: "MATICUSDT", AssetID: "crypto:eip155:137:erc20:0xc2132D05D31c914a87C6611C10748AEb04B58e8F", Pricing: pricingMetaUSDPegged("USDT", "tether"), DisplaySymbol: "USDT", DisplayName: "Tether USD on Polygon", Decimals: 6, Runtime: runtimeMeta(3*time.Second, 0)},
 	{Code: "MATICUSDC", AssetID: "crypto:eip155:137:erc20:0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", Pricing: pricingMetaUSDPegged("USDC", "usd-coin"), DisplaySymbol: "USDC", DisplayName: "USD Coin on Polygon", Decimals: 6, Runtime: runtimeMeta(3*time.Second, 0)},
-	// ── Phase EVM-ManagedEscrow v0.3.0 Sprint 1 D8 — promoted EVM L2 set ──
+	// ── Phase managed EVM v0.3.0 Sprint 1 D8 — promoted EVM L2 set ──
 	// Native coin types follow the BASEETH pattern: chains whose
 	// native gas token is ETH share the ETH pricing key; chains
 	// with a distinct gas token (AVAX / xDAI / CELO / MNT) own
@@ -246,5 +246,5 @@ var defaultDefinitions = []Definition{
 	{Code: "SOLUSDC", AssetID: "crypto:solana:mainnet:spl:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", Pricing: pricingMetaUSDPegged("USDC", "usd-coin"), DisplaySymbol: "USDC", DisplayName: "USD Coin on Solana", Decimals: 6, Runtime: runtimeMeta(400*time.Millisecond, 0)},
 	{Code: "TRX", AssetID: "crypto:tron:mainnet:native", Pricing: pricingMeta("TRX", "tron", PriceSource{Provider: "binance", ID: "TRXUSDT"}), DisplaySymbol: "TRX", DisplayName: "TRON", Decimals: 6, Runtime: runtimeMeta(3*time.Second, 195)},
 	{Code: "TRXUSDT", AssetID: "crypto:tron:mainnet:trc20:TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", Pricing: pricingMetaUSDPegged("USDT", "tether"), DisplaySymbol: "USDT", DisplayName: "Tether USD on TRON", Decimals: 6, Runtime: runtimeMeta(3*time.Second, 0)},
-	{Code: "EXTERNAL_PAYMENT", AssetID: "crypto:external_payment:mainnet:native", Pricing: pricingMeta("EXTERNAL_PAYMENT", "external_payment", PriceSource{Provider: "binance", ID: "EXTERNAL_PAYMENTUSDT"}), DisplaySymbol: "EXTERNAL_PAYMENT", DisplayName: "ExternalPayment", Decimals: 12, Runtime: runtimeMeta(2*time.Minute, 128)},
+	{Code: "XMR", AssetID: "crypto:monero:mainnet:native", Pricing: pricingMeta("XMR", "monero", PriceSource{Provider: "binance", ID: "XMRUSDT"}), DisplaySymbol: "XMR", DisplayName: "Monero", Decimals: 12, Runtime: runtimeMeta(2*time.Minute, 128)},
 }

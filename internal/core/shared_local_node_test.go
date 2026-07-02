@@ -57,7 +57,7 @@ func newSharedSovereignListing(t *testing.T, slug string) *pb.Listing {
 	t.Helper()
 
 	listing := factory.NewPhysicalListing(slug)
-	listing.Metadata.PricingCurrency.Code = "EXTERNAL_PAYMENT"
+	listing.Metadata.PricingCurrency.Code = "XMR"
 	listing.Metadata.PricingCurrency.Divisibility = 12
 	listing.Item.Price = "1000000000000"
 	for _, sku := range listing.Item.Skus {
@@ -67,7 +67,7 @@ func newSharedSovereignListing(t *testing.T, slug string) *pb.Listing {
 		for _, group := range listing.ShippingProfile.LocationGroups {
 			for _, zone := range group.Zones {
 				for _, rate := range zone.Rates {
-					rate.Currency = "EXTERNAL_PAYMENT"
+					rate.Currency = "XMR"
 					rate.Price = "500000000000"
 				}
 			}

@@ -13,7 +13,7 @@ const (
 	// ManagedEscrowGuestSettlementAction identifies a guest escrow payout.
 	ManagedEscrowGuestSettlementAction = "guest_release"
 	// ManagedEscrowGuestDeployAction identifies counterfactual guest escrow deployment.
-	ManagedEscrowGuestDeployAction = "guest_managed_escrow_deploy"
+	ManagedEscrowGuestDeployAction = "guest_managed_deploy"
 )
 
 // ActionRecord is the canonical durable projection of a backend-submitted

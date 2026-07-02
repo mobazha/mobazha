@@ -32,7 +32,7 @@ func (g *Gateway) registerDisputesInstructionsRelease(api huma.API) {
 		Path:        "/v1/disputes/{orderID}/instructions/release",
 		Summary:     "Legacy dispute release instructions",
 		Description: "Compatibility endpoint for client-signed moderated dispute payouts. " +
-			"ManagedEscrow-backed moderated dispute resolution stays on the backend close/release path " +
+			"backend-managed moderated dispute resolution stays on the backend close/release path " +
 			"and should not use this instructions contract as its primary entrypoint.",
 		Tags:     []string{"disputes"},
 		Security: nodeAuthSecurity,

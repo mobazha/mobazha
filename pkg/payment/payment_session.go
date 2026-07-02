@@ -9,7 +9,7 @@ type SettlementMode string
 
 const (
 	// SettlementModeAddressMonitored is used when the backend generates a
-	// funding address and monitors it for incoming transfers. Covers ManagedEscrow,
+	// funding address and monitors it for incoming transfers. Covers managed escrow,
 	// UTXO, and future Squads.
 	SettlementModeAddressMonitored SettlementMode = "address_monitored"
 	// SettlementModeProviderCheckout is used for fiat providers (Stripe,
@@ -21,13 +21,13 @@ const (
 	// address via their wallet — the backend does not monitor for incoming
 	// transfers.
 	//
-	// Migration path: once ManagedEscrow v2 and Solana Anchor v2 are fully enabled
+	// Migration path: once managed escrow v2 and Solana Anchor v2 are fully enabled
 	// (TECHDEBT TD-PSS-02), this mode should only cover TRON legacy orders.
 	//
 	// Wire value: "escrow_v1"
 	SettlementModeEscrowV1 SettlementMode = "escrow_v1"
 	// SettlementModeMultiRound is reserved for multi-round protocols such
-	// as ExternalPayment or future MPC schemes.
+	// as Monero or future MPC schemes.
 	SettlementModeMultiRound SettlementMode = "multi_round"
 )
 
@@ -39,7 +39,7 @@ const (
 type ProductMode string
 
 const (
-	// ProductModeCancelable is the default EVM/ManagedEscrow product mode: buyer
+	// ProductModeCancelable is the default EVM/managed escrow product mode: buyer
 	// or seller can cancel before fulfillment with a Gas Service Fee.
 	ProductModeCancelable ProductMode = "cancelable"
 	// ProductModeModerated means a third-party moderator can release funds.
@@ -90,7 +90,7 @@ type FundingTargetType string
 
 const (
 	// FundingTargetTypeAddress means the buyer sends funds to a blockchain
-	// address. Used by ManagedEscrow, UTXO, and all address-monitored chains.
+	// address. Used by managed escrow, UTXO, and all address-monitored chains.
 	FundingTargetTypeAddress FundingTargetType = "address"
 	// FundingTargetTypeProviderSession means the buyer completes a payment
 	// via a fiat provider SDK. The providerData field carries the session.
@@ -105,7 +105,7 @@ type UserActionType string
 const (
 	UserActionWalletTransfer         UserActionType = "wallet_transfer"
 	UserActionTokenApprove           UserActionType = "token_approve"
-	UserActionSignManagedEscrowTx             UserActionType = "sign_managed_escrow_tx"
+	UserActionSignEscrowTx           UserActionType = "sign_managed_escrow_tx"
 	UserActionSignSquadsApproval     UserActionType = "sign_squads_approval"
 	UserActionBroadcastSignedPayload UserActionType = "broadcast_signed_payload"
 )

@@ -15,7 +15,7 @@ import "github.com/mobazha/mobazha3.0/pkg/contracts"
 //     (full access). They are validated by AuthenticationMiddleware.
 //   - API tokens (mbz_*) carry an explicit ScopeSet. ScopeEnforcementMiddleware
 //     denies any request that does not match an entry in this map, so newly
-//     added private routes are managed_escrow-by-default until they are mapped here.
+//     added private routes are safe-by-default until they are mapped here.
 //
 // Order matters: more-specific paths must come before their less-specific
 // prefix counterparts (e.g. "POST /v1/wallet/spend" before "GET /v1/wallet").

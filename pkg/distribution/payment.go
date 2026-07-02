@@ -1,5 +1,7 @@
-// Package distribution defines the trusted build-time composition contracts
-// shared by Mobazha Open Core distributions.
+// Package distribution defines the stable build-time composition boundary for
+// trusted Mobazha distributions. Existing interfaces remain backward
+// compatible; new behavior is exposed through optional capability interfaces
+// instead of adding methods to established ports.
 package distribution
 
 import (

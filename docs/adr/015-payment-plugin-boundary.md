@@ -43,3 +43,10 @@ Go's in-process plugin mechanism has platform, toolchain, dependency, and failur
 - Unschematized subprocess protocol: cannot test compatibility/security reliably.
 - HTTP callback as the only local protocol: valid for remote providers, not preferred for local signing.
 - Frontend micro-frontends in v1: deferred pending signed sandbox and CSP design.
+
+## Related decisions
+
+- ADR-018 defines the shared module governance, capability gates, and authority
+  model. This ADR defines one specialized out-of-process protocol within that
+  architecture; it is not the universal extension interface.
+- ADR-016 defines reviewed first-party in-process composition.

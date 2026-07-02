@@ -34,9 +34,29 @@ Public Go packages explicitly documented as extension contracts follow their own
 
 Private or third-party extensions must not import `internal/`, receive `MobazhaNode`, or access raw seed/private-key material. Use documented Ports or versioned out-of-process protocols.
 
+The normative extension architecture and public-contract proposal process are
+defined by [ADR-018](../adr/018-open-core-extension-architecture.md) and the
+[`docs/extensions/`](../extensions/README.md) document set. A product-specific
+hook or exported method is not a supported extension contract merely because
+it is reachable from another repository.
+
 ### Capability compatibility
 
-Recognized identifiers, distribution-enabled capabilities, operator configuration, and healthy runtime providers are distinct sets. Effective availability is their intersection.
+Recognized identifiers, distribution policy, contract compatibility,
+installation/composition, authorization, operator configuration, and runtime
+health are distinct concerns. Effective availability is:
+
+```text
+distribution allowlist
+  ∩ contract compatible
+  ∩ installed or statically composed
+  ∩ authorized
+  ∩ configured
+  ∩ healthy
+```
+
+Recognition and source presence are descriptive only and are not activation
+gates.
 
 Clients must:
 
@@ -86,6 +106,12 @@ A change needs compatibility review when it modifies:
 - a shared persisted model or migration;
 - a public Port, plugin protocol, or signing boundary;
 - behavior consumed by `mobazha-unified`.
+
+Adding a public extension point also requires a domain owner, versioned
+schema, authority boundary, idempotency and failure semantics, capability
+gates, conformance tests, migration, rollback, and removal plan. Generic hooks
+and mutable runtime service registries are not compatible substitutes for
+that review.
 
 The review must identify the compatibility layer, affected distributions, rollout order, downgrade behavior, tests, documentation, and whether an RFC/ADR is required.
 

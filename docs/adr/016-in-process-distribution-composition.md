@@ -85,3 +85,6 @@ commercial distributions by advancing their pinned dependency.
 
 - ADR-015: Out-of-process payment plugin boundary.
 - ADR-017: Mobazha v0.3 payment scope.
+- ADR-018: Open Core extension architecture. First-party modules use its
+  descriptor, capability, lifecycle, authority, and conformance rules while
+  retaining domain-specific Ports.

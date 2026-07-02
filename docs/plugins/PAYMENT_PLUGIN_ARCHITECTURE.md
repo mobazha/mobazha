@@ -2,13 +2,18 @@
 
 ## 1. Purpose
 
-Define the target public contract for adding payment chains without modifying Mobazha Core. This specification implements ADR-015 and is subordinate to `docs/project/RELEASE_SCOPE.md`.
+Define the target public contract for adding payment chains without modifying Mobazha Core. This specification implements ADR-015, follows the shared governance in ADR-018, and is subordinate to `docs/project/RELEASE_SCOPE.md`.
 
 The first release may use compatibility adapters around bundled UTXO code. API names below are architectural contracts, not a claim that every RPC type already exists.
 
 This document governs untrusted or independently distributed extensions.
 Reviewed first-party modules follow the public in-process composition boundary
 and do not need to use this out-of-process protocol.
+
+The shared capability, lifecycle, authority, and security rules are defined in
+[`docs/extensions/`](../extensions/README.md). This payment protocol is one
+domain-specific extension contract. It is not a generic module API and must
+not be reused for order extensions such as Collectibles.
 
 ## 2. Trust model
 
@@ -193,3 +198,8 @@ Chain suites add consensus and transaction fixtures for every bundled payment ch
 5. Implement out-of-process supervisor and RPC v1.
 6. Convert one bundled UTXO chain as reference external plugin.
 7. Stabilize the compatibility kit before publishing a catalog.
+
+Payment plugin publication also requires the common extension conformance
+suite in [`CONFORMANCE.md`](../extensions/CONFORMANCE.md). Where this document
+is more restrictive for payment or signing behavior, the stricter requirement
+applies.

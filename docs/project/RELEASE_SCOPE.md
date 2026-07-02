@@ -2,7 +2,14 @@
 
 Mobazha is an open-source commerce platform for self-hosted stores and hosted deployments. This document defines the capabilities included in the initial Mobazha Node release, which enables Bitcoin, Bitcoin Cash, and Litecoin payments.
 
-The machine-readable allowlist is `config/editions/community.json`. The `community` identifier is retained as an internal compatibility key for manifests and release tooling; it is not a separate product name. Runtime availability is the intersection of the release allowlist and seller configuration. A frontend may narrow the set but must never widen it.
+The machine-readable allowlist is `config/editions/community.json`. The
+`community` identifier is retained as an internal compatibility key for
+manifests and release tooling; it is not a separate product name. Runtime
+availability follows the effective-capability intersection defined in
+[`COMPATIBILITY.md`](COMPATIBILITY.md): distribution allowlist, contract
+compatibility, installation/composition, authorization, configuration, and
+health must all pass. Seller configuration is one gate within that model. A
+frontend may narrow the set but must never widen it.
 
 Identifiers and adapters for additional chains may remain in the source for data migration and protocol compatibility. Their presence does not enable those chains in the current release and does not constitute a compatibility commitment.
 
@@ -21,8 +28,8 @@ and checkout is advertised only while that module reports `ready`.
 Third-party payment capabilities are intended to evolve as independently
 versioned, out-of-process plugins. Core retains release policy, order state,
 verification, audit, and key custody; plugins do not receive raw seed or
-private-key material. See ADR-016 for trusted first-party composition and
-`docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md` plus ADR-015 for third-party
-plugins.
+private-key material. See ADR-016 for trusted first-party composition,
+[`PAYMENT_PLUGIN_ARCHITECTURE.md`](../plugins/PAYMENT_PLUGIN_ARCHITECTURE.md),
+ADR-015, and ADR-018 for third-party plugins.
 
 English is the default language for repository documentation unless a document is explicitly maintained as a Chinese edition.

@@ -8,7 +8,7 @@ commit bodies without publishing provider-only files.
 ## Invariants
 
 - The retained history starts at root `56a8d8475522ae7570dc2984c3f87843a5e2a769`.
-- Commit `7ca9f834091f4176a2e9b68fd8f1f0aa673b4a6d` is the reviewed source-aligned
+- Commit `6fb2eb1786645edee6e15b57c5d035bb5f732bef` is the reviewed source-aligned
   anchor for the final Open Core extraction series.
 - The anchor contains exactly 1,835 commits and keeps its original author
   timestamp, `2026-06-28T09:44:00+08:00`.

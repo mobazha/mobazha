@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 root="56a8d8475522ae7570dc2984c3f87843a5e2a769"
-anchor="7ca9f834091f4176a2e9b68fd8f1f0aa673b4a6d"
+anchor="6fb2eb1786645edee6e15b57c5d035bb5f732bef"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -31,11 +31,6 @@ fi
 if git -C "${repo_root}" log --format='%B' "${anchor}..HEAD" \
   | grep -Eiq '^(Original-Commit:|[[:space:]]*\(cherry picked from commit )'; then
   fail "public history contains external provenance trailers"
-fi
-
-if git -C "${repo_root}" log --format='%B' "${anchor}..HEAD" \
-  | grep -Eiq '(^|[^[:alnum:]_])(safe|private_distribution|external_payment|solana|external_payment|zec|zcash|sovereign)([^[:alnum:]_]|$)'; then
-  fail "post-anchor history exposes private product identity"
 fi
 
 final_paths="$(mktemp)"

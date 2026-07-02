@@ -101,6 +101,24 @@ func newTestClient(server string) *Client {
 	}
 }
 
+func TestReconnectWithoutEndpointsReturns(t *testing.T) {
+	client := &Client{
+		shutdown: make(chan struct{}),
+		chain:    "TEST",
+	}
+	done := make(chan struct{})
+	go func() {
+		client.reconnect()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("reconnect must not spin forever without configured endpoints")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Test 1: readLoop uses its own reader parameter, not Client shared state.
 //
@@ -133,6 +151,7 @@ func TestReadLoop_OwnReader_NotAffectedByFieldReplacement(t *testing.T) {
 		shutdown: make(chan struct{}),
 		chain:    "TEST",
 	}
+	t.Cleanup(func() { _ = client.Close() })
 	client.conn = clientConn
 	client.connected = true
 

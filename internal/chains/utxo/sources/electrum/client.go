@@ -19,6 +19,8 @@ import (
 
 var log = logging.MustGetLogger("electrum")
 
+const defaultReconnectDelay = 5 * time.Second
+
 // Client represents an Electrum protocol client
 type Client struct {
 	servers        []string
@@ -66,7 +68,6 @@ func DefaultClientConfig(chain string, testnet bool) *ClientConfig {
 	}
 }
 
-
 // NewClient creates a new Electrum client
 func NewClient(config *ClientConfig) *Client {
 	if config == nil {
@@ -75,7 +76,7 @@ func NewClient(config *ClientConfig) *Client {
 
 	reconnect := config.ReconnectDelay
 	if reconnect <= 0 {
-		reconnect = 5 * time.Second
+		reconnect = defaultReconnectDelay
 	}
 
 	return &Client{
@@ -499,7 +500,14 @@ func (c *Client) handleDisconnect() {
 
 func (c *Client) reconnect() {
 	const maxDelay = 2 * time.Minute
+	if len(c.servers) == 0 {
+		log.Warningf("[%s] Automatic reconnect disabled: no Electrum endpoints configured", c.chain)
+		return
+	}
 	delay := c.reconnectDelay
+	if delay <= 0 {
+		delay = defaultReconnectDelay
+	}
 
 	for attempt := 1; ; attempt++ {
 		select {

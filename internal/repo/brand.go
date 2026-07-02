@@ -11,7 +11,7 @@ const brandConfigFilename = "brand.yaml"
 
 // BrandConfig holds white-label branding overrides loaded from
 // <dataDir>/brand.yaml. When absent, the node uses Mobazha defaults.
-// Partners (e.g. "Example Market") ship a pre-filled brand.yaml
+// Private distributions ship a pre-filled brand.yaml
 // alongside the binary or Docker image.
 type BrandConfig struct {
 	Brand BrandFields `yaml:"brand"`
@@ -24,7 +24,7 @@ type BrandFields struct {
 	// OpenAPI docs (e.g. "Example Market").
 	Name string `yaml:"name" json:"name"`
 
-	// ShortName is an abbreviated form for constrained UI (e.g. "AGM").
+	// ShortName is an abbreviated form for constrained UI (e.g. "EXM").
 	ShortName string `yaml:"shortName,omitempty" json:"shortName,omitempty"`
 
 	// Tagline is a one-line product description.
@@ -68,12 +68,12 @@ type BrandFields struct {
 
 // NetworkFields gates the network/node-pool UI surface for white-label
 // builds. Setting all fields to false yields the most locked-down UX
-// (Example baseline) — users see neither node lists nor diagnostics.
+// (the locked-down baseline) — users see neither node lists nor diagnostics.
 // Each flag is independent so partners can opt in to advanced visibility
 // piecemeal without unlocking custom-node entry.
 type NetworkFields struct {
 	// AllowUserCustomNode lets the user paste their own external_paymentd RPC
-	// address into Settings → Network. Off by default — Example-style
+	// address into Settings → Network. Off by default — restricted-egress
 	// devices ship a curated pool only. Independent of ShowNodePoolUI:
 	// a partner may show the curated pool (read-only) without allowing
 	// custom entries.

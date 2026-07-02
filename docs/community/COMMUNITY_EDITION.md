@@ -10,6 +10,10 @@ Mobazha-authored Community Edition source, including retained Mobazha history, i
 
 Zcash is outside the initial release while its production monitoring and seller-settlement journey is completed. Bundled fiat providers are not enabled in the initial Community Edition runtime.
 
-Additional payment capabilities are intended to evolve as independently versioned, out-of-process plugins. Core retains edition policy, order state, verification, audit, and key custody; plugins do not receive raw seed or private-key material. See `docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md` and ADR-015.
+Additional payment capabilities are intended to evolve as independently
+versioned, out-of-process plugins. Core retains edition policy, order state,
+verification, audit, and key custody; plugins do not receive raw seed or
+private-key material. See `docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md` and
+ADR-015.
 
 English is the default language for repository documentation unless a document is explicitly maintained as a Chinese edition.

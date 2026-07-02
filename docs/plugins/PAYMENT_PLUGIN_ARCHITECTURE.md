@@ -6,6 +6,10 @@ Define the target public contract for adding payment chains without modifying Mo
 
 The first release may use compatibility adapters around bundled UTXO code. API names below are architectural contracts, not a claim that every RPC type already exists.
 
+This document governs untrusted or independently distributed extensions.
+Reviewed first-party modules follow the public in-process composition boundary
+and do not need to use this out-of-process protocol.
+
 ## 2. Trust model
 
 Plugins are untrusted infrastructure extensions. They may contact chain nodes and indexers, parse hostile network data, and construct transactions. They must not receive raw seeds, private keys, unrestricted database handles, the complete `MobazhaNode`, or imports from `internal/`.

@@ -24,7 +24,10 @@ Identifiers or adapters for other chains may remain in the repository for histor
 
 The node is organized around explicit application services for marketplace, order, payment, and settlement workflows. The Community Edition policy remains authoritative for capability registration, API projection, validation, and wallet startup.
 
-Additional payment capabilities are planned as independently versioned, out-of-process plugins. Core keeps policy enforcement, order state, verification, audit, and key custody. Plugins must not receive raw seed phrases or private keys.
+Additional payment capabilities are planned as independently versioned,
+out-of-process plugins. Core keeps policy enforcement, order state,
+verification, audit, and key custody. Plugins must not receive raw seed phrases
+or private keys.
 
 See:
 
@@ -33,6 +36,8 @@ See:
 - [Public repository history](docs/community/PUBLIC_HISTORY.md)
 - [Payment plugin architecture](docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md)
 - [ADR-015: payment plugin boundary](docs/adr/015-payment-plugin-boundary.md)
+- [ADR-016: in-process first-party distribution composition](docs/adr/016-in-process-distribution-composition.md)
+- [ADR-017: Community v0.3 payment chain scope](docs/adr/017-community-v0.3-chain-scope.md)
 - [Supply-chain audit baseline](docs/security/SUPPLY_CHAIN_AUDIT.md)
 
 ## Requirements

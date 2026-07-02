@@ -15,11 +15,10 @@ machines and route semantics.
 
 First-party private modules also differ from third-party plugins. They are
 reviewed and released with a commercial distribution, may need low-latency
-in-process access, and can implement product-specific protocols such as ManagedEscrow,
-Solana, or ExternalPayment. Requiring those trusted modules to be separate processes
-would add operational failure modes without creating a meaningful trust
-boundary. Untrusted ecosystem extensions still need ADR-015's out-of-process
-boundary.
+in-process access, and can implement product-specific payment protocols.
+Requiring those trusted modules to be separate processes would add operational
+failure modes without creating a meaningful trust boundary. Untrusted
+ecosystem extensions still need ADR-015's out-of-process boundary.
 
 ## Decision
 
@@ -81,3 +80,8 @@ commercial distributions by advancing their pinned dependency.
   extensions, but unnecessary overhead for reviewed statically linked modules.
 - Runtime reflection or optional-method discovery: failures appear only at
   runtime and can silently omit capabilities.
+
+## Related decisions
+
+- ADR-015: Out-of-process payment plugin boundary.
+- ADR-017: Community v0.3 payment chain scope.

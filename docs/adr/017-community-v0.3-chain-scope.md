@@ -1,4 +1,4 @@
-# ADR-016: Community v0.3 Payment Chain Scope
+# ADR-017: Community v0.3 Payment Chain Scope
 
 Status: Accepted
 

@@ -32,7 +32,9 @@ func (*directPaymentExternalRuntimeStub) WatchPayment(*distribution.ExternalPaym
 func (*directPaymentExternalRuntimeStub) UnwatchPayment(uint32)              {}
 func (*directPaymentExternalRuntimeStub) ReapPayment(uint32)                 {}
 func (*directPaymentExternalRuntimeStub) PaymentPollInterval() time.Duration { return time.Second }
-func (*directPaymentExternalRuntimeStub) PaymentGracePeriod() time.Duration  { return time.Hour }
+func (*directPaymentExternalRuntimeStub) PaymentGracePeriod(iwallet.CoinType) time.Duration {
+	return time.Hour
+}
 func (*directPaymentExternalRuntimeStub) PaymentHeight(context.Context) (uint64, error) {
 	return 1, nil
 }

@@ -35,6 +35,9 @@ func (b *distributionDirectObservedRuntimeBinder) BindExternalPaymentRuntime(
 	if b.node.guestPaymentMonitor != nil {
 		b.node.guestPaymentMonitor.SetExternalPaymentRuntime(runtime)
 	}
+	if b.node.guestOrderService != nil {
+		b.node.guestOrderService.SetDirectObservedGraceProvider(runtime)
+	}
 	return nil
 }
 
@@ -53,6 +56,9 @@ func (b *distributionDirectObservedRuntimeBinder) UnbindExternalPaymentRuntime(
 	}
 	if b.node.guestPaymentMonitor != nil {
 		b.node.guestPaymentMonitor.SetExternalPaymentRuntime(nil)
+	}
+	if b.node.guestOrderService != nil {
+		b.node.guestOrderService.SetDirectObservedGraceProvider(nil)
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,6 +16,18 @@ func newCleanupSvc(db *testDatabase) *GuestOrderAppService {
 		DB:     db,
 		NodeID: "node-test",
 	})
+}
+
+type testGraceProvider struct {
+	asset iwallet.CoinType
+	grace time.Duration
+}
+
+func (provider testGraceProvider) PaymentGracePeriod(asset iwallet.CoinType) time.Duration {
+	if asset != provider.asset {
+		return 0
+	}
+	return provider.grace
 }
 
 // ── CleanupExpiredOrders ────────────────────────────────────────
@@ -105,8 +118,12 @@ func TestCleanupExpiredOrders_SkipsNotYetExpired(t *testing.T) {
 func TestCleanupExpiredOrders_RespectsXMRGrace(t *testing.T) {
 	db := newGuestTestDB(t)
 	svc := newCleanupSvc(db)
+	svc.SetDirectObservedGraceProvider(testGraceProvider{
+		asset: "crypto:monero:mainnet:native",
+		grace: 2 * time.Hour,
+	})
 
-	past := time.Now().Add(-30 * time.Minute) // expired, but well within 2h XMR grace
+	past := time.Now().Add(-90 * time.Minute) // outside fallback, inside module grace
 	seedGuestOrder(t, db, 1, models.GuestOrder{
 		OrderToken:  "gst_xmr_in_grace",
 		State:       models.GuestOrderAwaitingPayment,
@@ -288,6 +305,11 @@ func TestReleaseExpiredReservations_OnlyReleasesExpiredUnconfirmed(t *testing.T)
 // per-coin-grace cleanup fix would silently re-emerge in production.
 func TestReservationExpiresAtForOrder_IncludesPerCoinGrace(t *testing.T) {
 	base := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	svc := newCleanupSvc(newGuestTestDB(t))
+	svc.SetDirectObservedGraceProvider(testGraceProvider{
+		asset: "crypto:monero:mainnet:native",
+		grace: 2 * time.Hour,
+	})
 	cases := []struct {
 		coin string
 		want time.Duration
@@ -295,12 +317,13 @@ func TestReservationExpiresAtForOrder_IncludesPerCoinGrace(t *testing.T) {
 		{"crypto:bitcoin:mainnet:native", utxoGracePeriod},
 		{"crypto:litecoin:mainnet:native", utxoGracePeriod},
 		{"crypto:ethereum:mainnet:native", evmGracePeriod},
-		{"crypto:solana:mainnet:native", utxoGracePeriod},
-		{"crypto:unknown:mainnet:native", utxoGracePeriod}, // default branch
+		{"crypto:monero:mainnet:native", 2 * time.Hour},
+		{"crypto:solana:mainnet:native", fallbackGracePeriod},
+		{"crypto:unknown:mainnet:native", fallbackGracePeriod},
 	}
 	for _, tc := range cases {
 		t.Run(tc.coin, func(t *testing.T) {
-			got := reservationExpiresAtForOrder(base, tc.coin)
+			got := svc.reservationExpiresAtForOrder(base, tc.coin)
 			want := base.Add(tc.want)
 			assert.True(t, got.Equal(want),
 				"coin %q: got %s, want %s", tc.coin, got, want)
@@ -317,11 +340,15 @@ func TestReservationExpiresAtForOrder_IncludesPerCoinGrace(t *testing.T) {
 func TestReleaseExpiredReservations_RespectsGuestOrderGrace(t *testing.T) {
 	db := newGuestTestDB(t)
 	svc := newCleanupSvc(db)
+	svc.SetDirectObservedGraceProvider(testGraceProvider{
+		asset: "crypto:monero:mainnet:native",
+		grace: 2 * time.Hour,
+	})
 
 	// Order's payment window expired 30min ago; XMR grace is 2h, so
 	// reservation.ExpiresAt is ~90min in the future.
 	orderExpires := time.Now().Add(-30 * time.Minute)
-	resvExpires := reservationExpiresAtForOrder(orderExpires, "crypto:monero:mainnet:native")
+	resvExpires := svc.reservationExpiresAtForOrder(orderExpires, "crypto:monero:mainnet:native")
 	seedReservation(t, db, 1, models.InventoryReservation{
 		OrderRef:    "gst_xmr_in_grace",
 		OrderType:   models.OrderTypeGuest,

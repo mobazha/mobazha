@@ -89,6 +89,6 @@ type ExternalPaymentRuntime interface {
 	UnwatchPayment(addressIndex uint32)
 	ReapPayment(addressIndex uint32)
 	PaymentPollInterval() time.Duration
-	PaymentGracePeriod() time.Duration
+	PaymentGracePeriod(asset iwallet.CoinType) time.Duration
 	PaymentHeight(ctx context.Context) (uint64, error)
 }

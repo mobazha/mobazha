@@ -25,6 +25,7 @@ const (
 	confirmationPollInterval = 30 * time.Second
 	evmGracePeriod           = 1 * time.Hour
 	utxoGracePeriod          = 1 * time.Hour
+	fallbackGracePeriod      = 1 * time.Hour
 )
 
 // ChainBalanceChecker abstracts chain-specific balance queries so the monitor
@@ -183,7 +184,7 @@ func (m *GuestPaymentMonitor) RestoreWatches(ctx context.Context) error {
 
 	restored := 0
 	for i := range orders {
-		grace := m.gracePeriodForCoin(orders[i].PaymentCoin)
+		grace := resolvePaymentGracePeriod(orders[i].PaymentCoin, m.externalPay)
 		if time.Now().After(orders[i].ExpiresAt.Add(grace)) {
 			continue
 		}
@@ -255,13 +256,14 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 		}
 
 	default:
-		if m.externalPay == nil {
+		runtime := m.externalPay
+		if runtime == nil {
 			log.Warningf("no monitor strategy for coin %q (order %s)", coinType, redact.Token(order.OrderToken))
 			return
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		m.watches[order.OrderToken] = cancel
-		go m.watchExternalPaymentOrder(ctx, order)
+		go m.watchExternalPaymentOrder(ctx, order, runtime)
 	}
 }
 
@@ -505,10 +507,22 @@ func (m *GuestPaymentMonitor) pollConfirmationsLoop(
 	}
 }
 
-func (m *GuestPaymentMonitor) gracePeriodForCoin(paymentCoin string) time.Duration {
+// gracePeriodForCoin provides the provider-free fallback used by order cleanup
+// code that does not own a live module runtime.
+func gracePeriodForCoin(paymentCoin string) time.Duration {
+	return resolvePaymentGracePeriod(paymentCoin, nil)
+}
+
+// PaymentGracePeriodProvider supplies asset-specific timing policy without
+// exposing a concrete direct-observed client to order lifecycle code.
+type PaymentGracePeriodProvider interface {
+	PaymentGracePeriod(asset iwallet.CoinType) time.Duration
+}
+
+func resolvePaymentGracePeriod(paymentCoin string, provider PaymentGracePeriodProvider) time.Duration {
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(paymentCoin))
 	if err != nil {
-		return gracePeriodForCoin(paymentCoin)
+		return fallbackGracePeriod
 	}
 	switch {
 	case coinInfo.IsEthTypeChain() || coinInfo.Chain == iwallet.ChainTRON:
@@ -516,21 +530,13 @@ func (m *GuestPaymentMonitor) gracePeriodForCoin(paymentCoin string) time.Durati
 	case coinInfo.Chain.IsUTXOChain():
 		return utxoGracePeriod
 	default:
-		if m.externalPay != nil && m.externalPay.PaymentGracePeriod() > 0 {
-			return m.externalPay.PaymentGracePeriod()
+		if provider != nil {
+			if grace := provider.PaymentGracePeriod(iwallet.CoinType(paymentCoin)); grace > 0 {
+				return grace
+			}
 		}
-		return gracePeriodForCoin(paymentCoin)
+		return fallbackGracePeriod
 	}
-}
-
-// gracePeriodForCoin provides the provider-free fallback used by order cleanup
-// code that does not own a live module runtime.
-func gracePeriodForCoin(paymentCoin string) time.Duration {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(paymentCoin))
-	if err == nil && (coinInfo.IsEthTypeChain() || coinInfo.Chain == iwallet.ChainTRON) {
-		return evmGracePeriod
-	}
-	return utxoGracePeriod
 }
 
 func parsePaymentAmount(amount string) (uint64, bool) {
@@ -582,7 +588,11 @@ func computeWatcherDeadline(orderDeadline time.Time, monitorPollInterval time.Du
 // the monitor's reapExpired has time to deliver Partial/Expired into our
 // terminated channel before we tear down. Without the slack, a tx that
 // arrives partial right at the grace boundary can be lost.
-func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, order *models.GuestOrder) {
+func (m *GuestPaymentMonitor) watchExternalPaymentOrder(
+	ctx context.Context,
+	order *models.GuestOrder,
+	runtime distribution.ExternalPaymentRuntime,
+) {
 	defer func() {
 		m.mu.Lock()
 		delete(m.watches, order.OrderToken)
@@ -598,7 +608,7 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 	// Shared deadline: payment window + confirmation window. Same value is
 	// used both for the local select-case timeout and as the
 	// pollConfirmationsLoop deadline once the order funds.
-	grace := monitorGracePeriod(m.externalPay)
+	grace := monitorGracePeriod(runtime, iwallet.CoinType(order.PaymentCoin))
 	deadline := order.ExpiresAt.Add(grace)
 
 	type detection struct {
@@ -608,8 +618,7 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 	detected := make(chan detection, 1)
 	terminated := make(chan struct{})
 
-	monitor := m.directObservedMonitor()
-	if monitor == nil {
+	if runtime == nil {
 		log.Warningf("no direct observed payment runtime for order %s", redact.Token(order.OrderToken))
 		return
 	}
@@ -667,16 +676,16 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 		},
 	}
 
-	if err := monitor.WatchPayment(wa); err != nil {
+	if err := runtime.WatchPayment(wa); err != nil {
 		log.Warningf("watch external payment account for %s: %v", redact.Token(order.OrderToken), err)
 		return
 	}
-	defer monitor.UnwatchPayment(order.AddressIndex)
+	defer runtime.UnwatchPayment(order.AddressIndex)
 
 	// Watcher deadline = monitor's logical deadline + slack so reapExpired
 	// has time to deliver Partial/Expired before we unwatch. See
 	// watcherSettleSlack docs and computeWatcherDeadline.
-	watcherDeadline := computeWatcherDeadline(deadline, monitor.PaymentPollInterval())
+	watcherDeadline := computeWatcherDeadline(deadline, runtime.PaymentPollInterval())
 	expiryTimer := time.NewTimer(time.Until(watcherDeadline))
 	defer expiryTimer.Stop()
 
@@ -694,32 +703,21 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(ctx context.Context, ord
 		// pool/partial state).
 		log.Warningf("external payment watcher for %s past deadline+slack; reaping",
 			redact.Token(order.OrderToken))
-		monitor.ReapPayment(order.AddressIndex)
+		runtime.ReapPayment(order.AddressIndex)
 		return
 	case <-terminated:
 		return
 	case d := <-detected:
-		fetcher := &externalHeightFetcher{monitor: monitor, txHeight: d.height, label: order.PaymentCoin}
+		fetcher := &externalHeightFetcher{monitor: runtime, txHeight: d.height, label: order.PaymentCoin}
 		m.pollConfirmationsLoop(ctx, order.OrderToken, order.RequiredConfs, fetcher, deadline)
 	}
 }
 
-func monitorGracePeriod(runtime distribution.ExternalPaymentRuntime) time.Duration {
-	if runtime != nil && runtime.PaymentGracePeriod() > 0 {
-		return runtime.PaymentGracePeriod()
+func monitorGracePeriod(runtime distribution.ExternalPaymentRuntime, asset iwallet.CoinType) time.Duration {
+	if runtime != nil {
+		if grace := runtime.PaymentGracePeriod(asset); grace > 0 {
+			return grace
+		}
 	}
-	return utxoGracePeriod
-}
-
-type directObservedMonitor interface {
-	WatchPayment(*distribution.ExternalPaymentWatch) error
-	UnwatchPayment(uint32)
-	ReapPayment(uint32)
-	PaymentPollInterval() time.Duration
-	PaymentHeight(context.Context) (uint64, error)
-	PaymentHealth(context.Context) distribution.ExternalPaymentHealth
-}
-
-func (m *GuestPaymentMonitor) directObservedMonitor() directObservedMonitor {
-	return m.externalPay
+	return fallbackGracePeriod
 }

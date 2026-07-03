@@ -56,6 +56,7 @@ type DirectPaymentService struct {
 	projectorMu sync.RWMutex
 	projector   distribution.ManagedEscrowGuestProjector
 	sellerOwner GuestEVMSellerOwnerResolver
+	externalMu  sync.RWMutex
 	externalPay distribution.ExternalPaymentRuntime
 }
 
@@ -99,6 +100,8 @@ func (s *DirectPaymentService) HasManagedEscrowFunding() bool {
 // SetExternalPaymentRuntime injects the provider-neutral direct observed rail
 // used for fresh address allocation. The runtime owns its account selection.
 func (s *DirectPaymentService) SetExternalPaymentRuntime(runtime distribution.ExternalPaymentRuntime) {
+	s.externalMu.Lock()
+	defer s.externalMu.Unlock()
 	s.externalPay = runtime
 }
 
@@ -117,10 +120,7 @@ func (s *DirectPaymentService) GeneratePaymentAddress(ctx context.Context, req P
 	case coinInfo.Chain == iwallet.ChainTRON:
 		return s.derivePaymentAddress(ctx, coinInfo.Chain, req)
 	default:
-		if s.externalPay != nil {
-			return s.generateExternalPaymentAddress(ctx, req)
-		}
-		return nil, fmt.Errorf("unsupported chain for guest checkout: %s", coinInfo.Chain)
+		return s.generateExternalPaymentAddress(ctx, req)
 	}
 }
 
@@ -215,8 +215,11 @@ func (s *DirectPaymentService) derivePaymentAddress(
 // address and opaque account index used for subsequent observations.
 func (s *DirectPaymentService) generateExternalPaymentAddress(ctx context.Context, req PaymentAddressRequest) (*PaymentAddressResult, error) {
 	label := fmt.Sprintf("guest_%s", req.OrderToken)
-	if s.externalPay != nil {
-		address, err := s.externalPay.CreatePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{
+	s.externalMu.RLock()
+	runtime := s.externalPay
+	s.externalMu.RUnlock()
+	if runtime != nil {
+		address, err := runtime.CreatePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{
 			Label: label,
 			Asset: req.CoinType,
 		})

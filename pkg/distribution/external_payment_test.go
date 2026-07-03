@@ -6,6 +6,8 @@ package distribution
 import (
 	"context"
 	"time"
+
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 type externalPaymentRuntimeStub struct{}
@@ -22,7 +24,9 @@ func (externalPaymentRuntimeStub) WatchPayment(*ExternalPaymentWatch) error { re
 func (externalPaymentRuntimeStub) UnwatchPayment(uint32)                    {}
 func (externalPaymentRuntimeStub) ReapPayment(uint32)                       {}
 func (externalPaymentRuntimeStub) PaymentPollInterval() time.Duration       { return time.Second }
-func (externalPaymentRuntimeStub) PaymentGracePeriod() time.Duration        { return time.Hour }
+func (externalPaymentRuntimeStub) PaymentGracePeriod(iwallet.CoinType) time.Duration {
+	return time.Hour
+}
 func (externalPaymentRuntimeStub) PaymentHeight(context.Context) (uint64, error) {
 	return 1, nil
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const externalObservedCoinType = "crypto:monero:mainnet:native"
@@ -51,7 +52,9 @@ func (s *observedPaymentRuntimeStub) UnwatchPayment(index uint32) {
 }
 func (*observedPaymentRuntimeStub) ReapPayment(uint32)                 {}
 func (*observedPaymentRuntimeStub) PaymentPollInterval() time.Duration { return 50 * time.Millisecond }
-func (*observedPaymentRuntimeStub) PaymentGracePeriod() time.Duration  { return 10 * time.Second }
+func (*observedPaymentRuntimeStub) PaymentGracePeriod(iwallet.CoinType) time.Duration {
+	return 10 * time.Second
+}
 func (s *observedPaymentRuntimeStub) PaymentHeight(context.Context) (uint64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

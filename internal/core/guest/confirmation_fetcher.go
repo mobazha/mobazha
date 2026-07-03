@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/mobazha/mobazha/pkg/distribution"
 	pkgutxo "github.com/mobazha/mobazha/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
@@ -54,8 +55,13 @@ func (f *chainTxFetcher) Label() string {
 // externalHeightFetcher derives confirmations from a provider-owned current
 // height and the observed payment's block height. It contains no chain client
 // or provider-specific behavior.
+type externalPaymentHeightMonitor interface {
+	PaymentHeight(context.Context) (uint64, error)
+	PaymentHealth(context.Context) distribution.ExternalPaymentHealth
+}
+
 type externalHeightFetcher struct {
-	monitor  directObservedMonitor
+	monitor  externalPaymentHeightMonitor
 	txHeight uint64
 	label    string
 }

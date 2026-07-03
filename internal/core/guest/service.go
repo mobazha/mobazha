@@ -118,8 +118,22 @@ type GuestOrderAppService struct {
 	evmManagedEscrowMonitorChains map[iwallet.ChainType]struct{}
 	evmHealthProvider             distribution.ManagedEscrowHealthProvider
 	guestPaymentPolicy            distribution.GuestPaymentPolicy
+	directObservedGraceMu         sync.RWMutex
+	directObservedGrace           PaymentGracePeriodProvider
 	billingHoldActive             func() bool
 	checkoutSupplyQuoter          *checkoutsupply.CheckoutSupplyQuoteService
+}
+
+// SetDirectObservedGraceProvider wires asset-specific timing policy from the
+// currently bound direct-observed module. Passing nil restores the conservative
+// provider-free fallback used for historical or unsupported assets.
+func (s *GuestOrderAppService) SetDirectObservedGraceProvider(provider PaymentGracePeriodProvider) {
+	if s == nil {
+		return
+	}
+	s.directObservedGraceMu.Lock()
+	defer s.directObservedGraceMu.Unlock()
+	s.directObservedGrace = provider
 }
 
 // SetManagedEscrowSettlement wires managed EVM escrow settlement after distribution registration.
@@ -964,7 +978,7 @@ func (s *GuestOrderAppService) CleanupExpiredOrders(ctx context.Context) {
 	})
 
 	for _, order := range orders {
-		grace := gracePeriodForCoin(order.PaymentCoin)
+		grace := s.gracePeriodForCoin(order.PaymentCoin)
 		if now.Before(order.ExpiresAt.Add(grace)) {
 			// Watcher still owns this order — let it land
 			// HandlePaymentDetected (mined) or HandleLatePayment
@@ -1098,7 +1112,7 @@ func (s *GuestOrderAppService) reserveGuestSupplyInTx(
 			OrderRef:  orderToken,
 			OrderType: models.OrderTypeGuest,
 			Lines:     reservableLines,
-			ExpiresAt: reservationExpiresAtForOrder(orderExpiresAt, paymentCoin),
+			ExpiresAt: s.reservationExpiresAtForOrder(orderExpiresAt, paymentCoin),
 		})
 		if errors.Is(err, contracts.ErrSupplyUnavailable) {
 			return fmt.Errorf("%w: %w", contracts.ErrInsufficientStock, err)
@@ -1190,7 +1204,7 @@ func (s *GuestOrderAppService) reserveGuestInventoryLineInTx(
 		VariantHash: item.VariantHash,
 		Quantity:    item.Quantity,
 		ReservedAt:  time.Now(),
-		ExpiresAt:   reservationExpiresAtForOrder(orderExpiresAt, paymentCoin),
+		ExpiresAt:   s.reservationExpiresAtForOrder(orderExpiresAt, paymentCoin),
 	}
 	if err := tx.Save(&reservation); err != nil {
 		return fmt.Errorf("reserve inventory for %s: %w", item.ListingSlug, err)
@@ -1460,8 +1474,18 @@ const reservationConfirmationGrace = 2 * time.Hour
 // grace). Releasing earlier can leak inventory mid-grace while the
 // watcher could still fund the order. Single source of truth shared by
 // CreateGuestOrder and its regression test.
-func reservationExpiresAtForOrder(orderExpiresAt time.Time, paymentCoin string) time.Time {
-	return orderExpiresAt.Add(gracePeriodForCoin(paymentCoin))
+func (s *GuestOrderAppService) gracePeriodForCoin(paymentCoin string) time.Duration {
+	if s == nil {
+		return gracePeriodForCoin(paymentCoin)
+	}
+	s.directObservedGraceMu.RLock()
+	provider := s.directObservedGrace
+	s.directObservedGraceMu.RUnlock()
+	return resolvePaymentGracePeriod(paymentCoin, provider)
+}
+
+func (s *GuestOrderAppService) reservationExpiresAtForOrder(orderExpiresAt time.Time, paymentCoin string) time.Time {
+	return orderExpiresAt.Add(s.gracePeriodForCoin(paymentCoin))
 }
 
 func (s *GuestOrderAppService) extendReservationForConfirmation(tx database.Tx, orderToken string, orderExpiry time.Time) error {

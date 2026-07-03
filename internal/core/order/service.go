@@ -22,6 +22,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -64,6 +65,10 @@ type DiscountResolverFunc func(ctx context.Context, vendorPeerID string, dc mode
 // after a successful purchase.
 type DiscountRedemptionRecorderFunc func(ctx context.Context, vendorPeerID string, discountID string, codeID *string, orderID, customerPeerID, amount, currency string) error
 
+// OrderExtensionDeclarer invokes statically registered module codecs against
+// the signed OrderOpen. Core persists only the returned generic envelopes.
+type OrderExtensionDeclarer func(context.Context, extensions.DeclarationInput) ([]extensions.OrderExtension, error)
+
 // OrderAppService encapsulates order lifecycle business logic:
 // decline, refund, cancel, confirm, ship, complete, dispute, and their shared helpers.
 //
@@ -102,6 +107,7 @@ type OrderAppService struct {
 	supplyAvailability      contracts.SupplyAvailabilityService
 	digitalSupplyLines      DigitalSupplyLineResolver
 	checkoutSupplyQuoter    *checkoutsupply.CheckoutSupplyQuoteService
+	orderExtensionDeclarer  OrderExtensionDeclarer
 }
 
 // OrderAppServiceConfig groups the dependencies for constructing OrderAppService.
@@ -133,6 +139,7 @@ type OrderAppServiceConfig struct {
 	Resolver                   pkgconfig.ResolverInterface
 	SupplyAvailability         contracts.SupplyAvailabilityService
 	DigitalSupplyLines         DigitalSupplyLineResolver
+	OrderExtensionDeclarer     OrderExtensionDeclarer
 }
 
 // DigitalSupplyLineResolver preserves the order package API while sharing the
@@ -167,6 +174,7 @@ func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {
 		resolver:                   cfg.Resolver,
 		supplyAvailability:         cfg.SupplyAvailability,
 		digitalSupplyLines:         cfg.DigitalSupplyLines,
+		orderExtensionDeclarer:     cfg.OrderExtensionDeclarer,
 	}
 }
 

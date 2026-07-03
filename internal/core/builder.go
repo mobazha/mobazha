@@ -30,6 +30,7 @@ import (
 	obnet "github.com/mobazha/mobazha/internal/net"
 	"github.com/mobazha/mobazha/internal/notifications"
 	"github.com/mobazha/mobazha/internal/notifier"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/internal/orders"
 	"github.com/mobazha/mobazha/internal/orders/utils"
 	fiat "github.com/mobazha/mobazha/internal/payment/fiat"
@@ -47,6 +48,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/database/netdb"
 	"github.com/mobazha/mobazha/pkg/edition"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/fulfillment"
 	"github.com/mobazha/mobazha/pkg/logging"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -1463,25 +1465,41 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 		logger.LogWarningWithID(log, obNode.nodeID, "PaymentSession: db not available — subsystem skipped")
 		return
 	}
-
 	svc := corePmt.NewPaymentSessionService(obNode.db)
-	var authorize corePmt.CollectibleFirstSaleAuthorizationHook
-	if obNode.collectibleFirstSaleAuthorizationHook != nil {
-		authorize = func(ctx context.Context, signal corePmt.CollectibleFirstSaleAuthorizationSignal) error {
-			return obNode.collectibleFirstSaleAuthorizationHook(ctx, CollectibleFirstSaleAuthorizationSignal{
-				OrderID:              signal.OrderID,
-				HubSlotID:            signal.HubSlotID,
-				CertNumber:           signal.CertNumber,
-				SellerPeerID:         signal.SellerPeerID,
-				PaymentCoin:          signal.PaymentCoin,
-				ReservationExpiresAt: signal.ReservationExpiresAt,
-			})
+	resolve := func(input corePmt.SessionProvisioningPolicyInput) ([]extensions.OrderExtension, error) {
+		var persisted []extensions.OrderExtension
+		err := obNode.db.View(func(tx database.Tx) error {
+			var loadErr error
+			persisted, loadErr = orderextensions.LatestByOrderTx(tx, input.OrderID)
+			return loadErr
+		})
+		if err != nil {
+			return nil, fmt.Errorf("load order extensions: %w", err)
 		}
+		reservable := persisted[:0]
+		for _, extension := range persisted {
+			if extension.ReservationRequired {
+				reservable = append(reservable, extension)
+			}
+		}
+		return reservable, nil
 	}
-	// Always register the policy. A managed source-custody order must fail closed
-	// when hosting did not provide an authorizer, while unrelated orders remain
-	// unaffected.
-	policy := corePmt.NewCollectibleFirstSaleProvisioningPolicy(authorize)
+	reserve := func(ctx context.Context, request extensions.ReservationRequest) (extensions.Reservation, error) {
+		port := obNode.extensionReservationPort(request.Extension.ProviderID)
+		if port == nil {
+			return extensions.Reservation{}, fmt.Errorf("extension reservation provider %q is unavailable", request.Extension.ProviderID)
+		}
+		return port.Reserve(ctx, request)
+	}
+	record := func(request extensions.ReservationRequest, reservation extensions.Reservation) error {
+		return obNode.db.Update(func(tx database.Tx) error {
+			return orderextensions.RecordReservationTx(tx, request, reservation)
+		})
+	}
+	// Always register the policy. An extension declaring the reservation
+	// contract must fail closed when its provider is unavailable, while
+	// unrelated orders remain unaffected.
+	policy := corePmt.NewOrderExtensionsProvisioningPolicy(resolve, reserve, record)
 	svc.AddProvisioningPolicy(policy)
 	if obNode.paymentService != nil {
 		obNode.paymentService.AddProvisioningPolicy(policy)
@@ -1515,7 +1533,7 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 	}
 
 	obNode.paymentSessionService = svc
-	obNode.startCollectibleReservationReleaseListener()
+	obNode.startOrderExtensionEventListener()
 	logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession subsystem initialized")
 }
 

@@ -10,10 +10,12 @@ import (
 	dbgorm "github.com/mobazha/mobazha/internal/database"
 	"github.com/mobazha/mobazha/internal/database/dbstore"
 	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	adapters "github.com/mobazha/mobazha/internal/payment/adapters"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
@@ -353,15 +355,15 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 		return
 	}
 
-	managedCollectible, err := n.isManagedCollectibleFirstSaleOrder(event.OrderID)
+	requiresAttestation, err := n.orderRequiresAttestedSettlement(event.OrderID)
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID,
-			"Cannot establish managed collectible policy for order %s; auto-confirm denied: %v", event.OrderID, err)
+			"Cannot establish extension settlement policy for order %s; auto-confirm denied: %v", event.OrderID, err)
 		return
 	}
-	if managedCollectible {
+	if requiresAttestation {
 		logger.LogInfoWithIDf(log, n.nodeID,
-			"Skipping auto-confirm for managed collectible first-sale order %s; awaiting Hub settle or default refund", event.OrderID)
+			"Skipping auto-confirm for extension-attested order %s; awaiting validated module evidence", event.OrderID)
 		return
 	}
 
@@ -425,23 +427,31 @@ func cancelablePaymentEventTargetsNode(eventTenantID, nodeID, localTenantID stri
 	}
 }
 
-func (n *MobazhaNode) isManagedCollectibleFirstSaleOrder(orderID string) (bool, error) {
+func (n *MobazhaNode) orderRequiresAttestedSettlement(orderID string) (bool, error) {
 	if n == nil || n.db == nil {
 		return false, fmt.Errorf("order database is unavailable")
 	}
-
 	var order models.Order
+	var declared []extensions.OrderExtension
 	if err := n.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("id = ?", orderID).First(&order).Error
+		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
+			return err
+		}
+		var loadErr error
+		declared, loadErr = orderextensions.LatestByOrderTx(tx, orderID)
+		return loadErr
 	}); err != nil {
-		return false, fmt.Errorf("load order: %w", err)
+		return false, fmt.Errorf("load order settlement policy: %w", err)
 	}
-
-	orderOpen, err := order.OrderOpenMessage()
-	if err != nil {
+	if _, err := order.OrderOpenMessage(); err != nil {
 		return false, fmt.Errorf("decode order open: %w", err)
 	}
-	return models.IsManagedCollectibleFirstSale(orderOpen), nil
+	for _, extension := range declared {
+		if extension.SettlementPolicy == extensions.SettlementPolicyExtensionAttested {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) (bool, error) {

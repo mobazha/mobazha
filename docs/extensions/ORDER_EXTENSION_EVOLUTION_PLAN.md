@@ -1,162 +1,102 @@
 # Order extension evolution plan
 
-Status: Approved migration plan; implementation pending
+Status: Open Core direct cutover implemented
 
 ## Scope
 
-This plan evolves the current first-party Collectibles/NFT integration into
-the generic contracts in
-[`ORDER_EXTENSION_CONTRACT.md`](ORDER_EXTENSION_CONTRACT.md). It changes Open
-Core incrementally and preserves existing behavior until downstream consumers
-migrate. Hosting-specific implementation is outside this plan.
+This plan moves the first-party Collectibles/NFT integration onto the generic
+contracts in [`ORDER_EXTENSION_CONTRACT.md`](ORDER_EXTENSION_CONTRACT.md).
+Open Core is still under development, so the implementation performs a direct
+cutover rather than carrying product-specific compatibility APIs or storage.
+Hosting-specific module implementation remains outside this plan.
 
-## Current classification
+## Final classification
 
-| Current Collectibles concern | Target role |
+| Collectibles concern | Open Core role |
 |---|---|
-| Order metadata | Versioned `OrderExtension` declaration |
-| Token/inventory allocation | Resource reservation Port |
-| Payment/order callback | Durable extension lifecycle event |
-| Minting/delivery worker | Controller |
-| Delivery result | Observation |
-| Primary-sale release request | Settlement-condition attestation followed by a Core command |
-| `Collectible*` public APIs | Temporary compatibility adapters |
+| Signed order metadata | Collectibles codec producing a versioned `OrderExtension` |
+| Token/inventory allocation | Module-owned `ReservationPort` |
+| Payment and terminal-order notification | Transactional `ExtensionDelivery` event |
+| Minting/delivery worker | Module-owned `Controller` |
+| Delivery evidence | Module-verified `SettlementAttestation` |
+| Seller payout | Existing Core conditional settlement command |
 
-The initial Open Core inventory is concrete and intentionally visible:
+Concrete NFT, chain, mint, certificate, and Hub vocabulary stays in the
+Collectibles codec/module. Generic persistence, delivery, orchestration, and
+financial state transitions stay in Core.
 
-| Current surface | Migration destination |
-|---|---|
-| `pkg/models/collectibles_metadata.go` | Versioned order-extension envelope and Collectibles codec adapter |
-| `internal/core/collectibles_hook.go` and `internal/core/options.go` | Module composition plus reservation/delivery contracts |
-| `internal/core/payment/session_policy.go` and `internal/core/builder.go` | Generic reservation Port and explicit module composition |
-| `pkg/core/node.go` Collectibles aliases/options | Deprecated public compatibility adapters |
-| `internal/collectiblesdelivery/`, `internal/core/collectibles_reservation_listener.go`, and Collectibles-specific outbox call sites | Generic extension-event outbox and Controller delivery |
-| `internal/core/settlement/collectible_primary_sale.go` | Settlement-condition validation followed by the standard settlement command |
-| `pkg/contracts/contracts.go` `ExecuteCollectiblePrimarySaleRelease` | Deprecated compatibility method over conditional settlement |
+## Implemented cutover
 
-OE-0 must regenerate this inventory from the repository and include any newly
-found surface before its guard becomes mandatory.
+- `OrderExtensionRecord` stores append-only, hash-verified, Core-revisioned
+  envelopes. Collectibles data is not copied into `FiatMetadata`.
+- The product codec is invoked only through
+  `order-extension.declaration/v1`; purchase, incoming-order, payment-session,
+  and delivery composition no longer parse Collectibles metadata directly.
+- Signed `RWA_TOKEN` orders fail closed when no declaration module is installed
+  or when the module produces no extension envelope.
+- `OrderExtensionReservationRecord` persists the exact provider reservation
+  ID/version and provisioning context before a funding target is created.
+- The generic `extension-attested` settlement policy replaces Collectibles
+  inspection in the payment dispatcher and remains fail closed if a module is
+  later removed.
+- `ExtensionDelivery` is the only lifecycle outbox. It provides bounded retry,
+  database-leased delivery, monotonic order versions, dead-letter state,
+  replay support, and provider-scoped Controller dispatch without holding Core
+  locks across module calls.
+- Payment provisioning reserves through `ReservationPort`; missing modules
+  fail closed before a funding target is created.
+- Conditional settlement requires an explicit extension ID, expected revision,
+  Core-issued order-state version, fresh evidence, and a provider-owned
+  `AttestationVerifier`. Core reloads and rechecks state under the settlement
+  command lock after verification.
+- Module registration accepts only the four exact v1 capability contract
+  strings, requires descriptor/interface agreement and non-nil capabilities,
+  and snapshots descriptors before runtime dispatch.
+- Accepted attestations are audited before Core invokes its standard settlement
+  state machine. Core derives the seller payout destination, and a durable
+  evidence fingerprint rejects replay under different request IDs.
+- `WithOrderExtensionModules` is the only public composition entry point.
+- A source-boundary test scans every production Go file in `pkg/core` and
+  `pkg/contracts` and rejects exported `Collectible*` functions, methods,
+  types, variables, and constants.
 
-## Migration rules
+The cutover deliberately removes:
 
-- Preserve one Core order/payment/settlement state machine throughout.
-- Introduce generic storage and contracts before changing callers.
-- Use dual-read/dual-write only for a bounded, observable migration window.
-- Attach schema version and idempotency keys before replaying any side effect.
-- Do not delete legacy data until read fallback, downgrade, and audit recovery
-  have been verified on production-shaped fixtures.
-- Freeze the product-specific surface: new `WithCollectible*`,
-  `ExecuteCollectible*`, or equivalent public Core entry points are rejected.
-- Source-boundary tests maintain an allowlist of existing compatibility
-  symbols; the allowlist may only shrink.
+- `WithCollectible*` hooks and signals;
+- `ExecuteCollectiblePrimarySaleRelease`;
+- the Collectibles-specific lifecycle queue and dual-read consumer;
+- Collectibles-to-`FiatMetadata` dual writes and backfill;
+- settlement fallback from missing extension records;
+- implicit trust of Collectibles attestations when no verifier is installed;
+- physical-listing compatibility classification for old Hub orders.
 
-## Phases
+## Invariants
 
-### OE-0: Governance and guardrails
+1. Core owns order, payment, and settlement state machines.
+2. Modules receive declared ports and events; they never mutate Core state.
+3. Every financial attestation binds tenant, order, settlement, extension,
+   provider, condition version, evidence digest, expiry, expected extension
+   revision, and the Core-issued financial order-state version.
+4. Extension payloads are size-limited, hash-verified, and append-only.
+5. Event delivery is at least once; event IDs bind tenant, source actor, local
+   order role, order, extension, and event type, and Core assigns monotonic
+   aggregate versions under a durable lease.
+6. Missing reservation, Controller, or attestation capabilities fail closed.
+7. Product-specific public Core APIs are rejected by tests.
 
-- Accept ADR-018 and this document set.
-- Inventory existing Collectibles entry points and downstream consumers.
-- Add source-boundary tests that block new product-specific public symbols and
-  private-module imports of Open Core `internal/...`.
-- Capture current behavior with characterization tests.
+## Remaining evolution
 
-Exit: the legacy surface and behavior are measurable and cannot grow.
+- Add provider-independent status reconciliation for ambiguous reservation
+  timeouts.
+- Add operator APIs and metrics for dead-letter replay.
+- Add distribution allowlist, tenant authorization/configuration, health,
+  drain, and upgrade gates from the lifecycle governance target.
+- Publish a module conformance kit covering descriptor validation,
+  reservation idempotency, event replay, and attestation authorization.
+- Promote only genuinely cross-domain fields from opaque payloads into future
+  major contract versions.
 
-Rollback: remove guard-only changes; no runtime or data change exists.
-
-### OE-1: Durable extension delivery
-
-- Extract a versioned generic extension-event envelope and transactional
-  outbox from the existing Collectibles-specific durable delivery path.
-- Adapt the current Collectibles enqueue and listener paths to the generic
-  outbox and Controller contract.
-- Add idempotent retry, dead-letter, replay, and reconciliation operations.
-- Keep the current hook as an adapter that writes or consumes the durable path;
-  it must no longer be the source of truth.
-
-Exit: a process crash between order transition and delivery cannot lose work,
-and duplicate delivery is harmless.
-
-Rollback: pause the new consumer and resume the compatibility consumer from
-the same durable cursor; retain outbox records.
-
-### OE-2: Versioned order extension envelopes
-
-- Add generic envelope storage and public read/write contracts.
-- Map existing Collectibles metadata to a namespaced extension type.
-- Dual-write legacy and envelope representations with hash comparison.
-- Read the envelope first and fall back to legacy data while metrics show
-  mismatches and unsupported schema versions.
-
-Exit: all new orders have equivalent envelope data, backfill is complete, and
-the mismatch rate is zero for the declared observation window.
-
-Rollback: restore legacy-first reads; do not discard envelopes.
-
-### OE-3: Generic resource reservation
-
-- Introduce `Reserve`, `Commit`, `Release`, and status reconciliation Ports.
-- Adapt Collectibles allocation behind the Port.
-- Define expiry, duplicate request, timeout, cancellation, and compensation
-  behavior with fault-injection tests.
-
-Exit: Core orchestration contains no Collectibles allocation vocabulary and
-all ambiguous outcomes can be reconciled.
-
-Rollback: switch the adapter to the legacy implementation while preserving
-reservation IDs and idempotency records.
-
-### OE-4: Conditional settlement
-
-- Introduce a versioned settlement-condition and attestation contract.
-- Validate issuer, tenant/resource binding, condition version, evidence,
-  freshness, idempotency, expected state version, and authorization in Core.
-- Route accepted attestations through the existing Core settlement command and
-  state machine.
-- Replace direct Collectibles release calls with the compatibility adapter.
-
-Exit: no extension path can directly mutate settlement state; duplicate,
-stale, unauthorized, and conflicting attestations fail safely.
-
-Rollback: disable the new condition capability and hold affected settlements
-for reconciliation; never fall back to an unchecked release.
-
-### OE-5: Consumer migration
-
-- Move first-party Collectibles composition to the public module descriptor,
-  envelope, reservation, Controller, and attestation contracts.
-- Update public projections and client capability checks.
-- Publish the conformance kit and compatibility support window.
-
-Exit: production distributions use only compatibility adapters at the old API
-boundary, not internally.
-
-Rollback: pin the prior compatible Open Core version and replay durable events;
-extension envelope data remains readable.
-
-### OE-6: Legacy removal
-
-- Announce deprecation across at least the documented compatibility window.
-- Remove legacy hooks, product-specific contract methods, dual writes, and
-  legacy reads after all supported consumers migrate.
-- Remove migration metrics and allowlist entries only after final audit and
-  downgrade cutoff approval.
-
-Exit: Open Core exposes generic order-extension contracts only; concrete NFT
-vocabulary is owned by the Collectibles module.
-
-Rollback: removal occurs only after the downgrade cutoff; emergency recovery
-uses the last supported release and retained migration data, not reintroduced
-unchecked callbacks.
-
-## Required evidence per phase
-
-Each phase PR must include:
-
-- the affected public contract and compatibility classification;
-- data migration and downgrade behavior;
-- unit, contract, fault-injection, and cross-distribution tests as applicable;
-- capability-gate and unauthorized-path negative tests;
-- observability, alert thresholds, and reconciliation runbook changes;
-- rollout order for Open Core and downstream consumers;
-- an explicit stop/go decision based on the phase exit criteria.
+Any incompatible change to authority, ordering, idempotency, or financial
+semantics requires a new major extension contract version. Because no released
+legacy Collectibles contract is supported, old product-specific APIs must not
+be reintroduced as transitional shortcuts.

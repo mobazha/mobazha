@@ -1,17 +1,22 @@
 package order
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	solana "github.com/gagliardetto/solana-go"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func TestPersistCollectibleOrderMetadataMergesFiatMetadata(t *testing.T) {
+func TestPersistCollectibleOrderExtension_PersistsEnvelopeWithoutFiatMetadata(t *testing.T) {
 	db := newTestDatabase(t)
 	orderID := "order_collectible_1"
 	holderWallet := solana.NewWallet().PublicKey().String()
@@ -50,9 +55,10 @@ func TestPersistCollectibleOrderMetadataMergesFiatMetadata(t *testing.T) {
 			},
 		}},
 	}
+	svc := &OrderAppService{orderExtensionDeclarer: collectibleTestDeclarer}
 
 	err = db.Update(func(tx database.Tx) error {
-		return persistCollectibleOrderMetadata(tx, orderID, orderOpen)
+		return svc.persistOrderExtensions(context.Background(), tx, orderID, orderOpen)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -72,24 +78,28 @@ func TestPersistCollectibleOrderMetadataMergesFiatMetadata(t *testing.T) {
 	if meta["fiat_provider"] != "stripe" {
 		t.Fatalf("expected existing fiat metadata to be preserved, got %#v", meta)
 	}
-	if meta[models.CollectibleMetadataKeyType] != models.CollectibleMetadataTypePrimarySale {
-		t.Fatalf("unexpected collectible metadata: %#v", meta)
+	if len(meta) != 1 {
+		t.Fatalf("collectible data leaked into FiatMetadata: %#v", meta)
 	}
-	if meta[models.CollectibleMetadataKeyHubSlotID] != "slot-1" {
-		t.Fatalf("unexpected hub slot metadata: %#v", meta)
+	var extension models.OrderExtensionRecord
+	if err := db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_id = ? AND provider_id = ?", orderID, models.CollectibleExtensionProviderID).First(&extension).Error
+	}); err != nil {
+		t.Fatal(err)
 	}
-	if meta[models.CollectibleMetadataKeyNFTMint] != "mint-1" {
-		t.Fatalf("unexpected NFT mint metadata: %#v", meta)
+	if extension.ExtensionType != models.CollectibleExtensionTypePrimarySale || extension.Revision != 1 || extension.PayloadHash == "" {
+		t.Fatalf("unexpected order extension envelope: %+v", extension)
 	}
-	if meta[models.CollectibleMetadataKeySellerPeerID] != "seller-peer" {
-		t.Fatalf("unexpected seller metadata: %#v", meta)
+	var payload models.CollectibleOrderMetadata
+	if err := json.Unmarshal(extension.Payload, &payload); err != nil {
+		t.Fatal(err)
 	}
-	if meta[models.CollectibleMetadataKeyHolderWallet] != holderWallet {
-		t.Fatalf("unexpected holder wallet metadata: %#v", meta)
+	if payload.HubSlotID != "slot-1" || payload.NFTMint != "mint-1" || payload.SellerPeerID != "seller-peer" || payload.HolderWallet != holderWallet {
+		t.Fatalf("unexpected collectible extension payload: %+v", payload)
 	}
 }
 
-func TestPersistCollectibleOrderMetadataRejectsMissingHolderWallet(t *testing.T) {
+func TestPersistCollectibleOrderExtension_RejectsMissingHolderWallet(t *testing.T) {
 	db := newTestDatabase(t)
 	orderID := "order_collectible_missing_holder"
 	if err := db.Update(func(tx database.Tx) error {
@@ -110,15 +120,16 @@ func TestPersistCollectibleOrderMetadataRejectsMissingHolderWallet(t *testing.T)
 			},
 		}},
 	}
+	svc := &OrderAppService{orderExtensionDeclarer: collectibleTestDeclarer}
 	err := db.Update(func(tx database.Tx) error {
-		return persistCollectibleOrderMetadata(tx, orderID, orderOpen)
+		return svc.persistOrderExtensions(context.Background(), tx, orderID, orderOpen)
 	})
 	if err == nil {
-		t.Fatal("persistCollectibleOrderMetadata accepted a missing holder wallet")
+		t.Fatal("module declaration accepted a missing holder wallet")
 	}
 }
 
-func TestPersistCollectibleOrderMetadataNoopsForNonCollectible(t *testing.T) {
+func TestPersistCollectibleOrderExtension_NoopsForNonCollectible(t *testing.T) {
 	db := newTestDatabase(t)
 	orderID := "order_physical_1"
 	err := db.Update(func(tx database.Tx) error {
@@ -129,7 +140,8 @@ func TestPersistCollectibleOrderMetadataNoopsForNonCollectible(t *testing.T) {
 	}
 
 	err = db.Update(func(tx database.Tx) error {
-		return persistCollectibleOrderMetadata(tx, orderID, &pb.OrderOpen{
+		svc := &OrderAppService{orderExtensionDeclarer: collectibleTestDeclarer}
+		return svc.persistOrderExtensions(context.Background(), tx, orderID, &pb.OrderOpen{
 			Listings: []*pb.SignedListing{{
 				Listing: &pb.Listing{
 					Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_PHYSICAL_GOOD},
@@ -143,25 +155,42 @@ func TestPersistCollectibleOrderMetadataNoopsForNonCollectible(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var order models.Order
+	var count int64
 	err = db.View(func(tx database.Tx) error {
-		return tx.Read().Where("id = ?", orderID).First(&order).Error
+		return tx.Read().Model(&models.OrderExtensionRecord{}).Where("order_id = ?", orderID).Count(&count).Error
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	meta, err := order.GetFiatMetadata()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(meta) != 0 {
-		t.Fatalf("expected no metadata for non-collectible order, got %#v", meta)
+	if err != nil || count != 0 {
+		t.Fatalf("expected no extension for non-collectible order, count=%d err=%v", count, err)
 	}
 }
 
-func TestPostProcessOrderOpenPersistsVendorCollectibleMetadata(t *testing.T) {
+func TestPersistOrderExtensions_RequiresDeclarationForRWAOrder(t *testing.T) {
 	db := newTestDatabase(t)
-	svc := &OrderAppService{db: db}
+	orderOpen := &pb.OrderOpen{Listings: []*pb.SignedListing{{Listing: &pb.Listing{
+		Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_RWA_TOKEN},
+	}}}}
+	svc := &OrderAppService{}
+	err := db.Update(func(tx database.Tx) error {
+		return svc.persistOrderExtensions(context.Background(), tx, "order-rwa", orderOpen)
+	})
+	if err == nil {
+		t.Fatal("RWA order without a declaration module was accepted")
+	}
+
+	svc.orderExtensionDeclarer = func(context.Context, extensions.DeclarationInput) ([]extensions.OrderExtension, error) {
+		return nil, nil
+	}
+	err = db.Update(func(tx database.Tx) error {
+		return svc.persistOrderExtensions(context.Background(), tx, "order-rwa", orderOpen)
+	})
+	if err == nil {
+		t.Fatal("RWA order without a declared extension was accepted")
+	}
+}
+
+func TestPostProcessOrderOpen_PersistsVendorCollectibleExtension(t *testing.T) {
+	db := newTestDatabase(t)
+	svc := &OrderAppService{db: db, orderExtensionDeclarer: collectibleTestDeclarer}
 	orderID := "order_vendor_collectible_1"
 	holderWallet := solana.NewWallet().PublicKey().String()
 	err := db.Update(func(tx database.Tx) error {
@@ -208,24 +237,35 @@ func TestPostProcessOrderOpenPersistsVendorCollectibleMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var order models.Order
-	err = db.View(func(tx database.Tx) error {
-		return tx.Read().Where("id = ?", orderID).First(&order).Error
-	})
-	if err != nil {
+	var extension models.OrderExtensionRecord
+	if err := db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_id = ? AND provider_id = ?", orderID, models.CollectibleExtensionProviderID).First(&extension).Error
+	}); err != nil {
 		t.Fatal(err)
 	}
-	meta, err := order.GetFiatMetadata()
-	if err != nil {
+	var payloadMetadata models.CollectibleOrderMetadata
+	if err := json.Unmarshal(extension.Payload, &payloadMetadata); err != nil {
 		t.Fatal(err)
 	}
-	if meta[models.CollectibleMetadataKeyHubSlotID] != "slot-vendor" {
-		t.Fatalf("vendor collectible metadata missing: %#v", meta)
+	if payloadMetadata.HubSlotID != "slot-vendor" || payloadMetadata.SellerPeerID != "seller-peer" || payloadMetadata.HolderWallet != holderWallet {
+		t.Fatalf("vendor collectible extension payload missing: %+v", payloadMetadata)
 	}
-	if meta[models.CollectibleMetadataKeySellerPeerID] != "seller-peer" {
-		t.Fatalf("vendor seller metadata missing: %#v", meta)
+}
+
+func collectibleTestDeclarer(_ context.Context, input extensions.DeclarationInput) ([]extensions.OrderExtension, error) {
+	extension, ok, err := models.CollectibleOrderExtensionFromOrderOpen(input.OrderID, input.OrderOpen)
+	if err != nil || !ok {
+		return nil, err
 	}
-	if meta[models.CollectibleMetadataKeyHolderWallet] != holderWallet {
-		t.Fatalf("vendor holder wallet metadata missing: %#v", meta)
+	metadata, ok := models.CollectibleOrderMetadataFromExtension(extension)
+	if !ok {
+		return nil, fmt.Errorf("invalid collectible extension")
 	}
+	if metadata.HolderWallet == "" {
+		return nil, fmt.Errorf("%w: collectible declaration requires a holderWallet", coreiface.ErrBadRequest)
+	}
+	if _, err := solana.PublicKeyFromBase58(metadata.HolderWallet); err != nil {
+		return nil, fmt.Errorf("%w: collectible holderWallet must be a valid Solana public key", coreiface.ErrBadRequest)
+	}
+	return []extensions.OrderExtension{extension}, nil
 }

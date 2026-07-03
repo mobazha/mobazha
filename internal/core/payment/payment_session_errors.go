@@ -21,8 +21,8 @@ var (
 		"payment session: RWA token listings are not supported by payment-session provisioning yet",
 	)
 
-	ErrCollectibleFirstSalePreflight = errors.New(
-		"payment session: collectible source-custody validation failed",
+	ErrOrderExtensionReservation = errors.New(
+		"payment session: order extension reservation failed",
 	)
 
 	ErrPaymentCoinDisabled = errors.New(

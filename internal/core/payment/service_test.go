@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
@@ -320,12 +321,12 @@ func TestPaymentAppService_GeneratePaymentSetup_AuthorizesBeforeStrategy(t *test
 	wantErr := errors.New("source already reserved")
 	called := false
 	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{PaymentRegistry: reg})
-	svc.AddProvisioningPolicy(NewCollectibleFirstSaleProvisioningPolicy(func(_ context.Context, signal CollectibleFirstSaleAuthorizationSignal) error {
+	svc.AddProvisioningPolicy(NewOrderExtensionProvisioningPolicy(resolveCollectibleFirstSaleExtension, func(_ context.Context, request extensions.ReservationRequest) (extensions.Reservation, error) {
 		called = true
-		require.Equal(t, order.ID.String(), signal.OrderID)
-		require.Equal(t, "crypto:eip155:1:native", signal.PaymentCoin)
-		require.Equal(t, expiresAt, signal.ReservationExpiresAt)
-		return wantErr
+		require.Equal(t, order.ID.String(), request.OrderID)
+		require.Equal(t, "crypto:eip155:1:native", request.PaymentCoin)
+		require.Equal(t, expiresAt, request.ExpiresAt)
+		return extensions.Reservation{}, wantErr
 	}))
 
 	_, err = svc.GeneratePaymentSetup(context.Background(), payment.PaymentSetupParams{
@@ -333,7 +334,7 @@ func TestPaymentAppService_GeneratePaymentSetup_AuthorizesBeforeStrategy(t *test
 		CoinType:  iwallet.CoinType("crypto:eip155:1:native"),
 		OrderData: order,
 	})
-	require.ErrorIs(t, err, ErrCollectibleFirstSalePreflight)
+	require.ErrorIs(t, err, ErrOrderExtensionReservation)
 	require.ErrorIs(t, err, wantErr)
 	require.True(t, called)
 	require.Zero(t, strategy.genCallCount, "strategy must not create a funding target before authorization")

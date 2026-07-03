@@ -73,6 +73,15 @@ Mobazha adopts the following extension architecture:
 
     A capability is not externally visible unless every gate passes.
 
+### Current implementation boundary
+
+The static order-extension v1 slice currently implements exact contract
+compatibility, immutable startup composition, dependency validation, typed
+capability/interface agreement, and fail-closed invocation. Distribution
+allowlists, per-tenant authorization/configuration, structured module health,
+drain, and upgrade orchestration remain governance targets; they are not
+claimed as implemented runtime gates by this ADR.
+
 ## Module types
 
 | Type | Responsibility | Allowed output | Prohibited authority |
@@ -93,14 +102,15 @@ follows:
 
 - metadata attached to an order becomes a versioned `OrderExtension`
   declaration;
-- inventory or token allocation becomes a generic resource reservation with
-  `Reserve`, `Commit`, and `Release` semantics;
+- inventory or token allocation becomes a generic synchronous `Reserve`
+  capability before funding; commit/release work consumes typed durable
+  Controller events carrying the persisted reservation binding;
 - minting or delivery becomes a Controller consuming a durable lifecycle
   event and reporting an observation;
 - primary-sale release becomes conditional settlement: the extension submits
   a typed attestation and Core executes the standard settlement command;
-- existing `Collectible*` hooks and contract methods remain temporary
-  compatibility adapters while consumers migrate.
+- product-specific hooks and settlement commands are removed in a direct
+  development-time cutover; no compatibility adapter is retained.
 
 `nft` remains a concrete extension type until at least one additional use case
 proves a stable shared abstraction. Core must not generalize product nouns
@@ -133,9 +143,10 @@ callbacks throughout Core. The cost is more explicit contract design,
 capability gating, compatibility testing, and migration work. A small amount
 of duplication is preferable to a premature universal abstraction.
 
-Current Collectibles entry points are not removed immediately. They are frozen
-and adapted to generic contracts, then removed only after dual-read/dual-write,
-consumer migration, rollback validation, and the documented support window.
+Because this integration has not been released, the current Collectibles entry
+points are removed directly. Signed-order codecs and business validation move
+behind the module declaration capability; Core retains only generic extension,
+reservation, delivery, and attestation records.
 
 ## Rejected alternatives
 

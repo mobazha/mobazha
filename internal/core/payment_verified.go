@@ -2,12 +2,9 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
-	solana "github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -57,7 +54,7 @@ func (n *MobazhaNode) handleCryptoPaymentVerified(orderID string, paymentSent *p
 			logger.LogInfoWithIDf(log, n.nodeID, "payment verified: UTXO order %s tx %s has multiple or no unique outputs for address %s; relaying verified transaction without synthetic outpoint", orderID, pd.TransactionID, pd.ToAddress)
 		}
 	}
-	n.runCollectibleLifecycleDeliveries(ctx)
+	n.runExtensionDeliveries(ctx)
 	switch order.Role() {
 	case models.RoleVendor:
 		if err := n.orderService.EnsureRatingSignatures(ctx, models.OrderID(orderID)); err != nil {
@@ -83,74 +80,6 @@ func (n *MobazhaNode) handleCryptoPaymentVerified(orderID string, paymentSent *p
 	default:
 		logger.LogInfoWithIDf(log, n.nodeID, "payment verified: order %s role %q has no counterparty relay", orderID, order.Role())
 	}
-}
-
-func (n *MobazhaNode) deliverCollectiblePrimarySalePaid(ctx context.Context, orderID string) error {
-	if n == nil || n.collectiblePrimarySalePaidHook == nil {
-		return fmt.Errorf("hosting primary-sale hook is unavailable")
-	}
-	if n.orderService == nil {
-		return fmt.Errorf("order service is unavailable")
-	}
-	order, err := n.orderService.FetchOrder(orderID)
-	if err != nil {
-		return err
-	}
-	paymentSent, err := order.PaymentSentMessage()
-	if err != nil {
-		return err
-	}
-	orderOpen, err := order.OrderOpenMessage()
-	if err != nil {
-		return fmt.Errorf("read collectible order-open payload: %w", err)
-	}
-	if !models.IsHubManagedCollectiblePrimarySale(orderOpen) {
-		return fmt.Errorf("collectible lifecycle job has incomplete signed order metadata")
-	}
-	meta, ok := models.CollectibleOrderMetadataFromOrderOpen(orderOpen)
-	if !ok {
-		return fmt.Errorf("decode collectible metadata from signed order payload")
-	}
-	paidAt := time.Now().UTC()
-	if order.PaidAt != nil {
-		paidAt = order.PaidAt.UTC()
-	}
-	escrowID := strings.TrimSpace(paymentSent.GetTransactionID())
-	if escrowID == "" {
-		escrowID = strings.TrimSpace(paymentSent.GetToAddress())
-	}
-	buyerSolanaAddress := strings.TrimSpace(meta.HolderWallet)
-	if buyerSolanaAddress == "" {
-		buyerSolanaAddress = collectibleBuyerSolanaAddress(order)
-	}
-	return n.collectiblePrimarySalePaidHook(ctx, CollectiblePrimarySalePaidSignal{
-		OrderID:            orderID,
-		EscrowID:           escrowID,
-		HubSlotID:          meta.HubSlotID,
-		NFTMint:            meta.NFTMint,
-		CertNumber:         meta.CertNumber,
-		BuyerPeerID:        meta.BuyerPeerID,
-		BuyerSolanaAddress: buyerSolanaAddress,
-		SellerPeerID:       meta.SellerPeerID,
-		PriceAmount:        strings.TrimSpace(paymentSent.GetAmount()),
-		CurrencyCode:       strings.TrimSpace(paymentSent.GetCoin()),
-		PaidAt:             paidAt,
-	})
-}
-
-func collectibleBuyerSolanaAddress(order *models.Order) string {
-	if order == nil {
-		return ""
-	}
-	orderOpen, err := order.OrderOpenMessage()
-	if err != nil || orderOpen == nil {
-		return ""
-	}
-	pubkeys := orderOpen.GetBuyerID().GetPubkeys()
-	if pubkeys == nil || len(pubkeys.Solana) != solana.PublicKeyLength {
-		return ""
-	}
-	return solana.PublicKeyFromBytes(pubkeys.Solana).String()
 }
 
 func (n *MobazhaNode) verifiedTransactionFromPaymentSent(ctx context.Context, paymentSent *pb.PaymentSent) (*iwallet.Transaction, bool) {

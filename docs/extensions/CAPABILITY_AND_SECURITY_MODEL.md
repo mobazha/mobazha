@@ -1,6 +1,12 @@
 # Extension capability and security model
 
-Status: Initial contract
+Status: Target governance model; static contract gate implemented
+
+Today, order-extension startup enforces the `contract compatible ∩ statically
+composed` portion, including exact v1 contract names and capability/interface
+agreement. Distribution allowlists, tenant authorization/configuration, and
+structured health gates described below are required evolution before those
+capabilities can be advertised as generally available.
 
 ## Capability activation
 

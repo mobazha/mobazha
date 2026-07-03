@@ -1,0 +1,559 @@
+package orderextensions
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/extensions"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+// PersistTx appends a Core-owned extension revision in the caller's transaction.
+func PersistTx(tx database.Tx, orderID string, extension extensions.OrderExtension) error {
+	if tx == nil {
+		return fmt.Errorf("order extension transaction is required")
+	}
+	if err := extension.Validate(); err != nil {
+		return err
+	}
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return fmt.Errorf("order extension order ID is required")
+	}
+
+	var latest models.OrderExtensionRecord
+	err := tx.Read().Where("extension_id = ?", extension.ExtensionID).
+		Order("revision DESC").First(&latest).Error
+	if err == nil {
+		if latest.OrderID != orderID || latest.ProviderID != extension.ProviderID || latest.ExtensionType != extension.Type || latest.ResourceID != extension.ResourceID || latest.ReservationRequired != extension.ReservationRequired || latest.SettlementPolicy != string(extension.SettlementPolicy) {
+			return fmt.Errorf("order extension identity fields are immutable")
+		}
+		if latest.PayloadHash == extension.PayloadHash && latest.SchemaVersion == extension.SchemaVersion {
+			return ensureEventSequenceTx(tx, orderID, extension.ExtensionID)
+		}
+		extension.Revision = latest.Revision + 1
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("load latest order extension: %w", err)
+	} else {
+		extension.Revision = 1
+	}
+
+	createdAt := time.Now().UTC()
+	if err := tx.Create(&models.OrderExtensionRecord{
+		ExtensionID:         extension.ExtensionID,
+		OrderID:             orderID,
+		ProviderID:          extension.ProviderID,
+		ExtensionType:       extension.Type,
+		SchemaVersion:       extension.SchemaVersion,
+		Revision:            extension.Revision,
+		ResourceID:          extension.ResourceID,
+		ReservationRequired: extension.ReservationRequired,
+		SettlementPolicy:    string(extension.SettlementPolicy),
+		Payload:             append([]byte(nil), extension.Payload...),
+		PayloadHash:         extension.PayloadHash,
+		CreatedAt:           createdAt,
+	}); err != nil {
+		return err
+	}
+	return ensureEventSequenceTx(tx, orderID, extension.ExtensionID)
+}
+
+// LatestByIDTx returns the newest tenant-scoped extension revision.
+func LatestByIDTx(tx database.Tx, orderID, extensionID string) (extensions.OrderExtension, error) {
+	var record models.OrderExtensionRecord
+	err := tx.Read().Where("order_id = ? AND extension_id = ?", strings.TrimSpace(orderID), strings.TrimSpace(extensionID)).
+		Order("revision DESC").First(&record).Error
+	if err != nil {
+		return extensions.OrderExtension{}, err
+	}
+	return extensionFromRecord(record), nil
+}
+
+// LatestByIDGorm returns the newest extension revision from a scoped GORM transaction.
+func LatestByIDGorm(db *gorm.DB, tenantID, orderID, extensionID string) (extensions.OrderExtension, error) {
+	if db == nil {
+		return extensions.OrderExtension{}, fmt.Errorf("order extension database is required")
+	}
+	if tenantID = strings.TrimSpace(tenantID); tenantID == "" {
+		return extensions.OrderExtension{}, fmt.Errorf("order extension tenant ID is required")
+	}
+	query := db.Where("tenant_id = ? AND order_id = ? AND extension_id = ?", tenantID, strings.TrimSpace(orderID), strings.TrimSpace(extensionID))
+	var record models.OrderExtensionRecord
+	if err := query.Order("revision DESC").First(&record).Error; err != nil {
+		return extensions.OrderExtension{}, err
+	}
+	return extensionFromRecord(record), nil
+}
+
+// LatestByOrderTx returns one newest revision for every extension attached to
+// an order. Product-specific signed-order parsing is intentionally not used.
+func LatestByOrderTx(tx database.Tx, orderID string) ([]extensions.OrderExtension, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("order extension transaction is required")
+	}
+	if !tx.Read().Migrator().HasTable(&models.OrderExtensionRecord{}) {
+		return nil, nil
+	}
+	var records []models.OrderExtensionRecord
+	if err := tx.Read().Where("order_id = ?", strings.TrimSpace(orderID)).
+		Order("extension_id ASC, revision DESC").Find(&records).Error; err != nil {
+		return nil, err
+	}
+	return latestExtensions(records), nil
+}
+
+// LatestByOrderGorm is the tenant-scoped GORM variant of LatestByOrderTx.
+func LatestByOrderGorm(db *gorm.DB, tenantID, orderID string) ([]extensions.OrderExtension, error) {
+	if db == nil {
+		return nil, fmt.Errorf("order extension database is required")
+	}
+	if !db.Migrator().HasTable(&models.OrderExtensionRecord{}) {
+		return nil, nil
+	}
+	if tenantID = strings.TrimSpace(tenantID); tenantID == "" {
+		return nil, fmt.Errorf("order extension tenant ID is required")
+	}
+	query := db.Where("tenant_id = ? AND order_id = ?", tenantID, strings.TrimSpace(orderID))
+	var records []models.OrderExtensionRecord
+	if err := query.Order("extension_id ASC, revision DESC").Find(&records).Error; err != nil {
+		return nil, err
+	}
+	return latestExtensions(records), nil
+}
+
+func latestExtensions(records []models.OrderExtensionRecord) []extensions.OrderExtension {
+	latest := make([]extensions.OrderExtension, 0, len(records))
+	seen := make(map[string]struct{}, len(records))
+	for _, record := range records {
+		if _, exists := seen[record.ExtensionID]; exists {
+			continue
+		}
+		seen[record.ExtensionID] = struct{}{}
+		latest = append(latest, extensionFromRecord(record))
+	}
+	return latest
+}
+
+// RecordReservationTx persists the provider reservation returned before a
+// funding target is created. Repeated calls must describe the same binding.
+func RecordReservationTx(tx database.Tx, request extensions.ReservationRequest, reservation extensions.Reservation) error {
+	if tx == nil {
+		return fmt.Errorf("order extension reservation transaction is required")
+	}
+	if err := request.Validate(time.Now().UTC()); err != nil {
+		return err
+	}
+	if err := reservation.Validate(); err != nil {
+		return err
+	}
+	var existing models.OrderExtensionReservationRecord
+	err := tx.Read().Where("order_id = ? AND extension_id = ?", request.OrderID, request.Extension.ExtensionID).First(&existing).Error
+	if err == nil {
+		if existing.ProviderID != request.Extension.ProviderID || existing.ReservationID != reservation.ID ||
+			existing.ReservationVersion != reservation.Version || existing.IdempotencyKey != request.IdempotencyKey ||
+			existing.PaymentCoin != request.PaymentCoin || existing.ExtensionRevision != request.Extension.Revision {
+			return fmt.Errorf("order extension reservation binding is immutable")
+		}
+		if existing.Status != reservation.Status || !existing.ExpiresAt.Equal(request.ExpiresAt) {
+			return fmt.Errorf("order extension reservation binding is immutable")
+		}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return tx.Create(&models.OrderExtensionReservationRecord{
+		OrderID: request.OrderID, ExtensionID: request.Extension.ExtensionID, ProviderID: request.Extension.ProviderID,
+		ReservationID: reservation.ID, ReservationVersion: reservation.Version, ExtensionRevision: request.Extension.Revision, Status: reservation.Status,
+		PaymentCoin: request.PaymentCoin, IdempotencyKey: request.IdempotencyKey, ExpiresAt: request.ExpiresAt,
+	})
+}
+
+// ReservationByExtensionTx loads the binding for an extension, if one exists.
+func ReservationByExtensionTx(tx database.Tx, orderID, extensionID string) (*extensions.ReservationBinding, error) {
+	var record models.OrderExtensionReservationRecord
+	err := tx.Read().Where("order_id = ? AND extension_id = ?", strings.TrimSpace(orderID), strings.TrimSpace(extensionID)).First(&record).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return reservationBinding(record), nil
+}
+
+// ReservationByExtensionGorm is the tenant-scoped GORM variant.
+func ReservationByExtensionGorm(db *gorm.DB, tenantID, orderID, extensionID string) (*extensions.ReservationBinding, error) {
+	if db == nil {
+		return nil, fmt.Errorf("order extension database is required")
+	}
+	if tenantID = strings.TrimSpace(tenantID); tenantID == "" {
+		return nil, fmt.Errorf("order extension tenant ID is required")
+	}
+	query := db.Where("tenant_id = ? AND order_id = ? AND extension_id = ?", tenantID, strings.TrimSpace(orderID), strings.TrimSpace(extensionID))
+	var record models.OrderExtensionReservationRecord
+	if err := query.First(&record).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return reservationBinding(record), nil
+}
+
+func reservationBinding(record models.OrderExtensionReservationRecord) *extensions.ReservationBinding {
+	return &extensions.ReservationBinding{
+		ReservationID: record.ReservationID, ReservationVersion: record.ReservationVersion, ExtensionRevision: record.ExtensionRevision, Status: record.Status,
+		PaymentCoin: record.PaymentCoin, IdempotencyKey: record.IdempotencyKey, ExpiresAt: record.ExpiresAt, RecordedAt: record.CreatedAt,
+	}
+}
+
+// SettlementReferenceForOrder derives the opaque financial-state version that
+// a Controller must echo in a settlement attestation. Any relevant order or
+// payment transition changes the digest and makes stale evidence fail closed.
+func SettlementReferenceForOrder(order *models.Order) (extensions.SettlementReference, error) {
+	if order == nil {
+		return extensions.SettlementReference{}, fmt.Errorf("order is required")
+	}
+	paymentSent, err := order.PaymentSentMessage()
+	if err != nil {
+		return extensions.SettlementReference{}, err
+	}
+	settlementID := SettlementIDFromPaymentSent(paymentSent)
+	if settlementID == "" {
+		return extensions.SettlementReference{}, fmt.Errorf("payment settlement identity is required")
+	}
+	canonical := struct {
+		OrderID             string `json:"orderID"`
+		Role                string `json:"role"`
+		State               string `json:"state"`
+		PaymentVerification string `json:"paymentVerification"`
+		PaymentSent         string `json:"paymentSent"`
+		Confirmation        string `json:"confirmation"`
+		Cancel              string `json:"cancel"`
+		Decline             string `json:"decline"`
+		Refunds             string `json:"refunds"`
+	}{
+		OrderID: order.ID.String(), Role: string(order.Role()), State: order.State.String(),
+		PaymentVerification: string(order.CurrentPaymentVerificationStatus()),
+		PaymentSent:         digestBytes(order.SerializedPaymentSent), Confirmation: digestBytes(order.SerializedOrderConfirmation),
+		Cancel: digestBytes(order.SerializedOrderCancel), Decline: digestBytes(order.SerializedOrderDecline), Refunds: digestBytes(order.SerializedRefunds),
+	}
+	encoded, err := json.Marshal(canonical)
+	if err != nil {
+		return extensions.SettlementReference{}, err
+	}
+	digest := sha256.Sum256(encoded)
+	return extensions.SettlementReference{SettlementID: settlementID, OrderStateVersion: "sha256:" + hex.EncodeToString(digest[:])}, nil
+}
+
+func digestBytes(value []byte) string {
+	digest := sha256.Sum256(value)
+	return hex.EncodeToString(digest[:])
+}
+
+// SettlementIDFromPaymentSent derives the stable escrow/payment identity used
+// by Core events and conditional settlement attestations.
+func SettlementIDFromPaymentSent(paymentSent *pb.PaymentSent) string {
+	if paymentSent == nil {
+		return ""
+	}
+	if value := strings.TrimSpace(paymentSent.GetToAddress()); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(paymentSent.GetContractAddress()); value != "" {
+		return value
+	}
+	return strings.TrimSpace(paymentSent.GetTransactionID())
+}
+
+// EnqueueTx inserts an event once in the caller's tenant transaction.
+func EnqueueTx(tx database.Tx, event extensions.Event) error {
+	if tx == nil {
+		return fmt.Errorf("extension delivery transaction is required")
+	}
+	if err := validateEventBeforeVersionAssignment(event); err != nil {
+		return err
+	}
+	var existing models.ExtensionDelivery
+	err := tx.Read().Where("event_id = ?", event.EventID).First(&existing).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	orderVersion, err := nextEventVersionTx(tx, event.OrderID, event.ExtensionID)
+	if err != nil {
+		return fmt.Errorf("assign extension event order version: %w", err)
+	}
+	event.OrderVersion = orderVersion
+	if err := event.Validate(); err != nil {
+		return err
+	}
+	return tx.Create(deliveryFromEvent(event))
+}
+
+// EnqueueGorm inserts an event once through a scoped GORM transaction.
+func EnqueueGorm(tx *gorm.DB, event extensions.Event) error {
+	if tx == nil {
+		return fmt.Errorf("extension delivery transaction is required")
+	}
+	if err := validateEventBeforeVersionAssignment(event); err != nil {
+		return err
+	}
+	var existing models.ExtensionDelivery
+	lookup := tx.Where("tenant_id = ? AND event_id = ?", strings.TrimSpace(event.TenantID), event.EventID).First(&existing)
+	if lookup.Error == nil {
+		return nil
+	}
+	if !errors.Is(lookup.Error, gorm.ErrRecordNotFound) {
+		return lookup.Error
+	}
+	orderVersion, err := nextEventVersionGorm(tx, event.TenantID, event.OrderID, event.ExtensionID)
+	if err != nil {
+		return fmt.Errorf("assign extension event order version: %w", err)
+	}
+	event.OrderVersion = orderVersion
+	if err := event.Validate(); err != nil {
+		return err
+	}
+	record := deliveryFromEvent(event)
+	record.TenantID = strings.TrimSpace(event.TenantID)
+	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(record).Error
+}
+
+// EventFromDelivery reconstructs the public event envelope from its outbox record.
+func EventFromDelivery(record models.ExtensionDelivery) extensions.Event {
+	return extensions.Event{
+		EventID:        record.EventID,
+		ProviderID:     record.ProviderID,
+		Type:           record.EventType,
+		Version:        record.EventVersion,
+		TenantID:       record.TenantID,
+		SourceID:       record.SourceID,
+		OrderRole:      record.OrderRole,
+		OrderID:        record.OrderID,
+		OrderVersion:   record.OrderVersion,
+		ExtensionID:    record.ExtensionID,
+		IdempotencyKey: record.IdempotencyKey,
+		OccurredAt:     record.CreatedAt,
+		Payload:        append([]byte(nil), record.Payload...),
+	}
+}
+
+// RequeueDeliveryTx resets a dead-lettered or delayed delivery for operator replay.
+func RequeueDeliveryTx(tx database.Tx, eventID string) error {
+	if tx == nil || strings.TrimSpace(eventID) == "" {
+		return fmt.Errorf("extension delivery transaction and event ID are required")
+	}
+	updated, err := tx.UpdateColumns(map[string]interface{}{
+		"attempts":         0,
+		"last_error":       "",
+		"next_attempt_at":  nil,
+		"delivered_at":     nil,
+		"dead_lettered_at": nil,
+		"lease_owner":      "",
+		"lease_expires_at": nil,
+	}, map[string]interface{}{"event_id = ?": strings.TrimSpace(eventID)}, &models.ExtensionDelivery{})
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// RecordAttestationTx records accepted evidence and rejects conflicting reuse.
+func RecordAttestationTx(tx database.Tx, attestation extensions.SettlementAttestation, acceptedAt time.Time) error {
+	if tx == nil {
+		return fmt.Errorf("settlement attestation transaction is required")
+	}
+	replayFingerprint, err := settlementAttestationReplayFingerprint(attestation)
+	if err != nil {
+		return err
+	}
+	var existing models.SettlementAttestationRecord
+	err = tx.Read().Where("attestation_id = ? OR idempotency_key = ? OR replay_fingerprint = ?", attestation.AttestationID, attestation.IdempotencyKey, replayFingerprint).First(&existing).Error
+	if err == nil {
+		if existing.OrderID != attestation.OrderID || existing.ExtensionID != attestation.ExtensionID ||
+			existing.Issuer != attestation.Issuer || existing.SettlementID != attestation.SettlementID ||
+			existing.ExpectedExtensionRevision != attestation.ExpectedExtensionRevision || existing.EvidenceDigest != attestation.EvidenceDigest ||
+			existing.ExpectedOrderStateVersion != attestation.ExpectedOrderStateVersion ||
+			existing.ConditionType != attestation.ConditionType || existing.ConditionVersion != attestation.ConditionVersion {
+			return fmt.Errorf("settlement attestation ID was reused with different evidence")
+		}
+		if existing.AttestationID != attestation.AttestationID && existing.IdempotencyKey != attestation.IdempotencyKey {
+			return fmt.Errorf("settlement attestation evidence was replayed")
+		}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return tx.Create(&models.SettlementAttestationRecord{
+		TenantID:                  strings.TrimSpace(attestation.TenantID),
+		AttestationID:             attestation.AttestationID,
+		IdempotencyKey:            attestation.IdempotencyKey,
+		ReplayFingerprint:         replayFingerprint,
+		Issuer:                    attestation.Issuer,
+		OrderID:                   attestation.OrderID,
+		ExtensionID:               attestation.ExtensionID,
+		SettlementID:              attestation.SettlementID,
+		ExpectedExtensionRevision: attestation.ExpectedExtensionRevision,
+		ExpectedOrderStateVersion: attestation.ExpectedOrderStateVersion,
+		ConditionType:             attestation.ConditionType,
+		ConditionVersion:          attestation.ConditionVersion,
+		EvidenceDigest:            attestation.EvidenceDigest,
+		ObservedAt:                attestation.ObservedAt,
+		ExpiresAt:                 attestation.ExpiresAt,
+		AcceptedAt:                acceptedAt,
+	})
+}
+
+func ensureEventSequenceTx(tx database.Tx, orderID, extensionID string) error {
+	var sequence models.OrderExtensionEventSequence
+	err := tx.Read().Where("extension_id = ?", strings.TrimSpace(extensionID)).First(&sequence).Error
+	if err == nil {
+		if sequence.OrderID != strings.TrimSpace(orderID) {
+			return fmt.Errorf("order extension event sequence order mismatch")
+		}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return tx.Create(&models.OrderExtensionEventSequence{
+		ExtensionID: strings.TrimSpace(extensionID),
+		OrderID:     strings.TrimSpace(orderID),
+	})
+}
+
+func nextEventVersionTx(tx database.Tx, orderID, extensionID string) (uint64, error) {
+	if err := ensureEventSequenceTx(tx, orderID, extensionID); err != nil {
+		return 0, err
+	}
+	for attempts := 0; attempts < 8; attempts++ {
+		var sequence models.OrderExtensionEventSequence
+		if err := tx.Read().Where("extension_id = ?", strings.TrimSpace(extensionID)).First(&sequence).Error; err != nil {
+			return 0, err
+		}
+		next := sequence.LastVersion + 1
+		updated, err := tx.UpdateColumns(
+			map[string]interface{}{"last_version": next},
+			map[string]interface{}{
+				"extension_id = ?": strings.TrimSpace(extensionID),
+				"last_version = ?": sequence.LastVersion,
+			},
+			&models.OrderExtensionEventSequence{},
+		)
+		if err != nil {
+			return 0, err
+		}
+		if updated == 1 {
+			return next, nil
+		}
+	}
+	return 0, fmt.Errorf("order extension event sequence update conflicted repeatedly")
+}
+
+func nextEventVersionGorm(tx *gorm.DB, tenantID, orderID, extensionID string) (uint64, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	orderID = strings.TrimSpace(orderID)
+	extensionID = strings.TrimSpace(extensionID)
+	sequence := models.OrderExtensionEventSequence{TenantID: tenantID, ExtensionID: extensionID, OrderID: orderID}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&sequence).Error; err != nil {
+		return 0, err
+	}
+	result := tx.Model(&models.OrderExtensionEventSequence{}).
+		Where("tenant_id = ? AND extension_id = ? AND order_id = ?", tenantID, extensionID, orderID).
+		UpdateColumn("last_version", gorm.Expr("last_version + 1"))
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	if result.RowsAffected != 1 {
+		return 0, fmt.Errorf("order extension event sequence not found")
+	}
+	if err := tx.Where("tenant_id = ? AND extension_id = ?", tenantID, extensionID).First(&sequence).Error; err != nil {
+		return 0, err
+	}
+	return sequence.LastVersion, nil
+}
+
+func validateEventBeforeVersionAssignment(event extensions.Event) error {
+	event.OrderVersion = 1
+	return event.Validate()
+}
+
+func settlementAttestationReplayFingerprint(attestation extensions.SettlementAttestation) (string, error) {
+	canonical := struct {
+		Issuer                    string `json:"issuer"`
+		OrderID                   string `json:"orderID"`
+		SettlementID              string `json:"settlementID"`
+		ExtensionID               string `json:"extensionID"`
+		ExpectedExtensionRevision uint64 `json:"expectedExtensionRevision"`
+		ExpectedOrderStateVersion string `json:"expectedOrderStateVersion"`
+		ConditionType             string `json:"conditionType"`
+		ConditionVersion          string `json:"conditionVersion"`
+		EvidenceDigest            string `json:"evidenceDigest"`
+	}{
+		Issuer:                    strings.TrimSpace(attestation.Issuer),
+		OrderID:                   strings.TrimSpace(attestation.OrderID),
+		SettlementID:              strings.TrimSpace(attestation.SettlementID),
+		ExtensionID:               strings.TrimSpace(attestation.ExtensionID),
+		ExpectedExtensionRevision: attestation.ExpectedExtensionRevision,
+		ExpectedOrderStateVersion: strings.TrimSpace(attestation.ExpectedOrderStateVersion),
+		ConditionType:             strings.TrimSpace(attestation.ConditionType),
+		ConditionVersion:          strings.TrimSpace(attestation.ConditionVersion),
+		EvidenceDigest:            strings.TrimSpace(attestation.EvidenceDigest),
+	}
+	encoded, err := json.Marshal(canonical)
+	if err != nil {
+		return "", fmt.Errorf("marshal settlement attestation replay identity: %w", err)
+	}
+	digest := sha256.Sum256(encoded)
+	return "sha256:" + hex.EncodeToString(digest[:]), nil
+}
+
+func extensionFromRecord(record models.OrderExtensionRecord) extensions.OrderExtension {
+	return extensions.OrderExtension{
+		ExtensionID:         record.ExtensionID,
+		ProviderID:          record.ProviderID,
+		Type:                record.ExtensionType,
+		SchemaVersion:       record.SchemaVersion,
+		Revision:            record.Revision,
+		ResourceID:          record.ResourceID,
+		ReservationRequired: record.ReservationRequired,
+		SettlementPolicy:    extensions.SettlementPolicy(record.SettlementPolicy),
+		Payload:             append([]byte(nil), record.Payload...),
+		PayloadHash:         record.PayloadHash,
+		CreatedAt:           record.CreatedAt,
+	}
+}
+
+func deliveryFromEvent(event extensions.Event) *models.ExtensionDelivery {
+	return &models.ExtensionDelivery{
+		TenantID:       strings.TrimSpace(event.TenantID),
+		EventID:        event.EventID,
+		SourceID:       event.SourceID,
+		OrderRole:      event.OrderRole,
+		ProviderID:     event.ProviderID,
+		EventType:      event.Type,
+		EventVersion:   event.Version,
+		OrderID:        event.OrderID,
+		OrderVersion:   event.OrderVersion,
+		ExtensionID:    event.ExtensionID,
+		IdempotencyKey: event.IdempotencyKey,
+		Payload:        append([]byte(nil), event.Payload...),
+		CreatedAt:      event.OccurredAt,
+	}
+}

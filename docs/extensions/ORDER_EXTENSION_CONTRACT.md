@@ -1,6 +1,6 @@
 # Order extension contract
 
-Status: Target v1 contract; not yet fully implemented
+Status: v1 implemented for the Open Core Collectibles migration
 
 ## Purpose
 
@@ -21,11 +21,17 @@ OrderExtension {
   schema_version
   revision
   resource_id
+  reservation_required
+  settlement_policy
   payload
   payload_hash
   created_at
 }
 ```
+
+The persisted identity is scoped to the order as well as provider, type, and
+resource, so the same external resource identifier cannot collide across two
+orders owned by one tenant.
 
 - `extension_id` is the stable identity of the logical attachment.
 - `provider_id` identifies the module responsible for interpreting the
@@ -37,6 +43,11 @@ OrderExtension {
 - `revision` is a Core-assigned, monotonically increasing optimistic-lock
   version.
 - `resource_id` is the stable external or extension-owned resource binding.
+- `reservation_required` persists the fail-closed requirement independently
+  from whether the provider module is currently installed.
+- `settlement_policy` is either Core default or `extension-attested`. The
+  latter blocks automatic settlement even when the module is unavailable and
+  requires a validated attestation through the Core command path.
 - `payload_hash` uses a contract-declared canonical encoding and digest
   algorithm, making the declaration auditable and detecting unintended
   mutation.
@@ -47,26 +58,32 @@ version, and immutable fields. It treats the payload as opaque except for
 explicitly promoted cross-domain fields. Updates create a new version rather
 than silently replacing evidence used by completed financial actions.
 
+Declarations are produced by the provider's
+`order-extension.declaration/v1` capability from the signed `OrderOpen`.
+Core no longer calls a Collectibles codec from order or payment composition.
+The declaration capability receives no database, network, key, or Node handle.
+
 ## 2. Resource reservation
 
-Domains that allocate scarce resources implement this lifecycle:
+Domains that allocate scarce resources implement a synchronous provisioning
+gate:
 
 ```text
 Reserve(order, extension, idempotency_key, expiry)
   -> reservation_id, reservation_version, status
-
-Commit(reservation_id, reservation_version, order_version, idempotency_key)
-  -> new reservation_version, committed status
-
-Release(reservation_id, reservation_version, reason, idempotency_key)
-  -> new reservation_version, released status
 ```
 
-Core owns when each operation is requested. The provider owns its resource
-store. Repeated requests are idempotent and return the same logical outcome.
-Expiry and ambiguous timeouts are reconciled through status lookup or
-observation; Core never assumes a timeout means failure. Every mutation checks
-the tenant, order, extension, and expected reservation version binding.
+Core invokes `Reserve` before creating a funding target. The provider owns its
+resource store. Repeated requests are idempotent and return the same logical
+outcome. Core persists `reservation_id`, `reservation_version`, the bound
+extension revision, status,
+payment coin, idempotency key, and expiry before continuing funding
+provisioning. Later commit/release work is driven by durable payment and
+terminal-order events carrying that exact binding through the module
+Controller, so Core does not expose a second partially used mutation API.
+Expiry and ambiguous timeouts are reconciled by the provider; Core never
+assumes a timeout means failure. Every operation checks the tenant, order,
+extension, and expected reservation binding.
 
 Collectibles token or inventory allocation maps to this contract. The generic
 contract must not expose chain, token, collection, or mint vocabulary.
@@ -82,6 +99,8 @@ ExtensionEvent {
   event_type
   event_version
   tenant_id
+  source_id
+  order_role
   order_id
   order_version
   extension_ref
@@ -90,16 +109,30 @@ ExtensionEvent {
 }
 ```
 
-Core commits the domain transition and outbox record atomically. A Controller
-consumes at least once and deduplicates by `event_id`. The delivery system
-defines bounded backoff, visibility timeout, dead-letter state, replay, and
-operator reconciliation. Ordering is guaranteed only for the documented
-aggregate key; consumers must reject or defer stale order versions.
+`event_id` is derived from tenant, source actor, local order role, order,
+extension, and event type, so buyer/seller and multi-tenant copies cannot
+collide. Core commits the domain transition and outbox record atomically. A
+Controller consumes at least once and deduplicates by `event_id`. The delivery
+system assigns a monotonic `order_version` from a durable per-extension aggregate
+sequence and defines bounded backoff, a database compare-and-swap visibility
+lease, dead-letter state, and a transactional requeue primitive. Module code
+is invoked only after the lease transaction commits; Core never holds an
+internal mutex or database transaction across a Controller call. Versions are
+monotonic for each order-extension aggregate, but at-least-once execution may
+overlap after lease expiry; consumers must deduplicate and reject or defer
+stale order versions. A public operator reconciliation API remains future
+evolution.
 
 Minting, fulfillment, and external delivery belong in Controllers. A delivery
 result returns as an idempotent observation and may advance only a
 Core-defined non-financial transition unless an independently validated
 settlement condition applies.
+
+`payment-verified/v1` payloads contain the extension envelope, persisted
+reservation binding, settlement ID, payment coin/amount, and a Core-issued
+opaque `order_state_version`. Terminal release payloads contain the extension,
+reservation binding, and reason. Controllers do not reconstruct either
+binding from product metadata.
 
 ## 4. Conditional settlement
 
@@ -113,8 +146,10 @@ SettlementAttestation {
   issuer
   tenant_id
   order_id
+  extension_id
   settlement_id
-  expected_version
+  expected_extension_revision
+  expected_order_state_version
   condition_type
   condition_version
   evidence_digest
@@ -125,25 +160,36 @@ SettlementAttestation {
 
 Core verifies issuer authorization, tenant/order/settlement binding, condition
 schema and version, evidence digest, freshness, idempotency and replay
-protection, policy, and expected state. If valid, Core issues the existing
-standard settlement command. The state machine remains the only writer of
-settlement state.
+protection, policy, expected extension revision, and the opaque financial
+order-state version issued in the payment event. After module verification,
+Core re-reads the order and extension while holding the settlement submission
+lock and compares both versions again, closing the verifier-to-command TOCTOU
+window. If valid, Core issues the existing
+standard settlement command. The module cannot provide a payout address: Core
+resolves the seller's active receiving account for the settlement coin and
+passes that Core-owned destination to the command. Accepted evidence is also
+claimed by a durable fingerprint over issuer, order, settlement, extension,
+condition, expected revision, and evidence digest, so changing request IDs does
+not bypass replay protection. The state machine remains the only writer of
+settlement state. Composed distributions reach this capability through the
+typed `NodeService.ConditionalSettlement()` accessor.
 
 For a Collectibles primary sale, successful delivery can satisfy a declared
 condition, but the Controller does not execute release. Disputes, refunds,
 expiry, and reorg/reversal policy remain Core decisions.
 
-## 5. Compatibility and removal
+## 5. Versioning and change policy
 
-Contract versions are negotiated per capability. Additive optional fields are
-compatible; changed meaning, authority, idempotency, or ordering requires a
-new major contract version. Core preserves unknown envelopes and exposes only
-safe metadata when their provider is absent.
+Contract versions are negotiated per capability. Additive optional fields may
+remain within a major version; changed meaning, authority, idempotency,
+ordering, or financial semantics requires a new major contract version. Core
+preserves unknown envelopes and exposes only safe metadata when their provider
+is absent.
 
-The existing Collectibles metadata, hook, delivery queue, and primary-sale
-release APIs are compatibility adapters during migration. No new public
-product-specific entry points are added. Their allowlist is explicit and may
-only shrink after consumers adopt the v1 contracts.
+Open Core performs a direct development-time cutover to this contract. It does
+not retain Collectibles hooks, a Collectibles-specific outbox, FiatMetadata
+mirrors, or product-specific settlement commands. New domain integrations must
+compose through the generic module contract from their first implementation.
 
 ## Non-goals
 

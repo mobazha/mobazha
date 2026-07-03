@@ -13,16 +13,17 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	solana "github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	ordercontracttype "github.com/mobazha/mobazha/internal/core/contracttype"
 	"github.com/mobazha/mobazha/internal/core/paymentintent"
 	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/internal/orders"
 	"github.com/mobazha/mobazha/internal/orders/utils"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/identity"
 	"github.com/mobazha/mobazha/pkg/models"
 	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
@@ -114,7 +115,7 @@ func (s *OrderAppService) PurchaseListing(ctx context.Context, purchase *models.
 				return err
 			}
 		}
-		if err = persistCollectibleOrderMetadata(tx, order.OrderID, orderOpen); err != nil {
+		if err = s.persistOrderExtensions(ctx, tx, order.OrderID, orderOpen); err != nil {
 			return err
 		}
 
@@ -237,17 +238,13 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 		if listing.Listing.Metadata.ContractType == pb.Listing_Metadata_CLASSIFIED {
 			return nil, nil, fmt.Errorf("%w: classified listings cannot be purchased", coreiface.ErrBadRequest)
 		}
-		if listing.Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN || models.PurchaseItemHasCollectibleMetadata(item) {
-			if len(purchase.Items) != 1 || strings.TrimSpace(item.Quantity) != "1" {
-				return nil, nil, fmt.Errorf("%w: collectible NFT primary-sale orders must contain exactly one item with quantity 1", coreiface.ErrBadRequest)
-			}
-			holderWallet := strings.TrimSpace(item.HolderWallet)
-			if holderWallet == "" {
-				return nil, nil, fmt.Errorf("%w: collectible NFT primary-sale orders require a holderWallet", coreiface.ErrBadRequest)
-			}
-			if _, err := solana.PublicKeyFromBase58(holderWallet); err != nil {
-				return nil, nil, fmt.Errorf("%w: collectible holderWallet must be a valid Solana public key", coreiface.ErrBadRequest)
-			}
+		// RWA_TOKEN is a Core contract shape, independent of the module that
+		// interprets its extension payload. Primary transfers are intentionally
+		// one aggregate line and one unit; product-specific field validation is
+		// delegated to the declaring module.
+		if listing.Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN &&
+			(len(purchase.Items) != 1 || strings.TrimSpace(item.Quantity) != "1") {
+			return nil, nil, fmt.Errorf("%w: RWA token orders must contain exactly one item with quantity 1", coreiface.ErrBadRequest)
 		}
 		var sameType bool
 		orderContractType, hasOrderContractType, sameType = ordercontracttype.AddToSingleTypeOrder(
@@ -307,7 +304,7 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 			PaymentAddress:   item.PaymentAddress,
 			ShippingOption:   shippingOption,
 			Options:          options,
-			OptionalFeatures: models.PurchaseItemOptionalFeaturesWithCollectibleMetadata(item),
+			OptionalFeatures: append([]string(nil), item.OptionalFeatures...),
 		}
 		items = append(items, orderItem)
 	}
@@ -565,31 +562,39 @@ func persistOrderRefundAddress(tx database.Tx, orderID string, refundAddr string
 	return nil
 }
 
-func persistCollectibleOrderMetadata(tx database.Tx, orderID string, orderOpen *pb.OrderOpen) error {
-	meta, ok := models.CollectibleOrderMetadataFromOrderOpen(orderOpen)
-	if !ok {
+func (s *OrderAppService) persistOrderExtensions(ctx context.Context, tx database.Tx, orderID string, orderOpen *pb.OrderOpen) error {
+	required := orderOpenRequiresExtension(orderOpen)
+	if s == nil || s.orderExtensionDeclarer == nil {
+		if required {
+			return fmt.Errorf("%w: order %s requires an installed order-extension declaration module", coreiface.ErrBadRequest, orderID)
+		}
 		return nil
 	}
-	holderWallet := strings.TrimSpace(meta.HolderWallet)
-	if holderWallet == "" {
-		return fmt.Errorf("%w: collectible order requires a holderWallet", coreiface.ErrBadRequest)
+	declared, err := s.orderExtensionDeclarer(ctx, extensions.DeclarationInput{OrderID: orderID, OrderOpen: orderOpen})
+	if err != nil {
+		return fmt.Errorf("declare order extensions for order %s: %w", orderID, err)
 	}
-	if _, err := solana.PublicKeyFromBase58(holderWallet); err != nil {
-		return fmt.Errorf("%w: collectible holderWallet must be a valid Solana public key", coreiface.ErrBadRequest)
+	if required && len(declared) == 0 {
+		return fmt.Errorf("%w: order %s requires an order-extension declaration", coreiface.ErrBadRequest, orderID)
 	}
-	var dbOrder models.Order
-	if err := tx.Read().Where("id = ?", orderID).First(&dbOrder).Error; err != nil {
-		return fmt.Errorf("load order %s to set collectible metadata: %w", orderID, err)
-	}
-	if err := dbOrder.MergeFiatMetadata(meta.FiatMetadataMap()); err != nil {
-		return fmt.Errorf("merge collectible metadata for order %s: %w", orderID, err)
-	}
-	if err := tx.Update("fiat_metadata", dbOrder.FiatMetadata,
-		map[string]interface{}{"id = ?": orderID},
-		&models.Order{}); err != nil {
-		return fmt.Errorf("save order %s with collectible metadata: %w", orderID, err)
+	for _, extension := range declared {
+		if err := orderextensions.PersistTx(tx, orderID, extension); err != nil {
+			return fmt.Errorf("persist order extension %s for order %s: %w", extension.ExtensionID, orderID, err)
+		}
 	}
 	return nil
+}
+
+func orderOpenRequiresExtension(orderOpen *pb.OrderOpen) bool {
+	if orderOpen == nil {
+		return false
+	}
+	for _, signed := range orderOpen.GetListings() {
+		if signed.GetListing().GetMetadata().GetContractType() == pb.Listing_Metadata_RWA_TOKEN {
+			return true
+		}
+	}
+	return false
 }
 
 func persistOrderRefundAddressGorm(gdb *gorm.DB, orderID string, refundAddr string) error {

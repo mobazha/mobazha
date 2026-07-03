@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha/internal/repo"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
@@ -411,7 +412,11 @@ func TestFiatService_CreatePayment_RejectsManagedCollectibleBeforeProvider(t *te
 	reg := newMockFiatRegistry()
 	reg.Register(provider)
 	svc, db := newFiatTestService(t, reg)
-	svc.AddProvisioningPolicy(corepayment.NewCollectibleFirstSaleProvisioningPolicy(nil))
+	svc.AddProvisioningPolicy(corepayment.NewOrderExtensionProvisioningPolicy(
+		func(corepayment.SessionProvisioningPolicyInput) (extensions.OrderExtension, bool, error) {
+			return extensions.OrderExtension{}, false, corepayment.ErrRWAPaymentSessionUnsupported
+		}, nil,
+	))
 
 	open := &pb.OrderOpen{
 		Listings: []*pb.SignedListing{{Listing: &pb.Listing{

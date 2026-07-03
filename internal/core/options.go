@@ -24,6 +24,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/deploy"
 	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
@@ -64,43 +65,29 @@ func WithPaymentModules(modules ...distribution.PaymentModule) NodeOption {
 	}}
 }
 
+// WithOrderExtensionModules installs trusted, statically linked order-domain
+// modules. The slice is copied so composition cannot change after startup.
+func WithOrderExtensionModules(modules ...extensions.Module) NodeOption {
+	owned := append([]extensions.Module(nil), modules...)
+	var registered []registeredOrderExtensionModule
+	return NodeOption{
+		configure: func(*nodeBuildOptions) error {
+			var err error
+			registered, err = snapshotOrderExtensionModules(owned)
+			return err
+		},
+		apply: func(n *MobazhaNode) {
+			n.orderExtensionModules = append([]registeredOrderExtensionModule(nil), registered...)
+		},
+	}
+}
+
 // WithAIProfile injects distribution-provided AI routes through a
 // provider-neutral public contract.
 func WithAIProfile(profile contracts.AIProfile) NodeOption {
 	return NodeOption{apply: func(n *MobazhaNode) {
 		n.SetAIProfile(profile)
 	}}
-}
-
-// WithCollectiblePrimarySalePaidHook wires hosting's collectibles first-sale
-// bridge. Nil leaves collectible payment verification as a local metadata-only
-// no-op, which is the standalone-safe default.
-func WithCollectiblePrimarySalePaidHook(hook CollectiblePrimarySalePaidHook) NodeOption {
-	return NodeOption{apply: func(n *MobazhaNode) {
-		n.collectiblePrimarySalePaidHook = hook
-	}}
-}
-
-// WithCollectibleFirstSaleAuthorizationHook wires hosting's authoritative
-// source-deposit reservation into payment-session provisioning.
-func WithCollectibleFirstSaleAuthorizationHook(hook CollectibleFirstSaleAuthorizationHook) NodeOption {
-	return NodeOption{apply: func(n *MobazhaNode) {
-		n.collectibleFirstSaleAuthorizationHook = hook
-	}}
-}
-
-// WithCollectibleFirstSaleReservationReleaseHook wires the terminal-order
-// reservation release adapter supplied by the distribution composition root.
-func WithCollectibleFirstSaleReservationReleaseHook(hook CollectibleFirstSaleReservationReleaseHook) NodeOption {
-	return NodeOption{apply: func(n *MobazhaNode) {
-		n.collectibleFirstSaleReservationReleaseHook = hook
-	}}
-}
-
-// WithCollectibleFirstSalePreflightHook is retained as a source-compatible
-// alias. The hook now reserves rather than merely validates.
-func WithCollectibleFirstSalePreflightHook(hook CollectibleFirstSalePreflightHook) NodeOption {
-	return WithCollectibleFirstSaleAuthorizationHook(hook)
 }
 
 // WithPlatformFeatureProvider overrides the default PlatformGlobalProvider
@@ -661,6 +648,7 @@ func (n *MobazhaNode) initOrderService() {
 		CoTenantVerifiedPayment:    n.coTenantVerifiedPayment,
 		Resolver:                   n.featureResolver,
 		SupplyAvailability:         n.supplyAvailabilityService,
+		OrderExtensionDeclarer:     n.declareOrderExtensions,
 	})
 }
 
@@ -775,6 +763,7 @@ func (n *MobazhaNode) initSettlementService() {
 		RelayAPIURL:        n.relayAPIURL,
 		RelayAPIBearer:     n.relayAPIBearer,
 	})
+	n.settlementService.SetAttestationVerifierResolver(n.extensionAttestationVerifier)
 
 	if n.paymentService != nil {
 		n.paymentService.SetEscrowOps(n.settlementService)

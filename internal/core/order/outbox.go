@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/mobazha/mobazha/internal/collectiblesdelivery"
+	"github.com/mobazha/mobazha/internal/extensiondelivery"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
@@ -37,7 +37,7 @@ func WriteOutboxEvent(tx database.Tx, evt interface{}) error {
 	}); err != nil {
 		return err
 	}
-	return collectiblesdelivery.EnqueueTerminalEventByLookupTx(tx, evt)
+	return extensiondelivery.EnqueueTerminalEventByLookupTx(tx, evt)
 }
 
 // RunOutboxPollOnce delivers pending outbox events in a single pass.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha/internal/collectiblesdelivery"
+	"github.com/mobazha/mobazha/internal/extensiondelivery"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/orders/utils"
 	"github.com/mobazha/mobazha/pkg/database"
@@ -375,12 +375,15 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 	tx iwallet.Transaction,
 ) error {
 	saveOrder := func() error {
+		if err := dbtx.Save(order); err != nil {
+			return err
+		}
 		if order.IsPaymentVerified() {
-			if err := collectiblesdelivery.EnqueueTx(dbtx, order, models.CollectibleLifecyclePaid, ""); err != nil {
+			if err := extensiondelivery.EnqueuePaymentVerifiedTx(dbtx, order); err != nil {
 				return err
 			}
 		}
-		return dbtx.Save(order)
+		return nil
 	}
 	alreadyVerified := order.IsPaymentVerified()
 	if err := order.PutTransaction(tx); err != nil {

@@ -13,7 +13,7 @@ acceptance criteria.
 | [Capability and security model](CAPABILITY_AND_SECURITY_MODEL.md) | Activation gates, permissions, isolation, and financial safety |
 | [Module lifecycle](MODULE_LIFECYCLE.md) | Manifest, dependency validation, startup, health, drain, upgrade, and rollback |
 | [Order extension contract](ORDER_EXTENSION_CONTRACT.md) | Generic order metadata, reservations, delivery, and conditional settlement |
-| [Order extension evolution plan](ORDER_EXTENSION_EVOLUTION_PLAN.md) | Incremental migration of the current Collectibles integration |
+| [Order extension evolution plan](ORDER_EXTENSION_EVOLUTION_PLAN.md) | Direct cutover of the current Collectibles integration |
 | [Conformance](CONFORMANCE.md) | Contract, security, recovery, and compatibility test requirements |
 
 The [Payment Plugin Architecture](../plugins/PAYMENT_PLUGIN_ARCHITECTURE.md)

@@ -12,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
@@ -148,9 +149,12 @@ type mockNode struct {
 }
 
 // Service accessors — mockNode returns itself for each sub-interface.
-func (m *mockNode) IdentityInfo() contracts.IdentityService              { return m }
-func (m *mockNode) Notification() contracts.NotificationService          { return m }
-func (m *mockNode) Order() contracts.OrderService                        { return m }
+func (m *mockNode) IdentityInfo() contracts.IdentityService     { return m }
+func (m *mockNode) Notification() contracts.NotificationService { return m }
+func (m *mockNode) Order() contracts.OrderService               { return m }
+func (m *mockNode) ConditionalSettlement() contracts.ConditionalSettlementService {
+	return m
+}
 func (m *mockNode) Listing() contracts.ListingService                    { return m }
 func (m *mockNode) Profile() contracts.ProfileService                    { return m }
 func (m *mockNode) Wallet() contracts.WalletService                      { return m }
@@ -216,8 +220,9 @@ func (m *mockNode) ExecuteSettlementAction(ctx context.Context, action string, o
 	}
 	return nil, "", fmt.Errorf("ExecuteSettlementAction not stubbed in mockNode")
 }
-func (m *mockNode) ExecuteCollectiblePrimarySaleRelease(context.Context, models.OrderID, string) (*payment.ActionResult, iwallet.CoinType, error) {
-	return nil, "", fmt.Errorf("ExecuteCollectiblePrimarySaleRelease not stubbed in mockNode")
+
+func (m *mockNode) ExecuteConditionalSettlement(context.Context, extensions.SettlementAttestation) (*payment.ActionResult, iwallet.CoinType, error) {
+	return nil, "", fmt.Errorf("ExecuteConditionalSettlement not stubbed in mockNode")
 }
 func (m *mockNode) GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error) {
 	if m.getSettlementActionStatusFunc != nil {

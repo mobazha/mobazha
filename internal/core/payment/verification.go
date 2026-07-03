@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/mobazha/mobazha/internal/collectiblesdelivery"
+	"github.com/mobazha/mobazha/internal/extensiondelivery"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
@@ -132,7 +132,7 @@ func (s *PaymentAppService) verifyOrderPayment(order *models.Order) {
 				return err
 			}
 		}
-		return collectiblesdelivery.EnqueueTx(dbtx, &freshOrder, models.CollectibleLifecyclePaid, "")
+		return extensiondelivery.EnqueuePaymentVerifiedTx(dbtx, &freshOrder)
 	})
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "Payment verification: failed to save verified order %s: %v", order.ID, err)

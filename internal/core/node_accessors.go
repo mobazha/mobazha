@@ -281,6 +281,14 @@ func (n *MobazhaNode) Order() contracts.OrderService {
 	}
 }
 
+// ConditionalSettlement returns the attestation-gated settlement service.
+func (n *MobazhaNode) ConditionalSettlement() contracts.ConditionalSettlementService {
+	if n.settlementService == nil {
+		return nil
+	}
+	return n.settlementService
+}
+
 func (n *MobazhaNode) Listing() contracts.ListingService {
 	if n.listingService == nil {
 		return nil

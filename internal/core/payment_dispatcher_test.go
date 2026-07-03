@@ -7,9 +7,11 @@ import (
 	"time"
 
 	corepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
@@ -392,20 +394,29 @@ func TestDispatchCancelablePayment_SkipsSolanaSellerDeclineRefunderAutoConfirm(t
 	}
 }
 
-func TestDispatchCancelablePayment_SkipsManagedCollectibleFirstSaleAutoConfirm(t *testing.T) {
+func TestDispatchCancelablePayment_SkipsExtensionAttestedAutoConfirm(t *testing.T) {
 	db := newTestDatabase(t)
-	orderOpen := collectibleLifecycleOrderOpen("holder-wallet", []byte("buyer-identity-key"))
+	require.NoError(t, db.gormDB.AutoMigrate(&models.OrderExtensionRecord{}, &models.OrderExtensionEventSequence{}))
+	orderOpen := &pb.OrderOpen{}
 	serializedOrderOpen, err := protojson.Marshal(orderOpen)
 	if err != nil {
 		t.Fatal(err)
 	}
 	orderID := models.OrderID("managed-collectible-order")
 	if err := db.Update(func(tx database.Tx) error {
-		return tx.Save(&models.Order{
+		if err := tx.Save(&models.Order{
 			ID:                  orderID,
 			MyRole:              string(models.RoleVendor),
 			SerializedOrderOpen: serializedOrderOpen,
-		})
+		}); err != nil {
+			return err
+		}
+		extension, err := extensions.NewOrderExtension(orderID.String(), "io.mobazha.test", "test", "v1", "resource", map[string]string{"value": "test"})
+		if err != nil {
+			return err
+		}
+		extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
+		return orderextensions.PersistTx(tx, orderID.String(), extension)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +439,7 @@ func TestDispatchCancelablePayment_SkipsManagedCollectibleFirstSaleAutoConfirm(t
 
 	select {
 	case <-called:
-		t.Fatal("managed collectible first sale should preserve escrow until Hub settle or default")
+		t.Fatal("extension-attested order should preserve escrow until validated evidence")
 	case <-time.After(50 * time.Millisecond):
 	}
 }

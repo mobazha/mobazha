@@ -664,7 +664,7 @@ func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb
 	if err := orderMsg.Message.UnmarshalTo(orderOpen); err != nil {
 		return err
 	}
-	if err := persistCollectibleOrderMetadata(tx, orderMsg.OrderID, orderOpen); err != nil {
+	if err := s.persistOrderExtensions(context.Background(), tx, orderMsg.OrderID, orderOpen); err != nil {
 		return err
 	}
 

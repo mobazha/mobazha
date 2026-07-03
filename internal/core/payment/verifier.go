@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha/internal/collectiblesdelivery"
 	"github.com/mobazha/mobazha/internal/core/paymentintent"
+	"github.com/mobazha/mobazha/internal/extensiondelivery"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
@@ -197,7 +197,7 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 			if err := tx.Where("tenant_id = ? AND id = ?", tenantID, orderID).First(&order).Error; err != nil {
 				return err
 			}
-			return collectiblesdelivery.EnqueueGorm(tx, tenantID, &order, models.CollectibleLifecyclePaid, "")
+			return extensiondelivery.EnqueuePaymentVerifiedGorm(tx, tenantID, &order)
 		})
 	} else {
 		err = v.db.Update(func(tx database.Tx) error {
@@ -214,7 +214,7 @@ func (v *AggregatingVerifier) AggregateAndEmit(ctx context.Context, tenantID, or
 			if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
 				return err
 			}
-			return collectiblesdelivery.EnqueueTx(tx, &order, models.CollectibleLifecyclePaid, "")
+			return extensiondelivery.EnqueuePaymentVerifiedTx(tx, &order)
 		})
 	}
 	if err != nil {

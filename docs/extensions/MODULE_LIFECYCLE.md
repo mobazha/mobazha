@@ -1,6 +1,13 @@
 # Extension module lifecycle
 
-Status: Initial contract
+Status: Target governance contract; static v1 subset implemented
+
+The implemented static subset validates `id`, module `version`, exact
+capability contract strings, dependencies, cycles, duplicate IDs, non-nil
+capabilities, and agreement between declared contracts and Go interfaces. Core
+snapshots the canonical descriptor before runtime use. Runtime type,
+configuration schema, allowlist, health, drain, upgrade, and rollback states
+below remain planned governance work.
 
 ## Module descriptor
 
@@ -13,7 +20,10 @@ id: io.mobazha.collectibles
 version: 1.0.0
 runtime: static
 contracts:
-  order-extension: v1
+  - order-extension.declaration/v1
+  - order-extension.reservation/v1
+  - order-extension.delivery/v1
+  - order-extension.attestation/v1
 provides:
   - order-extension.collectibles
 requires:
@@ -21,10 +31,10 @@ requires:
 configurationSchema: collectibles.config/v1
 ```
 
-The descriptor separates module version, descriptor schema version, and each
-public contract version. Module identity is stable and globally namespaced.
-Static registration in Go may encode the descriptor as typed data, but it must
-pass the same validation as an external manifest.
+The target descriptor separates module version, descriptor schema version, and
+each public contract version. The current Go descriptor contains `ID`,
+`Version`, `Contracts`, and `Dependencies`; other fields in the example are
+not yet runtime inputs.
 
 ## Composition and dependency rules
 

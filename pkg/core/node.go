@@ -12,21 +12,13 @@ import (
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	pkgdb "github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/payment"
 	"github.com/mobazha/mobazha/pkg/repo"
 	"gorm.io/gorm"
 )
 
 type MobazhaNode = core.MobazhaNode
-
-type CollectiblePrimarySalePaidSignal = core.CollectiblePrimarySalePaidSignal
-type CollectiblePrimarySalePaidHook = core.CollectiblePrimarySalePaidHook
-type CollectibleFirstSaleAuthorizationSignal = core.CollectibleFirstSaleAuthorizationSignal
-type CollectibleFirstSaleAuthorizationHook = core.CollectibleFirstSaleAuthorizationHook
-type CollectibleFirstSaleReservationReleaseSignal = core.CollectibleFirstSaleReservationReleaseSignal
-type CollectibleFirstSaleReservationReleaseHook = core.CollectibleFirstSaleReservationReleaseHook
-type CollectibleFirstSalePreflightSignal = core.CollectibleFirstSalePreflightSignal
-type CollectibleFirstSalePreflightHook = core.CollectibleFirstSalePreflightHook
 
 // APIGateway is a type alias for internal/api.Gateway, enabling hosting
 // to reference the concrete Gateway type without importing internal packages.
@@ -61,6 +53,12 @@ func WithPaymentModules(modules ...distribution.PaymentModule) NodeOption {
 	return core.WithPaymentModules(modules...)
 }
 
+// WithOrderExtensionModules installs trusted order-domain modules through the
+// product-neutral extension contract.
+func WithOrderExtensionModules(modules ...extensions.Module) NodeOption {
+	return core.WithOrderExtensionModules(modules...)
+}
+
 // WithAIProfile injects distribution-provided AI routes through the public
 // provider-neutral contract.
 func WithAIProfile(profile contracts.AIProfile) NodeOption {
@@ -79,30 +77,6 @@ func SetAIProfile(node *MobazhaNode, profile contracts.AIProfile) {
 		return
 	}
 	node.SetAIProfile(profile)
-}
-
-// WithCollectiblePrimarySalePaidHook wires an optional first-sale lifecycle
-// callback into verified payment handling.
-func WithCollectiblePrimarySalePaidHook(hook CollectiblePrimarySalePaidHook) NodeOption {
-	return core.WithCollectiblePrimarySalePaidHook(hook)
-}
-
-// WithCollectibleFirstSalePreflightHook requires a composed adapter to validate
-// source custody before Node provisions payment for a collectible first sale.
-func WithCollectibleFirstSalePreflightHook(hook CollectibleFirstSalePreflightHook) NodeOption {
-	return core.WithCollectibleFirstSalePreflightHook(hook)
-}
-
-// WithCollectibleFirstSaleAuthorizationHook reserves source-custody inventory
-// before Node provisions a payment target.
-func WithCollectibleFirstSaleAuthorizationHook(hook CollectibleFirstSaleAuthorizationHook) NodeOption {
-	return core.WithCollectibleFirstSaleAuthorizationHook(hook)
-}
-
-// WithCollectibleFirstSaleReservationReleaseHook releases reservations after
-// terminal order events.
-func WithCollectibleFirstSaleReservationReleaseHook(hook CollectibleFirstSaleReservationReleaseHook) NodeOption {
-	return core.WithCollectibleFirstSaleReservationReleaseHook(hook)
 }
 
 // RuntimeAccess exposes the narrow shared-runtime ports needed by a

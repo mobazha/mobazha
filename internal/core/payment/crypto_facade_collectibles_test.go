@@ -3,11 +3,14 @@ package payment
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	porderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsManagedCollectibleFirstSale(t *testing.T) {
@@ -15,7 +18,7 @@ func TestIsManagedCollectibleFirstSale(t *testing.T) {
 	if !models.IsManagedCollectibleFirstSale(valid) {
 		t.Fatal("authoritative source-custody first sale was rejected")
 	}
-	if !orderOpenContainsRWA(valid) {
+	if !testOrderOpenContainsRWA(valid) {
 		t.Fatal("RWA listing was not detected")
 	}
 
@@ -57,42 +60,74 @@ func TestIsManagedCollectibleFirstSale(t *testing.T) {
 	}
 }
 
-func TestCollectibleFirstSaleProvisioningPolicyAuthorizesCrypto(t *testing.T) {
+func TestOrderExtensionProvisioningPolicy_ReservesCollectibleBeforeCryptoProvisioning(t *testing.T) {
 	open := managedCollectibleFirstSaleOrderOpen()
 	open.Listings[0].Listing.VendorID = &porderpb.ID{PeerID: "seller-peer"}
 	wantErr := errors.New("source deposit unavailable")
-	var got CollectibleFirstSaleAuthorizationSignal
-	policy := NewCollectibleFirstSaleProvisioningPolicy(func(_ context.Context, signal CollectibleFirstSaleAuthorizationSignal) error {
-		got = signal
-		return wantErr
+	var got extensions.ReservationRequest
+	policy := NewOrderExtensionProvisioningPolicy(resolveCollectibleFirstSaleExtension, func(_ context.Context, request extensions.ReservationRequest) (extensions.Reservation, error) {
+		got = request
+		return extensions.Reservation{}, wantErr
 	})
 	expiresAt := time.Now().Add(time.Hour).UTC()
 
 	err := policy.AuthorizeSessionProvisioning(context.Background(), SessionProvisioningPolicyInput{
 		OrderID: "order-1", PaymentCoin: "crypto:eip155:1:native", ExpiresAt: expiresAt, OrderOpen: open,
 	})
-	if !errors.Is(err, ErrCollectibleFirstSalePreflight) {
-		t.Fatalf("preflight error = %v, want ErrCollectibleFirstSalePreflight", err)
+	if !errors.Is(err, ErrOrderExtensionReservation) {
+		t.Fatalf("reservation error = %v, want ErrOrderExtensionReservation", err)
 	}
-	if got.OrderID != "order-1" || got.HubSlotID != "source_550e8400-e29b-41d4-a716-446655440000" || got.CertNumber != "PSA-123" || got.SellerPeerID != "seller-peer" || got.PaymentCoin != "crypto:eip155:1:native" || !got.ReservationExpiresAt.Equal(expiresAt) {
-		t.Fatalf("preflight signal = %+v", got)
+	metadata, ok := models.CollectibleOrderMetadataFromExtension(got.Extension)
+	if !ok || got.OrderID != "order-1" || metadata.HubSlotID != "source_550e8400-e29b-41d4-a716-446655440000" || metadata.CertNumber != "PSA-123" || metadata.SellerPeerID != "seller-peer" || got.PaymentCoin != "crypto:eip155:1:native" || !got.ExpiresAt.Equal(expiresAt) {
+		t.Fatalf("reservation request = %+v, metadata = %+v", got, metadata)
 	}
 }
 
-func TestCollectibleFirstSaleProvisioningPolicyRequiresHook(t *testing.T) {
-	err := NewCollectibleFirstSaleProvisioningPolicy(nil).AuthorizeSessionProvisioning(context.Background(), SessionProvisioningPolicyInput{
-		OrderID: "order-1", PaymentCoin: "crypto:eip155:1:native", OrderOpen: managedCollectibleFirstSaleOrderOpen(),
+func TestOrderExtensionProvisioningPolicy_RequiresReservationPort(t *testing.T) {
+	err := NewOrderExtensionProvisioningPolicy(resolveCollectibleFirstSaleExtension, nil).AuthorizeSessionProvisioning(context.Background(), SessionProvisioningPolicyInput{
+		OrderID: "order-1", PaymentCoin: "crypto:eip155:1:native", ExpiresAt: time.Now().Add(time.Hour), OrderOpen: managedCollectibleFirstSaleOrderOpen(),
 	})
-	if !errors.Is(err, ErrCollectibleFirstSalePreflight) {
-		t.Fatalf("preflight error = %v, want ErrCollectibleFirstSalePreflight", err)
+	if !errors.Is(err, ErrOrderExtensionReservation) {
+		t.Fatalf("reservation error = %v, want ErrOrderExtensionReservation", err)
 	}
 }
 
-func TestCollectibleFirstSaleProvisioningPolicyRejectsFiatBeforeAuthorization(t *testing.T) {
-	called := false
-	policy := NewCollectibleFirstSaleProvisioningPolicy(func(context.Context, CollectibleFirstSaleAuthorizationSignal) error {
-		called = true
+func TestOrderExtensionProvisioningPolicy_RequiresDurableReservationResult(t *testing.T) {
+	policy := NewOrderExtensionProvisioningPolicy(resolveCollectibleFirstSaleExtension, func(context.Context, extensions.ReservationRequest) (extensions.Reservation, error) {
+		return extensions.Reservation{}, nil
+	})
+	err := policy.AuthorizeSessionProvisioning(context.Background(), SessionProvisioningPolicyInput{
+		OrderID: "order-invalid-reservation", PaymentCoin: "crypto:eip155:1:native", ExpiresAt: time.Now().Add(time.Hour), OrderOpen: managedCollectibleFirstSaleOrderOpen(),
+	})
+	if !errors.Is(err, ErrOrderExtensionReservation) || err == nil {
+		t.Fatalf("reservation error = %v, want invalid reservation result", err)
+	}
+}
+
+func TestOrderExtensionProvisioningPolicy_AcceptsDurableReservationResult(t *testing.T) {
+	recorded := false
+	policy := NewOrderExtensionProvisioningPolicy(resolveCollectibleFirstSaleExtension, func(context.Context, extensions.ReservationRequest) (extensions.Reservation, error) {
+		return extensions.Reservation{ID: "reservation-1", Version: 1, Status: "reserved"}, nil
+	}, func(request extensions.ReservationRequest, reservation extensions.Reservation) error {
+		recorded = true
+		require.Equal(t, "reservation-1", reservation.ID)
+		require.NotEmpty(t, request.IdempotencyKey)
 		return nil
+	})
+	err := policy.AuthorizeSessionProvisioning(context.Background(), SessionProvisioningPolicyInput{
+		OrderID: "order-valid-reservation", PaymentCoin: "crypto:eip155:1:native", ExpiresAt: time.Now().Add(time.Hour), OrderOpen: managedCollectibleFirstSaleOrderOpen(),
+	})
+	if err != nil {
+		t.Fatalf("reservation error = %v", err)
+	}
+	require.True(t, recorded)
+}
+
+func TestOrderExtensionProvisioningPolicy_RejectsCollectibleFiatBeforeReservation(t *testing.T) {
+	called := false
+	policy := NewOrderExtensionProvisioningPolicy(resolveCollectibleFirstSaleExtension, func(context.Context, extensions.ReservationRequest) (extensions.Reservation, error) {
+		called = true
+		return extensions.Reservation{}, nil
 	})
 	err := policy.AuthorizeSessionProvisioning(context.Background(), SessionProvisioningPolicyInput{
 		OrderID: "order-fiat", PaymentCoin: "fiat:stripe:USD", OrderOpen: managedCollectibleFirstSaleOrderOpen(),
@@ -103,6 +138,32 @@ func TestCollectibleFirstSaleProvisioningPolicyRejectsFiatBeforeAuthorization(t 
 	if called {
 		t.Fatal("unsupported fiat rail must be rejected before reserving the source deposit")
 	}
+}
+
+func resolveCollectibleFirstSaleExtension(input SessionProvisioningPolicyInput) (extensions.OrderExtension, bool, error) {
+	if !testOrderOpenContainsRWA(input.OrderOpen) {
+		return extensions.OrderExtension{}, false, nil
+	}
+	if !models.IsManagedCollectibleFirstSale(input.OrderOpen) {
+		return extensions.OrderExtension{}, false, ErrRWAPaymentSessionUnsupported
+	}
+	if strings.HasPrefix(input.PaymentCoin, "fiat:") || !strings.HasPrefix(input.PaymentCoin, "crypto:") {
+		return extensions.OrderExtension{}, false, ErrRWAPaymentSessionUnsupported
+	}
+	extension, ok, err := models.CollectibleOrderExtensionFromOrderOpen(input.OrderID, input.OrderOpen)
+	return extension, ok, err
+}
+
+func testOrderOpenContainsRWA(orderOpen *porderpb.OrderOpen) bool {
+	if orderOpen == nil {
+		return false
+	}
+	for _, signed := range orderOpen.GetListings() {
+		if signed.GetListing().GetMetadata().GetContractType() == porderpb.Listing_Metadata_RWA_TOKEN {
+			return true
+		}
+	}
+	return false
 }
 
 func managedCollectibleFirstSaleOrderOpen() *porderpb.OrderOpen {

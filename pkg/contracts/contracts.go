@@ -23,6 +23,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	pkgdb "github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -95,9 +96,6 @@ type OrderService interface {
 	// (confirm / cancel) via ChainEscrowV2. Client-signed legacy chains
 	// are intentionally excluded from this surface.
 	ExecuteSettlementAction(ctx context.Context, action string, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error)
-	// ExecuteCollectiblePrimarySaleRelease releases the seller payout for a
-	// verified collectible primary-sale order after hosting confirms Hub intake.
-	ExecuteCollectiblePrimarySaleRelease(ctx context.Context, orderID models.OrderID, payoutAddr string) (*payment.ActionResult, iwallet.CoinType, error)
 	// GetSettlementActionStatus returns the latest known lifecycle state for a
 	// previously issued settlement action.
 	GetSettlementActionStatus(ctx context.Context, action string, orderID models.OrderID, actionID string) (*payment.ActionStatus, iwallet.CoinType, error)
@@ -156,6 +154,13 @@ type OrderService interface {
 	// SummarizeListingSupply performs a seller-safe advisory supply summary for
 	// authenticated admin product surfaces without creating holds.
 	SummarizeListingSupply(ctx context.Context, req ListingSupplySummaryRequest) (*ListingSupplySummaryResponse, error)
+}
+
+// ConditionalSettlementService is the narrow extension-facing settlement
+// surface. It is separate from OrderService so adding attestation versions
+// does not expand every order-service implementation.
+type ConditionalSettlementService interface {
+	ExecuteConditionalSettlement(context.Context, extensions.SettlementAttestation) (*payment.ActionResult, iwallet.CoinType, error)
 }
 
 // ListingService handles product listing management.
@@ -428,6 +433,7 @@ type NodeService interface {
 	IdentityInfo() IdentityService
 	Notification() NotificationService
 	Order() OrderService
+	ConditionalSettlement() ConditionalSettlementService
 	Listing() ListingService
 	Profile() ProfileService
 	Wallet() WalletService

@@ -9,6 +9,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
 	"github.com/mobazha/mobazha/pkg/relay"
@@ -48,8 +49,9 @@ type SettlementService struct {
 
 	// autoConfirmLock tracks orders currently being auto-confirmed to prevent
 	// concurrent processing. Keys are "nodeID:orderID".
-	autoConfirmLock    sync.Map
-	settlementActionMu sync.Mutex
+	autoConfirmLock     sync.Map
+	settlementActionMu  sync.Mutex
+	attestationVerifier func(string) extensions.AttestationVerifier
 }
 
 // SettlementServiceConfig groups the dependencies for constructing SettlementService.
@@ -95,6 +97,12 @@ func (s *SettlementService) SetRegistry(r *payment.Registry) {
 // SetReceiptVerifier updates the receipt verifier (late-init).
 func (s *SettlementService) SetReceiptVerifier(v contracts.ReceiptVerifier) {
 	s.receiptVerifier = v
+}
+
+// SetAttestationVerifierResolver supplies provider-scoped verification without
+// exposing the complete module registry to settlement code.
+func (s *SettlementService) SetAttestationVerifierResolver(resolve func(string) extensions.AttestationVerifier) {
+	s.attestationVerifier = resolve
 }
 
 // SetMonitorService injects the UTXO monitor (created at Start() time, after construction).

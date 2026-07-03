@@ -4,10 +4,13 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/internal/repo"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -206,88 +209,158 @@ func TestSettlementActionStatusMatchesSellerDeclineCancelAlias(t *testing.T) {
 	))
 }
 
-func TestExecuteCollectiblePrimarySaleRelease_UsesConfirmSettlement(t *testing.T) {
+func TestExecuteConditionalSettlement_AcceptsAuthorizedDeliveryAttestation(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
-
-	strategy := &utxoActionStatusStub{
-		model:         payment.PaymentModelMonitored,
-		confirmResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "act-primary-sale-release"},
-	}
-	reg := payment.NewRegistry()
-	reg.RegisterV2(iwallet.ChainEthereum, strategy)
-
+	strategy := &utxoActionStatusStub{model: payment.PaymentModelMonitored, confirmResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "conditional-action"}}
+	registry := payment.NewRegistry()
+	registry.RegisterV2(iwallet.ChainEthereum, strategy)
 	svc := NewSettlementService(SettlementServiceConfig{DB: db})
-	svc.SetRegistry(reg)
-	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-primary-sale-release", models.RoleVendor, true)
-
-	result, coinType, err := svc.ExecuteCollectiblePrimarySaleRelease(
-		context.Background(),
-		order.ID,
-		"0x5555555555555555555555555555555555555555",
-	)
+	svc.SetRegistry(registry)
+	const corePayoutAddress = "0x5555555555555555555555555555555555555555"
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ReceivingAccount{ID: 1, Name: "seller", ChainType: iwallet.ChainEthereum, Address: corePayoutAddress, IsActive: true})
+	}))
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-conditional-release", models.RoleVendor, true)
+	extension := persistCollectibleTestExtension(t, db, order)
+	svc.SetAttestationVerifierResolver(func(string) extensions.AttestationVerifier {
+		return attestationVerifierFunc(func(context.Context, extensions.SettlementAttestation, extensions.OrderExtension) error { return nil })
+	})
+	now := time.Now().UTC()
+	reference, err := orderextensions.SettlementReferenceForOrder(order)
 	require.NoError(t, err)
-	require.Equal(t, "crypto:eip155:1:native", coinType.String())
-	require.NotNil(t, result)
+	result, _, err := svc.ExecuteConditionalSettlement(context.Background(), extensions.SettlementAttestation{
+		AttestationID: "att-1", IdempotencyKey: "att-1", Issuer: models.CollectibleExtensionProviderID, TenantID: database.StandaloneTenantID,
+		OrderID: order.ID.String(), SettlementID: "settlement:" + order.ID.String(), ExtensionID: extension.ExtensionID, ExpectedExtensionRevision: extension.Revision, ExpectedOrderStateVersion: reference.OrderStateVersion,
+		ConditionType: extensions.ConditionOrderExtensionDeliveryConfirmed, ConditionVersion: extensions.ContractVersionV1,
+		EvidenceDigest: "sha256:evidence", ObservedAt: now, ExpiresAt: now.Add(time.Minute),
+	})
+	require.NoError(t, err)
 	require.Equal(t, payment.ActionModeSubmitted, result.Mode)
-	require.Equal(t, "act-primary-sale-release", result.ActionID)
-	require.Equal(t, order.ID.String(), strategy.lastConfirm.OrderID)
-	require.Equal(t, "0x5555555555555555555555555555555555555555", strategy.lastConfirm.PayoutAddr)
+	require.Equal(t, corePayoutAddress, strategy.lastConfirm.PayoutAddr)
+	var attestation models.SettlementAttestationRecord
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("attestation_id = ?", "att-1").First(&attestation).Error
+	}))
+	require.Equal(t, order.ID.String(), attestation.OrderID)
 }
 
-func TestExecuteCollectiblePrimarySaleRelease_AlreadyConfirmedIsIdempotent(t *testing.T) {
+func TestExecuteConditionalSettlement_RejectsExpiredAttestation(t *testing.T) {
+	svc := &SettlementService{}
+	now := time.Now().UTC()
+	_, _, err := svc.ExecuteConditionalSettlement(context.Background(), extensions.SettlementAttestation{
+		AttestationID: "att-expired", IdempotencyKey: "att-expired", Issuer: "provider", TenantID: database.StandaloneTenantID, OrderID: "order", SettlementID: "settlement-1", ExtensionID: "ext-1", ExpectedExtensionRevision: 1, ExpectedOrderStateVersion: "sha256:state",
+		ConditionType: "condition", ConditionVersion: "v1", EvidenceDigest: "sha256:evidence", ObservedAt: now.Add(-time.Hour), ExpiresAt: now.Add(-time.Minute),
+	})
+	require.ErrorContains(t, err, "time window")
+}
+
+func TestExecuteConditionalSettlement_RejectsStaleExtensionRevision(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
-
 	svc := NewSettlementService(SettlementServiceConfig{DB: db})
-	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-primary-sale-confirmed", models.RoleVendor, true)
-	confirmation, err := anypb.New(&pb.OrderConfirmation{})
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-stale-extension", models.RoleVendor, true)
+	extension := persistCollectibleTestExtension(t, db, order)
+	reference, err := orderextensions.SettlementReferenceForOrder(order)
 	require.NoError(t, err)
-	require.NoError(t, order.PutMessage(&npb.OrderMessage{
-		OrderID:     order.ID.String(),
-		MessageType: npb.OrderMessage_ORDER_CONFIRMATION,
-		Message:     confirmation,
-	}))
+	now := time.Now().UTC()
+	_, _, err = svc.ExecuteConditionalSettlement(context.Background(), extensions.SettlementAttestation{
+		AttestationID: "att-stale", IdempotencyKey: "att-stale", Issuer: extension.ProviderID, TenantID: database.StandaloneTenantID,
+		OrderID: order.ID.String(), SettlementID: "settlement:" + order.ID.String(), ExtensionID: extension.ExtensionID, ExpectedExtensionRevision: extension.Revision + 1, ExpectedOrderStateVersion: reference.OrderStateVersion,
+		ConditionType: extensions.ConditionOrderExtensionDeliveryConfirmed, ConditionVersion: extensions.ContractVersionV1,
+		EvidenceDigest: "sha256:stale", ObservedAt: now, ExpiresAt: now.Add(time.Minute),
+	})
+	require.ErrorContains(t, err, "expected extension revision")
+}
+
+func TestExecuteConditionalSettlement_RequiresProviderVerifier(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-missing-verifier", models.RoleVendor, true)
+	extension := persistCollectibleTestExtension(t, db, order)
+	reference, err := orderextensions.SettlementReferenceForOrder(order)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	_, _, err = svc.ExecuteConditionalSettlement(context.Background(), extensions.SettlementAttestation{
+		AttestationID: "att-no-verifier", IdempotencyKey: "att-no-verifier", Issuer: extension.ProviderID, TenantID: database.StandaloneTenantID,
+		OrderID: order.ID.String(), SettlementID: "settlement:" + order.ID.String(), ExtensionID: extension.ExtensionID, ExpectedExtensionRevision: extension.Revision, ExpectedOrderStateVersion: reference.OrderStateVersion,
+		ConditionType: extensions.ConditionOrderExtensionDeliveryConfirmed, ConditionVersion: extensions.ContractVersionV1,
+		EvidenceDigest: "sha256:no-verifier", ObservedAt: now, ExpiresAt: now.Add(time.Minute),
+	})
+	require.ErrorContains(t, err, "no attestation verifier")
+}
+
+func TestExecuteConditionalSettlement_RejectsWrongTenant(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-wrong-tenant", models.RoleVendor, true)
+	extension := persistCollectibleTestExtension(t, db, order)
+	reference, err := orderextensions.SettlementReferenceForOrder(order)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	_, _, err = svc.ExecuteConditionalSettlement(context.Background(), extensions.SettlementAttestation{
+		AttestationID: "att-wrong-tenant", IdempotencyKey: "att-wrong-tenant", Issuer: extension.ProviderID, TenantID: "other-tenant",
+		OrderID: order.ID.String(), SettlementID: "settlement:" + order.ID.String(), ExtensionID: extension.ExtensionID,
+		ExpectedExtensionRevision: extension.Revision, ExpectedOrderStateVersion: reference.OrderStateVersion,
+		ConditionType: extensions.ConditionOrderExtensionDeliveryConfirmed, ConditionVersion: extensions.ContractVersionV1,
+		EvidenceDigest: "sha256:tenant", ObservedAt: now, ExpiresAt: now.Add(time.Minute),
+	})
+	require.ErrorContains(t, err, "tenant mismatch")
+}
+
+func TestExecuteConditionalSettlement_RejectsStateChangedDuringVerification(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-state-race", models.RoleVendor, true)
+	extension := persistCollectibleTestExtension(t, db, order)
+	reference, err := orderextensions.SettlementReferenceForOrder(order)
+	require.NoError(t, err)
+	svc.SetAttestationVerifierResolver(func(string) extensions.AttestationVerifier {
+		return attestationVerifierFunc(func(context.Context, extensions.SettlementAttestation, extensions.OrderExtension) error {
+			return db.Update(func(tx database.Tx) error {
+				_, updateErr := tx.UpdateColumns(
+					map[string]interface{}{"serialized_order_cancel": []byte(`{"changed":true}`)},
+					map[string]interface{}{"id = ?": order.ID.String()},
+					&models.Order{},
+				)
+				return updateErr
+			})
+		})
+	})
+	now := time.Now().UTC()
+	_, _, err = svc.ExecuteConditionalSettlement(context.Background(), extensions.SettlementAttestation{
+		AttestationID: "att-race", IdempotencyKey: "att-race", Issuer: extension.ProviderID, TenantID: database.StandaloneTenantID,
+		OrderID: order.ID.String(), SettlementID: "settlement:" + order.ID.String(), ExtensionID: extension.ExtensionID,
+		ExpectedExtensionRevision: extension.Revision, ExpectedOrderStateVersion: reference.OrderStateVersion,
+		ConditionType: extensions.ConditionOrderExtensionDeliveryConfirmed, ConditionVersion: extensions.ContractVersionV1,
+		EvidenceDigest: "sha256:race", ObservedAt: now, ExpiresAt: now.Add(time.Minute),
+	})
+	require.ErrorContains(t, err, "order state version is stale")
+}
+
+type attestationVerifierFunc func(context.Context, extensions.SettlementAttestation, extensions.OrderExtension) error
+
+func (f attestationVerifierFunc) VerifySettlementAttestation(ctx context.Context, attestation extensions.SettlementAttestation, extension extensions.OrderExtension) error {
+	return f(ctx, attestation, extension)
+}
+
+func persistCollectibleTestExtension(t *testing.T, db database.Database, order *models.Order) extensions.OrderExtension {
+	t.Helper()
+	extension, err := extensions.NewOrderExtension(order.ID.String(), models.CollectibleExtensionProviderID, models.CollectibleExtensionTypePrimarySale, extensions.ContractVersionV1, "slot-test", map[string]string{"slot": "slot-test"})
+	require.NoError(t, err)
+	extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
 	require.NoError(t, db.Update(func(tx database.Tx) error {
-		return tx.Save(order)
+		return orderextensions.PersistTx(tx, order.ID.String(), extension)
 	}))
-
-	result, coinType, err := svc.ExecuteCollectiblePrimarySaleRelease(context.Background(), order.ID, "")
-	require.NoError(t, err)
-	require.Equal(t, "crypto:eip155:1:native", coinType.String())
-	require.NotNil(t, result)
-	require.Equal(t, payment.ActionModeCompleted, result.Mode)
-}
-
-func TestExecuteCollectiblePrimarySaleRelease_RejectsNonCollectibleOrder(t *testing.T) {
-	db, err := repo.MockDB()
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-
-	svc := NewSettlementService(SettlementServiceConfig{DB: db})
-	order := seedModeratedSettlementActionOrder(t, db, "order-not-collectible", models.RoleVendor)
-	require.NoError(t, db.Update(func(tx database.Tx) error {
-		return tx.Save(order)
-	}))
-
-	_, _, err = svc.ExecuteCollectiblePrimarySaleRelease(context.Background(), order.ID, "")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "not a collectible primary sale")
-}
-
-func TestExecuteCollectiblePrimarySaleRelease_RequiresVerifiedPayment(t *testing.T) {
-	db, err := repo.MockDB()
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-
-	svc := NewSettlementService(SettlementServiceConfig{DB: db})
-	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-primary-sale-unverified", models.RoleVendor, false)
-
-	_, _, err = svc.ExecuteCollectiblePrimarySaleRelease(context.Background(), order.ID, "")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "requires verified payment")
+	return extension
 }
 
 func seedModeratedSettlementActionOrder(
@@ -356,18 +429,12 @@ func seedCollectiblePrimarySaleReleaseOrder(
 	}
 	require.NoError(t, order.SetPaymentSent(&pb.PaymentSent{
 		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPaymentSent(),
+		ToAddress:      "settlement:" + id,
 		Amount:         "1000",
 		Coin:           "crypto:eip155:11155111:native",
 		PayerAddress:   "0x1111111111111111111111111111111111111111",
 		RefundAddress:  "0x1111111111111111111111111111111111111111",
 		Moderator:      "12D3KooWModerator",
-	}))
-	require.NoError(t, order.MergeFiatMetadata(map[string]string{
-		models.CollectibleMetadataKeyType:         models.CollectibleMetadataTypePrimarySale,
-		models.CollectibleMetadataKeyFulfillment:  models.CollectibleFulfillmentNFT,
-		models.CollectibleMetadataKeyHubSlotID:    "slot-primary-sale-release",
-		models.CollectibleMetadataKeyBuyerPeerID:  "buyer-peer",
-		models.CollectibleMetadataKeySellerPeerID: "seller-peer",
 	}))
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		return tx.Save(order)

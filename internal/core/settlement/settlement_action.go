@@ -74,6 +74,24 @@ func (s *SettlementService) executeSettlementActionForOrder(
 	// same managed escrow nonce cannot be signed and relayed twice concurrently.
 	s.settlementActionMu.Lock()
 	defer s.settlementActionMu.Unlock()
+	if order == nil {
+		return nil, "", fmt.Errorf("%w: order is required", coreiface.ErrBadRequest)
+	}
+	var current models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", order.ID.String()).First(&current).Error
+	}); err != nil {
+		return nil, "", err
+	}
+	return s.executeSettlementActionForOrderLocked(ctx, action, &current, payoutAddr)
+}
+
+func (s *SettlementService) executeSettlementActionForOrderLocked(
+	ctx context.Context,
+	action string,
+	order *models.Order,
+	payoutAddr string,
+) (*payment.ActionResult, iwallet.CoinType, error) {
 
 	normalizedAction, err := normalizeSettlementAction(action)
 	if err != nil {

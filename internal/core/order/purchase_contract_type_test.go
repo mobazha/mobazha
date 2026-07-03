@@ -10,6 +10,7 @@ import (
 	"github.com/mobazha/mobazha/internal/orders/utils"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/identity"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -164,8 +165,8 @@ func TestCreateOrder_RejectsMultiItemCollectiblePrimarySale(t *testing.T) {
 	_, _, err = svc.createOrder(context.Background(), &models.Purchase{
 		PricingCoin: "crypto:eip155:1:native",
 		Items: []models.PurchaseItem{
-			{ListingHash: firstCID.String(), Quantity: "1", HubSlotID: "slot-1"},
-			{ListingHash: secondCID.String(), Quantity: "1", HubSlotID: "slot-2"},
+			{ListingHash: firstCID.String(), Quantity: "1"},
+			{ListingHash: secondCID.String(), Quantity: "1"},
 		},
 	})
 	require.Error(t, err)
@@ -197,7 +198,6 @@ func TestCreateOrder_RejectsCollectibleQuantityAboveOne(t *testing.T) {
 		Items: []models.PurchaseItem{{
 			ListingHash: listingCID.String(),
 			Quantity:    "2",
-			HubSlotID:   "slot-1",
 		}},
 	})
 	require.Error(t, err)
@@ -205,40 +205,25 @@ func TestCreateOrder_RejectsCollectibleQuantityAboveOne(t *testing.T) {
 	assert.Contains(t, err.Error(), "quantity 1")
 }
 
-func TestCreateOrder_RequiresValidCollectibleHolderWallet(t *testing.T) {
-	kp, err := identity.GenerateKeyPair()
-	require.NoError(t, err)
-	pid, err := identity.PeerIDFromPublicKey(kp.PubKey)
-	require.NoError(t, err)
-	signer := contracts.NewKeyPairSigner(kp, pid)
-
-	listing := testSignedListingForContractType(t, "rwa-holder-card", pid.String(), pb.Listing_Metadata_RWA_TOKEN)
-	listingCID := listingCID(t, listing)
-	svc := newTestOrderAppService(t, OrderAppServiceConfig{
-		Signer: signer,
-		Listings: &contractTypeTestListings{
-			byCID: map[string]*pb.SignedListing{listingCID.String(): listing},
-			index: models.ListingIndex{{Slug: listing.Listing.Slug, CID: listingCID.String()}},
-		},
-	})
-
+func TestCollectibleDeclaration_RequiresValidHolderWallet(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		wallet string
 		want   string
 	}{
-		{name: "missing", want: "require a holderWallet"},
+		{name: "missing", want: "requires a holderWallet"},
 		{name: "invalid", wallet: "not-a-solana-address", want: "valid Solana public key"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := svc.createOrder(context.Background(), &models.Purchase{
-				PricingCoin: "crypto:eip155:1:native",
-				Items: []models.PurchaseItem{{
-					ListingHash:  listingCID.String(),
-					Quantity:     "1",
-					HubSlotID:    "slot-holder",
-					HolderWallet: tc.wallet,
-				}},
+			_, err := collectibleTestDeclarer(context.Background(), extensions.DeclarationInput{
+				OrderID: "order-holder",
+				OrderOpen: &pb.OrderOpen{
+					Listings: []*pb.SignedListing{{Listing: &pb.Listing{Metadata: &pb.Listing_Metadata{ContractType: pb.Listing_Metadata_RWA_TOKEN}}}},
+					Items: []*pb.OrderOpen_Item{{OptionalFeatures: []string{
+						models.CollectibleOptionalFeature(models.CollectibleFeatureHubSlotID, "slot-holder"),
+						models.CollectibleOptionalFeature(models.CollectibleFeatureHolderWallet, tc.wallet),
+					}}},
+				},
 			})
 			require.Error(t, err)
 			assert.True(t, errors.Is(err, coreiface.ErrBadRequest))

@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/mobazha/mobazha/internal/collectiblesdelivery"
+	"github.com/mobazha/mobazha/internal/extensiondelivery"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/pkg/events"
 )
 
-func (n *MobazhaNode) startCollectibleReservationReleaseListener() {
-	if n == nil || n.eventBus == nil || n.shutdown == nil || n.collectibleFirstSaleReservationReleaseHook == nil {
+func (n *MobazhaNode) startOrderExtensionEventListener() {
+	if n == nil || n.eventBus == nil || n.shutdown == nil || len(n.orderExtensionModules) == 0 {
 		return
 	}
 	sub, err := n.eventBus.Subscribe([]interface{}{
@@ -20,7 +20,7 @@ func (n *MobazhaNode) startCollectibleReservationReleaseListener() {
 		&events.OrderAutoCancelled{},
 	})
 	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Collectibles: reservation release subscription failed: %v", err)
+		logger.LogErrorWithIDf(log, n.nodeID, "Extensions: order event subscription failed: %v", err)
 		return
 	}
 	go func() {
@@ -31,21 +31,16 @@ func (n *MobazhaNode) startCollectibleReservationReleaseListener() {
 				if !ok {
 					return
 				}
-				orderID, _, ok := collectiblesdelivery.TerminalEvent(event)
+				orderID, _, ok := extensiondelivery.TerminalEvent(event)
 				if !ok || orderID == "" {
 					continue
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-				n.runCollectibleLifecycleDeliveries(ctx)
+				n.runExtensionDeliveries(ctx)
 				cancel()
 			case <-n.shutdown:
 				return
 			}
 		}
 	}()
-}
-
-func collectibleReservationReleaseEvent(event interface{}) (string, string) {
-	orderID, reason, _ := collectiblesdelivery.TerminalEvent(event)
-	return orderID, reason
 }

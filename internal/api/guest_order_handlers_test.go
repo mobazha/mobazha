@@ -619,6 +619,14 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 			saved = cfg
 			return nil
 		},
+		getGuestCheckoutCfgFunc: func(_ context.Context) (*models.GuestCheckoutConfig, error) {
+			return &models.GuestCheckoutConfig{
+				Enabled:        saved.Enabled,
+				AcceptedCoins:  saved.AcceptedCoins,
+				AvailableCoins: "BTC",
+				PaymentTimeout: saved.PaymentTimeout,
+			}, nil
+		},
 	}
 
 	node := &mockGuestNode{guestSvc: svc}
@@ -666,6 +674,16 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 	}
 	if saved.AcceptedCoins != "BTC" {
 		t.Errorf("expected BTC, got %s", saved.AcceptedCoins)
+	}
+
+	var envelope struct {
+		Data models.GuestCheckoutConfig `json:"data"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if envelope.Data.AvailableCoins != "BTC" {
+		t.Errorf("expected computed availableCoins BTC, got %q", envelope.Data.AvailableCoins)
 	}
 }
 

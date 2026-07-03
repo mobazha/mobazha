@@ -351,7 +351,13 @@ func (g *Gateway) handlePUTGuestCheckoutSettings(w http.ResponseWriter, r *http.
 		return
 	}
 
-	response.Success(w, req)
+	cfg, err := svc.GetGuestCheckoutConfig(r.Context())
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+
+	response.Success(w, cfg)
 }
 
 // handleGETAdminGuestOrderDetail returns full order detail for the seller,

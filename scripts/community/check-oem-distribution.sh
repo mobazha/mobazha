@@ -90,7 +90,7 @@ case "$mode" in
     require_file "$artifact_dir/config/editions/community.json"
 
     require_text "$artifact_dir/SOURCE_OFFER.md" "Mozilla Public License"
-    require_text "$artifact_dir/SOURCE_OFFER.md" "https://github.com/mobazha/mobazha3.0"
+    require_text "$artifact_dir/SOURCE_OFFER.md" "https://github.com/mobazha/mobazha"
     require_text "$artifact_dir/SOURCE_OFFER.md" "Source commit"
     grep -Eq '^[[:xdigit:]]{64}[[:space:]]+' "$artifact_dir/checksums.txt" ||
       fail "checksums.txt must contain at least one SHA-256 checksum"

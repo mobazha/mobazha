@@ -13,12 +13,12 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/database/sqlitedialect"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	postsPb "github.com/mobazha/mobazha/pkg/posts/pb"
 )
 
 // ─────────────────────────────────────────────────────────────────────────

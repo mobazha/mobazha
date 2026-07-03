@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/payment"
 )
 
 // Funded(bytes32 indexed scriptHash, address indexed from, uint256 value)

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func newCurrency(code string) *Currency {

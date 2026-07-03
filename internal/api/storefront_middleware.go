@@ -31,7 +31,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/pkg/storefront"
+	"github.com/mobazha/mobazha/pkg/storefront"
 )
 
 const (

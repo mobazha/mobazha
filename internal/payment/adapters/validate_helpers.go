@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/orders/utils"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func assertPaymentMessageParams(params payment.PaymentMessageParams) (*pb.OrderOpen, *pb.PaymentSent, error) {

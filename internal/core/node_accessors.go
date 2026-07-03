@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/wallet"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
+	"github.com/mobazha/mobazha/internal/wallet"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
+	wh "github.com/mobazha/mobazha/pkg/webhook"
 )
 
 // Context returns the node's lifecycle context. It is cancelled when

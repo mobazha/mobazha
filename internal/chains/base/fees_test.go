@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/jarcoal/httpmock"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func TestHardCodedFeeProvider_GetFee(t *testing.T) {

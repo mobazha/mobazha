@@ -14,11 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	"github.com/mobazha/mobazha3.0/pkg/relay"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/relay"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // ManagedEVMSignPurpose is an allow-listed commercial signing operation.

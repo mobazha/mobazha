@@ -6,8 +6,8 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	ethWal "github.com/mobazha/mobazha/internal/chains/evm"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 var testETHNativeCoin = func() iwallet.CoinType {

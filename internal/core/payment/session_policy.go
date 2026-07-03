@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	porderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/models"
+	porderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // SessionProvisioningPolicy is a business-policy boundary that runs before a

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/events"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func TestMockWallet_Spend(t *testing.T) {

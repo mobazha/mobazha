@@ -3,9 +3,9 @@ package core
 import (
 	"testing"
 
-	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
-	"github.com/mobazha/mobazha3.0/internal/payment/fiat"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	coreorder "github.com/mobazha/mobazha/internal/core/order"
+	"github.com/mobazha/mobazha/internal/payment/fiat"
+	"github.com/mobazha/mobazha/pkg/edition"
 )
 
 func TestInitFiatSubsystem_SetsOrderRepo(t *testing.T) {

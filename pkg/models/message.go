@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 	"google.golang.org/protobuf/proto"
 )
 

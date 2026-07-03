@@ -5,10 +5,10 @@ import (
 	"os"
 	"testing"
 
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+	pkgdb "github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	postsPb "github.com/mobazha/mobazha/pkg/posts/pb"
 )
 
 // newTestDBPublicData creates a DBPublicData backed by a temp-file SQLite DB.

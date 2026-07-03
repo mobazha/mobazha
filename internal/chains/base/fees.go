@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/libs/proxyclient"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/libs/proxyclient"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // FeeProvider is an interface used for selecting fee (usually fee-per-byte)

@@ -7,12 +7,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	evm "github.com/mobazha/mobazha3.0/internal/chains/evm"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	pkgEVM "github.com/mobazha/mobazha3.0/pkg/evm"
-	"github.com/mobazha/mobazha3.0/pkg/relay"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	evm "github.com/mobazha/mobazha/internal/chains/evm"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	pkgEVM "github.com/mobazha/mobazha/pkg/evm"
+	"github.com/mobazha/mobazha/pkg/relay"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 type distributionManagedEVMSigner struct {

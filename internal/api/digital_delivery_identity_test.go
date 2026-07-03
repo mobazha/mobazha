@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/contracts"
 )
 
 func TestIdentityAllowsDigitalDeliveryAdmin(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/payment/adapters"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/payment/adapters"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

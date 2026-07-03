@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
-	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
+	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
 )
 
 type agentMemoryAPITestSave struct {

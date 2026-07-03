@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
 )
 
 func TestGetLocalAPIURL_PrefersServerLocalAddr(t *testing.T) {

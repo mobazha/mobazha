@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

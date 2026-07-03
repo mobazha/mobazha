@@ -1,7 +1,7 @@
 package notifier
 
 import (
-	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha/pkg/events"
 )
 
 // ChannelType identifies a notification platform.

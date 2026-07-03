@@ -5,11 +5,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/chains"
-	"github.com/mobazha/mobazha3.0/internal/config"
-	"github.com/mobazha/mobazha3.0/internal/core"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains"
+	"github.com/mobazha/mobazha/internal/config"
+	"github.com/mobazha/mobazha/internal/core"
+	"github.com/mobazha/mobazha/internal/repo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // Init initializes a new Mobazha node at the provided path.

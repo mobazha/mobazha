@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"

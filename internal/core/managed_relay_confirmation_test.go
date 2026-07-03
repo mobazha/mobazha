@@ -13,12 +13,12 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	"github.com/mobazha/mobazha3.0/pkg/relay"
+	dbgorm "github.com/mobazha/mobazha/internal/database"
+	"github.com/mobazha/mobazha/internal/database/dbstore"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/relay"
 	"github.com/stretchr/testify/require"
 )
 

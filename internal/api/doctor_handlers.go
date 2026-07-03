@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/doctor"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/internal/doctor"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 func (g *Gateway) handleGETSystemDoctor(w http.ResponseWriter, r *http.Request) {

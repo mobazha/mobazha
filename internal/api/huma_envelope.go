@@ -10,7 +10,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // envelopeError wraps huma errors into the Mobazha error envelope.

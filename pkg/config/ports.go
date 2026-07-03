@@ -4,7 +4,7 @@
 // AllowAll* 便捷适配器外），具体逻辑由消费仓库注入：
 //
 //   - mobazha_hosting — PlatformGlobalProvider 读 app.yaml + override DB
-//   - mobazha3.0      — TenantFeatureStore 走 GORM；NodeFeatureProvider 读 repo.Config / CLI flag
+//   - mobazha      — TenantFeatureStore 走 GORM；NodeFeatureProvider 读 repo.Config / CLI flag
 //
 // 这样 `pkg/config` 保持零外部依赖，可被独立节点 / SaaS / 测试复用。
 package config

@@ -3,17 +3,17 @@ package core
 import (
 	"encoding/json"
 
-	"github.com/mobazha/mobazha3.0/internal/core/digital"
-	"github.com/mobazha/mobazha3.0/internal/core/guest"
-	"github.com/mobazha/mobazha3.0/internal/core/order"
-	"github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/internal/core/settlement"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/internal/core/digital"
+	"github.com/mobazha/mobazha/internal/core/guest"
+	"github.com/mobazha/mobazha/internal/core/order"
+	"github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/internal/core/settlement"
+	"github.com/mobazha/mobazha/internal/repo"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // MobazhaNode holds all the components that make up a network node

@@ -17,8 +17,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha/internal/embedded/frontend"
+	"github.com/mobazha/mobazha/pkg/logging"
 	"golang.org/x/crypto/acme/autocert"
 )
 

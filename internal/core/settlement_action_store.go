@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	adapters "github.com/mobazha/mobazha/internal/payment/adapters"
+	pkgdb "github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
 	"gorm.io/gorm"
 )
 

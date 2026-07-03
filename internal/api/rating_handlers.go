@@ -14,8 +14,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	"github.com/mobazha/mobazha/pkg/models"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

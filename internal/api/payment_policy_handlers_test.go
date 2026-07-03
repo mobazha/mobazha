@@ -11,11 +11,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 type paymentPolicyCoreNode struct {

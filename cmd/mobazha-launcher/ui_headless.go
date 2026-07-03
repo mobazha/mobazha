@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mobazha/mobazha3.0/internal/supervisor"
+	"github.com/mobazha/mobazha/internal/supervisor"
 )
 
 type headlessUI struct {

@@ -15,9 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	contract "github.com/mobazha/mobazha3.0/internal/chains/evm/contract"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	contract "github.com/mobazha/mobazha/internal/chains/evm/contract"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 var _ = iwallet.Wallet(&ETHWallet{})

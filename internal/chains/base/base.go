@@ -6,10 +6,10 @@ import (
 	"time"
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/mobazha/mobazha3.0/internal/config"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/config"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/logging"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // WalletConfig is struct that can be used pass into the constructor

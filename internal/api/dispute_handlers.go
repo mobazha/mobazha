@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/models"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) {

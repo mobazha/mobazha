@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func TestOrderEscrowInfo_SolanaCancelable_ProjectsSharedSemantics(t *testing.T) {

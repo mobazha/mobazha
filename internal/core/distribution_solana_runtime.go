@@ -9,14 +9,14 @@ import (
 	"time"
 
 	gosolana "github.com/gagliardetto/solana-go"
-	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	corepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const maxManagedSolanaMessageSize = 4096

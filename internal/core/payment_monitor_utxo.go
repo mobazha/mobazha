@@ -3,11 +3,11 @@ package core
 import (
 	"context"
 
-	internalutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	internalutxo "github.com/mobazha/mobazha/internal/chains/utxo"
+	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // ── Infrastructure lifecycle (MobazhaNode owns these) ───────────────────

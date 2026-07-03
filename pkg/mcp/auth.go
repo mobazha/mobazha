@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/contracts"
 )
 
 // IdentityResponse matches the GET /platform/v1/auth/identity response envelope.

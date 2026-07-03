@@ -5,8 +5,8 @@ import (
 	"time"
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/logging"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func setupWallet() (*WalletBase, error) {

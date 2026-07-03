@@ -17,7 +17,7 @@ import (
 
 	"github.com/h2non/filetype"
 
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // DG-1.9 — Gumroad Import Tool

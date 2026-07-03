@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/config"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -40,12 +40,12 @@ Launcher and Node communicate through JSON files in `~/.mobazha/`:
 ```bash
 # Headless (Linux servers, CGO=0)
 CGO_ENABLED=0 go build \
-  -ldflags "-X github.com/mobazha/mobazha3.0/internal/supervisor.Version=v0.1.0" \
+  -ldflags "-X github.com/mobazha/mobazha/internal/supervisor.Version=v0.1.0" \
   -o mobazha-launcher ./cmd/mobazha-launcher
 
 # Desktop (macOS, must build natively)
 CGO_ENABLED=1 go build -tags desktop \
-  -ldflags "-s -w -X github.com/mobazha/mobazha3.0/internal/supervisor.Version=v0.1.0" \
+  -ldflags "-s -w -X github.com/mobazha/mobazha/internal/supervisor.Version=v0.1.0" \
   -o mobazha-launcher ./cmd/mobazha-launcher
 ```
 
@@ -114,7 +114,7 @@ go run scripts/test/fake-release-server.go -binary /path/to/new-binary -version 
 ### Manual (macOS launcher)
 
 ```bash
-cd ~/go/src/github.com/mobazha/mobazha3.0
+cd ~/go/src/github.com/mobazha/mobazha
 
 GOARCH=arm64 CGO_ENABLED=1 go build -tags desktop -ldflags="-s -w" \
   -o /tmp/mobazha-launcher-darwin-arm64 ./cmd/mobazha-launcher

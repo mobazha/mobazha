@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/internal/database"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 func getShippingService(r *http.Request) (contracts.ShippingService, bool) {

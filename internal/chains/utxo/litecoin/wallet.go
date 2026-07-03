@@ -19,9 +19,9 @@ import (
 	"github.com/ltcsuite/ltcd/txscript"
 	"github.com/ltcsuite/ltcd/wire"
 	"github.com/ltcsuite/ltcwallet/wallet/txrules"
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha/internal/chains/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // Assert interfaces

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/mobazha/mobazha3.0/internal/config"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/config"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/logging"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 var (

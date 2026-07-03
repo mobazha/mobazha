@@ -1,6 +1,6 @@
 // Package identity provides Peer ID generation and key management for Mobazha.
 // It wraps libp2p's crypto and peer packages to provide a clean API for the
-// Mobazha ecosystem, following the same patterns as the existing mobazha3.0 node.
+// Mobazha ecosystem, following the same patterns as the existing mobazha node.
 package identity
 
 import (
@@ -71,7 +71,7 @@ func GenerateKeyPair() (*KeyPair, error) {
 
 // GenerateKeyPairFromSeed creates a deterministic key pair from a seed,
 // using the same HMAC-SHA256 derivation as the existing Mobazha node.
-// This matches mobazha3.0/internal/repo/identity.go IdentityKeyFromSeed.
+// This matches mobazha/internal/repo/identity.go IdentityKeyFromSeed.
 func GenerateKeyPairFromSeed(seed []byte) (*KeyPair, error) {
 	hm := hmac.New(sha256.New, []byte("OpenBazaar seed"))
 	hm.Write(seed)
@@ -108,7 +108,7 @@ func KeyPairFromMarshaledPrivateKey(marshaledKey []byte) (*KeyPair, error) {
 // MarshalPrivateKeyFromEd25519 serializes a raw Ed25519 private key (64 bytes)
 // into libp2p protobuf format, compatible with crypto.UnmarshalPrivateKey.
 // This is the bridge between KeyVault (which stores ed25519.PrivateKey) and
-// mobazha3.0 nodes (which use libp2p marshaled bytes for identity).
+// mobazha nodes (which use libp2p marshaled bytes for identity).
 func MarshalPrivateKeyFromEd25519(privKey ed25519.PrivateKey) ([]byte, error) {
 	if len(privKey) != ed25519.PrivateKeySize {
 		return nil, fmt.Errorf("invalid private key size: got %d, want %d", len(privKey), ed25519.PrivateKeySize)

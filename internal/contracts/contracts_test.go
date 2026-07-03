@@ -3,7 +3,7 @@ package contracts
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/chains"
+	"github.com/mobazha/mobazha/internal/chains"
 )
 
 func TestContracts_GetBlockedIds(t *testing.T) {

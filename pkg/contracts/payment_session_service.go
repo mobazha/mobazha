@@ -3,7 +3,7 @@ package contracts
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/payment"
 )
 
 // CreatePaymentSessionRequest carries the parameters needed to set up a

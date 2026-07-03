@@ -9,9 +9,9 @@ import (
 	"sort"
 
 	"github.com/ipfs/go-cid"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	postsPb "github.com/mobazha/mobazha/pkg/posts/pb"
 	"github.com/multiformats/go-multihash"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"

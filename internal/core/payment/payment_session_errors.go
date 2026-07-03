@@ -3,7 +3,7 @@ package payment
 import (
 	"errors"
 
-	pkgpayment "github.com/mobazha/mobazha3.0/pkg/payment"
+	pkgpayment "github.com/mobazha/mobazha/pkg/payment"
 )
 
 // Sentinel errors returned by PaymentSessionService and facades. API handlers map

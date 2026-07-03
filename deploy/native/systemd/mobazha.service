@@ -1,6 +1,6 @@
 [Unit]
 Description=Mobazha Decentralized Marketplace Node
-Documentation=https://github.com/mobazha/mobazha3.0
+Documentation=https://github.com/mobazha/mobazha
 After=network-online.target
 Wants=network-online.target
 

@@ -19,8 +19,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	msgio "github.com/libp2p/go-msgio"
-	"github.com/mobazha/mobazha3.0/libs/store-and-forward/pb"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha/libs/store-and-forward/pb"
+	"github.com/mobazha/mobazha/pkg/logging"
 	"github.com/multiformats/go-base32"
 )
 

@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	corepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 const maxWebhookBodySize = 512 * 1024 // 512 KB

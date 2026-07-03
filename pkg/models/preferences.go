@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/paymentaddress"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/paymentaddress"
 )
 
 // UserPreferences are set by the client and persisted in the database.

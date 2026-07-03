@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/embedded/frontend"
+	"github.com/mobazha/mobazha/pkg/edition"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

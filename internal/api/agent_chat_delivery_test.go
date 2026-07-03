@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	agentexec "github.com/mobazha/mobazha3.0/pkg/agent/exec"
-	agentruntime "github.com/mobazha/mobazha3.0/pkg/agent/runtime"
-	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	agentexec "github.com/mobazha/mobazha/pkg/agent/exec"
+	agentruntime "github.com/mobazha/mobazha/pkg/agent/runtime"
+	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
 	"github.com/stretchr/testify/require"
 )
 

@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func TestEffectiveManagedEscrowPaymentCoin_MainnetIgnoresTestnetEnvOverride(t *testing.T) {

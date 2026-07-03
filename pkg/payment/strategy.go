@@ -25,10 +25,10 @@ package payment
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // PaymentModel declares the payment paradigm used by a chain.

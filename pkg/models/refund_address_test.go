@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // TestValidateRefundAddress_Fiat covers the contract that fiat orders always

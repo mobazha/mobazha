@@ -8,15 +8,15 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	evm "github.com/mobazha/mobazha3.0/internal/chains/evm"
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
-	evmpayment "github.com/mobazha/mobazha3.0/internal/payment/evm"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	evm "github.com/mobazha/mobazha/internal/chains/evm"
+	"github.com/mobazha/mobazha/internal/orders/utils"
+	evmpayment "github.com/mobazha/mobazha/internal/payment/evm"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // EVMChainOps implements the ChainOps interface for EVM chains

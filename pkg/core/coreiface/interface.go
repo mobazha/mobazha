@@ -2,9 +2,9 @@ package coreiface
 
 import (
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/mobazha/mobazha3.0/internal/wallet"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha/internal/wallet"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
 )
 
 // CoreIface enumerates the interface of the MobazhaNode object in the Core package.

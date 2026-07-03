@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/deploy"
+	"github.com/mobazha/mobazha/pkg/deploy"
 )
 
 func TestDetectDeploymentModePrefersConfiguredDistribution(t *testing.T) {

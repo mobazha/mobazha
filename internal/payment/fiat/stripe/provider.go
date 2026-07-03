@@ -11,7 +11,7 @@ import (
 	"github.com/stripe/stripe-go/v82/client"
 	"github.com/stripe/stripe-go/v82/webhook"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/contracts"
 )
 
 const providerID = "stripe"

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 type storePaymentPolicyInput struct {

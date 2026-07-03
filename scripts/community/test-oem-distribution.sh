@@ -24,7 +24,7 @@ printf '%s\n' \
   '# Source offer' \
   '' \
   'This distribution contains Mozilla Public License covered software.' \
-  'Canonical source: https://github.com/mobazha/mobazha3.0' \
+  'Canonical source: https://github.com/mobazha/mobazha' \
   'Source commit: test-fixture' > "$artifact_dir/SOURCE_OFFER.md"
 printf '%s\n' '{"spdxVersion":"SPDX-2.3"}' > "$artifact_dir/SBOM.spdx.json"
 printf '%s\n' '{"predicateType":"https://slsa.dev/provenance/v1"}' \

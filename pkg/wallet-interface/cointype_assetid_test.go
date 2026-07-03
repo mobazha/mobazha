@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	"github.com/mobazha/mobazha/pkg/edition"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

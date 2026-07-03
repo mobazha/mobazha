@@ -28,9 +28,9 @@ runcmd:
 
   # Download Mobazha files
   - mkdir -p /opt/mobazha
-  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/docker-compose.yml -o /opt/mobazha/docker-compose.yml
-  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/.env.example -o /opt/mobazha/.env.example
-  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/install.sh -o /opt/mobazha/install.sh
+  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha/main/deploy/standalone/docker-compose.yml -o /opt/mobazha/docker-compose.yml
+  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha/main/deploy/standalone/.env.example -o /opt/mobazha/.env.example
+  - curl -sSL https://raw.githubusercontent.com/mobazha/mobazha/main/deploy/standalone/install.sh -o /opt/mobazha/install.sh
   - chmod +x /opt/mobazha/install.sh
 
   # Create setup wrapper

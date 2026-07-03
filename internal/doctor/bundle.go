@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/redact"
+	"github.com/mobazha/mobazha/pkg/redact"
 )
 
 func ExportBundle(outPath string, cfg Config, summary Summary) error {

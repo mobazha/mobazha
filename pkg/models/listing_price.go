@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"strings"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // ListingPriceSnapshot captures how a listing should be priced on storefront surfaces.

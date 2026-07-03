@@ -7,9 +7,9 @@ import (
 	"crypto/ed25519"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/identity"
-	"github.com/mobazha/mobazha3.0/pkg/orders"
-	"github.com/mobazha/mobazha3.0/pkg/p2p"
+	"github.com/mobazha/mobazha/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/orders"
+	"github.com/mobazha/mobazha/pkg/p2p"
 )
 
 // --- Mock Signer ---

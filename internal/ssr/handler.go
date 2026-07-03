@@ -7,8 +7,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/logging"
 )
 
 var log = logging.MustGetLogger("SSR")

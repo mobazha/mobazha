@@ -13,11 +13,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/agent/budget"
-	"github.com/mobazha/mobazha3.0/pkg/agent/exec"
-	"github.com/mobazha/mobazha3.0/pkg/agent/runtime"
-	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
-	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
+	"github.com/mobazha/mobazha/pkg/agent/budget"
+	"github.com/mobazha/mobazha/pkg/agent/exec"
+	"github.com/mobazha/mobazha/pkg/agent/runtime"
+	"github.com/mobazha/mobazha/pkg/agent/stream"
+	"github.com/mobazha/mobazha/pkg/agent/telemetry"
 )
 
 // demoLLM simulates an LLM that first requests a tool call, then answers.

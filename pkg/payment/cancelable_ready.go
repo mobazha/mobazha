@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // CancelableAutoConfirmReady reports whether a verified CANCELABLE payment has

@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/jessevdk/go-flags"
-	"github.com/mobazha/mobazha3.0/internal/version"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha/internal/version"
+	"github.com/mobazha/mobazha/pkg/logging"
 	"github.com/natefinch/lumberjack"
 )
 

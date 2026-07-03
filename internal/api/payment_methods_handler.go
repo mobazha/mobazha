@@ -3,10 +3,10 @@ package api
 import (
 	"net/http"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/edition"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // handleGETPaymentMethods returns the seller's accepted payment methods

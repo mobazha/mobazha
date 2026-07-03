@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/repo"
 )
 
 type Config = repo.Config

@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 func fulfillmentWebhookBaseURL(r *http.Request, providerID string) string {

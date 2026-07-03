@@ -59,7 +59,7 @@ print("community capability manifest: OK")
 PY
 
 if grep -R -n --include='*.go' \
-  'github\.com/mobazha/mobazha3\.0/internal/' \
+  'github\.com/mobazha/mobazha/internal/' \
   "${repo_root}/pkg/paymentplugin"; then
   echo "ERROR: public payment plugin contract imports internal packages" >&2
   exit 1

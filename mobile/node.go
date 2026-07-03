@@ -4,8 +4,8 @@ import (
 	"context"
 	"path"
 
-	"github.com/mobazha/mobazha3.0/internal/core"
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/core"
+	"github.com/mobazha/mobazha/internal/repo"
 )
 
 var defaultDataDir = repo.AppDataDir("obmobile", false)

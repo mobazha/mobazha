@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // DG-1.10 unit tests cover the pure helpers (format negotiation, customer

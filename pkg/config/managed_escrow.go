@@ -3,7 +3,7 @@
 
 package config
 
-import iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+import iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 
 const managedEscrowReleaseFeeUSDCentsPrefix = "managedEscrow.releaseFeeUSDCents."
 

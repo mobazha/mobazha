@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
+	"github.com/mobazha/mobazha/pkg/agent/stream"
 )
 
 // ToolCall is a type alias to the canonical definition in stream package.

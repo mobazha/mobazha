@@ -11,14 +11,14 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"gorm.io/gorm"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/encryption"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/redact"
-	"github.com/mobazha/mobazha3.0/pkg/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/encryption"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/redact"
+	"github.com/mobazha/mobazha/pkg/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const defaultSweepFeePerByte int64 = 2

@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // KeyMaterial holds derived BIP44 key material for one UTXO/EVM/TRON coin.

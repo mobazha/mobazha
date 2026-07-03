@@ -13,14 +13,14 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/ipfs/go-cid"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/models/factory"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/orders/utils"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models/factory"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func TestMobazhaNode_PurchaseListing(t *testing.T) {

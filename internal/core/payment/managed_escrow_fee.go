@@ -5,10 +5,10 @@ import (
 	"math/big"
 	"strings"
 
-	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	settlementpayment "github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	wallet "github.com/mobazha/mobazha/internal/wallet"
+	"github.com/mobazha/mobazha/pkg/models"
+	settlementpayment "github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 type managedEscrowFeeQuote struct {

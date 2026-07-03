@@ -9,8 +9,8 @@ import (
 	ggio "github.com/gogo/protobuf/io"
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	"github.com/mobazha/mobazha/internal/logger"
+	pb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 )
 
 type messageSender struct {

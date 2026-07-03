@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
+	"github.com/mobazha/mobazha/internal/database/dbstore"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/database/sqlitedialect"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )

@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"math/big"
 
-	evm "github.com/mobazha/mobazha3.0/internal/chains/evm"
-	tronchain "github.com/mobazha/mobazha3.0/internal/chains/tron"
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
-	tronpayment "github.com/mobazha/mobazha3.0/internal/payment/tron"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	evm "github.com/mobazha/mobazha/internal/chains/evm"
+	tronchain "github.com/mobazha/mobazha/internal/chains/tron"
+	"github.com/mobazha/mobazha/internal/orders/utils"
+	tronpayment "github.com/mobazha/mobazha/internal/payment/tron"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // TRONChainOps implements the ChainOps interface for TRON.

@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func TestMobazhaNode_PublishToFollowers(t *testing.T) {

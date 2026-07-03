@@ -3,8 +3,8 @@ package payment
 import (
 	"testing"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/stretchr/testify/require"
 )
 

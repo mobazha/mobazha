@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/sources/electrum"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/sources/mempool"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains/utxo/sources/electrum"
+	"github.com/mobazha/mobazha/internal/chains/utxo/sources/mempool"
+	"github.com/mobazha/mobazha/pkg/logging"
+	pkgutxo "github.com/mobazha/mobazha/pkg/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 var factoryLog = logging.MustGetLogger("utxo-factory")

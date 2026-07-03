@@ -16,13 +16,13 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
-	agentruntime "github.com/mobazha/mobazha3.0/pkg/agent/runtime"
-	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
-	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
-	agentstream "github.com/mobazha/mobazha3.0/pkg/agent/stream"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
+	agentruntime "github.com/mobazha/mobazha/pkg/agent/runtime"
+	agentskill "github.com/mobazha/mobazha/pkg/agent/skill"
+	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
+	agentstream "github.com/mobazha/mobazha/pkg/agent/stream"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 	"github.com/xuri/excelize/v2"
 )
 

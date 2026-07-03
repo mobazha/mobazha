@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func (g *Gateway) handleGETCartsItemsCount(w http.ResponseWriter, r *http.Request) {

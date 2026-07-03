@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/h2non/filetype"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/xuri/excelize/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

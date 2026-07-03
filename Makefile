@@ -24,10 +24,10 @@ clean: ## 清理构建文件
 ios_framework: ## Build iOS Framework for mobile
 # https://github.com/libp2p/go-libp2p-connmgr/issues/98
 # https://github.com/libp2p/go-libp2p/pull/1666
-	gomobile bind -target=ios -iosversion=10 -ldflags="-s -w" -tags "nowatchdog notor" github.com/mobazha/mobazha3.0/mobile
+	gomobile bind -target=ios -iosversion=10 -ldflags="-s -w" -tags "nowatchdog notor" github.com/mobazha/mobazha/mobile
 
 android_framework: ## Build Android Framework for mobile
-	gomobile bind -target=android/arm,android/arm64,android/amd64 -ldflags="-s -w" -tags notor github.com/mobazha/mobazha3.0/mobile
+	gomobile bind -target=android/arm,android/arm64,android/amd64 -ldflags="-s -w" -tags notor github.com/mobazha/mobazha/mobile
 
 ##
 ## Protobuf compilation
@@ -41,7 +41,7 @@ protos:
 	# 修复 OrderList 引用 (OrderList 定义在 net/mbzpb 中)
 	cd pkg/orders/mbzpb && sed -i '' 's/\*OrderList/\*mbzpb.OrderList/g' orders.pb.go
 	# 添加导入 (在 sync 导入后添加)
-	cd pkg/orders/mbzpb && sed -i '' 's|sync "sync"|sync "sync"\n\n\t"github.com/mobazha/mobazha3.0/pkg/net/mbzpb"|' orders.pb.go
+	cd pkg/orders/mbzpb && sed -i '' 's|sync "sync"|sync "sync"\n\n\t"github.com/mobazha/mobazha/pkg/net/mbzpb"|' orders.pb.go
 	# 移除无效的 file_msg_proto_init 调用
 	cd pkg/orders/mbzpb && sed -i '' 's/file_msg_proto_init()//' orders.pb.go
 	# 格式化代码

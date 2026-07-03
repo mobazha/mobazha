@@ -22,11 +22,11 @@ require_text() {
 require_text LICENSE "Mozilla Public License"
 require_text LICENSE "Version 2.0"
 require_text NOTICE "Originally developed by fengzie (https://github.com/fengzie)"
-require_text NOTICE "Canonical source: https://github.com/mobazha/mobazha3.0"
+require_text NOTICE "Canonical source: https://github.com/mobazha/mobazha"
 require_text NOTICE "Copyright (c) 2021-2026 fengzie and the respective contributors."
 require_text NOTICE "Copyright (c) 2016-2018 OpenBazaar Developers"
 require_text README.md "https://github.com/fengzie"
-require_text README.md "https://github.com/mobazha/mobazha3.0"
+require_text README.md "https://github.com/mobazha/mobazha"
 require_text TRADEMARKS.md "This condition governs"
 require_text docs/community/ATTRIBUTION.md "SPDX-License-Identifier: MPL-2.0"
 

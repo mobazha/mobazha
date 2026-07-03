@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/contracts"
 )
 
 // newTestServer returns an httptest.Server with a handler that dispatches on

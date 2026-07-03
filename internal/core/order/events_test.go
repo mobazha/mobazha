@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha/pkg/database"
 )
 
 func TestAutoConfirmRequestTargetsNode(t *testing.T) {

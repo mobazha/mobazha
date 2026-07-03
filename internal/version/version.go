@@ -23,7 +23,7 @@ const (
 
 // buildVersion is set at build time via:
 //
-//	-ldflags "-X github.com/mobazha/mobazha3.0/internal/version.buildVersion=v0.3.0-beta.26"
+//	-ldflags "-X github.com/mobazha/mobazha/internal/version.buildVersion=v0.3.0-beta.26"
 //
 // When set, String() returns this value (with the leading "v" stripped)
 // instead of the static constants above.

@@ -15,8 +15,8 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/edition"
 )
 
 const (

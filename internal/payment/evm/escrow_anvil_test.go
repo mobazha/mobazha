@@ -19,9 +19,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm"
-	"github.com/mobazha/mobazha3.0/internal/chains/evm/contract"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	ethWal "github.com/mobazha/mobazha/internal/chains/evm"
+	"github.com/mobazha/mobazha/internal/chains/evm/contract"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // Anvil default pre-funded keys (deterministic for --mnemonic="test test test test test test test test test test test junk")

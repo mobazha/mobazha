@@ -5,10 +5,10 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 
-	"github.com/mobazha/mobazha3.0/internal/chains/tron"
+	"github.com/mobazha/mobazha/internal/chains/tron"
 )
 
 // NodeKeyDeriver implements BIP44KeyDeriver using the node's BIP44 master

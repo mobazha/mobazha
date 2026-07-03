@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	"github.com/mobazha/mobazha3.0/pkg/redact"
+	"github.com/mobazha/mobazha/pkg/logging"
+	"github.com/mobazha/mobazha/pkg/redact"
 )
 
 var log = logging.MustGetLogger("electrum")

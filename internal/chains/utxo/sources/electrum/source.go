@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	pkgutxo "github.com/mobazha/mobazha/pkg/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // Source implements utxo.PaymentSource using Electrum protocol

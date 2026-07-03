@@ -15,11 +15,11 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	"github.com/mobazha/mobazha3.0/internal/config"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha/internal/chains/utxo"
+	"github.com/mobazha/mobazha/internal/config"
+	"github.com/mobazha/mobazha/pkg/logging"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const (

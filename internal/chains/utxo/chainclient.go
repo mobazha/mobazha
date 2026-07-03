@@ -3,8 +3,8 @@ package utxo
 import (
 	"encoding/hex"
 
-	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	pkgutxo "github.com/mobazha/mobazha/pkg/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // UTXOChainClient implements iwallet.ChainClient using ChainOperations interface

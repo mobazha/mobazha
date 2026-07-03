@@ -2,11 +2,11 @@ package coreiface
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/relay"
-	"github.com/mobazha/mobazha3.0/pkg/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/relay"
+	"github.com/mobazha/mobazha/pkg/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // HostService 定义托管服务的接口

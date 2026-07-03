@@ -8,12 +8,12 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

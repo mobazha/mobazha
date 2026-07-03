@@ -4,12 +4,12 @@ import (
 	"context"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/internal/core/order"
-	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/internal/core/settlement"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	paypkg "github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/core/order"
+	corepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/internal/core/settlement"
+	"github.com/mobazha/mobazha/pkg/models"
+	paypkg "github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // orderServiceFacade composes OrderAppService + PaymentAppService + SettlementService

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
 )
 
 func TestSellerToolMetadataMirrorsSellerTools(t *testing.T) {

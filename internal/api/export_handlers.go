@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 // DG-1.10: seller data-portability exports — listings, sales, and customers

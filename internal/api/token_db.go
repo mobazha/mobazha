@@ -3,7 +3,7 @@ package api
 import (
 	"path/filepath"
 
-	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
+	"github.com/mobazha/mobazha/pkg/database/sqlitedialect"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )

@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 const poolOpsTokenHeader = "X-Pool-Ops-Token"

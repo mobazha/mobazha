@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	agentexec "github.com/mobazha/mobazha3.0/pkg/agent/exec"
-	agentruntime "github.com/mobazha/mobazha3.0/pkg/agent/runtime"
-	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
+	agentexec "github.com/mobazha/mobazha/pkg/agent/exec"
+	agentruntime "github.com/mobazha/mobazha/pkg/agent/runtime"
+	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
 )
 
 type agentChatDeliveryResolver struct{}

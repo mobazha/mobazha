@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // authIdentityResponse is the wire shape of GET /v1/auth/identity.

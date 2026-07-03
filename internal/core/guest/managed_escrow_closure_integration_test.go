@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // TestManagedEscrowClosure_CapabilityAndReadinessE2E verifies Phase 3D gates:

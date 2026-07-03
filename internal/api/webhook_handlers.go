@@ -8,9 +8,9 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/response"
-	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/response"
+	wh "github.com/mobazha/mobazha/pkg/webhook"
 )
 
 func getWebhookProvider(r *http.Request) (contracts.WebhookProvider, bool) {

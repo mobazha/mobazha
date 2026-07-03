@@ -6,8 +6,8 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
-	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha/internal/database/dbstore"
+	"github.com/mobazha/mobazha/pkg/database"
 )
 
 // MockDB returns an in-memory sqlite db.

@@ -7,13 +7,13 @@ import (
 	"context"
 	"net/http"
 
-	internalapi "github.com/mobazha/mobazha3.0/internal/api"
-	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	internalapi "github.com/mobazha/mobazha/internal/api"
+	agentskill "github.com/mobazha/mobazha/pkg/agent/skill"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/edition"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // Gateway is a type alias for the internal API Gateway, following the same

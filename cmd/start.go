@@ -14,14 +14,14 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/mobazha/mobazha3.0/internal/api"
-	"github.com/mobazha/mobazha3.0/internal/core"
-	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/internal/version"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha/internal/api"
+	"github.com/mobazha/mobazha/internal/core"
+	"github.com/mobazha/mobazha/internal/embedded/frontend"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/internal/version"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/logging"
 )
 
 var log = logging.MustGetLogger("CMD")

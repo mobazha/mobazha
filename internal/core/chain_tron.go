@@ -1,10 +1,10 @@
 package core
 
 import (
-	"github.com/mobazha/mobazha3.0/internal/chains"
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	tronWal "github.com/mobazha/mobazha3.0/internal/chains/tron"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains"
+	"github.com/mobazha/mobazha/internal/logger"
+	tronWal "github.com/mobazha/mobazha/internal/chains/tron"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // TronChainConfig holds TRON chain configuration derived from multiwallet ChainAPIs.

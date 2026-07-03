@@ -13,7 +13,7 @@ package orders
 import "fmt"
 
 // OrderState represents the current state of an order.
-// Values match mobazha3.0/pkg/models/order_state.go for direct conversion.
+// Values match mobazha/pkg/models/order_state.go for direct conversion.
 type OrderState int32
 
 const (
@@ -211,7 +211,7 @@ type TransitionResult struct {
 }
 
 // transitionTable is the single source of truth for all valid state transitions.
-// The table is aligned with legacy mobazha3.0 handler behavior:
+// The table is aligned with legacy mobazha handler behavior:
 //   - AWAITING_PAYMENT is the initial state (order created, buyer hasn't paid)
 //   - AWAITING_PAYMENT_VERIFICATION means payment submitted, awaiting verification
 //   - PENDING means payment verified/funded, waiting for vendor to confirm/decline

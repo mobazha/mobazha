@@ -11,10 +11,10 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	corePmt "github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	paypb "github.com/mobazha/mobazha3.0/pkg/payment"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	corePmt "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	paypb "github.com/mobazha/mobazha/pkg/payment"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 type mockPaymentSessionService struct {

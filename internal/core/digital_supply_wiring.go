@@ -1,6 +1,6 @@
 package core
 
-import "github.com/mobazha/mobazha3.0/internal/core/digital"
+import "github.com/mobazha/mobazha/internal/core/digital"
 
 func wireDistributionDigitalSupplyLineResolvers(
 	n *MobazhaNode,

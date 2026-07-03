@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/mobazha/mobazha3.0/cmd"
-	"github.com/mobazha/mobazha3.0/pkg/cli"
+	"github.com/mobazha/mobazha/cmd"
+	"github.com/mobazha/mobazha/pkg/cli"
 )
 
 func main() {

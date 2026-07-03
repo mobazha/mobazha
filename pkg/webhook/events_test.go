@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha/pkg/events"
 )
 
 func TestClassifyEvent_AllTypes(t *testing.T) {

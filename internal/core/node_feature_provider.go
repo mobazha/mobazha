@@ -3,8 +3,8 @@ package core
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/config"
 )
 
 // ConfigNodeFeatureProvider implements config.NodeFeatureProvider by

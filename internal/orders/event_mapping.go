@@ -1,9 +1,9 @@
 package orders
 
 import (
-	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	coreorders "github.com/mobazha/mobazha/pkg/orders"
+	"github.com/mobazha/mobazha/pkg/models"
+	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 )
 
 // MessageTypeToEvent maps a P2P OrderMessage_MessageType to a mobazha-core OrderEvent.

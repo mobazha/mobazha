@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
-	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	dbgorm "github.com/mobazha/mobazha/internal/database"
+	"github.com/mobazha/mobazha/internal/database/dbstore"
+	adapters "github.com/mobazha/mobazha/internal/payment/adapters"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/stretchr/testify/require"
 )
 

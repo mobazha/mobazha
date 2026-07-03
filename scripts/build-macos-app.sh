@@ -81,7 +81,7 @@ PLIST
 echo "==> Building mobazha-launcher (desktop)..."
 CGO_ENABLED=1 GOARCH="${GOARCH}" go build \
     -tags "desktop" \
-    -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/supervisor.Version=${VERSION}" \
+    -ldflags="-s -w -X github.com/mobazha/mobazha/internal/supervisor.Version=${VERSION}" \
     -o "${APP_DIR}/Contents/MacOS/mobazha-launcher" \
     "${PROJECT_ROOT}/cmd/mobazha-launcher"
 
@@ -95,7 +95,7 @@ else
     BUILD_TAGS="${BUILD_TAGS:-goolm purego_sqlite embed_frontend}"
     CGO_ENABLED=0 GOARCH="${GOARCH}" go build \
         -tags "${BUILD_TAGS}" \
-        -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/version.buildVersion=${VERSION}" \
+        -ldflags="-s -w -X github.com/mobazha/mobazha/internal/version.buildVersion=${VERSION}" \
         -o "${APP_DIR}/Contents/MacOS/mobazha" \
         "${PROJECT_ROOT}"
 fi

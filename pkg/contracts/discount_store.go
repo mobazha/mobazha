@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // ValidateCodeResult holds the result of validating a discount code.

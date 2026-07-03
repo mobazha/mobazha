@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	pkgdatabase "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	utils "github.com/mobazha/mobazha/internal/orders/testutil"
+	"github.com/mobazha/mobazha/internal/repo"
+	pkgdatabase "github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )

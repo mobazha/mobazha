@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func (g *Gateway) handleGETCurrencies(w http.ResponseWriter, r *http.Request) {

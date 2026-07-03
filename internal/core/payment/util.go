@@ -3,8 +3,8 @@ package payment
 import (
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func updateFreshOrder(dbtx database.Tx, orderID models.OrderID, updateFn func(*models.Order) error) error {

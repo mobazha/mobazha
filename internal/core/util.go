@@ -6,8 +6,8 @@ import (
 	"image"
 	"image/jpeg"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // NormalizeCurrencyCode standardizes the format for the given currency code.

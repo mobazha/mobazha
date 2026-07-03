@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	pkgutxo "github.com/mobazha/mobazha3.0/pkg/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	pkgutxo "github.com/mobazha/mobazha/pkg/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // mockPaymentSource implements pkgutxo.PaymentSource for testing UTXO payment detection.

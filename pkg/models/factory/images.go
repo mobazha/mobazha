@@ -1,6 +1,6 @@
 package factory
 
-import pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+import pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 
 func NewImage() *pb.Image {
 	return &pb.Image{

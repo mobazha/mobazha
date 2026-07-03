@@ -13,11 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mobazha/ethereum-watcher/rpc"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	"github.com/mobazha/mobazha3.0/pkg/redact"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/logging"
+	"github.com/mobazha/mobazha/pkg/redact"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 
-	contract "github.com/mobazha/mobazha3.0/internal/chains/evm/contract"
+	contract "github.com/mobazha/mobazha/internal/chains/evm/contract"
 )
 
 /*

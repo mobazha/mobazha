@@ -3,7 +3,7 @@ package database
 import (
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // MarkOrderOpenPaymentReady records that the seller has processed ORDER_OPEN.

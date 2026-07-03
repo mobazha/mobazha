@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	corepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
 	"gorm.io/gorm"
 )
 

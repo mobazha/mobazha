@@ -15,17 +15,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	"github.com/mobazha/mobazha3.0/pkg/agent/budget"
-	agentexec "github.com/mobazha/mobazha3.0/pkg/agent/exec"
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
-	agentruntime "github.com/mobazha/mobazha3.0/pkg/agent/runtime"
-	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
-	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
-	agentstream "github.com/mobazha/mobazha3.0/pkg/agent/stream"
-	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
-	"github.com/mobazha/mobazha3.0/pkg/redact"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	"github.com/mobazha/mobazha/pkg/agent/budget"
+	agentexec "github.com/mobazha/mobazha/pkg/agent/exec"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
+	agentruntime "github.com/mobazha/mobazha/pkg/agent/runtime"
+	agentskill "github.com/mobazha/mobazha/pkg/agent/skill"
+	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
+	agentstream "github.com/mobazha/mobazha/pkg/agent/stream"
+	"github.com/mobazha/mobazha/pkg/agent/telemetry"
+	"github.com/mobazha/mobazha/pkg/redact"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 type agentChatRuntimeCacheEntry struct {

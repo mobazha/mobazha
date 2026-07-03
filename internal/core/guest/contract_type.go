@@ -3,7 +3,7 @@ package guest
 import (
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // ContractTypeFromItems returns the persisted order-level contract type.

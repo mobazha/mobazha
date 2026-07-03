@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
+	"github.com/mobazha/mobazha/pkg/events"
+	wh "github.com/mobazha/mobazha/pkg/webhook"
 )
 
 type recordingStore struct {

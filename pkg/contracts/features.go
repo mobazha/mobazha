@@ -3,8 +3,8 @@ package contracts
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // FeaturesProvider is the optional accessor for the feature-flag resolver.

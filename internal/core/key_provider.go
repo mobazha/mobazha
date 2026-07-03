@@ -7,7 +7,7 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/gagliardetto/solana-go"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"golang.org/x/crypto/hkdf"
 )
 

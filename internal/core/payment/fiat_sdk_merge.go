@@ -3,8 +3,8 @@ package payment
 import (
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	sesspb "github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	sesspb "github.com/mobazha/mobazha/pkg/payment"
 )
 
 // mergeFiatProviderSessionIntoView enriches FundingTarget.ProviderData with

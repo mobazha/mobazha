@@ -21,10 +21,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
-	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
+	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 	"github.com/xuri/excelize/v2"
 )
 

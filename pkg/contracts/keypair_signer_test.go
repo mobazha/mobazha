@@ -3,7 +3,7 @@ package contracts
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/identity"
 )
 
 func TestKeyPairSigner_NewAndSign(t *testing.T) {

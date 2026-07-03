@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/identity"
 )
 
 // testPeerID generates a real libp2p PeerID for testing.

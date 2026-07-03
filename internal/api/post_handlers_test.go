@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	postsPb "github.com/mobazha/mobazha/pkg/posts/pb"
 )
 
 func TestPostHandlers(t *testing.T) {

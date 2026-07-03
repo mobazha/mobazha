@@ -5,7 +5,7 @@ package contracts
 import (
 	"crypto/ed25519"
 
-	"github.com/mobazha/mobazha3.0/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/identity"
 )
 
 // Signer is the contract interface for signing operations.

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/repo"
 )
 
 // Service manages the Mobazha background service.

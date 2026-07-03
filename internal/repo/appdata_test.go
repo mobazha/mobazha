@@ -1,7 +1,7 @@
 package repo_test
 
 import (
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/repo"
 	"os"
 	"os/user"
 	"path/filepath"

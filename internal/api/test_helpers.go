@@ -14,8 +14,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	tnet "github.com/libp2p/go-libp2p-testing/net"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 type apiTests []apiTest

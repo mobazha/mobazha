@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/identity"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 )

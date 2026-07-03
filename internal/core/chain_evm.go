@@ -6,12 +6,12 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/mobazha/mobazha3.0/internal/chains"
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/mobazha/mobazha3.0/pkg/evm"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	"github.com/mobazha/mobazha/pkg/evm"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // evmChains lists the EVM chains that need shared client injection.

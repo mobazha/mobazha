@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/mobazha/mobazha3.0/pkg/encryption"
+	"github.com/mobazha/mobazha/pkg/encryption"
 )
 
 const matrixProvisionFile = "matrix_provision.json"

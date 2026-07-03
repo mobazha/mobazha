@@ -13,7 +13,7 @@ import (
 	"math/big"
 	"strings"
 
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // PriceRule applies a deterministic transform over a listing's base price

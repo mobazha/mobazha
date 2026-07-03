@@ -10,7 +10,7 @@ import (
 
 	gomcp "github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/mobazha/mobazha3.0/pkg/redact"
+	"github.com/mobazha/mobazha/pkg/redact"
 )
 
 type inMemoryAuditLogger struct {

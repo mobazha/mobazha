@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 func TestValidateDisputePayoutAddresses_AllowsZeroBuyerAmountWithoutAddress(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	pkgscheduler "github.com/mobazha/mobazha3.0/pkg/scheduler"
+	"github.com/mobazha/mobazha/internal/logger"
+	pkgscheduler "github.com/mobazha/mobazha/pkg/scheduler"
 )
 
 // startStandaloneSchedulerPlan owns the distribution-neutral scheduler

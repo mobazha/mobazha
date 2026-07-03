@@ -5,7 +5,7 @@ Mobazha Community Edition was originally developed by
 contributors.
 
 The canonical source repository is
-<https://github.com/mobazha/mobazha3.0>.
+<https://github.com/mobazha/mobazha>.
 
 ## Source-code notices
 

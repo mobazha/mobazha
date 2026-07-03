@@ -4,10 +4,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/internal/wallet"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/response"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/wallet"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/response"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request) {

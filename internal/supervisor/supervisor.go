@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/repo"
 )
 
 // Status represents the current state of the supervised node.

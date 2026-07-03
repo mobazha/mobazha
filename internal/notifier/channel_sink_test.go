@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha/pkg/events"
 )
 
 func newTestTGChannel(id string, serverURL string, filter string) ChannelConfig {

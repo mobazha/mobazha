@@ -3,9 +3,9 @@ package payment
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/events"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // V1AsV2 adapts a V1 ChainEscrow implementation to the V2

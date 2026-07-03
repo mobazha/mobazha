@@ -25,7 +25,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
-	"github.com/mobazha/mobazha3.0/pkg/apitoken"
+	"github.com/mobazha/mobazha/pkg/apitoken"
 )
 
 // clientIPKey is the context key for the upstream client IP address

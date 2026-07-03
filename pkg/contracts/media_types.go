@@ -1,6 +1,6 @@
 package contracts
 
-import "github.com/mobazha/mobazha3.0/pkg/models"
+import "github.com/mobazha/mobazha/pkg/models"
 
 // ProfileSlot identifies a profile image slot (avatar or header).
 type ProfileSlot string

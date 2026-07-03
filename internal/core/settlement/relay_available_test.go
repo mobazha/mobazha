@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/relay"
+	"github.com/mobazha/mobazha/pkg/relay"
 	"github.com/stretchr/testify/assert"
 )
 

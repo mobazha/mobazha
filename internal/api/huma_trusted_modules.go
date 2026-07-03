@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/distribution"
 )
 
 func (g *Gateway) registerTrustedHumaModules(api huma.API) {

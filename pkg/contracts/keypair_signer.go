@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/identity"
 )
 
 // KeyPairSigner is the standard implementation of Signer using an identity.KeyPair.

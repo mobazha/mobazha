@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/database/sqlitedialect"
+	"github.com/mobazha/mobazha/pkg/models"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )

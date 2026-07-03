@@ -3,7 +3,7 @@ package contracttype
 import (
 	"fmt"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // AddToSingleTypeOrder records the first listing contract type for an order and

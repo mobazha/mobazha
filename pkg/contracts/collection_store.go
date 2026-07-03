@@ -3,7 +3,7 @@ package contracts
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // CollectionStore abstracts Collection persistence for both standalone and SaaS modes.

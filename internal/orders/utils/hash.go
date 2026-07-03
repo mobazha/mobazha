@@ -3,7 +3,7 @@ package utils
 import (
 	"crypto/sha256"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/multiformats/go-multihash"
 	"google.golang.org/protobuf/proto"
 )

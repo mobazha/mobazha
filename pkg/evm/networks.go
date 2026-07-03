@@ -1,6 +1,6 @@
 package evm
 
-import iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+import iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 
 // Network identifies the EIP-155 domains supported by Mobazha's EVM wallet
 // layer. It deliberately contains no payment-provider readiness or deployment

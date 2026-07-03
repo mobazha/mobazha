@@ -10,7 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/encoding/protojson"
 	timestamp "google.golang.org/protobuf/types/known/timestamppb"
 )

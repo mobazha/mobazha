@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/assetid"
+	"github.com/mobazha/mobazha/pkg/assetid"
 )
 
 // ChainType 表示区块链网络类型

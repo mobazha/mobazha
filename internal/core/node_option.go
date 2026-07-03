@@ -3,7 +3,7 @@ package core
 import (
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/distribution"
 )
 
 // NodeOption configures node construction. Build options are resolved before

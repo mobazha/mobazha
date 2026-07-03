@@ -8,12 +8,12 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi/v5"
-	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
-	"github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	agentskill "github.com/mobazha/mobazha/pkg/agent/skill"
+	"github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/edition"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // SharedRouterConfig configures a SharedRouter.

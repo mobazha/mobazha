@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // ErrDuplicateObservation is the sentinel error returned by

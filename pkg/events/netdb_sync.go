@@ -3,7 +3,7 @@ package events
 import (
 	"encoding/json"
 
-	opb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	opb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // ProfileChanged signals that the local profile has been modified

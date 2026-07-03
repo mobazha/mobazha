@@ -19,9 +19,9 @@ import (
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/minio/blake2b-simd"
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha/internal/chains/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 var (

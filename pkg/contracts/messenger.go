@@ -8,8 +8,8 @@ import (
 	"context"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	"github.com/mobazha/mobazha/pkg/database"
+	pb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 )
 
 // Messenger abstracts reliable message delivery.

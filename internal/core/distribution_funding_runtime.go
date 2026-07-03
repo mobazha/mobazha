@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	corepayment "github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	pkgpayment "github.com/mobazha/mobazha3.0/pkg/payment"
+	corepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/internal/database/dbstore"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	pkgpayment "github.com/mobazha/mobazha/pkg/payment"
 )
 
 type distributionFundingSink struct {

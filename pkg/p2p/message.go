@@ -4,8 +4,8 @@ package p2p
 import (
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/crypto"
-	"github.com/mobazha/mobazha3.0/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/crypto"
+	"github.com/mobazha/mobazha/pkg/identity"
 )
 
 // MessageType represents the type of P2P message.

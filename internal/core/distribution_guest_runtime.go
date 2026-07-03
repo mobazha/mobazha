@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mobazha/mobazha3.0/internal/core/guest"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/core/guest"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 type distributionManagedEscrowGuestRuntimeBinder struct {

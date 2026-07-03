@@ -5,7 +5,7 @@ import (
 	"html"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha/pkg/events"
 )
 
 // formatEmailEvent produces a two-part string: first line is the subject,

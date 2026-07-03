@@ -18,7 +18,7 @@ LOG_DIR="/var/log/mobazha"
 SAAS_BASE_URL="${SAAS_BASE_URL:-https://app.mobazha.org}"
 
 MOBAZHA_VERSION="${MOBAZHA_VERSION:-latest}"
-GITHUB_BASE="https://github.com/mobazha/mobazha3.0/releases"
+GITHUB_BASE="https://github.com/mobazha/mobazha/releases"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -128,7 +128,7 @@ EOF
 }
 
 install_systemd() {
-    local service_url="https://raw.githubusercontent.com/mobazha/mobazha3.0/main/deploy/standalone/systemd/mobazha.service"
+    local service_url="https://raw.githubusercontent.com/mobazha/mobazha/main/deploy/standalone/systemd/mobazha.service"
 
     log "Installing systemd service..."
     curl -sSL "$service_url" -o /etc/systemd/system/mobazha.service

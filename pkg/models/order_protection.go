@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // OrderProtectionPolicy defines buyer-protection timeout parameters for a

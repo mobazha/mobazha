@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	"github.com/mobazha/mobazha3.0/pkg/relay"
+	ethWal "github.com/mobazha/mobazha/internal/chains/evm"
+	"github.com/mobazha/mobazha/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/relay"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

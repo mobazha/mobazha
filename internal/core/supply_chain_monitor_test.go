@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/stretchr/testify/assert"
 )
 

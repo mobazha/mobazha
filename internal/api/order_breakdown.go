@@ -4,10 +4,10 @@ import (
 	"math/big"
 	"strings"
 
-	ordercalc "github.com/mobazha/mobazha3.0/internal/orders"
-	"github.com/mobazha/mobazha3.0/internal/wallet"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	ordercalc "github.com/mobazha/mobazha/internal/orders"
+	"github.com/mobazha/mobazha/internal/wallet"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 type orderPricingBreakdownResp struct {

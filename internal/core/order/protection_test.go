@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func seedProtectionOrder(t *testing.T, db *testDatabase, order *models.Order) {

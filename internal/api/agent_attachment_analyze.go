@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	agentexec "github.com/mobazha/mobazha3.0/pkg/agent/exec"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	agentexec "github.com/mobazha/mobazha/pkg/agent/exec"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 type agentAttachmentAnalyzeRequest struct {

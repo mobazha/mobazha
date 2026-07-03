@@ -3,7 +3,7 @@ package wallet_interface
 import (
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	"github.com/mobazha/mobazha/pkg/edition"
 )
 
 // IsPaymentCoinEnabled reports whether a canonical or legacy payment coin is

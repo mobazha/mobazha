@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	pkgdatabase "github.com/mobazha/mobazha3.0/pkg/database"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	pkgdatabase "github.com/mobazha/mobazha/pkg/database"
 )
 
 func buyerPortalAccessErrorMessage(buyerPortalToken string) string {

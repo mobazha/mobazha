@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/mobazha/mobazha3.0/internal/version"
+	"github.com/mobazha/mobazha/internal/version"
 )
 
 type healthResponse struct {

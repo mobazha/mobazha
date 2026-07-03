@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/agent/exec"
+	"github.com/mobazha/mobazha/pkg/agent/exec"
 )
 
 type deliveryResolverStub struct {

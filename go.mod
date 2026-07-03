@@ -1,4 +1,4 @@
-module github.com/mobazha/mobazha3.0
+module github.com/mobazha/mobazha
 
 go 1.26.4
 

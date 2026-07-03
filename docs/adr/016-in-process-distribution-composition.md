@@ -22,7 +22,7 @@ ecosystem extensions still need ADR-015's out-of-process boundary.
 
 ## Decision
 
-1. `mobazha3.0` owns one Node type, one lifecycle state machine, shared domain
+1. `mobazha` owns one Node type, one lifecycle state machine, shared domain
    services, migrations, and public API semantics.
 2. A composition root selects a distribution before resources are opened.
    Selection is an explicit, validated configuration, not an edition-name

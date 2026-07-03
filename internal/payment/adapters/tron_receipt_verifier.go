@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	tronchain "github.com/mobazha/mobazha3.0/internal/chains/tron"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	tronchain "github.com/mobazha/mobazha/internal/chains/tron"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const (

@@ -9,10 +9,10 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/internal/mcpconnect"
-	"github.com/mobazha/mobazha3.0/pkg/apitoken"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/internal/mcpconnect"
+	"github.com/mobazha/mobazha/pkg/apitoken"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // readAndRestoreBody reads the entire request body into a buffer and replaces

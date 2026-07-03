@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
-	agentstore "github.com/mobazha/mobazha3.0/pkg/agent/store"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
+	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 const (

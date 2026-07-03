@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	"github.com/mobazha/mobazha/pkg/edition"
 )
 
 // newTestGatewayForRouting creates a minimal Gateway that can register

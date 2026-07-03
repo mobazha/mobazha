@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func TestNormalizeGuestPaymentCoin_Aliases(t *testing.T) {

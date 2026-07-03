@@ -3,7 +3,7 @@ package notifications
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha/pkg/events"
 )
 
 func TestWrapForWebSocket_PaymentReadiness(t *testing.T) {

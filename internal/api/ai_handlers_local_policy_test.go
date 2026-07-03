@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/distribution"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

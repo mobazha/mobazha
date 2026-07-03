@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // panicRecoveryMiddleware catches panics in downstream handlers and

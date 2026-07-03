@@ -3,7 +3,7 @@ package models
 import (
 	"testing"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 func TestPurchaseItemOptionalFeaturesWithCollectibleMetadata(t *testing.T) {

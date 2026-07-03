@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	"github.com/mobazha/mobazha3.0/internal/chains/evm"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	"github.com/mobazha/mobazha/internal/chains/evm"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 var _ = iwallet.Wallet(&TronWallet{})

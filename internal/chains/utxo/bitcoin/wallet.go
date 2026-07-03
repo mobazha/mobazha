@@ -18,9 +18,9 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	chainutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	chainutxo "github.com/mobazha/mobazha/internal/chains/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 var _ = iwallet.Wallet(&BitcoinWallet{})

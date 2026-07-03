@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/pkg/paymentaddress"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/paymentaddress"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // ErrRefundAddressRequired is returned when an order requires a buyer-declared

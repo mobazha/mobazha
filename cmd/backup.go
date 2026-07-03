@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/repo"
 )
 
 // Backup creates a compressed backup of the data directory.

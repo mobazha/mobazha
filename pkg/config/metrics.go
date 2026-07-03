@@ -59,7 +59,7 @@ func RecordFeatureEvaluation(eval Evaluation) {
 // RecordFeatureChange 记录一次 feature 管理端变更。
 //
 // 调用方：
-//   - mobazha3.0  tenant 层 PUT handler（scope=ScopeTenant）
+//   - mobazha  tenant 层 PUT handler（scope=ScopeTenant）
 //   - hosting    platform 层 PATCH handler（scope=ScopePlatformGlobal）
 //
 // 变更失败时**不要**调用此函数（否则指标会虚高）。

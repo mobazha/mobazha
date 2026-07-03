@@ -13,7 +13,7 @@ import (
 	reflect "reflect"
 	sync "sync"
 
-	"github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	"github.com/mobazha/mobazha/pkg/net/mbzpb"
 )
 
 const (

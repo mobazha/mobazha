@@ -3,14 +3,14 @@ package chains_test
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/chains"
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm" // registers EVM factory via init()
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/bitcoin"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo/zcash"
-	"github.com/mobazha/mobazha3.0/pkg/evm"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/chains"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	ethWal "github.com/mobazha/mobazha/internal/chains/evm" // registers EVM factory via init()
+	"github.com/mobazha/mobazha/internal/chains/utxo/bitcoin"
+	"github.com/mobazha/mobazha/internal/chains/utxo/litecoin"
+	"github.com/mobazha/mobazha/internal/chains/utxo/zcash"
+	"github.com/mobazha/mobazha/pkg/evm"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // ── Wallet construction tests ───────────────────────────────────────────

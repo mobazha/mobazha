@@ -18,7 +18,7 @@ import "time"
 //
 //   - In hosting (platform-global writes) the table is a cross-tenant ops
 //     log that must remain writable without any tenant scope.
-//   - In mobazha3.0 (tenant-scoped writes) the TenantID column still carries
+//   - In mobazha (tenant-scoped writes) the TenantID column still carries
 //     the tenant ID as a plain field, written explicitly by the caller; the
 //     multi-tenant DB partitioning handled elsewhere (per-tenant database)
 //     already isolates these rows. Adding TenantMixin here would collide

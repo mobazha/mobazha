@@ -6,9 +6,9 @@ import (
 	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	"github.com/mobazha/mobazha/pkg/events"
+	pb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 )
 
 const maxPongDelay = time.Second * 10

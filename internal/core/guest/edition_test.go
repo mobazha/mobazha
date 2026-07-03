@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	"github.com/mobazha/mobazha/pkg/edition"
 )
 
 func TestMain(m *testing.M) {

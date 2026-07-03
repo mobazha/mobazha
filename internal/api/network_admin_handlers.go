@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	caddymgr "github.com/mobazha/mobazha3.0/internal/caddy"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	caddymgr "github.com/mobazha/mobazha/internal/caddy"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 const (

@@ -12,8 +12,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/ipfs/go-cid"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 func matrixChatError(w http.ResponseWriter, err error, operation string) {

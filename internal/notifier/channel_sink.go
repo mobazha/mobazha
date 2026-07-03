@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/logging"
 )
 
 var log = logging.MustGetLogger("NTFCH")

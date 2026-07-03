@@ -23,14 +23,14 @@
 
 ### `walletBuiltinDisabled`
 
-- **Owner**: mobazha3.0 (Phase Privacy / External Wallet)
+- **Owner**: mobazha (Phase Privacy / External Wallet)
 - **Default**: true
 - **Stability**: stable
 - **Lifecycle**: stable (since pre-pm2)
 - **Scopes**: NodeRuntime
 - **Consumers**:
-  - mobazha3.0/internal/core/builder.go — 节点初始化时跳过钱包派生
-  - mobazha3.0/internal/core/node.go — 钱包相关方法 early return
+  - mobazha/internal/core/builder.go — 节点初始化时跳过钱包派生
+  - mobazha/internal/core/node.go — 钱包相关方法 early return
 - **Kill Path**: 设 false → 节点启动时初始化内建钱包
 - **Dependencies**: 无
 
@@ -40,13 +40,13 @@
 
 ### `privacyLocalEncryptedStorageEnabled`
 
-- **Owner**: mobazha3.0 (Phase 2 Encryption)
+- **Owner**: mobazha (Phase 2 Encryption)
 - **Default**: false
 - **Stability**: beta
 - **Lifecycle**: beta (since phase-2-encryption)
 - **Scopes**: NodeRuntime
 - **Consumers**:
-  - mobazha3.0/internal/core/ — 加密商品存储管道
+  - mobazha/internal/core/ — 加密商品存储管道
 - **Kill Path**: 设 false → 商品明文存储，不生成 .enc 文件
 - **Dependencies**: 无
 
@@ -56,13 +56,13 @@
 
 ### `guestCheckout`
 
-- **Owner**: mobazha3.0 (Phase Privacy PM-2)
+- **Owner**: mobazha (Phase Privacy PM-2)
 - **Default**: false
 - **Stability**: beta
 - **Lifecycle**: beta (since pm-2, target ga 2026-Q3)
 - **Scopes**: PlatformGlobal, Tenant, NodeRuntime
 - **Consumers**:
-  - mobazha3.0/internal/api/guest_order_handlers.go — Guest Checkout 端点
+  - mobazha/internal/api/guest_order_handlers.go — Guest Checkout 端点
   - mobazha_hosting/api/ — SaaS 匿名路由分发
   - mobazha-unified/apps/web/src/app/guest-checkout/page.tsx
   - mobazha-unified/apps/web/src/app/guest-order/page.tsx
@@ -135,8 +135,8 @@
 - **Scopes**: PlatformGlobal, Tenant, NodeRuntime
 - **Consumers**:
   - mobazha_hosting/api/ — 供应链路由注册（flag 关闭时 404）
-  - mobazha3.0/internal/core/ — EventBus OrderFunded listener 注册
-  - mobazha3.0/internal/core/ — Supply chain workers（重试/轮询/库存/价格监控）
+  - mobazha/internal/core/ — EventBus OrderFunded listener 注册
+  - mobazha/internal/core/ — Supply chain workers（重试/轮询/库存/价格监控）
   - mobazha-unified/apps/web/src/app/admin/sourcing/SourcingFeatureGuard.tsx
   - mobazha-unified/apps/web/src/app/admin/products/page.tsx
 - **Kill Path**: 设 false → 供应链路由 404；EventBus listener 不注册；workers 不启动
@@ -150,8 +150,8 @@
 - **Lifecycle**: experimental (since supply-availability-sa-0)
 - **Scopes**: PlatformGlobal, Tenant, NodeRuntime
 - **Consumers**:
-  - mobazha3.0/internal/core/ — SupplyAvailabilityService 聚合边界
-  - mobazha3.0/internal/core/ — Provider Quote/Reserve/Commit/Release shadow rollout
+  - mobazha/internal/core/ — SupplyAvailabilityService 聚合边界
+  - mobazha/internal/core/ — Provider Quote/Reserve/Commit/Release shadow rollout
   - mobazha-unified/apps/web/src/app/admin/ — seller supply availability surfaces
 - **Kill Path**: 设 false → 统一供给可用性边界停用，回退到既有供应链/数字商品路径
 - **Dependencies**: supplyChainEnabled（业务依赖；注册表暂不做强制级联）

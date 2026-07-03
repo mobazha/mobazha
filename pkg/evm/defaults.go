@@ -1,7 +1,7 @@
 package evm
 
 import (
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // defaultEVMChainDef holds the canonical RPC URLs and registry addresses for an EVM chain.

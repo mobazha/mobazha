@@ -3,7 +3,7 @@ package utxoaddress_test
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/payment/utxoaddress"
+	"github.com/mobazha/mobazha/pkg/payment/utxoaddress"
 )
 
 func TestSameUTXOAddress(t *testing.T) {

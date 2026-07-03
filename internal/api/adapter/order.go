@@ -1,8 +1,8 @@
 package adapter
 
 import (
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	timestamp "google.golang.org/protobuf/types/known/timestamppb"
 )
 

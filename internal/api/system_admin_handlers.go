@@ -3,7 +3,7 @@ package api
 import (
 	"os"
 
-	"github.com/mobazha/mobazha3.0/pkg/deploy"
+	"github.com/mobazha/mobazha/pkg/deploy"
 )
 
 // detectDeploymentMode returns the configured distribution before inspecting

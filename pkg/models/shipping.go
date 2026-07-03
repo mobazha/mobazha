@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // ============== GORM 持久化实体 ==============

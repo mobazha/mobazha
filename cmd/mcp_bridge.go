@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/mcpconnect"
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/mcpconnect"
+	"github.com/mobazha/mobazha/internal/repo"
 )
 
 // MCPBridge starts a stdio-to-MCP bridge. AI clients like Claude Desktop

@@ -14,8 +14,8 @@ import (
 
 	"fyne.io/systray"
 
-	"github.com/mobazha/mobazha3.0/internal/supervisor"
-	"github.com/mobazha/mobazha3.0/internal/version"
+	"github.com/mobazha/mobazha/internal/supervisor"
+	"github.com/mobazha/mobazha/internal/version"
 )
 
 //go:embed assets/icon.png

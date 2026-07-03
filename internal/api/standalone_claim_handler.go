@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 type claimStoreRequest struct {

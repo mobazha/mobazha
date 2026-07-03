@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // OrderFilter holds query parameters for listing orders.

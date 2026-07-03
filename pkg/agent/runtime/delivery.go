@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/pkg/agent/exec"
-	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
+	"github.com/mobazha/mobazha/pkg/agent/exec"
+	"github.com/mobazha/mobazha/pkg/agent/stream"
 )
 
 // DeliveryState describes the business outcome that should be delivered at

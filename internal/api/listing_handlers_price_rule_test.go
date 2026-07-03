@@ -3,9 +3,9 @@ package api
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/storefront"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/storefront"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // makeIndex builds a ListingIndex populated with integer prices so the

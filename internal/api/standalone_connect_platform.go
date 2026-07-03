@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	netutil "github.com/mobazha/mobazha3.0/internal/net"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	netutil "github.com/mobazha/mobazha/internal/net"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 const (

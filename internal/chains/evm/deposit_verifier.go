@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/payment"
 )
 
 // EVMReceiptFetcher abstracts the go-ethereum ethclient methods needed for

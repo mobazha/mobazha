@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/logging"
+	wh "github.com/mobazha/mobazha/pkg/webhook"
 )
 
 var sinkLog = logging.MustGetLogger("WHSK")

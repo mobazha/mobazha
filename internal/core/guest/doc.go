@@ -2,6 +2,6 @@
 // orders without escrow, HD address derivation, auto-sweep, and payment monitoring.
 package guest
 
-import "github.com/mobazha/mobazha3.0/pkg/logging"
+import "github.com/mobazha/mobazha/pkg/logging"
 
 var log = logging.MustGetLogger("GUEST")

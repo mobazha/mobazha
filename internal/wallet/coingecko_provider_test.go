@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jarcoal/httpmock"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func containsString(values []string, target string) bool {

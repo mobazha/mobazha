@@ -21,16 +21,16 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
-	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
-	"github.com/mobazha/mobazha3.0/pkg/request"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/mobazha/mobazha3.0/pkg/webhook"
+	pkgdb "github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
+	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
+	postsPb "github.com/mobazha/mobazha/pkg/posts/pb"
+	"github.com/mobazha/mobazha/pkg/request"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/webhook"
 )
 
 // CoTenantPublicDataFn resolves PublicData for a co-located tenant on the same

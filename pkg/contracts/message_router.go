@@ -4,8 +4,8 @@ package contracts
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/pkg/identity"
-	"github.com/mobazha/mobazha3.0/pkg/p2p"
+	"github.com/mobazha/mobazha/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/p2p"
 )
 
 // MessageSender is the contract interface for sending P2P messages.

@@ -1,9 +1,9 @@
 package core
 
 import (
-	evmchain "github.com/mobazha/mobazha3.0/internal/chains/evm"
-	pkgEVM "github.com/mobazha/mobazha3.0/pkg/evm"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	evmchain "github.com/mobazha/mobazha/internal/chains/evm"
+	pkgEVM "github.com/mobazha/mobazha/pkg/evm"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func (n *MobazhaNode) runtimeEVMChainID(chain iwallet.ChainType) uint64 {

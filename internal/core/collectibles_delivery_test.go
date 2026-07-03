@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	coreorder "github.com/mobazha/mobazha3.0/internal/core/order"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	coreorder "github.com/mobazha/mobazha/internal/core/order"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

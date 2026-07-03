@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	porderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	paypb "github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
+	porderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	paypb "github.com/mobazha/mobazha/pkg/payment"
 )
 
 func TestMergeFiatProviderSessionIntoView_Stripe(t *testing.T) {

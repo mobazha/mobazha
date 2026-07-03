@@ -7,11 +7,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/mobazha/mobazha3.0/internal/core/guest"
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/encryption"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/internal/core/guest"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/encryption"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // testMultiwallet builds a real UTXO-only multiwallet (BTC/LTC/BCH/ZEC) at a

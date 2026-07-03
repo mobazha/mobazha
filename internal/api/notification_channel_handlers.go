@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mobazha/mobazha3.0/internal/notifier"
-	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha/internal/notifier"
+	"github.com/mobazha/mobazha/pkg/events"
 )
 
 var sensitiveSettingsKeys = map[string]bool{

@@ -43,7 +43,7 @@ else
     BUILD_TAGS="${BUILD_TAGS:-goolm purego_sqlite embed_frontend}"
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
         -tags "${BUILD_TAGS}" \
-        -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/version.buildVersion=${VERSION}" \
+        -ldflags="-s -w -X github.com/mobazha/mobazha/internal/version.buildVersion=${VERSION}" \
         -o "${STAGE_DIR}/mobazha.exe" \
         "${PROJECT_ROOT}"
 fi
@@ -53,7 +53,7 @@ if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]] || [[ "${GOOS:-
     echo "==> Building launcher binary (native Windows, desktop mode)..."
     CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build \
         -tags "desktop" \
-        -ldflags="-s -w -H windowsgui -X github.com/mobazha/mobazha3.0/internal/supervisor.Version=${VERSION}" \
+        -ldflags="-s -w -H windowsgui -X github.com/mobazha/mobazha/internal/supervisor.Version=${VERSION}" \
         -o "${STAGE_DIR}/mobazha-launcher.exe" \
         "${PROJECT_ROOT}/cmd/mobazha-launcher"
 else

@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ipfs/go-cid"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 const (

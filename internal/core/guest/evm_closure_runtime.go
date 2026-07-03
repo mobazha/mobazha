@@ -3,9 +3,9 @@ package guest
 import (
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // ManagedEscrowClosureRuntime carries Phase 3D runtime gates for buyer-visible EVM guest checkout.

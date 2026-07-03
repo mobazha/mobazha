@@ -5,8 +5,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/mobazha/mobazha3.0/internal/mcpconnect"
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/mcpconnect"
+	"github.com/mobazha/mobazha/internal/repo"
 )
 
 // MCPConnect auto-detects installed AI clients and configures them to use

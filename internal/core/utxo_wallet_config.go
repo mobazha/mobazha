@@ -1,10 +1,10 @@
 package core
 
 import (
-	"github.com/mobazha/mobazha3.0/internal/chains/base"
-	internalutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/pkg/utxo"
+	"github.com/mobazha/mobazha/internal/chains/base"
+	internalutxo "github.com/mobazha/mobazha/internal/chains/utxo"
+	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/pkg/utxo"
 )
 
 // configureUTXOWallets injects a UTXOChainClient into every UTXO wallet held

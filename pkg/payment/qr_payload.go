@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/mobazha/mobazha3.0/pkg/assetid"
+	"github.com/mobazha/mobazha/pkg/assetid"
 )
 
 // BuildFundingQRPayload builds a wallet-scannable payment URI for the given

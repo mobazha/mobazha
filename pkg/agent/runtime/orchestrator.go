@@ -13,14 +13,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mobazha/mobazha3.0/pkg/agent/budget"
-	"github.com/mobazha/mobazha3.0/pkg/agent/exec"
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
-	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
-	"github.com/mobazha/mobazha3.0/pkg/agent/store"
-	"github.com/mobazha/mobazha3.0/pkg/agent/stream"
-	"github.com/mobazha/mobazha3.0/pkg/agent/telemetry"
-	"github.com/mobazha/mobazha3.0/pkg/redact"
+	"github.com/mobazha/mobazha/pkg/agent/budget"
+	"github.com/mobazha/mobazha/pkg/agent/exec"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
+	agentskill "github.com/mobazha/mobazha/pkg/agent/skill"
+	"github.com/mobazha/mobazha/pkg/agent/store"
+	"github.com/mobazha/mobazha/pkg/agent/stream"
+	"github.com/mobazha/mobazha/pkg/agent/telemetry"
+	"github.com/mobazha/mobazha/pkg/redact"
 )
 
 // LLMClient abstracts the model inference call.

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	pkpayment "github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	pkpayment "github.com/mobazha/mobazha/pkg/payment"
 )
 
 func TestPaymentSessionServiceImpl_CreateSession_RejectsNonCanonicalPaymentCoin(t *testing.T) {

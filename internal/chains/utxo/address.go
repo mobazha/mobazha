@@ -12,7 +12,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // AddressToScriptHash converts a scriptPubKey to the Electrum scripthash format

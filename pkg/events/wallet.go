@@ -3,8 +3,8 @@ package events
 import (
 	"encoding/json"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // TransactionReceived is an event that fires whenever a transaction

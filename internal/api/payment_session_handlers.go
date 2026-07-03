@@ -10,11 +10,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 
-	corePmt "github.com/mobazha/mobazha3.0/internal/core/payment"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	corePmt "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // handleGETOrderPaymentSession returns the unified payment session view for a given order.

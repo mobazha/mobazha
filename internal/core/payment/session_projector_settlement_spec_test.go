@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	testutil "github.com/mobazha/mobazha3.0/internal/orders/testutil"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	pkpayment "github.com/mobazha/mobazha3.0/pkg/payment"
+	testutil "github.com/mobazha/mobazha/internal/orders/testutil"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	pkpayment "github.com/mobazha/mobazha/pkg/payment"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

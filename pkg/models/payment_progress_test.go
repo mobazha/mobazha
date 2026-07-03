@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	utils "github.com/mobazha/mobazha3.0/internal/orders/testutil"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	utils "github.com/mobazha/mobazha/internal/orders/testutil"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // putOrderOpenWithAmount stamps an OrderOpen on the order whose only relevant

@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // ErrUTXOAlreadySpent indicates a UTXO has been spent on-chain.

@@ -7,16 +7,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/internal/core/digital"
-	guestcore "github.com/mobazha/mobazha3.0/internal/core/guest"
-	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/storage"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
-	pkgdatabase "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/internal/core/digital"
+	guestcore "github.com/mobazha/mobazha/internal/core/guest"
+	"github.com/mobazha/mobazha/internal/database"
+	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/internal/storage"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	pkgcontracts "github.com/mobazha/mobazha/pkg/contracts"
+	pkgdatabase "github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"gorm.io/gorm"
 )
 
@@ -224,7 +224,7 @@ func (s *digitalOrderShipper) ShipOrder(orderID models.OrderID, shipments []mode
 
 // TECHDEBT(TD-099): dbOrderQuerier loads the Order GORM row and decodes the
 // embedded OrderOpen / PaymentSent protobufs to extract entitlement metadata.
-// The mobazha3.0 orders schema does not store contract type / listing slug /
+// The mobazha orders schema does not store contract type / listing slug /
 // payment method as flat columns — they only exist inside the serialized
 // protobufs. A thin adapter is acceptable as long as we don't expand the
 // queried fields; if more callers need this metadata, promote it to

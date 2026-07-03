@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mobazha/mobazha3.0/internal/api"
+	"github.com/mobazha/mobazha/internal/api"
 )
 
 func main() {

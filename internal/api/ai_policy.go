@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/edition"
 )
 
 func resolveAIHTTPPolicy(explicit distribution.AIHTTPPolicy, policy edition.Policy) distribution.AIHTTPPolicy {

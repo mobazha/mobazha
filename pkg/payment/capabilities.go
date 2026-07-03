@@ -1,6 +1,6 @@
 package payment
 
-import iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+import iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 
 // RuntimeCapability identifies an optional payment or settlement behavior
 // selected by a distribution composition root.

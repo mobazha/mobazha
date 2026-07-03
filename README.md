@@ -1,9 +1,10 @@
-# Mobazha Node
+# Mobazha
 
-**Run your own peer-to-peer store. Own your data, accept crypto, and manage
-the full commerce lifecycle from one node.**
+**Open-source peer-to-peer commerce for storefronts, marketplaces, checkout,
+and seller operations.**
 
-Mobazha Node is the open-source runtime for self-hosted Mobazha stores. It
+Mobazha is an open-source commerce platform for self-hosted stores and hosted
+deployments. This repository contains the core Go runtime, Mobazha Node, which
 combines catalog and order management, fulfillment, disputes, ratings,
 messaging, wallet-backed payment monitoring, APIs, and an embedded browser
 interface.
@@ -70,8 +71,8 @@ or support.
 Clone and build the node with the default pure-Go crypto implementation:
 
 ```bash
-git clone https://github.com/mobazha/mobazha3.0.git
-cd mobazha3.0
+git clone https://github.com/mobazha/mobazha.git
+cd mobazha
 go build -tags goolm -o mobazha .
 ```
 
@@ -212,7 +213,7 @@ dependencies and assets remain subject to their respective licenses. See
 
 Originally developed by [fengzie](https://github.com/fengzie) and maintained by
 the Mobazha contributors. The canonical source repository is
-[mobazha/mobazha3.0](https://github.com/mobazha/mobazha3.0).
+[mobazha/mobazha](https://github.com/mobazha/mobazha).
 
 ## Contributing and security
 

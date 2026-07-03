@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // AIProxy returns the node's AI proxy (may be nil).

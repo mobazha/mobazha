@@ -1,6 +1,6 @@
 package adapters
 
-import "github.com/mobazha/mobazha3.0/pkg/payment"
+import "github.com/mobazha/mobazha/pkg/payment"
 
 // Transitional aliases keep existing internal adapters source-compatible while
 // trusted distribution modules adopt the public payment contracts directly.

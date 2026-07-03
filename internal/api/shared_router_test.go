@@ -8,9 +8,9 @@ import (
 	"testing"
 	"testing/fstest"
 
-	agentskill "github.com/mobazha/mobazha3.0/pkg/agent/skill"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	agentskill "github.com/mobazha/mobazha/pkg/agent/skill"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/edition"
 )
 
 type stubNodeService struct {

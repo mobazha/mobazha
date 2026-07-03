@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/collectiblesdelivery"
-	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha/internal/collectiblesdelivery"
+	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/pkg/events"
 )
 
 func (n *MobazhaNode) startCollectibleReservationReleaseListener() {

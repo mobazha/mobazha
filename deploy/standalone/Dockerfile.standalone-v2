@@ -26,7 +26,7 @@ RUN apk add --no-cache gcc musl-dev git upx
 WORKDIR /src
 
 
-WORKDIR /src/mobazha3.0
+WORKDIR /src/mobazha
 COPY go.mod go.sum ./
 
 
@@ -38,7 +38,7 @@ COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 go build -tags goolm \
-    -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/version.buildVersion=$(git describe --tags --always 2>/dev/null || echo dev)" \
+    -ldflags="-s -w -X github.com/mobazha/mobazha/internal/version.buildVersion=$(git describe --tags --always 2>/dev/null || echo dev)" \
     -o /usr/local/bin/mobazha . && \
     upx --best --lzma /usr/local/bin/mobazha || true
 

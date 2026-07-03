@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
 )
 
 // SupplyAvailabilityAppService is the order-facing aggregate boundary for

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )

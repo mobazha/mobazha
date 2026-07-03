@@ -1,6 +1,6 @@
 package api
 
-import "github.com/mobazha/mobazha3.0/pkg/contracts"
+import "github.com/mobazha/mobazha/pkg/contracts"
 
 // routeScopeMap defines the required scope for Node API (/v1/*) route prefixes
 // in standalone mode.

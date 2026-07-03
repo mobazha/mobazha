@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/supervisor/updater"
+	"github.com/mobazha/mobazha/internal/supervisor/updater"
 )
 
 // --- helpers ---

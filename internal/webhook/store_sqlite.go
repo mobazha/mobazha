@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
+	"github.com/mobazha/mobazha/pkg/database"
+	wh "github.com/mobazha/mobazha/pkg/webhook"
 	"gorm.io/gorm"
 )
 

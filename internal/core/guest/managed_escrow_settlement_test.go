@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	dbgorm "github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	dbgorm "github.com/mobazha/mobazha/internal/database"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func TestGuestOrderEligibleForSettlement(t *testing.T) {

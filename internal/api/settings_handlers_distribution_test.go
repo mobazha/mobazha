@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/distribution"
 )
 
 type restrictedProductSurfacePolicy struct{}

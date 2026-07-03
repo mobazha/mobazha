@@ -1,7 +1,7 @@
 package models
 
 import (
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 type OrderInfo struct {

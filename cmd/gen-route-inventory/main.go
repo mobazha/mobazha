@@ -11,9 +11,9 @@ import (
 	"os"
 	"path/filepath"
 
-	internalapi "github.com/mobazha/mobazha3.0/internal/api"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	internalapi "github.com/mobazha/mobazha/internal/api"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/edition"
 )
 
 const schemaVersion = 1

@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net/http"
 
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	"github.com/mobazha/mobazha3.0/pkg/distribution"
-	"github.com/mobazha/mobazha3.0/pkg/logging"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/logging"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 var aiLog = logging.MustGetLogger("AI")

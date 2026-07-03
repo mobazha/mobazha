@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
-	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 )
 
 func TestEncryptCurve25519(t *testing.T) {

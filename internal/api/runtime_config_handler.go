@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/mobazha/mobazha3.0/internal/embedded/frontend"
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/internal/embedded/frontend"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 // handleGETRuntimeConfig returns the same versioned snapshot used by

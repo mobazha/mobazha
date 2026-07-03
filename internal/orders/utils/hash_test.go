@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
-	"github.com/mobazha/mobazha3.0/pkg/models/factory"
+	"github.com/mobazha/mobazha/internal/orders/utils"
+	"github.com/mobazha/mobazha/pkg/models/factory"
 )
 
 func TestMultihashSha256(t *testing.T) {

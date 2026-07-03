@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/jessevdk/go-flags"
-	"github.com/mobazha/mobazha3.0/cmd"
+	"github.com/mobazha/mobazha/cmd"
 )
 
 type commandSpec struct {

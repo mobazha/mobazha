@@ -9,7 +9,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha/internal/repo"
 )
 
 type ReverseProxyManager interface {

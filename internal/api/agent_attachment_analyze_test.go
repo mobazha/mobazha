@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
-	agentexec "github.com/mobazha/mobazha3.0/pkg/agent/exec"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
+	agentexec "github.com/mobazha/mobazha/pkg/agent/exec"
 )
 
 func TestResolveAgentChatAttachment_SingleAttachment(t *testing.T) {

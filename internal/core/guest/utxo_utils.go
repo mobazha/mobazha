@@ -3,8 +3,8 @@ package guest
 import (
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // utxoAddressUtilsFor resolves the UTXOAddressUtilities implementation for a

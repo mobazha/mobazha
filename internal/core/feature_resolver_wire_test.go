@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
 	"github.com/stretchr/testify/require"
 )
 

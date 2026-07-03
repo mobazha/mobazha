@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // Sentinel errors for guest checkout. Service implementations wrap these

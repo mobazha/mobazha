@@ -6,10 +6,10 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/identity"
-	"github.com/mobazha/mobazha3.0/pkg/orders"
-	"github.com/mobazha/mobazha3.0/pkg/p2p"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/orders"
+	"github.com/mobazha/mobazha/pkg/p2p"
 )
 
 // OrderStateBridge bridges legacy order state handling with pkg/orders.

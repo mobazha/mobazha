@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha/pkg/events"
 )
 
 // EmailSender implements ChannelSender for email notifications.

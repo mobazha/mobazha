@@ -11,7 +11,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
-	oniontransport "github.com/mobazha/mobazha3.0/pkg/libs/onion-transport"
+	oniontransport "github.com/mobazha/mobazha/pkg/libs/onion-transport"
 	"github.com/cretz/bine/tor"
 	"github.com/ipfs/go-ipfs/core"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"

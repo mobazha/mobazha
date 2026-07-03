@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/mobazha/mobazha3.0/pkg/logging"
+	"github.com/mobazha/mobazha/pkg/logging"
 )
 
 var dispatcherLog = logging.MustGetLogger("EVTD")

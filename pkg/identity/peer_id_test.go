@@ -261,7 +261,7 @@ func TestPeerID_ToLibp2p_Roundtrip(t *testing.T) {
 
 func TestGenerateKeyPairFromSeed_MatchesOriginal(t *testing.T) {
 	// This test verifies that our GenerateKeyPairFromSeed produces the same
-	// result as the original mobazha3.0 IdentityKeyFromSeed function.
+	// result as the original mobazha IdentityKeyFromSeed function.
 	// Both use: HMAC-SHA256("OpenBazaar seed", seed) -> GenerateKeyPairWithReader(Ed25519)
 	seed := []byte("test seed for compatibility check!!") // 35 bytes, will be HMAC'd to 32
 

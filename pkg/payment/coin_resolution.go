@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/mobazha/mobazha3.0/pkg/assetid"
-	"github.com/mobazha/mobazha3.0/pkg/evm"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/assetid"
+	"github.com/mobazha/mobazha/pkg/evm"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // SettlementCoinFromPaymentSent resolves the chain asset declared by the

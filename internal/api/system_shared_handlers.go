@@ -8,10 +8,10 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/supervisor"
-	"github.com/mobazha/mobazha3.0/internal/version"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/internal/supervisor"
+	"github.com/mobazha/mobazha/internal/version"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // ── config ──────────────────────────────────────────────────────────

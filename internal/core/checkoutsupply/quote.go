@@ -10,13 +10,13 @@ import (
 	"strconv"
 	"strings"
 
-	ordercontracttype "github.com/mobazha/mobazha3.0/internal/core/contracttype"
-	"github.com/mobazha/mobazha3.0/internal/core/digital"
-	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	ordercontracttype "github.com/mobazha/mobazha/internal/core/contracttype"
+	"github.com/mobazha/mobazha/internal/core/digital"
+	pkgconfig "github.com/mobazha/mobazha/pkg/config"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 // CheckoutSupplyListingReader loads seller-local listings for checkout supply preflight.

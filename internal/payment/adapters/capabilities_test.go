@@ -3,8 +3,8 @@ package adapters_test
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/payment/adapters"
-	"github.com/mobazha/mobazha3.0/pkg/payment"
+	"github.com/mobazha/mobazha/internal/payment/adapters"
+	"github.com/mobazha/mobazha/pkg/payment"
 	"github.com/stretchr/testify/assert"
 )
 

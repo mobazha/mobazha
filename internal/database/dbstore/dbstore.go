@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"sync/atomic"
 
-	"github.com/mobazha/mobazha3.0/internal/common"
-	"github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/database/sqlitedialect"
+	"github.com/mobazha/mobazha/internal/common"
+	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/database/sqlitedialect"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )

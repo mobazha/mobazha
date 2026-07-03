@@ -3,8 +3,8 @@ package core
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/pkg/edition"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/edition"
 	"github.com/stretchr/testify/assert"
 )
 

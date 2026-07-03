@@ -4,7 +4,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/mobazha/mobazha3.0/internal/supervisor/updater"
+	"github.com/mobazha/mobazha/internal/supervisor/updater"
 )
 
 // UpdateStatus tracks the update lifecycle.

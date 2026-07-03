@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mobazha/mobazha3.0/pkg/apitoken"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/response"
+	"github.com/mobazha/mobazha/pkg/apitoken"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/response"
 )
 
 // AuthCookieName is the name for the authentication cookie

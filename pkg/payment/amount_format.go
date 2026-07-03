@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/mobazha/mobazha3.0/pkg/assetid"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/assetid"
+	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // FormatSessionAmount formats a persisted smallest-unit amount for the

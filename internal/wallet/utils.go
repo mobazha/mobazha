@@ -4,8 +4,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // ExchangeRateQuerier is the minimal interface needed by currency conversion

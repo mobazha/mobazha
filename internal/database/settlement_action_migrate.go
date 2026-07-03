@@ -1,8 +1,8 @@
 package database
 
 import (
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	pkgdb "github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // MigrateSettlementActionModels creates/updates backend-submitted settlement

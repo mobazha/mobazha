@@ -2,8 +2,8 @@ package core
 
 import (
 	"github.com/ipfs/go-cid"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/media"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/media"
 )
 
 // Compile-time check: cidContentStore implements contracts.ContentStore.

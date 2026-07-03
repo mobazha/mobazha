@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/agent/kernel"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/redact"
+	"github.com/mobazha/mobazha/pkg/agent/kernel"
+	pkgdb "github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/redact"
 	"gorm.io/gorm"
 )
 

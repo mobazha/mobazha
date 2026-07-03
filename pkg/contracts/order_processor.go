@@ -4,7 +4,7 @@ package contracts
 import (
 	"context"
 
-	"github.com/mobazha/mobazha3.0/pkg/orders"
+	"github.com/mobazha/mobazha/pkg/orders"
 )
 
 // OrderProcessor is the contract interface for processing order state transitions.

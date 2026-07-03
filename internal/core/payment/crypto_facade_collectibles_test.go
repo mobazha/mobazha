@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	porderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/models"
+	porderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 func TestIsManagedCollectibleFirstSale(t *testing.T) {

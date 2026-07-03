@@ -3,9 +3,9 @@ package orders
 import (
 	"testing"
 
-	coreorders "github.com/mobazha/mobazha3.0/pkg/orders"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	coreorders "github.com/mobazha/mobazha/pkg/orders"
+	"github.com/mobazha/mobazha/pkg/models"
+	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 )
 
 func TestMessageTypeToEvent_AllMappings(t *testing.T) {

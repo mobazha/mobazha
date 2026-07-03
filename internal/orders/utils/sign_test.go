@@ -3,10 +3,10 @@ package utils
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/identity"
-	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/identity"
+	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )

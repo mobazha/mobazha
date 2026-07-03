@@ -1,6 +1,6 @@
 package models
 
-import "github.com/mobazha/mobazha3.0/pkg/orders"
+import "github.com/mobazha/mobazha/pkg/orders"
 
 // OrderState is a type alias for the canonical definition in pkg/orders.
 type OrderState = orders.OrderState

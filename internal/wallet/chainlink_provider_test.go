@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 // TestChainlinkProviderIntegration 测试真实的 ChainlinkProvider

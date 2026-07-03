@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/internal/supervisor"
+	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/internal/supervisor"
 )
 
 const envBgKey = "MOBAZHA_LAUNCHER_BG"

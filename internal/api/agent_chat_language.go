@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+	aipkg "github.com/mobazha/mobazha/internal/ai"
 )
 
 func agentChatToolLanguage(chatCtx *aipkg.ChatContext, userMessage string) string {

@@ -3,8 +3,8 @@ package guest
 import (
 	"sort"
 
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func (s *GuestOrderAppService) evmReadinessChainList() []iwallet.ChainType {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // OrderInfoForCoin derives the chain-specific escrow owner metadata

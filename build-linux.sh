@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Build script for mobazha3.0 on Linux x64
+# Build script for mobazha on Linux x64
 
 set -e
 
 echo "Building mobazha_hosting for Linux x64..."
 
 # Set build variables
-OUTPUT="mobazha3.0"
+OUTPUT="mobazha"
 GOOS="linux"
 GOARCH="amd64"
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
 const maxStoreConfigSize = 100 * 1024 // 100 KB

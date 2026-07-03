@@ -3,7 +3,7 @@ package payment
 import (
 	"errors"
 
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // ErrTRONPaymentRetired is returned when checkout or payment setup targets TRON.

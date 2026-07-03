@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	cid "github.com/ipfs/go-cid"
-	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/contracts"
 )
 
 func newTestAdapter(t *testing.T) *LocalFSAdapter {

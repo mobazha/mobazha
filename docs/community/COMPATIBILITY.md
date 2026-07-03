@@ -6,7 +6,7 @@ This document defines the public compatibility relationship between the Mobazha 
 
 ## Repository and distribution identity
 
-The `mobazha3.0` repository is the public upstream for shared Mobazha commerce behavior. It also contains the default self-hosted composition.
+The `mobazha` repository is the public upstream for shared Mobazha commerce behavior. It also contains the default self-hosted composition.
 
 The name `community` identifies a distribution policy and publication boundary. It is used by manifests, packaging, tests, and release artifacts. It does not create a separate order model, payment state machine, or public API namespace.
 

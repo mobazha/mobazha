@@ -7,9 +7,9 @@ import (
 	"net/http"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
-	"github.com/mobazha/mobazha3.0/internal/version"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha/internal/version"
+	"github.com/mobazha/mobazha/pkg/core/coreiface"
+	"github.com/mobazha/mobazha/pkg/models"
 )
 
 func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Request) {

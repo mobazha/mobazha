@@ -348,6 +348,7 @@ const (
 	CapabilityManagedEVMExecution PaymentModuleCapability = "managed_evm_execution"
 	CapabilityManagedSolana       PaymentModuleCapability = "managed_solana_execution"
 	CapabilityManagedEscrowGuest  PaymentModuleCapability = "managed_escrow_guest"
+	CapabilityDirectObserved      PaymentModuleCapability = "direct_observed_runtime"
 )
 
 // PaymentRailKind identifies the payment model contributed by a module.
@@ -371,34 +372,63 @@ const (
 
 // PaymentModuleDescriptor declares module identity and least-privilege grants.
 type PaymentModuleDescriptor struct {
-	ID           string
-	Version      string
-	Rails        []PaymentRailKind
-	Capabilities []PaymentModuleCapability
-	Dependencies []string
-	Activation   PaymentModuleActivation
+	ID                 string
+	Version            string
+	Rails              []PaymentRailKind
+	Capabilities       []PaymentModuleCapability
+	Chains             []iwallet.ChainType
+	Assets             []iwallet.CoinType
+	Dependencies       []string
+	Activation         PaymentModuleActivation
+	ProtocolVersion    string
+	StateSchemaVersion string
+}
+
+// DirectObservedRuntimeBinder binds one provider-owned observation runtime to
+// Core's address allocation and payment observation services. Implementations
+// must reject competing runtimes and support idempotent unbinding.
+type DirectObservedRuntimeBinder interface {
+	BindExternalPaymentRuntime(runtime ExternalPaymentRuntime) error
+	UnbindExternalPaymentRuntime(runtime ExternalPaymentRuntime) error
+}
+
+// DirectObservedRuntimePorts is the least-privilege Core authority granted to
+// a trusted module that contributes a direct-observed payment rail.
+type DirectObservedRuntimePorts struct {
+	Binder DirectObservedRuntimeBinder
 }
 
 // PaymentRuntimeAuthority is retained by Core and can mint a scoped runtime
 // for one validated module descriptor. Distribution modules never receive it.
 type PaymentRuntimeAuthority struct {
-	managedEVM    ManagedEVMRuntime
-	managedSolana ManagedSolanaRuntime
-	guest         ManagedEscrowGuestRuntimePorts
+	managedEVM     ManagedEVMRuntime
+	managedSolana  ManagedSolanaRuntime
+	guest          ManagedEscrowGuestRuntimePorts
+	directObserved DirectObservedRuntimePorts
 }
 
 // NewPaymentRuntimeAuthority constructs Core's trusted runtime authority.
-func NewPaymentRuntimeAuthority(managedEVM ManagedEVMRuntime, managedSolana ManagedSolanaRuntime, guest ManagedEscrowGuestRuntimePorts) PaymentRuntimeAuthority {
-	return PaymentRuntimeAuthority{managedEVM: managedEVM, managedSolana: managedSolana, guest: guest}
+func NewPaymentRuntimeAuthority(
+	managedEVM ManagedEVMRuntime,
+	managedSolana ManagedSolanaRuntime,
+	guest ManagedEscrowGuestRuntimePorts,
+	directObserved ...DirectObservedRuntimePorts,
+) PaymentRuntimeAuthority {
+	authority := PaymentRuntimeAuthority{managedEVM: managedEVM, managedSolana: managedSolana, guest: guest}
+	if len(directObserved) > 0 {
+		authority.directObserved = directObserved[0]
+	}
+	return authority
 }
 
 // PaymentRuntime is a module-specific, capability-scoped grant. Its ports are
 // private so modules cannot bypass the declared capability set.
 type PaymentRuntime struct {
-	capabilities  map[PaymentModuleCapability]struct{}
-	managedEVM    ManagedEVMRuntime
-	managedSolana ManagedSolanaRuntime
-	guest         ManagedEscrowGuestRuntimePorts
+	capabilities   map[PaymentModuleCapability]struct{}
+	managedEVM     ManagedEVMRuntime
+	managedSolana  ManagedSolanaRuntime
+	guest          ManagedEscrowGuestRuntimePorts
+	directObserved DirectObservedRuntimePorts
 }
 
 // ManagedEVM returns the managed EVM grant when explicitly declared.
@@ -425,6 +455,18 @@ func (r PaymentRuntime) ManagedEscrowGuest() (ManagedEscrowGuestRuntimePorts, er
 	return r.guest, nil
 }
 
+// DirectObserved returns the provider-neutral observation grant when the
+// module explicitly declares the direct-observed capability.
+func (r PaymentRuntime) DirectObserved() (DirectObservedRuntimePorts, error) {
+	if _, ok := r.capabilities[CapabilityDirectObserved]; !ok {
+		return DirectObservedRuntimePorts{}, fmt.Errorf("payment module lacks %s capability", CapabilityDirectObserved)
+	}
+	if r.directObserved.Binder == nil {
+		return DirectObservedRuntimePorts{}, fmt.Errorf("direct observed runtime binder is unavailable")
+	}
+	return r.directObserved, nil
+}
+
 // RuntimeFor validates a descriptor and mints its scoped grant.
 func (a PaymentRuntimeAuthority) RuntimeFor(descriptor PaymentModuleDescriptor) (PaymentRuntime, error) {
 	descriptor.ID = strings.TrimSpace(descriptor.ID)
@@ -434,7 +476,7 @@ func (a PaymentRuntimeAuthority) RuntimeFor(descriptor PaymentModuleDescriptor) 
 	granted := make(map[PaymentModuleCapability]struct{}, len(descriptor.Capabilities))
 	for _, capability := range descriptor.Capabilities {
 		switch capability {
-		case CapabilityManagedEVMExecution, CapabilityManagedSolana, CapabilityManagedEscrowGuest:
+		case CapabilityManagedEVMExecution, CapabilityManagedSolana, CapabilityManagedEscrowGuest, CapabilityDirectObserved:
 		default:
 			return PaymentRuntime{}, fmt.Errorf("payment module %q requests unknown capability %q", descriptor.ID, capability)
 		}
@@ -445,7 +487,7 @@ func (a PaymentRuntimeAuthority) RuntimeFor(descriptor PaymentModuleDescriptor) 
 	}
 	return PaymentRuntime{
 		capabilities: granted, managedEVM: a.managedEVM,
-		managedSolana: a.managedSolana, guest: a.guest,
+		managedSolana: a.managedSolana, guest: a.guest, directObserved: a.directObserved,
 	}, nil
 }
 
@@ -477,6 +519,15 @@ type PaymentModule interface {
 // Stop must be idempotent, release module-owned resources, and unblock Start.
 type PaymentModuleRunner interface {
 	Start(ctx context.Context, ready func()) error
+	Stop(ctx context.Context) error
+}
+
+// PaymentModuleStatusRunner is implemented by setup-gated modules whose
+// health can transition while the node remains online. The first report marks
+// synchronous startup complete; subsequent reports update capability
+// projection without tearing down the module's setup or diagnostic surfaces.
+type PaymentModuleStatusRunner interface {
+	StartWithStatus(ctx context.Context, report func(PaymentModuleState, error)) error
 	Stop(ctx context.Context) error
 }
 

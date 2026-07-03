@@ -6,6 +6,8 @@ package distribution
 import (
 	"context"
 	"time"
+
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // ExternalPaymentStatus is a provider-neutral observation state for a direct
@@ -24,13 +26,15 @@ const (
 // address. Label is operational metadata and must not be treated as identity.
 type ExternalPaymentAddressRequest struct {
 	Label string
+	Asset iwallet.CoinType
 }
 
 // ExternalPaymentAddress is an allocated address plus its opaque runtime
 // index. Core persists the index so a watch can be restored after restart.
 type ExternalPaymentAddress struct {
-	Address string
-	Index   uint32
+	Address               string
+	Index                 uint32
+	RequiredConfirmations int
 }
 
 // ExternalPaymentEvent is the normalized observation emitted by a direct
@@ -48,6 +52,7 @@ type ExternalPaymentEvent struct {
 type ExternalPaymentWatch struct {
 	AddressIndex   uint32
 	OrderID        string
+	Asset          iwallet.CoinType
 	ExpectedAmount uint64
 	ExpiresAt      time.Time
 	OnPayment      func(ExternalPaymentEvent)
@@ -75,10 +80,9 @@ func (health ExternalPaymentHealth) Ready() bool { return health.State == Extern
 // ExternalPaymentRuntime is the provider-neutral direct observed rail used by
 // trusted first-party distributions. Wallet administration remains outside
 // this port; implementations expose only address allocation, observation,
-// health, and reversible lifecycle operations required by Core.
+// health, and observation operations required by Core. Module lifecycle stays
+// on the private module runner and is not granted through this data-plane port.
 type ExternalPaymentRuntime interface {
-	Start(ctx context.Context) error
-	Close() error
 	PaymentHealth(ctx context.Context) ExternalPaymentHealth
 	CreatePaymentAddress(ctx context.Context, request ExternalPaymentAddressRequest) (ExternalPaymentAddress, error)
 	WatchPayment(watch *ExternalPaymentWatch) error

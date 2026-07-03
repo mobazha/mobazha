@@ -19,7 +19,7 @@ import (
 
 func TestPaymentRuntime_DoesNotExposePrivilegedState(t *testing.T) {
 	runtimeType := reflect.TypeOf(PaymentRuntime{})
-	require.Equal(t, 4, runtimeType.NumField())
+	require.Equal(t, 5, runtimeType.NumField())
 	for index := 0; index < runtimeType.NumField(); index++ {
 		field := runtimeType.Field(index)
 		assert.False(t, field.IsExported(), "runtime field %s must not be exported", field.Name)

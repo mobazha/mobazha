@@ -2,14 +2,11 @@ package guest
 
 import (
 	"context"
-	"crypto/ed25519"
-	crypto_rand "crypto/rand"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/mr-tron/base58"
 	"gorm.io/gorm/clause"
 
 	"github.com/mobazha/mobazha/pkg/database"
@@ -41,18 +38,18 @@ type PaymentAddressRequest struct {
 
 // PaymentAddressResult contains the generated payment address and metadata.
 type PaymentAddressResult struct {
-	Address      string
-	AddressIndex uint32
-	ReferenceKey string // Solana only: reference pubkey (base58)
-	SweepTo      string // seller receiving address (empty for Solana)
+	Address       string
+	AddressIndex  uint32
+	RequiredConfs int
+	ReferenceKey  string // Legacy correlation key retained for stored-order compatibility.
+	SweepTo       string // seller receiving address (empty for Solana)
 	// ManagedEscrowMetadata is opaque provider JSON persisted by Core.
 	ManagedEscrowMetadata []byte
 }
 
-// DirectPaymentService generates unique payment addresses for Guest Checkout orders.
-// UTXO and TRON use HD derivation from the node's BIP-44 master key; EVM uses the
-// seller-owned 1/1 predicted managed escrow adapter when wired. Solana uses a one-time reference
-// key against the seller address. Monero creates subaddresses via monero-wallet-rpc.
+// DirectPaymentService generates unique payment targets for Guest Checkout.
+// Core-owned chains use their local derivation or managed-escrow path; a
+// trusted direct-observed module owns all provider-specific allocation.
 type DirectPaymentService struct {
 	db          database.Database
 	keyDeriver  BIP44KeyDeriver
@@ -119,11 +116,10 @@ func (s *DirectPaymentService) GeneratePaymentAddress(ctx context.Context, req P
 		return s.generateManagedEscrowFunding(ctx, coinInfo, req)
 	case coinInfo.Chain == iwallet.ChainTRON:
 		return s.derivePaymentAddress(ctx, coinInfo.Chain, req)
-	case coinInfo.Chain == iwallet.ChainSolana:
-		return s.generateSolanaReference(ctx, coinInfo.Chain, req)
-	case coinInfo.Chain == iwallet.ChainMonero:
-		return s.generateMoneroSubaddress(ctx, req)
 	default:
+		if s.externalPay != nil {
+			return s.generateExternalPaymentAddress(ctx, req)
+		}
 		return nil, fmt.Errorf("unsupported chain for guest checkout: %s", coinInfo.Chain)
 	}
 }
@@ -214,45 +210,23 @@ func (s *DirectPaymentService) derivePaymentAddress(
 	}, nil
 }
 
-// generateSolanaReference generates a one-time Ed25519 reference key for Solana payments.
-// The buyer pays directly to the seller's address; the reference key enables on-chain matching.
-func (s *DirectPaymentService) generateSolanaReference(
-	ctx context.Context,
-	chainType iwallet.ChainType,
-	req PaymentAddressRequest,
-) (*PaymentAddressResult, error) {
-	var account models.ReceivingAccount
-	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("chain_type = ? AND is_active = ?",
-			string(chainType), true).First(&account).Error
-	})
-	if err != nil {
-		return nil, fmt.Errorf("no active receiving account for Solana: %w", err)
-	}
-
-	refPubKey, _, err := ed25519.GenerateKey(crypto_rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("generate reference key: %w", err)
-	}
-
-	return &PaymentAddressResult{
-		Address:      account.Address,
-		ReferenceKey: base58.Encode(refPubKey),
-	}, nil
-}
-
-// generateMoneroSubaddress creates a new subaddress via monero-wallet-rpc.
-// The subaddress index is stored in AddressIndex for later transfer matching.
-// Note: SweepTo is intentionally empty — XMR auto-sweep is not supported in Phase B.
-// Funds stay in the wallet-rpc subaddress until manual withdrawal by the seller.
-func (s *DirectPaymentService) generateMoneroSubaddress(ctx context.Context, req PaymentAddressRequest) (*PaymentAddressResult, error) {
+// generateExternalPaymentAddress delegates address allocation to the trusted
+// module that owns a direct-observed rail. Core persists only the normalized
+// address and opaque account index used for subsequent observations.
+func (s *DirectPaymentService) generateExternalPaymentAddress(ctx context.Context, req PaymentAddressRequest) (*PaymentAddressResult, error) {
 	label := fmt.Sprintf("guest_%s", req.OrderToken)
 	if s.externalPay != nil {
-		address, err := s.externalPay.CreatePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{Label: label})
+		address, err := s.externalPay.CreatePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{
+			Label: label,
+			Asset: req.CoinType,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("create external payment address: %w", err)
 		}
-		return &PaymentAddressResult{Address: address.Address, AddressIndex: address.Index}, nil
+		return &PaymentAddressResult{
+			Address: address.Address, AddressIndex: address.Index,
+			RequiredConfs: address.RequiredConfirmations,
+		}, nil
 	}
 	return nil, fmt.Errorf("external payment runtime not configured")
 }

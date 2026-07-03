@@ -90,7 +90,7 @@ func TestExternalPaymentRuntime_PoolThenConfirmed_ToFunded(t *testing.T) {
 
 	runtime := newObservedPaymentRuntimeStub()
 
-	payMon := NewGuestPaymentMonitor(db, svc, nil, nil)
+	payMon := NewGuestPaymentMonitor(db, svc, nil)
 	payMon.SetExternalPaymentRuntime(runtime)
 	payMon.confirmationInterval = 50 * time.Millisecond
 	defer payMon.StopAll()
@@ -183,7 +183,7 @@ func TestExternalPaymentRuntime_DirectConfirmNoPool(t *testing.T) {
 
 	runtime := newObservedPaymentRuntimeStub()
 
-	payMon := NewGuestPaymentMonitor(db, svc, nil, nil)
+	payMon := NewGuestPaymentMonitor(db, svc, nil)
 	payMon.SetExternalPaymentRuntime(runtime)
 	payMon.confirmationInterval = 50 * time.Millisecond
 	defer payMon.StopAll()
@@ -241,7 +241,7 @@ func TestExternalPaymentRuntime_InsufficientPayment(t *testing.T) {
 
 	runtime := newObservedPaymentRuntimeStub()
 
-	payMon := NewGuestPaymentMonitor(db, svc, nil, nil)
+	payMon := NewGuestPaymentMonitor(db, svc, nil)
 	payMon.SetExternalPaymentRuntime(runtime)
 	defer payMon.StopAll()
 

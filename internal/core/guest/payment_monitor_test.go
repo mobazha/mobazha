@@ -37,30 +37,6 @@ func (m *mockBalanceChecker) GetAddressBalance(_ context.Context, chainKey, addr
 	return big.NewInt(0), nil
 }
 
-type mockSolanaChecker struct {
-	mu      sync.Mutex
-	results map[string]string
-}
-
-func newMockSolanaChecker() *mockSolanaChecker {
-	return &mockSolanaChecker{results: make(map[string]string)}
-}
-
-func (m *mockSolanaChecker) setResult(refKey, txHash string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.results[refKey] = txHash
-}
-
-func (m *mockSolanaChecker) FindTransferByReference(_ context.Context, referenceKey, _, _ string) (string, bool, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if h, ok := m.results[referenceKey]; ok && h != "" {
-		return h, true, nil
-	}
-	return "", false, nil
-}
-
 type recordingGuestService struct {
 	mu       sync.Mutex
 	detected []paymentDetection
@@ -170,7 +146,7 @@ func (r *recordingGuestService) GetAdminGuestOrder(_ context.Context, _ string) 
 func TestCheckEVMPayment_BalanceDetected(t *testing.T) {
 	bc := newMockBalanceChecker()
 	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, bc, nil)
+	monitor := NewGuestPaymentMonitor(nil, svc, bc)
 
 	order := &models.GuestOrder{
 		OrderToken:     "gst_test1",
@@ -196,7 +172,7 @@ func TestCheckEVMPayment_BalanceDetected(t *testing.T) {
 func TestCheckEVMPayment_InsufficientBalance(t *testing.T) {
 	bc := newMockBalanceChecker()
 	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, bc, nil)
+	monitor := NewGuestPaymentMonitor(nil, svc, bc)
 
 	order := &models.GuestOrder{
 		OrderToken:     "gst_test2",
@@ -221,7 +197,7 @@ func TestCheckEVMPayment_InsufficientBalance(t *testing.T) {
 func TestCheckEVMPayment_ZeroBalance(t *testing.T) {
 	bc := newMockBalanceChecker()
 	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, bc, nil)
+	monitor := NewGuestPaymentMonitor(nil, svc, bc)
 
 	order := &models.GuestOrder{
 		OrderToken:     "gst_test3",
@@ -237,57 +213,10 @@ func TestCheckEVMPayment_ZeroBalance(t *testing.T) {
 	}
 }
 
-func TestCheckSolanaPayment_Found(t *testing.T) {
-	sc := newMockSolanaChecker()
-	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, nil, sc)
-
-	order := &models.GuestOrder{
-		OrderToken:     "gst_sol1",
-		PaymentCoin:    "SOL",
-		PaymentAddress: "SomeSellerAddr",
-		PaymentAmount:  "1000000000",
-		ReferenceKey:   "refkey123",
-		ExpiresAt:      time.Now().Add(1 * time.Hour),
-	}
-
-	sc.setResult("refkey123", "txhash_abc")
-
-	found := monitor.checkSolanaPayment(context.Background(), order)
-	if !found {
-		t.Fatal("expected Solana payment to be detected")
-	}
-
-	detections := svc.getDetections()
-	if len(detections) != 1 || detections[0].txHash != "txhash_abc" {
-		t.Fatalf("expected detection with txhash_abc, got %v", detections)
-	}
-}
-
-func TestCheckSolanaPayment_NotFound(t *testing.T) {
-	sc := newMockSolanaChecker()
-	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, nil, sc)
-
-	order := &models.GuestOrder{
-		OrderToken:     "gst_sol2",
-		PaymentCoin:    "SOL",
-		PaymentAddress: "SomeAddr",
-		PaymentAmount:  "1000000000",
-		ReferenceKey:   "refkey_missing",
-		ExpiresAt:      time.Now().Add(1 * time.Hour),
-	}
-
-	found := monitor.checkSolanaPayment(context.Background(), order)
-	if found {
-		t.Fatal("should not detect payment when reference not found")
-	}
-}
-
 func TestWatchOrder_EVM_DetectsPayment(t *testing.T) {
 	bc := newMockBalanceChecker()
 	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, bc, nil)
+	monitor := NewGuestPaymentMonitor(nil, svc, bc)
 
 	order := &models.GuestOrder{
 		OrderToken:     "gst_watch1",
@@ -321,7 +250,7 @@ func TestWatchOrder_EVM_DetectsPayment(t *testing.T) {
 func TestWatchOrder_DuplicateIgnored(t *testing.T) {
 	bc := newMockBalanceChecker()
 	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, bc, nil)
+	monitor := NewGuestPaymentMonitor(nil, svc, bc)
 	defer monitor.StopAll()
 
 	order := &models.GuestOrder{
@@ -343,7 +272,7 @@ func TestWatchOrder_DuplicateIgnored(t *testing.T) {
 func TestStopAll_CancelsWatches(t *testing.T) {
 	bc := newMockBalanceChecker()
 	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, bc, nil)
+	monitor := NewGuestPaymentMonitor(nil, svc, bc)
 
 	for i := 0; i < 3; i++ {
 		order := &models.GuestOrder{
@@ -371,7 +300,7 @@ func TestStopAll_CancelsWatches(t *testing.T) {
 func TestStopAll_DoubleCallNoPanic(t *testing.T) {
 	bc := newMockBalanceChecker()
 	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, bc, nil)
+	monitor := NewGuestPaymentMonitor(nil, svc, bc)
 
 	order := &models.GuestOrder{
 		OrderToken:     "gst_double",
@@ -480,7 +409,7 @@ func (f *fakeFetcher) fetchCount() int {
 // so the test stays under a second.
 func TestPollConfirmationsLoop_SurvivesInitialUnhealthy(t *testing.T) {
 	svc := &recordingGuestService{}
-	monitor := NewGuestPaymentMonitor(nil, svc, nil, nil)
+	monitor := NewGuestPaymentMonitor(nil, svc, nil)
 	defer monitor.StopAll()
 	monitor.SetConfirmationPollInterval(20 * time.Millisecond)
 

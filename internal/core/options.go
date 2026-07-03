@@ -1013,7 +1013,7 @@ func (n *MobazhaNode) initGuestOrderService() {
 		n.guestOrderService.SetMultiwallet(n.multiwallet)
 	}
 
-	n.guestPaymentMonitor = guest.NewGuestPaymentMonitor(n.db, n.guestOrderService, nil, nil)
+	n.guestPaymentMonitor = guest.NewGuestPaymentMonitor(n.db, n.guestOrderService, nil)
 	n.guestPaymentMonitor.SetMultiwallet(n.multiwallet)
 	n.guestOrderService.SetPaymentWatcher(n.guestPaymentMonitor)
 

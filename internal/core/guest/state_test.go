@@ -37,13 +37,13 @@ func TestRequiredConfsForCoin(t *testing.T) {
 	}{
 		{"LTC native", iwallet.CoinType("crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native"), 3},
 		{"BTC native", iwallet.CoinType("crypto:bip122:000000000019d6689c085ae165831e93:native"), 1},
-		// EVM/Solana/TRON: 0 confs — see godoc on requiredConfsForCoin
-		// (no confirmation polling implemented for these chains yet).
+		// Module-owned direct-observed rails supply their confirmation policy
+		// when allocating the payment target. Core has no chain-specific default.
 		{"ETH native", iwallet.CoinType("crypto:eip155:1:native"), 0},
 		{"SOL native", iwallet.CoinType("crypto:solana:mainnet:native"), 0},
 		{"BSC native", iwallet.CoinType("crypto:eip155:56:native"), 0},
 		{"TRON native", iwallet.CoinType("crypto:tron:mainnet:native"), 0},
-		{"XMR native", iwallet.CoinType("crypto:monero:mainnet:native"), 10},
+		{"external observed", iwallet.CoinType("crypto:monero:mainnet:native"), 0},
 		{"unknown fallback", iwallet.CoinType("INVALID"), 1},
 	}
 	for _, tt := range tests {

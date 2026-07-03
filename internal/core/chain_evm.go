@@ -191,7 +191,7 @@ func (n *MobazhaNode) configureGuestEVMBalanceChecker() {
 		return
 	}
 	checker := &hostEVMNativeBalanceChecker{hostService: n.hostService}
-	n.guestPaymentMonitor.SetCheckers(checker, nil)
+	n.guestPaymentMonitor.SetBalanceChecker(checker)
 	// Buyer-visible EVM is gated by managed-escrow runtime readiness (Phase 3D), not balance polling.
 	logger.LogInfoWithIDf(log, n.nodeID, "Configured guest checkout EVM balance checker (legacy poll path only)")
 }

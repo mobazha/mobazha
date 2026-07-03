@@ -28,13 +28,11 @@ type confirmationFetcher interface {
 	// rather than counting a transient outage as "0 confirmations".
 	Healthy() bool
 
-	// Label is used in log messages ("UTXO" / "XMR" / future chain names).
+	// Label is used in log messages for the active rail or asset.
 	Label() string
 }
 
-// chainTxFetcher serves UTXO, EVM, and Solana orders. The underlying
-// pkgutxo.ChainOperations adapter already routes by chain to the correct
-// concrete client (Electrum / EVM RPC / Solana RPC).
+// chainTxFetcher serves payment rails backed by ChainOperations.
 type chainTxFetcher struct {
 	ops    pkgutxo.ChainOperations
 	chain  iwallet.ChainType
@@ -53,22 +51,16 @@ func (f *chainTxFetcher) Label() string {
 	return string(f.chain)
 }
 
-// moneroHeightFetcher serves Monero orders. Unlike chainTxFetcher there is no
-// per-tx confirmation API in monero-wallet-rpc — we hold the original tx
-// block height and derive confirmations from the current chain tip on each
-// poll. txHeight == 0 means the tx hasn't landed in a block yet (shouldn't
-// happen because we only construct this fetcher after a confirmed transfer
-// is observed, but Fetch tolerates it defensively).
-//
-// Bound to pkgmonero.PaymentMonitor (rather than the raw Source) to keep the XMR
-// boundary cohesive: the monitor already exposes GetHeight + IsHealthy so
-// the fetcher does not introduce a separate dependency.
-type moneroHeightFetcher struct {
+// externalHeightFetcher derives confirmations from a provider-owned current
+// height and the observed payment's block height. It contains no chain client
+// or provider-specific behavior.
+type externalHeightFetcher struct {
 	monitor  directObservedMonitor
 	txHeight uint64
+	label    string
 }
 
-func (f *moneroHeightFetcher) Fetch(ctx context.Context) (int, error) {
+func (f *externalHeightFetcher) Fetch(ctx context.Context) (int, error) {
 	currentHeight, err := f.monitor.PaymentHeight(ctx)
 	if err != nil {
 		return 0, err
@@ -76,12 +68,11 @@ func (f *moneroHeightFetcher) Fetch(ctx context.Context) (int, error) {
 	if currentHeight < f.txHeight {
 		return 0, nil
 	}
-	// Monero convention: confirmations = currentHeight - txHeight + 1
-	// (the block containing the tx counts as 1 confirmation).
+	// The block containing the payment counts as the first confirmation.
 	return int(currentHeight-f.txHeight) + 1, nil
 }
 
-func (f *moneroHeightFetcher) Healthy() bool {
+func (f *externalHeightFetcher) Healthy() bool {
 	if f.monitor == nil {
 		return false
 	}
@@ -90,6 +81,9 @@ func (f *moneroHeightFetcher) Healthy() bool {
 	return f.monitor.PaymentHealth(ctx).Ready()
 }
 
-func (f *moneroHeightFetcher) Label() string {
-	return "XMR"
+func (f *externalHeightFetcher) Label() string {
+	if f.label == "" {
+		return "external"
+	}
+	return f.label
 }

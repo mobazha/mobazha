@@ -53,15 +53,11 @@ func newResourceProfileNode(ctx context.Context, cfg *repo.Config, nodeID string
 		return nil, fmt.Errorf("repo init: %w", err)
 	}
 	succeeded := false
-	runtimeStarted := false
 	var nodeCancel context.CancelFunc
 	var sm *SharedManager
 	defer func() {
 		if succeeded {
 			return
-		}
-		if runtimeStarted {
-			_ = composition.ExternalPaymentRuntime.Close()
 		}
 		if nodeCancel != nil {
 			nodeCancel()
@@ -107,10 +103,7 @@ func newResourceProfileNode(ctx context.Context, cfg *repo.Config, nodeID string
 		networkFields: networkFields{
 			eventBus: bus,
 		},
-		chainFields: chainFields{
-			externalPayment: composition.ExternalPaymentRuntime,
-			sovereignPolicy: composition.Policy,
-		},
+		chainFields: chainFields{sovereignPolicy: composition.Policy},
 		modeFlags: modeFlags{
 			testnet:   cfg.Testnet,
 			sovereign: true,
@@ -127,14 +120,6 @@ func newResourceProfileNode(ctx context.Context, cfg *repo.Config, nodeID string
 		n.contentStore = &cidContentStore{}
 	}
 
-	if n.externalPayment != nil {
-		if startErr := n.externalPayment.Start(n.nodeCtx); startErr != nil {
-			_ = n.externalPayment.Close()
-			return nil, fmt.Errorf("start external payment runtime: %w", startErr)
-		}
-		runtimeStarted = true
-	}
-
 	sm, err = NewResourceProfileSharedManager(ctx, cfg, composition.TrustedHumaModules, composition.Policy)
 	if err != nil {
 		return nil, fmt.Errorf("shared manager: %w", err)
@@ -142,6 +127,9 @@ func newResourceProfileNode(ctx context.Context, cfg *repo.Config, nodeID string
 	n.sharedManager = sm
 
 	n.initResourceProfileServices(cfg)
+	if err := n.registerSovereignPaymentModules(); err != nil {
+		return nil, fmt.Errorf("register sovereign payment modules: %w", err)
+	}
 	sm.AddNode(nodeID, n)
 
 	succeeded = true
@@ -335,7 +323,7 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 		},
 	})
 
-	n.guestPaymentMonitor = guest.NewGuestPaymentMonitor(n.db, n.guestOrderService, nil, nil)
+	n.guestPaymentMonitor = guest.NewGuestPaymentMonitor(n.db, n.guestOrderService, nil)
 	n.guestOrderService.SetPaymentWatcher(n.guestPaymentMonitor)
 
 	checkoutSupplyQuoter := checkoutsupply.NewCheckoutSupplyQuoteService(checkoutsupply.CheckoutSupplyQuoteServiceConfig{
@@ -345,13 +333,6 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 		Listings:           n.listingService,
 	})
 	n.guestOrderService.SetCheckoutSupplyQuoter(checkoutSupplyQuoter)
-
-	if n.externalPayment != nil {
-		if n.directPaymentService != nil {
-			n.directPaymentService.SetExternalPaymentRuntime(n.externalPayment)
-		}
-		n.guestPaymentMonitor.SetExternalPaymentRuntime(n.externalPayment)
-	}
 
 	initDigitalSubsystem(n)
 	initSovereignEventDispatcher(n, n.sharedManager)

@@ -64,7 +64,7 @@ func TestLTCGuestOrder_PaymentDetection(t *testing.T) {
 	mon.AddSource(iwallet.ChainLitecoin, mockSrc)
 
 	svc := &GuestOrderAppService{db: db}
-	payMon := NewGuestPaymentMonitor(db, svc, nil, nil)
+	payMon := NewGuestPaymentMonitor(db, svc, nil)
 	payMon.SetUTXOMonitor(mon)
 	payMon.SetMultiwallet(&mockWalletOperator{
 		wallet: &mockUTXOWallet{scriptPubKey: []byte{0x76, 0xa9, 0x14}},
@@ -118,7 +118,7 @@ func TestLTCGuestOrder_InsufficientPayment(t *testing.T) {
 	mon.AddSource(iwallet.ChainLitecoin, mockSrc)
 
 	svc := &GuestOrderAppService{db: db}
-	payMon := NewGuestPaymentMonitor(db, svc, nil, nil)
+	payMon := NewGuestPaymentMonitor(db, svc, nil)
 	payMon.SetUTXOMonitor(mon)
 	payMon.SetMultiwallet(&mockWalletOperator{
 		wallet: &mockUTXOWallet{scriptPubKey: []byte{0x76, 0xa9, 0x14}},

@@ -8,13 +8,12 @@ import (
 )
 
 // SovereignNodeConfig is an atomic local-first composition. Product-specific
-// wallet administration remains in TrustedHumaModules; Core receives only the
-// payment lifecycle and provider-neutral policies it must enforce.
+// wallet administration remains in TrustedHumaModules; payment runtimes are
+// contributed through trusted payment modules rather than injected directly.
 type SovereignNodeConfig struct {
-	ExternalPaymentRuntime ExternalPaymentRuntime
-	Policy                 SovereignNodePolicy
-	TrustedHumaModules     []TrustedHumaModule
-	ContentStore           contracts.ContentStore
+	Policy             SovereignNodePolicy
+	TrustedHumaModules []TrustedHumaModule
+	ContentStore       contracts.ContentStore
 }
 
 // Clone returns an owned configuration safe from caller slice mutation.
@@ -25,9 +24,6 @@ func (config SovereignNodeConfig) Clone() SovereignNodeConfig {
 
 // Validate rejects partial sovereign compositions before resources are opened.
 func (config SovereignNodeConfig) Validate() error {
-	if nilCompositionPort(config.ExternalPaymentRuntime) {
-		return fmt.Errorf("sovereign external payment runtime is required")
-	}
 	if nilCompositionPort(config.Policy) {
 		return fmt.Errorf("sovereign node policy is required")
 	}

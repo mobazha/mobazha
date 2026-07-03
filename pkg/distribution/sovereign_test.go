@@ -30,15 +30,12 @@ type sovereignModuleTestStub struct{}
 func (*sovereignModuleTestStub) RegisterTrustedHuma(TrustedHumaRegistration) {}
 
 func TestSovereignNodeConfigValidateRejectsPartialAndTypedNilPorts(t *testing.T) {
-	runtime := externalPaymentRuntimeStub{}
 	policy := &sovereignPolicyTestStub{}
 
 	tests := []SovereignNodeConfig{
 		{},
-		{ExternalPaymentRuntime: runtime},
-		{ExternalPaymentRuntime: (*externalPaymentRuntimeStub)(nil), Policy: policy},
-		{ExternalPaymentRuntime: runtime, Policy: (*sovereignPolicyTestStub)(nil)},
-		{ExternalPaymentRuntime: runtime, Policy: policy, TrustedHumaModules: []TrustedHumaModule{(*sovereignModuleTestStub)(nil)}},
+		{Policy: (*sovereignPolicyTestStub)(nil)},
+		{Policy: policy, TrustedHumaModules: []TrustedHumaModule{(*sovereignModuleTestStub)(nil)}},
 	}
 	for index, config := range tests {
 		if err := config.Validate(); err == nil {
@@ -48,16 +45,14 @@ func TestSovereignNodeConfigValidateRejectsPartialAndTypedNilPorts(t *testing.T)
 }
 
 func TestSovereignNodeConfigCloneOwnsModuleSlice(t *testing.T) {
-	runtime := externalPaymentRuntimeStub{}
 	policy := &sovereignPolicyTestStub{}
 	first := &sovereignModuleTestStub{}
 	second := &sovereignModuleTestStub{}
 	modules := []TrustedHumaModule{first}
 
 	clone := (SovereignNodeConfig{
-		ExternalPaymentRuntime: runtime,
-		Policy:                 policy,
-		TrustedHumaModules:     modules,
+		Policy:             policy,
+		TrustedHumaModules: modules,
 	}).Clone()
 	modules[0] = second
 
@@ -69,12 +64,11 @@ func TestSovereignNodeConfigCloneOwnsModuleSlice(t *testing.T) {
 	}
 }
 
-func TestSovereignNodeConfigAcceptsExternalPaymentRuntime(t *testing.T) {
+func TestSovereignNodeConfigAcceptsPaymentModulesOutsideProfileConfig(t *testing.T) {
 	config := SovereignNodeConfig{
-		ExternalPaymentRuntime: externalPaymentRuntimeStub{},
-		Policy:                 &sovereignPolicyTestStub{},
+		Policy: &sovereignPolicyTestStub{},
 	}
 	if err := config.Validate(); err != nil {
-		t.Fatalf("external payment runtime rejected: %v", err)
+		t.Fatalf("valid sovereign policy rejected: %v", err)
 	}
 }

@@ -50,7 +50,7 @@ func TestLTCGuestOrder_FullClosurePath(t *testing.T) {
 	mon := pkgutxo.NewMonitor(nil)
 	mon.AddSource(iwallet.ChainLitecoin, mockSrc)
 
-	payMon := NewGuestPaymentMonitor(db, svc, nil, nil)
+	payMon := NewGuestPaymentMonitor(db, svc, nil)
 	payMon.SetUTXOMonitor(mon)
 	payMon.SetMultiwallet(&mockWalletOperator{
 		wallet: &mockUTXOWallet{scriptPubKey: []byte{0x76, 0xa9, 0x14}},

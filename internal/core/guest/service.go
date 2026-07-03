@@ -419,6 +419,10 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		return nil, fmt.Errorf("generate payment address: %w", err)
 	}
 
+	requiredConfs := requiredConfsForCoin(coinType)
+	if payResult.RequiredConfs > 0 {
+		requiredConfs = payResult.RequiredConfs
+	}
 	order := models.GuestOrder{
 		OrderToken:                orderToken,
 		State:                     models.GuestOrderAwaitingPayment,
@@ -433,7 +437,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		SweepToAddress:            payResult.SweepTo,
 		ReferenceKey:              payResult.ReferenceKey,
 		AddressIndex:              payResult.AddressIndex,
-		RequiredConfs:             requiredConfsForCoin(coinType),
+		RequiredConfs:             requiredConfs,
 		ExpiresAt:                 expiresAt,
 		ContactEmail:              req.ContactEmail,
 		BuyerPortalTokenHash:      hashBuyerPortalToken(buyerPortalToken),
@@ -1769,14 +1773,10 @@ func (s *GuestOrderAppService) convertToPaymentCoin(totalSmallest *big.Int, pric
 // Chain-by-chain rationale:
 //   - UTXO chains: BTC/BCH/ZEC = 1, LTC = 3 (LTC has higher orphan rate);
 //     watchUTXOOrder polls confirmations after PAYMENT_DETECTED.
-//   - Monero: 10 (matches Monero ecosystem convention; pollConfirmationsLoop
-//     polls block height after pool→confirmed transition via moneroHeightFetcher).
-//   - EVM/Solana/TRON: 0 — pollEVMLoop / pollSolanaLoop have no confirmation
-//     polling step, so any non-zero value would strand orders in
-//     PAYMENT_DETECTED forever. This is a known design compromise: balance/
-//     reference-key checks ARE the finality signal for these chains. Adding
-//     1-block reorg defense here requires implementing per-chain receipt
-//     polling first (tracked separately from Phase B XMR work).
+//   - Direct-observed modules: the asset policy supplies the required count;
+//     pollConfirmationsLoop derives progress from the provider's height.
+//   - Legacy EVM/TRON balance observation: 0 because those loops do not yet
+//     poll receipts. A non-zero value would strand orders in PAYMENT_DETECTED.
 //   - Unknown coin: 1 (safe default).
 func requiredConfsForCoin(coinType iwallet.CoinType) int {
 	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
@@ -1790,10 +1790,8 @@ func requiredConfsForCoin(coinType iwallet.CoinType) int {
 		return 1
 	case coinInfo.Chain == iwallet.ChainBitcoinCash, coinInfo.Chain == iwallet.ChainZCash:
 		return 1
-	case coinInfo.Chain == iwallet.ChainMonero:
-		return 10
 	default:
-		// EVM / Solana / TRON / unknown — see godoc above.
+		// Managed or externally observed rails provide their own requirement.
 		return 0
 	}
 }

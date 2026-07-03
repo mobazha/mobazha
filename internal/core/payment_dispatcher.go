@@ -148,7 +148,10 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 		GuestSettlements: guestSettlementSource,
 		GuestRuntime:     guestRuntimeBinder,
 	}
-	authority := distribution.NewPaymentRuntimeAuthority(managedEVM, managedSolana, guestRuntime)
+	directObserved := distribution.DirectObservedRuntimePorts{
+		Binder: &distributionDirectObservedRuntimeBinder{node: n},
+	}
+	authority := distribution.NewPaymentRuntimeAuthority(managedEVM, managedSolana, guestRuntime, directObserved)
 	manager, err := distribution.NewTrustedPaymentModuleManager(
 		authority,
 		distributionPaymentRegistry{registry: n.paymentRegistry},
@@ -156,6 +159,41 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 	)
 	if err != nil {
 		return err
+	}
+	if err := manager.Register(ctx); err != nil {
+		return err
+	}
+	n.paymentModuleManager = manager
+	return nil
+}
+
+// registerSovereignPaymentModules registers local-first payment modules after
+// guest services exist but before the node starts. Direct-observed modules do
+// not contribute escrow strategies, so an otherwise empty registry is valid.
+func (n *MobazhaNode) registerSovereignPaymentModules() error {
+	if len(n.paymentModules) == 0 {
+		return nil
+	}
+	n.paymentRegistry = payment.NewRegistry()
+	authority := distribution.NewPaymentRuntimeAuthority(
+		distribution.ManagedEVMRuntime{},
+		distribution.ManagedSolanaRuntime{},
+		distribution.ManagedEscrowGuestRuntimePorts{},
+		distribution.DirectObservedRuntimePorts{
+			Binder: &distributionDirectObservedRuntimeBinder{node: n},
+		},
+	)
+	manager, err := distribution.NewTrustedPaymentModuleManager(
+		authority,
+		distributionPaymentRegistry{registry: n.paymentRegistry},
+		n.paymentModules...,
+	)
+	if err != nil {
+		return err
+	}
+	ctx := n.nodeCtx
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	if err := manager.Register(ctx); err != nil {
 		return err
@@ -186,11 +224,20 @@ func (n *MobazhaNode) runDistributionPaymentModules(ctx context.Context) error {
 		return nil
 	}
 	if err := n.paymentModuleManager.Start(ctx, func(health distribution.PaymentModuleHealth) {
-		if health.State == distribution.PaymentModuleDegraded {
-			logger.LogErrorWithIDf(log, n.nodeID,
-				"Trusted payment module %s degraded; only its owned rails were disabled: %s",
+		switch health.State {
+		case distribution.PaymentModuleNeedsSetup:
+			logger.LogInfoWithIDf(log, n.nodeID,
+				"Trusted payment module %s is awaiting setup: %s",
 				health.Descriptor.ID, health.Error)
-			if health.Descriptor.Activation == distribution.PaymentModuleRequired {
+		case distribution.PaymentModuleDegraded:
+			availability := "its owned rails were disabled"
+			if health.Active {
+				availability = "it remains active for recovery and diagnostics"
+			}
+			logger.LogErrorWithIDf(log, n.nodeID,
+				"Trusted payment module %s degraded; %s: %s",
+				health.Descriptor.ID, availability, health.Error)
+			if health.Descriptor.Activation == distribution.PaymentModuleRequired && !health.Active {
 				go func() {
 					if stopErr := n.Stop(true); stopErr != nil {
 						logger.LogErrorWithIDf(log, n.nodeID,

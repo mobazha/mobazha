@@ -34,6 +34,12 @@ type PaymentModuleHealth struct {
 	State      PaymentModuleState
 	Chains     []iwallet.ChainType
 	Error      string
+	Active     bool
+}
+
+type paymentModuleStatusUpdate struct {
+	state PaymentModuleState
+	err   error
 }
 
 // TrustedPaymentModuleManager owns descriptor validation, dependency order,
@@ -116,6 +122,10 @@ func (m *TrustedPaymentModuleManager) Register(ctx context.Context) error {
 		id := registration.descriptor.ID
 		health := m.health[id]
 		health.Chains = append([]iwallet.ChainType(nil), registration.chains...)
+		if len(health.Chains) == 0 {
+			health.Chains = append([]iwallet.ChainType(nil), registration.descriptor.Chains...)
+		}
+		health.Active = true
 		m.health[id] = health
 		m.active[id] = true
 	}
@@ -186,6 +196,39 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 			continue
 		}
 		m.publish(id, PaymentModuleStarting, "")
+		if runner, ok := registration.module.(PaymentModuleStatusRunner); ok {
+			updates := make(chan paymentModuleStatusUpdate, 8)
+			result := make(chan error, 1)
+			m.runWG.Add(1)
+			go func() {
+				defer m.runWG.Done()
+				result <- runner.StartWithStatus(runCtx, func(state PaymentModuleState, err error) {
+					select {
+					case updates <- paymentModuleStatusUpdate{state: state, err: err}:
+					case <-runCtx.Done():
+					}
+				})
+			}()
+			select {
+			case update := <-updates:
+				state, detail := normalizeReportedPaymentModuleStatus(update)
+				m.publish(id, state, detail)
+				go m.watchStatusRunner(runCtx, registration, updates, result)
+			case err := <-result:
+				if err == nil {
+					err = fmt.Errorf("module returned before reporting status")
+				}
+				m.deactivateCascade(registration, err)
+				if registration.descriptor.Activation == PaymentModuleRequired {
+					return m.abortStart(runCtx, err)
+				}
+			case <-runCtx.Done():
+				return m.abortStart(runCtx, runCtx.Err())
+			case <-m.done:
+				return m.abortStart(runCtx, context.Canceled)
+			}
+			continue
+		}
 		runner, ok := registration.module.(PaymentModuleRunner)
 		if !ok {
 			m.publish(id, PaymentModuleReady, "")
@@ -233,6 +276,45 @@ func (m *TrustedPaymentModuleManager) Start(ctx context.Context, onHealth func(P
 		_ = m.Stop(cleanupCtx)
 	}()
 	return nil
+}
+
+func normalizeReportedPaymentModuleStatus(update paymentModuleStatusUpdate) (PaymentModuleState, string) {
+	detail := ""
+	if update.err != nil {
+		detail = update.err.Error()
+	}
+	switch update.state {
+	case PaymentModuleReady, PaymentModuleNeedsSetup, PaymentModuleDegraded:
+		return update.state, detail
+	default:
+		return PaymentModuleDegraded, fmt.Sprintf("module reported invalid runtime state %q", update.state)
+	}
+}
+
+func (m *TrustedPaymentModuleManager) watchStatusRunner(
+	ctx context.Context,
+	registration paymentModuleRegistration,
+	updates <-chan paymentModuleStatusUpdate,
+	result <-chan error,
+) {
+	for {
+		select {
+		case update := <-updates:
+			state, detail := normalizeReportedPaymentModuleStatus(update)
+			m.publish(registration.descriptor.ID, state, detail)
+		case err := <-result:
+			if ctx.Err() != nil {
+				return
+			}
+			if err == nil {
+				err = fmt.Errorf("module returned before node shutdown")
+			}
+			m.deactivateCascade(registration, err)
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (m *TrustedPaymentModuleManager) watchRunner(ctx context.Context, registration paymentModuleRegistration, result <-chan error) {
@@ -356,7 +438,11 @@ func (m *TrustedPaymentModuleManager) cleanupRegistration(
 		m.target.UnregisterV2Batch(registration.chains)
 	}
 	var cleanupErrors []error
-	if runner, ok := registration.module.(PaymentModuleRunner); ok {
+	if runner, ok := registration.module.(PaymentModuleStatusRunner); ok {
+		if err := runner.Stop(ctx); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop module %q: %w", id, err))
+		}
+	} else if runner, ok := registration.module.(PaymentModuleRunner); ok {
 		if err := runner.Stop(ctx); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop module %q: %w", id, err))
 		}
@@ -442,6 +528,7 @@ func (m *TrustedPaymentModuleManager) publish(id string, state PaymentModuleStat
 	health := m.health[id]
 	health.State = state
 	health.Error = detail
+	health.Active = m.active[id]
 	m.health[id] = health
 	callback := m.onHealth
 	snapshot := health
@@ -512,6 +599,8 @@ func normalizedPaymentModuleDescriptor(descriptor PaymentModuleDescriptor) Payme
 	descriptor = clonePaymentModuleDescriptor(descriptor)
 	descriptor.ID = strings.TrimSpace(descriptor.ID)
 	descriptor.Version = strings.TrimSpace(descriptor.Version)
+	descriptor.ProtocolVersion = strings.TrimSpace(descriptor.ProtocolVersion)
+	descriptor.StateSchemaVersion = strings.TrimSpace(descriptor.StateSchemaVersion)
 	for index := range descriptor.Dependencies {
 		descriptor.Dependencies[index] = strings.TrimSpace(descriptor.Dependencies[index])
 	}
@@ -521,6 +610,8 @@ func normalizedPaymentModuleDescriptor(descriptor PaymentModuleDescriptor) Payme
 func clonePaymentModuleDescriptor(descriptor PaymentModuleDescriptor) PaymentModuleDescriptor {
 	descriptor.Rails = append([]PaymentRailKind(nil), descriptor.Rails...)
 	descriptor.Capabilities = append([]PaymentModuleCapability(nil), descriptor.Capabilities...)
+	descriptor.Chains = append([]iwallet.ChainType(nil), descriptor.Chains...)
+	descriptor.Assets = append([]iwallet.CoinType(nil), descriptor.Assets...)
 	descriptor.Dependencies = append([]string(nil), descriptor.Dependencies...)
 	return descriptor
 }
@@ -535,12 +626,49 @@ func validatePaymentModuleDescriptor(descriptor PaymentModuleDescriptor) error {
 	if len(descriptor.Rails) == 0 {
 		return fmt.Errorf("payment module %q must declare at least one rail", descriptor.ID)
 	}
+	rails := make(map[PaymentRailKind]struct{}, len(descriptor.Rails))
 	for _, rail := range descriptor.Rails {
 		switch rail {
 		case PaymentRailEscrow, PaymentRailDirectObserved, PaymentRailProviderSession:
 		default:
 			return fmt.Errorf("payment module %q declares unknown rail %q", descriptor.ID, rail)
 		}
+		if _, exists := rails[rail]; exists {
+			return fmt.Errorf("payment module %q declares rail %q more than once", descriptor.ID, rail)
+		}
+		rails[rail] = struct{}{}
+	}
+	capabilities := make(map[PaymentModuleCapability]struct{}, len(descriptor.Capabilities))
+	for _, capability := range descriptor.Capabilities {
+		if _, exists := capabilities[capability]; exists {
+			return fmt.Errorf("payment module %q declares capability %q more than once", descriptor.ID, capability)
+		}
+		capabilities[capability] = struct{}{}
+	}
+	if _, requested := capabilities[CapabilityDirectObserved]; requested {
+		if _, declared := rails[PaymentRailDirectObserved]; !declared {
+			return fmt.Errorf("payment module %q requests %q without declaring the direct-observed rail", descriptor.ID, CapabilityDirectObserved)
+		}
+	}
+	chains := make(map[iwallet.ChainType]struct{}, len(descriptor.Chains))
+	for _, chain := range descriptor.Chains {
+		if strings.TrimSpace(string(chain)) == "" {
+			return fmt.Errorf("payment module %q declares an empty chain", descriptor.ID)
+		}
+		if _, exists := chains[chain]; exists {
+			return fmt.Errorf("payment module %q declares chain %q more than once", descriptor.ID, chain)
+		}
+		chains[chain] = struct{}{}
+	}
+	assets := make(map[iwallet.CoinType]struct{}, len(descriptor.Assets))
+	for _, asset := range descriptor.Assets {
+		if strings.TrimSpace(string(asset)) == "" {
+			return fmt.Errorf("payment module %q declares an empty asset", descriptor.ID)
+		}
+		if _, exists := assets[asset]; exists {
+			return fmt.Errorf("payment module %q declares asset %q more than once", descriptor.ID, asset)
+		}
+		assets[asset] = struct{}{}
 	}
 	switch descriptor.Activation {
 	case PaymentModuleRequired, PaymentModuleOptional, PaymentModuleSetupGated:

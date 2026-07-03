@@ -295,7 +295,7 @@ func TestReservationExpiresAtForOrder_IncludesPerCoinGrace(t *testing.T) {
 		{"crypto:bitcoin:mainnet:native", utxoGracePeriod},
 		{"crypto:litecoin:mainnet:native", utxoGracePeriod},
 		{"crypto:ethereum:mainnet:native", evmGracePeriod},
-		{"crypto:solana:mainnet:native", solanaGracePeriod},
+		{"crypto:solana:mainnet:native", utxoGracePeriod},
 		{"crypto:unknown:mainnet:native", utxoGracePeriod}, // default branch
 	}
 	for _, tc := range cases {

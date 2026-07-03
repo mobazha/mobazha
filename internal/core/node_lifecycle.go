@@ -229,6 +229,13 @@ func (n *MobazhaNode) startSovereign() {
 			logger.LogErrorWithIDf(log, n.nodeID, "failed to start event dispatcher: %v", err)
 		}
 	}
+	if err := n.runDistributionPaymentModules(n.nodeCtx); err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "trusted payment module startup failed: %v", err)
+		if stopErr := n.Stop(true); stopErr != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "node cleanup after payment module failure failed: %v", stopErr)
+		}
+		return
+	}
 
 	n.startStandaloneScheduler(n.nodeCtx)
 	n.restoreGuestPaymentWatches()
@@ -263,11 +270,13 @@ func (n *MobazhaNode) stopSovereign() error {
 		n.guestPaymentMonitor.StopAll()
 	}
 	var closeErr error
-	if n.externalPayment != nil {
-		if err := n.externalPayment.Close(); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "close external payment runtime: %v", err)
+	if n.paymentModuleManager != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := n.paymentModuleManager.Stop(ctx); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "stop trusted payment modules: %v", err)
 			closeErr = err
 		}
+		cancel()
 	}
 	if n.eventDispatcher != nil {
 		n.eventDispatcher.Stop()

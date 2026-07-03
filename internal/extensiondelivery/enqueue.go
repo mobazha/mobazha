@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 fengzie and the respective contributors.
+
 // Package extensiondelivery emits lifecycle events solely from persisted,
 // product-neutral order-extension declarations.
 package extensiondelivery

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -39,6 +40,20 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 	}
 	if err := wn.GenerateToAddress(addr, iwallet.NewAmount(100000)); err != nil {
 		t.Fatal(err)
+	}
+	fundingDeadline := time.Now().Add(time.Second)
+	for {
+		fundingTxs, err := wn.Wallets()[0].Transactions(-1, iwallet.TransactionID(""))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(fundingTxs) > 0 {
+			break
+		}
+		if time.Now().After(fundingDeadline) {
+			t.Fatal("funding transaction was not observed by mock wallet")
+		}
+		time.Sleep(time.Millisecond)
 	}
 
 	wdbtx, err := wn.Wallets()[0].Begin()

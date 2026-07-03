@@ -57,9 +57,8 @@ func (b *distributionDirectObservedRuntimeBinder) UnbindExternalPaymentRuntime(
 	if b.node.guestPaymentMonitor != nil {
 		b.node.guestPaymentMonitor.SetExternalPaymentRuntime(nil)
 	}
-	if b.node.guestOrderService != nil {
-		b.node.guestOrderService.SetDirectObservedGraceProvider(nil)
-	}
+	// Keep the last grace policy bound to the order service. Existing order and
+	// inventory deadlines are durable business policy, not live-runtime state.
 	return nil
 }
 

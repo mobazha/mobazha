@@ -331,6 +331,23 @@ func TestReservationExpiresAtForOrder_IncludesPerCoinGrace(t *testing.T) {
 	}
 }
 
+func TestSetDirectObservedGraceProvider_NilPreservesLastTimingPolicy(t *testing.T) {
+	base := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	svc := newCleanupSvc(newGuestTestDB(t))
+	svc.SetDirectObservedGraceProvider(testGraceProvider{
+		asset: "crypto:monero:mainnet:native",
+		grace: 2 * time.Hour,
+	})
+
+	beforeUnbind := svc.reservationExpiresAtForOrder(base, "crypto:monero:mainnet:native")
+	svc.SetDirectObservedGraceProvider(nil)
+	afterUnbind := svc.reservationExpiresAtForOrder(base, "crypto:monero:mainnet:native")
+
+	assert.Equal(t, base.Add(2*time.Hour), beforeUnbind)
+	assert.Equal(t, beforeUnbind, afterUnbind,
+		"unbinding the live runtime must not shorten durable order timing policy")
+}
+
 // TestReleaseExpiredReservations_RespectsGuestOrderGrace is the regression
 // test for the cleanup-vs-watcher race: a reservation created via the
 // production formula (reservationExpiresAtForOrder) for an XMR order that

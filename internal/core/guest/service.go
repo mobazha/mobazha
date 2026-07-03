@@ -124,11 +124,12 @@ type GuestOrderAppService struct {
 	checkoutSupplyQuoter          *checkoutsupply.CheckoutSupplyQuoteService
 }
 
-// SetDirectObservedGraceProvider wires asset-specific timing policy from the
-// currently bound direct-observed module. Passing nil restores the conservative
-// provider-free fallback used for historical or unsupported assets.
+// SetDirectObservedGraceProvider wires asset-specific timing policy from a
+// direct-observed module. A nil provider leaves the last policy in place: order
+// and reservation deadlines must not shrink merely because the data-plane
+// runtime was stopped or temporarily unbound.
 func (s *GuestOrderAppService) SetDirectObservedGraceProvider(provider PaymentGracePeriodProvider) {
-	if s == nil {
+	if s == nil || provider == nil {
 		return
 	}
 	s.directObservedGraceMu.Lock()

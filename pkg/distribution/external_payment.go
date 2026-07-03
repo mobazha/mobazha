@@ -89,6 +89,9 @@ type ExternalPaymentRuntime interface {
 	UnwatchPayment(addressIndex uint32)
 	ReapPayment(addressIndex uint32)
 	PaymentPollInterval() time.Duration
+	// PaymentGracePeriod is immutable timing policy. It must remain safe to
+	// call after the runtime has stopped so active order deadlines do not
+	// change when a module is temporarily unbound.
 	PaymentGracePeriod(asset iwallet.CoinType) time.Duration
 	PaymentHeight(ctx context.Context) (uint64, error)
 }

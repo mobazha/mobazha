@@ -1,54 +1,73 @@
-# Mobazha Community Edition
+# Mobazha Node
 
-Mobazha Community Edition is a self-hostable, peer-to-peer marketplace node. It provides store management, listings, orders, fulfillment, disputes, ratings, notifications, wallet integration, and a browser-based administration experience from one node.
+**Run your own peer-to-peer store. Own your data, accept crypto, and manage
+the full commerce lifecycle from one node.**
 
-Originally developed by [fengzie](https://github.com/fengzie) and maintained by
-the Mobazha contributors. The canonical source repository is
-[mobazha/mobazha3.0](https://github.com/mobazha/mobazha3.0).
+Mobazha Node is the open-source runtime for self-hosted Mobazha stores. It
+combines catalog and order management, fulfillment, disputes, ratings,
+messaging, wallet-backed payment monitoring, APIs, and an embedded browser
+interface.
 
-> **Status:** This repository is a pre-release Community Edition candidate. Security, dependency-license, packaging, and release-process reviews are still in progress.
+[Quick Start](#quick-start) · [Operations](#operations) ·
+[Frontend](https://github.com/mobazha/mobazha-unified) ·
+[Contributing](./CONTRIBUTING.md)
 
-## Included payment capabilities
+> **Status:** v0.3 is a release candidate intended for evaluation and testnet
+> use. Stable binaries and signed release artifacts have not been published
+> yet.
 
-The initial Community Edition runtime enables:
+## Why run a Mobazha node?
 
-- Bitcoin (BTC)
-- Bitcoin Cash (BCH)
-- Litecoin (LTC)
+- **Own your store** — keep your catalog, orders, customer interactions, and
+  operational data on infrastructure you control.
+- **Run complete commerce workflows** — manage listings, checkout,
+  fulfillment, refunds, disputes, and ratings from one node.
+- **Accept wallet-backed payments** — monitor and verify supported
+  cryptocurrency payments without a platform-controlled checkout.
+- **Connect directly** — participate in peer-to-peer discovery, order
+  messaging, and notifications.
+- **Automate operations** — integrate through HTTP, WebSocket, and MCP APIs.
+- **Operate with confidence** — use built-in service management, diagnostics,
+  and compressed backups.
 
-The authoritative allowlist is [`config/editions/community.json`](config/editions/community.json). Runtime availability is the intersection of the edition allowlist and seller configuration. Clients may narrow this set, but they must never widen it.
+A local standalone store remains usable for administration, listings, data
+export, and supported UTXO payment flows without requiring a Mobazha Hosting
+account. Optional services can add discovery, search, routing, managed updates,
+or support.
 
-Identifiers or adapters for other chains may remain in the repository for historical-data migration and protocol compatibility. Their presence does not enable those chains and is not a compatibility or support commitment. Bundled fiat payment providers are not enabled in the Community Edition runtime.
+## What is included?
 
-## Architecture
+### Store operations
 
-The node is organized around explicit application services for marketplace, order, payment, and settlement workflows. The Community Edition policy remains authoritative for capability registration, API projection, validation, and wallet startup.
+- Store profile and storefront configuration
+- Product listings and shipping profiles
+- Order, fulfillment, shipping, cancellation, and refund workflows
+- Browser-based seller administration
 
-Additional payment capabilities are planned as independently versioned,
-out-of-process plugins. Core keeps policy enforcement, order state,
-verification, audit, and key custody. Plugins must not receive raw seed phrases
-or private keys.
+### Trust and communication
 
-See:
+- Buyer and seller order state management
+- Payment monitoring and verification
+- Disputes, evidence, resolution, and ratings
+- Durable peer-to-peer messages and notifications
 
-- [Community Edition scope](docs/community/COMMUNITY_EDITION.md)
-- [OEM and VPS distribution](docs/community/OEM_DISTRIBUTION.md)
-- [Public repository history](docs/community/PUBLIC_HISTORY.md)
-- [Payment plugin architecture](docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md)
-- [ADR-015: payment plugin boundary](docs/adr/015-payment-plugin-boundary.md)
-- [ADR-016: in-process first-party distribution composition](docs/adr/016-in-process-distribution-composition.md)
-- [ADR-017: Community v0.3 payment chain scope](docs/adr/017-community-v0.3-chain-scope.md)
-- [Supply-chain audit baseline](docs/security/SUPPLY_CHAIN_AUDIT.md)
+### Platform capabilities
 
-## Requirements
+- Embedded Web UI
+- Versioned HTTP API and WebSocket events
+- MCP endpoint for agent and automation integrations
+- Background service installation and lifecycle management
+- Health diagnostics and local backups
+
+## Quick Start
+
+### Requirements
 
 - Go 1.26.4
 - Git
 - A supported macOS or Linux development environment
 
-The default test configuration uses the pure-Go `goolm` implementation. Native `libolm` is optional and is only required for the dedicated native-libolm build or test path.
-
-## Build from source
+Clone and build the node with the default pure-Go crypto implementation:
 
 ```bash
 git clone https://github.com/mobazha/mobazha3.0.git
@@ -62,14 +81,9 @@ Start the node and open the embedded Web UI:
 ./mobazha start --open
 ```
 
-The first start initializes the default data directory automatically. By default, the Web UI and HTTP API listen on `http://127.0.0.1:5102`, with API routes under `/v1/`.
-
-To initialize a custom data directory explicitly:
-
-```bash
-./mobazha init --datadir /path/to/mobazha-data
-./mobazha start --datadir /path/to/mobazha-data --open
-```
+The first start initializes the default data directory automatically. The Web
+UI and HTTP API listen on `http://127.0.0.1:5102` by default, with API routes
+under `/v1/`.
 
 Use testnet while evaluating payment flows:
 
@@ -77,6 +91,48 @@ Use testnet while evaluating payment flows:
 ./mobazha init --testnet
 ./mobazha start --testnet --open
 ```
+
+To use a custom data directory:
+
+```bash
+./mobazha init --datadir /path/to/mobazha-data
+./mobazha start --datadir /path/to/mobazha-data --open
+```
+
+## Payments and release scope
+
+The first open-source release enables these payment methods by default:
+
+- Bitcoin (BTC)
+- Bitcoin Cash (BCH)
+- Litecoin (LTC)
+
+Runtime availability also depends on the seller configuration. Frontends may
+narrow the methods reported by the node, but they cannot enable a method the
+node did not advertise.
+
+Additional payment extensions are being designed around a versioned plugin
+boundary. The public protocol is under development and should not yet be
+treated as a stable plugin runtime. Core remains responsible for policy, order
+state, verification, audit, settlement gates, and key custody; plugins must not
+receive raw seed phrases or private keys.
+
+See [release scope](./docs/community/COMMUNITY_EDITION.md) and
+[payment plugin architecture](./docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md).
+
+## APIs and integrations
+
+Mobazha Node exposes its commerce capabilities through:
+
+- HTTP APIs under `/v1/`
+- WebSocket connections under `/ws`
+- MCP Streamable HTTP under `/v1/mcp`
+- The shared [Mobazha Unified](https://github.com/mobazha/mobazha-unified)
+  storefront and seller interface
+
+The node is authoritative for capabilities, order state, payment verification,
+settlement, audit, and wallet operations. Clients render only the capabilities
+reported by the connected node.
 
 ## Operations
 
@@ -89,7 +145,7 @@ Install and manage the node as a background service on Linux or macOS:
 ./mobazha service start
 ```
 
-Run environment and node diagnostics:
+Run diagnostics:
 
 ```bash
 ./mobazha doctor
@@ -102,9 +158,21 @@ Create a compressed backup of the node data directory:
 ./mobazha backup --output mobazha-backup.tar.gz
 ```
 
-Standalone Docker deployment files are available under [`deploy/standalone`](deploy/standalone).
+Pre-release Docker, appliance, and standalone packaging files are available
+under [`deploy/standalone`](./deploy/standalone). Review the exact image tag,
+configuration, upgrade, and recovery instructions before using them outside a
+test environment.
 
-## Testing and release checks
+## Architecture and release documentation
+
+- [Release scope](./docs/community/COMMUNITY_EDITION.md)
+- [Compatibility policy](./docs/community/COMPATIBILITY.md)
+- [OEM and VPS distribution](./docs/community/OEM_DISTRIBUTION.md)
+- [Payment plugin architecture](./docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md)
+- [Supply-chain audit](./docs/security/SUPPLY_CHAIN_AUDIT.md)
+- [v0.3 release candidate notes](./docs/releases/v0.3.0-community.1.md)
+
+## Development and release checks
 
 Run the full Go test suite with the default pure-Go crypto implementation:
 
@@ -118,7 +186,7 @@ If native `libolm` is installed, run the native path with:
 make test-libolm
 ```
 
-Validate the Community Edition boundary:
+Validate the current public-release boundary:
 
 ```bash
 scripts/community/check-capabilities.sh
@@ -127,30 +195,31 @@ scripts/community/check-oem-distribution.sh --source
 scripts/community/check-vulnerabilities.sh
 ```
 
-The vulnerability check requires `govulncheck` on `PATH`.
+The vulnerability check requires `govulncheck` on `PATH`. Release maintainers
+should also follow the SBOM and license-review process in the
+[supply-chain audit](./docs/security/SUPPLY_CHAIN_AUDIT.md).
 
-Apply reviewed license conclusions to a fresh Syft SPDX JSON SBOM and collect
-the license texts required by the default Go release target:
+## License and attribution
 
-```bash
-python3 scripts/community/apply-license-conclusions.py \
-  mobazha-community.spdx.json \
-  mobazha-community-reviewed.spdx.json
-python3 scripts/community/collect-go-module-licenses.py \
-  third-party-licenses
-```
+Mobazha-authored source in this repository, including retained Mobazha history,
+is licensed under the [Mozilla Public License 2.0](./LICENSE).
 
-## Licensing
+Portions derived from OpenBazaar remain available under the
+[OpenBazaar MIT License](./LICENSES/MIT-OpenBazaar.txt). Third-party
+dependencies and assets remain subject to their respective licenses. See
+[NOTICE](./NOTICE) and
+[Attribution and source identity](./docs/community/ATTRIBUTION.md) for details.
 
-Mobazha-authored source in this repository is licensed under the [Mozilla Public License 2.0](LICENSE).
-
-Portions derived from OpenBazaar remain available under the [OpenBazaar MIT License](LICENSES/MIT-OpenBazaar.txt). Third-party dependencies and assets remain subject to their respective licenses. See [NOTICE](NOTICE) for attribution and scope.
-
-See [Attribution and source identity](docs/community/ATTRIBUTION.md) for the
-canonical project origin, source-header policy, and fork requirements.
+Originally developed by [fengzie](https://github.com/fengzie) and maintained by
+the Mobazha contributors. The canonical source repository is
+[mobazha/mobazha3.0](https://github.com/mobazha/mobazha3.0).
 
 ## Contributing and security
 
-Contributions are welcome. Before opening a pull request, read [CONTRIBUTING.md](CONTRIBUTING.md) and sign off commits under the [Developer Certificate of Origin](DCO.md). Report security issues privately as described in [SECURITY.md](SECURITY.md).
+Contributions are welcome. Before opening a pull request, read
+[CONTRIBUTING.md](./CONTRIBUTING.md) and sign off commits under the
+[Developer Certificate of Origin](./DCO.md).
 
-The source-code licenses do not grant rights to use Mobazha names or logos. See [TRADEMARKS.md](TRADEMARKS.md).
+Report security issues privately as described in [SECURITY.md](./SECURITY.md).
+The source-code licenses do not grant rights to use Mobazha names or logos; see
+[TRADEMARKS.md](./TRADEMARKS.md).

@@ -32,6 +32,10 @@ financial state transitions stay in Core.
 - The product codec is invoked only through
   `order-extension.declaration/v1`; purchase, incoming-order, payment-session,
   and delivery composition no longer parse Collectibles metadata directly.
+- Distribution policy is invoked independently through
+  `order-extension.declaration-admission/v1` after declaration validation and
+  before persistence. The declaration codec remains pure, while runtime feature
+  governance can reject new work without disabling persisted lifecycle handling.
 - Signed `RWA_TOKEN` orders fail closed when no declaration module is installed
   or when the module produces no extension envelope.
 - `OrderExtensionReservationRecord` persists the exact provider reservation
@@ -49,7 +53,7 @@ financial state transitions stay in Core.
   Core-issued order-state version, fresh evidence, and a provider-owned
   `AttestationVerifier`. Core reloads and rechecks state under the settlement
   command lock after verification.
-- Module registration accepts only the four exact v1 capability contract
+- Module registration accepts only the five exact v1 capability contract
   strings, requires descriptor/interface agreement and non-nil capabilities,
   and snapshots descriptors before runtime dispatch.
 - Accepted attestations are audited before Core invokes its standard settlement

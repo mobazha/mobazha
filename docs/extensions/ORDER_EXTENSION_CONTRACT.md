@@ -67,6 +67,16 @@ Declarations are produced by the provider's
 Core no longer calls a Collectibles codec from order or payment composition.
 The declaration capability receives no database, network, key, or Node handle.
 
+A module may separately declare
+`order-extension.declaration-admission/v1`. Core invokes this policy Function
+only after that module has produced non-empty, validated declarations and
+before any declaration is persisted. The Function receives detached copies of
+the signed order and envelopes, may allow or deny the new declaration, and
+cannot mutate Core state. Runtime distribution policy and feature governance
+belong here rather than inside the pure declaration codec. Admission is not
+consulted for already-persisted lifecycle delivery, release, or settlement, so
+disabling new work does not strand existing orders.
+
 ## 2. Resource reservation
 
 Domains that allocate scarce resources implement a synchronous provisioning

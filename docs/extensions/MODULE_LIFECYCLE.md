@@ -22,6 +22,7 @@ version: 1.0.0
 runtime: static
 contracts:
   - order-extension.declaration/v1
+  - order-extension.declaration-admission/v1
   - order-extension.reservation/v1
   - order-extension.delivery/v1
   - order-extension.attestation/v1

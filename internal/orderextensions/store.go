@@ -1,11 +1,13 @@
 package orderextensions
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -289,6 +291,9 @@ func ProjectReservations(source, target database.Database, orderID string) error
 			if binding == nil {
 				continue
 			}
+			if binding.ExtensionRevision != extension.Revision {
+				return fmt.Errorf("source order extension %s reservation revision %d does not match declaration revision %d", extension.ExtensionID, binding.ExtensionRevision, extension.Revision)
+			}
 			projected = append(projected, projection{extension: extension, binding: *binding})
 		}
 		return nil
@@ -309,9 +314,7 @@ func ProjectReservations(source, target database.Database, orderID string) error
 		}
 		for _, item := range projected {
 			targetExtension, ok := targetByID[item.extension.ExtensionID]
-			if !ok || targetExtension.Revision != item.extension.Revision ||
-				targetExtension.PayloadHash != item.extension.PayloadHash ||
-				targetExtension.ProviderID != item.extension.ProviderID {
+			if !ok || !sameReservationDeclaration(targetExtension, item.extension) {
 				return fmt.Errorf("target order extension %s does not match reservation declaration", item.extension.ExtensionID)
 			}
 			if err := RecordReservationTx(tx, extensions.ReservationRequest{
@@ -325,6 +328,20 @@ func ProjectReservations(source, target database.Database, orderID string) error
 		}
 		return nil
 	})
+}
+
+func sameReservationDeclaration(left, right extensions.OrderExtension) bool {
+	return left.ExtensionID == right.ExtensionID &&
+		left.ProviderID == right.ProviderID &&
+		left.Type == right.Type &&
+		left.SchemaVersion == right.SchemaVersion &&
+		left.Revision == right.Revision &&
+		left.ResourceID == right.ResourceID &&
+		left.ReservationRequired == right.ReservationRequired &&
+		left.SettlementPolicy == right.SettlementPolicy &&
+		slices.Equal(left.LifecycleEvents, right.LifecycleEvents) &&
+		left.PayloadHash == right.PayloadHash &&
+		bytes.Equal(left.Payload, right.Payload)
 }
 
 // SettlementReferenceForOrder derives the opaque financial-state version that

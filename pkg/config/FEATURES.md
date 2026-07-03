@@ -103,8 +103,9 @@
 - **Scopes**: PlatformGlobal
 - **Consumers**:
   - distribution-provided Collectibles API operations
+  - the distribution module's new-order declaration admission
   - compatible clients that declare the runtime capability
-- **Kill Path**: false disables Collectibles operations and keeps client entry points hidden
+- **Kill Path**: false hides Collectibles operations and rejects new Collectibles order declarations; already-persisted orders retain release, delivery, and settlement processing
 - **Dependencies**: a distribution-provided lifecycle adapter
 
 ---

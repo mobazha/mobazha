@@ -42,6 +42,12 @@ func enqueueTx(tx database.Tx, order *models.Order, eventType, reason string) er
 		if loadErr != nil {
 			return fmt.Errorf("extension lifecycle: load reservation %s: %w", extension.ExtensionID, loadErr)
 		}
+		// A terminal transition may happen before payment provisioning created a
+		// reservation. There is nothing external to release in that case, and the
+		// optional extension must not prevent Core from reaching its terminal state.
+		if eventType == extensions.EventOrderReservationReleaseRequested && reservation == nil {
+			continue
+		}
 		event, buildErr := eventForOrder(order, extension, reservation, eventType, reason)
 		if buildErr != nil {
 			return buildErr
@@ -142,6 +148,9 @@ func eventForOrder(order *models.Order, extension extensions.OrderExtension, res
 	if reservation != nil {
 		if err := reservation.Validate(); err != nil {
 			return extensions.Event{}, fmt.Errorf("extension lifecycle: invalid reservation binding: %w", err)
+		}
+		if reservation.ExtensionRevision != extension.Revision {
+			return extensions.Event{}, fmt.Errorf("extension lifecycle: reservation revision %d does not match extension revision %d", reservation.ExtensionRevision, extension.Revision)
 		}
 	}
 	sourceID, role, err := orderSource(order)

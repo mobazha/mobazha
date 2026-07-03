@@ -65,6 +65,13 @@ type testController struct{}
 
 func (testController) HandleExtensionEvent(context.Context, Event) error { return nil }
 
+type testAdmissionModule struct{ descriptor ModuleDescriptor }
+
+func (m testAdmissionModule) Descriptor() ModuleDescriptor { return m.descriptor }
+func (testAdmissionModule) DeclarationAdmission() DeclarationAdmissionFunc {
+	return func(context.Context, DeclarationAdmissionInput) error { return nil }
+}
+
 func TestValidateModules_RejectsMissingDependenciesAndCycles(t *testing.T) {
 	base := testModule{descriptor: ModuleDescriptor{ID: "base", Version: "1.0.0", Contracts: []string{ContractOrderExtensionDeliveryV1}}}
 	require.NoError(t, ValidateModules(base))
@@ -87,6 +94,9 @@ func TestValidateModules_EnforcesExactContractCapabilityAgreement(t *testing.T) 
 	require.ErrorContains(t, ValidateModules(testModule{descriptor: ModuleDescriptor{
 		ID: " spaced", Version: "1", Contracts: []string{ContractOrderExtensionDeliveryV1},
 	}}), "canonical")
+	require.ErrorContains(t, ValidateModules(testAdmissionModule{descriptor: ModuleDescriptor{
+		ID: "admission-only", Version: "1", Contracts: []string{ContractOrderExtensionDeclarationAdmissionV1},
+	}}), "requires the declaration contract")
 }
 
 func TestSnapshotDescriptor_IsDetachedFromModuleMutation(t *testing.T) {

@@ -19,10 +19,11 @@ import (
 const (
 	ContractVersionV1 = "v1"
 
-	ContractOrderExtensionDeclarationV1 = "order-extension.declaration/v1"
-	ContractOrderExtensionReservationV1 = "order-extension.reservation/v1"
-	ContractOrderExtensionDeliveryV1    = "order-extension.delivery/v1"
-	ContractOrderExtensionAttestationV1 = "order-extension.attestation/v1"
+	ContractOrderExtensionDeclarationV1          = "order-extension.declaration/v1"
+	ContractOrderExtensionDeclarationAdmissionV1 = "order-extension.declaration-admission/v1"
+	ContractOrderExtensionReservationV1          = "order-extension.reservation/v1"
+	ContractOrderExtensionDeliveryV1             = "order-extension.delivery/v1"
+	ContractOrderExtensionAttestationV1          = "order-extension.attestation/v1"
 
 	EventOrderPaymentVerified                = "io.mobazha.order.payment-verified"
 	EventOrderReservationReleaseRequested    = "io.mobazha.order.reservation-release-requested"
@@ -54,15 +55,17 @@ type Module interface {
 // module. Capability accessors are invoked exactly once while the snapshot is
 // built so validation and runtime invocation cannot observe different ports.
 type ModuleSnapshot struct {
-	Descriptor     ModuleDescriptor
-	Declaration    DeclarationPort
-	Reservation    ReservationPort
-	Controller     Controller
-	Attestation    AttestationVerifier
-	hasDeclaration bool
-	hasReservation bool
-	hasController  bool
-	hasAttestation bool
+	Descriptor           ModuleDescriptor
+	Declaration          DeclarationPort
+	DeclarationAdmission DeclarationAdmissionFunc
+	Reservation          ReservationPort
+	Controller           Controller
+	Attestation          AttestationVerifier
+	hasDeclaration       bool
+	hasAdmission         bool
+	hasReservation       bool
+	hasController        bool
+	hasAttestation       bool
 }
 
 // ValidateModules validates the immutable module graph before Core resources
@@ -176,6 +179,7 @@ func cloneDescriptor(descriptor ModuleDescriptor) ModuleDescriptor {
 func isSupportedContract(contract string) bool {
 	switch contract {
 	case ContractOrderExtensionDeclarationV1,
+		ContractOrderExtensionDeclarationAdmissionV1,
 		ContractOrderExtensionReservationV1,
 		ContractOrderExtensionDeliveryV1,
 		ContractOrderExtensionAttestationV1:
@@ -192,6 +196,10 @@ func snapshotModuleCapabilities(module Module, descriptor ModuleDescriptor) Modu
 	if capability, ok := module.(DeclarationModule); ok {
 		snapshot.hasDeclaration = true
 		snapshot.Declaration = capability.DeclarationPort()
+	}
+	if capability, ok := module.(DeclarationAdmissionModule); ok {
+		snapshot.hasAdmission = true
+		snapshot.DeclarationAdmission = capability.DeclarationAdmission()
 	}
 	if capability, ok := module.(ReservationModule); ok {
 		snapshot.hasReservation = true
@@ -215,6 +223,7 @@ func validateModuleCapabilities(snapshot ModuleSnapshot) error {
 		value    any
 	}{
 		{ContractOrderExtensionDeclarationV1, snapshot.hasDeclaration, snapshot.Declaration},
+		{ContractOrderExtensionDeclarationAdmissionV1, snapshot.hasAdmission, snapshot.DeclarationAdmission},
 		{ContractOrderExtensionReservationV1, snapshot.hasReservation, snapshot.Reservation},
 		{ContractOrderExtensionDeliveryV1, snapshot.hasController, snapshot.Controller},
 		{ContractOrderExtensionAttestationV1, snapshot.hasAttestation, snapshot.Attestation},
@@ -227,6 +236,10 @@ func validateModuleCapabilities(snapshot ModuleSnapshot) error {
 		if declared && isNilCapability(check.value) {
 			return fmt.Errorf("order extension module %q contract %q returned a nil capability", snapshot.Descriptor.ID, check.contract)
 		}
+	}
+	if descriptorHasContract(snapshot.Descriptor, ContractOrderExtensionDeclarationAdmissionV1) &&
+		!descriptorHasContract(snapshot.Descriptor, ContractOrderExtensionDeclarationV1) {
+		return fmt.Errorf("order extension module %q declaration admission requires the declaration contract", snapshot.Descriptor.ID)
 	}
 	return nil
 }
@@ -299,6 +312,26 @@ type DeclarationPort interface {
 type DeclarationModule interface {
 	Module
 	DeclarationPort() DeclarationPort
+}
+
+// DeclarationAdmissionInput contains validated declarations produced by one
+// module for the signed Core aggregate. The function may make policy decisions
+// but must not mutate Core state.
+type DeclarationAdmissionInput struct {
+	OrderID    string
+	OrderOpen  *pb.OrderOpen
+	Extensions []OrderExtension
+}
+
+// DeclarationAdmissionFunc decides whether validated declarations may be
+// persisted. It is invoked only when the module declared at least one extension.
+type DeclarationAdmissionFunc func(context.Context, DeclarationAdmissionInput) error
+
+// DeclarationAdmissionModule exposes a policy function independently from the
+// pure declaration codec.
+type DeclarationAdmissionModule interface {
+	Module
+	DeclarationAdmission() DeclarationAdmissionFunc
 }
 
 // NewOrderExtension creates a stable extension identity and hashes its JSON payload.

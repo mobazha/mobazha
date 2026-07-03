@@ -164,6 +164,119 @@ func TestRecordReservationTx_PersistsProviderBindingIdempotently(t *testing.T) {
 	require.ErrorContains(t, err, "immutable")
 }
 
+func TestProjectReservations_RequiresExactImmutableDeclaration(t *testing.T) {
+	const orderID = "order-projection-declaration"
+	baseline, err := extensions.NewOrderExtension(orderID, "provider", "type", "v1", "resource", map[string]string{"value": "one"})
+	require.NoError(t, err)
+	baseline.LifecycleEvents = []string{
+		extensions.EventOrderPaymentVerified,
+		extensions.EventOrderReservationReleaseRequested,
+	}
+
+	source, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, source.Close()) })
+	require.NoError(t, source.Update(func(tx database.Tx) error {
+		if err := orderextensions.PersistTx(tx, orderID, baseline); err != nil {
+			return err
+		}
+		return orderextensions.RecordReservationTx(tx, extensions.ReservationRequest{
+			OrderID: orderID, Extension: baseline, PaymentCoin: "MATIC",
+			IdempotencyKey: "reserve:projection", ExpiresAt: time.Now().UTC().Add(time.Hour),
+		}, extensions.Reservation{ID: "reservation-projection", Version: 1, Status: "reserved"})
+	}))
+
+	tests := []struct {
+		name    string
+		mutate  func(*extensions.OrderExtension)
+		wantErr bool
+	}{
+		{name: "exact declaration"},
+		{name: "schema version", wantErr: true, mutate: func(extension *extensions.OrderExtension) { extension.SchemaVersion = "v2" }},
+		{name: "reservation policy", wantErr: true, mutate: func(extension *extensions.OrderExtension) { extension.ReservationRequired = true }},
+		{name: "settlement policy", mutate: func(extension *extensions.OrderExtension) {
+			extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
+		}, wantErr: true},
+		{name: "lifecycle events", mutate: func(extension *extensions.OrderExtension) {
+			extension.LifecycleEvents = []string{extensions.EventOrderPaymentVerified}
+		}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target, err := repo.MockDB()
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, target.Close()) })
+			targetExtension := baseline
+			targetExtension.LifecycleEvents = append([]string(nil), baseline.LifecycleEvents...)
+			if tt.mutate != nil {
+				tt.mutate(&targetExtension)
+			}
+			require.NoError(t, target.Update(func(tx database.Tx) error {
+				return orderextensions.PersistTx(tx, orderID, targetExtension)
+			}))
+
+			err = orderextensions.ProjectReservations(source, target, orderID)
+			if tt.wantErr {
+				require.ErrorContains(t, err, "does not match reservation declaration")
+			} else {
+				require.NoError(t, err)
+			}
+			require.NoError(t, target.View(func(tx database.Tx) error {
+				binding, loadErr := orderextensions.ReservationByExtensionTx(tx, orderID, targetExtension.ExtensionID)
+				if tt.wantErr {
+					require.Nil(t, binding)
+				} else {
+					require.NotNil(t, binding)
+					require.Equal(t, "reservation-projection", binding.ReservationID)
+				}
+				return loadErr
+			}))
+		})
+	}
+}
+
+func TestProjectReservations_RejectsReservationForStaleExtensionRevision(t *testing.T) {
+	const orderID = "order-projection-stale-reservation"
+	baseline, err := extensions.NewOrderExtension(orderID, "provider", "type", "v1", "resource", map[string]string{"value": "one"})
+	require.NoError(t, err)
+	updated, err := extensions.NewOrderExtension(orderID, "provider", "type", "v1", "resource", map[string]string{"value": "two"})
+	require.NoError(t, err)
+
+	source, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, source.Close()) })
+	require.NoError(t, source.Update(func(tx database.Tx) error {
+		if err := orderextensions.PersistTx(tx, orderID, baseline); err != nil {
+			return err
+		}
+		if err := orderextensions.RecordReservationTx(tx, extensions.ReservationRequest{
+			OrderID: orderID, Extension: baseline, PaymentCoin: "MATIC",
+			IdempotencyKey: "reserve:stale", ExpiresAt: time.Now().UTC().Add(time.Hour),
+		}, extensions.Reservation{ID: "reservation-stale", Version: 1, Status: "reserved"}); err != nil {
+			return err
+		}
+		return orderextensions.PersistTx(tx, orderID, updated)
+	}))
+
+	target, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, target.Close()) })
+	require.NoError(t, target.Update(func(tx database.Tx) error {
+		if err := orderextensions.PersistTx(tx, orderID, baseline); err != nil {
+			return err
+		}
+		return orderextensions.PersistTx(tx, orderID, updated)
+	}))
+
+	err = orderextensions.ProjectReservations(source, target, orderID)
+	require.ErrorContains(t, err, "reservation revision 1 does not match declaration revision 2")
+	require.NoError(t, target.View(func(tx database.Tx) error {
+		binding, loadErr := orderextensions.ReservationByExtensionTx(tx, orderID, baseline.ExtensionID)
+		require.Nil(t, binding)
+		return loadErr
+	}))
+}
+
 func TestValidateConfirmationAuthorizationTx_BindsExecutedAttestationToCurrentState(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)

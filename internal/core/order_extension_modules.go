@@ -11,11 +11,12 @@ import (
 )
 
 type registeredOrderExtensionModule struct {
-	descriptor  extensions.ModuleDescriptor
-	declaration extensions.DeclarationPort
-	reservation extensions.ReservationPort
-	controller  extensions.Controller
-	attestation extensions.AttestationVerifier
+	descriptor           extensions.ModuleDescriptor
+	declaration          extensions.DeclarationPort
+	declarationAdmission extensions.DeclarationAdmissionFunc
+	reservation          extensions.ReservationPort
+	controller           extensions.Controller
+	attestation          extensions.AttestationVerifier
 }
 
 type orderExtensionFields struct {
@@ -30,11 +31,12 @@ func snapshotOrderExtensionModules(modules []extensions.Module) ([]registeredOrd
 	registered := make([]registeredOrderExtensionModule, 0, len(snapshots))
 	for _, snapshot := range snapshots {
 		registered = append(registered, registeredOrderExtensionModule{
-			descriptor:  snapshot.Descriptor,
-			declaration: snapshot.Declaration,
-			reservation: snapshot.Reservation,
-			controller:  snapshot.Controller,
-			attestation: snapshot.Attestation,
+			descriptor:           snapshot.Descriptor,
+			declaration:          snapshot.Declaration,
+			declarationAdmission: snapshot.DeclarationAdmission,
+			reservation:          snapshot.Reservation,
+			controller:           snapshot.Controller,
+			attestation:          snapshot.Attestation,
 		})
 	}
 	return registered, nil
@@ -90,6 +92,7 @@ func (n *MobazhaNode) declareOrderExtensions(ctx context.Context, input extensio
 		if err != nil {
 			return nil, fmt.Errorf("order extension module %q declaration: %w", registered.descriptor.ID, err)
 		}
+		validatedForModule := make([]extensions.OrderExtension, 0, len(extensionsForModule))
 		for _, extension := range extensionsForModule {
 			if err := extension.ValidateForOrder(input.OrderID); err != nil {
 				return nil, fmt.Errorf("order extension module %q declaration: %w", registered.descriptor.ID, err)
@@ -111,8 +114,31 @@ func (n *MobazhaNode) declareOrderExtensions(ctx context.Context, input extensio
 				return nil, fmt.Errorf("order extension %q was declared more than once", extension.ExtensionID)
 			}
 			seen[extension.ExtensionID] = struct{}{}
-			declared = append(declared, extension)
+			validatedForModule = append(validatedForModule, extension)
 		}
+		if len(validatedForModule) > 0 && registered.hasContract(extensions.ContractOrderExtensionDeclarationAdmissionV1) {
+			admissionInput := extensions.DeclarationAdmissionInput{
+				OrderID:    input.OrderID,
+				Extensions: cloneOrderExtensions(validatedForModule),
+			}
+			if input.OrderOpen != nil {
+				admissionInput.OrderOpen = proto.Clone(input.OrderOpen).(*orderpb.OrderOpen)
+			}
+			if err := registered.declarationAdmission(ctx, admissionInput); err != nil {
+				return nil, fmt.Errorf("order extension module %q declaration admission: %w", registered.descriptor.ID, err)
+			}
+		}
+		declared = append(declared, validatedForModule...)
 	}
 	return declared, nil
+}
+
+func cloneOrderExtensions(declared []extensions.OrderExtension) []extensions.OrderExtension {
+	cloned := make([]extensions.OrderExtension, len(declared))
+	for i := range declared {
+		cloned[i] = declared[i]
+		cloned[i].LifecycleEvents = append([]string(nil), declared[i].LifecycleEvents...)
+		cloned[i].Payload = append([]byte(nil), declared[i].Payload...)
+	}
+	return cloned
 }

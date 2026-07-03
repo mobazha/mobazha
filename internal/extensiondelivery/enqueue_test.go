@@ -53,8 +53,12 @@ func TestEnqueuePaymentVerifiedTx_UsesLatestPersistedExtensionRevision(t *testin
 		if err := orderextensions.PersistTx(tx, order.ID.String(), second); err != nil {
 			return err
 		}
+		persisted, err := orderextensions.LatestByIDTx(tx, order.ID.String(), second.ExtensionID)
+		if err != nil {
+			return err
+		}
 		if err := orderextensions.RecordReservationTx(tx, extensions.ReservationRequest{
-			OrderID: order.ID.String(), Extension: second, PaymentCoin: "MATIC", IdempotencyKey: "reserve:1", ExpiresAt: time.Now().UTC().Add(time.Hour),
+			OrderID: order.ID.String(), Extension: persisted, PaymentCoin: "MATIC", IdempotencyKey: "reserve:1", ExpiresAt: time.Now().UTC().Add(time.Hour),
 		}, extensions.Reservation{ID: "reservation-1", Version: 2, Status: "reserved"}); err != nil {
 			return err
 		}
@@ -74,6 +78,22 @@ func TestEnqueuePaymentVerifiedTx_UsesLatestPersistedExtensionRevision(t *testin
 	require.Equal(t, "reservation-1", payload.Reservation.ReservationID)
 	require.Equal(t, "settlement-1", payload.Settlement.SettlementID)
 	require.NotEmpty(t, payload.Settlement.OrderStateVersion)
+}
+
+func TestEventForOrder_RejectsReservationForStaleExtensionRevision(t *testing.T) {
+	order := &models.Order{ID: "order-stale-reservation-event"}
+	extension, err := extensions.NewOrderExtension(order.ID.String(), "provider", "type", "v1", "resource", map[string]string{"value": "two"})
+	require.NoError(t, err)
+	extension.Revision = 2
+	now := time.Now().UTC()
+	reservation := &extensions.ReservationBinding{
+		ReservationID: "reservation-stale", ReservationVersion: 1, ExtensionRevision: 1,
+		Status: "reserved", PaymentCoin: "MATIC", IdempotencyKey: "reserve:stale",
+		ExpiresAt: now.Add(time.Hour), RecordedAt: now,
+	}
+
+	_, err = eventForOrder(order, extension, reservation, extensions.EventOrderPaymentVerified, "")
+	require.ErrorContains(t, err, "reservation revision 1 does not match extension revision 2")
 }
 
 func TestEnqueuePaymentVerifiedTx_SkipsUnsubscribedExtension(t *testing.T) {
@@ -189,6 +209,37 @@ func TestEnqueueTerminalEventTx_WritesGenericReleaseEvent(t *testing.T) {
 		return tx.Read().Where("order_id = ?", order.ID.String()).First(&delivery).Error
 	}))
 	require.Equal(t, extensions.EventOrderReservationReleaseRequested, delivery.EventType)
+}
+
+func TestEnqueueTerminalEventTx_MissingReservationDoesNotBlockTerminalTransition(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	orderOpen := managedCollectibleOrderOpen()
+	serialized, err := protojson.Marshal(orderOpen)
+	require.NoError(t, err)
+	order := &models.Order{ID: "order-extension-release-without-reservation", SerializedOrderOpen: serialized}
+	order.SetRole(models.RoleVendor)
+	extension, ok, err := models.CollectibleOrderExtensionFromOrderOpen(order.ID.String(), orderOpen)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		if err := orderextensions.PersistTx(tx, order.ID.String(), extension); err != nil {
+			return err
+		}
+		return EnqueueTerminalEventTx(tx, order, &events.OrderExpired{
+			OrderID: order.ID.String(), Reason: "buyer abandoned checkout",
+		})
+	}))
+
+	var count int64
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Model(&models.ExtensionDelivery{}).Where("order_id = ?", order.ID.String()).Count(&count).Error
+	}))
+	require.Zero(t, count)
 }
 
 func testReservationBinding(extension extensions.OrderExtension) *extensions.ReservationBinding {

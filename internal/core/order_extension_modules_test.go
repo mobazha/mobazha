@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/mobazha/mobazha/pkg/extensions"
@@ -23,6 +24,15 @@ type declarationTestModule struct {
 func (m *declarationTestModule) Descriptor() extensions.ModuleDescriptor { return m.descriptor }
 func (m *declarationTestModule) DeclarationPort() extensions.DeclarationPort {
 	return m.port
+}
+
+type admissionTestModule struct {
+	*declarationTestModule
+	admission extensions.DeclarationAdmissionFunc
+}
+
+func (m *admissionTestModule) DeclarationAdmission() extensions.DeclarationAdmissionFunc {
+	return m.admission
 }
 
 func TestDeclareOrderExtensions_UsesRegisteredModuleCodec(t *testing.T) {
@@ -47,6 +57,42 @@ func TestDeclareOrderExtensions_UsesRegisteredModuleCodec(t *testing.T) {
 	require.Len(t, declared, 1)
 	require.Equal(t, "io.mobazha.test-declaration", declared[0].ProviderID)
 	require.Equal(t, registered[0].descriptor.ID, declared[0].ProviderID)
+	require.Equal(t, "original-buyer", orderOpen.GetBuyerID().GetPeerID())
+}
+
+func TestDeclareOrderExtensions_AppliesAdmissionAfterPureDeclaration(t *testing.T) {
+	denied := errors.New("distribution capability is disabled")
+	module := &admissionTestModule{
+		declarationTestModule: &declarationTestModule{
+			descriptor: extensions.ModuleDescriptor{
+				ID: "io.mobazha.admitted", Version: "1.0.0",
+				Contracts: []string{
+					extensions.ContractOrderExtensionDeclarationV1,
+					extensions.ContractOrderExtensionDeclarationAdmissionV1,
+				},
+			},
+			port: declarationPortFunc(func(_ context.Context, input extensions.DeclarationInput) ([]extensions.OrderExtension, error) {
+				extension, err := extensions.NewOrderExtension(input.OrderID, "io.mobazha.admitted", "test", "v1", "resource", map[string]string{"value": "declared"})
+				return []extensions.OrderExtension{extension}, err
+			}),
+		},
+		admission: func(_ context.Context, input extensions.DeclarationAdmissionInput) error {
+			require.Equal(t, "order-admission", input.OrderID)
+			require.Len(t, input.Extensions, 1)
+			input.OrderOpen.BuyerID.PeerID = "mutated-by-admission"
+			input.Extensions[0].Payload[0] = 'x'
+			return denied
+		},
+	}
+	registered, err := snapshotOrderExtensionModules([]extensions.Module{module})
+	require.NoError(t, err)
+	node := &MobazhaNode{orderExtensionFields: orderExtensionFields{orderExtensionModules: registered}}
+	orderOpen := &orderpb.OrderOpen{BuyerID: &orderpb.ID{PeerID: "original-buyer"}}
+	declared, err := node.declareOrderExtensions(context.Background(), extensions.DeclarationInput{
+		OrderID: "order-admission", OrderOpen: orderOpen,
+	})
+	require.ErrorIs(t, err, denied)
+	require.Empty(t, declared)
 	require.Equal(t, "original-buyer", orderOpen.GetBuyerID().GetPeerID())
 }
 

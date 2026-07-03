@@ -9,13 +9,29 @@ combines catalog and order management, fulfillment, disputes, ratings,
 messaging, wallet-backed payment monitoring, APIs, and an embedded browser
 interface.
 
-[Quick Start](#quick-start) · [Operations](#operations) ·
+[Try Mobazha](https://app.mobazha.org/) · [Overview](./docs/getting-started/OVERVIEW.md) ·
+[Self-host](./docs/getting-started/SELF_HOSTING.md) ·
 [Frontend](https://github.com/mobazha/mobazha-unified) ·
-[Contributing](./CONTRIBUTING.md)
+[Documentation](./docs/README.md)
 
 > **Status:** v0.3 is a release candidate intended for evaluation and testnet
 > use. Stable binaries and signed release artifacts have not been published
 > yet.
+
+[![The Mobazha Official Merch storefront showing a branded store and product listings](./docs/assets/screenshots/mobazha-official-store.jpg)](https://app.mobazha.org/)
+
+_A live storefront powered by Mobazha Unified. The same frontend can connect to
+hosted services or a self-hosted Mobazha Node._
+
+## Choose your path
+
+| Goal | Start here |
+| --- | --- |
+| Explore the hosted product | [Open app.mobazha.org](https://app.mobazha.org/) |
+| Understand the project | [What is Mobazha?](./docs/getting-started/OVERVIEW.md) |
+| Run your own node | [Self-hosting guide](./docs/getting-started/SELF_HOSTING.md) |
+| Connect an AI client or agent | [AI and agent integrations](./docs/concepts/AI_AND_AGENTS.md) |
+| Build and contribute | [Development guide](./docs/getting-started/DEVELOPMENT.md) |
 
 ## Why run a Mobazha node?
 
@@ -135,6 +151,21 @@ The node is authoritative for capabilities, order state, payment verification,
 settlement, audit, and wallet operations. Clients render only the capabilities
 reported by the connected node.
 
+## AI and agent integrations
+
+Mobazha Node exposes authenticated, scope-filtered commerce tools to AI clients
+through MCP. The CLI can detect and configure supported local clients, connect
+them to `/v1/mcp`, remove the integration, or provide a stdio bridge.
+
+```bash
+./mobazha mcp list
+./mobazha mcp connect --token <api-token>
+```
+
+Available tools depend on the connected node, token scopes, runtime policy,
+and enabled capabilities. Agents do not bypass order, payment, settlement, or
+key-custody controls. See [AI and agent integrations](./docs/concepts/AI_AND_AGENTS.md).
+
 ## Operations
 
 Install and manage the node as a background service on Linux or macOS:
@@ -166,6 +197,10 @@ test environment.
 
 ## Architecture and release documentation
 
+- [Documentation index](./docs/README.md)
+- [Product overview](./docs/getting-started/OVERVIEW.md)
+- [Architecture overview](./docs/concepts/ARCHITECTURE.md)
+- [Product demonstrations](./docs/DEMOS.md)
 - [Release scope](./docs/project/RELEASE_SCOPE.md)
 - [Compatibility policy](./docs/project/COMPATIBILITY.md)
 - [OEM and VPS distribution](./docs/project/OEM_DISTRIBUTION.md)

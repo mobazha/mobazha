@@ -1,4 +1,4 @@
-# Community Fees and Paid Services
+# Mobazha Fees and Paid Services
 
 Status: Public policy boundary; no fixed commercial rate is defined here
 Last updated: 2026-06-29
@@ -7,13 +7,13 @@ Chinese translation: [FEES_AND_PAID_SERVICES_ZH.md](FEES_AND_PAID_SERVICES_ZH.md
 
 ## Purpose
 
-This document explains which costs are inherent to running Mobazha Community Edition, which charges may come from optional services, and what a client must disclose before a user confirms a paid action.
+This document explains which costs are inherent to running Mobazha, which charges may come from optional services, and what a client must disclose before a user confirms a paid action.
 
-It is a durable Community Edition boundary, not a price list. Current Mobazha-operated service status and public pricing belong on [mobazha.org/fees](https://mobazha.org/fees). A transaction-specific quote, when implemented and shown, governs the amounts and transaction-specific terms only within this policy boundary.
+It is a durable project-policy boundary, not a price list. Current Mobazha-operated service status and public pricing belong on [mobazha.org/fees](https://mobazha.org/fees). A transaction-specific quote, when implemented and shown, governs the amounts and transaction-specific terms only within this policy boundary.
 
 ## Core commitments
 
-1. **Independent operation has no mandatory central Mobazha transaction fee.** Running the Community software on infrastructure you control does not, by itself, create a fee owed to Mobazha for creating or completing an order.
+1. **Independent operation has no mandatory central Mobazha transaction fee.** Running Mobazha on infrastructure you control does not, by itself, create a fee owed to Mobazha for creating or completing an order.
 2. **Operating the software is not costless.** Operators and users may still pay for servers, storage, network transactions, payment processors, exchange, taxes, support, or plugins.
 3. **Optional services may be paid.** Mobazha or another provider may charge for hosting, managed transaction services, distribution, AI, storage, support, or other clearly identified services.
 4. **Third-party costs remain separate.** A blockchain fee, payment-provider charge, plugin price, tax, or exchange cost must not be presented as a Mobazha platform fee unless Mobazha is the stated recipient.
@@ -21,9 +21,9 @@ It is a durable Community Edition boundary, not a price list. Current Mobazha-op
 
 ## Cost and service categories
 
-| Category | Typical payer | Recipient | Community rule |
+| Category | Typical payer | Recipient | Project rule |
 |---|---|---|---|
-| Community software | Operator | None for license use, subject to the repository license | Self-hostable; no mandatory Mobazha order fee |
+| Mobazha software | Operator | None for license use, subject to the repository license | Self-hostable; no mandatory Mobazha order fee |
 | Infrastructure | Operator | Hosting, storage, bandwidth, or other infrastructure provider | Selected and paid by the operator |
 | Network or payment processing | Buyer, seller, or operator | Blockchain or payment provider | Quoted separately where known |
 | Optional Mobazha service | The user selecting the service | Mobazha service operator | Requires clear pricing and consent |
@@ -45,13 +45,13 @@ Before a user confirms an action that creates a charge or reduces seller proceed
 
 Fees must not be hidden in an unexplained exchange rate, spread, or aggregate deduction. A user-facing website or cached UI string is not a substitute for a transaction-specific quote.
 
-The current Community foundation does not claim that a universal fee-quote protocol is already implemented. When such a contract is added, it must be versioned, fail closed when required information is missing, and be documented independently of any private service implementation.
+The current release does not claim that a universal fee-quote protocol is already implemented. When such a contract is added, it must be versioned, fail closed when required information is missing, and be documented independently of any private service implementation.
 
 ## Managed transaction services
 
 A provider may charge a transaction-related service fee only for an identified service, such as payment execution, delivery automation, evidence handling, dispute operations, or a defined risk commitment. The provider, payer, calculation, cap, and refund treatment must be visible before confirmation.
 
-This is different from imposing a protocol tax on every Community order. Community implementations must remain usable without enrolling in a Mobazha-operated managed transaction service.
+This is different from imposing a protocol tax on every Mobazha order. Self-hosted deployments must remain usable without enrolling in a Mobazha-operated managed transaction service.
 
 ## Referrals, distribution, and agents
 
@@ -63,22 +63,22 @@ Referral or distribution compensation must be:
 - reversed proportionally after refunds or fraud;
 - disclosed when an agent or recommendation has a paid relationship.
 
-Multi-level recruitment payments, unlimited downstream percentages, and undisclosed paid recommendations are outside the Community policy boundary.
+Multi-level recruitment payments, unlimited downstream percentages, and undisclosed paid recommendations are outside the Mobazha project-policy boundary.
 
 ## Changes to this boundary
 
-Any proposal to require a central Mobazha service or mandatory Mobazha fee for ordinary Community orders requires:
+Any proposal to require a central Mobazha service or mandatory Mobazha fee for ordinary self-hosted orders requires:
 
-1. a public ADR and Community review;
-2. an update to this document and the Community Edition scope;
+1. a public ADR and contributor review;
+2. an update to this document and the Mobazha release scope;
 3. explicit client and API behavior;
 4. migration and opt-out analysis;
 5. license, consumer-protection, and operational review where applicable.
 
-Commercial price changes that do not alter the independent Community boundary should be published on the provider's pricing surface with an effective date. They do not require hard-coding a rate in this repository.
+Service price changes that do not alter the independent-operation boundary should be published on the provider's pricing surface with an effective date. They do not require hard-coding a rate in this repository.
 
 ## Related documents
 
-- [Mobazha Community Edition](COMMUNITY_EDITION.md)
+- [Mobazha Release Scope](RELEASE_SCOPE.md)
 - [Payment Plugin Architecture](../plugins/PAYMENT_PLUGIN_ARCHITECTURE.md)
 - [ADR-015: Payment Plugin Boundary](../adr/015-payment-plugin-boundary.md)

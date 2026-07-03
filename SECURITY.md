@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are provided for the latest Community Edition release. Pre-release branches and older releases may receive fixes at the maintainers' discretion.
+Security fixes are provided for the latest Mobazha release. Pre-release branches and older releases may receive fixes at the maintainers' discretion.
 
 ## Reporting a vulnerability
 

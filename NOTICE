@@ -1,4 +1,4 @@
-Mobazha Community Edition
+Mobazha
 
 Originally developed by fengzie (https://github.com/fengzie) and maintained by
 the Mobazha contributors.
@@ -21,8 +21,8 @@ LICENSES/MIT-OpenBazaar.txt:
     Copyright (c) 2016-2018 OpenBazaar Developers
 
 The OpenBazaar name and the names of its contributors are used only for
-attribution. Git authorship records do not imply endorsement of Mobazha or the
-Community Edition release.
+attribution. Git authorship records do not imply endorsement of Mobazha or an
+official Mobazha release.
 
 Individual dependencies, vendored code, generated artifacts, and assets may be
 governed by their own licenses. Their copyright and license notices remain the

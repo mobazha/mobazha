@@ -28,7 +28,7 @@ require_text NOTICE "Copyright (c) 2016-2018 OpenBazaar Developers"
 require_text README.md "https://github.com/fengzie"
 require_text README.md "https://github.com/mobazha/mobazha"
 require_text TRADEMARKS.md "This condition governs"
-require_text docs/community/ATTRIBUTION.md "SPDX-License-Identifier: MPL-2.0"
+require_text docs/project/ATTRIBUTION.md "SPDX-License-Identifier: MPL-2.0"
 
 base="${ATTRIBUTION_BASE:-${1:-}}"
 zero_sha="0000000000000000000000000000000000000000"

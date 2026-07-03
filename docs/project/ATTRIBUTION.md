@@ -1,6 +1,6 @@
 # Attribution and Source Identity
 
-Mobazha Community Edition was originally developed by
+Mobazha was originally developed by
 [fengzie](https://github.com/fengzie) and is maintained by the Mobazha
 contributors.
 

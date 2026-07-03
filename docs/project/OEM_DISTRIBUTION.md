@@ -1,18 +1,18 @@
 # OEM and VPS Distribution
 
-Mobazha Community Edition may be distributed in a device, an appliance image,
+Mobazha may be distributed in a device, an appliance image,
 a VPS marketplace image, a container image, or a pre-installed server. This
 document defines the minimum expectations for those distributions. It is a
 technical and project-policy guide, not legal advice.
 
 ## What may be distributed
 
-An OEM or VPS provider may package the Community Edition standalone deployment
-and sell hardware, installation, hosting, support, or other services around it.
-The Community Edition is not a new edition when packaged this way: its enabled
-payment capabilities remain limited to BTC, BCH, and LTC.
+An OEM or VPS provider may package the default standalone deployment and sell
+hardware, installation, hosting, support, or other services around it.
+Packaging does not create a separate Mobazha edition: the enabled payment
+capabilities remain limited to BTC, BCH, and LTC.
 
-The following do not belong in a Community distribution:
+The following do not belong in the default standalone distribution:
 
 - unapproved payment capabilities or provider credentials;
 - platform tenancy, billing, control-plane, or private operations code;
@@ -22,7 +22,7 @@ The following do not belong in a Community distribution:
 
 ## License and source obligations
 
-Mobazha-authored Community source is licensed under MPL-2.0. A distributor
+Mobazha-authored source is licensed under MPL-2.0. A distributor
 must preserve the applicable license and copyright notices and make the Source
 Code Form of MPL-covered software and its distributed modifications available
 as required by MPL-2.0. OpenBazaar-derived material retains its separate MIT
@@ -72,13 +72,13 @@ backup, restore it, and choose not to use a managed update channel.
 ## Network and optional services
 
 A local standalone store must remain usable for its local administration,
-listings, data export, and Community UTXO payment flow without a required
+listings, data export, and supported UTXO payment flow without a required
 Mobazha Hosting account. Discovery, buyer identity, search, routing, managed
 updates, and support services may be offered as optional integrations only.
 Their endpoint, data handling, and disablement path must be disclosed to the
 operator.
 
-The first Community release does not define an official OEM directory,
+The first Mobazha release does not define an official OEM directory,
 certification program, or mandatory network registry. Do not claim that an
 image is "Official" or "Mobazha Certified" without a separate written
 trademark authorization.
@@ -87,9 +87,9 @@ trademark authorization.
 
 MPL-2.0 grants rights to the source code, not Mobazha names, logos, or an
 official-certification claim. See `TRADEMARKS.md` and
-`docs/community/ATTRIBUTION.md`.
+`docs/project/ATTRIBUTION.md`.
 
 An eventual certification program will verify reproducible source provenance,
-the required release material, Community capability boundaries, secure first
+the required release material, release capability boundaries, secure first
 run, update behavior, and recovery behavior. It is a quality and support
-service, not a condition for running or joining the Community network.
+service, not a condition for running or joining the Mobazha network.

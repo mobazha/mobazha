@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Define the target public contract for adding payment chains without modifying Mobazha Core. This specification implements ADR-015 and is subordinate to `docs/community/COMMUNITY_EDITION.md`.
+Define the target public contract for adding payment chains without modifying Mobazha Core. This specification implements ADR-015 and is subordinate to `docs/project/RELEASE_SCOPE.md`.
 
 The first release may use compatibility adapters around bundled UTXO code. API names below are architectural contracts, not a claim that every RPC type already exists.
 
@@ -165,7 +165,7 @@ Executable UI extensions require a later ADR covering signatures, sandboxing, CS
 - Semantic removal/change requires a new major API version.
 - Core and plugin select the highest common version.
 - Plugins declare required versus optional capabilities.
-- Deprecation covers at least two minor Community Edition releases unless security requires faster removal.
+- Deprecation covers at least two minor Mobazha releases unless security requires faster removal.
 
 ## 10. Compatibility kit
 
@@ -182,14 +182,14 @@ Every plugin passes:
 - malformed RPC and resource-limit tests;
 - license and artifact-integrity checks.
 
-Chain suites add consensus and transaction fixtures for every bundled Community chain.
+Chain suites add consensus and transaction fixtures for every bundled payment chain.
 
 ## 11. Migration sequence
 
 1. Split current `ChainEscrow` responsibilities into narrower public contracts.
 2. Introduce Core plugin registry and in-process compatibility adapter.
 3. Register UTXO implementations through that adapter.
-4. Move non-community chain construction behind separately distributed extension factories.
+4. Move non-default chain construction behind separately distributed extension factories.
 5. Implement out-of-process supervisor and RPC v1.
 6. Convert one bundled UTXO chain as reference external plugin.
 7. Stabilize the compatibility kit before publishing a catalog.

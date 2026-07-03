@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	// CommunityName identifies the public Community Edition distribution.
+	// CommunityName identifies the default public distribution profile.
 	CommunityName = "community"
 	// FullName identifies an unrestricted private or commercial composition.
 	FullName = "full"

@@ -37,17 +37,17 @@ ecosystem extensions still need ADR-015's out-of-process boundary.
    authenticated Huma gateway. The selected product-surface policy determines
    which Core route groups are registered.
 6. First-party commercial modules may be statically linked in process. They
-   import only public `pkg/...` contracts and never Open Core `internal/...`.
+   import only public `pkg/...` contracts and never `mobazha` `internal/...`.
 7. Third-party or independently trusted payment extensions remain
    out-of-process under ADR-015.
-8. Commercial repositories pin an audited Open Core commit and run shared
-   conformance tests. Compatible Open Core fixes flow forward through that
+8. Commercial repositories pin an audited `mobazha` commit and run shared
+   conformance tests. Compatible Mobazha fixes flow forward through that
    dependency; private implementation does not flow backward into public
    history.
 
 ## Invariants
 
-- No distribution-specific Go build tag exists in Open Core or private products.
+- No distribution-specific Go build tag exists in `mobazha` or private products.
 - No parallel Node field, lifecycle, accessor, or empty-stub implementation is
   selected per product.
 - Distribution configuration is copied and validated before a repository,
@@ -60,7 +60,7 @@ ecosystem extensions still need ADR-015's out-of-process boundary.
 
 ## Consequences
 
-The commercial binary includes reachable Open Core packages even when a
+The commercial binary includes reachable Mobazha packages even when a
 profile does not start every subsystem. This is acceptable: product security
 comes from explicit composition, route allowlists, and runtime capability
 checks rather than assuming that unreachable source code is a policy control.
@@ -68,7 +68,7 @@ The Go linker can still remove unreachable code.
 
 Adding a profile-specific service now requires a public port and an explicit
 composition decision. It cannot be implemented by adding another shadow Node
-or a no-op stub. Larger shared fixes are made once in Open Core and adopted by
+or a no-op stub. Larger shared fixes are made once in Mobazha and adopted by
 commercial distributions by advancing their pinned dependency.
 
 ## Rejected alternatives
@@ -84,4 +84,4 @@ commercial distributions by advancing their pinned dependency.
 ## Related decisions
 
 - ADR-015: Out-of-process payment plugin boundary.
-- ADR-017: Community v0.3 payment chain scope.
+- ADR-017: Mobazha v0.3 payment scope.

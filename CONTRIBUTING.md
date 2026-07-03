@@ -1,6 +1,6 @@
-# Contributing to Mobazha Community Edition
+# Contributing to Mobazha
 
-Thank you for helping improve Mobazha Community Edition.
+Thank you for helping improve Mobazha.
 
 ## Before you start
 
@@ -9,9 +9,9 @@ Thank you for helping improve Mobazha Community Edition.
 - Do not include credentials, private endpoints, customer data, proprietary code, or generated binaries.
 - Report vulnerabilities privately according to `SECURITY.md` instead of opening a public issue.
 
-## Community payment boundary
+## Default payment scope
 
-The default Community Edition payment allowlist is BTC, BCH, and LTC. A new chain or payment model requires an ADR, capability-manifest change, threat review, compatibility and negative tests, frontend support, and an explicit license decision.
+The default Mobazha payment allowlist is BTC, BCH, and LTC. A new chain or payment model requires an ADR, capability-manifest change, threat review, compatibility and negative tests, frontend support, and an explicit license decision.
 
 Payment plugins must use the public versioned contract. They must not import `internal/`, receive `MobazhaNode`, access raw seed or private-key material, or bypass Core payment-verification and settlement gates.
 
@@ -28,7 +28,7 @@ Payment plugins must use the public versioned contract. They must not import `in
    go build -tags goolm ./...
    ```
 
-4. Keep commits reviewable and use a concise conventional subject such as `fix(wallet): reject unsupported community coin`.
+4. Keep commits reviewable and use a concise conventional subject such as `fix(wallet): reject unsupported payment asset`.
 5. Update public documentation when behavior, API contracts, configuration, or security assumptions change.
 
 ## License and attribution headers
@@ -45,7 +45,7 @@ an accurate copyright notice for `fengzie and the respective contributors`.
 Contributors retain copyright in their own contributions unless a separate
 written agreement says otherwise, and may add accurate notices in their own
 name. Do not remove existing Mobazha, contributor, OpenBazaar, or third-party
-notices. See `docs/community/ATTRIBUTION.md`.
+notices. See `docs/project/ATTRIBUTION.md`.
 
 ## Developer Certificate of Origin
 
@@ -59,4 +59,4 @@ The sign-off must use a name and email address you are authorized to contribute 
 
 ## Review expectations
 
-Maintainers review correctness, tests, compatibility, security boundaries, licensing, and documentation. A contribution may be declined when it widens the default edition without an accepted design decision or creates a dependency from the public Core into a private implementation.
+Maintainers review correctness, tests, compatibility, security boundaries, licensing, and documentation. A contribution may be declined when it widens the default release scope without an accepted design decision or creates a dependency from the public core into a private implementation.

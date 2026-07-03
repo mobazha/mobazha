@@ -1,4 +1,4 @@
-# Open Core Public History
+# Mobazha Public History
 
 The public repository preserves a reviewed, sanitized projection of the
 project's development history from its original root. Source-repository commit

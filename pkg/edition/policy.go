@@ -100,7 +100,7 @@ func CurrentPolicy() Policy {
 	return holder.policy
 }
 
-// DefaultPolicy returns the fail-closed policy for the public Open Core
+// DefaultPolicy returns the fail-closed policy for the public Mobazha
 // composition. Callers should prefer this semantic default over depending on
 // a concrete distribution name.
 func DefaultPolicy() Policy {

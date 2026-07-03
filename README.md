@@ -118,7 +118,7 @@ treated as a stable plugin runtime. Core remains responsible for policy, order
 state, verification, audit, settlement gates, and key custody; plugins must not
 receive raw seed phrases or private keys.
 
-See [release scope](./docs/community/COMMUNITY_EDITION.md) and
+See [release scope](./docs/project/RELEASE_SCOPE.md) and
 [payment plugin architecture](./docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md).
 
 ## APIs and integrations
@@ -166,12 +166,12 @@ test environment.
 
 ## Architecture and release documentation
 
-- [Release scope](./docs/community/COMMUNITY_EDITION.md)
-- [Compatibility policy](./docs/community/COMPATIBILITY.md)
-- [OEM and VPS distribution](./docs/community/OEM_DISTRIBUTION.md)
+- [Release scope](./docs/project/RELEASE_SCOPE.md)
+- [Compatibility policy](./docs/project/COMPATIBILITY.md)
+- [OEM and VPS distribution](./docs/project/OEM_DISTRIBUTION.md)
 - [Payment plugin architecture](./docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md)
 - [Supply-chain audit](./docs/security/SUPPLY_CHAIN_AUDIT.md)
-- [v0.3 release candidate notes](./docs/releases/v0.3.0-community.1.md)
+- [v0.3 release candidate notes](./docs/releases/v0.3.0-rc.1.md)
 
 ## Development and release checks
 
@@ -209,7 +209,7 @@ Portions derived from OpenBazaar remain available under the
 [OpenBazaar MIT License](./LICENSES/MIT-OpenBazaar.txt). Third-party
 dependencies and assets remain subject to their respective licenses. See
 [NOTICE](./NOTICE) and
-[Attribution and source identity](./docs/community/ATTRIBUTION.md) for details.
+[Attribution and source identity](./docs/project/ATTRIBUTION.md) for details.
 
 Originally developed by [fengzie](https://github.com/fengzie) and maintained by
 the Mobazha contributors. The canonical source repository is

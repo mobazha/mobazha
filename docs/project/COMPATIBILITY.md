@@ -1,16 +1,16 @@
-# Mobazha Open Core compatibility policy
+# Mobazha compatibility policy
 
 Status: Initial policy implemented; shared conformance automation active
 
-This document defines the public compatibility relationship between the Mobazha Open Core, the public self-hosted distribution, shared frontends, and compatible commercial distributions.
+This document defines the compatibility relationship between Mobazha, its self-hosted and hosted deployments, shared frontends, and compatible distributions.
 
 ## Repository and distribution identity
 
 The `mobazha` repository is the public upstream for shared Mobazha commerce behavior. It also contains the default self-hosted composition.
 
-The name `community` identifies a distribution policy and publication boundary. It is used by manifests, packaging, tests, and release artifacts. It does not create a separate order model, payment state machine, or public API namespace.
+The default capability profile is an internal distribution and publication boundary used by manifests, packaging, tests, and release tooling. It does not create a separate product, order model, payment state machine, or public API namespace.
 
-Compatible commercial products may compose additional private adapters and services. They have independent artifacts and release versions, but must conform to the public contracts for capabilities they claim to share.
+Compatible distributions may compose additional adapters and services. They can have independent artifacts and release versions, but must conform to the public contracts for capabilities they claim to share.
 
 ## Compatibility layers
 
@@ -49,7 +49,7 @@ Servers must:
 
 - reject operations outside the effective capability set;
 - avoid branching on a distribution name when a concrete capability answers the decision;
-- expose additional commercial features through explicit capabilities, versions, or separate namespaces;
+- expose additional features through explicit capabilities, versions, or separate namespaces;
 - preserve shared semantics for every public capability they declare.
 
 ## Versioning
@@ -64,18 +64,18 @@ Additive JSON fields and optional capabilities are normally minor changes. Remov
 
 Every breaking proposal requires an RFC or ADR, migration guidance, updated conformance tests, and a declared support window.
 
-Commercial product versions do not need to match public self-hosted version numbers. A compatible commercial release must record the Open Core commit or tag and public contract version it implements.
+Compatible distribution versions do not need to match the default release version. Each distribution must record the Mobazha commit or tag and public contract version it implements.
 
 ## Test topology
 
 Compatibility is verified at four levels:
 
-1. Open Core tests cover domain behavior, state machines, public APIs, events, migrations, and security invariants.
-2. Self-hosted E2E covers the public distribution without private Hosting, identity, search, payment-provider, or operations services.
-3. Commercial platform E2E is private and uses the Hosting control plane with a commercial Node distribution.
+1. Mobazha tests cover domain behavior, state machines, public APIs, events, migrations, and security invariants.
+2. Self-hosted E2E covers the default distribution without optional Hosting, identity, search, payment-provider, or operations services.
+3. Hosted-platform E2E uses the Hosting control plane with its selected Node distribution.
 4. Cross-distribution conformance runs the same black-box public contract against each distribution. Tests for undeclared capabilities are skipped by policy, not satisfied by mocks.
 
-Running the Hosting control plane against the Community distribution is not a supported deployment or a public release requirement. It may be used temporarily to diagnose contract drift.
+Running the Hosting control plane against the default standalone distribution is not a supported deployment or a public release requirement. It may be used temporarily to diagnose contract drift.
 
 ## Change process
 
@@ -89,14 +89,14 @@ A change needs compatibility review when it modifies:
 
 The review must identify the compatibility layer, affected distributions, rollout order, downgrade behavior, tests, documentation, and whether an RFC/ADR is required.
 
-Shared fixes should land in the public Open Core. A security fix may remain under a temporary embargo, but the public portion must be released once disclosure is safe. Permanent independent reimplementations of shared order or payment behavior are not supported.
+Shared fixes should land in the `mobazha` repository. A security fix may remain under a temporary embargo, but the public portion must be released once disclosure is safe. Permanent independent reimplementations of shared order or payment behavior are not supported.
 
 ## Non-goals
 
 This policy does not require:
 
-- every commercial capability to be open source;
-- Community and commercial artifacts to release simultaneously;
+- every extension capability to be open source;
+- all distribution artifacts to release simultaneously;
 - identical internal database layouts for private extension tables;
 - private control-plane endpoints to be part of the public contract;
 - every private module to use the external payment-plugin protocol.

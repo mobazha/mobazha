@@ -2,7 +2,7 @@
 
 Syft may emit `NOASSERTION` when a Go module license is outside the nested
 module directory, uses an unexpected filename, or is expressed in source-file
-headers. The Community Edition release process does not silently accept those
+headers. The Mobazha release process does not silently accept those
 results.
 
 The reviewed conclusions are stored in

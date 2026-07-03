@@ -133,7 +133,7 @@ func TerminalEvent(event interface{}) (orderID, reason string, ok bool) {
 }
 
 func eventForOrder(order *models.Order, extension extensions.OrderExtension, reservation *extensions.ReservationBinding, eventType, reason string) (extensions.Event, error) {
-	if err := extension.Validate(); err != nil {
+	if err := extension.ValidateForOrder(order.ID.String()); err != nil {
 		return extensions.Event{}, fmt.Errorf("extension lifecycle: invalid persisted extension: %w", err)
 	}
 	if reservation != nil {

@@ -91,7 +91,7 @@ func (n *MobazhaNode) declareOrderExtensions(ctx context.Context, input extensio
 			return nil, fmt.Errorf("order extension module %q declaration: %w", registered.descriptor.ID, err)
 		}
 		for _, extension := range extensionsForModule {
-			if err := extension.Validate(); err != nil {
+			if err := extension.ValidateForOrder(input.OrderID); err != nil {
 				return nil, fmt.Errorf("order extension module %q declaration: %w", registered.descriptor.ID, err)
 			}
 			if extension.ProviderID != registered.descriptor.ID {

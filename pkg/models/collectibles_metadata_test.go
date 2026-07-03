@@ -103,3 +103,23 @@ func TestCollectibleOrderExtension_RequiresAttestedSettlement(t *testing.T) {
 		t.Fatal("collectible extension must require a pre-funding reservation")
 	}
 }
+
+func TestCollectibleOrderMetadataFromExtensionRejectsResourceMismatch(t *testing.T) {
+	extension, err := extensions.NewOrderExtension(
+		"order-resource-mismatch",
+		CollectibleExtensionProviderID,
+		CollectibleExtensionTypePrimarySale,
+		extensions.ContractVersionV1,
+		"slot-envelope",
+		CollectibleOrderMetadata{
+			Type: CollectibleMetadataTypePrimarySale, Fulfillment: CollectibleFulfillmentNFT,
+			HubSlotID: "slot-payload", HolderWallet: "holder",
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewOrderExtension: %v", err)
+	}
+	if _, ok := CollectibleOrderMetadataFromExtension(extension); ok {
+		t.Fatal("accepted collectible payload whose Hub slot differs from the envelope resource")
+	}
+}

@@ -22,12 +22,12 @@ func PersistTx(tx database.Tx, orderID string, extension extensions.OrderExtensi
 	if tx == nil {
 		return fmt.Errorf("order extension transaction is required")
 	}
-	if err := extension.Validate(); err != nil {
-		return err
-	}
 	orderID = strings.TrimSpace(orderID)
 	if orderID == "" {
 		return fmt.Errorf("order extension order ID is required")
+	}
+	if err := extension.ValidateForOrder(orderID); err != nil {
+		return err
 	}
 
 	lifecycleEvents, err := json.Marshal(extension.LifecycleEvents)
@@ -725,7 +725,7 @@ func extensionFromRecord(record models.OrderExtensionRecord) (extensions.OrderEx
 		PayloadHash:         record.PayloadHash,
 		CreatedAt:           record.CreatedAt,
 	}
-	if err := extension.Validate(); err != nil {
+	if err := extension.ValidateForOrder(record.OrderID); err != nil {
 		return extensions.OrderExtension{}, fmt.Errorf("validate persisted order extension: %w", err)
 	}
 	return extension, nil

@@ -315,10 +315,9 @@ func NewOrderExtension(orderID, providerID, extensionType, schemaVersion, resour
 	if orderID == "" {
 		return OrderExtension{}, fmt.Errorf("order extension order ID is required")
 	}
-	identity := sha256.Sum256([]byte(orderID + "\x00" + providerID + "\x00" + extensionType + "\x00" + resourceID))
 	payloadDigest := sha256.Sum256(encoded)
 	extension := OrderExtension{
-		ExtensionID:   "ext_" + hex.EncodeToString(identity[:16]),
+		ExtensionID:   orderExtensionID(orderID, providerID, extensionType, resourceID),
 		ProviderID:    providerID,
 		Type:          extensionType,
 		SchemaVersion: schemaVersion,
@@ -332,6 +331,28 @@ func NewOrderExtension(orderID, providerID, extensionType, schemaVersion, resour
 		return OrderExtension{}, err
 	}
 	return extension, nil
+}
+
+// ValidateForOrder verifies the extension envelope and binds its deterministic
+// identity to the exact Core order crossing a port boundary.
+func (e OrderExtension) ValidateForOrder(orderID string) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return fmt.Errorf("order extension order ID is required")
+	}
+	expectedID := orderExtensionID(orderID, strings.TrimSpace(e.ProviderID), strings.TrimSpace(e.Type), strings.TrimSpace(e.ResourceID))
+	if e.ExtensionID != expectedID {
+		return fmt.Errorf("order extension identity is not bound to order %q", orderID)
+	}
+	return nil
+}
+
+func orderExtensionID(orderID, providerID, extensionType, resourceID string) string {
+	identity := sha256.Sum256([]byte(strings.TrimSpace(orderID) + "\x00" + strings.TrimSpace(providerID) + "\x00" + strings.TrimSpace(extensionType) + "\x00" + strings.TrimSpace(resourceID)))
+	return "ext_" + hex.EncodeToString(identity[:16])
 }
 
 // Validate verifies the envelope's required identity, revision, size, and payload hash.
@@ -409,7 +430,7 @@ func (r ReservationRequest) Validate(now time.Time) error {
 	if r.ExpiresAt.IsZero() || !r.ExpiresAt.After(now) {
 		return fmt.Errorf("reservation expiry must be in the future")
 	}
-	if err := r.Extension.Validate(); err != nil {
+	if err := r.Extension.ValidateForOrder(r.OrderID); err != nil {
 		return fmt.Errorf("reservation extension: %w", err)
 	}
 	return nil

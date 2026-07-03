@@ -82,6 +82,11 @@ func CollectibleOrderMetadataFromExtension(extension extensions.OrderExtension) 
 	if err := json.Unmarshal(extension.Payload, &metadata); err != nil {
 		return nil, false
 	}
+	metadata.HubSlotID = strings.TrimSpace(metadata.HubSlotID)
+	if metadata.Type != CollectibleMetadataTypePrimarySale || metadata.Fulfillment != CollectibleFulfillmentNFT ||
+		metadata.HubSlotID == "" || strings.TrimSpace(extension.ResourceID) != metadata.HubSlotID {
+		return nil, false
+	}
 	return &metadata, true
 }
 

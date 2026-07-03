@@ -19,6 +19,8 @@ func TestNewOrderExtension_ProducesStableIdentityAndVerifiedPayload(t *testing.T
 	require.NoError(t, err)
 	require.NotEqual(t, first.ExtensionID, otherOrder.ExtensionID)
 	require.NoError(t, first.Validate())
+	require.NoError(t, first.ValidateForOrder("order-1"))
+	require.ErrorContains(t, first.ValidateForOrder("order-2"), "not bound")
 
 	first.Payload = json.RawMessage(`{"cert":"tampered"}`)
 	require.ErrorContains(t, first.Validate(), "hash mismatch")

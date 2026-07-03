@@ -71,9 +71,13 @@ func TestDeclareOrderExtensions_RequiresDeclaredPolicyCapabilities(t *testing.T)
 		mutate func(*extensions.OrderExtension)
 		want   string
 	}{
-		{name: "reservation", mutate: func(extension *extensions.OrderExtension) { extension.ReservationRequired = true }, want: "reservation contract"},
+		{name: "reservation", mutate: func(extension *extensions.OrderExtension) {
+			extension.ReservationRequired = true
+			extension.LifecycleEvents = []string{extensions.EventOrderPaymentVerified, extensions.EventOrderReservationReleaseRequested}
+		}, want: "reservation contract"},
 		{name: "attestation", mutate: func(extension *extensions.OrderExtension) {
 			extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
+			extension.LifecycleEvents = []string{extensions.EventOrderPaymentVerified}
 		}, want: "attestation contract"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -92,4 +96,20 @@ func TestDeclareOrderExtensions_RequiresDeclaredPolicyCapabilities(t *testing.T)
 			require.ErrorContains(t, err, test.want)
 		})
 	}
+}
+
+func TestDeclareOrderExtensions_RequiresDeliveryContractForSubscriptions(t *testing.T) {
+	module := &declarationTestModule{
+		descriptor: extensions.ModuleDescriptor{ID: "io.mobazha.owner", Version: "1.0.0", Contracts: []string{extensions.ContractOrderExtensionDeclarationV1}},
+		port: declarationPortFunc(func(_ context.Context, input extensions.DeclarationInput) ([]extensions.OrderExtension, error) {
+			extension, err := extensions.NewOrderExtension(input.OrderID, "io.mobazha.owner", "test", "v1", "resource", map[string]string{"value": "declared"})
+			extension.LifecycleEvents = []string{extensions.EventOrderPaymentVerified}
+			return []extensions.OrderExtension{extension}, err
+		}),
+	}
+	registered, err := snapshotOrderExtensionModules([]extensions.Module{module})
+	require.NoError(t, err)
+	node := &MobazhaNode{orderExtensionFields: orderExtensionFields{orderExtensionModules: registered}}
+	_, err = node.declareOrderExtensions(context.Background(), extensions.DeclarationInput{OrderID: "order-1"})
+	require.ErrorContains(t, err, "delivery contract")
 }

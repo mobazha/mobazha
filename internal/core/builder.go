@@ -1476,13 +1476,7 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 		if err != nil {
 			return nil, fmt.Errorf("load order extensions: %w", err)
 		}
-		reservable := persisted[:0]
-		for _, extension := range persisted {
-			if extension.ReservationRequired {
-				reservable = append(reservable, extension)
-			}
-		}
-		return reservable, nil
+		return persisted, nil
 	}
 	reserve := func(ctx context.Context, request extensions.ReservationRequest) (extensions.Reservation, error) {
 		port := obNode.extensionReservationPort(request.Extension.ProviderID)

@@ -453,11 +453,20 @@ func (n *MobazhaNode) emitOrderAutoConfirmAfterManagedRelayConfirm(row models.Se
 			payoutAddress = addr.String()
 		}
 	}
+	authorization, err := n.confirmationAuthorizationForAction(row.OrderID, row.ActionID, row.TxHash)
+	if err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "managed relay confirm: resolve extension authorization for order %s: %v", row.OrderID, err)
+		return
+	}
+	attestationID := ""
+	if authorization != nil {
+		attestationID = authorization.AttestationID
+		payoutAddress = authorization.PayoutAddress
+	}
 
 	n.eventBus.Emit(&events.OrderAutoConfirmRequest{
-		OrderID:       row.OrderID,
-		TxID:          row.TxHash,
-		PayoutAddress: payoutAddress,
+		OrderID: row.OrderID, TxID: row.TxHash, PayoutAddress: payoutAddress,
+		SettlementAttestationID: attestationID,
 	})
 }
 

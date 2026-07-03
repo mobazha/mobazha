@@ -5,7 +5,8 @@ Status: Target governance contract; static v1 subset implemented
 The implemented static subset validates `id`, module `version`, exact
 capability contract strings, dependencies, cycles, duplicate IDs, non-nil
 capabilities, and agreement between declared contracts and Go interfaces. Core
-snapshots the canonical descriptor before runtime use. Runtime type,
+invokes each capability accessor exactly once and snapshots both the canonical
+descriptor and those validated capability instances before runtime use. Runtime type,
 configuration schema, allowlist, health, drain, upgrade, and rollback states
 below remain planned governance work.
 

@@ -14,6 +14,7 @@ type OrderExtensionRecord struct {
 	ResourceID          string `gorm:"type:varchar(256);index"`
 	ReservationRequired bool   `gorm:"not null;default:false"`
 	SettlementPolicy    string `gorm:"type:varchar(32);not null;default:''"`
+	LifecycleEvents     []byte `gorm:"type:text;not null"`
 	Payload             []byte `gorm:"not null"`
 	PayloadHash         string `gorm:"type:varchar(96);not null"`
 	CreatedAt           time.Time
@@ -93,4 +94,7 @@ type SettlementAttestationRecord struct {
 	ObservedAt                time.Time
 	ExpiresAt                 time.Time
 	AcceptedAt                time.Time
+	ExecutionActionID         string `gorm:"type:varchar(192);index"`
+	ExecutionTransactionID    string `gorm:"type:varchar(192);index"`
+	ExecutionPayoutAddress    string `gorm:"type:varchar(256)"`
 }

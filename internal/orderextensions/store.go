@@ -30,11 +30,15 @@ func PersistTx(tx database.Tx, orderID string, extension extensions.OrderExtensi
 		return fmt.Errorf("order extension order ID is required")
 	}
 
+	lifecycleEvents, err := json.Marshal(extension.LifecycleEvents)
+	if err != nil {
+		return fmt.Errorf("marshal order extension lifecycle events: %w", err)
+	}
 	var latest models.OrderExtensionRecord
-	err := tx.Read().Where("extension_id = ?", extension.ExtensionID).
+	err = tx.Read().Where("extension_id = ?", extension.ExtensionID).
 		Order("revision DESC").First(&latest).Error
 	if err == nil {
-		if latest.OrderID != orderID || latest.ProviderID != extension.ProviderID || latest.ExtensionType != extension.Type || latest.ResourceID != extension.ResourceID || latest.ReservationRequired != extension.ReservationRequired || latest.SettlementPolicy != string(extension.SettlementPolicy) {
+		if latest.OrderID != orderID || latest.ProviderID != extension.ProviderID || latest.ExtensionType != extension.Type || latest.ResourceID != extension.ResourceID || latest.ReservationRequired != extension.ReservationRequired || latest.SettlementPolicy != string(extension.SettlementPolicy) || string(latest.LifecycleEvents) != string(lifecycleEvents) {
 			return fmt.Errorf("order extension identity fields are immutable")
 		}
 		if latest.PayloadHash == extension.PayloadHash && latest.SchemaVersion == extension.SchemaVersion {
@@ -58,6 +62,7 @@ func PersistTx(tx database.Tx, orderID string, extension extensions.OrderExtensi
 		ResourceID:          extension.ResourceID,
 		ReservationRequired: extension.ReservationRequired,
 		SettlementPolicy:    string(extension.SettlementPolicy),
+		LifecycleEvents:     lifecycleEvents,
 		Payload:             append([]byte(nil), extension.Payload...),
 		PayloadHash:         extension.PayloadHash,
 		CreatedAt:           createdAt,
@@ -75,7 +80,7 @@ func LatestByIDTx(tx database.Tx, orderID, extensionID string) (extensions.Order
 	if err != nil {
 		return extensions.OrderExtension{}, err
 	}
-	return extensionFromRecord(record), nil
+	return extensionFromRecord(record)
 }
 
 // LatestByIDGorm returns the newest extension revision from a scoped GORM transaction.
@@ -91,7 +96,7 @@ func LatestByIDGorm(db *gorm.DB, tenantID, orderID, extensionID string) (extensi
 	if err := query.Order("revision DESC").First(&record).Error; err != nil {
 		return extensions.OrderExtension{}, err
 	}
-	return extensionFromRecord(record), nil
+	return extensionFromRecord(record)
 }
 
 // LatestByOrderTx returns one newest revision for every extension attached to
@@ -108,7 +113,7 @@ func LatestByOrderTx(tx database.Tx, orderID string) ([]extensions.OrderExtensio
 		Order("extension_id ASC, revision DESC").Find(&records).Error; err != nil {
 		return nil, err
 	}
-	return latestExtensions(records), nil
+	return latestExtensions(records)
 }
 
 // LatestByOrderGorm is the tenant-scoped GORM variant of LatestByOrderTx.
@@ -127,10 +132,38 @@ func LatestByOrderGorm(db *gorm.DB, tenantID, orderID string) ([]extensions.Orde
 	if err := query.Order("extension_id ASC, revision DESC").Find(&records).Error; err != nil {
 		return nil, err
 	}
-	return latestExtensions(records), nil
+	return latestExtensions(records)
 }
 
-func latestExtensions(records []models.OrderExtensionRecord) []extensions.OrderExtension {
+// RequiresAttestedSettlementTx reports whether any persisted extension blocks
+// Core's default confirmation path for this order.
+func RequiresAttestedSettlementTx(tx database.Tx, orderID string) (bool, error) {
+	declared, err := LatestByOrderTx(tx, orderID)
+	if err != nil {
+		return false, err
+	}
+	for _, extension := range declared {
+		if extension.SettlementPolicy == extensions.SettlementPolicyExtensionAttested {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// EnsureSettlementMethodAllowedTx rejects rails that cannot execute the
+// conditional settlement promised by an extension-attested declaration.
+func EnsureSettlementMethodAllowedTx(tx database.Tx, orderID string, method pb.PaymentSent_Method) error {
+	required, err := RequiresAttestedSettlementTx(tx, orderID)
+	if err != nil {
+		return err
+	}
+	if required && method != pb.PaymentSent_CANCELABLE {
+		return fmt.Errorf("extension-attested order requires CANCELABLE settlement, got %s", method.String())
+	}
+	return nil
+}
+
+func latestExtensions(records []models.OrderExtensionRecord) ([]extensions.OrderExtension, error) {
 	latest := make([]extensions.OrderExtension, 0, len(records))
 	seen := make(map[string]struct{}, len(records))
 	for _, record := range records {
@@ -138,9 +171,13 @@ func latestExtensions(records []models.OrderExtensionRecord) []extensions.OrderE
 			continue
 		}
 		seen[record.ExtensionID] = struct{}{}
-		latest = append(latest, extensionFromRecord(record))
+		extension, err := extensionFromRecord(record)
+		if err != nil {
+			return nil, err
+		}
+		latest = append(latest, extension)
 	}
-	return latest
+	return latest, nil
 }
 
 // RecordReservationTx persists the provider reservation returned before a
@@ -420,6 +457,151 @@ func RecordAttestationTx(tx database.Tx, attestation extensions.SettlementAttest
 	})
 }
 
+// ConfirmationAuthorization is the Core-owned proof carried only by an
+// internal auto-confirm event after an attested settlement has executed.
+type ConfirmationAuthorization struct {
+	AttestationID string
+	ActionID      string
+	TransactionID string
+	PayoutAddress string
+}
+
+// BindAttestationExecutionTx binds accepted evidence to the exact Core-issued
+// settlement execution before order confirmation can be emitted.
+func BindAttestationExecutionTx(tx database.Tx, attestationID, actionID, transactionID, payoutAddress string) error {
+	if tx == nil {
+		return fmt.Errorf("settlement attestation transaction is required")
+	}
+	attestationID = strings.TrimSpace(attestationID)
+	actionID = strings.TrimSpace(actionID)
+	transactionID = strings.TrimSpace(transactionID)
+	payoutAddress = strings.TrimSpace(payoutAddress)
+	if attestationID == "" || (actionID == "" && transactionID == "") || payoutAddress == "" {
+		return fmt.Errorf("settlement attestation execution requires attestation, action or transaction, and payout identities")
+	}
+	var record models.SettlementAttestationRecord
+	if err := tx.Read().Where("attestation_id = ?", attestationID).First(&record).Error; err != nil {
+		return err
+	}
+	if record.ExecutionActionID != "" && record.ExecutionActionID != actionID {
+		return fmt.Errorf("settlement attestation execution action is immutable")
+	}
+	if record.ExecutionTransactionID != "" && transactionID != "" && record.ExecutionTransactionID != transactionID {
+		return fmt.Errorf("settlement attestation execution transaction is immutable")
+	}
+	if record.ExecutionPayoutAddress != "" && record.ExecutionPayoutAddress != payoutAddress {
+		return fmt.Errorf("settlement attestation execution payout is immutable")
+	}
+	if actionID != "" {
+		var conflicting models.SettlementAttestationRecord
+		err := tx.Read().Where(
+			"order_id = ? AND execution_action_id = ? AND attestation_id <> ?",
+			record.OrderID, actionID, record.AttestationID,
+		).First(&conflicting).Error
+		if err == nil {
+			return fmt.Errorf("settlement action is already bound to another attestation")
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
+	if transactionID != "" {
+		var conflicting models.SettlementAttestationRecord
+		err := tx.Read().Where(
+			"order_id = ? AND execution_transaction_id = ? AND attestation_id <> ?",
+			record.OrderID, transactionID, record.AttestationID,
+		).First(&conflicting).Error
+		if err == nil {
+			return fmt.Errorf("settlement transaction is already bound to another attestation")
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
+	columns := map[string]interface{}{"execution_payout_address": payoutAddress}
+	if actionID != "" {
+		columns["execution_action_id"] = actionID
+	}
+	if transactionID != "" {
+		columns["execution_transaction_id"] = transactionID
+	}
+	updated, err := tx.UpdateColumns(columns, map[string]interface{}{"attestation_id = ?": attestationID}, &models.SettlementAttestationRecord{})
+	if err != nil {
+		return err
+	}
+	if updated != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// AuthorizationForSettlementActionTx resolves and finalizes the attestation
+// bound to a confirmed backend settlement action.
+func AuthorizationForSettlementActionTx(tx database.Tx, order *models.Order, actionID, transactionID string) (ConfirmationAuthorization, error) {
+	if tx == nil || order == nil {
+		return ConfirmationAuthorization{}, fmt.Errorf("settlement confirmation transaction and order are required")
+	}
+	actionID = strings.TrimSpace(actionID)
+	transactionID = strings.TrimSpace(transactionID)
+	if actionID == "" || transactionID == "" {
+		return ConfirmationAuthorization{}, fmt.Errorf("settlement confirmation action and transaction IDs are required")
+	}
+	var record models.SettlementAttestationRecord
+	if err := tx.Read().Where("order_id = ? AND execution_action_id = ?", order.ID.String(), actionID).First(&record).Error; err != nil {
+		return ConfirmationAuthorization{}, err
+	}
+	if err := BindAttestationExecutionTx(tx, record.AttestationID, actionID, transactionID, record.ExecutionPayoutAddress); err != nil {
+		return ConfirmationAuthorization{}, err
+	}
+	record.ExecutionTransactionID = transactionID
+	return validateConfirmationAuthorizationRecord(tx, order, record, transactionID)
+}
+
+// ValidateConfirmationAuthorizationTx verifies the internal authorization
+// again under the order lock immediately before the Core state transition.
+func ValidateConfirmationAuthorizationTx(tx database.Tx, order *models.Order, attestationID, transactionID string) (ConfirmationAuthorization, error) {
+	if tx == nil || order == nil {
+		return ConfirmationAuthorization{}, fmt.Errorf("settlement confirmation transaction and order are required")
+	}
+	var record models.SettlementAttestationRecord
+	if err := tx.Read().Where("attestation_id = ?", strings.TrimSpace(attestationID)).First(&record).Error; err != nil {
+		return ConfirmationAuthorization{}, err
+	}
+	return validateConfirmationAuthorizationRecord(tx, order, record, strings.TrimSpace(transactionID))
+}
+
+func validateConfirmationAuthorizationRecord(tx database.Tx, order *models.Order, record models.SettlementAttestationRecord, transactionID string) (ConfirmationAuthorization, error) {
+	if record.OrderID != order.ID.String() || record.ExecutionTransactionID == "" || record.ExecutionTransactionID != transactionID || record.ExecutionPayoutAddress == "" {
+		return ConfirmationAuthorization{}, fmt.Errorf("settlement confirmation execution binding mismatch")
+	}
+	extension, err := LatestByIDTx(tx, order.ID.String(), record.ExtensionID)
+	if err != nil {
+		return ConfirmationAuthorization{}, err
+	}
+	if extension.ProviderID != record.Issuer || extension.Revision != record.ExpectedExtensionRevision ||
+		extension.SettlementPolicy != extensions.SettlementPolicyExtensionAttested ||
+		record.ConditionType != extensions.ConditionOrderExtensionDeliveryConfirmed || record.ConditionVersion != extensions.ContractVersionV1 {
+		return ConfirmationAuthorization{}, fmt.Errorf("settlement confirmation attestation is no longer authorized")
+	}
+	reference, err := SettlementReferenceForOrder(order)
+	if err != nil || reference.SettlementID != record.SettlementID || reference.OrderStateVersion != record.ExpectedOrderStateVersion {
+		return ConfirmationAuthorization{}, fmt.Errorf("settlement confirmation order state is stale")
+	}
+	orderTenantID := strings.TrimSpace(order.TenantID)
+	if orderTenantID == "" {
+		orderTenantID = database.StandaloneTenantID
+	}
+	if record.TenantID != orderTenantID {
+		return ConfirmationAuthorization{}, fmt.Errorf("settlement confirmation tenant mismatch")
+	}
+	return ConfirmationAuthorization{
+		AttestationID: record.AttestationID,
+		ActionID:      record.ExecutionActionID,
+		TransactionID: record.ExecutionTransactionID,
+		PayoutAddress: record.ExecutionPayoutAddress,
+	}, nil
+}
+
 func ensureEventSequenceTx(tx database.Tx, orderID, extensionID string) error {
 	var sequence models.OrderExtensionEventSequence
 	err := tx.Read().Where("extension_id = ?", strings.TrimSpace(extensionID)).First(&sequence).Error
@@ -524,8 +706,12 @@ func settlementAttestationReplayFingerprint(attestation extensions.SettlementAtt
 	return "sha256:" + hex.EncodeToString(digest[:]), nil
 }
 
-func extensionFromRecord(record models.OrderExtensionRecord) extensions.OrderExtension {
-	return extensions.OrderExtension{
+func extensionFromRecord(record models.OrderExtensionRecord) (extensions.OrderExtension, error) {
+	var lifecycleEvents []string
+	if err := json.Unmarshal(record.LifecycleEvents, &lifecycleEvents); err != nil {
+		return extensions.OrderExtension{}, fmt.Errorf("decode order extension lifecycle events: %w", err)
+	}
+	extension := extensions.OrderExtension{
 		ExtensionID:         record.ExtensionID,
 		ProviderID:          record.ProviderID,
 		Type:                record.ExtensionType,
@@ -534,10 +720,15 @@ func extensionFromRecord(record models.OrderExtensionRecord) extensions.OrderExt
 		ResourceID:          record.ResourceID,
 		ReservationRequired: record.ReservationRequired,
 		SettlementPolicy:    extensions.SettlementPolicy(record.SettlementPolicy),
+		LifecycleEvents:     lifecycleEvents,
 		Payload:             append([]byte(nil), record.Payload...),
 		PayloadHash:         record.PayloadHash,
 		CreatedAt:           record.CreatedAt,
 	}
+	if err := extension.Validate(); err != nil {
+		return extensions.OrderExtension{}, fmt.Errorf("validate persisted order extension: %w", err)
+	}
+	return extension, nil
 }
 
 func deliveryFromEvent(event extensions.Event) *models.ExtensionDelivery {

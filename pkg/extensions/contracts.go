@@ -50,57 +50,82 @@ type Module interface {
 	Descriptor() ModuleDescriptor
 }
 
+// ModuleSnapshot is the immutable, validated view of one statically composed
+// module. Capability accessors are invoked exactly once while the snapshot is
+// built so validation and runtime invocation cannot observe different ports.
+type ModuleSnapshot struct {
+	Descriptor     ModuleDescriptor
+	Declaration    DeclarationPort
+	Reservation    ReservationPort
+	Controller     Controller
+	Attestation    AttestationVerifier
+	hasDeclaration bool
+	hasReservation bool
+	hasController  bool
+	hasAttestation bool
+}
+
 // ValidateModules validates the immutable module graph before Core resources
 // are opened.
 func ValidateModules(modules ...Module) error {
+	_, err := ValidateAndSnapshotModules(modules...)
+	return err
+}
+
+// ValidateAndSnapshotModules validates the complete module graph and returns
+// detached descriptors with the exact capability instances that were checked.
+func ValidateAndSnapshotModules(modules ...Module) ([]ModuleSnapshot, error) {
 	descriptors := make(map[string]ModuleDescriptor, len(modules))
 	order := make([]string, 0, len(modules))
+	snapshots := make([]ModuleSnapshot, 0, len(modules))
 	for index, module := range modules {
 		if isNilModule(module) {
-			return fmt.Errorf("order extension module at index %d is nil", index)
+			return nil, fmt.Errorf("order extension module at index %d is nil", index)
 		}
 		descriptor := cloneDescriptor(module.Descriptor())
 		if descriptor.ID != strings.TrimSpace(descriptor.ID) || descriptor.Version != strings.TrimSpace(descriptor.Version) {
-			return fmt.Errorf("order extension module at index %d descriptor must use canonical ID and version", index)
+			return nil, fmt.Errorf("order extension module at index %d descriptor must use canonical ID and version", index)
 		}
 		if descriptor.ID == "" || descriptor.Version == "" || len(descriptor.Contracts) == 0 {
-			return fmt.Errorf("order extension module at index %d requires ID, version, and contracts", index)
+			return nil, fmt.Errorf("order extension module at index %d requires ID, version, and contracts", index)
 		}
 		if _, exists := descriptors[descriptor.ID]; exists {
-			return fmt.Errorf("order extension module ID %q is registered more than once", descriptor.ID)
+			return nil, fmt.Errorf("order extension module ID %q is registered more than once", descriptor.ID)
 		}
 		contracts := make(map[string]struct{}, len(descriptor.Contracts))
 		for _, contract := range descriptor.Contracts {
 			if contract != strings.TrimSpace(contract) || contract == "" {
-				return fmt.Errorf("order extension module %q has a non-canonical contract", descriptor.ID)
+				return nil, fmt.Errorf("order extension module %q has a non-canonical contract", descriptor.ID)
 			}
 			if !isSupportedContract(contract) {
-				return fmt.Errorf("order extension module %q requires unsupported contract %q", descriptor.ID, contract)
+				return nil, fmt.Errorf("order extension module %q requires unsupported contract %q", descriptor.ID, contract)
 			}
 			if _, exists := contracts[contract]; exists {
-				return fmt.Errorf("order extension module %q declares contract %q more than once", descriptor.ID, contract)
+				return nil, fmt.Errorf("order extension module %q declares contract %q more than once", descriptor.ID, contract)
 			}
 			contracts[contract] = struct{}{}
 		}
 		for _, dependency := range descriptor.Dependencies {
 			if dependency != strings.TrimSpace(dependency) || dependency == "" {
-				return fmt.Errorf("order extension module %q has a non-canonical dependency", descriptor.ID)
+				return nil, fmt.Errorf("order extension module %q has a non-canonical dependency", descriptor.ID)
 			}
 		}
-		if err := validateModuleCapabilities(module, descriptor); err != nil {
-			return err
+		snapshot := snapshotModuleCapabilities(module, descriptor)
+		if err := validateModuleCapabilities(snapshot); err != nil {
+			return nil, err
 		}
 		descriptors[descriptor.ID] = descriptor
 		order = append(order, descriptor.ID)
+		snapshots = append(snapshots, snapshot)
 	}
 	for id, descriptor := range descriptors {
 		for _, dependency := range descriptor.Dependencies {
 			dependency = strings.TrimSpace(dependency)
 			if dependency == id {
-				return fmt.Errorf("order extension module %q depends on itself", id)
+				return nil, fmt.Errorf("order extension module %q depends on itself", id)
 			}
 			if _, exists := descriptors[dependency]; !exists {
-				return fmt.Errorf("order extension module %q requires missing dependency %q", id, dependency)
+				return nil, fmt.Errorf("order extension module %q requires missing dependency %q", id, dependency)
 			}
 		}
 	}
@@ -124,10 +149,10 @@ func ValidateModules(modules ...Module) error {
 	}
 	for _, id := range order {
 		if err := visit(id); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return snapshots, nil
 }
 
 // SnapshotDescriptor returns a canonical copy suitable for immutable runtime
@@ -160,24 +185,47 @@ func isSupportedContract(contract string) bool {
 	}
 }
 
-func validateModuleCapabilities(module Module, descriptor ModuleDescriptor) error {
+func snapshotModuleCapabilities(module Module, descriptor ModuleDescriptor) ModuleSnapshot {
+	snapshot := ModuleSnapshot{Descriptor: cloneDescriptor(descriptor)}
+	sort.Strings(snapshot.Descriptor.Contracts)
+	sort.Strings(snapshot.Descriptor.Dependencies)
+	if capability, ok := module.(DeclarationModule); ok {
+		snapshot.hasDeclaration = true
+		snapshot.Declaration = capability.DeclarationPort()
+	}
+	if capability, ok := module.(ReservationModule); ok {
+		snapshot.hasReservation = true
+		snapshot.Reservation = capability.ReservationPort()
+	}
+	if capability, ok := module.(ControllerModule); ok {
+		snapshot.hasController = true
+		snapshot.Controller = capability.Controller()
+	}
+	if capability, ok := module.(AttestationModule); ok {
+		snapshot.hasAttestation = true
+		snapshot.Attestation = capability.AttestationVerifier()
+	}
+	return snapshot
+}
+
+func validateModuleCapabilities(snapshot ModuleSnapshot) error {
 	checks := []struct {
 		contract string
 		present  bool
 		value    any
 	}{
-		{ContractOrderExtensionDeclarationV1, implementsDeclaration(module), declarationPort(module)},
-		{ContractOrderExtensionReservationV1, implementsReservation(module), reservationPort(module)},
-		{ContractOrderExtensionDeliveryV1, implementsController(module), controller(module)},
-		{ContractOrderExtensionAttestationV1, implementsAttestation(module), attestationVerifier(module)},
+		{ContractOrderExtensionDeclarationV1, snapshot.hasDeclaration, snapshot.Declaration},
+		{ContractOrderExtensionReservationV1, snapshot.hasReservation, snapshot.Reservation},
+		{ContractOrderExtensionDeliveryV1, snapshot.hasController, snapshot.Controller},
+		{ContractOrderExtensionAttestationV1, snapshot.hasAttestation, snapshot.Attestation},
 	}
 	for _, check := range checks {
-		declared := descriptorHasContract(descriptor, check.contract)
+		declared := descriptorHasContract(snapshot.Descriptor, check.contract)
 		if declared != check.present {
-			return fmt.Errorf("order extension module %q contract %q and capability implementation must agree", descriptor.ID, check.contract)
+			return fmt.Errorf("order extension module %q contract %q and capability implementation must agree", snapshot.Descriptor.ID, check.contract)
 		}
 		if declared && isNilCapability(check.value) {
-			return fmt.Errorf("order extension module %q contract %q returned a nil capability", descriptor.ID, check.contract)
+			return fmt.Errorf("order extension module %q contract %q returned a nil capability", snapshot.Descriptor.ID, check.contract)
 		}
 	}
 	return nil
@@ -190,39 +238,6 @@ func descriptorHasContract(descriptor ModuleDescriptor, contract string) bool {
 		}
 	}
 	return false
-}
-
-func implementsDeclaration(module Module) bool { _, ok := module.(DeclarationModule); return ok }
-func implementsReservation(module Module) bool { _, ok := module.(ReservationModule); return ok }
-func implementsController(module Module) bool  { _, ok := module.(ControllerModule); return ok }
-func implementsAttestation(module Module) bool { _, ok := module.(AttestationModule); return ok }
-
-func declarationPort(module Module) any {
-	if capability, ok := module.(DeclarationModule); ok {
-		return capability.DeclarationPort()
-	}
-	return nil
-}
-
-func reservationPort(module Module) any {
-	if capability, ok := module.(ReservationModule); ok {
-		return capability.ReservationPort()
-	}
-	return nil
-}
-
-func controller(module Module) any {
-	if capability, ok := module.(ControllerModule); ok {
-		return capability.Controller()
-	}
-	return nil
-}
-
-func attestationVerifier(module Module) any {
-	if capability, ok := module.(AttestationModule); ok {
-		return capability.AttestationVerifier()
-	}
-	return nil
 }
 
 func isNilCapability(capability any) bool {
@@ -261,6 +276,7 @@ type OrderExtension struct {
 	ResourceID          string           `json:"resourceID,omitempty"`
 	ReservationRequired bool             `json:"reservationRequired,omitempty"`
 	SettlementPolicy    SettlementPolicy `json:"settlementPolicy,omitempty"`
+	LifecycleEvents     []string         `json:"lifecycleEvents,omitempty"`
 	Payload             json.RawMessage  `json:"payload"`
 	PayloadHash         string           `json:"payloadHash"`
 	CreatedAt           time.Time        `json:"createdAt"`
@@ -333,11 +349,47 @@ func (e OrderExtension) Validate() error {
 	if e.SettlementPolicy != SettlementPolicyCoreDefault && e.SettlementPolicy != SettlementPolicyExtensionAttested {
 		return fmt.Errorf("order extension settlement policy %q is unsupported", e.SettlementPolicy)
 	}
+	previous := ""
+	for _, eventType := range e.LifecycleEvents {
+		if eventType != strings.TrimSpace(eventType) || !isSupportedLifecycleEvent(eventType) {
+			return fmt.Errorf("order extension lifecycle event %q is unsupported or non-canonical", eventType)
+		}
+		if previous != "" && eventType <= previous {
+			return fmt.Errorf("order extension lifecycle events must be unique and sorted")
+		}
+		previous = eventType
+	}
+	if e.SettlementPolicy == SettlementPolicyExtensionAttested && !e.SubscribesTo(EventOrderPaymentVerified) {
+		return fmt.Errorf("extension-attested settlement requires the payment-verified lifecycle event")
+	}
+	if e.ReservationRequired && (!e.SubscribesTo(EventOrderPaymentVerified) || !e.SubscribesTo(EventOrderReservationReleaseRequested)) {
+		return fmt.Errorf("reserved extensions require payment-verified and reservation-release lifecycle events")
+	}
 	digest := sha256.Sum256(e.Payload)
 	if e.PayloadHash != "sha256:"+hex.EncodeToString(digest[:]) {
 		return fmt.Errorf("order extension payload hash mismatch")
 	}
 	return nil
+}
+
+// SubscribesTo reports whether the extension requested a supported durable
+// lifecycle event when it was declared.
+func (e OrderExtension) SubscribesTo(eventType string) bool {
+	for _, candidate := range e.LifecycleEvents {
+		if candidate == eventType {
+			return true
+		}
+	}
+	return false
+}
+
+func isSupportedLifecycleEvent(eventType string) bool {
+	switch eventType {
+	case EventOrderPaymentVerified, EventOrderReservationReleaseRequested:
+		return true
+	default:
+		return false
+	}
 }
 
 // ReservationRequest describes the fail-closed resource gate before payment provisioning.

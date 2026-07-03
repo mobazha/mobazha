@@ -62,6 +62,10 @@ func CollectibleOrderExtensionFromOrderOpen(orderID string, orderOpen *pb.OrderO
 	}
 	extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
 	extension.ReservationRequired = true
+	extension.LifecycleEvents = []string{
+		extensions.EventOrderPaymentVerified,
+		extensions.EventOrderReservationReleaseRequested,
+	}
 	return extension, true, nil
 }
 

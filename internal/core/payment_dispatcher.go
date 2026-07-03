@@ -15,7 +15,6 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/events"
-	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
@@ -432,26 +431,21 @@ func (n *MobazhaNode) orderRequiresAttestedSettlement(orderID string) (bool, err
 		return false, fmt.Errorf("order database is unavailable")
 	}
 	var order models.Order
-	var declared []extensions.OrderExtension
+	var requiresAttestation bool
 	if err := n.db.View(func(tx database.Tx) error {
 		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
 			return err
 		}
-		var loadErr error
-		declared, loadErr = orderextensions.LatestByOrderTx(tx, orderID)
-		return loadErr
+		var err error
+		requiresAttestation, err = orderextensions.RequiresAttestedSettlementTx(tx, orderID)
+		return err
 	}); err != nil {
 		return false, fmt.Errorf("load order settlement policy: %w", err)
 	}
 	if _, err := order.OrderOpenMessage(); err != nil {
 		return false, fmt.Errorf("decode order open: %w", err)
 	}
-	for _, extension := range declared {
-		if extension.SettlementPolicy == extensions.SettlementPolicyExtensionAttested {
-			return true, nil
-		}
-	}
-	return false, nil
+	return requiresAttestation, nil
 }
 
 func (n *MobazhaNode) isSupplyChainManagedOrder(orderID string) (bool, error) {

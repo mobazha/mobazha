@@ -61,10 +61,11 @@ func (s *OrderAppService) handleAutoConfirmRequest(event *events.OrderAutoConfir
 		return
 	}
 
-	err = service.ConfirmOrder(
+	err = service.confirmOrder(
 		models.OrderID(event.OrderID),
 		iwallet.TransactionID(event.TxID),
 		event.PayoutAddress,
+		event.SettlementAttestationID,
 		nil,
 	)
 	if err != nil {

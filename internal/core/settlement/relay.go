@@ -12,6 +12,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	ethWal "github.com/mobazha/mobazha/internal/chains/evm"
 	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
@@ -263,7 +264,17 @@ func (s *SettlementService) GetConfirmOrderInstructions(orderID models.OrderID, 
 func (s *SettlementService) GetLegacyConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error) {
 	var order models.Order
 	err = s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
+		if err := tx.Read().Where("id = ?", orderID.String()).First(&order).Error; err != nil {
+			return err
+		}
+		requiresAttestation, err := orderextensions.RequiresAttestedSettlementTx(tx, orderID.String())
+		if err != nil {
+			return err
+		}
+		if requiresAttestation {
+			return fmt.Errorf("%w: extension-attested order does not expose client-signed confirmation instructions", coreiface.ErrBadRequest)
+		}
+		return nil
 	})
 	if err != nil {
 		return "", nil, err

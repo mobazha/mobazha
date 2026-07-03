@@ -76,6 +76,11 @@ The Collectibles cutover additionally requires:
 - buyer/seller and tenant copies of the same order produce distinct event IDs;
 - a financial state change during attestation verification is rejected before
   settlement submission;
+- public confirmation, explicit confirm actions, client-signed instructions,
+  and Fiat funding cannot bypass an extension-attested settlement policy;
+- accepted evidence is bound to the executed action or transaction and
+  revalidated under the order lock before confirmation;
+- only explicitly subscribed lifecycle events enter the durable outbox;
 - exact contract versions, descriptor/capability mismatch, nil capabilities,
   and post-registration descriptor mutation are rejected or isolated;
 - no Collectibles data is mirrored into `FiatMetadata`;

@@ -432,10 +432,11 @@ type AfterSaleDisputeReceived struct {
 // payment should be auto-confirmed (UTXO or EVM). OrderAppService subscribes
 // and calls ConfirmOrder. This replaces the direct cross-service method call.
 type OrderAutoConfirmRequest struct {
-	TenantID      string `json:"tenantID,omitempty"`
-	OrderID       string `json:"orderID"`
-	TxID          string `json:"txID"`
-	PayoutAddress string `json:"payoutAddress"`
+	TenantID                string `json:"tenantID,omitempty"`
+	OrderID                 string `json:"orderID"`
+	TxID                    string `json:"txID"`
+	PayoutAddress           string `json:"payoutAddress"`
+	SettlementAttestationID string `json:"settlementAttestationID,omitempty"`
 }
 
 // PaymentVerified is the canonical "this order's chain payment has been

@@ -6,6 +6,8 @@ import (
 
 	ethWal "github.com/mobazha/mobazha/internal/chains/evm"
 	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/internal/orderextensions"
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
@@ -232,6 +234,19 @@ func (s *SettlementService) AutoConfirmManagedEscrow(ctx context.Context, event 
 // so the handler simply emits OrderAutoConfirmRequest to trigger ConfirmOrder.
 func (s *SettlementService) HandleFiatPaymentReady(event *events.FiatPaymentReady) {
 	logger.LogInfoWithIDf(log, s.nodeID, "Handling fiat payment ready for order %s (provider=%s)", event.OrderID, event.ProviderID)
+	var requiresAttestation bool
+	if err := s.db.View(func(tx database.Tx) error {
+		var err error
+		requiresAttestation, err = orderextensions.RequiresAttestedSettlementTx(tx, event.OrderID)
+		return err
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "Cannot establish extension settlement policy for fiat order %s: %v", event.OrderID, err)
+		return
+	}
+	if requiresAttestation {
+		logger.LogErrorWithIDf(log, s.nodeID, "Refusing fiat auto-confirm for extension-attested order %s", event.OrderID)
+		return
+	}
 
 	unlock := s.TryLockAutoConfirm(event.OrderID)
 	if unlock == nil {

@@ -35,6 +35,9 @@ func enqueueTx(tx database.Tx, order *models.Order, eventType, reason string) er
 		return fmt.Errorf("extension lifecycle: load order extensions: %w", err)
 	}
 	for _, extension := range declared {
+		if !extension.SubscribesTo(eventType) {
+			continue
+		}
 		reservation, loadErr := orderextensions.ReservationByExtensionTx(tx, order.ID.String(), extension.ExtensionID)
 		if loadErr != nil {
 			return fmt.Errorf("extension lifecycle: load reservation %s: %w", extension.ExtensionID, loadErr)
@@ -60,6 +63,9 @@ func EnqueuePaymentVerifiedGorm(tx *gorm.DB, tenantID string, order *models.Orde
 		return fmt.Errorf("extension lifecycle: load order extensions: %w", err)
 	}
 	for _, extension := range declared {
+		if !extension.SubscribesTo(extensions.EventOrderPaymentVerified) {
+			continue
+		}
 		reservation, loadErr := orderextensions.ReservationByExtensionGorm(tx, tenantID, order.ID.String(), extension.ExtensionID)
 		if loadErr != nil {
 			return fmt.Errorf("extension lifecycle: load reservation %s: %w", extension.ExtensionID, loadErr)

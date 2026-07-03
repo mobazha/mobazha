@@ -97,3 +97,28 @@ func TestSnapshotDescriptor_IsDetachedFromModuleMutation(t *testing.T) {
 	require.Equal(t, ContractOrderExtensionDeliveryV1, snapshot.Contracts[0])
 	require.Equal(t, "dependency", snapshot.Dependencies[0])
 }
+
+type singleReadControllerModule struct {
+	descriptor ModuleDescriptor
+	calls      int
+}
+
+func (m *singleReadControllerModule) Descriptor() ModuleDescriptor { return m.descriptor }
+func (m *singleReadControllerModule) Controller() Controller {
+	m.calls++
+	if m.calls > 1 {
+		return nil
+	}
+	return testController{}
+}
+
+func TestValidateAndSnapshotModules_ReadsCapabilityOnce(t *testing.T) {
+	module := &singleReadControllerModule{descriptor: ModuleDescriptor{
+		ID: "single-read", Version: "1", Contracts: []string{ContractOrderExtensionDeliveryV1},
+	}}
+	snapshots, err := ValidateAndSnapshotModules(module)
+	require.NoError(t, err)
+	require.Equal(t, 1, module.calls)
+	require.Len(t, snapshots, 1)
+	require.NotNil(t, snapshots[0].Controller)
+}

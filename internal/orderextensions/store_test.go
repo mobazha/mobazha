@@ -9,6 +9,8 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
 	"github.com/stretchr/testify/require"
 )
 
@@ -149,4 +151,67 @@ func TestRecordReservationTx_PersistsProviderBindingIdempotently(t *testing.T) {
 	conflicting.Status = "released"
 	err = db.Update(func(tx database.Tx) error { return orderextensions.RecordReservationTx(tx, request, conflicting) })
 	require.ErrorContains(t, err, "immutable")
+}
+
+func TestValidateConfirmationAuthorizationTx_BindsExecutedAttestationToCurrentState(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	order := &models.Order{ID: "order-authorized", MyRole: string(models.RoleVendor)}
+	order.MarkPaymentVerified()
+	require.NoError(t, order.SetPaymentSent(&pb.PaymentSent{
+		ToAddress: "settlement-1", Coin: "MATIC", Amount: "100",
+		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPaymentSent(),
+	}))
+	order.State = order.DeriveState()
+	extension, err := extensions.NewOrderExtension(order.ID.String(), "provider", "test", "v1", "resource", map[string]string{"value": "test"})
+	require.NoError(t, err)
+	extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
+	extension.LifecycleEvents = []string{extensions.EventOrderPaymentVerified}
+	reference, err := orderextensions.SettlementReferenceForOrder(order)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	attestation := extensions.SettlementAttestation{
+		AttestationID: "att-executed", IdempotencyKey: "att-executed", Issuer: "provider",
+		TenantID: database.StandaloneTenantID, OrderID: order.ID.String(), SettlementID: reference.SettlementID,
+		ExtensionID: extension.ExtensionID, ExpectedExtensionRevision: 1, ExpectedOrderStateVersion: reference.OrderStateVersion,
+		ConditionType: extensions.ConditionOrderExtensionDeliveryConfirmed, ConditionVersion: extensions.ContractVersionV1,
+		EvidenceDigest: "sha256:evidence", ObservedAt: now, ExpiresAt: now.Add(time.Minute),
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		if err := orderextensions.PersistTx(tx, order.ID.String(), extension); err != nil {
+			return err
+		}
+		if err := orderextensions.RecordAttestationTx(tx, attestation, now); err != nil {
+			return err
+		}
+		return orderextensions.BindAttestationExecutionTx(tx, attestation.AttestationID, "action-1", "tx-1", "payout-1")
+	}))
+	conflicting := attestation
+	conflicting.AttestationID = "att-conflicting"
+	conflicting.IdempotencyKey = "att-conflicting"
+	conflicting.EvidenceDigest = "sha256:other-evidence"
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return orderextensions.RecordAttestationTx(tx, conflicting, now)
+	}))
+	err = db.Update(func(tx database.Tx) error {
+		return orderextensions.BindAttestationExecutionTx(tx, conflicting.AttestationID, "action-1", "tx-2", "payout-1")
+	})
+	require.ErrorContains(t, err, "action is already bound")
+	var authorization orderextensions.ConfirmationAuthorization
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		var loadErr error
+		authorization, loadErr = orderextensions.ValidateConfirmationAuthorizationTx(tx, order, attestation.AttestationID, "tx-1")
+		return loadErr
+	}))
+	require.Equal(t, "payout-1", authorization.PayoutAddress)
+	order.SerializedOrderCancel = []byte(`{"changed":true}`)
+	err = db.View(func(tx database.Tx) error {
+		_, loadErr := orderextensions.ValidateConfirmationAuthorizationTx(tx, order, attestation.AttestationID, "tx-1")
+		return loadErr
+	})
+	require.ErrorContains(t, err, "state is stale")
 }

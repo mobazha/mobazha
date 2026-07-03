@@ -25,6 +25,10 @@ var (
 		"payment session: order extension reservation failed",
 	)
 
+	ErrOrderExtensionSettlement = errors.New(
+		"payment session: order extension settlement policy rejected the funding rail",
+	)
+
 	ErrPaymentCoinDisabled = errors.New(
 		"payment session: requested payment coin is not enabled",
 	)

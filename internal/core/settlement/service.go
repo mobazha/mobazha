@@ -1,6 +1,7 @@
 package settlement
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -30,6 +31,7 @@ type SettlementService struct {
 	keys            contracts.KeyProvider
 	eventBus        events.Bus
 	nodeID          string
+	orderLocker     OrderLocker
 
 	// UTXO escrow
 	monitorService     utxo.UTXOMonitorService
@@ -54,6 +56,12 @@ type SettlementService struct {
 	attestationVerifier func(string) extensions.AttestationVerifier
 }
 
+// OrderLocker serializes settlement commands with Core's order state machine.
+type OrderLocker interface {
+	Lock(context.Context, string, string) error
+	Unlock(string, string)
+}
+
 // SettlementServiceConfig groups the dependencies for constructing SettlementService.
 type SettlementServiceConfig struct {
 	DB          database.Database
@@ -61,6 +69,7 @@ type SettlementServiceConfig struct {
 	Keys        contracts.KeyProvider
 	EventBus    events.Bus
 	NodeID      string
+	OrderLocker OrderLocker
 
 	MonitorService     utxo.UTXOMonitorService
 	EscrowMasterPubKey *btcec.PublicKey
@@ -80,6 +89,7 @@ func NewSettlementService(cfg SettlementServiceConfig) *SettlementService {
 		keys:               cfg.Keys,
 		eventBus:           cfg.EventBus,
 		nodeID:             cfg.NodeID,
+		orderLocker:        cfg.OrderLocker,
 		monitorService:     cfg.MonitorService,
 		escrowMasterPubKey: cfg.EscrowMasterPubKey,
 		utxoKeyDeriver:     cfg.UTXOKeyDeriver,

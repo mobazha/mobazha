@@ -23,25 +23,19 @@ type orderExtensionFields struct {
 }
 
 func snapshotOrderExtensionModules(modules []extensions.Module) ([]registeredOrderExtensionModule, error) {
-	if err := extensions.ValidateModules(modules...); err != nil {
+	snapshots, err := extensions.ValidateAndSnapshotModules(modules...)
+	if err != nil {
 		return nil, err
 	}
-	registered := make([]registeredOrderExtensionModule, 0, len(modules))
-	for _, module := range modules {
-		entry := registeredOrderExtensionModule{descriptor: extensions.SnapshotDescriptor(module)}
-		if capability, ok := module.(extensions.DeclarationModule); ok {
-			entry.declaration = capability.DeclarationPort()
-		}
-		if capability, ok := module.(extensions.ReservationModule); ok {
-			entry.reservation = capability.ReservationPort()
-		}
-		if capability, ok := module.(extensions.ControllerModule); ok {
-			entry.controller = capability.Controller()
-		}
-		if capability, ok := module.(extensions.AttestationModule); ok {
-			entry.attestation = capability.AttestationVerifier()
-		}
-		registered = append(registered, entry)
+	registered := make([]registeredOrderExtensionModule, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		registered = append(registered, registeredOrderExtensionModule{
+			descriptor:  snapshot.Descriptor,
+			declaration: snapshot.Declaration,
+			reservation: snapshot.Reservation,
+			controller:  snapshot.Controller,
+			attestation: snapshot.Attestation,
+		})
 	}
 	return registered, nil
 }
@@ -109,6 +103,9 @@ func (n *MobazhaNode) declareOrderExtensions(ctx context.Context, input extensio
 			}
 			if extension.ReservationRequired && !registered.hasContract(extensions.ContractOrderExtensionReservationV1) {
 				return nil, fmt.Errorf("order extension module %q declared a required reservation without the reservation contract", registered.descriptor.ID)
+			}
+			if len(extension.LifecycleEvents) > 0 && !registered.hasContract(extensions.ContractOrderExtensionDeliveryV1) {
+				return nil, fmt.Errorf("order extension module %q declared lifecycle events without the delivery contract", registered.descriptor.ID)
 			}
 			if _, exists := seen[extension.ExtensionID]; exists {
 				return nil, fmt.Errorf("order extension %q was declared more than once", extension.ExtensionID)

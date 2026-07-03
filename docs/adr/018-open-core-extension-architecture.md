@@ -60,6 +60,9 @@ Mobazha adopts the following extension architecture:
    delegate the external execution leg to a narrowly authorized payment
    adapter, which reports the result back to Core. A domain Controller such as
    Collectibles may only submit evidence that a condition is satisfied.
+   Attested policies are enforced at every confirmation surface, not only the
+   automatic dispatcher, and are rejected from payment rails that cannot
+   execute the declared conditional settlement.
 10. **Capabilities are closed by default.** Effective capability is:
 
     ```text

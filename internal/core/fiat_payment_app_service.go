@@ -16,6 +16,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"gorm.io/gorm"
@@ -173,10 +174,12 @@ func (s *FiatPaymentAppService) authorizePaymentCreation(ctx context.Context, pr
 		expiresAt = order.ExpiresAt.UTC()
 	}
 	input := corepayment.SessionProvisioningPolicyInput{
-		OrderID:     strings.TrimSpace(params.OrderID),
-		PaymentCoin: "fiat:" + strings.ToLower(strings.TrimSpace(providerID)) + ":" + strings.ToUpper(strings.TrimSpace(params.Currency)),
-		ExpiresAt:   expiresAt,
-		OrderOpen:   orderOpen,
+		OrderID:               strings.TrimSpace(params.OrderID),
+		PaymentCoin:           "fiat:" + strings.ToLower(strings.TrimSpace(providerID)) + ":" + strings.ToUpper(strings.TrimSpace(params.Currency)),
+		SettlementMethod:      pb.PaymentSent_FIAT,
+		SettlementMethodKnown: true,
+		ExpiresAt:             expiresAt,
+		OrderOpen:             orderOpen,
 	}
 	for _, policy := range s.provisioningPolicies {
 		if err := policy.AuthorizeSessionProvisioning(ctx, input); err != nil {

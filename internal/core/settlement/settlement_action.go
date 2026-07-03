@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	nodepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -79,7 +80,20 @@ func (s *SettlementService) executeSettlementActionForOrder(
 	}
 	var current models.Order
 	if err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("id = ?", order.ID.String()).First(&current).Error
+		if err := tx.Read().Where("id = ?", order.ID.String()).First(&current).Error; err != nil {
+			return err
+		}
+		if action != payment.SettlementActionConfirm {
+			return nil
+		}
+		requiresAttestation, err := orderextensions.RequiresAttestedSettlementTx(tx, order.ID.String())
+		if err != nil {
+			return err
+		}
+		if requiresAttestation {
+			return fmt.Errorf("%w: extension-attested order requires conditional settlement", coreiface.ErrBadRequest)
+		}
+		return nil
 	}); err != nil {
 		return nil, "", err
 	}

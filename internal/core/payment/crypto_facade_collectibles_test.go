@@ -140,6 +140,30 @@ func TestOrderExtensionProvisioningPolicy_RejectsCollectibleFiatBeforeReservatio
 	}
 }
 
+func TestOrderExtensionProvisioningPolicy_RejectsIncompatibleAttestedRailBeforeReservation(t *testing.T) {
+	extension, err := extensions.NewOrderExtension("order-rail", "provider", "test", "v1", "resource", map[string]string{"value": "test"})
+	require.NoError(t, err)
+	extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
+	extension.LifecycleEvents = []string{extensions.EventOrderPaymentVerified}
+	called := false
+	policy := NewOrderExtensionsProvisioningPolicy(
+		func(SessionProvisioningPolicyInput) ([]extensions.OrderExtension, error) {
+			return []extensions.OrderExtension{extension}, nil
+		},
+		func(context.Context, extensions.ReservationRequest) (extensions.Reservation, error) {
+			called = true
+			return extensions.Reservation{}, nil
+		},
+		func(extensions.ReservationRequest, extensions.Reservation) error { return nil },
+	)
+	err = policy.AuthorizeSessionProvisioning(context.Background(), SessionProvisioningPolicyInput{
+		OrderID: "order-rail", PaymentCoin: "fiat:stripe:USD",
+		SettlementMethod: porderpb.PaymentSent_FIAT, SettlementMethodKnown: true,
+	})
+	require.ErrorIs(t, err, ErrOrderExtensionSettlement)
+	require.False(t, called)
+}
+
 func resolveCollectibleFirstSaleExtension(input SessionProvisioningPolicyInput) (extensions.OrderExtension, bool, error) {
 	if !testOrderOpenContainsRWA(input.OrderOpen) {
 		return extensions.OrderExtension{}, false, nil

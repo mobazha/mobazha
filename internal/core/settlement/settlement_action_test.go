@@ -216,7 +216,8 @@ func TestExecuteConditionalSettlement_AcceptsAuthorizedDeliveryAttestation(t *te
 	strategy := &utxoActionStatusStub{model: payment.PaymentModelMonitored, confirmResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted, ActionID: "conditional-action"}}
 	registry := payment.NewRegistry()
 	registry.RegisterV2(iwallet.ChainEthereum, strategy)
-	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	locker := &recordingOrderLocker{}
+	svc := NewSettlementService(SettlementServiceConfig{DB: db, OrderLocker: locker})
 	svc.SetRegistry(registry)
 	const corePayoutAddress = "0x5555555555555555555555555555555555555555"
 	require.NoError(t, db.Update(func(tx database.Tx) error {
@@ -244,6 +245,74 @@ func TestExecuteConditionalSettlement_AcceptsAuthorizedDeliveryAttestation(t *te
 		return tx.Read().Where("attestation_id = ?", "att-1").First(&attestation).Error
 	}))
 	require.Equal(t, order.ID.String(), attestation.OrderID)
+	require.Equal(t, "conditional-action", attestation.ExecutionActionID)
+	require.Equal(t, corePayoutAddress, attestation.ExecutionPayoutAddress)
+	require.True(t, locker.locked)
+	require.True(t, locker.unlocked)
+}
+
+func TestExecuteConditionalSettlement_CompletedActionEmitsBoundConfirmation(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	bus := events.NewBus()
+	subscription, err := bus.Subscribe(&events.OrderAutoConfirmRequest{})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, subscription.Close()) })
+	strategy := &utxoActionStatusStub{model: payment.PaymentModelMonitored, confirmResult: &payment.ActionResult{
+		Mode: payment.ActionModeCompleted, SubmittedTxHash: "0xconditional-confirmed",
+	}}
+	registry := payment.NewRegistry()
+	registry.RegisterV2(iwallet.ChainEthereum, strategy)
+	svc := NewSettlementService(SettlementServiceConfig{
+		DB: db, EventBus: bus, OrderLocker: &recordingOrderLocker{},
+	})
+	svc.SetRegistry(registry)
+	const payoutAddress = "0x6666666666666666666666666666666666666666"
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ReceivingAccount{ID: 2, Name: "seller", ChainType: iwallet.ChainEthereum, Address: payoutAddress, IsActive: true})
+	}))
+	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-conditional-completed", models.RoleVendor, true)
+	extension := persistCollectibleTestExtension(t, db, order)
+	svc.SetAttestationVerifierResolver(func(string) extensions.AttestationVerifier {
+		return attestationVerifierFunc(func(context.Context, extensions.SettlementAttestation, extensions.OrderExtension) error { return nil })
+	})
+	reference, err := orderextensions.SettlementReferenceForOrder(order)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	_, _, err = svc.ExecuteConditionalSettlement(context.Background(), extensions.SettlementAttestation{
+		AttestationID: "att-completed", IdempotencyKey: "att-completed", Issuer: extension.ProviderID,
+		TenantID: database.StandaloneTenantID, OrderID: order.ID.String(), SettlementID: reference.SettlementID,
+		ExtensionID: extension.ExtensionID, ExpectedExtensionRevision: extension.Revision, ExpectedOrderStateVersion: reference.OrderStateVersion,
+		ConditionType: extensions.ConditionOrderExtensionDeliveryConfirmed, ConditionVersion: extensions.ContractVersionV1,
+		EvidenceDigest: "sha256:completed", ObservedAt: now, ExpiresAt: now.Add(time.Minute),
+	})
+	require.NoError(t, err)
+	event := (<-subscription.Out()).(*events.OrderAutoConfirmRequest)
+	require.Equal(t, order.ID.String(), event.OrderID)
+	require.Equal(t, "0xconditional-confirmed", event.TxID)
+	require.Equal(t, payoutAddress, event.PayoutAddress)
+	require.Equal(t, "att-completed", event.SettlementAttestationID)
+	var record models.SettlementAttestationRecord
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("attestation_id = ?", "att-completed").First(&record).Error
+	}))
+	require.Equal(t, "0xconditional-confirmed", record.ExecutionTransactionID)
+	require.Equal(t, payoutAddress, record.ExecutionPayoutAddress)
+}
+
+func TestDefaultConfirmationSurfaces_RejectExtensionAttestedOrder(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	order := &models.Order{ID: "order-attested-default-confirm"}
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(order) }))
+	persistCollectibleTestExtension(t, db, order)
+	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	_, _, err = svc.ExecuteSettlementAction(context.Background(), payment.SettlementActionConfirm, order.ID, "")
+	require.ErrorContains(t, err, "requires conditional settlement")
+	_, _, err = svc.GetConfirmOrderInstructions(order.ID, "initiator", "payout")
+	require.ErrorContains(t, err, "does not expose client-signed confirmation instructions")
 }
 
 func TestExecuteConditionalSettlement_RejectsExpiredAttestation(t *testing.T) {
@@ -318,7 +387,7 @@ func TestExecuteConditionalSettlement_RejectsStateChangedDuringVerification(t *t
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	svc := NewSettlementService(SettlementServiceConfig{DB: db})
+	svc := NewSettlementService(SettlementServiceConfig{DB: db, OrderLocker: &recordingOrderLocker{}})
 	order := seedCollectiblePrimarySaleReleaseOrder(t, db, "order-state-race", models.RoleVendor, true)
 	extension := persistCollectibleTestExtension(t, db, order)
 	reference, err := orderextensions.SettlementReferenceForOrder(order)
@@ -352,11 +421,24 @@ func (f attestationVerifierFunc) VerifySettlementAttestation(ctx context.Context
 	return f(ctx, attestation, extension)
 }
 
+type recordingOrderLocker struct {
+	locked   bool
+	unlocked bool
+}
+
+func (l *recordingOrderLocker) Lock(context.Context, string, string) error {
+	l.locked = true
+	return nil
+}
+
+func (l *recordingOrderLocker) Unlock(string, string) { l.unlocked = true }
+
 func persistCollectibleTestExtension(t *testing.T, db database.Database, order *models.Order) extensions.OrderExtension {
 	t.Helper()
 	extension, err := extensions.NewOrderExtension(order.ID.String(), models.CollectibleExtensionProviderID, models.CollectibleExtensionTypePrimarySale, extensions.ContractVersionV1, "slot-test", map[string]string{"slot": "slot-test"})
 	require.NoError(t, err)
 	extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
+	extension.LifecycleEvents = []string{extensions.EventOrderPaymentVerified}
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		return orderextensions.PersistTx(tx, order.ID.String(), extension)
 	}))

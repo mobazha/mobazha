@@ -10,6 +10,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
+	porderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
@@ -221,6 +222,10 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			PaymentCoin: req.PaymentCoin,
 			ExpiresAt:   view.ExpiresAt,
 			OrderOpen:   input.orderOpen,
+		}
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(req.PaymentCoin)), "fiat:") {
+			policyInput.SettlementMethod = porderpb.PaymentSent_FIAT
+			policyInput.SettlementMethodKnown = true
 		}
 		for _, policy := range s.policies {
 			if err := policy.AuthorizeSessionProvisioning(ctx, policyInput); err != nil {

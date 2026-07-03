@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/internal/orders/utils"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
@@ -28,6 +29,10 @@ import (
 // For UTXO CANCELABLE payments: if txid is empty, this method will release the funds first.
 // If txid is provided (e.g., from autoConfirmCancelablePayment), it assumes funds are already released.
 func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error {
+	return s.confirmOrder(orderID, txid, payoutAddress, "", done)
+}
+
+func (s *OrderAppService) confirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress, attestationID string, done chan struct{}) error {
 	if err := s.acquireOrderLock(orderID); err != nil {
 		return fmt.Errorf("failed to acquire order lock for %s: %w", orderID, err)
 	}
@@ -39,8 +44,27 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 	}()
 
 	var order models.Order
+	var confirmationAuthorization *orderextensions.ConfirmationAuthorization
 	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
+		if err := tx.Read().Where("id = ?", orderID.String()).First(&order).Error; err != nil {
+			return err
+		}
+		requiresAttestation, err := orderextensions.RequiresAttestedSettlementTx(tx, orderID.String())
+		if err != nil {
+			return err
+		}
+		if !requiresAttestation {
+			return nil
+		}
+		if attestationID == "" || txid == "" {
+			return fmt.Errorf("%w: extension-attested order requires an executed conditional settlement", coreiface.ErrBadRequest)
+		}
+		authorization, err := orderextensions.ValidateConfirmationAuthorizationTx(tx, &order, attestationID, txid.String())
+		if err != nil {
+			return fmt.Errorf("%w: invalid conditional settlement authorization: %v", coreiface.ErrBadRequest, err)
+		}
+		confirmationAuthorization = &authorization
+		return nil
 	})
 	if err != nil {
 		return err
@@ -48,6 +72,9 @@ func (s *OrderAppService) ConfirmOrder(orderID models.OrderID, txid iwallet.Tran
 
 	if !order.CanConfirm() {
 		return fmt.Errorf("%w: order is not in a state where it can be confirmed", coreiface.ErrBadRequest)
+	}
+	if confirmationAuthorization != nil {
+		payoutAddress = confirmationAuthorization.PayoutAddress
 	}
 
 	paymentSent, err := order.PaymentSentMessage()

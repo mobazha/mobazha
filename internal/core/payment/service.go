@@ -378,10 +378,15 @@ func (s *PaymentAppService) authorizePaymentSetup(ctx context.Context, params pa
 		expiresAt = order.ExpiresAt.UTC()
 	}
 	input := SessionProvisioningPolicyInput{
-		OrderID:     params.OrderID,
-		PaymentCoin: string(params.CoinType),
-		ExpiresAt:   expiresAt,
-		OrderOpen:   orderOpen,
+		OrderID:               params.OrderID,
+		PaymentCoin:           string(params.CoinType),
+		SettlementMethod:      pb.PaymentSent_CANCELABLE,
+		SettlementMethodKnown: true,
+		ExpiresAt:             expiresAt,
+		OrderOpen:             orderOpen,
+	}
+	if strings.TrimSpace(params.Moderator) != "" {
+		input.SettlementMethod = pb.PaymentSent_MODERATED
 	}
 	for _, policy := range s.provisioningPolicies {
 		if err := policy.AuthorizeSessionProvisioning(ctx, input); err != nil {

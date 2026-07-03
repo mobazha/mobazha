@@ -41,6 +41,7 @@ func TestEnqueuePaymentVerifiedTx_UsesLatestPersistedExtensionRevision(t *testin
 	require.NoError(t, err)
 	second.ReservationRequired = first.ReservationRequired
 	second.SettlementPolicy = first.SettlementPolicy
+	second.LifecycleEvents = append([]string(nil), first.LifecycleEvents...)
 
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		if err := tx.Save(order); err != nil {
@@ -73,6 +74,29 @@ func TestEnqueuePaymentVerifiedTx_UsesLatestPersistedExtensionRevision(t *testin
 	require.Equal(t, "reservation-1", payload.Reservation.ReservationID)
 	require.Equal(t, "settlement-1", payload.Settlement.SettlementID)
 	require.NotEmpty(t, payload.Settlement.OrderStateVersion)
+}
+
+func TestEnqueuePaymentVerifiedTx_SkipsUnsubscribedExtension(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	order := &models.Order{ID: "order-no-delivery"}
+	extension, err := extensions.NewOrderExtension(order.ID.String(), "io.mobazha.metadata", "metadata", "v1", "resource", map[string]string{"value": "only"})
+	require.NoError(t, err)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		if err := orderextensions.PersistTx(tx, order.ID.String(), extension); err != nil {
+			return err
+		}
+		return EnqueuePaymentVerifiedTx(tx, order)
+	}))
+	var count int64
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Model(&models.ExtensionDelivery{}).Count(&count).Error
+	}))
+	require.Zero(t, count)
 }
 
 func TestEventForOrder_DistinguishesBuyerSellerAndTenantCopies(t *testing.T) {

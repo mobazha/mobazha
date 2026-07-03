@@ -416,6 +416,7 @@ func TestDispatchCancelablePayment_SkipsExtensionAttestedAutoConfirm(t *testing.
 			return err
 		}
 		extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
+		extension.LifecycleEvents = []string{extensions.EventOrderPaymentVerified}
 		return orderextensions.PersistTx(tx, orderID.String(), extension)
 	}); err != nil {
 		t.Fatal(err)

@@ -20,10 +20,12 @@ type SessionProvisioningPolicy interface {
 // SessionProvisioningPolicyInput contains the signed order data needed to
 // authorize creation of a new payment funding target.
 type SessionProvisioningPolicyInput struct {
-	OrderID     string
-	PaymentCoin string
-	ExpiresAt   time.Time
-	OrderOpen   *porderpb.OrderOpen
+	OrderID               string
+	PaymentCoin           string
+	SettlementMethod      porderpb.PaymentSent_Method
+	SettlementMethodKnown bool
+	ExpiresAt             time.Time
+	OrderOpen             *porderpb.OrderOpen
 }
 
 // OrderExtensionResolver projects signed order input into a required extension envelope.
@@ -32,8 +34,8 @@ type OrderExtensionResolver func(SessionProvisioningPolicyInput) (extensions.Ord
 // OrderExtensionReserveFunc invokes a provider's fail-closed reservation capability.
 type OrderExtensionReserveFunc func(context.Context, extensions.ReservationRequest) (extensions.Reservation, error)
 
-// OrderExtensionsResolver returns the persisted extensions whose descriptors
-// declare the reservation contract.
+// OrderExtensionsResolver returns every persisted extension whose funding
+// policy must be evaluated before a target is created.
 type OrderExtensionsResolver func(SessionProvisioningPolicyInput) ([]extensions.OrderExtension, error)
 
 // OrderExtensionReservationRecorder durably binds a provider reservation to
@@ -84,6 +86,23 @@ func (p *orderExtensionProvisioningPolicy) AuthorizeSessionProvisioning(ctx cont
 		}
 	}
 	for _, extension := range required {
+		if extension.SettlementPolicy != extensions.SettlementPolicyExtensionAttested {
+			continue
+		}
+		methodKnown := input.SettlementMethodKnown
+		method := input.SettlementMethod
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(input.PaymentCoin)), "fiat:") {
+			methodKnown = true
+			method = porderpb.PaymentSent_FIAT
+		}
+		if methodKnown && method != porderpb.PaymentSent_CANCELABLE {
+			return fmt.Errorf("%w: extension %s requires CANCELABLE settlement, got %s", ErrOrderExtensionSettlement, extension.ExtensionID, method.String())
+		}
+	}
+	for _, extension := range required {
+		if !extension.ReservationRequired {
+			continue
+		}
 		if err := p.reserveOne(ctx, input, extension); err != nil {
 			return err
 		}

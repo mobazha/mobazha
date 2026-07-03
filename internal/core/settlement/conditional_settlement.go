@@ -9,6 +9,7 @@ import (
 	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -90,9 +91,17 @@ func (s *SettlementService) ExecuteConditionalSettlement(
 		return nil, "", fmt.Errorf("%w: settlement attestation verification failed: %v", coreiface.ErrBadRequest, err)
 	}
 
-	// Re-read and compare the Core-issued state version while holding the same
-	// lock used for settlement submission. This closes the verifier-to-command
-	// TOCTOU window without granting the module access to Core state.
+	if s.orderLocker == nil {
+		return nil, "", fmt.Errorf("order execution lock is unavailable")
+	}
+	if err := s.orderLocker.Lock(ctx, s.nodeID, attestation.OrderID); err != nil {
+		return nil, "", fmt.Errorf("lock order for conditional settlement: %w", err)
+	}
+	defer s.orderLocker.Unlock(s.nodeID, attestation.OrderID)
+
+	// Re-read and compare the Core-issued state version while holding both the
+	// order state-machine lock and the settlement submission lock. Their fixed
+	// acquisition order closes the verifier-to-command TOCTOU window.
 	s.settlementActionMu.Lock()
 	defer s.settlementActionMu.Unlock()
 	var current models.Order
@@ -137,7 +146,53 @@ func (s *SettlementService) ExecuteConditionalSettlement(
 	if err != nil {
 		return nil, coinType, fmt.Errorf("resolve Core-owned seller payout address: %w", err)
 	}
-	return s.executeSettlementActionForOrderLocked(ctx, payment.SettlementActionConfirm, &current, payoutAddress.String())
+	result, coinType, err := s.executeSettlementActionForOrderLocked(ctx, payment.SettlementActionConfirm, &current, payoutAddress.String())
+	if err != nil {
+		return nil, coinType, err
+	}
+	if result == nil {
+		return nil, coinType, fmt.Errorf("conditional settlement returned no execution result")
+	}
+	strategy, err := s.settlementActionStrategy(coinType)
+	if err != nil {
+		return nil, coinType, err
+	}
+	transactionID := settlementActionTxHash(ctx, strategy, result)
+	if result.Mode == payment.ActionModeSubmitted && result.ActionID == "" {
+		return nil, coinType, fmt.Errorf("submitted conditional settlement returned no action identity")
+	}
+	if result.Mode == payment.ActionModeCompleted && transactionID == "" {
+		return nil, coinType, fmt.Errorf("completed conditional settlement returned no transaction identity")
+	}
+	if result.Mode != payment.ActionModeSubmitted && result.Mode != payment.ActionModeCompleted {
+		return nil, coinType, fmt.Errorf("conditional settlement returned unsupported execution mode %q", result.Mode)
+	}
+	if result.Mode == payment.ActionModeCompleted && s.eventBus == nil {
+		return nil, coinType, fmt.Errorf("conditional settlement confirmation event bus is unavailable")
+	}
+	bindingTransactionID := ""
+	if result.Mode == payment.ActionModeCompleted {
+		bindingTransactionID = transactionID
+	}
+	if err := s.db.Update(func(tx database.Tx) error {
+		return orderextensions.BindAttestationExecutionTx(
+			tx,
+			attestation.AttestationID,
+			result.ActionID,
+			bindingTransactionID,
+			payoutAddress.String(),
+		)
+	}); err != nil {
+		return nil, coinType, fmt.Errorf("bind conditional settlement execution: %w", err)
+	}
+	if result.Mode == payment.ActionModeCompleted {
+		s.eventBus.Emit(&events.OrderAutoConfirmRequest{
+			TenantID: strings.TrimSpace(attestation.TenantID), OrderID: attestation.OrderID,
+			TxID: transactionID, PayoutAddress: payoutAddress.String(),
+			SettlementAttestationID: attestation.AttestationID,
+		})
+	}
+	return result, coinType, nil
 }
 
 func validateConditionalSettlementOrder(order *models.Order) error {

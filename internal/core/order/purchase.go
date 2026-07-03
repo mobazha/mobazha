@@ -801,6 +801,11 @@ func (s *OrderAppService) ProcessOrderPayment(ctx context.Context, paymentData *
 	if err != nil {
 		return fmt.Errorf("build payment sent proto: %w", err)
 	}
+	if err := s.db.View(func(tx database.Tx) error {
+		return orderextensions.EnsureSettlementMethodAllowedTx(tx, paymentData.OrderID, paymentSent.GetSettlementSpec().GetMethod())
+	}); err != nil {
+		return fmt.Errorf("%w: payment settlement policy: %v", coreiface.ErrBadRequest, err)
+	}
 
 	orderAny, err := anypb.New(paymentSent)
 	if err != nil {

@@ -23,6 +23,7 @@ OrderExtension {
   resource_id
   reservation_required
   settlement_policy
+  lifecycle_events
   payload
   payload_hash
   created_at
@@ -48,6 +49,9 @@ orders owned by one tenant.
 - `settlement_policy` is either Core default or `extension-attested`. The
   latter blocks automatic settlement even when the module is unavailable and
   requires a validated attestation through the Core command path.
+- `lifecycle_events` is a sorted, duplicate-free allowlist of durable events
+  requested by this extension. Core does not enqueue undeclared events, and a
+  non-empty subscription requires the module's delivery contract.
 - `payload_hash` uses a contract-declared canonical encoding and digest
   algorithm, making the declaration auditable and detecting unintended
   mutation.
@@ -87,6 +91,10 @@ extension, and expected reservation binding.
 
 Collectibles token or inventory allocation maps to this contract. The generic
 contract must not expose chain, token, collection, or mint vocabulary.
+
+An `extension-attested` declaration is compatible only with a `CANCELABLE`
+settlement rail. Core rejects Fiat, DIRECT, MODERATED, and other incompatible
+methods before exposing a funding target or accepting a payment message.
 
 ## 3. Durable lifecycle delivery
 
@@ -173,6 +181,13 @@ condition, expected revision, and evidence digest, so changing request IDs does
 not bypass replay protection. The state machine remains the only writer of
 settlement state. Composed distributions reach this capability through the
 typed `NodeService.ConditionalSettlement()` accessor.
+
+After execution, Core binds the accepted attestation to the exact settlement
+action or transaction and Core-owned payout address. The later internal order
+confirmation revalidates that binding and the opaque order-state version under
+the order lock. Public confirmation, explicit default settlement actions,
+Fiat auto-confirm, and client-signed confirmation instructions all fail closed
+for `extension-attested` orders.
 
 For a Collectibles primary sale, successful delivery can satisfy a declared
 condition, but the Controller does not execute release. Disputes, refunds,

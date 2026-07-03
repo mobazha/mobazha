@@ -113,7 +113,18 @@ func (n *MobazhaNode) emitOrderAutoConfirmAfterManagedSettlement(row models.Sett
 			payoutAddress = address.String()
 		}
 	}
+	authorization, err := n.confirmationAuthorizationForAction(row.OrderID, row.ActionID, txID)
+	if err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "Managed settlement confirm: resolve extension authorization for order %s: %v", row.OrderID, err)
+		return
+	}
+	attestationID := ""
+	if authorization != nil {
+		attestationID = authorization.AttestationID
+		payoutAddress = authorization.PayoutAddress
+	}
 	n.eventBus.Emit(&events.OrderAutoConfirmRequest{
 		OrderID: row.OrderID, TxID: txID, PayoutAddress: payoutAddress,
+		SettlementAttestationID: attestationID,
 	})
 }

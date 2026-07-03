@@ -756,6 +756,7 @@ func (n *MobazhaNode) initSettlementService() {
 		Keys:               n.keyProvider,
 		EventBus:           n.eventBus,
 		NodeID:             n.nodeID,
+		OrderLocker:        n.orderLockManager,
 		MonitorService:     n.monitorService,
 		EscrowMasterPubKey: n.escrowMasterKey.PubKey(),
 		UTXOKeyDeriver:     n.paymentService,

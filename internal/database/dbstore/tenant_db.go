@@ -296,7 +296,7 @@ func (t *tenantTx) Update(key string, value interface{}, where map[string]interf
 	}
 	db := t.rawTx.Where("tenant_id = ?", t.tenantID).Model(model)
 	for k, v := range where {
-		db = db.Where(k, v)
+		db = tenantWhere(db, k, v)
 	}
 	return db.UpdateColumn(key, value).Error
 }
@@ -310,10 +310,25 @@ func (t *tenantTx) UpdateColumns(values map[string]interface{}, where map[string
 	}
 	db := t.rawTx.Where("tenant_id = ?", t.tenantID).Model(model)
 	for k, v := range where {
-		db = db.Where(k, v)
+		db = tenantWhere(db, k, v)
 	}
 	res := db.UpdateColumns(values)
 	return res.RowsAffected, res.Error
+}
+
+// tenantWhere keeps the Tx condition-map API portable across SQL dialects.
+// GORM binds `nil` in a raw `IS ?` predicate as a normal parameter. SQLite
+// accepts `IS ?`, but PostgreSQL renders it as `IS $n`, which is invalid SQL;
+// PostgreSQL requires the NULL keyword to be part of the statement instead.
+func tenantWhere(db *gorm.DB, query string, value interface{}) *gorm.DB {
+	if value == nil {
+		trimmed := strings.TrimSpace(query)
+		upper := strings.ToUpper(trimmed)
+		if strings.HasSuffix(upper, " IS ?") || strings.HasSuffix(upper, " IS NOT ?") {
+			return db.Where(strings.TrimSuffix(trimmed, "?") + "NULL")
+		}
+	}
+	return db.Where(query, value)
 }
 
 // Delete deletes records with tenant scoping.
@@ -324,7 +339,7 @@ func (t *tenantTx) Delete(key string, value interface{}, where map[string]interf
 	}
 	db := t.rawTx.Where("tenant_id = ?", t.tenantID).Model(model)
 	for k, v := range where {
-		db = db.Where(k, v)
+		db = tenantWhere(db, k, v)
 	}
 	if strings.Contains(key, "?") {
 		return db.Where(key, value).Delete(model).Error

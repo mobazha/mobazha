@@ -200,8 +200,16 @@ func RecordReservationTx(tx database.Tx, request extensions.ReservationRequest, 
 			existing.PaymentCoin != request.PaymentCoin || existing.ExtensionRevision != request.Extension.Revision {
 			return fmt.Errorf("order extension reservation binding is immutable")
 		}
-		if existing.Status != reservation.Status || !existing.ExpiresAt.Equal(request.ExpiresAt) {
+		if existing.Status != reservation.Status {
 			return fmt.Errorf("order extension reservation binding is immutable")
+		}
+		// Provisioning may pass through both the public session service and its
+		// underlying payment facade. The provider owns one idempotent reservation
+		// and may monotonically extend its lease between those calls. Preserve the
+		// longest observed lease without weakening any identity or policy binding.
+		if request.ExpiresAt.After(existing.ExpiresAt) {
+			existing.ExpiresAt = request.ExpiresAt
+			return tx.Save(&existing)
 		}
 		return nil
 	}
@@ -251,6 +259,72 @@ func reservationBinding(record models.OrderExtensionReservationRecord) *extensio
 		ReservationID: record.ReservationID, ReservationVersion: record.ReservationVersion, ExtensionRevision: record.ExtensionRevision, Status: record.Status,
 		PaymentCoin: record.PaymentCoin, IdempotencyKey: record.IdempotencyKey, ExpiresAt: record.ExpiresAt, RecordedAt: record.CreatedAt,
 	}
+}
+
+// ProjectReservations copies immutable provider reservation bindings to a
+// co-tenant counterparty order before verified payment is processed there.
+// The target must already contain the exact same persisted extension
+// revision and payload; this prevents a reservation from being attached to a
+// different declaration while allowing each tenant's Core state machine to
+// emit a complete, independently versioned lifecycle event.
+func ProjectReservations(source, target database.Database, orderID string) error {
+	if source == nil || target == nil || strings.TrimSpace(orderID) == "" {
+		return fmt.Errorf("order extension reservation projection requires source, target, and order ID")
+	}
+	type projection struct {
+		extension extensions.OrderExtension
+		binding   extensions.ReservationBinding
+	}
+	var projected []projection
+	if err := source.View(func(tx database.Tx) error {
+		declared, err := LatestByOrderTx(tx, orderID)
+		if err != nil {
+			return err
+		}
+		for _, extension := range declared {
+			binding, err := ReservationByExtensionTx(tx, orderID, extension.ExtensionID)
+			if err != nil {
+				return err
+			}
+			if binding == nil {
+				continue
+			}
+			projected = append(projected, projection{extension: extension, binding: *binding})
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("load source order extension reservations: %w", err)
+	}
+	if len(projected) == 0 {
+		return nil
+	}
+	return target.Update(func(tx database.Tx) error {
+		declared, err := LatestByOrderTx(tx, orderID)
+		if err != nil {
+			return err
+		}
+		targetByID := make(map[string]extensions.OrderExtension, len(declared))
+		for _, extension := range declared {
+			targetByID[extension.ExtensionID] = extension
+		}
+		for _, item := range projected {
+			targetExtension, ok := targetByID[item.extension.ExtensionID]
+			if !ok || targetExtension.Revision != item.extension.Revision ||
+				targetExtension.PayloadHash != item.extension.PayloadHash ||
+				targetExtension.ProviderID != item.extension.ProviderID {
+				return fmt.Errorf("target order extension %s does not match reservation declaration", item.extension.ExtensionID)
+			}
+			if err := RecordReservationTx(tx, extensions.ReservationRequest{
+				OrderID: orderID, Extension: targetExtension, PaymentCoin: item.binding.PaymentCoin,
+				IdempotencyKey: item.binding.IdempotencyKey, ExpiresAt: item.binding.ExpiresAt,
+			}, extensions.Reservation{
+				ID: item.binding.ReservationID, Version: item.binding.ReservationVersion, Status: item.binding.Status,
+			}); err != nil {
+				return fmt.Errorf("project order extension reservation %s: %w", item.extension.ExtensionID, err)
+			}
+		}
+		return nil
+	})
 }
 
 // SettlementReferenceForOrder derives the opaque financial-state version that

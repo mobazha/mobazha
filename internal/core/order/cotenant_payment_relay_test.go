@@ -2,6 +2,7 @@ package order
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -9,11 +10,13 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/internal/database/dbstore"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/internal/orders"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha/pkg/events"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/identity"
 	"github.com/mobazha/mobazha/pkg/models"
 	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
@@ -33,7 +36,7 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
-	require.NoError(t, shared.AutoMigrate(&models.Order{}))
+	require.NoError(t, shared.AutoMigrate(&models.Order{}, &models.OrderExtensionRecord{}, &models.OrderExtensionReservationRecord{}, &models.OrderExtensionEventSequence{}, &models.ExtensionDelivery{}))
 
 	buyerDB := tenantDB(t, shared, "tenant-buyer")
 	sellerDB := tenantDB(t, shared, "tenant-seller")
@@ -61,6 +64,26 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 	open := signedOrderOpen(t, buyerPeerID, sellerPeerID)
 	seedTenantOrder(t, buyerDB, orderID, models.RoleBuyer, open)
 	seedTenantOrder(t, sellerDB, orderID, models.RoleVendor, open)
+	extension, err := extensions.NewOrderExtension(orderID, "io.mobazha.test", "test", extensions.ContractVersionV1, "resource-1", map[string]string{"value": "same"})
+	require.NoError(t, err)
+	extension.ReservationRequired = true
+	extension.SettlementPolicy = extensions.SettlementPolicyExtensionAttested
+	extension.LifecycleEvents = []string{
+		extensions.EventOrderPaymentVerified,
+		extensions.EventOrderReservationReleaseRequested,
+	}
+	for _, db := range []database.Database{buyerDB, sellerDB} {
+		require.NoError(t, db.Update(func(tx database.Tx) error {
+			return orderextensions.PersistTx(tx, orderID, extension)
+		}))
+	}
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	require.NoError(t, buyerDB.Update(func(tx database.Tx) error {
+		return orderextensions.RecordReservationTx(tx, extensions.ReservationRequest{
+			OrderID: orderID, Extension: extension, PaymentCoin: "crypto:solana:mainnet:native",
+			IdempotencyKey: "reserve-cotenant", ExpiresAt: expiresAt,
+		}, extensions.Reservation{ID: "reservation-cotenant", Version: 1, Status: "reserved"})
+	}))
 
 	pd := &models.PaymentData{
 		OrderID:       orderID,
@@ -108,6 +131,22 @@ func TestRelayPaymentToCounterparty_DeliversVerifiedPaymentToCoTenant(t *testing
 	require.NoError(t, err)
 	require.Len(t, relayedPaymentSent.GetFundingFacts(), 1)
 	require.Equal(t, "solana-fact-1", relayedPaymentSent.GetFundingFacts()[0].GetId())
+	var sellerReservation *extensions.ReservationBinding
+	require.NoError(t, sellerDB.View(func(tx database.Tx) error {
+		var err error
+		sellerReservation, err = orderextensions.ReservationByExtensionTx(tx, orderID, extension.ExtensionID)
+		return err
+	}))
+	require.NotNil(t, sellerReservation)
+	require.Equal(t, "reservation-cotenant", sellerReservation.ReservationID)
+	var delivery models.ExtensionDelivery
+	require.NoError(t, sellerDB.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_id = ?", orderID).First(&delivery).Error
+	}))
+	var eventPayload extensions.PaymentVerifiedEventPayload
+	require.NoError(t, json.Unmarshal(delivery.Payload, &eventPayload))
+	require.NotNil(t, eventPayload.Reservation)
+	require.Equal(t, sellerReservation.ReservationID, eventPayload.Reservation.ReservationID)
 }
 
 func TestPreProcessPaymentSent_HydratesIncomingManagedIntentBeforeValidation(t *testing.T) {
@@ -190,7 +229,7 @@ func TestProcessOrderPayment_RelaysVerifiedPaymentWhenPersistFails(t *testing.T)
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
-	require.NoError(t, shared.AutoMigrate(&models.Order{}))
+	require.NoError(t, shared.AutoMigrate(&models.Order{}, &models.OrderExtensionRecord{}, &models.OrderExtensionReservationRecord{}))
 
 	buyerDB := tenantDB(t, shared, "tenant-buyer")
 	sellerDB := tenantDB(t, shared, "tenant-seller")

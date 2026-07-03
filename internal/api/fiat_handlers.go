@@ -135,7 +135,9 @@ func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) 
 
 	session, err := svc.CreatePayment(r.Context(), providerID, params)
 	if err != nil {
-		if errors.Is(err, corepayment.ErrRWAPaymentSessionUnsupported) || errors.Is(err, corepayment.ErrOrderExtensionReservation) {
+		if errors.Is(err, corepayment.ErrRWAPaymentSessionUnsupported) ||
+			errors.Is(err, corepayment.ErrOrderExtensionReservation) ||
+			errors.Is(err, corepayment.ErrOrderExtensionSettlement) {
 			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "This order requires an escrow-backed crypto payment")
 			return
 		}

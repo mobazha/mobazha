@@ -131,6 +131,16 @@ func TestRecordReservationTx_PersistsProviderBindingIdempotently(t *testing.T) {
 		}
 		return orderextensions.RecordReservationTx(tx, request, reservation)
 	}))
+	laterRequest := request
+	laterRequest.ExpiresAt = request.ExpiresAt.Add(time.Hour)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return orderextensions.RecordReservationTx(tx, laterRequest, reservation)
+	}))
+	earlierRequest := request
+	earlierRequest.ExpiresAt = request.ExpiresAt.Add(-time.Minute)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return orderextensions.RecordReservationTx(tx, earlierRequest, reservation)
+	}))
 	var binding *extensions.ReservationBinding
 	require.NoError(t, db.View(func(tx database.Tx) error {
 		var loadErr error
@@ -142,6 +152,7 @@ func TestRecordReservationTx_PersistsProviderBindingIdempotently(t *testing.T) {
 	require.Equal(t, reservation.Version, binding.ReservationVersion)
 	require.Equal(t, extension.Revision, binding.ExtensionRevision)
 	require.Equal(t, request.PaymentCoin, binding.PaymentCoin)
+	require.WithinDuration(t, laterRequest.ExpiresAt, binding.ExpiresAt, time.Millisecond)
 
 	conflicting := reservation
 	conflicting.ID = "reservation-2"

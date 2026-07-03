@@ -99,6 +99,42 @@ func TestEnqueuePaymentVerifiedTx_SkipsUnsubscribedExtension(t *testing.T) {
 	require.Zero(t, count)
 }
 
+func TestEnqueuePaymentVerifiedTx_RejectsRequiredReservationGap(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	orderOpen := managedCollectibleOrderOpen()
+	serialized, err := protojson.Marshal(orderOpen)
+	require.NoError(t, err)
+	order := &models.Order{ID: "order-required-reservation-gap", SerializedOrderOpen: serialized}
+	order.SetRole(models.RoleVendor)
+	order.MarkPaymentVerified()
+	require.NoError(t, order.SetPaymentSent(&pb.PaymentSent{
+		ToAddress: "settlement-gap", Coin: "MATIC", Amount: "100",
+		SettlementSpec: &pb.PaymentSent_SettlementSpec{Method: pb.PaymentSent_CANCELABLE},
+	}))
+	extension, ok, err := models.CollectibleOrderExtensionFromOrderOpen(order.ID.String(), orderOpen)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	err = db.Update(func(tx database.Tx) error {
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		if err := orderextensions.PersistTx(tx, order.ID.String(), extension); err != nil {
+			return err
+		}
+		return EnqueuePaymentVerifiedTx(tx, order)
+	})
+	require.ErrorContains(t, err, "required reservation binding")
+
+	var count int64
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Model(&models.ExtensionDelivery{}).Count(&count).Error
+	}))
+	require.Zero(t, count)
+}
+
 func TestEventForOrder_DistinguishesBuyerSellerAndTenantCopies(t *testing.T) {
 	orderOpen := managedCollectibleOrderOpen()
 	serialized, err := protojson.Marshal(orderOpen)
@@ -111,9 +147,10 @@ func TestEventForOrder_DistinguishesBuyerSellerAndTenantCopies(t *testing.T) {
 	buyer.SetRole(models.RoleBuyer)
 	seller := &models.Order{ID: "shared-order", SerializedOrderOpen: serialized, TenantMixin: models.TenantMixin{TenantID: "tenant-seller"}}
 	seller.SetRole(models.RoleVendor)
-	buyerEvent, err := eventForOrder(buyer, extension, nil, extensions.EventOrderReservationReleaseRequested, "cancelled")
+	reservation := testReservationBinding(extension)
+	buyerEvent, err := eventForOrder(buyer, extension, reservation, extensions.EventOrderReservationReleaseRequested, "cancelled")
 	require.NoError(t, err)
-	sellerEvent, err := eventForOrder(seller, extension, nil, extensions.EventOrderReservationReleaseRequested, "cancelled")
+	sellerEvent, err := eventForOrder(seller, extension, reservation, extensions.EventOrderReservationReleaseRequested, "cancelled")
 	require.NoError(t, err)
 	require.NotEqual(t, buyerEvent.EventID, sellerEvent.EventID)
 	require.NotEqual(t, buyerEvent.SourceID, sellerEvent.SourceID)
@@ -139,6 +176,12 @@ func TestEnqueueTerminalEventTx_WritesGenericReleaseEvent(t *testing.T) {
 		if err := orderextensions.PersistTx(tx, order.ID.String(), extension); err != nil {
 			return err
 		}
+		if err := orderextensions.RecordReservationTx(tx, extensions.ReservationRequest{
+			OrderID: order.ID.String(), Extension: extension, PaymentCoin: "MATIC",
+			IdempotencyKey: "reserve-release", ExpiresAt: time.Now().UTC().Add(time.Hour),
+		}, extensions.Reservation{ID: "reservation-release", Version: 1, Status: "reserved"}); err != nil {
+			return err
+		}
 		return EnqueueTerminalEventTx(tx, order, &events.OrderCancel{OrderID: order.ID.String()})
 	}))
 	var delivery models.ExtensionDelivery
@@ -146,6 +189,15 @@ func TestEnqueueTerminalEventTx_WritesGenericReleaseEvent(t *testing.T) {
 		return tx.Read().Where("order_id = ?", order.ID.String()).First(&delivery).Error
 	}))
 	require.Equal(t, extensions.EventOrderReservationReleaseRequested, delivery.EventType)
+}
+
+func testReservationBinding(extension extensions.OrderExtension) *extensions.ReservationBinding {
+	now := time.Now().UTC()
+	return &extensions.ReservationBinding{
+		ReservationID: "reservation-role", ReservationVersion: 1, ExtensionRevision: extension.Revision,
+		Status: "reserved", PaymentCoin: "MATIC", IdempotencyKey: "reserve-role",
+		ExpiresAt: now.Add(time.Hour), RecordedAt: now,
+	}
 }
 
 func managedCollectibleOrderOpen() *pb.OrderOpen {

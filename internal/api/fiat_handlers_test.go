@@ -224,15 +224,23 @@ func TestHandlePOSTFiatPayment_MissingProviderID(t *testing.T) {
 }
 
 func TestHandlePOSTFiatPayment_CollectiblePolicyConflict(t *testing.T) {
-	svc := &mockFiatService{createErr: corepayment.ErrRWAPaymentSessionUnsupported}
-	g := &Gateway{}
-	w := httptest.NewRecorder()
-	body := map[string]interface{}{"orderID": "source-order", "amount": 2500, "currency": "USD"}
-	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments", body,
-		map[string]string{"providerID": "stripe"}, svc)
+	for _, policyErr := range []error{
+		corepayment.ErrRWAPaymentSessionUnsupported,
+		corepayment.ErrOrderExtensionReservation,
+		fmt.Errorf("wrapped: %w", corepayment.ErrOrderExtensionSettlement),
+	} {
+		t.Run(policyErr.Error(), func(t *testing.T) {
+			svc := &mockFiatService{createErr: policyErr}
+			g := &Gateway{}
+			w := httptest.NewRecorder()
+			body := map[string]interface{}{"orderID": "source-order", "amount": 2500, "currency": "USD"}
+			r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments", body,
+				map[string]string{"providerID": "stripe"}, svc)
 
-	g.handlePOSTFiatPayment(w, r)
-	assert.Equal(t, http.StatusConflict, w.Code)
+			g.handlePOSTFiatPayment(w, r)
+			assert.Equal(t, http.StatusConflict, w.Code)
+		})
+	}
 }
 
 // --- POST /v1/fiat/{providerID}/payments/{sessionID}/capture ---

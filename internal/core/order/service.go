@@ -14,6 +14,7 @@ import (
 	nodepayment "github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/internal/core/paymentintent"
 	"github.com/mobazha/mobazha/internal/logger"
+	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/internal/orders"
 	"github.com/mobazha/mobazha/internal/orders/utils"
 	wallet "github.com/mobazha/mobazha/internal/wallet"
@@ -346,6 +347,23 @@ func (s *OrderAppService) deliverVerifiedPaymentToCoTenant(
 		logger.LogInfoWithIDf(log, s.nodeID,
 			"RelayPayment co-tenant: target peer mismatch for order %s role %s tenant %s",
 			sourceOrder.ID, targetRole, targetOrder.TenantID)
+		return false
+	}
+	router, ok := s.db.(tenantDatabaseRouter)
+	if !ok {
+		return false
+	}
+	targetDB, err := router.ForTenant(targetOrder.TenantID)
+	if err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"RelayPayment co-tenant: open target tenant %s for order %s: %v",
+			targetOrder.TenantID, sourceOrder.ID, err)
+		return false
+	}
+	if err := orderextensions.ProjectReservations(s.db, targetDB, sourceOrder.ID.String()); err != nil {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"RelayPayment co-tenant: project extension reservations to tenant %s for order %s: %v",
+			targetOrder.TenantID, sourceOrder.ID, err)
 		return false
 	}
 

@@ -257,6 +257,64 @@ func TestTenantDB_Update(t *testing.T) {
 	}
 }
 
+func TestTenantDB_UpdateColumns_NullPredicateAndTenantIsolation(t *testing.T) {
+	sharedDB := newTestSharedDB(t)
+	dbA := newTestTenantDB(t, sharedDB, "tenant-null-A")
+	dbB := newTestTenantDB(t, sharedDB, "tenant-null-B")
+
+	for _, db := range []database.Database{dbA, dbB} {
+		err := db.Update(func(tx database.Tx) error {
+			if err := tx.Migrate(&models.ExtensionDelivery{}); err != nil {
+				return err
+			}
+			return tx.Create(&models.ExtensionDelivery{
+				EventID: "shared-event", SourceID: "source", OrderRole: string(models.RoleVendor),
+				ProviderID: "provider", EventType: "event", EventVersion: "v1",
+				OrderID: "order", OrderVersion: 1, ExtensionID: "extension",
+				IdempotencyKey: "idempotency-key",
+			})
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := dbA.Update(func(tx database.Tx) error {
+		updated, err := tx.UpdateColumns(
+			map[string]interface{}{"lease_owner": "worker-A"},
+			map[string]interface{}{
+				"event_id = ?":      "shared-event",
+				"delivered_at IS ?": nil,
+			},
+			&models.ExtensionDelivery{},
+		)
+		if err != nil {
+			return err
+		}
+		if updated != 1 {
+			return fmt.Errorf("updated %d rows, want 1", updated)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var rows []models.ExtensionDelivery
+	if err := sharedDB.Order("tenant_id").Find(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("got %d rows, want 2", len(rows))
+	}
+	if rows[0].TenantID != "tenant-null-A" || rows[0].LeaseOwner != "worker-A" {
+		t.Fatalf("tenant A row = %#v", rows[0])
+	}
+	if rows[1].TenantID != "tenant-null-B" || rows[1].LeaseOwner != "" {
+		t.Fatalf("tenant B row = %#v", rows[1])
+	}
+}
+
 func TestTenantDB_Delete(t *testing.T) {
 	sharedDB := newTestSharedDB(t)
 	db := newTestTenantDB(t, sharedDB, "tenant-D")

@@ -136,6 +136,9 @@ func eventForOrder(order *models.Order, extension extensions.OrderExtension, res
 	if err := extension.ValidateForOrder(order.ID.String()); err != nil {
 		return extensions.Event{}, fmt.Errorf("extension lifecycle: invalid persisted extension: %w", err)
 	}
+	if extension.ReservationRequired && reservation == nil {
+		return extensions.Event{}, fmt.Errorf("extension lifecycle: required reservation binding for %s is unavailable", extension.ExtensionID)
+	}
 	if reservation != nil {
 		if err := reservation.Validate(); err != nil {
 			return extensions.Event{}, fmt.Errorf("extension lifecycle: invalid reservation binding: %w", err)

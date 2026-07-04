@@ -482,12 +482,14 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 					DealLinkID: "deal-checkout-1",
 					Revision:   4,
 					TermsHash:  strings.Repeat("d", 64),
+					FeeQuoteID: "fee-quote-checkout-1",
 				},
 			},
 			checkOrder: func(purchase *models.Purchase, order *pb.OrderOpen) error {
 				if order.DealLinkID != purchase.DealTermsSnapshotRef.DealLinkID ||
 					order.DealRevision != purchase.DealTermsSnapshotRef.Revision ||
-					order.TermsHash != purchase.DealTermsSnapshotRef.TermsHash {
+					order.TermsHash != purchase.DealTermsSnapshotRef.TermsHash ||
+					order.FeeQuoteID != purchase.DealTermsSnapshotRef.FeeQuoteID {
 					return errors.New("incorrect deal terms snapshot reference")
 				}
 				if order.Shipping.ShipTo != purchase.ShipTo {

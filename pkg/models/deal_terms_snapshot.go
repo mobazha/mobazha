@@ -11,6 +11,7 @@ import (
 
 const (
 	dealLinkIDMaxLength = 128
+	feeQuoteIDMaxLength = 128
 	sha256HexLength     = 64
 )
 
@@ -25,6 +26,7 @@ type DealTermsSnapshotRef struct {
 	DealLinkID string `gorm:"column:deal_link_id;type:text" json:"dealLinkID"`
 	Revision   uint64 `gorm:"column:deal_revision" json:"revision"`
 	TermsHash  string `gorm:"column:terms_hash;type:char(64)" json:"termsHash"`
+	FeeQuoteID string `gorm:"column:fee_quote_id;type:text" json:"feeQuoteID,omitempty"`
 }
 
 // Validate checks that the reference is complete and canonically encoded.
@@ -47,6 +49,12 @@ func (r *DealTermsSnapshotRef) Validate() error {
 	if _, err := hex.DecodeString(r.TermsHash); err != nil {
 		return fmt.Errorf("%w: termsHash must be lowercase SHA-256 hex", ErrInvalidDealTermsSnapshotRef)
 	}
+	if strings.TrimSpace(r.FeeQuoteID) != r.FeeQuoteID {
+		return fmt.Errorf("%w: feeQuoteID must be trimmed", ErrInvalidDealTermsSnapshotRef)
+	}
+	if len(r.FeeQuoteID) > feeQuoteIDMaxLength {
+		return fmt.Errorf("%w: feeQuoteID exceeds %d bytes", ErrInvalidDealTermsSnapshotRef, feeQuoteIDMaxLength)
+	}
 	return nil
 }
 
@@ -56,13 +64,14 @@ func DealTermsSnapshotRefFromOrderOpen(orderOpen *pb.OrderOpen) (*DealTermsSnaps
 	if orderOpen == nil {
 		return nil, nil
 	}
-	if orderOpen.GetDealLinkID() == "" && orderOpen.GetDealRevision() == 0 && orderOpen.GetTermsHash() == "" {
+	if orderOpen.GetDealLinkID() == "" && orderOpen.GetDealRevision() == 0 && orderOpen.GetTermsHash() == "" && orderOpen.GetFeeQuoteID() == "" {
 		return nil, nil
 	}
 	result := &DealTermsSnapshotRef{
 		DealLinkID: orderOpen.GetDealLinkID(),
 		Revision:   orderOpen.GetDealRevision(),
 		TermsHash:  orderOpen.GetTermsHash(),
+		FeeQuoteID: orderOpen.GetFeeQuoteID(),
 	}
 	if err := result.Validate(); err != nil {
 		return nil, err

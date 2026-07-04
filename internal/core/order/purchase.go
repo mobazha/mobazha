@@ -393,6 +393,7 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 		order.DealLinkID = purchase.DealTermsSnapshotRef.DealLinkID
 		order.DealRevision = purchase.DealTermsSnapshotRef.Revision
 		order.TermsHash = purchase.DealTermsSnapshotRef.TermsHash
+		order.FeeQuoteID = purchase.DealTermsSnapshotRef.FeeQuoteID
 	}
 
 	// First pass: compute raw subtotal (no discounts) for DiscountEngine input

@@ -18,13 +18,16 @@ func TestDealTermsSnapshotRefValidate(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "absent", ref: nil},
-		{name: "valid", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash}},
+		{name: "valid without fee quote", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash}},
+		{name: "valid with fee quote", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash, FeeQuoteID: "fee-quote-123"}},
 		{name: "empty ID", ref: &DealTermsSnapshotRef{Revision: 2, TermsHash: validHash}, wantErr: true},
 		{name: "untrimmed ID", ref: &DealTermsSnapshotRef{DealLinkID: " deal-123", Revision: 2, TermsHash: validHash}, wantErr: true},
 		{name: "zero revision", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", TermsHash: validHash}, wantErr: true},
 		{name: "uppercase hash", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: strings.ToUpper(validHash)}, wantErr: true},
 		{name: "non-hex hash", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: strings.Repeat("z", sha256HexLength)}, wantErr: true},
 		{name: "short hash", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: "abcd"}, wantErr: true},
+		{name: "untrimmed fee quote ID", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash, FeeQuoteID: " fee-quote-123"}, wantErr: true},
+		{name: "long fee quote ID", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash, FeeQuoteID: strings.Repeat("q", feeQuoteIDMaxLength+1)}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -47,17 +50,22 @@ func TestDealTermsSnapshotRefFromOrderOpen(t *testing.T) {
 		DealLinkID:   "deal-456",
 		DealRevision: 7,
 		TermsHash:    validHash,
+		FeeQuoteID:   "fee-quote-456",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, ref)
 	assert.Equal(t, "deal-456", ref.DealLinkID)
 	assert.Equal(t, uint64(7), ref.Revision)
 	assert.Equal(t, validHash, ref.TermsHash)
+	assert.Equal(t, "fee-quote-456", ref.FeeQuoteID)
 
 	ref, err = DealTermsSnapshotRefFromOrderOpen(&pb.OrderOpen{})
 	require.NoError(t, err)
 	assert.Nil(t, ref)
 
 	_, err = DealTermsSnapshotRefFromOrderOpen(&pb.OrderOpen{DealLinkID: "partial"})
+	require.ErrorIs(t, err, ErrInvalidDealTermsSnapshotRef)
+
+	_, err = DealTermsSnapshotRefFromOrderOpen(&pb.OrderOpen{FeeQuoteID: "fee-quote-without-deal"})
 	require.ErrorIs(t, err, ErrInvalidDealTermsSnapshotRef)
 }

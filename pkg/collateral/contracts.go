@@ -146,6 +146,58 @@ func (r AllocationRequest) Validate() error {
 	return nil
 }
 
+// FundingObservation is a trusted payment-adapter observation submitted to
+// Core after external confirmation. Recording it is a Core transition; the
+// observation alone cannot move funds or prove finality.
+type FundingObservation struct {
+	TenantID         string    `json:"tenantID"`
+	CollateralID     string    `json:"collateralID"`
+	AssetID          string    `json:"assetID"`
+	FundedAmount     string    `json:"fundedAmount"`
+	FundingReference string    `json:"fundingReference"`
+	ExpectedRevision uint64    `json:"expectedRevision"`
+	IdempotencyKey   string    `json:"idempotencyKey"`
+	ObservedAt       time.Time `json:"observedAt"`
+}
+
+func (o FundingObservation) Validate(now time.Time) error {
+	if missing(o.TenantID, o.CollateralID, o.AssetID, o.FundingReference, o.IdempotencyKey) {
+		return fmt.Errorf("collateral funding tenant, account, asset, reference, and idempotency key are required")
+	}
+	if o.ExpectedRevision == 0 {
+		return fmt.Errorf("collateral funding expected revision is required")
+	}
+	if err := validateBaseUnits(o.FundedAmount, false); err != nil {
+		return fmt.Errorf("collateral funded amount: %w", err)
+	}
+	if o.ObservedAt.IsZero() || o.ObservedAt.After(now.Add(time.Minute)) {
+		return fmt.Errorf("collateral funding observation time is invalid")
+	}
+	return nil
+}
+
+// AllocationReleaseRequest releases coverage back to the same collateral
+// account. It does not release the underlying funded collateral to a wallet.
+type AllocationReleaseRequest struct {
+	TenantID                   string `json:"tenantID"`
+	CollateralID               string `json:"collateralID"`
+	AllocationID               string `json:"allocationID"`
+	ExpectedCollateralRevision uint64 `json:"expectedCollateralRevision"`
+	ExpectedAllocationRevision uint64 `json:"expectedAllocationRevision"`
+	IdempotencyKey             string `json:"idempotencyKey"`
+	Reason                     string `json:"reason"`
+}
+
+func (r AllocationReleaseRequest) Validate() error {
+	if missing(r.TenantID, r.CollateralID, r.AllocationID, r.IdempotencyKey, r.Reason) {
+		return fmt.Errorf("collateral allocation release tenant, account, allocation, idempotency key, and reason are required")
+	}
+	if r.ExpectedCollateralRevision == 0 || r.ExpectedAllocationRevision == 0 {
+		return fmt.Errorf("collateral allocation release expected revisions are required")
+	}
+	return nil
+}
+
 // AllocationReference is a Core-issued, revision-bound reference suitable for
 // a future Order Extension contract. Providers cannot mint this reference.
 type AllocationReference struct {

@@ -242,6 +242,21 @@ not retain Collectibles hooks, a Collectibles-specific outbox, FiatMetadata
 mirrors, or product-specific settlement commands. New domain integrations must
 compose through the generic module contract from their first implementation.
 
+## Resource collateral boundary
+
+Independent resource collateral is not an Order Extension v1 reservation or
+settlement policy. A provider reservation owns scarce domain capacity, while
+collateral is separately funded money whose account, allocation, release,
+claim, slash, audit, and rail reconciliation state belongs to Core. An
+extension cannot mark collateral funded or select a compensation destination.
+
+Order Extension v1 therefore remains unchanged. A future major contract may
+carry a Core-issued collateral allocation reference after Core has validated
+tenant, provider, resource, principal, asset, amount, state, and revisions.
+Opaque provider payload fields and Hosting projections are not proof of
+funding. The staged design is tracked by
+[mobazha-docs RFC-0003](https://github.com/mobazha/mobazha-docs/blob/main/rfcs/0003-core-owned-resource-collateral.md).
+
 ## Non-goals
 
 - A universal fulfillment taxonomy.
@@ -249,3 +264,5 @@ compose through the generic module contract from their first implementation.
 - Executable extension payloads.
 - Cross-extension access to another provider's private data.
 - A way to bypass Core commands, policy, or state machines.
+- A provider-owned collateral balance or a way to reuse seller proceeds as an
+  implicit guarantee.

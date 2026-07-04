@@ -64,6 +64,32 @@ func TestAllocationRequestBindsExactOrderExtensionAndRevision(t *testing.T) {
 	require.ErrorContains(t, request.Validate(), "expected revision")
 }
 
+func TestFundingObservationRequiresTrustedReferenceRevisionAndTime(t *testing.T) {
+	now := time.Now().UTC()
+	observation := FundingObservation{
+		TenantID: "tenant-1", CollateralID: "col-1", AssetID: "crypto:solana:mainnet:usdc",
+		FundedAmount: "100", FundingReference: "funding-1", ExpectedRevision: 1,
+		IdempotencyKey: "fund-1", ObservedAt: now,
+	}
+	require.NoError(t, observation.Validate(now))
+	observation.ExpectedRevision = 0
+	require.ErrorContains(t, observation.Validate(now), "expected revision")
+	observation.ExpectedRevision = 1
+	observation.ObservedAt = now.Add(2 * time.Minute)
+	require.ErrorContains(t, observation.Validate(now), "time")
+}
+
+func TestAllocationReleaseDoesNotRepresentAccountFundRelease(t *testing.T) {
+	request := AllocationReleaseRequest{
+		TenantID: "tenant-1", CollateralID: "col-1", AllocationID: "alloc-1",
+		ExpectedCollateralRevision: 3, ExpectedAllocationRevision: 1,
+		IdempotencyKey: "release-allocation-1", Reason: "order-cancelled",
+	}
+	require.NoError(t, request.Validate())
+	request.Reason = ""
+	require.ErrorContains(t, request.Validate(), "reason")
+}
+
 func TestAllocationReferenceRejectsUnknownStateAndNonCanonicalAmount(t *testing.T) {
 	reference := AllocationReference{
 		AllocationID: "alloc-1", CollateralID: "col-1", TenantID: "tenant-1", OrderID: "order-1",

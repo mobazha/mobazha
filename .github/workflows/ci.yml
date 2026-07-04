@@ -33,6 +33,9 @@ jobs:
       - name: Verify Community capabilities
         run: ./scripts/community/check-capabilities.sh
 
+      - name: Verify documentation authority boundaries
+        run: ./scripts/community/check-documentation-authority.sh
+
       - name: Verify OEM source-distribution material
         run: ./scripts/community/check-oem-distribution.sh --source
 

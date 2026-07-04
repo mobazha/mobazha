@@ -22,5 +22,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Verify documentation authority boundaries
+        run: ./scripts/community/check-documentation-authority.sh
+
       - name: Verify release documentation and reviewed source revision
         run: ./scripts/community/check-release-documentation.sh "${{ github.event.inputs.tag || github.ref_name }}"

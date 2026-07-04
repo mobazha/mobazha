@@ -119,7 +119,7 @@ treated as a stable plugin runtime. Core remains responsible for policy, order
 state, verification, audit, settlement gates, and key custody; plugins must not
 receive raw seed phrases or private keys.
 
-See [release scope](./docs/project/RELEASE_SCOPE.md) and
+See [release scope](https://docs.mobazha.org/project/release-scope) and
 [payment plugin architecture](./docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md).
 
 ## APIs and integrations
@@ -167,9 +167,10 @@ test environment.
 
 ## Architecture and release documentation
 
-- [Release scope](./docs/project/RELEASE_SCOPE.md)
-- [Compatibility policy](./docs/project/COMPATIBILITY.md)
-- [OEM and VPS distribution](./docs/project/OEM_DISTRIBUTION.md)
+- [Release scope](https://docs.mobazha.org/project/release-scope)
+- [Compatibility policy](https://docs.mobazha.org/project/compatibility)
+- [Fees and economics](https://docs.mobazha.org/project/fees)
+- [OEM and VPS distribution](https://docs.mobazha.org/project/distribution)
 - [Payment plugin architecture](./docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md)
 - [Supply-chain audit](./docs/security/SUPPLY_CHAIN_AUDIT.md)
 - [v0.3 release candidate notes](./docs/releases/v0.3.0-rc.1.md)

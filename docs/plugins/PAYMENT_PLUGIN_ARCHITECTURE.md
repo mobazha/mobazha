@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Define the target public contract for adding payment chains without modifying Mobazha Core. This specification implements ADR-015, follows the shared governance in ADR-018, and is subordinate to `docs/project/RELEASE_SCOPE.md`.
+Define the target public contract for adding payment chains without modifying Mobazha Core. This specification implements ADR-015, follows the shared governance in ADR-018, and is subordinate to the canonical [public release scope](https://docs.mobazha.org/project/release-scope).
 
 The first release may use compatibility adapters around bundled UTXO code. API names below are architectural contracts, not a claim that every RPC type already exists.
 

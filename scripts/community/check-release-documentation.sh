@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2021-2026 fengzie and the respective contributors.
+
 set -euo pipefail
 
 tag="${1:-${GITHUB_REF_NAME:-}}"

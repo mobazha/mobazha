@@ -475,6 +475,20 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		}
 	}
 
+	// Resolve supply lines before opening the managed write transaction.
+	// Digital supply resolvers and feature stores may use Database.View, while
+	// TenantDB intentionally serializes View/Update with a non-reentrant mutex.
+	// Calling either resolver from inside Update would self-deadlock the request.
+	txSupplyService, txSupplyLines, err := s.prepareAuthoritativeGuestSupplyReservation(
+		ctx,
+		items,
+		itemBuckets,
+		itemStockLimits,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	err = s.db.Update(func(tx database.Tx) error {
 		if err := tx.Save(&order); err != nil {
 			return fmt.Errorf("save guest order: %w", err)
@@ -485,7 +499,18 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 			}
 		}
 
-		if err := s.reserveGuestSupplyInTx(ctx, tx, orderToken, paymentCoin, expiresAt, items, itemBuckets, itemStockLimits); err != nil {
+		if err := s.reserveGuestSupplyInTx(
+			ctx,
+			tx,
+			txSupplyService,
+			txSupplyLines,
+			orderToken,
+			paymentCoin,
+			expiresAt,
+			items,
+			itemBuckets,
+			itemStockLimits,
+		); err != nil {
 			return err
 		}
 		return nil
@@ -1085,6 +1110,8 @@ type transactionalSupplyAvailabilityService interface {
 func (s *GuestOrderAppService) reserveGuestSupplyInTx(
 	ctx context.Context,
 	tx database.Tx,
+	txService transactionalSupplyAvailabilityService,
+	preparedLines []contracts.SupplyLine,
 	orderToken string,
 	paymentCoin string,
 	orderExpiresAt time.Time,
@@ -1092,16 +1119,8 @@ func (s *GuestOrderAppService) reserveGuestSupplyInTx(
 	itemBuckets []guestInventoryBucketKey,
 	itemStockLimits map[guestInventoryBucketKey]int64,
 ) error {
-	if txService, ok := s.authoritativeSupplyAvailabilityTxService(ctx); ok {
-		externalMappings, err := guestExternalSupplyMappingsForItemsInTx(tx, items)
-		if err != nil {
-			return fmt.Errorf("resolve guest external supply mappings: %w", err)
-		}
-		lines, err := s.supplyAvailabilityLinesForGuestItems(ctx, items, itemBuckets, itemStockLimits, externalMappings)
-		if err != nil {
-			return fmt.Errorf("resolve guest supply lines: %w", err)
-		}
-		reservableLines, manualActionLines := contracts.PartitionReservableSupplyLines(lines)
+	if txService != nil {
+		reservableLines, manualActionLines := contracts.PartitionReservableSupplyLines(preparedLines)
 		for _, line := range manualActionLines {
 			log.Infof("guest order %s external supply line %s for listing %s requires manual action; no external hold created",
 				redact.Token(orderToken), line.LineID, line.ListingSlug)
@@ -1109,7 +1128,7 @@ func (s *GuestOrderAppService) reserveGuestSupplyInTx(
 		if len(reservableLines) == 0 {
 			return nil
 		}
-		_, err = txService.ReserveOrderTx(ctx, tx, contracts.ReserveOrderSupplyRequest{
+		_, err := txService.ReserveOrderTx(ctx, tx, contracts.ReserveOrderSupplyRequest{
 			OrderRef:  orderToken,
 			OrderType: models.OrderTypeGuest,
 			Lines:     reservableLines,
@@ -1130,6 +1149,33 @@ func (s *GuestOrderAppService) reserveGuestSupplyInTx(
 		}
 	}
 	return nil
+}
+
+func (s *GuestOrderAppService) prepareAuthoritativeGuestSupplyReservation(
+	ctx context.Context,
+	items []models.GuestOrderItem,
+	itemBuckets []guestInventoryBucketKey,
+	itemStockLimits map[guestInventoryBucketKey]int64,
+) (transactionalSupplyAvailabilityService, []contracts.SupplyLine, error) {
+	txService, ok := s.authoritativeSupplyAvailabilityTxService(ctx)
+	if !ok {
+		return nil, nil, nil
+	}
+	externalMappings, err := s.guestExternalSupplyMappingsForItems(items)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve guest external supply mappings: %w", err)
+	}
+	lines, err := s.supplyAvailabilityLinesForGuestItems(
+		ctx,
+		items,
+		itemBuckets,
+		itemStockLimits,
+		externalMappings,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve guest supply lines: %w", err)
+	}
+	return txService, lines, nil
 }
 
 func (s *GuestOrderAppService) authoritativeSupplyAvailabilityTxService(ctx context.Context) (transactionalSupplyAvailabilityService, bool) {

@@ -649,6 +649,51 @@ func TestCreateGuestOrder_AuthoritativeSupplyReserveUsesTransactionalService(t *
 	require.Equal(t, 1, reservations[0].Quantity)
 }
 
+func TestCreateGuestOrder_PreparesDigitalSupplyBeforeWriteTransaction(t *testing.T) {
+	svc := newUTXOCapableService(t, true, true)
+	baseDB := svc.db.(*testDatabase)
+	require.NoError(t, baseDB.gormDB.AutoMigrate(
+		&models.DirectPaymentAddressCounter{},
+		&models.GuestCheckoutConfig{},
+	))
+	require.NoError(t, baseDB.gormDB.Create(&models.DirectPaymentAddressCounter{
+		TenantID: testTenantID,
+		ID:       1,
+		ChainKey: "LTC",
+	}).Error)
+
+	guardDB := &nestedViewGuardDatabase{Database: baseDB}
+	listing := guestListingWithSku("ebook", "License", "Standard", "3", "1200")
+	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+
+	svc.db = guardDB
+	svc.resolver = alwaysEnabledResolver{}
+	svc.directPayment = NewDirectPaymentService(guardDB, fixedBIP44KeyDeriver{})
+	svc.exchangeRates = wallet.NewFixedRateProvider("LTC", map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(8000),
+	})
+	svc.supplyAvailability = &transactionalRecordingSupplyAvailability{}
+	svc.digitalSupplyLines = databaseReadingDigitalSupplyLineResolver{db: guardDB}
+	svc.listings = &stubGuestListings{bySlug: map[string]*pb.SignedListing{"ebook": listing}}
+
+	require.NoError(t, svc.SaveGuestCheckoutConfig(context.Background(), &models.GuestCheckoutConfig{
+		Enabled:       true,
+		AcceptedCoins: "LTC",
+	}))
+
+	resp, err := svc.CreateGuestOrder(context.Background(), contracts.CreateGuestOrderRequest{
+		PaymentCoin: "LTC",
+		Items: []contracts.GuestOrderItemRequest{{
+			ListingSlug: "ebook",
+			Quantity:    1,
+			Options:     []map[string]string{{"License": "Standard"}},
+		}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.False(t, guardDB.nestedView, "digital supply resolution must not open a nested DB view")
+}
+
 func TestCreateGuestOrder_AuthoritativeSupplyReserveSkipsExternalSyncedListing(t *testing.T) {
 	svc := newUTXOCapableService(t, true, true)
 	db := svc.db.(*testDatabase)
@@ -950,6 +995,44 @@ type recordingGuestDigitalSupplyLineResolver struct {
 	items [][]digital.OrderLineItem
 	lines []contracts.SupplyLine
 	err   error
+}
+
+type nestedViewGuardDatabase struct {
+	database.Database
+	inUpdate   bool
+	nestedView bool
+}
+
+func (db *nestedViewGuardDatabase) View(fn func(database.Tx) error) error {
+	if db.inUpdate {
+		db.nestedView = true
+		return errors.New("nested Database.View during Database.Update")
+	}
+	return db.Database.View(fn)
+}
+
+func (db *nestedViewGuardDatabase) Update(fn func(database.Tx) error) error {
+	db.inUpdate = true
+	defer func() { db.inUpdate = false }()
+	return db.Database.Update(fn)
+}
+
+type databaseReadingDigitalSupplyLineResolver struct {
+	db database.Database
+}
+
+func (resolver databaseReadingDigitalSupplyLineResolver) SupplyAvailabilityLinesForOrderItems(
+	items []digital.OrderLineItem,
+) ([]contracts.SupplyLine, error) {
+	if err := resolver.db.View(func(database.Tx) error { return nil }); err != nil {
+		return nil, err
+	}
+	return []contracts.SupplyLine{{
+		LineID:      "digital:0:ebook:unlimited_digital",
+		ListingSlug: items[0].ListingSlug,
+		Quantity:    int(items[0].Quantity),
+		SupplyKind:  contracts.SupplyKindUnlimitedDigital,
+	}}, nil
 }
 
 func (r *recordingGuestDigitalSupplyLineResolver) SupplyAvailabilityLinesForOrderItems(items []digital.OrderLineItem) ([]contracts.SupplyLine, error) {

@@ -452,11 +452,19 @@ func wrapError(err error) string {
 // Prefer the domain-specific getters below when the handler only needs
 // a single domain's methods — they return narrower interface types.
 func getNodeService(r *http.Request) contracts.NodeService {
-	ns, ok := r.Context().Value(nodeContextKey).(contracts.NodeService)
+	ns, ok := nodeServiceFromContext(r.Context())
 	if !ok || ns == nil {
 		panic(fmt.Sprintf("BUG: nodeContextKey missing from request context: %s %s (NodeSelectionMiddleware may not have run)", r.Method, r.URL.Path))
 	}
 	return ns
+}
+
+func nodeServiceFromContext(ctx context.Context) (contracts.NodeService, bool) {
+	if ctx == nil {
+		return nil, false
+	}
+	node, ok := ctx.Value(nodeContextKey).(contracts.NodeService)
+	return node, ok && node != nil
 }
 
 func getIdentityService(r *http.Request) contracts.IdentityService {
@@ -581,23 +589,26 @@ func (g *Gateway) WebsocketDefaultHandler() http.HandlerFunc {
 // tenant layer participates in evaluation (matches handleGETFeatures).
 func featuresSnapshotFromNodeManager(nm coreiface.NodeManagerIface) func(context.Context) []frontend.FeatureSnapshot {
 	return func(ctx context.Context) []frontend.FeatureSnapshot {
-		if nm == nil {
-			return nil
-		}
-
-		// Full mode: GetDefaultNode returns a CoreIface which also implements FeaturesProvider.
 		var fp contracts.FeaturesProvider
-		if def := nm.GetDefaultNode(); def != nil {
-			fp, _ = def.(contracts.FeaturesProvider)
-		}
+		if requestNode, ok := nodeServiceFromContext(ctx); ok {
+			// Hosted mode resolves a tenant-scoped node before this callback runs.
+			// Never fall back to another tenant when the resolved node does not
+			// expose features; the correct result is fail-closed.
+			fp, _ = requestNode.(contracts.FeaturesProvider)
+		} else if nm != nil {
+			// Full mode: GetDefaultNode returns a CoreIface which also implements FeaturesProvider.
+			if def := nm.GetDefaultNode(); def != nil {
+				fp, _ = def.(contracts.FeaturesProvider)
+			}
 
-		// Defensive fallback for custom managers that expose only the narrower
-		// NodeService collection.
-		if fp == nil {
-			for _, n := range nm.GetNodes() {
-				if p, ok := n.(contracts.FeaturesProvider); ok {
-					fp = p
-					break
+			// Defensive fallback for custom managers that expose only the narrower
+			// NodeService collection.
+			if fp == nil {
+				for _, n := range nm.GetNodes() {
+					if p, ok := n.(contracts.FeaturesProvider); ok {
+						fp = p
+						break
+					}
 				}
 			}
 		}
@@ -664,25 +675,32 @@ type activePaymentChainProvider interface {
 }
 
 func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy edition.Policy) func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
-	return func(_ context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+	return func(ctx context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
 		result := baseline
 		result.Payments = frontend.PaymentCapabilities{Methods: []frontend.PaymentCapability{}}
-		if nm == nil {
-			return result
-		}
 
 		var node contracts.NodeService
 		var walletOperator contracts.WalletOperator
-		if def := nm.GetDefaultNode(); def != nil {
-			node = def
-			walletOperator = def.Multiwallet()
-		} else {
-			for _, candidate := range nm.GetNodes() {
-				node = candidate
-				if provider, ok := candidate.(walletOperatorProvider); ok {
-					walletOperator = provider.Multiwallet()
+		if requestNode, ok := nodeServiceFromContext(ctx); ok {
+			// Shared/hosted routers resolve the tenant node into the request
+			// context. Its capabilities must take precedence over the manager's
+			// default/first node to avoid cross-tenant capability projection.
+			node = requestNode
+			if provider, ok := requestNode.(walletOperatorProvider); ok {
+				walletOperator = provider.Multiwallet()
+			}
+		} else if nm != nil {
+			if def := nm.GetDefaultNode(); def != nil {
+				node = def
+				walletOperator = def.Multiwallet()
+			} else {
+				for _, candidate := range nm.GetNodes() {
+					node = candidate
+					if provider, ok := candidate.(walletOperatorProvider); ok {
+						walletOperator = provider.Multiwallet()
+					}
+					break
 				}
-				break
 			}
 		}
 

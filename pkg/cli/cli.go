@@ -69,5 +69,11 @@ func Run(startCommand any) error {
 	}
 
 	_, err = parser.Parse()
+	if flagErr, ok := err.(*flags.Error); ok && flagErr.Type == flags.ErrHelp {
+		// go-flags has already rendered the requested help. Treat it as a
+		// successful terminal action so distribution mains do not print the
+		// same help error a second time and exit non-zero.
+		return nil
+	}
 	return err
 }

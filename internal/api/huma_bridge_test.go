@@ -3,8 +3,31 @@ package api
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
+
+func TestNodeBridgeRecorderBinaryPreservesDownload(t *testing.T) {
+	rr := httptest.NewRecorder()
+	rr.Header().Set("Content-Type", "application/gzip")
+	rr.Header().Set("Content-Disposition", `attachment; filename="mobazha-diag.tar.gz"`)
+	rr.WriteHeader(http.StatusOK)
+	_, _ = rr.Write([]byte{0x1f, 0x8b, 0x08, 0x00})
+
+	out, err := nodeBridgeRecorderBinary(rr)
+	if err != nil {
+		t.Fatalf("nodeBridgeRecorderBinary: %v", err)
+	}
+	if out.ContentType != "application/gzip" {
+		t.Fatalf("Content-Type = %q, want application/gzip", out.ContentType)
+	}
+	if out.ContentDisposition != `attachment; filename="mobazha-diag.tar.gz"` {
+		t.Fatalf("Content-Disposition = %q", out.ContentDisposition)
+	}
+	if got, want := string(out.Body), string([]byte{0x1f, 0x8b, 0x08, 0x00}); got != want {
+		t.Fatalf("Body = %v, want %v", []byte(got), []byte(want))
+	}
+}
 
 // TestNodeBridgeRequestWithOptionalAuth_BareNode_DoesNotInjectAdmin guards
 // against regression of the "anonymous IsAdmin" fallback that previously

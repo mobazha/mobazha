@@ -157,15 +157,11 @@ func (g *Gateway) registerCommonSystemAdminOps(api huma.API) {
 		Summary:     "Export structured diagnostics blob",
 		Tags:        []string{"system"},
 		Security:    adminOnlyAuthSecurity,
-	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+	}, func(ctx context.Context, _ *struct{}) (*nodeLegacyBinaryBody, error) {
 		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/system/diagnostics", nil)
 		rr := httptest.NewRecorder()
 		g.handleGETSystemDiagnostics(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
-			return nil, err
-		}
-		return &nodeDataOutput{Body: data}, nil
+		return nodeBridgeRecorderBinary(rr)
 	})
 
 	huma.Register(api, huma.Operation{

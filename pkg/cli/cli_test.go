@@ -33,3 +33,13 @@ func TestRunRejectsMissingStartCommand(t *testing.T) {
 		t.Fatal("expected a missing start command to fail")
 	}
 }
+
+func TestRunTreatsHelpAsSuccess(t *testing.T) {
+	originalArgs := os.Args
+	t.Cleanup(func() { os.Args = originalArgs })
+	os.Args = []string{"mobazha", "start", "--help"}
+
+	if err := Run(new(recordingStart)); err != nil {
+		t.Fatalf("help should be a successful terminal action: %v", err)
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mobazha/mobazha/internal/common"
 	"github.com/mobazha/mobazha/internal/repo"
 )
 
@@ -115,18 +116,30 @@ func (r *Runner) CheckDataDir() CheckResult {
 		return cr
 	}
 
-	dbPath := filepath.Join(r.cfg.DataDir, "datastore", "mainnet.db")
-	if r.cfg.Testnet {
-		dbPath = filepath.Join(r.cfg.DataDir, "datastore", "testnet.db")
+	for _, dbPath := range r.databaseCandidates() {
+		if _, err := os.Stat(dbPath); err == nil {
+			cr.Status = StatusPass
+			cr.Detail = fmt.Sprintf("%s (database found: %s)", r.cfg.DataDir, dbPath)
+			return cr
+		}
 	}
-	if _, err := os.Stat(dbPath); err == nil {
-		cr.Status = StatusPass
-		cr.Detail = fmt.Sprintf("%s (database found)", r.cfg.DataDir)
-	} else {
-		cr.Status = StatusWarn
-		cr.Detail = fmt.Sprintf("%s exists but database not found", r.cfg.DataDir)
-	}
+
+	cr.Status = StatusWarn
+	cr.Detail = fmt.Sprintf("%s exists but database not found", r.cfg.DataDir)
 	return cr
+}
+
+func (r *Runner) databaseCandidates() []string {
+	legacyDatabase := "mainnet.db"
+	if r.cfg.Testnet {
+		legacyDatabase = "testnet.db"
+	}
+
+	return []string{
+		filepath.Join(r.cfg.DataDir, "nodes", repo.DefaultNodeID, common.DatabaseFileName),
+		filepath.Join(r.cfg.DataDir, common.DatabaseFileName),
+		filepath.Join(r.cfg.DataDir, "datastore", legacyDatabase),
+	}
 }
 
 func (r *Runner) CheckDisk() CheckResult {

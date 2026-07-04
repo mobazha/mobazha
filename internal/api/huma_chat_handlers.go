@@ -105,11 +105,6 @@ type chatRoomEventBodyInput struct {
 	Body    json.RawMessage
 }
 
-type chatUserBodyInput struct {
-	UserID string `path:"userID" doc:"Matrix user ID."`
-	Body   json.RawMessage
-}
-
 type chatTxnBodyInput struct {
 	TxnID string `path:"txnId" doc:"Verification transaction ID."`
 	Body  json.RawMessage
@@ -529,23 +524,22 @@ func (g *Gateway) registerChatMediaDownload(api huma.API) {
 
 func (g *Gateway) registerChatBlockUser(api huma.API) {
 	huma.Register(api, huma.Operation{
-		OperationID: "chat-block-user",
-		Method:      http.MethodPost,
-		Path:        "/v1/chat/users/{userID}/block",
-		Summary:     "Block a chat user",
-		Tags:        []string{"chat"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *chatUserBodyInput) (*nodeDataOutput, error) {
+		OperationID:   "chat-block-user",
+		Method:        http.MethodPost,
+		Path:          "/v1/chat/users/{userID}/block",
+		Summary:       "Block a chat user",
+		Tags:          []string{"chat"},
+		Security:      nodeAuthSecurity,
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *chatUserInput) (*nodeNoContentOutput, error) {
 		rawURL := "/v1/chat/users/" + url.PathEscape(in.UserID) + "/block"
-		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"userID": in.UserID})
-		req.Header.Set("Content-Type", "application/json")
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, nil, map[string]string{"userID": in.UserID})
 		rr := httptest.NewRecorder()
 		g.handlePOSTMatrixChatUserBlock(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
+		if err := nodeBridgeNoContent(rr); err != nil {
 			return nil, err
 		}
-		return &nodeDataOutput{Body: data}, nil
+		return nil, nil
 	})
 }
 
@@ -697,67 +691,64 @@ func (g *Gateway) registerChatVerificationRequest(api huma.API) {
 
 func (g *Gateway) registerChatVerificationAccept(api huma.API) {
 	huma.Register(api, huma.Operation{
-		OperationID: "chat-verification-accept",
-		Method:      http.MethodPost,
-		Path:        "/v1/chat/verification/{txnId}/accept",
-		Summary:     "Accept verification request",
-		Tags:        []string{"chat"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *chatTxnBodyInput) (*nodeDataOutput, error) {
+		OperationID:   "chat-verification-accept",
+		Method:        http.MethodPost,
+		Path:          "/v1/chat/verification/{txnId}/accept",
+		Summary:       "Accept verification request",
+		Tags:          []string{"chat"},
+		Security:      nodeAuthSecurity,
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *chatTxnInput) (*nodeNoContentOutput, error) {
 		rawURL := "/v1/chat/verification/" + url.PathEscape(in.TxnID) + "/accept"
-		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"txnId": in.TxnID})
-		req.Header.Set("Content-Type", "application/json")
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, nil, map[string]string{"txnId": in.TxnID})
 		rr := httptest.NewRecorder()
 		g.handlePOSTMatrixChatVerificationAccept(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
+		if err := nodeBridgeNoContent(rr); err != nil {
 			return nil, err
 		}
-		return &nodeDataOutput{Body: data}, nil
+		return nil, nil
 	})
 }
 
 func (g *Gateway) registerChatVerificationStartSAS(api huma.API) {
 	huma.Register(api, huma.Operation{
-		OperationID: "chat-verification-start-sas",
-		Method:      http.MethodPost,
-		Path:        "/v1/chat/verification/{txnId}/start-sas",
-		Summary:     "Start SAS verification",
-		Tags:        []string{"chat"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *chatTxnBodyInput) (*nodeDataOutput, error) {
+		OperationID:   "chat-verification-start-sas",
+		Method:        http.MethodPost,
+		Path:          "/v1/chat/verification/{txnId}/start-sas",
+		Summary:       "Start SAS verification",
+		Tags:          []string{"chat"},
+		Security:      nodeAuthSecurity,
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *chatTxnInput) (*nodeNoContentOutput, error) {
 		rawURL := "/v1/chat/verification/" + url.PathEscape(in.TxnID) + "/start-sas"
-		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"txnId": in.TxnID})
-		req.Header.Set("Content-Type", "application/json")
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, nil, map[string]string{"txnId": in.TxnID})
 		rr := httptest.NewRecorder()
 		g.handlePOSTMatrixChatVerificationStartSAS(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
+		if err := nodeBridgeNoContent(rr); err != nil {
 			return nil, err
 		}
-		return &nodeDataOutput{Body: data}, nil
+		return nil, nil
 	})
 }
 
 func (g *Gateway) registerChatVerificationConfirm(api huma.API) {
 	huma.Register(api, huma.Operation{
-		OperationID: "chat-verification-confirm",
-		Method:      http.MethodPost,
-		Path:        "/v1/chat/verification/{txnId}/confirm",
-		Summary:     "Confirm SAS verification",
-		Tags:        []string{"chat"},
-		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, in *chatTxnBodyInput) (*nodeDataOutput, error) {
+		OperationID:   "chat-verification-confirm",
+		Method:        http.MethodPost,
+		Path:          "/v1/chat/verification/{txnId}/confirm",
+		Summary:       "Confirm SAS verification",
+		Tags:          []string{"chat"},
+		Security:      nodeAuthSecurity,
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *chatTxnInput) (*nodeNoContentOutput, error) {
 		rawURL := "/v1/chat/verification/" + url.PathEscape(in.TxnID) + "/confirm"
-		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"txnId": in.TxnID})
-		req.Header.Set("Content-Type", "application/json")
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, nil, map[string]string{"txnId": in.TxnID})
 		rr := httptest.NewRecorder()
 		g.handlePOSTMatrixChatVerificationConfirm(rr, req)
-		data, err := nodeBridgeSuccessData(rr)
-		if err != nil {
+		if err := nodeBridgeNoContent(rr); err != nil {
 			return nil, err
 		}
-		return &nodeDataOutput{Body: data}, nil
+		return nil, nil
 	})
 }
 

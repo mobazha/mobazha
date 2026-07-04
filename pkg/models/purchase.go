@@ -91,17 +91,18 @@ func (item *ShoppingCartItem) IsSamePurchaseItem(secondItem *ShoppingCartItem) b
 // Purchase contains all the information needed by the node to
 // execute a purchase.
 type Purchase struct {
-	ShipTo               string         `json:"shipTo"`
-	Address              string         `json:"address"`
-	City                 string         `json:"city"`
-	State                string         `json:"state"`
-	PostalCode           string         `json:"postalCode"`
-	CountryCode          string         `json:"countryCode"`
-	AddressNotes         string         `json:"addressNotes"`
-	Items                []PurchaseItem `json:"items"`
-	AlternateContactInfo string         `json:"alternateContactInfo"`
-	PricingCoin          string         `json:"pricingCoin"`
-	DiscountCodes        []string       `json:"discountCodes,omitempty"`
+	ShipTo               string                `json:"shipTo"`
+	Address              string                `json:"address"`
+	City                 string                `json:"city"`
+	State                string                `json:"state"`
+	PostalCode           string                `json:"postalCode"`
+	CountryCode          string                `json:"countryCode"`
+	AddressNotes         string                `json:"addressNotes"`
+	Items                []PurchaseItem        `json:"items"`
+	AlternateContactInfo string                `json:"alternateContactInfo"`
+	PricingCoin          string                `json:"pricingCoin"`
+	DiscountCodes        []string              `json:"discountCodes,omitempty"`
+	DealTermsSnapshotRef *DealTermsSnapshotRef `json:"dealTermsSnapshotRef,omitempty"`
 
 	// RefundAddress is the buyer-declared on-chain address used for refunds
 	// when a crypto order is cancelled / disputed. Required by the

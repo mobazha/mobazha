@@ -256,6 +256,10 @@ type Order struct {
 	OrderOpenAcked      bool
 	PaymentReadyAt      *time.Time `gorm:"column:payment_ready_at"`
 
+	// DealTermsSnapshotRef binds the order to immutable externally managed
+	// terms. It is copied from the signed OrderOpen and persisted by both peers.
+	DealTermsSnapshotRef *DealTermsSnapshotRef `gorm:"embedded" json:"dealTermsSnapshotRef,omitempty"`
+
 	SerializedPaymentSent []byte
 	PaymentSentAcked      bool
 	PaymentSentSignature  string

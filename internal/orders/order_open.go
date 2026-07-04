@@ -117,6 +117,13 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 		}
 		validationError = true
 	}
+	if !validationError {
+		dealTermsSnapshotRef, err := models.DealTermsSnapshotRefFromOrderOpen(orderOpen)
+		if err != nil {
+			return nil, err
+		}
+		order.DealTermsSnapshotRef = dealTermsSnapshotRef
+	}
 
 	// TODO: if role == Vendor && autoConfirm && < mispaymentBuffer send orderConfirmation.
 
@@ -196,6 +203,9 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 	}
 	if order.RatingKeys == nil {
 		return errors.New("rating keys field is nil")
+	}
+	if _, err := models.DealTermsSnapshotRefFromOrderOpen(order); err != nil {
+		return err
 	}
 
 	if role == models.RoleVendor { // If we are vendor.

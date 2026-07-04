@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -477,8 +478,18 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 				},
 				AlternateContactInfo: "peter@protonmail.com",
 				PricingCoin:          "MCK",
+				DealTermsSnapshotRef: &models.DealTermsSnapshotRef{
+					DealLinkID: "deal-checkout-1",
+					Revision:   4,
+					TermsHash:  strings.Repeat("d", 64),
+				},
 			},
 			checkOrder: func(purchase *models.Purchase, order *pb.OrderOpen) error {
+				if order.DealLinkID != purchase.DealTermsSnapshotRef.DealLinkID ||
+					order.DealRevision != purchase.DealTermsSnapshotRef.Revision ||
+					order.TermsHash != purchase.DealTermsSnapshotRef.TermsHash {
+					return errors.New("incorrect deal terms snapshot reference")
+				}
 				if order.Shipping.ShipTo != purchase.ShipTo {
 					return errors.New("incorrect ships to")
 				}

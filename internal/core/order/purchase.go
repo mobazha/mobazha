@@ -175,6 +175,13 @@ func (s *OrderAppService) EstimateOrderTotal(ctx context.Context, purchase *mode
 // createOrder builds an OrderOpen protobuf from purchase parameters.
 // Returns the order, any applied discount result (may be nil), and error.
 func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purchase) (*pb.OrderOpen, *models.DiscountResult, error) {
+	if purchase == nil {
+		return nil, nil, fmt.Errorf("%w: purchase is required", coreiface.ErrBadRequest)
+	}
+	if err := purchase.DealTermsSnapshotRef.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)
+	}
+
 	var (
 		listings []*pb.SignedListing
 		items    []*pb.OrderOpen_Item
@@ -381,6 +388,11 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 		},
 		Chaincode:   hex.EncodeToString(chaincode),
 		PricingCoin: purchase.PricingCoin,
+	}
+	if purchase.DealTermsSnapshotRef != nil {
+		order.DealLinkID = purchase.DealTermsSnapshotRef.DealLinkID
+		order.DealRevision = purchase.DealTermsSnapshotRef.Revision
+		order.TermsHash = purchase.DealTermsSnapshotRef.TermsHash
 	}
 
 	// First pass: compute raw subtotal (no discounts) for DiscountEngine input

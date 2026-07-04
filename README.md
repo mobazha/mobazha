@@ -10,6 +10,7 @@ messaging, wallet-backed payment monitoring, APIs, and an embedded browser
 interface.
 
 [Quick Start](#quick-start) · [Operations](#operations) ·
+[Documentation](https://docs.mobazha.org) ·
 [Frontend](https://github.com/mobazha/mobazha-unified) ·
 [Contributing](./CONTRIBUTING.md)
 

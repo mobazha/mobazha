@@ -1,0 +1,26 @@
+name: Release Readiness
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag whose documentation should be verified
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  documentation:
+    name: Verify Release Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify release documentation and reviewed source revision
+        run: ./scripts/community/check-release-documentation.sh "${{ github.event.inputs.tag || github.ref_name }}"

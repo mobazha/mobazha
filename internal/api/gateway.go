@@ -652,13 +652,17 @@ func (g *Gateway) runtimeFrontendConfig() frontend.ServerConfig {
 		deploymentMode = frontend.RuntimeDeploymentSovereign
 	}
 	return frontend.ServerConfig{
-		SaaSURL:                g.config.SaaSAPIURL,
-		Edition:                g.editionPolicy.Name(),
-		Deployment:             frontend.RuntimeDeployment{Mode: deploymentMode},
-		Brand:                  g.config.Brand,
-		FeaturesSnapshotFn:     featuresSnapshotFromNodeManager(g.nodeManager),
-		CapabilitiesSnapshotFn: capabilitiesSnapshotFromNodeManager(g.nodeManager, g.editionPolicy),
-		NeedsSetupShellFn:      g.needsSetupShell,
+		SaaSURL:            g.config.SaaSAPIURL,
+		Edition:            g.editionPolicy.Name(),
+		Deployment:         frontend.RuntimeDeployment{Mode: deploymentMode},
+		Brand:              g.config.Brand,
+		FeaturesSnapshotFn: featuresSnapshotFromNodeManager(g.nodeManager),
+		CapabilitiesSnapshotFn: capabilitiesSnapshotFromNodeManager(
+			g.nodeManager,
+			g.editionPolicy,
+			g.config.GuestPaymentPolicy,
+		),
+		NeedsSetupShellFn: g.needsSetupShell,
 	}
 }
 
@@ -674,7 +678,11 @@ type activePaymentChainProvider interface {
 	ActivePaymentChains() []iwallet.ChainType
 }
 
-func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy edition.Policy) func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+func capabilitiesSnapshotFromNodeManager(
+	nm coreiface.NodeManagerIface,
+	policy edition.Policy,
+	guestPaymentPolicy distribution.GuestPaymentPolicy,
+) func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
 	return func(ctx context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
 		result := baseline
 		result.Payments = frontend.PaymentCapabilities{Methods: []frontend.PaymentCapability{}}
@@ -733,6 +741,30 @@ func capabilitiesSnapshotFromNodeManager(nm coreiface.NodeManagerIface, policy e
 					Kind: "fiat",
 					Flow: "provider-session",
 				})
+			}
+		}
+
+		// Trusted distributions may implement direct-payment assets outside the
+		// built-in wallet operator (for example an isolated wallet-rpc sidecar).
+		// AdvertisedPaymentCoins is already availability-filtered by the
+		// distribution policy, so project it through the same edition gate.
+		if guestPaymentPolicy != nil {
+			for _, coin := range guestPaymentPolicy.AdvertisedPaymentCoins() {
+				info, err := iwallet.CoinInfoFromCoinType(coin)
+				if err != nil {
+					continue
+				}
+				capability := frontend.PaymentCapability{
+					ID:   info.String(),
+					Kind: "crypto",
+					Flow: paymentFlowForChain(info.Chain),
+				}
+				key := "crypto:" + capability.ID
+				if _, exists := seen[key]; exists {
+					continue
+				}
+				seen[key] = struct{}{}
+				result.Payments.Methods = append(result.Payments.Methods, capability)
 			}
 		}
 

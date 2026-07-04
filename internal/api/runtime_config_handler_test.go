@@ -66,13 +66,34 @@ func TestCapabilitiesSnapshotFromNodeManager_UsesRequestResolvedNode(t *testing.
 	}
 	ctx := context.WithValue(context.Background(), nodeContextKey, contracts.NodeService(node))
 
-	got := capabilitiesSnapshotFromNodeManager(nil, policy)(ctx, frontend.RuntimeCapabilities{})
+	got := capabilitiesSnapshotFromNodeManager(nil, policy, nil)(ctx, frontend.RuntimeCapabilities{})
 	if len(got.Payments.Methods) != 1 {
 		t.Fatalf("payment methods = %#v, want one request-node method", got.Payments.Methods)
 	}
 	method := got.Payments.Methods[0]
 	if method.ID != iwallet.ChainBitcoin.String() || method.Kind != "crypto" || method.Flow != "address-transfer" {
 		t.Fatalf("payment method = %#v, want BTC address-transfer", method)
+	}
+}
+
+func TestCapabilitiesSnapshotFromNodeManager_ProjectsDistributionPaymentCoin(t *testing.T) {
+	policy, err := edition.ResolvePolicy(edition.FullName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coin := iwallet.CoinType("crypto:monero:mainnet:native")
+	guestPolicy := paymentProjectionPolicyStub{coins: []iwallet.CoinType{coin}}
+
+	got := capabilitiesSnapshotFromNodeManager(nil, policy, guestPolicy)(
+		context.Background(),
+		frontend.RuntimeCapabilities{},
+	)
+	if len(got.Payments.Methods) != 1 {
+		t.Fatalf("payment methods = %#v, want one distribution method", got.Payments.Methods)
+	}
+	method := got.Payments.Methods[0]
+	if method.ID != iwallet.ChainMonero.String() || method.Kind != "crypto" || method.Flow != "address-transfer" {
+		t.Fatalf("payment method = %#v, want XMR address-transfer", method)
 	}
 }
 

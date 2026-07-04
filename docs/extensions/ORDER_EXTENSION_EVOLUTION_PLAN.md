@@ -4,8 +4,12 @@ Status: Open Core direct cutover implemented
 
 ## Scope
 
-This plan moves the first-party Collectibles/NFT integration onto the generic
-contracts in [`ORDER_EXTENSION_CONTRACT.md`](ORDER_EXTENSION_CONTRACT.md).
+This plan moves the first implemented provider, the first-party
+Collectibles/NFT integration, onto the generic contracts in
+[`ORDER_EXTENSION_CONTRACT.md`](ORDER_EXTENSION_CONTRACT.md). `OrderExtension`
+is intentionally broader than Collectibles: later resource providers may use
+the same durable declaration, reservation, delivery, and attestation semantics
+while keeping their own namespaced types and payloads.
 Open Core is still under development, so the implementation performs a direct
 cutover rather than carrying product-specific compatibility APIs or storage.
 Hosting-specific module implementation remains outside this plan.

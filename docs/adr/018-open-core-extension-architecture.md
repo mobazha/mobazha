@@ -97,11 +97,20 @@ claimed as implemented runtime gates by this ADR.
 A package may implement more than one role, but each exported contract must
 have one role and authority boundary.
 
-## Collectibles classification
+## Order-extension scope and the Collectibles implementation
 
-The current Collectibles/NFT implementation is a first-party domain extension,
-not a generic Core order type and not a payment plugin. Its capabilities map as
-follows:
+`OrderExtension` is a generic contract for order-associated domain resources
+whose declaration, reservation, external lifecycle, or evidence must remain
+durable across several Core order stages. It is neither a synonym for
+Collectibles nor a universal product model. Candidate resource categories
+include collectible Hub slots, limited inventory, gift-card redemption quotas,
+event tickets, regulated product lots, and made-to-order production capacity.
+These examples describe the intended contract scope; they are not claims that
+all such providers are implemented.
+
+The current Collectibles/NFT implementation is the first implemented
+first-party domain module using this contract. It is not a generic Core order
+type and not a payment plugin. Its capabilities map as follows:
 
 - metadata attached to an order becomes a versioned `OrderExtension`
   declaration;
@@ -115,9 +124,12 @@ follows:
 - product-specific hooks and settlement commands are removed in a direct
   development-time cutover; no compatibility adapter is retained.
 
-`nft` remains a concrete extension type until at least one additional use case
-proves a stable shared abstraction. Core must not generalize product nouns
-prematurely.
+The Collectibles extension type remains concrete. A future ticket, quota, lot,
+or production-capacity provider receives its own namespaced type and payload;
+it does not inherit NFT vocabulary. Shared product taxonomies must wait for at
+least one additional implementation to prove them. The envelope, reservation,
+durable delivery, and attestation contracts are shared because their authority
+and recovery semantics are stable, not because the products are the same.
 
 The detailed contract and phased migration are defined in
 [`ORDER_EXTENSION_CONTRACT.md`](../extensions/ORDER_EXTENSION_CONTRACT.md) and

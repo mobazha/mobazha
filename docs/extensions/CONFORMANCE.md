@@ -61,16 +61,25 @@ Every extension mechanism is tested for:
 - Failure after acceptance but before command completion is recoverable without
   duplicate financial action.
 
-## Order extension cutover suite
+## Order extension and Collectibles cutover suite
 
-The Collectibles cutover additionally requires:
+Every Order Extension provider additionally requires:
 
 - unknown extension types survive read/write and export without corruption;
 - absent or unhealthy providers do not erase order or financial history;
-- reservation timeout, expiry, cancel, duplicate commit, and compensation
-  fixtures;
-- durable delivery replay after process and database restart;
-- missing reservation, Controller, and attestation capabilities fail closed;
+- provider-specific vocabulary stays inside its namespaced payload, with a
+  non-Collectibles fixture proving that Core does not require NFT fields;
+- providers receive only the declaration, reservation, delivery, observation,
+  or attestation capabilities they declare and are authorized to use;
+
+For every sub-capability a provider declares, the applicable fixtures include:
+
+- reservation providers cover timeout, expiry, cancel, duplicate commit, and
+  compensation;
+- Controller providers cover durable delivery replay after process and
+  database restart;
+- required reservation, Controller, and attestation capabilities fail closed
+  when missing;
 - reservation IDs/versions survive retries and appear unchanged in lifecycle
   payloads;
 - buyer/seller and tenant copies of the same order produce distinct event IDs;
@@ -83,6 +92,9 @@ The Collectibles cutover additionally requires:
 - only explicitly subscribed lifecycle events enter the durable outbox;
 - exact contract versions, descriptor/capability mismatch, nil capabilities,
   and post-registration descriptor mutation are rejected or isolated;
+
+The first Collectibles provider additionally requires:
+
 - no Collectibles data is mirrored into `FiatMetadata`;
 - a source-boundary test rejects product-specific public Core APIs.
 

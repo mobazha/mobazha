@@ -1,13 +1,36 @@
 # Order extension contract
 
-Status: v1 implemented for the Open Core Collectibles migration
+Status: v1 implemented; Collectibles is the first provider
 
 ## Purpose
 
-The order extension contract lets a domain attach versioned data and react to
-an order lifecycle without adding product-specific fields, callbacks, or
-financial commands to Core. It is initially motivated by Collectibles, but its
-names and guarantees are limited to concepts already stable across domains.
+The order extension contract lets a domain bind a versioned resource or
+domain process to an order and participate in its lifecycle without adding
+product-specific fields, callbacks, or financial commands to Core.
+Collectibles is the first implementation, not the definition of the contract.
+The names and guarantees are limited to concepts already stable across
+domains.
+
+Use this contract when the binding must survive restarts and provider absence,
+when scarce capacity must be reserved before funding, when external work must
+be delivered durably, or when Core must validate an observation or attestation
+before a Core-owned transition. Candidate applications include:
+
+| Resource category | Possible order-extension responsibility |
+|---|---|
+| Collectible Hub slot | Reserve capacity, deliver or mint, and attest completion |
+| Limited inventory | Bind an allocation and commit or release it from durable events |
+| Gift-card redemption quota | Reserve provider quota and report issuance evidence |
+| Event ticket | Reserve admission capacity and report ticket issuance |
+| Regulated product lot | Persist a lot binding and return permitted fulfillment evidence |
+| Made-to-order capacity | Reserve a production slot and report production or delivery milestones |
+
+The table is a modeling guide, not a list of shipped providers. A candidate
+does not need every sub-capability: for example, a reservation-only resource
+does not gain settlement-attestation authority. Simple implementation
+replacement remains a Port; pure policy remains a Function; ordinary external
+reconciliation remains a Controller. Stable commerce concepts that Core owns
+should be modeled in Core rather than hidden in an extension payload.
 
 ## 1. Extension declaration
 
@@ -99,8 +122,11 @@ Expiry and ambiguous timeouts are reconciled by the provider; Core never
 assumes a timeout means failure. Every operation checks the tenant, order,
 extension, and expected reservation binding.
 
-Collectibles token or inventory allocation maps to this contract. The generic
-contract must not expose chain, token, collection, or mint vocabulary.
+Collectibles token or inventory allocation is the first mapping to this
+contract. Other providers retain their own quota, seat, lot, or capacity
+vocabulary inside their namespaced payloads. The generic contract must not
+expose chain, token, collection, mint, ticket, batch, or provider-specific
+vocabulary.
 
 An `extension-attested` declaration is compatible only with a `CANCELABLE`
 settlement rail. Core rejects Fiat, DIRECT, MODERATED, and other incompatible

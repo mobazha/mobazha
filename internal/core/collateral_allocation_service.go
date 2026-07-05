@@ -21,16 +21,17 @@ import (
 )
 
 type collateralAllocationService struct {
-	db     database.Database
-	signer contracts.Signer
-	now    func() time.Time
+	db        database.Database
+	signer    contracts.Signer
+	messenger contracts.Messenger
+	now       func() time.Time
 }
 
-func newCollateralAllocationService(db database.Database, signer contracts.Signer) contracts.CollateralAllocationService {
+func newCollateralAllocationService(db database.Database, signer contracts.Signer, messenger contracts.Messenger) contracts.CollateralAllocationService {
 	if db == nil {
 		return nil
 	}
-	return &collateralAllocationService{db: db, signer: signer, now: func() time.Time { return time.Now().UTC() }}
+	return &collateralAllocationService{db: db, signer: signer, messenger: messenger, now: func() time.Time { return time.Now().UTC() }}
 }
 
 func (s *collateralAllocationService) IssueOrderExtensionCollateralCredential(
@@ -71,6 +72,7 @@ func (s *collateralAllocationService) IssueOrderExtensionCollateralCredential(
 	identity := sha256.Sum256([]byte(strings.Join([]string{
 		reference.AllocationID, request.OrderID, request.Extension.ExtensionID,
 		fmt.Sprint(request.Extension.Revision), request.AudiencePeerID, fmt.Sprint(now.Unix()),
+		fmt.Sprint(request.ExpiresAt.UTC().Truncate(time.Second).Unix()),
 	}, "\x00")))
 	credential := pkgcollateral.AllocationCredential{
 		CredentialID: "colcred_" + hex.EncodeToString(identity[:16]), Version: pkgcollateral.AllocationCredentialVersionV1,

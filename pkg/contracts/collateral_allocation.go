@@ -47,6 +47,7 @@ func (r AllocateOrderExtensionCollateralRequest) Validate() error {
 // envelope; it cannot accept provider assertions of funding.
 type CollateralAllocationService interface {
 	AllocateOrderExtensionCollateral(context.Context, AllocateOrderExtensionCollateralRequest) (extensions.OrderExtensionV2, error)
+	RequestOrderExtensionCollateralCredential(context.Context, RequestOrderExtensionCollateralCredentialRequest) error
 	IssueOrderExtensionCollateralCredential(context.Context, IssueOrderExtensionCollateralCredentialRequest) (pkgcollateral.AllocationCredential, error)
 	ImportOrderExtensionCollateralCredential(context.Context, ImportOrderExtensionCollateralCredentialRequest) error
 }
@@ -64,6 +65,32 @@ type IssueOrderExtensionCollateralCredentialRequest struct {
 	Requirement    extensions.CollateralRequirement
 	AudiencePeerID string
 	ExpiresAt      time.Time
+}
+
+// RequestOrderExtensionCollateralCredentialRequest starts a durable buyer-to-
+// seller request over Core messaging. The seller identity is derived from the
+// buyer's persisted order and is never accepted from the caller.
+type RequestOrderExtensionCollateralCredentialRequest struct {
+	OrderID     string
+	Extension   extensions.OrderExtension
+	Requirement extensions.CollateralRequirement
+	ExpiresAt   time.Time
+}
+
+func (r RequestOrderExtensionCollateralCredentialRequest) Validate(now time.Time) error {
+	if strings.TrimSpace(r.OrderID) == "" {
+		return fmt.Errorf("collateral credential order is required")
+	}
+	if err := r.Extension.ValidateForOrder(r.OrderID); err != nil {
+		return err
+	}
+	if err := r.Requirement.ValidateForExtension(r.Extension); err != nil {
+		return err
+	}
+	if !r.ExpiresAt.After(now) || r.ExpiresAt.Sub(now) > pkgcollateral.MaxAllocationCredentialTTL {
+		return fmt.Errorf("collateral credential expiry must be future and within the maximum TTL")
+	}
+	return nil
 }
 
 func (r IssueOrderExtensionCollateralCredentialRequest) Validate(now time.Time) error {

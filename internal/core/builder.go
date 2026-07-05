@@ -911,6 +911,12 @@ func (n *MobazhaNode) registerHandlers() {
 	n.networkService.RegisterHandler(pb.Message_ADDRESS_RESPONSE, func(from peer.ID, message *pb.Message) error {
 		return n.orderService.HandleAddressResponse(from, message)
 	})
+	n.networkService.RegisterHandler(pb.Message_COLLATERAL_CREDENTIAL_REQUEST, func(from peer.ID, message *pb.Message) error {
+		return n.handleCollateralCredentialRequest(from, message)
+	})
+	n.networkService.RegisterHandler(pb.Message_COLLATERAL_CREDENTIAL_RESPONSE, func(from peer.ID, message *pb.Message) error {
+		return n.handleCollateralCredentialResponse(from, message)
+	})
 	n.networkService.RegisterHandler(pb.Message_PING, func(from peer.ID, message *pb.Message) error {
 		return n.handlePingMessage(from, message)
 	})

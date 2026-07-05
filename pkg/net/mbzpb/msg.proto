@@ -21,6 +21,8 @@ message Message {
         DISPUTE                  = 8;
         ADDRESS_REQUEST          = 9;
         ADDRESS_RESPONSE         = 10;
+        COLLATERAL_CREDENTIAL_REQUEST  = 11;
+        COLLATERAL_CREDENTIAL_RESPONSE = 12;
     }
 }
 
@@ -79,6 +81,25 @@ message AddressRequestMessage {
 message AddressResponseMessage {
     string address = 1;
     string coin    = 2;
+}
+
+// CollateralCredentialRequest asks the seller Core to project one live local
+// allocation into a short-lived credential for the authenticated buyer peer.
+message CollateralCredentialRequest {
+    string orderID          = 1;
+    bytes extensionJson     = 2;
+    bytes requirementJson   = 3;
+    int64 expiresAtUnix     = 4;
+}
+
+// CollateralCredentialResponse carries seller-signed evidence back to the
+// buyer. The buyer must still bind it to its own persisted extension state.
+message CollateralCredentialResponse {
+    string requestMessageID = 1;
+    string orderID          = 2;
+    bytes extensionJson     = 3;
+    bytes requirementJson   = 4;
+    bytes credentialJson    = 5;
 }
 
 // ChannelRequestMessage, ChannelResponseMessage removed: Channels feature retired.

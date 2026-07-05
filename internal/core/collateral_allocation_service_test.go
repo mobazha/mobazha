@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	corecollateral "github.com/mobazha/mobazha/internal/collateral"
 	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/internal/repo"
@@ -16,9 +17,11 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
+	netpb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 	orderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *testing.T) {
@@ -29,7 +32,7 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 		for _, model := range []any{
 			&models.CollateralAccountRecord{}, &models.CollateralFundingRecord{}, &models.CollateralAllocationRecord{},
 			&models.CollateralActionRecord{}, &models.OrderExtensionRecord{}, &models.CollateralOrderExtensionBindingRecord{},
-			&models.CollateralAllocationCredentialRecord{},
+			&models.CollateralAllocationCredentialRecord{}, &models.IncomingMessage{},
 			&models.Order{},
 		} {
 			if err := tx.Migrate(model); err != nil {
@@ -41,6 +44,10 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 	now := time.Now().UTC().Truncate(time.Second)
 	sellerSigner := newMockSigner()
 	buyerSigner := newMockSigner()
+	sellerPeer, err := peer.Decode(string(sellerSigner.PeerID()))
+	require.NoError(t, err)
+	buyerPeer, err := peer.Decode(string(buyerSigner.PeerID()))
+	require.NoError(t, err)
 	assetID := "crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955"
 	open := pkgcollateral.OpenRequest{
 		TenantID: database.StandaloneTenantID, ProviderID: "io.mobazha.collectibles", ResourceID: "srcdep-1",
@@ -140,18 +147,30 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, buyerDB.Close()) })
 	require.NoError(t, buyerDB.Update(func(tx database.Tx) error {
-		if err := tx.Migrate(&models.OrderExtensionRecord{}); err != nil {
+		for _, model := range []any{
+			&models.OrderExtensionRecord{}, &models.CollateralOrderExtensionBindingRecord{},
+			&models.CollateralAllocationCredentialRecord{}, &models.IncomingMessage{}, &models.Order{},
+		} {
+			if err := tx.Migrate(model); err != nil {
+				return err
+			}
+		}
+		if err := orderextensions.PersistTx(tx, request.OrderID, extension); err != nil {
 			return err
 		}
-		if err := tx.Migrate(&models.CollateralOrderExtensionBindingRecord{}); err != nil {
+		orderOpen, err := protojson.Marshal(&orderpb.OrderOpen{
+			BuyerID:  &orderpb.ID{PeerID: string(buyerSigner.PeerID())},
+			Listings: []*orderpb.SignedListing{{Listing: &orderpb.Listing{VendorID: &orderpb.ID{PeerID: string(sellerSigner.PeerID())}}}},
+		})
+		if err != nil {
 			return err
 		}
-		if err := tx.Migrate(&models.CollateralAllocationCredentialRecord{}); err != nil {
-			return err
-		}
-		return orderextensions.PersistTx(tx, request.OrderID, extension)
+		return tx.Save(&models.Order{
+			ID: models.OrderID(request.OrderID), MyRole: string(models.RoleBuyer), SerializedOrderOpen: orderOpen,
+		})
 	}))
-	buyerService := &collateralAllocationService{db: buyerDB, signer: buyerSigner, now: func() time.Time { return clock }}
+	buyerMessenger := &mockMessenger{}
+	buyerService := &collateralAllocationService{db: buyerDB, signer: buyerSigner, messenger: buyerMessenger, now: func() time.Time { return clock }}
 	require.NoError(t, buyerService.ImportOrderExtensionCollateralCredential(context.Background(), contracts.ImportOrderExtensionCollateralCredentialRequest{
 		OrderID: request.OrderID, Extension: extension, Requirement: request.Requirement, Credential: credential,
 	}))
@@ -165,11 +184,37 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 		return err
 	}))
 	buyerNode := &MobazhaNode{
-		cryptoFields: cryptoFields{signer: buyerSigner},
+		storageFields: storageFields{db: buyerDB},
+		cryptoFields:  cryptoFields{signer: buyerSigner},
+		networkFields: networkFields{messenger: buyerMessenger},
 		orderExtensionFields: orderExtensionFields{orderExtensionModules: mustRegisterOrderExtensionModules(
 			t, collateralRequirementTestModule{requirement: request.Requirement},
 		)},
 	}
+	clock = now.Add(2 * time.Second)
+	require.NoError(t, buyerService.RequestOrderExtensionCollateralCredential(context.Background(), contracts.RequestOrderExtensionCollateralCredentialRequest{
+		OrderID: request.OrderID, Extension: extension, Requirement: request.Requirement, ExpiresAt: clock.Add(5 * time.Minute),
+	}))
+	require.Len(t, buyerMessenger.sent, 1)
+	require.Equal(t, sellerPeer, buyerMessenger.sent[0].PeerID)
+	require.Equal(t, netpb.Message_COLLATERAL_CREDENTIAL_REQUEST, buyerMessenger.sent[0].Msg.MessageType)
+
+	sellerMessenger := &mockMessenger{}
+	sellerNode := &MobazhaNode{
+		storageFields: storageFields{db: db}, cryptoFields: cryptoFields{signer: sellerSigner},
+		networkFields: networkFields{messenger: sellerMessenger},
+	}
+	require.NoError(t, sellerNode.handleCollateralCredentialRequest(buyerPeer, buyerMessenger.sent[0].Msg))
+	require.NoError(t, sellerNode.handleCollateralCredentialRequest(buyerPeer, buyerMessenger.sent[0].Msg), "request retry is ACKed without issuing another response")
+	require.Len(t, sellerMessenger.sent, 1)
+	require.Equal(t, buyerPeer, sellerMessenger.sent[0].PeerID)
+	require.Equal(t, netpb.Message_COLLATERAL_CREDENTIAL_RESPONSE, sellerMessenger.sent[0].Msg.MessageType)
+	require.NoError(t, buyerNode.handleCollateralCredentialResponse(sellerPeer, sellerMessenger.sent[0].Msg))
+	require.NoError(t, buyerNode.handleCollateralCredentialResponse(sellerPeer, sellerMessenger.sent[0].Msg), "response retry is idempotent")
+
+	spoofed := proto.Clone(sellerMessenger.sent[0].Msg).(*netpb.Message)
+	spoofed.MessageID = "spoofed-collateral-credential-response"
+	require.ErrorContains(t, buyerNode.handleCollateralCredentialResponse(buyerPeer, spoofed), "sender does not match issuer")
 	require.NoError(t, buyerDB.View(func(tx database.Tx) error {
 		return buyerNode.admitOrderExtensionCollateralRequirementsTx(
 			context.Background(), tx, request.OrderID, nil, []extensions.OrderExtension{extension},

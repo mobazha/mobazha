@@ -935,10 +935,8 @@ func (g *Gateway) registerOrderPaymentSessionGet(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/v1/orders/{orderID}/payment-session",
 		Summary:     "Unified payment session view for an order",
-		Description: "Returns a PaymentSession projection built from existing order, payment, and " +
-			"fiat metadata. Settlement modes include address_monitored (UTXO, Monero, backend-managed EVM, " +
-			"and Solana escrow when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), " +
-			"and provider_checkout (Stripe/PayPal).",
+		Description: "Returns a PaymentSession projection built from existing order and payment metadata. " +
+			"Settlement modes indicate observed-address, client-signed escrow, or provider-session execution.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
@@ -1031,7 +1029,7 @@ func (g *Gateway) registerOrderSettlementActionPost(api huma.API) {
 		Method:      http.MethodPost,
 		Path:        "/v1/orders/{orderID}/settlement-actions/{action}",
 		Summary:     "Execute backend settlement action",
-		Description: "Runs backend-submitted settlement for crypto orders (managed EVM, Solana Anchor, UTXO sync). " +
+		Description: "Runs Core-authorized backend settlement for supported crypto routes. " +
 			"Supported actions: confirm, cancel, seller-decline-refund, complete, dispute-release. " +
 			"Client-signed legacy chains use instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
 		Tags:     []string{"orders", "payments"},

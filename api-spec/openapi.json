@@ -15528,7 +15528,7 @@
     },
     "/v1/orders/{orderID}/payment-session": {
       "get": {
-        "description": "Returns a PaymentSession projection built from existing order, payment, and fiat metadata. Settlement modes include address_monitored (UTXO, Monero, backend-managed EVM, and Solana escrow when persisted), escrow_v1 (legacy EVM / Solana / TRON flows that require buyer-signed escrow), and provider_checkout (Stripe/PayPal).",
+        "description": "Returns a PaymentSession projection built from existing order and payment metadata. Settlement modes indicate observed-address, client-signed escrow, or provider-session execution.",
         "operationId": "orders-get-payment-session",
         "parameters": [
           {
@@ -16090,7 +16090,7 @@
     },
     "/v1/orders/{orderID}/settlement-actions/{action}": {
       "post": {
-        "description": "Runs backend-submitted settlement for crypto orders (managed EVM, Solana Anchor, UTXO sync). Supported actions: confirm, cancel, seller-decline-refund, complete, dispute-release. Client-signed legacy chains use instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
+        "description": "Runs Core-authorized backend settlement for supported crypto routes. Supported actions: confirm, cancel, seller-decline-refund, complete, dispute-release. Client-signed legacy chains use instruction endpoints. Fiat orders return 400. Optional body: payoutAddress.",
         "operationId": "orders-post-settlement-action",
         "parameters": [
           {

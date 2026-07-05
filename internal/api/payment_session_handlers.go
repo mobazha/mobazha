@@ -176,6 +176,9 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 				"cannot switch coin with existing partial payment")
 		case errors.Is(err, corePmt.ErrPaymentCoinMismatch):
 			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
+		case errors.Is(err, corePmt.ErrDealPaymentQuoteRequired),
+			errors.Is(err, corePmt.ErrDealPaymentConversionQuoteRequired):
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 		case errors.Is(err, corePmt.ErrExchangeRateUnavailable):
 			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
 				"exchange rate service unavailable — cross-currency crypto payment cannot be calculated")

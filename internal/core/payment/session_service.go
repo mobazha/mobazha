@@ -151,6 +151,9 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 	if err != nil {
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
 	}
+	if err := validateDealSessionProvisioning(input.orderOpen, req); err != nil {
+		return nil, err
+	}
 	view, err := s.projector.Project(input)
 	if err != nil {
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
@@ -172,7 +175,14 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			// finish provisioning in this request instead of requiring a client
 			// to detect and retry an invalid intermediate projection.
 			if updated.PaymentReadiness.Status == payment.PaymentReadinessReadyToPay && updated.FundingTarget.Address == "" {
-				return s.crypto.CreateSession(ctx, req)
+				created, err := s.crypto.CreateSession(ctx, req)
+				if err != nil {
+					return nil, err
+				}
+				if err := validateDealPaymentSession(input.orderOpen, req, created); err != nil {
+					return nil, err
+				}
+				return created, nil
 			}
 			return updated, nil
 		}
@@ -211,7 +221,17 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			if s.crypto == nil {
 				return nil, ErrProvisioningNotImplemented
 			}
-			return s.crypto.UpdateCreateSessionRefundAddress(ctx, req)
+			updated, err := s.crypto.UpdateCreateSessionRefundAddress(ctx, req)
+			if err != nil {
+				return nil, err
+			}
+			if err := validateDealPaymentSession(input.orderOpen, req, updated); err != nil {
+				return nil, err
+			}
+			return updated, nil
+		}
+		if err := validateDealPaymentSession(input.orderOpen, req, view); err != nil {
+			return nil, err
 		}
 		return view, nil
 	}
@@ -250,7 +270,14 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			if s.fiat == nil {
 				return nil, fmt.Errorf("%w: use POST /v1/fiat/{providerID}/payments", ErrFiatFacadeNotWired)
 			}
-			return s.fiat.CreateSession(ctx, req)
+			created, err := s.fiat.CreateSession(ctx, req)
+			if err != nil {
+				return nil, err
+			}
+			if err := validateDealPaymentSession(input.orderOpen, req, created); err != nil {
+				return nil, err
+			}
+			return created, nil
 		}
 
 		// Crypto orders (managed EVM + UTXO): "crypto:{chain}:{token}"
@@ -258,7 +285,14 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			if s.crypto == nil {
 				return nil, ErrProvisioningNotImplemented
 			}
-			return s.crypto.CreateSession(ctx, req)
+			created, err := s.crypto.CreateSession(ctx, req)
+			if err != nil {
+				return nil, err
+			}
+			if err := validateDealPaymentSession(input.orderOpen, req, created); err != nil {
+				return nil, err
+			}
+			return created, nil
 		}
 
 		return nil, fmt.Errorf(

@@ -33,6 +33,26 @@ var (
 		"payment session: requested payment coin is not enabled",
 	)
 
+	// ErrDealPaymentQuoteRequired is returned when a Deal-backed signed order
+	// reaches payment provisioning without an immutable Hosting fee quote.
+	ErrDealPaymentQuoteRequired = errors.New(
+		"payment session: Deal order requires an immutable fee quote",
+	)
+
+	// ErrDealPaymentConversionQuoteRequired prevents a Deal-backed order from
+	// using an ephemeral exchange rate. Cross-currency payment requires a
+	// separately persisted quote binding source amount, rate, target amount,
+	// payment asset, and expiry before a funding target can be provisioned.
+	ErrDealPaymentConversionQuoteRequired = errors.New(
+		"payment session: Deal cross-currency payment requires an immutable conversion quote",
+	)
+
+	// ErrDealPaymentAmountIntegrity identifies a mismatch between signed Deal
+	// terms and the amount or asset exposed by an actionable PaymentSession.
+	ErrDealPaymentAmountIntegrity = errors.New(
+		"payment session: Deal amount integrity validation failed",
+	)
+
 	// ErrPaymentCoinMismatch is returned when CreateSession is called with a
 	// paymentCoin that differs from the coin already provisioned for the order.
 	// Callers must explicitly handle this as a coin-switch case rather than

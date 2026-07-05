@@ -1,0 +1,151 @@
+package payment
+
+import (
+	"errors"
+	"strings"
+	"testing"
+
+	"github.com/mobazha/mobazha/pkg/contracts"
+	porderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	paypb "github.com/mobazha/mobazha/pkg/payment"
+	"github.com/stretchr/testify/require"
+)
+
+func TestValidateDealSessionProvisioning(t *testing.T) {
+	dealOpen := func(pricingCoin, amount, feeQuoteID string) *porderpb.OrderOpen {
+		return &porderpb.OrderOpen{
+			PricingCoin:  pricingCoin,
+			Amount:       amount,
+			DealLinkID:   "deal-123",
+			DealRevision: 2,
+			TermsHash:    strings.Repeat("a", 64),
+			FeeQuoteID:   feeQuoteID,
+		}
+	}
+
+	tests := []struct {
+		name    string
+		open    *porderpb.OrderOpen
+		req     contracts.CreatePaymentSessionRequest
+		wantErr error
+	}{
+		{
+			name: "non deal order remains compatible",
+			open: &porderpb.OrderOpen{PricingCoin: "USD", Amount: "4900"},
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin:     "crypto:eip155:1:native",
+				FiatAmountCents: 1,
+			},
+		},
+		{
+			name: "deal requires fee quote",
+			open: dealOpen("USD", "4900", ""),
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin:     "fiat:stripe:USD",
+				FiatAmountCents: 4900,
+			},
+			wantErr: ErrDealPaymentQuoteRequired,
+		},
+		{
+			name: "cross currency requires immutable conversion quote",
+			open: dealOpen("USD", "4900", "fq-123"),
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin: "crypto:eip155:1:native",
+			},
+			wantErr: ErrDealPaymentConversionQuoteRequired,
+		},
+		{
+			name: "same currency fiat amount matches signed order",
+			open: dealOpen("USD", "4900", "fq-123"),
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin:     "fiat:stripe:USD",
+				FiatAmountCents: 4900,
+			},
+		},
+		{
+			name: "canonical pricing coin resolves to same currency",
+			open: dealOpen("crypto:eip155:1:native", "1000000000000000000", "fq-123"),
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin: "crypto:eip155:1:native",
+			},
+		},
+		{
+			name: "fiat request amount cannot override signed order",
+			open: dealOpen("USD", "4900", "fq-123"),
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin:     "fiat:stripe:USD",
+				FiatAmountCents: 1,
+			},
+			wantErr: ErrDealPaymentAmountIntegrity,
+		},
+		{
+			name: "signed amount must be positive integer",
+			open: dealOpen("USD", "not-an-amount", "fq-123"),
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin:     "fiat:stripe:USD",
+				FiatAmountCents: 4900,
+			},
+			wantErr: ErrDealPaymentAmountIntegrity,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateDealSessionProvisioning(tt.open, tt.req)
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestValidateDealPaymentSession(t *testing.T) {
+	open := &porderpb.OrderOpen{
+		PricingCoin:  "USD",
+		Amount:       "4900",
+		DealLinkID:   "deal-123",
+		DealRevision: 2,
+		TermsHash:    strings.Repeat("b", 64),
+		FeeQuoteID:   "fq-123",
+	}
+	req := contracts.CreatePaymentSessionRequest{
+		PaymentCoin:     "fiat:stripe:USD",
+		FiatAmountCents: 4900,
+	}
+	valid := func() *paypb.PaymentSession {
+		return &paypb.PaymentSession{
+			PaymentCoin:    req.PaymentCoin,
+			ExpectedAmount: "49",
+			FundingTarget: paypb.FundingTargetView{
+				AssetID:         req.PaymentCoin,
+				Amount:          "49",
+				NetworkFeeHints: &paypb.NetworkFeeHints{FeePayer: "buyer", Asset: "crypto:eip155:1:native"},
+			},
+			PaymentProgress: paypb.PaymentProgressView{RequiredAmount: "49"},
+		}
+	}
+
+	require.NoError(t, validateDealPaymentSession(open, req, valid()),
+		"advisory network fee hints must not change the signed order amount")
+
+	tests := []struct {
+		name   string
+		mutate func(*paypb.PaymentSession)
+	}{
+		{name: "payment coin mismatch", mutate: func(s *paypb.PaymentSession) { s.PaymentCoin = "fiat:paypal:USD" }},
+		{name: "expected amount mismatch", mutate: func(s *paypb.PaymentSession) { s.ExpectedAmount = "48.99" }},
+		{name: "funding asset mismatch", mutate: func(s *paypb.PaymentSession) { s.FundingTarget.AssetID = "fiat:paypal:USD" }},
+		{name: "funding amount mismatch", mutate: func(s *paypb.PaymentSession) { s.FundingTarget.Amount = "50" }},
+		{name: "required amount mismatch", mutate: func(s *paypb.PaymentSession) { s.PaymentProgress.RequiredAmount = "48" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			session := valid()
+			tt.mutate(session)
+			err := validateDealPaymentSession(open, req, session)
+			require.True(t, errors.Is(err, ErrDealPaymentAmountIntegrity), "error = %v", err)
+		})
+	}
+}

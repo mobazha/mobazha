@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha/internal/payment/fiat/stripe"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -117,6 +119,12 @@ func (s *FiatPaymentAppService) EnabledProviders(ctx context.Context) ([]contrac
 }
 
 func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID string, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
+	if strings.TrimSpace(params.OrderID) == "" {
+		return nil, fmt.Errorf("create %s payment: order ID is required", providerID)
+	}
+	if strings.TrimSpace(s.nodeID) == "" {
+		return nil, fmt.Errorf("create %s payment: stable node identity is required", providerID)
+	}
 	if err := s.authorizePaymentCreation(ctx, providerID, params); err != nil {
 		return nil, err
 	}
@@ -130,16 +138,44 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 		return nil, fmt.Errorf("seller has no %s account configured: %w", providerID, err)
 	}
 	params.SellerAccountID = ra.Address
+	attempt, route, err := s.prepareFiatPaymentAttempt(providerID, params, ra)
+	if err != nil {
+		return nil, err
+	}
+	params.IdempotencyKey = attempt.IdempotencyKey
+	params.Metadata = cloneStringMap(params.Metadata)
+	params.Metadata["mobazha_payment_attempt_id"] = attempt.AttemptID
+	params.Metadata["mobazha_route_binding_id"] = route.RouteBindingID
 
 	session, err := provider.CreatePayment(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("create %s payment: %w", providerID, err)
+		providerErr := fmt.Errorf("create %s payment: %w", providerID, err)
+		if persistErr := s.markFiatAttemptReconcileRequired(attempt.AttemptID, providerErr); persistErr != nil {
+			return nil, errors.Join(providerErr, persistErr)
+		}
+		return nil, providerErr
+	}
+	if session == nil || strings.TrimSpace(session.SessionID) == "" {
+		providerErr := fmt.Errorf("create %s payment: provider returned an empty session", providerID)
+		if persistErr := s.markFiatAttemptReconcileRequired(attempt.AttemptID, providerErr); persistErr != nil {
+			return nil, errors.Join(providerErr, persistErr)
+		}
+		return nil, providerErr
+	}
+	if err := s.commitFiatPaymentAttempt(attempt.AttemptID, session.SessionID); err != nil {
+		persistErr := fmt.Errorf("persist %s payment attempt: %w", providerID, err)
+		if markErr := s.markFiatAttemptReconcileRequired(attempt.AttemptID, persistErr); markErr != nil {
+			return nil, errors.Join(persistErr, markErr)
+		}
+		return nil, persistErr
 	}
 
-	if s.orderRepo != nil && params.OrderID != "" && session.SessionID != "" {
+	if s.orderRepo != nil && params.OrderID != "" {
 		meta := map[string]string{
-			"fiat_provider":   providerID,
-			"fiat_session_id": session.SessionID,
+			"fiat_provider":         providerID,
+			"fiat_session_id":       session.SessionID,
+			"payment_attempt_id":    attempt.AttemptID,
+			"payment_route_binding": route.RouteBindingID,
 			// fiat_currency is stored so the PaymentSessionProjector can reconstruct
 			// the canonical paymentCoin ("fiat:{provider}:{currency}") for orders
 			// where PaymentSent has not yet been written (e.g. awaiting buyer action).
@@ -148,11 +184,117 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 		if specJSON, err := payment.FiatMetadataSettlementSpecJSON(); err == nil {
 			meta["settlement_spec"] = specJSON
 		}
-		_ = s.orderRepo.MergeFiatMetadata(ctx, params.OrderID, meta)
+		if err := s.orderRepo.MergeFiatMetadata(ctx, params.OrderID, meta); err != nil {
+			persistErr := fmt.Errorf("persist %s payment metadata: %w", providerID, err)
+			if markErr := s.markFiatAttemptReconcileRequired(attempt.AttemptID, persistErr); markErr != nil {
+				return nil, errors.Join(persistErr, markErr)
+			}
+			return nil, persistErr
+		}
 	}
 
 	logger.LogInfoWithIDf(log, s.nodeID, "fiat payment created: provider=%s session=%s order=%s", providerID, session.SessionID, params.OrderID)
 	return session, nil
+}
+
+func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, params contracts.CreatePaymentParams, account *models.ReceivingAccount) (models.PaymentAttempt, models.PaymentRouteBinding, error) {
+	assetID := "fiat:" + strings.ToLower(strings.TrimSpace(providerID)) + ":" + strings.ToUpper(strings.TrimSpace(params.Currency))
+	// The provider binding identifies the stable settlement destination, not the
+	// mutable configuration row. Key rotation or status refreshes must not create
+	// a second provider object for the same order; changing the external account
+	// address intentionally creates a new binding.
+	bindingSeed := fmt.Sprintf("%s|%s|%d|%s", strings.TrimSpace(s.nodeID), providerID, account.ID, account.Address)
+	providerBindingID := stablePaymentIdentity("fpb_", bindingSeed)
+	attemptSeed := fmt.Sprintf("%s|%s|%d|%s", strings.TrimSpace(params.OrderID), assetID, params.Amount, providerBindingID)
+	attemptID := stablePaymentIdentity("pa_", attemptSeed)
+	routeID := stablePaymentIdentity("prb_", attemptID)
+	attempt := models.PaymentAttempt{
+		AttemptID: attemptID, PaymentSessionID: "ps_" + strings.TrimSpace(params.OrderID), OrderID: strings.TrimSpace(params.OrderID),
+		RouteBindingID: routeID, IdempotencyKey: stablePaymentIdentity("mbz_", attemptSeed), State: models.PaymentAttemptPendingExternal,
+	}
+	route := models.PaymentRouteBinding{
+		RouteBindingID: routeID, AttemptID: attemptID,
+		ContributionID: "core.fiat." + strings.ToLower(providerID), ModuleID: "mobazha.core.fiat." + strings.ToLower(providerID),
+		ImplementationGeneration: "builtin-v1", RailKind: string(distribution.PaymentRailProviderSession),
+		NetworkID: string(FiatChainType(providerID)), AssetID: assetID, ProtocolVersion: "provider-v1", StateSchemaVersion: "1",
+		ProviderBindingID: providerBindingID, ExternalAccountReference: account.Address,
+	}
+	err := s.db.Update(func(tx database.Tx) error {
+		var existing models.PaymentAttempt
+		if err := tx.Read().Where("attempt_id = ?", attemptID).First(&existing).Error; err == nil {
+			attempt = existing
+			return tx.Read().Where("route_binding_id = ?", existing.RouteBindingID).First(&route).Error
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err := tx.Create(&route); err != nil {
+			return err
+		}
+		return tx.Create(&attempt)
+	})
+	if err == nil {
+		return attempt, route, nil
+	}
+	// A concurrent caller may have committed the same deterministic claim.
+	if loadErr := s.db.View(func(tx database.Tx) error {
+		if err := tx.Read().Where("attempt_id = ?", attemptID).First(&attempt).Error; err != nil {
+			return err
+		}
+		return tx.Read().Where("route_binding_id = ?", attempt.RouteBindingID).First(&route).Error
+	}); loadErr == nil {
+		return attempt, route, nil
+	}
+	return models.PaymentAttempt{}, models.PaymentRouteBinding{}, fmt.Errorf("prepare fiat payment attempt: %w", err)
+}
+
+func (s *FiatPaymentAppService) commitFiatPaymentAttempt(attemptID, externalReference string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var attempt models.PaymentAttempt
+		if err := tx.Read().Where("attempt_id = ?", attemptID).First(&attempt).Error; err != nil {
+			return err
+		}
+		if attempt.ExternalReference != "" && attempt.ExternalReference != externalReference {
+			return fmt.Errorf("payment attempt %s provider reference conflict: existing=%s returned=%s", attemptID, attempt.ExternalReference, externalReference)
+		}
+		rows, err := tx.UpdateColumns(map[string]interface{}{
+			"state": models.PaymentAttemptExternalCreated, "external_reference": externalReference, "last_error": "",
+		}, map[string]interface{}{"attempt_id = ?": attemptID}, &models.PaymentAttempt{})
+		if err != nil {
+			return err
+		}
+		if rows != 1 {
+			return fmt.Errorf("payment attempt %s not found", attemptID)
+		}
+		return nil
+	})
+}
+
+func (s *FiatPaymentAppService) markFiatAttemptReconcileRequired(attemptID string, cause error) error {
+	return s.db.Update(func(tx database.Tx) error {
+		rows, err := tx.UpdateColumns(map[string]interface{}{
+			"state": models.PaymentAttemptReconcileRequired, "last_error": cause.Error(),
+		}, map[string]interface{}{"attempt_id = ?": attemptID}, &models.PaymentAttempt{})
+		if err != nil {
+			return err
+		}
+		if rows != 1 {
+			return fmt.Errorf("payment attempt %s not found", attemptID)
+		}
+		return nil
+	})
+}
+
+func stablePaymentIdentity(prefix, value string) string {
+	digest := sha256.Sum256([]byte(value))
+	return prefix + fmt.Sprintf("%x", digest[:16])
+}
+
+func cloneStringMap(input map[string]string) map[string]string {
+	result := make(map[string]string, len(input)+2)
+	for key, value := range input {
+		result[key] = value
+	}
+	return result
 }
 
 func (s *FiatPaymentAppService) authorizePaymentCreation(ctx context.Context, providerID string, params contracts.CreatePaymentParams) error {

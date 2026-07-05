@@ -39,6 +39,9 @@ func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePayme
 			Enabled: gostripe.Bool(true),
 		},
 	}
+	if params.IdempotencyKey != "" {
+		piParams.SetIdempotencyKey(params.IdempotencyKey)
+	}
 
 	if params.Metadata != nil {
 		piParams.Metadata = params.Metadata
@@ -565,7 +568,7 @@ func (p *Provider) findExistingWebhook(api *client.API, webhookURL string) (*gos
 
 // Compile-time interface compliance checks.
 var (
-	_ contracts.FiatPaymentProvider    = (*Provider)(nil)
-	_ contracts.FiatOnboardingProvider = (*Provider)(nil)
+	_ contracts.FiatPaymentProvider     = (*Provider)(nil)
+	_ contracts.FiatOnboardingProvider  = (*Provider)(nil)
 	_ contracts.FiatWebhookConfigurator = (*Provider)(nil)
 )

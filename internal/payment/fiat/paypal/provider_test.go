@@ -70,6 +70,7 @@ func TestProvider_CreatePayment_Success(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v2/checkout/orders", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "mbz-attempt-123", r.Header.Get("PayPal-Request-Id"))
 
 		var req orderRequest
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
@@ -93,9 +94,10 @@ func TestProvider_CreatePayment_Success(t *testing.T) {
 	defer ts.Close()
 
 	session, err := p.CreatePayment(context.Background(), contracts.CreatePaymentParams{
-		OrderID:  "order-123",
-		Amount:   2999,
-		Currency: "USD",
+		OrderID:        "order-123",
+		Amount:         2999,
+		Currency:       "USD",
+		IdempotencyKey: "mbz-attempt-123",
 	})
 	require.NoError(t, err)
 

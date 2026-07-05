@@ -26,6 +26,7 @@ import (
 // --- Mock provider ---
 
 type mockFiatProvider struct {
+	createMu      sync.Mutex
 	id            string
 	parseErr      error
 	parsedEvent   *contracts.WebhookEvent
@@ -41,12 +42,16 @@ type mockFiatProvider struct {
 	cancelErr     error
 	cancelCalls   []string
 	createCalls   int
+	createParams  []contracts.CreatePaymentParams
 }
 
 func (m *mockFiatProvider) ProviderID() string { return m.id }
 
-func (m *mockFiatProvider) CreatePayment(_ context.Context, _ contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
+func (m *mockFiatProvider) CreatePayment(_ context.Context, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
+	m.createMu.Lock()
+	defer m.createMu.Unlock()
 	m.createCalls++
+	m.createParams = append(m.createParams, params)
 	return m.createResult, m.createErr
 }
 
@@ -377,13 +382,14 @@ func TestFiatService_CreatePayment_NoAccount(t *testing.T) {
 
 func TestFiatService_CreatePayment_Success(t *testing.T) {
 	reg := newMockFiatRegistry()
-	reg.Register(&mockFiatProvider{
+	provider := &mockFiatProvider{
 		id: "stripe",
 		createResult: &contracts.FiatProviderSession{
 			SessionID: "sess_ok", CaptureMode: contracts.CaptureAutomatic,
 			ExpiresAt: time.Now().Add(30 * time.Minute), Status: "requires_payment_method",
 		},
-	})
+	}
+	reg.Register(provider)
 
 	svc, db := newFiatTestService(t, reg)
 
@@ -402,6 +408,165 @@ func TestFiatService_CreatePayment_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "sess_ok", session.SessionID)
+	require.Len(t, provider.createParams, 1)
+	assert.NotEmpty(t, provider.createParams[0].IdempotencyKey)
+	assert.NotEmpty(t, provider.createParams[0].Metadata["mobazha_payment_attempt_id"])
+
+	var attempt models.PaymentAttempt
+	var route models.PaymentRouteBinding
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		if err := tx.Read().First(&attempt).Error; err != nil {
+			return err
+		}
+		return tx.Read().First(&route).Error
+	}))
+	assert.Equal(t, models.PaymentAttemptExternalCreated, attempt.State)
+	assert.Equal(t, "sess_ok", attempt.ExternalReference)
+	assert.Equal(t, attempt.AttemptID, route.AttemptID)
+	assert.Equal(t, "core.fiat.stripe", route.ContributionID)
+	assert.Equal(t, "fiat:stripe:USD", route.AssetID)
+	assert.Equal(t, provider.createParams[0].IdempotencyKey, attempt.IdempotencyKey)
+	require.ErrorContains(t, svc.commitFiatPaymentAttempt(attempt.AttemptID, "sess_conflict"), "provider reference conflict")
+}
+
+func TestFiatService_CreatePayment_RetryUsesSameDurableAttemptAndProviderKey(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", createResult: &contracts.FiatProviderSession{SessionID: "sess_retry"}}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ReceivingAccount{ChainType: FiatChainType("stripe"), Address: "acct_retry", IsActive: true})
+	}))
+	params := contracts.CreatePaymentParams{OrderID: "order_retry", Amount: 2500, Currency: "USD"}
+
+	first, err := svc.CreatePayment(context.Background(), "stripe", params)
+	require.NoError(t, err)
+	second, err := svc.CreatePayment(context.Background(), "stripe", params)
+	require.NoError(t, err)
+	assert.Equal(t, first.SessionID, second.SessionID)
+	require.Len(t, provider.createParams, 2)
+	assert.Equal(t, provider.createParams[0].IdempotencyKey, provider.createParams[1].IdempotencyKey)
+
+	var attempts int64
+	var routes int64
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		if err := tx.Read().Model(&models.PaymentAttempt{}).Count(&attempts).Error; err != nil {
+			return err
+		}
+		return tx.Read().Model(&models.PaymentRouteBinding{}).Count(&routes).Error
+	}))
+	assert.Equal(t, int64(1), attempts)
+	assert.Equal(t, int64(1), routes)
+}
+
+func TestFiatService_CreatePayment_ConcurrentRetryUsesOneDurableClaim(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", createResult: &contracts.FiatProviderSession{SessionID: "sess_concurrent"}}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ReceivingAccount{ChainType: FiatChainType("stripe"), Address: "acct_concurrent", IsActive: true})
+	}))
+	params := contracts.CreatePaymentParams{OrderID: "order_concurrent", Amount: 2500, Currency: "USD"}
+
+	results := make(chan *contracts.FiatProviderSession, 2)
+	errs := make(chan error, 2)
+	var callers sync.WaitGroup
+	callers.Add(2)
+	for range 2 {
+		go func() {
+			defer callers.Done()
+			result, err := svc.CreatePayment(context.Background(), "stripe", params)
+			results <- result
+			errs <- err
+		}()
+	}
+	callers.Wait()
+	close(results)
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	for result := range results {
+		require.NotNil(t, result)
+		assert.Equal(t, "sess_concurrent", result.SessionID)
+	}
+	require.Len(t, provider.createParams, 2)
+	assert.Equal(t, provider.createParams[0].IdempotencyKey, provider.createParams[1].IdempotencyKey)
+
+	var attempts, routes int64
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		if err := tx.Read().Model(&models.PaymentAttempt{}).Count(&attempts).Error; err != nil {
+			return err
+		}
+		return tx.Read().Model(&models.PaymentRouteBinding{}).Count(&routes).Error
+	}))
+	assert.Equal(t, int64(1), attempts)
+	assert.Equal(t, int64(1), routes)
+}
+
+func TestFiatService_CreatePayment_ProviderReferenceConflictRequiresReconciliation(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", createResult: &contracts.FiatProviderSession{SessionID: "sess_first"}}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ReceivingAccount{ChainType: FiatChainType("stripe"), Address: "acct_conflict", IsActive: true})
+	}))
+	params := contracts.CreatePaymentParams{OrderID: "order_conflict", Amount: 2500, Currency: "USD"}
+
+	_, err := svc.CreatePayment(context.Background(), "stripe", params)
+	require.NoError(t, err)
+	provider.createResult = &contracts.FiatProviderSession{SessionID: "sess_duplicate"}
+	_, err = svc.CreatePayment(context.Background(), "stripe", params)
+	require.ErrorContains(t, err, "provider reference conflict")
+
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&attempt).Error }))
+	assert.Equal(t, models.PaymentAttemptReconcileRequired, attempt.State)
+	assert.Equal(t, "sess_first", attempt.ExternalReference)
+	assert.Contains(t, attempt.LastError, "sess_duplicate")
+}
+
+func TestFiatService_CreatePayment_NodeIdentityScopesProviderIdempotency(t *testing.T) {
+	newService := func(nodeID string) (*FiatPaymentAppService, *mockFiatProvider) {
+		provider := &mockFiatProvider{id: "stripe", createResult: &contracts.FiatProviderSession{SessionID: "sess_" + nodeID}}
+		reg := newMockFiatRegistry()
+		reg.Register(provider)
+		db := newFiatTestDB(t)
+		require.NoError(t, db.Update(func(tx database.Tx) error {
+			return tx.Save(&models.ReceivingAccount{ChainType: FiatChainType("stripe"), Address: "acct_shared", IsActive: true})
+		}))
+		return NewFiatPaymentAppService(reg, db, nodeID, false), provider
+	}
+	firstService, firstProvider := newService("node-a")
+	secondService, secondProvider := newService("node-b")
+	params := contracts.CreatePaymentParams{OrderID: "order_shared", Amount: 2500, Currency: "USD"}
+
+	_, err := firstService.CreatePayment(context.Background(), "stripe", params)
+	require.NoError(t, err)
+	_, err = secondService.CreatePayment(context.Background(), "stripe", params)
+	require.NoError(t, err)
+	require.Len(t, firstProvider.createParams, 1)
+	require.Len(t, secondProvider.createParams, 1)
+	assert.NotEqual(t, firstProvider.createParams[0].IdempotencyKey, secondProvider.createParams[0].IdempotencyKey)
+}
+
+func TestFiatService_CreatePayment_ProviderFailureLeavesReconcileClaim(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", createErr: errors.New("ambiguous timeout")}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ReceivingAccount{ChainType: FiatChainType("stripe"), Address: "acct_timeout", IsActive: true})
+	}))
+
+	_, err := svc.CreatePayment(context.Background(), "stripe", contracts.CreatePaymentParams{OrderID: "order_timeout", Amount: 2500, Currency: "USD"})
+	require.ErrorContains(t, err, "ambiguous timeout")
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&attempt).Error }))
+	assert.Equal(t, models.PaymentAttemptReconcileRequired, attempt.State)
+	assert.Contains(t, attempt.LastError, "ambiguous timeout")
 }
 
 func TestFiatService_CreatePayment_RejectsManagedCollectibleBeforeProvider(t *testing.T) {

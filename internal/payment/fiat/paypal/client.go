@@ -86,6 +86,10 @@ func (c *apiClient) getToken(ctx context.Context) (string, error) {
 }
 
 func (c *apiClient) doJSON(ctx context.Context, method, path string, body, result interface{}) error {
+	return c.doJSONWithHeaders(ctx, method, path, body, result, nil)
+}
+
+func (c *apiClient) doJSONWithHeaders(ctx context.Context, method, path string, body, result interface{}, headers map[string]string) error {
 	token, err := c.getToken(ctx)
 	if err != nil {
 		return err
@@ -106,6 +110,11 @@ func (c *apiClient) doJSON(ctx context.Context, method, path string, body, resul
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	for key, value := range headers {
+		if value != "" {
+			req.Header.Set(key, value)
+		}
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

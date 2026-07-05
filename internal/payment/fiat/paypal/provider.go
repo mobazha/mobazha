@@ -98,7 +98,11 @@ func (p *Provider) CreatePayment(ctx context.Context, params contracts.CreatePay
 	}
 
 	var resp orderResponse
-	if err := p.client.doJSON(ctx, "POST", "/v2/checkout/orders", reqBody, &resp); err != nil {
+	headers := map[string]string{}
+	if params.IdempotencyKey != "" {
+		headers["PayPal-Request-Id"] = params.IdempotencyKey
+	}
+	if err := p.client.doJSONWithHeaders(ctx, "POST", "/v2/checkout/orders", reqBody, &resp, headers); err != nil {
 		return nil, fmt.Errorf("paypal: create order: %w", err)
 	}
 
@@ -785,8 +789,8 @@ var requiredWebhookEvents = []string{
 }
 
 type webhookCreateRequest struct {
-	URL        string              `json:"url"`
-	EventTypes []webhookEventType  `json:"event_types"`
+	URL        string             `json:"url"`
+	EventTypes []webhookEventType `json:"event_types"`
 }
 
 type webhookEventType struct {

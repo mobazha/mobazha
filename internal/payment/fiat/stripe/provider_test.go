@@ -59,6 +59,7 @@ func TestProvider_CreatePayment_Success(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/payment_intents", func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "mbz_attempt_123", r.Header.Get("Idempotency-Key"))
 
 		body, _ := io.ReadAll(r.Body)
 		vals := string(body)
@@ -80,9 +81,10 @@ func TestProvider_CreatePayment_Success(t *testing.T) {
 	_, p := newTestProvider(t, mux)
 
 	session, err := p.CreatePayment(context.Background(), contracts.CreatePaymentParams{
-		OrderID:  "order_123",
-		Amount:   2500,
-		Currency: "usd",
+		OrderID:        "order_123",
+		Amount:         2500,
+		Currency:       "usd",
+		IdempotencyKey: "mbz_attempt_123",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "pi_test_123", session.SessionID)

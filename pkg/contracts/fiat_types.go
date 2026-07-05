@@ -21,6 +21,9 @@ type CreatePaymentParams struct {
 	Metadata    map[string]string
 	ReturnURL   string // required by PayPal
 	CancelURL   string // required by PayPal
+	// IdempotencyKey is generated and persisted by Core before provider I/O.
+	// Providers must send it through their native create-or-retrieve mechanism.
+	IdempotencyKey string
 
 	// SellerAccountID is filled internally by FiatPaymentAppService;
 	// handlers must not set this directly.

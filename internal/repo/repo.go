@@ -565,6 +565,8 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.PaymentObservation{},
 		&models.SettlementAction{},
 		&models.SharedPaymentIntent{},
+		&models.PaymentRouteBinding{},
+		&models.PaymentAttempt{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

@@ -241,6 +241,57 @@ func TestRailExecutorAppliesConfirmedSlash(t *testing.T) {
 	require.Equal(t, "slash-receipt-1", claim.ExecutionReference)
 }
 
+func TestRailExecutorPersistsConfirmedSlashBelowRequirement(t *testing.T) {
+	db := collateralTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	open, account := openAndFundCollateral(t, db, now, "source-slash-below-required", "open-slash-below-required", "fund-slash-below-required", "funding-slash-below-required", "100")
+	allocation := allocateCollateral(t, db, now, open, account, "order-slash-below-required", "ext-slash-below-required", "25", "allocate-slash-below-required")
+	decision := claimDecision(now, account.CollateralID, allocation, "20")
+	var claim pkgcollateral.Claim
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		claim, err = AcceptClaimTx(tx, decision, now)
+		return err
+	}))
+
+	request := pkgcollateral.RailExecutionRequest{
+		ActionID: "slash-action-below-required", TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
+		ClaimID: claim.ClaimID, Kind: pkgcollateral.ExecutionSlash, AssetID: open.AssetID, Amount: claim.Amount,
+		Destination: "beneficiary:buyer-below-required", ExpectedRevision: claim.CollateralRevision,
+		IdempotencyKey: "slash-submit-below-required",
+	}
+	rail := completeFakeRail()
+	rail.submitResult = pkgcollateral.RailActionResult{
+		ActionID: request.ActionID, State: pkgcollateral.RailActionConfirmed,
+		Reference: "slash-receipt-below-required", ObservedAt: now,
+	}
+	executor, err := NewRailExecutor(db, rail)
+	require.NoError(t, err)
+	executor.now = func() time.Time { return now }
+
+	result, err := executor.SubmitExecution(context.Background(), request)
+	require.NoError(t, err)
+	require.Equal(t, pkgcollateral.RailActionConfirmed, result.State)
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		var action models.CollateralRailActionRecord
+		if err := tx.Read().Where("action_id = ?", request.ActionID).First(&action).Error; err != nil {
+			return err
+		}
+		require.Equal(t, string(pkgcollateral.RailActionConfirmed), action.State)
+		var err error
+		account, err = AccountByIDTx(tx, account.CollateralID)
+		if err != nil {
+			return err
+		}
+		claim, err = ClaimByIDTx(tx, claim.ClaimID)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.StateSlashed, account.State)
+	require.Equal(t, "80", account.FundedAmount)
+	require.Equal(t, pkgcollateral.ClaimSlashed, claim.State)
+	require.Equal(t, "slash-receipt-below-required", claim.ExecutionReference)
+}
+
 func TestRailExecutorRecoversPendingExecutionAfterRestart(t *testing.T) {
 	db := collateralTestDB(t)
 	now := time.Now().UTC().Truncate(time.Second)

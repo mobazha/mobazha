@@ -96,15 +96,29 @@ func ClaimCredentialRequestTx(
 	if now.Before(existing.LastRequestedAt.Add(minimumInterval)) {
 		return false, nil
 	}
+	return claimExistingCredentialRequestTx(tx, existing, messageID, now)
+}
+
+// claimExistingCredentialRequestTx uses the observed request time as a
+// compare-and-swap token. TenantDB serializes one process, but this predicate
+// also prevents two Hosting processes sharing a database from both claiming
+// the same refresh interval.
+func claimExistingCredentialRequestTx(
+	tx database.Tx,
+	existing models.CollateralCredentialRefreshRecord,
+	messageID string,
+	now time.Time,
+) (bool, error) {
 	rows, err := tx.UpdateColumns(map[string]interface{}{
 		"last_request_message_id": messageID,
 		"last_requested_at":       now,
 		"updated_at":              now,
 	}, map[string]interface{}{
-		"order_id = ?":           orderID,
-		"extension_id = ?":       extensionID,
-		"extension_revision = ?": extensionRevision,
-		"audience_peer_id = ?":   audiencePeerID,
+		"order_id = ?":           existing.OrderID,
+		"extension_id = ?":       existing.ExtensionID,
+		"extension_revision = ?": existing.ExtensionRevision,
+		"audience_peer_id = ?":   existing.AudiencePeerID,
+		"last_requested_at = ?":  existing.LastRequestedAt,
 	}, &models.CollateralCredentialRefreshRecord{})
 	return rows == 1, err
 }

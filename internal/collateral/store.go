@@ -254,8 +254,8 @@ func ReleaseAllocationTx(tx database.Tx, request collateral.AllocationReleaseReq
 	if account.Revision != request.ExpectedCollateralRevision || allocation.AllocationRevision != request.ExpectedAllocationRevision {
 		return collateral.AllocationReference{}, fmt.Errorf("collateral allocation release revision conflict")
 	}
-	if account.State != string(collateral.StateActive) || allocation.State != string(collateral.AllocationActive) {
-		return collateral.AllocationReference{}, fmt.Errorf("collateral allocation release requires active account and allocation")
+	if (account.State != string(collateral.StateActive) && account.State != string(collateral.StateSlashed)) || allocation.State != string(collateral.AllocationActive) {
+		return collateral.AllocationReference{}, fmt.Errorf("collateral allocation release requires serviceable account and active allocation")
 	}
 	nextCollateralRevision := account.Revision + 1
 	nextAllocationRevision := allocation.AllocationRevision + 1
@@ -321,8 +321,11 @@ func RequestAccountReleaseTx(tx database.Tx, request collateral.AccountReleaseRe
 	if account.Revision != request.ExpectedRevision {
 		return collateral.Account{}, fmt.Errorf("collateral release revision conflict")
 	}
-	if account.State != string(collateral.StateActive) {
-		return collateral.Account{}, fmt.Errorf("collateral release requires active account")
+	if account.State != string(collateral.StateActive) && account.State != string(collateral.StateSlashed) {
+		return collateral.Account{}, fmt.Errorf("collateral release requires active or partially slashed account")
+	}
+	if account.FundedAmount == "0" {
+		return collateral.Account{}, fmt.Errorf("collateral release requires a positive residual balance")
 	}
 	if compareAmount(account.AvailableAmount, account.FundedAmount) != 0 {
 		return collateral.Account{}, fmt.Errorf("collateral release requires all allocations to be released")
@@ -401,8 +404,8 @@ func AcceptClaimTx(tx database.Tx, decision collateral.ClaimDecision, now time.T
 	if account.Revision != a.ExpectedCollateralRevision || allocation.AllocationRevision != a.ExpectedAllocationRevision {
 		return collateral.Claim{}, fmt.Errorf("collateral claim revision conflict")
 	}
-	if account.State != string(collateral.StateActive) || allocation.State != string(collateral.AllocationActive) {
-		return collateral.Claim{}, fmt.Errorf("collateral claim requires active account and allocation")
+	if (account.State != string(collateral.StateActive) && account.State != string(collateral.StateSlashed)) || allocation.State != string(collateral.AllocationActive) {
+		return collateral.Claim{}, fmt.Errorf("collateral claim requires serviceable account and active allocation")
 	}
 	if compareAmount(decision.Amount, allocation.Amount) > 0 {
 		return collateral.Claim{}, fmt.Errorf("collateral claim exceeds allocation")
@@ -536,7 +539,7 @@ func RecordExecutionTx(tx database.Tx, observation collateral.ExecutionObservati
 		}
 		values["funded_amount"] = newFunded
 		values["available_amount"] = newAvailable
-		if newFunded == "0" {
+		if compareAmount(newFunded, account.RequiredAmount) < 0 {
 			values["state"] = string(collateral.StateSlashed)
 		} else {
 			values["state"] = string(collateral.StateActive)

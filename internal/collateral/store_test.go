@@ -374,6 +374,100 @@ func TestCollateralClaimAndPartialSlashPreserveRemainingCoverage(t *testing.T) {
 	require.ErrorContains(t, err, "already claimed")
 }
 
+func TestCollateralPartialSlashBelowRequirementServicesExistingObligations(t *testing.T) {
+	db := collateralTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	open, account := openAndFundCollateral(t, db, now, "source-underfunded-slash", "open-underfunded-slash", "fund-underfunded-slash", "funding-underfunded-slash", "100")
+	first := allocateCollateral(t, db, now, open, account, "order-first", "ext-first", "40", "allocate-first")
+	account.Revision = first.CollateralRevision
+	second := allocateCollateral(t, db, now, open, account, "order-second", "ext-second", "20", "allocate-second")
+	account.Revision = second.CollateralRevision
+	third := allocateCollateral(t, db, now, open, account, "order-third", "ext-third", "10", "allocate-third")
+
+	firstDecision := claimDecision(now, account.CollateralID, first, "20")
+	firstDecision.Attestation.ExpectedCollateralRevision = third.CollateralRevision
+	var firstClaim pkgcollateral.Claim
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		firstClaim, err = AcceptClaimTx(tx, firstDecision, now)
+		return err
+	}))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		account, err = RecordExecutionTx(tx, pkgcollateral.ExecutionObservation{
+			TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID, ClaimID: firstClaim.ClaimID,
+			Kind: pkgcollateral.ExecutionSlash, AssetID: open.AssetID, Amount: "20",
+			ExecutionReference: "slash-underfunded-first", ExpectedRevision: firstClaim.CollateralRevision,
+			IdempotencyKey: "confirm-underfunded-first", ObservedAt: now,
+		}, now)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.StateSlashed, account.State)
+	require.Equal(t, "80", account.FundedAmount)
+	require.Equal(t, "50", account.AvailableAmount)
+
+	secondDecision := claimDecision(now, account.CollateralID, second, "10")
+	secondDecision.ClaimID = "claim-underfunded-second"
+	secondDecision.IdempotencyKey = "claim-underfunded-second"
+	secondDecision.Attestation.AttestationID = "att-underfunded-second"
+	secondDecision.Attestation.IdempotencyKey = "att-underfunded-second"
+	secondDecision.Attestation.ExpectedCollateralRevision = account.Revision
+	var secondClaim pkgcollateral.Claim
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		secondClaim, err = AcceptClaimTx(tx, secondDecision, now)
+		return err
+	}))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		account, err = RecordExecutionTx(tx, pkgcollateral.ExecutionObservation{
+			TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID, ClaimID: secondClaim.ClaimID,
+			Kind: pkgcollateral.ExecutionSlash, AssetID: open.AssetID, Amount: "10",
+			ExecutionReference: "slash-underfunded-second", ExpectedRevision: secondClaim.CollateralRevision,
+			IdempotencyKey: "confirm-underfunded-second", ObservedAt: now,
+		}, now)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.StateSlashed, account.State)
+	require.Equal(t, "70", account.FundedAmount)
+	require.Equal(t, "60", account.AvailableAmount)
+
+	var released pkgcollateral.AllocationReference
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		released, err = ReleaseAllocationTx(tx, pkgcollateral.AllocationReleaseRequest{
+			TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID, AllocationID: third.AllocationID,
+			ExpectedCollateralRevision: account.Revision, ExpectedAllocationRevision: third.AllocationRevision,
+			IdempotencyKey: "release-underfunded-third", Reason: "third-order-ended",
+		}, now)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.AllocationReleased, released.State)
+	account.Revision = released.CollateralRevision
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		account, err = RequestAccountReleaseTx(tx, pkgcollateral.AccountReleaseRequest{
+			TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
+			ExpectedRevision: account.Revision, IdempotencyKey: "request-underfunded-residual", Reason: "all-exposures-ended",
+		}, now)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.StateReleasePending, account.State)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		account, err = RecordExecutionTx(tx, pkgcollateral.ExecutionObservation{
+			TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
+			Kind: pkgcollateral.ExecutionRelease, AssetID: open.AssetID, Amount: "70",
+			ExecutionReference: "release-underfunded-residual", ExpectedRevision: account.Revision,
+			IdempotencyKey: "confirm-underfunded-residual", ObservedAt: now,
+		}, now)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.StateReleased, account.State)
+	require.Equal(t, "0", account.FundedAmount)
+}
+
 func TestCollateralSlashPendingFreezesOtherAllocationReleases(t *testing.T) {
 	db := collateralTestDB(t)
 	now := time.Now().UTC().Truncate(time.Second)
@@ -409,7 +503,7 @@ func TestCollateralSlashPendingFreezesOtherAllocationReleases(t *testing.T) {
 		}, now)
 		return err
 	})
-	require.ErrorContains(t, err, "requires active account")
+	require.ErrorContains(t, err, "requires serviceable account")
 
 	var unchanged pkgcollateral.Account
 	require.NoError(t, db.View(func(tx database.Tx) error {

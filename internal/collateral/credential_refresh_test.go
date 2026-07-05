@@ -101,3 +101,64 @@ func TestCredentialRefreshStateClaimsObservesAndSelectsDueWork(t *testing.T) {
 		return err
 	}))
 }
+
+func TestClaimCredentialRequestTxRejectsStaleCrossInstanceClaim(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Migrate(&models.CollateralCredentialRefreshRecord{})
+	}))
+	now := time.Now().UTC().Truncate(time.Second)
+	const (
+		orderID     = "order-refresh-cas"
+		extensionID = "extension-refresh-cas"
+		audience    = "buyer-peer-cas"
+	)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		claimed, err := ClaimCredentialRequestTx(tx, orderID, extensionID, 1, audience, "request-original", now, 2*time.Minute)
+		require.True(t, claimed)
+		return err
+	}))
+
+	var stale models.CollateralCredentialRefreshRecord
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"order_id = ? AND extension_id = ? AND extension_revision = ? AND audience_peer_id = ?",
+			orderID, extensionID, 1, audience,
+		).First(&stale).Error
+	}))
+	competingAt := now.Add(3 * time.Minute)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		rows, err := tx.UpdateColumns(map[string]interface{}{
+			"last_request_message_id": "request-competing",
+			"last_requested_at":       competingAt,
+			"updated_at":              competingAt,
+		}, map[string]interface{}{
+			"order_id = ?":           orderID,
+			"extension_id = ?":       extensionID,
+			"extension_revision = ?": 1,
+			"audience_peer_id = ?":   audience,
+		}, &models.CollateralCredentialRefreshRecord{})
+		require.Equal(t, int64(1), rows)
+		return err
+	}))
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		claimed, err := claimExistingCredentialRequestTx(tx, stale, "request-stale", competingAt)
+		require.False(t, claimed)
+		return err
+	}))
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		var current models.CollateralCredentialRefreshRecord
+		if err := tx.Read().Where(
+			"order_id = ? AND extension_id = ? AND extension_revision = ? AND audience_peer_id = ?",
+			orderID, extensionID, 1, audience,
+		).First(&current).Error; err != nil {
+			return err
+		}
+		require.Equal(t, "request-competing", current.LastRequestMessageID)
+		require.Equal(t, competingAt, current.LastRequestedAt)
+		return nil
+	}))
+}

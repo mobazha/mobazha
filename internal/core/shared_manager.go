@@ -577,9 +577,11 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		return nil, err
 	}
 
-	// Auto-fetch Casdoor certificate on standalone startup when not yet available.
-	// This enables buyer login immediately after deployment without manual admin action.
-	if platformIntegration && !cfg.SaaSMode && cfg.SaaSAPIURL != "" && casdoorCert == "" && cfg.DataDir != "" {
+	// Refresh the Casdoor certificate on every standalone startup. A persisted
+	// certificate keeps JWT auth available during startup, but the SaaS issuer
+	// may have rotated its key since this node last ran. autoFetchCasdoorCert
+	// persists the current certificate and hot-reloads the gateway.
+	if platformIntegration && !cfg.SaaSMode && cfg.SaaSAPIURL != "" && cfg.DataDir != "" {
 		go im.autoFetchCasdoorCert(cfg.SaaSAPIURL, cfg.DataDir, localPeerID, ownerUserID)
 	}
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -103,6 +104,19 @@ func (g *Gateway) handlePOSTClaimStore(w http.ResponseWriter, r *http.Request) {
 		}
 		response.Error(w, http.StatusBadGateway, response.CodeInternalError,
 			"Failed to register claim with platform")
+		return
+	}
+
+	dataDir := g.setupDataDir()
+	if dataDir == "" {
+		response.Error(w, http.StatusServiceUnavailable, response.CodeServiceUnavail,
+			"Owner binding is not available in this mode")
+		return
+	}
+	if err := os.WriteFile(OwnerUserIDFilePath(dataDir), []byte(claims.Id), 0600); err != nil {
+		log.Errorf("Failed to persist claimed owner user ID: %v", err)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError,
+			"Failed to save owner binding")
 		return
 	}
 

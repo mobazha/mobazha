@@ -47,6 +47,12 @@ var (
 		"payment session: Deal cross-currency payment requires an immutable conversion quote",
 	)
 
+	// ErrDealPaymentSelectionQuoteInvalid identifies an absent, expired or
+	// mismatched immutable payment-selection quote.
+	ErrDealPaymentSelectionQuoteInvalid = errors.New(
+		"payment session: Deal payment-selection quote is invalid",
+	)
+
 	// ErrDealPaymentAmountIntegrity identifies a mismatch between signed Deal
 	// terms and the amount or asset exposed by an actionable PaymentSession.
 	ErrDealPaymentAmountIntegrity = errors.New(

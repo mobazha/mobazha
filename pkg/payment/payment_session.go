@@ -252,6 +252,9 @@ type PaymentSession struct {
 	// Phase B: derived as "ps_" + orderID. Phase C+: persistently stored.
 	SessionID string `json:"sessionID"`
 	OrderID   string `json:"orderID"`
+	// PaymentSelectionQuoteID binds an actionable Deal session to the
+	// immutable asset, conversion, fee and expiry snapshot used at creation.
+	PaymentSelectionQuoteID string `json:"paymentSelectionQuoteID,omitempty"`
 
 	// PaymentCoin is the payment coin, ideally in canonical format:
 	//   crypto:chain/token  — e.g. "crypto:ETH", "crypto:ETH/USDC-0xA0b8..."

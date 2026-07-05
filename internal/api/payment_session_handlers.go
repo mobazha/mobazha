@@ -67,6 +67,67 @@ func (g *Gateway) handleGETOrderPaymentSession(w http.ResponseWriter, r *http.Re
 	responsePkg.Success(w, session)
 }
 
+// handlePOSTOrderPaymentSelectionQuote freezes the selected payment asset,
+// conversion rate, numeric costs and target amount before Deal provisioning.
+func (g *Gateway) handlePOSTOrderPaymentSelectionQuote(w http.ResponseWriter, r *http.Request) {
+	orderID := chi.URLParam(r, "orderID")
+	if orderID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "orderID is required")
+		return
+	}
+	svc := getNodeService(r).PaymentSession()
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
+			"payment session subsystem not available")
+		return
+	}
+	var payload struct {
+		PaymentCoin string `json:"paymentCoin"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&payload); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid payment selection request")
+		return
+	}
+	var trailing json.RawMessage
+	if err := dec.Decode(&trailing); err != nil && !errors.Is(err, io.EOF) {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid payment selection request")
+		return
+	}
+	if len(trailing) > 0 {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "unexpected trailing JSON in request body")
+		return
+	}
+	normalizedCoin, err := iwallet.NormalizePaymentCoinIngress(payload.PaymentCoin)
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "invalid paymentCoin")
+		return
+	}
+	quote, err := svc.CreateSelectionQuote(r.Context(), contracts.CreatePaymentSelectionQuoteRequest{
+		OrderID: orderID, PaymentCoin: string(normalizedCoin),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "order not found")
+		case errors.Is(err, corePmt.ErrExchangeRateUnavailable):
+			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
+				"payment quote is temporarily unavailable")
+		case errors.Is(err, corePmt.ErrPaymentCoinDisabled),
+			errors.Is(err, corePmt.ErrDealPaymentSelectionQuoteInvalid):
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict,
+				"payment selection cannot be quoted for this order")
+		default:
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+				"payment quote could not be created")
+		}
+		return
+	}
+	responsePkg.Success(w, quote)
+}
+
 // handlePOSTOrderPaymentSession provisions (or idempotently re-reads) the unified
 // payment session for an order.
 //
@@ -96,16 +157,17 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 	}
 
 	var payload struct {
-		PaymentCoin      string `json:"paymentCoin"`
-		RefundAddress    string `json:"refundAddress"`
-		PayFromCustodial bool   `json:"payFromCustodial"`
-		BuyerPeerID      string `json:"buyerPeerID"`
-		PayerAddress     string `json:"payerAddress"`
-		Moderator        string `json:"moderator"`
-		FiatAmountCents  int64  `json:"fiatAmountCents"`
-		FiatDescription  string `json:"fiatDescription"`
-		FiatReturnURL    string `json:"fiatReturnURL"`
-		FiatCancelURL    string `json:"fiatCancelURL"`
+		PaymentCoin             string `json:"paymentCoin"`
+		PaymentSelectionQuoteID string `json:"paymentSelectionQuoteID"`
+		RefundAddress           string `json:"refundAddress"`
+		PayFromCustodial        bool   `json:"payFromCustodial"`
+		BuyerPeerID             string `json:"buyerPeerID"`
+		PayerAddress            string `json:"payerAddress"`
+		Moderator               string `json:"moderator"`
+		FiatAmountCents         int64  `json:"fiatAmountCents"`
+		FiatDescription         string `json:"fiatDescription"`
+		FiatReturnURL           string `json:"fiatReturnURL"`
+		FiatCancelURL           string `json:"fiatCancelURL"`
 	}
 	if r.Body != nil {
 		dec := json.NewDecoder(r.Body)
@@ -138,20 +200,22 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 	}
 
 	req := contracts.CreatePaymentSessionRequest{
-		OrderID:          orderID,
-		PaymentCoin:      string(normalizedCoin),
-		RefundAddress:    payload.RefundAddress,
-		PayFromCustodial: payload.PayFromCustodial,
-		BuyerPeerID:      payload.BuyerPeerID,
-		PayerAddress:     payload.PayerAddress,
-		Moderator:        payload.Moderator,
-		FiatAmountCents:  payload.FiatAmountCents,
-		FiatDescription:  payload.FiatDescription,
-		FiatReturnURL:    payload.FiatReturnURL,
-		FiatCancelURL:    payload.FiatCancelURL,
+		OrderID:                 orderID,
+		PaymentCoin:             string(normalizedCoin),
+		PaymentSelectionQuoteID: payload.PaymentSelectionQuoteID,
+		RefundAddress:           payload.RefundAddress,
+		PayFromCustodial:        payload.PayFromCustodial,
+		BuyerPeerID:             payload.BuyerPeerID,
+		PayerAddress:            payload.PayerAddress,
+		Moderator:               payload.Moderator,
+		FiatAmountCents:         payload.FiatAmountCents,
+		FiatDescription:         payload.FiatDescription,
+		FiatReturnURL:           payload.FiatReturnURL,
+		FiatCancelURL:           payload.FiatCancelURL,
 	}
 
-	if strings.HasPrefix(strings.ToLower(req.PaymentCoin), "fiat:") && req.FiatAmountCents <= 0 {
+	if strings.HasPrefix(strings.ToLower(req.PaymentCoin), "fiat:") &&
+		req.FiatAmountCents <= 0 && strings.TrimSpace(req.PaymentSelectionQuoteID) == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation,
 			"fiatAmountCents must be > 0 when paymentCoin is a fiat canonical id")
 		return
@@ -178,8 +242,10 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 		case errors.Is(err, corePmt.ErrDealPaymentQuoteRequired),
 			errors.Is(err, corePmt.ErrDealPaymentConversionQuoteRequired),
+			errors.Is(err, corePmt.ErrDealPaymentSelectionQuoteInvalid),
 			errors.Is(err, corePmt.ErrDealPaymentAmountIntegrity):
-			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict,
+				"payment quote does not authorize this session")
 		case errors.Is(err, corePmt.ErrExchangeRateUnavailable):
 			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
 				"exchange rate service unavailable — cross-currency crypto payment cannot be calculated")

@@ -1483,6 +1483,7 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 		return
 	}
 	svc := corePmt.NewPaymentSessionService(obNode.db)
+	svc.SetExchangeRateService(obNode.ExchangeRate())
 	resolve := func(input corePmt.SessionProvisioningPolicyInput) ([]extensions.OrderExtension, error) {
 		var persisted []extensions.OrderExtension
 		err := obNode.db.View(func(tx database.Tx) error {

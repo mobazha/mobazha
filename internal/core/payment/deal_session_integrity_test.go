@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
 	porderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	paypb "github.com/mobazha/mobazha/pkg/payment"
 	"github.com/stretchr/testify/require"
@@ -91,7 +92,7 @@ func TestValidateDealSessionProvisioning(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateDealSessionProvisioning(tt.open, tt.req)
+			err := validateDealSessionProvisioning(tt.open, tt.req, nil)
 			if tt.wantErr == nil {
 				require.NoError(t, err)
 				return
@@ -127,7 +128,7 @@ func TestValidateDealPaymentSession(t *testing.T) {
 		}
 	}
 
-	require.NoError(t, validateDealPaymentSession(open, req, valid()),
+	require.NoError(t, validateDealPaymentSession(open, req, nil, valid()),
 		"advisory network fee hints must not change the signed order amount")
 
 	tests := []struct {
@@ -144,8 +145,32 @@ func TestValidateDealPaymentSession(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			session := valid()
 			tt.mutate(session)
-			err := validateDealPaymentSession(open, req, session)
+			err := validateDealPaymentSession(open, req, nil, session)
 			require.True(t, errors.Is(err, ErrDealPaymentAmountIntegrity), "error = %v", err)
 		})
 	}
+}
+
+func TestValidateDealSessionProvisioning_AcceptsBoundCrossCurrencyQuote(t *testing.T) {
+	open := &porderpb.OrderOpen{
+		PricingCoin: "USD", Amount: "4900", DealLinkID: "deal-123", DealRevision: 2,
+		TermsHash: strings.Repeat("c", 64), FeeQuoteID: "fq-123",
+	}
+	req := contracts.CreatePaymentSessionRequest{
+		PaymentCoin: "crypto:eip155:1:native", PaymentSelectionQuoteID: "psq-123",
+		AuthorizedPaymentAmount: "19600000000000000",
+	}
+	quote := &models.PaymentSelectionQuote{
+		QuoteID: "psq-123", FeeQuoteID: "fq-123", PaymentCoin: req.PaymentCoin,
+		BuyerPaymentTotal: req.AuthorizedPaymentAmount,
+	}
+	require.NoError(t, validateDealSessionProvisioning(open, req, quote))
+
+	expected := paypb.FormatSessionAmount(quote.BuyerPaymentTotal, req.PaymentCoin)
+	session := &paypb.PaymentSession{
+		PaymentCoin: req.PaymentCoin, ExpectedAmount: expected,
+		FundingTarget:   paypb.FundingTargetView{AssetID: req.PaymentCoin, Amount: expected},
+		PaymentProgress: paypb.PaymentProgressView{RequiredAmount: expected},
+	}
+	require.NoError(t, validateDealPaymentSession(open, req, quote, session))
 }

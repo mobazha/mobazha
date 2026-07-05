@@ -92,20 +92,21 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	readiness := payment.DerivePaymentReadiness(order, expiresAt)
 
 	session := &payment.PaymentSession{
-		SessionID:          sessionID,
-		OrderID:            order.ID.String(),
-		PaymentCoin:        paymentCoin,
-		SettlementMode:     settlementMode,
-		ProductMode:        productMode,
-		Status:             status,
-		ConfirmationPolicy: p.deriveConfirmationPolicy(order),
-		ExpectedAmount:     expectedAmount,
-		ExpiresAt:          expiresAt,
-		FundingTarget:      fundingTarget,
-		PaymentProgress:    progress,
-		Capabilities:       caps,
-		PaymentReadiness:   readiness,
-		UserActionRequest:  nil, // Phase B: no user action required for address_monitored
+		SessionID:               sessionID,
+		OrderID:                 order.ID.String(),
+		PaymentSelectionQuoteID: order.PaymentSelectionQuoteID,
+		PaymentCoin:             paymentCoin,
+		SettlementMode:          settlementMode,
+		ProductMode:             productMode,
+		Status:                  status,
+		ConfirmationPolicy:      p.deriveConfirmationPolicy(order),
+		ExpectedAmount:          expectedAmount,
+		ExpiresAt:               expiresAt,
+		FundingTarget:           fundingTarget,
+		PaymentProgress:         progress,
+		Capabilities:            caps,
+		PaymentReadiness:        readiness,
+		UserActionRequest:       nil, // Phase B: no user action required for address_monitored
 	}
 	applyRefundProjection(p.db, session, input, paymentCoin)
 	payment.ApplyBuyerPaymentReadinessGate(session)

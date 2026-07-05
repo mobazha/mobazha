@@ -23,6 +23,15 @@ type CreatePaymentSessionRequest struct {
 	// PaymentCoin is the canonical payment coin. See format rules above.
 	PaymentCoin string
 
+	// PaymentSelectionQuoteID binds Deal cross-currency provisioning to an
+	// immutable server-authored quote. It is required when the selected payment
+	// currency differs from the signed order pricing currency.
+	PaymentSelectionQuoteID string
+
+	// AuthorizedPaymentAmount is populated internally after the quote is loaded
+	// from Core storage. API callers must not provide or calculate this value.
+	AuthorizedPaymentAmount string
+
 	// RefundAddress is the buyer's on-chain address to which funds are
 	// returned on cancel/refund/dispute-release. Optional for crypto
 	// orders: client-signed flows may provide it up front, while address-
@@ -65,6 +74,14 @@ type CreatePaymentSessionRequest struct {
 	FiatCancelURL string
 }
 
+// CreatePaymentSelectionQuoteRequest selects one canonical payment asset for a
+// Deal order. Core derives all amounts from the signed OrderOpen and its own
+// exchange-rate service.
+type CreatePaymentSelectionQuoteRequest struct {
+	OrderID     string
+	PaymentCoin string
+}
+
 // PaymentSessionService creates, reads, and refreshes unified payment
 // sessions across all supported payment rails (managed escrow, UTXO, Stripe, PayPal,
 // and future Squads / guest checkout).
@@ -95,6 +112,10 @@ type CreatePaymentSessionRequest struct {
 //
 // Reference: docs/payment/UNIFIED_PAYMENT_SESSION_ARCHITECTURE.md §12.2
 type PaymentSessionService interface {
+	// CreateSelectionQuote creates or reuses a still-valid immutable Deal
+	// payment-selection quote. No payment target or Provider session is created.
+	CreateSelectionQuote(ctx context.Context, req CreatePaymentSelectionQuoteRequest) (*payment.PaymentSelectionQuote, error)
+
 	// CreateSession provisions a payment session for an order.
 	//
 	// For crypto orders (settlementMode=address_monitored or escrow_v1):

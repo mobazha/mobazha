@@ -19,7 +19,15 @@ import (
 
 type mockPaymentSessionService struct {
 	createFunc func(ctx context.Context, req contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error)
+	quoteFunc  func(ctx context.Context, req contracts.CreatePaymentSelectionQuoteRequest) (*paypb.PaymentSelectionQuote, error)
 	getFunc    func(ctx context.Context, orderID string) (*paypb.PaymentSession, error)
+}
+
+func (m *mockPaymentSessionService) CreateSelectionQuote(ctx context.Context, req contracts.CreatePaymentSelectionQuoteRequest) (*paypb.PaymentSelectionQuote, error) {
+	if m.quoteFunc != nil {
+		return m.quoteFunc(ctx, req)
+	}
+	return nil, errors.New("not implemented")
 }
 
 func (m *mockPaymentSessionService) CreateSession(ctx context.Context, req contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {
@@ -106,6 +114,7 @@ func TestHandlePOSTOrderPaymentSession_DealIntegrityConflict(t *testing.T) {
 	}{
 		{name: "missing fee quote", err: corePmt.ErrDealPaymentQuoteRequired},
 		{name: "conversion quote required", err: corePmt.ErrDealPaymentConversionQuoteRequired},
+		{name: "selection quote invalid", err: corePmt.ErrDealPaymentSelectionQuoteInvalid},
 		{name: "amount mismatch", err: corePmt.ErrDealPaymentAmountIntegrity},
 	}
 	for _, tt := range tests {
@@ -133,6 +142,69 @@ func TestHandlePOSTOrderPaymentSession_DealIntegrityConflict(t *testing.T) {
 				t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestHandlePOSTOrderPaymentSelectionQuote_ReturnsImmutableQuote(t *testing.T) {
+	called := false
+	svc := &mockPaymentSessionService{
+		quoteFunc: func(_ context.Context, req contracts.CreatePaymentSelectionQuoteRequest) (*paypb.PaymentSelectionQuote, error) {
+			called = true
+			if req.OrderID != "o1" || req.PaymentCoin != "crypto:eip155:1:native" {
+				t.Fatalf("request = %+v", req)
+			}
+			return &paypb.PaymentSelectionQuote{
+				ID: "psq-1", OrderID: req.OrderID, PaymentCoin: req.PaymentCoin,
+				PricingCurrency: "USD", PricingAmount: "4900", BuyerPaymentTotal: "19600000000000000",
+			}, nil
+		},
+	}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newPaymentSessionHandlerRequest(t,
+		http.MethodPost,
+		"/v1/orders/o1/payment-selection-quotes",
+		map[string]interface{}{"paymentCoin": "crypto:eip155:1:native"},
+		map[string]string{"orderID": "o1"},
+		svc,
+	)
+
+	g.handlePOSTOrderPaymentSelectionQuote(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+	}
+	if !called || !bytes.Contains(w.Body.Bytes(), []byte(`"id":"psq-1"`)) {
+		t.Fatalf("quote handler result = %s", w.Body.String())
+	}
+}
+
+func TestHandlePOSTOrderPaymentSession_SelectionQuoteSuppliesFiatAmount(t *testing.T) {
+	svc := &mockPaymentSessionService{
+		createFunc: func(_ context.Context, req contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {
+			if req.PaymentSelectionQuoteID != "psq-1" {
+				t.Fatalf("paymentSelectionQuoteID = %q", req.PaymentSelectionQuoteID)
+			}
+			if req.FiatAmountCents != 0 {
+				t.Fatalf("handler must not invent quoted amount, got %d", req.FiatAmountCents)
+			}
+			return &paypb.PaymentSession{SessionID: "ps_o1", OrderID: "o1", PaymentCoin: req.PaymentCoin}, nil
+		},
+	}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newPaymentSessionHandlerRequest(t,
+		http.MethodPost,
+		"/v1/orders/o1/payment-session",
+		map[string]interface{}{
+			"paymentCoin": "fiat:stripe:EUR", "paymentSelectionQuoteID": "psq-1",
+		},
+		map[string]string{"orderID": "o1"},
+		svc,
+	)
+
+	g.handlePOSTOrderPaymentSession(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
 	}
 }
 

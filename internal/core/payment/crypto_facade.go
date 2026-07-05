@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -105,7 +106,7 @@ func (c *CryptoPaymentFacade) CreateSession(
 	}
 
 	setupParams, err := buildPaymentSetupParamsFromOrder(order, orderOpen, coin,
-		req.PayerAddress, refundAddr, moderator, c.exchange)
+		req.PayerAddress, refundAddr, moderator, req.AuthorizedPaymentAmount, c.exchange)
 	if err != nil {
 		return nil, fmt.Errorf("crypto facade: build escrow params: %w", err)
 	}
@@ -368,6 +369,7 @@ func buildPaymentSetupParamsFromOrder(
 	orderOpen *porderpb.OrderOpen,
 	coin iwallet.CoinType,
 	payerAddress, refundAddress, moderator string,
+	authorizedPaymentAmount string,
 	ex contracts.ExchangeRateService,
 ) (paypb.PaymentSetupParams, error) {
 	if order == nil {
@@ -381,7 +383,13 @@ func buildPaymentSetupParamsFromOrder(
 	}
 
 	var amt uint64
-	if pricingCoin != "" && pricingCoin != paymentCoinCode {
+	if strings.TrimSpace(authorizedPaymentAmount) != "" {
+		quoted, ok := new(big.Int).SetString(strings.TrimSpace(authorizedPaymentAmount), 10)
+		if !ok || quoted.Sign() <= 0 || !quoted.IsUint64() {
+			return paypb.PaymentSetupParams{}, errors.New("authorized payment amount is invalid")
+		}
+		amt = quoted.Uint64()
+	} else if pricingCoin != "" && pricingCoin != paymentCoinCode {
 		// Cross-currency order: pricing coin differs from payment coin.
 		// ExchangeRateService is required; its adapter returns an informative error
 		// (not a panic) when the underlying provider is nil, so errors propagate

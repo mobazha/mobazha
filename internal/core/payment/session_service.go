@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
@@ -43,7 +44,10 @@ type PaymentSessionServiceImpl struct {
 	projector *PaymentSessionProjector
 	fiat      *FiatPaymentFacade // injected via SetFiatFacade (Phase B3)
 	crypto    *CryptoPaymentFacade
+	exchange  contracts.ExchangeRateService
 	policies  []SessionProvisioningPolicy
+	now       func() time.Time
+	quoteTTL  time.Duration
 }
 
 // NewPaymentSessionService constructs the service.
@@ -52,7 +56,15 @@ func NewPaymentSessionService(db database.Database) *PaymentSessionServiceImpl {
 	return &PaymentSessionServiceImpl{
 		db:        db,
 		projector: NewPaymentSessionProjector(db),
+		now:       time.Now,
+		quoteTTL:  defaultPaymentSelectionQuoteTTL,
 	}
+}
+
+// SetExchangeRateService injects the authoritative rate source used to create
+// immutable payment-selection quotes.
+func (s *PaymentSessionServiceImpl) SetExchangeRateService(exchange contracts.ExchangeRateService) {
+	s.exchange = exchange
 }
 
 // SetFiatFacade injects the FiatPaymentFacade so CreateSession can provision
@@ -151,12 +163,40 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 	if err != nil {
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
 	}
-	if err := validateDealSessionProvisioning(input.orderOpen, req); err != nil {
+	selectionQuote, err := s.resolveDealPaymentSelectionQuote(ctx, input.order, input.orderOpen, req)
+	if err != nil {
+		return nil, err
+	}
+	if selectionQuote != nil {
+		req.AuthorizedPaymentAmount = selectionQuote.BuyerPaymentTotal
+		if strings.HasPrefix(strings.ToLower(req.PaymentCoin), "fiat:") {
+			amount, ok := new(big.Int).SetString(selectionQuote.BuyerPaymentTotal, 10)
+			if !ok || !amount.IsInt64() || amount.Sign() <= 0 {
+				return nil, fmt.Errorf("%w: quoted fiat amount is invalid", ErrDealPaymentSelectionQuoteInvalid)
+			}
+			if req.FiatAmountCents > 0 && req.FiatAmountCents != amount.Int64() {
+				return nil, fmt.Errorf("%w: requested fiat amount does not match the quote", ErrDealPaymentAmountIntegrity)
+			}
+			req.FiatAmountCents = amount.Int64()
+		}
+	}
+	if err := validateDealSessionProvisioning(input.orderOpen, req, selectionQuote); err != nil {
 		return nil, err
 	}
 	view, err := s.projector.Project(input)
 	if err != nil {
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
+	}
+	alreadyProvisioned := paymentSessionHasProvisionedTarget(view)
+	if selectionQuote != nil && alreadyProvisioned && view.PaymentSelectionQuoteID != selectionQuote.QuoteID {
+		return nil, fmt.Errorf(
+			"%w: existing payment target is bound to a different quote",
+			ErrDealPaymentSelectionQuoteInvalid,
+		)
+	}
+	if selectionQuote != nil && !selectionQuote.ExpiresAt.After(s.currentTime()) &&
+		(!alreadyProvisioned || view.PaymentSelectionQuoteID != selectionQuote.QuoteID) {
+		return nil, fmt.Errorf("%w: quote expired before provisioning", ErrDealPaymentSelectionQuoteInvalid)
 	}
 
 	if view.PaymentReadiness.Status != payment.PaymentReadinessReadyToPay {
@@ -175,11 +215,15 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			// finish provisioning in this request instead of requiring a client
 			// to detect and retry an invalid intermediate projection.
 			if updated.PaymentReadiness.Status == payment.PaymentReadinessReadyToPay && updated.FundingTarget.Address == "" {
+				if err := s.bindPaymentSelectionQuote(input.order, selectionQuote); err != nil {
+					return nil, err
+				}
 				created, err := s.crypto.CreateSession(ctx, req)
 				if err != nil {
 					return nil, err
 				}
-				if err := validateDealPaymentSession(input.orderOpen, req, created); err != nil {
+				applyPaymentSelectionQuote(created, selectionQuote)
+				if err := validateDealPaymentSession(input.orderOpen, req, selectionQuote, created); err != nil {
 					return nil, err
 				}
 				return created, nil
@@ -197,9 +241,6 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 	// without a "sessionID". We intentionally require sessionID to be present
 	// before treating the fiat session as already provisioned; otherwise a
 	// partially-populated view would block all subsequent CreatePayment calls.
-	alreadyProvisioned := view.FundingTarget.Address != "" ||
-		fiatSessionIDFromView(view) != ""
-
 	coinSwitch := false
 	if alreadyProvisioned && req.PaymentCoin != "" {
 		// Guard: if the caller requests a different coin, reject instead of
@@ -225,12 +266,14 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			if err != nil {
 				return nil, err
 			}
-			if err := validateDealPaymentSession(input.orderOpen, req, updated); err != nil {
+			applyPaymentSelectionQuote(updated, selectionQuote)
+			if err := validateDealPaymentSession(input.orderOpen, req, selectionQuote, updated); err != nil {
 				return nil, err
 			}
 			return updated, nil
 		}
-		if err := validateDealPaymentSession(input.orderOpen, req, view); err != nil {
+		applyPaymentSelectionQuote(view, selectionQuote)
+		if err := validateDealPaymentSession(input.orderOpen, req, selectionQuote, view); err != nil {
 			return nil, err
 		}
 		return view, nil
@@ -238,10 +281,11 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 
 	if req.PaymentCoin != "" {
 		policyInput := SessionProvisioningPolicyInput{
-			OrderID:     req.OrderID,
-			PaymentCoin: req.PaymentCoin,
-			ExpiresAt:   view.ExpiresAt,
-			OrderOpen:   input.orderOpen,
+			OrderID:                 req.OrderID,
+			PaymentCoin:             req.PaymentCoin,
+			PaymentSelectionQuoteID: req.PaymentSelectionQuoteID,
+			ExpiresAt:               view.ExpiresAt,
+			OrderOpen:               input.orderOpen,
 		}
 		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(req.PaymentCoin)), "fiat:") {
 			policyInput.SettlementMethod = porderpb.PaymentSent_FIAT
@@ -252,6 +296,9 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 				return nil, err
 			}
 		}
+	}
+	if err := s.bindPaymentSelectionQuote(input.order, selectionQuote); err != nil {
+		return nil, fmt.Errorf("bind payment selection quote: %w", err)
 	}
 
 	// Authorization, including an atomic source-card reservation update, must
@@ -274,7 +321,8 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			if err != nil {
 				return nil, err
 			}
-			if err := validateDealPaymentSession(input.orderOpen, req, created); err != nil {
+			applyPaymentSelectionQuote(created, selectionQuote)
+			if err := validateDealPaymentSession(input.orderOpen, req, selectionQuote, created); err != nil {
 				return nil, err
 			}
 			return created, nil
@@ -289,7 +337,8 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			if err != nil {
 				return nil, err
 			}
-			if err := validateDealPaymentSession(input.orderOpen, req, created); err != nil {
+			applyPaymentSelectionQuote(created, selectionQuote)
+			if err := validateDealPaymentSession(input.orderOpen, req, selectionQuote, created); err != nil {
 				return nil, err
 			}
 			return created, nil
@@ -302,6 +351,10 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 
 	// Read-only query with no paymentCoin — return best-effort projection.
 	return view, nil
+}
+
+func paymentSessionHasProvisionedTarget(view *payment.PaymentSession) bool {
+	return view != nil && (view.FundingTarget.Address != "" || fiatSessionIDFromView(view) != "")
 }
 
 func createSessionCarriesRefundAddressUpdate(req contracts.CreatePaymentSessionRequest) bool {

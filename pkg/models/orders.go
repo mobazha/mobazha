@@ -259,6 +259,10 @@ type Order struct {
 	// terms. It is copied from the signed OrderOpen and persisted by both peers.
 	DealTermsSnapshotRef *DealTermsSnapshotRef `gorm:"embedded" json:"dealTermsSnapshotRef,omitempty"`
 
+	// PaymentSelectionQuoteID identifies the current immutable payment-asset,
+	// conversion and fee snapshot authorized before provisioning.
+	PaymentSelectionQuoteID string `gorm:"column:payment_selection_quote_id;size:64;index" json:"paymentSelectionQuoteID,omitempty"`
+
 	SerializedPaymentSent []byte
 	PaymentSentAcked      bool
 	PaymentSentSignature  string

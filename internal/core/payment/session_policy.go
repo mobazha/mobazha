@@ -20,12 +20,13 @@ type SessionProvisioningPolicy interface {
 // SessionProvisioningPolicyInput contains the signed order data needed to
 // authorize creation of a new payment funding target.
 type SessionProvisioningPolicyInput struct {
-	OrderID               string
-	PaymentCoin           string
-	SettlementMethod      porderpb.PaymentSent_Method
-	SettlementMethodKnown bool
-	ExpiresAt             time.Time
-	OrderOpen             *porderpb.OrderOpen
+	OrderID                 string
+	PaymentCoin             string
+	PaymentSelectionQuoteID string
+	SettlementMethod        porderpb.PaymentSent_Method
+	SettlementMethodKnown   bool
+	ExpiresAt               time.Time
+	OrderOpen               *porderpb.OrderOpen
 }
 
 // OrderExtensionResolver projects signed order input into a required extension envelope.

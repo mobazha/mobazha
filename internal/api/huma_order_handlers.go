@@ -60,6 +60,7 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 
 	// Phase PS / B1: unified payment session read endpoint.
 	g.registerOrderPaymentSessionGet(api)
+	g.registerOrderPaymentSelectionQuotePost(api)
 	g.registerOrderPaymentSessionPost(api)
 	g.registerOrderRefundAddressPost(api)
 	g.registerOrderSettlementActionPost(api)
@@ -73,6 +74,35 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 	g.registerPGPKeyDelete(api)          // PM-3a: remove vendor PGP public key
 
 	g.registerAnalyticsStatsGet(api)
+}
+
+// registerOrderPaymentSelectionQuotePost registers the immutable Deal payment
+// asset and conversion quote endpoint.
+func (g *Gateway) registerOrderPaymentSelectionQuotePost(api huma.API) {
+	type in struct {
+		OrderID string          `path:"orderID" doc:"Order ID."`
+		Body    json.RawMessage `json:",omitempty"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "orders-post-payment-selection-quote",
+		Method:      http.MethodPost,
+		Path:        "/v1/orders/{orderID}/payment-selection-quotes",
+		Summary:     "Create immutable Deal payment-selection quote",
+		Description: "Freezes the signed pricing amount, canonical payment asset, conversion rate, numeric provider/platform costs, target amount, policy version and expiry before PaymentSession provisioning.",
+		Tags:        []string{"orders", "payments"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/payment-selection-quotes"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(hi.Body), map[string]string{"orderID": hi.OrderID})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handlePOSTOrderPaymentSelectionQuote(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
 }
 
 func orderSearchQueryVals(state, search, sortBy, limit string) url.Values {
@@ -940,7 +970,8 @@ func (g *Gateway) registerOrderPaymentSessionPost(api huma.API) {
 		Summary:     "Provision unified payment session",
 		Description: "Creates or idempotently returns a PaymentSession. Fiat: canonical " +
 			"paymentCoin fiat:{provider}:{currency}, fiatAmountCents (>0), and optional PayPal return/cancel URLs. " +
-			"Crypto: optional refundAddress/payerAddress/moderator; buyers should declare refundAddress before paying.",
+			"Crypto: optional refundAddress/payerAddress/moderator; buyers should declare refundAddress before paying. " +
+			"Deal cross-currency requests must include paymentSelectionQuoteID from the immutable quote endpoint.",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {

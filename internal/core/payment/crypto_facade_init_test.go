@@ -71,7 +71,7 @@ func TestBuildPaymentSetupParamsFromOrder_SameCurrencyUsesOrderOpenNumeric(t *te
 		Amount:      "42",
 		PricingCoin: "ETH",
 	}
-	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", "", noopRates{})
+	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", "", "", noopRates{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,6 +97,7 @@ func TestBuildPaymentSetupParamsFromOrder_ForwardsRefundAddress(t *testing.T) {
 		coin,
 		"payer-address",
 		"refund-address",
+		"",
 		"",
 		noopRates{},
 	)

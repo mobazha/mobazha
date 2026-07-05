@@ -16,7 +16,11 @@ import (
 // crypto funding target is created. Hosting remains the source of truth for
 // the fee quote; Core only verifies that the signed order carries the quote
 // reference and that no unbound currency conversion is being attempted.
-func validateDealSessionProvisioning(orderOpen *porderpb.OrderOpen, req contracts.CreatePaymentSessionRequest) error {
+func validateDealSessionProvisioning(
+	orderOpen *porderpb.OrderOpen,
+	req contracts.CreatePaymentSessionRequest,
+	selectionQuote *models.PaymentSelectionQuote,
+) error {
 	ref, err := models.DealTermsSnapshotRefFromOrderOpen(orderOpen)
 	if err != nil {
 		return fmt.Errorf("%w: invalid signed deal reference: %v", ErrDealPaymentAmountIntegrity, err)
@@ -36,7 +40,7 @@ func validateDealSessionProvisioning(orderOpen *porderpb.OrderOpen, req contract
 	if err != nil {
 		return fmt.Errorf("%w: resolve payment currency: %v", ErrDealPaymentAmountIntegrity, err)
 	}
-	if !strings.EqualFold(pricingCode, paymentCode) {
+	if !strings.EqualFold(pricingCode, paymentCode) && selectionQuote == nil {
 		return fmt.Errorf(
 			"%w: feeQuoteID=%s pricingCurrency=%s paymentCurrency=%s",
 			ErrDealPaymentConversionQuoteRequired,
@@ -50,7 +54,7 @@ func validateDealSessionProvisioning(orderOpen *porderpb.OrderOpen, req contract
 	if !ok || orderAmount.Sign() <= 0 {
 		return fmt.Errorf("%w: signed order amount must be a positive integer", ErrDealPaymentAmountIntegrity)
 	}
-	if strings.HasPrefix(strings.ToLower(req.PaymentCoin), "fiat:") {
+	if strings.HasPrefix(strings.ToLower(req.PaymentCoin), "fiat:") && selectionQuote == nil {
 		if !orderAmount.IsInt64() || req.FiatAmountCents != orderAmount.Int64() {
 			return fmt.Errorf(
 				"%w: feeQuoteID=%s signedAmount=%s requestedFiatAmount=%d",
@@ -82,6 +86,7 @@ func dealPricingCurrencyCode(pricingCoin string) (string, error) {
 func validateDealPaymentSession(
 	orderOpen *porderpb.OrderOpen,
 	req contracts.CreatePaymentSessionRequest,
+	selectionQuote *models.PaymentSelectionQuote,
 	session *paypb.PaymentSession,
 ) error {
 	ref, err := models.DealTermsSnapshotRefFromOrderOpen(orderOpen)
@@ -95,7 +100,11 @@ func validateDealPaymentSession(
 		return fmt.Errorf("%w: payment session is nil", ErrDealPaymentAmountIntegrity)
 	}
 
-	expected := paypb.FormatSessionAmount(orderOpen.GetAmount(), req.PaymentCoin)
+	expectedAmount := orderOpen.GetAmount()
+	if selectionQuote != nil {
+		expectedAmount = selectionQuote.BuyerPaymentTotal
+	}
+	expected := paypb.FormatSessionAmount(expectedAmount, req.PaymentCoin)
 	checks := []struct {
 		name string
 		got  string
@@ -120,4 +129,10 @@ func validateDealPaymentSession(
 		}
 	}
 	return nil
+}
+
+func applyPaymentSelectionQuote(session *paypb.PaymentSession, quote *models.PaymentSelectionQuote) {
+	if session != nil && quote != nil {
+		session.PaymentSelectionQuoteID = quote.QuoteID
+	}
 }

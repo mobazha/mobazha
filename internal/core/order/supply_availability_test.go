@@ -399,6 +399,25 @@ func TestStandardOrderSupplyLinesUsesExistingTransactionForDigitalGoods(t *testi
 	require.Empty(t, resolver.items, "transactional resolution must not re-enter Database.View")
 }
 
+func TestStandardOrderSupplyLinesRejectsNonTransactionalResolverInsideWrite(t *testing.T) {
+	listing := orderSupplyListingNoVariant(t, "ebook", "")
+	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	listingHash := orderSupplyListingHash(t, listing)
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+
+	err := svc.db.Update(func(tx database.Tx) error {
+		_, err := standardOrderSupplyLinesFromOrderOpen(
+			tx,
+			"order-standard-digital-tx",
+			orderSupplyOrderOpen(listing, listingHash),
+			nonTransactionalDigitalSupplyLineResolver{},
+			true,
+		)
+		return err
+	})
+	require.ErrorContains(t, err, "does not support caller transactions")
+}
+
 func TestStandardOrderSupplyLinesSkipsDigitalGoodsWithoutResolver(t *testing.T) {
 	listing := orderSupplyListingNoVariant(t, "ebook", "")
 	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
@@ -678,6 +697,12 @@ type recordingDigitalSupplyLineResolver struct {
 	txSeen  bool
 	lines   []contracts.SupplyLine
 	err     error
+}
+
+type nonTransactionalDigitalSupplyLineResolver struct{}
+
+func (nonTransactionalDigitalSupplyLineResolver) SupplyAvailabilityLinesForOrderItems([]digital.OrderLineItem) ([]contracts.SupplyLine, error) {
+	return nil, nil
 }
 
 func (r *recordingDigitalSupplyLineResolver) SupplyAvailabilityLinesForOrderItems(items []digital.OrderLineItem) ([]contracts.SupplyLine, error) {

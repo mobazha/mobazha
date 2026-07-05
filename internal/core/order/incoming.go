@@ -807,7 +807,11 @@ func standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, order
 				Quantity:    uint32(qty),
 			}}
 			var digitalLines []contracts.SupplyLine
-			if txResolver, ok := digitalResolver.(transactionalDigitalSupplyLineResolver); ok && tx != nil {
+			if tx != nil {
+				txResolver, ok := digitalResolver.(transactionalDigitalSupplyLineResolver)
+				if !ok {
+					return nil, fmt.Errorf("digital supply resolver for %q does not support caller transactions", listing.Slug)
+				}
 				digitalLines, err = txResolver.SupplyAvailabilityLinesForOrderItemsTx(tx, items)
 			} else {
 				digitalLines, err = digitalResolver.SupplyAvailabilityLinesForOrderItems(items)

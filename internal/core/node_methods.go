@@ -10,6 +10,7 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	aipkg "github.com/mobazha/mobazha/internal/ai"
 	"github.com/mobazha/mobazha/internal/config"
+	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/notifier"
 	"github.com/mobazha/mobazha/internal/wallet"
 	agentstore "github.com/mobazha/mobazha/pkg/agent/store"
@@ -321,10 +322,16 @@ func (n *MobazhaNode) RunOutboxCleanupOnce(_ context.Context) {
 	}
 }
 
-// RunPaymentReconcileScanOnce retains the scheduler contract for optional
-// observation scanners. First-party managed modules own their own observation
-// loops, so the Open Core distribution has no scanner to invoke.
-func (n *MobazhaNode) RunPaymentReconcileScanOnce(context.Context) {}
+// RunPaymentReconcileScanOnce resumes persistence-first payment provisioning.
+// First-party modules still own observation loops; Core owns durable attempt
+// recovery because it owns the idempotency claim and historical route.
+func (n *MobazhaNode) RunPaymentReconcileScanOnce(ctx context.Context) {
+	if n.directPaymentService != nil {
+		if _, err := n.directPaymentService.RecoverPendingExternalPaymentAddresses(ctx); err != nil {
+			logger.LogWarningWithIDf(log, n.nodeID, "direct observed address reconciliation: %v", err)
+		}
+	}
+}
 
 func (n *MobazhaNode) RunPaymentVerificationOnce(_ context.Context) {
 	if n.paymentService != nil {

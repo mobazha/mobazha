@@ -22,11 +22,12 @@ const (
 	ExternalPaymentExpired   ExternalPaymentStatus = "expired"
 )
 
-// ExternalPaymentAddressRequest asks a trusted runtime for a fresh receiving
-// address. Label is operational metadata and must not be treated as identity.
+// ExternalPaymentAddressRequest asks a trusted runtime to create or retrieve
+// one receiving address. IdempotencyKey is the durable operation identity and
+// must map to the same address after retries and process restarts.
 type ExternalPaymentAddressRequest struct {
-	Label string
-	Asset iwallet.CoinType
+	IdempotencyKey string
+	Asset          iwallet.CoinType
 }
 
 // ExternalPaymentAddress is an allocated address plus its opaque runtime
@@ -82,9 +83,11 @@ func (health ExternalPaymentHealth) Ready() bool { return health.State == Extern
 // this port; implementations expose only address allocation, observation,
 // health, and observation operations required by Core. Module lifecycle stays
 // on the private module runner and is not granted through this data-plane port.
+// EnsurePaymentAddress must be safe under concurrent retries and must return
+// the same normalized result for one idempotency key across process restarts.
 type ExternalPaymentRuntime interface {
 	PaymentHealth(ctx context.Context) ExternalPaymentHealth
-	CreatePaymentAddress(ctx context.Context, request ExternalPaymentAddressRequest) (ExternalPaymentAddress, error)
+	EnsurePaymentAddress(ctx context.Context, request ExternalPaymentAddressRequest) (ExternalPaymentAddress, error)
 	WatchPayment(watch *ExternalPaymentWatch) error
 	UnwatchPayment(addressIndex uint32)
 	ReapPayment(addressIndex uint32)

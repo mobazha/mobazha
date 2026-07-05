@@ -87,6 +87,9 @@ type GuestOrder struct {
 	Confirmations  int    `json:"confirmations"`
 	RequiredConfs  int    `json:"requiredConfs"`
 	AddressIndex   uint32 `json:"-"`
+	// PaymentAttemptID links externally provisioned targets to the durable
+	// claim that was committed before the provider call.
+	PaymentAttemptID string `gorm:"column:payment_attempt_id;size:64;index;<-:create" json:"-"`
 	// Route* and PaymentGracePeriodNanos snapshot the immutable payment
 	// implementation and timing policy selected when the target was allocated.
 	RouteContributionID           string `gorm:"column:route_contribution_id;size:128;index:idx_guest_order_route;<-:create" json:"-"`

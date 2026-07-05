@@ -51,7 +51,7 @@ func (*observedPaymentRuntimeStub) Close() error                { return nil }
 func (*observedPaymentRuntimeStub) PaymentHealth(context.Context) distribution.ExternalPaymentHealth {
 	return distribution.ExternalPaymentHealth{State: distribution.ExternalPaymentReady}
 }
-func (*observedPaymentRuntimeStub) CreatePaymentAddress(context.Context, distribution.ExternalPaymentAddressRequest) (distribution.ExternalPaymentAddress, error) {
+func (*observedPaymentRuntimeStub) EnsurePaymentAddress(context.Context, distribution.ExternalPaymentAddressRequest) (distribution.ExternalPaymentAddress, error) {
 	return distribution.ExternalPaymentAddress{Address: "addr_test", Index: 1}, nil
 }
 func (s *observedPaymentRuntimeStub) WatchPayment(watch *distribution.ExternalPaymentWatch) error {
@@ -166,7 +166,7 @@ func TestGuestOrder_DurableRouteIsCreateOnly(t *testing.T) {
 	order := models.GuestOrder{
 		OrderToken: "gst_immutable_route", State: models.GuestOrderAwaitingPayment,
 		PaymentCoin: externalObservedCoinType, PaymentAddress: "immutable_address", PaymentAmount: "100",
-		AddressIndex: 43, RequiredConfs: 2, ExpiresAt: time.Now().Add(time.Hour),
+		AddressIndex: 43, PaymentAttemptID: "pa_immutable", RequiredConfs: 2, ExpiresAt: time.Now().Add(time.Hour),
 	}
 	setGuestOrderPaymentRoute(&order, route, 10*time.Second)
 	seedGuestOrder(t, db, 705, order)
@@ -174,11 +174,13 @@ func TestGuestOrder_DurableRouteIsCreateOnly(t *testing.T) {
 	stored := loadGuestOrder(t, db, order.OrderToken)
 	stored.RouteImplementationGeneration = "v2"
 	stored.PaymentGracePeriodNanos = int64(time.Minute)
+	stored.PaymentAttemptID = "pa_changed"
 	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(&stored) }))
 
 	reloaded := loadGuestOrder(t, db, order.OrderToken)
 	assert.Equal(t, "v1", reloaded.RouteImplementationGeneration)
 	assert.Equal(t, int64(10*time.Second), reloaded.PaymentGracePeriodNanos)
+	assert.Equal(t, "pa_immutable", reloaded.PaymentAttemptID)
 }
 
 // TestExternalPaymentRuntime_PoolThenConfirmed_ToFunded exercises the full externally observed

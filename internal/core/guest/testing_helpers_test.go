@@ -142,6 +142,8 @@ func newGuestTestDB(t *testing.T) *testDatabase {
 		&models.GuestOrder{},
 		&models.GuestOrderItem{},
 		&models.InventoryReservation{},
+		&models.PaymentRouteBinding{},
+		&models.PaymentAttempt{},
 		&models.SweepTask{},
 		&models.UserPreferences{},
 	))

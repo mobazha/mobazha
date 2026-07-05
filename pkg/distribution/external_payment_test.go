@@ -21,7 +21,7 @@ func (externalPaymentRuntimeStub) Close() error                { return nil }
 func (externalPaymentRuntimeStub) PaymentHealth(context.Context) ExternalPaymentHealth {
 	return ExternalPaymentHealth{State: ExternalPaymentReady}
 }
-func (externalPaymentRuntimeStub) CreatePaymentAddress(context.Context, ExternalPaymentAddressRequest) (ExternalPaymentAddress, error) {
+func (externalPaymentRuntimeStub) EnsurePaymentAddress(context.Context, ExternalPaymentAddressRequest) (ExternalPaymentAddress, error) {
 	return ExternalPaymentAddress{}, nil
 }
 func (externalPaymentRuntimeStub) WatchPayment(*ExternalPaymentWatch) error { return nil }

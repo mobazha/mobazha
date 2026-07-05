@@ -245,7 +245,8 @@ func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, par
 		attemptID := stablePaymentIdentity("pa_", attemptSeed)
 		routeID := stablePaymentIdentity("prb_", attemptID)
 		attempt = models.PaymentAttempt{
-			AttemptID: attemptID, PaymentSessionID: "ps_" + strings.TrimSpace(params.OrderID), OrderID: strings.TrimSpace(params.OrderID),
+			AttemptID: attemptID, Kind: models.PaymentAttemptKindProviderSession,
+			PaymentSessionID: "ps_" + strings.TrimSpace(params.OrderID), OrderID: strings.TrimSpace(params.OrderID),
 			ProviderID: strings.ToLower(strings.TrimSpace(providerID)), Amount: params.Amount, Currency: strings.ToUpper(strings.TrimSpace(params.Currency)),
 			RouteBindingID: routeID, IdempotencyKey: stablePaymentIdentity("mbz_", attemptSeed), State: models.PaymentAttemptPendingExternal,
 		}
@@ -2176,8 +2177,8 @@ func (s *FiatPaymentAppService) reconcileFiatPaymentAttempts(ctx context.Context
 	cutoff := time.Now().Add(-2 * time.Minute)
 	if err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where(
-			"state = ? OR (state = ? AND updated_at < ?)",
-			models.PaymentAttemptReconcileRequired, models.PaymentAttemptPendingExternal, cutoff,
+			"kind = ? AND (state = ? OR (state = ? AND updated_at < ?))",
+			models.PaymentAttemptKindProviderSession, models.PaymentAttemptReconcileRequired, models.PaymentAttemptPendingExternal, cutoff,
 		).Find(&attempts).Error
 	}); err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "fiat attempt reconciliation: query failed: %v", err)

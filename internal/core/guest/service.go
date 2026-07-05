@@ -452,6 +452,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		SweepToAddress:            payResult.SweepTo,
 		ReferenceKey:              payResult.ReferenceKey,
 		AddressIndex:              payResult.AddressIndex,
+		PaymentAttemptID:          payResult.AttemptID,
 		RequiredConfs:             requiredConfs,
 		ExpiresAt:                 expiresAt,
 		ContactEmail:              req.ContactEmail,

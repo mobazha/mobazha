@@ -809,17 +809,29 @@ func (s *DigitalAssetAppService) getAssetModelsByListing(
 	listingSlug string,
 	variantSKU string,
 ) ([]models.DigitalAsset, error) {
-	variantSKU = strings.TrimSpace(variantSKU)
 	var assets []models.DigitalAsset
 	err := s.db.View(func(tx database.Tx) error {
-		q := tx.Read().Where("listing_slug = ?", listingSlug)
-		if variantSKU != "" {
-			q = q.Where("variant_sku IN (?, '')", variantSKU)
-		} else {
-			q = q.Where("variant_sku = ?", "")
-		}
-		return q.Order("sort_order ASC").Find(&assets).Error
+		var err error
+		assets, err = getAssetModelsByListingTx(tx, listingSlug, variantSKU)
+		return err
 	})
+	return assets, err
+}
+
+func getAssetModelsByListingTx(
+	tx database.Tx,
+	listingSlug string,
+	variantSKU string,
+) ([]models.DigitalAsset, error) {
+	variantSKU = strings.TrimSpace(variantSKU)
+	var assets []models.DigitalAsset
+	q := tx.Read().Where("listing_slug = ?", listingSlug)
+	if variantSKU != "" {
+		q = q.Where("variant_sku IN (?, '')", variantSKU)
+	} else {
+		q = q.Where("variant_sku = ?", "")
+	}
+	err := q.Order("sort_order ASC").Find(&assets).Error
 	return assets, err
 }
 

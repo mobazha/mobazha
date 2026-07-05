@@ -648,6 +648,10 @@ type orderTransactionalSupplyAvailabilityService interface {
 	ReleaseOrderTx(context.Context, database.Tx, string, string, string) error
 }
 
+type transactionalDigitalSupplyLineResolver interface {
+	SupplyAvailabilityLinesForOrderItemsTx(database.Tx, []digital.OrderLineItem) ([]contracts.SupplyLine, error)
+}
+
 func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb.OrderMessage) error {
 	var stored models.Order
 	if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&stored).Error; err != nil {
@@ -797,11 +801,17 @@ func standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, order
 			if err != nil {
 				return nil, fmt.Errorf("select digital sku for %q: %w", listing.Slug, err)
 			}
-			digitalLines, err := digitalResolver.SupplyAvailabilityLinesForOrderItems([]digital.OrderLineItem{{
+			items := []digital.OrderLineItem{{
 				ListingSlug: listing.Slug,
 				VariantSKU:  variantSKU,
 				Quantity:    uint32(qty),
-			}})
+			}}
+			var digitalLines []contracts.SupplyLine
+			if txResolver, ok := digitalResolver.(transactionalDigitalSupplyLineResolver); ok && tx != nil {
+				digitalLines, err = txResolver.SupplyAvailabilityLinesForOrderItemsTx(tx, items)
+			} else {
+				digitalLines, err = digitalResolver.SupplyAvailabilityLinesForOrderItems(items)
+			}
 			if err != nil {
 				return nil, fmt.Errorf("resolve digital supply for %q: %w", listing.Slug, err)
 			}

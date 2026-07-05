@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 )
 
@@ -90,7 +91,30 @@ func (s *DigitalAssetAppService) UnlimitedDigitalSupplyLinesForOrderItems(items 
 // produce a manual-action unlimited-digital line so checkout fails closed
 // instead of silently skipping the digital item.
 func (s *DigitalAssetAppService) SupplyAvailabilityLinesForOrderItems(items []OrderLineItem) ([]contracts.SupplyLine, error) {
-	if s == nil || len(items) == 0 {
+	if s == nil {
+		return nil, nil
+	}
+	return supplyAvailabilityLinesForOrderItems(items, s.getAssetModelsByListing)
+}
+
+// SupplyAvailabilityLinesForOrderItemsTx resolves the same supply contract
+// using an existing database transaction. Standard ORDER_OPEN processing must
+// use this path because TenantDB deliberately serializes View and Update; a
+// nested View from inside Update would otherwise deadlock cold-start replay.
+func (s *DigitalAssetAppService) SupplyAvailabilityLinesForOrderItemsTx(tx database.Tx, items []OrderLineItem) ([]contracts.SupplyLine, error) {
+	if s == nil || tx == nil {
+		return nil, nil
+	}
+	return supplyAvailabilityLinesForOrderItems(items, func(listingSlug, variantSKU string) ([]models.DigitalAsset, error) {
+		return getAssetModelsByListingTx(tx, listingSlug, variantSKU)
+	})
+}
+
+func supplyAvailabilityLinesForOrderItems(
+	items []OrderLineItem,
+	loadAssets func(listingSlug, variantSKU string) ([]models.DigitalAsset, error),
+) ([]contracts.SupplyLine, error) {
+	if len(items) == 0 {
 		return nil, nil
 	}
 
@@ -99,7 +123,7 @@ func (s *DigitalAssetAppService) SupplyAvailabilityLinesForOrderItems(items []Or
 		if item.ListingSlug == "" {
 			continue
 		}
-		assets, err := s.getAssetModelsByListing(item.ListingSlug, item.VariantSKU)
+		assets, err := loadAssets(item.ListingSlug, item.VariantSKU)
 		if err != nil {
 			return nil, fmt.Errorf("resolve digital supply assets for %s/%s: %w", item.ListingSlug, item.VariantSKU, err)
 		}

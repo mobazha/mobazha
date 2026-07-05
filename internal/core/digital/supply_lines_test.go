@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/stretchr/testify/require"
 )
 
@@ -211,4 +212,21 @@ func TestDigitalAssetService_SupplyAvailabilityLinesForOrderItemsCombinesDigital
 	availability, err = licenseProvider.GetAvailability(context.Background(), contracts.AvailabilityRequest{Line: lines[2]})
 	require.NoError(t, err)
 	require.True(t, availability.Available)
+}
+
+func TestDigitalAssetService_SupplyAvailabilityLinesForOrderItemsTxUsesCallerTransaction(t *testing.T) {
+	assetSvc, db := newTestAssetService(t)
+	_, err := assetSvc.CreateLinkAsset("listing-link-tx", "", "https://example.com/link")
+	require.NoError(t, err)
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		lines, resolveErr := assetSvc.SupplyAvailabilityLinesForOrderItemsTx(tx, []OrderLineItem{{
+			ListingSlug: "listing-link-tx",
+			Quantity:    1,
+		}})
+		require.NoError(t, resolveErr)
+		require.Len(t, lines, 1)
+		require.Equal(t, contracts.SupplyKindUnlimitedDigital, lines[0].SupplyKind)
+		return nil
+	}))
 }

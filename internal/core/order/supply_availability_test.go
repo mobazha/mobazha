@@ -374,6 +374,31 @@ func TestStandardOrderSupplyLinesUsesDigitalResolverForDigitalGoods(t *testing.T
 	}}, lines)
 }
 
+func TestStandardOrderSupplyLinesUsesExistingTransactionForDigitalGoods(t *testing.T) {
+	resolver := &recordingDigitalSupplyLineResolver{
+		lines: []contracts.SupplyLine{{
+			LineID:      "digital:0:ebook:unlimited_digital",
+			ListingSlug: "ebook",
+			Quantity:    1,
+			SupplyKind:  contracts.SupplyKindUnlimitedDigital,
+		}},
+	}
+	listing := orderSupplyListingNoVariant(t, "ebook", "")
+	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
+	listingHash := orderSupplyListingHash(t, listing)
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+
+	require.NoError(t, svc.db.View(func(tx database.Tx) error {
+		lines, err := standardOrderSupplyLinesFromOrderOpen(tx, "order-standard-digital-tx", orderSupplyOrderOpen(listing, listingHash), resolver, false)
+		require.NoError(t, err)
+		require.Len(t, lines, 1)
+		return nil
+	}))
+	require.True(t, resolver.txSeen)
+	require.Len(t, resolver.txItems, 1)
+	require.Empty(t, resolver.items, "transactional resolution must not re-enter Database.View")
+}
+
 func TestStandardOrderSupplyLinesSkipsDigitalGoodsWithoutResolver(t *testing.T) {
 	listing := orderSupplyListingNoVariant(t, "ebook", "")
 	listing.Listing.Metadata.ContractType = pb.Listing_Metadata_DIGITAL_GOOD
@@ -648,13 +673,26 @@ type recordingOrderSupplyAvailability struct {
 }
 
 type recordingDigitalSupplyLineResolver struct {
-	items [][]digital.OrderLineItem
-	lines []contracts.SupplyLine
-	err   error
+	items   [][]digital.OrderLineItem
+	txItems [][]digital.OrderLineItem
+	txSeen  bool
+	lines   []contracts.SupplyLine
+	err     error
 }
 
 func (r *recordingDigitalSupplyLineResolver) SupplyAvailabilityLinesForOrderItems(items []digital.OrderLineItem) ([]contracts.SupplyLine, error) {
 	r.items = append(r.items, append([]digital.OrderLineItem(nil), items...))
+	if r.err != nil {
+		return nil, r.err
+	}
+	lines := make([]contracts.SupplyLine, len(r.lines))
+	copy(lines, r.lines)
+	return lines, nil
+}
+
+func (r *recordingDigitalSupplyLineResolver) SupplyAvailabilityLinesForOrderItemsTx(tx database.Tx, items []digital.OrderLineItem) ([]contracts.SupplyLine, error) {
+	r.txSeen = tx != nil
+	r.txItems = append(r.txItems, append([]digital.OrderLineItem(nil), items...))
 	if r.err != nil {
 		return nil, r.err
 	}

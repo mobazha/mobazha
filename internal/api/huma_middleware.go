@@ -1,13 +1,15 @@
 // Package api — huma_middleware.go
 //
 // AH-1.4: Bridges the Node gateway's auth model onto huma's per-operation
-// declarative security. The Node supports three auth modes (in priority):
+// declarative security. The Node supports four auth modes (in priority):
 //  1. mbz_ API token → AuthIdentity with IsAPIToken=true + ScopeSet
 //  2. Bearer JWT (Casdoor) → AuthIdentity with IsAdmin=true
-//  3. Basic Auth → AuthIdentity with IsAdmin=true
+//  3. HttpOnly admin session + CSRF → AuthIdentity with IsAdmin=true
+//  4. Basic Auth → AuthIdentity with IsAdmin=true
 //
 // huma operations declare their auth requirement via:
-//   - Security: nodeAuthSecurity (OR across basicAuth / bearerJWT / apiToken)
+//   - Security: nodeAuthSecurity (OR across basicAuth / bearerJWT / apiToken /
+//     adminSession)
 //     for owner-only routes
 //   - omitting Security for anonymous/public routes
 //
@@ -98,6 +100,18 @@ func operationAcceptsAPIToken(op *huma.Operation) bool {
 	}
 	for _, requirement := range op.Security {
 		if _, ok := requirement[SecuritySchemeAPIToken]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func operationAcceptsAdminSession(op *huma.Operation) bool {
+	if op == nil {
+		return false
+	}
+	for _, requirement := range op.Security {
+		if _, ok := requirement[SecuritySchemeAdminSession]; ok {
 			return true
 		}
 	}
@@ -318,7 +332,29 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 			return
 		}
 
-		// 3) Basic Auth
+		// 3) Short-lived browser admin session. Explicit Authorization or
+		// WebSocket Basic credentials always take precedence over ambient cookies.
+		basicQuery := strings.HasPrefix(ctx.Query("token"), "basic:")
+		if authHeader == "" && !basicQuery {
+			cookieVal := extractCookieFromHuma(ctx, AdminSessionCookieName)
+			if session, ok := g.ensureAdminSessionStore().get(cookieVal); ok {
+				if !operationAcceptsAdminSession(op) {
+					huma.WriteErr(api, ctx, http.StatusUnauthorized,
+						"Administrator sessions are not accepted for this operation")
+					return
+				}
+				if adminSessionRequiresCSRF(op.Method) &&
+					!csrfTokenMatches(session.CSRFToken, ctx.Header(AdminSessionCSRFHeader)) {
+					huma.WriteErr(api, ctx, http.StatusForbidden, "Invalid or missing CSRF token")
+					return
+				}
+				g.resetHumaAuthFailure(ctx)
+				next(huma.WithContext(ctx, WithAuthIdentity(ctx.Context(), adminSessionIdentity(session))))
+				return
+			}
+		}
+
+		// 4) Basic Auth
 		if g.auth.isConfigured() {
 			username, password, ok := parseBasicFromHuma(ctx)
 			if !ok {

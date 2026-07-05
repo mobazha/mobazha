@@ -80,7 +80,7 @@ func (s *authState) isConfigured() bool {
 }
 
 // AuthenticationMiddleware checks credentials for every request on protected
-// /v1/* routes. It supports three authentication modes (checked in order):
+// /v1/* routes. It supports four authentication modes (checked in order):
 //
 //  1. mbz_ API token (for AI agents / MCP / programmatic access):
 //     Authorization: Bearer mbz_<id>_<secret>
@@ -93,7 +93,12 @@ func (s *authState) isConfigured() bool {
 //     Signed by SaaS Casdoor; the user must be the store owner. Yields an
 //     AuthIdentity with IsAdmin=true and Scopes=nil (full access).
 //
-//  3. Basic Auth (for direct admin access):
+//  3. Short-lived HttpOnly admin session (for the standalone browser UI):
+//     Cookie: Mobazha_Admin_Session=<opaque token>
+//     Unsafe methods additionally require X-CSRF-Token. Explicit
+//     Authorization credentials always take precedence over this cookie.
+//
+//  4. Basic Auth (for direct admin access and session creation):
 //     Authorization: Basic <base64(user:pass)>
 //     Also supports ?token=basic:<base64> for direct WebSocket fallback.
 //     Basic credentials are intentionally not accepted through
@@ -183,11 +188,26 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 3) Basic Auth.
+		// 3) Short-lived browser admin session. Explicit Authorization or
+		// WebSocket Basic credentials always take precedence over ambient cookies.
+		tokenParam := r.URL.Query().Get("token")
+		if authHeader == "" && !strings.HasPrefix(tokenParam, "basic:") {
+			if _, session, ok := g.adminSessionFromRequest(r); ok {
+				if adminSessionRequiresCSRF(r.Method) &&
+					!csrfTokenMatches(session.CSRFToken, r.Header.Get(AdminSessionCSRFHeader)) {
+					ErrorResponse(w, http.StatusForbidden, "Invalid or missing CSRF token")
+					return
+				}
+				g.ResetAuthFailure(r)
+				next.ServeHTTP(w, r.WithContext(WithAuthIdentity(r.Context(), adminSessionIdentity(session))))
+				return
+			}
+		}
+
+		// 4) Basic Auth.
 		if g.auth.isConfigured() {
 			username, password, ok := r.BasicAuth()
 			if !ok {
-				tokenParam := r.URL.Query().Get("token")
 				if strings.HasPrefix(tokenParam, "basic:") {
 					username, password, ok = parseBasicToken(tokenParam[6:])
 				}
@@ -491,6 +511,7 @@ func (g *Gateway) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	g.auth.mu.Lock()
 	g.auth.passwordHash = newHash
 	g.auth.mu.Unlock()
+	g.ensureAdminSessionStore().revokeAll()
 
 	if g.auth.plainFile != "" {
 		if err := os.Remove(g.auth.plainFile); err != nil && !os.IsNotExist(err) {

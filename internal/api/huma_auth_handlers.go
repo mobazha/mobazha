@@ -7,9 +7,22 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 )
+
+type adminSessionStatus struct {
+	Authenticated bool       `json:"authenticated"`
+	CSRFToken     string     `json:"csrfToken,omitempty"`
+	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
+}
+
+type adminSessionOutput struct {
+	SetCookie    string `header:"Set-Cookie" required:"false"`
+	CacheControl string `header:"Cache-Control" required:"false"`
+	Body         adminSessionStatus
+}
 
 // registerNodeHumaAuthPublicOperations registers public auth ops
 // (node version fingerprint — unauthenticated health check).
@@ -42,6 +55,81 @@ func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 	type tokenIDPath struct {
 		TokenID string `path:"tokenID"`
 	}
+
+	huma.Register(api, huma.Operation{
+		OperationID: "auth-admin-session-post",
+		Method:      http.MethodPost,
+		Path:        "/v1/auth/admin-session",
+		Summary:     "Create a short-lived standalone administrator session",
+		Tags:        []string{"auth"},
+		Security:    adminLoginAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*adminSessionOutput, error) {
+		identity := GetAuthIdentity(ctx)
+		if identity == nil || !identity.IsAdmin {
+			return nil, huma.NewError(http.StatusUnauthorized, "Administrator authentication required")
+		}
+		token, session, err := g.ensureAdminSessionStore().issue(identity.UserID)
+		if err != nil {
+			log.Errorf("Failed to issue administrator session: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "Failed to create administrator session")
+		}
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/auth/admin-session", nil)
+		expiresAt := session.ExpiresAt.UTC()
+		log.Infof("[ADMIN_SESSION] issued user=%q remote=%q expires=%s",
+			identity.UserID, req.RemoteAddr, expiresAt.Format(time.RFC3339))
+		return &adminSessionOutput{
+			SetCookie:    g.adminSessionCookie(token, session.ExpiresAt, req),
+			CacheControl: "no-store",
+			Body: adminSessionStatus{
+				Authenticated: true,
+				CSRFToken:     session.CSRFToken,
+				ExpiresAt:     &expiresAt,
+			},
+		}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "auth-admin-session-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/auth/admin-session",
+		Summary:     "Inspect the current standalone administrator session",
+		Tags:        []string{"auth"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*adminSessionOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/auth/admin-session", nil)
+		_, session, ok := g.adminSessionFromRequest(req)
+		status := adminSessionStatus{Authenticated: true}
+		if ok {
+			expiresAt := session.ExpiresAt.UTC()
+			status.CSRFToken = session.CSRFToken
+			status.ExpiresAt = &expiresAt
+		}
+		return &adminSessionOutput{CacheControl: "no-store", Body: status}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "auth-admin-session-delete",
+		Method:      http.MethodDelete,
+		Path:        "/v1/auth/admin-session",
+		Summary:     "Revoke the current standalone administrator session",
+		Tags:        []string{"auth"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*adminSessionOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodDelete, "/v1/auth/admin-session", nil)
+		token, _, _ := g.adminSessionFromRequest(req)
+		g.ensureAdminSessionStore().revoke(token)
+		identity := GetAuthIdentity(ctx)
+		userID := "unknown"
+		if identity != nil && identity.UserID != "" {
+			userID = identity.UserID
+		}
+		log.Infof("[ADMIN_SESSION] revoked user=%q remote=%q", userID, req.RemoteAddr)
+		return &adminSessionOutput{
+			SetCookie:    g.expiredAdminSessionCookie(req),
+			CacheControl: "no-store",
+			Body:         adminSessionStatus{Authenticated: false},
+		}, nil
+	})
 
 	huma.Register(api, huma.Operation{
 		OperationID: "admin-password-post",

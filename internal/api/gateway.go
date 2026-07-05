@@ -67,6 +67,9 @@ type GatewayConfig struct {
 	PublicOnly      bool
 	HashFile        string // path to persist password hash for runtime changes (standalone)
 	PlainFile       string // first-run plaintext password file (standalone)
+	// AdminSessionTTL controls short-lived browser administrator sessions.
+	// Zero uses the secure default (30 minutes).
+	AdminSessionTTL time.Duration
 
 	// CasdoorCertificate is the PEM certificate from SaaS Casdoor.
 	// When set, the standalone node accepts JWT Bearer tokens in addition
@@ -131,6 +134,7 @@ type Gateway struct {
 	handler           http.Handler
 	config            *GatewayConfig
 	auth              authState
+	adminSessions     *adminSessionStore
 	jwtValidator      *JWTValidator   // nil when no Casdoor cert configured
 	tokenStore        *apitoken.Store // nil in SaaS mode; set for standalone
 	hubs              map[string]*hub
@@ -162,6 +166,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			featureManager:    pkgconfig.GetGlobalFeatureManager(),
 			guestOrderLimiter: newRateLimiter(10, time.Hour),
 			authLimiter:       newAuthRateLimiter(),
+			adminSessions:     newAdminSessionStore(config.AdminSessionTTL),
 			editionPolicy:     editionPolicy,
 			aiHTTPPolicy:      resolveAIHTTPPolicy(config.AIHTTPPolicy, editionPolicy),
 		}

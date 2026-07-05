@@ -31,7 +31,7 @@ func TestOperationAcceptsAPIToken(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "adminOnlyAuthSecurity (basic+jwt only) refuses",
+			name: "adminOnlyAuthSecurity (basic+jwt+session) refuses",
 			sec:  adminOnlyAuthSecurity,
 			want: false,
 		},
@@ -78,6 +78,21 @@ func TestOperationAcceptsAPIToken(t *testing.T) {
 				t.Errorf("operationAcceptsAPIToken: got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestOperationAcceptsAdminSession(t *testing.T) {
+	if !operationAcceptsAdminSession(&huma.Operation{Security: nodeAuthSecurity}) {
+		t.Fatal("nodeAuthSecurity must accept administrator sessions")
+	}
+	if !operationAcceptsAdminSession(&huma.Operation{Security: adminOnlyAuthSecurity}) {
+		t.Fatal("adminOnlyAuthSecurity must accept administrator sessions")
+	}
+	if operationAcceptsAdminSession(&huma.Operation{Security: adminLoginAuthSecurity}) {
+		t.Fatal("session creation must require fresh Basic or JWT credentials")
+	}
+	if operationAcceptsAdminSession(nil) {
+		t.Fatal("nil operation must not accept administrator sessions")
 	}
 }
 

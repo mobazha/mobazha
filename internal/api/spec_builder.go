@@ -50,6 +50,12 @@ func BuildOpenAPISpec() []byte {
 		BearerFormat: "mbz_<id>_<secret>",
 		Description:  "Scoped API token (standalone). Prefix: mbz_.",
 	}
+	cfg.Components.SecuritySchemes[SecuritySchemeAdminSession] = &huma.SecurityScheme{
+		Type:        "apiKey",
+		In:          "cookie",
+		Name:        AdminSessionCookieName,
+		Description: "Short-lived HttpOnly standalone administrator session. Unsafe requests also require X-CSRF-Token.",
+	}
 	cfg.Components.SecuritySchemes[SecuritySchemeNodeAuth] = &huma.SecurityScheme{
 		Type:        "http",
 		Scheme:      "bearer",

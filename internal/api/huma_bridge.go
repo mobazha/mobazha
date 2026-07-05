@@ -300,6 +300,14 @@ func (g *Gateway) nodeBridgeRequestWithOptionalAuth(ctx context.Context, method,
 			}
 		}
 	}
+	if authHeader == "" {
+		if _, session, ok := g.adminSessionFromRequest(req); ok {
+			if !adminSessionRequiresCSRF(req.Method) ||
+				csrfTokenMatches(session.CSRFToken, req.Header.Get(AdminSessionCSRFHeader)) {
+				return req.WithContext(WithAuthIdentity(req.Context(), adminSessionIdentity(session)))
+			}
+		}
+	}
 
 	if g.auth.isConfigured() {
 		username, password, ok := req.BasicAuth()

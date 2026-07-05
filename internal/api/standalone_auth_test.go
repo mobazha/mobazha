@@ -22,7 +22,8 @@ func testGateway(t *testing.T, password string) *Gateway {
 		t.Fatal(err)
 	}
 	return &Gateway{
-		config: &GatewayConfig{},
+		config:        &GatewayConfig{},
+		adminSessions: newAdminSessionStore(defaultAdminSessionTTL),
 		auth: authState{
 			username:     "admin",
 			passwordHash: hash,
@@ -86,6 +87,68 @@ func TestAuthMiddleware_AcceptsCorrectCredentials(t *testing.T) {
 	}
 }
 
+func TestAuthMiddleware_AcceptsAdminSessionAndEnforcesCSRF(t *testing.T) {
+	g := testGateway(t, "testpass")
+	token, session, err := g.adminSessions.issue("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handler := g.AuthenticationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity := GetAuthIdentity(r.Context())
+		if identity == nil || !identity.IsAdmin || identity.UserID != "admin" {
+			t.Fatalf("unexpected session identity: %#v", identity)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for _, test := range []struct {
+		name       string
+		method     string
+		csrf       string
+		wantStatus int
+	}{
+		{name: "safe request", method: http.MethodGet, wantStatus: http.StatusOK},
+		{name: "unsafe request without CSRF", method: http.MethodPost, wantStatus: http.StatusForbidden},
+		{name: "unsafe request with wrong CSRF", method: http.MethodDelete, csrf: "wrong", wantStatus: http.StatusForbidden},
+		{name: "unsafe request with CSRF", method: http.MethodPatch, csrf: session.CSRFToken, wantStatus: http.StatusOK},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(test.method, "/v1/products", nil)
+			req.AddCookie(&http.Cookie{Name: AdminSessionCookieName, Value: token})
+			if test.csrf != "" {
+				req.Header.Set(AdminSessionCSRFHeader, test.csrf)
+			}
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+			if rr.Code != test.wantStatus {
+				t.Fatalf("expected %d, got %d: %s", test.wantStatus, rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
+func TestAuthMiddleware_ExplicitBasicOverridesAmbientSession(t *testing.T) {
+	g := testGateway(t, "testpass")
+	token, _, err := g.adminSessions.issue("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := g.AuthenticationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/products", nil)
+	req.AddCookie(&http.Cookie{Name: AdminSessionCookieName, Value: token})
+	req.SetBasicAuth("admin", "testpass")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("explicit Basic auth should not require session CSRF, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestAuthMiddleware_SkipsWhenNoCredentials(t *testing.T) {
 	g := &Gateway{
 		config: &GatewayConfig{},
@@ -122,6 +185,10 @@ func TestChangePassword_RejectsGET(t *testing.T) {
 
 func TestChangePassword_Success(t *testing.T) {
 	g := testGateway(t, "oldpassword")
+	token, _, err := g.adminSessions.issue("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	body, _ := json.Marshal(changePasswordRequest{
 		CurrentPassword: "oldpassword",
@@ -145,6 +212,9 @@ func TestChangePassword_Success(t *testing.T) {
 	}
 	if err := bcrypt.CompareHashAndPassword(persistedHash, []byte("newpassword123")); err != nil {
 		t.Errorf("persisted hash doesn't match new password: %v", err)
+	}
+	if _, ok := g.adminSessions.get(token); ok {
+		t.Error("password rotation must revoke existing administrator sessions")
 	}
 }
 

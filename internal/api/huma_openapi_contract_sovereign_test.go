@@ -213,6 +213,10 @@ func TestSovereignOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"settings-ai-test-post",
 		"ai-status-get",
 		"ai-generate-post",
+		// short-lived standalone administrator session
+		"auth-admin-session-delete",
+		"auth-admin-session-get",
+		"auth-admin-session-post",
 		// exchange rates
 		"exchange-rates-get",
 		"exchange-rates-currency-code-get",

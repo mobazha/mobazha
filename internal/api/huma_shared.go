@@ -10,18 +10,20 @@ import (
 
 // Security scheme names referenced in huma.Operation.Security.
 const (
-	SecuritySchemeBasicAuth = "basicAuth"
-	SecuritySchemeBearerJWT = "bearerJWT"
-	SecuritySchemeAPIToken  = "apiToken"
-	SecuritySchemeNodeAuth  = "nodeAuth"
+	SecuritySchemeBasicAuth    = "basicAuth"
+	SecuritySchemeBearerJWT    = "bearerJWT"
+	SecuritySchemeAPIToken     = "apiToken"
+	SecuritySchemeNodeAuth     = "nodeAuth"
+	SecuritySchemeAdminSession = "adminSession"
 )
 
 // nodeAuthSecurity is the standard security requirement for owner-only routes.
-// It allows any one of: Basic Auth, Bearer JWT, or API token.
+// It allows any one of: Basic Auth, Bearer JWT, API token, or administrator session.
 var nodeAuthSecurity = []map[string][]string{
 	{SecuritySchemeBasicAuth: {}},
 	{SecuritySchemeBearerJWT: {}},
 	{SecuritySchemeAPIToken: {}},
+	{SecuritySchemeAdminSession: {}},
 }
 
 // adminOnlyAuthSecurity is used for first-run / lifecycle-critical
@@ -31,6 +33,12 @@ var nodeAuthSecurity = []map[string][]string{
 // machines that follow the spec won't waste a round-trip trying tokens
 // that the scope middleware would deny-by-default anyway.
 var adminOnlyAuthSecurity = []map[string][]string{
+	{SecuritySchemeBasicAuth: {}},
+	{SecuritySchemeBearerJWT: {}},
+	{SecuritySchemeAdminSession: {}},
+}
+
+var adminLoginAuthSecurity = []map[string][]string{
 	{SecuritySchemeBasicAuth: {}},
 	{SecuritySchemeBearerJWT: {}},
 }

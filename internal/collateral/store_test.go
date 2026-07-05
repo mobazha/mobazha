@@ -398,7 +398,7 @@ func collateralTestDB(t *testing.T) database.Database {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	require.NoError(t, db.Update(func(tx database.Tx) error {
-		for _, model := range []interface{}{&models.CollateralAccountRecord{}, &models.CollateralFundingRecord{}, &models.CollateralExecutionRecord{}, &models.CollateralAllocationRecord{}, &models.CollateralClaimRecord{}, &models.CollateralActionRecord{}} {
+		for _, model := range []interface{}{&models.CollateralAccountRecord{}, &models.CollateralFundingRecord{}, &models.CollateralExecutionRecord{}, &models.CollateralAllocationRecord{}, &models.CollateralClaimRecord{}, &models.CollateralActionRecord{}, &models.CollateralFundingTargetRecord{}, &models.CollateralRailActionRecord{}} {
 			if err := tx.Migrate(model); err != nil {
 				return err
 			}

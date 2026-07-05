@@ -212,7 +212,12 @@ func (r RailActionResult) Validate() error {
 // settlement adapters do not satisfy this interface implicitly.
 type Rail interface {
 	Descriptor() RailDescriptor
+	// PrepareFunding and SubmitExecution are create-or-retrieve operations.
+	// Repeating the same validated idempotency identity must not create a
+	// second external target or transfer.
 	PrepareFunding(context.Context, FundingTargetRequest) (FundingTarget, error)
+	// Status results are receipt-verified rail projections. Core still checks
+	// every immutable binding before accepting a confirmed transition.
 	FundingStatus(context.Context, FundingTarget) (RailFundingStatus, error)
 	SubmitExecution(context.Context, RailExecutionRequest) (RailActionResult, error)
 	ExecutionStatus(context.Context, string) (RailActionResult, error)

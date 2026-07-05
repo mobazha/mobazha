@@ -129,3 +129,54 @@ type CollateralActionRecord struct {
 	Reference                  string `gorm:"type:varchar(256)"`
 	CreatedAt                  time.Time
 }
+
+// CollateralFundingTargetRecord persists a funding-target request before the
+// selected rail performs external work. A pending row without a destination
+// is deliberately recoverable by repeating the same idempotent request.
+type CollateralFundingTargetRecord struct {
+	TenantID         string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:uidx_collateral_funding_target_idempotency,priority:1" json:"-"`
+	CollateralID     string `gorm:"primaryKey;type:varchar(96)"`
+	RailID           string `gorm:"type:varchar(160);not null"`
+	RailVersion      string `gorm:"type:varchar(32);not null"`
+	PrincipalID      string `gorm:"type:varchar(192);not null"`
+	AssetID          string `gorm:"type:varchar(160);not null"`
+	Amount           string `gorm:"type:varchar(128);not null"`
+	IdempotencyKey   string `gorm:"type:varchar(192);not null;uniqueIndex:uidx_collateral_funding_target_idempotency,priority:2"`
+	ExpectedRevision uint64 `gorm:"not null"`
+	Destination      string `gorm:"type:varchar(512)"`
+	Payload          []byte
+	State            string `gorm:"type:varchar(32);not null;index"`
+	FundingReference string `gorm:"type:varchar(256)"`
+	ObservedAmount   string `gorm:"type:varchar(128)"`
+	Attempts         uint64 `gorm:"not null"`
+	LastError        string `gorm:"type:text"`
+	ObservedAt       *time.Time
+	ExpiresAt        time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+// CollateralRailActionRecord is the durable C2 execution intent. The immutable
+// request is committed before SubmitExecution is called, so a crash or timeout
+// can only leave recoverable pending work and never an untracked transfer.
+type CollateralRailActionRecord struct {
+	TenantID         string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:uidx_collateral_rail_action_idempotency,priority:1" json:"-"`
+	ActionID         string `gorm:"primaryKey;type:varchar(96)"`
+	CollateralID     string `gorm:"type:varchar(96);not null;index"`
+	ClaimID          string `gorm:"type:varchar(96);index"`
+	RailID           string `gorm:"type:varchar(160);not null"`
+	RailVersion      string `gorm:"type:varchar(32);not null"`
+	Kind             string `gorm:"type:varchar(32);not null"`
+	AssetID          string `gorm:"type:varchar(160);not null"`
+	Amount           string `gorm:"type:varchar(128);not null"`
+	Destination      string `gorm:"type:varchar(512);not null"`
+	ExpectedRevision uint64 `gorm:"not null"`
+	IdempotencyKey   string `gorm:"type:varchar(192);not null;uniqueIndex:uidx_collateral_rail_action_idempotency,priority:2"`
+	State            string `gorm:"type:varchar(32);not null;index"`
+	Reference        string `gorm:"type:varchar(256)"`
+	Attempts         uint64 `gorm:"not null"`
+	LastError        string `gorm:"type:text"`
+	ObservedAt       *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}

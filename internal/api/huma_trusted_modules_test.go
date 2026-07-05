@@ -149,6 +149,16 @@ func TestRegisterTrustedHumaModules_FailsClosed(t *testing.T) {
 			want: "method \"CONNECT\" is unsupported",
 		},
 		{
+			name: "trace method",
+			register: func(registration distribution.TrustedHumaRegistration) error {
+				return distribution.RegisterTrustedAdminOnly(registration, huma.Operation{
+					OperationID: "trusted-module-trace", Method: http.MethodTrace,
+					Path: "/v1/test/trusted/trace",
+				}, trustedTestHandler)
+			},
+			want: "method \"TRACE\" is unsupported",
+		},
+		{
 			name: "missing API token scope",
 			register: func(registration distribution.TrustedHumaRegistration) error {
 				return distribution.RegisterTrustedNodeToken(registration, huma.Operation{

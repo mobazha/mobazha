@@ -197,7 +197,7 @@ func (registrar *trustedHumaRegistrar) validateOperation(operation huma.Operatio
 	}
 	switch method {
 	case http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete,
-		http.MethodOptions, http.MethodHead, http.MethodPatch, http.MethodTrace:
+		http.MethodOptions, http.MethodHead, http.MethodPatch:
 	default:
 		return fmt.Errorf("trusted Huma operation %q: method %q is unsupported", operationID, method)
 	}

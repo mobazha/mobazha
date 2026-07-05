@@ -143,6 +143,18 @@
       "path": "/v1/analytics/{peerID}/events"
     },
     {
+      "method": "DELETE",
+      "path": "/v1/auth/admin-session"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/auth/admin-session"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/auth/admin-session"
+    },
+    {
       "method": "GET",
       "path": "/v1/auth/identity"
     },
@@ -913,6 +925,10 @@
     {
       "method": "POST",
       "path": "/v1/orders/{orderID}/payment"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/payment-selection-quotes"
     },
     {
       "method": "GET",

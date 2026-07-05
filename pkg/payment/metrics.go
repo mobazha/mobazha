@@ -73,6 +73,31 @@ var (
 			Buckets: []float64{0, 1, 2, 5, 10, 25, 50, 100},
 		},
 	)
+
+	fiatProviderActionOldestDueAge = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "fiat_provider_action_oldest_due_age_seconds",
+			Help:    "Age of the oldest due durable provider action observed in one tenant reconciliation pass.",
+			Buckets: []float64{60, 300, 900, 1800, 3600, 7200, 21600, 43200, 86400},
+		},
+	)
+
+	fiatProviderActionAttempts = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "fiat_provider_action_attempts",
+			Help:    "Number of provider attempts recorded when a durable action changes outcome.",
+			Buckets: []float64{1, 2, 3, 5, 8, 13, 21, 34},
+		},
+		[]string{"provider", "action", "outcome"},
+	)
+
+	fiatProviderActionManualRetries = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "fiat_provider_action_manual_retries_total",
+			Help: "Total number of tenant-scoped manual provider action retry requests by result.",
+		},
+		[]string{"provider", "action", "result"},
+	)
 )
 
 // RecordPaymentObservationInserted records a successful append-only observation insert.
@@ -147,6 +172,35 @@ func RecordFiatProviderActionOutcome(providerID, actionKind, outcome string) {
 // each other.
 func ObserveFiatProviderActionReconcileBatchSize(count int) {
 	fiatProviderActionReconcileBatchSize.Observe(float64(count))
+}
+
+// ObserveFiatProviderActionOldestDueAge records the oldest backlog item seen by
+// one tenant-scoped pass. A histogram avoids process-global gauge overwrites
+// when many tenant services reconcile concurrently.
+func ObserveFiatProviderActionOldestDueAge(age time.Duration) {
+	if age < 0 {
+		age = 0
+	}
+	fiatProviderActionOldestDueAge.Observe(age.Seconds())
+}
+
+// ObserveFiatProviderActionAttempts records the consecutive provider attempt
+// count at an outcome boundary.
+func ObserveFiatProviderActionAttempts(providerID, actionKind, outcome string, attempts int) {
+	fiatProviderActionAttempts.WithLabelValues(
+		sanitizeMetricLabel(providerID),
+		sanitizeMetricLabel(actionKind),
+		sanitizeMetricLabel(outcome),
+	).Observe(float64(attempts))
+}
+
+// RecordFiatProviderActionManualRetry records low-cardinality operator retry outcomes.
+func RecordFiatProviderActionManualRetry(providerID, actionKind, result string) {
+	fiatProviderActionManualRetries.WithLabelValues(
+		sanitizeMetricLabel(providerID),
+		sanitizeMetricLabel(actionKind),
+		sanitizeMetricLabel(result),
+	).Inc()
 }
 
 func sanitizeMetricLabel(v string) string {

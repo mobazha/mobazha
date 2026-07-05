@@ -59,6 +59,8 @@ const (
 	providerCredentialEncryptionKeyVersion uint64 = 1
 	providerActionLeaseDuration                   = 2 * time.Minute
 	providerActionBatchSize                       = 100
+	providerActionDefaultListLimit                = 50
+	providerActionMaxListLimit                    = 100
 )
 
 type providerCredentialMaterial struct {
@@ -823,6 +825,7 @@ func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, actio
 		return providerActionResult{}, err
 	}
 	payment.RecordFiatProviderActionOutcome(action.ProviderID, action.ActionKind, "completed")
+	payment.ObserveFiatProviderActionAttempts(action.ProviderID, action.ActionKind, "completed", action.Attempts+1)
 	logger.LogInfoWithIDf(log, s.nodeID, "provider action completed: action=%s kind=%s provider=%s attempts=%d",
 		action.ActionID, action.ActionKind, action.ProviderID, action.Attempts+1)
 	if result.AlreadyRefunded {
@@ -911,7 +914,7 @@ func (s *FiatPaymentAppService) markProviderActionReconcileRequired(action model
 	updateErr := s.db.Update(func(tx database.Tx) error {
 		updated, err := tx.UpdateColumns(map[string]interface{}{
 			"state": models.PaymentProviderActionReconcileRequired, "attempts": action.Attempts + 1,
-			"last_error": actionErr.Error(), "next_attempt_at": nextAttemptAt,
+			"last_error": payment.SanitizeProviderError(actionErr), "next_attempt_at": nextAttemptAt,
 			"lease_owner": "", "lease_expires_at": nil, "updated_at": time.Now().UTC(),
 		}, map[string]interface{}{
 			"action_id = ?": action.ActionID, "lease_owner = ?": action.LeaseOwner,
@@ -933,9 +936,10 @@ func (s *FiatPaymentAppService) markProviderActionReconcileRequired(action model
 		return errors.Join(actionErr, updateErr)
 	}
 	payment.RecordFiatProviderActionOutcome(action.ProviderID, action.ActionKind, "reconcile_required")
+	payment.ObserveFiatProviderActionAttempts(action.ProviderID, action.ActionKind, "reconcile_required", action.Attempts+1)
 	logger.LogWarningWithIDf(log, s.nodeID,
 		"provider action scheduled for reconciliation: action=%s kind=%s provider=%s attempts=%d next_attempt=%s error=%v",
-		action.ActionID, action.ActionKind, action.ProviderID, action.Attempts+1, nextAttemptAt.Format(time.RFC3339), actionErr)
+		action.ActionID, action.ActionKind, action.ProviderID, action.Attempts+1, nextAttemptAt.Format(time.RFC3339), payment.SanitizeProviderError(actionErr))
 	return actionErr
 }
 
@@ -961,6 +965,157 @@ func (s *FiatPaymentAppService) completeProviderAction(action models.PaymentProv
 		}
 		return nil
 	})
+}
+
+// ListProviderActions returns a tenant-scoped operational projection without
+// exposing provider credentials, raw intent/result payloads, or lease owners.
+func (s *FiatPaymentAppService) ListProviderActions(ctx context.Context, query contracts.ProviderActionQuery) ([]contracts.ProviderActionView, error) {
+	limit := query.Limit
+	if limit <= 0 {
+		limit = providerActionDefaultListLimit
+	}
+	if limit > providerActionMaxListLimit {
+		limit = providerActionMaxListLimit
+	}
+	var actions []models.PaymentProviderAction
+	err := s.db.View(func(tx database.Tx) error {
+		db := tx.Read().WithContext(ctx)
+		if providerID := strings.TrimSpace(query.ProviderID); providerID != "" {
+			db = db.Where("provider_id = ?", strings.ToLower(providerID))
+		}
+		if actionKind := strings.TrimSpace(query.ActionKind); actionKind != "" {
+			db = db.Where("action_kind = ?", strings.ToLower(actionKind))
+		}
+		if state := strings.TrimSpace(query.State); state != "" {
+			db = db.Where("state = ?", strings.ToLower(state))
+		}
+		return db.Order("created_at DESC").Limit(limit).Find(&actions).Error
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list provider actions: %w", err)
+	}
+	now := time.Now().UTC()
+	result := make([]contracts.ProviderActionView, 0, len(actions))
+	for _, action := range actions {
+		result = append(result, providerActionView(action, now))
+	}
+	return result, nil
+}
+
+// RetryProviderAction performs one explicit, tenant-scoped retry. It may
+// override persisted backoff, but never a live lease; the normal CAS claim and
+// provider idempotency key remain authoritative.
+func (s *FiatPaymentAppService) RetryProviderAction(ctx context.Context, request contracts.ProviderActionRetryRequest) (*contracts.ProviderActionView, error) {
+	actionID := strings.TrimSpace(request.ActionID)
+	if actionID == "" {
+		return nil, contracts.ErrActionNotFound
+	}
+	action, err := s.loadProviderAction(ctx, actionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.auditProviderActionManualRetry(action, request.RequestedBy); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	if action.State == models.PaymentProviderActionCompleted {
+		view := providerActionView(action, now)
+		payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, "already_completed")
+		return &view, nil
+	}
+	if action.LeaseExpiresAt != nil && action.LeaseExpiresAt.After(now) {
+		payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, "in_progress")
+		return nil, contracts.ErrActionInProgress
+	}
+	if action.State != models.PaymentProviderActionPendingExternal && action.State != models.PaymentProviderActionReconcileRequired {
+		payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, "not_retryable")
+		return nil, contracts.ErrActionNotRetryable
+	}
+	if action.NextAttemptAt != nil && action.NextAttemptAt.After(now) {
+		if err := s.clearProviderActionBackoff(action, now); err != nil {
+			payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, "claim_conflict")
+			return nil, err
+		}
+		action.NextAttemptAt = nil
+		action.UpdatedAt = now
+	}
+	if _, err := s.executeProviderAction(ctx, action); err != nil && !errors.Is(err, contracts.ErrAlreadyRefunded) {
+		result := "failed"
+		if errors.Is(err, contracts.ErrActionInProgress) || errors.Is(err, contracts.ErrActionLeaseLost) {
+			result = "claim_conflict"
+		}
+		payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, result)
+		return nil, err
+	}
+	completed, err := s.loadProviderAction(ctx, actionID)
+	if err != nil {
+		payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, "reload_error")
+		return nil, err
+	}
+	payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, "completed")
+	view := providerActionView(completed, time.Now().UTC())
+	return &view, nil
+}
+
+func (s *FiatPaymentAppService) auditProviderActionManualRetry(action models.PaymentProviderAction, requestedBy string) error {
+	requestedBy = strings.TrimSpace(requestedBy)
+	if requestedBy == "" {
+		requestedBy = "unknown"
+	}
+	audit := &models.PaymentProviderActionAudit{
+		AuditID: uuid.NewString(), ActionID: action.ActionID,
+		Event: models.PaymentProviderActionAuditManualRetryRequested, Actor: requestedBy,
+		ActionKind: action.ActionKind, ProviderID: action.ProviderID, State: action.State,
+		Attempts: action.Attempts, CreatedAt: time.Now().UTC(),
+	}
+	if err := s.db.Update(func(tx database.Tx) error { return tx.Create(audit) }); err != nil {
+		return fmt.Errorf("audit manual retry for provider action %s: %w", action.ActionID, err)
+	}
+	return nil
+}
+
+func (s *FiatPaymentAppService) loadProviderAction(ctx context.Context, actionID string) (models.PaymentProviderAction, error) {
+	var action models.PaymentProviderAction
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().WithContext(ctx).Where("action_id = ?", actionID).First(&action).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.PaymentProviderAction{}, contracts.ErrActionNotFound
+	}
+	if err != nil {
+		return models.PaymentProviderAction{}, fmt.Errorf("load provider action %s: %w", actionID, err)
+	}
+	return action, nil
+}
+
+func (s *FiatPaymentAppService) clearProviderActionBackoff(action models.PaymentProviderAction, now time.Time) error {
+	return s.db.Update(func(tx database.Tx) error {
+		updated, err := tx.UpdateColumns(map[string]interface{}{
+			"next_attempt_at": nil, "updated_at": now,
+		}, map[string]interface{}{
+			"action_id = ?": action.ActionID, "state = ?": action.State, "attempts = ?": action.Attempts,
+			"(lease_expires_at IS NULL OR lease_expires_at <= ?)": now,
+		}, &models.PaymentProviderAction{})
+		if err != nil {
+			return err
+		}
+		if updated != 1 {
+			return contracts.ErrActionInProgress
+		}
+		return nil
+	})
+}
+
+func providerActionView(action models.PaymentProviderAction, now time.Time) contracts.ProviderActionView {
+	leased := action.LeaseExpiresAt != nil && action.LeaseExpiresAt.After(now)
+	retryable := action.State == models.PaymentProviderActionPendingExternal || action.State == models.PaymentProviderActionReconcileRequired
+	return contracts.ProviderActionView{
+		ActionID: action.ActionID, ActionKind: action.ActionKind, ProviderID: action.ProviderID,
+		ExternalReference: action.ExternalReference, State: action.State, Attempts: action.Attempts,
+		ErrorSummary: payment.SanitizeProviderErrorMessage(action.LastError), Retryable: retryable && !leased, Leased: leased,
+		NextAttemptAt: action.NextAttemptAt, LeaseExpiresAt: action.LeaseExpiresAt, LastAttemptAt: action.LastAttemptAt,
+		CompletedAt: action.CompletedAt, CreatedAt: action.CreatedAt, UpdatedAt: action.UpdatedAt,
+	}
 }
 
 // GetPaymentStatus returns the normalized status of a fiat payment session.
@@ -1987,6 +2142,15 @@ func (s *FiatPaymentAppService) reconcileProviderActions(ctx context.Context) {
 		return
 	}
 	payment.ObserveFiatProviderActionReconcileBatchSize(len(actions))
+	if len(actions) > 0 {
+		oldestCreatedAt := actions[0].CreatedAt
+		for i := 1; i < len(actions); i++ {
+			if actions[i].CreatedAt.Before(oldestCreatedAt) {
+				oldestCreatedAt = actions[i].CreatedAt
+			}
+		}
+		payment.ObserveFiatProviderActionOldestDueAge(now.Sub(oldestCreatedAt))
+	}
 	for _, action := range actions {
 		if ctx.Err() != nil {
 			return

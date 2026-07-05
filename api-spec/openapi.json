@@ -1,6 +1,25 @@
 {
   "components": {
     "schemas": {
+      "AdminSessionStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          },
+          "csrfToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authenticated"
+        ],
+        "type": "object"
+      },
       "AgentProductImportAdvanceCounts": {
         "additionalProperties": false,
         "properties": {
@@ -1445,6 +1464,12 @@
       }
     },
     "securitySchemes": {
+      "adminSession": {
+        "description": "Short-lived HttpOnly standalone administrator session. Unsafe requests also require X-CSRF-Token.",
+        "in": "cookie",
+        "name": "Mobazha_Admin_Session",
+        "type": "apiKey"
+      },
       "apiToken": {
         "bearerFormat": "mbz_\u003cid\u003e_\u003csecret\u003e",
         "description": "Scoped API token (standalone). Prefix: mbz_.",
@@ -1515,6 +1540,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Rotate standalone admin password",
@@ -1616,6 +1644,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List agent approval requests",
@@ -1670,6 +1701,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get an agent approval request",
@@ -1724,6 +1758,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Apply an approved agent approval request",
@@ -1786,6 +1823,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Approve or reject an agent approval request",
@@ -1870,6 +1910,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List agent artifacts",
@@ -1918,6 +1961,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create an agent artifact",
@@ -1972,6 +2018,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get an agent artifact",
@@ -2032,6 +2081,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update an agent artifact",
@@ -2086,6 +2138,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create an approval from an agent proposal artifact",
@@ -2179,6 +2234,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get binary content for an agent source artifact",
@@ -2229,6 +2287,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Analyze a chat attachment on demand",
@@ -2274,6 +2335,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Stream an agent chat turn",
@@ -2334,6 +2398,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List agent chat sessions",
@@ -2381,6 +2448,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete agent chat session",
@@ -2433,6 +2503,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get agent chat session",
@@ -2545,6 +2618,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List agent memories",
@@ -2590,6 +2666,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Save an agent memory",
@@ -2664,6 +2743,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete an agent memory",
@@ -2751,6 +2833,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update an agent memory",
@@ -2815,6 +2900,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Ingest product import source material",
@@ -2879,6 +2967,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Advance a product import run",
@@ -2943,6 +3034,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Apply approved product import approval requests",
@@ -3007,6 +3101,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Approve or reject product import approval requests",
@@ -3070,6 +3167,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create approval requests for product import proposals",
@@ -3155,6 +3255,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get product import workbench data",
@@ -3231,6 +3334,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List agent skill runs",
@@ -3279,6 +3385,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create an agent skill run",
@@ -3333,6 +3442,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get an agent skill run",
@@ -3393,6 +3505,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update an agent skill run",
@@ -3443,6 +3558,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Generate AI content",
@@ -3485,6 +3603,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "AI availability and quota status",
@@ -3537,6 +3658,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Authenticated seller analytics rollup",
@@ -3589,6 +3713,161 @@
         ]
       }
     },
+    "/v1/auth/admin-session": {
+      "delete": {
+        "operationId": "auth-admin-session-delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSessionStatus"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Revoke the current standalone administrator session",
+        "tags": [
+          "auth"
+        ]
+      },
+      "get": {
+        "operationId": "auth-admin-session-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSessionStatus"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Inspect the current standalone administrator session",
+        "tags": [
+          "auth"
+        ]
+      },
+      "post": {
+        "operationId": "auth-admin-session-post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSessionStatus"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          }
+        ],
+        "summary": "Create a short-lived standalone administrator session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/auth/identity": {
       "get": {
         "operationId": "auth-identity-get",
@@ -3623,6 +3902,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Inspect resolved principal and scopes",
@@ -3665,6 +3947,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Enumerate token scope catalog",
@@ -3704,6 +3989,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List local API tokens (standalone)",
@@ -3749,6 +4037,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Mint local API token (standalone)",
@@ -3791,6 +4082,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Revoke local API token by ID",
@@ -3843,6 +4137,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Remove blocklist entry",
@@ -3893,6 +4190,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Block storefront peer IDs",
@@ -3935,6 +4235,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Clear all carts",
@@ -3975,6 +4278,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List shopping carts",
@@ -4017,6 +4323,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Cart item count across vendors",
@@ -4079,6 +4388,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Remove item from cart",
@@ -4139,6 +4451,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Add item to cart for vendor",
@@ -4199,6 +4514,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update cart item for vendor",
@@ -4275,6 +4593,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List dispute cases",
@@ -4324,6 +4645,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List dispute cases via JSON filter",
@@ -4379,6 +4703,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Retrieve dispute case envelope",
@@ -4421,6 +4748,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List blocked chat users",
@@ -4463,6 +4793,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List pending chat invites",
@@ -4527,6 +4860,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Upload chat media (multipart)",
@@ -4630,6 +4966,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Download chat media",
@@ -4672,6 +5011,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get chat presence status",
@@ -4720,6 +5062,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Set chat presence status",
@@ -4762,6 +5107,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List chat rooms",
@@ -4810,6 +5158,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create a new chat room",
@@ -4884,6 +5235,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Set chat room avatar (multipart)",
@@ -4946,6 +5300,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Invite a user to a chat room",
@@ -5000,6 +5357,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Join a chat room",
@@ -5062,6 +5422,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Kick a user from a chat room",
@@ -5116,6 +5479,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Leave a chat room",
@@ -5170,6 +5536,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List room members",
@@ -5264,6 +5633,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get messages in a chat room",
@@ -5324,6 +5696,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Send a message in a chat room",
@@ -5381,6 +5756,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete a chat message",
@@ -5451,6 +5829,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Edit a chat message",
@@ -5523,6 +5904,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "React to a chat message",
@@ -5585,6 +5969,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Mark room messages as read",
@@ -5639,6 +6026,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get chat room settings",
@@ -5699,6 +6089,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update chat room settings",
@@ -5761,6 +6154,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Send typing indicator",
@@ -5803,6 +6199,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get global chat settings",
@@ -5851,6 +6250,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update global chat settings",
@@ -5893,6 +6295,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get Matrix chat connection status",
@@ -5940,6 +6345,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Unblock a chat user",
@@ -5961,24 +6369,9 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {}
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Success envelope inner data."
-                }
-              }
-            },
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           },
           "default": {
             "content": {
@@ -6000,6 +6393,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Block a chat user",
@@ -6050,6 +6446,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Request device verification",
@@ -6073,24 +6472,9 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {}
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Success envelope inner data."
-                }
-              }
-            },
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           },
           "default": {
             "content": {
@@ -6112,6 +6496,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Accept verification request",
@@ -6174,6 +6561,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Cancel verification",
@@ -6197,24 +6587,9 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {}
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Success envelope inner data."
-                }
-              }
-            },
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           },
           "default": {
             "content": {
@@ -6236,6 +6611,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Confirm SAS verification",
@@ -6259,24 +6637,9 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {}
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Success envelope inner data."
-                }
-              }
-            },
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           },
           "default": {
             "content": {
@@ -6298,6 +6661,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Start SAS verification",
@@ -6366,6 +6732,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List collections",
@@ -6414,6 +6783,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create collection",
@@ -6461,6 +6833,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete collection",
@@ -6513,6 +6888,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get collection",
@@ -6571,6 +6949,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update collection",
@@ -6631,6 +7012,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Add products to collection",
@@ -6684,6 +7068,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Reorder products in collection",
@@ -6739,6 +7126,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Remove product from collection",
@@ -6889,6 +7279,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get gateway configuration snapshot",
@@ -6939,6 +7332,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Stable hash helper for payloads",
@@ -6989,6 +7385,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Sign a payload with seller keys",
@@ -7039,6 +7438,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Verify a detached signature",
@@ -7106,6 +7508,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List digital assets for a listing",
@@ -7158,6 +7563,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create a license-key-type digital asset",
@@ -7248,6 +7656,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List license keys (masked) for a listing",
@@ -7298,6 +7709,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Import license keys for a listing",
@@ -7359,6 +7773,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get license key pool statistics for a listing",
@@ -7404,6 +7821,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Revoke a license key",
@@ -7456,6 +7876,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create a link-type digital asset",
@@ -7501,6 +7924,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete a digital asset",
@@ -7551,6 +7977,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get a digital asset by ID",
@@ -7611,6 +8040,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update a digital asset",
@@ -7695,6 +8127,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List discounts",
@@ -7743,6 +8178,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create discount",
@@ -7790,6 +8228,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete discount",
@@ -7842,6 +8283,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get discount",
@@ -7900,6 +8344,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update discount",
@@ -7954,6 +8401,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List discount codes",
@@ -8012,6 +8462,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Add discount codes",
@@ -8065,6 +8518,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete a discount code",
@@ -8133,6 +8589,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List discount redemptions",
@@ -8342,6 +8801,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Open an after-sale dispute",
@@ -8404,6 +8866,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Close a dispute",
@@ -8467,6 +8932,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Legacy dispute release instructions",
@@ -8529,6 +8997,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Open a dispute",
@@ -8591,6 +9062,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Release escrow funds",
@@ -8653,6 +9127,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Release escrow after timeout",
@@ -8777,11 +9254,161 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get feature flags",
         "tags": [
           "settings"
+        ]
+      }
+    },
+    "/v1/fiat/provider-actions": {
+      "get": {
+        "operationId": "fiat-list-provider-actions",
+        "parameters": [
+          {
+            "description": "Optional fiat provider filter.",
+            "explode": false,
+            "in": "query",
+            "name": "provider",
+            "schema": {
+              "description": "Optional fiat provider filter.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional action-kind filter.",
+            "explode": false,
+            "in": "query",
+            "name": "action",
+            "schema": {
+              "description": "Optional action-kind filter.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional durable state filter.",
+            "explode": false,
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "description": "Optional durable state filter.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum rows; zero uses the server default.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Maximum rows; zero uses the server default.",
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "List durable fiat provider actions",
+        "tags": [
+          "fiat"
+        ]
+      }
+    },
+    "/v1/fiat/provider-actions/{actionID}/retry": {
+      "post": {
+        "operationId": "fiat-retry-provider-action",
+        "parameters": [
+          {
+            "description": "Durable provider action ID.",
+            "in": "path",
+            "name": "actionID",
+            "required": true,
+            "schema": {
+              "description": "Durable provider action ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Retry a durable fiat provider action",
+        "tags": [
+          "fiat"
         ]
       }
     },
@@ -8819,6 +9446,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List enabled fiat providers for seller dashboard",
@@ -9033,6 +9663,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Disconnect a fiat provider",
@@ -9085,6 +9718,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Load seller-facing provider configuration",
@@ -9145,6 +9781,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Save fiat provider keys and settings",
@@ -9207,6 +9846,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create a fiat checkout session",
@@ -9271,6 +9913,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get fiat payment details",
@@ -9300,6 +9945,16 @@
             "required": true,
             "schema": {
               "description": "Payment ID to refund.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Stable key for this refund intent.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "Stable key for this refund intent.",
               "type": "string"
             }
           }
@@ -9343,6 +9998,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Refund a fiat payment",
@@ -9407,6 +10065,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Capture a fiat authorization",
@@ -9461,6 +10122,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Automatically register provider webhook URLs",
@@ -9515,6 +10179,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Seller fiat provider onboarding status",
@@ -9569,6 +10236,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Ping provider credentials",
@@ -9741,6 +10411,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Whether the caller is followed by the given peer",
@@ -9826,6 +10499,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Stop following a peer",
@@ -9919,6 +10595,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Follow a peer",
@@ -9961,6 +10640,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List fulfillment alerts",
@@ -10008,6 +10690,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Dismiss a fulfillment alert",
@@ -10050,6 +10735,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List fulfillment locations",
@@ -10104,6 +10792,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get fulfillment location detail",
@@ -10158,6 +10849,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get fulfillment execution status",
@@ -10212,6 +10906,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Push sync updates for a product by slug",
@@ -10254,6 +10951,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List fulfillment providers",
@@ -10296,6 +10996,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List fulfillment auto-action rules",
@@ -10344,6 +11047,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create a fulfillment auto-action rule",
@@ -10391,6 +11097,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete a fulfillment auto-action rule",
@@ -10477,6 +11186,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Browse provider catalog",
@@ -10541,6 +11253,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get catalog product detail",
@@ -10603,6 +11318,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Connect a fulfillment provider",
@@ -10650,6 +11368,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Disconnect fulfillment provider",
@@ -10712,6 +11433,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Import a product from provider catalog",
@@ -10774,6 +11498,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Estimate shipping via provider",
@@ -10828,6 +11555,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Fulfillment provider connection status",
@@ -10898,6 +11628,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Browse store sync products",
@@ -10962,6 +11695,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get a store sync product",
@@ -11016,6 +11752,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List synced fulfillment products",
@@ -11073,6 +11812,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Unlink a synced product from its supplier",
@@ -11195,6 +11937,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Seller-visible guest-checkout orders",
@@ -11365,6 +12110,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Manually finalize guest-funded order",
@@ -11420,6 +12168,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Admin: full guest order detail including encrypted shipping address",
@@ -11476,6 +12227,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Mark guest order shipped with tracking payload",
@@ -11527,6 +12281,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create listing",
@@ -11575,6 +12332,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update listing",
@@ -11639,6 +12399,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Import listings from ZIP (multipart)",
@@ -11690,6 +12453,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Import listings from a Gumroad creator account",
@@ -11740,6 +12506,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Batch import listings from JSON payload",
@@ -11890,6 +12659,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get authenticated seller listing by slug or CID",
@@ -11940,6 +12712,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get seller supply summaries",
@@ -12170,6 +12945,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete listing by slug",
@@ -12220,6 +12998,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Upload store avatar image",
@@ -12284,6 +13065,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Upload arbitrary media file (multipart)",
@@ -12416,6 +13200,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Upload store header image",
@@ -12466,6 +13253,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Upload one or more images",
@@ -12598,6 +13388,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Upload product images with variants",
@@ -12640,6 +13433,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Withdraw moderator advertisement",
@@ -12706,6 +13502,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Enumerate candidate moderators (async/sync)",
@@ -12754,6 +13553,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Declare self as dispute moderator candidate",
@@ -12822,6 +13624,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List notifications",
@@ -12872,6 +13677,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Batch mark read or delete notifications",
@@ -12914,6 +13722,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List notification channel types",
@@ -12956,6 +13767,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List notification channels",
@@ -13004,6 +13818,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create notification channel",
@@ -13054,6 +13871,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Detect chat binding for notification channel",
@@ -13101,6 +13921,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete notification channel",
@@ -13161,6 +13984,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update notification channel",
@@ -13223,6 +14049,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Send test notification on channel",
@@ -13265,6 +14094,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Notification unread and total counts",
@@ -13307,6 +14139,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Mark all notifications as read",
@@ -13361,6 +14196,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Mark one notification as read",
@@ -13411,6 +14249,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Submit a new multi-item purchase order",
@@ -13461,6 +14302,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Pricing breakdown preview",
@@ -13511,6 +14355,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Estimate totals for checkout",
@@ -13561,6 +14408,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Authenticated checkout supply preflight",
@@ -13615,6 +14465,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Order detail snapshot",
@@ -13677,6 +14530,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Broadcast cancel escrow transaction",
@@ -13739,6 +14595,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Finalize fully paid order (+ optional ratings)",
@@ -13801,6 +14660,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Buyer confirm or decline order",
@@ -13999,6 +14861,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Retry digital delivery for an order",
@@ -14192,6 +15057,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Buyer protection extension preview",
@@ -14254,6 +15122,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Cancellation / refund-before-ship instructions",
@@ -14317,6 +15188,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Legacy completion payout instructions",
@@ -14379,6 +15253,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Confirmation / acceptance instructions",
@@ -14441,6 +15318,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Decline / refund-flow instructions via confirmation handler",
@@ -14503,6 +15383,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Refund instructions",
@@ -14565,11 +15448,81 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Buyer submit payment payloads",
         "tags": [
           "orders"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/payment-selection-quotes": {
+      "post": {
+        "description": "Freezes the signed pricing amount, canonical payment asset, conversion rate, numeric provider/platform costs, target amount, policy version and expiry before PaymentSession provisioning.",
+        "operationId": "orders-post-payment-selection-quote",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Create immutable Deal payment-selection quote",
+        "tags": [
+          "orders",
+          "payments"
         ]
       }
     },
@@ -14620,6 +15573,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Unified payment session view for an order",
@@ -14629,7 +15585,7 @@
         ]
       },
       "post": {
-        "description": "Creates or idempotently returns a PaymentSession. Fiat: canonical paymentCoin fiat:{provider}:{currency}, fiatAmountCents (\u003e0), and optional PayPal return/cancel URLs. Crypto: optional refundAddress/payerAddress/moderator; buyers should declare refundAddress before paying.",
+        "description": "Creates or idempotently returns a PaymentSession. Fiat: canonical paymentCoin fiat:{provider}:{currency}, fiatAmountCents (\u003e0), and optional PayPal return/cancel URLs. Crypto: optional refundAddress/payerAddress/moderator; buyers should declare refundAddress before paying. Deal cross-currency requests must include paymentSelectionQuoteID from the immutable quote endpoint.",
         "operationId": "orders-post-payment-session",
         "parameters": [
           {
@@ -14682,6 +15638,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Provision unified payment session",
@@ -14737,6 +15696,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Revert partial-payment watch / refund leftover",
@@ -14792,6 +15754,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Outstanding underpayment totals",
@@ -14847,6 +15812,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Stop address watcher for UX tear-down",
@@ -14910,6 +15878,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Seller/buyer rate order fulfillment",
@@ -14973,6 +15944,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Finalize refund transaction",
@@ -15036,6 +16010,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Set buyer refund wallet address",
@@ -15100,6 +16077,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get RWA token identity payment info",
@@ -15173,6 +16153,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Execute backend settlement action",
@@ -15250,6 +16233,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Read unified settlement action status",
@@ -15313,6 +16299,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Fulfill shipments",
@@ -15375,6 +16364,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Execute wallet spend in order context",
@@ -15500,6 +16492,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Publish a storefront post",
@@ -15617,6 +16612,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete a post owned by authenticated seller",
@@ -15700,6 +16698,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get user preferences",
@@ -15748,6 +16749,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update user preferences",
@@ -15798,6 +16802,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Bulk update listing currency preferences",
@@ -15877,6 +16884,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create profile (authenticated peer)",
@@ -15925,6 +16935,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Patch profile merge (authenticated peer)",
@@ -15967,6 +16980,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Batch fetch profiles (GET; body often empty—legacy accepts JSON array of peer IDs via POST)",
@@ -16015,6 +17031,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Batch fetch profiles by peer ID list",
@@ -16128,6 +17147,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create profile with explicit peer path",
@@ -16188,6 +17210,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Patch profile with explicit peer path",
@@ -16448,6 +17473,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Buyer purchase history",
@@ -16497,6 +17525,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Search purchases via POST JSON filter",
@@ -16858,6 +17889,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Seller sales feed",
@@ -16907,6 +17941,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Seller sales POST filter",
@@ -16950,6 +17987,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get AI integration config",
@@ -16998,6 +18038,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update AI integration config",
@@ -17040,6 +18083,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List supported AI providers",
@@ -17090,6 +18136,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Test AI provider connection",
@@ -17152,6 +18201,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update a feature flag",
@@ -17231,6 +18283,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update guest checkout settings",
@@ -17273,6 +18328,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get guest checkout UTXO readiness",
@@ -17315,6 +18373,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get store payment policy",
@@ -17363,6 +18424,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update store payment policy",
@@ -17395,6 +18459,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Remove seller PGP public key",
@@ -17469,6 +18536,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Set seller PGP public key",
@@ -17511,6 +18581,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get storefront branding (seller)",
@@ -17559,6 +18632,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update storefront branding",
@@ -17644,6 +18720,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List shipping locations",
@@ -17692,6 +18771,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create shipping location",
@@ -17739,6 +18821,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete shipping location",
@@ -17791,6 +18876,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get shipping location",
@@ -17849,6 +18937,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update shipping location",
@@ -17891,6 +18982,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List shipping profiles",
@@ -17939,6 +19033,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create shipping profile",
@@ -17992,6 +19089,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete shipping profile",
@@ -18044,6 +19144,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get shipping profile",
@@ -18102,6 +19205,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Patch shipping profile",
@@ -18160,6 +19266,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Replace shipping profile",
@@ -18228,6 +19337,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Paginated listings using a shipping profile",
@@ -18275,6 +19387,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Set default shipping profile",
@@ -18317,6 +19432,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Refresh stale listing shipping snapshots",
@@ -18377,6 +19495,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List stale shipping snapshots",
@@ -18419,6 +19540,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get store policy",
@@ -18461,6 +19585,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List store moderators",
@@ -18509,6 +19636,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Add or update store moderator",
@@ -18557,6 +19687,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Replace store moderators",
@@ -18611,6 +19744,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Remove store moderator",
@@ -18851,6 +19987,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Purge publishing cache",
@@ -18937,6 +20076,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Bind standalone store owner to SaaS identity",
@@ -18953,11 +20095,50 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Success envelope inner data."
+                  "contentEncoding": "base64",
+                  "type": "string"
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "description": "Cache directive.",
+                  "type": "string"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "description": "Attachment hint for downloads.",
+                  "type": "string"
+                }
+              },
+              "Content-Security-Policy": {
+                "schema": {
+                  "description": "Content security policy from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "Content-Type": {
+                "schema": {
+                  "description": "MIME type from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "description": "Entity tag from legacy handler.",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "description": "MIME sniffing policy from legacy handler.",
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -18976,6 +20157,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Export structured diagnostics blob",
@@ -19015,6 +20199,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Run self-check diagnostics snapshot",
@@ -19054,6 +20241,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Inspect store domain bindings",
@@ -19099,6 +20289,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update store domain configuration",
@@ -19138,6 +20331,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Node health and telemetry",
@@ -19209,6 +20405,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get system/network info snapshot",
@@ -19248,6 +20447,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Tail recent node log lines",
@@ -19287,6 +20489,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Detect MCP client capabilities",
@@ -19327,6 +20532,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List configured MCP clients",
@@ -19375,6 +20583,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Auto-configure MCP client",
@@ -19433,6 +20644,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Auto-configure a specific MCP client",
@@ -19473,6 +20687,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Remove MCP integration",
@@ -19523,6 +20740,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Remove integration for one MCP client",
@@ -19563,6 +20783,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Inspect network overlays and listening multiaddrs",
@@ -19608,6 +20831,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Change network overlays (standalone)",
@@ -19647,6 +20873,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Publish store data",
@@ -19754,6 +20983,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Shutdown standalone node process",
@@ -19793,6 +21025,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Read auto-update configuration sidecar",
@@ -19838,6 +21073,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Write auto-update configuration sidecar",
@@ -19885,6 +21123,9 @@
           },
           {
             "bearerJWT": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Ask launcher/native updater to action",
@@ -19927,6 +21168,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List supported wallet currencies",
@@ -19969,6 +21213,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get wallet mnemonic seed phrase",
@@ -20011,6 +21258,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List receiving accounts",
@@ -20059,6 +21309,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Add a receiving account",
@@ -20107,6 +21360,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update a receiving account",
@@ -20154,6 +21410,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete a receiving account",
@@ -20204,6 +21463,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Send cryptocurrency from wallet",
@@ -20246,6 +21508,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List webhook endpoints",
@@ -20294,6 +21559,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Create webhook endpoint",
@@ -20341,6 +21609,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Delete webhook endpoint",
@@ -20393,6 +21664,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Get webhook endpoint",
@@ -20451,6 +21725,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Update webhook endpoint",
@@ -20527,6 +21804,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List webhook delivery attempts",
@@ -20581,6 +21861,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Enqueue test webhook event",
@@ -20623,6 +21906,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "List wishlist items",
@@ -20671,6 +21957,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Add item to wishlist",
@@ -20724,6 +22013,9 @@
           },
           {
             "apiToken": []
+          },
+          {
+            "adminSession": []
           }
         ],
         "summary": "Remove wishlist item",

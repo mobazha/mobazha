@@ -1100,6 +1100,102 @@ func TestFiatService_ReconcileProviderAction_RetriesWithSameIdempotencyKey(t *te
 	assert.Equal(t, 2, action.Attempts)
 }
 
+func TestFiatService_ListProviderActions_ReturnsSafeFilteredProjection(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", captureErr: errors.New("upstream sk_test_super-secret timed out")}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_action_list", "pi_action_list")
+
+	_, err := svc.CapturePayment(context.Background(), "stripe", "pi_action_list")
+	require.ErrorContains(t, err, "timed out")
+	actions, err := svc.ListProviderActions(context.Background(), contracts.ProviderActionQuery{
+		ProviderID: "STRIPE", ActionKind: "CAPTURE", State: models.PaymentProviderActionReconcileRequired, Limit: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, actions, 1)
+	action := actions[0]
+	assert.Equal(t, "stripe", action.ProviderID)
+	assert.Equal(t, models.PaymentProviderActionCapture, action.ActionKind)
+	assert.Equal(t, models.PaymentProviderActionReconcileRequired, action.State)
+	assert.Equal(t, 1, action.Attempts)
+	assert.True(t, action.Retryable)
+	assert.False(t, action.Leased)
+	assert.Contains(t, action.ErrorSummary, "sk_test_***")
+	assert.NotContains(t, action.ErrorSummary, "super-secret")
+
+	var persisted models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&persisted).Error }))
+	assert.NotContains(t, persisted.LastError, "super-secret", "provider secrets must be redacted before persistence")
+}
+
+func TestFiatService_RetryProviderAction_OverridesBackoffAndReusesIdempotencyKey(t *testing.T) {
+	provider := &mockFiatProvider{id: "paypal", captureErr: errors.New("ambiguous timeout")}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "paypal", "order_manual_retry", "pp_manual_retry")
+
+	_, err := svc.CapturePayment(context.Background(), "paypal", "pp_manual_retry")
+	require.ErrorContains(t, err, "ambiguous timeout")
+	require.Len(t, provider.captureCalls, 1)
+	originalKey := provider.captureCalls[0].IdempotencyKey
+	var action models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	require.NotNil(t, action.NextAttemptAt)
+	assert.True(t, action.NextAttemptAt.After(time.Now()))
+
+	provider.captureErr = nil
+	provider.captureResult = &contracts.PaymentResult{PaymentID: "pp_manual_retry", Status: "succeeded"}
+	view, err := svc.RetryProviderAction(context.Background(), contracts.ProviderActionRetryRequest{
+		ActionID: action.ActionID, RequestedBy: "test-operator",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, view)
+	assert.Equal(t, models.PaymentProviderActionCompleted, view.State)
+	assert.Equal(t, 2, view.Attempts)
+	assert.False(t, view.Retryable)
+	require.Len(t, provider.captureCalls, 2)
+	assert.Equal(t, originalKey, provider.captureCalls[1].IdempotencyKey)
+	var audits []models.PaymentProviderActionAudit
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().Find(&audits).Error }))
+	require.Len(t, audits, 1)
+	assert.Equal(t, models.PaymentProviderActionAuditManualRetryRequested, audits[0].Event)
+	assert.Equal(t, "test-operator", audits[0].Actor)
+	assert.Equal(t, action.ActionID, audits[0].ActionID)
+}
+
+func TestFiatService_RetryProviderAction_LiveLeaseFailsClosed(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe"}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_retry_leased", "pi_retry_leased")
+	action, err := svc.prepareProviderAction(
+		"stripe", models.PaymentProviderActionCapture, "pi_retry_leased", "", "",
+		providerCaptureIntent{SessionID: "pi_retry_leased"},
+	)
+	require.NoError(t, err)
+	claimed, _, err := svc.claimProviderAction(action, time.Now().UTC())
+	require.NoError(t, err)
+	require.True(t, claimed)
+
+	_, err = svc.RetryProviderAction(context.Background(), contracts.ProviderActionRetryRequest{
+		ActionID: action.ActionID, RequestedBy: "test-operator",
+	})
+	require.ErrorIs(t, err, contracts.ErrActionInProgress)
+}
+
+func TestFiatService_RetryProviderAction_NotFound(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, _ := newFiatTestService(t, reg)
+
+	_, err := svc.RetryProviderAction(context.Background(), contracts.ProviderActionRetryRequest{
+		ActionID: "fpa_missing", RequestedBy: "test-operator",
+	})
+	require.ErrorIs(t, err, contracts.ErrActionNotFound)
+}
+
 func TestFiatService_RefundPayment_IdempotencyConflictFailsClosed(t *testing.T) {
 	provider := &mockFiatProvider{id: "stripe", refundResult: &contracts.RefundResult{RefundID: "re_once", Status: "succeeded"}}
 	reg := newMockFiatRegistry()

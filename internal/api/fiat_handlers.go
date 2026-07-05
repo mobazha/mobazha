@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	corepayment "github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/models"
+	pkgpayment "github.com/mobazha/mobazha/pkg/payment"
 	responsePkg "github.com/mobazha/mobazha/pkg/response"
 )
 
@@ -20,25 +22,7 @@ const maxWebhookBodySize = 512 * 1024 // 512 KB
 // sanitizeProviderError strips API keys, tokens and URLs with credentials
 // from provider error messages to produce a safe detail string.
 func sanitizeProviderError(err error) string {
-	msg := err.Error()
-	for _, prefix := range []string{"sk_live_", "sk_test_", "rk_live_", "rk_test_", "pk_live_", "pk_test_"} {
-		searchFrom := 0
-		for searchFrom < len(msg) {
-			idx := strings.Index(msg[searchFrom:], prefix)
-			if idx < 0 {
-				break
-			}
-			idx += searchFrom
-			end := idx + len(prefix)
-			for end < len(msg) && msg[end] != ' ' && msg[end] != '"' && msg[end] != '\'' && msg[end] != ',' {
-				end++
-			}
-			replacement := prefix + "***"
-			msg = msg[:idx] + replacement + msg[end:]
-			searchFrom = idx + len(replacement)
-		}
-	}
-	return msg
+	return pkgpayment.SanitizeProviderError(err)
 }
 
 func requestWebhookURL(r *http.Request, providerID string) string {
@@ -76,6 +60,76 @@ func (g *Gateway) handleGETFiatProviders(w http.ResponseWriter, r *http.Request)
 	}
 
 	responsePkg.Success(w, providers)
+}
+
+func getFiatProviderActionOperations(r *http.Request) (contracts.FiatProviderActionOperations, bool) {
+	svc, ok := getFiatService(r)
+	if !ok {
+		return nil, false
+	}
+	ops, ok := svc.(contracts.FiatProviderActionOperations)
+	return ops, ok
+}
+
+func (g *Gateway) handleGETFiatProviderActions(w http.ResponseWriter, r *http.Request) {
+	ops, ok := getFiatProviderActionOperations(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Provider action operations not available")
+		return
+	}
+	query := contracts.ProviderActionQuery{
+		ProviderID: r.URL.Query().Get("provider"),
+		ActionKind: r.URL.Query().Get("action"),
+		State:      r.URL.Query().Get("state"),
+	}
+	if rawLimit := strings.TrimSpace(r.URL.Query().Get("limit")); rawLimit != "" {
+		limit, err := strconv.Atoi(rawLimit)
+		if err != nil || limit <= 0 {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "limit must be a positive integer")
+			return
+		}
+		query.Limit = limit
+	}
+	actions, err := ops.ListProviderActions(r.Context(), query)
+	if err != nil {
+		log.Warningf("Failed to list provider actions: %v", err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to load provider actions")
+		return
+	}
+	responsePkg.Success(w, actions)
+}
+
+func (g *Gateway) handlePOSTFiatProviderActionRetry(w http.ResponseWriter, r *http.Request) {
+	ops, ok := getFiatProviderActionOperations(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Provider action operations not available")
+		return
+	}
+	actionID := strings.TrimSpace(chi.URLParam(r, "actionID"))
+	if actionID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "actionID is required")
+		return
+	}
+	requestedBy := "unknown"
+	if identity := GetAuthIdentity(r.Context()); identity != nil && strings.TrimSpace(identity.UserID) != "" {
+		requestedBy = identity.UserID
+	}
+	action, err := ops.RetryProviderAction(r.Context(), contracts.ProviderActionRetryRequest{
+		ActionID: actionID, RequestedBy: requestedBy,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, contracts.ErrActionNotFound):
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Provider action not found")
+		case errors.Is(err, contracts.ErrActionInProgress), errors.Is(err, contracts.ErrActionLeaseLost), errors.Is(err, contracts.ErrActionNotRetryable):
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "Provider action cannot be retried in its current state")
+		default:
+			log.Warningf("Provider action retry failed for %s: %s", actionID, sanitizeProviderError(err))
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeProviderError, "Provider action retry failed")
+		}
+		return
+	}
+	responsePkg.Success(w, action)
 }
 
 func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) {

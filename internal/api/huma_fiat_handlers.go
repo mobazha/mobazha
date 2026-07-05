@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -28,12 +29,81 @@ func (g *Gateway) registerNodeHumaFiatAdminOperations(api huma.API) {
 	g.registerFiatSellerGetPayment(api)
 	g.registerFiatSellerCapturePayment(api)
 	g.registerFiatSellerRefundPayment(api)
+	g.registerFiatSellerListProviderActions(api)
+	g.registerFiatSellerRetryProviderAction(api)
 	g.registerFiatSellerProviderStatus(api)
 	g.registerFiatSellerGetProviderConfig(api)
 	g.registerFiatSellerPutProviderConfig(api)
 	g.registerFiatSellerDeleteProviderConfig(api)
 	g.registerFiatSellerSetupWebhook(api)
 	g.registerFiatSellerVerifyProvider(api)
+}
+
+func (g *Gateway) registerFiatSellerListProviderActions(api huma.API) {
+	type in struct {
+		Provider string `query:"provider" doc:"Optional fiat provider filter."`
+		Action   string `query:"action" doc:"Optional action-kind filter."`
+		State    string `query:"state" doc:"Optional durable state filter."`
+		Limit    int    `query:"limit" minimum:"0" maximum:"100" doc:"Maximum rows; zero uses the server default."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "fiat-list-provider-actions",
+		Method:      http.MethodGet,
+		Path:        "/v1/fiat/provider-actions",
+		Summary:     "List durable fiat provider actions",
+		Tags:        []string{"fiat"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		values := url.Values{}
+		if hi.Provider != "" {
+			values.Set("provider", hi.Provider)
+		}
+		if hi.Action != "" {
+			values.Set("action", hi.Action)
+		}
+		if hi.State != "" {
+			values.Set("state", hi.State)
+		}
+		if hi.Limit > 0 {
+			values.Set("limit", strconv.Itoa(hi.Limit))
+		}
+		rawURL := "/v1/fiat/provider-actions"
+		if encoded := values.Encode(); encoded != "" {
+			rawURL += "?" + encoded
+		}
+		req := nodeBridgeRequest(ctx, http.MethodGet, rawURL, nil)
+		rr := httptest.NewRecorder()
+		g.handleGETFiatProviderActions(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerFiatSellerRetryProviderAction(api huma.API) {
+	type in struct {
+		ActionID string `path:"actionID" doc:"Durable provider action ID."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "fiat-retry-provider-action",
+		Method:      http.MethodPost,
+		Path:        "/v1/fiat/provider-actions/{actionID}/retry",
+		Summary:     "Retry a durable fiat provider action",
+		Tags:        []string{"fiat"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/fiat/provider-actions/" + url.PathEscape(hi.ActionID) + "/retry"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, nil, map[string]string{"actionID": hi.ActionID})
+		rr := httptest.NewRecorder()
+		g.handlePOSTFiatProviderActionRetry(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
 }
 
 func (g *Gateway) registerFiatSellerListProviders(api huma.API) {

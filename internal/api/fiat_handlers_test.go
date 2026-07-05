@@ -42,6 +42,12 @@ type mockFiatService struct {
 	onboardErr      error
 	onboardCBResult *contracts.AccountStatus
 	onboardCBErr    error
+	actionsResult   []contracts.ProviderActionView
+	actionsErr      error
+	retryResult     *contracts.ProviderActionView
+	retryErr        error
+	lastActionQuery contracts.ProviderActionQuery
+	lastRetry       contracts.ProviderActionRetryRequest
 }
 
 func (m *mockFiatService) EnabledProviders(_ context.Context) ([]contracts.ProviderInfo, error) {
@@ -98,6 +104,16 @@ func (m *mockFiatService) GetOnboardingURL(_ context.Context, _ string, _ contra
 
 func (m *mockFiatService) HandleOnboardingCallback(_ context.Context, _ string, _ contracts.CallbackParams) (*contracts.AccountStatus, error) {
 	return m.onboardCBResult, m.onboardCBErr
+}
+
+func (m *mockFiatService) ListProviderActions(_ context.Context, query contracts.ProviderActionQuery) ([]contracts.ProviderActionView, error) {
+	m.lastActionQuery = query
+	return m.actionsResult, m.actionsErr
+}
+
+func (m *mockFiatService) RetryProviderAction(_ context.Context, request contracts.ProviderActionRetryRequest) (*contracts.ProviderActionView, error) {
+	m.lastRetry = request
+	return m.retryResult, m.retryErr
 }
 
 // mockNodeWithFiat implements both contracts.NodeService (partially) and
@@ -168,6 +184,75 @@ func TestHandleGETFiatProviders_NotImplemented(t *testing.T) {
 
 	g.handleGETFiatProviders(w, req)
 	assert.Equal(t, http.StatusNotImplemented, w.Code)
+}
+
+func TestHandleGETFiatProviderActions_Success(t *testing.T) {
+	svc := &mockFiatService{actionsResult: []contracts.ProviderActionView{{
+		ActionID: "fpa_test", ProviderID: "stripe", ActionKind: "refund", State: "reconcile_required", Attempts: 2,
+	}}}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, http.MethodGet, "/v1/fiat/provider-actions?provider=stripe&action=refund&state=reconcile_required&limit=25", nil, nil, svc)
+
+	g.handleGETFiatProviderActions(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, contracts.ProviderActionQuery{
+		ProviderID: "stripe", ActionKind: "refund", State: "reconcile_required", Limit: 25,
+	}, svc.lastActionQuery)
+	assert.Contains(t, w.Body.String(), "fpa_test")
+}
+
+func TestHandleGETFiatProviderActions_InvalidLimit(t *testing.T) {
+	svc := &mockFiatService{}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, http.MethodGet, "/v1/fiat/provider-actions?limit=invalid", nil, nil, svc)
+
+	g.handleGETFiatProviderActions(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandlePOSTFiatProviderActionRetry_Success(t *testing.T) {
+	svc := &mockFiatService{retryResult: &contracts.ProviderActionView{ActionID: "fpa_retry", State: "completed"}}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, http.MethodPost, "/v1/fiat/provider-actions/fpa_retry/retry", nil,
+		map[string]string{"actionID": "fpa_retry"}, svc)
+	r = r.WithContext(WithAuthIdentity(r.Context(), &AuthIdentity{UserID: "operator-user"}))
+
+	g.handlePOSTFiatProviderActionRetry(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "fpa_retry", svc.lastRetry.ActionID)
+	assert.Equal(t, "operator-user", svc.lastRetry.RequestedBy)
+	assert.Contains(t, w.Body.String(), "completed")
+}
+
+func TestHandlePOSTFiatProviderActionRetry_MapsTypedErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+	}{
+		{name: "not found", err: contracts.ErrActionNotFound, wantStatus: http.StatusNotFound},
+		{name: "live lease", err: contracts.ErrActionInProgress, wantStatus: http.StatusConflict},
+		{name: "not retryable", err: contracts.ErrActionNotRetryable, wantStatus: http.StatusConflict},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &mockFiatService{retryErr: tt.err}
+			g := &Gateway{}
+			w := httptest.NewRecorder()
+			r := newFiatHandlerRequest(t, http.MethodPost, "/v1/fiat/provider-actions/fpa_retry/retry", nil,
+				map[string]string{"actionID": "fpa_retry"}, svc)
+
+			g.handlePOSTFiatProviderActionRetry(w, r)
+
+			assert.Equal(t, tt.wantStatus, w.Code)
+		})
+	}
 }
 
 // --- POST /v1/fiat/{providerID}/payments ---

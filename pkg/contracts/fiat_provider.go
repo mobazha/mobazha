@@ -14,6 +14,8 @@ var (
 	ErrActionIntentConflict = errors.New("fiat: provider action idempotency key conflicts with an existing intent")
 	ErrActionInProgress     = errors.New("fiat: provider action is already in progress or scheduled for retry")
 	ErrActionLeaseLost      = errors.New("fiat: provider action execution lease lost")
+	ErrActionNotFound       = errors.New("fiat: provider action not found")
+	ErrActionNotRetryable   = errors.New("fiat: provider action is not retryable")
 	ErrActiveOrdersExist    = errors.New("fiat: cannot disconnect provider with active orders")
 )
 
@@ -221,6 +223,52 @@ type FiatPaymentOperations interface {
 	RefundPayment(ctx context.Context, providerID string, params RefundParams) (*RefundResult, error)
 	CancelPayment(ctx context.Context, providerID string, paymentID string) error
 	GetPaymentStatus(ctx context.Context, providerID string, paymentID string) (string, error)
+}
+
+// ProviderActionQuery selects tenant-scoped durable provider commands for an
+// operational view. Empty filters match all values. Limit is bounded by the
+// implementation so callers cannot turn this into an unbounded table scan.
+type ProviderActionQuery struct {
+	ProviderID string
+	ActionKind string
+	State      string
+	Limit      int
+}
+
+// ProviderActionView is the safe operational projection of a durable external
+// provider command. Intent/result payloads, credential references, tenant IDs,
+// and lease-owner identities are deliberately excluded.
+type ProviderActionView struct {
+	ActionID          string     `json:"actionID"`
+	ActionKind        string     `json:"actionKind"`
+	ProviderID        string     `json:"providerID"`
+	ExternalReference string     `json:"externalReference"`
+	State             string     `json:"state"`
+	Attempts          int        `json:"attempts"`
+	ErrorSummary      string     `json:"errorSummary,omitempty"`
+	Retryable         bool       `json:"retryable"`
+	Leased            bool       `json:"leased"`
+	NextAttemptAt     *time.Time `json:"nextAttemptAt,omitempty"`
+	LeaseExpiresAt    *time.Time `json:"leaseExpiresAt,omitempty"`
+	LastAttemptAt     *time.Time `json:"lastAttemptAt,omitempty"`
+	CompletedAt       *time.Time `json:"completedAt,omitempty"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
+}
+
+// ProviderActionRetryRequest carries the durable action identity and the
+// authenticated operator identity used for append-only audit.
+type ProviderActionRetryRequest struct {
+	ActionID    string
+	RequestedBy string
+}
+
+// FiatProviderActionOperations is an optional operational extension to
+// FiatService. Keeping it separate avoids forcing payment-provider plugins to
+// implement persistence controls they do not own.
+type FiatProviderActionOperations interface {
+	ListProviderActions(ctx context.Context, query ProviderActionQuery) ([]ProviderActionView, error)
+	RetryProviderAction(ctx context.Context, request ProviderActionRetryRequest) (*ProviderActionView, error)
 }
 
 // FiatPaymentProviderAccessor exposes the fiat payment subsystem.

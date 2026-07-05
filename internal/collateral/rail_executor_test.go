@@ -28,12 +28,14 @@ func TestRailExecutorPersistsFundingIntentBeforeIOAndReconciles(t *testing.T) {
 
 	request := pkgcollateral.FundingTargetRequest{
 		TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
-		PrincipalID: account.PrincipalID, AssetID: account.AssetID, Amount: account.RequiredAmount,
+		PrincipalID: account.PrincipalID, PrincipalDestination: "principal:seller-1",
+		AssetID: account.AssetID, Amount: account.RequiredAmount,
 		IdempotencyKey: "rail-funding-1", ExpiresAt: now.Add(time.Hour),
 	}
 	rail := completeFakeRail()
 	rail.prepareTarget = pkgcollateral.FundingTarget{
-		RailID: rail.descriptor.ID, CollateralID: account.CollateralID, AssetID: account.AssetID,
+		RailID: rail.descriptor.ID, TenantID: request.TenantID, CollateralID: account.CollateralID, AssetID: account.AssetID,
+		PrincipalDestination: request.PrincipalDestination, IdempotencyKey: request.IdempotencyKey,
 		Amount: account.RequiredAmount, Destination: "vault:deposit-1", ExpiresAt: request.ExpiresAt,
 	}
 	rail.onPrepare = func() {
@@ -137,6 +139,7 @@ func TestRailExecutorKeepsAmbiguousReleasePendingUntilReconciled(t *testing.T) {
 	result, err := executor.ReconcileExecution(context.Background(), request.ActionID)
 	require.NoError(t, err)
 	require.Equal(t, pkgcollateral.RailActionConfirmed, result.State)
+	require.Equal(t, request, rail.executionStatusRequest)
 	require.NoError(t, db.View(func(tx database.Tx) error {
 		var err error
 		account, err = AccountByIDTx(tx, account.CollateralID)
@@ -150,6 +153,46 @@ func TestRailExecutorKeepsAmbiguousReleasePendingUntilReconciled(t *testing.T) {
 	require.Equal(t, "release-receipt-1", result.Reference)
 	require.Equal(t, 1, rail.submitCalls)
 	require.Equal(t, 1, rail.executionStatusCalls)
+}
+
+func TestRailExecutorReconcilesFundingAfterTargetExpiry(t *testing.T) {
+	db := collateralTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	open := openRequest(now)
+	var account pkgcollateral.Account
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		account, err = OpenTx(tx, open, now)
+		return err
+	}))
+	request := pkgcollateral.FundingTargetRequest{
+		TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
+		PrincipalID: account.PrincipalID, PrincipalDestination: "principal:seller-1",
+		AssetID: account.AssetID, Amount: account.RequiredAmount,
+		IdempotencyKey: "funding-expiry-1", ExpiresAt: now.Add(time.Hour),
+	}
+	rail := completeFakeRail()
+	rail.prepareTarget = pkgcollateral.FundingTarget{
+		RailID: rail.descriptor.ID, TenantID: request.TenantID, CollateralID: account.CollateralID,
+		PrincipalDestination: request.PrincipalDestination, IdempotencyKey: request.IdempotencyKey,
+		AssetID: account.AssetID, Amount: account.RequiredAmount,
+		Destination: "vault:expiry", ExpiresAt: request.ExpiresAt,
+	}
+	executor, err := NewRailExecutor(db, rail)
+	require.NoError(t, err)
+	executor.now = func() time.Time { return now }
+	_, err = executor.PrepareFunding(context.Background(), request)
+	require.NoError(t, err)
+
+	rail.fundingStatus = pkgcollateral.RailFundingStatus{
+		State: pkgcollateral.RailActionFailed, AssetID: account.AssetID,
+		Amount: account.RequiredAmount, LastError: "collateral funding window expired",
+	}
+	executor.now = func() time.Time { return now.Add(2 * time.Hour) }
+	status, err := executor.ReconcileFunding(context.Background(), account.CollateralID)
+	require.NoError(t, err)
+	require.Equal(t, pkgcollateral.RailActionFailed, status.State)
+	require.Equal(t, 1, rail.fundingStatusCalls)
 }
 
 func TestRailExecutorAppliesConfirmedSlash(t *testing.T) {
@@ -256,7 +299,8 @@ func TestRailExecutorRecoversFundingTargetCreationAfterRestart(t *testing.T) {
 	}))
 	request := pkgcollateral.FundingTargetRequest{
 		TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
-		PrincipalID: account.PrincipalID, AssetID: account.AssetID, Amount: account.RequiredAmount,
+		PrincipalID: account.PrincipalID, PrincipalDestination: "principal:seller-1",
+		AssetID: account.AssetID, Amount: account.RequiredAmount,
 		IdempotencyKey: "funding-restart-1", ExpiresAt: now.Add(time.Hour),
 	}
 
@@ -270,7 +314,8 @@ func TestRailExecutorRecoversFundingTargetCreationAfterRestart(t *testing.T) {
 
 	recoveredRail := completeFakeRail()
 	recoveredRail.prepareTarget = pkgcollateral.FundingTarget{
-		RailID: recoveredRail.descriptor.ID, CollateralID: account.CollateralID, AssetID: account.AssetID,
+		RailID: recoveredRail.descriptor.ID, TenantID: request.TenantID, CollateralID: account.CollateralID, AssetID: account.AssetID,
+		PrincipalDestination: request.PrincipalDestination, IdempotencyKey: request.IdempotencyKey,
 		Amount: account.RequiredAmount, Destination: "vault:recovered", ExpiresAt: request.ExpiresAt,
 	}
 	restarted, err := NewRailExecutor(db, recoveredRail)
@@ -287,21 +332,22 @@ func TestRailExecutorRecoversFundingTargetCreationAfterRestart(t *testing.T) {
 }
 
 type fakeCollateralRail struct {
-	descriptor           pkgcollateral.RailDescriptor
-	prepareTarget        pkgcollateral.FundingTarget
-	prepareErr           error
-	fundingStatus        pkgcollateral.RailFundingStatus
-	fundingStatusErr     error
-	submitResult         pkgcollateral.RailActionResult
-	submitErr            error
-	executionStatus      pkgcollateral.RailActionResult
-	executionStatusErr   error
-	prepareCalls         int
-	fundingStatusCalls   int
-	submitCalls          int
-	executionStatusCalls int
-	onPrepare            func()
-	onSubmit             func()
+	descriptor             pkgcollateral.RailDescriptor
+	prepareTarget          pkgcollateral.FundingTarget
+	prepareErr             error
+	fundingStatus          pkgcollateral.RailFundingStatus
+	fundingStatusErr       error
+	submitResult           pkgcollateral.RailActionResult
+	submitErr              error
+	executionStatus        pkgcollateral.RailActionResult
+	executionStatusErr     error
+	executionStatusRequest pkgcollateral.RailExecutionRequest
+	prepareCalls           int
+	fundingStatusCalls     int
+	submitCalls            int
+	executionStatusCalls   int
+	onPrepare              func()
+	onSubmit               func()
 }
 
 func completeFakeRail() *fakeCollateralRail {
@@ -336,8 +382,9 @@ func (r *fakeCollateralRail) SubmitExecution(context.Context, pkgcollateral.Rail
 	return r.submitResult, r.submitErr
 }
 
-func (r *fakeCollateralRail) ExecutionStatus(context.Context, string) (pkgcollateral.RailActionResult, error) {
+func (r *fakeCollateralRail) ExecutionStatus(_ context.Context, request pkgcollateral.RailExecutionRequest) (pkgcollateral.RailActionResult, error) {
 	r.executionStatusCalls++
+	r.executionStatusRequest = request
 	return r.executionStatus, r.executionStatusErr
 }
 

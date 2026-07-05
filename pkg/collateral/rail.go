@@ -65,18 +65,22 @@ func (d RailDescriptor) ValidateForAsset(assetID string) error {
 // FundingTargetRequest asks a rail for a principal-funded destination or
 // instruction set bound to one unopened collateral obligation.
 type FundingTargetRequest struct {
-	TenantID       string    `json:"tenantID"`
-	CollateralID   string    `json:"collateralID"`
-	PrincipalID    string    `json:"principalID"`
-	AssetID        string    `json:"assetID"`
-	Amount         string    `json:"amount"`
-	IdempotencyKey string    `json:"idempotencyKey"`
-	ExpiresAt      time.Time `json:"expiresAt"`
+	TenantID     string `json:"tenantID"`
+	CollateralID string `json:"collateralID"`
+	PrincipalID  string `json:"principalID"`
+	// PrincipalDestination is the Core-resolved rail identity that funds the
+	// obligation and receives a normal release. For an EVM vault it is an
+	// address; other rails may define a different canonical destination form.
+	PrincipalDestination string    `json:"principalDestination"`
+	AssetID              string    `json:"assetID"`
+	Amount               string    `json:"amount"`
+	IdempotencyKey       string    `json:"idempotencyKey"`
+	ExpiresAt            time.Time `json:"expiresAt"`
 }
 
 func (r FundingTargetRequest) Validate(now time.Time) error {
-	if missing(r.TenantID, r.CollateralID, r.PrincipalID, r.AssetID, r.IdempotencyKey) {
-		return fmt.Errorf("collateral funding target tenant, account, principal, asset, and idempotency key are required")
+	if missing(r.TenantID, r.CollateralID, r.PrincipalID, r.PrincipalDestination, r.AssetID, r.IdempotencyKey) {
+		return fmt.Errorf("collateral funding target tenant, account, principal, destination, asset, and idempotency key are required")
 	}
 	if err := validateBaseUnits(r.Amount, false); err != nil {
 		return fmt.Errorf("collateral funding target amount: %w", err)
@@ -90,18 +94,21 @@ func (r FundingTargetRequest) Validate(now time.Time) error {
 // FundingTarget is a Core-scoped rail target. Payload may contain bounded,
 // chain-specific wallet instructions; it is never treated as funding proof.
 type FundingTarget struct {
-	RailID       string          `json:"railID"`
-	CollateralID string          `json:"collateralID"`
-	AssetID      string          `json:"assetID"`
-	Amount       string          `json:"amount"`
-	Destination  string          `json:"destination,omitempty"`
-	Payload      json.RawMessage `json:"payload,omitempty"`
-	ExpiresAt    time.Time       `json:"expiresAt"`
+	RailID               string          `json:"railID"`
+	TenantID             string          `json:"-"`
+	CollateralID         string          `json:"collateralID"`
+	PrincipalDestination string          `json:"-"`
+	IdempotencyKey       string          `json:"-"`
+	AssetID              string          `json:"assetID"`
+	Amount               string          `json:"amount"`
+	Destination          string          `json:"destination,omitempty"`
+	Payload              json.RawMessage `json:"payload,omitempty"`
+	ExpiresAt            time.Time       `json:"expiresAt"`
 }
 
 func (t FundingTarget) Validate(now time.Time) error {
-	if missing(t.RailID, t.CollateralID, t.AssetID) || (strings.TrimSpace(t.Destination) == "" && len(t.Payload) == 0) {
-		return fmt.Errorf("collateral funding target rail, account, asset, and destination or payload are required")
+	if missing(t.RailID, t.TenantID, t.CollateralID, t.PrincipalDestination, t.IdempotencyKey, t.AssetID) || (strings.TrimSpace(t.Destination) == "" && len(t.Payload) == 0) {
+		return fmt.Errorf("collateral funding target rail, tenant, account, principal destination, idempotency key, asset, and destination or payload are required")
 	}
 	if len(t.Payload) > maxRailPayloadBytes {
 		return fmt.Errorf("collateral funding target payload exceeds %d bytes", maxRailPayloadBytes)
@@ -220,5 +227,8 @@ type Rail interface {
 	// every immutable binding before accepting a confirmed transition.
 	FundingStatus(context.Context, FundingTarget) (RailFundingStatus, error)
 	SubmitExecution(context.Context, RailExecutionRequest) (RailActionResult, error)
-	ExecutionStatus(context.Context, string) (RailActionResult, error)
+	// ExecutionStatus receives the immutable request so receipt verification
+	// can bind action, collateral, claim, amount, and destination instead of
+	// confirming an action identifier in isolation.
+	ExecutionStatus(context.Context, RailExecutionRequest) (RailActionResult, error)
 }

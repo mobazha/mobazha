@@ -25,12 +25,14 @@ func TestRailFundingTargetIsIntentNotFundingProof(t *testing.T) {
 	now := time.Now().UTC()
 	request := FundingTargetRequest{
 		TenantID: "tenant-1", CollateralID: "col-1", PrincipalID: "seller-1",
-		AssetID: "crypto:solana:devnet:usdc", Amount: "100", IdempotencyKey: "target-1",
+		PrincipalDestination: "principal:seller-1",
+		AssetID:              "crypto:solana:devnet:usdc", Amount: "100", IdempotencyKey: "target-1",
 		ExpiresAt: now.Add(time.Hour),
 	}
 	require.NoError(t, request.Validate(now))
 	target := FundingTarget{
-		RailID: "io.mobazha.collateral.solana-vault", CollateralID: request.CollateralID,
+		RailID: "io.mobazha.collateral.solana-vault", TenantID: request.TenantID, CollateralID: request.CollateralID,
+		PrincipalDestination: request.PrincipalDestination, IdempotencyKey: request.IdempotencyKey,
 		AssetID: request.AssetID, Amount: request.Amount, Destination: "vault-address",
 		ExpiresAt: request.ExpiresAt,
 	}

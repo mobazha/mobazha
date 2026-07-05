@@ -100,8 +100,10 @@ func (e *RailExecutor) PrepareFunding(ctx context.Context, request pkgcollateral
 			return nil
 		}
 		existing = models.CollateralFundingTargetRecord{
-			CollateralID: request.CollateralID, RailID: e.descriptor.ID, RailVersion: e.descriptor.Version,
-			PrincipalID: request.PrincipalID, AssetID: request.AssetID, Amount: request.Amount,
+			TenantID: request.TenantID, CollateralID: request.CollateralID,
+			RailID: e.descriptor.ID, RailVersion: e.descriptor.Version,
+			PrincipalID: request.PrincipalID, PrincipalDestination: request.PrincipalDestination,
+			AssetID: request.AssetID, Amount: request.Amount,
 			IdempotencyKey: request.IdempotencyKey, ExpectedRevision: account.Revision,
 			State: string(pkgcollateral.RailActionPending), Attempts: 1, ExpiresAt: request.ExpiresAt,
 			CreatedAt: now, UpdatedAt: now,
@@ -122,7 +124,9 @@ func (e *RailExecutor) PrepareFunding(ctx context.Context, request pkgcollateral
 	if err := target.Validate(now); err != nil {
 		return pkgcollateral.FundingTarget{}, e.recordFundingError(existing.CollateralID, fmt.Errorf("invalid collateral funding target: %w", err), now)
 	}
-	if target.RailID != e.descriptor.ID || target.CollateralID != request.CollateralID || target.AssetID != request.AssetID || target.Amount != request.Amount || target.ExpiresAt.After(request.ExpiresAt) {
+	if target.RailID != e.descriptor.ID || target.TenantID != request.TenantID || target.CollateralID != request.CollateralID ||
+		target.PrincipalDestination != request.PrincipalDestination || target.IdempotencyKey != request.IdempotencyKey ||
+		target.AssetID != request.AssetID || target.Amount != request.Amount || target.ExpiresAt.After(request.ExpiresAt) {
 		return pkgcollateral.FundingTarget{}, e.recordFundingError(existing.CollateralID, fmt.Errorf("collateral funding target result binding mismatch"), now)
 	}
 	err = e.db.Update(func(tx database.Tx) error {
@@ -162,7 +166,10 @@ func (e *RailExecutor) ReconcileFunding(ctx context.Context, collateralID string
 	if record.State == string(pkgcollateral.RailActionConfirmed) || record.State == string(pkgcollateral.RailActionFailed) {
 		return fundingStatusFromRecord(record), nil
 	}
-	target, err := fundingTargetFromRecord(record, e.now().UTC())
+	// A target's expiry closes new funding, not observation of an already
+	// persisted transaction. Validate against its creation time so recovery can
+	// still reconcile confirmations (or an expiry failure) after the deadline.
+	target, err := fundingTargetFromRecord(record, record.CreatedAt)
 	if err != nil {
 		return pkgcollateral.RailFundingStatus{}, err
 	}
@@ -249,7 +256,8 @@ func (e *RailExecutor) SubmitExecution(ctx context.Context, request pkgcollatera
 			return nil
 		}
 		record = models.CollateralRailActionRecord{
-			ActionID: request.ActionID, CollateralID: request.CollateralID, ClaimID: request.ClaimID,
+			TenantID: request.TenantID, ActionID: request.ActionID,
+			CollateralID: request.CollateralID, ClaimID: request.ClaimID,
 			RailID: e.descriptor.ID, RailVersion: e.descriptor.Version, Kind: string(request.Kind),
 			AssetID: request.AssetID, Amount: request.Amount, Destination: request.Destination,
 			ExpectedRevision: request.ExpectedRevision, IdempotencyKey: request.IdempotencyKey,
@@ -290,7 +298,12 @@ func (e *RailExecutor) ReconcileExecution(ctx context.Context, actionID string) 
 	if record.State == string(pkgcollateral.RailActionConfirmed) || record.State == string(pkgcollateral.RailActionFailed) {
 		return railActionResultFromRecord(record), nil
 	}
-	result, err := e.rail.ExecutionStatus(ctx, record.ActionID)
+	request := pkgcollateral.RailExecutionRequest{
+		ActionID: record.ActionID, TenantID: record.TenantID, CollateralID: record.CollateralID, ClaimID: record.ClaimID,
+		Kind: pkgcollateral.ExecutionKind(record.Kind), AssetID: record.AssetID, Amount: record.Amount,
+		Destination: record.Destination, ExpectedRevision: record.ExpectedRevision, IdempotencyKey: record.IdempotencyKey,
+	}
+	result, err := e.rail.ExecutionStatus(ctx, request)
 	if err != nil {
 		return pkgcollateral.RailActionResult{}, e.recordExecutionError(record.ActionID, err, e.now().UTC())
 	}
@@ -339,7 +352,8 @@ func (e *RailExecutor) RecoverPending(ctx context.Context, limit int) error {
 		if row.Destination == "" && len(row.Payload) == 0 {
 			_, err = e.PrepareFunding(ctx, pkgcollateral.FundingTargetRequest{
 				TenantID: row.TenantID, CollateralID: row.CollateralID, PrincipalID: row.PrincipalID,
-				AssetID: row.AssetID, Amount: row.Amount, IdempotencyKey: row.IdempotencyKey, ExpiresAt: row.ExpiresAt,
+				PrincipalDestination: row.PrincipalDestination,
+				AssetID:              row.AssetID, Amount: row.Amount, IdempotencyKey: row.IdempotencyKey, ExpiresAt: row.ExpiresAt,
 			})
 		} else {
 			_, err = e.ReconcileFunding(ctx, row.CollateralID)
@@ -480,7 +494,8 @@ func (e *RailExecutor) recordExecutionError(actionID string, cause error, now ti
 
 func fundingTargetFromRecord(record models.CollateralFundingTargetRecord, now time.Time) (pkgcollateral.FundingTarget, error) {
 	target := pkgcollateral.FundingTarget{
-		RailID: record.RailID, CollateralID: record.CollateralID, AssetID: record.AssetID,
+		RailID: record.RailID, TenantID: record.TenantID, CollateralID: record.CollateralID, AssetID: record.AssetID,
+		PrincipalDestination: record.PrincipalDestination, IdempotencyKey: record.IdempotencyKey,
 		Amount: record.Amount, Destination: record.Destination, Payload: json.RawMessage(append([]byte(nil), record.Payload...)),
 		ExpiresAt: record.ExpiresAt,
 	}
@@ -515,7 +530,8 @@ func railActionResultFromRecord(record models.CollateralRailActionRecord) pkgcol
 
 func sameFundingTargetRequest(record models.CollateralFundingTargetRecord, request pkgcollateral.FundingTargetRequest, descriptor pkgcollateral.RailDescriptor) bool {
 	return record.TenantID == request.TenantID && record.CollateralID == request.CollateralID &&
-		record.PrincipalID == request.PrincipalID && record.AssetID == request.AssetID && record.Amount == request.Amount &&
+		record.PrincipalID == request.PrincipalID && record.PrincipalDestination == request.PrincipalDestination &&
+		record.AssetID == request.AssetID && record.Amount == request.Amount &&
 		record.IdempotencyKey == request.IdempotencyKey && record.RailID == descriptor.ID && record.RailVersion == descriptor.Version &&
 		record.ExpiresAt.Equal(request.ExpiresAt)
 }

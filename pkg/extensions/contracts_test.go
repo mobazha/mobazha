@@ -59,6 +59,29 @@ func TestOrderExtensionV2BindsCoreCollateralReferenceWithoutChangingV1(t *testin
 	require.ErrorContains(t, envelope.ValidateForOrder("order-1"), "version")
 }
 
+func TestCollateralRequirementBindsCanonicalBaseUnitsToExtension(t *testing.T) {
+	extension, err := NewOrderExtension("order-requirement", "io.mobazha.collectibles", "source-custody", "v1", "source-1", map[string]string{"mode": "M2"})
+	require.NoError(t, err)
+	requirement := CollateralRequirement{
+		ProviderID: extension.ProviderID, ResourceID: extension.ResourceID, PrincipalID: "seller-1",
+		AssetID: "crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955", Amount: "1000000",
+		PolicyID: "collectibles-source-custody", PolicyVersion: "1",
+	}
+	require.NoError(t, requirement.ValidateForExtension(extension))
+
+	wrongResource := requirement
+	wrongResource.ResourceID = "source-2"
+	require.ErrorContains(t, wrongResource.ValidateForExtension(extension), "binding mismatch")
+	for _, amount := range []string{"", "0", "01", "+1", "1.0", " 1"} {
+		invalid := requirement
+		invalid.Amount = amount
+		require.Error(t, invalid.ValidateForExtension(extension), amount)
+	}
+	invalidAsset := requirement
+	invalidAsset.AssetID = "USDT"
+	require.ErrorContains(t, invalidAsset.ValidateForExtension(extension), "canonical asset ID")
+}
+
 func TestSettlementAttestation_RejectsExpiredAndFutureEvidence(t *testing.T) {
 	now := time.Now().UTC()
 	base := SettlementAttestation{AttestationID: "att-1", IdempotencyKey: "idem-1", Issuer: "module", TenantID: "tenant-1", OrderID: "order", SettlementID: "settlement-1", ExtensionID: "ext-1", ExpectedExtensionRevision: 1, ExpectedOrderStateVersion: "sha256:state", ConditionType: "delivered", ConditionVersion: "v1", EvidenceDigest: "sha256:x", ObservedAt: now, ExpiresAt: now.Add(time.Minute)}
@@ -105,6 +128,35 @@ func (testAdmissionModule) DeclarationAdmission() DeclarationAdmissionFunc {
 	return func(context.Context, DeclarationAdmissionInput) error { return nil }
 }
 
+type testCollateralRequirementModule struct{ descriptor ModuleDescriptor }
+
+func (m testCollateralRequirementModule) Descriptor() ModuleDescriptor { return m.descriptor }
+func (testCollateralRequirementModule) DeclarationPort() DeclarationPort {
+	return testDeclarationPort{}
+}
+func (testCollateralRequirementModule) CollateralRequirementPort() CollateralRequirementPort {
+	return testCollateralRequirementPort{}
+}
+
+type testCollateralOnlyModule struct{ descriptor ModuleDescriptor }
+
+func (m testCollateralOnlyModule) Descriptor() ModuleDescriptor { return m.descriptor }
+func (testCollateralOnlyModule) CollateralRequirementPort() CollateralRequirementPort {
+	return testCollateralRequirementPort{}
+}
+
+type testDeclarationPort struct{}
+
+func (testDeclarationPort) DeclareOrderExtensions(context.Context, DeclarationInput) ([]OrderExtension, error) {
+	return nil, nil
+}
+
+type testCollateralRequirementPort struct{}
+
+func (testCollateralRequirementPort) CollateralRequirement(context.Context, CollateralRequirementInput) (CollateralRequirement, bool, error) {
+	return CollateralRequirement{}, false, nil
+}
+
 func TestValidateModules_RejectsMissingDependenciesAndCycles(t *testing.T) {
 	base := testModule{descriptor: ModuleDescriptor{ID: "base", Version: "1.0.0", Contracts: []string{ContractOrderExtensionDeliveryV1}}}
 	require.NoError(t, ValidateModules(base))
@@ -130,6 +182,12 @@ func TestValidateModules_EnforcesExactContractCapabilityAgreement(t *testing.T) 
 	require.ErrorContains(t, ValidateModules(testAdmissionModule{descriptor: ModuleDescriptor{
 		ID: "admission-only", Version: "1", Contracts: []string{ContractOrderExtensionDeclarationAdmissionV1},
 	}}), "requires the declaration contract")
+	require.ErrorContains(t, ValidateModules(testCollateralOnlyModule{descriptor: ModuleDescriptor{
+		ID: "collateral-without-declaration", Version: "1", Contracts: []string{ContractOrderExtensionCollateralRequirementV1},
+	}}), "requires the declaration contract")
+	require.NoError(t, ValidateModules(testCollateralRequirementModule{descriptor: ModuleDescriptor{
+		ID: "collateral", Version: "1", Contracts: []string{ContractOrderExtensionDeclarationV1, ContractOrderExtensionCollateralRequirementV1},
+	}}))
 }
 
 func TestSnapshotDescriptor_IsDetachedFromModuleMutation(t *testing.T) {

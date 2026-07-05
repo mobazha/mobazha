@@ -22,7 +22,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	aipkg "github.com/mobazha/mobazha/internal/ai"
 	"github.com/mobazha/mobazha/internal/chains"
-	corecollateral "github.com/mobazha/mobazha/internal/collateral"
 	"github.com/mobazha/mobazha/internal/contracts"
 	coreorder "github.com/mobazha/mobazha/internal/core/order"
 	corePmt "github.com/mobazha/mobazha/internal/core/payment"
@@ -1509,12 +1508,12 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 			return orderextensions.RecordReservationTx(tx, request, reservation)
 		})
 	}
-	admitCollateral := func(ctx context.Context, input corePmt.SessionProvisioningPolicyInput) error {
+	admitCollateral := func(ctx context.Context, input corePmt.SessionProvisioningPolicyInput, persisted []extensions.OrderExtension) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		return obNode.db.View(func(tx database.Tx) error {
-			return corecollateral.AdmitPersistedOrderExtensionsV2Tx(tx, input.OrderID, time.Now().UTC())
+			return obNode.admitOrderExtensionCollateralRequirementsTx(ctx, tx, input.OrderID, input.OrderOpen, persisted)
 		})
 	}
 	// Always register the policy. An extension declaring the reservation

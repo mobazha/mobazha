@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"reflect"
 	"sort"
 	"strings"
@@ -18,17 +19,19 @@ import (
 
 	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const (
 	ContractVersionV1 = "v1"
 	ContractVersionV2 = "v2"
 
-	ContractOrderExtensionDeclarationV1          = "order-extension.declaration/v1"
-	ContractOrderExtensionDeclarationAdmissionV1 = "order-extension.declaration-admission/v1"
-	ContractOrderExtensionReservationV1          = "order-extension.reservation/v1"
-	ContractOrderExtensionDeliveryV1             = "order-extension.delivery/v1"
-	ContractOrderExtensionAttestationV1          = "order-extension.attestation/v1"
+	ContractOrderExtensionDeclarationV1           = "order-extension.declaration/v1"
+	ContractOrderExtensionDeclarationAdmissionV1  = "order-extension.declaration-admission/v1"
+	ContractOrderExtensionReservationV1           = "order-extension.reservation/v1"
+	ContractOrderExtensionDeliveryV1              = "order-extension.delivery/v1"
+	ContractOrderExtensionAttestationV1           = "order-extension.attestation/v1"
+	ContractOrderExtensionCollateralRequirementV1 = "order-extension.collateral-requirement/v1"
 
 	EventOrderPaymentVerified                = "io.mobazha.order.payment-verified"
 	EventOrderReservationReleaseRequested    = "io.mobazha.order.reservation-release-requested"
@@ -60,17 +63,19 @@ type Module interface {
 // module. Capability accessors are invoked exactly once while the snapshot is
 // built so validation and runtime invocation cannot observe different ports.
 type ModuleSnapshot struct {
-	Descriptor           ModuleDescriptor
-	Declaration          DeclarationPort
-	DeclarationAdmission DeclarationAdmissionFunc
-	Reservation          ReservationPort
-	Controller           Controller
-	Attestation          AttestationVerifier
-	hasDeclaration       bool
-	hasAdmission         bool
-	hasReservation       bool
-	hasController        bool
-	hasAttestation       bool
+	Descriptor               ModuleDescriptor
+	Declaration              DeclarationPort
+	DeclarationAdmission     DeclarationAdmissionFunc
+	Reservation              ReservationPort
+	Controller               Controller
+	Attestation              AttestationVerifier
+	CollateralRequirement    CollateralRequirementPort
+	hasDeclaration           bool
+	hasAdmission             bool
+	hasReservation           bool
+	hasController            bool
+	hasAttestation           bool
+	hasCollateralRequirement bool
 }
 
 // ValidateModules validates the immutable module graph before Core resources
@@ -187,7 +192,8 @@ func isSupportedContract(contract string) bool {
 		ContractOrderExtensionDeclarationAdmissionV1,
 		ContractOrderExtensionReservationV1,
 		ContractOrderExtensionDeliveryV1,
-		ContractOrderExtensionAttestationV1:
+		ContractOrderExtensionAttestationV1,
+		ContractOrderExtensionCollateralRequirementV1:
 		return true
 	default:
 		return false
@@ -218,6 +224,10 @@ func snapshotModuleCapabilities(module Module, descriptor ModuleDescriptor) Modu
 		snapshot.hasAttestation = true
 		snapshot.Attestation = capability.AttestationVerifier()
 	}
+	if capability, ok := module.(CollateralRequirementModule); ok {
+		snapshot.hasCollateralRequirement = true
+		snapshot.CollateralRequirement = capability.CollateralRequirementPort()
+	}
 	return snapshot
 }
 
@@ -232,6 +242,7 @@ func validateModuleCapabilities(snapshot ModuleSnapshot) error {
 		{ContractOrderExtensionReservationV1, snapshot.hasReservation, snapshot.Reservation},
 		{ContractOrderExtensionDeliveryV1, snapshot.hasController, snapshot.Controller},
 		{ContractOrderExtensionAttestationV1, snapshot.hasAttestation, snapshot.Attestation},
+		{ContractOrderExtensionCollateralRequirementV1, snapshot.hasCollateralRequirement, snapshot.CollateralRequirement},
 	}
 	for _, check := range checks {
 		declared := descriptorHasContract(snapshot.Descriptor, check.contract)
@@ -245,6 +256,10 @@ func validateModuleCapabilities(snapshot ModuleSnapshot) error {
 	if descriptorHasContract(snapshot.Descriptor, ContractOrderExtensionDeclarationAdmissionV1) &&
 		!descriptorHasContract(snapshot.Descriptor, ContractOrderExtensionDeclarationV1) {
 		return fmt.Errorf("order extension module %q declaration admission requires the declaration contract", snapshot.Descriptor.ID)
+	}
+	if descriptorHasContract(snapshot.Descriptor, ContractOrderExtensionCollateralRequirementV1) &&
+		!descriptorHasContract(snapshot.Descriptor, ContractOrderExtensionDeclarationV1) {
+		return fmt.Errorf("order extension module %q collateral requirement requires the declaration contract", snapshot.Descriptor.ID)
 	}
 	return nil
 }
@@ -372,6 +387,66 @@ type DeclarationAdmissionFunc func(context.Context, DeclarationAdmissionInput) e
 type DeclarationAdmissionModule interface {
 	Module
 	DeclarationAdmission() DeclarationAdmissionFunc
+}
+
+// CollateralRequirement is a provider declaration of the exact Core-owned
+// coverage an order extension requires. It is not evidence that collateral is
+// funded or allocated; only a Core-issued AllocationReference can prove that.
+type CollateralRequirement struct {
+	ProviderID    string `json:"providerID"`
+	ResourceID    string `json:"resourceID"`
+	PrincipalID   string `json:"principalID"`
+	AssetID       string `json:"assetID"`
+	Amount        string `json:"amount"`
+	PolicyID      string `json:"policyID"`
+	PolicyVersion string `json:"policyVersion"`
+}
+
+// ValidateForExtension binds a canonical, positive base-unit requirement to
+// the provider and resource in the persisted extension declaration.
+func (r CollateralRequirement) ValidateForExtension(extension OrderExtension) error {
+	values := []string{r.ProviderID, r.ResourceID, r.PrincipalID, r.AssetID, r.Amount, r.PolicyID, r.PolicyVersion}
+	for _, value := range values {
+		if value == "" || value != strings.TrimSpace(value) {
+			return fmt.Errorf("collateral requirement provider, resource, principal, asset, amount, policy, and policy version are required and canonical")
+		}
+	}
+	if err := extension.Validate(); err != nil {
+		return fmt.Errorf("collateral requirement extension: %w", err)
+	}
+	if r.ProviderID != extension.ProviderID || r.ResourceID != extension.ResourceID {
+		return fmt.Errorf("collateral requirement provider or resource binding mismatch")
+	}
+	canonicalAssetID, err := iwallet.NormalizePaymentCoinIngress(r.AssetID)
+	if err != nil || string(canonicalAssetID) != r.AssetID {
+		return fmt.Errorf("collateral requirement asset must be a canonical asset ID")
+	}
+	amount, ok := new(big.Int).SetString(r.Amount, 10)
+	if !ok || amount.Sign() <= 0 || amount.String() != r.Amount {
+		return fmt.Errorf("collateral requirement amount must be positive integer base units")
+	}
+	return nil
+}
+
+// CollateralRequirementInput contains a detached, persisted extension and the
+// signed order aggregate from which a trusted module may derive a requirement.
+// Implementations are decision-only and receive no Core database or key access.
+type CollateralRequirementInput struct {
+	OrderID   string
+	OrderOpen *pb.OrderOpen
+	Extension OrderExtension
+}
+
+// CollateralRequirementPort declares whether an extension needs independent
+// Core-owned collateral before payment provisioning.
+type CollateralRequirementPort interface {
+	CollateralRequirement(context.Context, CollateralRequirementInput) (CollateralRequirement, bool, error)
+}
+
+// CollateralRequirementModule exposes the narrow provider declaration port.
+type CollateralRequirementModule interface {
+	Module
+	CollateralRequirementPort() CollateralRequirementPort
 }
 
 // NewOrderExtension creates a stable extension identity and hashes its JSON payload.

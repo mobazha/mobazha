@@ -365,7 +365,7 @@ func TestPaymentAppService_GeneratePaymentSetup_RejectsStaleCollateralBindingBef
 		func(SessionProvisioningPolicyInput) ([]extensions.OrderExtension, error) { return nil, nil },
 		nil,
 		nil,
-		func(_ context.Context, input SessionProvisioningPolicyInput) error {
+		func(_ context.Context, input SessionProvisioningPolicyInput, _ []extensions.OrderExtension) error {
 			require.Equal(t, order.ID.String(), input.OrderID)
 			return wantErr
 		},

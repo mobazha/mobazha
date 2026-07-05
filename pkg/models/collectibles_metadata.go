@@ -13,11 +13,16 @@ const (
 
 	CollectibleFeaturePrefix = "collectibles."
 
-	CollectibleFeatureFulfillment  = "fulfillment"
-	CollectibleFeatureHubSlotID    = "hub_slot_id"
-	CollectibleFeatureNFTMint      = "nft_mint"
-	CollectibleFeatureCertNumber   = "cert_number"
-	CollectibleFeatureHolderWallet = "holder_wallet"
+	CollectibleFeatureFulfillment             = "fulfillment"
+	CollectibleFeatureHubSlotID               = "hub_slot_id"
+	CollectibleFeatureNFTMint                 = "nft_mint"
+	CollectibleFeatureCertNumber              = "cert_number"
+	CollectibleFeatureHolderWallet            = "holder_wallet"
+	CollectibleFeatureSourceDepositID         = "source_deposit_id"
+	CollectibleFeatureCollateralAssetID       = "collateral_asset_id"
+	CollectibleFeatureCollateralAmount        = "collateral_amount"
+	CollectibleFeatureCollateralPolicyID      = "collateral_policy_id"
+	CollectibleFeatureCollateralPolicyVersion = "collateral_policy_version"
 
 	CollectibleMetadataTypePrimarySale  = "collectible_primary_sale"
 	CollectibleExtensionProviderID      = "io.mobazha.collectibles"
@@ -27,19 +32,24 @@ const (
 // CollectibleOrderMetadata is the module payload binding an order to a
 // Collectibles resource without adding product fields to Core contracts.
 type CollectibleOrderMetadata struct {
-	Type          string `json:"type"`
-	Fulfillment   string `json:"fulfillment"`
-	HubSlotID     string `json:"hubSlotID"`
-	NFTMint       string `json:"nftMint,omitempty"`
-	CertNumber    string `json:"certNumber,omitempty"`
-	HolderWallet  string `json:"holderWallet"`
-	ListingHash   string `json:"listingHash,omitempty"`
-	ListingSlug   string `json:"listingSlug,omitempty"`
-	BuyerPeerID   string `json:"buyerPeerID,omitempty"`
-	SellerPeerID  string `json:"sellerPeerID,omitempty"`
-	ContractType  string `json:"contractType,omitempty"`
-	TokenStandard string `json:"tokenStandard,omitempty"`
-	TokenAddress  string `json:"tokenAddress,omitempty"`
+	Type                    string `json:"type"`
+	Fulfillment             string `json:"fulfillment"`
+	HubSlotID               string `json:"hubSlotID"`
+	SourceDepositID         string `json:"sourceDepositID,omitempty"`
+	NFTMint                 string `json:"nftMint,omitempty"`
+	CertNumber              string `json:"certNumber,omitempty"`
+	HolderWallet            string `json:"holderWallet"`
+	ListingHash             string `json:"listingHash,omitempty"`
+	ListingSlug             string `json:"listingSlug,omitempty"`
+	BuyerPeerID             string `json:"buyerPeerID,omitempty"`
+	SellerPeerID            string `json:"sellerPeerID,omitempty"`
+	ContractType            string `json:"contractType,omitempty"`
+	TokenStandard           string `json:"tokenStandard,omitempty"`
+	TokenAddress            string `json:"tokenAddress,omitempty"`
+	CollateralAssetID       string `json:"collateralAssetID,omitempty"`
+	CollateralAmount        string `json:"collateralAmount,omitempty"`
+	CollateralPolicyID      string `json:"collateralPolicyID,omitempty"`
+	CollateralPolicyVersion string `json:"collateralPolicyVersion,omitempty"`
 }
 
 // CollectibleOrderExtensionFromOrderOpen projects signed collectible fields
@@ -54,7 +64,7 @@ func CollectibleOrderExtensionFromOrderOpen(orderID string, orderOpen *pb.OrderO
 		CollectibleExtensionProviderID,
 		CollectibleExtensionTypePrimarySale,
 		extensions.ContractVersionV1,
-		strings.TrimSpace(meta.HubSlotID),
+		collectibleResourceID(meta),
 		meta,
 	)
 	if err != nil {
@@ -83,8 +93,9 @@ func CollectibleOrderMetadataFromExtension(extension extensions.OrderExtension) 
 		return nil, false
 	}
 	metadata.HubSlotID = strings.TrimSpace(metadata.HubSlotID)
+	metadata.SourceDepositID = strings.TrimSpace(metadata.SourceDepositID)
 	if metadata.Type != CollectibleMetadataTypePrimarySale || metadata.Fulfillment != CollectibleFulfillmentNFT ||
-		metadata.HubSlotID == "" || strings.TrimSpace(extension.ResourceID) != metadata.HubSlotID {
+		metadata.HubSlotID == "" || strings.TrimSpace(extension.ResourceID) != collectibleResourceID(&metadata) {
 		return nil, false
 	}
 	return &metadata, true
@@ -150,18 +161,23 @@ func CollectibleOrderMetadataFromOrderOpen(orderOpen *pb.OrderOpen) (*Collectibl
 	}
 
 	meta := &CollectibleOrderMetadata{
-		Type:          CollectibleMetadataTypePrimarySale,
-		Fulfillment:   fulfillment,
-		HubSlotID:     hubSlotID,
-		NFTMint:       nftMint,
-		CertNumber:    strings.TrimSpace(features[CollectibleFeatureCertNumber]),
-		HolderWallet:  holderWallet,
-		ListingSlug:   strings.TrimSpace(listing.GetSlug()),
-		BuyerPeerID:   strings.TrimSpace(orderOpen.GetBuyerID().GetPeerID()),
-		SellerPeerID:  strings.TrimSpace(listing.GetVendorID().GetPeerID()),
-		ContractType:  listing.GetMetadata().GetContractType().String(),
-		TokenStandard: strings.TrimSpace(listing.GetItem().GetTokenStandard()),
-		TokenAddress:  strings.TrimSpace(listing.GetItem().GetTokenAddress()),
+		Type:                    CollectibleMetadataTypePrimarySale,
+		Fulfillment:             fulfillment,
+		HubSlotID:               hubSlotID,
+		SourceDepositID:         strings.TrimSpace(features[CollectibleFeatureSourceDepositID]),
+		NFTMint:                 nftMint,
+		CertNumber:              strings.TrimSpace(features[CollectibleFeatureCertNumber]),
+		HolderWallet:            holderWallet,
+		ListingSlug:             strings.TrimSpace(listing.GetSlug()),
+		BuyerPeerID:             strings.TrimSpace(orderOpen.GetBuyerID().GetPeerID()),
+		SellerPeerID:            strings.TrimSpace(listing.GetVendorID().GetPeerID()),
+		ContractType:            listing.GetMetadata().GetContractType().String(),
+		TokenStandard:           strings.TrimSpace(listing.GetItem().GetTokenStandard()),
+		TokenAddress:            strings.TrimSpace(listing.GetItem().GetTokenAddress()),
+		CollateralAssetID:       strings.TrimSpace(features[CollectibleFeatureCollateralAssetID]),
+		CollateralAmount:        strings.TrimSpace(features[CollectibleFeatureCollateralAmount]),
+		CollateralPolicyID:      strings.TrimSpace(features[CollectibleFeatureCollateralPolicyID]),
+		CollateralPolicyVersion: strings.TrimSpace(features[CollectibleFeatureCollateralPolicyVersion]),
 	}
 	if item != nil {
 		meta.ListingHash = strings.TrimSpace(item.GetListingHash())
@@ -213,9 +229,21 @@ func parseCollectibleFeature(feature string) (string, string) {
 	key = strings.TrimSpace(key)
 	value = strings.TrimSpace(value)
 	switch key {
-	case CollectibleFeatureFulfillment, CollectibleFeatureHubSlotID, CollectibleFeatureNFTMint, CollectibleFeatureCertNumber, CollectibleFeatureHolderWallet:
+	case CollectibleFeatureFulfillment, CollectibleFeatureHubSlotID, CollectibleFeatureNFTMint, CollectibleFeatureCertNumber, CollectibleFeatureHolderWallet,
+		CollectibleFeatureSourceDepositID, CollectibleFeatureCollateralAssetID, CollectibleFeatureCollateralAmount,
+		CollectibleFeatureCollateralPolicyID, CollectibleFeatureCollateralPolicyVersion:
 		return key, value
 	default:
 		return "", ""
 	}
+}
+
+func collectibleResourceID(metadata *CollectibleOrderMetadata) string {
+	if metadata == nil {
+		return ""
+	}
+	if sourceDepositID := strings.TrimSpace(metadata.SourceDepositID); sourceDepositID != "" {
+		return sourceDepositID
+	}
+	return strings.TrimSpace(metadata.HubSlotID)
 }

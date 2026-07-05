@@ -14,12 +14,13 @@ import (
 )
 
 type registeredOrderExtensionModule struct {
-	descriptor           extensions.ModuleDescriptor
-	declaration          extensions.DeclarationPort
-	declarationAdmission extensions.DeclarationAdmissionFunc
-	reservation          extensions.ReservationPort
-	controller           extensions.Controller
-	attestation          extensions.AttestationVerifier
+	descriptor            extensions.ModuleDescriptor
+	declaration           extensions.DeclarationPort
+	declarationAdmission  extensions.DeclarationAdmissionFunc
+	reservation           extensions.ReservationPort
+	controller            extensions.Controller
+	attestation           extensions.AttestationVerifier
+	collateralRequirement extensions.CollateralRequirementPort
 }
 
 type orderExtensionFields struct {
@@ -34,12 +35,13 @@ func snapshotOrderExtensionModules(modules []extensions.Module) ([]registeredOrd
 	registered := make([]registeredOrderExtensionModule, 0, len(snapshots))
 	for _, snapshot := range snapshots {
 		registered = append(registered, registeredOrderExtensionModule{
-			descriptor:           snapshot.Descriptor,
-			declaration:          snapshot.Declaration,
-			declarationAdmission: snapshot.DeclarationAdmission,
-			reservation:          snapshot.Reservation,
-			controller:           snapshot.Controller,
-			attestation:          snapshot.Attestation,
+			descriptor:            snapshot.Descriptor,
+			declaration:           snapshot.Declaration,
+			declarationAdmission:  snapshot.DeclarationAdmission,
+			reservation:           snapshot.Reservation,
+			controller:            snapshot.Controller,
+			attestation:           snapshot.Attestation,
+			collateralRequirement: snapshot.CollateralRequirement,
 		})
 	}
 	return registered, nil
@@ -78,6 +80,14 @@ func (n *MobazhaNode) extensionAttestationVerifier(providerID string) extensions
 		return nil
 	}
 	return registered.attestation
+}
+
+func (n *MobazhaNode) extensionCollateralRequirementPort(providerID string) extensions.CollateralRequirementPort {
+	registered := n.extensionModule(providerID)
+	if registered == nil || !registered.hasContract(extensions.ContractOrderExtensionCollateralRequirementV1) {
+		return nil
+	}
+	return registered.collateralRequirement
 }
 
 func (n *MobazhaNode) declareOrderExtensions(ctx context.Context, input extensions.DeclarationInput) ([]extensions.OrderExtension, error) {

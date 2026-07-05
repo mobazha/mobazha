@@ -45,7 +45,7 @@ type OrderExtensionReservationRecorder func(extensions.ReservationRequest, exten
 
 // OrderExtensionCollateralAdmissionFunc revalidates persisted Core-issued v2
 // collateral bindings before any payment funding target is created.
-type OrderExtensionCollateralAdmissionFunc func(context.Context, SessionProvisioningPolicyInput) error
+type OrderExtensionCollateralAdmissionFunc func(context.Context, SessionProvisioningPolicyInput, []extensions.OrderExtension) error
 
 type orderExtensionProvisioningPolicy struct {
 	resolve         OrderExtensionResolver
@@ -96,7 +96,7 @@ func (p *orderExtensionProvisioningPolicy) AuthorizeSessionProvisioning(ctx cont
 		}
 	}
 	if p.admitCollateral != nil {
-		if err := p.admitCollateral(ctx, input); err != nil {
+		if err := p.admitCollateral(ctx, input, cloneExtensions(required)); err != nil {
 			return fmt.Errorf("%w: %w", ErrOrderExtensionCollateral, err)
 		}
 	}
@@ -123,6 +123,16 @@ func (p *orderExtensionProvisioningPolicy) AuthorizeSessionProvisioning(ctx cont
 		}
 	}
 	return nil
+}
+
+func cloneExtensions(source []extensions.OrderExtension) []extensions.OrderExtension {
+	cloned := make([]extensions.OrderExtension, len(source))
+	for i := range source {
+		cloned[i] = source[i]
+		cloned[i].LifecycleEvents = append([]string(nil), source[i].LifecycleEvents...)
+		cloned[i].Payload = append([]byte(nil), source[i].Payload...)
+	}
+	return cloned
 }
 
 func (p *orderExtensionProvisioningPolicy) reserveOne(ctx context.Context, input SessionProvisioningPolicyInput, extension extensions.OrderExtension) error {

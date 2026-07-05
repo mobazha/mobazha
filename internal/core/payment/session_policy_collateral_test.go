@@ -23,9 +23,12 @@ func TestOrderExtensionProvisioningPolicyRunsCollateralAdmission(t *testing.T) {
 		},
 		nil,
 		nil,
-		func(_ context.Context, input SessionProvisioningPolicyInput) error {
+		func(_ context.Context, input SessionProvisioningPolicyInput, persisted []extensions.OrderExtension) error {
 			admissionCalls++
 			require.Equal(t, "order-collateral", input.OrderID)
+			require.Equal(t, []extensions.OrderExtension{extension}, persisted)
+			persisted[0].Payload[0] = 'x'
+			require.NotEqual(t, persisted[0].Payload, extension.Payload, "admission receives a detached extension projection")
 			return denied
 		},
 	)

@@ -30,6 +30,11 @@ func TestCollectibleOrderMetadataFromOrderOpen(t *testing.T) {
 				CollectibleOptionalFeature(CollectibleFeatureNFTMint, "mint-from-feature"),
 				CollectibleOptionalFeature(CollectibleFeatureCertNumber, "cert-1"),
 				CollectibleOptionalFeature(CollectibleFeatureHolderWallet, "holder-wallet-1"),
+				CollectibleOptionalFeature(CollectibleFeatureSourceDepositID, "srcdep-1"),
+				CollectibleOptionalFeature(CollectibleFeatureCollateralAssetID, "crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955"),
+				CollectibleOptionalFeature(CollectibleFeatureCollateralAmount, "1000000"),
+				CollectibleOptionalFeature(CollectibleFeatureCollateralPolicyID, "collectibles-source-custody"),
+				CollectibleOptionalFeature(CollectibleFeatureCollateralPolicyVersion, "1"),
 			},
 		}},
 	}
@@ -55,6 +60,13 @@ func TestCollectibleOrderMetadataFromOrderOpen(t *testing.T) {
 	}
 	if meta.HolderWallet != "holder-wallet-1" {
 		t.Fatalf("unexpected holder wallet %q", meta.HolderWallet)
+	}
+	if meta.SourceDepositID != "srcdep-1" || meta.CollateralAmount != "1000000" || meta.CollateralPolicyVersion != "1" {
+		t.Fatalf("unexpected collateral metadata: %#v", meta)
+	}
+	extension, ok, err := CollectibleOrderExtensionFromOrderOpen("order-source", orderOpen)
+	if err != nil || !ok || extension.ResourceID != "srcdep-1" {
+		t.Fatalf("source-custody extension resource = %q ok=%v err=%v", extension.ResourceID, ok, err)
 	}
 	if meta.ListingHash != "listing-hash" || meta.ListingSlug != "psa-card" {
 		t.Fatalf("unexpected listing metadata: %#v", meta)

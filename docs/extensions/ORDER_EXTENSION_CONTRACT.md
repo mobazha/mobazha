@@ -259,6 +259,26 @@ Hosting projections, and provider declarations are not proof of funding. The
 staged design and activation gates are tracked by
 [mobazha-docs RFC-0005](https://github.com/mobazha/mobazha-docs/blob/main/rfcs/0005-core-owned-resource-collateral.md).
 
+The authenticated operator onboarding surface is intentionally narrow:
+
+- `POST /v1/collateral/accounts` opens an idempotent tenant-local account;
+- `GET /v1/collateral/accounts/{collateralID}` returns the account and a safe
+  funding projection;
+- `POST /v1/collateral/accounts/{collateralID}/funding-target` persists and
+  creates or retrieves a target through the configured reviewed rail; and
+- `POST /v1/collateral/accounts/{collateralID}/funding/reconcile` applies only
+  receipt-verified rail confirmation.
+
+These routes require administrator authentication and do not accept API
+tokens. Core derives tenant and principal from the selected local node; callers
+cannot choose either binding. Status responses omit the tenant, principal
+destination, idempotency identity, raw rail payload, credentials, and private
+evidence. Invalid commands return `400`, missing records return `404`,
+idempotency or state conflicts return `409`, and an unconfigured rail returns
+`503`. No route in this surface exposes release, claim, slash, or evidence
+authority. The API being present does not activate collateral: without an
+explicitly injected and reviewed rail, funding remains unavailable.
+
 Existing Solana Anchor and EVM Safe adapters are order-settlement adapters:
 they require order escrow data and interpret actions as seller payout, buyer
 refund, or dispute release. They do not implicitly implement the dedicated

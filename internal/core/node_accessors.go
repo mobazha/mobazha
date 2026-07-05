@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	internalcollateral "github.com/mobazha/mobazha/internal/collateral"
 	"github.com/mobazha/mobazha/internal/wallet"
+	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	pkgconfig "github.com/mobazha/mobazha/pkg/config"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -281,6 +283,26 @@ func (n *MobazhaNode) CollateralAllocation() contracts.CollateralAllocationServi
 }
 
 var _ contracts.CollateralAllocationServiceProvider = (*MobazhaNode)(nil)
+
+// CollateralOperator returns the tenant- and principal-bound onboarding
+// service. Funding remains unavailable unless a reviewed rail was injected.
+func (n *MobazhaNode) CollateralOperator() pkgcollateral.OperatorService {
+	if n == nil || n.db == nil || n.peerID == "" {
+		return nil
+	}
+	service, err := internalcollateral.NewOperatorService(
+		n.db,
+		collateralTransportTenantID(n.db),
+		n.peerID.String(),
+		n.collateralRail,
+	)
+	if err != nil {
+		return nil
+	}
+	return service
+}
+
+var _ pkgcollateral.OperatorServiceProvider = (*MobazhaNode)(nil)
 
 func (n *MobazhaNode) Order() contracts.OrderService {
 	if n.orderService == nil {

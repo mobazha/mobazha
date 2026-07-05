@@ -150,6 +150,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) (huma.API, error) {
 		g.registerAIHTTPCapabilities(api)
 		g.registerNodeHumaShippingOperations(api)
 		g.registerNodeHumaSellerDigitalOperations(api)
+		g.registerNodeHumaCollateralOperations(api)
 	}
 	if err := g.registerTrustedHumaModules(api); err != nil {
 		return nil, err

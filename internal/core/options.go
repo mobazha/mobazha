@@ -18,6 +18,7 @@ import (
 	"github.com/mobazha/mobazha/internal/logger"
 	obnet "github.com/mobazha/mobazha/internal/net"
 	"github.com/mobazha/mobazha/internal/storage"
+	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	pkgconfig "github.com/mobazha/mobazha/pkg/config"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
@@ -63,6 +64,36 @@ func WithPaymentCapabilityProvider(provider payment.ChainCapabilityProvider) Nod
 	return NodeOption{apply: func(n *MobazhaNode) {
 		n.paymentCapabilities = provider
 	}}
+}
+
+// WithCollateralRail injects one reviewed, fully lifecycle-capable collateral
+// rail. Omit it to keep collateral funding unavailable. Merely compiling a rail
+// implementation never activates the capability.
+func WithCollateralRail(rail pkgcollateral.Rail) NodeOption {
+	return NodeOption{
+		configure: func(options *nodeBuildOptions) error {
+			if rail == nil {
+				return fmt.Errorf("collateral rail is nil")
+			}
+			if options.collateralRailInjected {
+				return fmt.Errorf("collateral rail configured more than once")
+			}
+			descriptor := rail.Descriptor()
+			if len(descriptor.Assets) == 0 {
+				return fmt.Errorf("collateral rail has no supported assets")
+			}
+			for _, assetID := range descriptor.Assets {
+				if err := descriptor.ValidateForAsset(assetID); err != nil {
+					return err
+				}
+			}
+			options.collateralRailInjected = true
+			return nil
+		},
+		apply: func(n *MobazhaNode) {
+			n.collateralRail = rail
+		},
+	}
 }
 
 // WithPaymentModules installs trusted, statically linked distribution modules.

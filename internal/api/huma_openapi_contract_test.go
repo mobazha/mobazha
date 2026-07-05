@@ -65,6 +65,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaWebhookOperations(api)
 	g.registerAIHTTPCapabilities(api)
 	g.registerNodeHumaShippingOperations(api)
+	g.registerNodeHumaCollateralOperations(api)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
@@ -95,6 +96,10 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 
 	expectedOps := []string{
 		"node-huma-ping",
+		"collateral-accounts-open",
+		"collateral-accounts-get",
+		"collateral-funding-target-prepare",
+		"collateral-funding-reconcile",
 		// wallet
 		"wallet-spend",
 		"wallet-get-mnemonic",

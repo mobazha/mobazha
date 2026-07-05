@@ -15,7 +15,8 @@ type NodeOption struct {
 }
 
 type nodeBuildOptions struct {
-	sovereign *distribution.SovereignNodeConfig
+	sovereign              *distribution.SovereignNodeConfig
+	collateralRailInjected bool
 }
 
 func resolveNodeBuildOptions(options []NodeOption) (nodeBuildOptions, error) {

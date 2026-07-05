@@ -9,6 +9,7 @@ import (
 	"github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/internal/core/settlement"
 	"github.com/mobazha/mobazha/internal/repo"
+	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	pkgconfig "github.com/mobazha/mobazha/pkg/config"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
@@ -103,6 +104,7 @@ type appServices struct {
 	digitalAssetService        *digital.DigitalAssetAppService
 	digitalEntitlementService  *digital.DigitalEntitlementAppService
 	paymentSessionService      contracts.PaymentSessionService
+	collateralRail             pkgcollateral.Rail
 
 	// Feature flag resolver infrastructure (Phase FF-3).
 	// featureResolver is the SSOT for `isEnabled(ctx, key)` queries; it

@@ -8,6 +8,7 @@ import (
 	"github.com/mobazha/mobazha/internal/config"
 	"github.com/mobazha/mobazha/internal/core"
 	"github.com/mobazha/mobazha/internal/database/dbstore"
+	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	pkgdb "github.com/mobazha/mobazha/pkg/database"
@@ -45,6 +46,12 @@ func NewNodeWithOptions(ctx context.Context, cfg *repo.Config, nodeID string,
 // capability allowlist without exposing a concrete commercial adapter config.
 func WithPaymentCapabilityProvider(provider payment.ChainCapabilityProvider) NodeOption {
 	return core.WithPaymentCapabilityProvider(provider)
+}
+
+// WithCollateralRail injects one reviewed collateral rail. Without this option
+// the operator funding API is present but fails closed as unavailable.
+func WithCollateralRail(rail pkgcollateral.Rail) NodeOption {
+	return core.WithCollateralRail(rail)
 }
 
 // WithPaymentModules installs trusted, statically linked distribution payment

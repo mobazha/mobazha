@@ -142,6 +142,7 @@ func (m *testPaymentModule) Descriptor() PaymentModuleDescriptor {
 	}
 	return PaymentModuleDescriptor{
 		ID: m.id, Version: "test", Rails: []PaymentRailKind{PaymentRailEscrow}, Activation: activation,
+		ProtocolVersion: "1", StateSchemaVersion: "1",
 	}
 }
 
@@ -153,7 +154,17 @@ func (m *testPaymentModule) Register(_ context.Context, _ PaymentRuntime, regist
 	if m.chain == "" {
 		return nil
 	}
-	return registrar.RegisterV2(m.chain, m.strategy)
+	return registrar.RegisterEscrowV2(PaymentRailContribution{
+		ContributionID: m.id + "." + string(m.chain),
+		Rail:           PaymentRailEscrow,
+		Network:        m.chain,
+		Asset:          PaymentAssetAny,
+		Operations: []PaymentRailOperation{
+			PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify,
+			PaymentOperationConfirm, PaymentOperationCancel, PaymentOperationRefund,
+			PaymentOperationComplete, PaymentOperationDisputeRelease, PaymentOperationReconcile,
+		},
+	}, m.strategy)
 }
 
 func registerTestPaymentModules(ctx context.Context, registry PaymentRegistry, modules ...PaymentModule) (*TrustedPaymentModuleManager, error) {
@@ -172,12 +183,60 @@ func TestTrustedPaymentModuleManager_ValidModule_CommitsStrategy(t *testing.T) {
 		strategy: &testPaymentStrategy{},
 	}
 
-	_, err := registerTestPaymentModules(context.Background(), registry, module)
+	manager, err := registerTestPaymentModules(context.Background(), registry, module)
 
 	require.NoError(t, err)
 	assert.True(t, module.called)
 	assert.True(t, module.activated)
 	assert.True(t, registry.HasChain(iwallet.ChainEthereum))
+	health := manager.Health()
+	require.Len(t, health, 1)
+	require.Len(t, health[0].Contributions, 1)
+	assert.Equal(t, "commercial.managed.ETH", health[0].Contributions[0].ContributionID)
+	assert.Equal(t, "commercial.managed", health[0].Contributions[0].ModuleID)
+	assert.Equal(t, "1", health[0].Contributions[0].ProtocolVersion)
+}
+
+type metadataPaymentModule struct {
+	id      string
+	network iwallet.ChainType
+	asset   iwallet.CoinType
+}
+
+func (m *metadataPaymentModule) Descriptor() PaymentModuleDescriptor {
+	return PaymentModuleDescriptor{
+		ID: m.id, Version: "test", Rails: []PaymentRailKind{PaymentRailDirectObserved},
+		Activation: PaymentModuleOptional, ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+}
+
+func (m *metadataPaymentModule) Register(_ context.Context, _ PaymentRuntime, registrar PaymentRegistrar) error {
+	return registrar.RegisterRail(PaymentRailContribution{
+		ContributionID: m.id + ".rail",
+		Rail:           PaymentRailDirectObserved,
+		Network:        m.network,
+		Asset:          m.asset,
+		Operations:     []PaymentRailOperation{PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify, PaymentOperationReconcile},
+	})
+}
+
+func (*metadataPaymentModule) RollbackRegistration(context.Context) error { return nil }
+
+func TestTrustedPaymentModuleManager_DuplicateContributionRoute_IsolatesOptionalModule(t *testing.T) {
+	registry := newTestPaymentRegistry()
+	first := &metadataPaymentModule{id: "first", network: iwallet.ChainMonero, asset: iwallet.CoinType("crypto:monero:mainnet:native")}
+	second := &metadataPaymentModule{id: "second", network: iwallet.ChainMonero, asset: iwallet.CoinType("crypto:monero:mainnet:native")}
+
+	manager, err := registerTestPaymentModules(context.Background(), registry, first, second)
+
+	require.NoError(t, err)
+	health := manager.Health()
+	require.Len(t, health, 2)
+	assert.Equal(t, PaymentModuleStopped, health[0].State)
+	assert.True(t, health[0].Active)
+	assert.Equal(t, PaymentModuleDegraded, health[1].State)
+	assert.False(t, health[1].Active)
+	assert.Contains(t, health[1].Error, "conflicts with module")
 }
 
 func TestTrustedPaymentModuleManager_OptionalActivationFailure_Isolated(t *testing.T) {

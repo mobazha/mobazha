@@ -589,8 +589,10 @@ func (m *paymentModuleRunnerProbe) Stop(context.Context) error {
 func (m *paymentModuleProbe) Descriptor() distribution.PaymentModuleDescriptor {
 	return distribution.PaymentModuleDescriptor{
 		ID: m.id, Version: "test", Rails: []distribution.PaymentRailKind{distribution.PaymentRailEscrow},
-		Activation:   distribution.PaymentModuleOptional,
-		Capabilities: []distribution.PaymentModuleCapability{distribution.CapabilityManagedEVMExecution},
+		Activation:         distribution.PaymentModuleOptional,
+		Capabilities:       []distribution.PaymentModuleCapability{distribution.CapabilityManagedEVMExecution},
+		ProtocolVersion:    "1",
+		StateSchemaVersion: "1",
 	}
 }
 
@@ -601,7 +603,18 @@ func (m *paymentModuleProbe) Register(_ context.Context, runtime distribution.Pa
 	if m.err != nil {
 		return m.err
 	}
-	return registrar.RegisterV2(m.chain, m.strategy)
+	return registrar.RegisterEscrowV2(distribution.PaymentRailContribution{
+		ContributionID: m.id + "." + string(m.chain),
+		Rail:           distribution.PaymentRailEscrow,
+		Network:        m.chain,
+		Asset:          distribution.PaymentAssetAny,
+		Operations: []distribution.PaymentRailOperation{
+			distribution.PaymentOperationSetup,
+			distribution.PaymentOperationObserve,
+			distribution.PaymentOperationVerify,
+			distribution.PaymentOperationReconcile,
+		},
+	}, m.strategy)
 }
 
 func TestRegisterDistributionPaymentModules_ExternalStrategyIsRegistered(t *testing.T) {

@@ -17,17 +17,25 @@ type statusTestPaymentModule struct {
 
 func (*statusTestPaymentModule) Descriptor() PaymentModuleDescriptor {
 	return PaymentModuleDescriptor{
-		ID:           "private.direct-observed",
-		Version:      "test",
-		Rails:        []PaymentRailKind{PaymentRailDirectObserved},
-		Capabilities: []PaymentModuleCapability{CapabilityDirectObserved},
-		Chains:       []iwallet.ChainType{iwallet.ChainMonero},
-		Activation:   PaymentModuleSetupGated,
+		ID:                 "private.direct-observed",
+		Version:            "test",
+		Rails:              []PaymentRailKind{PaymentRailDirectObserved},
+		Capabilities:       []PaymentModuleCapability{CapabilityDirectObserved},
+		Chains:             []iwallet.ChainType{iwallet.ChainMonero},
+		Activation:         PaymentModuleSetupGated,
+		ProtocolVersion:    "1",
+		StateSchemaVersion: "1",
 	}
 }
 
-func (*statusTestPaymentModule) Register(context.Context, PaymentRuntime, PaymentRegistrar) error {
-	return nil
+func (*statusTestPaymentModule) Register(_ context.Context, _ PaymentRuntime, registrar PaymentRegistrar) error {
+	return registrar.RegisterRail(PaymentRailContribution{
+		ContributionID: "private.direct-observed.xmr",
+		Rail:           PaymentRailDirectObserved,
+		Network:        iwallet.ChainMonero,
+		Asset:          iwallet.CoinType("crypto:monero:mainnet:native"),
+		Operations:     []PaymentRailOperation{PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify, PaymentOperationReconcile},
+	})
 }
 
 func (*statusTestPaymentModule) RollbackRegistration(context.Context) error { return nil }

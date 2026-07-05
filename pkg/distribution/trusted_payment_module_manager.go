@@ -30,11 +30,12 @@ const (
 // PaymentModuleHealth is an immutable manager snapshot suitable for product
 // capability projection and operational diagnostics.
 type PaymentModuleHealth struct {
-	Descriptor PaymentModuleDescriptor
-	State      PaymentModuleState
-	Chains     []iwallet.ChainType
-	Error      string
-	Active     bool
+	Descriptor    PaymentModuleDescriptor
+	State         PaymentModuleState
+	Chains        []iwallet.ChainType
+	Contributions []PaymentRailContribution
+	Error         string
+	Active        bool
 }
 
 type paymentModuleStatusUpdate struct {
@@ -122,6 +123,12 @@ func (m *TrustedPaymentModuleManager) Register(ctx context.Context) error {
 		id := registration.descriptor.ID
 		health := m.health[id]
 		health.Chains = append([]iwallet.ChainType(nil), registration.chains...)
+		health.Contributions = clonePaymentRailContributions(registration.contributions)
+		if len(health.Chains) == 0 {
+			for _, contribution := range health.Contributions {
+				health.Chains = appendUniquePaymentChain(health.Chains, contribution.Network)
+			}
+		}
 		if len(health.Chains) == 0 {
 			health.Chains = append([]iwallet.ChainType(nil), registration.descriptor.Chains...)
 		}
@@ -515,6 +522,7 @@ func (m *TrustedPaymentModuleManager) Health() []PaymentModuleHealth {
 	result := make([]PaymentModuleHealth, 0, len(m.health))
 	for _, health := range m.health {
 		health.Chains = append([]iwallet.ChainType(nil), health.Chains...)
+		health.Contributions = clonePaymentRailContributions(health.Contributions)
 		health.Descriptor = clonePaymentModuleDescriptor(health.Descriptor)
 		result = append(result, health)
 	}
@@ -534,6 +542,7 @@ func (m *TrustedPaymentModuleManager) publish(id string, state PaymentModuleStat
 	snapshot := health
 	snapshot.Descriptor = clonePaymentModuleDescriptor(snapshot.Descriptor)
 	snapshot.Chains = append([]iwallet.ChainType(nil), snapshot.Chains...)
+	snapshot.Contributions = clonePaymentRailContributions(snapshot.Contributions)
 	m.mu.Unlock()
 	if callback != nil {
 		callback(snapshot)
@@ -623,6 +632,12 @@ func validatePaymentModuleDescriptor(descriptor PaymentModuleDescriptor) error {
 	if descriptor.Version == "" {
 		return fmt.Errorf("payment module %q version is required", descriptor.ID)
 	}
+	if descriptor.ProtocolVersion == "" {
+		return fmt.Errorf("payment module %q protocol version is required", descriptor.ID)
+	}
+	if descriptor.StateSchemaVersion == "" {
+		return fmt.Errorf("payment module %q state schema version is required", descriptor.ID)
+	}
 	if len(descriptor.Rails) == 0 {
 		return fmt.Errorf("payment module %q must declare at least one rail", descriptor.ID)
 	}
@@ -681,4 +696,21 @@ func validatePaymentModuleDescriptor(descriptor PaymentModuleDescriptor) error {
 		}
 	}
 	return nil
+}
+
+func clonePaymentRailContributions(contributions []PaymentRailContribution) []PaymentRailContribution {
+	result := make([]PaymentRailContribution, 0, len(contributions))
+	for _, contribution := range contributions {
+		result = append(result, clonePaymentRailContribution(contribution))
+	}
+	return result
+}
+
+func appendUniquePaymentChain(chains []iwallet.ChainType, chain iwallet.ChainType) []iwallet.ChainType {
+	for _, existing := range chains {
+		if existing == chain {
+			return chains
+		}
+	}
+	return append(chains, chain)
 }

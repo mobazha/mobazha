@@ -360,6 +360,44 @@ const (
 	PaymentRailProviderSession PaymentRailKind = "provider_session"
 )
 
+// PaymentRailOperation is one narrow operation exposed by a payment rail
+// contribution. Declaring one operation never implies support for another.
+type PaymentRailOperation string
+
+const (
+	PaymentOperationSetup          PaymentRailOperation = "setup"
+	PaymentOperationObserve        PaymentRailOperation = "observe"
+	PaymentOperationVerify         PaymentRailOperation = "verify"
+	PaymentOperationConfirm        PaymentRailOperation = "confirm"
+	PaymentOperationCancel         PaymentRailOperation = "cancel"
+	PaymentOperationRefund         PaymentRailOperation = "refund"
+	PaymentOperationComplete       PaymentRailOperation = "complete"
+	PaymentOperationDisputeRelease PaymentRailOperation = "dispute_release"
+	PaymentOperationReconcile      PaymentRailOperation = "reconcile"
+)
+
+// PaymentAssetAny is an explicit contribution scope for adapters that validate
+// the concrete asset at request time. Empty asset IDs are never wildcards.
+const PaymentAssetAny iwallet.CoinType = "*"
+
+// PaymentRailContribution is the stable routing and recovery identity of one
+// typed rail implementation. ModuleID is assigned by the trusted module
+// manager; modules must leave it empty when registering a contribution.
+//
+// ContributionID, rail, network, asset, protocol, and state schema are durable
+// route fields. They must not be inferred later from the current default
+// module or distribution profile.
+type PaymentRailContribution struct {
+	ContributionID     string
+	ModuleID           string
+	Rail               PaymentRailKind
+	Network            iwallet.ChainType
+	Asset              iwallet.CoinType
+	Operations         []PaymentRailOperation
+	ProtocolVersion    string
+	StateSchemaVersion string
+}
+
 // PaymentModuleActivation controls whether a composition may continue when a
 // module cannot be activated.
 type PaymentModuleActivation string
@@ -491,10 +529,12 @@ func (a PaymentRuntimeAuthority) RuntimeFor(descriptor PaymentModuleDescriptor) 
 	}, nil
 }
 
-// PaymentRegistrar records V2 payment strategies contributed by a module.
-// Implementations must reject duplicate chain registrations.
+// PaymentRegistrar records typed rail contributions prepared by one module.
+// Escrow strategies remain the current execution adapter, but their durable
+// identity comes from the contribution rather than the chain key.
 type PaymentRegistrar interface {
-	RegisterV2(chain iwallet.ChainType, strategy payment.ChainEscrowV2) error
+	RegisterEscrowV2(contribution PaymentRailContribution, strategy payment.ChainEscrowV2) error
+	RegisterRail(contribution PaymentRailContribution) error
 }
 
 // PaymentRegistry is the Open Core registry surface used when atomically
@@ -540,40 +580,78 @@ type PaymentModuleBinder interface {
 }
 
 type paymentRegistration struct {
-	chain    iwallet.ChainType
-	strategy payment.ChainEscrowV2
+	contribution PaymentRailContribution
+	strategy     payment.ChainEscrowV2
 }
 
 type collectingPaymentRegistrar struct {
+	descriptor    PaymentModuleDescriptor
+	identities    map[string]struct{}
+	routes        map[string]struct{}
 	chains        map[iwallet.ChainType]struct{}
 	registrations []paymentRegistration
 }
 
-func newCollectingPaymentRegistrar() *collectingPaymentRegistrar {
-	return &collectingPaymentRegistrar{chains: make(map[iwallet.ChainType]struct{})}
+func newCollectingPaymentRegistrar(descriptor PaymentModuleDescriptor) *collectingPaymentRegistrar {
+	return &collectingPaymentRegistrar{
+		descriptor: descriptor,
+		identities: make(map[string]struct{}),
+		routes:     make(map[string]struct{}),
+		chains:     make(map[iwallet.ChainType]struct{}),
+	}
 }
 
-func (r *collectingPaymentRegistrar) RegisterV2(chain iwallet.ChainType, strategy payment.ChainEscrowV2) error {
-	if strings.TrimSpace(string(chain)) == "" {
-		return fmt.Errorf("payment module chain is required")
-	}
+func (r *collectingPaymentRegistrar) RegisterEscrowV2(contribution PaymentRailContribution, strategy payment.ChainEscrowV2) error {
 	if isNilInterface(strategy) {
-		return fmt.Errorf("payment module strategy for chain %s is nil", chain)
+		return fmt.Errorf("payment module escrow strategy is nil")
 	}
-	if _, exists := r.chains[chain]; exists {
-		return fmt.Errorf("payment module chain %s is registered more than once", chain)
+	if contribution.Rail != PaymentRailEscrow {
+		return fmt.Errorf("payment module escrow strategy must declare the escrow rail")
 	}
-	r.chains[chain] = struct{}{}
-	r.registrations = append(r.registrations, paymentRegistration{chain: chain, strategy: strategy})
+	if err := r.register(contribution, strategy); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *collectingPaymentRegistrar) RegisterRail(contribution PaymentRailContribution) error {
+	if contribution.Rail == PaymentRailEscrow {
+		return fmt.Errorf("payment module escrow contribution requires an escrow strategy")
+	}
+	return r.register(contribution, nil)
+}
+
+func (r *collectingPaymentRegistrar) register(contribution PaymentRailContribution, strategy payment.ChainEscrowV2) error {
+	contribution = normalizedPaymentRailContribution(contribution, r.descriptor)
+	if err := validatePaymentRailContribution(contribution, r.descriptor); err != nil {
+		return err
+	}
+	if _, exists := r.identities[contribution.ContributionID]; exists {
+		return fmt.Errorf("payment contribution %q is registered more than once", contribution.ContributionID)
+	}
+	routeKey := paymentContributionRouteKey(contribution)
+	if _, exists := r.routes[routeKey]; exists {
+		return fmt.Errorf("payment contribution route %s is registered more than once", routeKey)
+	}
+	if !isNilInterface(strategy) {
+		if _, exists := r.chains[contribution.Network]; exists {
+			return fmt.Errorf("payment module escrow network %s is registered more than once", contribution.Network)
+		}
+		r.chains[contribution.Network] = struct{}{}
+	}
+	r.identities[contribution.ContributionID] = struct{}{}
+	r.routes[routeKey] = struct{}{}
+	r.registrations = append(r.registrations, paymentRegistration{contribution: contribution, strategy: strategy})
 	return nil
 }
 
 // paymentModuleRegistration records the exact live contribution owned by one
 // module. Lifecycle failure must never unregister another module's chains.
 type paymentModuleRegistration struct {
-	descriptor PaymentModuleDescriptor
-	module     PaymentModule
-	chains     []iwallet.ChainType
+	descriptor    PaymentModuleDescriptor
+	module        PaymentModule
+	chains        []iwallet.ChainType
+	contributions []PaymentRailContribution
 }
 
 type paymentModuleRegistrationFailure struct {
@@ -601,6 +679,8 @@ func registerPaymentModules(
 	registrations := make([]paymentModuleRegistration, 0, len(modules))
 	failures := make([]paymentModuleRegistrationFailure, 0)
 	available := make(map[string]bool, len(modules))
+	committedContributionIDs := make(map[string]string)
+	committedRouteKeys := make(map[string]string)
 	rollbackAll := func(cause error) error {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
@@ -651,7 +731,7 @@ func registerPaymentModules(
 			}
 			continue
 		}
-		collector := newCollectingPaymentRegistrar()
+		collector := newCollectingPaymentRegistrar(descriptor)
 		if err := module.Register(ctx, runtime, collector); err != nil {
 			cause := fmt.Errorf("register payment module %q: %w", descriptor.ID, err)
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -669,15 +749,29 @@ func registerPaymentModules(
 		}
 
 		ownedChains := make([]iwallet.ChainType, 0, len(collector.registrations))
+		contributions := make([]PaymentRailContribution, 0, len(collector.registrations))
 		strategies := make(map[iwallet.ChainType]payment.ChainEscrowV2, len(collector.registrations))
+		var contributionConflict error
 		for _, registration := range collector.registrations {
-			ownedChains = append(ownedChains, registration.chain)
-			strategies[registration.chain] = registration.strategy
+			contribution := registration.contribution
+			if owner, exists := committedContributionIDs[contribution.ContributionID]; exists {
+				contributionConflict = fmt.Errorf("payment contribution %q from module %q conflicts with module %q", contribution.ContributionID, descriptor.ID, owner)
+				break
+			}
+			routeKey := paymentContributionRouteKey(contribution)
+			if owner, exists := committedRouteKeys[routeKey]; exists {
+				contributionConflict = fmt.Errorf("payment contribution route %s from module %q conflicts with module %q", routeKey, descriptor.ID, owner)
+				break
+			}
+			contributions = append(contributions, clonePaymentRailContribution(contribution))
+			if !isNilInterface(registration.strategy) {
+				ownedChains = append(ownedChains, contribution.Network)
+				strategies[contribution.Network] = registration.strategy
+			}
 		}
-		registration := paymentModuleRegistration{descriptor: descriptor, module: module, chains: ownedChains}
-		if err := target.RegisterV2BatchExclusive(strategies); err != nil {
-			cause := fmt.Errorf("commit payment module %q strategies: %w", descriptor.ID, err)
+		if contributionConflict != nil {
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			cause := contributionConflict
 			if cleanupErr := module.RollbackRegistration(cleanupCtx); cleanupErr != nil {
 				cause = errors.Join(cause, fmt.Errorf("rollback payment module %q registration: %w", descriptor.ID, cleanupErr))
 			}
@@ -686,6 +780,21 @@ func registerPaymentModules(
 				return nil, failures, failureErr
 			}
 			continue
+		}
+		registration := paymentModuleRegistration{descriptor: descriptor, module: module, chains: ownedChains, contributions: contributions}
+		if len(strategies) > 0 {
+			if err := target.RegisterV2BatchExclusive(strategies); err != nil {
+				cause := fmt.Errorf("commit payment module %q strategies: %w", descriptor.ID, err)
+				cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+				if cleanupErr := module.RollbackRegistration(cleanupCtx); cleanupErr != nil {
+					cause = errors.Join(cause, fmt.Errorf("rollback payment module %q registration: %w", descriptor.ID, cleanupErr))
+				}
+				cancel()
+				if failureErr := recordFailure(descriptor, cause); failureErr != nil {
+					return nil, failures, failureErr
+				}
+				continue
+			}
 		}
 		if binder, ok := module.(PaymentModuleBinder); ok {
 			if err := binder.Bind(ctx); err != nil {
@@ -707,6 +816,10 @@ func registerPaymentModules(
 			}
 		}
 		registrations = append(registrations, registration)
+		for _, contribution := range contributions {
+			committedContributionIDs[contribution.ContributionID] = descriptor.ID
+			committedRouteKeys[paymentContributionRouteKey(contribution)] = descriptor.ID
+		}
 		available[descriptor.ID] = true
 	}
 	return registrations, failures, nil
@@ -724,6 +837,117 @@ func rollbackCommittedPaymentModule(ctx context.Context, target PaymentRegistry,
 		cleanupErrors = append(cleanupErrors, fmt.Errorf("rollback payment module %q: %w", registration.descriptor.ID, err))
 	}
 	return errors.Join(cleanupErrors...)
+}
+
+func normalizedPaymentRailContribution(contribution PaymentRailContribution, descriptor PaymentModuleDescriptor) PaymentRailContribution {
+	contribution = clonePaymentRailContribution(contribution)
+	contribution.ContributionID = strings.TrimSpace(contribution.ContributionID)
+	contribution.ModuleID = strings.TrimSpace(contribution.ModuleID)
+	contribution.Network = iwallet.ChainType(strings.TrimSpace(string(contribution.Network)))
+	contribution.Asset = iwallet.CoinType(strings.TrimSpace(string(contribution.Asset)))
+	contribution.ProtocolVersion = strings.TrimSpace(contribution.ProtocolVersion)
+	contribution.StateSchemaVersion = strings.TrimSpace(contribution.StateSchemaVersion)
+	if contribution.ModuleID == "" {
+		contribution.ModuleID = descriptor.ID
+	}
+	if contribution.ProtocolVersion == "" {
+		contribution.ProtocolVersion = descriptor.ProtocolVersion
+	}
+	if contribution.StateSchemaVersion == "" {
+		contribution.StateSchemaVersion = descriptor.StateSchemaVersion
+	}
+	for index := range contribution.Operations {
+		contribution.Operations[index] = PaymentRailOperation(strings.TrimSpace(string(contribution.Operations[index])))
+	}
+	return contribution
+}
+
+func clonePaymentRailContribution(contribution PaymentRailContribution) PaymentRailContribution {
+	contribution.Operations = append([]PaymentRailOperation(nil), contribution.Operations...)
+	return contribution
+}
+
+func validatePaymentRailContribution(contribution PaymentRailContribution, descriptor PaymentModuleDescriptor) error {
+	if contribution.ContributionID == "" {
+		return fmt.Errorf("payment contribution ID is required")
+	}
+	if contribution.ModuleID != descriptor.ID {
+		return fmt.Errorf("payment contribution %q module ID %q does not match descriptor %q", contribution.ContributionID, contribution.ModuleID, descriptor.ID)
+	}
+	declaredRail := false
+	for _, rail := range descriptor.Rails {
+		if contribution.Rail == rail {
+			declaredRail = true
+			break
+		}
+	}
+	if !declaredRail {
+		return fmt.Errorf("payment contribution %q uses undeclared rail %q", contribution.ContributionID, contribution.Rail)
+	}
+	if strings.TrimSpace(string(contribution.Network)) == "" {
+		return fmt.Errorf("payment contribution %q network is required", contribution.ContributionID)
+	}
+	if strings.TrimSpace(string(contribution.Asset)) == "" {
+		return fmt.Errorf("payment contribution %q asset is required; use PaymentAssetAny explicitly when appropriate", contribution.ContributionID)
+	}
+	if contribution.ProtocolVersion == "" {
+		return fmt.Errorf("payment contribution %q protocol version is required", contribution.ContributionID)
+	}
+	if contribution.StateSchemaVersion == "" {
+		return fmt.Errorf("payment contribution %q state schema version is required", contribution.ContributionID)
+	}
+	if contribution.ProtocolVersion != descriptor.ProtocolVersion {
+		return fmt.Errorf("payment contribution %q protocol version %q does not match descriptor %q", contribution.ContributionID, contribution.ProtocolVersion, descriptor.ProtocolVersion)
+	}
+	if contribution.StateSchemaVersion != descriptor.StateSchemaVersion {
+		return fmt.Errorf("payment contribution %q state schema version %q does not match descriptor %q", contribution.ContributionID, contribution.StateSchemaVersion, descriptor.StateSchemaVersion)
+	}
+	if len(descriptor.Chains) > 0 {
+		declaredNetwork := false
+		for _, network := range descriptor.Chains {
+			if contribution.Network == network {
+				declaredNetwork = true
+				break
+			}
+		}
+		if !declaredNetwork {
+			return fmt.Errorf("payment contribution %q uses undeclared network %q", contribution.ContributionID, contribution.Network)
+		}
+	}
+	if len(descriptor.Assets) > 0 {
+		declaredAsset := false
+		for _, asset := range descriptor.Assets {
+			if contribution.Asset == asset {
+				declaredAsset = true
+				break
+			}
+		}
+		if !declaredAsset {
+			return fmt.Errorf("payment contribution %q uses undeclared asset %q", contribution.ContributionID, contribution.Asset)
+		}
+	}
+	if len(contribution.Operations) == 0 {
+		return fmt.Errorf("payment contribution %q must declare at least one operation", contribution.ContributionID)
+	}
+	operations := make(map[PaymentRailOperation]struct{}, len(contribution.Operations))
+	for _, operation := range contribution.Operations {
+		switch operation {
+		case PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify,
+			PaymentOperationConfirm, PaymentOperationCancel, PaymentOperationRefund,
+			PaymentOperationComplete, PaymentOperationDisputeRelease, PaymentOperationReconcile:
+		default:
+			return fmt.Errorf("payment contribution %q declares unknown operation %q", contribution.ContributionID, operation)
+		}
+		if _, exists := operations[operation]; exists {
+			return fmt.Errorf("payment contribution %q declares operation %q more than once", contribution.ContributionID, operation)
+		}
+		operations[operation] = struct{}{}
+	}
+	return nil
+}
+
+func paymentContributionRouteKey(contribution PaymentRailContribution) string {
+	return fmt.Sprintf("%s/%s/%s", contribution.Rail, contribution.Network, contribution.Asset)
 }
 
 func isNilInterface(value any) bool {

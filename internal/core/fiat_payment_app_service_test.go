@@ -1693,13 +1693,14 @@ func TestFiatService_HandleWebhook_DisputeResolved_Lost_TransitionsToRefunded(t 
 	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
 	require.NoError(t, err)
 
-	meta, ok := repo.mergedMeta["order_dr_lost"]
-	require.True(t, ok, "MergeFiatMetadata should have been called")
+	require.Len(t, repo.savedOrders, 1, "should Save order and evidence atomically when dispute is lost")
+	meta, err := repo.savedOrders[0].GetFiatMetadata()
+	require.NoError(t, err)
 	assert.Equal(t, "resolved", meta["fiat_dispute_status"])
 	assert.Equal(t, "lost", meta["fiat_dispute_outcome"])
 	assert.NotEmpty(t, meta["fiat_dispute_resolved_at"])
+	assert.NotEmpty(t, meta["fiat_chargeback_observed_at"])
 
-	require.Len(t, repo.savedOrders, 1, "should Save order when dispute lost")
 	assert.Equal(t, models.OrderState_REFUNDED, repo.savedOrders[0].State,
 		"dispute lost → REFUNDED")
 }

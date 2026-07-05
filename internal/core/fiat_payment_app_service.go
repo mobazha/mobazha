@@ -1371,13 +1371,13 @@ func (s *FiatPaymentAppService) handleDisputeOpened(ctx context.Context, event *
 		return err
 	}
 
-	metadata := map[string]string{
-		"fiat_dispute_status":    "opened",
-		"fiat_dispute_id":        event.DisputeID,
-		"fiat_dispute_reason":    event.DisputeReason,
-		"fiat_dispute_provider":  event.ProviderID,
-		"fiat_dispute_opened_at": time.Now().UTC().Format(time.RFC3339),
+	existing, err := order.GetFiatMetadata()
+	if err != nil {
+		return fmt.Errorf("read dispute metadata for order %s: %w", order.ID, err)
 	}
+	metadata := models.FiatDisputeOpenedMetadata(
+		existing, event.ProviderID, event.DisputeID, event.DisputeReason, time.Now().UTC(),
+	)
 	if err := s.orderRepo.MergeFiatMetadata(ctx, string(order.ID), metadata); err != nil {
 		return fmt.Errorf("update dispute metadata for order %s: %w", order.ID, err)
 	}
@@ -1403,29 +1403,37 @@ func (s *FiatPaymentAppService) handleDisputeResolved(ctx context.Context, event
 		return err
 	}
 
-	metadata := map[string]string{
-		"fiat_dispute_status":      "resolved",
-		"fiat_dispute_outcome":     outcome,
-		"fiat_dispute_resolved_at": time.Now().UTC().Format(time.RFC3339),
+	existing, err := order.GetFiatMetadata()
+	if err != nil {
+		return fmt.Errorf("read dispute metadata for order %s: %w", order.ID, err)
 	}
-	if err := s.orderRepo.MergeFiatMetadata(ctx, string(order.ID), metadata); err != nil {
-		return fmt.Errorf("update dispute resolved metadata for order %s: %w", order.ID, err)
-	}
+	metadata := models.FiatDisputeResolvedMetadata(
+		existing, event.ProviderID, event.DisputeID, event.DisputeReason, outcome, time.Now().UTC(),
+	)
 
 	switch outcome {
 	case "lost":
+		if err := order.MergeFiatMetadata(metadata); err != nil {
+			return fmt.Errorf("update dispute resolved metadata for order %s: %w", order.ID, err)
+		}
 		order.SetFSMState(models.OrderState_REFUNDED)
 		if err := s.orderRepo.Save(ctx, order); err != nil {
 			return fmt.Errorf("dispute lost but REFUNDED sync failed for order %s: %w", order.ID, err)
 		}
 		logger.LogInfoWithIDf(log, s.nodeID, "order %s → REFUNDED (dispute lost)", order.ID)
 	case "won":
+		if err := order.MergeFiatMetadata(metadata); err != nil {
+			return fmt.Errorf("update dispute resolved metadata for order %s: %w", order.ID, err)
+		}
 		order.SetFSMState(models.OrderState_RESOLVED)
 		if err := s.orderRepo.Save(ctx, order); err != nil {
 			return fmt.Errorf("dispute won but RESOLVED sync failed for order %s: %w", order.ID, err)
 		}
 		logger.LogInfoWithIDf(log, s.nodeID, "order %s → RESOLVED (dispute won)", order.ID)
 	default:
+		if err := s.orderRepo.MergeFiatMetadata(ctx, string(order.ID), metadata); err != nil {
+			return fmt.Errorf("update dispute resolved metadata for order %s: %w", order.ID, err)
+		}
 		logger.LogInfoWithIDf(log, s.nodeID, "order %s dispute resolved with outcome=%s, no state change", order.ID, outcome)
 	}
 

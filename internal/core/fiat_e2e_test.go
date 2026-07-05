@@ -280,11 +280,13 @@ func TestE2E_PayPal_DisputeResolved_Lost_TransitionsToRefunded(t *testing.T) {
 	err := svc.HandleWebhook(context.Background(), "paypal", []byte(payload), paypalHeaders())
 	require.NoError(t, err)
 
-	meta := orderRepo.mergedMeta["pp-dispute-lost"]
+	require.Len(t, orderRepo.savedOrders, 1)
+	meta, err := orderRepo.savedOrders[0].GetFiatMetadata()
+	require.NoError(t, err)
 	assert.Equal(t, "resolved", meta["fiat_dispute_status"])
 	assert.Equal(t, "lost", meta["fiat_dispute_outcome"])
+	assert.NotEmpty(t, meta["fiat_chargeback_observed_at"])
 
-	require.Len(t, orderRepo.savedOrders, 1)
 	assert.Equal(t, models.OrderState_REFUNDED, orderRepo.savedOrders[0].State)
 }
 
@@ -321,11 +323,12 @@ func TestE2E_PayPal_DisputeResolved_Won_TransitionsToResolved(t *testing.T) {
 	err := svc.HandleWebhook(context.Background(), "paypal", []byte(payload), paypalHeaders())
 	require.NoError(t, err)
 
-	meta := orderRepo.mergedMeta["pp-dispute-won"]
+	require.Len(t, orderRepo.savedOrders, 1)
+	meta, err := orderRepo.savedOrders[0].GetFiatMetadata()
+	require.NoError(t, err)
 	assert.Equal(t, "resolved", meta["fiat_dispute_status"])
 	assert.Equal(t, "won", meta["fiat_dispute_outcome"])
 
-	require.Len(t, orderRepo.savedOrders, 1)
 	assert.Equal(t, models.OrderState_RESOLVED, orderRepo.savedOrders[0].State,
 		"dispute won → RESOLVED (seller keeps funds)")
 }
@@ -556,11 +559,13 @@ func TestE2E_Stripe_DisputeClosed_Lost_TransitionsToRefunded(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	meta := orderRepo.mergedMeta["stripe-dispute-lost"]
+	require.Len(t, orderRepo.savedOrders, 1)
+	meta, err := orderRepo.savedOrders[0].GetFiatMetadata()
+	require.NoError(t, err)
 	assert.Equal(t, "resolved", meta["fiat_dispute_status"])
 	assert.Equal(t, "lost", meta["fiat_dispute_outcome"])
+	assert.NotEmpty(t, meta["fiat_chargeback_observed_at"])
 
-	require.Len(t, orderRepo.savedOrders, 1)
 	assert.Equal(t, models.OrderState_REFUNDED, orderRepo.savedOrders[0].State)
 }
 

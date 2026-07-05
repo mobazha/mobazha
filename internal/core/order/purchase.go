@@ -27,10 +27,10 @@ import (
 	"github.com/mobazha/mobazha/pkg/identity"
 	"github.com/mobazha/mobazha/pkg/models"
 	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
+	pkgorders "github.com/mobazha/mobazha/pkg/orders"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	paymentpkg "github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
@@ -284,12 +284,7 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 			options = append(options, orderOption)
 		}
 
-		ser, err := proto.Marshal(listing)
-		if err != nil {
-			return nil, nil, fmt.Errorf("marshal listing: %s", err.Error())
-		}
-
-		listingHash, err := utils.MultihashSha256(ser)
+		listingHash, err := pkgorders.CalculateSignedListingHash(listing)
 		if err != nil {
 			return nil, nil, fmt.Errorf("hash listing info: %s", err.Error())
 		}
@@ -305,7 +300,7 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 		}
 
 		orderItem := &pb.OrderOpen_Item{
-			ListingHash:      listingHash.B58String(),
+			ListingHash:      listingHash,
 			Quantity:         item.Quantity,
 			Memo:             item.Memo,
 			PaymentAddress:   item.PaymentAddress,

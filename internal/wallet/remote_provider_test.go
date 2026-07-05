@@ -54,6 +54,42 @@ func TestRemoteProvider_FetchRates_Success(t *testing.T) {
 	}
 }
 
+func TestRemoteProvider_RebasesReserveSnapshotForRequestedBase(t *testing.T) {
+	var callCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&callCount, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(makeRemoteRateJSON(map[string]string{
+			"USD": "100",
+			"ETH": "500000000000000",
+		}))
+	}))
+	defer srv.Close()
+
+	rp := NewRemoteProvider(srv.URL, srv.Client(), 30*time.Second)
+	usdRates, err := rp.fetchRates("USD")
+	if err != nil {
+		t.Fatalf("fetch USD rates: %v", err)
+	}
+	if got := usdRates[models.CurrencyCode("ETH")].String(); got != "500000000000000" {
+		t.Fatalf("USD/ETH rate = %s, want 500000000000000", got)
+	}
+
+	ethRates, err := rp.fetchRates("ETH")
+	if err != nil {
+		t.Fatalf("fetch ETH rates: %v", err)
+	}
+	if got := ethRates[models.CurrencyCode("USD")].String(); got != "200000" {
+		t.Fatalf("ETH/USD rate = %s, want 200000", got)
+	}
+	if got := ethRates[models.CurrencyCode("ETH")].String(); got != "1000000000000000000" {
+		t.Fatalf("ETH/ETH rate = %s, want 1000000000000000000", got)
+	}
+	if got := atomic.LoadInt32(&callCount); got != 1 {
+		t.Fatalf("remote calls = %d, want one shared reserve snapshot", got)
+	}
+}
+
 func TestRemoteProvider_Cache_HitAndExpiry(t *testing.T) {
 	var callCount int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

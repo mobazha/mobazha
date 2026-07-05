@@ -22,6 +22,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	aipkg "github.com/mobazha/mobazha/internal/ai"
 	"github.com/mobazha/mobazha/internal/chains"
+	corecollateral "github.com/mobazha/mobazha/internal/collateral"
 	"github.com/mobazha/mobazha/internal/contracts"
 	coreorder "github.com/mobazha/mobazha/internal/core/order"
 	corePmt "github.com/mobazha/mobazha/internal/core/payment"
@@ -1508,10 +1509,18 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 			return orderextensions.RecordReservationTx(tx, request, reservation)
 		})
 	}
+	admitCollateral := func(ctx context.Context, input corePmt.SessionProvisioningPolicyInput) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return obNode.db.View(func(tx database.Tx) error {
+			return corecollateral.AdmitPersistedOrderExtensionsV2Tx(tx, input.OrderID, time.Now().UTC())
+		})
+	}
 	// Always register the policy. An extension declaring the reservation
 	// contract must fail closed when its provider is unavailable, while
 	// unrelated orders remain unaffected.
-	policy := corePmt.NewOrderExtensionsProvisioningPolicy(resolve, reserve, record)
+	policy := corePmt.NewOrderExtensionsProvisioningPolicy(resolve, reserve, record, admitCollateral)
 	svc.AddProvisioningPolicy(policy)
 	if obNode.paymentService != nil {
 		obNode.paymentService.AddProvisioningPolicy(policy)

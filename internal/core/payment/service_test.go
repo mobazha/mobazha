@@ -340,6 +340,47 @@ func TestPaymentAppService_GeneratePaymentSetup_AuthorizesBeforeStrategy(t *test
 	require.Zero(t, strategy.genCallCount, "strategy must not create a funding target before authorization")
 }
 
+func TestPaymentAppService_GeneratePaymentSetup_RejectsStaleCollateralBindingBeforeTarget(t *testing.T) {
+	reg := payment.NewRegistry()
+	strategy := &testChainEscrow{
+		model: payment.PaymentModelMonitored,
+		genResult: &payment.PaymentSetupResult{
+			PaymentModel: payment.PaymentModelMonitored,
+			EscrowAddr:   "0x111122223333444455556666777788889999aaaa",
+		},
+	}
+	reg.RegisterV2(iwallet.ChainEthereum, payment.NewV1AsV2(strategy))
+
+	orderOpen := managedCollectibleFirstSaleOrderOpen()
+	rawOpen, err := (protojson.MarshalOptions{}).Marshal(orderOpen)
+	require.NoError(t, err)
+	expiresAt := time.Now().Add(time.Hour).UTC()
+	order := &models.Order{
+		ID:                  models.OrderID("order-collateral-policy"),
+		SerializedOrderOpen: rawOpen,
+		OrderTimeoutState:   models.OrderTimeoutState{ExpiresAt: &expiresAt},
+	}
+	wantErr := errors.New("allocation revision is stale")
+	policy := NewOrderExtensionsProvisioningPolicy(
+		func(SessionProvisioningPolicyInput) ([]extensions.OrderExtension, error) { return nil, nil },
+		nil,
+		nil,
+		func(_ context.Context, input SessionProvisioningPolicyInput) error {
+			require.Equal(t, order.ID.String(), input.OrderID)
+			return wantErr
+		},
+	)
+	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{PaymentRegistry: reg})
+	svc.AddProvisioningPolicy(policy)
+
+	_, err = svc.GeneratePaymentSetup(context.Background(), payment.PaymentSetupParams{
+		OrderID: order.ID.String(), CoinType: iwallet.CoinType("crypto:eip155:1:native"), OrderData: order,
+	})
+	require.ErrorIs(t, err, ErrOrderExtensionCollateral)
+	require.ErrorIs(t, err, wantErr)
+	require.Zero(t, strategy.genCallCount, "strategy must not create a funding target before collateral admission")
+}
+
 func TestPaymentAppService_GeneratePaymentSetup_RejectsLegacyEVMFundingHash(t *testing.T) {
 	reg := payment.NewRegistry()
 	legacyHash := "0xdfac9fe89ed092e0b27e5bf1a71639758d799a6cd301476e78475165e7a2b5ae"

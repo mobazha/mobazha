@@ -43,11 +43,16 @@ type OrderExtensionsResolver func(SessionProvisioningPolicyInput) ([]extensions.
 // the order before Core creates a funding target.
 type OrderExtensionReservationRecorder func(extensions.ReservationRequest, extensions.Reservation) error
 
+// OrderExtensionCollateralAdmissionFunc revalidates persisted Core-issued v2
+// collateral bindings before any payment funding target is created.
+type OrderExtensionCollateralAdmissionFunc func(context.Context, SessionProvisioningPolicyInput) error
+
 type orderExtensionProvisioningPolicy struct {
-	resolve     OrderExtensionResolver
-	resolveMany OrderExtensionsResolver
-	reserve     OrderExtensionReserveFunc
-	record      OrderExtensionReservationRecorder
+	resolve         OrderExtensionResolver
+	resolveMany     OrderExtensionsResolver
+	reserve         OrderExtensionReserveFunc
+	record          OrderExtensionReservationRecorder
+	admitCollateral OrderExtensionCollateralAdmissionFunc
 }
 
 // NewOrderExtensionProvisioningPolicy creates a product-neutral reservation
@@ -62,8 +67,12 @@ func NewOrderExtensionProvisioningPolicy(resolve OrderExtensionResolver, reserve
 
 // NewOrderExtensionsProvisioningPolicy creates the generic multi-extension
 // reservation gate used by node composition.
-func NewOrderExtensionsProvisioningPolicy(resolve OrderExtensionsResolver, reserve OrderExtensionReserveFunc, record OrderExtensionReservationRecorder) SessionProvisioningPolicy {
-	return &orderExtensionProvisioningPolicy{resolveMany: resolve, reserve: reserve, record: record}
+func NewOrderExtensionsProvisioningPolicy(resolve OrderExtensionsResolver, reserve OrderExtensionReserveFunc, record OrderExtensionReservationRecorder, collateralAdmission ...OrderExtensionCollateralAdmissionFunc) SessionProvisioningPolicy {
+	policy := &orderExtensionProvisioningPolicy{resolveMany: resolve, reserve: reserve, record: record}
+	if len(collateralAdmission) > 0 {
+		policy.admitCollateral = collateralAdmission[0]
+	}
+	return policy
 }
 
 func (p *orderExtensionProvisioningPolicy) AuthorizeSessionProvisioning(ctx context.Context, input SessionProvisioningPolicyInput) error {
@@ -84,6 +93,11 @@ func (p *orderExtensionProvisioningPolicy) AuthorizeSessionProvisioning(ctx cont
 		}
 		if needed {
 			required = append(required, extension)
+		}
+	}
+	if p.admitCollateral != nil {
+		if err := p.admitCollateral(ctx, input); err != nil {
+			return fmt.Errorf("%w: %w", ErrOrderExtensionCollateral, err)
 		}
 	}
 	for _, extension := range required {

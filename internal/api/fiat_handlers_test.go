@@ -313,6 +313,7 @@ func TestHandlePOSTFiatPayment_CollectiblePolicyConflict(t *testing.T) {
 		corepayment.ErrRWAPaymentSessionUnsupported,
 		corepayment.ErrOrderExtensionReservation,
 		fmt.Errorf("wrapped: %w", corepayment.ErrOrderExtensionSettlement),
+		fmt.Errorf("wrapped: %w", corepayment.ErrOrderExtensionCollateral),
 	} {
 		t.Run(policyErr.Error(), func(t *testing.T) {
 			svc := &mockFiatService{createErr: policyErr}

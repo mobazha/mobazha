@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/contracts"
 	paypb "github.com/mobazha/mobazha/pkg/payment"
 	responsePkg "github.com/mobazha/mobazha/pkg/response"
+	"github.com/stretchr/testify/require"
 )
 
 type mockPaymentSessionService struct {
@@ -205,6 +206,26 @@ func TestHandlePOSTOrderPaymentSession_SelectionQuoteSuppliesFiatAmount(t *testi
 	g.handlePOSTOrderPaymentSession(w, r)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandlePOSTOrderPaymentSession_OrderExtensionPolicyConflict(t *testing.T) {
+	for _, policyErr := range []error{
+		corePmt.ErrOrderExtensionReservation,
+		corePmt.ErrOrderExtensionSettlement,
+		corePmt.ErrOrderExtensionCollateral,
+	} {
+		t.Run(policyErr.Error(), func(t *testing.T) {
+			svc := &mockPaymentSessionService{createFunc: func(_ context.Context, _ contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {
+				return nil, policyErr
+			}}
+			w := httptest.NewRecorder()
+			r := newPaymentSessionHandlerRequest(t, http.MethodPost, "/v1/orders/o1/payment-session", map[string]interface{}{
+				"paymentCoin": "crypto:eip155:56:native",
+			}, map[string]string{"orderID": "o1"}, svc)
+			(&Gateway{}).handlePOSTOrderPaymentSession(w, r)
+			require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+		})
 	}
 }
 

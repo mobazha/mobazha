@@ -77,6 +77,29 @@ type CollateralAllocationRecord struct {
 	UpdatedAt          time.Time
 }
 
+// CollateralOrderExtensionBindingRecord stores the Core-issued v2 projection
+// admitted for one persisted order extension. It is a reference, not a copy
+// of provider evidence and not authority to mutate collateral.
+type CollateralOrderExtensionBindingRecord struct {
+	TenantID           string `gorm:"column:tenant_id;primaryKey;default:''" json:"-"`
+	OrderID            string `gorm:"primaryKey;type:varchar(128);index"`
+	ExtensionID        string `gorm:"primaryKey;type:varchar(96);index"`
+	ContractVersion    string `gorm:"type:varchar(32);not null"`
+	ExtensionRevision  uint64 `gorm:"primaryKey;not null"`
+	AllocationID       string `gorm:"type:varchar(96);not null;index"`
+	CollateralID       string `gorm:"type:varchar(96);not null;index"`
+	ProviderID         string `gorm:"type:varchar(160);not null"`
+	ResourceID         string `gorm:"type:varchar(256);not null"`
+	PrincipalID        string `gorm:"type:varchar(192);not null"`
+	AssetID            string `gorm:"type:varchar(160);not null"`
+	Amount             string `gorm:"type:varchar(128);not null"`
+	CollateralRevision uint64 `gorm:"not null"`
+	AllocationRevision uint64 `gorm:"not null"`
+	AllocationState    string `gorm:"type:varchar(32);not null"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 // CollateralClaimRecord stores a Core-accepted, revision-bound claim. The
 // record authorizes a later payment action; it is not itself proof of slash.
 type CollateralClaimRecord struct {

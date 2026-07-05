@@ -254,7 +254,9 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 				"TRON payments are retired for new orders")
 		case errors.Is(err, corePmt.ErrRWAPaymentSessionUnsupported):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
-		case errors.Is(err, corePmt.ErrOrderExtensionReservation):
+		case errors.Is(err, corePmt.ErrOrderExtensionReservation),
+			errors.Is(err, corePmt.ErrOrderExtensionSettlement),
+			errors.Is(err, corePmt.ErrOrderExtensionCollateral):
 			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 		case errors.Is(err, corePmt.ErrPaymentCoinDisabled):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())

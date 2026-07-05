@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha/internal/repo"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -171,6 +172,38 @@ func newFiatTestService(t *testing.T, reg contracts.FiatProviderRegistry) (*Fiat
 	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
 	svc.SetProviderCredentialKeyProvider(testProviderCredentialKeys{})
 	return svc, db
+}
+
+func subscribeProviderPaymentRisk(t *testing.T, svc *FiatPaymentAppService) events.Subscription {
+	t.Helper()
+	bus := events.NewBus()
+	subscription, err := bus.Subscribe(&events.ProviderPaymentRiskObserved{})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, subscription.Close()) })
+	svc.SetEventBus(bus)
+	return subscription
+}
+
+func requireProviderPaymentRisk(t *testing.T, subscription events.Subscription) *events.ProviderPaymentRiskObserved {
+	t.Helper()
+	select {
+	case raw := <-subscription.Out():
+		event, ok := raw.(*events.ProviderPaymentRiskObserved)
+		require.True(t, ok)
+		return event
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for provider payment risk event")
+		return nil
+	}
+}
+
+func requireNoProviderPaymentRisk(t *testing.T, subscription events.Subscription) {
+	t.Helper()
+	select {
+	case event := <-subscription.Out():
+		t.Fatalf("unexpected provider payment risk event: %#v", event)
+	case <-time.After(50 * time.Millisecond):
+	}
 }
 
 func seedProviderActionAttempt(t *testing.T, svc *FiatPaymentAppService, db database.Database, providerID, orderID, externalReference string) models.PaymentAttempt {
@@ -1601,6 +1634,7 @@ func TestFiatService_HandleWebhook_RefundCreated_TransitionsToRefunded(t *testin
 	})
 
 	svc, _ := newFiatTestService(t, reg)
+	riskSubscription := subscribeProviderPaymentRisk(t, svc)
 	repo := newMockOrderRepo()
 	repo.addOrder(&models.Order{ID: "order_rf_001", State: models.OrderState_SHIPPED})
 	svc.SetOrderRepo(repo)
@@ -1611,6 +1645,12 @@ func TestFiatService_HandleWebhook_RefundCreated_TransitionsToRefunded(t *testin
 	require.Len(t, repo.savedOrders, 1, "should Save order once")
 	assert.Equal(t, models.OrderState_REFUNDED, repo.savedOrders[0].State,
 		"order should transition to REFUNDED")
+	risk := requireProviderPaymentRisk(t, riskSubscription)
+	assert.Equal(t, "evt_rf_001", risk.EventID)
+	assert.Equal(t, "order_rf_001", risk.OrderID)
+	assert.Equal(t, "stripe", risk.ProviderID)
+	assert.Equal(t, events.ProviderPaymentRiskRefundObserved, risk.Kind)
+	assert.False(t, risk.ObservedAt.IsZero())
 }
 
 func TestFiatService_HandleWebhook_RefundCreated_AlreadyRefunded_Idempotent(t *testing.T) {
@@ -1654,6 +1694,7 @@ func TestFiatService_HandleWebhook_DisputeOpened_StoresMetadata(t *testing.T) {
 	})
 
 	svc, _ := newFiatTestService(t, reg)
+	riskSubscription := subscribeProviderPaymentRisk(t, svc)
 	repo := newMockOrderRepo()
 	repo.addOrder(&models.Order{ID: "order_do_001", State: models.OrderState_SHIPPED})
 	svc.SetOrderRepo(repo)
@@ -1668,6 +1709,10 @@ func TestFiatService_HandleWebhook_DisputeOpened_StoresMetadata(t *testing.T) {
 	assert.Equal(t, "product_not_received", meta["fiat_dispute_reason"])
 	assert.NotEmpty(t, meta["fiat_dispute_opened_at"])
 	assert.Empty(t, repo.savedOrders, "DisputeOpened should not change order state")
+	risk := requireProviderPaymentRisk(t, riskSubscription)
+	assert.Equal(t, "evt_do_001", risk.EventID)
+	assert.Equal(t, "order_do_001", risk.OrderID)
+	assert.Equal(t, events.ProviderPaymentRiskDisputeOpened, risk.Kind)
 }
 
 func TestFiatService_HandleWebhook_DisputeResolved_Lost_TransitionsToRefunded(t *testing.T) {
@@ -1686,6 +1731,7 @@ func TestFiatService_HandleWebhook_DisputeResolved_Lost_TransitionsToRefunded(t 
 	})
 
 	svc, _ := newFiatTestService(t, reg)
+	riskSubscription := subscribeProviderPaymentRisk(t, svc)
 	repo := newMockOrderRepo()
 	repo.addOrder(&models.Order{ID: "order_dr_lost", State: models.OrderState_SHIPPED})
 	svc.SetOrderRepo(repo)
@@ -1703,6 +1749,9 @@ func TestFiatService_HandleWebhook_DisputeResolved_Lost_TransitionsToRefunded(t 
 
 	assert.Equal(t, models.OrderState_REFUNDED, repo.savedOrders[0].State,
 		"dispute lost → REFUNDED")
+	risk := requireProviderPaymentRisk(t, riskSubscription)
+	assert.Equal(t, "evt_dr_lost", risk.EventID)
+	assert.Equal(t, events.ProviderPaymentRiskChargebackObserved, risk.Kind)
 }
 
 func TestFiatService_HandleWebhook_DisputeResolved_Lost_SaveFails_ReturnsError(t *testing.T) {
@@ -1721,6 +1770,7 @@ func TestFiatService_HandleWebhook_DisputeResolved_Lost_SaveFails_ReturnsError(t
 	})
 
 	svc, _ := newFiatTestService(t, reg)
+	riskSubscription := subscribeProviderPaymentRisk(t, svc)
 	repo := newMockOrderRepo()
 	repo.addOrder(&models.Order{ID: "order_dr_sf", State: models.OrderState_SHIPPED})
 	repo.saveErr = errors.New("db connection lost")
@@ -1729,6 +1779,30 @@ func TestFiatService_HandleWebhook_DisputeResolved_Lost_SaveFails_ReturnsError(t
 	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
 	require.Error(t, err, "should propagate Save error so event is NOT marked processed")
 	assert.Contains(t, err.Error(), "REFUNDED sync failed")
+	requireNoProviderPaymentRisk(t, riskSubscription)
+}
+
+func TestFiatService_HandleWebhook_DisputeOpened_PersistFails_DoesNotEmitRisk(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID: "evt_do_save_fail", Type: contracts.WebhookDisputeOpened,
+			ProviderID: "stripe", OrderID: "order_do_save_fail", DisputeID: "dp_save_fail",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	riskSubscription := subscribeProviderPaymentRisk(t, svc)
+	repo := newMockOrderRepo()
+	repo.addOrder(&models.Order{ID: "order_do_save_fail", State: models.OrderState_SHIPPED})
+	repo.mergeMetaErr = errors.New("db connection lost")
+	svc.SetOrderRepo(repo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "update dispute metadata")
+	requireNoProviderPaymentRisk(t, riskSubscription)
 }
 
 func TestFiatService_HandleWebhook_AccountUpdated_LogsOnly(t *testing.T) {

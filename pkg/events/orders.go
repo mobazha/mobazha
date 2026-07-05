@@ -1,5 +1,7 @@
 package events
 
+import "time"
+
 type Notification struct {
 	ID  string `json:"notificationID"`
 	Typ string `json:"type"`
@@ -296,6 +298,28 @@ type FiatPaymentReady struct {
 	OrderID    string `json:"orderID"`
 	ProviderID string `json:"providerID"`
 	SessionID  string `json:"sessionID"`
+}
+
+// ProviderPaymentRiskKind is a provider-neutral payment risk observation.
+// Consumers must treat these values as downgrade-only signals; a later
+// provider success or dispute win is not an automatic recovery instruction.
+type ProviderPaymentRiskKind string
+
+const (
+	ProviderPaymentRiskRefundObserved     ProviderPaymentRiskKind = "refund_observed"
+	ProviderPaymentRiskDisputeOpened      ProviderPaymentRiskKind = "dispute_opened"
+	ProviderPaymentRiskChargebackObserved ProviderPaymentRiskKind = "chargeback_observed"
+)
+
+// ProviderPaymentRiskObserved is emitted after the authoritative order risk
+// evidence has been persisted. It intentionally excludes provider payloads so
+// downstream commercial policy remains independent from Stripe or PayPal.
+type ProviderPaymentRiskObserved struct {
+	EventID    string                  `json:"eventID"`
+	OrderID    string                  `json:"orderID"`
+	ProviderID string                  `json:"providerID"`
+	Kind       ProviderPaymentRiskKind `json:"kind"`
+	ObservedAt time.Time               `json:"observedAt"`
 }
 
 // RwaInstantBuyCompleted is emitted when an RWA instant buy (atomic swap) has completed on-chain.

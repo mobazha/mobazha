@@ -1344,13 +1344,16 @@ func (s *FiatPaymentAppService) handleRefundCreated(ctx context.Context, event *
 
 	if order.State == models.OrderState_REFUNDED {
 		logger.LogInfoWithIDf(log, s.nodeID, "order %s already REFUNDED, skipping refund webhook", order.ID)
+		s.emitProviderPaymentRisk(event, events.ProviderPaymentRiskRefundObserved, time.Now().UTC())
 		return nil
 	}
 
+	observedAt := time.Now().UTC()
 	order.SetFSMState(models.OrderState_REFUNDED)
 	if err := s.orderRepo.Save(ctx, order); err != nil {
 		return fmt.Errorf("update order %s to REFUNDED: %w", order.ID, err)
 	}
+	s.emitProviderPaymentRisk(event, events.ProviderPaymentRiskRefundObserved, observedAt)
 
 	logger.LogInfoWithIDf(log, s.nodeID, "order %s → REFUNDED via %s refund %s",
 		order.ID, event.ProviderID, event.RefundID)
@@ -1376,12 +1379,12 @@ func (s *FiatPaymentAppService) handleDisputeOpened(ctx context.Context, event *
 	if err != nil {
 		return fmt.Errorf("read dispute metadata for order %s: %w", order.ID, err)
 	}
-	metadata := models.FiatDisputeOpenedMetadata(
-		existing, event.ProviderID, event.DisputeID, event.DisputeReason, time.Now().UTC(),
-	)
+	observedAt := time.Now().UTC()
+	metadata := models.FiatDisputeOpenedMetadata(existing, event.ProviderID, event.DisputeID, event.DisputeReason, observedAt)
 	if err := s.orderRepo.MergeFiatMetadata(ctx, string(order.ID), metadata); err != nil {
 		return fmt.Errorf("update dispute metadata for order %s: %w", order.ID, err)
 	}
+	s.emitProviderPaymentRisk(event, events.ProviderPaymentRiskDisputeOpened, observedAt)
 
 	logger.LogInfoWithIDf(log, s.nodeID, "order %s: fiat dispute %s opened via %s (reason: %s), order state unchanged",
 		order.ID, event.DisputeID, event.ProviderID, event.DisputeReason)
@@ -1408,9 +1411,8 @@ func (s *FiatPaymentAppService) handleDisputeResolved(ctx context.Context, event
 	if err != nil {
 		return fmt.Errorf("read dispute metadata for order %s: %w", order.ID, err)
 	}
-	metadata := models.FiatDisputeResolvedMetadata(
-		existing, event.ProviderID, event.DisputeID, event.DisputeReason, outcome, time.Now().UTC(),
-	)
+	observedAt := time.Now().UTC()
+	metadata := models.FiatDisputeResolvedMetadata(existing, event.ProviderID, event.DisputeID, event.DisputeReason, outcome, observedAt)
 
 	switch outcome {
 	case "lost":
@@ -1421,6 +1423,7 @@ func (s *FiatPaymentAppService) handleDisputeResolved(ctx context.Context, event
 		if err := s.orderRepo.Save(ctx, order); err != nil {
 			return fmt.Errorf("dispute lost but REFUNDED sync failed for order %s: %w", order.ID, err)
 		}
+		s.emitProviderPaymentRisk(event, events.ProviderPaymentRiskChargebackObserved, observedAt)
 		logger.LogInfoWithIDf(log, s.nodeID, "order %s → REFUNDED (dispute lost)", order.ID)
 	case "won":
 		if err := order.MergeFiatMetadata(metadata); err != nil {
@@ -1439,6 +1442,23 @@ func (s *FiatPaymentAppService) handleDisputeResolved(ctx context.Context, event
 	}
 
 	return nil
+}
+
+func (s *FiatPaymentAppService) emitProviderPaymentRisk(
+	event *contracts.WebhookEvent,
+	kind events.ProviderPaymentRiskKind,
+	observedAt time.Time,
+) {
+	if s.eventBus == nil || event == nil {
+		return
+	}
+	s.eventBus.Emit(&events.ProviderPaymentRiskObserved{
+		EventID:    strings.TrimSpace(event.EventID),
+		OrderID:    strings.TrimSpace(event.OrderID),
+		ProviderID: strings.ToLower(strings.TrimSpace(event.ProviderID)),
+		Kind:       kind,
+		ObservedAt: observedAt.UTC(),
+	})
 }
 
 func (s *FiatPaymentAppService) handlePaymentCanceled(_ context.Context, event *contracts.WebhookEvent) error {

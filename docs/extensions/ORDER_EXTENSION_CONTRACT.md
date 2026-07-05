@@ -250,12 +250,14 @@ collateral is separately funded money whose account, allocation, release,
 claim, slash, audit, and rail reconciliation state belongs to Core. An
 extension cannot mark collateral funded or select a compensation destination.
 
-Order Extension v1 therefore remains unchanged. A future major contract may
-carry a Core-issued collateral allocation reference after Core has validated
-tenant, provider, resource, principal, asset, amount, state, and revisions.
-Opaque provider payload fields and Hosting projections are not proof of
-funding. The staged design is tracked by
-[mobazha-docs RFC-0004](https://github.com/mobazha/mobazha-docs/blob/main/rfcs/0004-core-owned-resource-collateral.md).
+Order Extension v1 therefore remains unchanged. The separate
+`OrderExtensionV2` projection can carry a Core-issued collateral allocation
+reference after Core validates tenant, provider, resource, principal, asset,
+amount, state, and revisions. Payment provisioning revalidates the persisted
+v2 binding before creating a funding target. Opaque provider payload fields,
+Hosting projections, and provider declarations are not proof of funding. The
+staged design and activation gates are tracked by
+[mobazha-docs RFC-0005](https://github.com/mobazha/mobazha-docs/blob/main/rfcs/0005-core-owned-resource-collateral.md).
 
 Existing Solana Anchor and EVM Safe adapters are order-settlement adapters:
 they require order escrow data and interpret actions as seller payout, buyer

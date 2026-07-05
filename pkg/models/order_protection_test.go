@@ -479,6 +479,22 @@ func TestResolvePolicyForOrder_PhysicalGoodIgnoresOverride(t *testing.T) {
 	}
 }
 
+func TestResolvePolicyForOrder_ServiceExtendsOverride(t *testing.T) {
+	o := makeContractOrder(t, pb.Listing_Metadata_SERVICE, 10)
+	p := ResolvePolicyForOrder(o)
+	if p.AutoCompleteAfterShipDays != 10 {
+		t.Errorf("SERVICE override: AutoCompleteAfterShipDays = %d, want 10", p.AutoCompleteAfterShipDays)
+	}
+}
+
+func TestResolvePolicyForOrder_ServiceShortenOverrideClampedToDefault(t *testing.T) {
+	o := makeContractOrder(t, pb.Listing_Metadata_SERVICE, 3)
+	p := ResolvePolicyForOrder(o)
+	if p.AutoCompleteAfterShipDays != 7 {
+		t.Errorf("SERVICE shortened override: AutoCompleteAfterShipDays = %d, want 7", p.AutoCompleteAfterShipDays)
+	}
+}
+
 func TestComputeProtection_DigitalGoodOverrideExtendsWindow(t *testing.T) {
 	shippedAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	o := makeContractOrder(t, pb.Listing_Metadata_DIGITAL_GOOD, 5) // 5d window (extended from default 3)

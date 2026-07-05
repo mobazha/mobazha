@@ -81,9 +81,9 @@ func DefaultProtectionPolicy(ct pb.Listing_Metadata_ContractType) OrderProtectio
 }
 
 // ResolvePolicyForOrder returns the effective buyer-protection policy for an
-// order, applying the per-store override snapshotted at order-creation time
-// (DG-1.11). Currently only DIGITAL_GOOD honours the override; other contract
-// types fall through to the ContractType default.
+// order, applying the immutable override snapshotted at order-creation time.
+// DIGITAL_GOOD and SERVICE orders honour the override; physical goods retain
+// their ContractType default.
 //
 // Trust safety: the override is honoured only when it would EXTEND the
 // buyer-protection window beyond the ContractType default. A shorter
@@ -97,8 +97,9 @@ func ResolvePolicyForOrder(order *Order) OrderProtectionPolicy {
 		return DefaultProtectionPolicy(pb.Listing_Metadata_PHYSICAL_GOOD)
 	}
 	policy := DefaultProtectionPolicy(order.ContractType())
-	if order.AutoCompleteAfterShipDaysOverride > 0 &&
-		order.ContractType() == pb.Listing_Metadata_DIGITAL_GOOD &&
+	contractType := order.ContractType()
+	acceptsOverride := contractType == pb.Listing_Metadata_DIGITAL_GOOD || contractType == pb.Listing_Metadata_SERVICE
+	if order.AutoCompleteAfterShipDaysOverride > 0 && acceptsOverride &&
 		int(order.AutoCompleteAfterShipDaysOverride) > policy.AutoCompleteAfterShipDays {
 		policy.AutoCompleteAfterShipDays = int(order.AutoCompleteAfterShipDaysOverride)
 	}

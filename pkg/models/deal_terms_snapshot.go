@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	dealLinkIDMaxLength = 128
-	feeQuoteIDMaxLength = 128
-	sha256HexLength     = 64
+	dealLinkIDMaxLength         = 128
+	feeQuoteIDMaxLength         = 128
+	sha256HexLength             = 64
+	maxDealAcceptanceWindowDays = 365
 )
 
 // ErrInvalidDealTermsSnapshotRef identifies malformed immutable deal-term
@@ -27,6 +28,9 @@ type DealTermsSnapshotRef struct {
 	Revision   uint64 `gorm:"column:deal_revision" json:"revision"`
 	TermsHash  string `gorm:"column:terms_hash;type:char(64)" json:"termsHash"`
 	FeeQuoteID string `gorm:"column:fee_quote_id;type:text" json:"feeQuoteID,omitempty"`
+	// AcceptanceWindowDays is the normalized buyer review window copied from
+	// the signed OrderOpen. Zero is accepted only for legacy deal orders.
+	AcceptanceWindowDays uint32 `gorm:"column:deal_acceptance_window_days" json:"acceptanceWindowDays,omitempty"`
 }
 
 // Validate checks that the reference is complete and canonically encoded.
@@ -55,6 +59,9 @@ func (r *DealTermsSnapshotRef) Validate() error {
 	if len(r.FeeQuoteID) > feeQuoteIDMaxLength {
 		return fmt.Errorf("%w: feeQuoteID exceeds %d bytes", ErrInvalidDealTermsSnapshotRef, feeQuoteIDMaxLength)
 	}
+	if r.AcceptanceWindowDays > maxDealAcceptanceWindowDays {
+		return fmt.Errorf("%w: acceptanceWindowDays exceeds %d", ErrInvalidDealTermsSnapshotRef, maxDealAcceptanceWindowDays)
+	}
 	return nil
 }
 
@@ -64,14 +71,15 @@ func DealTermsSnapshotRefFromOrderOpen(orderOpen *pb.OrderOpen) (*DealTermsSnaps
 	if orderOpen == nil {
 		return nil, nil
 	}
-	if orderOpen.GetDealLinkID() == "" && orderOpen.GetDealRevision() == 0 && orderOpen.GetTermsHash() == "" && orderOpen.GetFeeQuoteID() == "" {
+	if orderOpen.GetDealLinkID() == "" && orderOpen.GetDealRevision() == 0 && orderOpen.GetTermsHash() == "" && orderOpen.GetFeeQuoteID() == "" && orderOpen.GetAcceptanceWindowDays() == 0 {
 		return nil, nil
 	}
 	result := &DealTermsSnapshotRef{
-		DealLinkID: orderOpen.GetDealLinkID(),
-		Revision:   orderOpen.GetDealRevision(),
-		TermsHash:  orderOpen.GetTermsHash(),
-		FeeQuoteID: orderOpen.GetFeeQuoteID(),
+		DealLinkID:           orderOpen.GetDealLinkID(),
+		Revision:             orderOpen.GetDealRevision(),
+		TermsHash:            orderOpen.GetTermsHash(),
+		FeeQuoteID:           orderOpen.GetFeeQuoteID(),
+		AcceptanceWindowDays: orderOpen.GetAcceptanceWindowDays(),
 	}
 	if err := result.Validate(); err != nil {
 		return nil, err

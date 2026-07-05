@@ -28,6 +28,7 @@ func TestOrderProcessorProcessMessagePersistsDealTermsSnapshotRef(t *testing.T) 
 	orderOpen.DealRevision = 3
 	orderOpen.TermsHash = strings.Repeat("c", 64)
 	orderOpen.FeeQuoteID = "fee-quote-789"
+	orderOpen.AcceptanceWindowDays = 5
 
 	orderID, err := utils.CalcOrderID(orderOpen)
 	require.NoError(t, err)
@@ -52,6 +53,8 @@ func TestOrderProcessorProcessMessagePersistsDealTermsSnapshotRef(t *testing.T) 
 	assert.Equal(t, uint64(3), stored.DealTermsSnapshotRef.Revision)
 	assert.Equal(t, strings.Repeat("c", 64), stored.DealTermsSnapshotRef.TermsHash)
 	assert.Equal(t, "fee-quote-789", stored.DealTermsSnapshotRef.FeeQuoteID)
+	assert.Equal(t, uint32(5), stored.DealTermsSnapshotRef.AcceptanceWindowDays)
+	assert.Equal(t, uint32(5), stored.AutoCompleteAfterShipDaysOverride)
 
 	plain := &models.Order{ID: "plain-order"}
 	require.NoError(t, op.db.Update(func(tx database.Tx) error {

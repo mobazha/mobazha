@@ -153,6 +153,9 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	if err := order.PutMessage(message); err != nil {
 		return nil, err
 	}
+	if order.DealTermsSnapshotRef != nil && order.DealTermsSnapshotRef.AcceptanceWindowDays > 0 {
+		order.AutoCompleteAfterShipDaysOverride = order.DealTermsSnapshotRef.AcceptanceWindowDays
+	}
 
 	// DG-1.11: snapshot the seller's per-store digital-good review window into
 	// the Order so subsequent buyer-protection calculations use the policy in
@@ -164,7 +167,8 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	// ContractType default to prevent shortening the buyer-protection window.
 	// Soft-fail: a missing/unreadable preferences row should not block the
 	// order — fall back to the ContractType default policy.
-	if order.Role() == models.RoleVendor &&
+	if order.AutoCompleteAfterShipDaysOverride == 0 &&
+		order.Role() == models.RoleVendor &&
 		len(orderOpen.Listings) > 0 &&
 		orderOpen.Listings[0].Listing != nil &&
 		orderOpen.Listings[0].Listing.Metadata != nil &&

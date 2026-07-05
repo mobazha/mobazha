@@ -19,7 +19,7 @@ func TestDealTermsSnapshotRefValidate(t *testing.T) {
 	}{
 		{name: "absent", ref: nil},
 		{name: "valid without fee quote", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash}},
-		{name: "valid with fee quote", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash, FeeQuoteID: "fee-quote-123"}},
+		{name: "valid with fee quote and acceptance window", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash, FeeQuoteID: "fee-quote-123", AcceptanceWindowDays: 7}},
 		{name: "empty ID", ref: &DealTermsSnapshotRef{Revision: 2, TermsHash: validHash}, wantErr: true},
 		{name: "untrimmed ID", ref: &DealTermsSnapshotRef{DealLinkID: " deal-123", Revision: 2, TermsHash: validHash}, wantErr: true},
 		{name: "zero revision", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", TermsHash: validHash}, wantErr: true},
@@ -28,6 +28,7 @@ func TestDealTermsSnapshotRefValidate(t *testing.T) {
 		{name: "short hash", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: "abcd"}, wantErr: true},
 		{name: "untrimmed fee quote ID", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash, FeeQuoteID: " fee-quote-123"}, wantErr: true},
 		{name: "long fee quote ID", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash, FeeQuoteID: strings.Repeat("q", feeQuoteIDMaxLength+1)}, wantErr: true},
+		{name: "acceptance window too long", ref: &DealTermsSnapshotRef{DealLinkID: "deal-123", Revision: 2, TermsHash: validHash, AcceptanceWindowDays: maxDealAcceptanceWindowDays + 1}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -47,10 +48,11 @@ func TestDealTermsSnapshotRefFromOrderOpen(t *testing.T) {
 	validHash := strings.Repeat("b", sha256HexLength)
 
 	ref, err := DealTermsSnapshotRefFromOrderOpen(&pb.OrderOpen{
-		DealLinkID:   "deal-456",
-		DealRevision: 7,
-		TermsHash:    validHash,
-		FeeQuoteID:   "fee-quote-456",
+		DealLinkID:           "deal-456",
+		DealRevision:         7,
+		TermsHash:            validHash,
+		FeeQuoteID:           "fee-quote-456",
+		AcceptanceWindowDays: 9,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, ref)
@@ -58,6 +60,7 @@ func TestDealTermsSnapshotRefFromOrderOpen(t *testing.T) {
 	assert.Equal(t, uint64(7), ref.Revision)
 	assert.Equal(t, validHash, ref.TermsHash)
 	assert.Equal(t, "fee-quote-456", ref.FeeQuoteID)
+	assert.Equal(t, uint32(9), ref.AcceptanceWindowDays)
 
 	ref, err = DealTermsSnapshotRefFromOrderOpen(&pb.OrderOpen{})
 	require.NoError(t, err)
@@ -67,5 +70,8 @@ func TestDealTermsSnapshotRefFromOrderOpen(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidDealTermsSnapshotRef)
 
 	_, err = DealTermsSnapshotRefFromOrderOpen(&pb.OrderOpen{FeeQuoteID: "fee-quote-without-deal"})
+	require.ErrorIs(t, err, ErrInvalidDealTermsSnapshotRef)
+
+	_, err = DealTermsSnapshotRefFromOrderOpen(&pb.OrderOpen{AcceptanceWindowDays: 3})
 	require.ErrorIs(t, err, ErrInvalidDealTermsSnapshotRef)
 }

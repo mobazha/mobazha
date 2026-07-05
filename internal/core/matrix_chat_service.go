@@ -1671,7 +1671,13 @@ type verificationCallbacks struct {
 var _ verificationhelper.RequiredCallbacks = (*verificationCallbacks)(nil)
 var _ verificationhelper.ShowSASCallbacks = (*verificationCallbacks)(nil)
 
-func (c *verificationCallbacks) VerificationRequested(_ context.Context, txnID id.VerificationTransactionID, from id.UserID, fromDevice id.DeviceID) {
+func (c *verificationCallbacks) VerificationRequested(ctx context.Context, txnID id.VerificationTransactionID, from id.UserID, fromDevice id.DeviceID) {
+	// VerificationHelper validates the peer's MAC against the device signing
+	// key in the local crypto store. A newly-created SaaS tenant may receive a
+	// request before ordinary chat traffic has fetched that user's keys.
+	if err := c.svc.prefetchVerificationKeys(ctx, from); err != nil {
+		log.Warningf("Failed to prefetch verification keys for %s/%s: %v", from, fromDevice, err)
+	}
 	c.svc.subsMu.Lock()
 	subCount := len(c.svc.subs)
 	c.svc.subsMu.Unlock()
@@ -1684,6 +1690,19 @@ func (c *verificationCallbacks) VerificationRequested(_ context.Context, txnID i
 			"deviceId":      fromDevice.String(),
 		},
 	})
+}
+
+func (s *mautrixChatService) prefetchVerificationKeys(ctx context.Context, userID id.UserID) error {
+	if userID == "" {
+		return fmt.Errorf("verification user ID is empty")
+	}
+	if s.cryptoHelper == nil || s.cryptoHelper.Machine() == nil {
+		return fmt.Errorf("crypto machine is not initialized")
+	}
+	if _, err := s.cryptoHelper.Machine().FetchKeys(ctx, []id.UserID{userID}, false); err != nil {
+		return fmt.Errorf("fetch device keys for %s: %w", userID, err)
+	}
+	return nil
 }
 
 func (c *verificationCallbacks) VerificationReady(_ context.Context, txnID id.VerificationTransactionID, otherDeviceID id.DeviceID, supportsSAS, _ bool, _ *verificationhelper.QRCode) {
@@ -1749,7 +1768,11 @@ func (s *mautrixChatService) StartVerification(ctx context.Context, userID strin
 	if available, reason := s.getVerificationStatus(); !available {
 		return "", s.verificationError(reason)
 	}
-	txnID, err := s.verifyHelper.StartVerification(ctx, id.UserID(userID))
+	targetUserID := id.UserID(userID)
+	if err := s.prefetchVerificationKeys(ctx, targetUserID); err != nil {
+		return "", fmt.Errorf("prepare verification peer: %w", err)
+	}
+	txnID, err := s.verifyHelper.StartVerification(ctx, targetUserID)
 	if err != nil {
 		return "", fmt.Errorf("failed to start verification: %w", err)
 	}

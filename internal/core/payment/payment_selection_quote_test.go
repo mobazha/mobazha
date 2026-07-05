@@ -56,7 +56,7 @@ func TestCreateSelectionQuote_CrossCurrencyPersistsAndReuses(t *testing.T) {
 		}
 		return tx.Create(&models.Order{
 			TenantMixin: models.TenantMixin{TenantID: database.StandaloneTenantID},
-			ID:          models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true,
+			ID:          models.OrderID(orderID), MyRole: string(models.RoleVendor), Open: true,
 			SerializedOrderOpen: raw,
 		})
 	}))

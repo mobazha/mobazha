@@ -53,9 +53,6 @@ func (s *PaymentSessionServiceImpl) CreateSelectionQuote(
 	if input.order == nil || input.orderOpen == nil {
 		return nil, fmt.Errorf("%w: signed order is unavailable", ErrDealPaymentSelectionQuoteInvalid)
 	}
-	if input.order.MyRole != string(models.RoleBuyer) {
-		return nil, fmt.Errorf("%w: only the buyer order can select a payment asset", ErrDealPaymentSelectionQuoteInvalid)
-	}
 	ref, err := models.DealTermsSnapshotRefFromOrderOpen(input.orderOpen)
 	if err != nil || ref == nil || ref.FeeQuoteID == "" {
 		return nil, fmt.Errorf("%w: a complete signed Deal fee quote reference is required", ErrDealPaymentSelectionQuoteInvalid)

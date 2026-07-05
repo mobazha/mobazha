@@ -271,6 +271,17 @@ func (n *MobazhaNode) PaymentSession() contracts.PaymentSessionService {
 	return n.paymentSessionService
 }
 
+// CollateralAllocation returns the tenant-local seller-Core allocation
+// authority. It is deliberately separate from provider modules.
+func (n *MobazhaNode) CollateralAllocation() contracts.CollateralAllocationService {
+	if n == nil {
+		return nil
+	}
+	return newCollateralAllocationService(n.db)
+}
+
+var _ contracts.CollateralAllocationServiceProvider = (*MobazhaNode)(nil)
+
 func (n *MobazhaNode) Order() contracts.OrderService {
 	if n.orderService == nil {
 		return nil

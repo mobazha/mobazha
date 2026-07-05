@@ -99,6 +99,43 @@ func TestHandlePOSTOrderPaymentSession_PaymentCoinMismatch(t *testing.T) {
 	}
 }
 
+func TestHandlePOSTOrderPaymentSession_DealIntegrityConflict(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "missing fee quote", err: corePmt.ErrDealPaymentQuoteRequired},
+		{name: "conversion quote required", err: corePmt.ErrDealPaymentConversionQuoteRequired},
+		{name: "amount mismatch", err: corePmt.ErrDealPaymentAmountIntegrity},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &mockPaymentSessionService{
+				createFunc: func(_ context.Context, _ contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {
+					return nil, tt.err
+				},
+			}
+			g := &Gateway{}
+			w := httptest.NewRecorder()
+			r := newPaymentSessionHandlerRequest(t,
+				http.MethodPost,
+				"/v1/orders/o1/payment-session",
+				map[string]interface{}{
+					"paymentCoin":     "fiat:stripe:USD",
+					"fiatAmountCents": 999,
+				},
+				map[string]string{"orderID": "o1"},
+				svc,
+			)
+
+			g.handlePOSTOrderPaymentSession(w, r)
+			if w.Code != http.StatusConflict {
+				t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestHandlePOSTOrderPaymentSession_PaymentCoinDisabled(t *testing.T) {
 	svc := &mockPaymentSessionService{
 		createFunc: func(_ context.Context, _ contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {

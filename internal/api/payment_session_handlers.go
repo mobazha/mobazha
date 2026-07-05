@@ -177,7 +177,8 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 		case errors.Is(err, corePmt.ErrPaymentCoinMismatch):
 			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 		case errors.Is(err, corePmt.ErrDealPaymentQuoteRequired),
-			errors.Is(err, corePmt.ErrDealPaymentConversionQuoteRequired):
+			errors.Is(err, corePmt.ErrDealPaymentConversionQuoteRequired),
+			errors.Is(err, corePmt.ErrDealPaymentAmountIntegrity):
 			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 		case errors.Is(err, corePmt.ErrExchangeRateUnavailable):
 			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,

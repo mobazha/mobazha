@@ -644,6 +644,7 @@ func accountFromRecord(record models.CollateralAccountRecord) (collateral.Accoun
 func allocationFromRecord(record models.CollateralAllocationRecord) (collateral.AllocationReference, error) {
 	reference := collateral.AllocationReference{
 		AllocationID: record.AllocationID, CollateralID: record.CollateralID, TenantID: record.TenantID,
+		ProviderID: record.ProviderID, ResourceID: record.ResourceID, PrincipalID: record.PrincipalID,
 		OrderID: record.OrderID, ExtensionID: record.ExtensionID, AssetID: record.AssetID, Amount: record.Amount,
 		CollateralRevision: record.CollateralRevision, AllocationRevision: record.AllocationRevision,
 		State: collateral.AllocationState(record.State),

@@ -16,11 +16,13 @@ import (
 	"strings"
 	"time"
 
+	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 )
 
 const (
 	ContractVersionV1 = "v1"
+	ContractVersionV2 = "v2"
 
 	ContractOrderExtensionDeclarationV1          = "order-extension.declaration/v1"
 	ContractOrderExtensionDeclarationAdmissionV1 = "order-extension.declaration-admission/v1"
@@ -296,6 +298,41 @@ type OrderExtension struct {
 	Payload             json.RawMessage  `json:"payload"`
 	PayloadHash         string           `json:"payloadHash"`
 	CreatedAt           time.Time        `json:"createdAt"`
+}
+
+// OrderExtensionV2 carries a Core-issued collateral allocation without
+// changing the v1 envelope or granting the provider collateral authority.
+// Presence is not proof of coverage: Core must reload and admit the reference.
+type OrderExtensionV2 struct {
+	ContractVersion      string                             `json:"contractVersion"`
+	Extension            OrderExtension                     `json:"extension"`
+	CollateralAllocation *pkgcollateral.AllocationReference `json:"collateralAllocation,omitempty"`
+}
+
+// ValidateForOrder verifies the structural v2 binding. Runtime admission must
+// still compare the reference with Core-owned allocation and account records.
+func (e OrderExtensionV2) ValidateForOrder(orderID string) error {
+	if e.ContractVersion != ContractVersionV2 {
+		return fmt.Errorf("order extension v2 contract version is unsupported")
+	}
+	if err := e.Extension.ValidateForOrder(orderID); err != nil {
+		return err
+	}
+	if e.CollateralAllocation == nil {
+		return nil
+	}
+	if err := e.CollateralAllocation.Validate(); err != nil {
+		return err
+	}
+	reference := *e.CollateralAllocation
+	if reference.State != pkgcollateral.AllocationActive {
+		return fmt.Errorf("order extension v2 collateral allocation is not active")
+	}
+	if reference.OrderID != strings.TrimSpace(orderID) || reference.ExtensionID != e.Extension.ExtensionID ||
+		reference.ProviderID != e.Extension.ProviderID || reference.ResourceID != e.Extension.ResourceID {
+		return fmt.Errorf("order extension v2 collateral allocation binding mismatch")
+	}
+	return nil
 }
 
 // DeclarationInput contains the signed Core aggregate from which a module may

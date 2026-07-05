@@ -93,6 +93,7 @@ func TestAllocationReleaseDoesNotRepresentAccountFundRelease(t *testing.T) {
 func TestAllocationReferenceRejectsUnknownStateAndNonCanonicalAmount(t *testing.T) {
 	reference := AllocationReference{
 		AllocationID: "alloc-1", CollateralID: "col-1", TenantID: "tenant-1", OrderID: "order-1",
+		ProviderID: "provider-1", ResourceID: "resource-1", PrincipalID: "seller-1",
 		ExtensionID: "ext-1", AssetID: "crypto:solana:mainnet:usdc", Amount: "25",
 		CollateralRevision: 3, AllocationRevision: 1, State: AllocationActive,
 	}

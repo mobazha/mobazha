@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,6 +28,35 @@ func TestNewOrderExtension_ProducesStableIdentityAndVerifiedPayload(t *testing.T
 
 	first.Payload = json.RawMessage(`{"cert":"tampered"}`)
 	require.ErrorContains(t, first.Validate(), "hash mismatch")
+}
+
+func TestOrderExtensionV2BindsCoreCollateralReferenceWithoutChangingV1(t *testing.T) {
+	extension, err := NewOrderExtension("order-1", "io.mobazha.collectibles", "source-custody", "v1", "source-1", map[string]string{"mode": "M2"})
+	require.NoError(t, err)
+	reference := pkgcollateral.AllocationReference{
+		AllocationID: "alloc-1", CollateralID: "col-1", TenantID: "tenant-1",
+		ProviderID: extension.ProviderID, ResourceID: extension.ResourceID, PrincipalID: "seller-1",
+		OrderID: "order-1", ExtensionID: extension.ExtensionID,
+		AssetID: "crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955", Amount: "25",
+		CollateralRevision: 3, AllocationRevision: 1, State: pkgcollateral.AllocationActive,
+	}
+	envelope := OrderExtensionV2{
+		ContractVersion: ContractVersionV2, Extension: extension, CollateralAllocation: &reference,
+	}
+	require.NoError(t, envelope.ValidateForOrder("order-1"))
+	require.NoError(t, extension.ValidateForOrder("order-1"), "the v1 envelope remains independently valid")
+
+	wrongResource := reference
+	wrongResource.ResourceID = "other-source"
+	envelope.CollateralAllocation = &wrongResource
+	require.ErrorContains(t, envelope.ValidateForOrder("order-1"), "binding mismatch")
+	released := reference
+	released.State = pkgcollateral.AllocationReleased
+	envelope.CollateralAllocation = &released
+	require.ErrorContains(t, envelope.ValidateForOrder("order-1"), "not active")
+	envelope.CollateralAllocation = &reference
+	envelope.ContractVersion = ContractVersionV1
+	require.ErrorContains(t, envelope.ValidateForOrder("order-1"), "version")
 }
 
 func TestSettlementAttestation_RejectsExpiredAndFutureEvidence(t *testing.T) {

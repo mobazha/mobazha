@@ -342,6 +342,9 @@ type AllocationReference struct {
 	AllocationID       string          `json:"allocationID"`
 	CollateralID       string          `json:"collateralID"`
 	TenantID           string          `json:"tenantID"`
+	ProviderID         string          `json:"providerID"`
+	ResourceID         string          `json:"resourceID"`
+	PrincipalID        string          `json:"principalID"`
 	OrderID            string          `json:"orderID"`
 	ExtensionID        string          `json:"extensionID"`
 	AssetID            string          `json:"assetID"`
@@ -352,8 +355,8 @@ type AllocationReference struct {
 }
 
 func (r AllocationReference) Validate() error {
-	if missing(r.AllocationID, r.CollateralID, r.TenantID, r.OrderID, r.ExtensionID, r.AssetID) {
-		return fmt.Errorf("collateral allocation reference identity, scope, order, extension, and asset are required")
+	if missing(r.AllocationID, r.CollateralID, r.TenantID, r.ProviderID, r.ResourceID, r.PrincipalID, r.OrderID, r.ExtensionID, r.AssetID) {
+		return fmt.Errorf("collateral allocation reference identity, scope, principal, order, extension, and asset are required")
 	}
 	if r.CollateralRevision == 0 || r.AllocationRevision == 0 {
 		return fmt.Errorf("collateral and allocation revisions are required")

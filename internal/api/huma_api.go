@@ -28,7 +28,7 @@ const (
 
 // registerHumaAPI installs the huma adapter onto the V1 router and
 // registers all huma-managed operations.
-func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
+func (g *Gateway) registerHumaAPI(r chi.Router) (huma.API, error) {
 	apiTitle := nodeHumaAPITitle
 	apiDescription := nodeHumaAPIDescription
 	serverDescription := "Node gateway"
@@ -84,8 +84,10 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 	g.installNodeHumaMiddlewares(api)
 	if g.restrictedProductSurface() {
 		g.registerRestrictedHumaOperations(api)
-		g.registerTrustedHumaModules(api)
-		return api
+		if err := g.registerTrustedHumaModules(api); err != nil {
+			return nil, err
+		}
+		return api, nil
 	}
 
 	// Public storefront routes — always registered, even in PublicOnly mode.
@@ -143,9 +145,11 @@ func (g *Gateway) registerHumaAPI(r chi.Router) huma.API {
 		g.registerNodeHumaShippingOperations(api)
 		g.registerNodeHumaSellerDigitalOperations(api)
 	}
-	g.registerTrustedHumaModules(api)
+	if err := g.registerTrustedHumaModules(api); err != nil {
+		return nil, err
+	}
 
-	return api
+	return api, nil
 }
 
 func (g *Gateway) restrictedProductSurface() bool {

@@ -117,7 +117,7 @@ func TestAH14_NoRouteCollision_ActivatedDomains(t *testing.T) {
 	g := newTestGatewayForRouting(t)
 	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
-	g.registerHumaAPI(r)
+	mustRegisterHumaAPI(t, g, r)
 
 	collisions := collectRouteCollisions(r)
 
@@ -157,7 +157,7 @@ func TestCommunityHumaRoutes_FiatCapabilityFailsClosed(t *testing.T) {
 		editionPolicy:     policy,
 	}
 	r := chi.NewMux()
-	g.registerHumaAPI(r)
+	mustRegisterHumaAPI(t, g, r)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/fiat/providers", nil)
 	recorder := httptest.NewRecorder()
@@ -174,7 +174,7 @@ func TestAH14_ActivatedRoutesServedByHuma(t *testing.T) {
 	g := newTestGatewayForRouting(t)
 	r := chi.NewMux()
 	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
-	g.registerHumaAPI(r)
+	mustRegisterHumaAPI(t, g, r)
 
 	cases := []struct {
 		method string

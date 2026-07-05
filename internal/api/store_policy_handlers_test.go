@@ -133,7 +133,7 @@ func TestStorePolicyHumaDeleteModerator_AcceptsEmptyBody(t *testing.T) {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router(false, false))
+	outer.Mount("/", mustNewV1Router(t, gateway, false, false))
 	ts := httptest.NewServer(outer)
 	defer ts.Close()
 

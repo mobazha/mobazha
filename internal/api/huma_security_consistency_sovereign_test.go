@@ -25,7 +25,7 @@ import (
 func TestHumaSecurity_RouteScopeConsistency_Sovereign(t *testing.T) {
 	r := chi.NewMux()
 	g := &Gateway{config: &GatewayConfig{ProductSurfacePolicy: restrictedProductSurfacePolicy{}}}
-	g.registerHumaAPI(r)
+	mustRegisterHumaAPI(t, g, r)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)

@@ -27,7 +27,15 @@ func (*sovereignPolicyTestStub) EnabledBackgroundJobs() []string                
 
 type sovereignModuleTestStub struct{}
 
-func (*sovereignModuleTestStub) RegisterTrustedHuma(TrustedHumaRegistration) {}
+func (*sovereignModuleTestStub) TrustedHumaModuleDescriptor() TrustedHumaModuleDescriptor {
+	return TrustedHumaModuleDescriptor{
+		Owner:               "test.sovereign",
+		PathNamespaces:      []string{"/v1/test/sovereign"},
+		OperationIDPrefixes: []string{"test-sovereign-"},
+	}
+}
+
+func (*sovereignModuleTestStub) RegisterTrustedHuma(TrustedHumaRegistration) error { return nil }
 
 func TestSovereignNodeConfigValidateRejectsPartialAndTypedNilPorts(t *testing.T) {
 	policy := &sovereignPolicyTestStub{}

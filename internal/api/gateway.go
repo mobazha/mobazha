@@ -202,7 +202,10 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	}
 
 	csrfEnabled := !config.PublicOnly && config.Password != ""
-	r := g.newV1Router(config.AllowAllOrigins, csrfEnabled)
+	r, err := g.newV1Router(config.AllowAllOrigins, csrfEnabled)
+	if err != nil {
+		return nil, fmt.Errorf("register V1 API: %w", err)
+	}
 
 	// Create default hub
 	defaultNodeID := repo.DefaultNodeID
@@ -405,7 +408,7 @@ func (g *Gateway) Serve() error {
 	return err
 }
 
-func (g *Gateway) newV1Router(allowAllOrigins, csrfEnabled bool) chi.Router {
+func (g *Gateway) newV1Router(allowAllOrigins, csrfEnabled bool) (chi.Router, error) {
 	r := chi.NewMux()
 	r.Use(panicRecoveryMiddleware)
 	r.Use(securityHeadersMiddleware)
@@ -428,8 +431,10 @@ func (g *Gateway) newV1Router(allowAllOrigins, csrfEnabled bool) chi.Router {
 	// static node exists when the param node is inserted.
 	g.registerPreHumaRoutes(r)
 
-	g.registerHumaAPI(r)
-	return r
+	if _, err := g.registerHumaAPI(r); err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 
 // securityHeadersMiddleware sets baseline HTTP security headers on every response.

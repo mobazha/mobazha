@@ -26,6 +26,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/mobazha/mobazha/pkg/apitoken"
+	"github.com/mobazha/mobazha/pkg/distribution"
 )
 
 // clientIPKey is the context key for the upstream client IP address
@@ -109,6 +110,14 @@ func operationAcceptsAPIToken(op *huma.Operation) bool {
 func enforceHumaScope(api huma.API, ctx huma.Context, op *huma.Operation, identity *AuthIdentity) bool {
 	if identity.Scopes == nil {
 		return false
+	}
+	if scope, ok := distribution.TrustedOperationAPITokenScope(op); ok {
+		if identity.HasScope(scope) {
+			return false
+		}
+		logScopeDenial(identity, scope, op.Path)
+		huma.WriteErr(api, ctx, http.StatusForbidden, "missing required scope: "+string(scope))
+		return true
 	}
 	result := matchRouteScope(op.Method, op.Path, identity)
 	if result.Allowed {

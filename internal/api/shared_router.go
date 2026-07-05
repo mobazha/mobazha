@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -83,7 +84,9 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 	r.Use(g.StorefrontMiddleware)
 
 	g.registerPreHumaRoutes(r)
-	g.registerHumaAPI(r)
+	if _, err := g.registerHumaAPI(r); err != nil {
+		return nil, fmt.Errorf("register shared Huma API: %w", err)
+	}
 
 	r.HandleFunc("/ws/{nodeID}", g.WebsocketNodeHandler())
 	r.HandleFunc("/ws", g.WebsocketDefaultHandler())

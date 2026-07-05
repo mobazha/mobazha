@@ -224,7 +224,7 @@ func digitalAssetTestServer(t *testing.T, node contracts.NodeService) *httptest.
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router(false, false))
+	outer.Mount("/", mustNewV1Router(t, gateway, false, false))
 	ts := httptest.NewServer(outer)
 	t.Cleanup(ts.Close)
 	return ts

@@ -17,7 +17,7 @@ import (
 func TestSovereignOpenAPI_OperationIDSnapshot(t *testing.T) {
 	r := chi.NewMux()
 	g := &Gateway{config: &GatewayConfig{ProductSurfacePolicy: restrictedProductSurfacePolicy{}}}
-	g.registerHumaAPI(r)
+	mustRegisterHumaAPI(t, g, r)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
@@ -293,7 +293,7 @@ func TestSovereignOpenAPI_OperationIDSnapshot(t *testing.T) {
 func TestSovereignOpenAPI_SensitiveOpsRefuseAPIToken(t *testing.T) {
 	r := chi.NewMux()
 	g := &Gateway{config: &GatewayConfig{ProductSurfacePolicy: restrictedProductSurfacePolicy{}}}
-	g.registerHumaAPI(r)
+	mustRegisterHumaAPI(t, g, r)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)

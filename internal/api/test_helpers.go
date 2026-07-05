@@ -104,7 +104,7 @@ func runAPITests(t *testing.T, tests apiTests) {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router(false, false))
+	outer.Mount("/", mustNewV1Router(t, gateway, false, false))
 
 	ts := httptest.NewServer(outer)
 	defer ts.Close()
@@ -153,5 +153,21 @@ func runAPITests(t *testing.T, tests apiTests) {
 				continue
 			}
 		}
+	}
+}
+
+func mustNewV1Router(t *testing.T, gateway *Gateway, allowAllOrigins, csrfEnabled bool) chi.Router {
+	t.Helper()
+	router, err := gateway.newV1Router(allowAllOrigins, csrfEnabled)
+	if err != nil {
+		t.Fatalf("register V1 router: %v", err)
+	}
+	return router
+}
+
+func mustRegisterHumaAPI(t *testing.T, gateway *Gateway, router chi.Router) {
+	t.Helper()
+	if _, err := gateway.registerHumaAPI(router); err != nil {
+		t.Fatalf("register Huma API: %v", err)
 	}
 }

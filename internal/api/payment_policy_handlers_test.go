@@ -48,7 +48,7 @@ func newPaymentPolicyRouterWithNode(t *testing.T, db database.Database, asCoreIf
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
-	outer.Mount("/", gateway.newV1Router(false, false))
+	outer.Mount("/", mustNewV1Router(t, gateway, false, false))
 	return outer
 }
 

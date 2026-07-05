@@ -27,23 +27,20 @@ func matchRouteScope(method, path string, identity *AuthIdentity) scopeMatch {
 		return scopeMatch{Matched: true, Allowed: true}
 	}
 
-	key := method + " " + path
-	for _, rs := range routeScopeMap {
-		if !strings.HasPrefix(key, rs.pattern) {
-			continue
+	scope, matched := routeScopeForOperation(method, path)
+	if matched {
+		if scope == contracts.ScopeAny {
+			return scopeMatch{Matched: true, Scope: scope, Allowed: true}
 		}
-		if rs.scope == contracts.ScopeAny {
-			return scopeMatch{Matched: true, Scope: rs.scope, Allowed: true}
-		}
-		if !identity.HasScope(rs.scope) {
+		if !identity.HasScope(scope) {
 			return scopeMatch{
 				Matched: true,
-				Scope:   rs.scope,
+				Scope:   scope,
 				Allowed: false,
-				DenyMsg: fmt.Sprintf("missing required scope: %s", rs.scope),
+				DenyMsg: fmt.Sprintf("missing required scope: %s", scope),
 			}
 		}
-		return scopeMatch{Matched: true, Scope: rs.scope, Allowed: true}
+		return scopeMatch{Matched: true, Scope: scope, Allowed: true}
 	}
 
 	return scopeMatch{
@@ -51,6 +48,16 @@ func matchRouteScope(method, path string, identity *AuthIdentity) scopeMatch {
 		Allowed: false,
 		DenyMsg: "this route is not accessible to API tokens",
 	}
+}
+
+func routeScopeForOperation(method, path string) (contracts.Scope, bool) {
+	key := strings.ToUpper(method) + " " + path
+	for _, route := range routeScopeMap {
+		if strings.HasPrefix(key, route.pattern) {
+			return route.scope, true
+		}
+	}
+	return "", false
 }
 
 // ScopeEnforcementMiddleware enforces fine-grained permission checks for

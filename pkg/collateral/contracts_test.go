@@ -110,7 +110,8 @@ func TestClaimAttestationRequiresFreshRevisionBoundEvidence(t *testing.T) {
 		AttestationID: "att-1", IdempotencyKey: "claim-1", Issuer: "io.mobazha.collectibles",
 		TenantID: "tenant-1", CollateralID: "col-1", AllocationID: "alloc-1", OrderID: "order-1",
 		ExtensionID: "ext-1", ExpectedCollateralRevision: 3, ExpectedAllocationRevision: 1,
-		ConditionType: "physical-delivery-default", ConditionVersion: "v1", EvidenceDigest: "sha256:evidence",
+		ExpectedOrderStateVersion: "sha256:order-state",
+		ConditionType:             "physical-delivery-default", ConditionVersion: "v1", EvidenceDigest: "sha256:evidence",
 		ObservedAt: now, ExpiresAt: now.Add(time.Minute),
 	}
 	require.NoError(t, attestation.Validate(now))
@@ -118,8 +119,36 @@ func TestClaimAttestationRequiresFreshRevisionBoundEvidence(t *testing.T) {
 	attestation.ExpectedAllocationRevision = 0
 	require.ErrorContains(t, attestation.Validate(now), "expected revisions")
 	attestation.ExpectedAllocationRevision = 1
+	attestation.ExpectedOrderStateVersion = ""
+	require.ErrorContains(t, attestation.Validate(now), "binding")
+	attestation.ExpectedOrderStateVersion = "sha256:order-state"
 	attestation.ExpiresAt = now.Add(-time.Second)
 	require.ErrorContains(t, attestation.Validate(now), "time window")
+}
+
+func TestClaimDecisionAndExecutionObservationKeepFinancialAuthorityInCore(t *testing.T) {
+	now := time.Now().UTC()
+	attestation := validClaimAttestation(now)
+	decision := ClaimDecision{
+		ClaimID: "claim-1", Amount: "25", Reason: "accepted-dispute",
+		IdempotencyKey: "claim-decision-1", Attestation: attestation,
+	}
+	require.NoError(t, decision.Validate(now))
+	decision.Amount = "0"
+	require.ErrorContains(t, decision.Validate(now), "claim amount")
+
+	execution := ExecutionObservation{
+		TenantID: "tenant-1", CollateralID: "col-1", ClaimID: "claim-1",
+		Kind: ExecutionSlash, AssetID: "crypto:solana:mainnet:usdc", Amount: "25",
+		ExecutionReference: "slash-tx-1", ExpectedRevision: 4,
+		IdempotencyKey: "slash-confirm-1", ObservedAt: now,
+	}
+	require.NoError(t, execution.Validate(now))
+	execution.ClaimID = ""
+	require.ErrorContains(t, execution.Validate(now), "requires claim")
+	execution.Kind = ExecutionRelease
+	execution.ClaimID = "claim-1"
+	require.ErrorContains(t, execution.Validate(now), "cannot include claim")
 }
 
 func validOpenRequest(now time.Time) OpenRequest {
@@ -139,5 +168,16 @@ func validAccount(now time.Time) Account {
 		RequiredAmount: "100", FundedAmount: "100", AvailableAmount: "100",
 		PolicyID: "collectibles-source-custody", PolicyVersion: "v1", FundingReference: "rail-funding-1",
 		Revision: 2, State: StateActive, ActivatedAt: &activatedAt, ExpiresAt: now.Add(24 * time.Hour),
+	}
+}
+
+func validClaimAttestation(now time.Time) ClaimAttestation {
+	return ClaimAttestation{
+		AttestationID: "att-1", IdempotencyKey: "attestation-1", Issuer: "io.mobazha.collectibles",
+		TenantID: "tenant-1", CollateralID: "col-1", AllocationID: "alloc-1", OrderID: "order-1",
+		ExtensionID: "ext-1", ExpectedCollateralRevision: 3, ExpectedAllocationRevision: 1,
+		ExpectedOrderStateVersion: "sha256:order-state",
+		ConditionType:             "physical-delivery-default", ConditionVersion: "v1", EvidenceDigest: "sha256:evidence",
+		ObservedAt: now, ExpiresAt: now.Add(time.Minute),
 	}
 }

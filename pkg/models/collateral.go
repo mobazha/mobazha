@@ -42,6 +42,21 @@ type CollateralFundingRecord struct {
 	CreatedAt        time.Time
 }
 
+// CollateralExecutionRecord claims one externally confirmed release or slash
+// reference exactly once within a tenant and asset.
+type CollateralExecutionRecord struct {
+	TenantID           string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:uidx_collateral_execution_reference,priority:1" json:"-"`
+	ExecutionID        string `gorm:"primaryKey;type:varchar(96)"`
+	CollateralID       string `gorm:"type:varchar(96);not null;index"`
+	ClaimID            string `gorm:"type:varchar(96);index"`
+	Kind               string `gorm:"type:varchar(32);not null"`
+	AssetID            string `gorm:"type:varchar(160);not null;uniqueIndex:uidx_collateral_execution_reference,priority:2"`
+	Amount             string `gorm:"type:varchar(128);not null"`
+	ExecutionReference string `gorm:"type:varchar(256);not null;uniqueIndex:uidx_collateral_execution_reference,priority:3"`
+	ObservedAt         time.Time
+	CreatedAt          time.Time
+}
+
 // CollateralAllocationRecord binds available coverage to one order extension.
 type CollateralAllocationRecord struct {
 	TenantID           string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:uidx_collateral_order_extension,priority:1;uniqueIndex:uidx_collateral_allocation_idempotency,priority:1" json:"-"`
@@ -60,6 +75,38 @@ type CollateralAllocationRecord struct {
 	IdempotencyKey     string `gorm:"type:varchar(192);not null;uniqueIndex:uidx_collateral_allocation_idempotency,priority:2"`
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+}
+
+// CollateralClaimRecord stores a Core-accepted, revision-bound claim. The
+// record authorizes a later payment action; it is not itself proof of slash.
+type CollateralClaimRecord struct {
+	TenantID                   string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:uidx_collateral_claim_idempotency,priority:1;uniqueIndex:uidx_collateral_claim_attestation,priority:1;uniqueIndex:uidx_collateral_claim_attestation_idempotency,priority:1;uniqueIndex:uidx_collateral_claim_replay,priority:1" json:"-"`
+	ClaimID                    string `gorm:"primaryKey;type:varchar(96)"`
+	CollateralID               string `gorm:"type:varchar(96);not null;index"`
+	AllocationID               string `gorm:"type:varchar(96);not null;index"`
+	OrderID                    string `gorm:"type:varchar(128);not null;index"`
+	ExtensionID                string `gorm:"type:varchar(96);not null;index"`
+	AttestationID              string `gorm:"type:varchar(192);not null;uniqueIndex:uidx_collateral_claim_attestation,priority:2"`
+	AttestationIdempotencyKey  string `gorm:"type:varchar(192);not null;uniqueIndex:uidx_collateral_claim_attestation_idempotency,priority:2"`
+	ReplayFingerprint          string `gorm:"type:varchar(96);not null;uniqueIndex:uidx_collateral_claim_replay,priority:2"`
+	IdempotencyKey             string `gorm:"type:varchar(192);not null;uniqueIndex:uidx_collateral_claim_idempotency,priority:2"`
+	Issuer                     string `gorm:"type:varchar(160);not null"`
+	Amount                     string `gorm:"type:varchar(128);not null"`
+	Reason                     string `gorm:"type:varchar(256);not null"`
+	ConditionType              string `gorm:"type:varchar(160);not null"`
+	ConditionVersion           string `gorm:"type:varchar(32);not null"`
+	EvidenceDigest             string `gorm:"type:varchar(256);not null"`
+	ExpectedCollateralRevision uint64 `gorm:"not null"`
+	ExpectedAllocationRevision uint64 `gorm:"not null"`
+	ExpectedOrderStateVersion  string `gorm:"type:varchar(96);not null"`
+	CollateralRevision         uint64 `gorm:"not null"`
+	AllocationRevision         uint64 `gorm:"not null"`
+	State                      string `gorm:"type:varchar(32);not null;index"`
+	ExecutionReference         string `gorm:"type:varchar(256)"`
+	ObservedAt                 time.Time
+	ExpiresAt                  time.Time
+	AcceptedAt                 time.Time
+	UpdatedAt                  time.Time
 }
 
 // CollateralActionRecord is an append-only audit record for accepted Core

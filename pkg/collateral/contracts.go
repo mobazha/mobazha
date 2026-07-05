@@ -33,6 +33,20 @@ const (
 	AllocationClaimed  AllocationState = "claimed"
 )
 
+type ClaimState string
+
+const (
+	ClaimPendingSlash ClaimState = "slash-pending"
+	ClaimSlashed      ClaimState = "slashed"
+)
+
+type ExecutionKind string
+
+const (
+	ExecutionRelease ExecutionKind = "release"
+	ExecutionSlash   ExecutionKind = "slash"
+)
+
 // OpenRequest declares the minimum single-asset collateral required for one
 // provider-owned resource and principal. Funding is a later Core transition.
 type OpenRequest struct {
@@ -198,6 +212,130 @@ func (r AllocationReleaseRequest) Validate() error {
 	return nil
 }
 
+// AccountReleaseRequest asks Core to begin returning an unallocated account's
+// funds to its Core-derived principal destination. It contains no address.
+type AccountReleaseRequest struct {
+	TenantID         string `json:"tenantID"`
+	CollateralID     string `json:"collateralID"`
+	ExpectedRevision uint64 `json:"expectedRevision"`
+	IdempotencyKey   string `json:"idempotencyKey"`
+	Reason           string `json:"reason"`
+}
+
+func (r AccountReleaseRequest) Validate() error {
+	if missing(r.TenantID, r.CollateralID, r.IdempotencyKey, r.Reason) {
+		return fmt.Errorf("collateral release tenant, account, idempotency key, and reason are required")
+	}
+	if r.ExpectedRevision == 0 {
+		return fmt.Errorf("collateral release expected revision is required")
+	}
+	return nil
+}
+
+// ClaimDecision is a Core policy decision accepting bounded provider evidence
+// for an allocation. It authorizes a later slash execution but cannot provide
+// a payout address or execute the transfer itself.
+type ClaimDecision struct {
+	ClaimID        string           `json:"claimID"`
+	Amount         string           `json:"amount"`
+	Reason         string           `json:"reason"`
+	IdempotencyKey string           `json:"idempotencyKey"`
+	Attestation    ClaimAttestation `json:"attestation"`
+}
+
+func (d ClaimDecision) Validate(now time.Time) error {
+	if missing(d.ClaimID, d.Reason, d.IdempotencyKey) {
+		return fmt.Errorf("collateral claim decision identity, reason, and idempotency key are required")
+	}
+	if err := validateBaseUnits(d.Amount, false); err != nil {
+		return fmt.Errorf("collateral claim amount: %w", err)
+	}
+	if err := d.Attestation.Validate(now); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Claim is the Core-issued projection of an accepted collateral claim.
+type Claim struct {
+	ClaimID                   string     `json:"claimID"`
+	TenantID                  string     `json:"tenantID"`
+	CollateralID              string     `json:"collateralID"`
+	AllocationID              string     `json:"allocationID"`
+	OrderID                   string     `json:"orderID"`
+	ExtensionID               string     `json:"extensionID"`
+	Issuer                    string     `json:"issuer"`
+	Amount                    string     `json:"amount"`
+	ConditionType             string     `json:"conditionType"`
+	ConditionVersion          string     `json:"conditionVersion"`
+	EvidenceDigest            string     `json:"evidenceDigest"`
+	ExpectedOrderStateVersion string     `json:"expectedOrderStateVersion"`
+	CollateralRevision        uint64     `json:"collateralRevision"`
+	AllocationRevision        uint64     `json:"allocationRevision"`
+	State                     ClaimState `json:"state"`
+	ExecutionReference        string     `json:"executionReference,omitempty"`
+}
+
+func (c Claim) Validate() error {
+	if missing(c.ClaimID, c.TenantID, c.CollateralID, c.AllocationID, c.OrderID, c.ExtensionID, c.Issuer, c.ExpectedOrderStateVersion, c.ConditionType, c.ConditionVersion, c.EvidenceDigest) {
+		return fmt.Errorf("collateral claim identity, scope, issuer, condition, and evidence are required")
+	}
+	if c.CollateralRevision == 0 || c.AllocationRevision == 0 {
+		return fmt.Errorf("collateral claim revisions are required")
+	}
+	if c.State != ClaimPendingSlash && c.State != ClaimSlashed {
+		return fmt.Errorf("collateral claim state %q is unsupported", c.State)
+	}
+	if c.State == ClaimSlashed && strings.TrimSpace(c.ExecutionReference) == "" {
+		return fmt.Errorf("slashed collateral claim requires execution reference")
+	}
+	if err := validateBaseUnits(c.Amount, false); err != nil {
+		return fmt.Errorf("collateral claim amount: %w", err)
+	}
+	return nil
+}
+
+// ExecutionObservation is submitted by a trusted collateral payment adapter
+// after a release or slash is externally confirmed. Core still performs all
+// aggregate, amount, revision, and replay checks before accepting it.
+type ExecutionObservation struct {
+	TenantID           string        `json:"tenantID"`
+	CollateralID       string        `json:"collateralID"`
+	ClaimID            string        `json:"claimID,omitempty"`
+	Kind               ExecutionKind `json:"kind"`
+	AssetID            string        `json:"assetID"`
+	Amount             string        `json:"amount"`
+	ExecutionReference string        `json:"executionReference"`
+	ExpectedRevision   uint64        `json:"expectedRevision"`
+	IdempotencyKey     string        `json:"idempotencyKey"`
+	ObservedAt         time.Time     `json:"observedAt"`
+}
+
+func (o ExecutionObservation) Validate(now time.Time) error {
+	if missing(o.TenantID, o.CollateralID, o.AssetID, o.ExecutionReference, o.IdempotencyKey) {
+		return fmt.Errorf("collateral execution tenant, account, asset, reference, and idempotency key are required")
+	}
+	if o.Kind != ExecutionRelease && o.Kind != ExecutionSlash {
+		return fmt.Errorf("collateral execution kind %q is unsupported", o.Kind)
+	}
+	if o.Kind == ExecutionSlash && strings.TrimSpace(o.ClaimID) == "" {
+		return fmt.Errorf("collateral slash execution requires claim")
+	}
+	if o.Kind == ExecutionRelease && strings.TrimSpace(o.ClaimID) != "" {
+		return fmt.Errorf("collateral release execution cannot include claim")
+	}
+	if o.ExpectedRevision == 0 {
+		return fmt.Errorf("collateral execution expected revision is required")
+	}
+	if err := validateBaseUnits(o.Amount, false); err != nil {
+		return fmt.Errorf("collateral execution amount: %w", err)
+	}
+	if o.ObservedAt.IsZero() || o.ObservedAt.After(now.Add(time.Minute)) {
+		return fmt.Errorf("collateral execution observation time is invalid")
+	}
+	return nil
+}
+
 // AllocationReference is a Core-issued, revision-bound reference suitable for
 // a future Order Extension contract. Providers cannot mint this reference.
 type AllocationReference struct {
@@ -243,6 +381,7 @@ type ClaimAttestation struct {
 	ExtensionID                string    `json:"extensionID"`
 	ExpectedCollateralRevision uint64    `json:"expectedCollateralRevision"`
 	ExpectedAllocationRevision uint64    `json:"expectedAllocationRevision"`
+	ExpectedOrderStateVersion  string    `json:"expectedOrderStateVersion"`
 	ConditionType              string    `json:"conditionType"`
 	ConditionVersion           string    `json:"conditionVersion"`
 	EvidenceDigest             string    `json:"evidenceDigest"`
@@ -251,7 +390,7 @@ type ClaimAttestation struct {
 }
 
 func (a ClaimAttestation) Validate(now time.Time) error {
-	if missing(a.AttestationID, a.IdempotencyKey, a.Issuer, a.TenantID, a.CollateralID, a.AllocationID, a.OrderID, a.ExtensionID, a.ConditionType, a.ConditionVersion, a.EvidenceDigest) {
+	if missing(a.AttestationID, a.IdempotencyKey, a.Issuer, a.TenantID, a.CollateralID, a.AllocationID, a.OrderID, a.ExtensionID, a.ExpectedOrderStateVersion, a.ConditionType, a.ConditionVersion, a.EvidenceDigest) {
 		return fmt.Errorf("collateral claim identity, issuer, scope, binding, condition, evidence, and idempotency key are required")
 	}
 	if a.ExpectedCollateralRevision == 0 || a.ExpectedAllocationRevision == 0 {

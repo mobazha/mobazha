@@ -380,6 +380,7 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 		//     applyOptions would unconditionally start the monitor and
 		//     silently drop the orderService link.
 		initDigitalSubsystem(obNode)
+		finalizeFiatSubsystem(obNode)
 		initPaymentSessionSubsystem(obNode)
 		finalizeSupplyChainSubsystem(obNode)
 		infraOwned = true
@@ -731,6 +732,7 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 	// rationale): Digital depends on featureResolver; SupplyChain depends
 	// on orderService + featureResolver.
 	initDigitalSubsystem(obNode)
+	finalizeFiatSubsystem(obNode)
 	initPaymentSessionSubsystem(obNode)
 	finalizeSupplyChainSubsystem(obNode)
 	obNode.registerHandlers()
@@ -1331,6 +1333,7 @@ func newLightweightNode(
 	// rationale): Digital depends on featureResolver; SupplyChain depends
 	// on orderService + featureResolver.
 	initDigitalSubsystem(obNode)
+	finalizeFiatSubsystem(obNode)
 	initPaymentSessionSubsystem(obNode)
 	finalizeSupplyChainSubsystem(obNode)
 	obNode.registerHandlers()
@@ -1445,7 +1448,6 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID, obNode.walletTestnet)
 	obNode.fiatPaymentService.SetOrderRepo(NewGormOrderRepo(obNode.db))
 	obNode.fiatPaymentService.SetEventBus(obNode.eventBus)
-	obNode.fiatPaymentService.LoadAndRegisterProviders()
 
 	// NOTE: orderService.SetFiatOps wiring is handled in
 	// wireServiceSetters() (called from applyOptions). Performing it here
@@ -1453,6 +1455,21 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	// applyOptions → initOrderService.
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
+}
+
+// finalizeFiatSubsystem runs after NodeOptions have been applied so hosted
+// distributions can inject a dedicated credential KMS before direct provider
+// configurations are decrypted and registered.
+func finalizeFiatSubsystem(obNode *MobazhaNode) {
+	if obNode == nil || obNode.fiatPaymentService == nil {
+		return
+	}
+	if obNode.credentialKeys == nil {
+		logger.LogWarningWithID(log, obNode.nodeID, "Fiat: direct provider credentials disabled because no credential key provider is configured")
+		return
+	}
+	obNode.fiatPaymentService.SetProviderCredentialKeyProvider(obNode.credentialKeys)
+	obNode.fiatPaymentService.LoadAndRegisterProviders()
 }
 
 // initPaymentSessionSubsystem wires the unified PaymentSessionService (Phase PS / B1–B3).

@@ -40,6 +40,15 @@ func WithKeyProvider(kp contracts.KeyProvider) NodeOption {
 	}}
 }
 
+// WithProviderCredentialKeyProvider overrides the credential-encryption key
+// source independently from chain-signing keys. Hosted distributions should
+// use this when payment secrets live in a dedicated KMS/Vault boundary.
+func WithProviderCredentialKeyProvider(kp contracts.ProviderCredentialKeyProvider) NodeOption {
+	return NodeOption{apply: func(n *MobazhaNode) {
+		n.credentialKeys = kp
+	}}
+}
+
 // WithHostService sets the HostService for SaaS integration.
 // This is extracted from the variadic parameter of NewNode for cleaner API.
 func WithHostService(hs coreiface.HostService) NodeOption {
@@ -166,6 +175,11 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 			n.solPrivKey,
 			n.tronMasterKey,
 		)
+	}
+	if n.credentialKeys == nil {
+		if credentialKeys, ok := n.keyProvider.(contracts.ProviderCredentialKeyProvider); ok {
+			n.credentialKeys = credentialKeys
+		}
 	}
 	n.initProfileService()
 	n.initModerationService()

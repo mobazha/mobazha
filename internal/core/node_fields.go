@@ -59,6 +59,7 @@ type cryptoFields struct {
 	ratingMasterKey *btcec.PrivateKey
 	tronMasterKey   *btcec.PrivateKey
 	keyProvider     contracts.KeyProvider
+	credentialKeys  contracts.ProviderCredentialKeyProvider
 	bip44Key        *hdkeychain.ExtendedKey
 }
 

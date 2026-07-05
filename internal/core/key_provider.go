@@ -12,6 +12,7 @@ import (
 )
 
 var _ contracts.KeyProvider = (*fileKeyProvider)(nil)
+var _ contracts.ProviderCredentialKeyProvider = (*fileKeyProvider)(nil)
 
 // fileKeyProvider implements KeyProvider by holding key references directly.
 // Used in standalone mode where keys are loaded from the node's data directory.
@@ -50,6 +51,25 @@ func (p *fileKeyProvider) DigitalContentMasterKey(version int) ([]byte, error) {
 	ikm := p.escrowKey.Serialize()
 	salt := []byte("mobazha-digital-content-master-v1")
 	info := []byte(fmt.Sprintf("digital-content-master:v%d", version))
+
+	kdf := hkdf.New(sha256.New, ikm, salt, info)
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(kdf, key); err != nil {
+		return nil, fmt.Errorf("HKDF expand failed: %w", err)
+	}
+	return key, nil
+}
+
+// ProviderCredentialMasterKey derives a domain-separated key for encrypting
+// provider credentials. The version is independent of provider configuration
+// generations and permits encryption-key rotation without changing bindings.
+func (p *fileKeyProvider) ProviderCredentialMasterKey(version uint64) ([]byte, error) {
+	if p.escrowKey == nil {
+		return nil, fmt.Errorf("escrow master key not available")
+	}
+	ikm := p.escrowKey.Serialize()
+	salt := []byte("mobazha-provider-credential-master-v1")
+	info := []byte(fmt.Sprintf("provider-credential-master:v%d", version))
 
 	kdf := hkdf.New(sha256.New, ikm, salt, info)
 	key := make([]byte, 32)

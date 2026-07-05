@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"sync"
@@ -45,6 +46,18 @@ type mockFiatProvider struct {
 	createParams  []contracts.CreatePaymentParams
 }
 
+type mockWebhookProvider struct {
+	*mockFiatProvider
+	setupResult *contracts.WebhookSetupResult
+	setupErr    error
+}
+
+func (m *mockWebhookProvider) SetupWebhook(context.Context, string) (*contracts.WebhookSetupResult, error) {
+	return m.setupResult, m.setupErr
+}
+
+func (*mockWebhookProvider) CleanupWebhook(context.Context, string) error { return nil }
+
 func (m *mockFiatProvider) ProviderID() string { return m.id }
 
 func (m *mockFiatProvider) CreatePayment(_ context.Context, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
@@ -85,6 +98,13 @@ func (m *mockFiatProvider) ParseWebhook(_ context.Context, _ []byte, _ map[strin
 type mockFiatRegistry struct {
 	mu        sync.RWMutex
 	providers map[string]contracts.FiatPaymentProvider
+}
+
+type testProviderCredentialKeys struct{}
+
+func (testProviderCredentialKeys) ProviderCredentialMasterKey(version uint64) ([]byte, error) {
+	key := sha256.Sum256([]byte(fmt.Sprintf("test-provider-credential-key:%d", version)))
+	return key[:], nil
 }
 
 func newMockFiatRegistry() *mockFiatRegistry {
@@ -138,6 +158,7 @@ func newFiatTestService(t *testing.T, reg contracts.FiatProviderRegistry) (*Fiat
 	t.Helper()
 	db := newFiatTestDB(t)
 	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
+	svc.SetProviderCredentialKeyProvider(testProviderCredentialKeys{})
 	return svc, db
 }
 
@@ -345,6 +366,108 @@ func TestFiatService_SaveProviderConfig_ConfigurationChangeCreatesNewBindingGene
 	assert.NotEqual(t, bindings[0].BindingID, bindings[1].BindingID)
 }
 
+func TestFiatService_SaveProviderConfig_CredentialsAreEncryptedAndAppendOnly(t *testing.T) {
+	svc, db := newFiatTestService(t, newMockFiatRegistry())
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
+		AccountID: "acct_v1", PublicKey: "pk_v1", SecretKey: "sk_secret_v1", WebhookSecret: "wh_secret_v1",
+	}))
+
+	var first models.PaymentProviderCredential
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("credential_reference = ?", "tenant-config:stripe:1").First(&first).Error
+	}))
+	assert.NotContains(t, string(first.Ciphertext), "sk_secret_v1")
+	assert.NotContains(t, string(first.Ciphertext), "wh_secret_v1")
+	firstCiphertext := append([]byte(nil), first.Ciphertext...)
+
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{}))
+	var repeated models.PaymentProviderCredential
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("credential_reference = ?", "tenant-config:stripe:1").First(&repeated).Error
+	}))
+	assert.Equal(t, firstCiphertext, repeated.Ciphertext, "an existing credential generation must never be rewritten")
+
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{SecretKey: "sk_secret_v2"}))
+	var credentials []models.PaymentProviderCredential
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ?", "stripe").Order("configuration_generation ASC").Find(&credentials).Error
+	}))
+	require.Len(t, credentials, 2)
+	assert.Equal(t, uint64(1), credentials[0].ConfigurationGeneration)
+	assert.Equal(t, firstCiphertext, credentials[0].Ciphertext)
+	assert.Equal(t, uint64(2), credentials[1].ConfigurationGeneration)
+}
+
+func TestFiatService_LoadProviderCredential_RejectsValidCiphertextSubstitution(t *testing.T) {
+	svc, db := newFiatTestService(t, newMockFiatRegistry())
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
+		AccountID: "acct_swap", PublicKey: "pk", SecretKey: "sk_v1", WebhookSecret: "wh_v1",
+	}))
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{SecretKey: "sk_v2"}))
+
+	var first, second models.PaymentProviderCredential
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		if err := tx.Read().Where("credential_reference = ?", "tenant-config:stripe:1").First(&first).Error; err != nil {
+			return err
+		}
+		return tx.Read().Where("credential_reference = ?", "tenant-config:stripe:2").First(&second).Error
+	}))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		_, err := tx.UpdateColumns(
+			map[string]interface{}{"ciphertext": second.Ciphertext},
+			map[string]interface{}{"credential_reference = ?": first.CredentialReference},
+			&models.PaymentProviderCredential{},
+		)
+		return err
+	}))
+
+	err := db.View(func(tx database.Tx) error {
+		_, err := svc.loadProviderCredentialTx(
+			tx, first.CredentialReference, first.ProviderID, first.ExternalAccountReference,
+			first.ConfigurationGeneration, first.ConfigurationFingerprint,
+		)
+		return err
+	})
+	require.ErrorContains(t, err, "failed integrity verification")
+}
+
+func TestFiatService_SetupWebhook_CreatesNewCredentialGeneration(t *testing.T) {
+	svc, db := newFiatTestService(t, newMockFiatRegistry())
+	provider := &mockWebhookProvider{
+		mockFiatProvider: &mockFiatProvider{id: "stripe"},
+		setupResult:      &contracts.WebhookSetupResult{WebhookID: "we_2", WebhookSecret: "wh_secret_v2"},
+	}
+	svc.providerFactory = func(string, providerCredentialMaterial, bool, *contracts.PlatformProviderOpts) (contracts.FiatPaymentProvider, error) {
+		return provider, nil
+	}
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
+		AccountID: "acct_webhook", PublicKey: "pk", SecretKey: "sk", WebhookSecret: "wh_secret_v1",
+	}))
+
+	result, err := svc.SetupWebhook(context.Background(), "stripe", "https://example.test/webhook")
+	require.NoError(t, err)
+	assert.Equal(t, "we_2", result.WebhookID)
+
+	var cfg models.FiatProviderConfig
+	var credentialCount int64
+	var current providerCredentialMaterial
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		if err := tx.Read().Where("provider_id = ?", "stripe").First(&cfg).Error; err != nil {
+			return err
+		}
+		if err := tx.Read().Model(&models.PaymentProviderCredential{}).Where("provider_id = ?", "stripe").Count(&credentialCount).Error; err != nil {
+			return err
+		}
+		var err error
+		current, err = svc.loadProviderCredentialTx(tx, cfg.CredentialReference, cfg.ProviderID, cfg.AccountID, cfg.ConfigurationGeneration, cfg.ConfigurationFingerprint)
+		return err
+	}))
+	assert.Equal(t, uint64(2), cfg.ConfigurationGeneration)
+	assert.Equal(t, "tenant-config:stripe:2", cfg.CredentialReference)
+	assert.Equal(t, int64(2), credentialCount)
+	assert.Equal(t, "wh_secret_v2", current.WebhookSecret)
+}
+
 func TestFiatService_ProviderBinding_PlatformAccountRebindAdvancesGeneration(t *testing.T) {
 	svc, db := newFiatTestService(t, newMockFiatRegistry())
 	svc.markPlatformProvider("stripe")
@@ -387,6 +510,11 @@ func TestFiatService_deleteProviderConfig_UnregistersProvider(t *testing.T) {
 
 	require.NoError(t, svc.deleteProviderConfig(context.Background(), "stripe"))
 	assert.Empty(t, reg.Registered(), "provider should be unregistered after delete")
+	var credentialCount int64
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Model(&models.PaymentProviderCredential{}).Where("provider_id = ?", "stripe").Count(&credentialCount).Error
+	}))
+	assert.Equal(t, int64(1), credentialCount, "disconnect must retain historical credentials for in-flight recovery")
 	var binding models.PaymentProviderBinding
 	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&binding).Error }))
 	assert.Equal(t, models.PaymentProviderBindingRetired, binding.State)
@@ -680,32 +808,71 @@ func TestFiatService_ReconcilePaymentAttempt_ReplaysProviderCreateWithSameClaim(
 	assert.Empty(t, attempt.LastError)
 }
 
-func TestFiatService_ReconcilePaymentAttempt_HistoricalDirectCredentialUnavailableFailsClosed(t *testing.T) {
+func TestFiatService_ReconcilePaymentAttempt_UsesHistoricalDirectCredential(t *testing.T) {
 	reg := newMockFiatRegistry()
 	svc, db := newFiatTestService(t, reg)
+	oldProvider := &mockFiatProvider{id: "stripe", createErr: errors.New("ambiguous timeout")}
+	currentProvider := &mockFiatProvider{id: "stripe", createResult: &contracts.FiatProviderSession{SessionID: "current_must_not_be_used"}}
+	svc.providerFactory = func(_ string, credential providerCredentialMaterial, _ bool, _ *contracts.PlatformProviderOpts) (contracts.FiatPaymentProvider, error) {
+		if credential.SecretKey == "sk_old" {
+			return oldProvider, nil
+		}
+		return currentProvider, nil
+	}
 	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
 		AccountID: "acct_old", PublicKey: "pk", SecretKey: "sk_old", WebhookSecret: "wh",
 	}))
-	provider := &mockFiatProvider{id: "stripe", createErr: errors.New("ambiguous timeout")}
-	reg.Register(provider)
 	_, err := svc.CreatePayment(context.Background(), "stripe", contracts.CreatePaymentParams{
 		OrderID: "order_old_binding", Amount: 2500, Currency: "USD",
 	})
 	require.ErrorContains(t, err, "ambiguous timeout")
-	require.Len(t, provider.createParams, 1)
+	require.Len(t, oldProvider.createParams, 1)
 
 	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{AccountID: "acct_new", SecretKey: "sk_new"}))
-	provider.createErr = nil
-	provider.createResult = &contracts.FiatProviderSession{SessionID: "must_not_be_created"}
-	reg.Register(provider)
+	oldProvider.createErr = nil
+	oldProvider.createResult = &contracts.FiatProviderSession{SessionID: "created_with_historical_credential"}
 	svc.ReconcileFiatOrders(context.Background())
-	require.Len(t, provider.createParams, 1, "reconciliation must not use current credentials for a historical direct binding")
+	require.Len(t, oldProvider.createParams, 2)
+	assert.Equal(t, "acct_old", oldProvider.createParams[1].SellerAccountID)
+	assert.Zero(t, currentProvider.createCalls, "reconciliation must not use current credentials for a historical direct binding")
 
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&attempt).Error }))
+	assert.Equal(t, models.PaymentAttemptExternalCreated, attempt.State)
+	assert.Equal(t, "created_with_historical_credential", attempt.ExternalReference)
+}
+
+func TestFiatService_ReconcilePaymentAttempt_MissingHistoricalCredentialFailsClosed(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, db := newFiatTestService(t, reg)
+	oldProvider := &mockFiatProvider{id: "stripe", createErr: errors.New("ambiguous timeout")}
+	currentProvider := &mockFiatProvider{id: "stripe", createResult: &contracts.FiatProviderSession{SessionID: "must_not_be_created"}}
+	svc.providerFactory = func(_ string, credential providerCredentialMaterial, _ bool, _ *contracts.PlatformProviderOpts) (contracts.FiatPaymentProvider, error) {
+		if credential.SecretKey == "sk_old" {
+			return oldProvider, nil
+		}
+		return currentProvider, nil
+	}
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
+		AccountID: "acct_old", PublicKey: "pk", SecretKey: "sk_old", WebhookSecret: "wh",
+	}))
+	_, err := svc.CreatePayment(context.Background(), "stripe", contracts.CreatePaymentParams{
+		OrderID: "order_missing_credential", Amount: 2500, Currency: "USD",
+	})
+	require.ErrorContains(t, err, "ambiguous timeout")
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{SecretKey: "sk_new"}))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Delete("credential_reference", "tenant-config:stripe:1", nil, &models.PaymentProviderCredential{})
+	}))
+
+	svc.ReconcileFiatOrders(context.Background())
+	require.Len(t, oldProvider.createParams, 1)
+	assert.Zero(t, currentProvider.createCalls)
 	var attempt models.PaymentAttempt
 	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&attempt).Error }))
 	assert.Equal(t, models.PaymentAttemptReconcileRequired, attempt.State)
 	assert.Contains(t, attempt.LastError, "route decision denied historical provider binding")
-	assert.Contains(t, attempt.LastError, "not the active generation")
+	assert.Contains(t, attempt.LastError, "credential reference tenant-config:stripe:1 is unavailable")
 }
 
 func TestFiatService_CreatePayment_RejectsManagedCollectibleBeforeProvider(t *testing.T) {
@@ -753,18 +920,15 @@ func TestFiatService_CreatePayment_RejectsManagedCollectibleBeforeProvider(t *te
 // --- Tests: LoadAndRegisterProviders ---
 
 func TestFiatService_LoadAndRegisterProviders(t *testing.T) {
-	reg := newMockFiatRegistry()
 	db := newFiatTestDB(t)
-
-	require.NoError(t, db.Update(func(tx database.Tx) error {
-		return tx.Save(&models.FiatProviderConfig{
-			ProviderID: "stripe", AccountID: "acct_pre",
-			PublicKey: "pk_pre", SecretKey: "sk_pre",
-			WebhookSecret: "whsec_pre", IsActive: true,
-		})
+	seed := NewFiatPaymentAppService(newMockFiatRegistry(), db, "test-node", false)
+	seed.SetProviderCredentialKeyProvider(testProviderCredentialKeys{})
+	require.NoError(t, seed.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
+		AccountID: "acct_pre", PublicKey: "pk_pre", SecretKey: "sk_pre", WebhookSecret: "whsec_pre",
 	}))
-
+	reg := newMockFiatRegistry()
 	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
+	svc.SetProviderCredentialKeyProvider(testProviderCredentialKeys{})
 	svc.LoadAndRegisterProviders()
 
 	ids := reg.Registered()
@@ -1306,6 +1470,7 @@ func newFiatTestServiceWithOrders(t *testing.T, reg contracts.FiatProviderRegist
 	t.Helper()
 	db := newFiatTestDBWithOrders(t)
 	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
+	svc.SetProviderCredentialKeyProvider(testProviderCredentialKeys{})
 	return svc, db
 }
 

@@ -47,3 +47,11 @@ type KeyProvider interface {
 	// remain accessible until all assets have been re-encrypted.
 	DigitalContentMasterKey(version int) ([]byte, error)
 }
+
+// ProviderCredentialKeyProvider supplies versioned, tenant-scoped encryption
+// keys for payment-provider credentials. It is deliberately separate from
+// KeyProvider so hosted distributions can back it with a dedicated KMS/Vault
+// without exposing payment secrets to chain-signing components.
+type ProviderCredentialKeyProvider interface {
+	ProviderCredentialMasterKey(version uint64) ([]byte, error)
+}

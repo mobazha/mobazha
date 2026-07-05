@@ -2,7 +2,8 @@ package models
 
 import "time"
 
-// FiatProviderConfig stores per-tenant API credentials for a fiat payment provider.
+// FiatProviderConfig stores the current non-secret provider configuration and
+// an immutable reference into PaymentProviderCredential.
 // Used in standalone mode where sellers supply their own API keys.
 // In SaaS mode, platform-level keys are in environment variables; only ReceivingAccount is used.
 type FiatProviderConfig struct {
@@ -10,10 +11,9 @@ type FiatProviderConfig struct {
 	ID         int    `gorm:"primaryKey;autoIncrement:false"`
 	ProviderID string `gorm:"column:provider_id;type:varchar(32);not null;uniqueIndex:idx_fiat_config_tenant_provider"`
 
-	AccountID     string `gorm:"column:account_id;type:varchar(255)"` // Stripe acct_xxx or PayPal merchant_xxx
-	PublicKey     string `gorm:"column:public_key;type:text"`
-	SecretKey     string `gorm:"column:secret_key;type:text"`     // AES-256-GCM encrypted
-	WebhookSecret string `gorm:"column:webhook_secret;type:text"` // AES-256-GCM encrypted
+	AccountID           string `gorm:"column:account_id;type:varchar(255)"` // Stripe acct_xxx or PayPal merchant_xxx
+	PublicKey           string `gorm:"column:public_key;type:text"`
+	CredentialReference string `gorm:"column:credential_reference;type:varchar(255);not null;default:''"`
 
 	WebhookID                string `gorm:"column:webhook_id;type:varchar(255)"`
 	WebhookAutoConfigured    bool   `gorm:"column:webhook_auto_configured;default:false"`
@@ -26,24 +26,6 @@ type FiatProviderConfig struct {
 }
 
 func (FiatProviderConfig) TableName() string { return "fiat_provider_configs" }
-
-// MaskSecrets redacts secret fields for API responses.
-func (c *FiatProviderConfig) MaskSecrets() {
-	if len(c.SecretKey) > 6 {
-		c.SecretKey = c.SecretKey[:4] + "****" + c.SecretKey[len(c.SecretKey)-3:]
-	} else if c.SecretKey != "" {
-		c.SecretKey = "****"
-	}
-	if c.WebhookSecret != "" {
-		c.WebhookSecret = "****"
-	}
-}
-
-// AccountID is a helper to extract the connected account ID.
-// For standalone mode this comes from the config, for SaaS from ReceivingAccount.
-func (c *FiatProviderConfig) HasWebhookSecret() bool {
-	return c.WebhookSecret != "" && c.WebhookSecret != "****"
-}
 
 // ProcessedFiatEvent tracks webhook event IDs for idempotency deduplication.
 // Records are cleaned up after 7 days via a periodic job.

@@ -2,7 +2,10 @@ package core
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha/internal/payment/fiat/paypal"
 	"github.com/mobazha/mobazha/internal/payment/fiat/stripe"
 	"github.com/mobazha/mobazha/pkg/contracts"
+	pkgcrypto "github.com/mobazha/mobazha/pkg/crypto"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/events"
@@ -46,7 +50,19 @@ type FiatPaymentAppService struct {
 	platformMu           sync.RWMutex
 	platformIDs          map[string]struct{}
 	provisioningPolicies []corepayment.SessionProvisioningPolicy
+	credentialKeys       contracts.ProviderCredentialKeyProvider
+	providerFactory      fiatProviderFactory
 }
+
+const providerCredentialEncryptionKeyVersion uint64 = 1
+
+type providerCredentialMaterial struct {
+	PublicKey     string `json:"publicKey"`
+	SecretKey     string `json:"secretKey"`
+	WebhookSecret string `json:"webhookSecret,omitempty"`
+}
+
+type fiatProviderFactory func(providerID string, credential providerCredentialMaterial, platformMode bool, opts *contracts.PlatformProviderOpts) (contracts.FiatPaymentProvider, error)
 
 func NewFiatPaymentAppService(
 	registry contracts.FiatProviderRegistry,
@@ -55,12 +71,20 @@ func NewFiatPaymentAppService(
 	testnet bool,
 ) *FiatPaymentAppService {
 	return &FiatPaymentAppService{
-		registry:    registry,
-		db:          db,
-		nodeID:      nodeID,
-		testnet:     testnet,
-		platformIDs: make(map[string]struct{}),
+		registry:        registry,
+		db:              db,
+		nodeID:          nodeID,
+		testnet:         testnet,
+		platformIDs:     make(map[string]struct{}),
+		providerFactory: defaultFiatProviderFactory(testnet),
 	}
+}
+
+// SetProviderCredentialKeyProvider configures the KMS/Vault boundary used by
+// direct provider credentials. It must be set before loading or saving direct
+// provider configuration.
+func (s *FiatPaymentAppService) SetProviderCredentialKeyProvider(keys contracts.ProviderCredentialKeyProvider) {
+	s.credentialKeys = keys
 }
 
 // SetWebhookHandler registers a callback for webhook-driven order actions.
@@ -265,10 +289,10 @@ func (s *FiatPaymentAppService) ensureProviderBindingTx(tx database.Tx, provider
 				generation = 1
 			}
 			fingerprint = cfg.ConfigurationFingerprint
-			if fingerprint == "" {
-				fingerprint = providerConfigurationFingerprint(providerID, cfg.AccountID, cfg.PublicKey, cfg.SecretKey, cfg.WebhookSecret)
+			if fingerprint == "" || strings.TrimSpace(cfg.CredentialReference) == "" {
+				return models.PaymentProviderBinding{}, fmt.Errorf("provider %s configuration has no versioned credential", providerID)
 			}
-			credentialReference = fmt.Sprintf("tenant-config:%s:%d", providerID, generation)
+			credentialReference = cfg.CredentialReference
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.PaymentProviderBinding{}, err
 		}
@@ -323,6 +347,117 @@ func (s *FiatPaymentAppService) ensureProviderBindingTx(tx database.Tx, provider
 
 func providerConfigurationFingerprint(values ...string) string {
 	return stablePaymentIdentity("", strings.Join(values, "\x00"))
+}
+
+func (s *FiatPaymentAppService) directProviderConfigurationFingerprint(providerID, accountID string, material providerCredentialMaterial) (string, error) {
+	if s.credentialKeys == nil {
+		return "", fmt.Errorf("provider credential key provider is not configured")
+	}
+	key, err := s.credentialKeys.ProviderCredentialMasterKey(providerCredentialEncryptionKeyVersion)
+	if err != nil {
+		return "", fmt.Errorf("resolve provider credential fingerprint key v%d: %w", providerCredentialEncryptionKeyVersion, err)
+	}
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write([]byte(strings.Join([]string{
+		strings.ToLower(strings.TrimSpace(providerID)), strings.TrimSpace(accountID),
+		material.PublicKey, material.SecretKey, material.WebhookSecret,
+	}, "\x00")))
+	return hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+func providerCredentialReference(providerID string, generation uint64) string {
+	return fmt.Sprintf("tenant-config:%s:%d", strings.ToLower(strings.TrimSpace(providerID)), generation)
+}
+
+func maskProviderSecret(secret string) string {
+	if secret == "" {
+		return ""
+	}
+	if len(secret) <= 6 {
+		return "****"
+	}
+	return secret[:4] + "****" + secret[len(secret)-3:]
+}
+
+func (s *FiatPaymentAppService) storeProviderCredentialTx(
+	tx database.Tx,
+	reference, providerID, accountReference string,
+	generation uint64,
+	fingerprint string,
+	material providerCredentialMaterial,
+) error {
+	if s.credentialKeys == nil {
+		return fmt.Errorf("provider credential key provider is not configured")
+	}
+	var existing models.PaymentProviderCredential
+	err := tx.Read().Where("credential_reference = ?", reference).First(&existing).Error
+	if err == nil {
+		if existing.ProviderID != providerID || existing.ExternalAccountReference != accountReference || existing.ConfigurationGeneration != generation || existing.ConfigurationFingerprint != fingerprint {
+			return fmt.Errorf("credential reference %s is immutable and already identifies different material", reference)
+		}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	payload, err := json.Marshal(material)
+	if err != nil {
+		return fmt.Errorf("marshal provider credential: %w", err)
+	}
+	key, err := s.credentialKeys.ProviderCredentialMasterKey(providerCredentialEncryptionKeyVersion)
+	if err != nil {
+		return fmt.Errorf("resolve provider credential encryption key v%d: %w", providerCredentialEncryptionKeyVersion, err)
+	}
+	ciphertext, err := pkgcrypto.EncryptAESGCM(payload, key)
+	if err != nil {
+		return fmt.Errorf("encrypt provider credential: %w", err)
+	}
+	return tx.Create(&models.PaymentProviderCredential{
+		CredentialReference: reference, ProviderID: providerID, ExternalAccountReference: accountReference,
+		ConfigurationGeneration: generation, ConfigurationFingerprint: fingerprint,
+		EncryptionKeyVersion: providerCredentialEncryptionKeyVersion, Ciphertext: ciphertext,
+	})
+}
+
+func (s *FiatPaymentAppService) loadProviderCredentialTx(
+	tx database.Tx,
+	reference, providerID, accountReference string,
+	generation uint64,
+	fingerprint string,
+) (providerCredentialMaterial, error) {
+	if s.credentialKeys == nil {
+		return providerCredentialMaterial{}, fmt.Errorf("provider credential key provider is not configured")
+	}
+	if strings.TrimSpace(reference) == "" {
+		return providerCredentialMaterial{}, fmt.Errorf("provider credential reference is empty")
+	}
+	var stored models.PaymentProviderCredential
+	if err := tx.Read().Where("credential_reference = ?", reference).First(&stored).Error; err != nil {
+		return providerCredentialMaterial{}, fmt.Errorf("credential reference %s is unavailable: %w", reference, err)
+	}
+	if stored.ProviderID != providerID || stored.ExternalAccountReference != accountReference || stored.ConfigurationGeneration != generation || stored.ConfigurationFingerprint != fingerprint {
+		return providerCredentialMaterial{}, fmt.Errorf("credential reference %s does not match provider binding", reference)
+	}
+	key, err := s.credentialKeys.ProviderCredentialMasterKey(stored.EncryptionKeyVersion)
+	if err != nil {
+		return providerCredentialMaterial{}, fmt.Errorf("resolve provider credential encryption key v%d: %w", stored.EncryptionKeyVersion, err)
+	}
+	payload, err := pkgcrypto.DecryptAESGCM(stored.Ciphertext, key)
+	if err != nil {
+		return providerCredentialMaterial{}, fmt.Errorf("decrypt credential reference %s: %w", reference, err)
+	}
+	var material providerCredentialMaterial
+	if err := json.Unmarshal(payload, &material); err != nil {
+		return providerCredentialMaterial{}, fmt.Errorf("decode credential reference %s: %w", reference, err)
+	}
+	actualFingerprint, err := s.directProviderConfigurationFingerprint(providerID, accountReference, material)
+	if err != nil {
+		return providerCredentialMaterial{}, err
+	}
+	if !hmac.Equal([]byte(actualFingerprint), []byte(fingerprint)) {
+		return providerCredentialMaterial{}, fmt.Errorf("credential reference %s failed integrity verification", reference)
+	}
+	return material, nil
 }
 
 func (s *FiatPaymentAppService) persistFiatPaymentMetadata(ctx context.Context, attempt models.PaymentAttempt, route models.PaymentRouteBinding, sessionID string) error {
@@ -900,8 +1035,14 @@ func (s *FiatPaymentAppService) markEventProcessed(eventID, providerID string) e
 // GetProviderConfig returns the (masked) fiat provider config for a standalone seller.
 func (s *FiatPaymentAppService) GetProviderConfig(providerID string) (*contracts.ProviderConfigView, error) {
 	var cfg models.FiatProviderConfig
+	var credential providerCredentialMaterial
 	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error
+		if err := tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error; err != nil {
+			return err
+		}
+		var err error
+		credential, err = s.loadProviderCredentialTx(tx, cfg.CredentialReference, cfg.ProviderID, cfg.AccountID, cfg.ConfigurationGeneration, cfg.ConfigurationFingerprint)
+		return err
 	})
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -909,13 +1050,12 @@ func (s *FiatPaymentAppService) GetProviderConfig(providerID string) (*contracts
 		}
 		return nil, err
 	}
-	cfg.MaskSecrets()
 	return &contracts.ProviderConfigView{
 		ProviderID:            cfg.ProviderID,
 		AccountID:             cfg.AccountID,
-		PublicKey:             cfg.PublicKey,
-		SecretKey:             cfg.SecretKey,
-		WebhookSecret:         cfg.WebhookSecret,
+		PublicKey:             credential.PublicKey,
+		SecretKey:             maskProviderSecret(credential.SecretKey),
+		WebhookSecret:         maskProviderSecret(credential.WebhookSecret),
 		IsActive:              cfg.IsActive,
 		WebhookAutoConfigured: cfg.WebhookAutoConfigured,
 	}, nil
@@ -930,39 +1070,48 @@ func (s *FiatPaymentAppService) GetProviderConfig(providerID string) (*contracts
 func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input contracts.ProviderConfigInput) error {
 	providerID = strings.ToLower(strings.TrimSpace(providerID))
 	chainType := FiatChainType(providerID)
-	var resolved models.FiatProviderConfig
+	var resolvedCredential providerCredentialMaterial
 	if err := s.db.Update(func(tx database.Tx) error {
 		cfg := &models.FiatProviderConfig{
-			ProviderID:    providerID,
-			AccountID:     input.AccountID,
-			PublicKey:     input.PublicKey,
-			SecretKey:     input.SecretKey,
-			WebhookSecret: input.WebhookSecret,
-			IsActive:      true,
+			ProviderID: providerID,
+			AccountID:  input.AccountID,
+			PublicKey:  input.PublicKey,
+			IsActive:   true,
+		}
+		credential := providerCredentialMaterial{
+			PublicKey: input.PublicKey, SecretKey: input.SecretKey, WebhookSecret: input.WebhookSecret,
 		}
 
 		// Partial-update: empty input fields keep existing values
 		var existing models.FiatProviderConfig
 		existingErr := tx.Read().Where("provider_id = ?", providerID).First(&existing).Error
 		if existingErr == nil {
-			if cfg.SecretKey == "" {
-				cfg.SecretKey = existing.SecretKey
+			existingCredential, err := s.loadProviderCredentialTx(tx, existing.CredentialReference, existing.ProviderID, existing.AccountID, existing.ConfigurationGeneration, existing.ConfigurationFingerprint)
+			if err != nil {
+				return fmt.Errorf("load current %s credential: %w", providerID, err)
 			}
-			if cfg.PublicKey == "" {
-				cfg.PublicKey = existing.PublicKey
+			if credential.SecretKey == "" {
+				credential.SecretKey = existingCredential.SecretKey
+			}
+			if credential.PublicKey == "" {
+				credential.PublicKey = existingCredential.PublicKey
 			}
 			if cfg.AccountID == "" {
 				cfg.AccountID = existing.AccountID
 			}
-			if cfg.WebhookSecret == "" {
-				cfg.WebhookSecret = existing.WebhookSecret
+			if credential.WebhookSecret == "" {
+				credential.WebhookSecret = existingCredential.WebhookSecret
 			}
+			cfg.PublicKey = credential.PublicKey
 			cfg.WebhookID = existing.WebhookID
 			cfg.WebhookAutoConfigured = existing.WebhookAutoConfigured
 		} else if !errors.Is(existingErr, gorm.ErrRecordNotFound) {
 			return existingErr
 		}
-		fingerprint := providerConfigurationFingerprint(providerID, cfg.AccountID, cfg.PublicKey, cfg.SecretKey, cfg.WebhookSecret)
+		fingerprint, err := s.directProviderConfigurationFingerprint(providerID, cfg.AccountID, credential)
+		if err != nil {
+			return err
+		}
 		generation := existing.ConfigurationGeneration
 		if generation == 0 {
 			generation = 1
@@ -980,6 +1129,10 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 		}
 		cfg.ConfigurationGeneration = generation
 		cfg.ConfigurationFingerprint = fingerprint
+		cfg.CredentialReference = providerCredentialReference(providerID, generation)
+		if err := s.storeProviderCredentialTx(tx, cfg.CredentialReference, providerID, cfg.AccountID, generation, fingerprint, credential); err != nil {
+			return err
+		}
 
 		if err := database.SaveByBusinessKey(tx, cfg, "provider_id = ?", providerID); err != nil {
 			return err
@@ -998,13 +1151,13 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 				return err
 			}
 		}
-		resolved = *cfg
+		resolvedCredential = credential
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	s.registerProviderFromConfig(providerID, resolved.SecretKey, resolved.PublicKey, resolved.WebhookSecret)
+	s.registerProviderFromConfig(providerID, resolvedCredential.SecretKey, resolvedCredential.PublicKey, resolvedCredential.WebhookSecret)
 	return nil
 }
 
@@ -1032,16 +1185,27 @@ func (s *FiatPaymentAppService) SetupWebhook(ctx context.Context, providerID str
 			if err := tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error; err != nil {
 				return err
 			}
-			cfg.WebhookSecret = result.WebhookSecret
+			credential, err := s.loadProviderCredentialTx(tx, cfg.CredentialReference, cfg.ProviderID, cfg.AccountID, cfg.ConfigurationGeneration, cfg.ConfigurationFingerprint)
+			if err != nil {
+				return err
+			}
+			credential.WebhookSecret = result.WebhookSecret
 			cfg.WebhookID = result.WebhookID
 			cfg.WebhookAutoConfigured = true
-			fingerprint := providerConfigurationFingerprint(providerID, cfg.AccountID, cfg.PublicKey, cfg.SecretKey, cfg.WebhookSecret)
+			fingerprint, err := s.directProviderConfigurationFingerprint(providerID, cfg.AccountID, credential)
+			if err != nil {
+				return err
+			}
 			if cfg.ConfigurationFingerprint != fingerprint {
 				cfg.ConfigurationGeneration++
 				if cfg.ConfigurationGeneration == 0 {
 					cfg.ConfigurationGeneration = 1
 				}
 				cfg.ConfigurationFingerprint = fingerprint
+			}
+			cfg.CredentialReference = providerCredentialReference(providerID, cfg.ConfigurationGeneration)
+			if err := s.storeProviderCredentialTx(tx, cfg.CredentialReference, providerID, cfg.AccountID, cfg.ConfigurationGeneration, fingerprint, credential); err != nil {
+				return err
 			}
 			if err := database.SaveByBusinessKey(tx, &cfg, "provider_id = ?", providerID); err != nil {
 				return err
@@ -1066,14 +1230,20 @@ func (s *FiatPaymentAppService) SetupWebhook(ctx context.Context, providerID str
 // registerProviderFromConfigReload reloads the config from DB and re-registers the provider.
 func (s *FiatPaymentAppService) registerProviderFromConfigReload(providerID string) {
 	var cfg models.FiatProviderConfig
+	var credential providerCredentialMaterial
 	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error
+		if err := tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error; err != nil {
+			return err
+		}
+		var err error
+		credential, err = s.loadProviderCredentialTx(tx, cfg.CredentialReference, cfg.ProviderID, cfg.AccountID, cfg.ConfigurationGeneration, cfg.ConfigurationFingerprint)
+		return err
 	})
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "reload provider config for %s: %v", providerID, err)
 		return
 	}
-	s.registerProviderFromConfig(providerID, cfg.SecretKey, cfg.PublicKey, cfg.WebhookSecret)
+	s.registerProviderFromConfig(providerID, credential.SecretKey, credential.PublicKey, credential.WebhookSecret)
 }
 
 // deleteProviderConfig removes the fiat provider config and receiving account.
@@ -1291,40 +1461,53 @@ func (s *FiatPaymentAppService) registerProviderFromConfig(providerID, secretKey
 }
 
 func (s *FiatPaymentAppService) registerProvider(providerID, secretKey, publishableKey, webhookSecret string, platformMode bool, opts *contracts.PlatformProviderOpts) {
-	switch providerID {
-	case "stripe":
-		mode := stripe.ModeDirect
-		if platformMode {
-			mode = stripe.ModeConnected
+	credential := providerCredentialMaterial{PublicKey: publishableKey, SecretKey: secretKey, WebhookSecret: webhookSecret}
+	p, err := s.providerFactory(providerID, credential, platformMode, opts)
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "%v", err)
+		return
+	}
+	s.registry.Register(p)
+	mode := "direct"
+	if platformMode {
+		mode = "platform"
+	}
+	logger.LogInfoWithIDf(log, s.nodeID, "registered %s provider (%s mode)", providerID, mode)
+}
+
+func defaultFiatProviderFactory(testnet bool) fiatProviderFactory {
+	return func(providerID string, credential providerCredentialMaterial, platformMode bool, opts *contracts.PlatformProviderOpts) (contracts.FiatPaymentProvider, error) {
+		switch providerID {
+		case "stripe":
+			mode := stripe.ModeDirect
+			if platformMode {
+				mode = stripe.ModeConnected
+			}
+			return stripe.NewProvider(stripe.Config{
+				SecretKey:      credential.SecretKey,
+				PublishableKey: credential.PublicKey,
+				WebhookSecret:  credential.WebhookSecret,
+				Mode:           mode,
+			}), nil
+		case "paypal":
+			mode := paypal.ModeDirect
+			if platformMode {
+				mode = paypal.ModePartner
+			}
+			cfg := paypal.Config{
+				ClientID:     credential.PublicKey,
+				ClientSecret: credential.SecretKey,
+				WebhookID:    credential.WebhookSecret,
+				Mode:         mode,
+				Sandbox:      testnet,
+			}
+			if opts != nil && opts.PayPalPartnerID != "" {
+				cfg.PartnerID = opts.PayPalPartnerID
+			}
+			return paypal.NewProvider(cfg), nil
+		default:
+			return nil, fmt.Errorf("unknown fiat provider %q, cannot register", providerID)
 		}
-		p := stripe.NewProvider(stripe.Config{
-			SecretKey:      secretKey,
-			PublishableKey: publishableKey,
-			WebhookSecret:  webhookSecret,
-			Mode:           mode,
-		})
-		s.registry.Register(p)
-		logger.LogInfoWithIDf(log, s.nodeID, "registered Stripe provider (%s mode)", mode)
-	case "paypal":
-		mode := paypal.ModeDirect
-		if platformMode {
-			mode = paypal.ModePartner
-		}
-		cfg := paypal.Config{
-			ClientID:     publishableKey,
-			ClientSecret: secretKey,
-			WebhookID:    webhookSecret,
-			Mode:         mode,
-			Sandbox:      s.testnet,
-		}
-		if opts != nil && opts.PayPalPartnerID != "" {
-			cfg.PartnerID = opts.PayPalPartnerID
-		}
-		p := paypal.NewProvider(cfg)
-		s.registry.Register(p)
-		logger.LogInfoWithIDf(log, s.nodeID, "registered PayPal provider (%s mode, partnerID=%q)", mode, cfg.PartnerID)
-	default:
-		logger.LogErrorWithIDf(log, s.nodeID, "unknown fiat provider %q, cannot register", providerID)
 	}
 }
 
@@ -1348,15 +1531,27 @@ func (s *FiatPaymentAppService) isPlatformProvider(providerID string) bool {
 // the corresponding providers. Called during node startup for standalone mode.
 func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
 	var configs []models.FiatProviderConfig
+	credentials := make(map[string]providerCredentialMaterial)
 	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("is_active = ?", true).Find(&configs).Error
+		if err := tx.Read().Where("is_active = ?", true).Find(&configs).Error; err != nil {
+			return err
+		}
+		for _, cfg := range configs {
+			credential, err := s.loadProviderCredentialTx(tx, cfg.CredentialReference, cfg.ProviderID, cfg.AccountID, cfg.ConfigurationGeneration, cfg.ConfigurationFingerprint)
+			if err != nil {
+				return fmt.Errorf("load %s provider credential: %w", cfg.ProviderID, err)
+			}
+			credentials[cfg.ProviderID] = credential
+		}
+		return nil
 	})
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID, "failed to load fiat provider configs: %v", err)
 		return
 	}
 	for _, cfg := range configs {
-		s.registerProviderFromConfig(cfg.ProviderID, cfg.SecretKey, cfg.PublicKey, cfg.WebhookSecret)
+		credential := credentials[cfg.ProviderID]
+		s.registerProviderFromConfig(cfg.ProviderID, credential.SecretKey, credential.PublicKey, credential.WebhookSecret)
 	}
 }
 
@@ -1460,14 +1655,9 @@ func (s *FiatPaymentAppService) reconcileFiatPaymentAttempts(ctx context.Context
 			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("load route binding: %w", err))
 			continue
 		}
-		binding, err := s.resolveHistoricalProviderBinding(route)
+		binding, provider, err := s.resolveHistoricalProviderBinding(route)
 		if err != nil {
 			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("route decision denied historical provider binding: %w", err))
-			continue
-		}
-		provider, err := s.registry.ForProvider(attempt.ProviderID)
-		if err != nil {
-			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("resolve provider %s: %w", attempt.ProviderID, err))
 			continue
 		}
 		params := contracts.CreatePaymentParams{
@@ -1496,11 +1686,12 @@ func (s *FiatPaymentAppService) reconcileFiatPaymentAttempts(ctx context.Context
 	}
 }
 
-func (s *FiatPaymentAppService) resolveHistoricalProviderBinding(route models.PaymentRouteBinding) (models.PaymentProviderBinding, error) {
+func (s *FiatPaymentAppService) resolveHistoricalProviderBinding(route models.PaymentRouteBinding) (models.PaymentProviderBinding, contracts.FiatPaymentProvider, error) {
 	if strings.TrimSpace(route.ProviderBindingID) == "" {
-		return models.PaymentProviderBinding{}, fmt.Errorf("route %s has no provider binding", route.RouteBindingID)
+		return models.PaymentProviderBinding{}, nil, fmt.Errorf("route %s has no provider binding", route.RouteBindingID)
 	}
 	var binding models.PaymentProviderBinding
+	var credential providerCredentialMaterial
 	var historicalCredentialErr error
 	err := s.db.View(func(tx database.Tx) error {
 		if err := tx.Read().Where("binding_id = ?", route.ProviderBindingID).First(&binding).Error; err != nil {
@@ -1509,24 +1700,20 @@ func (s *FiatPaymentAppService) resolveHistoricalProviderBinding(route models.Pa
 		if binding.Mode != "direct" {
 			return nil
 		}
-		var cfg models.FiatProviderConfig
-		if err := tx.Read().Where("provider_id = ?", binding.ProviderID).First(&cfg).Error; err != nil {
-			historicalCredentialErr = fmt.Errorf("credential reference %s is unavailable: %w", binding.CredentialReference, err)
-			return nil
-		}
-		if cfg.ConfigurationGeneration != binding.ConfigurationGeneration {
-			historicalCredentialErr = fmt.Errorf("credential reference %s is not the active generation", binding.CredentialReference)
-		}
+		credential, historicalCredentialErr = s.loadProviderCredentialTx(
+			tx, binding.CredentialReference, binding.ProviderID, binding.ExternalAccountReference,
+			binding.ConfigurationGeneration, binding.ConfigurationFingerprint,
+		)
 		return nil
 	})
 	if err != nil {
-		return models.PaymentProviderBinding{}, err
+		return models.PaymentProviderBinding{}, nil, err
 	}
 	if binding.ExternalAccountReference != route.ExternalAccountReference {
-		return models.PaymentProviderBinding{}, fmt.Errorf("route account does not match provider binding")
+		return models.PaymentProviderBinding{}, nil, fmt.Errorf("route account does not match provider binding")
 	}
 	if binding.DriverContributionID != route.ContributionID {
-		return models.PaymentProviderBinding{}, fmt.Errorf("route contribution does not match provider binding")
+		return models.PaymentProviderBinding{}, nil, fmt.Errorf("route contribution does not match provider binding")
 	}
 	availability := distribution.PaymentRouteReady
 	if binding.State == models.PaymentProviderBindingRetired {
@@ -1539,11 +1726,22 @@ func (s *FiatPaymentAppService) resolveHistoricalProviderBinding(route models.Pa
 	})
 	if !decision.Allowed {
 		if historicalCredentialErr != nil {
-			return models.PaymentProviderBinding{}, fmt.Errorf("payment route decision %s: %s: %w", decision.Code, decision.Reason, historicalCredentialErr)
+			return models.PaymentProviderBinding{}, nil, fmt.Errorf("payment route decision %s: %s: %w", decision.Code, decision.Reason, historicalCredentialErr)
 		}
-		return models.PaymentProviderBinding{}, fmt.Errorf("payment route decision %s: %s", decision.Code, decision.Reason)
+		return models.PaymentProviderBinding{}, nil, fmt.Errorf("payment route decision %s: %s", decision.Code, decision.Reason)
 	}
-	return binding, nil
+	if binding.Mode == "direct" {
+		provider, err := s.providerFactory(binding.ProviderID, credential, false, nil)
+		if err != nil {
+			return models.PaymentProviderBinding{}, nil, fmt.Errorf("construct provider from credential reference %s: %w", binding.CredentialReference, err)
+		}
+		return binding, provider, nil
+	}
+	provider, err := s.registry.ForProvider(binding.ProviderID)
+	if err != nil {
+		return models.PaymentProviderBinding{}, nil, fmt.Errorf("resolve provider %s: %w", binding.ProviderID, err)
+	}
+	return binding, provider, nil
 }
 
 // RunFiatReconciliationOnce executes a single pass of fiat order reconciliation.

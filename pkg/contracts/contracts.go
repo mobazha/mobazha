@@ -893,6 +893,7 @@ type SchedulerHooks interface {
 	RunFollowerConnectOnce(ctx context.Context)
 	RunNetDBReconcileOnce(ctx context.Context)
 	RunOrderLockCleanupOnce(ctx context.Context)
+	RunCollateralCredentialRefreshOnce(ctx context.Context)
 	RunSupplyChainRetryOnce(ctx context.Context)
 	RunSupplyChainReconcileOnce(ctx context.Context)
 	RunSupplyChainCleanupOnce(ctx context.Context)

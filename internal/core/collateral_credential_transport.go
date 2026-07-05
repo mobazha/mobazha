@@ -6,12 +6,14 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	corecollateral "github.com/mobazha/mobazha/internal/collateral"
+	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/orderextensions"
 	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -20,6 +22,14 @@ import (
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 	"google.golang.org/protobuf/types/known/anypb"
+	"gorm.io/gorm"
+)
+
+const (
+	collateralCredentialRequestMinInterval = 2 * time.Minute
+	collateralCredentialRefreshWindow      = 5 * time.Minute
+	collateralCredentialRequestedTTL       = 10 * time.Minute
+	collateralCredentialRefreshBatchSize   = 100
 )
 
 func (s *collateralAllocationService) RequestOrderExtensionCollateralCredential(
@@ -99,11 +109,117 @@ func (s *collateralAllocationService) RequestOrderExtensionCollateralCredential(
 	message.MessageType = pb.Message_COLLATERAL_CREDENTIAL_REQUEST
 	message.Payload = payload
 	if err := s.db.Update(func(tx database.Tx) error {
+		claimed, err := corecollateral.ClaimCredentialRequestTx(
+			tx, request.OrderID, request.Extension.ExtensionID, request.Extension.Revision,
+			string(s.signer.PeerID()), message.MessageID, now, collateralCredentialRequestMinInterval,
+		)
+		if err != nil || !claimed {
+			return err
+		}
 		return s.messenger.ReliablySendMessage(tx, seller, message, nil)
 	}); err != nil {
 		return fmt.Errorf("persist collateral credential request: %w", err)
 	}
 	return nil
+}
+
+func (n *MobazhaNode) RunCollateralCredentialRefreshOnce(ctx context.Context) {
+	if err := n.runCollateralCredentialRefreshOnceAt(ctx, time.Now().UTC()); err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "Collateral credential refresh failed: %v", err)
+	}
+}
+
+func (n *MobazhaNode) runCollateralCredentialRefreshOnceAt(ctx context.Context, now time.Time) error {
+	if n == nil || n.db == nil || n.signer == nil || n.messenger == nil {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	now = now.UTC().Truncate(time.Second)
+	audiencePeerID := string(n.signer.PeerID())
+	var candidates []corecollateral.CredentialRefreshCandidate
+	if err := n.db.View(func(tx database.Tx) error {
+		var err error
+		candidates, err = corecollateral.DueCredentialRefreshesTx(
+			tx, audiencePeerID, now, now.Add(collateralCredentialRefreshWindow),
+			now.Add(-collateralCredentialRequestMinInterval), collateralCredentialRefreshBatchSize,
+		)
+		return err
+	}); err != nil {
+		return err
+	}
+
+	service := &collateralAllocationService{
+		db: n.db, signer: n.signer, messenger: n.messenger,
+		now: func() time.Time { return now },
+	}
+	var refreshErr error
+	for _, candidate := range candidates {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(refreshErr, err)
+		}
+		var order models.Order
+		var extension extensions.OrderExtension
+		if err := n.db.View(func(tx database.Tx) error {
+			if err := tx.Read().Where("id = ?", candidate.OrderID).First(&order).Error; err != nil {
+				return err
+			}
+			var err error
+			extension, err = orderextensions.LatestByIDTx(tx, candidate.OrderID, candidate.ExtensionID)
+			return err
+		}); err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				if dismissErr := n.dismissCollateralCredentialRefresh(candidate); dismissErr != nil {
+					refreshErr = errors.Join(refreshErr, dismissErr)
+				}
+				continue
+			}
+			refreshErr = errors.Join(refreshErr, fmt.Errorf("load collateral credential refresh state for order %s: %w", candidate.OrderID, err))
+			continue
+		}
+		if order.Role() != models.RoleBuyer || extension.Revision != candidate.ExtensionRevision {
+			if err := n.dismissCollateralCredentialRefresh(candidate); err != nil {
+				refreshErr = errors.Join(refreshErr, err)
+			}
+			continue
+		}
+		orderOpen, err := order.OrderOpenMessage()
+		if err != nil {
+			refreshErr = errors.Join(refreshErr, fmt.Errorf("decode collateral credential order %s: %w", candidate.OrderID, err))
+			continue
+		}
+		requirement, required, err := n.collateralRequirementForExtension(ctx, candidate.OrderID, orderOpen, extension)
+		if err != nil {
+			refreshErr = errors.Join(refreshErr, err)
+			continue
+		}
+		if !required {
+			if err := n.dismissCollateralCredentialRefresh(candidate); err != nil {
+				refreshErr = errors.Join(refreshErr, err)
+			}
+			continue
+		}
+		expiresAt := now.Add(collateralCredentialRequestedTTL)
+		if !candidate.AccountExpiresAt.IsZero() && expiresAt.After(candidate.AccountExpiresAt) {
+			expiresAt = candidate.AccountExpiresAt
+		}
+		if !expiresAt.After(now) {
+			continue
+		}
+		if err := service.RequestOrderExtensionCollateralCredential(ctx, contracts.RequestOrderExtensionCollateralCredentialRequest{
+			OrderID: candidate.OrderID, Extension: extension, Requirement: requirement, ExpiresAt: expiresAt,
+		}); err != nil {
+			refreshErr = errors.Join(refreshErr, fmt.Errorf("request collateral credential refresh for order %s: %w", candidate.OrderID, err))
+		}
+	}
+	return refreshErr
+}
+
+func (n *MobazhaNode) dismissCollateralCredentialRefresh(candidate corecollateral.CredentialRefreshCandidate) error {
+	return n.db.Update(func(tx database.Tx) error {
+		return corecollateral.DismissCredentialRefreshTx(tx, candidate)
+	})
 }
 
 func (n *MobazhaNode) handleCollateralCredentialRequest(from peer.ID, message *pb.Message) error {

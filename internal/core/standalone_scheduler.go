@@ -32,6 +32,7 @@ func (n *MobazhaNode) startStandaloneScheduler(ctx context.Context) {
 		"follower-connect":                func(ctx context.Context) error { n.RunFollowerConnectOnce(ctx); return nil },
 		"netdb-reconcile":                 func(ctx context.Context) error { n.RunNetDBReconcileOnce(ctx); return nil },
 		"order-lock-cleanup":              func(ctx context.Context) error { n.RunOrderLockCleanupOnce(ctx); return nil },
+		"collateral-credential-refresh":   func(ctx context.Context) error { n.RunCollateralCredentialRefreshOnce(ctx); return nil },
 
 		"supply-chain-retry":           func(ctx context.Context) error { n.RunSupplyChainRetryOnce(ctx); return nil },
 		"supply-chain-reconcile":       func(ctx context.Context) error { n.RunSupplyChainReconcileOnce(ctx); return nil },

@@ -119,6 +119,25 @@ type CollateralAllocationCredentialRecord struct {
 	UpdatedAt         time.Time
 }
 
+// CollateralCredentialRefreshRecord is the buyer-side durable cursor for one
+// extension revision. It throttles requests independently of transient ACK
+// state and tracks only the newest imported credential for scheduler scans.
+type CollateralCredentialRefreshRecord struct {
+	TenantID             string    `gorm:"column:tenant_id;primaryKey;default:''" json:"-"`
+	OrderID              string    `gorm:"primaryKey;type:varchar(128)"`
+	ExtensionID          string    `gorm:"primaryKey;type:varchar(96)"`
+	ExtensionRevision    uint64    `gorm:"primaryKey"`
+	AudiencePeerID       string    `gorm:"primaryKey;type:varchar(192);index:idx_collateral_refresh_due,priority:1"`
+	CredentialID         string    `gorm:"type:varchar(96)"`
+	CredentialIssuedAt   time.Time `gorm:"index"`
+	CredentialExpiresAt  time.Time `gorm:"index:idx_collateral_refresh_due,priority:2"`
+	AccountExpiresAt     time.Time
+	LastRequestMessageID string    `gorm:"type:varchar(96)"`
+	LastRequestedAt      time.Time `gorm:"index:idx_collateral_refresh_due,priority:3"`
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+}
+
 // CollateralClaimRecord stores a Core-accepted, revision-bound claim. The
 // record authorizes a later payment action; it is not itself proof of slash.
 type CollateralClaimRecord struct {

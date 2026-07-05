@@ -24,6 +24,16 @@ const (
 	CredentialDirectionImported = "imported"
 )
 
+type CredentialRefreshCandidate struct {
+	OrderID             string
+	ExtensionID         string
+	ExtensionRevision   uint64
+	AudiencePeerID      string
+	CredentialID        string
+	CredentialExpiresAt time.Time
+	AccountExpiresAt    time.Time
+}
+
 func PersistAllocationCredentialTx(tx database.Tx, direction string, credential pkgcollateral.AllocationCredential, now time.Time) error {
 	if tx == nil || (direction != CredentialDirectionIssued && direction != CredentialDirectionImported) {
 		return fmt.Errorf("collateral allocation credential transaction and direction are required")
@@ -56,6 +66,131 @@ func PersistAllocationCredentialTx(tx database.Tx, direction string, credential 
 	return tx.Create(&record)
 }
 
+func ClaimCredentialRequestTx(
+	tx database.Tx,
+	orderID, extensionID string,
+	extensionRevision uint64,
+	audiencePeerID, messageID string,
+	now time.Time,
+	minimumInterval time.Duration,
+) (bool, error) {
+	if tx == nil || strings.TrimSpace(orderID) == "" || strings.TrimSpace(extensionID) == "" || extensionRevision == 0 ||
+		strings.TrimSpace(audiencePeerID) == "" || strings.TrimSpace(messageID) == "" || now.IsZero() || minimumInterval <= 0 {
+		return false, fmt.Errorf("collateral credential request claim is incomplete")
+	}
+	var existing models.CollateralCredentialRefreshRecord
+	err := tx.Read().Where(
+		"order_id = ? AND extension_id = ? AND extension_revision = ? AND audience_peer_id = ?",
+		orderID, extensionID, extensionRevision, audiencePeerID,
+	).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true, tx.Create(&models.CollateralCredentialRefreshRecord{
+			OrderID: orderID, ExtensionID: extensionID, ExtensionRevision: extensionRevision,
+			AudiencePeerID: audiencePeerID, LastRequestMessageID: messageID,
+			LastRequestedAt: now, CreatedAt: now, UpdatedAt: now,
+		})
+	}
+	if err != nil {
+		return false, err
+	}
+	if now.Before(existing.LastRequestedAt.Add(minimumInterval)) {
+		return false, nil
+	}
+	rows, err := tx.UpdateColumns(map[string]interface{}{
+		"last_request_message_id": messageID,
+		"last_requested_at":       now,
+		"updated_at":              now,
+	}, map[string]interface{}{
+		"order_id = ?":           orderID,
+		"extension_id = ?":       extensionID,
+		"extension_revision = ?": extensionRevision,
+		"audience_peer_id = ?":   audiencePeerID,
+	}, &models.CollateralCredentialRefreshRecord{})
+	return rows == 1, err
+}
+
+func ObserveImportedCredentialTx(tx database.Tx, credential pkgcollateral.AllocationCredential, now time.Time) error {
+	if tx == nil || now.IsZero() {
+		return fmt.Errorf("collateral credential observation transaction and time are required")
+	}
+	issuedAt := time.Unix(credential.IssuedAtUnix, 0).UTC()
+	expiresAt := time.Unix(credential.ExpiresAtUnix, 0).UTC()
+	accountExpiresAt := time.Unix(credential.AccountExpiresAtUnix, 0).UTC()
+	var existing models.CollateralCredentialRefreshRecord
+	err := tx.Read().Where(
+		"order_id = ? AND extension_id = ? AND extension_revision = ? AND audience_peer_id = ?",
+		credential.Allocation.OrderID, credential.Allocation.ExtensionID, credential.ExtensionRevision, credential.AudiencePeerID,
+	).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return tx.Create(&models.CollateralCredentialRefreshRecord{
+			OrderID: credential.Allocation.OrderID, ExtensionID: credential.Allocation.ExtensionID,
+			ExtensionRevision: credential.ExtensionRevision, AudiencePeerID: credential.AudiencePeerID,
+			CredentialID: credential.CredentialID, CredentialIssuedAt: issuedAt,
+			CredentialExpiresAt: expiresAt, AccountExpiresAt: accountExpiresAt,
+			CreatedAt: now, UpdatedAt: now,
+		})
+	}
+	if err != nil {
+		return err
+	}
+	if existing.CredentialID != "" && (issuedAt.Before(existing.CredentialIssuedAt) ||
+		(issuedAt.Equal(existing.CredentialIssuedAt) && !expiresAt.After(existing.CredentialExpiresAt))) {
+		return nil
+	}
+	_, err = tx.UpdateColumns(map[string]interface{}{
+		"credential_id":         credential.CredentialID,
+		"credential_issued_at":  issuedAt,
+		"credential_expires_at": expiresAt,
+		"account_expires_at":    accountExpiresAt,
+		"updated_at":            now,
+	}, map[string]interface{}{
+		"order_id = ?":           credential.Allocation.OrderID,
+		"extension_id = ?":       credential.Allocation.ExtensionID,
+		"extension_revision = ?": credential.ExtensionRevision,
+		"audience_peer_id = ?":   credential.AudiencePeerID,
+	}, &models.CollateralCredentialRefreshRecord{})
+	return err
+}
+
+func DueCredentialRefreshesTx(
+	tx database.Tx,
+	audiencePeerID string,
+	now, refreshBefore, retryBefore time.Time,
+	limit int,
+) ([]CredentialRefreshCandidate, error) {
+	if tx == nil || strings.TrimSpace(audiencePeerID) == "" || now.IsZero() || refreshBefore.IsZero() || retryBefore.IsZero() || limit <= 0 {
+		return nil, fmt.Errorf("collateral credential refresh query is incomplete")
+	}
+	var records []models.CollateralCredentialRefreshRecord
+	if err := tx.Read().Where(
+		"audience_peer_id = ? AND credential_expires_at <= ? AND last_requested_at <= ? AND (credential_id = ? OR account_expires_at > ?)",
+		audiencePeerID, refreshBefore, retryBefore, "", now,
+	).Order("credential_expires_at ASC, updated_at ASC").Limit(limit).Find(&records).Error; err != nil {
+		return nil, err
+	}
+	candidates := make([]CredentialRefreshCandidate, 0, len(records))
+	for _, record := range records {
+		candidates = append(candidates, CredentialRefreshCandidate{
+			OrderID: record.OrderID, ExtensionID: record.ExtensionID, ExtensionRevision: record.ExtensionRevision,
+			AudiencePeerID: record.AudiencePeerID, CredentialID: record.CredentialID,
+			CredentialExpiresAt: record.CredentialExpiresAt, AccountExpiresAt: record.AccountExpiresAt,
+		})
+	}
+	return candidates, nil
+}
+
+func DismissCredentialRefreshTx(tx database.Tx, candidate CredentialRefreshCandidate) error {
+	if tx == nil || strings.TrimSpace(candidate.OrderID) == "" || strings.TrimSpace(candidate.ExtensionID) == "" ||
+		candidate.ExtensionRevision == 0 || strings.TrimSpace(candidate.AudiencePeerID) == "" {
+		return fmt.Errorf("collateral credential refresh dismissal is incomplete")
+	}
+	return tx.Delete("order_id", candidate.OrderID, map[string]interface{}{
+		"extension_id = ?":       candidate.ExtensionID,
+		"extension_revision = ?": candidate.ExtensionRevision,
+		"audience_peer_id = ?":   candidate.AudiencePeerID,
+	}, &models.CollateralCredentialRefreshRecord{})
+}
+
 func ImportedAllocationCredentialTx(tx database.Tx, orderID, extensionID string, extensionRevision uint64, audiencePeerID string) (pkgcollateral.AllocationCredential, error) {
 	if tx == nil {
 		return pkgcollateral.AllocationCredential{}, fmt.Errorf("collateral allocation credential transaction is required")
@@ -64,7 +199,7 @@ func ImportedAllocationCredentialTx(tx database.Tx, orderID, extensionID string,
 	err := tx.Read().Where(
 		"direction = ? AND order_id = ? AND extension_id = ? AND extension_revision = ? AND audience_peer_id = ?",
 		CredentialDirectionImported, strings.TrimSpace(orderID), strings.TrimSpace(extensionID), extensionRevision, strings.TrimSpace(audiencePeerID),
-	).Order("issued_at DESC").First(&record).Error
+	).Order("issued_at DESC, expires_at DESC, credential_id DESC").First(&record).Error
 	if err != nil {
 		return pkgcollateral.AllocationCredential{}, err
 	}

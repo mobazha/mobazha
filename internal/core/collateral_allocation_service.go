@@ -136,8 +136,10 @@ func (s *collateralAllocationService) ImportOrderExtensionCollateralCredential(
 		if err := corecollateral.PersistAllocationCredentialTx(tx, corecollateral.CredentialDirectionImported, request.Credential, now); err != nil {
 			return err
 		}
-		_, err = corecollateral.AdmitExternalAllocationCredentialTx(tx, audiencePeerID, request.OrderID, persisted, request.Requirement, now)
-		return err
+		if _, err = corecollateral.AdmitExternalAllocationCredentialTx(tx, audiencePeerID, request.OrderID, persisted, request.Requirement, now); err != nil {
+			return err
+		}
+		return corecollateral.ObserveImportedCredentialTx(tx, request.Credential, now)
 	})
 }
 

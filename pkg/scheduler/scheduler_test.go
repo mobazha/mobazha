@@ -138,6 +138,22 @@ func TestJobs_MarketplaceDomainVerification(t *testing.T) {
 	}
 }
 
+func TestJobs_CollateralCredentialRefresh(t *testing.T) {
+	job, ok := Jobs["collateral-credential-refresh"]
+	if !ok {
+		t.Fatal("collateral-credential-refresh job is not registered")
+	}
+	if job.Interval != time.Minute {
+		t.Fatalf("collateral credential refresh interval = %s, want 1m", job.Interval)
+	}
+	if job.OverlapPolicy != OverlapSkip || job.MaxConcurrency != 4 {
+		t.Fatalf("collateral credential refresh scheduling = overlap %v concurrency %d", job.OverlapPolicy, job.MaxConcurrency)
+	}
+	if job.PerNodeTimeout >= job.Interval {
+		t.Fatalf("collateral credential refresh timeout = %s must stay below interval %s", job.PerNodeTimeout, job.Interval)
+	}
+}
+
 func TestNew_RequiresHolderID(t *testing.T) {
 	_, err := New(Config{})
 	if err != ErrHolderIDRequired {

@@ -79,6 +79,7 @@ var Jobs = map[string]JobMeta{
 	"follower-connect":                 {Name: "follower-connect", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 25 * time.Second},
 	"netdb-reconcile":                  {Name: "netdb-reconcile", Interval: 10 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 60 * time.Second},
 	"order-lock-cleanup":               {Name: "order-lock-cleanup", Interval: 30 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 30 * time.Second},
+	"collateral-credential-refresh":    {Name: "collateral-credential-refresh", Interval: 1 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 4, PerNodeTimeout: 30 * time.Second},
 
 	"supply-chain-retry":           {Name: "supply-chain-retry", Interval: 30 * time.Second, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 25 * time.Second},
 	"supply-chain-reconcile":       {Name: "supply-chain-reconcile", Interval: 5 * time.Minute, OverlapPolicy: OverlapSkip, MaxConcurrency: 2, PerNodeTimeout: 4 * time.Minute},

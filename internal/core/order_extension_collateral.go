@@ -43,26 +43,12 @@ func (n *MobazhaNode) admitOrderExtensionCollateralRequirementsTx(
 	}
 
 	for _, extension := range persisted {
-		port := n.extensionCollateralRequirementPort(extension.ProviderID)
-		if port == nil {
-			continue
-		}
-		input := extensions.CollateralRequirementInput{
-			OrderID:   orderID,
-			Extension: cloneOrderExtension(extension),
-		}
-		if orderOpen != nil {
-			input.OrderOpen = proto.Clone(orderOpen).(*orderpb.OrderOpen)
-		}
-		requirement, required, err := port.CollateralRequirement(ctx, input)
+		requirement, required, err := n.collateralRequirementForExtension(ctx, orderID, orderOpen, extension)
 		if err != nil {
-			return fmt.Errorf("order extension module %q collateral requirement: %w", extension.ProviderID, err)
+			return err
 		}
 		if !required {
 			continue
-		}
-		if err := requirement.ValidateForExtension(extension); err != nil {
-			return fmt.Errorf("order extension module %q collateral requirement: %w", extension.ProviderID, err)
 		}
 		envelope, ok := bindings[bindingKey{extensionID: extension.ExtensionID, revision: extension.Revision}]
 		if !ok {
@@ -95,6 +81,35 @@ func (n *MobazhaNode) admitOrderExtensionCollateralRequirementsTx(
 	// A provider may stop declaring new requirements while already-bound work
 	// remains outstanding. Persisted v2 bindings are therefore always rechecked.
 	return corecollateral.AdmitPersistedOrderExtensionsV2Tx(tx, orderID, now)
+}
+
+func (n *MobazhaNode) collateralRequirementForExtension(
+	ctx context.Context,
+	orderID string,
+	orderOpen *orderpb.OrderOpen,
+	extension extensions.OrderExtension,
+) (extensions.CollateralRequirement, bool, error) {
+	port := n.extensionCollateralRequirementPort(extension.ProviderID)
+	if port == nil {
+		return extensions.CollateralRequirement{}, false, nil
+	}
+	input := extensions.CollateralRequirementInput{
+		OrderID: orderID, Extension: cloneOrderExtension(extension),
+	}
+	if orderOpen != nil {
+		input.OrderOpen = proto.Clone(orderOpen).(*orderpb.OrderOpen)
+	}
+	requirement, required, err := port.CollateralRequirement(ctx, input)
+	if err != nil {
+		return extensions.CollateralRequirement{}, false, fmt.Errorf("order extension module %q collateral requirement: %w", extension.ProviderID, err)
+	}
+	if !required {
+		return extensions.CollateralRequirement{}, false, nil
+	}
+	if err := requirement.ValidateForExtension(extension); err != nil {
+		return extensions.CollateralRequirement{}, false, fmt.Errorf("order extension module %q collateral requirement: %w", extension.ProviderID, err)
+	}
+	return requirement, true, nil
 }
 
 func cloneOrderExtension(extension extensions.OrderExtension) extensions.OrderExtension {

@@ -149,7 +149,8 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 	require.NoError(t, buyerDB.Update(func(tx database.Tx) error {
 		for _, model := range []any{
 			&models.OrderExtensionRecord{}, &models.CollateralOrderExtensionBindingRecord{},
-			&models.CollateralAllocationCredentialRecord{}, &models.IncomingMessage{}, &models.Order{},
+			&models.CollateralAllocationCredentialRecord{}, &models.CollateralCredentialRefreshRecord{},
+			&models.IncomingMessage{}, &models.Order{},
 		} {
 			if err := tx.Migrate(model); err != nil {
 				return err
@@ -192,9 +193,11 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 		)},
 	}
 	clock = now.Add(2 * time.Second)
-	require.NoError(t, buyerService.RequestOrderExtensionCollateralCredential(context.Background(), contracts.RequestOrderExtensionCollateralCredentialRequest{
+	transportRequest := contracts.RequestOrderExtensionCollateralCredentialRequest{
 		OrderID: request.OrderID, Extension: extension, Requirement: request.Requirement, ExpiresAt: clock.Add(5 * time.Minute),
-	}))
+	}
+	require.NoError(t, buyerService.RequestOrderExtensionCollateralCredential(context.Background(), transportRequest))
+	require.NoError(t, buyerService.RequestOrderExtensionCollateralCredential(context.Background(), transportRequest), "request is throttled durably")
 	require.Len(t, buyerMessenger.sent, 1)
 	require.Equal(t, sellerPeer, buyerMessenger.sent[0].PeerID)
 	require.Equal(t, netpb.Message_COLLATERAL_CREDENTIAL_REQUEST, buyerMessenger.sent[0].Msg.MessageType)
@@ -211,6 +214,13 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 	require.Equal(t, netpb.Message_COLLATERAL_CREDENTIAL_RESPONSE, sellerMessenger.sent[0].Msg.MessageType)
 	require.NoError(t, buyerNode.handleCollateralCredentialResponse(sellerPeer, sellerMessenger.sent[0].Msg))
 	require.NoError(t, buyerNode.handleCollateralCredentialResponse(sellerPeer, sellerMessenger.sent[0].Msg), "response retry is idempotent")
+	buyerMessenger.mu.Lock()
+	buyerMessenger.sent = nil
+	buyerMessenger.mu.Unlock()
+	require.NoError(t, buyerNode.runCollateralCredentialRefreshOnceAt(context.Background(), clock.Add(3*time.Minute)))
+	require.NoError(t, buyerNode.runCollateralCredentialRefreshOnceAt(context.Background(), clock.Add(3*time.Minute)), "refresh retry is throttled")
+	require.Len(t, buyerMessenger.sent, 1)
+	require.Equal(t, sellerPeer, buyerMessenger.sent[0].PeerID)
 
 	spoofed := proto.Clone(sellerMessenger.sent[0].Msg).(*netpb.Message)
 	spoofed.MessageID = "spoofed-collateral-credential-response"

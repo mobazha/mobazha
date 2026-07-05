@@ -231,6 +231,7 @@ func TestProvider_CapturePayment_Success(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v2/checkout/orders/ORDER-001/capture", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "capture-request-1", r.Header.Get("PayPal-Request-Id"))
 		json.NewEncoder(w).Encode(orderResponse{
 			ID:     "ORDER-001",
 			Status: "COMPLETED",
@@ -243,7 +244,7 @@ func TestProvider_CapturePayment_Success(t *testing.T) {
 	ts, p := newTestServer(t, mux)
 	defer ts.Close()
 
-	result, err := p.CapturePayment(context.Background(), "ORDER-001")
+	result, err := p.CapturePayment(context.Background(), contracts.CapturePaymentParams{SessionID: "ORDER-001", IdempotencyKey: "capture-request-1"})
 	require.NoError(t, err)
 	assert.Equal(t, "ORDER-001", result.PaymentID)
 	assert.Equal(t, "succeeded", result.Status)
@@ -264,7 +265,7 @@ func TestProvider_CapturePayment_Declined(t *testing.T) {
 	ts, p := newTestServer(t, mux)
 	defer ts.Close()
 
-	result, err := p.CapturePayment(context.Background(), "ORDER-FAIL")
+	result, err := p.CapturePayment(context.Background(), contracts.CapturePaymentParams{SessionID: "ORDER-FAIL"})
 	require.NoError(t, err)
 	assert.Equal(t, "failed", result.Status)
 }
@@ -890,6 +891,7 @@ func TestProvider_RefundPayment_FullRefund(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v2/payments/captures/CAP-001/refund", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "refund-request-1", r.Header.Get("PayPal-Request-Id"))
 
 		var body map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&body)
@@ -907,10 +909,10 @@ func TestProvider_RefundPayment_FullRefund(t *testing.T) {
 	defer ts.Close()
 
 	result, err := p.RefundPayment(context.Background(), contracts.RefundParams{
-		PaymentID: "CAP-001",
-		Amount:    nil,
-		Currency:  "USD",
-		Reason:    "Seller initiated refund",
+		PaymentID: "CAP-001", IdempotencyKey: "refund-request-1",
+		Amount:   nil,
+		Currency: "USD",
+		Reason:   "Seller initiated refund",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "REFUND-PPL-001", result.RefundID)

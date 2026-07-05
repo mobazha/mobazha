@@ -190,6 +190,11 @@ func (g *Gateway) handlePOSTFiatRefund(w http.ResponseWriter, r *http.Request) {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID and paymentID are required")
 		return
 	}
+	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotencyKey == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Idempotency-Key header is required")
+		return
+	}
 
 	var body struct {
 		Amount   *int64 `json:"amount"`
@@ -202,15 +207,17 @@ func (g *Gateway) handlePOSTFiatRefund(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := contracts.RefundParams{
-		PaymentID: paymentID,
-		Amount:    body.Amount,
-		Currency:  body.Currency,
-		Reason:    body.Reason,
+		PaymentID: paymentID, IdempotencyKey: idempotencyKey,
+		Amount: body.Amount, Currency: body.Currency, Reason: body.Reason,
 	}
 
 	result, err := svc.RefundPayment(r.Context(), providerID, params)
 	if err != nil {
 		log.Errorf("fiat refund failed for %s/%s: %v", providerID, paymentID, err)
+		if errors.Is(err, contracts.ErrActionIntentConflict) {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "Idempotency-Key conflicts with an existing refund intent")
+			return
+		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "refund request failed")
 		return
 	}

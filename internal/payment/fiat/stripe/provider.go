@@ -80,10 +80,13 @@ func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePayme
 	}, nil
 }
 
-func (p *Provider) CapturePayment(_ context.Context, sessionID string) (*contracts.PaymentResult, error) {
+func (p *Provider) CapturePayment(_ context.Context, params contracts.CapturePaymentParams) (*contracts.PaymentResult, error) {
 	api := newAPI(p.config.SecretKey, p.config.BackendURL)
-
-	pi, err := api.PaymentIntents.Get(sessionID, nil)
+	getParams := &gostripe.PaymentIntentParams{}
+	if p.config.Mode == ModeConnected && params.SellerAccountID != "" {
+		getParams.Params.StripeAccount = gostripe.String(params.SellerAccountID)
+	}
+	pi, err := api.PaymentIntents.Get(params.SessionID, getParams)
 	if err != nil {
 		return nil, fmt.Errorf("stripe: get payment intent: %w", err)
 	}
@@ -254,6 +257,9 @@ func (p *Provider) RefundPayment(_ context.Context, params contracts.RefundParam
 	rp := &gostripe.RefundParams{
 		PaymentIntent: gostripe.String(params.PaymentID),
 	}
+	if params.IdempotencyKey != "" {
+		rp.SetIdempotencyKey(params.IdempotencyKey)
+	}
 
 	if params.Amount != nil {
 		rp.Amount = params.Amount
@@ -286,12 +292,18 @@ func (p *Provider) RefundPayment(_ context.Context, params contracts.RefundParam
 	}, nil
 }
 
-func (p *Provider) CancelPayment(_ context.Context, paymentID string) error {
+func (p *Provider) CancelPayment(_ context.Context, request contracts.CancelPaymentParams) error {
 	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 	params := &gostripe.PaymentIntentCancelParams{}
-	_, err := api.PaymentIntents.Cancel(paymentID, params)
+	if request.IdempotencyKey != "" {
+		params.SetIdempotencyKey(request.IdempotencyKey)
+	}
+	if p.config.Mode == ModeConnected && request.SellerAccountID != "" {
+		params.Params.StripeAccount = gostripe.String(request.SellerAccountID)
+	}
+	_, err := api.PaymentIntents.Cancel(request.PaymentID, params)
 	if err != nil {
-		return fmt.Errorf("stripe cancel payment intent %s: %w", paymentID, err)
+		return fmt.Errorf("stripe cancel payment intent %s: %w", request.PaymentID, err)
 	}
 	return nil
 }

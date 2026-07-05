@@ -8,10 +8,11 @@ import (
 
 // Sentinel errors for typed error handling in handlers.
 var (
-	ErrWebhookSignature  = errors.New("fiat: invalid webhook signature")
-	ErrProviderNotFound  = errors.New("fiat: provider not found")
-	ErrAlreadyRefunded   = errors.New("fiat: payment already refunded")
-	ErrActiveOrdersExist = errors.New("fiat: cannot disconnect provider with active orders")
+	ErrWebhookSignature     = errors.New("fiat: invalid webhook signature")
+	ErrProviderNotFound     = errors.New("fiat: provider not found")
+	ErrAlreadyRefunded      = errors.New("fiat: payment already refunded")
+	ErrActionIntentConflict = errors.New("fiat: provider action idempotency key conflicts with an existing intent")
+	ErrActiveOrdersExist    = errors.New("fiat: cannot disconnect provider with active orders")
 )
 
 // RetryableError signals that a webhook should be retried later.
@@ -39,7 +40,7 @@ type FiatPaymentProvider interface {
 	// CapturePayment captures an authorized payment.
 	//   CaptureAutomatic (Stripe): no-op, returns current status
 	//   CaptureManual (PayPal): calls the Capture API
-	CapturePayment(ctx context.Context, sessionID string) (*PaymentResult, error)
+	CapturePayment(ctx context.Context, params CapturePaymentParams) (*PaymentResult, error)
 
 	// GetPayment retrieves the details of a payment.
 	GetPayment(ctx context.Context, paymentID string) (*PaymentDetail, error)
@@ -58,7 +59,21 @@ type FiatPaymentProvider interface {
 	//   Stripe: calls PaymentIntent.Cancel()
 	//   PayPal: no-op (orders auto-expire)
 	// Used during provider disconnect to clean up pending payments.
-	CancelPayment(ctx context.Context, paymentID string) error
+	CancelPayment(ctx context.Context, params CancelPaymentParams) error
+}
+
+// CapturePaymentParams identifies one idempotent provider capture command.
+type CapturePaymentParams struct {
+	SessionID       string
+	IdempotencyKey  string
+	SellerAccountID string
+}
+
+// CancelPaymentParams identifies one idempotent provider cancellation command.
+type CancelPaymentParams struct {
+	PaymentID       string
+	IdempotencyKey  string
+	SellerAccountID string
 }
 
 // FiatOnboardingProvider is an optional extension for SaaS OAuth-based seller onboarding.

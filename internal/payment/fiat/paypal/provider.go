@@ -127,9 +127,13 @@ func (p *Provider) CreatePayment(ctx context.Context, params contracts.CreatePay
 	}, nil
 }
 
-func (p *Provider) CapturePayment(ctx context.Context, sessionID string) (*contracts.PaymentResult, error) {
+func (p *Provider) CapturePayment(ctx context.Context, params contracts.CapturePaymentParams) (*contracts.PaymentResult, error) {
 	var resp orderResponse
-	if err := p.client.doJSON(ctx, "POST", "/v2/checkout/orders/"+sessionID+"/capture", nil, &resp); err != nil {
+	headers := map[string]string{}
+	if params.IdempotencyKey != "" {
+		headers["PayPal-Request-Id"] = params.IdempotencyKey
+	}
+	if err := p.client.doJSONWithHeaders(ctx, "POST", "/v2/checkout/orders/"+params.SessionID+"/capture", nil, &resp, headers); err != nil {
 		return nil, fmt.Errorf("paypal: capture order: %w", err)
 	}
 
@@ -309,7 +313,11 @@ func (p *Provider) RefundPayment(ctx context.Context, params contracts.RefundPar
 	}
 
 	var resp refundResponse
-	if err := p.client.doJSON(ctx, "POST", path, body, &resp); err != nil {
+	headers := map[string]string{}
+	if params.IdempotencyKey != "" {
+		headers["PayPal-Request-Id"] = params.IdempotencyKey
+	}
+	if err := p.client.doJSONWithHeaders(ctx, "POST", path, body, &resp, headers); err != nil {
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "422") && strings.Contains(errMsg, "CAPTURE_FULLY_REFUNDED") {
 			return nil, contracts.ErrAlreadyRefunded
@@ -344,7 +352,7 @@ func mapRefundStatus(status string) string {
 	}
 }
 
-func (p *Provider) CancelPayment(_ context.Context, _ string) error {
+func (p *Provider) CancelPayment(_ context.Context, _ contracts.CancelPaymentParams) error {
 	return nil
 }
 

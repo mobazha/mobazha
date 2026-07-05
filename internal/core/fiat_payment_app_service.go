@@ -64,6 +64,18 @@ type providerCredentialMaterial struct {
 
 type fiatProviderFactory func(providerID string, credential providerCredentialMaterial, platformMode bool, opts *contracts.PlatformProviderOpts) (contracts.FiatPaymentProvider, error)
 
+type providerCaptureIntent struct {
+	SessionID string `json:"sessionID"`
+}
+
+type providerRefundIntent struct {
+	Params contracts.RefundParams `json:"params"`
+}
+
+type providerCancelIntent struct {
+	PaymentID string `json:"paymentID"`
+}
+
 func NewFiatPaymentAppService(
 	registry contracts.FiatProviderRegistry,
 	db database.Database,
@@ -562,18 +574,15 @@ func (s *FiatPaymentAppService) authorizePaymentCreation(ctx context.Context, pr
 }
 
 func (s *FiatPaymentAppService) CapturePayment(ctx context.Context, providerID string, sessionID string) (*contracts.PaymentResult, error) {
-	provider, err := s.registry.ForProvider(providerID)
+	action, err := s.prepareProviderAction(providerID, models.PaymentProviderActionCapture, sessionID, "", "", providerCaptureIntent{SessionID: sessionID})
 	if err != nil {
 		return nil, err
 	}
-
-	result, err := provider.CapturePayment(ctx, sessionID)
+	result, err := s.executeProviderAction(ctx, action)
 	if err != nil {
-		return nil, fmt.Errorf("capture %s payment: %w", providerID, err)
+		return nil, err
 	}
-
-	logger.LogInfoWithIDf(log, s.nodeID, "fiat payment captured: provider=%s session=%s status=%s", providerID, sessionID, result.Status)
-	return result, nil
+	return result.Capture, nil
 }
 
 func (s *FiatPaymentAppService) GetPayment(ctx context.Context, providerID string, paymentID string) (*contracts.PaymentDetail, error) {
@@ -589,30 +598,234 @@ func (s *FiatPaymentAppService) RefundPayment(
 	providerID string,
 	params contracts.RefundParams,
 ) (*contracts.RefundResult, error) {
-	provider, err := s.registry.ForProvider(providerID)
-	if err != nil {
-		return nil, fmt.Errorf("unknown fiat provider %q: %w", providerID, err)
+	if strings.TrimSpace(params.IdempotencyKey) == "" {
+		return nil, fmt.Errorf("fiat refund requires an idempotency key")
 	}
-
-	result, err := provider.RefundPayment(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("fiat refund via %s: %w", providerID, err)
+	orderID := ""
+	if params.Metadata != nil {
+		orderID = params.Metadata["orderID"]
 	}
-
-	logger.LogInfoWithIDf(log, s.nodeID, "fiat refund %s via %s: status=%s amount=%d %s",
-		result.RefundID, providerID, result.Status, result.Amount, result.Currency)
-
-	return result, nil
+	action, err := s.prepareProviderAction(providerID, models.PaymentProviderActionRefund, params.PaymentID, orderID, params.IdempotencyKey, providerRefundIntent{Params: params})
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.executeProviderAction(ctx, action)
+	if err != nil {
+		return nil, err
+	}
+	return result.Refund, nil
 }
 
 // CancelPayment cancels a fiat payment session via the provider registry.
 // Implements contracts.FiatPaymentOperations.
 func (s *FiatPaymentAppService) CancelPayment(ctx context.Context, providerID string, paymentID string) error {
-	provider, err := s.registry.ForProvider(providerID)
+	action, err := s.prepareProviderAction(providerID, models.PaymentProviderActionCancel, paymentID, "", "", providerCancelIntent{PaymentID: paymentID})
 	if err != nil {
 		return err
 	}
-	return provider.CancelPayment(ctx, paymentID)
+	_, err = s.executeProviderAction(ctx, action)
+	return err
+}
+
+type providerActionResult struct {
+	Capture         *contracts.PaymentResult `json:"capture,omitempty"`
+	Refund          *contracts.RefundResult  `json:"refund,omitempty"`
+	Canceled        bool                     `json:"canceled,omitempty"`
+	AlreadyRefunded bool                     `json:"alreadyRefunded,omitempty"`
+}
+
+func (s *FiatPaymentAppService) prepareProviderAction(
+	providerID, actionKind, externalReference, orderID, callerIdempotencyKey string,
+	intent interface{},
+) (models.PaymentProviderAction, error) {
+	providerID = strings.ToLower(strings.TrimSpace(providerID))
+	externalReference = strings.TrimSpace(externalReference)
+	if providerID == "" || externalReference == "" {
+		return models.PaymentProviderAction{}, fmt.Errorf("provider action requires provider and external reference")
+	}
+	intentPayload, err := json.Marshal(intent)
+	if err != nil {
+		return models.PaymentProviderAction{}, fmt.Errorf("marshal provider action intent: %w", err)
+	}
+	intentFingerprint := providerConfigurationFingerprint(string(intentPayload))
+	var action models.PaymentProviderAction
+	err = s.db.Update(func(tx database.Tx) error {
+		attempt, route, err := s.resolveProviderActionRouteTx(tx, providerID, externalReference, orderID)
+		if err != nil {
+			return err
+		}
+		identityKey := strings.TrimSpace(callerIdempotencyKey)
+		if identityKey == "" {
+			identityKey = externalReference
+		}
+		seed := strings.Join([]string{actionKind, providerID, attempt.AttemptID, identityKey}, "\x00")
+		actionID := stablePaymentIdentity("fpa_", seed)
+		// Keep the provider-facing key within PayPal's 38-character limit.
+		idempotencyKey := stablePaymentIdentity("mbza_", seed)
+
+		var existing models.PaymentProviderAction
+		if err := tx.Read().Where("action_id = ?", actionID).First(&existing).Error; err == nil {
+			if existing.IntentFingerprint != intentFingerprint || existing.ActionKind != actionKind || existing.ExternalReference != externalReference {
+				return contracts.ErrActionIntentConflict
+			}
+			action = existing
+			return nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		action = models.PaymentProviderAction{
+			ActionID: actionID, ActionKind: actionKind, ProviderID: providerID,
+			AttemptID: attempt.AttemptID, RouteBindingID: route.RouteBindingID,
+			ProviderBindingID: route.ProviderBindingID, ExternalReference: externalReference,
+			IdempotencyKey: idempotencyKey, IntentFingerprint: intentFingerprint,
+			IntentPayload: intentPayload, State: models.PaymentProviderActionPendingExternal,
+		}
+		return tx.Create(&action)
+	})
+	if err != nil {
+		return models.PaymentProviderAction{}, err
+	}
+	return action, nil
+}
+
+func (s *FiatPaymentAppService) resolveProviderActionRouteTx(
+	tx database.Tx, providerID, externalReference, orderID string,
+) (models.PaymentAttempt, models.PaymentRouteBinding, error) {
+	var attempt models.PaymentAttempt
+	query := tx.Read().Where("provider_id = ? AND external_reference = ?", providerID, externalReference)
+	err := query.First(&attempt).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) && strings.TrimSpace(orderID) == "" {
+		var order models.Order
+		if orderErr := tx.Read().Where("payment_transaction_id = ?", externalReference).First(&order).Error; orderErr == nil {
+			orderID = order.ID.String()
+		} else if !errors.Is(orderErr, gorm.ErrRecordNotFound) {
+			return models.PaymentAttempt{}, models.PaymentRouteBinding{}, fmt.Errorf("resolve provider action order: %w", orderErr)
+		}
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) && strings.TrimSpace(orderID) != "" {
+		err = tx.Read().Where("provider_id = ? AND order_id = ?", providerID, strings.TrimSpace(orderID)).Order("created_at DESC").First(&attempt).Error
+	}
+	if err != nil {
+		return models.PaymentAttempt{}, models.PaymentRouteBinding{}, fmt.Errorf("resolve provider action payment attempt: %w", err)
+	}
+	var route models.PaymentRouteBinding
+	if err := tx.Read().Where("route_binding_id = ?", attempt.RouteBindingID).First(&route).Error; err != nil {
+		return models.PaymentAttempt{}, models.PaymentRouteBinding{}, fmt.Errorf("resolve provider action route: %w", err)
+	}
+	return attempt, route, nil
+}
+
+func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, action models.PaymentProviderAction) (providerActionResult, error) {
+	if action.State == models.PaymentProviderActionCompleted {
+		return decodeProviderActionResult(action)
+	}
+	var route models.PaymentRouteBinding
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("route_binding_id = ?", action.RouteBindingID).First(&route).Error
+	}); err != nil {
+		return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("load provider action route: %w", err))
+	}
+	binding, provider, err := s.resolveHistoricalProviderBinding(route)
+	if err != nil {
+		return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("resolve provider action binding: %w", err))
+	}
+
+	var result providerActionResult
+	switch action.ActionKind {
+	case models.PaymentProviderActionCapture:
+		var intent providerCaptureIntent
+		if err := json.Unmarshal(action.IntentPayload, &intent); err != nil {
+			return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("decode capture intent: %w", err))
+		}
+		result.Capture, err = provider.CapturePayment(ctx, contracts.CapturePaymentParams{
+			SessionID: intent.SessionID, IdempotencyKey: action.IdempotencyKey,
+			SellerAccountID: binding.ExternalAccountReference,
+		})
+		if err == nil && result.Capture == nil {
+			err = fmt.Errorf("provider returned an empty capture result")
+		}
+	case models.PaymentProviderActionRefund:
+		var intent providerRefundIntent
+		if err := json.Unmarshal(action.IntentPayload, &intent); err != nil {
+			return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("decode refund intent: %w", err))
+		}
+		intent.Params.IdempotencyKey = action.IdempotencyKey
+		intent.Params.Metadata = cloneStringMap(intent.Params.Metadata)
+		intent.Params.Metadata["connectedAccountID"] = binding.ExternalAccountReference
+		result.Refund, err = provider.RefundPayment(ctx, intent.Params)
+		if errors.Is(err, contracts.ErrAlreadyRefunded) {
+			result.AlreadyRefunded = true
+			err = nil
+		} else if err == nil && result.Refund == nil {
+			err = fmt.Errorf("provider returned an empty refund result")
+		}
+	case models.PaymentProviderActionCancel:
+		var intent providerCancelIntent
+		if err := json.Unmarshal(action.IntentPayload, &intent); err != nil {
+			return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("decode cancel intent: %w", err))
+		}
+		err = provider.CancelPayment(ctx, contracts.CancelPaymentParams{
+			PaymentID: intent.PaymentID, IdempotencyKey: action.IdempotencyKey,
+			SellerAccountID: binding.ExternalAccountReference,
+		})
+		result.Canceled = err == nil
+	default:
+		err = fmt.Errorf("unknown provider action kind %q", action.ActionKind)
+	}
+	if err != nil {
+		return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("%s %s payment: %w", action.ActionKind, action.ProviderID, err))
+	}
+	if err := s.completeProviderAction(action, result); err != nil {
+		return providerActionResult{}, err
+	}
+	if result.AlreadyRefunded {
+		return providerActionResult{}, contracts.ErrAlreadyRefunded
+	}
+	return result, nil
+}
+
+func decodeProviderActionResult(action models.PaymentProviderAction) (providerActionResult, error) {
+	var result providerActionResult
+	if err := json.Unmarshal(action.ResultPayload, &result); err != nil {
+		return providerActionResult{}, fmt.Errorf("decode completed provider action %s: %w", action.ActionID, err)
+	}
+	if result.AlreadyRefunded {
+		return providerActionResult{}, contracts.ErrAlreadyRefunded
+	}
+	return result, nil
+}
+
+func (s *FiatPaymentAppService) markProviderActionReconcileRequired(action models.PaymentProviderAction, actionErr error) error {
+	delay := time.Minute << min(action.Attempts, 6)
+	if delay > time.Hour {
+		delay = time.Hour
+	}
+	nextAttemptAt := time.Now().UTC().Add(delay)
+	updateErr := s.db.Update(func(tx database.Tx) error {
+		_, err := tx.UpdateColumns(map[string]interface{}{
+			"state": models.PaymentProviderActionReconcileRequired, "attempts": action.Attempts + 1,
+			"last_error": actionErr.Error(), "next_attempt_at": nextAttemptAt, "updated_at": time.Now().UTC(),
+		}, map[string]interface{}{"action_id = ?": action.ActionID}, &models.PaymentProviderAction{})
+		return err
+	})
+	if updateErr != nil {
+		return errors.Join(actionErr, updateErr)
+	}
+	return actionErr
+}
+
+func (s *FiatPaymentAppService) completeProviderAction(action models.PaymentProviderAction, result providerActionResult) error {
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return err
+	}
+	return s.db.Update(func(tx database.Tx) error {
+		_, err := tx.UpdateColumns(map[string]interface{}{
+			"state": models.PaymentProviderActionCompleted, "result_payload": payload,
+			"attempts": action.Attempts + 1, "last_error": "", "next_attempt_at": nil, "updated_at": time.Now().UTC(),
+		}, map[string]interface{}{"action_id = ?": action.ActionID}, &models.PaymentProviderAction{})
+		return err
+	})
 }
 
 // GetPaymentStatus returns the normalized status of a fiat payment session.
@@ -779,16 +992,9 @@ func (s *FiatPaymentAppService) autoRefundCanceledOrder(ctx context.Context, pro
 		return
 	}
 
-	provider, err := s.registry.ForProvider(providerID)
-	if err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "auto-refund: provider %s not found: %v", providerID, err)
-		return
-	}
-
-	_, err = provider.RefundPayment(ctx, contracts.RefundParams{
-		PaymentID: event.PaymentID,
-		Reason:    "order_canceled",
-		Metadata:  map[string]string{"orderID": event.OrderID},
+	_, err := s.RefundPayment(ctx, providerID, contracts.RefundParams{
+		PaymentID: event.PaymentID, IdempotencyKey: "auto-refund-canceled:" + event.OrderID,
+		Reason: "order_canceled", Metadata: map[string]string{"orderID": event.OrderID},
 	})
 	if err != nil {
 		logger.LogErrorWithIDf(log, s.nodeID,
@@ -1350,7 +1556,6 @@ func (s *FiatPaymentAppService) DisconnectProvider(ctx context.Context, provider
 		logger.LogWarningWithIDf(log, s.nodeID, "query awaiting-payment fiat orders: %v", err)
 	}
 
-	provider, _ := s.registry.ForProvider(providerID)
 	for _, order := range awaitingPaymentOrders {
 		meta, err := order.GetFiatMetadata()
 		if err != nil {
@@ -1363,14 +1568,12 @@ func (s *FiatPaymentAppService) DisconnectProvider(ctx context.Context, provider
 		if sessionID == "" {
 			continue
 		}
-		if provider != nil {
-			if err := provider.CancelPayment(ctx, sessionID); err != nil {
-				logger.LogWarningWithIDf(log, s.nodeID,
-					"cancel fiat session %s for order %s: %v", sessionID, order.ID, err)
-			} else {
-				logger.LogInfoWithIDf(log, s.nodeID,
-					"canceled fiat session %s for order %s during provider disconnect", sessionID, order.ID)
-			}
+		if err := s.CancelPayment(ctx, providerID, sessionID); err != nil {
+			logger.LogWarningWithIDf(log, s.nodeID,
+				"cancel fiat session %s for order %s: %v", sessionID, order.ID, err)
+		} else {
+			logger.LogInfoWithIDf(log, s.nodeID,
+				"canceled fiat session %s for order %s during provider disconnect", sessionID, order.ID)
 		}
 	}
 
@@ -1562,6 +1765,7 @@ func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
 // If the provider reports canceled/failed, it's a no-op (order timeout handles cancellation).
 func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 	s.reconcileFiatPaymentAttempts(ctx)
+	s.reconcileProviderActions(ctx)
 	if s.webhookHandler == nil {
 		return
 	}
@@ -1631,6 +1835,27 @@ func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 				logger.LogErrorWithIDf(log, s.nodeID,
 					"fiat reconciliation: ProcessOrderPayment for order %s failed: %v", order.ID, err)
 			}
+		}
+	}
+}
+
+func (s *FiatPaymentAppService) reconcileProviderActions(ctx context.Context) {
+	var actions []models.PaymentProviderAction
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"state = ? OR (state = ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?))",
+			models.PaymentProviderActionPendingExternal, models.PaymentProviderActionReconcileRequired, time.Now().UTC(),
+		).Order("created_at ASC").Limit(100).Find(&actions).Error
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "provider action reconciliation: query failed: %v", err)
+		return
+	}
+	for _, action := range actions {
+		if ctx.Err() != nil {
+			return
+		}
+		if _, err := s.executeProviderAction(ctx, action); err != nil && !errors.Is(err, contracts.ErrAlreadyRefunded) {
+			logger.LogWarningWithIDf(log, s.nodeID, "provider action reconciliation: action=%s kind=%s: %v", action.ActionID, action.ActionKind, err)
 		}
 	}
 }

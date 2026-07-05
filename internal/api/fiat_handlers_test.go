@@ -483,6 +483,7 @@ func TestHandlePOSTFiatRefund_Success(t *testing.T) {
 	}
 	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments/pi_test/refund", body,
 		map[string]string{"providerID": "stripe", "paymentID": "pi_test"}, svc)
+	r.Header.Set("Idempotency-Key", "refund-test-1")
 
 	g.handlePOSTFiatRefund(w, r)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -502,6 +503,7 @@ func TestHandlePOSTFiatRefund_ServiceError(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments/pi_test/refund", nil,
 		map[string]string{"providerID": "stripe", "paymentID": "pi_test"}, svc)
+	r.Header.Set("Idempotency-Key", "refund-test-error")
 
 	g.handlePOSTFiatRefund(w, r)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -512,6 +514,29 @@ func TestHandlePOSTFiatRefund_ServiceError(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "refund request failed", errObj["message"])
 	assert.NotContains(t, errObj["message"], "stripe")
+}
+
+func TestHandlePOSTFiatRefund_IdempotencyConflict(t *testing.T) {
+	svc := &mockFiatService{refundErr: contracts.ErrActionIntentConflict}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments/pi_test/refund", nil,
+		map[string]string{"providerID": "stripe", "paymentID": "pi_test"}, svc)
+	r.Header.Set("Idempotency-Key", "refund-conflict")
+
+	g.handlePOSTFiatRefund(w, r)
+	assert.Equal(t, http.StatusConflict, w.Code)
+}
+
+func TestHandlePOSTFiatRefund_MissingIdempotencyKey(t *testing.T) {
+	svc := &mockFiatService{}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments/pi_test/refund", nil,
+		map[string]string{"providerID": "stripe", "paymentID": "pi_test"}, svc)
+
+	g.handlePOSTFiatRefund(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestHandlePOSTFiatRefund_MissingPaymentID(t *testing.T) {

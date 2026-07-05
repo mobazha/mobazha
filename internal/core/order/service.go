@@ -1063,11 +1063,9 @@ func (s *OrderAppService) refundFiatPayment(
 	currency := orderOpen.PricingCoin
 
 	result, err := s.fiatOps.RefundPayment(ctx, providerID, contracts.RefundParams{
-		PaymentID: paymentID,
-		Amount:    nil,
-		Currency:  currency,
-		Reason:    reason,
-		Metadata:  map[string]string{"orderID": order.ID.String()},
+		PaymentID: paymentID, IdempotencyKey: "order-refund:" + order.ID.String() + ":" + reason,
+		Amount: nil, Currency: currency, Reason: reason,
+		Metadata: map[string]string{"orderID": order.ID.String()},
 	})
 	if err != nil {
 		if errors.Is(err, contracts.ErrAlreadyRefunded) {

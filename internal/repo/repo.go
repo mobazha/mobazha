@@ -569,6 +569,7 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.PaymentAttempt{},
 		&models.PaymentProviderBinding{},
 		&models.PaymentProviderCredential{},
+		&models.PaymentProviderAction{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

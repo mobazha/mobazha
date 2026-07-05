@@ -179,7 +179,7 @@ func TestProvider_CapturePayment_Success(t *testing.T) {
 	})
 
 	_, p := newTestProvider(t, mux)
-	result, err := p.CapturePayment(context.Background(), "pi_cap")
+	result, err := p.CapturePayment(context.Background(), contracts.CapturePaymentParams{SessionID: "pi_cap"})
 	require.NoError(t, err)
 	assert.Equal(t, "pi_cap", result.PaymentID)
 	assert.Equal(t, "succeeded", result.Status)
@@ -187,6 +187,41 @@ func TestProvider_CapturePayment_Success(t *testing.T) {
 	assert.Equal(t, "eur", result.Currency)
 	assert.Equal(t, "mastercard", result.PaymentMethod.Brand)
 	assert.Equal(t, "5678", result.PaymentMethod.Last4)
+}
+
+func TestProvider_CapturePayment_ConnectedAccount(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/payment_intents/pi_connected", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "acct_connected", r.Header.Get("Stripe-Account"))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"id": "pi_connected", "object": "payment_intent", "status": "succeeded", "amount": 1000, "currency": "usd",
+		})
+	})
+	_, p := newTestProvider(t, mux)
+	p.config.Mode = ModeConnected
+	result, err := p.CapturePayment(context.Background(), contracts.CapturePaymentParams{
+		SessionID: "pi_connected", SellerAccountID: "acct_connected",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "pi_connected", result.PaymentID)
+}
+
+func TestProvider_CancelPayment_ConnectedAccountAndIdempotency(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/payment_intents/pi_cancel/cancel", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "acct_connected", r.Header.Get("Stripe-Account"))
+		assert.Equal(t, "cancel-request-1", r.Header.Get("Idempotency-Key"))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"id": "pi_cancel", "object": "payment_intent", "status": "canceled", "amount": 1000, "currency": "usd",
+		})
+	})
+	_, p := newTestProvider(t, mux)
+	p.config.Mode = ModeConnected
+	require.NoError(t, p.CancelPayment(context.Background(), contracts.CancelPaymentParams{
+		PaymentID: "pi_cancel", IdempotencyKey: "cancel-request-1", SellerAccountID: "acct_connected",
+	}))
 }
 
 func TestProvider_GetPayment_Success(t *testing.T) {
@@ -684,6 +719,7 @@ func TestProvider_RefundPayment_FullRefund(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/refunds", func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "refund-request-1", r.Header.Get("Idempotency-Key"))
 		body, _ := io.ReadAll(r.Body)
 		vals := string(body)
 		assert.Contains(t, vals, "payment_intent=pi_refund_test")
@@ -702,11 +738,11 @@ func TestProvider_RefundPayment_FullRefund(t *testing.T) {
 
 	_, p := newTestProvider(t, mux)
 	result, err := p.RefundPayment(context.Background(), contracts.RefundParams{
-		PaymentID: "pi_refund_test",
-		Amount:    nil,
-		Currency:  "usd",
-		Reason:    "requested_by_customer",
-		Metadata:  map[string]string{"orderID": "order_rf_1"},
+		PaymentID: "pi_refund_test", IdempotencyKey: "refund-request-1",
+		Amount:   nil,
+		Currency: "usd",
+		Reason:   "requested_by_customer",
+		Metadata: map[string]string{"orderID": "order_rf_1"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "re_test_001", result.RefundID)

@@ -14,6 +14,9 @@ func MigrateFiatModels(db pkgdb.Database) error {
 		if err := tx.Migrate(&models.PaymentProviderCredential{}); err != nil {
 			return err
 		}
+		if err := tx.Migrate(&models.PaymentProviderAction{}); err != nil {
+			return err
+		}
 		// Pre-launch schema reset: legacy columns were documented as encrypted
 		// but stored plaintext. They are no longer authoritative and must not
 		// retain secret material after the versioned credential store is enabled.

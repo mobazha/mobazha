@@ -212,6 +212,10 @@ type RefundParams struct {
 	//   PayPal: Capture ID
 	PaymentID string
 
+	// IdempotencyKey is required for durable refund commands. Reusing the key
+	// with different parameters is rejected by the service and provider.
+	IdempotencyKey string
+
 	// Amount is the refund amount in smallest currency unit (e.g. cents).
 	// nil = full refund; non-nil = partial refund.
 	Amount *int64

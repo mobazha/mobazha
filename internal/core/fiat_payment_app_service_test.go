@@ -35,6 +35,8 @@ type mockFiatProvider struct {
 	createErr     error
 	captureResult *contracts.PaymentResult
 	captureErr    error
+	captureCalls  []contracts.CapturePaymentParams
+	beforeCapture func(contracts.CapturePaymentParams)
 	getResult     *contracts.PaymentDetail
 	getErr        error
 	refundResult  *contracts.RefundResult
@@ -42,6 +44,7 @@ type mockFiatProvider struct {
 	refundCalls   []contracts.RefundParams
 	cancelErr     error
 	cancelCalls   []string
+	cancelParams  []contracts.CancelPaymentParams
 	createCalls   int
 	createParams  []contracts.CreatePaymentParams
 }
@@ -68,7 +71,11 @@ func (m *mockFiatProvider) CreatePayment(_ context.Context, params contracts.Cre
 	return m.createResult, m.createErr
 }
 
-func (m *mockFiatProvider) CapturePayment(_ context.Context, _ string) (*contracts.PaymentResult, error) {
+func (m *mockFiatProvider) CapturePayment(_ context.Context, params contracts.CapturePaymentParams) (*contracts.PaymentResult, error) {
+	m.captureCalls = append(m.captureCalls, params)
+	if m.beforeCapture != nil {
+		m.beforeCapture(params)
+	}
 	return m.captureResult, m.captureErr
 }
 
@@ -81,8 +88,9 @@ func (m *mockFiatProvider) RefundPayment(_ context.Context, params contracts.Ref
 	return m.refundResult, m.refundErr
 }
 
-func (m *mockFiatProvider) CancelPayment(_ context.Context, paymentID string) error {
-	m.cancelCalls = append(m.cancelCalls, paymentID)
+func (m *mockFiatProvider) CancelPayment(_ context.Context, params contracts.CancelPaymentParams) error {
+	m.cancelCalls = append(m.cancelCalls, params.PaymentID)
+	m.cancelParams = append(m.cancelParams, params)
 	return m.cancelErr
 }
 
@@ -160,6 +168,21 @@ func newFiatTestService(t *testing.T, reg contracts.FiatProviderRegistry) (*Fiat
 	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
 	svc.SetProviderCredentialKeyProvider(testProviderCredentialKeys{})
 	return svc, db
+}
+
+func seedProviderActionAttempt(t *testing.T, svc *FiatPaymentAppService, db database.Database, providerID, orderID, externalReference string) models.PaymentAttempt {
+	t.Helper()
+	account := &models.ReceivingAccount{ChainType: FiatChainType(providerID), Address: "acct_action_" + providerID, IsActive: true}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return database.SaveByBusinessKey(tx, account, "chain_type = ?", account.ChainType)
+	}))
+	attempt, _, err := svc.prepareFiatPaymentAttempt(providerID, contracts.CreatePaymentParams{
+		OrderID: orderID, Amount: 1000, Currency: "USD",
+	}, account)
+	require.NoError(t, err)
+	require.NoError(t, svc.commitFiatPaymentAttempt(attempt.AttemptID, externalReference))
+	attempt.ExternalReference = externalReference
+	return attempt
 }
 
 // --- Tests: Webhook handling ---
@@ -875,6 +898,123 @@ func TestFiatService_ReconcilePaymentAttempt_MissingHistoricalCredentialFailsClo
 	assert.Contains(t, attempt.LastError, "credential reference tenant-config:stripe:1 is unavailable")
 }
 
+func TestFiatService_CapturePayment_PersistsIntentBeforeProviderAndReturnsCompletedResult(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", captureResult: &contracts.PaymentResult{PaymentID: "pi_capture", Status: "succeeded"}}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_capture", "pi_capture")
+	provider.beforeCapture = func(params contracts.CapturePaymentParams) {
+		var row models.PaymentProviderAction
+		require.NoError(t, db.View(func(tx database.Tx) error {
+			return tx.Read().Where("idempotency_key = ?", params.IdempotencyKey).First(&row).Error
+		}))
+		assert.Equal(t, models.PaymentProviderActionPendingExternal, row.State)
+	}
+
+	result, err := svc.CapturePayment(context.Background(), "stripe", "pi_capture")
+	require.NoError(t, err)
+	assert.Equal(t, "pi_capture", result.PaymentID)
+	result, err = svc.CapturePayment(context.Background(), "stripe", "pi_capture")
+	require.NoError(t, err)
+	assert.Equal(t, "pi_capture", result.PaymentID)
+	require.Len(t, provider.captureCalls, 1, "completed action must be returned without another provider call")
+	assert.NotEmpty(t, provider.captureCalls[0].IdempotencyKey)
+
+	var action models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	assert.Equal(t, models.PaymentProviderActionCompleted, action.State)
+	assert.Equal(t, 1, action.Attempts)
+}
+
+func TestFiatService_ReconcileProviderAction_RetriesWithSameIdempotencyKey(t *testing.T) {
+	provider := &mockFiatProvider{id: "paypal", captureErr: errors.New("ambiguous timeout")}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "paypal", "order_capture_retry", "pp_order_retry")
+
+	_, err := svc.CapturePayment(context.Background(), "paypal", "pp_order_retry")
+	require.ErrorContains(t, err, "ambiguous timeout")
+	require.Len(t, provider.captureCalls, 1)
+	originalKey := provider.captureCalls[0].IdempotencyKey
+	var action models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	assert.Equal(t, models.PaymentProviderActionReconcileRequired, action.State)
+	require.NotNil(t, action.NextAttemptAt)
+	assert.True(t, action.NextAttemptAt.After(time.Now()))
+	svc.reconcileProviderActions(context.Background())
+	require.Len(t, provider.captureCalls, 1, "reconciler must honor persisted backoff")
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		_, err := tx.UpdateColumns(
+			map[string]interface{}{"next_attempt_at": nil},
+			map[string]interface{}{"action_id = ?": action.ActionID}, &models.PaymentProviderAction{},
+		)
+		return err
+	}))
+
+	provider.captureErr = nil
+	provider.captureResult = &contracts.PaymentResult{PaymentID: "capture_retry", Status: "succeeded"}
+	svc.reconcileProviderActions(context.Background())
+	require.Len(t, provider.captureCalls, 2)
+	assert.Equal(t, originalKey, provider.captureCalls[1].IdempotencyKey)
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	assert.Equal(t, models.PaymentProviderActionCompleted, action.State)
+	assert.Equal(t, 2, action.Attempts)
+}
+
+func TestFiatService_RefundPayment_IdempotencyConflictFailsClosed(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", refundResult: &contracts.RefundResult{RefundID: "re_once", Status: "succeeded"}}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_refund", "pi_refund_action")
+	amount := int64(500)
+	params := contracts.RefundParams{
+		PaymentID: "pi_refund_action", IdempotencyKey: "refund-request-1", Amount: &amount,
+		Currency: "USD", Metadata: map[string]string{"orderID": "order_refund"},
+	}
+	_, err := svc.RefundPayment(context.Background(), "stripe", params)
+	require.NoError(t, err)
+	differentAmount := int64(600)
+	params.Amount = &differentAmount
+	_, err = svc.RefundPayment(context.Background(), "stripe", params)
+	require.ErrorContains(t, err, "idempotency key conflicts")
+	require.Len(t, provider.refundCalls, 1)
+}
+
+func TestFiatService_CapturePayment_UsesHistoricalDirectProviderAfterRotation(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, db := newFiatTestService(t, reg)
+	oldProvider := &mockFiatProvider{id: "stripe", captureResult: &contracts.PaymentResult{PaymentID: "pi_historical", Status: "succeeded"}}
+	currentProvider := &mockFiatProvider{id: "stripe", captureResult: &contracts.PaymentResult{PaymentID: "must_not_be_used"}}
+	svc.providerFactory = func(_ string, credential providerCredentialMaterial, _ bool, _ *contracts.PlatformProviderOpts) (contracts.FiatPaymentProvider, error) {
+		if credential.SecretKey == "sk_action_old" {
+			return oldProvider, nil
+		}
+		return currentProvider, nil
+	}
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
+		AccountID: "acct_action_old", PublicKey: "pk", SecretKey: "sk_action_old", WebhookSecret: "wh",
+	}))
+	account := &models.ReceivingAccount{ChainType: FiatChainType("stripe"), Address: "acct_action_old", IsActive: true}
+	attempt, _, err := svc.prepareFiatPaymentAttempt("stripe", contracts.CreatePaymentParams{
+		OrderID: "order_historical_action", Amount: 1000, Currency: "USD",
+	}, account)
+	require.NoError(t, err)
+	require.NoError(t, svc.commitFiatPaymentAttempt(attempt.AttemptID, "pi_historical"))
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{SecretKey: "sk_action_new"}))
+
+	result, err := svc.CapturePayment(context.Background(), "stripe", "pi_historical")
+	require.NoError(t, err)
+	assert.Equal(t, "pi_historical", result.PaymentID)
+	require.Len(t, oldProvider.captureCalls, 1)
+	assert.Empty(t, currentProvider.captureCalls)
+	var action models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	assert.Equal(t, models.PaymentProviderActionCompleted, action.State)
+}
+
 func TestFiatService_CreatePayment_RejectsManagedCollectibleBeforeProvider(t *testing.T) {
 	provider := &mockFiatProvider{
 		id:           "stripe",
@@ -1395,7 +1535,8 @@ func TestFiatService_WebhookRace_OrderCanceled_AutoRefund(t *testing.T) {
 	reg := newMockFiatRegistry()
 	reg.Register(provider)
 
-	svc, _ := newFiatTestService(t, reg)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_already_canceled", "pi_race_canceled")
 	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {
 		t.Fatal("webhook handler should NOT be called for canceled orders")
 		return nil
@@ -1430,7 +1571,8 @@ func TestFiatService_WebhookRace_AutoRefundFails_NoRetryLoop(t *testing.T) {
 	reg := newMockFiatRegistry()
 	reg.Register(provider)
 
-	svc, _ := newFiatTestService(t, reg)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_canceled_refund_fail", "pi_refund_fail")
 	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {
 		t.Fatal("webhook handler should NOT be called for canceled orders")
 		return nil
@@ -1582,6 +1724,7 @@ func TestDisconnectProvider_AwaitingPayment_CancelsSession(t *testing.T) {
 	reg.Register(provider)
 
 	svc, db := newFiatTestServiceWithOrders(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "awaiting-payment-order", "pi_session_abc")
 
 	seedFiatOrder(t, db, &models.Order{
 		ID: "awaiting-payment-order",

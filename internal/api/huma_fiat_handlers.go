@@ -140,9 +140,10 @@ func (g *Gateway) registerFiatSellerCapturePayment(api huma.API) {
 
 func (g *Gateway) registerFiatSellerRefundPayment(api huma.API) {
 	type in struct {
-		ProviderID string          `path:"providerID" doc:"Fiat provider ID."`
-		PaymentID  string          `path:"paymentID" doc:"Payment ID to refund."`
-		Body       json.RawMessage `json:",omitempty"`
+		ProviderID     string          `path:"providerID" doc:"Fiat provider ID."`
+		PaymentID      string          `path:"paymentID" doc:"Payment ID to refund."`
+		IdempotencyKey string          `header:"Idempotency-Key" required:"true" doc:"Stable key for this refund intent."`
+		Body           json.RawMessage `json:",omitempty"`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "fiat-refund-payment",
@@ -158,6 +159,7 @@ func (g *Gateway) registerFiatSellerRefundPayment(api huma.API) {
 			"paymentID":  hi.PaymentID,
 		})
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", hi.IdempotencyKey)
 		rr := httptest.NewRecorder()
 		g.handlePOSTFiatRefund(rr, req)
 		data, err := nodeBridgeSuccessData(rr)

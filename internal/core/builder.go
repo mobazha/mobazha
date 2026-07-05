@@ -1518,9 +1518,20 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		return obNode.db.View(func(tx database.Tx) error {
+		err := obNode.db.View(func(tx database.Tx) error {
 			return obNode.admitOrderExtensionCollateralRequirementsTx(ctx, tx, input.OrderID, input.OrderOpen, persisted)
 		})
+		var required *collateralCredentialRequiredError
+		if errors.As(err, &required) {
+			service := obNode.CollateralAllocation()
+			if service == nil {
+				return fmt.Errorf("%w; collateral credential transport is unavailable", err)
+			}
+			if requestErr := service.RequestOrderExtensionCollateralCredential(ctx, required.request); requestErr != nil {
+				return fmt.Errorf("%w; request collateral credential: %v", err, requestErr)
+			}
+		}
+		return err
 	}
 	// Always register the policy. An extension declaring the reservation
 	// contract must fail closed when its provider is unavailable, while

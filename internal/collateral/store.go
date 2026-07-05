@@ -18,6 +18,7 @@ import (
 
 	"github.com/mobazha/mobazha/pkg/collateral"
 	"github.com/mobazha/mobazha/pkg/database"
+	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	"gorm.io/gorm"
 )
@@ -592,6 +593,38 @@ func AllocationByIDTx(tx database.Tx, allocationID string) (collateral.Allocatio
 		return collateral.AllocationReference{}, err
 	}
 	return allocationFromRecord(record)
+}
+
+// ActiveAccountForRequirementTx resolves seller-owned coverage without
+// accepting an account identifier from the remote buyer. Selection is stable
+// and only returns an active, unexpired account with sufficient availability.
+func ActiveAccountForRequirementTx(
+	tx database.Tx,
+	tenantID string,
+	requirement extensions.CollateralRequirement,
+	now time.Time,
+) (collateral.Account, error) {
+	if tx == nil || strings.TrimSpace(tenantID) == "" || now.IsZero() {
+		return collateral.Account{}, fmt.Errorf("collateral account lookup is incomplete")
+	}
+	var records []models.CollateralAccountRecord
+	if err := tx.Read().Where(
+		"tenant_id = ? AND provider_id = ? AND resource_id = ? AND principal_id = ? AND asset_id = ? AND policy_id = ? AND policy_version = ? AND state = ? AND expires_at > ?",
+		tenantID, requirement.ProviderID, requirement.ResourceID, requirement.PrincipalID,
+		requirement.AssetID, requirement.PolicyID, requirement.PolicyVersion, collateral.StateActive, now,
+	).Order("revision DESC, collateral_id ASC").Find(&records).Error; err != nil {
+		return collateral.Account{}, err
+	}
+	for _, record := range records {
+		account, err := accountFromRecord(record)
+		if err != nil {
+			return collateral.Account{}, err
+		}
+		if compareAmount(account.AvailableAmount, requirement.Amount) >= 0 {
+			return account, nil
+		}
+	}
+	return collateral.Account{}, gorm.ErrRecordNotFound
 }
 
 func ClaimByIDTx(tx database.Tx, claimID string) (collateral.Claim, error) {

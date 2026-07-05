@@ -34,6 +34,43 @@ func newCollateralAllocationService(db database.Database, signer contracts.Signe
 	return &collateralAllocationService{db: db, signer: signer, messenger: messenger, now: func() time.Time { return time.Now().UTC() }}
 }
 
+func (s *collateralAllocationService) ensureOrderExtensionCollateralAllocation(
+	ctx context.Context,
+	request contracts.IssueOrderExtensionCollateralCredentialRequest,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	var account pkgcollateral.Account
+	bound := false
+	if err := s.db.View(func(tx database.Tx) error {
+		envelopes, err := corecollateral.OrderExtensionsV2ByOrderTx(tx, request.OrderID)
+		if err != nil {
+			return err
+		}
+		for _, envelope := range envelopes {
+			if envelope.Extension.ExtensionID == request.Extension.ExtensionID && envelope.Extension.Revision == request.Extension.Revision {
+				bound = true
+				return nil
+			}
+		}
+		account, err = corecollateral.ActiveAccountForRequirementTx(tx, request.TenantID, request.Requirement, s.now().UTC())
+		return err
+	}); err != nil {
+		return fmt.Errorf("resolve active collateral account: %w", err)
+	}
+	if bound {
+		return nil
+	}
+	_, err := s.AllocateOrderExtensionCollateral(ctx, contracts.AllocateOrderExtensionCollateralRequest{
+		TenantID: request.TenantID, CollateralID: account.CollateralID, OrderID: request.OrderID,
+		ExpectedCollateralRevision: account.Revision,
+		IdempotencyKey:             fmt.Sprintf("credential-allocation:%s:%s:%d", request.OrderID, request.Extension.ExtensionID, request.Extension.Revision),
+		Extension:                  request.Extension, Requirement: request.Requirement,
+	})
+	return err
+}
+
 func (s *collateralAllocationService) IssueOrderExtensionCollateralCredential(
 	ctx context.Context,
 	request contracts.IssueOrderExtensionCollateralCredentialRequest,

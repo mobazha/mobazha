@@ -16,6 +16,7 @@ import (
 	paypb "github.com/mobazha/mobazha/pkg/payment"
 	responsePkg "github.com/mobazha/mobazha/pkg/response"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 type mockPaymentSessionService struct {
@@ -214,6 +215,7 @@ func TestHandlePOSTOrderPaymentSession_OrderExtensionPolicyConflict(t *testing.T
 		corePmt.ErrOrderExtensionReservation,
 		corePmt.ErrOrderExtensionSettlement,
 		corePmt.ErrOrderExtensionCollateral,
+		errors.Join(corePmt.ErrOrderExtensionCollateral, gorm.ErrRecordNotFound),
 	} {
 		t.Run(policyErr.Error(), func(t *testing.T) {
 			svc := &mockPaymentSessionService{createFunc: func(_ context.Context, _ contracts.CreatePaymentSessionRequest) (*paypb.PaymentSession, error) {

@@ -46,48 +46,61 @@ func (s *collateralAllocationService) RequestOrderExtensionCollateralCredential(
 	if err := request.Validate(now); err != nil {
 		return err
 	}
-
-	var seller peer.ID
-	if err := s.db.View(func(tx database.Tx) error {
-		var order models.Order
-		if err := tx.Read().Where("id = ?", request.OrderID).First(&order).Error; err != nil {
-			return fmt.Errorf("load collateral credential buyer order: %w", err)
-		}
-		if order.Role() != models.RoleBuyer {
-			return fmt.Errorf("collateral credential may only be requested from the buyer order copy")
-		}
-		buyer, err := order.Buyer()
-		if err != nil {
-			return err
-		}
-		if buyer.String() != string(s.signer.PeerID()) {
-			return fmt.Errorf("collateral credential requester does not own the buyer order copy")
-		}
-		seller, err = order.Vendor()
-		if err != nil {
-			return err
-		}
-		if seller == buyer {
-			return fmt.Errorf("collateral credential seller must differ from buyer")
-		}
-		persisted, err := orderextensions.LatestByIDTx(tx, request.OrderID, request.Extension.ExtensionID)
-		if err != nil {
-			return err
-		}
-		persistedDigest, err := corecollateral.OrderExtensionDigest(persisted)
-		if err != nil {
-			return err
-		}
-		requestDigest, err := corecollateral.OrderExtensionDigest(request.Extension)
-		if err != nil {
-			return err
-		}
-		if persisted.Revision != request.Extension.Revision || persistedDigest != requestDigest {
-			return fmt.Errorf("collateral credential order extension revision is stale")
-		}
-		return nil
+	if err := s.db.Update(func(tx database.Tx) error {
+		return s.requestOrderExtensionCollateralCredentialTx(tx, request, now)
 	}); err != nil {
+		return fmt.Errorf("persist collateral credential request: %w", err)
+	}
+	return nil
+}
+
+func (s *collateralAllocationService) requestOrderExtensionCollateralCredentialTx(
+	tx database.Tx,
+	request contracts.RequestOrderExtensionCollateralCredentialRequest,
+	now time.Time,
+) error {
+	if tx == nil {
+		return fmt.Errorf("collateral credential request transaction is required")
+	}
+	if err := request.Validate(now); err != nil {
 		return err
+	}
+	var seller peer.ID
+	var order models.Order
+	if err := tx.Read().Where("id = ?", request.OrderID).First(&order).Error; err != nil {
+		return fmt.Errorf("load collateral credential buyer order: %w", err)
+	}
+	if order.Role() != models.RoleBuyer {
+		return fmt.Errorf("collateral credential may only be requested from the buyer order copy")
+	}
+	buyer, err := order.Buyer()
+	if err != nil {
+		return err
+	}
+	if buyer.String() != string(s.signer.PeerID()) {
+		return fmt.Errorf("collateral credential requester does not own the buyer order copy")
+	}
+	seller, err = order.Vendor()
+	if err != nil {
+		return err
+	}
+	if seller == buyer {
+		return fmt.Errorf("collateral credential seller must differ from buyer")
+	}
+	persisted, err := orderextensions.LatestByIDTx(tx, request.OrderID, request.Extension.ExtensionID)
+	if err != nil {
+		return err
+	}
+	persistedDigest, err := corecollateral.OrderExtensionDigest(persisted)
+	if err != nil {
+		return err
+	}
+	requestDigest, err := corecollateral.OrderExtensionDigest(request.Extension)
+	if err != nil {
+		return err
+	}
+	if persisted.Revision != request.Extension.Revision || persistedDigest != requestDigest {
+		return fmt.Errorf("collateral credential order extension revision is stale")
 	}
 
 	extensionJSON, err := json.Marshal(request.Extension)
@@ -108,19 +121,14 @@ func (s *collateralAllocationService) RequestOrderExtensionCollateralCredential(
 	message := newMessageWithID()
 	message.MessageType = pb.Message_COLLATERAL_CREDENTIAL_REQUEST
 	message.Payload = payload
-	if err := s.db.Update(func(tx database.Tx) error {
-		claimed, err := corecollateral.ClaimCredentialRequestTx(
-			tx, request.OrderID, request.Extension.ExtensionID, request.Extension.Revision,
-			string(s.signer.PeerID()), message.MessageID, now, collateralCredentialRequestMinInterval,
-		)
-		if err != nil || !claimed {
-			return err
-		}
-		return s.messenger.ReliablySendMessage(tx, seller, message, nil)
-	}); err != nil {
-		return fmt.Errorf("persist collateral credential request: %w", err)
+	claimed, err := corecollateral.ClaimCredentialRequestTx(
+		tx, request.OrderID, request.Extension.ExtensionID, request.Extension.Revision,
+		string(s.signer.PeerID()), message.MessageID, now, collateralCredentialRequestMinInterval,
+	)
+	if err != nil || !claimed {
+		return err
 	}
-	return nil
+	return s.messenger.ReliablySendMessage(tx, seller, message, nil)
 }
 
 func (n *MobazhaNode) RunCollateralCredentialRefreshOnce(ctx context.Context) {
@@ -248,11 +256,20 @@ func (n *MobazhaNode) handleCollateralCredentialRequest(from peer.ID, message *p
 	if service == nil {
 		return fmt.Errorf("collateral allocation service is unavailable")
 	}
-	credential, err := service.IssueOrderExtensionCollateralCredential(collateralTransportContext(n), contracts.IssueOrderExtensionCollateralCredentialRequest{
+	issueRequest := contracts.IssueOrderExtensionCollateralCredentialRequest{
 		TenantID: collateralTransportTenantID(n.db), OrderID: wire.OrderID,
 		Extension: extension, Requirement: requirement, AudiencePeerID: from.String(),
 		ExpiresAt: time.Unix(wire.ExpiresAtUnix, 0).UTC(),
-	})
+	}
+	authority, ok := service.(*collateralAllocationService)
+	if !ok {
+		return fmt.Errorf("collateral allocation authority implementation is unavailable")
+	}
+	transportCtx := collateralTransportContext(n)
+	if err := authority.ensureOrderExtensionCollateralAllocation(transportCtx, issueRequest); err != nil {
+		return fmt.Errorf("allocate collateral for credential request: %w", err)
+	}
+	credential, err := service.IssueOrderExtensionCollateralCredential(transportCtx, issueRequest)
 	if err != nil {
 		return err
 	}

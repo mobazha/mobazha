@@ -224,6 +224,13 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 	session, err := svc.CreateSession(r.Context(), req)
 	if err != nil {
 		switch {
+		case errors.Is(err, corePmt.ErrOrderExtensionReservation),
+			errors.Is(err, corePmt.ErrOrderExtensionSettlement),
+			errors.Is(err, corePmt.ErrOrderExtensionCollateral):
+			// Extension policy errors may wrap a lower-level not-found lookup.
+			// Preserve the fail-closed business conflict instead of misreporting
+			// the persisted order itself as missing.
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound,
 				"order not found: "+orderID)
@@ -254,10 +261,6 @@ func (g *Gateway) handlePOSTOrderPaymentSession(w http.ResponseWriter, r *http.R
 				"TRON payments are retired for new orders")
 		case errors.Is(err, corePmt.ErrRWAPaymentSessionUnsupported):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
-		case errors.Is(err, corePmt.ErrOrderExtensionReservation),
-			errors.Is(err, corePmt.ErrOrderExtensionSettlement),
-			errors.Is(err, corePmt.ErrOrderExtensionCollateral):
-			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
 		case errors.Is(err, corePmt.ErrPaymentCoinDisabled):
 			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		case errors.Is(err, coreiface.ErrBadRequest):

@@ -9,11 +9,24 @@ import (
 	"time"
 
 	corecollateral "github.com/mobazha/mobazha/internal/collateral"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/extensions"
 	orderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/proto"
 )
+
+type collateralCredentialRequiredError struct {
+	extensionID string
+	request     contracts.RequestOrderExtensionCollateralCredentialRequest
+	cause       error
+}
+
+func (e *collateralCredentialRequiredError) Error() string {
+	return fmt.Sprintf("order extension %s requires a valid seller-Core collateral credential: %v", e.extensionID, e.cause)
+}
+
+func (e *collateralCredentialRequiredError) Unwrap() error { return e.cause }
 
 // admitOrderExtensionCollateralRequirementsTx asks each provider that declared
 // the collateral-requirement contract whether a persisted extension requires
@@ -58,7 +71,14 @@ func (n *MobazhaNode) admitOrderExtensionCollateralRequirementsTx(
 			if _, err := corecollateral.AdmitExternalAllocationCredentialTx(
 				tx, string(n.signer.PeerID()), orderID, extension, requirement, now,
 			); err != nil {
-				return fmt.Errorf("order extension %s requires a valid seller-Core collateral credential: %w", extension.ExtensionID, err)
+				return &collateralCredentialRequiredError{
+					extensionID: extension.ExtensionID,
+					request: contracts.RequestOrderExtensionCollateralCredentialRequest{
+						OrderID: orderID, Extension: extension, Requirement: requirement,
+						ExpiresAt: now.Add(collateralCredentialRequestedTTL),
+					},
+					cause: err,
+				}
 			}
 			continue
 		}

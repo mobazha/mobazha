@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/internal/wallet"
@@ -340,6 +341,13 @@ func (a *exchangeRateAdapter) GetRate(base models.CurrencyCode, to models.Curren
 		return iwallet.NewAmount(0), fmt.Errorf("exchange rate provider not available")
 	}
 	return a.provider.GetRate(base, to, breakCache)
+}
+
+func (a *exchangeRateAdapter) LastUpdated(base models.CurrencyCode) time.Time {
+	if a.provider == nil {
+		return time.Time{}
+	}
+	return a.provider.LastUpdated(base)
 }
 
 // listingServiceFacade composes ListingAppService + ModerationAppService

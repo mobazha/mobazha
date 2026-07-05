@@ -294,6 +294,11 @@ type ExchangeRateService interface {
 	// GetRate returns the rate for a specific currency pair.
 	// Supports crypto-fiat, fiat-crypto, and fiat-fiat pairs.
 	GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error)
+
+	// LastUpdated returns the source timestamp of the current snapshot for the
+	// base currency. Consumers forwarding rates across runtime boundaries must
+	// preserve this value instead of replacing it with response time.
+	LastUpdated(base models.CurrencyCode) time.Time
 }
 
 // ProviderHealthInfo contains health metrics for an exchange rate provider.

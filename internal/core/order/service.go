@@ -106,7 +106,7 @@ type OrderAppService struct {
 	coTenantVerifiedPayment contracts.CoTenantVerifiedPaymentFn
 	resolver                pkgconfig.ResolverInterface
 	supplyAvailability      contracts.SupplyAvailabilityService
-	digitalSupplyLines      DigitalSupplyLineResolver
+	digitalSupplyLines      TransactionalDigitalSupplyLineResolver
 	checkoutSupplyQuoter    *checkoutsupply.CheckoutSupplyQuoteService
 	orderExtensionDeclarer  OrderExtensionDeclarer
 }
@@ -139,13 +139,18 @@ type OrderAppServiceConfig struct {
 	CoTenantVerifiedPayment    contracts.CoTenantVerifiedPaymentFn
 	Resolver                   pkgconfig.ResolverInterface
 	SupplyAvailability         contracts.SupplyAvailabilityService
-	DigitalSupplyLines         DigitalSupplyLineResolver
+	DigitalSupplyLines         TransactionalDigitalSupplyLineResolver
 	OrderExtensionDeclarer     OrderExtensionDeclarer
 }
 
 // DigitalSupplyLineResolver preserves the order package API while sharing the
 // channel-neutral resolver contract with guest checkout and supply quoting.
 type DigitalSupplyLineResolver = contracts.DigitalSupplyLineResolver
+
+// TransactionalDigitalSupplyLineResolver is the compile-time contract required
+// by standard order replay. Advisory checkout and guest flows continue to use
+// DigitalSupplyLineResolver.
+type TransactionalDigitalSupplyLineResolver = contracts.TransactionalDigitalSupplyLineResolver
 
 // NewOrderAppService constructs an OrderAppService with the given dependencies.
 func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {
@@ -181,7 +186,7 @@ func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {
 
 // SetDigitalSupplyLineResolver wires digital metadata after the digital
 // subsystem has initialized. This avoids an init-order cycle with orders.
-func (s *OrderAppService) SetDigitalSupplyLineResolver(resolver DigitalSupplyLineResolver) {
+func (s *OrderAppService) SetDigitalSupplyLineResolver(resolver TransactionalDigitalSupplyLineResolver) {
 	if s == nil {
 		return
 	}

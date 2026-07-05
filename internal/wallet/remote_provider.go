@@ -18,6 +18,11 @@ import (
 
 const remoteRateFetchTimeout = 10 * time.Second
 
+const (
+	remoteRateMaxSourceAge = 10 * time.Minute
+	remoteRateMaxStaleAge  = 15 * time.Minute
+)
+
 // remoteExchangeRateResponse mirrors the SaaS endpoint response structure:
 // {"data": {"rates": {"BTC": "65000", ...}, "reserve": "USD", "updatedAt": "..."}}
 type remoteExchangeRateResponse struct {
@@ -41,6 +46,7 @@ type remoteProvider struct {
 	mu            sync.RWMutex
 	cached        map[models.CurrencyCode]iwallet.Amount
 	cachedReserve models.CurrencyCode
+	cachedUpdated time.Time
 	lastFetch     time.Time
 }
 
@@ -69,15 +75,16 @@ func (p *remoteProvider) fetchRates(base models.CurrencyCode) (map[models.Curren
 	fresh := p.cached != nil && time.Since(p.lastFetch) < p.cacheTTL
 	stale := p.cached
 	staleReserve := p.cachedReserve
+	staleUpdated := p.cachedUpdated
 	p.mu.RUnlock()
 
-	if fresh {
+	if fresh && remoteRateTimestampUsable(staleUpdated, remoteRateMaxSourceAge) == nil {
 		return rebaseRemoteRates(stale, staleReserve, base)
 	}
 
-	rates, reserve, err := p.fetchFromSaaS()
+	rates, reserve, updatedAt, err := p.fetchFromSaaS()
 	if err != nil {
-		if stale != nil {
+		if stale != nil && remoteRateTimestampUsable(staleUpdated, remoteRateMaxStaleAge) == nil {
 			staleness := time.Since(p.lastFetch)
 			fmt.Printf("remote exchange rate fetch failed, using stale cache (age %s): %v\n",
 				staleness.Round(time.Second), err)
@@ -89,53 +96,61 @@ func (p *remoteProvider) fetchRates(base models.CurrencyCode) (map[models.Curren
 	p.mu.Lock()
 	p.cached = rates
 	p.cachedReserve = reserve
+	p.cachedUpdated = updatedAt
 	p.lastFetch = time.Now()
 	p.mu.Unlock()
 
 	return rebaseRemoteRates(rates, reserve, base)
 }
 
-func (p *remoteProvider) fetchFromSaaS() (map[models.CurrencyCode]iwallet.Amount, models.CurrencyCode, error) {
+func (p *remoteProvider) fetchFromSaaS() (map[models.CurrencyCode]iwallet.Amount, models.CurrencyCode, time.Time, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), remoteRateFetchTimeout)
 	defer cancel()
 
 	u, err := url.Parse(p.saasURL)
 	if err != nil {
-		return nil, "", fmt.Errorf("invalid saas URL %q: %w", p.saasURL, err)
+		return nil, "", time.Time{}, fmt.Errorf("invalid saas URL %q: %w", p.saasURL, err)
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return nil, "", fmt.Errorf("saas URL must use http(s) scheme, got %q", u.Scheme)
+		return nil, "", time.Time{}, fmt.Errorf("saas URL must use http(s) scheme, got %q", u.Scheme)
 	}
 	u.Path = u.Path + "/platform/v1/exchange-rates"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, "", fmt.Errorf("create request: %w", err)
+		return nil, "", time.Time{}, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("fetch exchange rates: %w", err)
+		return nil, "", time.Time{}, fmt.Errorf("fetch exchange rates: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, body)
+		return nil, "", time.Time{}, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, body)
 	}
 
 	var result remoteExchangeRateResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, "", fmt.Errorf("decode response: %w", err)
+		return nil, "", time.Time{}, fmt.Errorf("decode response: %w", err)
 	}
 
 	if len(result.Data.Rates) == 0 {
-		return nil, "", fmt.Errorf("empty rates in response")
+		return nil, "", time.Time{}, fmt.Errorf("empty rates in response")
 	}
 	reserve := models.CurrencyCode(strings.ToUpper(strings.TrimSpace(result.Data.Reserve)))
 	if reserve == "" {
-		return nil, "", fmt.Errorf("empty reserve currency in response")
+		return nil, "", time.Time{}, fmt.Errorf("empty reserve currency in response")
+	}
+	updatedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(result.Data.UpdatedAt))
+	if err != nil {
+		return nil, "", time.Time{}, fmt.Errorf("invalid remote exchange rate updatedAt: %w", err)
+	}
+	if err := remoteRateTimestampUsable(updatedAt, remoteRateMaxSourceAge); err != nil {
+		return nil, "", time.Time{}, err
 	}
 
 	rates := make(map[models.CurrencyCode]iwallet.Amount, len(result.Data.Rates))
@@ -149,10 +164,24 @@ func (p *remoteProvider) fetchFromSaaS() (map[models.CurrencyCode]iwallet.Amount
 	}
 
 	if len(rates) == 0 {
-		return nil, "", fmt.Errorf("no valid rates parsed from response")
+		return nil, "", time.Time{}, fmt.Errorf("no valid rates parsed from response")
 	}
 
-	return rates, reserve, nil
+	return rates, reserve, updatedAt, nil
+}
+
+func remoteRateTimestampUsable(updatedAt time.Time, maxAge time.Duration) error {
+	if updatedAt.IsZero() {
+		return fmt.Errorf("remote exchange rate snapshot has no source timestamp")
+	}
+	age := time.Since(updatedAt)
+	if age < -time.Minute {
+		return fmt.Errorf("remote exchange rate snapshot timestamp is in the future")
+	}
+	if age > maxAge {
+		return fmt.Errorf("remote exchange rate snapshot is stale (age %s, max %s)", age.Round(time.Second), maxAge)
+	}
+	return nil
 }
 
 // rebaseRemoteRates converts the SaaS reserve-currency matrix into the base

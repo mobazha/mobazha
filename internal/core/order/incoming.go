@@ -648,10 +648,6 @@ type orderTransactionalSupplyAvailabilityService interface {
 	ReleaseOrderTx(context.Context, database.Tx, string, string, string) error
 }
 
-type transactionalDigitalSupplyLineResolver interface {
-	SupplyAvailabilityLinesForOrderItemsTx(database.Tx, []digital.OrderLineItem) ([]contracts.SupplyLine, error)
-}
-
 func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb.OrderMessage) error {
 	var stored models.Order
 	if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&stored).Error; err != nil {
@@ -766,7 +762,7 @@ func standardOrderIsVendorInTx(tx database.Tx, orderID string) (bool, error) {
 }
 
 func (s *OrderAppService) standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, orderOpen *pb.OrderOpen, requireDigitalResolver bool) ([]contracts.SupplyLine, error) {
-	var digitalResolver DigitalSupplyLineResolver
+	var digitalResolver TransactionalDigitalSupplyLineResolver
 	if s != nil {
 		digitalResolver = s.digitalSupplyLines
 	}
@@ -808,7 +804,7 @@ func standardOrderSupplyLinesFromOrderOpen(tx database.Tx, orderID string, order
 			}}
 			var digitalLines []contracts.SupplyLine
 			if tx != nil {
-				txResolver, ok := digitalResolver.(transactionalDigitalSupplyLineResolver)
+				txResolver, ok := digitalResolver.(TransactionalDigitalSupplyLineResolver)
 				if !ok {
 					return nil, fmt.Errorf("digital supply resolver for %q does not support caller transactions", listing.Slug)
 				}

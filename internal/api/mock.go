@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -600,6 +601,10 @@ func (m *mockNode) GetRate(base models.CurrencyCode, to models.CurrencyCode, bre
 		return iwallet.NewAmount(0), fmt.Errorf("rate not found for %s -> %s", base, to)
 	}
 	return amount, nil
+}
+
+func (m *mockNode) LastUpdated(models.CurrencyCode) time.Time {
+	return time.Now()
 }
 
 func (m *mockNode) AddPost(post *postsPb.Post, done chan<- struct{}) error {

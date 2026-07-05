@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/mobazha/mobazha/internal/database/dbstore"
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -53,6 +54,10 @@ func (noopRates) GetAllRates(base models.CurrencyCode, breakCache bool) (map[mod
 
 func (noopRates) GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
 	panic("unexpected GetRate — same-currency branch should skip conversion")
+}
+
+func (noopRates) LastUpdated(models.CurrencyCode) time.Time {
+	panic("unexpected LastUpdated")
 }
 
 func TestBuildPaymentSetupParamsFromOrder_SameCurrencyUsesOrderOpenNumeric(t *testing.T) {

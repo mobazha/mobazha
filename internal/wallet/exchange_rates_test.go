@@ -54,6 +54,16 @@ func TestNormalizeBaseForRateQuery(t *testing.T) {
 	}
 }
 
+func TestLastUpdatedNormalizesBaseCurrency(t *testing.T) {
+	want := time.Now().UTC().Truncate(time.Second)
+	provider := &ExchangeRateProvider{
+		lastQueried: map[models.CurrencyCode]time.Time{"USD": want},
+	}
+	if got := provider.LastUpdated("fiat:stripe:usd"); !got.Equal(want) {
+		t.Fatalf("LastUpdated() = %s, want %s", got, want)
+	}
+}
+
 func TestNewExchangeRateProvider(t *testing.T) {
 	cfg := config.GetGlobalExchangeRateConfig()
 	cfg.SetRemoteSaaSURL("")
@@ -241,6 +251,25 @@ func TestGetRate_StaleFallback(t *testing.T) {
 	}
 	if rate.Int64() != 6500000 {
 		t.Fatalf("expected stale value 6500000, got %d", rate.Int64())
+	}
+}
+
+func TestGetRate_ExpiredStaleCacheFailsClosed(t *testing.T) {
+	mock := &mockProvider{err: errors.New("provider down")}
+	e := &ExchangeRateProvider{
+		cache: map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount{
+			"BTC": {"USD": iwallet.NewAmount(6500000)},
+		},
+		lastQueried: map[models.CurrencyCode]time.Time{
+			"BTC": time.Now().Add(-2 * time.Minute),
+		},
+		providers:   []provider{mock},
+		cacheTTL:    30 * time.Second,
+		maxStaleAge: time.Minute,
+	}
+
+	if _, err := e.GetRate("BTC", "USD", false); err == nil {
+		t.Fatal("expected an expired stale rate to fail closed")
 	}
 }
 

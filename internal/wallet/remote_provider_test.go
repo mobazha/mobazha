@@ -9,32 +9,70 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 func makeRemoteRateJSON(rates map[string]string) []byte {
+	return makeRemoteRateJSONAt(rates, time.Now().UTC())
+}
+
+func makeRemoteRateJSONAt(rates map[string]string, updatedAt time.Time) []byte {
 	resp := map[string]interface{}{
 		"data": map[string]interface{}{
 			"rates":     rates,
 			"reserve":   "USD",
-			"updatedAt": time.Now().UTC().Format(time.RFC3339),
+			"updatedAt": updatedAt.UTC().Format(time.RFC3339),
 		},
 	}
 	b, _ := json.Marshal(resp)
 	return b
 }
 
+func TestRemoteProvider_RejectsExpiredSourceSnapshot(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(makeRemoteRateJSONAt(map[string]string{
+			"USD": "100",
+			"ETH": "500000000000000",
+		}, time.Now().Add(-remoteRateMaxSourceAge-time.Minute)))
+	}))
+	defer srv.Close()
+
+	rp := NewRemoteProvider(srv.URL, srv.Client(), 30*time.Second)
+	_, err := rp.fetchRates("USD")
+	if err == nil {
+		t.Fatal("expected an expired source snapshot to fail closed")
+	}
+}
+
+func TestRemoteProvider_RejectsExpiredStaleCache(t *testing.T) {
+	rp := NewRemoteProvider("http://127.0.0.1:1", &http.Client{Timeout: 10 * time.Millisecond}, time.Millisecond)
+	rp.cached = map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(100),
+	}
+	rp.cachedReserve = "USD"
+	rp.cachedUpdated = time.Now().Add(-remoteRateMaxStaleAge - time.Minute)
+	rp.lastFetch = time.Now().Add(-time.Minute)
+
+	_, err := rp.fetchRates("USD")
+	if err == nil {
+		t.Fatal("expected an expired stale cache to fail closed")
+	}
+}
+
 func TestRemoteProvider_FetchRates_Success(t *testing.T) {
+	sourceUpdated := time.Now().UTC().Add(-time.Minute).Truncate(time.Second)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/platform/v1/exchange-rates" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(makeRemoteRateJSON(map[string]string{
+		w.Write(makeRemoteRateJSONAt(map[string]string{
 			"BTC": "6500000000000",
 			"ETH": "350000000000",
 			"LTC": "8700000000",
 			"USD": "100000000",
-		}))
+		}, sourceUpdated))
 	}))
 	defer srv.Close()
 
@@ -51,6 +89,9 @@ func TestRemoteProvider_FetchRates_Success(t *testing.T) {
 	btcRate := rates[models.CurrencyCode("BTC")]
 	if btcRate.String() != "6500000000000" {
 		t.Errorf("BTC rate = %s, want 6500000000000", btcRate.String())
+	}
+	if !rp.cachedUpdated.Equal(sourceUpdated) {
+		t.Errorf("cached source timestamp = %s, want %s", rp.cachedUpdated, sourceUpdated)
 	}
 }
 

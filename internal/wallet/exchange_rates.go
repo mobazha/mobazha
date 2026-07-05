@@ -20,6 +20,13 @@ import (
 // currency, we derive it from its USD price.
 const ReserveCurrency = models.CurrencyCode("USD")
 
+var _ contracts.ExchangeRateService = (*ExchangeRateProvider)(nil)
+
+// DefaultMaxStaleRateAge bounds stale-while-revalidate for payment-critical
+// exchange rates. A temporary provider outage may use a recent known value,
+// but an indefinitely old quote must fail closed.
+const DefaultMaxStaleRateAge = 15 * time.Minute
+
 // ExchangeRateProvider provides exchange rate data to be used by OpenBazaar.
 // It gives the exchange rate from any listed cryptocurrency into any other
 // currency.
@@ -29,6 +36,7 @@ type ExchangeRateProvider struct {
 	mtx         sync.Mutex
 	providers   []provider
 	cacheTTL    time.Duration
+	maxStaleAge time.Duration
 
 	providerHealth []providerHealth
 }
@@ -52,6 +60,7 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 		lastQueried: make(map[models.CurrencyCode]time.Time),
 		mtx:         sync.Mutex{},
 		cacheTTL:    cfg.GetCacheTTL(),
+		maxStaleAge: DefaultMaxStaleRateAge,
 	}
 
 	client := proxyclient.NewHttpClient()
@@ -107,7 +116,19 @@ func NewFixedRateProvider(base models.CurrencyCode, rates map[models.CurrencyCod
 		cache:       cache,
 		lastQueried: map[models.CurrencyCode]time.Time{base: time.Now().Add(time.Hour)},
 		cacheTTL:    time.Hour,
+		maxStaleAge: DefaultMaxStaleRateAge,
 	}
+}
+
+func (e *ExchangeRateProvider) effectiveMaxStaleAge() time.Duration {
+	if e.maxStaleAge <= 0 {
+		return DefaultMaxStaleRateAge
+	}
+	return e.maxStaleAge
+}
+
+func (e *ExchangeRateProvider) canUseStale(lastUpdated time.Time) bool {
+	return !lastUpdated.IsZero() && time.Since(lastUpdated) <= e.effectiveMaxStaleAge()
 }
 
 func normalizeBaseForRateQuery(base models.CurrencyCode) models.CurrencyCode {
@@ -138,7 +159,7 @@ func (e *ExchangeRateProvider) GetRate(base models.CurrencyCode, to models.Curre
 	if breakCache || !hasCached || lastQueried.Add(e.cacheTTL).Before(time.Now()) {
 		freshRates, err := e.fetchRatesFromProviders(baseForQuery)
 		if err != nil {
-			if hasCached {
+			if hasCached && e.canUseStale(lastQueried) {
 				staleness := time.Since(lastQueried)
 				fmt.Printf("exchange rate provider failed, using stale cache (age %s) for %s: %v\n", staleness.Round(time.Second), baseForQuery, err)
 				amount, ok := cachedRates[to]
@@ -179,7 +200,7 @@ func (e *ExchangeRateProvider) GetAllRates(base models.CurrencyCode, breakCache 
 	if breakCache || !hasCached || lastQueried.Add(e.cacheTTL).Before(time.Now()) {
 		freshRates, err := e.fetchRatesFromProviders(baseForQuery)
 		if err != nil {
-			if hasCached {
+			if hasCached && e.canUseStale(lastQueried) {
 				staleness := time.Since(lastQueried)
 				fmt.Printf("exchange rate provider failed, using stale cache (age %s) for %s: %v\n", staleness.Round(time.Second), baseForQuery, err)
 				return cachedRates, nil
@@ -191,6 +212,15 @@ func (e *ExchangeRateProvider) GetAllRates(base models.CurrencyCode, breakCache 
 		cachedRates = freshRates
 	}
 	return cachedRates, nil
+}
+
+// LastUpdated returns the last successful provider refresh time for a base
+// currency. Callers use it to preserve source freshness when forwarding a
+// rate snapshot to another runtime.
+func (e *ExchangeRateProvider) LastUpdated(base models.CurrencyCode) time.Time {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+	return e.lastQueried[normalizeBaseForRateQuery(base)]
 }
 
 // DivergenceThreshold is the maximum acceptable percentage difference between

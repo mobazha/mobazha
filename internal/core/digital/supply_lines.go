@@ -9,6 +9,8 @@ import (
 	"github.com/mobazha/mobazha/pkg/models"
 )
 
+var _ contracts.TransactionalDigitalSupplyLineResolver = (*DigitalAssetAppService)(nil)
+
 // LicenseKeyPoolSupplyLinesForOrderItems resolves order line items whose
 // scarcity is controlled by a DigitalLicenseKey pool. It is intentionally
 // narrower than full digital supply resolution: file/link-only assets are left

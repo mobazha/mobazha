@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/mobazha/mobazha/pkg/database"
 )
 
 // Sentinel errors returned by supply availability implementations.
@@ -92,6 +94,15 @@ type DigitalOrderLineItem struct {
 // supply contract shared by standard orders, guest checkout, and quote flows.
 type DigitalSupplyLineResolver interface {
 	SupplyAvailabilityLinesForOrderItems([]DigitalOrderLineItem) ([]SupplyLine, error)
+}
+
+// TransactionalDigitalSupplyLineResolver resolves the same digital supply
+// contract through a caller-owned transaction. Standard order replay requires
+// this stronger port so implementations cannot open a nested database view
+// while the order write transaction is active.
+type TransactionalDigitalSupplyLineResolver interface {
+	DigitalSupplyLineResolver
+	SupplyAvailabilityLinesForOrderItemsTx(database.Tx, []DigitalOrderLineItem) ([]SupplyLine, error)
 }
 
 // AvailabilityRequest asks a single provider for advisory availability.

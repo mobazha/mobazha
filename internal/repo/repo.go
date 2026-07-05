@@ -814,6 +814,7 @@ func autoMigrateDatabaseSafe(db database.Database) error {
 		&models.PaymentObservation{},
 		&models.SettlementAction{},
 		&models.SharedPaymentIntent{},
+		&models.PaymentSelectionQuote{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

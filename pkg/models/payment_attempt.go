@@ -15,6 +15,9 @@ type PaymentAttempt struct {
 	AttemptID         string `gorm:"column:attempt_id;primaryKey;size:64"`
 	PaymentSessionID  string `gorm:"column:payment_session_id;size:255;not null;index:idx_payment_attempt_session"`
 	OrderID           string `gorm:"column:order_id;size:255;not null;index:idx_payment_attempt_order"`
+	ProviderID        string `gorm:"column:provider_id;size:64;not null;default:''"`
+	Amount            int64  `gorm:"column:amount;not null;default:0"`
+	Currency          string `gorm:"column:currency;size:16;not null;default:''"`
 	RouteBindingID    string `gorm:"column:route_binding_id;size:64;not null"`
 	IdempotencyKey    string `gorm:"column:idempotency_key;size:128;not null;uniqueIndex:idx_payment_attempt_idempotency,priority:2"`
 	State             string `gorm:"column:state;size:32;not null;index:idx_payment_attempt_state"`

@@ -569,6 +569,34 @@ func TestFiatService_CreatePayment_ProviderFailureLeavesReconcileClaim(t *testin
 	assert.Contains(t, attempt.LastError, "ambiguous timeout")
 }
 
+func TestFiatService_ReconcilePaymentAttempt_ReplaysProviderCreateWithSameClaim(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", createErr: errors.New("ambiguous timeout")}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ReceivingAccount{ChainType: FiatChainType("stripe"), Address: "acct_recover", IsActive: true})
+	}))
+	params := contracts.CreatePaymentParams{OrderID: "order_recover", Amount: 2500, Currency: "USD"}
+
+	_, err := svc.CreatePayment(context.Background(), "stripe", params)
+	require.ErrorContains(t, err, "ambiguous timeout")
+	require.Len(t, provider.createParams, 1)
+	originalKey := provider.createParams[0].IdempotencyKey
+	provider.createErr = nil
+	provider.createResult = &contracts.FiatProviderSession{SessionID: "sess_recovered"}
+
+	svc.ReconcileFiatOrders(context.Background())
+	require.Len(t, provider.createParams, 2)
+	assert.Equal(t, originalKey, provider.createParams[1].IdempotencyKey)
+	assert.Equal(t, "acct_recover", provider.createParams[1].SellerAccountID)
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&attempt).Error }))
+	assert.Equal(t, models.PaymentAttemptExternalCreated, attempt.State)
+	assert.Equal(t, "sess_recovered", attempt.ExternalReference)
+	assert.Empty(t, attempt.LastError)
+}
+
 func TestFiatService_CreatePayment_RejectsManagedCollectibleBeforeProvider(t *testing.T) {
 	provider := &mockFiatProvider{
 		id:           "stripe",

@@ -169,28 +169,12 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 		}
 		return nil, persistErr
 	}
-
-	if s.orderRepo != nil && params.OrderID != "" {
-		meta := map[string]string{
-			"fiat_provider":         providerID,
-			"fiat_session_id":       session.SessionID,
-			"payment_attempt_id":    attempt.AttemptID,
-			"payment_route_binding": route.RouteBindingID,
-			// fiat_currency is stored so the PaymentSessionProjector can reconstruct
-			// the canonical paymentCoin ("fiat:{provider}:{currency}") for orders
-			// where PaymentSent has not yet been written (e.g. awaiting buyer action).
-			"fiat_currency": params.Currency,
+	if err := s.persistFiatPaymentMetadata(ctx, attempt, route, session.SessionID); err != nil {
+		persistErr := fmt.Errorf("persist %s payment metadata: %w", providerID, err)
+		if markErr := s.markFiatAttemptReconcileRequired(attempt.AttemptID, persistErr); markErr != nil {
+			return nil, errors.Join(persistErr, markErr)
 		}
-		if specJSON, err := payment.FiatMetadataSettlementSpecJSON(); err == nil {
-			meta["settlement_spec"] = specJSON
-		}
-		if err := s.orderRepo.MergeFiatMetadata(ctx, params.OrderID, meta); err != nil {
-			persistErr := fmt.Errorf("persist %s payment metadata: %w", providerID, err)
-			if markErr := s.markFiatAttemptReconcileRequired(attempt.AttemptID, persistErr); markErr != nil {
-				return nil, errors.Join(persistErr, markErr)
-			}
-			return nil, persistErr
-		}
+		return nil, persistErr
 	}
 
 	logger.LogInfoWithIDf(log, s.nodeID, "fiat payment created: provider=%s session=%s order=%s", providerID, session.SessionID, params.OrderID)
@@ -210,6 +194,7 @@ func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, par
 	routeID := stablePaymentIdentity("prb_", attemptID)
 	attempt := models.PaymentAttempt{
 		AttemptID: attemptID, PaymentSessionID: "ps_" + strings.TrimSpace(params.OrderID), OrderID: strings.TrimSpace(params.OrderID),
+		ProviderID: strings.ToLower(strings.TrimSpace(providerID)), Amount: params.Amount, Currency: strings.ToUpper(strings.TrimSpace(params.Currency)),
 		RouteBindingID: routeID, IdempotencyKey: stablePaymentIdentity("mbz_", attemptSeed), State: models.PaymentAttemptPendingExternal,
 	}
 	route := models.PaymentRouteBinding{
@@ -245,6 +230,23 @@ func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, par
 		return attempt, route, nil
 	}
 	return models.PaymentAttempt{}, models.PaymentRouteBinding{}, fmt.Errorf("prepare fiat payment attempt: %w", err)
+}
+
+func (s *FiatPaymentAppService) persistFiatPaymentMetadata(ctx context.Context, attempt models.PaymentAttempt, route models.PaymentRouteBinding, sessionID string) error {
+	if s.orderRepo == nil {
+		return nil
+	}
+	meta := map[string]string{
+		"fiat_provider":         attempt.ProviderID,
+		"fiat_session_id":       sessionID,
+		"payment_attempt_id":    attempt.AttemptID,
+		"payment_route_binding": route.RouteBindingID,
+		"fiat_currency":         attempt.Currency,
+	}
+	if specJSON, err := payment.FiatMetadataSettlementSpecJSON(); err == nil {
+		meta["settlement_spec"] = specJSON
+	}
+	return s.orderRepo.MergeFiatMetadata(ctx, attempt.OrderID, meta)
 }
 
 func (s *FiatPaymentAppService) commitFiatPaymentAttempt(attemptID, externalReference string) error {
@@ -1214,6 +1216,7 @@ func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
 // Orders in AWAITING_PAYMENT_VERIFICATION are handled by PaymentVerificationLoop.
 // If the provider reports canceled/failed, it's a no-op (order timeout handles cancellation).
 func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
+	s.reconcileFiatPaymentAttempts(ctx)
 	if s.webhookHandler == nil {
 		return
 	}
@@ -1283,6 +1286,57 @@ func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 				logger.LogErrorWithIDf(log, s.nodeID,
 					"fiat reconciliation: ProcessOrderPayment for order %s failed: %v", order.ID, err)
 			}
+		}
+	}
+}
+
+func (s *FiatPaymentAppService) reconcileFiatPaymentAttempts(ctx context.Context) {
+	var attempts []models.PaymentAttempt
+	cutoff := time.Now().Add(-2 * time.Minute)
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"state = ? OR (state = ? AND updated_at < ?)",
+			models.PaymentAttemptReconcileRequired, models.PaymentAttemptPendingExternal, cutoff,
+		).Find(&attempts).Error
+	}); err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "fiat attempt reconciliation: query failed: %v", err)
+		return
+	}
+	for _, attempt := range attempts {
+		var route models.PaymentRouteBinding
+		if err := s.db.View(func(tx database.Tx) error {
+			return tx.Read().Where("route_binding_id = ?", attempt.RouteBindingID).First(&route).Error
+		}); err != nil {
+			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("load route binding: %w", err))
+			continue
+		}
+		provider, err := s.registry.ForProvider(attempt.ProviderID)
+		if err != nil {
+			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("resolve provider %s: %w", attempt.ProviderID, err))
+			continue
+		}
+		params := contracts.CreatePaymentParams{
+			OrderID: attempt.OrderID, Amount: attempt.Amount, Currency: attempt.Currency,
+			SellerAccountID: route.ExternalAccountReference, IdempotencyKey: attempt.IdempotencyKey,
+			Metadata: map[string]string{
+				"mobazha_payment_attempt_id": attempt.AttemptID,
+				"mobazha_route_binding_id":   route.RouteBindingID,
+			},
+		}
+		session, err := provider.CreatePayment(ctx, params)
+		if err != nil || session == nil || strings.TrimSpace(session.SessionID) == "" {
+			if err == nil {
+				err = fmt.Errorf("provider returned an empty session")
+			}
+			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("reconcile provider create: %w", err))
+			continue
+		}
+		if err := s.commitFiatPaymentAttempt(attempt.AttemptID, session.SessionID); err != nil {
+			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("reconcile provider reference: %w", err))
+			continue
+		}
+		if err := s.persistFiatPaymentMetadata(ctx, attempt, route, session.SessionID); err != nil {
+			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("reconcile payment metadata: %w", err))
 		}
 	}
 }

@@ -515,6 +515,11 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		); err != nil {
 			return err
 		}
+		if payResult.AttemptID != "" {
+			if err := s.directPayment.linkExternalPaymentAddressAttemptInTx(tx, payResult.AttemptID, orderToken); err != nil {
+				return fmt.Errorf("link external payment attempt: %w", err)
+			}
+		}
 		return nil
 	})
 	if err != nil {

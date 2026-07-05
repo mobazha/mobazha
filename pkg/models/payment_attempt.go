@@ -8,8 +8,11 @@ const (
 
 	PaymentAttemptPendingExternal   = "pending_external"
 	PaymentAttemptExternalCreated   = "external_created"
+	PaymentAttemptLinked            = "linked"
 	PaymentAttemptReconcileRequired = "reconcile_required"
 	PaymentAttemptExpired           = "expired"
+	PaymentAttemptAbandoning        = "abandoning"
+	PaymentAttemptAbandoned         = "abandoned"
 )
 
 // PaymentAttempt is Core's durable claim for one concrete payment provisioning

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
@@ -21,6 +22,7 @@ import (
 type directPaymentExternalRuntimeStub struct {
 	mu       sync.Mutex
 	requests []distribution.ExternalPaymentAddressRequest
+	reaped   []uint32
 	address  distribution.ExternalPaymentAddress
 	failures int
 	before   func(distribution.ExternalPaymentAddressRequest)
@@ -56,8 +58,12 @@ func (s *directPaymentExternalRuntimeStub) requestSnapshot() []distribution.Exte
 func (*directPaymentExternalRuntimeStub) WatchPayment(*distribution.ExternalPaymentWatch) error {
 	return nil
 }
-func (*directPaymentExternalRuntimeStub) UnwatchPayment(uint32)              {}
-func (*directPaymentExternalRuntimeStub) ReapPayment(uint32)                 {}
+func (*directPaymentExternalRuntimeStub) UnwatchPayment(uint32) {}
+func (s *directPaymentExternalRuntimeStub) ReapPayment(index uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reaped = append(s.reaped, index)
+}
 func (*directPaymentExternalRuntimeStub) PaymentPollInterval() time.Duration { return time.Second }
 func (*directPaymentExternalRuntimeStub) PaymentGracePeriod(iwallet.CoinType) time.Duration {
 	return time.Hour
@@ -65,6 +71,13 @@ func (*directPaymentExternalRuntimeStub) PaymentGracePeriod(iwallet.CoinType) ti
 func (*directPaymentExternalRuntimeStub) PaymentHeight(context.Context) (uint64, error) {
 	return 1, nil
 }
+
+func (s *directPaymentExternalRuntimeStub) reapedSnapshot() []uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]uint32(nil), s.reaped...)
+}
+
 func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 	db := newGuestTestDB(t)
 	runtime := &directPaymentExternalRuntimeStub{}
@@ -113,6 +126,132 @@ func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 	require.Equal(t, result.Address, attempt.ExternalReference)
 	require.Equal(t, result.AddressIndex, attempt.ExternalIndex)
 	require.Equal(t, result.RequiredConfs, attempt.RequiredConfs)
+}
+
+func TestDirectPaymentService_OrderLinkIsAtomicWithGuestOrder(t *testing.T) {
+	db := newGuestTestDB(t)
+	runtime := &directPaymentExternalRuntimeStub{}
+	service := NewDirectPaymentService(db, nil)
+	route := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
+		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
+		NetworkID: "TEST", AssetID: "crypto:monero:mainnet:native", ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	catalog := distribution.NewExternalPaymentRuntimeCatalog()
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: route, Runtime: runtime, ActiveForNewWork: true}))
+	service.SetExternalPaymentRuntimeCatalog(catalog)
+
+	request := PaymentAddressRequest{
+		CoinType: iwallet.CoinType(route.AssetID), Amount: "500", OrderToken: "gst_linked", ExpiresAt: time.Now().Add(time.Hour),
+	}
+	result, err := service.GeneratePaymentAddress(context.Background(), request)
+	require.NoError(t, err)
+	order := models.GuestOrder{
+		ID: 711, OrderToken: request.OrderToken, State: models.GuestOrderAwaitingPayment,
+		PaymentCoin: route.AssetID, PaymentAddress: result.Address, PaymentAmount: request.Amount,
+		PaymentAttemptID: result.AttemptID, AddressIndex: result.AddressIndex, ExpiresAt: request.ExpiresAt,
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Save(&order); err != nil {
+			return err
+		}
+		return service.linkExternalPaymentAddressAttemptInTx(tx, result.AttemptID, request.OrderToken)
+	}))
+
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.gormDB.Where("attempt_id = ?", result.AttemptID).First(&attempt).Error)
+	require.Equal(t, models.PaymentAttemptLinked, attempt.State)
+	retried, err := service.GeneratePaymentAddress(context.Background(), request)
+	require.NoError(t, err)
+	require.Equal(t, result, retried)
+	require.Len(t, runtime.requestSnapshot(), 1)
+}
+
+func TestDirectPaymentService_RolledBackOrderLeavesExpiredAddressForAbandonment(t *testing.T) {
+	db := newGuestTestDB(t)
+	runtime := &directPaymentExternalRuntimeStub{}
+	service := NewDirectPaymentService(db, nil)
+	route := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
+		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
+		NetworkID: "TEST", AssetID: "crypto:monero:mainnet:native", ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	catalog := distribution.NewExternalPaymentRuntimeCatalog()
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: route, Runtime: runtime, ActiveForNewWork: true}))
+	service.SetExternalPaymentRuntimeCatalog(catalog)
+
+	request := PaymentAddressRequest{
+		CoinType: iwallet.CoinType(route.AssetID), Amount: "600", OrderToken: "gst_rolled_back", ExpiresAt: time.Now().Add(-time.Minute),
+	}
+	result, err := service.GeneratePaymentAddress(context.Background(), request)
+	require.NoError(t, err)
+	order := models.GuestOrder{
+		ID: 712, OrderToken: request.OrderToken, State: models.GuestOrderAwaitingPayment,
+		PaymentCoin: route.AssetID, PaymentAddress: result.Address, PaymentAmount: request.Amount,
+		PaymentAttemptID: result.AttemptID, AddressIndex: result.AddressIndex, ExpiresAt: request.ExpiresAt,
+	}
+	rollbackErr := errors.New("forced guest order transaction rollback")
+	err = db.Update(func(tx database.Tx) error {
+		if err := tx.Save(&order); err != nil {
+			return err
+		}
+		if err := service.linkExternalPaymentAddressAttemptInTx(tx, result.AttemptID, request.OrderToken); err != nil {
+			return err
+		}
+		return rollbackErr
+	})
+	require.ErrorIs(t, err, rollbackErr)
+	require.ErrorIs(t, db.gormDB.Where("order_token = ?", request.OrderToken).First(&models.GuestOrder{}).Error, gorm.ErrRecordNotFound)
+
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.gormDB.Where("attempt_id = ?", result.AttemptID).First(&attempt).Error)
+	require.Equal(t, models.PaymentAttemptExternalCreated, attempt.State)
+
+	recovered, err := service.RecoverPendingExternalPaymentAddresses(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, recovered)
+	require.NoError(t, db.gormDB.Where("attempt_id = ?", result.AttemptID).First(&attempt).Error)
+	require.Equal(t, models.PaymentAttemptAbandoned, attempt.State)
+	require.Equal(t, []uint32{result.AddressIndex}, runtime.reapedSnapshot())
+
+	recovered, err = service.RecoverPendingExternalPaymentAddresses(context.Background())
+	require.NoError(t, err)
+	require.Zero(t, recovered)
+	require.Equal(t, []uint32{result.AddressIndex}, runtime.reapedSnapshot())
+}
+
+func TestDirectPaymentService_AbandoningCleanupReplaysAfterRestart(t *testing.T) {
+	db := newGuestTestDB(t)
+	runtime := &directPaymentExternalRuntimeStub{}
+	service := NewDirectPaymentService(db, nil)
+	route := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
+		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
+		NetworkID: "TEST", AssetID: "crypto:monero:mainnet:native", ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	catalog := distribution.NewExternalPaymentRuntimeCatalog()
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: route, Runtime: runtime, ActiveForNewWork: true}))
+	service.SetExternalPaymentRuntimeCatalog(catalog)
+
+	request := PaymentAddressRequest{
+		CoinType: iwallet.CoinType(route.AssetID), Amount: "700", OrderToken: "gst_abandoning", ExpiresAt: time.Now().Add(-time.Minute),
+	}
+	result, err := service.GeneratePaymentAddress(context.Background(), request)
+	require.NoError(t, err)
+	require.NoError(t, db.gormDB.Model(&models.PaymentAttempt{}).
+		Where("attempt_id = ?", result.AttemptID).
+		Updates(map[string]interface{}{
+			"state":      models.PaymentAttemptAbandoning,
+			"last_error": "simulated crash before cleanup completion",
+		}).Error)
+
+	recovered, err := service.RecoverPendingExternalPaymentAddresses(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, recovered)
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.gormDB.Where("attempt_id = ?", result.AttemptID).First(&attempt).Error)
+	require.Equal(t, models.PaymentAttemptAbandoned, attempt.State)
+	require.Equal(t, []uint32{result.AddressIndex}, runtime.reapedSnapshot())
 }
 
 func TestDirectPaymentService_ExternalRuntimeRecoversWithStableIdempotencyKey(t *testing.T) {

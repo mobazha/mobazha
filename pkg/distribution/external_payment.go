@@ -90,6 +90,9 @@ type ExternalPaymentRuntime interface {
 	EnsurePaymentAddress(ctx context.Context, request ExternalPaymentAddressRequest) (ExternalPaymentAddress, error)
 	WatchPayment(watch *ExternalPaymentWatch) error
 	UnwatchPayment(addressIndex uint32)
+	// ReapPayment releases runtime-local observation state for an address that
+	// Core has terminalized. Implementations must make repeated calls safe so a
+	// crash between cleanup and durable completion can be replayed.
 	ReapPayment(addressIndex uint32)
 	PaymentPollInterval() time.Duration
 	// PaymentGracePeriod is immutable timing policy. It must remain safe to

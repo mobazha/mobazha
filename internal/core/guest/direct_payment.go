@@ -325,8 +325,12 @@ func (s *DirectPaymentService) ensureExternalPaymentAddressAttempt(
 	route payment.RouteIdentity,
 	runtime distribution.ExternalPaymentRuntime,
 ) (*PaymentAddressResult, error) {
-	if attempt.State == models.PaymentAttemptExternalCreated {
+	switch attempt.State {
+	case models.PaymentAttemptExternalCreated, models.PaymentAttemptLinked:
 		return externalPaymentAddressResult(attempt, route, runtime), nil
+	case models.PaymentAttemptPendingExternal, models.PaymentAttemptReconcileRequired:
+	default:
+		return nil, fmt.Errorf("external payment attempt %q cannot provision from state %q", attempt.AttemptID, attempt.State)
 	}
 	address, err := runtime.EnsurePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{
 		IdempotencyKey: attempt.IdempotencyKey,
@@ -346,12 +350,12 @@ func (s *DirectPaymentService) ensureExternalPaymentAddressAttempt(
 		if err := tx.Read().Where("attempt_id = ?", attempt.AttemptID).First(&current).Error; err != nil {
 			return err
 		}
-		if current.State == models.PaymentAttemptExternalCreated {
+		if externalPaymentAddressCommitted(current.State) {
 			if current.ExternalReference != strings.TrimSpace(address.Address) ||
 				current.ExternalIndex != address.Index || current.RequiredConfs != address.RequiredConfirmations {
 				return fmt.Errorf("external payment runtime changed result for idempotency key %q", current.IdempotencyKey)
 			}
-		} else {
+		} else if current.State == models.PaymentAttemptPendingExternal || current.State == models.PaymentAttemptReconcileRequired {
 			current.ExternalReference = strings.TrimSpace(address.Address)
 			current.ExternalIndex = address.Index
 			current.RequiredConfs = address.RequiredConfirmations
@@ -360,6 +364,8 @@ func (s *DirectPaymentService) ensureExternalPaymentAddressAttempt(
 			if err := tx.Save(&current); err != nil {
 				return err
 			}
+		} else {
+			return fmt.Errorf("external payment attempt %q cannot persist from state %q", current.AttemptID, current.State)
 		}
 		attempt = current
 		return nil
@@ -368,6 +374,43 @@ func (s *DirectPaymentService) ensureExternalPaymentAddressAttempt(
 		return nil, fmt.Errorf("persist external payment address: %w", err)
 	}
 	return externalPaymentAddressResult(attempt, route, runtime), nil
+}
+
+func externalPaymentAddressCommitted(state string) bool {
+	return state == models.PaymentAttemptExternalCreated || state == models.PaymentAttemptLinked
+}
+
+// linkExternalPaymentAddressAttemptInTx makes the durable order link and the
+// terminal attempt transition one atomic write. A failed order or inventory
+// transaction therefore leaves the attempt external_created for reconciliation.
+func (s *DirectPaymentService) linkExternalPaymentAddressAttemptInTx(
+	tx database.Tx,
+	attemptID, orderID string,
+) error {
+	if strings.TrimSpace(attemptID) == "" {
+		return nil
+	}
+	var attempt models.PaymentAttempt
+	if err := tx.Read().Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("attempt_id = ?", attemptID).First(&attempt).Error; err != nil {
+		return err
+	}
+	if attempt.Kind != models.PaymentAttemptKindDirectObservedAddress || attempt.OrderID != orderID {
+		return fmt.Errorf("external payment attempt %q does not belong to order %q", attemptID, orderID)
+	}
+	switch attempt.State {
+	case models.PaymentAttemptLinked:
+		return nil
+	case models.PaymentAttemptExternalCreated:
+		if strings.TrimSpace(attempt.ExternalReference) == "" {
+			return fmt.Errorf("external payment attempt %q has no committed external reference", attemptID)
+		}
+		attempt.State = models.PaymentAttemptLinked
+		attempt.LastError = ""
+		return tx.Save(&attempt)
+	default:
+		return fmt.Errorf("external payment attempt %q cannot be linked from state %q", attemptID, attempt.State)
+	}
 }
 
 func externalPaymentAddressResult(
@@ -382,24 +425,39 @@ func externalPaymentAddressResult(
 	}
 }
 
-// RecoverPendingExternalPaymentAddresses replays durable attempts using their
-// exact historical implementation and stable idempotency key. Per-attempt
-// provider failures remain durable reconcile work; only database failures stop
-// the scan.
+// RecoverPendingExternalPaymentAddresses reconciles durable attempts using
+// their exact historical implementation and stable idempotency key. It also
+// terminalizes created addresses: an order link becomes linked atomically;
+// an expired address with no order moves through abandoning before runtime
+// cleanup and reaches abandoned only after cleanup completes.
+// Per-attempt provider failures remain durable work; only database failures
+// stop the scan.
 func (s *DirectPaymentService) RecoverPendingExternalPaymentAddresses(ctx context.Context) (int, error) {
 	if s == nil || s.db == nil {
 		return 0, fmt.Errorf("recover external payment attempts: database is unavailable")
 	}
-	var attempts []models.PaymentAttempt
+	var provisioning []models.PaymentAttempt
+	var terminalizing []models.PaymentAttempt
 	if err := s.db.View(func(tx database.Tx) error {
+		if err := tx.Read().Where(
+			"kind = ? AND state IN ?",
+			models.PaymentAttemptKindDirectObservedAddress,
+			[]string{
+				models.PaymentAttemptPendingExternal,
+				models.PaymentAttemptReconcileRequired,
+			},
+		).Order("created_at ASC").Limit(100).Find(&provisioning).Error; err != nil {
+			return err
+		}
 		return tx.Read().Where(
 			"kind = ? AND state IN ?",
 			models.PaymentAttemptKindDirectObservedAddress,
-			[]string{models.PaymentAttemptPendingExternal, models.PaymentAttemptReconcileRequired},
-		).Order("created_at ASC").Limit(100).Find(&attempts).Error
+			[]string{models.PaymentAttemptExternalCreated, models.PaymentAttemptAbandoning},
+		).Order("created_at ASC").Limit(100).Find(&terminalizing).Error
 	}); err != nil {
 		return 0, fmt.Errorf("query external payment attempts: %w", err)
 	}
+	attempts := append(provisioning, terminalizing...)
 
 	s.externalMu.RLock()
 	catalog := s.externalPayments
@@ -408,6 +466,16 @@ func (s *DirectPaymentService) RecoverPendingExternalPaymentAddresses(ctx contex
 	for _, attempt := range attempts {
 		if err := ctx.Err(); err != nil {
 			return recovered, err
+		}
+		if attempt.State == models.PaymentAttemptExternalCreated || attempt.State == models.PaymentAttemptAbandoning {
+			changed, err := s.reconcileExternalCreatedPaymentAttempt(attempt, catalog)
+			if err != nil {
+				return recovered, err
+			}
+			if changed {
+				recovered++
+			}
+			continue
 		}
 		if attempt.ExpiresAt != nil && !attempt.ExpiresAt.After(time.Now()) {
 			if err := s.expireExternalPaymentAttempt(attempt.AttemptID); err != nil {
@@ -422,7 +490,7 @@ func (s *DirectPaymentService) RecoverPendingExternalPaymentAddresses(ctx contex
 			}
 			continue
 		}
-		runtime, err := catalog.Resolve(route)
+		runtime, err := resolveExternalPaymentRuntime(catalog, route)
 		if err == nil {
 			_, err = s.ensureExternalPaymentAddressAttempt(ctx, loaded, route, runtime)
 		}
@@ -437,13 +505,116 @@ func (s *DirectPaymentService) RecoverPendingExternalPaymentAddresses(ctx contex
 	return recovered, nil
 }
 
+func resolveExternalPaymentRuntime(
+	catalog *distribution.ExternalPaymentRuntimeCatalog,
+	route payment.RouteIdentity,
+) (distribution.ExternalPaymentRuntime, error) {
+	if catalog == nil {
+		return nil, fmt.Errorf("external payment runtime catalog is unavailable")
+	}
+	return catalog.Resolve(route)
+}
+
+// reconcileExternalCreatedPaymentAttempt serializes against order creation by
+// locking the attempt row. If cleanup wins, a concurrent order transaction sees
+// abandoning and rolls back; if order creation wins, cleanup observes linked.
+func (s *DirectPaymentService) reconcileExternalCreatedPaymentAttempt(
+	attempt models.PaymentAttempt,
+	catalog *distribution.ExternalPaymentRuntimeCatalog,
+) (bool, error) {
+	loaded, route, loadErr := s.loadExternalPaymentAddressAttempt(attempt.AttemptID)
+	if loadErr != nil {
+		return false, loadErr
+	}
+	runtime, resolveErr := resolveExternalPaymentRuntime(catalog, route)
+	transition := ""
+	index := loaded.ExternalIndex
+	now := time.Now()
+	err := s.db.Update(func(tx database.Tx) error {
+		var current models.PaymentAttempt
+		if err := tx.Read().Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("attempt_id = ?", attempt.AttemptID).First(&current).Error; err != nil {
+			return err
+		}
+		if current.Kind != models.PaymentAttemptKindDirectObservedAddress {
+			return nil
+		}
+		if current.State == models.PaymentAttemptAbandoning {
+			if resolveErr != nil {
+				current.LastError = strings.TrimSpace(resolveErr.Error())
+				return tx.Save(&current)
+			}
+			transition = models.PaymentAttemptAbandoning
+			index = current.ExternalIndex
+			return nil
+		}
+		if current.State != models.PaymentAttemptExternalCreated {
+			return nil
+		}
+
+		var order models.GuestOrder
+		orderErr := tx.Read().Where("payment_attempt_id = ?", current.AttemptID).First(&order).Error
+		switch {
+		case orderErr == nil:
+			if order.OrderToken != current.OrderID {
+				return fmt.Errorf("external payment attempt %q is linked to unexpected order %q", current.AttemptID, order.OrderToken)
+			}
+			current.State = models.PaymentAttemptLinked
+			current.LastError = ""
+			transition = models.PaymentAttemptLinked
+			return tx.Save(&current)
+		case !errors.Is(orderErr, gorm.ErrRecordNotFound):
+			return orderErr
+		case current.ExpiresAt == nil || current.ExpiresAt.After(now):
+			return nil
+		case resolveErr != nil:
+			current.LastError = strings.TrimSpace(resolveErr.Error())
+			return tx.Save(&current)
+		default:
+			current.State = models.PaymentAttemptAbandoning
+			current.LastError = "payment address cleanup is pending because no order was committed before expiry"
+			transition = models.PaymentAttemptAbandoning
+			index = current.ExternalIndex
+			return tx.Save(&current)
+		}
+	})
+	if err != nil {
+		return false, fmt.Errorf("reconcile created external payment attempt %q: %w", attempt.AttemptID, err)
+	}
+	if transition == models.PaymentAttemptAbandoning {
+		runtime.ReapPayment(index)
+		if err := s.completeExternalPaymentAttemptAbandonment(attempt.AttemptID); err != nil {
+			return false, err
+		}
+		transition = models.PaymentAttemptAbandoned
+	}
+	return transition != "", nil
+}
+
+func (s *DirectPaymentService) completeExternalPaymentAttemptAbandonment(attemptID string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		var attempt models.PaymentAttempt
+		if err := tx.Read().Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("attempt_id = ?", attemptID).First(&attempt).Error; err != nil {
+			return err
+		}
+		if attempt.Kind != models.PaymentAttemptKindDirectObservedAddress || attempt.State != models.PaymentAttemptAbandoning {
+			return nil
+		}
+		attempt.State = models.PaymentAttemptAbandoned
+		attempt.LastError = "payment address was abandoned because no order was committed before expiry"
+		return tx.Save(&attempt)
+	})
+}
+
 func (s *DirectPaymentService) markExternalPaymentAttemptReconcileRequired(attemptID string, cause error) error {
 	return s.db.Update(func(tx database.Tx) error {
 		var attempt models.PaymentAttempt
 		if err := tx.Read().Where("attempt_id = ?", attemptID).First(&attempt).Error; err != nil {
 			return err
 		}
-		if attempt.Kind != models.PaymentAttemptKindDirectObservedAddress || attempt.State == models.PaymentAttemptExternalCreated {
+		if attempt.Kind != models.PaymentAttemptKindDirectObservedAddress ||
+			(attempt.State != models.PaymentAttemptPendingExternal && attempt.State != models.PaymentAttemptReconcileRequired) {
 			return nil
 		}
 		attempt.State = models.PaymentAttemptReconcileRequired
@@ -458,7 +629,8 @@ func (s *DirectPaymentService) expireExternalPaymentAttempt(attemptID string) er
 		if err := tx.Read().Where("attempt_id = ?", attemptID).First(&attempt).Error; err != nil {
 			return err
 		}
-		if attempt.Kind != models.PaymentAttemptKindDirectObservedAddress || attempt.State == models.PaymentAttemptExternalCreated {
+		if attempt.Kind != models.PaymentAttemptKindDirectObservedAddress ||
+			(attempt.State != models.PaymentAttemptPendingExternal && attempt.State != models.PaymentAttemptReconcileRequired) {
 			return nil
 		}
 		attempt.State = models.PaymentAttemptExpired
@@ -498,18 +670,24 @@ func validateExternalPaymentAddressAttempt(
 	if strings.TrimSpace(attempt.IdempotencyKey) == "" {
 		return fmt.Errorf("external payment attempt %q has no idempotency key", attempt.AttemptID)
 	}
-	if attempt.State == models.PaymentAttemptExternalCreated && strings.TrimSpace(attempt.ExternalReference) == "" {
+	if externalPaymentAddressHasResult(attempt.State) && strings.TrimSpace(attempt.ExternalReference) == "" {
 		return fmt.Errorf("external payment attempt %q has no committed external reference", attempt.AttemptID)
 	}
 	if err := route.Validate(); err != nil {
 		return fmt.Errorf("external payment attempt %q has invalid route: %w", attempt.AttemptID, err)
 	}
 	switch attempt.State {
-	case models.PaymentAttemptPendingExternal, models.PaymentAttemptReconcileRequired, models.PaymentAttemptExternalCreated:
+	case models.PaymentAttemptPendingExternal, models.PaymentAttemptReconcileRequired,
+		models.PaymentAttemptExternalCreated, models.PaymentAttemptLinked, models.PaymentAttemptAbandoning:
 	default:
 		return fmt.Errorf("external payment attempt %q is not recoverable from state %q", attempt.AttemptID, attempt.State)
 	}
 	return nil
+}
+
+func externalPaymentAddressHasResult(state string) bool {
+	return externalPaymentAddressCommitted(state) ||
+		state == models.PaymentAttemptAbandoning || state == models.PaymentAttemptAbandoned
 }
 
 func stableExternalPaymentIdentity(prefix, seed string) string {

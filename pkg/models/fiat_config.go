@@ -6,8 +6,8 @@ import "time"
 // Used in standalone mode where sellers supply their own API keys.
 // In SaaS mode, platform-level keys are in environment variables; only ReceivingAccount is used.
 type FiatProviderConfig struct {
-	TenantID  string `gorm:"column:tenant_id;primaryKey;default:''"`
-	ID        int    `gorm:"primaryKey;autoIncrement:false"`
+	TenantID   string `gorm:"column:tenant_id;primaryKey;default:''"`
+	ID         int    `gorm:"primaryKey;autoIncrement:false"`
 	ProviderID string `gorm:"column:provider_id;type:varchar(32);not null;uniqueIndex:idx_fiat_config_tenant_provider"`
 
 	AccountID     string `gorm:"column:account_id;type:varchar(255)"` // Stripe acct_xxx or PayPal merchant_xxx
@@ -15,8 +15,10 @@ type FiatProviderConfig struct {
 	SecretKey     string `gorm:"column:secret_key;type:text"`     // AES-256-GCM encrypted
 	WebhookSecret string `gorm:"column:webhook_secret;type:text"` // AES-256-GCM encrypted
 
-	WebhookID             string `gorm:"column:webhook_id;type:varchar(255)"`
-	WebhookAutoConfigured bool   `gorm:"column:webhook_auto_configured;default:false"`
+	WebhookID                string `gorm:"column:webhook_id;type:varchar(255)"`
+	WebhookAutoConfigured    bool   `gorm:"column:webhook_auto_configured;default:false"`
+	ConfigurationGeneration  uint64 `gorm:"column:configuration_generation;not null;default:1"`
+	ConfigurationFingerprint string `gorm:"column:configuration_fingerprint;type:varchar(64);not null;default:''"`
 
 	IsActive  bool      `gorm:"column:is_active;default:false"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`

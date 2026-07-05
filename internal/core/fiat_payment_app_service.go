@@ -183,28 +183,36 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 
 func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, params contracts.CreatePaymentParams, account *models.ReceivingAccount) (models.PaymentAttempt, models.PaymentRouteBinding, error) {
 	assetID := "fiat:" + strings.ToLower(strings.TrimSpace(providerID)) + ":" + strings.ToUpper(strings.TrimSpace(params.Currency))
-	// The provider binding identifies the stable settlement destination, not the
-	// mutable configuration row. Key rotation or status refreshes must not create
-	// a second provider object for the same order; changing the external account
-	// address intentionally creates a new binding.
-	bindingSeed := fmt.Sprintf("%s|%s|%d|%s", strings.TrimSpace(s.nodeID), providerID, account.ID, account.Address)
-	providerBindingID := stablePaymentIdentity("fpb_", bindingSeed)
-	attemptSeed := fmt.Sprintf("%s|%s|%d|%s", strings.TrimSpace(params.OrderID), assetID, params.Amount, providerBindingID)
-	attemptID := stablePaymentIdentity("pa_", attemptSeed)
-	routeID := stablePaymentIdentity("prb_", attemptID)
-	attempt := models.PaymentAttempt{
-		AttemptID: attemptID, PaymentSessionID: "ps_" + strings.TrimSpace(params.OrderID), OrderID: strings.TrimSpace(params.OrderID),
-		ProviderID: strings.ToLower(strings.TrimSpace(providerID)), Amount: params.Amount, Currency: strings.ToUpper(strings.TrimSpace(params.Currency)),
-		RouteBindingID: routeID, IdempotencyKey: stablePaymentIdentity("mbz_", attemptSeed), State: models.PaymentAttemptPendingExternal,
-	}
-	route := models.PaymentRouteBinding{
-		RouteBindingID: routeID, AttemptID: attemptID,
-		ContributionID: "core.fiat." + strings.ToLower(providerID), ModuleID: "mobazha.core.fiat." + strings.ToLower(providerID),
-		ImplementationGeneration: "builtin-v1", RailKind: string(distribution.PaymentRailProviderSession),
-		NetworkID: string(FiatChainType(providerID)), AssetID: assetID, ProtocolVersion: "provider-v1", StateSchemaVersion: "1",
-		ProviderBindingID: providerBindingID, ExternalAccountReference: account.Address,
-	}
+	var attempt models.PaymentAttempt
+	var route models.PaymentRouteBinding
 	err := s.db.Update(func(tx database.Tx) error {
+		binding, err := s.ensureProviderBindingTx(tx, providerID, account.Address)
+		if err != nil {
+			return err
+		}
+		decision := distribution.DecidePaymentRoute(distribution.PaymentRouteDecisionRequest{
+			WorkMode: distribution.PaymentRouteAdmitNew, ContributionID: binding.DriverContributionID,
+			ProviderBindingID: binding.BindingID, BindingState: binding.State,
+			ContributionAvailability: distribution.PaymentRouteReady, HistoricalImplementationAvailable: true,
+		})
+		if !decision.Allowed {
+			return fmt.Errorf("payment route decision %s: %s", decision.Code, decision.Reason)
+		}
+		attemptSeed := fmt.Sprintf("%s|%s|%d|%s", strings.TrimSpace(params.OrderID), assetID, params.Amount, binding.BindingID)
+		attemptID := stablePaymentIdentity("pa_", attemptSeed)
+		routeID := stablePaymentIdentity("prb_", attemptID)
+		attempt = models.PaymentAttempt{
+			AttemptID: attemptID, PaymentSessionID: "ps_" + strings.TrimSpace(params.OrderID), OrderID: strings.TrimSpace(params.OrderID),
+			ProviderID: strings.ToLower(strings.TrimSpace(providerID)), Amount: params.Amount, Currency: strings.ToUpper(strings.TrimSpace(params.Currency)),
+			RouteBindingID: routeID, IdempotencyKey: stablePaymentIdentity("mbz_", attemptSeed), State: models.PaymentAttemptPendingExternal,
+		}
+		route = models.PaymentRouteBinding{
+			RouteBindingID: routeID, AttemptID: attemptID,
+			ContributionID: binding.DriverContributionID, ModuleID: "mobazha.core.fiat." + strings.ToLower(providerID),
+			ImplementationGeneration: fmt.Sprintf("builtin-v1.binding-%d", binding.ConfigurationGeneration), RailKind: string(distribution.PaymentRailProviderSession),
+			NetworkID: string(FiatChainType(providerID)), AssetID: assetID, ProtocolVersion: "provider-v1", StateSchemaVersion: "1",
+			ProviderBindingID: binding.BindingID, ExternalAccountReference: binding.ExternalAccountReference,
+		}
 		var existing models.PaymentAttempt
 		if err := tx.Read().Where("attempt_id = ?", attemptID).First(&existing).Error; err == nil {
 			attempt = existing
@@ -222,7 +230,7 @@ func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, par
 	}
 	// A concurrent caller may have committed the same deterministic claim.
 	if loadErr := s.db.View(func(tx database.Tx) error {
-		if err := tx.Read().Where("attempt_id = ?", attemptID).First(&attempt).Error; err != nil {
+		if err := tx.Read().Where("attempt_id = ?", attempt.AttemptID).First(&attempt).Error; err != nil {
 			return err
 		}
 		return tx.Read().Where("route_binding_id = ?", attempt.RouteBindingID).First(&route).Error
@@ -230,6 +238,91 @@ func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, par
 		return attempt, route, nil
 	}
 	return models.PaymentAttempt{}, models.PaymentRouteBinding{}, fmt.Errorf("prepare fiat payment attempt: %w", err)
+}
+
+func (s *FiatPaymentAppService) ensureProviderBindingTx(tx database.Tx, providerID, accountReference string) (models.PaymentProviderBinding, error) {
+	providerID = strings.ToLower(strings.TrimSpace(providerID))
+	accountReference = strings.TrimSpace(accountReference)
+	if providerID == "" || accountReference == "" {
+		return models.PaymentProviderBinding{}, fmt.Errorf("provider binding requires provider and external account")
+	}
+	mode := "runtime"
+	configurationBacked := false
+	generation := uint64(1)
+	fingerprint := providerConfigurationFingerprint(providerID, accountReference, mode)
+	credentialReference := "runtime:" + providerID
+	if s.isPlatformProvider(providerID) {
+		mode = "platform"
+		fingerprint = providerConfigurationFingerprint(providerID, accountReference, mode)
+		credentialReference = "platform:" + providerID
+	} else {
+		var cfg models.FiatProviderConfig
+		if err := tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error; err == nil {
+			mode = "direct"
+			configurationBacked = true
+			generation = cfg.ConfigurationGeneration
+			if generation == 0 {
+				generation = 1
+			}
+			fingerprint = cfg.ConfigurationFingerprint
+			if fingerprint == "" {
+				fingerprint = providerConfigurationFingerprint(providerID, cfg.AccountID, cfg.PublicKey, cfg.SecretKey, cfg.WebhookSecret)
+			}
+			credentialReference = fmt.Sprintf("tenant-config:%s:%d", providerID, generation)
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.PaymentProviderBinding{}, err
+		}
+	}
+	if !configurationBacked {
+		var current models.PaymentProviderBinding
+		if err := tx.Read().Where(
+			"provider_id = ? AND mode = ? AND configuration_fingerprint = ? AND external_account_reference = ? AND state = ?",
+			providerID, mode, fingerprint, accountReference, models.PaymentProviderBindingActive,
+		).First(&current).Error; err == nil {
+			return current, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.PaymentProviderBinding{}, err
+		}
+		var latest models.PaymentProviderBinding
+		if err := tx.Read().Where("provider_id = ?", providerID).Order("configuration_generation DESC").First(&latest).Error; err == nil {
+			generation = latest.ConfigurationGeneration + 1
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.PaymentProviderBinding{}, err
+		}
+	}
+	bindingID := stablePaymentIdentity("fpb_", fmt.Sprintf("%s|%s|%s|%d|%s|%s", s.nodeID, providerID, mode, generation, accountReference, fingerprint))
+	var binding models.PaymentProviderBinding
+	if err := tx.Read().Where("binding_id = ?", bindingID).First(&binding).Error; err == nil {
+		return binding, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.PaymentProviderBinding{}, err
+	}
+	var active []models.PaymentProviderBinding
+	if err := tx.Read().Where("provider_id = ? AND state = ?", providerID, models.PaymentProviderBindingActive).Find(&active).Error; err != nil {
+		return models.PaymentProviderBinding{}, err
+	}
+	now := time.Now().UTC()
+	for _, previous := range active {
+		if _, err := tx.UpdateColumns(map[string]interface{}{
+			"state": models.PaymentProviderBindingRetired, "retired_at": now,
+		}, map[string]interface{}{"binding_id = ?": previous.BindingID}, &models.PaymentProviderBinding{}); err != nil {
+			return models.PaymentProviderBinding{}, err
+		}
+	}
+	binding = models.PaymentProviderBinding{
+		BindingID: bindingID, ProviderID: providerID, DriverContributionID: "core.fiat." + providerID,
+		ExternalAccountReference: accountReference, CredentialReference: credentialReference,
+		ConfigurationGeneration: generation, ConfigurationFingerprint: fingerprint,
+		Mode: mode, State: models.PaymentProviderBindingActive,
+	}
+	if err := tx.Create(&binding); err != nil {
+		return models.PaymentProviderBinding{}, err
+	}
+	return binding, nil
+}
+
+func providerConfigurationFingerprint(values ...string) string {
+	return stablePaymentIdentity("", strings.Join(values, "\x00"))
 }
 
 func (s *FiatPaymentAppService) persistFiatPaymentMetadata(ctx context.Context, attempt models.PaymentAttempt, route models.PaymentRouteBinding, sessionID string) error {
@@ -835,8 +928,9 @@ func (s *FiatPaymentAppService) GetProviderConfig(providerID string) (*contracts
 // it attempts automated webhook creation. The webhookURL must be set by the caller
 // (handler knows the public-facing URL).
 func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input contracts.ProviderConfigInput) error {
+	providerID = strings.ToLower(strings.TrimSpace(providerID))
 	chainType := FiatChainType(providerID)
-
+	var resolved models.FiatProviderConfig
 	if err := s.db.Update(func(tx database.Tx) error {
 		cfg := &models.FiatProviderConfig{
 			ProviderID:    providerID,
@@ -849,7 +943,8 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 
 		// Partial-update: empty input fields keep existing values
 		var existing models.FiatProviderConfig
-		if tx.Read().Where("provider_id = ?", providerID).First(&existing).Error == nil {
+		existingErr := tx.Read().Where("provider_id = ?", providerID).First(&existing).Error
+		if existingErr == nil {
 			if cfg.SecretKey == "" {
 				cfg.SecretKey = existing.SecretKey
 			}
@@ -862,7 +957,29 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 			if cfg.WebhookSecret == "" {
 				cfg.WebhookSecret = existing.WebhookSecret
 			}
+			cfg.WebhookID = existing.WebhookID
+			cfg.WebhookAutoConfigured = existing.WebhookAutoConfigured
+		} else if !errors.Is(existingErr, gorm.ErrRecordNotFound) {
+			return existingErr
 		}
+		fingerprint := providerConfigurationFingerprint(providerID, cfg.AccountID, cfg.PublicKey, cfg.SecretKey, cfg.WebhookSecret)
+		generation := existing.ConfigurationGeneration
+		if generation == 0 {
+			generation = 1
+		}
+		if errors.Is(existingErr, gorm.ErrRecordNotFound) {
+			var latest models.PaymentProviderBinding
+			if err := tx.Read().Where("provider_id = ?", providerID).Order("configuration_generation DESC").First(&latest).Error; err == nil {
+				generation = latest.ConfigurationGeneration + 1
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
+		if existing.ProviderID != "" && existing.ConfigurationFingerprint != "" && existing.ConfigurationFingerprint != fingerprint {
+			generation++
+		}
+		cfg.ConfigurationGeneration = generation
+		cfg.ConfigurationFingerprint = fingerprint
 
 		if err := database.SaveByBusinessKey(tx, cfg, "provider_id = ?", providerID); err != nil {
 			return err
@@ -874,14 +991,20 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 				Address:   cfg.AccountID,
 				IsActive:  true,
 			}
-			return database.SaveByBusinessKey(tx, ra, "chain_type = ?", chainType)
+			if err := database.SaveByBusinessKey(tx, ra, "chain_type = ?", chainType); err != nil {
+				return err
+			}
+			if _, err := s.ensureProviderBindingTx(tx, providerID, cfg.AccountID); err != nil {
+				return err
+			}
 		}
+		resolved = *cfg
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	s.registerProviderFromConfig(providerID, input.SecretKey, input.PublicKey, input.WebhookSecret)
+	s.registerProviderFromConfig(providerID, resolved.SecretKey, resolved.PublicKey, resolved.WebhookSecret)
 	return nil
 }
 
@@ -912,7 +1035,22 @@ func (s *FiatPaymentAppService) SetupWebhook(ctx context.Context, providerID str
 			cfg.WebhookSecret = result.WebhookSecret
 			cfg.WebhookID = result.WebhookID
 			cfg.WebhookAutoConfigured = true
-			return database.SaveByBusinessKey(tx, &cfg, "provider_id = ?", providerID)
+			fingerprint := providerConfigurationFingerprint(providerID, cfg.AccountID, cfg.PublicKey, cfg.SecretKey, cfg.WebhookSecret)
+			if cfg.ConfigurationFingerprint != fingerprint {
+				cfg.ConfigurationGeneration++
+				if cfg.ConfigurationGeneration == 0 {
+					cfg.ConfigurationGeneration = 1
+				}
+				cfg.ConfigurationFingerprint = fingerprint
+			}
+			if err := database.SaveByBusinessKey(tx, &cfg, "provider_id = ?", providerID); err != nil {
+				return err
+			}
+			if cfg.AccountID != "" {
+				_, err := s.ensureProviderBindingTx(tx, providerID, cfg.AccountID)
+				return err
+			}
+			return nil
 		}); dbErr != nil {
 			logger.LogErrorWithIDf(log, s.nodeID, "auto-webhook: saved webhook but failed to update config: %v", dbErr)
 			return result, dbErr
@@ -965,6 +1103,18 @@ func (s *FiatPaymentAppService) deleteProviderConfig(ctx context.Context, provid
 	}
 
 	err := s.db.Update(func(tx database.Tx) error {
+		var bindings []models.PaymentProviderBinding
+		if err := tx.Read().Where("provider_id = ? AND state = ?", providerID, models.PaymentProviderBindingActive).Find(&bindings).Error; err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		for _, binding := range bindings {
+			if _, err := tx.UpdateColumns(map[string]interface{}{
+				"state": models.PaymentProviderBindingRetired, "retired_at": now,
+			}, map[string]interface{}{"binding_id = ?": binding.BindingID}, &models.PaymentProviderBinding{}); err != nil {
+				return err
+			}
+		}
 		if err := tx.Delete("provider_id", providerID, nil, &models.FiatProviderConfig{}); err != nil {
 			return err
 		}
@@ -1310,6 +1460,11 @@ func (s *FiatPaymentAppService) reconcileFiatPaymentAttempts(ctx context.Context
 			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("load route binding: %w", err))
 			continue
 		}
+		binding, err := s.resolveHistoricalProviderBinding(route)
+		if err != nil {
+			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("route decision denied historical provider binding: %w", err))
+			continue
+		}
 		provider, err := s.registry.ForProvider(attempt.ProviderID)
 		if err != nil {
 			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("resolve provider %s: %w", attempt.ProviderID, err))
@@ -1317,7 +1472,7 @@ func (s *FiatPaymentAppService) reconcileFiatPaymentAttempts(ctx context.Context
 		}
 		params := contracts.CreatePaymentParams{
 			OrderID: attempt.OrderID, Amount: attempt.Amount, Currency: attempt.Currency,
-			SellerAccountID: route.ExternalAccountReference, IdempotencyKey: attempt.IdempotencyKey,
+			SellerAccountID: binding.ExternalAccountReference, IdempotencyKey: attempt.IdempotencyKey,
 			Metadata: map[string]string{
 				"mobazha_payment_attempt_id": attempt.AttemptID,
 				"mobazha_route_binding_id":   route.RouteBindingID,
@@ -1339,6 +1494,56 @@ func (s *FiatPaymentAppService) reconcileFiatPaymentAttempts(ctx context.Context
 			_ = s.markFiatAttemptReconcileRequired(attempt.AttemptID, fmt.Errorf("reconcile payment metadata: %w", err))
 		}
 	}
+}
+
+func (s *FiatPaymentAppService) resolveHistoricalProviderBinding(route models.PaymentRouteBinding) (models.PaymentProviderBinding, error) {
+	if strings.TrimSpace(route.ProviderBindingID) == "" {
+		return models.PaymentProviderBinding{}, fmt.Errorf("route %s has no provider binding", route.RouteBindingID)
+	}
+	var binding models.PaymentProviderBinding
+	var historicalCredentialErr error
+	err := s.db.View(func(tx database.Tx) error {
+		if err := tx.Read().Where("binding_id = ?", route.ProviderBindingID).First(&binding).Error; err != nil {
+			return err
+		}
+		if binding.Mode != "direct" {
+			return nil
+		}
+		var cfg models.FiatProviderConfig
+		if err := tx.Read().Where("provider_id = ?", binding.ProviderID).First(&cfg).Error; err != nil {
+			historicalCredentialErr = fmt.Errorf("credential reference %s is unavailable: %w", binding.CredentialReference, err)
+			return nil
+		}
+		if cfg.ConfigurationGeneration != binding.ConfigurationGeneration {
+			historicalCredentialErr = fmt.Errorf("credential reference %s is not the active generation", binding.CredentialReference)
+		}
+		return nil
+	})
+	if err != nil {
+		return models.PaymentProviderBinding{}, err
+	}
+	if binding.ExternalAccountReference != route.ExternalAccountReference {
+		return models.PaymentProviderBinding{}, fmt.Errorf("route account does not match provider binding")
+	}
+	if binding.DriverContributionID != route.ContributionID {
+		return models.PaymentProviderBinding{}, fmt.Errorf("route contribution does not match provider binding")
+	}
+	availability := distribution.PaymentRouteReady
+	if binding.State == models.PaymentProviderBindingRetired {
+		availability = distribution.PaymentRouteExistingOnly
+	}
+	decision := distribution.DecidePaymentRoute(distribution.PaymentRouteDecisionRequest{
+		WorkMode: distribution.PaymentRouteReconcile, ContributionID: binding.DriverContributionID,
+		ProviderBindingID: binding.BindingID, BindingState: binding.State,
+		ContributionAvailability: availability, HistoricalImplementationAvailable: historicalCredentialErr == nil,
+	})
+	if !decision.Allowed {
+		if historicalCredentialErr != nil {
+			return models.PaymentProviderBinding{}, fmt.Errorf("payment route decision %s: %s: %w", decision.Code, decision.Reason, historicalCredentialErr)
+		}
+		return models.PaymentProviderBinding{}, fmt.Errorf("payment route decision %s: %s", decision.Code, decision.Reason)
+	}
+	return binding, nil
 }
 
 // RunFiatReconciliationOnce executes a single pass of fiat order reconciliation.

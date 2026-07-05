@@ -312,11 +312,73 @@ func TestFiatService_SaveProviderConfig_CreatesReceivingAccount(t *testing.T) {
 	assert.Equal(t, "acct_test123", ra.Address)
 
 	assert.Contains(t, reg.Registered(), "stripe", "provider should be registered")
+
+	var binding models.PaymentProviderBinding
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&binding).Error }))
+	assert.Equal(t, models.PaymentProviderBindingActive, binding.State)
+	assert.Equal(t, uint64(1), binding.ConfigurationGeneration)
+	assert.Equal(t, "acct_test123", binding.ExternalAccountReference)
+	assert.Equal(t, "tenant-config:stripe:1", binding.CredentialReference)
+}
+
+func TestFiatService_SaveProviderConfig_ConfigurationChangeCreatesNewBindingGeneration(t *testing.T) {
+	svc, db := newFiatTestService(t, newMockFiatRegistry())
+	initial := contracts.ProviderConfigInput{AccountID: "acct_v1", PublicKey: "pk", SecretKey: "sk_v1", WebhookSecret: "wh"}
+	require.NoError(t, svc.SaveProviderConfig("stripe", initial))
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{}), "empty partial update must reuse the generation")
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{AccountID: "acct_v2", SecretKey: "sk_v2"}))
+
+	var cfg models.FiatProviderConfig
+	var bindings []models.PaymentProviderBinding
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		if err := tx.Read().Where("provider_id = ?", "stripe").First(&cfg).Error; err != nil {
+			return err
+		}
+		return tx.Read().Where("provider_id = ?", "stripe").Order("configuration_generation ASC").Find(&bindings).Error
+	}))
+	assert.Equal(t, uint64(2), cfg.ConfigurationGeneration)
+	require.Len(t, bindings, 2)
+	assert.Equal(t, models.PaymentProviderBindingRetired, bindings[0].State)
+	assert.Equal(t, "acct_v1", bindings[0].ExternalAccountReference)
+	assert.Equal(t, models.PaymentProviderBindingActive, bindings[1].State)
+	assert.Equal(t, "acct_v2", bindings[1].ExternalAccountReference)
+	assert.NotEqual(t, bindings[0].BindingID, bindings[1].BindingID)
+}
+
+func TestFiatService_ProviderBinding_PlatformAccountRebindAdvancesGeneration(t *testing.T) {
+	svc, db := newFiatTestService(t, newMockFiatRegistry())
+	svc.markPlatformProvider("stripe")
+	var first, repeated, second models.PaymentProviderBinding
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		first, err = svc.ensureProviderBindingTx(tx, "stripe", "acct_platform_v1")
+		if err != nil {
+			return err
+		}
+		repeated, err = svc.ensureProviderBindingTx(tx, "stripe", "acct_platform_v1")
+		if err != nil {
+			return err
+		}
+		second, err = svc.ensureProviderBindingTx(tx, "stripe", "acct_platform_v2")
+		return err
+	}))
+	assert.Equal(t, first.BindingID, repeated.BindingID)
+	assert.Equal(t, uint64(1), first.ConfigurationGeneration)
+	assert.Equal(t, uint64(2), second.ConfigurationGeneration)
+	assert.NotEqual(t, first.BindingID, second.BindingID)
+
+	var bindings []models.PaymentProviderBinding
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ?", "stripe").Order("configuration_generation ASC").Find(&bindings).Error
+	}))
+	require.Len(t, bindings, 2)
+	assert.Equal(t, models.PaymentProviderBindingRetired, bindings[0].State)
+	assert.Equal(t, models.PaymentProviderBindingActive, bindings[1].State)
 }
 
 func TestFiatService_deleteProviderConfig_UnregistersProvider(t *testing.T) {
 	reg := newMockFiatRegistry()
-	svc, _ := newFiatTestService(t, reg)
+	svc, db := newFiatTestService(t, reg)
 
 	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
 		AccountID: "acct_del", PublicKey: "pk", SecretKey: "sk", WebhookSecret: "wh",
@@ -325,6 +387,21 @@ func TestFiatService_deleteProviderConfig_UnregistersProvider(t *testing.T) {
 
 	require.NoError(t, svc.deleteProviderConfig(context.Background(), "stripe"))
 	assert.Empty(t, reg.Registered(), "provider should be unregistered after delete")
+	var binding models.PaymentProviderBinding
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&binding).Error }))
+	assert.Equal(t, models.PaymentProviderBindingRetired, binding.State)
+	assert.NotNil(t, binding.RetiredAt)
+
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
+		AccountID: "acct_del", PublicKey: "pk", SecretKey: "sk", WebhookSecret: "wh",
+	}))
+	var bindings []models.PaymentProviderBinding
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ?", "stripe").Order("configuration_generation ASC").Find(&bindings).Error
+	}))
+	require.Len(t, bindings, 2)
+	assert.Equal(t, uint64(2), bindings[1].ConfigurationGeneration)
+	assert.Equal(t, models.PaymentProviderBindingActive, bindings[1].State)
 }
 
 func TestFiatService_deleteProviderConfig_KeepPlatformProviderRegistered(t *testing.T) {
@@ -414,17 +491,23 @@ func TestFiatService_CreatePayment_Success(t *testing.T) {
 
 	var attempt models.PaymentAttempt
 	var route models.PaymentRouteBinding
+	var binding models.PaymentProviderBinding
 	require.NoError(t, db.View(func(tx database.Tx) error {
 		if err := tx.Read().First(&attempt).Error; err != nil {
 			return err
 		}
-		return tx.Read().First(&route).Error
+		if err := tx.Read().First(&route).Error; err != nil {
+			return err
+		}
+		return tx.Read().First(&binding).Error
 	}))
 	assert.Equal(t, models.PaymentAttemptExternalCreated, attempt.State)
 	assert.Equal(t, "sess_ok", attempt.ExternalReference)
 	assert.Equal(t, attempt.AttemptID, route.AttemptID)
 	assert.Equal(t, "core.fiat.stripe", route.ContributionID)
 	assert.Equal(t, "fiat:stripe:USD", route.AssetID)
+	assert.Equal(t, binding.BindingID, route.ProviderBindingID)
+	assert.Equal(t, binding.ExternalAccountReference, route.ExternalAccountReference)
 	assert.Equal(t, provider.createParams[0].IdempotencyKey, attempt.IdempotencyKey)
 	require.ErrorContains(t, svc.commitFiatPaymentAttempt(attempt.AttemptID, "sess_conflict"), "provider reference conflict")
 }
@@ -595,6 +678,34 @@ func TestFiatService_ReconcilePaymentAttempt_ReplaysProviderCreateWithSameClaim(
 	assert.Equal(t, models.PaymentAttemptExternalCreated, attempt.State)
 	assert.Equal(t, "sess_recovered", attempt.ExternalReference)
 	assert.Empty(t, attempt.LastError)
+}
+
+func TestFiatService_ReconcilePaymentAttempt_HistoricalDirectCredentialUnavailableFailsClosed(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, db := newFiatTestService(t, reg)
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{
+		AccountID: "acct_old", PublicKey: "pk", SecretKey: "sk_old", WebhookSecret: "wh",
+	}))
+	provider := &mockFiatProvider{id: "stripe", createErr: errors.New("ambiguous timeout")}
+	reg.Register(provider)
+	_, err := svc.CreatePayment(context.Background(), "stripe", contracts.CreatePaymentParams{
+		OrderID: "order_old_binding", Amount: 2500, Currency: "USD",
+	})
+	require.ErrorContains(t, err, "ambiguous timeout")
+	require.Len(t, provider.createParams, 1)
+
+	require.NoError(t, svc.SaveProviderConfig("stripe", contracts.ProviderConfigInput{AccountID: "acct_new", SecretKey: "sk_new"}))
+	provider.createErr = nil
+	provider.createResult = &contracts.FiatProviderSession{SessionID: "must_not_be_created"}
+	reg.Register(provider)
+	svc.ReconcileFiatOrders(context.Background())
+	require.Len(t, provider.createParams, 1, "reconciliation must not use current credentials for a historical direct binding")
+
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&attempt).Error }))
+	assert.Equal(t, models.PaymentAttemptReconcileRequired, attempt.State)
+	assert.Contains(t, attempt.LastError, "route decision denied historical provider binding")
+	assert.Contains(t, attempt.LastError, "not the active generation")
 }
 
 func TestFiatService_CreatePayment_RejectsManagedCollectibleBeforeProvider(t *testing.T) {

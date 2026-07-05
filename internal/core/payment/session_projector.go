@@ -350,10 +350,13 @@ func (p *PaymentSessionProjector) deriveProgress(
 	observations []models.PaymentObservation,
 ) payment.PaymentProgressView {
 	observedRaw := strings.TrimSpace(observedAmountRaw)
-	if observedRaw == "" {
+	// queryObservationProgress returns "0" when there are no observation rows.
+	// Treat that aggregate identity as missing so legacy/provider payments can
+	// still fall back to the authoritative order transaction or PaymentSent.
+	if obsCount == 0 && isMissingObservedAmount(observedRaw) {
 		observedRaw = order.TotalReceived
 	}
-	if strings.TrimSpace(observedRaw) == "" {
+	if obsCount == 0 && isMissingObservedAmount(observedRaw) {
 		if paymentSent, err := order.PaymentSentMessage(); err == nil && paymentSent != nil {
 			observedRaw = strings.TrimSpace(paymentSent.GetAmount())
 		}
@@ -395,6 +398,15 @@ func (p *PaymentSessionProjector) deriveProgress(
 		FundingState:     fundingState,
 		Observations:     paymentObservationViews(observations, paymentCoin),
 	}
+}
+
+func isMissingObservedAmount(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return true
+	}
+	amount := parseBigInt(trimmed)
+	return amount != nil && amount.Sign() == 0
 }
 
 func paymentObservationViews(rows []models.PaymentObservation, paymentCoin string) []payment.ObservedPaymentView {

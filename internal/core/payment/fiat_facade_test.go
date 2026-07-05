@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
 )
 
@@ -83,6 +84,42 @@ func TestDeriveFundingState_Fiat_ExpiredUnfunded_WhenFailed(t *testing.T) {
 	got := deriveFundingState("0", "0", models.PaymentVerificationStatusFailed, true)
 	if got != payment.FundingStateExpiredUnfunded {
 		t.Errorf("deriveFundingState(isFiat=true, failed) = %v, want ExpiredUnfunded", got)
+	}
+}
+
+func TestDeriveProgress_FiatVerifiedFallsBackToPaymentSentAmount(t *testing.T) {
+	order := &models.Order{OrderPaymentState: models.OrderPaymentState{
+		PaymentVerificationStatus: models.PaymentVerificationStatusVerified,
+	}}
+	if err := order.MergeFiatMetadata(map[string]string{
+		"fiat_provider":   "stripe",
+		"fiat_currency":   "USD",
+		"fiat_session_id": "pi_verified",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.SetPaymentSent(&pb.PaymentSent{Amount: "4900"}); err != nil {
+		t.Fatal(err)
+	}
+
+	progress := (&PaymentSessionProjector{}).deriveProgress(
+		order,
+		"4900",
+		"fiat:stripe:USD",
+		"0",
+		0,
+		nil,
+		nil,
+	)
+
+	if progress.ObservedAmount != "49" {
+		t.Errorf("ObservedAmount = %q, want 49", progress.ObservedAmount)
+	}
+	if progress.RemainingAmount != "0" {
+		t.Errorf("RemainingAmount = %q, want 0", progress.RemainingAmount)
+	}
+	if progress.FundingState != payment.FundingStateFullyFunded {
+		t.Errorf("FundingState = %q, want fully_funded", progress.FundingState)
 	}
 }
 

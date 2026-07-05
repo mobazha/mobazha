@@ -303,6 +303,68 @@ func (e *RailExecutor) ReconcileExecution(ctx context.Context, actionID string) 
 	return result, nil
 }
 
+// RecoverPending retries durable create-or-retrieve work after process restart.
+// The limit applies independently to funding targets and execution actions so
+// one class of obligations cannot starve the other. Individual failures do not
+// prevent unrelated pending work from being serviced.
+func (e *RailExecutor) RecoverPending(ctx context.Context, limit int) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if limit <= 0 {
+		return fmt.Errorf("collateral rail recovery limit must be positive")
+	}
+	var funding []models.CollateralFundingTargetRecord
+	var executions []models.CollateralRailActionRecord
+	if err := e.db.View(func(tx database.Tx) error {
+		if err := tx.Read().WithContext(ctx).
+			Where("rail_id = ? AND rail_version = ? AND state = ?", e.descriptor.ID, e.descriptor.Version, string(pkgcollateral.RailActionPending)).
+			Order("updated_at ASC").Limit(limit).Find(&funding).Error; err != nil {
+			return err
+		}
+		return tx.Read().WithContext(ctx).
+			Where("rail_id = ? AND rail_version = ? AND state = ?", e.descriptor.ID, e.descriptor.Version, string(pkgcollateral.RailActionPending)).
+			Order("updated_at ASC").Limit(limit).Find(&executions).Error
+	}); err != nil {
+		return err
+	}
+
+	var recoveryErrors []error
+	for i := range funding {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(recoveryErrors, err)...)
+		}
+		row := funding[i]
+		var err error
+		if row.Destination == "" && len(row.Payload) == 0 {
+			_, err = e.PrepareFunding(ctx, pkgcollateral.FundingTargetRequest{
+				TenantID: row.TenantID, CollateralID: row.CollateralID, PrincipalID: row.PrincipalID,
+				AssetID: row.AssetID, Amount: row.Amount, IdempotencyKey: row.IdempotencyKey, ExpiresAt: row.ExpiresAt,
+			})
+		} else {
+			_, err = e.ReconcileFunding(ctx, row.CollateralID)
+		}
+		if err != nil {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("recover collateral funding %s: %w", row.CollateralID, err))
+		}
+	}
+	for i := range executions {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(recoveryErrors, err)...)
+		}
+		row := executions[i]
+		_, err := e.SubmitExecution(ctx, pkgcollateral.RailExecutionRequest{
+			ActionID: row.ActionID, TenantID: row.TenantID, CollateralID: row.CollateralID, ClaimID: row.ClaimID,
+			Kind: pkgcollateral.ExecutionKind(row.Kind), AssetID: row.AssetID, Amount: row.Amount,
+			Destination: row.Destination, ExpectedRevision: row.ExpectedRevision, IdempotencyKey: row.IdempotencyKey,
+		})
+		if err != nil {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("recover collateral execution %s: %w", row.ActionID, err))
+		}
+	}
+	return errors.Join(recoveryErrors...)
+}
+
 func (e *RailExecutor) applyFundingStatus(record models.CollateralFundingTargetRecord, status pkgcollateral.RailFundingStatus, now time.Time) error {
 	return e.db.Update(func(tx database.Tx) error {
 		if status.State == pkgcollateral.RailActionConfirmed {

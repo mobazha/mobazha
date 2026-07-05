@@ -198,6 +198,94 @@ func TestRailExecutorAppliesConfirmedSlash(t *testing.T) {
 	require.Equal(t, "slash-receipt-1", claim.ExecutionReference)
 }
 
+func TestRailExecutorRecoversPendingExecutionAfterRestart(t *testing.T) {
+	db := collateralTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	_, account := openAndFundCollateral(t, db, now, "source-restart", "open-restart", "fund-restart", "funding-restart", "100")
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		account, err = RequestAccountReleaseTx(tx, pkgcollateral.AccountReleaseRequest{
+			TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
+			ExpectedRevision: account.Revision, IdempotencyKey: "request-restart", Reason: "resource-retired",
+		}, now)
+		return err
+	}))
+	request := pkgcollateral.RailExecutionRequest{
+		ActionID: "release-restart-1", TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
+		Kind: pkgcollateral.ExecutionRelease, AssetID: account.AssetID, Amount: account.FundedAmount,
+		Destination: "principal:seller-1", ExpectedRevision: account.Revision, IdempotencyKey: "submit-restart-1",
+	}
+
+	uncertainRail := completeFakeRail()
+	uncertainRail.submitErr = errors.New("connection reset after submit")
+	first, err := NewRailExecutor(db, uncertainRail)
+	require.NoError(t, err)
+	first.now = func() time.Time { return now }
+	_, err = first.SubmitExecution(context.Background(), request)
+	require.ErrorContains(t, err, "connection reset")
+
+	// A fresh executor reconstructs the immutable request and safely repeats
+	// the rail's create-or-retrieve operation.
+	recoveredRail := completeFakeRail()
+	recoveredRail.submitResult = pkgcollateral.RailActionResult{
+		ActionID: request.ActionID, State: pkgcollateral.RailActionConfirmed,
+		Reference: "release-restart-receipt", ObservedAt: now,
+	}
+	restarted, err := NewRailExecutor(db, recoveredRail)
+	require.NoError(t, err)
+	restarted.now = func() time.Time { return now }
+	require.NoError(t, restarted.RecoverPending(context.Background(), 10))
+	require.Equal(t, 1, recoveredRail.submitCalls)
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		var err error
+		account, err = AccountByIDTx(tx, account.CollateralID)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.StateReleased, account.State)
+}
+
+func TestRailExecutorRecoversFundingTargetCreationAfterRestart(t *testing.T) {
+	db := collateralTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	open := openRequest(now)
+	var account pkgcollateral.Account
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		account, err = OpenTx(tx, open, now)
+		return err
+	}))
+	request := pkgcollateral.FundingTargetRequest{
+		TenantID: database.StandaloneTenantID, CollateralID: account.CollateralID,
+		PrincipalID: account.PrincipalID, AssetID: account.AssetID, Amount: account.RequiredAmount,
+		IdempotencyKey: "funding-restart-1", ExpiresAt: now.Add(time.Hour),
+	}
+
+	uncertainRail := completeFakeRail()
+	uncertainRail.prepareErr = errors.New("connection reset during target creation")
+	first, err := NewRailExecutor(db, uncertainRail)
+	require.NoError(t, err)
+	first.now = func() time.Time { return now }
+	_, err = first.PrepareFunding(context.Background(), request)
+	require.ErrorContains(t, err, "connection reset")
+
+	recoveredRail := completeFakeRail()
+	recoveredRail.prepareTarget = pkgcollateral.FundingTarget{
+		RailID: recoveredRail.descriptor.ID, CollateralID: account.CollateralID, AssetID: account.AssetID,
+		Amount: account.RequiredAmount, Destination: "vault:recovered", ExpiresAt: request.ExpiresAt,
+	}
+	restarted, err := NewRailExecutor(db, recoveredRail)
+	require.NoError(t, err)
+	restarted.now = func() time.Time { return now }
+	require.NoError(t, restarted.RecoverPending(context.Background(), 10))
+	require.Equal(t, 1, recoveredRail.prepareCalls)
+	var record models.CollateralFundingTargetRecord
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("collateral_id = ?", account.CollateralID).First(&record).Error
+	}))
+	require.Equal(t, "vault:recovered", record.Destination)
+	require.Equal(t, uint64(2), record.Attempts)
+}
+
 type fakeCollateralRail struct {
 	descriptor           pkgcollateral.RailDescriptor
 	prepareTarget        pkgcollateral.FundingTarget

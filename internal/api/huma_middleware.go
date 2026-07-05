@@ -231,12 +231,14 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		// Security layers — mirror legacy AuthenticationMiddleware behavior.
 		// Use RemoteAddr directly (not proxy headers) to prevent XFF bypass.
 		peerIP := remoteIPFromHuma(ctx)
+		authHeader := ctx.Header("Authorization")
 
 		// No up-front isBlocked check — see AuthenticationMiddleware.
 		// The limiter is enforced only after a credential failure
 		// below; valid credentials reset via resetIP.
 
 		if len(g.config.AllowedIPs) > 0 && !g.config.AllowedIPs[peerIP] {
+			g.recordHumaLoginDenied(ctx, op, peerIP, authMethodFromHeader(authHeader), "client_ip_not_allowed")
 			huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 			return
 		}
@@ -244,12 +246,12 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		if g.config.Cookie != "" {
 			cookieVal := extractCookieFromHuma(ctx, AuthCookieName)
 			if subtle.ConstantTimeCompare([]byte(cookieVal), []byte(g.config.Cookie)) != 1 {
+				g.recordHumaLoginDenied(ctx, op, peerIP, authMethodFromHeader(authHeader), "deployment_cookie_mismatch")
 				huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 				return
 			}
 		}
 
-		authHeader := ctx.Header("Authorization")
 		jv := g.getJWTValidator()
 
 		// 1) mbz_ API token
@@ -265,6 +267,7 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 				// to share a prefix with read-only wallet routes in
 				// routeScopeMap.
 				if !operationAcceptsAPIToken(op) {
+					g.recordHumaLoginDenied(ctx, op, peerIP, "api_token", "unsupported_auth_method")
 					huma.WriteErr(api, ctx, http.StatusUnauthorized,
 						"API tokens are not accepted for this operation; use Basic Auth or Bearer JWT")
 					return
@@ -272,9 +275,11 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 				identity, ok := g.tryAPITokenAuth(bearerVal)
 				if !ok {
 					if g.recordHumaAuthFailureAndRateLimited(ctx) {
+						g.recordHumaLoginDenied(ctx, op, peerIP, "api_token", "rate_limited")
 						writeHumaAuthRateLimited(api, ctx)
 						return
 					}
+					g.recordHumaLoginDenied(ctx, op, peerIP, "api_token", "invalid_credentials")
 					huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid or expired API token")
 					return
 				}
@@ -314,9 +319,11 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 				}
 				// Bearer was present but invalid → hard fail
 				if g.recordHumaAuthFailureAndRateLimited(ctx) {
+					g.recordHumaLoginDenied(ctx, op, peerIP, "jwt", "rate_limited")
 					writeHumaAuthRateLimited(api, ctx)
 					return
 				}
+				g.recordHumaLoginDenied(ctx, op, peerIP, "jwt", "invalid_credentials")
 				huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid or expired token")
 				return
 			}
@@ -325,9 +332,11 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		// If a Bearer token was present but neither mbz_ nor valid JWT, reject.
 		if jv != nil && strings.HasPrefix(authHeader, "Bearer ") {
 			if g.recordHumaAuthFailureAndRateLimited(ctx) {
+				g.recordHumaLoginDenied(ctx, op, peerIP, "jwt", "rate_limited")
 				writeHumaAuthRateLimited(api, ctx)
 				return
 			}
+			g.recordHumaLoginDenied(ctx, op, peerIP, "jwt", "invalid_credentials")
 			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid or expired token")
 			return
 		}
@@ -337,20 +346,42 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		basicQuery := strings.HasPrefix(ctx.Query("token"), "basic:")
 		if authHeader == "" && !basicQuery {
 			cookieVal := extractCookieFromHuma(ctx, AdminSessionCookieName)
-			if session, ok := g.ensureAdminSessionStore().get(cookieVal); ok {
+			session, lookupStatus := g.ensureAdminSessionStore().lookup(cookieVal)
+			if lookupStatus == adminSessionValid {
 				if !operationAcceptsAdminSession(op) {
+					g.recordAuthAudit(ctx.Context(), AuthAuditEvent{
+						Type: AuthAuditSessionRejected, Outcome: "denied", Reason: "unsupported_operation",
+						ActorID: session.UserID, AuthMethod: "session", ClientIP: peerIP,
+						RequestMethod: op.Method, RequestPath: op.Path,
+					})
 					huma.WriteErr(api, ctx, http.StatusUnauthorized,
 						"Administrator sessions are not accepted for this operation")
 					return
 				}
 				if adminSessionRequiresCSRF(op.Method) &&
 					!csrfTokenMatches(session.CSRFToken, ctx.Header(AdminSessionCSRFHeader)) {
+					g.recordAuthAudit(ctx.Context(), AuthAuditEvent{
+						Type: AuthAuditSessionCSRFDenied, Outcome: "denied", Reason: "csrf_mismatch",
+						ActorID: session.UserID, AuthMethod: "session", ClientIP: peerIP,
+						RequestMethod: op.Method, RequestPath: op.Path,
+					})
 					huma.WriteErr(api, ctx, http.StatusForbidden, "Invalid or missing CSRF token")
 					return
 				}
 				g.resetHumaAuthFailure(ctx)
 				next(huma.WithContext(ctx, WithAuthIdentity(ctx.Context(), adminSessionIdentity(session))))
 				return
+			}
+			if cookieVal != "" {
+				reason := "unknown_session"
+				if lookupStatus == adminSessionExpired {
+					reason = "expired_session"
+				}
+				g.recordAuthAudit(ctx.Context(), AuthAuditEvent{
+					Type: AuthAuditSessionRejected, Outcome: "denied", Reason: reason,
+					AuthMethod: "session", ClientIP: peerIP,
+					RequestMethod: op.Method, RequestPath: op.Path,
+				})
 			}
 		}
 
@@ -363,15 +394,22 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 				}
 			}
 			if !ok {
+				reason := "missing_credentials"
+				if authMethodFromHeader(authHeader) != "" {
+					reason = "invalid_credentials"
+				}
+				g.recordHumaLoginDenied(ctx, op, peerIP, authMethodFromHeader(authHeader), reason)
 				huma.WriteErr(api, ctx, http.StatusUnauthorized, "Authentication required")
 				return
 			}
 			matched, upgradable := g.auth.checkPassword(username, password)
 			if !matched {
 				if g.recordHumaAuthFailureAndRateLimited(ctx) {
+					g.recordHumaLoginDenied(ctx, op, peerIP, "basic", "rate_limited")
 					writeHumaAuthRateLimited(api, ctx)
 					return
 				}
+				g.recordHumaLoginDenied(ctx, op, peerIP, "basic", "invalid_credentials")
 				huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid credentials")
 				return
 			}
@@ -389,6 +427,7 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		}
 
 		if jv != nil {
+			g.recordHumaLoginDenied(ctx, op, peerIP, "", "missing_credentials")
 			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Authentication required")
 			return
 		}
@@ -405,6 +444,7 @@ func (g *Gateway) nodeHumaAuthMiddleware(api huma.API) func(huma.Context, func(h
 		// configurations (DataDir empty, auth explicitly disabled) do, and
 		// those must explicitly opt in by setting AllowedIPs / configuring
 		// auth before exposing owner-only routes.
+		g.recordHumaLoginDenied(ctx, op, peerIP, "", "authentication_not_configured")
 		huma.WriteErr(api, ctx, http.StatusUnauthorized,
 			"Authentication required — configure an admin password or JWT validator")
 	}

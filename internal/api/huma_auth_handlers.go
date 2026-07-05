@@ -68,15 +68,24 @@ func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 		if identity == nil || !identity.IsAdmin {
 			return nil, huma.NewError(http.StatusUnauthorized, "Administrator authentication required")
 		}
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/auth/admin-session", nil)
 		token, session, err := g.ensureAdminSessionStore().issue(identity.UserID)
 		if err != nil {
+			g.recordAuthAudit(ctx, AuthAuditEvent{
+				Type: AuthAuditSessionCreated, Outcome: "error", Reason: "issue_failed",
+				ActorID: identity.UserID, AuthMethod: authMethodFromHeader(req.Header.Get("Authorization")),
+				ClientIP: requestPeerIP(req), RequestMethod: req.Method, RequestPath: req.URL.Path,
+			})
 			log.Errorf("Failed to issue administrator session: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "Failed to create administrator session")
 		}
-		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/auth/admin-session", nil)
 		expiresAt := session.ExpiresAt.UTC()
-		log.Infof("[ADMIN_SESSION] issued user=%q remote=%q expires=%s",
-			identity.UserID, req.RemoteAddr, expiresAt.Format(time.RFC3339))
+		g.recordAuthAudit(ctx, AuthAuditEvent{
+			Type: AuthAuditSessionCreated, Outcome: "success",
+			ActorID: identity.UserID, AuthMethod: authMethodFromHeader(req.Header.Get("Authorization")),
+			ClientIP: requestPeerIP(req), RequestMethod: req.Method, RequestPath: req.URL.Path,
+			SessionExpiresAt: &expiresAt,
+		})
 		return &adminSessionOutput{
 			SetCookie:    g.adminSessionCookie(token, session.ExpiresAt, req),
 			CacheControl: "no-store",
@@ -103,6 +112,11 @@ func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 			expiresAt := session.ExpiresAt.UTC()
 			status.CSRFToken = session.CSRFToken
 			status.ExpiresAt = &expiresAt
+			g.recordAuthAudit(ctx, AuthAuditEvent{
+				Type: AuthAuditSessionRestored, Outcome: "success",
+				ActorID: session.UserID, AuthMethod: "session", ClientIP: requestPeerIP(req),
+				RequestMethod: req.Method, RequestPath: req.URL.Path, SessionExpiresAt: &expiresAt,
+			})
 		}
 		return &adminSessionOutput{CacheControl: "no-store", Body: status}, nil
 	})
@@ -117,13 +131,21 @@ func (g *Gateway) registerNodeHumaAuthAdminOperations(api huma.API) {
 	}, func(ctx context.Context, _ *struct{}) (*adminSessionOutput, error) {
 		req := nodeBridgeRequest(ctx, http.MethodDelete, "/v1/auth/admin-session", nil)
 		token, _, _ := g.adminSessionFromRequest(req)
-		g.ensureAdminSessionStore().revoke(token)
+		revoked := g.ensureAdminSessionStore().revoke(token)
 		identity := GetAuthIdentity(ctx)
-		userID := "unknown"
+		userID := ""
 		if identity != nil && identity.UserID != "" {
 			userID = identity.UserID
 		}
-		log.Infof("[ADMIN_SESSION] revoked user=%q remote=%q", userID, req.RemoteAddr)
+		revokedCount := 0
+		if revoked {
+			revokedCount = 1
+		}
+		g.recordAuthAudit(ctx, AuthAuditEvent{
+			Type: AuthAuditSessionRevoked, Outcome: "success",
+			ActorID: userID, AuthMethod: authMethodFromRequest(req), ClientIP: requestPeerIP(req),
+			RequestMethod: req.Method, RequestPath: req.URL.Path, RevokedSessions: revokedCount,
+		})
 		return &adminSessionOutput{
 			SetCookie:    g.expiredAdminSessionCookie(req),
 			CacheControl: "no-store",

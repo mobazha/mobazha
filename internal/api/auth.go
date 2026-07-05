@@ -489,12 +489,22 @@ func (g *Gateway) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	curOK, _ := VerifyPassword(req.CurrentPassword, storedHash)
 	if !curOK {
+		g.recordAuthAudit(r.Context(), AuthAuditEvent{
+			Type: AuthAuditPasswordRotated, Outcome: "denied", Reason: "current_password_mismatch",
+			ActorID: authAuditActorID(r.Context()), AuthMethod: authMethodFromRequest(r), ClientIP: requestPeerIP(r),
+			RequestMethod: r.Method, RequestPath: r.URL.Path,
+		})
 		ErrorResponse(w, http.StatusForbidden, "Current password is incorrect")
 		return
 	}
 
 	newHash, err := HashPassword(req.NewPassword)
 	if err != nil {
+		g.recordAuthAudit(r.Context(), AuthAuditEvent{
+			Type: AuthAuditPasswordRotated, Outcome: "error", Reason: "hash_failed",
+			ActorID: authAuditActorID(r.Context()), AuthMethod: authMethodFromRequest(r),
+			ClientIP: requestPeerIP(r), RequestMethod: r.Method, RequestPath: r.URL.Path,
+		})
 		log.Errorf("Failed to hash new password: %v", err)
 		ErrorResponse(w, http.StatusInternalServerError, "Failed to save password")
 		return
@@ -502,6 +512,11 @@ func (g *Gateway) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	if g.auth.hashFile != "" {
 		if err := os.WriteFile(g.auth.hashFile, []byte(newHash), 0600); err != nil {
+			g.recordAuthAudit(r.Context(), AuthAuditEvent{
+				Type: AuthAuditPasswordRotated, Outcome: "error", Reason: "persist_failed",
+				ActorID: authAuditActorID(r.Context()), AuthMethod: authMethodFromRequest(r),
+				ClientIP: requestPeerIP(r), RequestMethod: r.Method, RequestPath: r.URL.Path,
+			})
 			log.Errorf("Failed to persist password hash: %v", err)
 			ErrorResponse(w, http.StatusInternalServerError, "Failed to save password")
 			return
@@ -511,7 +526,12 @@ func (g *Gateway) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	g.auth.mu.Lock()
 	g.auth.passwordHash = newHash
 	g.auth.mu.Unlock()
-	g.ensureAdminSessionStore().revokeAll()
+	revokedSessions := g.ensureAdminSessionStore().revokeAll()
+	g.recordAuthAudit(r.Context(), AuthAuditEvent{
+		Type: AuthAuditPasswordRotated, Outcome: "success",
+		ActorID: authAuditActorID(r.Context()), AuthMethod: authMethodFromRequest(r), ClientIP: requestPeerIP(r),
+		RequestMethod: r.Method, RequestPath: r.URL.Path, RevokedSessions: revokedSessions,
+	})
 
 	if g.auth.plainFile != "" {
 		if err := os.Remove(g.auth.plainFile); err != nil && !os.IsNotExist(err) {

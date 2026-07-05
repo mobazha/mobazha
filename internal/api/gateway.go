@@ -70,6 +70,9 @@ type GatewayConfig struct {
 	// AdminSessionTTL controls short-lived browser administrator sessions.
 	// Zero uses the secure default (30 minutes).
 	AdminSessionTTL time.Duration
+	// AuthAuditSink receives structured authentication boundary events.
+	// Nil uses the standard structured log sink.
+	AuthAuditSink AuthAuditSink
 
 	// CasdoorCertificate is the PEM certificate from SaaS Casdoor.
 	// When set, the standalone node accepts JWT Bearer tokens in addition
@@ -135,6 +138,7 @@ type Gateway struct {
 	config            *GatewayConfig
 	auth              authState
 	adminSessions     *adminSessionStore
+	authAuditSink     AuthAuditSink
 	jwtValidator      *JWTValidator   // nil when no Casdoor cert configured
 	tokenStore        *apitoken.Store // nil in SaaS mode; set for standalone
 	hubs              map[string]*hub
@@ -167,11 +171,15 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			guestOrderLimiter: newRateLimiter(10, time.Hour),
 			authLimiter:       newAuthRateLimiter(),
 			adminSessions:     newAdminSessionStore(config.AdminSessionTTL),
+			authAuditSink:     config.AuthAuditSink,
 			editionPolicy:     editionPolicy,
 			aiHTTPPolicy:      resolveAIHTTPPolicy(config.AIHTTPPolicy, editionPolicy),
 		}
 		topMux = http.NewServeMux()
 	)
+	if g.authAuditSink == nil {
+		g.authAuditSink = logAuthAuditSink{}
+	}
 
 	g.auth = authState{
 		username:     config.Username,

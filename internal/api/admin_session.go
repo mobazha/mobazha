@@ -33,6 +33,14 @@ type adminSessionStore struct {
 	sessions map[[sha256.Size]byte]adminSessionRecord
 }
 
+type adminSessionLookupStatus uint8
+
+const (
+	adminSessionMissing adminSessionLookupStatus = iota
+	adminSessionValid
+	adminSessionExpired
+)
+
 func newAdminSessionStore(ttl time.Duration) *adminSessionStore {
 	if ttl <= 0 {
 		ttl = defaultAdminSessionTTL
@@ -83,36 +91,49 @@ func (s *adminSessionStore) issue(userID string) (string, adminSessionRecord, er
 }
 
 func (s *adminSessionStore) get(token string) (adminSessionRecord, bool) {
+	record, status := s.lookup(token)
+	return record, status == adminSessionValid
+}
+
+func (s *adminSessionStore) lookup(token string) (adminSessionRecord, adminSessionLookupStatus) {
 	if token == "" {
-		return adminSessionRecord{}, false
+		return adminSessionRecord{}, adminSessionMissing
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := sessionTokenHash(token)
 	record, ok := s.sessions[key]
 	if !ok {
-		return adminSessionRecord{}, false
+		return adminSessionRecord{}, adminSessionMissing
 	}
 	if !record.ExpiresAt.After(s.now()) {
 		delete(s.sessions, key)
-		return adminSessionRecord{}, false
+		return adminSessionRecord{}, adminSessionExpired
 	}
-	return record, true
+	return record, adminSessionValid
 }
 
-func (s *adminSessionStore) revoke(token string) {
+func (s *adminSessionStore) revoke(token string) bool {
 	if token == "" {
-		return
+		return false
 	}
 	s.mu.Lock()
-	delete(s.sessions, sessionTokenHash(token))
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+	key := sessionTokenHash(token)
+	if _, ok := s.sessions[key]; !ok {
+		return false
+	}
+	delete(s.sessions, key)
+	return true
 }
 
-func (s *adminSessionStore) revokeAll() {
+func (s *adminSessionStore) revokeAll() int {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.removeExpiredLocked(s.now())
+	count := len(s.sessions)
 	clear(s.sessions)
-	s.mu.Unlock()
+	return count
 }
 
 func (s *adminSessionStore) removeExpiredLocked(now time.Time) {

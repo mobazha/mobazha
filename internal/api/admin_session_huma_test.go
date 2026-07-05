@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,6 +15,8 @@ import (
 
 func TestAdminSessionHumaLifecycle(t *testing.T) {
 	g := testGateway(t, "testpass")
+	audit := &bufferAuthAuditSink{}
+	g.authAuditSink = audit
 	router := chi.NewMux()
 	api := humachi.New(router, huma.DefaultConfig("test", "1.0.0"))
 	g.installNodeHumaMiddlewares(api)
@@ -103,5 +106,44 @@ func TestAdminSessionHumaLifecycle(t *testing.T) {
 	getResp.Body.Close()
 	if getResp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("revoked session returned %d, want 401", getResp.StatusCode)
+	}
+
+	events := audit.snapshot()
+	wantTypes := []AuthAuditEventType{
+		AuthAuditSessionCreated,
+		AuthAuditSessionRestored,
+		AuthAuditSessionCSRFDenied,
+		AuthAuditSessionRevoked,
+		AuthAuditSessionRejected,
+	}
+	if len(events) != len(wantTypes) {
+		t.Fatalf("unexpected audit events: %#v", events)
+	}
+	for i, wantType := range wantTypes {
+		if events[i].Type != wantType {
+			t.Errorf("audit event %d type = %q, want %q", i, events[i].Type, wantType)
+		}
+		if events[i].SchemaVersion != authAuditSchemaVersion || events[i].OccurredAt.IsZero() {
+			t.Errorf("audit event %d is missing schema metadata: %#v", i, events[i])
+		}
+	}
+	if events[0].AuthMethod != "basic" || events[0].ActorID != "admin" {
+		t.Errorf("unexpected session creation audit: %#v", events[0])
+	}
+	if events[2].Reason != "csrf_mismatch" || events[2].Outcome != "denied" {
+		t.Errorf("unexpected CSRF audit: %#v", events[2])
+	}
+	if events[3].RevokedSessions != 1 {
+		t.Errorf("logout must report one revoked session: %#v", events[3])
+	}
+	if events[4].Reason != "unknown_session" {
+		t.Errorf("unexpected rejected session audit: %#v", events[4])
+	}
+	encoded, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(encoded, []byte(cookies[0].Value)) || bytes.Contains(encoded, []byte(login.CSRFToken)) {
+		t.Fatalf("audit events leaked session credential material: %s", encoded)
 	}
 }

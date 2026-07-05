@@ -32,6 +32,10 @@ type PaymentProviderAction struct {
 	Attempts          int        `gorm:"column:attempts;not null;default:0"`
 	LastError         string     `gorm:"column:last_error;size:2048"`
 	NextAttemptAt     *time.Time `gorm:"column:next_attempt_at;index"`
+	LeaseOwner        string     `gorm:"column:lease_owner;size:128"`
+	LeaseExpiresAt    *time.Time `gorm:"column:lease_expires_at;index:idx_provider_action_lease"`
+	LastAttemptAt     *time.Time `gorm:"column:last_attempt_at"`
+	CompletedAt       *time.Time `gorm:"column:completed_at"`
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }

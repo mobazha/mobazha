@@ -260,6 +260,17 @@ func TestHandlePOSTFiatCapture_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
+func TestHandlePOSTFiatCapture_InProgress(t *testing.T) {
+	svc := &mockFiatService{captureErr: contracts.ErrActionInProgress}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/paypal/payments/order_1/capture", nil,
+		map[string]string{"providerID": "paypal", "sessionID": "order_1"}, svc)
+
+	g.handlePOSTFiatCapture(w, r)
+	assert.Equal(t, http.StatusConflict, w.Code)
+}
+
 // --- GET /v1/fiat/{providerID}/payments/{paymentID} ---
 
 func TestHandleGETFiatPayment_Success(t *testing.T) {
@@ -523,6 +534,18 @@ func TestHandlePOSTFiatRefund_IdempotencyConflict(t *testing.T) {
 	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments/pi_test/refund", nil,
 		map[string]string{"providerID": "stripe", "paymentID": "pi_test"}, svc)
 	r.Header.Set("Idempotency-Key", "refund-conflict")
+
+	g.handlePOSTFiatRefund(w, r)
+	assert.Equal(t, http.StatusConflict, w.Code)
+}
+
+func TestHandlePOSTFiatRefund_InProgress(t *testing.T) {
+	svc := &mockFiatService{refundErr: contracts.ErrActionInProgress}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments/pi_test/refund", nil,
+		map[string]string{"providerID": "stripe", "paymentID": "pi_test"}, svc)
+	r.Header.Set("Idempotency-Key", "refund-in-progress")
 
 	g.handlePOSTFiatRefund(w, r)
 	assert.Equal(t, http.StatusConflict, w.Code)

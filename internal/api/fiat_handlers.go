@@ -168,6 +168,10 @@ func (g *Gateway) handlePOSTFiatCapture(w http.ResponseWriter, r *http.Request) 
 	result, err := svc.CapturePayment(r.Context(), providerID, sessionID)
 	if err != nil {
 		log.Warningf("Fiat capture failed for %s/%s: %v", providerID, sessionID, err)
+		if errors.Is(err, contracts.ErrActionInProgress) {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "Payment capture is already in progress")
+			return
+		}
 		responsePkg.ErrorWithDetail(w, http.StatusInternalServerError, responsePkg.CodeProviderError,
 			"Payment capture failed. Please try again.",
 			fmt.Sprintf("%s capture: %v", providerID, sanitizeProviderError(err)))
@@ -216,6 +220,10 @@ func (g *Gateway) handlePOSTFiatRefund(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("fiat refund failed for %s/%s: %v", providerID, paymentID, err)
 		if errors.Is(err, contracts.ErrActionIntentConflict) {
 			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "Idempotency-Key conflicts with an existing refund intent")
+			return
+		}
+		if errors.Is(err, contracts.ErrActionInProgress) {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, "Refund is already in progress or scheduled for retry")
 			return
 		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "refund request failed")

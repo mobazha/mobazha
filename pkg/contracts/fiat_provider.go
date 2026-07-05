@@ -12,6 +12,8 @@ var (
 	ErrProviderNotFound     = errors.New("fiat: provider not found")
 	ErrAlreadyRefunded      = errors.New("fiat: payment already refunded")
 	ErrActionIntentConflict = errors.New("fiat: provider action idempotency key conflicts with an existing intent")
+	ErrActionInProgress     = errors.New("fiat: provider action is already in progress or scheduled for retry")
+	ErrActionLeaseLost      = errors.New("fiat: provider action execution lease lost")
 	ErrActiveOrdersExist    = errors.New("fiat: cannot disconnect provider with active orders")
 )
 

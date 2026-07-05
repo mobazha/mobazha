@@ -28,6 +28,7 @@ import (
 
 type mockFiatProvider struct {
 	createMu      sync.Mutex
+	captureMu     sync.Mutex
 	id            string
 	parseErr      error
 	parsedEvent   *contracts.WebhookEvent
@@ -72,7 +73,9 @@ func (m *mockFiatProvider) CreatePayment(_ context.Context, params contracts.Cre
 }
 
 func (m *mockFiatProvider) CapturePayment(_ context.Context, params contracts.CapturePaymentParams) (*contracts.PaymentResult, error) {
+	m.captureMu.Lock()
 	m.captureCalls = append(m.captureCalls, params)
+	m.captureMu.Unlock()
 	if m.beforeCapture != nil {
 		m.beforeCapture(params)
 	}
@@ -910,6 +913,9 @@ func TestFiatService_CapturePayment_PersistsIntentBeforeProviderAndReturnsComple
 			return tx.Read().Where("idempotency_key = ?", params.IdempotencyKey).First(&row).Error
 		}))
 		assert.Equal(t, models.PaymentProviderActionPendingExternal, row.State)
+		assert.NotEmpty(t, row.LeaseOwner)
+		require.NotNil(t, row.LeaseExpiresAt)
+		require.NotNil(t, row.LastAttemptAt)
 	}
 
 	result, err := svc.CapturePayment(context.Background(), "stripe", "pi_capture")
@@ -925,6 +931,131 @@ func TestFiatService_CapturePayment_PersistsIntentBeforeProviderAndReturnsComple
 	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
 	assert.Equal(t, models.PaymentProviderActionCompleted, action.State)
 	assert.Equal(t, 1, action.Attempts)
+	assert.Empty(t, action.LeaseOwner)
+	assert.Nil(t, action.LeaseExpiresAt)
+	require.NotNil(t, action.CompletedAt)
+}
+
+func TestFiatService_ExecuteProviderAction_ConcurrentWorkersUseSingleLease(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var enteredOnce sync.Once
+	var releaseOnce sync.Once
+	provider := &mockFiatProvider{
+		id: "stripe", captureResult: &contracts.PaymentResult{PaymentID: "pi_leased", Status: "succeeded"},
+		beforeCapture: func(contracts.CapturePaymentParams) {
+			enteredOnce.Do(func() { close(entered) })
+			<-release
+		},
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_leased", "pi_leased")
+	action, err := svc.prepareProviderAction(
+		"stripe", models.PaymentProviderActionCapture, "pi_leased", "", "",
+		providerCaptureIntent{SessionID: "pi_leased"},
+	)
+	require.NoError(t, err)
+
+	workerTwo := NewFiatPaymentAppService(reg, db, "test-node-two", false)
+	workerTwo.SetProviderCredentialKeyProvider(testProviderCredentialKeys{})
+	firstResult := make(chan error, 1)
+	go func() {
+		_, executeErr := svc.executeProviderAction(context.Background(), action)
+		firstResult <- executeErr
+	}()
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first worker did not enter provider capture")
+	}
+	secondResult := make(chan error, 1)
+	go func() {
+		_, executeErr := workerTwo.executeProviderAction(context.Background(), action)
+		secondResult <- executeErr
+	}()
+	select {
+	case err = <-secondResult:
+		require.ErrorIs(t, err, contracts.ErrActionInProgress)
+	case <-time.After(2 * time.Second):
+		releaseOnce.Do(func() { close(release) })
+		t.Fatal("second worker did not reject the active lease")
+	}
+	releaseOnce.Do(func() { close(release) })
+	require.NoError(t, <-firstResult)
+
+	provider.captureMu.Lock()
+	captureCalls := len(provider.captureCalls)
+	provider.captureMu.Unlock()
+	assert.Equal(t, 1, captureCalls)
+	var completed models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&completed).Error }))
+	assert.Equal(t, models.PaymentProviderActionCompleted, completed.State)
+	assert.Empty(t, completed.LeaseOwner)
+}
+
+func TestFiatService_ExecuteProviderAction_ExpiredLeaseIsRecoverable(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe", captureResult: &contracts.PaymentResult{PaymentID: "pi_expired", Status: "succeeded"}}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_expired", "pi_expired")
+	action, err := svc.prepareProviderAction(
+		"stripe", models.PaymentProviderActionCapture, "pi_expired", "", "",
+		providerCaptureIntent{SessionID: "pi_expired"},
+	)
+	require.NoError(t, err)
+	expiredAt := time.Now().UTC().Add(-time.Minute)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		_, updateErr := tx.UpdateColumns(map[string]interface{}{
+			"lease_owner": "dead-worker:lease", "lease_expires_at": expiredAt,
+		}, map[string]interface{}{"action_id = ?": action.ActionID}, &models.PaymentProviderAction{})
+		return updateErr
+	}))
+
+	result, err := svc.executeProviderAction(context.Background(), action)
+	require.NoError(t, err)
+	require.NotNil(t, result.Capture)
+	assert.Equal(t, "pi_expired", result.Capture.PaymentID)
+	var completed models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&completed).Error }))
+	assert.Equal(t, models.PaymentProviderActionCompleted, completed.State)
+	assert.Empty(t, completed.LeaseOwner)
+	require.NotNil(t, completed.CompletedAt)
+}
+
+func TestFiatService_CompleteProviderAction_StaleLeaseCannotOverwrite(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe"}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_stale_lease", "pi_stale_lease")
+	action, err := svc.prepareProviderAction(
+		"stripe", models.PaymentProviderActionCapture, "pi_stale_lease", "", "",
+		providerCaptureIntent{SessionID: "pi_stale_lease"},
+	)
+	require.NoError(t, err)
+	claimed, action, err := svc.claimProviderAction(action, time.Now().UTC())
+	require.NoError(t, err)
+	require.True(t, claimed)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		_, updateErr := tx.UpdateColumns(
+			map[string]interface{}{"lease_owner": "replacement-worker:lease"},
+			map[string]interface{}{"action_id = ?": action.ActionID}, &models.PaymentProviderAction{},
+		)
+		return updateErr
+	}))
+
+	err = svc.completeProviderAction(action, providerActionResult{
+		Capture: &contracts.PaymentResult{PaymentID: "pi_stale_lease", Status: "succeeded"},
+	})
+	require.ErrorIs(t, err, contracts.ErrActionLeaseLost)
+	var current models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&current).Error }))
+	assert.Equal(t, models.PaymentProviderActionPendingExternal, current.State)
+	assert.Equal(t, "replacement-worker:lease", current.LeaseOwner)
 }
 
 func TestFiatService_ReconcileProviderAction_RetriesWithSameIdempotencyKey(t *testing.T) {
@@ -942,7 +1073,13 @@ func TestFiatService_ReconcileProviderAction_RetriesWithSameIdempotencyKey(t *te
 	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
 	assert.Equal(t, models.PaymentProviderActionReconcileRequired, action.State)
 	require.NotNil(t, action.NextAttemptAt)
+	assert.Empty(t, action.LeaseOwner)
+	assert.Nil(t, action.LeaseExpiresAt)
+	require.NotNil(t, action.LastAttemptAt)
 	assert.True(t, action.NextAttemptAt.After(time.Now()))
+	_, err = svc.CapturePayment(context.Background(), "paypal", "pp_order_retry")
+	require.ErrorIs(t, err, contracts.ErrActionInProgress)
+	require.Len(t, provider.captureCalls, 1, "explicit retry must honor persisted backoff")
 	svc.reconcileProviderActions(context.Background())
 	require.Len(t, provider.captureCalls, 1, "reconciler must honor persisted backoff")
 	require.NoError(t, db.Update(func(tx database.Tx) error {

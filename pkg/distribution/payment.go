@@ -376,6 +376,52 @@ const (
 	PaymentOperationReconcile      PaymentRailOperation = "reconcile"
 )
 
+// PaymentRailContract defines the provider-neutral lifecycle boundary of one
+// rail kind. Required operations are the portable kernel contract; Allowed
+// operations prevent a module from claiming settlement authority its rail
+// model cannot implement.
+type PaymentRailContract struct {
+	Required []PaymentRailOperation
+	Allowed  []PaymentRailOperation
+}
+
+// ContractForPaymentRail returns the frozen lifecycle contract for a rail.
+func ContractForPaymentRail(rail PaymentRailKind) (PaymentRailContract, error) {
+	kernel := []PaymentRailOperation{
+		PaymentOperationSetup,
+		PaymentOperationObserve,
+		PaymentOperationVerify,
+		PaymentOperationReconcile,
+	}
+	switch rail {
+	case PaymentRailEscrow:
+		return PaymentRailContract{
+			Required: append([]PaymentRailOperation(nil), kernel...),
+			Allowed: []PaymentRailOperation{
+				PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify,
+				PaymentOperationConfirm, PaymentOperationCancel, PaymentOperationRefund,
+				PaymentOperationComplete, PaymentOperationDisputeRelease, PaymentOperationReconcile,
+			},
+		}, nil
+	case PaymentRailDirectObserved:
+		return PaymentRailContract{
+			Required: append([]PaymentRailOperation(nil), kernel...),
+			Allowed:  append([]PaymentRailOperation(nil), kernel...),
+		}, nil
+	case PaymentRailProviderSession:
+		return PaymentRailContract{
+			Required: append([]PaymentRailOperation(nil), kernel...),
+			Allowed: []PaymentRailOperation{
+				PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify,
+				PaymentOperationConfirm, PaymentOperationCancel, PaymentOperationRefund,
+				PaymentOperationReconcile,
+			},
+		}, nil
+	default:
+		return PaymentRailContract{}, fmt.Errorf("unknown payment rail %q", rail)
+	}
+}
+
 // PaymentAssetAny is an explicit contribution scope for adapters that validate
 // the concrete asset at request time. Empty asset IDs are never wildcards.
 const PaymentAssetAny iwallet.CoinType = "*"
@@ -943,7 +989,43 @@ func validatePaymentRailContribution(contribution PaymentRailContribution, descr
 		}
 		operations[operation] = struct{}{}
 	}
+	contract, err := ContractForPaymentRail(contribution.Rail)
+	if err != nil {
+		return fmt.Errorf("payment contribution %q: %w", contribution.ContributionID, err)
+	}
+	allowed := make(map[PaymentRailOperation]struct{}, len(contract.Allowed))
+	for _, operation := range contract.Allowed {
+		allowed[operation] = struct{}{}
+	}
+	for operation := range operations {
+		if _, ok := allowed[operation]; !ok {
+			return fmt.Errorf("payment contribution %q rail %q does not allow operation %q", contribution.ContributionID, contribution.Rail, operation)
+		}
+	}
+	for _, required := range contract.Required {
+		if _, ok := operations[required]; !ok {
+			return fmt.Errorf("payment contribution %q rail %q requires operation %q", contribution.ContributionID, contribution.Rail, required)
+		}
+	}
 	return nil
+}
+
+// ValidatePaymentModuleDescriptor exposes the same normalized contract check
+// used by the trusted manager so first-party distribution repositories can run
+// architecture tests without duplicating Core rules.
+func ValidatePaymentModuleDescriptor(descriptor PaymentModuleDescriptor) error {
+	return validatePaymentModuleDescriptor(normalizedPaymentModuleDescriptor(descriptor))
+}
+
+// ValidatePaymentRailContribution exposes the registrar's normalized
+// contribution check for cross-repository contract vectors.
+func ValidatePaymentRailContribution(descriptor PaymentModuleDescriptor, contribution PaymentRailContribution) error {
+	descriptor = normalizedPaymentModuleDescriptor(descriptor)
+	if err := validatePaymentModuleDescriptor(descriptor); err != nil {
+		return err
+	}
+	contribution = normalizedPaymentRailContribution(contribution, descriptor)
+	return validatePaymentRailContribution(contribution, descriptor)
 }
 
 func paymentContributionRouteKey(contribution PaymentRailContribution) string {

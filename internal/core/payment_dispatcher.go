@@ -109,9 +109,9 @@ func (r distributionPaymentRegistry) UnregisterV2Batch(chains []iwallet.ChainTyp
 }
 
 func (n *MobazhaNode) registerDistributionPaymentModules() error {
-	if len(n.paymentModules) == 0 {
-		return nil
-	}
+	modules := make([]distribution.PaymentModule, 0, len(n.paymentModules)+1)
+	modules = append(modules, newCoreFiatPaymentModule())
+	modules = append(modules, n.paymentModules...)
 	ctx := n.nodeCtx
 	if ctx == nil {
 		ctx = context.Background()
@@ -156,7 +156,7 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 	manager, err := distribution.NewTrustedPaymentModuleManager(
 		authority,
 		distributionPaymentRegistry{registry: n.paymentRegistry},
-		n.paymentModules...,
+		modules...,
 	)
 	if err != nil {
 		return err

@@ -512,6 +512,7 @@ func TestFiatService_ProviderBinding_PlatformAccountRebindAdvancesGeneration(t *
 		return err
 	}))
 	assert.Equal(t, first.BindingID, repeated.BindingID)
+	assert.Equal(t, coreFiatPaymentContributionID("stripe"), first.DriverContributionID)
 	assert.Equal(t, uint64(1), first.ConfigurationGeneration)
 	assert.Equal(t, uint64(2), second.ConfigurationGeneration)
 	assert.NotEqual(t, first.BindingID, second.BindingID)
@@ -523,6 +524,35 @@ func TestFiatService_ProviderBinding_PlatformAccountRebindAdvancesGeneration(t *
 	require.Len(t, bindings, 2)
 	assert.Equal(t, models.PaymentProviderBindingRetired, bindings[0].State)
 	assert.Equal(t, models.PaymentProviderBindingActive, bindings[1].State)
+}
+
+func TestFiatService_ProviderBinding_LegacyContributionCutsOverToRegisteredContribution(t *testing.T) {
+	svc, db := newFiatTestService(t, newMockFiatRegistry())
+	svc.markPlatformProvider("stripe")
+	legacy := models.PaymentProviderBinding{
+		BindingID: "legacy-binding", ProviderID: "stripe", DriverContributionID: "core.fiat.stripe",
+		ExternalAccountReference: "acct_platform", CredentialReference: "platform:stripe",
+		ConfigurationGeneration:  1,
+		ConfigurationFingerprint: providerConfigurationFingerprint("stripe", "acct_platform", "platform"),
+		Mode:                     "platform", State: models.PaymentProviderBindingActive,
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Create(&legacy) }))
+
+	var current models.PaymentProviderBinding
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		current, err = svc.ensureProviderBindingTx(tx, "stripe", "acct_platform")
+		return err
+	}))
+	assert.NotEqual(t, legacy.BindingID, current.BindingID)
+	assert.Equal(t, coreFiatPaymentContributionID("stripe"), current.DriverContributionID)
+	assert.Equal(t, uint64(2), current.ConfigurationGeneration)
+
+	var previous models.PaymentProviderBinding
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("binding_id = ?", legacy.BindingID).First(&previous).Error
+	}))
+	assert.Equal(t, models.PaymentProviderBindingRetired, previous.State)
 }
 
 func TestFiatService_deleteProviderConfig_UnregistersProvider(t *testing.T) {
@@ -658,7 +688,8 @@ func TestFiatService_CreatePayment_Success(t *testing.T) {
 	assert.Equal(t, models.PaymentAttemptExternalCreated, attempt.State)
 	assert.Equal(t, "sess_ok", attempt.ExternalReference)
 	assert.Equal(t, attempt.AttemptID, route.AttemptID)
-	assert.Equal(t, "core.fiat.stripe", route.ContributionID)
+	assert.Equal(t, coreFiatPaymentContributionID("stripe"), route.ContributionID)
+	assert.Equal(t, coreFiatPaymentModuleID, route.ModuleID)
 	assert.Equal(t, "fiat:stripe:USD", route.AssetID)
 	assert.Equal(t, binding.BindingID, route.ProviderBindingID)
 	assert.Equal(t, binding.ExternalAccountReference, route.ExternalAccountReference)

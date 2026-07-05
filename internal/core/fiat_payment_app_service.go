@@ -251,7 +251,7 @@ func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, par
 		}
 		route = models.PaymentRouteBinding{
 			RouteBindingID: routeID, AttemptID: attemptID,
-			ContributionID: binding.DriverContributionID, ModuleID: "mobazha.core.fiat." + strings.ToLower(providerID),
+			ContributionID: binding.DriverContributionID, ModuleID: coreFiatPaymentModuleID,
 			ImplementationGeneration: fmt.Sprintf("builtin-v1.binding-%d", binding.ConfigurationGeneration), RailKind: string(distribution.PaymentRailProviderSession),
 			NetworkID: string(FiatChainType(providerID)), AssetID: assetID, ProtocolVersion: "provider-v1", StateSchemaVersion: "1",
 			ProviderBindingID: binding.BindingID, ExternalAccountReference: binding.ExternalAccountReference,
@@ -292,6 +292,7 @@ func (s *FiatPaymentAppService) ensureProviderBindingTx(tx database.Tx, provider
 	mode := "runtime"
 	configurationBacked := false
 	generation := uint64(1)
+	contributionID := coreFiatPaymentContributionID(providerID)
 	fingerprint := providerConfigurationFingerprint(providerID, accountReference, mode)
 	credentialReference := "runtime:" + providerID
 	if s.isPlatformProvider(providerID) {
@@ -319,8 +320,8 @@ func (s *FiatPaymentAppService) ensureProviderBindingTx(tx database.Tx, provider
 	if !configurationBacked {
 		var current models.PaymentProviderBinding
 		if err := tx.Read().Where(
-			"provider_id = ? AND mode = ? AND configuration_fingerprint = ? AND external_account_reference = ? AND state = ?",
-			providerID, mode, fingerprint, accountReference, models.PaymentProviderBindingActive,
+			"provider_id = ? AND driver_contribution_id = ? AND mode = ? AND configuration_fingerprint = ? AND external_account_reference = ? AND state = ?",
+			providerID, contributionID, mode, fingerprint, accountReference, models.PaymentProviderBindingActive,
 		).First(&current).Error; err == nil {
 			return current, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -333,7 +334,7 @@ func (s *FiatPaymentAppService) ensureProviderBindingTx(tx database.Tx, provider
 			return models.PaymentProviderBinding{}, err
 		}
 	}
-	bindingID := stablePaymentIdentity("fpb_", fmt.Sprintf("%s|%s|%s|%d|%s|%s", s.nodeID, providerID, mode, generation, accountReference, fingerprint))
+	bindingID := stablePaymentIdentity("fpb_", fmt.Sprintf("%s|%s|%s|%d|%s|%s|%s", s.nodeID, providerID, mode, generation, accountReference, fingerprint, contributionID))
 	var binding models.PaymentProviderBinding
 	if err := tx.Read().Where("binding_id = ?", bindingID).First(&binding).Error; err == nil {
 		return binding, nil
@@ -353,7 +354,7 @@ func (s *FiatPaymentAppService) ensureProviderBindingTx(tx database.Tx, provider
 		}
 	}
 	binding = models.PaymentProviderBinding{
-		BindingID: bindingID, ProviderID: providerID, DriverContributionID: "core.fiat." + providerID,
+		BindingID: bindingID, ProviderID: providerID, DriverContributionID: contributionID,
 		ExternalAccountReference: accountReference, CredentialReference: credentialReference,
 		ConfigurationGeneration: generation, ConfigurationFingerprint: fingerprint,
 		Mode: mode, State: models.PaymentProviderBindingActive,

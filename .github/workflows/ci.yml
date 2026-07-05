@@ -62,6 +62,38 @@ jobs:
         run: go test -tags goolm -race -count=1 -timeout 10m ./...
         working-directory: node
 
+  provider-action-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mobazha
+          POSTGRES_PASSWORD: mobazha
+          POSTGRES_DB: provider_action_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mobazha -d provider_action_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: node
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.4"
+          cache-dependency-path: node/go.sum
+
+      - name: Test durable provider action leases and crash recovery
+        working-directory: node
+        env:
+          MOBAZHA_TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=mobazha password=mobazha dbname=provider_action_ci sslmode=disable
+        run: go test -tags 'goolm integration' -race -count=1 -timeout 5m -run '^TestFiatProviderAction_Postgres' ./internal/core
+
   build:
     runs-on: ubuntu-latest
     steps:

@@ -680,8 +680,15 @@ func TestRegisterDistributionPaymentModules_OptionalConflictIsIsolated(t *testin
 		t.Fatal("core strategy was replaced after rejected module registration")
 	}
 	health := n.paymentModuleManager.Health()
-	if len(health) != 1 || health[0].State != distribution.PaymentModuleDegraded {
-		t.Fatalf("conflicting optional module health = %#v, want degraded", health)
+	var conflictHealth *distribution.PaymentModuleHealth
+	for index := range health {
+		if health[index].Descriptor.ID == "invalid.override" {
+			conflictHealth = &health[index]
+			break
+		}
+	}
+	if conflictHealth == nil || conflictHealth.State != distribution.PaymentModuleDegraded {
+		t.Fatalf("conflicting optional module health = %#v, want invalid.override degraded", health)
 	}
 }
 

@@ -30,6 +30,50 @@ func TestPaymentRuntime_DoesNotExposePrivilegedState(t *testing.T) {
 	}
 }
 
+func TestPaymentRailContracts_RequiredAndForbiddenOperations(t *testing.T) {
+	descriptor := PaymentModuleDescriptor{
+		ID: "test.direct", Version: "1", Rails: []PaymentRailKind{PaymentRailDirectObserved},
+		Capabilities: []PaymentModuleCapability{CapabilityDirectObserved},
+		Activation:   PaymentModuleOptional, ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	base := PaymentRailContribution{
+		ContributionID: "test.direct.xmr", Rail: PaymentRailDirectObserved,
+		Network: iwallet.ChainMonero, Asset: iwallet.CoinType("crypto:monero:mainnet:native"),
+		Operations: []PaymentRailOperation{
+			PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify, PaymentOperationReconcile,
+		},
+	}
+	require.NoError(t, ValidatePaymentRailContribution(descriptor, base))
+
+	missingVerify := base
+	missingVerify.Operations = []PaymentRailOperation{
+		PaymentOperationSetup, PaymentOperationObserve, PaymentOperationReconcile,
+	}
+	require.ErrorContains(t, ValidatePaymentRailContribution(descriptor, missingVerify), "requires operation \"verify\"")
+
+	claimsRefund := base
+	claimsRefund.Operations = append(append([]PaymentRailOperation(nil), base.Operations...), PaymentOperationRefund)
+	require.ErrorContains(t, ValidatePaymentRailContribution(descriptor, claimsRefund), "does not allow operation \"refund\"")
+}
+
+func TestPaymentRailContracts_ProviderSessionAllowsProviderCommandsButNotDisputes(t *testing.T) {
+	descriptor := PaymentModuleDescriptor{
+		ID: "test.provider", Version: "1", Rails: []PaymentRailKind{PaymentRailProviderSession},
+		Activation: PaymentModuleOptional, ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	contribution := PaymentRailContribution{
+		ContributionID: "test.provider.stripe", Rail: PaymentRailProviderSession,
+		Network: iwallet.ChainType("fiat:stripe"), Asset: PaymentAssetAny,
+		Operations: []PaymentRailOperation{
+			PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify,
+			PaymentOperationConfirm, PaymentOperationCancel, PaymentOperationRefund, PaymentOperationReconcile,
+		},
+	}
+	require.NoError(t, ValidatePaymentRailContribution(descriptor, contribution))
+	contribution.Operations = append(contribution.Operations, PaymentOperationDisputeRelease)
+	require.ErrorContains(t, ValidatePaymentRailContribution(descriptor, contribution), "does not allow operation \"dispute_release\"")
+}
+
 type testPaymentStrategy struct{}
 
 func (*testPaymentStrategy) Model() payment.PaymentModel { return payment.PaymentModelMonitored }

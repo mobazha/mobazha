@@ -374,6 +374,63 @@ func TestCollateralClaimAndPartialSlashPreserveRemainingCoverage(t *testing.T) {
 	require.ErrorContains(t, err, "already claimed")
 }
 
+func TestCollateralSlashPendingFreezesOtherAllocationReleases(t *testing.T) {
+	db := collateralTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	open, account := openAndFundCollateral(t, db, now, "source-slash-freeze", "open-slash-freeze", "fund-slash-freeze", "funding-slash-freeze", "120")
+	claimedAllocation := allocateCollateral(t, db, now, open, account, "order-claimed", "ext-claimed", "25", "allocate-claimed")
+	account.Revision = claimedAllocation.CollateralRevision
+	otherAllocation := allocateCollateral(t, db, now, open, account, "order-other", "ext-other", "30", "allocate-other")
+
+	decision := claimDecision(now, account.CollateralID, claimedAllocation, "20")
+	decision.Attestation.ExpectedCollateralRevision = otherAllocation.CollateralRevision
+	var claim pkgcollateral.Claim
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		var err error
+		claim, err = AcceptClaimTx(tx, decision, now)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.ClaimPendingSlash, claim.State)
+
+	var pending pkgcollateral.Account
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		var err error
+		pending, err = AccountByIDTx(tx, account.CollateralID)
+		return err
+	}))
+	require.Equal(t, pkgcollateral.StateSlashPending, pending.State)
+
+	err := db.Update(func(tx database.Tx) error {
+		_, err := ReleaseAllocationTx(tx, pkgcollateral.AllocationReleaseRequest{
+			TenantID: database.StandaloneTenantID, CollateralID: pending.CollateralID,
+			AllocationID: otherAllocation.AllocationID, ExpectedCollateralRevision: pending.Revision,
+			ExpectedAllocationRevision: otherAllocation.AllocationRevision,
+			IdempotencyKey:             "release-during-slash", Reason: "unrelated-order-ended",
+		}, now)
+		return err
+	})
+	require.ErrorContains(t, err, "requires active account")
+
+	var unchanged pkgcollateral.Account
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		var err error
+		unchanged, err = AccountByIDTx(tx, account.CollateralID)
+		return err
+	}))
+	require.Equal(t, pending.Revision, unchanged.Revision)
+	require.Equal(t, pkgcollateral.StateSlashPending, unchanged.State)
+
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		_, err := RecordExecutionTx(tx, pkgcollateral.ExecutionObservation{
+			TenantID: database.StandaloneTenantID, CollateralID: unchanged.CollateralID, ClaimID: claim.ClaimID,
+			Kind: pkgcollateral.ExecutionSlash, AssetID: open.AssetID, Amount: "20",
+			ExecutionReference: "slash-freeze-tx", ExpectedRevision: unchanged.Revision,
+			IdempotencyKey: "confirm-slash-freeze", ObservedAt: now,
+		}, now)
+		return err
+	}))
+}
+
 func TestCollateralClaimRejectsWrongIssuerAndExcessAmount(t *testing.T) {
 	db := collateralTestDB(t)
 	now := time.Now().UTC().Truncate(time.Second)

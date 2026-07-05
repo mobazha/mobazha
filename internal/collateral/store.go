@@ -254,8 +254,8 @@ func ReleaseAllocationTx(tx database.Tx, request collateral.AllocationReleaseReq
 	if account.Revision != request.ExpectedCollateralRevision || allocation.AllocationRevision != request.ExpectedAllocationRevision {
 		return collateral.AllocationReference{}, fmt.Errorf("collateral allocation release revision conflict")
 	}
-	if (account.State != string(collateral.StateActive) && account.State != string(collateral.StateSlashPending)) || allocation.State != string(collateral.AllocationActive) {
-		return collateral.AllocationReference{}, fmt.Errorf("collateral allocation release requires serviceable account and active allocation")
+	if account.State != string(collateral.StateActive) || allocation.State != string(collateral.AllocationActive) {
+		return collateral.AllocationReference{}, fmt.Errorf("collateral allocation release requires active account and allocation")
 	}
 	nextCollateralRevision := account.Revision + 1
 	nextAllocationRevision := allocation.AllocationRevision + 1

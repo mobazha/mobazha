@@ -358,6 +358,9 @@ func (c *BindingClient) verifyEvent(ctx context.Context, event types.Log) (bool,
 	if err != nil {
 		return false, 0, time.Time{}, fmt.Errorf("read EVM collateral receipt block: %w", err)
 	}
+	if header == nil || header.Number == nil || header.Number.Cmp(receipt.BlockNumber) != 0 || header.Hash() != receipt.BlockHash {
+		return false, 0, time.Time{}, fmt.Errorf("EVM collateral receipt block is not canonical")
+	}
 	latest, err := c.backend.BlockNumber(ctx)
 	if err != nil {
 		return false, 0, time.Time{}, fmt.Errorf("read EVM collateral confirmation head: %w", err)
@@ -378,6 +381,13 @@ func (c *BindingClient) waitSuccessfulReceipt(ctx context.Context, hash common.H
 		if err == nil {
 			if receipt.Status != types.ReceiptStatusSuccessful || receipt.BlockNumber == nil {
 				return nil, fmt.Errorf("EVM collateral transaction reverted")
+			}
+			header, headerErr := c.backend.HeaderByNumber(ctx, receipt.BlockNumber)
+			if headerErr != nil {
+				return nil, fmt.Errorf("read EVM collateral transaction block: %w", headerErr)
+			}
+			if header == nil || header.Number == nil || header.Number.Cmp(receipt.BlockNumber) != 0 || header.Hash() != receipt.BlockHash {
+				return nil, fmt.Errorf("EVM collateral transaction block is not canonical")
 			}
 			latest, headErr := c.backend.BlockNumber(ctx)
 			if headErr != nil {

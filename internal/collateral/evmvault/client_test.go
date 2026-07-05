@@ -4,14 +4,35 @@
 package evmvault
 
 import (
+	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	"github.com/stretchr/testify/require"
 )
+
+type receiptVerificationBackend struct {
+	Backend
+	receipt *types.Receipt
+	header  *types.Header
+	head    uint64
+}
+
+func (b receiptVerificationBackend) TransactionReceipt(context.Context, common.Hash) (*types.Receipt, error) {
+	return b.receipt, nil
+}
+
+func (b receiptVerificationBackend) HeaderByNumber(context.Context, *big.Int) (*types.Header, error) {
+	return b.header, nil
+}
+
+func (b receiptVerificationBackend) BlockNumber(context.Context) (uint64, error) {
+	return b.head, nil
+}
 
 func TestExecutionDigestMatchesSolidityGoldenValues(t *testing.T) {
 	release := ExecutionCommand{
@@ -106,4 +127,65 @@ func TestReceiptContainsExactCanonicalLog(t *testing.T) {
 	tampered.Topics = append([]common.Hash(nil), expected.Topics...)
 	tampered.Topics[1] = common.HexToHash("0xff")
 	require.False(t, receiptContainsLog(receipt, tampered))
+}
+
+func TestVerifyEventRejectsReceiptFromNonCanonicalBlock(t *testing.T) {
+	canonicalHeader := &types.Header{Number: big.NewInt(10), Time: 1_800_000_000, Extra: []byte("canonical")}
+	orphanedHeader := &types.Header{Number: big.NewInt(10), Time: 1_799_999_999, Extra: []byte("orphaned")}
+	event := types.Log{
+		Address: testVault, TxHash: common.HexToHash("0x01"), BlockHash: orphanedHeader.Hash(),
+		BlockNumber: 10, Index: 1,
+	}
+	receipt := &types.Receipt{
+		Status: types.ReceiptStatusSuccessful, BlockHash: event.BlockHash, BlockNumber: big.NewInt(10),
+		Logs: []*types.Log{&event},
+	}
+	client := &BindingClient{
+		config:  Config{VaultAddress: testVault, Confirmations: 3},
+		backend: receiptVerificationBackend{receipt: receipt, header: canonicalHeader, head: 12},
+	}
+
+	confirmed, confirmations, observedAt, err := client.verifyEvent(context.Background(), event)
+	require.ErrorContains(t, err, "receipt block is not canonical")
+	require.False(t, confirmed)
+	require.Zero(t, confirmations)
+	require.Equal(t, time.Time{}, observedAt)
+}
+
+func TestVerifyEventAcceptsReceiptBoundToCanonicalBlock(t *testing.T) {
+	header := &types.Header{Number: big.NewInt(10), Time: 1_800_000_000, Extra: []byte("canonical")}
+	event := types.Log{
+		Address: testVault, TxHash: common.HexToHash("0x02"), BlockHash: header.Hash(),
+		BlockNumber: 10, Index: 2,
+	}
+	receipt := &types.Receipt{
+		Status: types.ReceiptStatusSuccessful, BlockHash: event.BlockHash, BlockNumber: big.NewInt(10),
+		Logs: []*types.Log{&event},
+	}
+	client := &BindingClient{
+		config:  Config{VaultAddress: testVault, Confirmations: 3},
+		backend: receiptVerificationBackend{receipt: receipt, header: header, head: 12},
+	}
+
+	confirmed, confirmations, observedAt, err := client.verifyEvent(context.Background(), event)
+	require.NoError(t, err)
+	require.True(t, confirmed)
+	require.Equal(t, uint64(3), confirmations)
+	require.Equal(t, time.Unix(int64(header.Time), 0).UTC(), observedAt)
+}
+
+func TestWaitSuccessfulReceiptRejectsNonCanonicalBlock(t *testing.T) {
+	canonicalHeader := &types.Header{Number: big.NewInt(10), Extra: []byte("canonical")}
+	orphanedHeader := &types.Header{Number: big.NewInt(10), Extra: []byte("orphaned")}
+	receipt := &types.Receipt{
+		Status: types.ReceiptStatusSuccessful, BlockHash: orphanedHeader.Hash(), BlockNumber: big.NewInt(10),
+	}
+	client := &BindingClient{
+		config:       Config{Confirmations: 1},
+		backend:      receiptVerificationBackend{receipt: receipt, header: canonicalHeader, head: 10},
+		pollInterval: time.Millisecond,
+	}
+
+	_, err := client.waitSuccessfulReceipt(context.Background(), common.HexToHash("0x03"))
+	require.ErrorContains(t, err, "transaction block is not canonical")
 }

@@ -468,12 +468,11 @@ type PaymentModuleDescriptor struct {
 	StateSchemaVersion string
 }
 
-// DirectObservedRuntimeBinder binds one provider-owned observation runtime to
-// Core's address allocation and payment observation services. Implementations
-// must reject competing runtimes and support idempotent unbinding.
+// DirectObservedRuntimeBinder binds one provider-owned observation runtime and
+// its immutable route identity to Core's runtime catalog.
 type DirectObservedRuntimeBinder interface {
-	BindExternalPaymentRuntime(runtime ExternalPaymentRuntime) error
-	UnbindExternalPaymentRuntime(runtime ExternalPaymentRuntime) error
+	BindExternalPaymentRuntime(registration ExternalPaymentRuntimeRegistration) error
+	UnbindExternalPaymentRuntime(registration ExternalPaymentRuntimeRegistration) error
 }
 
 // DirectObservedRuntimePorts is the least-privilege Core authority granted to

@@ -110,8 +110,9 @@ type chainFields struct {
 	// Local-first compositions inject a narrow payment runtime and product
 	// policy. Chain protocol and wallet administration stay in the private
 	// distribution module.
-	externalPayment distribution.ExternalPaymentRuntime
-	sovereignPolicy distribution.SovereignNodePolicy
+	externalPaymentMu sync.Mutex
+	externalPayments  *distribution.ExternalPaymentRuntimeCatalog
+	sovereignPolicy   distribution.SovereignNodePolicy
 }
 
 // ipnsFields groups NetDB configuration (IPNS resolution retired).

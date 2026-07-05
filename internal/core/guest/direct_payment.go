@@ -12,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -41,6 +42,8 @@ type PaymentAddressResult struct {
 	Address       string
 	AddressIndex  uint32
 	RequiredConfs int
+	Route         payment.RouteIdentity
+	GracePeriod   time.Duration
 	ReferenceKey  string // Legacy correlation key retained for stored-order compatibility.
 	SweepTo       string // seller receiving address (empty for Solana)
 	// ManagedEscrowMetadata is opaque provider JSON persisted by Core.
@@ -51,13 +54,13 @@ type PaymentAddressResult struct {
 // Core-owned chains use their local derivation or managed-escrow path; a
 // trusted direct-observed module owns all provider-specific allocation.
 type DirectPaymentService struct {
-	db          database.Database
-	keyDeriver  BIP44KeyDeriver
-	projectorMu sync.RWMutex
-	projector   distribution.ManagedEscrowGuestProjector
-	sellerOwner GuestEVMSellerOwnerResolver
-	externalMu  sync.RWMutex
-	externalPay distribution.ExternalPaymentRuntime
+	db               database.Database
+	keyDeriver       BIP44KeyDeriver
+	projectorMu      sync.RWMutex
+	projector        distribution.ManagedEscrowGuestProjector
+	sellerOwner      GuestEVMSellerOwnerResolver
+	externalMu       sync.RWMutex
+	externalPayments *distribution.ExternalPaymentRuntimeCatalog
 }
 
 // NewDirectPaymentService creates a DirectPaymentService.
@@ -97,12 +100,12 @@ func (s *DirectPaymentService) HasManagedEscrowFunding() bool {
 	return s.projector != nil && s.sellerOwner != nil
 }
 
-// SetExternalPaymentRuntime injects the provider-neutral direct observed rail
-// used for fresh address allocation. The runtime owns its account selection.
-func (s *DirectPaymentService) SetExternalPaymentRuntime(runtime distribution.ExternalPaymentRuntime) {
+// SetExternalPaymentRuntimeCatalog injects the Core-owned route catalog used
+// for fresh address allocation and immutable implementation selection.
+func (s *DirectPaymentService) SetExternalPaymentRuntimeCatalog(catalog *distribution.ExternalPaymentRuntimeCatalog) {
 	s.externalMu.Lock()
 	defer s.externalMu.Unlock()
-	s.externalPay = runtime
+	s.externalPayments = catalog
 }
 
 // GeneratePaymentAddress creates a payment address for a Guest Order.
@@ -216,22 +219,25 @@ func (s *DirectPaymentService) derivePaymentAddress(
 func (s *DirectPaymentService) generateExternalPaymentAddress(ctx context.Context, req PaymentAddressRequest) (*PaymentAddressResult, error) {
 	label := fmt.Sprintf("guest_%s", req.OrderToken)
 	s.externalMu.RLock()
-	runtime := s.externalPay
+	catalog := s.externalPayments
 	s.externalMu.RUnlock()
-	if runtime != nil {
-		address, err := runtime.CreatePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{
-			Label: label,
-			Asset: req.CoinType,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("create external payment address: %w", err)
-		}
-		return &PaymentAddressResult{
-			Address: address.Address, AddressIndex: address.Index,
-			RequiredConfs: address.RequiredConfirmations,
-		}, nil
+	registration, err := catalog.Active(req.CoinType)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("external payment runtime not configured")
+	address, err := registration.Runtime.CreatePaymentAddress(ctx, distribution.ExternalPaymentAddressRequest{
+		Label: label,
+		Asset: req.CoinType,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create external payment address: %w", err)
+	}
+	return &PaymentAddressResult{
+		Address: address.Address, AddressIndex: address.Index,
+		RequiredConfs: address.RequiredConfirmations,
+		Route:         registration.Route,
+		GracePeriod:   monitorGracePeriod(registration.Runtime, req.CoinType),
+	}, nil
 }
 
 func (s *DirectPaymentService) getOrCreateCounter(tx database.Tx, chainKey string) (*models.DirectPaymentAddressCounter, error) {

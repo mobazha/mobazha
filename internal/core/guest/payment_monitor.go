@@ -44,7 +44,7 @@ type GuestPaymentMonitor struct {
 	utxoMonitor           *pkgutxo.Monitor
 	chainOps              pkgutxo.ChainOperations
 	multiwallet           contracts.WalletOperator
-	externalPay           distribution.ExternalPaymentRuntime
+	externalPayments      *distribution.ExternalPaymentRuntimeCatalog
 	evmManagedEscrowWatch EVMManagedEscrowWatcher
 	gracePeriod           time.Duration
 	// confirmationInterval is the tick used by pollConfirmationsLoop.
@@ -126,12 +126,12 @@ func (m *GuestPaymentMonitor) SetEVMManagedEscrowWatch(w EVMManagedEscrowWatcher
 	m.evmManagedEscrowWatch = w
 }
 
-// SetExternalPaymentRuntime injects a provider-neutral direct observation
-// runtime. Its lifecycle is owned by the composition root.
-func (m *GuestPaymentMonitor) SetExternalPaymentRuntime(runtime distribution.ExternalPaymentRuntime) {
+// SetExternalPaymentRuntimeCatalog injects the Core-owned historical runtime
+// catalog. Its implementations remain lifecycle-owned by the composition root.
+func (m *GuestPaymentMonitor) SetExternalPaymentRuntimeCatalog(catalog *distribution.ExternalPaymentRuntimeCatalog) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.externalPay = runtime
+	m.externalPayments = catalog
 }
 
 // WatchOrder starts monitoring a newly created guest order for incoming payments.
@@ -184,15 +184,25 @@ func (m *GuestPaymentMonitor) RestoreWatches(ctx context.Context) error {
 
 	restored := 0
 	for i := range orders {
-		grace := resolvePaymentGracePeriod(orders[i].PaymentCoin, m.externalPay)
+		var provider PaymentGracePeriodProvider
+		route := guestOrderPaymentRoute(&orders[i])
+		if !route.IsZero() && m.externalPayments != nil {
+			if runtime, resolveErr := m.externalPayments.Resolve(route); resolveErr == nil {
+				provider = runtime
+			}
+		}
+		grace := guestOrderPaymentGrace(&orders[i], resolvePaymentGracePeriod(orders[i].PaymentCoin, provider))
 		if time.Now().After(orders[i].ExpiresAt.Add(grace)) {
 			continue
 		}
 		if _, exists := m.watches[orders[i].OrderToken]; exists {
 			continue
 		}
+		before := len(m.watches)
 		m.startWatchingLocked(&orders[i])
-		restored++
+		if len(m.watches) > before {
+			restored++
+		}
 	}
 	log.Infof("Restored %d guest order watches (of %d active)", restored, len(orders))
 	return nil
@@ -256,9 +266,22 @@ func (m *GuestPaymentMonitor) startWatchingLocked(order *models.GuestOrder) {
 		}
 
 	default:
-		runtime := m.externalPay
-		if runtime == nil {
-			log.Warningf("no monitor strategy for coin %q (order %s)", coinType, redact.Token(order.OrderToken))
+		route := guestOrderPaymentRoute(order)
+		if err := route.Validate(); err != nil {
+			log.Warningf("direct observed order %s has invalid durable route: %v", redact.Token(order.OrderToken), err)
+			return
+		}
+		if route.AssetID != order.PaymentCoin {
+			log.Warningf("direct observed order %s route asset does not match payment coin", redact.Token(order.OrderToken))
+			return
+		}
+		if m.externalPayments == nil {
+			log.Warningf("no direct observed runtime catalog for order %s", redact.Token(order.OrderToken))
+			return
+		}
+		runtime, err := m.externalPayments.Resolve(route)
+		if err != nil {
+			log.Warningf("resolve direct observed runtime for order %s: %v", redact.Token(order.OrderToken), err)
 			return
 		}
 		ctx, cancel := context.WithCancel(context.Background())
@@ -608,7 +631,7 @@ func (m *GuestPaymentMonitor) watchExternalPaymentOrder(
 	// Shared deadline: payment window + confirmation window. Same value is
 	// used both for the local select-case timeout and as the
 	// pollConfirmationsLoop deadline once the order funds.
-	grace := monitorGracePeriod(runtime, iwallet.CoinType(order.PaymentCoin))
+	grace := guestOrderPaymentGrace(order, monitorGracePeriod(runtime, iwallet.CoinType(order.PaymentCoin)))
 	deadline := order.ExpiresAt.Add(grace)
 
 	type detection struct {

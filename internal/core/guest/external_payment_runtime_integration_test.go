@@ -12,8 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -29,6 +31,19 @@ type observedPaymentRuntimeStub struct {
 
 func newObservedPaymentRuntimeStub() *observedPaymentRuntimeStub {
 	return &observedPaymentRuntimeStub{watches: make(map[uint32]*distribution.ExternalPaymentWatch), height: 100}
+}
+
+func bindObservedPaymentRuntime(t *testing.T, monitor *GuestPaymentMonitor, runtime distribution.ExternalPaymentRuntime, generation string) payment.RouteIdentity {
+	t.Helper()
+	route := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
+		ImplementationGeneration: generation, RailKind: string(distribution.PaymentRailDirectObserved),
+		NetworkID: "TEST", AssetID: externalObservedCoinType, ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	catalog := distribution.NewExternalPaymentRuntimeCatalog()
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: route, Runtime: runtime, ActiveForNewWork: true}))
+	monitor.SetExternalPaymentRuntimeCatalog(catalog)
+	return route
 }
 
 func (*observedPaymentRuntimeStub) Start(context.Context) error { return nil }
@@ -81,6 +96,91 @@ func (s *observedPaymentRuntimeStub) setHeight(height uint64) {
 	s.height = height
 }
 
+func TestGuestPaymentMonitor_RestoreUsesPersistedHistoricalRoute(t *testing.T) {
+	db := newGuestTestDB(t)
+	oldRuntime := newObservedPaymentRuntimeStub()
+	newRuntime := newObservedPaymentRuntimeStub()
+	oldRoute := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
+		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
+		NetworkID: "TEST", AssetID: externalObservedCoinType, ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	newRoute := oldRoute
+	newRoute.ImplementationGeneration = "v2"
+	catalog := distribution.NewExternalPaymentRuntimeCatalog()
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: oldRoute, Runtime: oldRuntime}))
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: newRoute, Runtime: newRuntime, ActiveForNewWork: true}))
+
+	order := models.GuestOrder{
+		OrderToken: "gst_historical_route", State: models.GuestOrderAwaitingPayment,
+		PaymentCoin: externalObservedCoinType, PaymentAddress: "historical_address", PaymentAmount: "100",
+		AddressIndex: 41, RequiredConfs: 2, ExpiresAt: time.Now().Add(time.Hour),
+	}
+	setGuestOrderPaymentRoute(&order, oldRoute, 10*time.Second)
+	seedGuestOrder(t, db, 703, order)
+
+	monitor := NewGuestPaymentMonitor(db, nil, nil)
+	monitor.SetExternalPaymentRuntimeCatalog(catalog)
+	defer monitor.StopAll()
+	require.NoError(t, monitor.RestoreWatches(context.Background()))
+	require.Eventually(t, func() bool { return oldRuntime.isWatching(41) }, time.Second, 10*time.Millisecond)
+	assert.False(t, newRuntime.isWatching(41), "current default must not service historical work")
+}
+
+func TestGuestPaymentMonitor_RestoreFailsClosedWithoutHistoricalRoute(t *testing.T) {
+	db := newGuestTestDB(t)
+	currentRuntime := newObservedPaymentRuntimeStub()
+	currentRoute := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
+		ImplementationGeneration: "v2", RailKind: string(distribution.PaymentRailDirectObserved),
+		NetworkID: "TEST", AssetID: externalObservedCoinType, ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	historicalRoute := currentRoute
+	historicalRoute.ImplementationGeneration = "v1"
+	catalog := distribution.NewExternalPaymentRuntimeCatalog()
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: currentRoute, Runtime: currentRuntime, ActiveForNewWork: true}))
+
+	order := models.GuestOrder{
+		OrderToken: "gst_missing_historical_route", State: models.GuestOrderAwaitingPayment,
+		PaymentCoin: externalObservedCoinType, PaymentAddress: "historical_address", PaymentAmount: "100",
+		AddressIndex: 42, RequiredConfs: 2, ExpiresAt: time.Now().Add(time.Hour),
+	}
+	setGuestOrderPaymentRoute(&order, historicalRoute, 10*time.Second)
+	seedGuestOrder(t, db, 704, order)
+
+	monitor := NewGuestPaymentMonitor(db, nil, nil)
+	monitor.SetExternalPaymentRuntimeCatalog(catalog)
+	defer monitor.StopAll()
+	require.NoError(t, monitor.RestoreWatches(context.Background()))
+	assert.Equal(t, 0, monitor.ActiveWatchCount())
+	assert.False(t, currentRuntime.isWatching(42))
+}
+
+func TestGuestOrder_DurableRouteIsCreateOnly(t *testing.T) {
+	db := newGuestTestDB(t)
+	route := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
+		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
+		NetworkID: "TEST", AssetID: externalObservedCoinType, ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	order := models.GuestOrder{
+		OrderToken: "gst_immutable_route", State: models.GuestOrderAwaitingPayment,
+		PaymentCoin: externalObservedCoinType, PaymentAddress: "immutable_address", PaymentAmount: "100",
+		AddressIndex: 43, RequiredConfs: 2, ExpiresAt: time.Now().Add(time.Hour),
+	}
+	setGuestOrderPaymentRoute(&order, route, 10*time.Second)
+	seedGuestOrder(t, db, 705, order)
+
+	stored := loadGuestOrder(t, db, order.OrderToken)
+	stored.RouteImplementationGeneration = "v2"
+	stored.PaymentGracePeriodNanos = int64(time.Minute)
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(&stored) }))
+
+	reloaded := loadGuestOrder(t, db, order.OrderToken)
+	assert.Equal(t, "v1", reloaded.RouteImplementationGeneration)
+	assert.Equal(t, int64(10*time.Second), reloaded.PaymentGracePeriodNanos)
+}
+
 // TestExternalPaymentRuntime_PoolThenConfirmed_ToFunded exercises the full externally observed
 // guest checkout lifecycle:
 //
@@ -94,12 +194,12 @@ func TestExternalPaymentRuntime_PoolThenConfirmed_ToFunded(t *testing.T) {
 	runtime := newObservedPaymentRuntimeStub()
 
 	payMon := NewGuestPaymentMonitor(db, svc, nil)
-	payMon.SetExternalPaymentRuntime(runtime)
+	route := bindObservedPaymentRuntime(t, payMon, runtime, "v1")
 	payMon.confirmationInterval = 50 * time.Millisecond
 	defer payMon.StopAll()
 
 	token := "gst_external_full_lifecycle"
-	seedGuestOrder(t, db, 700, models.GuestOrder{
+	orderSeed := models.GuestOrder{
 		OrderToken:     token,
 		State:          models.GuestOrderAwaitingPayment,
 		PaymentCoin:    externalObservedCoinType,
@@ -109,7 +209,9 @@ func TestExternalPaymentRuntime_PoolThenConfirmed_ToFunded(t *testing.T) {
 		AddressIndex:   5,
 		RequiredConfs:  3,
 		ExpiresAt:      time.Now().Add(10 * time.Second),
-	})
+	}
+	setGuestOrderPaymentRoute(&orderSeed, route, 10*time.Second)
+	seedGuestOrder(t, db, 700, orderSeed)
 
 	order := loadGuestOrder(t, db, token)
 	payMon.WatchOrder(&order)
@@ -187,12 +289,12 @@ func TestExternalPaymentRuntime_DirectConfirmNoPool(t *testing.T) {
 	runtime := newObservedPaymentRuntimeStub()
 
 	payMon := NewGuestPaymentMonitor(db, svc, nil)
-	payMon.SetExternalPaymentRuntime(runtime)
+	route := bindObservedPaymentRuntime(t, payMon, runtime, "v1")
 	payMon.confirmationInterval = 50 * time.Millisecond
 	defer payMon.StopAll()
 
 	token := "gst_external_direct_conf"
-	seedGuestOrder(t, db, 701, models.GuestOrder{
+	orderSeed := models.GuestOrder{
 		OrderToken:     token,
 		State:          models.GuestOrderAwaitingPayment,
 		PaymentCoin:    externalObservedCoinType,
@@ -202,7 +304,9 @@ func TestExternalPaymentRuntime_DirectConfirmNoPool(t *testing.T) {
 		AddressIndex:   7,
 		RequiredConfs:  2,
 		ExpiresAt:      time.Now().Add(10 * time.Second),
-	})
+	}
+	setGuestOrderPaymentRoute(&orderSeed, route, 10*time.Second)
+	seedGuestOrder(t, db, 701, orderSeed)
 
 	order := loadGuestOrder(t, db, token)
 	payMon.WatchOrder(&order)
@@ -245,11 +349,11 @@ func TestExternalPaymentRuntime_InsufficientPayment(t *testing.T) {
 	runtime := newObservedPaymentRuntimeStub()
 
 	payMon := NewGuestPaymentMonitor(db, svc, nil)
-	payMon.SetExternalPaymentRuntime(runtime)
+	route := bindObservedPaymentRuntime(t, payMon, runtime, "v1")
 	defer payMon.StopAll()
 
 	token := "gst_external_partial"
-	seedGuestOrder(t, db, 702, models.GuestOrder{
+	orderSeed := models.GuestOrder{
 		OrderToken:     token,
 		State:          models.GuestOrderAwaitingPayment,
 		PaymentCoin:    externalObservedCoinType,
@@ -259,7 +363,9 @@ func TestExternalPaymentRuntime_InsufficientPayment(t *testing.T) {
 		AddressIndex:   9,
 		RequiredConfs:  10,
 		ExpiresAt:      time.Now().Add(10 * time.Second),
-	})
+	}
+	setGuestOrderPaymentRoute(&orderSeed, route, 10*time.Second)
+	seedGuestOrder(t, db, 702, orderSeed)
 
 	order := loadGuestOrder(t, db, token)
 	payMon.WatchOrder(&order)

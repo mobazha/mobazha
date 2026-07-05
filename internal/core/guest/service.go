@@ -459,6 +459,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		BuyerPortalTokenExpiresAt: &buyerPortalExpiresAt,
 		BuyerPortalTokenVersion:   1,
 	}
+	setGuestOrderPaymentRoute(&order, payResult.Route, payResult.GracePeriod)
 	if allDigitalGoods {
 		order.AutoCompleteAfterShipDaysOverride = s.digitalGoodReviewWindowDays()
 	}

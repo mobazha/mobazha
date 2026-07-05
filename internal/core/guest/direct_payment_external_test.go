@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +42,14 @@ func (*directPaymentExternalRuntimeStub) PaymentHeight(context.Context) (uint64,
 func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 	runtime := &directPaymentExternalRuntimeStub{}
 	service := NewDirectPaymentService(nil, nil)
-	service.SetExternalPaymentRuntime(runtime)
+	route := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
+		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
+		NetworkID: "TEST", AssetID: "crypto:monero:mainnet:native", ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	catalog := distribution.NewExternalPaymentRuntimeCatalog()
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: route, Runtime: runtime, ActiveForNewWork: true}))
+	service.SetExternalPaymentRuntimeCatalog(catalog)
 
 	result, err := service.GeneratePaymentAddress(context.Background(), PaymentAddressRequest{
 		CoinType:   iwallet.CoinType("crypto:monero:mainnet:native"),
@@ -50,5 +58,7 @@ func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "external-address-7", result.Address)
 	require.Equal(t, uint32(7), result.AddressIndex)
+	require.Equal(t, route, result.Route)
+	require.Equal(t, time.Hour, result.GracePeriod)
 	require.Equal(t, "guest_gst_order_7", runtime.request.Label)
 }

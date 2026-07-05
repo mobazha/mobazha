@@ -87,6 +87,17 @@ type GuestOrder struct {
 	Confirmations  int    `json:"confirmations"`
 	RequiredConfs  int    `json:"requiredConfs"`
 	AddressIndex   uint32 `json:"-"`
+	// Route* and PaymentGracePeriodNanos snapshot the immutable payment
+	// implementation and timing policy selected when the target was allocated.
+	RouteContributionID           string `gorm:"column:route_contribution_id;size:128;index:idx_guest_order_route;<-:create" json:"-"`
+	RouteModuleID                 string `gorm:"column:route_module_id;size:128;<-:create" json:"-"`
+	RouteImplementationGeneration string `gorm:"column:route_implementation_generation;size:64;<-:create" json:"-"`
+	RouteRailKind                 string `gorm:"column:route_rail_kind;size:32;<-:create" json:"-"`
+	RouteNetworkID                string `gorm:"column:route_network_id;size:128;<-:create" json:"-"`
+	RouteAssetID                  string `gorm:"column:route_asset_id;size:255;<-:create" json:"-"`
+	RouteProtocolVersion          string `gorm:"column:route_protocol_version;size:64;<-:create" json:"-"`
+	RouteStateSchemaVersion       string `gorm:"column:route_state_schema_version;size:64;<-:create" json:"-"`
+	PaymentGracePeriodNanos       int64  `gorm:"column:payment_grace_period_nanos;<-:create" json:"-"`
 	// ManagedEscrowMetadata is opaque provider JSON for per-order managed EVM
 	// funding targets.
 	ManagedEscrowMetadata []byte `gorm:"column:managed_escrow_metadata" json:"-"`

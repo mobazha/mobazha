@@ -17,45 +17,44 @@ type distributionDirectObservedRuntimeBinder struct {
 }
 
 func (b *distributionDirectObservedRuntimeBinder) BindExternalPaymentRuntime(
-	runtime distribution.ExternalPaymentRuntime,
+	registration distribution.ExternalPaymentRuntimeRegistration,
 ) error {
 	if b == nil || b.node == nil {
 		return fmt.Errorf("direct observed runtime binder is unavailable")
 	}
-	if runtime == nil {
+	if registration.Runtime == nil {
 		return fmt.Errorf("direct observed runtime is required")
 	}
-	if b.node.externalPayment != nil {
-		return fmt.Errorf("a direct observed runtime is already bound")
+	b.node.externalPaymentMu.Lock()
+	defer b.node.externalPaymentMu.Unlock()
+	if b.node.externalPayments == nil {
+		b.node.externalPayments = distribution.NewExternalPaymentRuntimeCatalog()
 	}
-	b.node.externalPayment = runtime
+	if err := b.node.externalPayments.Register(registration); err != nil {
+		return err
+	}
 	if b.node.directPaymentService != nil {
-		b.node.directPaymentService.SetExternalPaymentRuntime(runtime)
+		b.node.directPaymentService.SetExternalPaymentRuntimeCatalog(b.node.externalPayments)
 	}
 	if b.node.guestPaymentMonitor != nil {
-		b.node.guestPaymentMonitor.SetExternalPaymentRuntime(runtime)
+		b.node.guestPaymentMonitor.SetExternalPaymentRuntimeCatalog(b.node.externalPayments)
 	}
-	if b.node.guestOrderService != nil {
-		b.node.guestOrderService.SetDirectObservedGraceProvider(runtime)
+	if registration.ActiveForNewWork && b.node.guestOrderService != nil {
+		b.node.guestOrderService.SetDirectObservedGraceProvider(registration.Runtime)
 	}
 	return nil
 }
 
 func (b *distributionDirectObservedRuntimeBinder) UnbindExternalPaymentRuntime(
-	_ distribution.ExternalPaymentRuntime,
+	registration distribution.ExternalPaymentRuntimeRegistration,
 ) error {
 	if b == nil || b.node == nil {
 		return nil
 	}
-	if b.node.externalPayment == nil {
-		return nil
-	}
-	b.node.externalPayment = nil
-	if b.node.directPaymentService != nil {
-		b.node.directPaymentService.SetExternalPaymentRuntime(nil)
-	}
-	if b.node.guestPaymentMonitor != nil {
-		b.node.guestPaymentMonitor.SetExternalPaymentRuntime(nil)
+	b.node.externalPaymentMu.Lock()
+	defer b.node.externalPaymentMu.Unlock()
+	if b.node.externalPayments != nil {
+		b.node.externalPayments.Unregister(registration.Route)
 	}
 	// Keep the last grace policy bound to the order service. Existing order and
 	// inventory deadlines are durable business policy, not live-runtime state.

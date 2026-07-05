@@ -255,7 +255,13 @@ carry a Core-issued collateral allocation reference after Core has validated
 tenant, provider, resource, principal, asset, amount, state, and revisions.
 Opaque provider payload fields and Hosting projections are not proof of
 funding. The staged design is tracked by
-[mobazha-docs RFC-0003](https://github.com/mobazha/mobazha-docs/blob/main/rfcs/0003-core-owned-resource-collateral.md).
+[mobazha-docs RFC-0004](https://github.com/mobazha/mobazha-docs/blob/main/rfcs/0004-core-owned-resource-collateral.md).
+
+Existing Solana Anchor and EVM Safe adapters are order-settlement adapters:
+they require order escrow data and interpret actions as seller payout, buyer
+refund, or dispute release. They do not implicitly implement the dedicated
+`collateral.Rail` contract and must not be registered as collateral rails
+without a separate provider, conformance evidence, and security review.
 
 ## Non-goals
 

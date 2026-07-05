@@ -66,7 +66,15 @@ func (n *MobazhaNode) admitOrderExtensionCollateralRequirementsTx(
 		}
 		envelope, ok := bindings[bindingKey{extensionID: extension.ExtensionID, revision: extension.Revision}]
 		if !ok {
-			return fmt.Errorf("order extension %s requires a Core-issued collateral allocation binding", extension.ExtensionID)
+			if n.signer == nil {
+				return fmt.Errorf("order extension %s requires a Core-issued collateral allocation binding", extension.ExtensionID)
+			}
+			if _, err := corecollateral.AdmitExternalAllocationCredentialTx(
+				tx, string(n.signer.PeerID()), orderID, extension, requirement, now,
+			); err != nil {
+				return fmt.Errorf("order extension %s requires a valid seller-Core collateral credential: %w", extension.ExtensionID, err)
+			}
+			continue
 		}
 		reference := envelope.CollateralAllocation
 		if reference == nil {

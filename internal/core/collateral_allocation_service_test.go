@@ -16,7 +16,9 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
+	orderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *testing.T) {
@@ -27,6 +29,8 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 		for _, model := range []any{
 			&models.CollateralAccountRecord{}, &models.CollateralFundingRecord{}, &models.CollateralAllocationRecord{},
 			&models.CollateralActionRecord{}, &models.OrderExtensionRecord{}, &models.CollateralOrderExtensionBindingRecord{},
+			&models.CollateralAllocationCredentialRecord{},
+			&models.Order{},
 		} {
 			if err := tx.Migrate(model); err != nil {
 				return err
@@ -35,10 +39,12 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 		return nil
 	}))
 	now := time.Now().UTC().Truncate(time.Second)
+	sellerSigner := newMockSigner()
+	buyerSigner := newMockSigner()
 	assetID := "crypto:eip155:56:erc20:0x55d398326f99059fF775485246999027B3197955"
 	open := pkgcollateral.OpenRequest{
 		TenantID: database.StandaloneTenantID, ProviderID: "io.mobazha.collectibles", ResourceID: "srcdep-1",
-		PrincipalID: "seller-1", AssetID: assetID, RequiredAmount: "100",
+		PrincipalID: string(sellerSigner.PeerID()), AssetID: assetID, RequiredAmount: "100",
 		PolicyID: "io.mobazha.collectibles.source-custody", PolicyVersion: "1",
 		IdempotencyKey: "open-seller-authority", ExpiresAt: now.Add(24 * time.Hour),
 	}
@@ -60,7 +66,16 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 	)
 	require.NoError(t, err)
 	require.NoError(t, db.Update(func(tx database.Tx) error {
-		return orderextensions.PersistTx(tx, "order-seller-authority", extension)
+		if err := orderextensions.PersistTx(tx, "order-seller-authority", extension); err != nil {
+			return err
+		}
+		orderOpen, err := protojson.Marshal(&orderpb.OrderOpen{BuyerID: &orderpb.ID{PeerID: string(buyerSigner.PeerID())}})
+		if err != nil {
+			return err
+		}
+		return tx.Save(&models.Order{
+			ID: models.OrderID("order-seller-authority"), MyRole: string(models.RoleVendor), SerializedOrderOpen: orderOpen,
+		})
 	}))
 	request := contracts.AllocateOrderExtensionCollateralRequest{
 		TenantID: open.TenantID, CollateralID: account.CollateralID, OrderID: "order-seller-authority",
@@ -71,7 +86,8 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 			AssetID: assetID, Amount: "25", PolicyID: open.PolicyID, PolicyVersion: open.PolicyVersion,
 		},
 	}
-	service := &collateralAllocationService{db: db, now: func() time.Time { return now }}
+	clock := now
+	service := &collateralAllocationService{db: db, signer: sellerSigner, now: func() time.Time { return clock }}
 	first, err := service.AllocateOrderExtensionCollateral(context.Background(), request)
 	require.NoError(t, err)
 	wrongPolicy := request
@@ -94,4 +110,76 @@ func TestCollateralAllocationServiceAllocatesAndBindsInOneCoreTransaction(t *tes
 		require.Equal(t, "75", stored.AvailableAmount)
 		return corecollateral.AdmitPersistedOrderExtensionsV2Tx(tx, request.OrderID, now)
 	}))
+
+	credential, err := service.IssueOrderExtensionCollateralCredential(context.Background(), contracts.IssueOrderExtensionCollateralCredentialRequest{
+		TenantID: open.TenantID, OrderID: request.OrderID, Extension: extension, Requirement: request.Requirement,
+		AudiencePeerID: string(buyerSigner.PeerID()), ExpiresAt: now.Add(5 * time.Minute),
+	})
+	require.NoError(t, err)
+	require.NoError(t, credential.Verify(string(buyerSigner.PeerID()), now))
+	differentExtension, err := extensions.NewOrderExtension(
+		request.OrderID, open.ProviderID, "source-custody", "v1", open.ResourceID, map[string]string{"mode": "M3"},
+	)
+	require.NoError(t, err)
+	require.Equal(t, extension.ExtensionID, differentExtension.ExtensionID)
+	_, err = service.IssueOrderExtensionCollateralCredential(context.Background(), contracts.IssueOrderExtensionCollateralCredentialRequest{
+		TenantID: open.TenantID, OrderID: request.OrderID, Extension: differentExtension, Requirement: request.Requirement,
+		AudiencePeerID: string(buyerSigner.PeerID()), ExpiresAt: now.Add(5 * time.Minute),
+	})
+	require.ErrorContains(t, err, "revision is stale")
+	clock = now.Add(time.Second)
+	refreshedCredential, err := service.IssueOrderExtensionCollateralCredential(context.Background(), contracts.IssueOrderExtensionCollateralCredentialRequest{
+		TenantID: open.TenantID, OrderID: request.OrderID, Extension: extension, Requirement: request.Requirement,
+		AudiencePeerID: string(buyerSigner.PeerID()), ExpiresAt: clock.Add(5 * time.Minute),
+	})
+	require.NoError(t, err)
+	require.NotEqual(t, credential.CredentialID, refreshedCredential.CredentialID)
+	credential = refreshedCredential
+
+	buyerDB, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, buyerDB.Close()) })
+	require.NoError(t, buyerDB.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.OrderExtensionRecord{}); err != nil {
+			return err
+		}
+		if err := tx.Migrate(&models.CollateralOrderExtensionBindingRecord{}); err != nil {
+			return err
+		}
+		if err := tx.Migrate(&models.CollateralAllocationCredentialRecord{}); err != nil {
+			return err
+		}
+		return orderextensions.PersistTx(tx, request.OrderID, extension)
+	}))
+	buyerService := &collateralAllocationService{db: buyerDB, signer: buyerSigner, now: func() time.Time { return clock }}
+	require.NoError(t, buyerService.ImportOrderExtensionCollateralCredential(context.Background(), contracts.ImportOrderExtensionCollateralCredentialRequest{
+		OrderID: request.OrderID, Extension: extension, Requirement: request.Requirement, Credential: credential,
+	}))
+	require.NoError(t, buyerService.ImportOrderExtensionCollateralCredential(context.Background(), contracts.ImportOrderExtensionCollateralCredentialRequest{
+		OrderID: request.OrderID, Extension: extension, Requirement: request.Requirement, Credential: credential,
+	}), "credential import is idempotent")
+	require.NoError(t, buyerDB.View(func(tx database.Tx) error {
+		_, err := corecollateral.AdmitExternalAllocationCredentialTx(
+			tx, string(buyerSigner.PeerID()), request.OrderID, extension, request.Requirement, clock,
+		)
+		return err
+	}))
+	buyerNode := &MobazhaNode{
+		cryptoFields: cryptoFields{signer: buyerSigner},
+		orderExtensionFields: orderExtensionFields{orderExtensionModules: mustRegisterOrderExtensionModules(
+			t, collateralRequirementTestModule{requirement: request.Requirement},
+		)},
+	}
+	require.NoError(t, buyerDB.View(func(tx database.Tx) error {
+		return buyerNode.admitOrderExtensionCollateralRequirementsTx(
+			context.Background(), tx, request.OrderID, nil, []extensions.OrderExtension{extension},
+		)
+	}))
+
+	tampered := credential
+	tampered.Allocation.Amount = "24"
+	err = buyerService.ImportOrderExtensionCollateralCredential(context.Background(), contracts.ImportOrderExtensionCollateralCredentialRequest{
+		OrderID: request.OrderID, Extension: extension, Requirement: request.Requirement, Credential: tampered,
+	})
+	require.ErrorContains(t, err, "signature is invalid")
 }

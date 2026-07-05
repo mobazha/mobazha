@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	"github.com/mobazha/mobazha/pkg/extensions"
 )
 
@@ -45,10 +47,54 @@ func (r AllocateOrderExtensionCollateralRequest) Validate() error {
 // envelope; it cannot accept provider assertions of funding.
 type CollateralAllocationService interface {
 	AllocateOrderExtensionCollateral(context.Context, AllocateOrderExtensionCollateralRequest) (extensions.OrderExtensionV2, error)
+	IssueOrderExtensionCollateralCredential(context.Context, IssueOrderExtensionCollateralCredentialRequest) (pkgcollateral.AllocationCredential, error)
+	ImportOrderExtensionCollateralCredential(context.Context, ImportOrderExtensionCollateralCredentialRequest) error
 }
 
 // CollateralAllocationServiceProvider is optional so distributions can expose
 // the authority without expanding the universal NodeService locator contract.
 type CollateralAllocationServiceProvider interface {
 	CollateralAllocation() CollateralAllocationService
+}
+
+type IssueOrderExtensionCollateralCredentialRequest struct {
+	TenantID       string
+	OrderID        string
+	Extension      extensions.OrderExtension
+	Requirement    extensions.CollateralRequirement
+	AudiencePeerID string
+	ExpiresAt      time.Time
+}
+
+func (r IssueOrderExtensionCollateralCredentialRequest) Validate(now time.Time) error {
+	if strings.TrimSpace(r.TenantID) == "" || strings.TrimSpace(r.OrderID) == "" || strings.TrimSpace(r.AudiencePeerID) == "" {
+		return fmt.Errorf("collateral credential tenant, order, and audience are required")
+	}
+	if err := r.Extension.ValidateForOrder(r.OrderID); err != nil {
+		return err
+	}
+	if err := r.Requirement.ValidateForExtension(r.Extension); err != nil {
+		return err
+	}
+	if !r.ExpiresAt.After(now) || r.ExpiresAt.Sub(now) > pkgcollateral.MaxAllocationCredentialTTL {
+		return fmt.Errorf("collateral credential expiry must be future and within the maximum TTL")
+	}
+	return nil
+}
+
+type ImportOrderExtensionCollateralCredentialRequest struct {
+	OrderID     string
+	Extension   extensions.OrderExtension
+	Requirement extensions.CollateralRequirement
+	Credential  pkgcollateral.AllocationCredential
+}
+
+func (r ImportOrderExtensionCollateralCredentialRequest) Validate() error {
+	if strings.TrimSpace(r.OrderID) == "" {
+		return fmt.Errorf("collateral credential order is required")
+	}
+	if err := r.Extension.ValidateForOrder(r.OrderID); err != nil {
+		return err
+	}
+	return r.Requirement.ValidateForExtension(r.Extension)
 }

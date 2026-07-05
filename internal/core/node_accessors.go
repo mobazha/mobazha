@@ -277,7 +277,7 @@ func (n *MobazhaNode) CollateralAllocation() contracts.CollateralAllocationServi
 	if n == nil {
 		return nil
 	}
-	return newCollateralAllocationService(n.db)
+	return newCollateralAllocationService(n.db, n.signer)
 }
 
 var _ contracts.CollateralAllocationServiceProvider = (*MobazhaNode)(nil)

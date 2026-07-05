@@ -100,6 +100,25 @@ type CollateralOrderExtensionBindingRecord struct {
 	UpdatedAt          time.Time
 }
 
+// CollateralAllocationCredentialRecord stores a signed seller-Core credential
+// as issued or imported evidence. It never becomes a buyer-local allocation.
+type CollateralAllocationCredentialRecord struct {
+	TenantID          string    `gorm:"column:tenant_id;primaryKey;default:'';index:idx_collateral_credential_binding,priority:1" json:"-"`
+	CredentialID      string    `gorm:"primaryKey;type:varchar(96)"`
+	Direction         string    `gorm:"type:varchar(16);not null"`
+	OrderID           string    `gorm:"type:varchar(128);not null;index;index:idx_collateral_credential_binding,priority:2"`
+	ExtensionID       string    `gorm:"type:varchar(96);not null;index;index:idx_collateral_credential_binding,priority:3"`
+	ExtensionRevision uint64    `gorm:"not null;index:idx_collateral_credential_binding,priority:4"`
+	AudiencePeerID    string    `gorm:"type:varchar(192);not null;index:idx_collateral_credential_binding,priority:5"`
+	IssuerPeerID      string    `gorm:"type:varchar(192);not null;index"`
+	CredentialDigest  string    `gorm:"type:varchar(96);not null"`
+	Credential        []byte    `gorm:"not null"`
+	IssuedAt          time.Time `gorm:"index"`
+	ExpiresAt         time.Time `gorm:"index"`
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
 // CollateralClaimRecord stores a Core-accepted, revision-bound claim. The
 // record authorizes a later payment action; it is not itself proof of slash.
 type CollateralClaimRecord struct {

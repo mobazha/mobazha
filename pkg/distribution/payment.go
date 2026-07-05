@@ -1028,6 +1028,47 @@ func ValidatePaymentRailContribution(descriptor PaymentModuleDescriptor, contrib
 	return validatePaymentRailContribution(contribution, descriptor)
 }
 
+// BuildPaymentRouteIdentity converts one validated contribution into the
+// immutable identity persisted with durable work. Wildcard contributions must
+// be bound to the concrete asset selected by the payment action.
+func BuildPaymentRouteIdentity(
+	descriptor PaymentModuleDescriptor,
+	contribution PaymentRailContribution,
+	asset iwallet.CoinType,
+) (payment.RouteIdentity, error) {
+	descriptor = normalizedPaymentModuleDescriptor(descriptor)
+	if err := validatePaymentModuleDescriptor(descriptor); err != nil {
+		return payment.RouteIdentity{}, err
+	}
+	contribution = normalizedPaymentRailContribution(contribution, descriptor)
+	if err := validatePaymentRailContribution(contribution, descriptor); err != nil {
+		return payment.RouteIdentity{}, err
+	}
+	asset = iwallet.CoinType(strings.TrimSpace(string(asset)))
+	if contribution.Asset == PaymentAssetAny {
+		if asset == "" || asset == PaymentAssetAny {
+			return payment.RouteIdentity{}, fmt.Errorf("payment contribution %q requires a concrete route asset", contribution.ContributionID)
+		}
+	} else {
+		if asset == "" {
+			asset = contribution.Asset
+		}
+		if asset != contribution.Asset {
+			return payment.RouteIdentity{}, fmt.Errorf("payment contribution %q asset %q does not match route asset %q", contribution.ContributionID, contribution.Asset, asset)
+		}
+	}
+	route := payment.RouteIdentity{
+		ContributionID: contribution.ContributionID, ModuleID: contribution.ModuleID,
+		ImplementationGeneration: descriptor.Version, RailKind: string(contribution.Rail),
+		NetworkID: string(contribution.Network), AssetID: string(asset),
+		ProtocolVersion: contribution.ProtocolVersion, StateSchemaVersion: contribution.StateSchemaVersion,
+	}
+	if err := route.Validate(); err != nil {
+		return payment.RouteIdentity{}, err
+	}
+	return route, nil
+}
+
 func paymentContributionRouteKey(contribution PaymentRailContribution) string {
 	return fmt.Sprintf("%s/%s/%s", contribution.Rail, contribution.Network, contribution.Asset)
 }

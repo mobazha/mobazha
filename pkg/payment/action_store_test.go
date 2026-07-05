@@ -33,8 +33,14 @@ func TestMemoryActionStore_LookupReturnsDefensiveCopy(t *testing.T) {
 func TestMemoryActionStore_PutPreservesIncrementalFields(t *testing.T) {
 	store := NewMemoryActionStore()
 	confirmedAt := time.Now().UTC().Add(-time.Minute)
+	route := RouteIdentity{
+		ContributionID: "first-party.escrow.eth", ModuleID: "first-party.escrow",
+		ImplementationGeneration: "v1", RailKind: "escrow", NetworkID: "ETH", AssetID: "ETH",
+		ProtocolVersion: "escrow-v1", StateSchemaVersion: "1",
+	}
 	require.NoError(t, store.Put(ActionRecord{
 		ActionID:       "action-1",
+		Route:          route,
 		SettlementCoin: "ETH",
 		GrossAmount:    "42",
 		PlannedLines:   []models.SettlementPayoutLine{{Address: "seller"}},
@@ -45,10 +51,30 @@ func TestMemoryActionStore_PutPreservesIncrementalFields(t *testing.T) {
 	record, err := store.Lookup(context.Background(), "action-1")
 	require.NoError(t, err)
 	assert.Equal(t, "ETH", record.SettlementCoin)
+	assert.Equal(t, route, record.Route)
 	assert.Equal(t, "42", record.GrossAmount)
 	assert.Len(t, record.PlannedLines, 1)
 	assert.Equal(t, confirmedAt, *record.ConfirmedAt)
 	assert.Equal(t, "confirmed", record.State)
+}
+
+func TestMemoryActionStore_RejectsImmutableRouteMutation(t *testing.T) {
+	store := NewMemoryActionStore()
+	route := RouteIdentity{
+		ContributionID: "first-party.escrow.eth", ModuleID: "first-party.escrow",
+		ImplementationGeneration: "v1", RailKind: "escrow", NetworkID: "ETH", AssetID: "ETH",
+		ProtocolVersion: "escrow-v1", StateSchemaVersion: "1",
+	}
+	require.NoError(t, route.Validate())
+	require.NoError(t, store.Put(ActionRecord{ActionID: "action-route", Route: route}))
+
+	changed := route
+	changed.ImplementationGeneration = "v2"
+	require.ErrorIs(t, store.Put(ActionRecord{ActionID: "action-route", Route: changed}), ErrActionIntentConflict)
+
+	incomplete := route
+	incomplete.AssetID = ""
+	require.Error(t, store.Put(ActionRecord{ActionID: "incomplete-route", Route: incomplete}))
 }
 
 func TestMemoryActionStore_RejectsEmptyIDAndHonorsContext(t *testing.T) {

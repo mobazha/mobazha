@@ -22,7 +22,12 @@ func TestSettlementActionStore_PutLookupRoundTrip(t *testing.T) {
 	require.NotNil(t, s)
 
 	rec := adapters.ActionRecord{
-		ActionID:        "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		ActionID: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		Route: adapters.RouteIdentity{
+			ContributionID: "first-party.escrow.bsc", ModuleID: "first-party.escrow",
+			ImplementationGeneration: "v1", RailKind: "escrow", NetworkID: "BSC", AssetID: "BNB",
+			ProtocolVersion: "escrow-v1", StateSchemaVersion: "1",
+		},
 		OrderID:         "QmOrderTest",
 		Action:          "relay_submit",
 		ChainID:         56,
@@ -51,6 +56,7 @@ func TestSettlementActionStore_PutLookupRoundTrip(t *testing.T) {
 	got, err := s.Lookup(context.Background(), rec.ActionID)
 	require.NoError(t, err)
 	require.Equal(t, rec.OrderID, got.OrderID)
+	require.Equal(t, rec.Route, got.Route)
 	require.Equal(t, rec.State, got.State)
 	require.Equal(t, rec.ChainID, got.ChainID)
 	require.Equal(t, rec.TxHash, got.TxHash)
@@ -61,6 +67,10 @@ func TestSettlementActionStore_PutLookupRoundTrip(t *testing.T) {
 	require.Equal(t, rec.SettlementCoin, got.SettlementCoin)
 	require.Equal(t, rec.GrossAmount, got.GrossAmount)
 	require.Equal(t, rec.PlannedLines, got.PlannedLines)
+
+	changedRoute := rec.Route
+	changedRoute.ProtocolVersion = "escrow-v2"
+	require.ErrorIs(t, s.Put(adapters.ActionRecord{ActionID: rec.ActionID, Route: changedRoute}), adapters.ErrActionIntentConflict)
 }
 
 func TestSettlementActionStore_PutRequiresCurrentExecutionLease(t *testing.T) {

@@ -21,6 +21,7 @@ const (
 // persistence implementations; API callers receive the narrower ActionStatus.
 type ActionRecord struct {
 	ActionID        string
+	Route           RouteIdentity
 	IntentKey       string
 	IntentPayload   string
 	OrderID         string
@@ -107,6 +108,11 @@ func (s *MemoryActionStore) Put(record ActionRecord) error {
 	if record.ActionID == "" {
 		return errors.New("action store: ActionID is empty")
 	}
+	if !record.Route.IsZero() {
+		if err := record.Route.Validate(); err != nil {
+			return err
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if existing, ok := s.records[record.ActionID]; ok {
@@ -118,6 +124,9 @@ func (s *MemoryActionStore) Put(record ActionRecord) error {
 		}
 		if record.IntentKey == "" {
 			record.IntentKey = existing.IntentKey
+		}
+		if record.Route.IsZero() {
+			record.Route = existing.Route
 		}
 		if record.IntentPayload == "" {
 			record.IntentPayload = existing.IntentPayload
@@ -159,6 +168,9 @@ func (s *MemoryActionStore) Put(record ActionRecord) error {
 }
 
 func actionRecordIntentConflict(existing, incoming ActionRecord) bool {
+	if !existing.Route.IsZero() && !incoming.Route.IsZero() && incoming.Route != existing.Route {
+		return true
+	}
 	if existing.IntentKey == "" {
 		return false
 	}

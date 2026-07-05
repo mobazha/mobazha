@@ -74,6 +74,31 @@ func TestPaymentRailContracts_ProviderSessionAllowsProviderCommandsButNotDispute
 	require.ErrorContains(t, ValidatePaymentRailContribution(descriptor, contribution), "does not allow operation \"dispute_release\"")
 }
 
+func TestBuildPaymentRouteIdentityBindsConcreteWildcardAsset(t *testing.T) {
+	descriptor := PaymentModuleDescriptor{
+		ID: "first-party.escrow", Version: "v2", Rails: []PaymentRailKind{PaymentRailEscrow},
+		Activation: PaymentModuleRequired, ProtocolVersion: "escrow-v2", StateSchemaVersion: "2",
+	}
+	contribution := PaymentRailContribution{
+		ContributionID: "first-party.escrow.eth", Rail: PaymentRailEscrow,
+		Network: iwallet.ChainEthereum, Asset: PaymentAssetAny,
+		Operations: []PaymentRailOperation{
+			PaymentOperationSetup, PaymentOperationObserve, PaymentOperationVerify,
+			PaymentOperationConfirm, PaymentOperationCancel, PaymentOperationRefund,
+			PaymentOperationComplete, PaymentOperationDisputeRelease, PaymentOperationReconcile,
+		},
+	}
+	route, err := BuildPaymentRouteIdentity(descriptor, contribution, iwallet.CoinType("ETH"))
+	require.NoError(t, err)
+	assert.Equal(t, "first-party.escrow.eth", route.ContributionID)
+	assert.Equal(t, "first-party.escrow", route.ModuleID)
+	assert.Equal(t, "v2", route.ImplementationGeneration)
+	assert.Equal(t, "ETH", route.AssetID)
+
+	_, err = BuildPaymentRouteIdentity(descriptor, contribution, PaymentAssetAny)
+	require.ErrorContains(t, err, "concrete route asset")
+}
+
 type testPaymentStrategy struct{}
 
 func (*testPaymentStrategy) Model() payment.PaymentModel { return payment.PaymentModelMonitored }

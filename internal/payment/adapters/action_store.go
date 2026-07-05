@@ -6,6 +6,7 @@ import "github.com/mobazha/mobazha/pkg/payment"
 // trusted distribution modules adopt the public payment contracts directly.
 type (
 	ActionRecord      = payment.ActionRecord
+	RouteIdentity     = payment.RouteIdentity
 	ActionStore       = payment.ActionStore
 	ActionRecorder    = payment.ActionRecorder
 	MemoryActionStore = payment.MemoryActionStore

@@ -47,7 +47,13 @@ func (s *SettlementActionStore) Lookup(ctx context.Context, actionID string) (*a
 		return nil, err
 	}
 	out := &adapters.ActionRecord{
-		ActionID:        row.ActionID,
+		ActionID: row.ActionID,
+		Route: adapters.RouteIdentity{
+			ContributionID: row.RouteContributionID, ModuleID: row.RouteModuleID,
+			ImplementationGeneration: row.RouteImplementationGeneration,
+			RailKind:                 row.RouteRailKind, NetworkID: row.RouteNetworkID, AssetID: row.RouteAssetID,
+			ProtocolVersion: row.RouteProtocolVersion, StateSchemaVersion: row.RouteStateSchemaVersion,
+		},
 		IntentKey:       row.IntentKey,
 		IntentPayload:   row.IntentPayload,
 		OrderID:         row.OrderID,
@@ -80,9 +86,18 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 	if rec.ActionID == "" {
 		return errors.New("action store: ActionID is empty")
 	}
+	if !rec.Route.IsZero() {
+		if err := rec.Route.Validate(); err != nil {
+			return err
+		}
+	}
 	now := time.Now().UTC()
 	row := models.SettlementAction{
-		ActionID:        rec.ActionID,
+		ActionID:            rec.ActionID,
+		RouteContributionID: rec.Route.ContributionID, RouteModuleID: rec.Route.ModuleID,
+		RouteImplementationGeneration: rec.Route.ImplementationGeneration,
+		RouteRailKind:                 rec.Route.RailKind, RouteNetworkID: rec.Route.NetworkID, RouteAssetID: rec.Route.AssetID,
+		RouteProtocolVersion: rec.Route.ProtocolVersion, RouteStateSchemaVersion: rec.Route.StateSchemaVersion,
 		IntentKey:       rec.IntentKey,
 		IntentPayload:   rec.IntentPayload,
 		OrderID:         rec.OrderID,
@@ -127,6 +142,16 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 		}
 		if row.IntentKey == "" {
 			row.IntentKey = existing.IntentKey
+		}
+		if rec.Route.IsZero() {
+			row.RouteContributionID = existing.RouteContributionID
+			row.RouteModuleID = existing.RouteModuleID
+			row.RouteImplementationGeneration = existing.RouteImplementationGeneration
+			row.RouteRailKind = existing.RouteRailKind
+			row.RouteNetworkID = existing.RouteNetworkID
+			row.RouteAssetID = existing.RouteAssetID
+			row.RouteProtocolVersion = existing.RouteProtocolVersion
+			row.RouteStateSchemaVersion = existing.RouteStateSchemaVersion
 		}
 		if row.IntentPayload == "" {
 			row.IntentPayload = existing.IntentPayload
@@ -193,6 +218,15 @@ func (s *SettlementActionStore) Put(rec adapters.ActionRecord) error {
 }
 
 func settlementActionIntentConflict(existing models.SettlementAction, incoming adapters.ActionRecord) bool {
+	existingRoute := adapters.RouteIdentity{
+		ContributionID: existing.RouteContributionID, ModuleID: existing.RouteModuleID,
+		ImplementationGeneration: existing.RouteImplementationGeneration,
+		RailKind:                 existing.RouteRailKind, NetworkID: existing.RouteNetworkID, AssetID: existing.RouteAssetID,
+		ProtocolVersion: existing.RouteProtocolVersion, StateSchemaVersion: existing.RouteStateSchemaVersion,
+	}
+	if !existingRoute.IsZero() && !incoming.Route.IsZero() && incoming.Route != existingRoute {
+		return true
+	}
 	if existing.IntentKey == "" {
 		return false
 	}
@@ -208,6 +242,10 @@ func settlementActionIntentConflict(existing models.SettlementAction, incoming a
 func settlementActionValues(row models.SettlementAction) map[string]interface{} {
 	return map[string]interface{}{
 		"intent_key": row.IntentKey, "intent_payload": row.IntentPayload, "order_id": row.OrderID, "action_kind": row.ActionKind,
+		"route_contribution_id": row.RouteContributionID, "route_module_id": row.RouteModuleID,
+		"route_implementation_generation": row.RouteImplementationGeneration, "route_rail_kind": row.RouteRailKind,
+		"route_network_id": row.RouteNetworkID, "route_asset_id": row.RouteAssetID,
+		"route_protocol_version": row.RouteProtocolVersion, "route_state_schema_version": row.RouteStateSchemaVersion,
 		"chain_id": row.ChainID, "to_address": row.To, "call_data": row.Data,
 		"state": row.State, "tx_hash": row.TxHash, "attempt_tx_hashes": row.AttemptTxHashes,
 		"relay_task_id": row.RelayTaskID, "attempts": row.Attempts, "confirmations": row.Confirmations,

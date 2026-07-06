@@ -3,6 +3,7 @@ package paypal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -134,7 +135,7 @@ func (p *Provider) CapturePayment(ctx context.Context, params contracts.CaptureP
 		headers["PayPal-Request-Id"] = params.IdempotencyKey
 	}
 	if err := p.client.doJSONWithHeaders(ctx, "POST", "/v2/checkout/orders/"+params.SessionID+"/capture", nil, &resp, headers); err != nil {
-		return nil, fmt.Errorf("paypal: capture order: %w", err)
+		return nil, fmt.Errorf("paypal: capture order: %w", classifyProviderActionError(err))
 	}
 
 	// Use the Capture ID (not Order ID) as PaymentID so RefundPayment works correctly.
@@ -322,7 +323,7 @@ func (p *Provider) RefundPayment(ctx context.Context, params contracts.RefundPar
 		if strings.Contains(errMsg, "422") && strings.Contains(errMsg, "CAPTURE_FULLY_REFUNDED") {
 			return nil, contracts.ErrAlreadyRefunded
 		}
-		return nil, fmt.Errorf("paypal refund: %w", err)
+		return nil, fmt.Errorf("paypal refund: %w", classifyProviderActionError(err))
 	}
 
 	result := &contracts.RefundResult{
@@ -349,6 +350,29 @@ func mapRefundStatus(status string) string {
 		return "failed"
 	default:
 		return "pending"
+	}
+}
+
+func classifyProviderActionError(err error) error {
+	var providerErr *apiError
+	if errors.As(err, &providerErr) && isPermanentProviderHTTPStatus(providerErr.StatusCode) {
+		return contracts.NewPermanentProviderActionError(err)
+	}
+	return err
+}
+
+func isPermanentProviderHTTPStatus(status int) bool {
+	if status < 400 || status >= 500 {
+		return false
+	}
+	switch status {
+	// PayPal uses 422 both for definitive validation errors and for outcomes
+	// such as an already-applied capture/refund. Keep it on the bounded
+	// reconciliation path unless the operation handles a known issue code.
+	case 408, 409, 422, 425, 429:
+		return false
+	default:
+		return true
 	}
 }
 

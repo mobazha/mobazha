@@ -52,6 +52,28 @@ var specialRegionCodes = map[string]bool{
 	"CENTRAL_AMERICA": true, // Central America region
 }
 
+// shippingRegionCountries is the authoritative mapping used when a shipping
+// zone targets a continent-level region instead of individual ISO countries.
+// Keep the values aligned with the region groups exposed by the storefront.
+var shippingRegionCountries = map[string]map[string]struct{}{
+	"ASIA":            countrySet("CN JP KR IN SG HK TW MO MY TH VN ID PH BD PK LK NP MM KH LA MN KZ UZ KG TJ TM AF BT BN TL MV"),
+	"EUROPE":          countrySet("GB DE FR IT ES PT NL BE CH AT SE NO DK FI IE PL CZ HU RO BG GR HR SK SI RS UA BY LT LV EE IS LU MT CY MC AD LI SM VA ME MK AL BA MD XK"),
+	"NORTH_AMERICA":   countrySet("US CA MX GL BM PM"),
+	"SOUTH_AMERICA":   countrySet("BR AR CL CO PE VE EC BO PY UY GY SR GF FK"),
+	"CENTRAL_AMERICA": countrySet("GT BZ SV HN NI CR PA CU JM HT DO PR TT BB BS AW CW AG DM GD KN LC VC AI KY TC VG VI"),
+	"OCEANIA":         countrySet("AU NZ FJ PG NC VU SB WS TO KI FM PW MH NR TV GU PF"),
+	"AFRICA":          countrySet("ZA EG NG KE MA GH TZ ET DZ TN UG SD AO MZ CM CI SN ZW ZM MW MU BW NA RW LY GA BJ BF CD CG CF TD DJ GQ ER SZ GM GN GW LR LS MG ML MR NE SC SL SO SS ST TG CV KM RE YT"),
+	"MIDDLE_EAST":     countrySet("AE SA IL TR IR IQ KW QA BH OM JO LB SY YE PS"),
+}
+
+func countrySet(codes string) map[string]struct{} {
+	set := make(map[string]struct{})
+	for _, code := range strings.Fields(codes) {
+		set[code] = struct{}{}
+	}
+	return set
+}
+
 // IsValidISOCountryCode checks if the given code is a valid ISO 3166-1 alpha-2 country code.
 func IsValidISOCountryCode(code string) bool {
 	return validISO31661Alpha2[strings.ToUpper(code)]
@@ -72,6 +94,26 @@ func IsValidShippingRegion(code string) bool {
 // NormalizeRegionCode normalizes a region code to uppercase.
 func NormalizeRegionCode(code string) string {
 	return strings.ToUpper(strings.TrimSpace(code))
+}
+
+// ShippingRegionMatchesCountry reports whether an ISO destination belongs to
+// a configured shipping region. Worldwide aliases and continent groups are
+// resolved server-side so callers cannot self-assert a cheaper region.
+func ShippingRegionMatchesCountry(region, country string) bool {
+	region = NormalizeRegionCode(region)
+	country = NormalizeRegionCode(country)
+	if !IsValidISOCountryCode(country) {
+		return false
+	}
+	if region == "ALL" || region == "WORLDWIDE" || region == country {
+		return true
+	}
+	countries, ok := shippingRegionCountries[region]
+	if !ok {
+		return false
+	}
+	_, ok = countries[country]
+	return ok
 }
 
 // ValidateShippingRegions validates a list of shipping regions.

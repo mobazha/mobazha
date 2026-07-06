@@ -48,8 +48,11 @@ var (
 type CreateGuestOrderRequest struct {
 	Items           []GuestOrderItemRequest `json:"items"`
 	ShippingAddress interface{}             `json:"shippingAddress,omitempty"`
-	ContactEmail    string                  `json:"contactEmail,omitempty"`
-	PaymentCoin     string                  `json:"paymentCoin"`
+	// ShippingCountry is the ISO 3166-1 alpha-2 destination used to authorize
+	// shipping zones without exposing the rest of an encrypted address.
+	ShippingCountry string `json:"shippingCountry,omitempty"`
+	ContactEmail    string `json:"contactEmail,omitempty"`
+	PaymentCoin     string `json:"paymentCoin"`
 }
 
 // QuoteGuestOrderSupplyRequest is the public preflight input for checking

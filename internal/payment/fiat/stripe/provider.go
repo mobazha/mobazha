@@ -3,6 +3,7 @@ package stripe
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -88,7 +89,7 @@ func (p *Provider) CapturePayment(_ context.Context, params contracts.CapturePay
 	}
 	pi, err := api.PaymentIntents.Get(params.SessionID, getParams)
 	if err != nil {
-		return nil, fmt.Errorf("stripe: get payment intent: %w", err)
+		return nil, fmt.Errorf("stripe: get payment intent: %w", classifyProviderActionError(err))
 	}
 
 	return &contracts.PaymentResult{
@@ -281,7 +282,7 @@ func (p *Provider) RefundPayment(_ context.Context, params contracts.RefundParam
 
 	refund, err := api.Refunds.New(rp)
 	if err != nil {
-		return nil, fmt.Errorf("stripe refund: %w", err)
+		return nil, fmt.Errorf("stripe refund: %w", classifyProviderActionError(err))
 	}
 
 	return &contracts.RefundResult{
@@ -303,7 +304,7 @@ func (p *Provider) CancelPayment(_ context.Context, request contracts.CancelPaym
 	}
 	_, err := api.PaymentIntents.Cancel(request.PaymentID, params)
 	if err != nil {
-		return fmt.Errorf("stripe cancel payment intent %s: %w", request.PaymentID, err)
+		return fmt.Errorf("stripe cancel payment intent %s: %w", request.PaymentID, classifyProviderActionError(err))
 	}
 	return nil
 }
@@ -323,6 +324,26 @@ func mapRefundReason(reason string) string {
 		return string(gostripe.RefundReasonFraudulent)
 	default:
 		return string(gostripe.RefundReasonRequestedByCustomer)
+	}
+}
+
+func classifyProviderActionError(err error) error {
+	var providerErr *gostripe.Error
+	if errors.As(err, &providerErr) && isPermanentProviderHTTPStatus(providerErr.HTTPStatusCode) {
+		return contracts.NewPermanentProviderActionError(err)
+	}
+	return err
+}
+
+func isPermanentProviderHTTPStatus(status int) bool {
+	if status < 400 || status >= 500 {
+		return false
+	}
+	switch status {
+	case 408, 409, 425, 429:
+		return false
+	default:
+		return true
 	}
 }
 

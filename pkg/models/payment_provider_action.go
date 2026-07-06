@@ -9,6 +9,7 @@ const (
 
 	PaymentProviderActionPendingExternal   = "pending_external"
 	PaymentProviderActionReconcileRequired = "reconcile_required"
+	PaymentProviderActionFailed            = "failed"
 	PaymentProviderActionCompleted         = "completed"
 )
 

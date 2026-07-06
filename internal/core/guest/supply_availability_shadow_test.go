@@ -488,10 +488,14 @@ func TestCreateGuestOrder_ShadowQuotePreservesGuestInventoryReservation(t *testi
 	}))
 
 	resp, err := svc.CreateGuestOrder(context.Background(), contracts.CreateGuestOrderRequest{
-		PaymentCoin: "LTC",
+		PaymentCoin:     "LTC",
+		ShippingAddress: map[string]string{"country": "US"},
+		ShippingCountry: "US",
 		Items: []contracts.GuestOrderItemRequest{{
-			ListingSlug: "camera",
-			Quantity:    1,
+			ListingSlug:     "camera",
+			Quantity:        1,
+			ShippingOption:  "test-zone",
+			ShippingService: "standard",
 			Options: []map[string]string{
 				{"Color": "Red"},
 			},
@@ -567,10 +571,14 @@ func TestCreateGuestOrder_ShadowQuoteUsesExternalSupplyLineForSyncedListing(t *t
 	}))
 
 	resp, err := svc.CreateGuestOrder(context.Background(), contracts.CreateGuestOrderRequest{
-		PaymentCoin: "LTC",
+		PaymentCoin:     "LTC",
+		ShippingAddress: map[string]string{"country": "US"},
+		ShippingCountry: "US",
 		Items: []contracts.GuestOrderItemRequest{{
-			ListingSlug: "supplier-shirt",
-			Quantity:    1,
+			ListingSlug:     "supplier-shirt",
+			Quantity:        1,
+			ShippingOption:  "test-zone",
+			ShippingService: "standard",
 			Options: []map[string]string{
 				{"Color": "Red"},
 			},
@@ -624,10 +632,14 @@ func TestCreateGuestOrder_AuthoritativeSupplyReserveUsesTransactionalService(t *
 	}))
 
 	resp, err := svc.CreateGuestOrder(context.Background(), contracts.CreateGuestOrderRequest{
-		PaymentCoin: "LTC",
+		PaymentCoin:     "LTC",
+		ShippingAddress: map[string]string{"country": "US"},
+		ShippingCountry: "US",
 		Items: []contracts.GuestOrderItemRequest{{
-			ListingSlug: "camera",
-			Quantity:    1,
+			ListingSlug:     "camera",
+			Quantity:        1,
+			ShippingOption:  "test-zone",
+			ShippingService: "standard",
 			Options: []map[string]string{
 				{"Color": "Red"},
 			},
@@ -735,10 +747,14 @@ func TestCreateGuestOrder_AuthoritativeSupplyReserveSkipsExternalSyncedListing(t
 	}))
 
 	resp, err := svc.CreateGuestOrder(context.Background(), contracts.CreateGuestOrderRequest{
-		PaymentCoin: "LTC",
+		PaymentCoin:     "LTC",
+		ShippingAddress: map[string]string{"country": "US"},
+		ShippingCountry: "US",
 		Items: []contracts.GuestOrderItemRequest{{
-			ListingSlug: "supplier-shirt",
-			Quantity:    1,
+			ListingSlug:     "supplier-shirt",
+			Quantity:        1,
+			ShippingOption:  "test-zone",
+			ShippingService: "standard",
 			Options: []map[string]string{
 				{"Color": "Red"},
 			},
@@ -855,6 +871,21 @@ func TestReleaseGuestSupplyInTx_UsesAuthoritativeServiceWhenEnabled(t *testing.T
 
 func guestListingWithSku(slug, option, variant, quantity, price string) *pb.SignedListing {
 	listing := guestListing(slug, pb.Listing_Metadata_PHYSICAL_GOOD)
+	listing.Listing.ShippingProfile = &pb.ShippingProfile{
+		LocationGroups: []*pb.LocationGroup{{
+			Zones: []*pb.ShippingZone{{
+				Id:      "test-zone",
+				Name:    "Worldwide",
+				Regions: []string{"ALL"},
+				Rates: []*pb.ShippingRate{{
+					Id:       "standard",
+					Name:     "Standard",
+					Price:    "0",
+					Currency: "USD",
+				}},
+			}},
+		}},
+	}
 	listing.Listing.Item.Skus = []*pb.Listing_Item_Sku{{
 		Selections: []*pb.Listing_Item_Sku_Selection{{
 			Option:  option,

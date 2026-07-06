@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/armor"
 	"gorm.io/gorm"
 
 	pkgconfig "github.com/mobazha/mobazha/pkg/config"
@@ -213,6 +215,35 @@ func guestAssertErrorCode(t *testing.T, body []byte, expectedCode string) {
 	if envelope.Error.Code != expectedCode {
 		t.Errorf("expected error code %q, got %q", expectedCode, envelope.Error.Code)
 	}
+}
+
+func testPGPArmors(t *testing.T) (publicArmor, privateArmor string) {
+	t.Helper()
+	entity, err := openpgp.NewEntity("Guest Checkout", "test", "guest@example.test", nil)
+	require.NoError(t, err)
+
+	var public bytes.Buffer
+	publicWriter, err := armor.Encode(&public, openpgp.PublicKeyType, nil)
+	require.NoError(t, err)
+	require.NoError(t, entity.Serialize(publicWriter))
+	require.NoError(t, publicWriter.Close())
+
+	var private bytes.Buffer
+	privateWriter, err := armor.Encode(&private, openpgp.PrivateKeyType, nil)
+	require.NoError(t, err)
+	require.NoError(t, entity.SerializePrivate(privateWriter, nil))
+	require.NoError(t, privateWriter.Close())
+	return public.String(), private.String()
+}
+
+func TestValidatePGPPublicKey_PublicOnlyAccepted_PrivateRejected(t *testing.T) {
+	publicArmor, privateArmor := testPGPArmors(t)
+	fingerprint, err := validatePGPPublicKey(publicArmor)
+	require.NoError(t, err)
+	require.NotEmpty(t, fingerprint)
+
+	_, err = validatePGPPublicKey(privateArmor)
+	require.ErrorContains(t, err, "public key block")
 }
 
 func TestPOSTGuestOrderQuote_Valid(t *testing.T) {
@@ -620,6 +651,15 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 			return nil
 		},
 		getGuestCheckoutCfgFunc: func(_ context.Context) (*models.GuestCheckoutConfig, error) {
+			if saved == nil {
+				return &models.GuestCheckoutConfig{
+					PGPPublicKey:              "existing-public-key",
+					PGPKeyFingerprint:         "AABBCCDD",
+					PGPKeyVersion:             3,
+					PGPEncryptedPrivateKey:    "existing-encrypted-private-key",
+					AddressEncryptionRequired: true,
+				}, nil
+			}
 			return &models.GuestCheckoutConfig{
 				Enabled:        saved.Enabled,
 				AcceptedCoins:  saved.AcceptedCoins,
@@ -668,6 +708,12 @@ func TestPUTGuestCheckoutSettings(t *testing.T) {
 	}
 	if saved == nil {
 		t.Fatal("config was not saved")
+	}
+	if saved.PGPPublicKey != "existing-public-key" || saved.PGPKeyFingerprint != "AABBCCDD" || saved.PGPKeyVersion != 3 {
+		t.Fatalf("ordinary settings update cleared PGP public metadata: %+v", saved)
+	}
+	if saved.PGPEncryptedPrivateKey != "existing-encrypted-private-key" || !saved.AddressEncryptionRequired {
+		t.Fatalf("ordinary settings update cleared encrypted key policy: %+v", saved)
 	}
 	if !saved.Enabled {
 		t.Error("expected saved.Enabled=true")
@@ -874,6 +920,42 @@ func TestPUTGuestCheckoutSettings_IgnoresPGPPublicKey(t *testing.T) {
 	if saved.PGPPublicKey != "" {
 		t.Fatalf("settings save path must not mutate PGP key, got %q", saved.PGPPublicKey)
 	}
+}
+
+func TestPUTPGPPublicKey_OmittedEncryptedBackup_PreservesExistingBackup(t *testing.T) {
+	publicArmor, _ := testPGPArmors(t)
+	fingerprint, err := validatePGPPublicKey(publicArmor)
+	require.NoError(t, err)
+
+	const existingBackup = "encrypted-private-key-backup"
+	current := &models.GuestCheckoutConfig{
+		Enabled:                   true,
+		PGPPublicKey:              publicArmor,
+		PGPKeyFingerprint:         fingerprint,
+		PGPKeyVersion:             1,
+		PGPEncryptedPrivateKey:    existingBackup,
+		AddressEncryptionRequired: true,
+	}
+	var saved *models.GuestCheckoutConfig
+	svc := &mockGuestOrderService{
+		getGuestCheckoutCfgFunc: func(context.Context) (*models.GuestCheckoutConfig, error) {
+			copy := *current
+			return &copy, nil
+		},
+		saveGuestCheckoutCfgFunc: func(_ context.Context, cfg *models.GuestCheckoutConfig) error {
+			copy := *cfg
+			saved = &copy
+			return nil
+		},
+	}
+	ts := guestTestServer(t, svc)
+	payload, err := json.Marshal(map[string]string{"publicKey": publicArmor})
+	require.NoError(t, err)
+
+	resp, body := guestDoReq(t, ts, http.MethodPut, "/v1/settings/pgp-key", payload)
+	guestAssertStatus(t, resp, http.StatusOK)
+	require.NotNil(t, saved, "response body: %s", body)
+	require.Equal(t, existingBackup, saved.PGPEncryptedPrivateKey)
 }
 
 func TestPUTGuestCheckoutSettings_SyncsTenantFeatureFlag(t *testing.T) {

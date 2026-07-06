@@ -13,6 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestClassifyProviderActionError_HTTPStatus(t *testing.T) {
+	permanent := classifyProviderActionError(&apiError{Method: http.MethodPost, Path: "/capture", StatusCode: http.StatusBadRequest})
+	assert.True(t, contracts.IsPermanentProviderActionError(permanent))
+
+	ambiguous := classifyProviderActionError(&apiError{Method: http.MethodPost, Path: "/capture", StatusCode: http.StatusUnprocessableEntity})
+	assert.False(t, contracts.IsPermanentProviderActionError(ambiguous))
+
+	retryable := classifyProviderActionError(&apiError{Method: http.MethodPost, Path: "/capture", StatusCode: http.StatusTooManyRequests})
+	assert.False(t, contracts.IsPermanentProviderActionError(retryable))
+}
+
 // newTestServer creates an httptest.Server and a Provider configured to use it,
 // with a pre-set access token to skip OAuth.
 func newTestServer(t *testing.T, handler http.Handler) (*httptest.Server, *Provider) {

@@ -27,6 +27,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/redact"
+	pkgutils "github.com/mobazha/mobazha/pkg/utils"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -319,6 +320,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	buyerPortalExpiresAt := expiresAt.Add(defaultBuyerPortalTTL)
 
 	var items []models.GuestOrderItem
+	var resolvedItems []*resolvedItem
 	var subtotalSmallest = new(big.Int)
 	var priceCurrencyCode string
 	var priceDivisibility uint32
@@ -394,14 +396,46 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 			}
 		}
 		items = append(items, item)
+		resolvedItems = append(resolvedItems, resolved)
+	}
+	if hasOrderContractType && orderContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
+		if req.ShippingAddress == nil {
+			return nil, fmt.Errorf("%w: physical orders require a shipping address", contracts.ErrInvalidGuestRequest)
+		}
+		if cfg.AddressEncryptionRequired {
+			ciphertext, encrypted := req.ShippingAddress.(string)
+			if cfg.PGPPublicKey == "" || strings.TrimSpace(cfg.PGPKeyFingerprint) == "" {
+				return nil, fmt.Errorf("%w: seller address encryption is not configured", contracts.ErrInvalidGuestRequest)
+			}
+			if !encrypted || !strings.HasPrefix(strings.TrimSpace(ciphertext), "-----BEGIN PGP MESSAGE-----") {
+				return nil, fmt.Errorf("%w: physical shipping address must be PGP-encrypted", contracts.ErrInvalidGuestRequest)
+			}
+			if err := validateAddressCiphertext(ciphertext, cfg.PGPPublicKey); err != nil {
+				return nil, fmt.Errorf("%w: %v", contracts.ErrInvalidGuestRequest, err)
+			}
+		}
+		shippingCountry := strings.ToUpper(strings.TrimSpace(req.ShippingCountry))
+		if !pkgutils.IsValidISOCountryCode(shippingCountry) {
+			return nil, fmt.Errorf("%w: physical orders require a valid ISO shipping country",
+				contracts.ErrInvalidGuestRequest)
+		}
+		req.ShippingCountry = shippingCountry
 	}
 
 	shippingCostSmallest := new(big.Int)
 	for i, it := range req.Items {
-		if it.ShippingOption == "" {
+		if !hasOrderContractType || orderContractType != pb.Listing_Metadata_PHYSICAL_GOOD {
 			continue
 		}
-		shippingFee, shErr := s.resolveShippingCost(it)
+		if i >= len(resolvedItems) {
+			return nil, fmt.Errorf("%w: shipping item resolution mismatch", contracts.ErrInvalidGuestRequest)
+		}
+		shippingFee, shErr := s.resolveShippingCost(
+			it,
+			req.ShippingCountry,
+			subtotalSmallest,
+			resolvedItems[i],
+		)
 		if shErr != nil {
 			return nil, fmt.Errorf("resolve shipping cost (listing %q): %w", it.ListingSlug, shErr)
 		}
@@ -474,6 +508,9 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	if req.ShippingAddress != nil {
 		if err := order.SetShippingAddress(req.ShippingAddress); err != nil {
 			return nil, fmt.Errorf("set shipping address: %w", err)
+		}
+		if order.ShippingAddressEncrypted {
+			order.ShippingAddressKeyFingerprint = strings.TrimSpace(cfg.PGPKeyFingerprint)
 		}
 	}
 
@@ -1629,6 +1666,7 @@ type resolvedItem struct {
 	VariantSKU        string
 	HasStockTracking  bool
 	StockQty          int64
+	UnitWeightGrams   uint64
 }
 
 func (s *GuestOrderAppService) resolveItemPrice(item contracts.GuestOrderItemRequest) (*resolvedItem, error) {
@@ -1661,6 +1699,7 @@ func (s *GuestOrderAppService) resolveItemPrice(item contracts.GuestOrderItemReq
 		PriceCurrencyCode: priceCurCode,
 		PriceDivisibility: uint32(priceCurDef.Divisibility),
 		ContractType:      listing.Metadata.GetContractType(),
+		UnitWeightGrams:   uint64(listing.Item.GetGrams()),
 	}
 
 	hasSkus := len(listing.Item.Skus) > 0
@@ -1690,6 +1729,9 @@ func (s *GuestOrderAppService) resolveItemPrice(item contracts.GuestOrderItemReq
 		}
 		out.VariantHash = computeVariantHashFromSku(sku)
 		out.VariantSKU = strings.TrimSpace(sku.GetProductID())
+		if sku.GetWeight() > 0 {
+			out.UnitWeightGrams = uint64(sku.GetWeight())
+		}
 	}
 
 	out.ListingTitle = listing.Item.Title
@@ -1705,9 +1747,15 @@ func (s *GuestOrderAppService) resolveItemPrice(item contracts.GuestOrderItemReq
 	return out, nil
 }
 
-func (s *GuestOrderAppService) resolveShippingCost(item contracts.GuestOrderItemRequest) (*big.Int, error) {
+func (s *GuestOrderAppService) resolveShippingCost(
+	item contracts.GuestOrderItemRequest,
+	shippingCountry string,
+	orderSubtotal *big.Int,
+	resolved *resolvedItem,
+) (*big.Int, error) {
 	if item.ShippingOption == "" || item.ShippingService == "" {
-		return new(big.Int), nil
+		return nil, fmt.Errorf("%w: physical listing %q requires a shipping option and service",
+			contracts.ErrInvalidGuestRequest, item.ListingSlug)
 	}
 	if s.listings == nil {
 		return nil, fmt.Errorf("listing service not configured")
@@ -1732,8 +1780,40 @@ func (s *GuestOrderAppService) resolveShippingCost(item contracts.GuestOrderItem
 				continue
 			}
 			zoneFound = true
+			countryAllowed := false
+			for _, region := range zone.GetRegions() {
+				if pkgutils.ShippingRegionMatchesCountry(region, shippingCountry) {
+					countryAllowed = true
+					break
+				}
+			}
+			if !countryAllowed {
+				return nil, fmt.Errorf("%w: shipping option %q is not available for country %s",
+					contracts.ErrInvalidGuestRequest, item.ShippingOption, shippingCountry)
+			}
 			for _, rate := range zone.GetRates() {
 				if rate.GetId() == item.ShippingService || rate.GetName() == item.ShippingService {
+					if currency := strings.ToUpper(strings.TrimSpace(rate.GetCurrency())); currency != "" && resolved != nil && currency != resolved.PriceCurrencyCode {
+						return nil, fmt.Errorf("%w: shipping rate currency %s does not match listing currency %s",
+							contracts.ErrInvalidGuestRequest, currency, resolved.PriceCurrencyCode)
+					}
+					itemWeight := new(big.Int)
+					if resolved != nil && resolved.UnitWeightGrams > 0 {
+						itemWeight.Mul(new(big.Int).SetUint64(resolved.UnitWeightGrams), big.NewInt(int64(item.Quantity)))
+					}
+					if !shippingRateConditionMatches(rate.GetCondition(), itemWeight, orderSubtotal) {
+						return nil, fmt.Errorf("%w: shipping service %q conditions are not satisfied",
+							contracts.ErrInvalidGuestRequest, item.ShippingService)
+					}
+					if threshold := rate.GetFreeShippingThreshold(); threshold.GetEnabled() {
+						minimum, ok := new(big.Int).SetString(strings.TrimSpace(threshold.GetMinAmount()), 10)
+						if !ok || minimum.Sign() < 0 {
+							return nil, fmt.Errorf("invalid free-shipping threshold: %q", threshold.GetMinAmount())
+						}
+						if orderSubtotal != nil && orderSubtotal.Cmp(minimum) >= 0 {
+							return new(big.Int), nil
+						}
+					}
 					if rate.GetPrice() == "" {
 						return new(big.Int), nil
 					}
@@ -1753,6 +1833,36 @@ func (s *GuestOrderAppService) resolveShippingCost(item contracts.GuestOrderItem
 	}
 	return nil, fmt.Errorf("%w: shipping service %q not available under option %q for listing %q",
 		contracts.ErrInvalidGuestRequest, item.ShippingService, item.ShippingOption, item.ListingSlug)
+}
+
+func shippingRateConditionMatches(
+	condition *pb.ShippingRate_RateCondition,
+	itemWeight, orderSubtotal *big.Int,
+) bool {
+	if condition == nil || condition.GetType() == pb.ShippingRate_RateCondition_NONE {
+		return true
+	}
+	var value *big.Int
+	switch condition.GetType() {
+	case pb.ShippingRate_RateCondition_WEIGHT:
+		value = itemWeight
+	case pb.ShippingRate_RateCondition_PRICE:
+		value = orderSubtotal
+	default:
+		return false
+	}
+	if value == nil || value.Sign() < 0 {
+		return false
+	}
+	minimum := new(big.Int).SetUint64(uint64(condition.GetMinValue()))
+	if value.Cmp(minimum) < 0 {
+		return false
+	}
+	if condition.GetMaxValue() == 0 {
+		return true
+	}
+	maximum := new(big.Int).SetUint64(uint64(condition.GetMaxValue()))
+	return value.Cmp(maximum) <= 0
 }
 
 func (s *GuestOrderAppService) digitalGoodReviewWindowDays() uint32 {
@@ -2073,5 +2183,64 @@ func (s *GuestOrderAppService) SaveGuestCheckoutConfig(ctx context.Context, cfg 
 	cfg.ID = 1
 	return s.db.Update(func(tx database.Tx) error {
 		return tx.Save(cfg)
+	})
+}
+
+// SaveGuestCheckoutBusinessConfig updates only merchant-facing checkout
+// fields. Encryption material is managed independently and must not be
+// overwritten by a stale read from the settings form.
+func (s *GuestOrderAppService) SaveGuestCheckoutBusinessConfig(
+	_ context.Context,
+	cfg *models.GuestCheckoutConfig,
+) error {
+	if cfg == nil {
+		return errors.New("guest checkout config is required")
+	}
+	cfg.ID = 1
+	return s.updateGuestCheckoutConfigColumns(cfg, map[string]interface{}{
+		"enabled":          cfg.Enabled,
+		"accepted_coins":   cfg.AcceptedCoins,
+		"max_order_amount": cfg.MaxOrderAmount,
+		"payment_timeout":  cfg.PaymentTimeout,
+	})
+}
+
+// SaveGuestCheckoutEncryptionConfig updates only the address-protection
+// columns. This prevents PGP key creation/rotation from reverting concurrent
+// business settings changes.
+func (s *GuestOrderAppService) SaveGuestCheckoutEncryptionConfig(
+	_ context.Context,
+	cfg *models.GuestCheckoutConfig,
+) error {
+	if cfg == nil {
+		return errors.New("guest checkout encryption config is required")
+	}
+	cfg.ID = 1
+	return s.updateGuestCheckoutConfigColumns(cfg, map[string]interface{}{
+		"pgp_public_key":              cfg.PGPPublicKey,
+		"pgp_key_fingerprint":         cfg.PGPKeyFingerprint,
+		"pgp_key_version":             cfg.PGPKeyVersion,
+		"pgp_encrypted_private_key":   cfg.PGPEncryptedPrivateKey,
+		"address_encryption_required": cfg.AddressEncryptionRequired,
+	})
+}
+
+func (s *GuestOrderAppService) updateGuestCheckoutConfigColumns(
+	createValue *models.GuestCheckoutConfig,
+	values map[string]interface{},
+) error {
+	return s.db.Update(func(tx database.Tx) error {
+		updated, err := tx.UpdateColumns(values, map[string]interface{}{
+			"id = ?": 1,
+		}, &models.GuestCheckoutConfig{})
+		if err != nil {
+			return err
+		}
+		if updated > 0 {
+			return nil
+		}
+		// The singleton may not exist on a fresh node. Create it using the
+		// caller's complete snapshot; subsequent writes are column-scoped.
+		return tx.Create(createValue)
 	})
 }

@@ -94,7 +94,7 @@ func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 	runtime.before = func(request distribution.ExternalPaymentAddressRequest) {
 		var attempt models.PaymentAttempt
 		require.NoError(t, db.gormDB.Where("idempotency_key = ?", request.IdempotencyKey).First(&attempt).Error)
-		require.Equal(t, models.PaymentAttemptPendingExternal, attempt.State)
+		require.Equal(t, models.PaymentAttemptExternalDispatching, attempt.State)
 	}
 	request := PaymentAddressRequest{
 		CoinType:   iwallet.CoinType("crypto:monero:mainnet:native"),
@@ -369,6 +369,47 @@ func TestDirectPaymentService_RecoveryDoesNotAllocateExpiredAttempt(t *testing.T
 	require.Empty(t, runtime.requestSnapshot())
 	require.NoError(t, db.gormDB.Where("attempt_id = ?", attempt.AttemptID).First(&attempt).Error)
 	require.Equal(t, models.PaymentAttemptExpired, attempt.State)
+}
+
+func TestDirectPaymentService_RecoveryReapsExpiredDispatchedAttempt(t *testing.T) {
+	db := newGuestTestDB(t)
+	runtime := &directPaymentExternalRuntimeStub{
+		address: distribution.ExternalPaymentAddress{Address: "ambiguous-address", Index: 19, RequiredConfirmations: 2},
+	}
+	service := NewDirectPaymentService(db, nil)
+	route := payment.RouteIdentity{
+		ContributionID: "test.direct.mainnet", ModuleID: "test.direct", ImplementationGeneration: "v1",
+		RailKind: string(distribution.PaymentRailDirectObserved), NetworkID: "TEST",
+		AssetID: "crypto:monero:mainnet:native", ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	catalog := distribution.NewExternalPaymentRuntimeCatalog()
+	require.NoError(t, catalog.Register(distribution.ExternalPaymentRuntimeRegistration{Route: route, Runtime: runtime, ActiveForNewWork: true}))
+	service.SetExternalPaymentRuntimeCatalog(catalog)
+
+	expiresAt := time.Now().Add(-time.Minute)
+	attempt := models.PaymentAttempt{
+		TenantID: testTenantID, AttemptID: "pa_dispatched_expired", Kind: models.PaymentAttemptKindDirectObservedAddress,
+		PaymentSessionID: "guest:gst_dispatched_expired", OrderID: "gst_dispatched_expired", AmountValue: "300",
+		RouteBindingID: "prb_dispatched_expired", IdempotencyKey: "dpa_dispatched_expired",
+		State: models.PaymentAttemptExternalDispatching, ExpiresAt: &expiresAt,
+	}
+	binding := paymentRouteBindingFromIdentity(attempt.RouteBindingID, attempt.AttemptID, route)
+	binding.TenantID = testTenantID
+	require.NoError(t, db.gormDB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&binding).Error; err != nil {
+			return err
+		}
+		return tx.Create(&attempt).Error
+	}))
+
+	recovered, err := service.RecoverPendingExternalPaymentAddresses(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, recovered)
+	require.Len(t, runtime.requestSnapshot(), 1)
+	require.Equal(t, attempt.IdempotencyKey, runtime.requestSnapshot()[0].IdempotencyKey)
+	require.Equal(t, []uint32{19}, runtime.reapedSnapshot())
+	require.NoError(t, db.gormDB.Where("attempt_id = ?", attempt.AttemptID).First(&attempt).Error)
+	require.Equal(t, models.PaymentAttemptAbandoned, attempt.State)
 }
 
 func TestDirectPaymentService_ConcurrentRetriesShareDurableAttempt(t *testing.T) {

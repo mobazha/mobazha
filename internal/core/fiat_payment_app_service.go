@@ -59,6 +59,7 @@ const (
 	providerCredentialEncryptionKeyVersion uint64 = 1
 	providerActionLeaseDuration                   = 2 * time.Minute
 	providerActionBatchSize                       = 100
+	providerActionMaxAutomaticAttempts            = 8
 	providerActionDefaultListLimit                = 50
 	providerActionMaxListLimit                    = 100
 )
@@ -745,8 +746,19 @@ func (s *FiatPaymentAppService) resolveProviderActionRouteTx(
 }
 
 func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, action models.PaymentProviderAction) (providerActionResult, error) {
+	return s.executeProviderActionWithTerminalRetry(ctx, action, false)
+}
+
+func (s *FiatPaymentAppService) executeProviderActionWithTerminalRetry(
+	ctx context.Context,
+	action models.PaymentProviderAction,
+	allowTerminalRetry bool,
+) (providerActionResult, error) {
 	if action.State == models.PaymentProviderActionCompleted {
 		return decodeProviderActionResult(action)
+	}
+	if action.State == models.PaymentProviderActionFailed && !allowTerminalRetry {
+		return providerActionResult{}, contracts.ErrActionNotRetryable
 	}
 	claimed, current, err := s.claimProviderAction(action, time.Now().UTC())
 	if err != nil {
@@ -755,6 +767,9 @@ func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, actio
 	if !claimed {
 		if current.State == models.PaymentProviderActionCompleted {
 			return decodeProviderActionResult(current)
+		}
+		if current.State == models.PaymentProviderActionFailed && !allowTerminalRetry {
+			return providerActionResult{}, contracts.ErrActionNotRetryable
 		}
 		return providerActionResult{}, contracts.ErrActionInProgress
 	}
@@ -766,6 +781,9 @@ func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, actio
 	if err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("route_binding_id = ?", action.RouteBindingID).First(&route).Error
 	}); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("load provider action route: %w", err))
+		}
 		return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("load provider action route: %w", err))
 	}
 	binding, provider, err := s.resolveHistoricalProviderBinding(route)
@@ -778,7 +796,7 @@ func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, actio
 	case models.PaymentProviderActionCapture:
 		var intent providerCaptureIntent
 		if err := json.Unmarshal(action.IntentPayload, &intent); err != nil {
-			return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("decode capture intent: %w", err))
+			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("decode capture intent: %w", err))
 		}
 		result.Capture, err = provider.CapturePayment(ctx, contracts.CapturePaymentParams{
 			SessionID: intent.SessionID, IdempotencyKey: action.IdempotencyKey,
@@ -790,7 +808,7 @@ func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, actio
 	case models.PaymentProviderActionRefund:
 		var intent providerRefundIntent
 		if err := json.Unmarshal(action.IntentPayload, &intent); err != nil {
-			return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("decode refund intent: %w", err))
+			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("decode refund intent: %w", err))
 		}
 		intent.Params.IdempotencyKey = action.IdempotencyKey
 		intent.Params.Metadata = cloneStringMap(intent.Params.Metadata)
@@ -805,7 +823,7 @@ func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, actio
 	case models.PaymentProviderActionCancel:
 		var intent providerCancelIntent
 		if err := json.Unmarshal(action.IntentPayload, &intent); err != nil {
-			return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("decode cancel intent: %w", err))
+			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("decode cancel intent: %w", err))
 		}
 		err = provider.CancelPayment(ctx, contracts.CancelPaymentParams{
 			PaymentID: intent.PaymentID, IdempotencyKey: action.IdempotencyKey,
@@ -813,9 +831,12 @@ func (s *FiatPaymentAppService) executeProviderAction(ctx context.Context, actio
 		})
 		result.Canceled = err == nil
 	default:
-		err = fmt.Errorf("unknown provider action kind %q", action.ActionKind)
+		return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("unknown provider action kind %q", action.ActionKind))
 	}
 	if err != nil {
+		if contracts.IsPermanentProviderActionError(err) {
+			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("%s %s payment: %w", action.ActionKind, action.ProviderID, err))
+		}
 		return providerActionResult{}, s.markProviderActionReconcileRequired(action, fmt.Errorf("%s %s payment: %w", action.ActionKind, action.ProviderID, err))
 	}
 	if err := s.completeProviderAction(action, result); err != nil {
@@ -908,6 +929,13 @@ func decodeProviderActionResult(action models.PaymentProviderAction) (providerAc
 }
 
 func (s *FiatPaymentAppService) markProviderActionReconcileRequired(action models.PaymentProviderAction, actionErr error) error {
+	if action.Attempts+1 >= providerActionMaxAutomaticAttempts {
+		return s.markProviderActionFailed(action, fmt.Errorf(
+			"automatic provider action retry limit reached after %d attempts: %w",
+			action.Attempts+1,
+			actionErr,
+		))
+	}
 	delay := time.Minute << min(action.Attempts, 6)
 	if delay > time.Hour {
 		delay = time.Hour
@@ -942,6 +970,36 @@ func (s *FiatPaymentAppService) markProviderActionReconcileRequired(action model
 	logger.LogWarningWithIDf(log, s.nodeID,
 		"provider action scheduled for reconciliation: action=%s kind=%s provider=%s attempts=%d next_attempt=%s error=%v",
 		action.ActionID, action.ActionKind, action.ProviderID, action.Attempts+1, nextAttemptAt.Format(time.RFC3339), payment.SanitizeProviderError(actionErr))
+	return actionErr
+}
+
+func (s *FiatPaymentAppService) markProviderActionFailed(action models.PaymentProviderAction, actionErr error) error {
+	now := time.Now().UTC()
+	updateErr := s.db.Update(func(tx database.Tx) error {
+		updated, err := tx.UpdateColumns(map[string]interface{}{
+			"state": models.PaymentProviderActionFailed, "attempts": action.Attempts + 1,
+			"last_error": payment.SanitizeProviderError(actionErr), "next_attempt_at": nil,
+			"lease_owner": "", "lease_expires_at": nil, "updated_at": now,
+		}, map[string]interface{}{
+			"action_id = ?": action.ActionID, "lease_owner = ?": action.LeaseOwner,
+		}, &models.PaymentProviderAction{})
+		if err != nil {
+			return err
+		}
+		if updated != 1 {
+			return contracts.ErrActionLeaseLost
+		}
+		return nil
+	})
+	if updateErr != nil {
+		payment.RecordFiatProviderActionOutcome(action.ProviderID, action.ActionKind, "persist_error")
+		return errors.Join(actionErr, updateErr)
+	}
+	payment.RecordFiatProviderActionOutcome(action.ProviderID, action.ActionKind, "failed")
+	payment.ObserveFiatProviderActionAttempts(action.ProviderID, action.ActionKind, "failed", action.Attempts+1)
+	logger.LogErrorWithIDf(log, s.nodeID,
+		"provider action stopped automatic retries: action=%s kind=%s provider=%s attempts=%d error=%v",
+		action.ActionID, action.ActionKind, action.ProviderID, action.Attempts+1, payment.SanitizeProviderError(actionErr))
 	return actionErr
 }
 
@@ -1029,7 +1087,9 @@ func (s *FiatPaymentAppService) RetryProviderAction(ctx context.Context, request
 		payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, "in_progress")
 		return nil, contracts.ErrActionInProgress
 	}
-	if action.State != models.PaymentProviderActionPendingExternal && action.State != models.PaymentProviderActionReconcileRequired {
+	if action.State != models.PaymentProviderActionPendingExternal &&
+		action.State != models.PaymentProviderActionReconcileRequired &&
+		action.State != models.PaymentProviderActionFailed {
 		payment.RecordFiatProviderActionManualRetry(action.ProviderID, action.ActionKind, "not_retryable")
 		return nil, contracts.ErrActionNotRetryable
 	}
@@ -1041,7 +1101,7 @@ func (s *FiatPaymentAppService) RetryProviderAction(ctx context.Context, request
 		action.NextAttemptAt = nil
 		action.UpdatedAt = now
 	}
-	if _, err := s.executeProviderAction(ctx, action); err != nil && !errors.Is(err, contracts.ErrAlreadyRefunded) {
+	if _, err := s.executeProviderActionWithTerminalRetry(ctx, action, true); err != nil && !errors.Is(err, contracts.ErrAlreadyRefunded) {
 		result := "failed"
 		if errors.Is(err, contracts.ErrActionInProgress) || errors.Is(err, contracts.ErrActionLeaseLost) {
 			result = "claim_conflict"
@@ -1110,7 +1170,9 @@ func (s *FiatPaymentAppService) clearProviderActionBackoff(action models.Payment
 
 func providerActionView(action models.PaymentProviderAction, now time.Time) contracts.ProviderActionView {
 	leased := action.LeaseExpiresAt != nil && action.LeaseExpiresAt.After(now)
-	retryable := action.State == models.PaymentProviderActionPendingExternal || action.State == models.PaymentProviderActionReconcileRequired
+	retryable := action.State == models.PaymentProviderActionPendingExternal ||
+		action.State == models.PaymentProviderActionReconcileRequired ||
+		action.State == models.PaymentProviderActionFailed
 	return contracts.ProviderActionView{
 		ActionID: action.ActionID, ActionKind: action.ActionKind, ProviderID: action.ProviderID,
 		ExternalReference: action.ExternalReference, State: action.State, Attempts: action.Attempts,

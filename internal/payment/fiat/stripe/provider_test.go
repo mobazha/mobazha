@@ -24,6 +24,14 @@ import (
 
 const testAPIVersion = gostripe.APIVersion
 
+func TestClassifyProviderActionError_HTTPStatus(t *testing.T) {
+	permanent := classifyProviderActionError(&gostripe.Error{HTTPStatusCode: http.StatusBadRequest, Msg: "invalid request"})
+	assert.True(t, contracts.IsPermanentProviderActionError(permanent))
+
+	retryable := classifyProviderActionError(&gostripe.Error{HTTPStatusCode: http.StatusTooManyRequests, Msg: "rate limited"})
+	assert.False(t, contracts.IsPermanentProviderActionError(retryable))
+}
+
 // newTestProvider creates an httptest.Server and a Provider configured to use it.
 func newTestProvider(t *testing.T, handler http.Handler) (*httptest.Server, *Provider) {
 	t.Helper()

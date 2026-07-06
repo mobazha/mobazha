@@ -234,6 +234,26 @@ func (g *Gateway) registerPGPKeyGet(api huma.API) {
 	})
 }
 
+func (g *Gateway) registerPGPKeyVaultGet(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "settings-pgp-key-vault-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/settings/pgp-key/vault",
+		Summary:     "Get seller encrypted PGP key backup",
+		Tags:        []string{"settings"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/settings/pgp-key/vault", nil)
+		rr := httptest.NewRecorder()
+		g.handleGETPGPKeyVault(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
 // registerPGPKeyPut exposes PUT /v1/settings/pgp-key (authenticated seller).
 func (g *Gateway) registerPGPKeyPut(api huma.API) {
 	type in struct {

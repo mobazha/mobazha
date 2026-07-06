@@ -9,14 +9,13 @@ import (
 	corepayment "github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/distribution"
-	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestMobazhaNodeDecidePaymentCapability_RequiresExactTenantAssetConfiguration(t *testing.T) {
+func TestMobazhaNodeDecidePaymentCapability_AllowsEscrowFromSignedSellerTerms(t *testing.T) {
 	strategy := &autoConfirmProbeStrategy{called: make(chan struct{})}
 	module := &paymentModuleProbe{id: "commercial.evm", chain: iwallet.ChainBSC, strategy: strategy}
 	registry := payment.NewRegistry()
@@ -28,19 +27,9 @@ func TestMobazhaNodeDecidePaymentCapability_RequiresExactTenantAssetConfiguratio
 	require.NoError(t, manager.Start(context.Background(), nil))
 	t.Cleanup(func() { require.NoError(t, manager.Stop(context.Background())) })
 
-	receivingAccounts := newTestReceivingAccountService(t)
-	nativeAccount := &models.ReceivingAccount{
-		Name: "Settlement", ChainType: iwallet.ChainBSC,
-		Address: "0x1234567890abcdef1234567890abcdef12345678", IsActive: true,
-	}
-	require.NoError(t, nativeAccount.SetActiveTokens([]string{iwallet.NATIVE_SYMBOL}))
-	_, err = receivingAccounts.Add(nativeAccount)
-	require.NoError(t, err)
-
 	node := &MobazhaNode{
 		identityFields: identityFields{nodeID: "tenant-a"},
 		walletFields:   walletFields{paymentModuleManager: manager},
-		appServices:    appServices{receivingAccountService: receivingAccounts},
 	}
 	native, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBSC)
 	require.NoError(t, err)
@@ -56,20 +45,6 @@ func TestMobazhaNodeDecidePaymentCapability_RequiresExactTenantAssetConfiguratio
 		Rail: distribution.PaymentRailEscrow, Network: iwallet.ChainBSC,
 		Asset: usdt, Operation: distribution.PaymentOperationSetup,
 	})
-	assert.False(t, tokenDecision.Allowed())
-	assert.Equal(t, distribution.PaymentCapabilityNotConfigured, tokenDecision.Code)
-
-	tokenAccount := &models.ReceivingAccount{
-		Name: "Token settlement", ChainType: iwallet.ChainBSC,
-		Address: "0xabcdef1234567890abcdef1234567890abcdef12", IsActive: true,
-	}
-	require.NoError(t, tokenAccount.SetActiveTokens([]string{iwallet.NATIVE_SYMBOL, "USDT"}))
-	_, err = receivingAccounts.Add(tokenAccount)
-	require.NoError(t, err)
-	tokenDecision = node.DecidePaymentCapability(context.Background(), distribution.PaymentCapabilityRequest{
-		Rail: distribution.PaymentRailEscrow, Network: iwallet.ChainBSC,
-		Asset: usdt, Operation: distribution.PaymentOperationSetup,
-	})
 	assert.True(t, tokenDecision.Allowed())
 
 	policy := effectivePaymentProvisioningPolicy{node: node}
@@ -77,11 +52,9 @@ func TestMobazhaNodeDecidePaymentCapability_RequiresExactTenantAssetConfiguratio
 		PaymentCoin: string(usdt),
 	}))
 
-	node.receivingAccountService = nil
-	err = policy.AuthorizeSessionProvisioning(context.Background(), corepayment.SessionProvisioningPolicyInput{
+	require.NoError(t, policy.AuthorizeSessionProvisioning(context.Background(), corepayment.SessionProvisioningPolicyInput{
 		PaymentCoin: string(native),
-	})
-	require.ErrorIs(t, err, contracts.ErrCoinUnavailable)
+	}))
 }
 
 func TestNodePaymentTenantCapabilityResolver_RejectsCrossTenantScope(t *testing.T) {

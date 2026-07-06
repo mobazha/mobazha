@@ -1164,6 +1164,73 @@ func TestFiatService_ReconcileProviderAction_RetriesWithSameIdempotencyKey(t *te
 	assert.Equal(t, 2, action.Attempts)
 }
 
+func TestFiatService_ProviderActionPermanentFailureStopsAutomaticRetriesAndAllowsManualRetry(t *testing.T) {
+	provider := &mockFiatProvider{
+		id:         "stripe",
+		captureErr: contracts.NewPermanentProviderActionError(errors.New("payment intent cannot be captured")),
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "stripe", "order_permanent_failure", "pi_permanent_failure")
+
+	_, err := svc.CapturePayment(context.Background(), "stripe", "pi_permanent_failure")
+	require.ErrorContains(t, err, "cannot be captured")
+	require.Len(t, provider.captureCalls, 1)
+	var action models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	assert.Equal(t, models.PaymentProviderActionFailed, action.State)
+	assert.Equal(t, 1, action.Attempts)
+	assert.Nil(t, action.NextAttemptAt)
+	assert.Empty(t, action.LeaseOwner)
+	assert.True(t, providerActionView(action, time.Now().UTC()).Retryable)
+
+	svc.reconcileProviderActions(context.Background())
+	require.Len(t, provider.captureCalls, 1, "failed actions must not be retried automatically")
+	_, err = svc.CapturePayment(context.Background(), "stripe", "pi_permanent_failure")
+	require.ErrorIs(t, err, contracts.ErrActionNotRetryable)
+	require.Len(t, provider.captureCalls, 1)
+
+	provider.captureErr = nil
+	provider.captureResult = &contracts.PaymentResult{PaymentID: "pi_permanent_failure", Status: "succeeded"}
+	view, err := svc.RetryProviderAction(context.Background(), contracts.ProviderActionRetryRequest{
+		ActionID: action.ActionID, RequestedBy: "test-operator",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, view)
+	assert.Equal(t, models.PaymentProviderActionCompleted, view.State)
+	assert.Equal(t, 2, view.Attempts)
+	require.Len(t, provider.captureCalls, 2)
+}
+
+func TestFiatService_ProviderActionAutomaticRetryLimitRequiresManualIntervention(t *testing.T) {
+	provider := &mockFiatProvider{id: "paypal", captureErr: errors.New("ambiguous timeout")}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "paypal", "order_retry_limit", "pp_retry_limit")
+
+	_, err := svc.CapturePayment(context.Background(), "paypal", "pp_retry_limit")
+	require.ErrorContains(t, err, "ambiguous timeout")
+	var action models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		_, updateErr := tx.UpdateColumns(map[string]interface{}{
+			"attempts": providerActionMaxAutomaticAttempts - 1, "next_attempt_at": nil,
+		}, map[string]interface{}{"action_id = ?": action.ActionID}, &models.PaymentProviderAction{})
+		return updateErr
+	}))
+
+	svc.reconcileProviderActions(context.Background())
+	action = models.PaymentProviderAction{}
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	assert.Equal(t, models.PaymentProviderActionFailed, action.State)
+	assert.Equal(t, providerActionMaxAutomaticAttempts, action.Attempts)
+	assert.Contains(t, action.LastError, "automatic provider action retry limit reached")
+	assert.Nil(t, action.NextAttemptAt)
+	require.Len(t, provider.captureCalls, 2)
+}
+
 func TestFiatService_ListProviderActions_ReturnsSafeFilteredProjection(t *testing.T) {
 	provider := &mockFiatProvider{id: "stripe", captureErr: errors.New("upstream sk_test_super-secret timed out")}
 	reg := newMockFiatRegistry()

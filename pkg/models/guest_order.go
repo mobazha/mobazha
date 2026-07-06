@@ -128,9 +128,10 @@ type GuestOrder struct {
 	// ShippingAddress holds either a JSON-encoded address struct (plaintext)
 	// or an OpenPGP ASCII-armor ciphertext (PM-3a). Inspect
 	// ShippingAddressEncrypted to distinguish the two cases.
-	ShippingAddress          []byte `json:"-"`
-	ShippingAddressEncrypted bool   `gorm:"column:shipping_address_encrypted" json:"-"`
-	ContactEmail             string `json:"contactEmail,omitempty"`
+	ShippingAddress               []byte `json:"-"`
+	ShippingAddressEncrypted      bool   `gorm:"column:shipping_address_encrypted" json:"-"`
+	ShippingAddressKeyFingerprint string `gorm:"column:shipping_address_key_fingerprint;size:64" json:"shippingAddressKeyFingerprint,omitempty"`
+	ContactEmail                  string `json:"contactEmail,omitempty"`
 
 	// Lifecycle
 	ExpiresAt       time.Time  `gorm:"index" json:"expiresAt"`

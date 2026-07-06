@@ -30,6 +30,28 @@ type RetryableError struct {
 func (e *RetryableError) Error() string { return e.Err.Error() }
 func (e *RetryableError) Unwrap() error { return e.Err }
 
+// PermanentProviderActionError marks a definitive provider rejection that
+// must not be retried automatically. Operators may still request an explicit
+// retry after correcting credentials or business input.
+type PermanentProviderActionError struct {
+	Err error
+}
+
+func (e *PermanentProviderActionError) Error() string { return e.Err.Error() }
+func (e *PermanentProviderActionError) Unwrap() error { return e.Err }
+
+func NewPermanentProviderActionError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &PermanentProviderActionError{Err: err}
+}
+
+func IsPermanentProviderActionError(err error) bool {
+	var permanent *PermanentProviderActionError
+	return errors.As(err, &permanent)
+}
+
 // FiatPaymentProvider is the core payment interface that all fiat providers must implement.
 // Implementations live in internal/payment/fiat/{stripe,paypal}/.
 type FiatPaymentProvider interface {

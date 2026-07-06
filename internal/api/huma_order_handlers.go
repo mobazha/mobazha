@@ -70,6 +70,7 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 	g.registerGuestOrderShip(api)
 	g.registerGuestOrderComplete(api)
 	g.registerGuestOrderAdminDetail(api) // PM-3a: admin detail with shipping address ciphertext
+	g.registerPGPKeyVaultGet(api)        // authenticated encrypted private-key backup
 	g.registerPGPKeyPut(api)             // PM-3a: set vendor PGP public key
 	g.registerPGPKeyDelete(api)          // PM-3a: remove vendor PGP public key
 

@@ -966,6 +966,72 @@
         ],
         "type": "object"
       },
+      "CollateralAccountView": {
+        "additionalProperties": false,
+        "properties": {
+          "activatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "assetID": {
+            "type": "string"
+          },
+          "availableAmount": {
+            "type": "string"
+          },
+          "collateralID": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fundedAmount": {
+            "type": "string"
+          },
+          "funding": {
+            "$ref": "#/components/schemas/OperatorFundingStatus"
+          },
+          "policyID": {
+            "type": "string"
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "providerID": {
+            "type": "string"
+          },
+          "requiredAmount": {
+            "type": "string"
+          },
+          "resourceID": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "collateralID",
+          "providerID",
+          "resourceID",
+          "assetID",
+          "requiredAmount",
+          "fundedAmount",
+          "availableAmount",
+          "policyID",
+          "policyVersion",
+          "revision",
+          "state",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
       "Digital-asset-create-license-keyRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1164,6 +1230,59 @@
       },
       "EnvelopeError": {
         "additionalProperties": false,
+        "type": "object"
+      },
+      "FundingInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 192,
+            "minLength": 1,
+            "type": "string"
+          },
+          "principalDestination": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "principalDestination",
+          "idempotencyKey"
+        ],
+        "type": "object"
+      },
+      "FundingTarget": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "assetID": {
+            "type": "string"
+          },
+          "collateralID": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "payload": {},
+          "railID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "railID",
+          "collateralID",
+          "assetID",
+          "amount",
+          "expiresAt"
+        ],
         "type": "object"
       },
       "HumaNodePingOutputBody": {
@@ -1397,6 +1516,118 @@
           "maskedKey",
           "licenseType",
           "maxActivations"
+        ],
+        "type": "object"
+      },
+      "OpenInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "assetID": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "maxLength": 192,
+            "minLength": 1,
+            "type": "string"
+          },
+          "policyID": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "policyVersion": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "providerID": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "requiredAmount": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "resourceID": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerID",
+          "resourceID",
+          "assetID",
+          "requiredAmount",
+          "policyID",
+          "policyVersion",
+          "idempotencyKey",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "OperatorFundingStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "assetID": {
+            "type": "string"
+          },
+          "attempts": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fundingReference": {
+            "type": "string"
+          },
+          "lastErrorCode": {
+            "type": "string"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "railID": {
+            "type": "string"
+          },
+          "railVersion": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "railID",
+          "railVersion",
+          "state",
+          "assetID",
+          "amount",
+          "attempts",
+          "expiresAt",
+          "updatedAt"
         ],
         "type": "object"
       },
@@ -6669,6 +6900,234 @@
         "summary": "Start SAS verification",
         "tags": [
           "chat"
+        ]
+      }
+    },
+    "/v1/collateral/accounts": {
+      "post": {
+        "description": "Creates or retrieves one tenant- and local-principal-bound collateral requirement. This does not prove funding.",
+        "operationId": "collateral-accounts-open",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollateralAccountView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Open a collateral account",
+        "tags": [
+          "collateral"
+        ]
+      }
+    },
+    "/v1/collateral/accounts/{collateralID}": {
+      "get": {
+        "description": "Returns a safe tenant-local account and funding projection without credentials, evidence, raw rail payload, or idempotency identity.",
+        "operationId": "collateral-accounts-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "collateralID",
+            "required": true,
+            "schema": {
+              "maxLength": 96,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollateralAccountView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Get collateral account status",
+        "tags": [
+          "collateral"
+        ]
+      }
+    },
+    "/v1/collateral/accounts/{collateralID}/funding-target": {
+      "post": {
+        "description": "Creates or retrieves a persisted funding target through the configured reviewed rail. The target is not funding proof.",
+        "operationId": "collateral-funding-target-prepare",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "collateralID",
+            "required": true,
+            "schema": {
+              "maxLength": 96,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundingInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundingTarget"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Prepare a collateral funding target",
+        "tags": [
+          "collateral"
+        ]
+      }
+    },
+    "/v1/collateral/accounts/{collateralID}/funding/reconcile": {
+      "post": {
+        "description": "Polls the configured rail and applies only receipt-verified confirmed funding to the Core aggregate.",
+        "operationId": "collateral-funding-reconcile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "collateralID",
+            "required": true,
+            "schema": {
+              "maxLength": 96,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollateralAccountView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Reconcile collateral funding",
+        "tags": [
+          "collateral"
         ]
       }
     },
@@ -18542,6 +19001,48 @@
           }
         ],
         "summary": "Set seller PGP public key",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/settings/pgp-key/vault": {
+      "get": {
+        "operationId": "settings-pgp-key-vault-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Get seller encrypted PGP key backup",
         "tags": [
           "settings"
         ]

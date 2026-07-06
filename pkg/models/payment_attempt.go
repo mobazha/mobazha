@@ -9,13 +9,14 @@ const (
 	PaymentAttemptKindProviderSession       = "provider_session"
 	PaymentAttemptKindDirectObservedAddress = "direct_observed_address"
 
-	PaymentAttemptPendingExternal   = "pending_external"
-	PaymentAttemptExternalCreated   = "external_created"
-	PaymentAttemptLinked            = "linked"
-	PaymentAttemptReconcileRequired = "reconcile_required"
-	PaymentAttemptExpired           = "expired"
-	PaymentAttemptAbandoning        = "abandoning"
-	PaymentAttemptAbandoned         = "abandoned"
+	PaymentAttemptPendingExternal     = "pending_external"
+	PaymentAttemptExternalDispatching = "external_dispatching"
+	PaymentAttemptExternalCreated     = "external_created"
+	PaymentAttemptLinked              = "linked"
+	PaymentAttemptReconcileRequired   = "reconcile_required"
+	PaymentAttemptExpired             = "expired"
+	PaymentAttemptAbandoning          = "abandoning"
+	PaymentAttemptAbandoned           = "abandoned"
 )
 
 // PaymentAttempt is Core's durable claim for one concrete payment provisioning

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/openpgp"
 	"gorm.io/gorm"
 
 	pkgconfig "github.com/mobazha/mobazha/pkg/config"
@@ -19,12 +21,103 @@ import (
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
+const maxPGPKeyArmorBytes = 64 * 1024
+
+func validatePGPPublicKey(armored string) (string, error) {
+	armored = strings.TrimSpace(armored)
+	if armored == "" || len(armored) > maxPGPKeyArmorBytes {
+		return "", errors.New("publicKey must be a non-empty OpenPGP key under 64 KiB")
+	}
+	if !strings.HasPrefix(armored, "-----BEGIN PGP PUBLIC KEY BLOCK-----") {
+		return "", errors.New("publicKey must be an OpenPGP public key block")
+	}
+	entities, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armored))
+	if err != nil || len(entities) != 1 || entities[0].PrimaryKey == nil {
+		return "", errors.New("publicKey must contain exactly one valid OpenPGP public key")
+	}
+	entity := entities[0]
+	if entity.PrivateKey != nil {
+		return "", errors.New("publicKey must not contain private key material")
+	}
+	for _, subkey := range entity.Subkeys {
+		if subkey.PrivateKey != nil {
+			return "", errors.New("publicKey must not contain private key material")
+		}
+	}
+	canEncrypt := entity.PrimaryKey.PubKeyAlgo.CanEncrypt()
+	for _, subkey := range entity.Subkeys {
+		if subkey.PublicKey != nil && subkey.PublicKey.PubKeyAlgo.CanEncrypt() {
+			canEncrypt = true
+			break
+		}
+	}
+	if !canEncrypt {
+		return "", errors.New("publicKey does not contain an encryption-capable key")
+	}
+	return strings.ToUpper(hex.EncodeToString(entity.PrimaryKey.Fingerprint[:])), nil
+}
+
+func validateEncryptedPGPPrivateKey(armored, expectedFingerprint string) error {
+	armored = strings.TrimSpace(armored)
+	if armored == "" || len(armored) > maxPGPKeyArmorBytes {
+		return errors.New("encryptedPrivateKey must be a non-empty OpenPGP key under 64 KiB")
+	}
+	entities, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armored))
+	if err != nil || len(entities) != 1 || entities[0].PrimaryKey == nil {
+		return errors.New("encryptedPrivateKey must contain exactly one valid OpenPGP private key")
+	}
+	entity := entities[0]
+	fingerprint := strings.ToUpper(hex.EncodeToString(entity.PrimaryKey.Fingerprint[:]))
+	if fingerprint != strings.ToUpper(strings.TrimSpace(expectedFingerprint)) {
+		return errors.New("public and private key fingerprints do not match")
+	}
+	if entity.PrivateKey == nil || !entity.PrivateKey.Encrypted {
+		return errors.New("private key must be encrypted with a recovery passphrase")
+	}
+	for _, subkey := range entity.Subkeys {
+		if subkey.PrivateKey != nil && !subkey.PrivateKey.Encrypted {
+			return errors.New("all private subkeys must be encrypted with a recovery passphrase")
+		}
+	}
+	return nil
+}
+
 type guestCheckoutSettingsInput struct {
 	Enabled               bool                  `json:"enabled"`
 	AcceptedCoins         guestCheckoutCoinList `json:"acceptedCoins"`
 	MaxOrderAmount        string                `json:"maxOrderAmount"`
 	PaymentTimeout        int                   `json:"paymentTimeout"`
 	PaymentTimeoutMinutes int                   `json:"paymentTimeoutMinutes"`
+}
+
+type guestCheckoutBusinessConfigSaver interface {
+	SaveGuestCheckoutBusinessConfig(context.Context, *models.GuestCheckoutConfig) error
+}
+
+type guestCheckoutEncryptionConfigSaver interface {
+	SaveGuestCheckoutEncryptionConfig(context.Context, *models.GuestCheckoutConfig) error
+}
+
+func saveGuestCheckoutBusinessConfig(
+	ctx context.Context,
+	svc contracts.GuestOrderService,
+	cfg *models.GuestCheckoutConfig,
+) error {
+	if saver, ok := svc.(guestCheckoutBusinessConfigSaver); ok {
+		return saver.SaveGuestCheckoutBusinessConfig(ctx, cfg)
+	}
+	return svc.SaveGuestCheckoutConfig(ctx, cfg)
+}
+
+func saveGuestCheckoutEncryptionConfig(
+	ctx context.Context,
+	svc contracts.GuestOrderService,
+	cfg *models.GuestCheckoutConfig,
+) error {
+	if saver, ok := svc.(guestCheckoutEncryptionConfigSaver); ok {
+		return saver.SaveGuestCheckoutEncryptionConfig(ctx, cfg)
+	}
+	return svc.SaveGuestCheckoutConfig(ctx, cfg)
 }
 
 type guestCheckoutCoinList []string
@@ -341,8 +434,20 @@ func (g *Gateway) handlePUTGuestCheckoutSettings(w http.ResponseWriter, r *http.
 		return
 	}
 	req := input.toModel()
+	current, err := svc.GetGuestCheckoutConfig(r.Context())
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+	// Business settings must not erase the independently managed encryption
+	// key material or fail-closed policy.
+	req.PGPPublicKey = current.PGPPublicKey
+	req.PGPKeyFingerprint = current.PGPKeyFingerprint
+	req.PGPKeyVersion = current.PGPKeyVersion
+	req.PGPEncryptedPrivateKey = current.PGPEncryptedPrivateKey
+	req.AddressEncryptionRequired = current.AddressEncryptionRequired
 
-	if err := svc.SaveGuestCheckoutConfig(r.Context(), &req); err != nil {
+	if err := saveGuestCheckoutBusinessConfig(r.Context(), svc, &req); err != nil {
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
 		return
 	}
@@ -428,7 +533,38 @@ func (g *Gateway) handleGETPGPPublicKey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response.Success(w, map[string]string{"publicKey": cfg.PGPPublicKey})
+	response.Success(w, map[string]interface{}{
+		"publicKey":   cfg.PGPPublicKey,
+		"fingerprint": cfg.PGPKeyFingerprint,
+		"keyVersion":  cfg.PGPKeyVersion,
+	})
+}
+
+// handleGETPGPKeyVault returns the passphrase-encrypted private key backup to
+// an authenticated seller. The key remains encrypted and is unlocked only in
+// the browser; public storefront routes never expose this endpoint.
+func (g *Gateway) handleGETPGPKeyVault(w http.ResponseWriter, r *http.Request) {
+	svc := getGuestOrderService(r)
+	if svc == nil {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented,
+			"Guest Checkout is not available")
+		return
+	}
+	cfg, err := svc.GetGuestCheckoutConfig(r.Context())
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+	if cfg.PGPPublicKey == "" || cfg.PGPEncryptedPrivateKey == "" {
+		response.Error(w, http.StatusNotFound, response.CodeNotFound, "address protection key vault is not configured")
+		return
+	}
+	response.Success(w, map[string]interface{}{
+		"publicKey":           cfg.PGPPublicKey,
+		"encryptedPrivateKey": cfg.PGPEncryptedPrivateKey,
+		"fingerprint":         cfg.PGPKeyFingerprint,
+		"keyVersion":          cfg.PGPKeyVersion,
+	})
 }
 
 // handlePUTPGPPublicKey sets the seller's OpenPGP public key (authenticated).
@@ -442,17 +578,24 @@ func (g *Gateway) handlePUTPGPPublicKey(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req struct {
-		PublicKey string `json:"publicKey"`
+		PublicKey           string  `json:"publicKey"`
+		EncryptedPrivateKey *string `json:"encryptedPrivateKey"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
 		return
 	}
 
-	if req.PublicKey != "" && !strings.HasPrefix(req.PublicKey, "-----BEGIN PGP PUBLIC KEY") {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
-			"publicKey must be an OpenPGP ASCII-armor public key block")
+	fingerprint, err := validatePGPPublicKey(req.PublicKey)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
 		return
+	}
+	if req.EncryptedPrivateKey != nil && strings.TrimSpace(*req.EncryptedPrivateKey) != "" {
+		if err := validateEncryptedPGPPrivateKey(*req.EncryptedPrivateKey, fingerprint); err != nil {
+			response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
+			return
+		}
 	}
 
 	cfg, err := svc.GetGuestCheckoutConfig(r.Context())
@@ -460,14 +603,36 @@ func (g *Gateway) handlePUTPGPPublicKey(w http.ResponseWriter, r *http.Request) 
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
 		return
 	}
+	keyChanged := !strings.EqualFold(cfg.PGPKeyFingerprint, fingerprint)
+	if (keyChanged || strings.TrimSpace(cfg.PGPEncryptedPrivateKey) == "") &&
+		(req.EncryptedPrivateKey == nil || strings.TrimSpace(*req.EncryptedPrivateKey) == "") {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest,
+			"encryptedPrivateKey is required when configuring a new address-protection key")
+		return
+	}
+	if keyChanged {
+		cfg.PGPKeyVersion++
+		if cfg.PGPKeyVersion < 1 {
+			cfg.PGPKeyVersion = 1
+		}
+	}
 
-	cfg.PGPPublicKey = req.PublicKey
-	if err := svc.SaveGuestCheckoutConfig(r.Context(), cfg); err != nil {
+	cfg.PGPPublicKey = strings.TrimSpace(req.PublicKey)
+	cfg.PGPKeyFingerprint = fingerprint
+	if req.EncryptedPrivateKey != nil {
+		cfg.PGPEncryptedPrivateKey = strings.TrimSpace(*req.EncryptedPrivateKey)
+	}
+	cfg.AddressEncryptionRequired = true
+	if err := saveGuestCheckoutEncryptionConfig(r.Context(), svc, cfg); err != nil {
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
 		return
 	}
 
-	response.Success(w, map[string]string{"publicKey": cfg.PGPPublicKey})
+	response.Success(w, map[string]interface{}{
+		"publicKey":   cfg.PGPPublicKey,
+		"fingerprint": cfg.PGPKeyFingerprint,
+		"keyVersion":  cfg.PGPKeyVersion,
+	})
 }
 
 // handleDELETEPGPPublicKey removes the seller's OpenPGP public key (authenticated).
@@ -487,7 +652,11 @@ func (g *Gateway) handleDELETEPGPPublicKey(w http.ResponseWriter, r *http.Reques
 	}
 
 	cfg.PGPPublicKey = ""
-	if err := svc.SaveGuestCheckoutConfig(r.Context(), cfg); err != nil {
+	cfg.PGPKeyFingerprint = ""
+	cfg.PGPKeyVersion = 0
+	cfg.PGPEncryptedPrivateKey = ""
+	cfg.AddressEncryptionRequired = true
+	if err := saveGuestCheckoutEncryptionConfig(r.Context(), svc, cfg); err != nil {
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
 		return
 	}

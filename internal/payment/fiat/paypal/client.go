@@ -16,6 +16,17 @@ const (
 	productionBaseURL = "https://api-m.paypal.com"
 )
 
+type apiError struct {
+	Method     string
+	Path       string
+	StatusCode int
+	Body       string
+}
+
+func (e *apiError) Error() string {
+	return fmt.Sprintf("paypal: %s %s returned %d: %s", e.Method, e.Path, e.StatusCode, e.Body)
+}
+
 // apiClient is a lightweight PayPal REST API client with automatic OAuth2 token management.
 type apiClient struct {
 	clientID     string
@@ -128,7 +139,7 @@ func (c *apiClient) doJSONWithHeaders(ctx context.Context, method, path string, 
 	}
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("paypal: %s %s returned %d: %s", method, path, resp.StatusCode, respBody)
+		return &apiError{Method: method, Path: path, StatusCode: resp.StatusCode, Body: string(respBody)}
 	}
 
 	if result != nil && len(respBody) > 0 {

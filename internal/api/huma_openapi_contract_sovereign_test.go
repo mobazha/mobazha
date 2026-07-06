@@ -189,6 +189,7 @@ func TestSovereignOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"guest-orders-admin-detail",
 		"settings-guest-checkout-readiness-get",
 		"settings-pgp-key-get",
+		"settings-pgp-key-vault-get",
 		"settings-pgp-key-put",
 		"settings-pgp-key-delete",
 		// payment methods
@@ -211,6 +212,7 @@ func TestSovereignOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"settings-ai-put",
 		"settings-ai-providers-get",
 		"settings-ai-test-post",
+		"settings-pgp-key-vault-get",
 		"ai-status-get",
 		"ai-generate-post",
 		// short-lived standalone administrator session

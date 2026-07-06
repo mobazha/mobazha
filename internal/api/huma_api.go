@@ -204,6 +204,7 @@ func (g *Gateway) registerRestrictedHumaOperations(api huma.API) {
 	g.registerGuestOrderShip(api)
 	g.registerGuestOrderComplete(api)
 	g.registerGuestOrderAdminDetail(api)
+	g.registerPGPKeyVaultGet(api)
 	g.registerPGPKeyPut(api)
 	g.registerPGPKeyDelete(api)
 	g.registerNodeHumaReceivingAccountOperations(api)

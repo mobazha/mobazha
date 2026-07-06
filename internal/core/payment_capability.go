@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/mobazha/mobazha/pkg/distribution"
-	"github.com/mobazha/mobazha/pkg/models"
-	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"gorm.io/gorm"
 )
 
@@ -35,7 +33,7 @@ type nodePaymentTenantCapabilityResolver struct {
 func (r nodePaymentTenantCapabilityResolver) ResolvePaymentTenantCapability(
 	ctx context.Context,
 	tenantID string,
-	request distribution.PaymentCapabilityRequest,
+	_ distribution.PaymentCapabilityRequest,
 	_ distribution.PaymentModuleDescriptor,
 	contribution distribution.PaymentRailContribution,
 ) (distribution.PaymentTenantCapability, error) {
@@ -44,11 +42,12 @@ func (r nodePaymentTenantCapabilityResolver) ResolvePaymentTenantCapability(
 	}
 	switch contribution.Rail {
 	case distribution.PaymentRailEscrow:
-		configured, err := r.hasConfiguredReceivingAccount(request, contribution)
-		if err != nil {
-			return distribution.PaymentTenantCapability{}, err
-		}
-		return distribution.PaymentTenantCapability{Authorized: true, Configured: configured}, nil
+		// Escrow sessions are provisioned by the buyer from the seller's signed
+		// order terms. Requiring a matching receiving-account row on the buyer
+		// node would make cross-store checkout impossible. Seller-side payment
+		// discovery already filters assets through its configured accounts; the
+		// session gate therefore owns composition/readiness and tenant scope only.
+		return distribution.PaymentTenantCapability{Authorized: true, Configured: true}, nil
 	case distribution.PaymentRailDirectObserved:
 		// The module is composed per node and owns setup-aware health. Ready is
 		// evaluated independently by the manager; no generic database row exists.
@@ -59,29 +58,6 @@ func (r nodePaymentTenantCapabilityResolver) ResolvePaymentTenantCapability(
 		return distribution.PaymentTenantCapability{}, fmt.Errorf("unsupported payment rail %q", contribution.Rail)
 	}
 }
-
-func (r nodePaymentTenantCapabilityResolver) hasConfiguredReceivingAccount(
-	request distribution.PaymentCapabilityRequest,
-	contribution distribution.PaymentRailContribution,
-) (bool, error) {
-	if r.node.receivingAccountService == nil {
-		return false, nil
-	}
-	accounts, err := r.node.receivingAccountService.List()
-	if err != nil {
-		return false, fmt.Errorf("list receiving accounts: %w", err)
-	}
-	for _, account := range accounts {
-		if !account.IsActive || account.ChainType != contribution.Network || account.ChainType != request.Network {
-			continue
-		}
-		if receivingAccountAcceptsAsset(account, request.Asset) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func (r nodePaymentTenantCapabilityResolver) providerSessionCapability(
 	_ context.Context,
 	contribution distribution.PaymentRailContribution,
@@ -110,30 +86,6 @@ func (r nodePaymentTenantCapabilityResolver) providerSessionCapability(
 		Authorized: true,
 		Configured: account != nil && strings.TrimSpace(account.Address) != "",
 	}, nil
-}
-
-func receivingAccountAcceptsAsset(account models.ReceivingAccount, asset iwallet.CoinType) bool {
-	candidates := map[string]struct{}{}
-	if value := strings.TrimSpace(string(asset)); value != "" {
-		candidates[strings.ToLower(value)] = struct{}{}
-	}
-	if value, err := asset.PricingCurrencyCode(); err == nil {
-		if value = strings.TrimSpace(value); value != "" {
-			candidates[strings.ToLower(value)] = struct{}{}
-		}
-	}
-	if info, err := iwallet.CoinInfoFromCoinType(asset); err == nil && info.IsNative && info.Chain == account.ChainType {
-		candidates[strings.ToLower(string(account.ChainType))] = struct{}{}
-	}
-	if len(candidates) == 0 {
-		return false
-	}
-	for _, accepted := range account.AcceptedCurrencies() {
-		if _, ok := candidates[strings.ToLower(strings.TrimSpace(accepted))]; ok {
-			return true
-		}
-	}
-	return false
 }
 
 var _ distribution.PaymentCapabilityDecisionProvider = (*MobazhaNode)(nil)

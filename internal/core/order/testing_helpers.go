@@ -32,7 +32,7 @@ func newTestDatabase(t *testing.T) *testDatabase {
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.Order{}, &models.OrderExtensionRecord{}, &models.OrderExtensionReservationRecord{}, &models.OrderExtensionEventSequence{}, &models.ExtensionDelivery{}))
+	require.NoError(t, db.AutoMigrate(&models.Order{}, &models.PurchaseRequestCorrelation{}, &models.OrderExtensionRecord{}, &models.OrderExtensionReservationRecord{}, &models.OrderExtensionEventSequence{}, &models.ExtensionDelivery{}))
 	return &testDatabase{gormDB: db}
 }
 

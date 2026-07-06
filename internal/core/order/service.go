@@ -111,6 +111,8 @@ type OrderAppService struct {
 	orderExtensionDeclarer  OrderExtensionDeclarer
 }
 
+var _ contracts.PurchaseRecoveryService = (*OrderAppService)(nil)
+
 // OrderAppServiceConfig groups the dependencies for constructing OrderAppService.
 type OrderAppServiceConfig struct {
 	DB              database.Database
@@ -2179,6 +2181,31 @@ func (s *OrderAppService) GetOrder(orderID string) (*models.Order, error) {
 	s.db.Update(func(tx database.Tx) error {
 		return tx.Update("read", true, map[string]interface{}{"id = ?": orderID, "read = ?": false}, &models.Order{})
 	})
+	return &order, nil
+}
+
+// GetOrderByPurchaseRequestID resolves the buyer-local durable correlation
+// written in the same transaction as OrderOpen. It deliberately does not mark
+// the order read: recovery workers are infrastructure, not user interaction.
+func (s *OrderAppService) GetOrderByPurchaseRequestID(requestID string) (*models.Order, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var order models.Order
+	err := s.db.View(func(tx database.Tx) error {
+		var correlation models.PurchaseRequestCorrelation
+		if err := tx.Read().Where("purchase_request_id = ?", requestID).First(&correlation).Error; err != nil {
+			return err
+		}
+		return tx.Read().Where("id = ?", correlation.OrderID).First(&order).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := s.attachSettlementActions(&order); err != nil {
+		return nil, err
+	}
 	return &order, nil
 }
 

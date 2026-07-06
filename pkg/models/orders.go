@@ -226,6 +226,16 @@ type OrderPaymentState struct {
 	FiatPaymentState `gorm:"embedded"`
 }
 
+// PurchaseRequestCorrelation maps a buyer-local orchestration request to the
+// order created by that request. TenantID and PurchaseRequestID form the
+// durable idempotency boundary; the correlation is never exchanged with the
+// counterparty or interpreted as order semantics.
+type PurchaseRequestCorrelation struct {
+	TenantMixin
+	PurchaseRequestID string  `gorm:"column:purchase_request_id;type:varchar(128);primaryKey" json:"-"`
+	OrderID           OrderID `gorm:"column:order_id;not null;index" json:"-"`
+}
+
 // Order holds the state of all orders. This model is saved in the
 // database indexed by the order ID.
 type Order struct {
@@ -258,6 +268,10 @@ type Order struct {
 	// DealTermsSnapshotRef binds the order to immutable externally managed
 	// terms. It is copied from the signed OrderOpen and persisted by both peers.
 	DealTermsSnapshotRef *DealTermsSnapshotRef `gorm:"embedded" json:"dealTermsSnapshotRef,omitempty"`
+
+	// PurchaseRequestID is a buyer-local orchestration correlation. It is
+	// intentionally outside the signed cross-peer contract.
+	PurchaseRequestID string `gorm:"column:purchase_request_id;type:varchar(128);index" json:"purchaseRequestID,omitempty"`
 
 	// PaymentSelectionQuoteID identifies the current immutable payment-asset,
 	// conversion and fee snapshot authorized before provisioning.

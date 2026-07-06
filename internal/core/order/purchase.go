@@ -36,6 +36,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const maxPurchaseRequestIDBytes = 128
+
 // PurchaseListing creates an order and sends it to the vendor.
 //
 // Monitor-Driven Payment (Sprint 2A Step 7 / P0-3): when the buyer declares a
@@ -104,6 +106,20 @@ func (s *OrderAppService) PurchaseListing(ctx context.Context, purchase *models.
 	err = s.db.Update(func(tx database.Tx) error {
 		if _, err = s.orderProcessor.ProcessMessage(tx, order); err != nil {
 			return err
+		}
+		if purchase.PurchaseRequestID != "" {
+			if err = tx.Update(
+				"purchase_request_id", purchase.PurchaseRequestID,
+				map[string]interface{}{"id = ?": order.OrderID}, &models.Order{},
+			); err != nil {
+				return fmt.Errorf("persist purchase request correlation: %w", err)
+			}
+			if err = tx.Create(&models.PurchaseRequestCorrelation{
+				PurchaseRequestID: purchase.PurchaseRequestID,
+				OrderID:           models.OrderID(order.OrderID),
+			}); err != nil {
+				return fmt.Errorf("reserve purchase request correlation: %w", err)
+			}
 		}
 
 		// Persist buyer-declared RefundAddress onto the local Order row
@@ -177,6 +193,9 @@ func (s *OrderAppService) EstimateOrderTotal(ctx context.Context, purchase *mode
 func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purchase) (*pb.OrderOpen, *models.DiscountResult, error) {
 	if purchase == nil {
 		return nil, nil, fmt.Errorf("%w: purchase is required", coreiface.ErrBadRequest)
+	}
+	if purchase.PurchaseRequestID != strings.TrimSpace(purchase.PurchaseRequestID) || len(purchase.PurchaseRequestID) > maxPurchaseRequestIDBytes {
+		return nil, nil, fmt.Errorf("%w: purchaseRequestID must be trimmed and at most %d bytes", coreiface.ErrBadRequest, maxPurchaseRequestIDBytes)
 	}
 	if err := purchase.DealTermsSnapshotRef.Validate(); err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", coreiface.ErrBadRequest, err)

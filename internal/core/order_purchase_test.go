@@ -15,6 +15,7 @@ import (
 	"github.com/ipfs/go-cid"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/mobazha/mobazha/internal/orders/utils"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
@@ -105,12 +106,25 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 	// Create a purchase from the factory.
 	purchase := factory.NewPurchase()
 	purchase.Items[0].ListingHash = index[0].CID
+	purchase.PurchaseRequestID = "purchase-listing-recovery-1"
 
 	// Have node 1 purchase the listing from node 0.
-	_, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
+	firstOrderID, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
+	recovery, ok := network.Nodes()[1].Order().(contracts.PurchaseRecoveryService)
+	if !ok {
+		t.Fatal("buyer order service does not expose purchase recovery")
+	}
+	recovered, err := recovery.GetOrderByPurchaseRequestID(purchase.PurchaseRequestID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recovered.ID != firstOrderID {
+		t.Fatalf("recovered order %s, expected %s", recovered.ID, firstOrderID)
+	}
+	purchase.PurchaseRequestID = ""
 
 	// Validate expected amount is correct.
 	expectedAmount := "24970826"

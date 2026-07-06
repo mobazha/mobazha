@@ -1,7 +1,9 @@
 package order
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -219,6 +221,47 @@ func TestOrderAppService_GetOrder_Found(t *testing.T) {
 	order, err := svc.GetOrder("order-get-1")
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderID("order-get-1"), order.ID)
+}
+
+func TestOrderAppService_GetOrderByPurchaseRequestID(t *testing.T) {
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+	order := &models.Order{
+		ID:                models.OrderID("order-acceptance-1"),
+		MyRole:            "buyer",
+		PurchaseRequestID: "acceptance-1",
+	}
+	order.SetFSMState(models.OrderState_PENDING)
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		return tx.Create(&models.PurchaseRequestCorrelation{
+			PurchaseRequestID: order.PurchaseRequestID,
+			OrderID:           order.ID,
+		})
+	}))
+
+	recovered, err := svc.GetOrderByPurchaseRequestID("acceptance-1")
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, recovered.ID)
+	require.Error(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Create(&models.PurchaseRequestCorrelation{
+			PurchaseRequestID: "acceptance-1",
+			OrderID:           "order-acceptance-duplicate",
+		})
+	}))
+
+	missing, err := svc.GetOrderByPurchaseRequestID("missing")
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	assert.Nil(t, missing)
+}
+
+func TestOrderAppService_RejectsInvalidPurchaseRequestID(t *testing.T) {
+	svc := &OrderAppService{}
+	for _, requestID := range []string{" untrimmed", strings.Repeat("x", maxPurchaseRequestIDBytes+1)} {
+		_, _, err := svc.createOrder(context.Background(), &models.Purchase{PurchaseRequestID: requestID})
+		require.ErrorIs(t, err, coreiface.ErrBadRequest)
+	}
 }
 
 func TestOrderAppService_GetOrder_AttachesSettlementActions(t *testing.T) {

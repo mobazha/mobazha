@@ -20,3 +20,37 @@ func TestAutoMigrateDatabaseSafe_IncludesPaymentSelectionQuotes(t *testing.T) {
 		return nil
 	}))
 }
+
+func TestAutoMigrateDatabaseSafe_PurchaseRequestCorrelationIsTenantScoped(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, autoMigrateDatabaseSafe(db))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		for _, correlation := range []*models.PurchaseRequestCorrelation{
+			{
+				TenantMixin:       models.TenantMixin{TenantID: "tenant-a"},
+				PurchaseRequestID: "request-1",
+				OrderID:           "order-a",
+			},
+			{
+				TenantMixin:       models.TenantMixin{TenantID: "tenant-b"},
+				PurchaseRequestID: "request-1",
+				OrderID:           "order-b",
+			},
+		} {
+			if err := tx.Read().Create(correlation).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+	require.Error(t, db.Update(func(tx database.Tx) error {
+		return tx.Read().Create(&models.PurchaseRequestCorrelation{
+			TenantMixin:       models.TenantMixin{TenantID: "tenant-a"},
+			PurchaseRequestID: "request-1",
+			OrderID:           "order-a-duplicate",
+		}).Error
+	}))
+}

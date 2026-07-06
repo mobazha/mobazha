@@ -527,6 +527,7 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.FollowSequence{},
 		&models.Event{},
 		&models.Order{},
+		&models.PurchaseRequestCorrelation{},
 		&models.TransactionMetadata{},
 		&models.UserPreferences{},
 		&models.StoreAndForwardServers{},
@@ -604,6 +605,9 @@ func autoMigrateDatabase(db database.Database) error {
 		// Phase 3: Restore data from v4 backup tables
 		if err := completeV4PKMigration(tx, backups); err != nil {
 			return fmt.Errorf("v4 PK migration restore failed: %v", err)
+		}
+		if err := migratePurchaseRequestCorrelations(tx); err != nil {
+			return fmt.Errorf("purchase request correlation migration failed: %v", err)
 		}
 
 		// 特殊处理 ReceivingAccount 表
@@ -788,6 +792,7 @@ func autoMigrateDatabaseSafe(db database.Database) error {
 		&models.FollowSequence{},
 		&models.Event{},
 		&models.Order{},
+		&models.PurchaseRequestCorrelation{},
 		&models.TransactionMetadata{},
 		&models.UserPreferences{},
 		&models.StoreAndForwardServers{},
@@ -845,8 +850,30 @@ func autoMigrateDatabaseSafe(db database.Database) error {
 				return fmt.Errorf("migrate %s failed: %v", reflect.TypeOf(m).String(), err)
 			}
 		}
-		return nil
+		return migratePurchaseRequestCorrelations(tx)
 	})
+}
+
+func migratePurchaseRequestCorrelations(tx database.Tx) error {
+	db := tx.Read()
+	if db.Migrator().HasIndex(&models.Order{}, "uq_orders_purchase_request_id") {
+		if err := db.Migrator().DropIndex(&models.Order{}, "uq_orders_purchase_request_id"); err != nil {
+			return fmt.Errorf("drop legacy global purchase request index: %w", err)
+		}
+	}
+
+	statement := `INSERT INTO purchase_request_correlations (tenant_id, purchase_request_id, order_id)
+		SELECT tenant_id, purchase_request_id, id FROM orders
+		WHERE purchase_request_id IS NOT NULL AND purchase_request_id <> ''`
+	switch db.Dialector.Name() {
+	case "mysql":
+		statement = strings.Replace(statement, "INSERT INTO", "INSERT IGNORE INTO", 1)
+	case "sqlite", "postgres":
+		statement += " ON CONFLICT DO NOTHING"
+	default:
+		return fmt.Errorf("unsupported database dialect %q", db.Dialector.Name())
+	}
+	return db.Exec(statement).Error
 }
 
 // CheckAndMigrateRepo checks and performs repository migrations

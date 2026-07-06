@@ -156,6 +156,14 @@ type OrderService interface {
 	SummarizeListingSupply(ctx context.Context, req ListingSupplySummaryRequest) (*ListingSupplySummaryResponse, error)
 }
 
+// PurchaseRecoveryService is the narrow, optional composition capability for
+// recovering a locally-created buyer order by a caller-owned correlation key.
+// It stays separate from OrderService so consumers that do not orchestrate
+// ambiguous purchase outcomes are not forced to implement it.
+type PurchaseRecoveryService interface {
+	GetOrderByPurchaseRequestID(requestID string) (*models.Order, error)
+}
+
 // ConditionalSettlementService is the narrow extension-facing settlement
 // surface. It is separate from OrderService so adding attestation versions
 // does not expand every order-service implementation.

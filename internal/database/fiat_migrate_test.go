@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 fengzie and the respective contributors.
+
 package database_test
 
 import (
@@ -5,7 +8,7 @@ import (
 	"time"
 
 	dbgorm "github.com/mobazha/mobazha/internal/database"
-	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/internal/database/dbstore"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/stretchr/testify/require"
@@ -34,10 +37,35 @@ type legacyPaymentProviderAction struct {
 
 func (legacyPaymentProviderAction) TableName() string { return "payment_provider_actions" }
 
-func TestMigrateFiatModels_RemovesLegacyConfigWithoutCredentialReference(t *testing.T) {
-	db, err := repo.MockDB()
+type legacyPaymentAttempt struct {
+	TenantID          string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:idx_payment_attempt_idempotency,priority:1"`
+	AttemptID         string `gorm:"column:attempt_id;primaryKey;size:64"`
+	PaymentSessionID  string `gorm:"column:payment_session_id;size:255;not null;index:idx_payment_attempt_session"`
+	OrderID           string `gorm:"column:order_id;size:255;not null;index:idx_payment_attempt_order"`
+	ProviderID        string `gorm:"column:provider_id;size:64;not null;default:''"`
+	Amount            int64  `gorm:"column:amount;not null;default:0"`
+	Currency          string `gorm:"column:currency;size:16;not null;default:''"`
+	RouteBindingID    string `gorm:"column:route_binding_id;size:64;not null"`
+	IdempotencyKey    string `gorm:"column:idempotency_key;size:128;not null;uniqueIndex:idx_payment_attempt_idempotency,priority:2"`
+	State             string `gorm:"column:state;size:32;not null;index:idx_payment_attempt_state"`
+	ExternalReference string `gorm:"column:external_reference;size:255"`
+	LastError         string `gorm:"column:last_error;size:2048"`
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+func (legacyPaymentAttempt) TableName() string { return "payment_attempts" }
+
+func newFiatMigrationTestDB(t *testing.T) database.Database {
+	t.Helper()
+	db, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	return db
+}
+
+func TestMigrateFiatModels_RemovesLegacyConfigWithoutCredentialReference(t *testing.T) {
+	db := newFiatMigrationTestDB(t)
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		if err := tx.Migrate(&models.FiatProviderConfig{}); err != nil {
 			return err
@@ -56,9 +84,7 @@ func TestMigrateFiatModels_RemovesLegacyConfigWithoutCredentialReference(t *test
 }
 
 func TestMigrateFiatModels_AddsProviderActionLeaseColumnsToExistingRows(t *testing.T) {
-	db, err := repo.MockDB()
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	db := newFiatMigrationTestDB(t)
 	require.NoError(t, db.Update(func(tx database.Tx) error {
 		if err := tx.Migrate(&legacyPaymentProviderAction{}); err != nil {
 			return err
@@ -80,4 +106,28 @@ func TestMigrateFiatModels_AddsProviderActionLeaseColumnsToExistingRows(t *testi
 	require.Nil(t, action.LeaseExpiresAt)
 	require.Nil(t, action.LastAttemptAt)
 	require.Nil(t, action.CompletedAt)
+}
+
+func TestMigrateFiatModels_BackfillsExistingPaymentAttemptKind(t *testing.T) {
+	db := newFiatMigrationTestDB(t)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&legacyPaymentAttempt{}); err != nil {
+			return err
+		}
+		return tx.Create(&legacyPaymentAttempt{
+			AttemptID: "pa_existing", PaymentSessionID: "ps_existing", OrderID: "order_existing",
+			ProviderID: "stripe", Amount: 1250, Currency: "USD", RouteBindingID: "prb_existing",
+			IdempotencyKey: "mbz_existing", State: models.PaymentAttemptExternalCreated,
+			ExternalReference: "pi_existing",
+		})
+	}))
+
+	require.NoError(t, dbgorm.MigrateFiatModels(db))
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("attempt_id = ?", "pa_existing").First(&attempt).Error
+	}))
+	require.Equal(t, models.PaymentAttemptKindProviderSession, attempt.Kind)
+	require.Equal(t, int64(1250), attempt.Amount)
+	require.Equal(t, "pi_existing", attempt.ExternalReference)
 }

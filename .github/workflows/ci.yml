@@ -92,7 +92,7 @@ jobs:
         working-directory: node
         env:
           MOBAZHA_TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=mobazha password=mobazha dbname=provider_action_ci sslmode=disable
-        run: go test -tags 'goolm integration' -race -count=1 -timeout 5m -run '^TestFiatProviderAction_Postgres' ./internal/core
+        run: go test -tags 'goolm integration' -race -count=1 -timeout 5m -run '^(TestFiatProviderAction_Postgres|TestMigrateFiatModels_Postgres)' ./internal/core ./internal/database
 
   build:
     runs-on: ubuntu-latest

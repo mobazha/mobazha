@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 fengzie and the respective contributors.
+
 package models
 
 import "time"
@@ -18,9 +21,11 @@ const (
 // PaymentAttempt is Core's durable claim for one concrete payment provisioning
 // operation. It must exist before any external provider or chain create call.
 type PaymentAttempt struct {
-	TenantID          string     `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:idx_payment_attempt_idempotency,priority:1"`
-	AttemptID         string     `gorm:"column:attempt_id;primaryKey;size:64"`
-	Kind              string     `gorm:"column:kind;size:64;not null;index:idx_payment_attempt_kind_state,priority:1"`
+	TenantID  string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:idx_payment_attempt_idempotency,priority:1"`
+	AttemptID string `gorm:"column:attempt_id;primaryKey;size:64"`
+	// Kind defaults to provider_session so databases created before attempt
+	// kinds were introduced upgrade without losing the meaning of existing rows.
+	Kind              string     `gorm:"column:kind;size:64;not null;default:provider_session;index:idx_payment_attempt_kind_state,priority:1"`
 	PaymentSessionID  string     `gorm:"column:payment_session_id;size:255;not null;index:idx_payment_attempt_session"`
 	OrderID           string     `gorm:"column:order_id;size:255;not null;index:idx_payment_attempt_order"`
 	ProviderID        string     `gorm:"column:provider_id;size:64;not null;default:''"`

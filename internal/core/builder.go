@@ -1538,11 +1538,15 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 	// unrelated orders remain unaffected.
 	policy := corePmt.NewOrderExtensionsProvisioningPolicy(resolve, reserve, record, admitCollateral)
 	svc.AddProvisioningPolicy(policy)
+	capabilityPolicy := effectivePaymentProvisioningPolicy{node: obNode}
+	svc.AddProvisioningPolicy(capabilityPolicy)
 	if obNode.paymentService != nil {
 		obNode.paymentService.AddProvisioningPolicy(policy)
+		obNode.paymentService.AddProvisioningPolicy(capabilityPolicy)
 	}
 	if obNode.fiatPaymentService != nil {
 		obNode.fiatPaymentService.AddProvisioningPolicy(policy)
+		obNode.fiatPaymentService.AddProvisioningPolicy(capabilityPolicy)
 	}
 
 	// Phase B3: inject FiatPaymentFacade when fiat payments are available.

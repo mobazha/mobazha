@@ -2,8 +2,10 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/edition"
 	responsePkg "github.com/mobazha/mobazha/pkg/response"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
@@ -14,6 +16,7 @@ import (
 //
 // GET /v1/payment-methods/{peerID}
 func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request) {
+	capabilityProvider, capabilityDecisionAvailable := paymentCapabilityDecisionProvider(r)
 	raSvc := getReceivingAccountService(r)
 	accounts, err := raSvc.List()
 	if err != nil {
@@ -30,6 +33,14 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 		}
 		for _, c := range acct.AcceptedCurrencies() {
 			if !iwallet.IsPaymentCoinEnabledForPolicy(c, g.editionPolicy) {
+				continue
+			}
+			coin := iwallet.CoinType(c)
+			if paymentCoinRequiresModule(acct.ChainType) && (!capabilityDecisionAvailable ||
+				!capabilityProvider.DecidePaymentCapability(r.Context(), distribution.PaymentCapabilityRequest{
+					Rail: distribution.PaymentRailEscrow, Network: acct.ChainType,
+					Asset: coin, Operation: distribution.PaymentOperationSetup,
+				}).Allowed()) {
 				continue
 			}
 			if !seen[c] {
@@ -50,6 +61,15 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 		if !iwallet.IsPaymentCoinEnabledForPolicy(c, g.editionPolicy) {
 			continue
 		}
+		coinInfo, coinErr := iwallet.CoinInfoFromCoinType(coin)
+		if coinErr != nil || !capabilityDecisionAvailable || !capabilityProvider.DecidePaymentCapability(
+			r.Context(), distribution.PaymentCapabilityRequest{
+				Rail: distribution.PaymentRailDirectObserved, Network: coinInfo.Chain,
+				Asset: coin, Operation: distribution.PaymentOperationSetup,
+			},
+		).Allowed() {
+			continue
+		}
 		if !seen[c] {
 			seen[c] = true
 			crypto = append(crypto, c)
@@ -65,11 +85,17 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 				policy = edition.CurrentPolicy()
 			}
 			for _, provider := range providers {
+				providerNetwork := iwallet.ChainType("fiat:" + strings.ToLower(strings.TrimSpace(provider.ProviderID)))
 				if policy.AllowsPaymentMethod(edition.PaymentMethod{
 					ID:   provider.ProviderID,
 					Kind: "fiat",
 					Flow: "provider-session",
-				}) {
+				}) && capabilityDecisionAvailable && capabilityProvider.DecidePaymentCapability(
+					r.Context(), distribution.PaymentCapabilityRequest{
+						Rail: distribution.PaymentRailProviderSession, Network: providerNetwork,
+						Asset: distribution.PaymentAssetAny, Operation: distribution.PaymentOperationSetup,
+					},
+				).Allowed() {
 					fiat = append(fiat, provider)
 				}
 			}
@@ -83,4 +109,24 @@ func (g *Gateway) handleGETPaymentMethods(w http.ResponseWriter, r *http.Request
 		"crypto": crypto,
 		"fiat":   fiat,
 	})
+}
+
+func paymentCapabilityDecisionProvider(r *http.Request) (distribution.PaymentCapabilityDecisionProvider, bool) {
+	provider, ok := getNodeService(r).(distribution.PaymentCapabilityDecisionProvider)
+	if !ok || provider == nil {
+		return nil, false
+	}
+	return provider, true
+}
+
+func paymentCoinRequiresModule(chain iwallet.ChainType) bool {
+	if chain == iwallet.ChainSolana {
+		return true
+	}
+	native, err := iwallet.RequireCanonicalNativeCoinType(chain)
+	if err != nil {
+		return false
+	}
+	coin, err := iwallet.CoinInfoFromCoinType(native)
+	return err == nil && coin.IsEthTypeChain()
 }

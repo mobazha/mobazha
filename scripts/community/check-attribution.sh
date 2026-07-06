@@ -33,12 +33,21 @@ require_text docs/project/ATTRIBUTION.md "SPDX-License-Identifier: MPL-2.0"
 base="${ATTRIBUTION_BASE:-${1:-}}"
 zero_sha="0000000000000000000000000000000000000000"
 
-if [[ -z "$base" || "$base" == "$zero_sha" ]]; then
-  exit 0
+# Keep the audit sticky across subsequent pushes. Without a stable floor, a
+# source file that fails attribution on one push becomes invisible as soon as
+# another commit is pushed on top of it. This floor is the last known-good
+# payment architecture commit before sticky attribution enforcement began.
+attribution_floor="${ATTRIBUTION_FLOOR:-adc9bd43bc6b948628a578e52ad5cd3d1d3bff64}"
+
+if [[ -n "$base" && "$base" != "$zero_sha" ]] && ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+  echo "attribution check: base commit $base is unavailable; root notices verified" >&2
+  base=""
 fi
 
-if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-  echo "attribution check: base commit $base is unavailable; root notices verified" >&2
+if git cat-file -e "${attribution_floor}^{commit}" 2>/dev/null &&
+  git merge-base --is-ancestor "$attribution_floor" HEAD; then
+  base="$attribution_floor"
+elif [[ -z "$base" || "$base" == "$zero_sha" ]]; then
   exit 0
 fi
 

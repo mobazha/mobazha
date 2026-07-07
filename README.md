@@ -1,249 +1,109 @@
-# Mobazha Node
+# Mobazha
 
-**The open-source commerce backend for independently operated stores and connected markets.**
+**Independent commerce, connected on your terms.**
 
-Mobazha Node owns store, catalog, quote, order, payment-verification,
-fulfillment, recovery, messaging, and audit state. It can run on infrastructure
-you control, serve an embedded storefront and administration interface, and
-connect to other Mobazha experiences through versioned APIs and protocols.
+Most online marketplaces bundle the storefront, discovery, checkout, data, and customer
+relationship inside one operator. Mobazha separates them. A seller can own the store and its
+commercial history while choosing which markets, services, and interfaces to connect.
 
-[Product map](https://docs.mobazha.org/project/product-map) ·
-[Install a Node](https://docs.mobazha.org/self-host/install) ·
-[API reference](https://docs.mobazha.org/api-reference) ·
-[Unified frontend](https://github.com/mobazha/mobazha-unified) ·
-[Contributing](./CONTRIBUTING.md)
+The open-source Mobazha Node can publish products, receive and fulfill orders, verify supported
+payments, communicate with buyers, and preserve transaction history on a backend chosen by the
+operator. Other stores, marketplaces, apps, and Agents can connect through shared interfaces while
+each seller's backend remains authoritative for its own business state.
 
-> **Release status:** the current public target is `v0.3.0-rc.1`. It is a
-> release candidate for evaluation and testnet use and has not been tagged or
-> published as a stable binary release. Verify the exact commit, runtime
-> capabilities, and release evidence before material use.
+[Try Mobazha](https://app.mobazha.org/) ·
+[Explore the product](https://docs.mobazha.org/project/product-map) ·
+[Run your own store](https://docs.mobazha.org/self-host/install) ·
+[Read the whitepaper](https://docs.mobazha.org/project/whitepaper) ·
+[Documentation](https://docs.mobazha.org/)
 
-[![Conceptual diagram of direct peer-to-peer and hybrid Mobazha store networks](https://docs.mobazha.org/images/docs/project/store-network-topologies.svg)](https://docs.mobazha.org/project/architecture)
+> **Current status:** `v0.3.0-rc.1` is the public release target. Use testnet while evaluating the
+> current source; stable signed binaries have not yet been published.
 
-_Independent and hosted stores can share public protocols without moving every
-order into one central database. The selected seller backend remains
-authoritative for its store and orders._
+[![Direct peer-to-peer and hybrid Mobazha store networks](https://docs.mobazha.org/images/docs/project/store-network-topologies.svg)](https://docs.mobazha.org/project/architecture)
 
-## Start with your goal
+_Stores can operate independently, use selected hosted services, or participate in a hybrid network
+without moving every order into one central database._
 
-| Goal | Start here |
-| --- | --- |
-| Understand the product | [How Mobazha fits together](https://docs.mobazha.org/project/product-map) |
-| Evaluate the hosted experience | [Open app.mobazha.org](https://app.mobazha.org/) |
-| Run an independent store backend | [Install a Node](https://docs.mobazha.org/self-host/install) |
-| Build a client or integration | [HTTP API and OpenAPI](https://docs.mobazha.org/build/api) |
-| Connect an Agent or MCP client | [MCP integration guide](https://docs.mobazha.org/build/mcp) |
-| Contribute to the runtime | [Development and release checks](#development-and-release-checks) |
+## Why Mobazha
 
-## Where this repository fits
+- **Own the commercial relationship.** Keep control of your store identity, catalog, policies,
+  orders, customer interactions, and operational data.
+- **Use one commerce core across many channels.** Present the same store through its own storefront,
+  shared markets, direct links, embedded experiences, or Agent-assisted workflows.
+- **Choose what to operate yourself.** Run the complete open-source Node, use a compatible hosted
+  service, or combine your own backend with selected external services.
+- **Make important actions accountable.** Orders, payment observations, fulfillment, recovery, and
+  disputes are recorded by the backend that owns the transaction—not inferred from a page or
+  notification.
 
-| Component | Responsibility | Source |
-| --- | --- | --- |
-| **Mobazha Node — this repository** | Commerce Core, business-state authority, persistence, payment verification, APIs, messaging, and operator controls | `mobazha/mobazha` |
-| [Mobazha Unified](https://github.com/mobazha/mobazha-unified) | Storefront, checkout, seller administration, marketplace, and responsive experience surfaces | `mobazha/mobazha-unified` |
-| Mobazha hosted services | Optional managed operation, routing, discovery, and other explicitly enabled services | Service-specific distributions and terms |
-| [Mobazha Docs](https://docs.mobazha.org) | Canonical public product knowledge, user guidance, policy, architecture, and release scope | `mobazha/mobazha-docs` |
+## One product, two core repositories
 
-A channel, client, gateway, provider, or Agent can present information and
-request work. The Node serving the active store or order context validates the
-request and owns admitted business state.
+This repository contains **Mobazha Node**, the commerce engine and source of truth for store and
+transaction state. It provides the data, policies, APIs, messaging, payment verification, and
+operator controls needed to run a store.
 
-## What the Node owns
+[Mobazha Unified](https://github.com/mobazha/mobazha-unified) is the shared buyer and seller
+experience. It turns the capabilities of a connected Node or hosted backend into storefront,
+checkout, order, marketplace, and administration journeys.
 
-### Commerce Core
+Together they support three operating paths:
 
-- Store identity, profiles, policies, catalogs, listings, options, and supply
-- Quotes, checkout validation, orders, fulfillment, cancellation, and refunds
-- Payment instructions, observations, verification, and settlement gates
-- Buyer protection, disputes, evidence, resolution, and ratings
+- **Hosted:** start quickly while a service operator runs the backend under published terms.
+- **Self-hosted:** run the Node on infrastructure you control and own its security, backup, and
+  availability.
+- **Hybrid:** keep the store backend independent while opting into selected discovery, payment,
+  delivery, messaging, AI, or other services.
 
-### Connectivity and automation
+[Compare the operating paths](https://docs.mobazha.org/start/choose-deployment).
 
-- Peer-to-peer discovery, signed content, order messages, and notifications
-- Versioned HTTP APIs under `/v1/` and authenticated WebSocket updates under `/ws`
-- Signed webhook delivery for operator-controlled integrations
-- Authenticated MCP Tool discovery and invocation under `/v1/mcp`
+## Try Mobazha
 
-### Independent operation
+The fastest way to see the buyer and seller experience is
+[app.mobazha.org](https://app.mobazha.org/).
 
-- Embedded Web UI for storefront and seller administration
-- Background-service installation and lifecycle management
-- Health diagnostics, local data ownership, export, and compressed backups
-- Explicit runtime capabilities so clients do not infer availability from source presence
-
-The Community edition can operate without a Mobazha Hosting account. Optional
-discovery, payment, delivery, messaging, AI, routing, or managed services remain
-named dependencies with their own availability, data, and pricing boundaries.
-
-## Operating paths
-
-- **Self-hosted:** you run the Node and own server security, availability,
-  backups, updates, network exposure, and selected integrations.
-- **Hosted:** a service operator runs a compatible commercial distribution
-  under its published terms while store and tenant boundaries remain explicit.
-- **Hybrid:** an independent or hosted backend uses selected external services
-  or participates in shared discovery and commerce protocols. Hybrid does not
-  create a second owner for one order.
-
-See [hosted and self-hosted responsibilities](https://docs.mobazha.org/start/choose-deployment)
-and the [store-network architecture](https://docs.mobazha.org/project/architecture).
-
-## Current release boundary
-
-The default Community release boundary enables these payment methods, subject
-to effective runtime capability, seller configuration, dependency health, and
-the active transaction:
-
-- Bitcoin (BTC)
-- Bitcoin Cash (BCH)
-- Litecoin (LTC)
-
-Identifiers, adapters, experimental code, or documentation do not activate a
-payment rail. Additional payment and extension work remains versioned and
-capability-gated. Core retains order policy, verification, settlement gates,
-audit, and key-custody boundaries.
-
-Read the canonical [release scope](https://docs.mobazha.org/project/release-scope),
-[runtime capability model](https://docs.mobazha.org/build/runtime-capabilities),
-and repository-local [payment plugin architecture](./docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md).
-
-## Quick start from source
-
-### Requirements
-
-- Go 1.26.4
-- Git
-- A supported macOS or Linux development environment
-
-Clone and build with the default pure-Go crypto implementation:
+To evaluate an independent Node from source:
 
 ```bash
 git clone https://github.com/mobazha/mobazha.git
 cd mobazha
 go build -tags goolm -o mobazha .
-```
-
-Initialize a testnet data directory, start the Node, and open the embedded UI:
-
-```bash
 ./mobazha init --testnet
 ./mobazha start --testnet --open
 ```
 
-The Web UI and HTTP API listen on `http://127.0.0.1:5102` by default. To use a
-different data directory:
+The embedded Web UI and API listen on `http://127.0.0.1:5102` by default. The current Community
+release enables BTC, BCH, and LTC by default, subject to store configuration and runtime readiness.
+See the [release scope](https://docs.mobazha.org/project/release-scope) before relying on any specific
+capability.
 
-```bash
-./mobazha init --testnet --datadir /path/to/mobazha-data
-./mobazha start --testnet --datadir /path/to/mobazha-data --open
-```
+## Go deeper
 
-This is a source evaluation path, not a substitute for a tagged release,
-signed artifacts, upgrade instructions, backup verification, or production
-security review.
-
-## Interfaces and integration contracts
-
-| Need | Interface | Guidance |
-| --- | --- | --- |
-| Read state or request a protected action | HTTP `/v1/` | [API guide](https://docs.mobazha.org/build/api) |
-| Refresh an interactive client | WebSocket `/ws` | [WebSocket guide](https://docs.mobazha.org/build/websocket) |
-| Deliver durable operator events | Signed webhooks | [Webhook guide](https://docs.mobazha.org/build/webhooks) |
-| Expose permitted Tools to an Agent | MCP `/v1/mcp` | [MCP guide](https://docs.mobazha.org/build/mcp) |
-
-Events and notifications are refresh hints or deliveries, not independent
-transaction authority. After reconnects, retries, or uncertain outcomes,
-clients reconcile protected state through the owning Node.
-
-## Operations
-
-Install and manage the Node as a background service:
-
-```bash
-./mobazha service install
-./mobazha service status
-./mobazha service stop
-./mobazha service start
-```
-
-Run diagnostics and create a compressed backup:
-
-```bash
-./mobazha doctor
-./mobazha doctor --json
-./mobazha backup --output mobazha-backup.tar.gz
-```
-
-Pre-release Docker, appliance, and standalone packaging files are under
-[`deploy/standalone`](./deploy/standalone). Review exact image tags,
-configuration, update, rollback, and restore behavior before relying on them.
-
-## Development and release checks
-
-Run the Go test suite with the default pure-Go crypto implementation:
-
-```bash
-make test
-```
-
-If native `libolm` is installed:
-
-```bash
-make test-libolm
-```
-
-Validate public capability, documentation, history, distribution, and
-vulnerability boundaries:
-
-```bash
-scripts/community/check-capabilities.sh
-scripts/community/check-documentation-authority.sh
-scripts/community/audit-public-history.sh
-scripts/community/check-oem-distribution.sh --source
-scripts/community/check-vulnerabilities.sh
-```
-
-The vulnerability check requires `govulncheck` on `PATH`. Release maintainers
-should also follow the SBOM and license-review process in the
-[supply-chain audit](./docs/security/SUPPLY_CHAIN_AUDIT.md).
-
-## Documentation
-
-Canonical public knowledge:
-
-- [Product model](https://docs.mobazha.org/project/product-map)
+- [How Mobazha fits together](https://docs.mobazha.org/project/product-map)
 - [System and store-network architecture](https://docs.mobazha.org/project/architecture)
-- [Release scope](https://docs.mobazha.org/project/release-scope)
-- [Compatibility policy](https://docs.mobazha.org/project/compatibility)
-- [Fees and economics](https://docs.mobazha.org/project/fees)
-- [Packaging and distributions](https://docs.mobazha.org/project/distribution)
-
-Repository-local implementation and release evidence:
-
-- [Payment plugin architecture](./docs/plugins/PAYMENT_PLUGIN_ARCHITECTURE.md)
-- [Supply-chain audit](./docs/security/SUPPLY_CHAIN_AUDIT.md)
-- [v0.3.0-rc.1 release-candidate notes](./docs/releases/v0.3.0-rc.1.md)
+- [Buy from an independent store](https://docs.mobazha.org/buy)
+- [Start and operate a store](https://docs.mobazha.org/sell)
+- [Build with the API, webhooks, and MCP](https://docs.mobazha.org/build)
+- [Fees](https://docs.mobazha.org/project/fees),
+  [compatibility](https://docs.mobazha.org/project/compatibility), and
+  [packaging](https://docs.mobazha.org/project/distribution)
+- [Roadmap and current release scope](https://docs.mobazha.org/project/roadmap)
 
 ## Contributing and security
 
-Contributions are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md), sign off
-commits under the [Developer Certificate of Origin](./DCO.md), and follow the
-private vulnerability-reporting process in [SECURITY.md](./SECURITY.md).
+Contributions are welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md); implementation and
+release evidence lives in the repository's [`docs`](./docs/) directory. Run `make test`
+before submitting Go changes.
 
-The source-code licenses do not grant rights to use Mobazha names or logos; see
-[TRADEMARKS.md](./TRADEMARKS.md).
+Report security issues privately as described in [SECURITY.md](./SECURITY.md).
 
 ## License and attribution
 
-Mobazha-authored source in this repository, including retained Mobazha history,
-is licensed under the [Mozilla Public License 2.0](./LICENSE).
+Mobazha-authored source is licensed under the [Mozilla Public License 2.0](./LICENSE). Portions
+derived from OpenBazaar remain available under the
+[OpenBazaar MIT License](./LICENSES/MIT-OpenBazaar.txt). See [NOTICE](./NOTICE) and
+[Attribution and source identity](./docs/project/ATTRIBUTION.md) for details.
 
-Portions derived from OpenBazaar remain available under the
-[OpenBazaar MIT License](./LICENSES/MIT-OpenBazaar.txt). Third-party
-dependencies and assets remain subject to their respective licenses. See
-[NOTICE](./NOTICE) and
-[Attribution and source identity](./docs/project/ATTRIBUTION.md).
-
-Originally developed by [fengzie](https://github.com/fengzie) and maintained by
-the Mobazha contributors. The canonical source repository is
+Originally developed by [fengzie](https://github.com/fengzie) and maintained by the Mobazha
+contributors. The canonical source repository is
 [mobazha/mobazha](https://github.com/mobazha/mobazha).

@@ -34,7 +34,7 @@ type GuestCheckoutConfig struct {
 	// AddressEncryptionRequired makes physical guest checkout fail closed.
 	// Sovereign composition enables it when the merchant creates an address
 	// protection key; the generic open-core configuration remains opt-in.
-	AddressEncryptionRequired bool `json:"addressEncryptionRequired" gorm:"not null"`
+	AddressEncryptionRequired bool `json:"addressEncryptionRequired" gorm:"not null;default:false"`
 
 	// AvailableCoins is a computed, non-persisted field populated by
 	// GetGuestCheckoutConfig at query time. It reflects the subset of

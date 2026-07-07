@@ -404,8 +404,18 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		}
 		if cfg.AddressEncryptionRequired {
 			ciphertext, encrypted := req.ShippingAddress.(string)
-			if cfg.PGPPublicKey == "" || strings.TrimSpace(cfg.PGPKeyFingerprint) == "" {
+			if cfg.PGPPublicKey == "" {
 				return nil, fmt.Errorf("%w: seller address encryption is not configured", contracts.ErrInvalidGuestRequest)
+			}
+			if strings.TrimSpace(cfg.PGPKeyFingerprint) == "" {
+				fingerprint, err := addressPublicKeyFingerprint(cfg.PGPPublicKey)
+				if err != nil {
+					return nil, fmt.Errorf("%w: seller address encryption is not configured", contracts.ErrInvalidGuestRequest)
+				}
+				// Compatibility for stores configured before fingerprints were persisted.
+				// The derived value is still bound to the exact active public key and is
+				// copied into the order snapshot below.
+				cfg.PGPKeyFingerprint = fingerprint
 			}
 			if !encrypted || !strings.HasPrefix(strings.TrimSpace(ciphertext), "-----BEGIN PGP MESSAGE-----") {
 				return nil, fmt.Errorf("%w: physical shipping address must be PGP-encrypted", contracts.ErrInvalidGuestRequest)

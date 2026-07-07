@@ -3,6 +3,7 @@ package guest
 import (
 	"bytes"
 	"io"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -33,6 +34,29 @@ func encryptedAddressFixture(t *testing.T) (publicArmor, messageArmor string) {
 	require.NoError(t, plaintextWriter.Close())
 	require.NoError(t, messageWriter.Close())
 	return public.String(), message.String()
+}
+
+func TestAddressPublicKeyFingerprint_DerivesLegacyKeyFingerprint(t *testing.T) {
+	publicArmor, _ := encryptedAddressFixture(t)
+	fingerprint, err := addressPublicKeyFingerprint(publicArmor)
+	require.NoError(t, err)
+	require.Regexp(t, regexp.MustCompile(`^[0-9A-F]{40}$`), fingerprint)
+}
+
+func TestAddressPublicKeyFingerprint_DoesNotRequireAlgorithmSupport(t *testing.T) {
+	// Algorithm 22 is the legacy EdDSA identifier emitted by OpenPGP.js for
+	// Ed25519 keys. The deprecated x/crypto entity parser rejects it, but the
+	// receipt validator only needs the standard packet fingerprint and key ID.
+	contents := append([]byte{4, 0, 0, 0, 0, 22}, bytes.Repeat([]byte{0x42}, 32)...)
+	var public bytes.Buffer
+	publicWriter, err := armor.Encode(&public, openpgp.PublicKeyType, nil)
+	require.NoError(t, err)
+	require.NoError(t, (&packet.OpaquePacket{Tag: 6, Contents: contents}).Serialize(publicWriter))
+	require.NoError(t, publicWriter.Close())
+
+	fingerprint, err := addressPublicKeyFingerprint(public.String())
+	require.NoError(t, err)
+	require.Regexp(t, regexp.MustCompile(`^[0-9A-F]{40}$`), fingerprint)
 }
 
 func TestValidateAddressCiphertext_RequiresEncryptedPayloadPacket(t *testing.T) {

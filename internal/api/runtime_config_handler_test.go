@@ -66,7 +66,7 @@ func TestCapabilitiesSnapshotFromNodeManager_UsesRequestResolvedNode(t *testing.
 	}
 	ctx := context.WithValue(context.Background(), nodeContextKey, contracts.NodeService(node))
 
-	got := capabilitiesSnapshotFromNodeManager(nil, policy, nil)(ctx, frontend.RuntimeCapabilities{})
+	got := capabilitiesSnapshotFromNodeManager(nil, policy, nil, nil)(ctx, frontend.RuntimeCapabilities{})
 	if len(got.Payments.Methods) != 1 {
 		t.Fatalf("payment methods = %#v, want one request-node method", got.Payments.Methods)
 	}
@@ -84,7 +84,7 @@ func TestCapabilitiesSnapshotFromNodeManager_ProjectsDistributionPaymentCoin(t *
 	coin := iwallet.CoinType("crypto:monero:mainnet:native")
 	guestPolicy := paymentProjectionPolicyStub{coins: []iwallet.CoinType{coin}}
 
-	got := capabilitiesSnapshotFromNodeManager(nil, policy, guestPolicy)(
+	got := capabilitiesSnapshotFromNodeManager(nil, policy, guestPolicy, nil)(
 		context.Background(),
 		frontend.RuntimeCapabilities{},
 	)
@@ -94,6 +94,90 @@ func TestCapabilitiesSnapshotFromNodeManager_ProjectsDistributionPaymentCoin(t *
 	method := got.Payments.Methods[0]
 	if method.ID != iwallet.ChainMonero.String() || method.Kind != "crypto" || method.Flow != "address-transfer" {
 		t.Fatalf("payment method = %#v, want XMR address-transfer", method)
+	}
+}
+
+func TestCapabilitiesSnapshotFromNodeManager_UsesPlatformSnapshotWithoutRequestNode(t *testing.T) {
+	policy, err := edition.ResolvePolicy(edition.FullName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	platformSnapshot := func(_ context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+		baseline.Payments.Methods = []frontend.PaymentCapability{
+			{ID: "stripe", Kind: "fiat", Flow: "provider-session"},
+			{ID: iwallet.ChainEthereum.String(), Kind: "crypto", Flow: "external-wallet"},
+		}
+		return baseline
+	}
+
+	got := capabilitiesSnapshotFromNodeManager(nil, policy, nil, platformSnapshot)(
+		context.Background(),
+		frontend.RuntimeCapabilities{},
+	)
+	if len(got.Payments.Methods) != 2 {
+		t.Fatalf("payment methods = %#v, want platform methods", got.Payments.Methods)
+	}
+	if got.Payments.Methods[0].ID != iwallet.ChainEthereum.String() || got.Payments.Methods[1].ID != "stripe" {
+		t.Fatalf("payment methods = %#v, want sorted platform methods", got.Payments.Methods)
+	}
+}
+
+func TestCapabilitiesSnapshotFromNodeManager_RequestNodeOverridesPlatformSnapshot(t *testing.T) {
+	policy, err := edition.ResolvePolicy(edition.FullName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := &runtimeConfigNode{
+		wallet: &runtimeConfigWallet{chains: []iwallet.ChainType{iwallet.ChainBitcoin}},
+		active: []iwallet.ChainType{iwallet.ChainBitcoin},
+	}
+	ctx := context.WithValue(context.Background(), nodeContextKey, contracts.NodeService(node))
+	platformSnapshot := func(_ context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+		baseline.Payments.Methods = []frontend.PaymentCapability{
+			{ID: iwallet.ChainEthereum.String(), Kind: "crypto", Flow: "external-wallet"},
+		}
+		return baseline
+	}
+
+	got := capabilitiesSnapshotFromNodeManager(nil, policy, nil, platformSnapshot)(
+		ctx,
+		frontend.RuntimeCapabilities{},
+	)
+	if len(got.Payments.Methods) != 1 {
+		t.Fatalf("payment methods = %#v, want request-node method only", got.Payments.Methods)
+	}
+	if got.Payments.Methods[0].ID != iwallet.ChainBitcoin.String() {
+		t.Fatalf("payment method = %#v, want request-node BTC", got.Payments.Methods[0])
+	}
+}
+
+func TestCapabilitiesSnapshotFromNodeManager_PlatformRuntimeConfigOverridesRequestNode(t *testing.T) {
+	policy, err := edition.ResolvePolicy(edition.FullName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := &runtimeConfigNode{
+		wallet: &runtimeConfigWallet{chains: []iwallet.ChainType{iwallet.ChainBitcoin}},
+		active: []iwallet.ChainType{iwallet.ChainBitcoin},
+	}
+	ctx := context.WithValue(context.Background(), nodeContextKey, contracts.NodeService(node))
+	ctx = context.WithValue(ctx, platformRuntimeCapabilitiesContextKey, true)
+	platformSnapshot := func(_ context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+		baseline.Payments.Methods = []frontend.PaymentCapability{
+			{ID: iwallet.ChainEthereum.String(), Kind: "crypto", Flow: "external-wallet"},
+		}
+		return baseline
+	}
+
+	got := capabilitiesSnapshotFromNodeManager(nil, policy, nil, platformSnapshot)(
+		ctx,
+		frontend.RuntimeCapabilities{},
+	)
+	if len(got.Payments.Methods) != 1 {
+		t.Fatalf("payment methods = %#v, want platform method only", got.Payments.Methods)
+	}
+	if got.Payments.Methods[0].ID != iwallet.ChainEthereum.String() {
+		t.Fatalf("payment method = %#v, want platform ETH", got.Payments.Methods[0])
 	}
 }
 

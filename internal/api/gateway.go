@@ -34,6 +34,7 @@ var log = logging.MustGetLogger("API")
 type contextKey string
 
 const nodeContextKey contextKey = "node"
+const platformRuntimeCapabilitiesContextKey contextKey = "platform-runtime-capabilities"
 
 // normalizeLoopbackAddr rewrites wildcard listener addresses (0.0.0.0, ::,
 // empty host) to a routable loopback host for in-process MCP bridge calls.
@@ -128,6 +129,12 @@ type GatewayConfig struct {
 	GuestPaymentPolicy   distribution.GuestPaymentPolicy
 	ProductSurfacePolicy distribution.ProductSurfacePolicy
 	AIHTTPPolicy         distribution.AIHTTPPolicy
+
+	// RuntimeCapabilitiesSnapshotFn lets a distribution composition project
+	// platform-level capabilities for global/public runtime-config requests.
+	// Tenant-resolved requests still use the resolved node so checkout surfaces
+	// remain scoped to the store that will actually serve the order.
+	RuntimeCapabilitiesSnapshotFn func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities
 }
 
 // Gateway represents an HTTP API gateway
@@ -485,6 +492,24 @@ func nodeServiceFromContext(ctx context.Context) (contracts.NodeService, bool) {
 	return node, ok && node != nil
 }
 
+func usePlatformRuntimeCapabilities(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	usePlatform, _ := ctx.Value(platformRuntimeCapabilitiesContextKey).(bool)
+	return usePlatform
+}
+
+func isRuntimeConfigRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil {
+		return false
+	}
+	if req.Method != http.MethodGet && req.Method != http.MethodHead {
+		return false
+	}
+	return req.URL.Path == "/v1/runtime-config" || req.URL.Path == "/runtime-config.js"
+}
+
 func getIdentityService(r *http.Request) contracts.IdentityService {
 	return getNodeService(r).IdentityInfo()
 }
@@ -679,6 +704,7 @@ func (g *Gateway) runtimeFrontendConfig() frontend.ServerConfig {
 			g.nodeManager,
 			g.editionPolicy,
 			g.config.GuestPaymentPolicy,
+			g.config.RuntimeCapabilitiesSnapshotFn,
 		),
 		NeedsSetupShellFn: g.needsSetupShell,
 	}
@@ -700,10 +726,18 @@ func capabilitiesSnapshotFromNodeManager(
 	nm coreiface.NodeManagerIface,
 	policy edition.Policy,
 	guestPaymentPolicy distribution.GuestPaymentPolicy,
+	platformSnapshotFn func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities,
 ) func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
 	return func(ctx context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
 		result := baseline
 		result.Payments = frontend.PaymentCapabilities{Methods: []frontend.PaymentCapability{}}
+
+		if platformSnapshotFn != nil && usePlatformRuntimeCapabilities(ctx) {
+			result = platformSnapshotFn(ctx, result)
+			result.Payments.Methods = filterPaymentCapabilities(result.Payments.Methods, policy)
+			sortPaymentCapabilities(result.Payments.Methods)
+			return result
+		}
 
 		var node contracts.NodeService
 		var walletOperator contracts.WalletOperator
@@ -715,6 +749,11 @@ func capabilitiesSnapshotFromNodeManager(
 			if provider, ok := requestNode.(walletOperatorProvider); ok {
 				walletOperator = provider.Multiwallet()
 			}
+		} else if platformSnapshotFn != nil {
+			result = platformSnapshotFn(ctx, result)
+			result.Payments.Methods = filterPaymentCapabilities(result.Payments.Methods, policy)
+			sortPaymentCapabilities(result.Payments.Methods)
+			return result
 		} else if nm != nil {
 			if def := nm.GetDefaultNode(); def != nil {
 				node = def
@@ -787,17 +826,43 @@ func capabilitiesSnapshotFromNodeManager(
 		}
 
 		result.Payments.Methods = filterPaymentCapabilities(result.Payments.Methods, policy)
-
-		sort.Slice(result.Payments.Methods, func(i, j int) bool {
-			left := result.Payments.Methods[i]
-			right := result.Payments.Methods[j]
-			if left.Kind == right.Kind {
-				return left.ID < right.ID
-			}
-			return left.Kind < right.Kind
-		})
+		sortPaymentCapabilities(result.Payments.Methods)
 		return result
 	}
+}
+
+func runtimeCapabilitiesFromPaymentMethods(
+	provider func(context.Context) []edition.PaymentMethod,
+) func(context.Context, frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+	if provider == nil {
+		return nil
+	}
+	return func(ctx context.Context, baseline frontend.RuntimeCapabilities) frontend.RuntimeCapabilities {
+		baseline.Payments = frontend.PaymentCapabilities{Methods: []frontend.PaymentCapability{}}
+		for _, method := range provider(ctx) {
+			if method.ID == "" || method.Kind == "" || method.Flow == "" {
+				continue
+			}
+			baseline.Payments.Methods = append(baseline.Payments.Methods, frontend.PaymentCapability{
+				ID:          method.ID,
+				Kind:        method.Kind,
+				Flow:        method.Flow,
+				AddressMode: method.AddressMode,
+			})
+		}
+		return baseline
+	}
+}
+
+func sortPaymentCapabilities(methods []frontend.PaymentCapability) {
+	sort.Slice(methods, func(i, j int) bool {
+		left := methods[i]
+		right := methods[j]
+		if left.Kind == right.Kind {
+			return left.ID < right.ID
+		}
+		return left.Kind < right.Kind
+	})
 }
 
 func activeCryptoPaymentCapabilities(walletChains, registeredChains []iwallet.ChainType) []frontend.PaymentCapability {

@@ -33,12 +33,12 @@ func (s *mautrixChatService) GetRooms(ctx context.Context) ([]contracts.MatrixRo
 
 	rooms := make([]contracts.MatrixRoom, 0, len(resp.JoinedRooms))
 	for _, roomID := range resp.JoinedRooms {
-		room, err := s.buildRoomSummary(ctx, roomID)
+		room, lastMessageReliable, err := s.buildRoomSummary(ctx, roomID)
 		if err != nil {
 			continue
 		}
 		if count, ok := unreadCounts[roomID]; ok {
-			room.UnreadCount = count
+			applyRoomUnreadCount(room, count, lastMessageReliable)
 		}
 		rooms = append(rooms, *room)
 	}
@@ -61,13 +61,25 @@ func (s *mautrixChatService) GetRooms(ctx context.Context) ([]contracts.MatrixRo
 	return rooms, nil
 }
 
+func applyRoomUnreadCount(room *contracts.MatrixRoom, count int, lastMessageReliable bool) {
+	if room == nil {
+		return
+	}
+	if room.LastMessage == nil && lastMessageReliable {
+		room.UnreadCount = 0
+		return
+	}
+	room.UnreadCount = count
+}
+
 // GetRoom returns detailed info for a single room.
 func (s *mautrixChatService) GetRoom(ctx context.Context, roomID string) (*contracts.MatrixRoom, error) {
 	if err := s.ensureReady(ctx); err != nil {
 		return nil, err
 	}
 	s.touchActivity()
-	return s.buildRoomSummary(ctx, id.RoomID(roomID))
+	room, _, err := s.buildRoomSummary(ctx, id.RoomID(roomID))
+	return room, err
 }
 
 // GetInvitedRooms returns rooms where the user has a pending invite.
@@ -399,8 +411,10 @@ func (s *mautrixChatService) SetRoomAvatar(ctx context.Context, roomID string, r
 	return err
 }
 
-// buildRoomSummary fetches room state and builds a MatrixRoom summary.
-func (s *mautrixChatService) buildRoomSummary(ctx context.Context, roomID id.RoomID) (*contracts.MatrixRoom, error) {
+// buildRoomSummary fetches room state and builds a MatrixRoom summary. The
+// boolean reports whether an empty LastMessage means the room was read reliably
+// and has no displayable messages, instead of a transient fetch/decrypt failure.
+func (s *mautrixChatService) buildRoomSummary(ctx context.Context, roomID id.RoomID) (*contracts.MatrixRoom, bool, error) {
 	room := &contracts.MatrixRoom{
 		RoomID: roomID.String(),
 	}
@@ -526,11 +540,12 @@ func (s *mautrixChatService) buildRoomSummary(ctx context.Context, roomID id.Roo
 		}
 	}
 
-	if lastMsg := s.fetchLastMessage(ctx, roomID); lastMsg != nil {
+	lastMsg, lastMessageReliable := s.fetchLastMessage(ctx, roomID)
+	if lastMsg != nil {
 		room.LastMessage = lastMsg
 	}
 
-	return room, nil
+	return room, lastMessageReliable, nil
 }
 
 func isActiveMemberMembership(membership event.Membership) bool {
@@ -641,31 +656,38 @@ func (s *mautrixChatService) fetchUnreadCounts(_ context.Context) map[id.RoomID]
 	return out
 }
 
-// fetchLastMessage retrieves the most recent message event from a room
-// for display in the room list. Silently returns nil on any error.
-func (s *mautrixChatService) fetchLastMessage(ctx context.Context, roomID id.RoomID) *contracts.MatrixMessage {
-	resp, err := s.client.Messages(ctx, roomID, "", "", mautrix.DirectionBackward, nil, 5)
+// fetchLastMessage retrieves the most recent message event from a room for
+// display in the room list. The boolean reports whether the lookup was reliable
+// enough to treat a nil message as "no displayable messages yet".
+func (s *mautrixChatService) fetchLastMessage(ctx context.Context, roomID id.RoomID) (*contracts.MatrixMessage, bool) {
+	resp, err := s.client.Messages(ctx, roomID, "", "", mautrix.DirectionBackward, nil, 50)
 	if err != nil {
-		return nil
+		return nil, false
 	}
+	reliable := true
 	for _, evt := range resp.Chunk {
 		if evt.Type == event.EventEncrypted && s.client.Crypto != nil {
 			if err := evt.Content.ParseRaw(evt.Type); err != nil {
+				reliable = false
 				continue
 			}
 			decrypted, err := s.client.Crypto.Decrypt(ctx, evt)
 			if err != nil {
+				reliable = false
 				continue
 			}
 			evt = decrypted
+		} else if evt.Type == event.EventEncrypted {
+			reliable = false
+			continue
 		}
 		if evt.Type != event.EventMessage {
 			continue
 		}
 		msg := s.eventToMessage(evt)
-		return &msg
+		return &msg, true
 	}
-	return nil
+	return nil, reliable
 }
 
 var (

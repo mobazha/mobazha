@@ -2,6 +2,7 @@ package core
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -34,6 +35,46 @@ func TestClassifyRoomFromState_DirectMetadataOverridesMemberCount(t *testing.T) 
 func TestClassifyRoomFromState_TwoMembersDefaultsToDirect(t *testing.T) {
 	if got := classifyRoomFromState(mautrix.RoomStateMap{}, 2); got != "direct" {
 		t.Fatalf("classifyRoomFromState() = %q, want %q", got, "direct")
+	}
+}
+
+func TestApplyRoomUnreadCount_RequiresDisplayableLastMessage(t *testing.T) {
+	room := &contracts.MatrixRoom{RoomID: "!room:test"}
+
+	applyRoomUnreadCount(room, 4, true)
+
+	if room.UnreadCount != 0 {
+		t.Fatalf("unreadCount = %d, want 0 without lastMessage", room.UnreadCount)
+	}
+}
+
+func TestApplyRoomUnreadCount_KeepsCountWhenLastMessageLookupUnreliable(t *testing.T) {
+	room := &contracts.MatrixRoom{RoomID: "!room:test"}
+
+	applyRoomUnreadCount(room, 4, false)
+
+	if room.UnreadCount != 4 {
+		t.Fatalf("unreadCount = %d, want 4 when last message lookup is unreliable", room.UnreadCount)
+	}
+}
+
+func TestApplyRoomUnreadCount_KeepsCountWithLastMessage(t *testing.T) {
+	room := &contracts.MatrixRoom{
+		RoomID: "!room:test",
+		LastMessage: &contracts.MatrixMessage{
+			EventID:   "$event",
+			RoomID:    "!room:test",
+			Sender:    "@alice:test",
+			Content:   "hello",
+			MsgType:   "m.text",
+			Timestamp: time.Now(),
+		},
+	}
+
+	applyRoomUnreadCount(room, 4, true)
+
+	if room.UnreadCount != 4 {
+		t.Fatalf("unreadCount = %d, want 4", room.UnreadCount)
 	}
 }
 

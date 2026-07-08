@@ -19,12 +19,13 @@ import (
 
 // SharedRouterConfig configures a SharedRouter.
 type SharedRouterConfig struct {
-	Resolver           func(r *http.Request) (contracts.NodeService, error)
-	FeatureManager     *config.FeatureManager
-	SkillProvider      agentskill.Provider
-	AllowCORS          bool
-	DistributionPolicy edition.Policy
-	AIHTTPPolicy       distribution.AIHTTPPolicy
+	Resolver                      func(r *http.Request) (contracts.NodeService, error)
+	FeatureManager                *config.FeatureManager
+	SkillProvider                 agentskill.Provider
+	AllowCORS                     bool
+	DistributionPolicy            edition.Policy
+	AIHTTPPolicy                  distribution.AIHTTPPolicy
+	RuntimePaymentMethodsProvider func(context.Context) []edition.PaymentMethod
 
 	// PostResolverMiddleware, if set, is applied after the resolver middleware
 	// has populated the request context (NodeService + AuthIdentity) but before
@@ -43,7 +44,10 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 		distributionPolicy = edition.DefaultPolicy()
 	}
 	g := &Gateway{
-		config:        &GatewayConfig{SkillProvider: cfg.SkillProvider},
+		config: &GatewayConfig{
+			SkillProvider:                 cfg.SkillProvider,
+			RuntimeCapabilitiesSnapshotFn: runtimeCapabilitiesFromPaymentMethods(cfg.RuntimePaymentMethodsProvider),
+		},
 		hubs:          make(map[string]*hub),
 		hubsMtx:       sync.RWMutex{},
 		editionPolicy: distributionPolicy,
@@ -69,6 +73,9 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 				return
 			}
 			ctx := context.WithValue(req.Context(), nodeContextKey, node)
+			if cfg.RuntimePaymentMethodsProvider != nil && isRuntimeConfigRequest(req) {
+				ctx = context.WithValue(ctx, platformRuntimeCapabilitiesContextKey, true)
+			}
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})

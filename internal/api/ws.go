@@ -145,7 +145,8 @@ func (h *hub) run() {
 			}
 		case <-protocolPingTicker.C:
 			for c := range h.connections {
-				if err := c.ws.WriteMessage(websocket.PingMessage, nil); err != nil {
+				deadline := time.Now().Add(10 * time.Second)
+				if err := c.ws.WriteControl(websocket.PingMessage, nil, deadline); err != nil {
 					log.Warningf("Protocol ping failed, nodeID: %s, error: %s", h.nodeID, err.Error())
 				}
 			}

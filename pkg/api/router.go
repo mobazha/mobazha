@@ -48,6 +48,9 @@ type RouterConfig struct {
 	// AIHTTPPolicy explicitly selects the AI route and endpoint trust surface.
 	// Nil derives a fail-closed policy from DistributionPolicy.
 	AIHTTPPolicy distribution.AIHTTPPolicy
+	// RuntimePaymentMethodsProvider supplies platform-level payment methods for
+	// public runtime-config responses in SaaS compositions.
+	RuntimePaymentMethodsProvider func(context.Context) []edition.PaymentMethod
 
 	// PostResolverMiddleware is applied after the resolver has populated the
 	// request context but before route handlers. Use this for scope enforcement
@@ -65,13 +68,14 @@ type Router struct {
 // eliminating the need for a reverse proxy.
 func NewRouter(cfg RouterConfig) (*Router, error) {
 	sr, err := internalapi.NewSharedRouter(internalapi.SharedRouterConfig{
-		Resolver:               cfg.Resolver,
-		FeatureManager:         cfg.FeatureManager,
-		SkillProvider:          cfg.SkillProvider,
-		AllowCORS:              cfg.AllowCORS,
-		DistributionPolicy:     cfg.DistributionPolicy,
-		AIHTTPPolicy:           cfg.AIHTTPPolicy,
-		PostResolverMiddleware: cfg.PostResolverMiddleware,
+		Resolver:                      cfg.Resolver,
+		FeatureManager:                cfg.FeatureManager,
+		SkillProvider:                 cfg.SkillProvider,
+		AllowCORS:                     cfg.AllowCORS,
+		DistributionPolicy:            cfg.DistributionPolicy,
+		AIHTTPPolicy:                  cfg.AIHTTPPolicy,
+		RuntimePaymentMethodsProvider: cfg.RuntimePaymentMethodsProvider,
+		PostResolverMiddleware:        cfg.PostResolverMiddleware,
 	})
 	if err != nil {
 		return nil, err

@@ -400,8 +400,9 @@ func (s *OrderAppService) createOrder(ctx context.Context, purchase *models.Purc
 			Country:      strings.ToUpper(purchase.CountryCode),
 			AddressNotes: purchase.AddressNotes,
 		},
-		Chaincode:   hex.EncodeToString(chaincode),
-		PricingCoin: purchase.PricingCoin,
+		Chaincode:                  hex.EncodeToString(chaincode),
+		PricingCoin:                purchase.PricingCoin,
+		AffiliateReferralSessionID: strings.TrimSpace(purchase.AffiliateReferralSessionID),
 	}
 	if purchase.DealTermsSnapshotRef != nil {
 		order.DealLinkID = purchase.DealTermsSnapshotRef.DealLinkID

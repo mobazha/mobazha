@@ -15,9 +15,9 @@ import (
 
 var (
 	// ErrSellerAffiliateNotFound indicates a missing tenant-local affiliate resource.
-	ErrSellerAffiliateNotFound = errors.New("seller affiliate resource not found")
+	ErrSellerAffiliateNotFound = models.ErrSellerAffiliateNotFound
 	// ErrSellerAffiliateConflict indicates an immutable binding or lifecycle conflict.
-	ErrSellerAffiliateConflict = errors.New("seller affiliate conflict")
+	ErrSellerAffiliateConflict = models.ErrSellerAffiliateConflict
 )
 
 // GormSellerAffiliateStore persists the minimal tenant-scoped affiliate domain.
@@ -203,6 +203,22 @@ func (s *GormSellerAffiliateStore) ListAffiliateCommissionLinesByOrder(_ context
 		return nil, err
 	}
 	return lines, nil
+}
+
+// ListPendingAffiliateCommissionOrderIDs returns distinct tenant-local pending orders.
+func (s *GormSellerAffiliateStore) ListPendingAffiliateCommissionOrderIDs(_ context.Context) ([]string, error) {
+	var orderIDs []string
+	err := s.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Model(&models.AffiliateCommissionLine{}).
+			Distinct("order_id").
+			Where("status = ?", models.AffiliateCommissionStatusPending).
+			Order("order_id ASC").
+			Pluck("order_id", &orderIDs).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return orderIDs, nil
 }
 
 // TransitionAffiliateCommission advances all order lines without manual review.

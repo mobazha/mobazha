@@ -27,6 +27,7 @@ func (s *OrderAppService) RunOrderTimeoutOnce() {
 	s.autoCompleteShippedOrders()
 	s.autoRefundUnshippedOrders()
 	s.emitProtectionReminders()
+	s.reconcilePendingSellerAffiliateOrders()
 }
 
 // ── AWAITING_PAYMENT timeout (existing) ─────────────────────────────────

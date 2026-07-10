@@ -490,8 +490,9 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 						Memo: "I want it fast!",
 					},
 				},
-				AlternateContactInfo: "peter@protonmail.com",
-				PricingCoin:          "MCK",
+				AlternateContactInfo:       "peter@protonmail.com",
+				PricingCoin:                "MCK",
+				AffiliateReferralSessionID: "affiliate-session-checkout-1",
 				DealTermsSnapshotRef: &models.DealTermsSnapshotRef{
 					DealLinkID:           "deal-checkout-1",
 					Revision:             4,
@@ -501,6 +502,9 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 				},
 			},
 			checkOrder: func(purchase *models.Purchase, order *pb.OrderOpen) error {
+				if order.AffiliateReferralSessionID != purchase.AffiliateReferralSessionID {
+					return errors.New("incorrect affiliate referral session")
+				}
 				if order.DealLinkID != purchase.DealTermsSnapshotRef.DealLinkID ||
 					order.DealRevision != purchase.DealTermsSnapshotRef.Revision ||
 					order.TermsHash != purchase.DealTermsSnapshotRef.TermsHash ||

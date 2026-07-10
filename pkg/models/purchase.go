@@ -103,6 +103,8 @@ type Purchase struct {
 	PricingCoin          string                `json:"pricingCoin"`
 	DiscountCodes        []string              `json:"discountCodes,omitempty"`
 	DealTermsSnapshotRef *DealTermsSnapshotRef `json:"dealTermsSnapshotRef,omitempty"`
+	// AffiliateReferralSessionID is signed into OrderOpen for seller-side validation.
+	AffiliateReferralSessionID string `json:"affiliateReferralSessionID,omitempty"`
 	// PurchaseRequestID is an optional caller-owned correlation key. Core stores
 	// it only on the buyer's local order in the same transaction as OrderOpen;
 	// it is not sent to the vendor or interpreted as order semantics.

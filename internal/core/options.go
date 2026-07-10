@@ -694,7 +694,9 @@ func (n *MobazhaNode) initOrderService() {
 		Resolver:                   n.featureResolver,
 		SupplyAvailability:         n.supplyAvailabilityService,
 		OrderExtensionDeclarer:     n.declareOrderExtensions,
+		SellerAffiliate:            n.sellerAffiliateService,
 	})
+	n.orderService.StartSellerAffiliatePaymentFactListener()
 }
 
 // buildDiscountResolver returns a DiscountResolverFunc that resolves discounts

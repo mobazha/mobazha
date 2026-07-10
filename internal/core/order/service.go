@@ -109,6 +109,7 @@ type OrderAppService struct {
 	digitalSupplyLines      TransactionalDigitalSupplyLineResolver
 	checkoutSupplyQuoter    *checkoutsupply.CheckoutSupplyQuoteService
 	orderExtensionDeclarer  OrderExtensionDeclarer
+	sellerAffiliate         contracts.SellerAffiliateService
 }
 
 var _ contracts.PurchaseRecoveryService = (*OrderAppService)(nil)
@@ -143,6 +144,7 @@ type OrderAppServiceConfig struct {
 	SupplyAvailability         contracts.SupplyAvailabilityService
 	DigitalSupplyLines         TransactionalDigitalSupplyLineResolver
 	OrderExtensionDeclarer     OrderExtensionDeclarer
+	SellerAffiliate            contracts.SellerAffiliateService
 }
 
 // DigitalSupplyLineResolver preserves the order package API while sharing the
@@ -183,6 +185,7 @@ func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {
 		supplyAvailability:         cfg.SupplyAvailability,
 		digitalSupplyLines:         cfg.DigitalSupplyLines,
 		orderExtensionDeclarer:     cfg.OrderExtensionDeclarer,
+		sellerAffiliate:            cfg.SellerAffiliate,
 	}
 }
 
@@ -585,8 +588,7 @@ func (s *OrderAppService) ProcessVerifiedPaymentMessage(ctx context.Context, ord
 	if err != nil {
 		return err
 	}
-	_ = ctx
-	return nil
+	return s.ReconcileSellerAffiliateOrder(ctx, models.OrderID(orderMsg.OrderID))
 }
 
 // RelayPaymentToBuyer is a convenience method that fetches the order,

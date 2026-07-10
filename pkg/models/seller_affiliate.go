@@ -232,8 +232,14 @@ type AffiliateOrderResult struct {
 	Lines       []AffiliateCommissionLine
 }
 
-// ErrInvalidSellerAffiliate indicates malformed or inconsistent affiliate facts.
-var ErrInvalidSellerAffiliate = errors.New("invalid seller affiliate data")
+var (
+	// ErrInvalidSellerAffiliate indicates malformed or inconsistent affiliate facts.
+	ErrInvalidSellerAffiliate = errors.New("invalid seller affiliate data")
+	// ErrSellerAffiliateNotFound indicates a missing tenant-local affiliate resource.
+	ErrSellerAffiliateNotFound = errors.New("seller affiliate resource not found")
+	// ErrSellerAffiliateConflict indicates an immutable binding or lifecycle conflict.
+	ErrSellerAffiliateConflict = errors.New("seller affiliate conflict")
+)
 
 func validAffiliateID(value string) bool {
 	value = strings.TrimSpace(value)

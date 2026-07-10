@@ -249,6 +249,14 @@ func (s *SellerAffiliateAppService) ListCommissionLinesByOrder(ctx context.Conte
 	return s.store.ListAffiliateCommissionLinesByOrder(ctx, strings.TrimSpace(orderID))
 }
 
+// ListPendingCommissionOrderIDs returns orders waiting on existing protection facts.
+func (s *SellerAffiliateAppService) ListPendingCommissionOrderIDs(ctx context.Context) ([]string, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	return s.store.ListPendingAffiliateCommissionOrderIDs(ctx)
+}
+
 func affiliateCommissionAtomic(baseAtomic string, rateBPS uint32) (string, error) {
 	base, ok := new(big.Int).SetString(baseAtomic, 10)
 	if !ok || base.Sign() <= 0 || rateBPS == 0 || rateBPS > 10000 {

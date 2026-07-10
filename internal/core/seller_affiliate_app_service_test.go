@@ -55,6 +55,9 @@ func TestSellerAffiliateAppService_AutomatesMinimalCommissionLifecycle(t *testin
 	assert.Equal(t, "125", result.Lines[0].CommissionAtomic)
 	assert.Equal(t, "0", result.Lines[1].CommissionAtomic)
 	assert.Equal(t, models.AffiliateCommissionStatusPending, result.Lines[0].Status)
+	pendingOrderIDs, err := service.ListPendingCommissionOrderIDs(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{facts.OrderID}, pendingOrderIDs)
 
 	replayFacts := facts
 	replayFacts.AttributedAt = facts.AttributedAt.Add(time.Minute)
@@ -67,6 +70,9 @@ func TestSellerAffiliateAppService_AutomatesMinimalCommissionLifecycle(t *testin
 	require.NoError(t, err)
 	require.Len(t, earned, 2)
 	assert.Equal(t, models.AffiliateCommissionStatusEarned, earned[0].Status)
+	pendingOrderIDs, err = service.ListPendingCommissionOrderIDs(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, pendingOrderIDs)
 
 	earnedReplay, err := service.TransitionCommission(ctx, facts.OrderID, models.AffiliateCommissionStatusEarned, "", earnedAt.Add(time.Hour))
 	require.NoError(t, err)

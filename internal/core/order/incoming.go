@@ -88,6 +88,8 @@ func (s *OrderAppService) HandleIncomingOrderMessage(ctx context.Context, orderM
 	})
 	if err != nil {
 		s.recordIncomingOrderMessageError(orderMsg, err)
+	} else if reconcileErr := s.ReconcileSellerAffiliateOrder(ctx, orderID); reconcileErr != nil {
+		logger.LogInfoWithIDf(log, s.nodeID, "seller affiliate reconciliation deferred for order %s: %v", orderID, reconcileErr)
 	}
 
 	return event, order, err

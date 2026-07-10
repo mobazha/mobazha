@@ -8,6 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // affiliatePayoutFromEscrowRelease returns the affiliate leg that the seller
@@ -121,5 +123,61 @@ func affiliatePayoutFromDisputeRelease(
 		}, nil
 	}
 
+	return nil, nil
+}
+
+func affiliatePayoutForDisputeSettlement(coinType iwallet.CoinType, shipments []*pb.OrderShipment, release *pb.DisputeClose_ModeratedEscrowRelease) (*models.AffiliateSettlementPayout, error) {
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	if err == nil && coinInfo.Chain.IsUTXOChain() {
+		return affiliateUTXOPayoutFromDisputeRelease(shipments, release)
+	}
+	return affiliatePayoutFromDisputeRelease(shipments, release)
+}
+
+func affiliateUTXOPayoutFromDisputeRelease(shipments []*pb.OrderShipment, release *pb.DisputeClose_ModeratedEscrowRelease) (*models.AffiliateSettlementPayout, error) {
+	if release == nil {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	for _, shipment := range shipments {
+		if shipment == nil || shipment.GetReleaseInfo() == nil {
+			continue
+		}
+		original := shipment.GetReleaseInfo()
+		payout, err := affiliateUTXOPayoutFromEscrowRelease(original)
+		if err != nil {
+			return nil, err
+		}
+		if payout == nil {
+			continue
+		}
+		if !payment.SameUTXOAddress(original.GetToAddress(), release.GetVendorAddress()) {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		vendorAmount, ok := new(big.Int).SetString(strings.TrimSpace(release.GetVendorAmount()), 10)
+		if !ok || vendorAmount.Sign() < 0 {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		if vendorAmount.Sign() == 0 {
+			return nil, nil
+		}
+		originalSellerAmount, ok := new(big.Int).SetString(strings.TrimSpace(original.GetToAmount()), 10)
+		if !ok || originalSellerAmount.Sign() <= 0 {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		originalAffiliateAmount, ok := new(big.Int).SetString(payout.Amount, 10)
+		if !ok {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		grossSellerAmount := new(big.Int).Add(originalSellerAmount, originalAffiliateAmount)
+		if vendorAmount.Cmp(grossSellerAmount) > 0 {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		scaledAmount := new(big.Int).Mul(originalAffiliateAmount, vendorAmount)
+		scaledAmount.Div(scaledAmount, grossSellerAmount)
+		if scaledAmount.Sign() == 0 {
+			return nil, nil
+		}
+		return &models.AffiliateSettlementPayout{Address: payout.Address, Amount: scaledAmount.String()}, nil
+	}
 	return nil, nil
 }

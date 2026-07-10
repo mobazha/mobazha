@@ -659,7 +659,15 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		return fmt.Errorf("invalid dispute release funding: %w", err)
 	}
 
-	txn, err = s.BuildDisputeReleaseTransaction(&moderatedEscrowRelease, paymentSent)
+	affiliatePayout, err := affiliatePayoutForDisputeSettlement(coinType, preferredContract.GetOrderShipments(), &moderatedEscrowRelease)
+	if err != nil {
+		return fmt.Errorf("read seller-signed dispute affiliate payout: %w", err)
+	}
+	buildAffiliatePayout := affiliatePayout
+	if coinInfo, coinErr := iwallet.CoinInfoFromCoinType(coinType); coinErr != nil || !coinInfo.Chain.IsUTXOChain() {
+		buildAffiliatePayout = nil
+	}
+	txn, err = s.BuildDisputeReleaseTransaction(&moderatedEscrowRelease, paymentSent, buildAffiliatePayout)
 	if err != nil {
 		return fmt.Errorf("failed to build release transaction: %w", err)
 	}
@@ -668,11 +676,6 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	if err != nil {
 		return fmt.Errorf("failed to materialize dispute order data for settlement signing: %w", err)
 	}
-	affiliatePayout, err := affiliatePayoutFromDisputeRelease(preferredContract.GetOrderShipments(), &moderatedEscrowRelease)
-	if err != nil {
-		return fmt.Errorf("read seller-signed dispute affiliate payout: %w", err)
-	}
-
 	if settlementSigs, handled, err := s.signSettlementActionRelease(context.Background(), coinType, "dispute_release", payment.ActionParams{
 		OrderID:         orderID.String(),
 		PaymentCoin:     string(coinType),
@@ -825,7 +828,7 @@ func (s *OrderAppService) getOrderAndPaymentInfo(orderID models.OrderID) (*model
 	return &order, orderOpen, paymentSent, disputeClose, nil
 }
 
-func (s *OrderAppService) BuildDisputeReleaseTransaction(releaseInfo *pb.DisputeClose_ModeratedEscrowRelease, paymentSent *pb.PaymentSent) (iwallet.Transaction, error) {
+func (s *OrderAppService) BuildDisputeReleaseTransaction(releaseInfo *pb.DisputeClose_ModeratedEscrowRelease, paymentSent *pb.PaymentSent, affiliatePayout ...*models.AffiliateSettlementPayout) (iwallet.Transaction, error) {
 	var txn iwallet.Transaction
 	if paymentSent == nil {
 		return txn, errors.New("payment sent is missing")
@@ -849,7 +852,9 @@ func (s *OrderAppService) BuildDisputeReleaseTransaction(releaseInfo *pb.Dispute
 		})
 	}
 
+	vendorOutputIndex := -1
 	if iwallet.NewAmount(releaseInfo.VendorAmount).Cmp(iwallet.NewAmount(0)) > 0 {
+		vendorOutputIndex = len(txn.To)
 		txn.To = append(txn.To, iwallet.SpendInfo{
 			Address: iwallet.NewAddress(releaseInfo.VendorAddress, coinType),
 			Amount:  iwallet.NewAmount(releaseInfo.VendorAmount),
@@ -860,6 +865,17 @@ func (s *OrderAppService) BuildDisputeReleaseTransaction(releaseInfo *pb.Dispute
 		txn.To = append(txn.To, iwallet.SpendInfo{
 			Address: iwallet.NewAddress(releaseInfo.ModeratorAddress, coinType),
 			Amount:  iwallet.NewAmount(releaseInfo.ModeratorAmount),
+		})
+	}
+	if len(affiliatePayout) > 0 && affiliatePayout[0] != nil {
+		payout := affiliatePayout[0]
+		if vendorOutputIndex < 0 || iwallet.NewAmount(payout.Amount).Cmp(txn.To[vendorOutputIndex].Amount) >= 0 {
+			return txn, models.ErrInvalidSellerAffiliate
+		}
+		txn.To[vendorOutputIndex].Amount = txn.To[vendorOutputIndex].Amount.Sub(iwallet.NewAmount(payout.Amount))
+		txn.To = append(txn.To, iwallet.SpendInfo{
+			Address: iwallet.NewAddress(payout.Address, coinType),
+			Amount:  iwallet.NewAmount(payout.Amount),
 		})
 	}
 
@@ -950,14 +966,21 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 		return fmt.Errorf("load settlement actions for order %s: %w", orderID, err)
 	}
 
-	releaseTx, err := s.BuildDisputeReleaseTransaction(disputeClose.ReleaseInfo, paymentSent)
+	shipments, err := order.OrderShipmentMessages()
 	if err != nil {
-		return fmt.Errorf("build dispute release tx: %w", err)
+		return fmt.Errorf("load seller shipment payout terms: %w", err)
 	}
-
 	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return err
+	}
+	affiliatePayout, err := affiliatePayoutForDisputeSettlement(coinType, shipments, disputeClose.ReleaseInfo)
+	if err != nil {
+		return fmt.Errorf("read seller-signed dispute affiliate payout: %w", err)
+	}
+	releaseTx, err := s.BuildDisputeReleaseTransaction(disputeClose.ReleaseInfo, paymentSent, affiliatePayout)
+	if err != nil {
+		return fmt.Errorf("build dispute release tx: %w", err)
 	}
 
 	if !orderRequiresMonitoredSettlementActions(order, paymentSent, coinType, s.paymentRegistry) {

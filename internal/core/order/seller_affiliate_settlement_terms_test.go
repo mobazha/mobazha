@@ -8,6 +8,7 @@ import (
 
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const (
@@ -61,4 +62,24 @@ func TestAffiliatePayoutFromDisputeRelease_RejectsDifferentVendor(t *testing.T) 
 		VendorAmount:  "400",
 	})
 	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
+}
+
+func TestAffiliatePayoutForDisputeSettlement_UsesUTXOGrossSellerRatio(t *testing.T) {
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBitcoinCash)
+	require.NoError(t, err)
+	payout, err := affiliatePayoutForDisputeSettlement(coinType, []*pb.OrderShipment{{
+		ReleaseInfo: &pb.EscrowRelease{
+			ToAddress:        "bitcoincash:qvendor",
+			ToAmount:         "80",
+			AffiliateAddress: "bitcoincash:qaffiliate",
+			AffiliateAmount:  "20",
+		},
+	}}, &pb.DisputeClose_ModeratedEscrowRelease{
+		VendorAddress: "bitcoincash:qvendor",
+		VendorAmount:  "40",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, payout)
+	require.Equal(t, "bitcoincash:qaffiliate", payout.Address)
+	require.Equal(t, "8", payout.Amount)
 }

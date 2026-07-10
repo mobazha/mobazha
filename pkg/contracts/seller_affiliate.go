@@ -14,6 +14,7 @@ type SellerAffiliateStore interface {
 	CreateAffiliateLink(ctx context.Context, link *models.AffiliateLink) error
 	GetAffiliateLink(ctx context.Context, id string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
+	GetAffiliateLinkByPromoter(ctx context.Context, programID, promoterPeerID string) (*models.AffiliateLink, error)
 	CreateAffiliateReferralSession(ctx context.Context, session *models.AffiliateReferralSession) error
 	GetAffiliateReferralSession(ctx context.Context, id string) (*models.AffiliateReferralSession, error)
 	RecordAffiliateOrder(ctx context.Context, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error)

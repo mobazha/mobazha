@@ -109,6 +109,21 @@ func (s *GormSellerAffiliateStore) GetAffiliateLinkByToken(_ context.Context, to
 	return affiliateResult(&link, err)
 }
 
+// GetAffiliateLinkByPromoter resolves the tenant's single direct link for a promoter.
+func (s *GormSellerAffiliateStore) GetAffiliateLinkByPromoter(_ context.Context, programID, promoterPeerID string) (*models.AffiliateLink, error) {
+	var link models.AffiliateLink
+	err := s.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Where("program_id = ? AND promoter_peer_id = ?", programID, promoterPeerID).First(&link).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrSellerAffiliateNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &link, nil
+}
+
 // CreateAffiliateReferralSession inserts one immutable referral session.
 func (s *GormSellerAffiliateStore) CreateAffiliateReferralSession(_ context.Context, session *models.AffiliateReferralSession) error {
 	if session == nil {

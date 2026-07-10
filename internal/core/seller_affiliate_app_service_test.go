@@ -34,6 +34,9 @@ func TestSellerAffiliateAppService_AutomatesMinimalCommissionLifecycle(t *testin
 	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-promoter-a")
 	require.NoError(t, err)
 	assert.Equal(t, program.ID, link.ProgramID)
+	replayedLink, err := service.CreateLink(ctx, promoterPeerID, "ignored-token-on-retry")
+	require.NoError(t, err)
+	assert.Equal(t, link, replayedLink)
 
 	issuedAt := time.Now().UTC().Add(-time.Minute)
 	session, err := service.CreateReferralSession(ctx, link.PublicToken, issuedAt)

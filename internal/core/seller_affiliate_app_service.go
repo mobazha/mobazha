@@ -67,14 +67,22 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 	if err != nil {
 		return nil, err
 	}
+	promoterPeerID = strings.TrimSpace(promoterPeerID)
 	if program.Status != models.AffiliateProgramStatusActive || promoterPeerID == program.SellerPeerID {
 		return nil, models.ErrInvalidSellerAffiliate
+	}
+	existing, err := s.store.GetAffiliateLinkByPromoter(ctx, program.ID, promoterPeerID)
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, models.ErrSellerAffiliateNotFound) {
+		return nil, err
 	}
 	now := time.Now().UTC()
 	link := &models.AffiliateLink{
 		ID:             uuid.NewString(),
 		ProgramID:      program.ID,
-		PromoterPeerID: strings.TrimSpace(promoterPeerID),
+		PromoterPeerID: promoterPeerID,
 		PublicToken:    strings.TrimSpace(publicToken),
 		Status:         models.AffiliateLinkStatusActive,
 		CreatedAt:      now,

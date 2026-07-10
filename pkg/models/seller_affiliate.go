@@ -12,6 +12,75 @@ import (
 
 const affiliateMaxTextLength = 256
 
+const (
+	// AffiliatePayoutRailBitcoin identifies the native Bitcoin payout rail.
+	AffiliatePayoutRailBitcoin = "BTC"
+	// AffiliatePayoutRailBitcoinCash identifies the native Bitcoin Cash payout rail.
+	AffiliatePayoutRailBitcoinCash = "BCH"
+	// AffiliatePayoutRailLitecoin identifies the native Litecoin payout rail.
+	AffiliatePayoutRailLitecoin = "LTC"
+)
+
+// AffiliateUTXOPayoutAddresses contains the promoter-controlled native payout
+// address for each UTXO rail supported by affiliate settlement. The address
+// set is frozen with the link, referral session, and order attribution.
+type AffiliateUTXOPayoutAddresses map[string]string
+
+// Clone returns an independent copy suitable for immutable snapshots.
+func (a AffiliateUTXOPayoutAddresses) Clone() AffiliateUTXOPayoutAddresses {
+	if a == nil {
+		return nil
+	}
+	clone := make(AffiliateUTXOPayoutAddresses, len(a))
+	for rail, address := range a {
+		clone[rail] = address
+	}
+	return clone
+}
+
+// Equal reports whether two payout address sets have the same rails and values.
+func (a AffiliateUTXOPayoutAddresses) Equal(other AffiliateUTXOPayoutAddresses) bool {
+	if len(a) != len(other) {
+		return false
+	}
+	for rail, address := range a {
+		if other[rail] != address {
+			return false
+		}
+	}
+	return true
+}
+
+// AddressForRail returns the frozen destination for a native UTXO rail.
+func (a AffiliateUTXOPayoutAddresses) AddressForRail(rail string) (string, bool) {
+	address, ok := a[strings.ToUpper(strings.TrimSpace(rail))]
+	return strings.TrimSpace(address), ok && strings.TrimSpace(address) != ""
+}
+
+// Valid reports whether the set covers exactly the UTXO rails enabled for
+// affiliate settlement. Chain-specific address syntax is validated by the
+// settlement wallet immediately before it signs an output.
+func (a AffiliateUTXOPayoutAddresses) Valid() bool {
+	addresses := a
+	if len(addresses) != 3 {
+		return false
+	}
+	for _, rail := range []string{AffiliatePayoutRailBitcoin, AffiliatePayoutRailBitcoinCash, AffiliatePayoutRailLitecoin} {
+		address, ok := addresses.AddressForRail(rail)
+		if !ok || len(address) > affiliateMaxTextLength {
+			return false
+		}
+	}
+	for rail := range addresses {
+		switch rail {
+		case AffiliatePayoutRailBitcoin, AffiliatePayoutRailBitcoinCash, AffiliatePayoutRailLitecoin:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // AffiliateProgramStatus is the minimal seller-controlled program state.
 type AffiliateProgramStatus string
 
@@ -74,15 +143,16 @@ func (p *AffiliateProgram) Validate() error {
 
 // AffiliateLink is one seller program's direct link for one promoter.
 type AffiliateLink struct {
-	TenantID              string              `json:"-" gorm:"column:tenant_id;primaryKey;default:'_default';uniqueIndex:idx_affiliate_link_promoter,priority:1;uniqueIndex:idx_affiliate_link_token,priority:1"`
-	ID                    string              `json:"id" gorm:"primaryKey;type:text"`
-	ProgramID             string              `json:"programID" gorm:"column:program_id;type:text;not null;index;uniqueIndex:idx_affiliate_link_promoter,priority:2"`
-	PromoterPeerID        string              `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index;uniqueIndex:idx_affiliate_link_promoter,priority:3"`
-	PromoterPayoutAddress string              `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
-	PublicToken           string              `json:"publicToken" gorm:"column:public_token;type:text;not null;uniqueIndex:idx_affiliate_link_token,priority:2"`
-	Status                AffiliateLinkStatus `json:"status" gorm:"type:text;not null;index"`
-	CreatedAt             time.Time           `json:"createdAt" gorm:"column:created_at;not null;autoCreateTime:false"`
-	UpdatedAt             time.Time           `json:"updatedAt" gorm:"column:updated_at;not null;autoUpdateTime:false"`
+	TenantID                    string                       `json:"-" gorm:"column:tenant_id;primaryKey;default:'_default';uniqueIndex:idx_affiliate_link_promoter,priority:1;uniqueIndex:idx_affiliate_link_token,priority:1"`
+	ID                          string                       `json:"id" gorm:"primaryKey;type:text"`
+	ProgramID                   string                       `json:"programID" gorm:"column:program_id;type:text;not null;index;uniqueIndex:idx_affiliate_link_promoter,priority:2"`
+	PromoterPeerID              string                       `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index;uniqueIndex:idx_affiliate_link_promoter,priority:3"`
+	PromoterPayoutAddress       string                       `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
+	PromoterUTXOPayoutAddresses AffiliateUTXOPayoutAddresses `json:"promoterUTXOPayoutAddresses" gorm:"column:promoter_utxo_payout_addresses;serializer:json;type:text;not null"`
+	PublicToken                 string                       `json:"publicToken" gorm:"column:public_token;type:text;not null;uniqueIndex:idx_affiliate_link_token,priority:2"`
+	Status                      AffiliateLinkStatus          `json:"status" gorm:"type:text;not null;index"`
+	CreatedAt                   time.Time                    `json:"createdAt" gorm:"column:created_at;not null;autoCreateTime:false"`
+	UpdatedAt                   time.Time                    `json:"updatedAt" gorm:"column:updated_at;not null;autoUpdateTime:false"`
 }
 
 func (AffiliateLink) TableName() string { return "affiliate_links" }
@@ -91,7 +161,7 @@ func (AffiliateLink) TableName() string { return "affiliate_links" }
 func (l *AffiliateLink) Validate() error {
 	if l == nil || !validAffiliateID(l.ID) || !validAffiliateID(l.ProgramID) ||
 		!validAffiliatePeerID(l.PromoterPeerID) || !validAffiliateID(l.PublicToken) ||
-		!validAffiliateEVMPayoutAddress(l.PromoterPayoutAddress) ||
+		!validAffiliateEVMPayoutAddress(l.PromoterPayoutAddress) || !l.PromoterUTXOPayoutAddresses.Valid() ||
 		(l.Status != AffiliateLinkStatusActive && l.Status != AffiliateLinkStatusRevoked) ||
 		l.CreatedAt.IsZero() || l.UpdatedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
@@ -101,18 +171,19 @@ func (l *AffiliateLink) Validate() error {
 
 // AffiliateReferralSession is a seller-scoped referral carried into checkout.
 type AffiliateReferralSession struct {
-	TenantID                  string     `json:"-" gorm:"column:tenant_id;primaryKey;default:'_default'"`
-	ID                        string     `json:"id" gorm:"primaryKey;type:text"`
-	AffiliateLinkID           string     `json:"affiliateLinkID" gorm:"column:affiliate_link_id;type:text;not null;index"`
-	ProgramID                 string     `json:"programID" gorm:"column:program_id;type:text;not null;index"`
-	SellerPeerID              string     `json:"sellerPeerID" gorm:"column:seller_peer_id;type:text;not null;index"`
-	PromoterPeerID            string     `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index"`
-	CommissionRateBPSSnapshot uint32     `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
-	PromoterPayoutAddress     string     `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
-	IssuedAt                  time.Time  `json:"issuedAt" gorm:"column:issued_at;not null;index"`
-	ExpiresAt                 time.Time  `json:"expiresAt" gorm:"column:expires_at;not null;index"`
-	RevokedAt                 *time.Time `json:"revokedAt,omitempty" gorm:"column:revoked_at"`
-	CreatedAt                 time.Time  `json:"createdAt" gorm:"column:created_at;not null;autoCreateTime:false"`
+	TenantID                    string                       `json:"-" gorm:"column:tenant_id;primaryKey;default:'_default'"`
+	ID                          string                       `json:"id" gorm:"primaryKey;type:text"`
+	AffiliateLinkID             string                       `json:"affiliateLinkID" gorm:"column:affiliate_link_id;type:text;not null;index"`
+	ProgramID                   string                       `json:"programID" gorm:"column:program_id;type:text;not null;index"`
+	SellerPeerID                string                       `json:"sellerPeerID" gorm:"column:seller_peer_id;type:text;not null;index"`
+	PromoterPeerID              string                       `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index"`
+	CommissionRateBPSSnapshot   uint32                       `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
+	PromoterPayoutAddress       string                       `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
+	PromoterUTXOPayoutAddresses AffiliateUTXOPayoutAddresses `json:"promoterUTXOPayoutAddresses" gorm:"column:promoter_utxo_payout_addresses;serializer:json;type:text;not null"`
+	IssuedAt                    time.Time                    `json:"issuedAt" gorm:"column:issued_at;not null;index"`
+	ExpiresAt                   time.Time                    `json:"expiresAt" gorm:"column:expires_at;not null;index"`
+	RevokedAt                   *time.Time                   `json:"revokedAt,omitempty" gorm:"column:revoked_at"`
+	CreatedAt                   time.Time                    `json:"createdAt" gorm:"column:created_at;not null;autoCreateTime:false"`
 }
 
 func (AffiliateReferralSession) TableName() string { return "affiliate_referral_sessions" }
@@ -123,7 +194,7 @@ func (s *AffiliateReferralSession) Validate() error {
 		!validAffiliateID(s.ProgramID) || !validAffiliatePeerID(s.SellerPeerID) ||
 		!validAffiliatePeerID(s.PromoterPeerID) || s.IssuedAt.IsZero() ||
 		s.CommissionRateBPSSnapshot == 0 || s.CommissionRateBPSSnapshot > 10000 ||
-		!validAffiliateEVMPayoutAddress(s.PromoterPayoutAddress) ||
+		!validAffiliateEVMPayoutAddress(s.PromoterPayoutAddress) || !s.PromoterUTXOPayoutAddresses.Valid() ||
 		s.ExpiresAt.IsZero() || !s.ExpiresAt.After(s.IssuedAt) || s.CreatedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
 	}
@@ -137,17 +208,18 @@ func (s AffiliateReferralSession) UsableAt(at time.Time) bool {
 
 // AffiliateAttribution is the immutable order-level referral result.
 type AffiliateAttribution struct {
-	TenantID                  string    `json:"-" gorm:"column:tenant_id;primaryKey;default:'_default';uniqueIndex:idx_affiliate_attribution_order,priority:1"`
-	ID                        string    `json:"id" gorm:"primaryKey;type:text"`
-	OrderID                   string    `json:"orderID" gorm:"column:order_id;type:text;not null;index;uniqueIndex:idx_affiliate_attribution_order,priority:2"`
-	ReferralSessionID         string    `json:"referralSessionID" gorm:"column:referral_session_id;type:text;not null;index"`
-	ProgramID                 string    `json:"programID" gorm:"column:program_id;type:text;not null;index"`
-	SellerPeerID              string    `json:"sellerPeerID" gorm:"column:seller_peer_id;type:text;not null;index"`
-	BuyerPeerID               string    `json:"buyerPeerID" gorm:"column:buyer_peer_id;type:text;not null;index"`
-	PromoterPeerID            string    `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index"`
-	CommissionRateBPSSnapshot uint32    `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
-	PromoterPayoutAddress     string    `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
-	AttributedAt              time.Time `json:"attributedAt" gorm:"column:attributed_at;not null;index"`
+	TenantID                    string                       `json:"-" gorm:"column:tenant_id;primaryKey;default:'_default';uniqueIndex:idx_affiliate_attribution_order,priority:1"`
+	ID                          string                       `json:"id" gorm:"primaryKey;type:text"`
+	OrderID                     string                       `json:"orderID" gorm:"column:order_id;type:text;not null;index;uniqueIndex:idx_affiliate_attribution_order,priority:2"`
+	ReferralSessionID           string                       `json:"referralSessionID" gorm:"column:referral_session_id;type:text;not null;index"`
+	ProgramID                   string                       `json:"programID" gorm:"column:program_id;type:text;not null;index"`
+	SellerPeerID                string                       `json:"sellerPeerID" gorm:"column:seller_peer_id;type:text;not null;index"`
+	BuyerPeerID                 string                       `json:"buyerPeerID" gorm:"column:buyer_peer_id;type:text;not null;index"`
+	PromoterPeerID              string                       `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index"`
+	CommissionRateBPSSnapshot   uint32                       `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
+	PromoterPayoutAddress       string                       `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
+	PromoterUTXOPayoutAddresses AffiliateUTXOPayoutAddresses `json:"promoterUTXOPayoutAddresses" gorm:"column:promoter_utxo_payout_addresses;serializer:json;type:text;not null"`
+	AttributedAt                time.Time                    `json:"attributedAt" gorm:"column:attributed_at;not null;index"`
 }
 
 func (AffiliateAttribution) TableName() string { return "affiliate_attributions" }
@@ -159,7 +231,7 @@ func (a *AffiliateAttribution) Validate() error {
 		!validAffiliatePeerID(a.SellerPeerID) || !validAffiliatePeerID(a.BuyerPeerID) ||
 		!validAffiliatePeerID(a.PromoterPeerID) || a.CommissionRateBPSSnapshot == 0 ||
 		a.CommissionRateBPSSnapshot > 10000 ||
-		!validAffiliateEVMPayoutAddress(a.PromoterPayoutAddress) ||
+		!validAffiliateEVMPayoutAddress(a.PromoterPayoutAddress) || !a.PromoterUTXOPayoutAddresses.Valid() ||
 		a.AttributedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
 	}

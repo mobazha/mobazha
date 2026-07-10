@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // SellerAffiliateAppService implements the automation-first Phase 1 domain.
@@ -59,13 +60,17 @@ func (s *SellerAffiliateAppService) GetProgram(ctx context.Context) (*models.Aff
 	return s.store.GetAffiliateProgram(ctx)
 }
 
-// CreateLink creates a link with the promoter's immutable EVM settlement
-// destination. A payout destination is mandatory before a referral can exist.
-func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error) {
+// CreateLink creates a link with the promoter's immutable settlement destinations.
+// Every enabled settlement rail must have a destination before a referral exists.
+func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string, utxoPayoutAddresses models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
 	payoutAddress, err := normalizeAffiliateEVMPayoutAddress(payoutAddress)
 	if err != nil {
 		return nil, err
 	}
+	if !utxoPayoutAddresses.Valid() {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	utxoPayoutAddresses = utxoPayoutAddresses.Clone()
 	if s == nil || s.store == nil {
 		return nil, errors.New("seller affiliate store not configured")
 	}
@@ -80,7 +85,7 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 	existing, err := s.store.GetAffiliateLinkByPromoter(ctx, program.ID, promoterPeerID)
 	if err == nil {
 		existingAddress, normalizeErr := normalizeAffiliateEVMPayoutAddress(existing.PromoterPayoutAddress)
-		if normalizeErr != nil || existingAddress != payoutAddress {
+		if normalizeErr != nil || existingAddress != payoutAddress || !existing.PromoterUTXOPayoutAddresses.Equal(utxoPayoutAddresses) {
 			return nil, models.ErrSellerAffiliateConflict
 		}
 		return existing, nil
@@ -90,14 +95,15 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 	}
 	now := time.Now().UTC()
 	link := &models.AffiliateLink{
-		ID:                    uuid.NewString(),
-		ProgramID:             program.ID,
-		PromoterPeerID:        promoterPeerID,
-		PromoterPayoutAddress: payoutAddress,
-		PublicToken:           strings.TrimSpace(publicToken),
-		Status:                models.AffiliateLinkStatusActive,
-		CreatedAt:             now,
-		UpdatedAt:             now,
+		ID:                          uuid.NewString(),
+		ProgramID:                   program.ID,
+		PromoterPeerID:              promoterPeerID,
+		PromoterPayoutAddress:       payoutAddress,
+		PromoterUTXOPayoutAddresses: utxoPayoutAddresses,
+		PublicToken:                 strings.TrimSpace(publicToken),
+		Status:                      models.AffiliateLinkStatusActive,
+		CreatedAt:                   now,
+		UpdatedAt:                   now,
 	}
 	if err := link.Validate(); err != nil {
 		return nil, err
@@ -138,16 +144,17 @@ func (s *SellerAffiliateAppService) CreateReferralSession(ctx context.Context, p
 		return nil, models.ErrInvalidSellerAffiliate
 	}
 	session := &models.AffiliateReferralSession{
-		ID:                        uuid.NewString(),
-		AffiliateLinkID:           link.ID,
-		ProgramID:                 program.ID,
-		SellerPeerID:              program.SellerPeerID,
-		PromoterPeerID:            link.PromoterPeerID,
-		CommissionRateBPSSnapshot: program.CommissionRateBPS,
-		PromoterPayoutAddress:     link.PromoterPayoutAddress,
-		IssuedAt:                  issuedAt,
-		ExpiresAt:                 issuedAt.Add(time.Duration(program.AttributionWindowSeconds) * time.Second),
-		CreatedAt:                 issuedAt,
+		ID:                          uuid.NewString(),
+		AffiliateLinkID:             link.ID,
+		ProgramID:                   program.ID,
+		SellerPeerID:                program.SellerPeerID,
+		PromoterPeerID:              link.PromoterPeerID,
+		CommissionRateBPSSnapshot:   program.CommissionRateBPS,
+		PromoterPayoutAddress:       link.PromoterPayoutAddress,
+		PromoterUTXOPayoutAddresses: link.PromoterUTXOPayoutAddresses.Clone(),
+		IssuedAt:                    issuedAt,
+		ExpiresAt:                   issuedAt.Add(time.Duration(program.AttributionWindowSeconds) * time.Second),
+		CreatedAt:                   issuedAt,
 	}
 	if err := session.Validate(); err != nil {
 		return nil, err
@@ -195,16 +202,17 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 	attributionID := uuid.NewString()
 	result := &models.AffiliateOrderResult{
 		Attribution: models.AffiliateAttribution{
-			ID:                        attributionID,
-			OrderID:                   facts.OrderID,
-			ReferralSessionID:         session.ID,
-			ProgramID:                 session.ProgramID,
-			SellerPeerID:              facts.SellerPeerID,
-			BuyerPeerID:               facts.BuyerPeerID,
-			PromoterPeerID:            session.PromoterPeerID,
-			CommissionRateBPSSnapshot: session.CommissionRateBPSSnapshot,
-			PromoterPayoutAddress:     session.PromoterPayoutAddress,
-			AttributedAt:              facts.AttributedAt,
+			ID:                          attributionID,
+			OrderID:                     facts.OrderID,
+			ReferralSessionID:           session.ID,
+			ProgramID:                   session.ProgramID,
+			SellerPeerID:                facts.SellerPeerID,
+			BuyerPeerID:                 facts.BuyerPeerID,
+			PromoterPeerID:              session.PromoterPeerID,
+			CommissionRateBPSSnapshot:   session.CommissionRateBPSSnapshot,
+			PromoterPayoutAddress:       session.PromoterPayoutAddress,
+			PromoterUTXOPayoutAddresses: session.PromoterUTXOPayoutAddresses.Clone(),
+			AttributedAt:                facts.AttributedAt,
 		},
 		Lines: make([]models.AffiliateCommissionLine, 0, len(facts.Lines)),
 	}
@@ -329,7 +337,7 @@ func (s *SellerAffiliateAppService) SettlementPayout(ctx context.Context, orderI
 	if attribution == nil {
 		return nil, models.ErrInvalidSellerAffiliate
 	}
-	address, err := normalizeAffiliateEVMPayoutAddress(attribution.PromoterPayoutAddress)
+	address, err := affiliatePayoutAddressForSettlementCoin(attribution, settlementCoin)
 	if err != nil {
 		return nil, err
 	}
@@ -356,6 +364,29 @@ func (s *SellerAffiliateAppService) SettlementPayout(ctx context.Context, orderI
 		return nil, nil
 	}
 	return &models.AffiliateSettlementPayout{Address: address, Amount: amount.String()}, nil
+}
+
+func affiliatePayoutAddressForSettlementCoin(attribution *models.AffiliateAttribution, settlementCoin string) (string, error) {
+	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(settlementCoin))
+	if err == nil {
+		switch coinInfo.Chain {
+		case iwallet.ChainBitcoin:
+			return affiliateUTXOPayoutAddress(attribution.PromoterUTXOPayoutAddresses, models.AffiliatePayoutRailBitcoin)
+		case iwallet.ChainBitcoinCash:
+			return affiliateUTXOPayoutAddress(attribution.PromoterUTXOPayoutAddresses, models.AffiliatePayoutRailBitcoinCash)
+		case iwallet.ChainLitecoin:
+			return affiliateUTXOPayoutAddress(attribution.PromoterUTXOPayoutAddresses, models.AffiliatePayoutRailLitecoin)
+		}
+	}
+	return normalizeAffiliateEVMPayoutAddress(attribution.PromoterPayoutAddress)
+}
+
+func affiliateUTXOPayoutAddress(addresses models.AffiliateUTXOPayoutAddresses, rail string) (string, error) {
+	address, ok := addresses.AddressForRail(rail)
+	if !ok {
+		return "", models.ErrInvalidSellerAffiliate
+	}
+	return address, nil
 }
 
 func affiliateCommissionAtomic(baseAtomic string, rateBPS uint32) (string, error) {

@@ -340,7 +340,8 @@ func sameAffiliateOrderSnapshot(existing models.AffiliateAttribution, storedLine
 		existing.ProgramID != requested.Attribution.ProgramID || existing.SellerPeerID != requested.Attribution.SellerPeerID ||
 		existing.BuyerPeerID != requested.Attribution.BuyerPeerID || existing.PromoterPeerID != requested.Attribution.PromoterPeerID ||
 		existing.CommissionRateBPSSnapshot != requested.Attribution.CommissionRateBPSSnapshot ||
-		existing.PromoterPayoutAddress != requested.Attribution.PromoterPayoutAddress || len(storedLines) != len(requested.Lines) {
+		existing.PromoterPayoutAddress != requested.Attribution.PromoterPayoutAddress ||
+		!existing.PromoterUTXOPayoutAddresses.Equal(requested.Attribution.PromoterUTXOPayoutAddresses) || len(storedLines) != len(requested.Lines) {
 		return false
 	}
 	requestedLines := append([]models.AffiliateCommissionLine(nil), requested.Lines...)

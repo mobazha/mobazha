@@ -30,7 +30,7 @@ func (*recordingSellerAffiliateService) PutProgram(context.Context, *models.Affi
 func (*recordingSellerAffiliateService) GetProgram(context.Context) (*models.AffiliateProgram, error) {
 	return nil, nil
 }
-func (*recordingSellerAffiliateService) CreateLink(context.Context, string, string, string) (*models.AffiliateLink, error) {
+func (*recordingSellerAffiliateService) CreateLink(context.Context, string, string, string, models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
 	return nil, nil
 }
 func (*recordingSellerAffiliateService) GetLinkByToken(context.Context, string) (*models.AffiliateLink, error) {

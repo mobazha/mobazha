@@ -238,6 +238,16 @@ func (n *MobazhaNode) StorePolicy() contracts.StorePolicyService {
 	return n.storePolicyService
 }
 
+// SellerAffiliate returns the tenant-local automation-first affiliate service.
+func (n *MobazhaNode) SellerAffiliate() contracts.SellerAffiliateService {
+	if n.sellerAffiliateService == nil {
+		return nil
+	}
+	return n.sellerAffiliateService
+}
+
+var _ contracts.SellerAffiliateProvider = (*MobazhaNode)(nil)
+
 // DiscountStore exposes the underlying DiscountStore for cross-tenant wiring
 // (e.g., hosting constructs a DiscountEngine with the vendor's store).
 func (n *MobazhaNode) DiscountStore() contracts.DiscountStore {

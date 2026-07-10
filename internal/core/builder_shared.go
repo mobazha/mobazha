@@ -93,6 +93,17 @@ func initStorePolicySubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "StorePolicy subsystem initialized")
 }
 
+// initSellerAffiliateSubsystem initializes the minimal tenant-local affiliate domain.
+func initSellerAffiliateSubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateSellerAffiliateModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "SellerAffiliate: failed to migrate models: %v", err)
+		return
+	}
+	store := database.NewGormSellerAffiliateStore(obNode.db)
+	obNode.sellerAffiliateService = NewSellerAffiliateAppService(store)
+	logger.LogInfoWithID(log, obNode.nodeID, "SellerAffiliate subsystem initialized")
+}
+
 // initShippingSubsystem initializes the per-node shipping subsystem:
 // migrates DB models, creates ShippingStore, and wires up ShippingAppService.
 // Shared between standard and sovereign profiles (no build tags).

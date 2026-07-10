@@ -243,6 +243,7 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 	initDiscountSubsystem(n)
 	initCollectionSubsystem(n)
 	initStorePolicySubsystem(n)
+	initSellerAffiliateSubsystem(n)
 	initShippingSubsystem(n)
 	n.listingService = NewListingAppService(ListingAppServiceConfig{
 		DB:             n.db,

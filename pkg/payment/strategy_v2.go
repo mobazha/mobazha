@@ -292,6 +292,19 @@ type ActionParams struct {
 	// for Complete. Ignored by other actions. Polymorphic to avoid
 	// importing pb here — adapters cast to *pb.EscrowRelease.
 	ReleaseInfo any
+
+	// AffiliatePayout is the Core-validated seller-funded commission split for
+	// this settlement action. Adapters execute it as an additional output and
+	// deduct the same amount from the seller output; they must not recalculate
+	// affiliate terms from order or profile data.
+	AffiliatePayout *AffiliatePayout
+}
+
+// AffiliatePayout is one immutable seller-funded commission output expressed
+// in the settlement asset's minimal unit.
+type AffiliatePayout struct {
+	Address string
+	Amount  string
 }
 
 // ActionStatus describes the lifecycle of a submitted action. The

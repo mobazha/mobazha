@@ -11,12 +11,14 @@ import (
 	"github.com/mobazha/mobazha/pkg/identity"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type recordingSellerAffiliateService struct {
 	attribution *models.AffiliateAttribution
+	lines       []models.AffiliateCommissionLine
 	facts       []models.AffiliateOrderFacts
 	status      models.AffiliateCommissionStatus
 	reason      models.AffiliateCommissionReversalReason
@@ -59,8 +61,34 @@ func (s *recordingSellerAffiliateService) GetAttributionByOrder(context.Context,
 	}
 	return s.attribution, nil
 }
-func (*recordingSellerAffiliateService) ListCommissionLinesByOrder(context.Context, string) ([]models.AffiliateCommissionLine, error) {
-	return nil, nil
+func (s *recordingSellerAffiliateService) ListCommissionLinesByOrder(context.Context, string) ([]models.AffiliateCommissionLine, error) {
+	return s.lines, nil
+}
+
+func TestSellerAffiliateSettlementPayout_UsesFrozenSettlementAssetAndAddress(t *testing.T) {
+	affiliate := &recordingSellerAffiliateService{
+		attribution: &models.AffiliateAttribution{PromoterPayoutAddress: "0x1111111111111111111111111111111111111111"},
+		lines: []models.AffiliateCommissionLine{
+			{Currency: "USDT", CommissionAtomic: "125", Status: models.AffiliateCommissionStatusPending},
+			{Currency: "USDT", CommissionAtomic: "7", Status: models.AffiliateCommissionStatusEarned},
+		},
+	}
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	payout, err := service.sellerAffiliateSettlementPayout(context.Background(), "affiliate-settlement-order", iwallet.CoinType("USDT"))
+	require.NoError(t, err)
+	require.NotNil(t, payout)
+	assert.Equal(t, "0x1111111111111111111111111111111111111111", payout.Address)
+	assert.Equal(t, "132", payout.Amount)
+}
+
+func TestSellerAffiliateSettlementPayout_RejectsDifferentSettlementAsset(t *testing.T) {
+	affiliate := &recordingSellerAffiliateService{
+		attribution: &models.AffiliateAttribution{PromoterPayoutAddress: "0x1111111111111111111111111111111111111111"},
+		lines:       []models.AffiliateCommissionLine{{Currency: "USD", CommissionAtomic: "125", Status: models.AffiliateCommissionStatusPending}},
+	}
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	_, err := service.sellerAffiliateSettlementPayout(context.Background(), "affiliate-settlement-order", iwallet.CoinType("USDT"))
+	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
 }
 func (*recordingSellerAffiliateService) ListSellerStatement(context.Context) ([]models.AffiliateStatementLine, error) {
 	return nil, nil

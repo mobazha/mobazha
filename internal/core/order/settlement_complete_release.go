@@ -129,15 +129,20 @@ func (s *OrderAppService) runMonitoredSettlementComplete(
 	if release == nil {
 		return nil, nil, nil, true, fmt.Errorf("settlement complete release info is nil")
 	}
+	affiliatePayout, err := s.sellerAffiliateSettlementPayout(ctx, order.ID, coinType)
+	if err != nil {
+		return nil, nil, nil, true, fmt.Errorf("resolve affiliate settlement payout: %w", err)
+	}
 
 	result, err := strategy.Complete(ctx, payment.ActionParams{
-		OrderID:       order.ID.String(),
-		PaymentCoin:   string(coinType),
-		PaymentAmount: paymentSent.Amount,
-		Chaincode:     paymentSent.Chaincode,
-		Script:        paymentSent.Script,
-		OrderData:     order,
-		ReleaseInfo:   release,
+		OrderID:         order.ID.String(),
+		PaymentCoin:     string(coinType),
+		PaymentAmount:   paymentSent.Amount,
+		Chaincode:       paymentSent.Chaincode,
+		Script:          paymentSent.Script,
+		OrderData:       order,
+		ReleaseInfo:     release,
+		AffiliatePayout: affiliatePayout,
 	})
 	if err != nil {
 		return nil, nil, nil, true, err

@@ -234,6 +234,7 @@ func TestBuildEscrowRelease_UsesFundingFactsForUTXOModerated(t *testing.T) {
 		iwallet.NewAmount(5),
 		iwallet.NewAddress("bitcoincash:qplatform", coinType),
 		iwallet.NewAmount(10),
+		false,
 	)
 	require.NoError(t, err)
 	require.Equal(t, "85", release.GetToAmount())
@@ -273,6 +274,7 @@ func TestBuildEscrowRelease_UsesSettlementActionSigner(t *testing.T) {
 		iwallet.NewAmount(0),
 		iwallet.NewAddress("0x7777777777777777777777777777777777777777", coinType),
 		iwallet.NewAmount("10000000000000000"),
+		false,
 	)
 	if err != nil {
 		t.Fatalf("buildEscrowRelease: %v", err)
@@ -316,6 +318,7 @@ func TestBuildEscrowRelease_ManagedSolanaDoesNotRequireWallet(t *testing.T) {
 		order, nil,
 		iwallet.NewAddress("solana-seller", coinType), iwallet.NewAmount(0),
 		iwallet.NewAddress("solana-platform", coinType), iwallet.NewAmount(100),
+		false,
 	)
 	require.NoError(t, err)
 	require.Equal(t, "900", release.GetToAmount())

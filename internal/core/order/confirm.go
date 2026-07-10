@@ -369,7 +369,7 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 
 		release, err := s.buildEscrowRelease(&order, wallet, paymentAddr, fee,
 			iwallet.NewAddress(paymentSent.PlatformAddr, coinType),
-			iwallet.NewAmount(paymentSent.PlatformAmount))
+			iwallet.NewAmount(paymentSent.PlatformAmount), true)
 		if err != nil {
 			return err
 		}

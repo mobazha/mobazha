@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/orders"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -58,6 +61,54 @@ func (s *OrderAppService) ReconcileSellerAffiliateOrder(ctx context.Context, ord
 		return models.ErrSellerAffiliateConflict
 	}
 	return s.reconcileSellerAffiliateCommissionStatus(ctx, &orderRecord)
+}
+
+// sellerAffiliateSettlementPayout returns the one payout line that Core has
+// already attributed to an order. Legacy links without a frozen EVM destination
+// remain ledger-only so deployment cannot strand their historical orders.
+func (s *OrderAppService) sellerAffiliateSettlementPayout(ctx context.Context, orderID models.OrderID, coinType iwallet.CoinType) (*payment.AffiliatePayout, error) {
+	if s == nil || s.sellerAffiliate == nil {
+		return nil, nil
+	}
+	attribution, err := s.sellerAffiliate.GetAttributionByOrder(ctx, orderID.String())
+	if errors.Is(err, models.ErrSellerAffiliateNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if attribution == nil || strings.TrimSpace(attribution.PromoterPayoutAddress) == "" {
+		return nil, nil
+	}
+	if !common.IsHexAddress(attribution.PromoterPayoutAddress) || common.HexToAddress(attribution.PromoterPayoutAddress) == (common.Address{}) {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	lines, err := s.sellerAffiliate.ListCommissionLinesByOrder(ctx, orderID.String())
+	if err != nil {
+		return nil, err
+	}
+	amount := new(big.Int)
+	for _, line := range lines {
+		if line.Status == models.AffiliateCommissionStatusReversed {
+			continue
+		}
+		if line.Status != models.AffiliateCommissionStatusPending && line.Status != models.AffiliateCommissionStatusEarned ||
+			!strings.EqualFold(strings.TrimSpace(line.Currency), string(coinType)) {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		lineAmount, ok := new(big.Int).SetString(line.CommissionAtomic, 10)
+		if !ok || lineAmount.Sign() < 0 {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		amount.Add(amount, lineAmount)
+	}
+	if amount.Sign() == 0 {
+		return nil, nil
+	}
+	return &payment.AffiliatePayout{
+		Address: common.HexToAddress(attribution.PromoterPayoutAddress).Hex(),
+		Amount:  amount.String(),
+	}, nil
 }
 
 func (s *OrderAppService) sellerAffiliateOrderFacts(orderID models.OrderID, orderOpen *pb.OrderOpen, referralSessionID string) (models.AffiliateOrderFacts, error) {

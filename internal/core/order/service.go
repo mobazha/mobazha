@@ -1669,7 +1669,7 @@ func (s *OrderAppService) prepareRefundMessage(ctx context.Context, order *model
 			release, err := s.buildEscrowRelease(order, wallet,
 				iwallet.NewAddress(payoutAddr, coinType),
 				escrowReleaseFee,
-				iwallet.Address{}, iwallet.Amount{})
+				iwallet.Address{}, iwallet.Amount{}, false)
 			if err != nil {
 				_ = wdbTx.Rollback()
 				return nil, fmt.Errorf("failed to build escrow release: %w", err)
@@ -1978,7 +1978,7 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 	}, nil
 }
 
-func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet.Wallet, to iwallet.Address, escrowReleaseFee iwallet.Amount, platformAddr iwallet.Address, platformAmt iwallet.Amount) (*pb.EscrowRelease, error) {
+func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet.Wallet, to iwallet.Address, escrowReleaseFee iwallet.Amount, platformAddr iwallet.Address, platformAmt iwallet.Amount, includeAffiliate bool) (*pb.EscrowRelease, error) {
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		return nil, err
@@ -2044,14 +2044,22 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		})
 	}
 
+	var affiliatePayout *payment.AffiliatePayout
+	if includeAffiliate {
+		affiliatePayout, err = s.sellerAffiliateSettlementPayout(context.Background(), order.ID, coinType)
+		if err != nil {
+			return nil, fmt.Errorf("resolve affiliate settlement payout: %w", err)
+		}
+	}
 	if settlementSigs, handled, err := s.signSettlementActionRelease(context.Background(), coinType, "complete", payment.ActionParams{
-		OrderID:       order.ID.String(),
-		PaymentCoin:   string(coinType),
-		PaymentAmount: paymentSent.Amount,
-		Chaincode:     paymentSent.Chaincode,
-		Script:        paymentSent.Script,
-		OrderData:     order,
-		ReleaseInfo:   release,
+		OrderID:         order.ID.String(),
+		PaymentCoin:     string(coinType),
+		PaymentAmount:   paymentSent.Amount,
+		Chaincode:       paymentSent.Chaincode,
+		Script:          paymentSent.Script,
+		OrderData:       order,
+		ReleaseInfo:     release,
+		AffiliatePayout: affiliatePayout,
 	}); handled {
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign settlement complete action: %w", err)

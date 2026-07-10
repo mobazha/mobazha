@@ -205,6 +205,44 @@ func (s *GormSellerAffiliateStore) ListAffiliateCommissionLinesByOrder(_ context
 	return lines, nil
 }
 
+// ListAffiliateStatementLines returns line-level statement projections without
+// copying commission amounts into a second persistent aggregate.
+func (s *GormSellerAffiliateStore) ListAffiliateStatementLines(_ context.Context, promoterPeerID string) ([]models.AffiliateStatementLine, error) {
+	attributions := make([]models.AffiliateAttribution, 0)
+	lines := make([]models.AffiliateCommissionLine, 0)
+	err := s.db.View(func(tx pkgdb.Tx) error {
+		query := tx.Read().Order("attributed_at DESC, id ASC")
+		if promoterPeerID != "" {
+			query = query.Where("promoter_peer_id = ?", promoterPeerID)
+		}
+		if err := query.Find(&attributions).Error; err != nil || len(attributions) == 0 {
+			return err
+		}
+		attributionIDs := make([]string, 0, len(attributions))
+		for _, attribution := range attributions {
+			attributionIDs = append(attributionIDs, attribution.ID)
+		}
+		return tx.Read().Where("attribution_id IN ?", attributionIDs).
+			Order("created_at DESC, order_line_id ASC").Find(&lines).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	attributionByID := make(map[string]models.AffiliateAttribution, len(attributions))
+	for _, attribution := range attributions {
+		attributionByID[attribution.ID] = attribution
+	}
+	statement := make([]models.AffiliateStatementLine, 0, len(lines))
+	for _, line := range lines {
+		attribution, ok := attributionByID[line.AttributionID]
+		if !ok {
+			continue
+		}
+		statement = append(statement, models.AffiliateStatementLine{Attribution: attribution, CommissionLine: line})
+	}
+	return statement, nil
+}
+
 // ListPendingAffiliateCommissionOrderIDs returns distinct tenant-local pending orders.
 func (s *GormSellerAffiliateStore) ListPendingAffiliateCommissionOrderIDs(_ context.Context) ([]string, error) {
 	var orderIDs []string

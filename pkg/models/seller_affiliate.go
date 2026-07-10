@@ -232,6 +232,13 @@ type AffiliateOrderResult struct {
 	Lines       []AffiliateCommissionLine
 }
 
+// AffiliateStatementLine is a read-only projection of one immutable
+// attribution and one commission line. It is not persisted separately.
+type AffiliateStatementLine struct {
+	Attribution    AffiliateAttribution    `json:"attribution"`
+	CommissionLine AffiliateCommissionLine `json:"commissionLine"`
+}
+
 var (
 	// ErrInvalidSellerAffiliate indicates malformed or inconsistent affiliate facts.
 	ErrInvalidSellerAffiliate = errors.New("invalid seller affiliate data")

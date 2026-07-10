@@ -59,6 +59,12 @@ func (s *recordingSellerAffiliateService) GetAttributionByOrder(context.Context,
 func (*recordingSellerAffiliateService) ListCommissionLinesByOrder(context.Context, string) ([]models.AffiliateCommissionLine, error) {
 	return nil, nil
 }
+func (*recordingSellerAffiliateService) ListSellerStatement(context.Context) ([]models.AffiliateStatementLine, error) {
+	return nil, nil
+}
+func (*recordingSellerAffiliateService) ListPromoterStatement(context.Context, string) ([]models.AffiliateStatementLine, error) {
+	return nil, nil
+}
 func (*recordingSellerAffiliateService) ListPendingCommissionOrderIDs(context.Context) ([]string, error) {
 	return nil, nil
 }

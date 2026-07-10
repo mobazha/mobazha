@@ -249,6 +249,26 @@ func (s *SellerAffiliateAppService) ListCommissionLinesByOrder(ctx context.Conte
 	return s.store.ListAffiliateCommissionLinesByOrder(ctx, strings.TrimSpace(orderID))
 }
 
+// ListSellerStatement returns the tenant seller's complete line-level statement.
+func (s *SellerAffiliateAppService) ListSellerStatement(ctx context.Context) ([]models.AffiliateStatementLine, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	return s.store.ListAffiliateStatementLines(ctx, "")
+}
+
+// ListPromoterStatement returns only lines attributed to one promoter PeerID.
+func (s *SellerAffiliateAppService) ListPromoterStatement(ctx context.Context, promoterPeerID string) ([]models.AffiliateStatementLine, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	promoterPeerID = strings.TrimSpace(promoterPeerID)
+	if promoterPeerID == "" {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	return s.store.ListAffiliateStatementLines(ctx, promoterPeerID)
+}
+
 // ListPendingCommissionOrderIDs returns orders waiting on existing protection facts.
 func (s *SellerAffiliateAppService) ListPendingCommissionOrderIDs(ctx context.Context) ([]string, error) {
 	if s == nil || s.store == nil {

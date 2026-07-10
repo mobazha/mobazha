@@ -19,6 +19,7 @@ type SellerAffiliateStore interface {
 	RecordAffiliateOrder(ctx context.Context, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error)
 	GetAffiliateAttributionByOrder(ctx context.Context, orderID string) (*models.AffiliateAttribution, error)
 	ListAffiliateCommissionLinesByOrder(ctx context.Context, orderID string) ([]models.AffiliateCommissionLine, error)
+	ListAffiliateStatementLines(ctx context.Context, promoterPeerID string) ([]models.AffiliateStatementLine, error)
 	ListPendingAffiliateCommissionOrderIDs(ctx context.Context) ([]string, error)
 	TransitionAffiliateCommission(ctx context.Context, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 }
@@ -34,6 +35,8 @@ type SellerAffiliateService interface {
 	TransitionCommission(ctx context.Context, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 	GetAttributionByOrder(ctx context.Context, orderID string) (*models.AffiliateAttribution, error)
 	ListCommissionLinesByOrder(ctx context.Context, orderID string) ([]models.AffiliateCommissionLine, error)
+	ListSellerStatement(ctx context.Context) ([]models.AffiliateStatementLine, error)
+	ListPromoterStatement(ctx context.Context, promoterPeerID string) ([]models.AffiliateStatementLine, error)
 	ListPendingCommissionOrderIDs(ctx context.Context) ([]string, error)
 }
 

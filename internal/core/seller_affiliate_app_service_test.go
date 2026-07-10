@@ -81,27 +81,12 @@ func TestSellerAffiliateAppService_AutomatesMinimalCommissionLifecycle(t *testin
 	require.NoError(t, err)
 	assert.Equal(t, result.Attribution.ID, replay.Attribution.ID)
 
-	earnedAt := facts.AttributedAt.Add(24 * time.Hour)
-	earned, err := service.TransitionCommission(ctx, facts.OrderID, models.AffiliateCommissionStatusEarned, "", earnedAt)
-	require.NoError(t, err)
-	require.Len(t, earned, 2)
-	assert.Equal(t, models.AffiliateCommissionStatusEarned, earned[0].Status)
-	pendingOrderIDs, err = service.ListPendingCommissionOrderIDs(ctx)
-	require.NoError(t, err)
-	assert.Empty(t, pendingOrderIDs)
-
-	earnedReplay, err := service.TransitionCommission(ctx, facts.OrderID, models.AffiliateCommissionStatusEarned, "", earnedAt.Add(time.Hour))
-	require.NoError(t, err)
-	assert.Equal(t, earned[0].UpdatedAt, earnedReplay[0].UpdatedAt)
-
-	reversedAt := earnedAt.Add(time.Hour)
+	reversedAt := facts.AttributedAt.Add(24 * time.Hour)
 	reversed, err := service.TransitionCommission(ctx, facts.OrderID, models.AffiliateCommissionStatusReversed, models.AffiliateReversalRefund, reversedAt)
 	require.NoError(t, err)
 	assert.Equal(t, models.AffiliateCommissionStatusReversed, reversed[0].Status)
 	assert.Equal(t, models.AffiliateReversalRefund, reversed[0].ReversalReason)
 
-	_, err = service.TransitionCommission(ctx, facts.OrderID, models.AffiliateCommissionStatusEarned, "", reversedAt.Add(time.Hour))
-	require.ErrorIs(t, err, coredatabase.ErrSellerAffiliateConflict)
 }
 
 func TestSellerAffiliateAppService_RejectsDeterministicSelfAttribution(t *testing.T) {

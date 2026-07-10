@@ -132,11 +132,6 @@ func (s *OrderAppService) reconcileSellerAffiliateCommissionStatus(ctx context.C
 		_, err := s.sellerAffiliate.TransitionCommission(ctx, order.ID.String(), models.AffiliateCommissionStatusReversed, models.AffiliateReversalChargeback, time.Now().UTC())
 		return err
 	}
-	protection := order.ComputeProtection(time.Now())
-	if protection != nil && protection.Stage == models.ProtectionStageCompleted {
-		_, err := s.sellerAffiliate.TransitionCommission(ctx, order.ID.String(), models.AffiliateCommissionStatusEarned, "", time.Now().UTC())
-		return err
-	}
 	return nil
 }
 

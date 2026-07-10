@@ -263,9 +263,7 @@ func (s *SellerAffiliateAppService) TransitionCommission(ctx context.Context, or
 	if s == nil || s.store == nil {
 		return nil, errors.New("seller affiliate store not configured")
 	}
-	if at.IsZero() || (status != models.AffiliateCommissionStatusEarned && status != models.AffiliateCommissionStatusReversed) ||
-		(status == models.AffiliateCommissionStatusEarned && reason != "") ||
-		(status == models.AffiliateCommissionStatusReversed && !reason.Valid()) {
+	if at.IsZero() || status != models.AffiliateCommissionStatusReversed || !reason.Valid() {
 		return nil, models.ErrInvalidSellerAffiliate
 	}
 	return s.store.TransitionAffiliateCommission(ctx, strings.TrimSpace(orderID), status, reason, at.UTC())
@@ -350,7 +348,7 @@ func (s *SellerAffiliateAppService) SettlementPayout(ctx context.Context, orderI
 		if line.Status == models.AffiliateCommissionStatusReversed {
 			continue
 		}
-		if (line.Status != models.AffiliateCommissionStatusPending && line.Status != models.AffiliateCommissionStatusEarned) ||
+		if line.Status != models.AffiliateCommissionStatusPending ||
 			!strings.EqualFold(strings.TrimSpace(line.Currency), settlementCoin) {
 			return nil, models.ErrInvalidSellerAffiliate
 		}

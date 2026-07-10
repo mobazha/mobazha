@@ -293,13 +293,8 @@ func (s *GormSellerAffiliateStore) TransitionAffiliateCommission(_ context.Conte
 				continue
 			}
 			switch status {
-			case models.AffiliateCommissionStatusEarned:
-				if line.Status != models.AffiliateCommissionStatusPending {
-					return ErrSellerAffiliateConflict
-				}
-				line.Status = status
 			case models.AffiliateCommissionStatusReversed:
-				if line.Status != models.AffiliateCommissionStatusPending && line.Status != models.AffiliateCommissionStatusEarned {
+				if line.Status != models.AffiliateCommissionStatusPending {
 					return ErrSellerAffiliateConflict
 				}
 				line.Status = status

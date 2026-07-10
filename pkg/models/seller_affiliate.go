@@ -102,7 +102,6 @@ type AffiliateCommissionStatus string
 
 const (
 	AffiliateCommissionStatusPending  AffiliateCommissionStatus = "pending"
-	AffiliateCommissionStatusEarned   AffiliateCommissionStatus = "earned"
 	AffiliateCommissionStatusReversed AffiliateCommissionStatus = "reversed"
 )
 
@@ -267,7 +266,7 @@ func (l *AffiliateCommissionLine) Validate() error {
 		return ErrInvalidSellerAffiliate
 	}
 	switch l.Status {
-	case AffiliateCommissionStatusPending, AffiliateCommissionStatusEarned:
+	case AffiliateCommissionStatusPending:
 		if l.ReversalReason != "" || l.ReversedAt != nil {
 			return ErrInvalidSellerAffiliate
 		}

@@ -128,13 +128,6 @@ func TestReconcileSellerAffiliateOrder_DerivesPendingCommissionFromSignedOrder(t
 	assert.Equal(t, buyerPeerID, affiliate.facts[0].BuyerPeerID)
 	assert.Empty(t, affiliate.status)
 
-	completedAt := time.Now().Add(-365 * 24 * time.Hour)
-	order.SetFSMState(models.OrderState_COMPLETED)
-	order.CompletedAt = &completedAt
-	require.NoError(t, service.db.Update(func(tx database.Tx) error { return tx.Save(order) }))
-	require.NoError(t, service.ReconcileSellerAffiliateOrder(context.Background(), orderID))
-	assert.Equal(t, models.AffiliateCommissionStatusEarned, affiliate.status)
-
 	order.SetFSMState(models.OrderState_REFUNDED)
 	require.NoError(t, service.db.Update(func(tx database.Tx) error { return tx.Save(order) }))
 	require.NoError(t, service.ReconcileSellerAffiliateOrder(context.Background(), orderID))

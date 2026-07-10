@@ -2050,6 +2050,10 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		if err != nil {
 			return nil, fmt.Errorf("resolve affiliate settlement payout: %w", err)
 		}
+		if affiliatePayout != nil {
+			release.AffiliateAddress = affiliatePayout.Address
+			release.AffiliateAmount = affiliatePayout.Amount
+		}
 	}
 	if settlementSigs, handled, err := s.signSettlementActionRelease(context.Background(), coinType, "complete", payment.ActionParams{
 		OrderID:         order.ID.String(),

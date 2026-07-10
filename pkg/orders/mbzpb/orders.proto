@@ -342,6 +342,10 @@ message EscrowRelease {
     string platformAmount               = 6;
     string transactionFee               = 7;
     string txid                         = 8;
+    // Seller-signed affiliate split for backend-managed Safe settlement.
+    // Amount uses the same minimal unit as toAmount and is deducted from it.
+    string affiliateAddress             = 9;
+    string affiliateAmount              = 10;
 }
 
 message Signature {

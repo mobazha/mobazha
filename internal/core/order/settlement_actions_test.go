@@ -293,6 +293,40 @@ func TestBuildEscrowRelease_UsesSettlementActionSigner(t *testing.T) {
 	}
 }
 
+func TestBuildEscrowRelease_EmbedsSellerSignedAffiliateTerms(t *testing.T) {
+	t.Parallel()
+
+	coinType := iwallet.CoinType("crypto:eip155:1:native")
+	strategy := &fakeManagedStrategy{
+		model: payment.PaymentModelMonitored,
+		signatures: []payment.ActionOwnerSignature{{
+			From: "0x1111111111111111111111111111111111111111", Signature: []byte{0xaa}, Index: 1,
+		}},
+	}
+	registry := payment.NewRegistry()
+	registry.RegisterV2(iwallet.ChainEthereum, strategy)
+	affiliate := &recordingSellerAffiliateService{payout: &models.AffiliateSettlementPayout{
+		Address: "0x8888888888888888888888888888888888888888",
+		Amount:  "125",
+	}}
+	svc := &OrderAppService{paymentRegistry: registry, sellerAffiliate: affiliate}
+	order, _ := newManagedEscrowOrderForTests(t, coinType)
+
+	release, err := svc.buildEscrowRelease(
+		order,
+		nil,
+		iwallet.NewAddress("0x2222222222222222222222222222222222222222", coinType),
+		iwallet.NewAmount(0),
+		iwallet.NewAddress("0x7777777777777777777777777777777777777777", coinType),
+		iwallet.NewAmount(0),
+		true,
+	)
+	require.NoError(t, err)
+	require.Equal(t, affiliate.payout.Address, release.GetAffiliateAddress())
+	require.Equal(t, affiliate.payout.Amount, release.GetAffiliateAmount())
+	require.Equal(t, affiliate.payout, strategy.lastParams.AffiliatePayout)
+}
+
 func TestBuildEscrowRelease_ManagedSolanaDoesNotRequireWallet(t *testing.T) {
 	t.Parallel()
 

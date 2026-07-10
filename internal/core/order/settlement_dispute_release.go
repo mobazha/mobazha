@@ -122,15 +122,24 @@ func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
 	if release == nil {
 		return nil, nil, true, fmt.Errorf("settlement dispute release info is nil")
 	}
+	shipments, err := order.OrderShipmentMessages()
+	if err != nil && !models.IsMessageNotExistError(err) {
+		return nil, nil, true, fmt.Errorf("read seller-signed shipment release: %w", err)
+	}
+	affiliatePayout, err := affiliatePayoutFromDisputeRelease(shipments, release)
+	if err != nil {
+		return nil, nil, true, fmt.Errorf("read seller-signed dispute affiliate payout: %w", err)
+	}
 
 	result, err := strategy.DisputeRelease(ctx, payment.ActionParams{
-		OrderID:       order.ID.String(),
-		PaymentCoin:   string(coinType),
-		PaymentAmount: paymentSent.Amount,
-		Chaincode:     paymentSent.Chaincode,
-		Script:        paymentSent.Script,
-		OrderData:     order,
-		ReleaseInfo:   release,
+		OrderID:         order.ID.String(),
+		PaymentCoin:     string(coinType),
+		PaymentAmount:   paymentSent.Amount,
+		Chaincode:       paymentSent.Chaincode,
+		Script:          paymentSent.Script,
+		OrderData:       order,
+		ReleaseInfo:     release,
+		AffiliatePayout: affiliatePayout,
 	})
 	if err != nil {
 		return nil, nil, true, err

@@ -668,15 +668,20 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	if err != nil {
 		return fmt.Errorf("failed to materialize dispute order data for settlement signing: %w", err)
 	}
+	affiliatePayout, err := affiliatePayoutFromDisputeRelease(preferredContract.GetOrderShipments(), &moderatedEscrowRelease)
+	if err != nil {
+		return fmt.Errorf("read seller-signed dispute affiliate payout: %w", err)
+	}
 
 	if settlementSigs, handled, err := s.signSettlementActionRelease(context.Background(), coinType, "dispute_release", payment.ActionParams{
-		OrderID:       orderID.String(),
-		PaymentCoin:   string(coinType),
-		PaymentAmount: paymentSent.Amount,
-		Chaincode:     paymentSent.Chaincode,
-		Script:        paymentSent.Script,
-		OrderData:     orderData,
-		ReleaseInfo:   &moderatedEscrowRelease,
+		OrderID:         orderID.String(),
+		PaymentCoin:     string(coinType),
+		PaymentAmount:   paymentSent.Amount,
+		Chaincode:       paymentSent.Chaincode,
+		Script:          paymentSent.Script,
+		OrderData:       orderData,
+		ReleaseInfo:     &moderatedEscrowRelease,
+		AffiliatePayout: affiliatePayout,
 	}); handled {
 		if err != nil {
 			return fmt.Errorf("failed to sign settlement dispute release action: %w", err)

@@ -31,6 +31,9 @@ func (*recordingSellerAffiliateService) GetProgram(context.Context) (*models.Aff
 func (*recordingSellerAffiliateService) CreateLink(context.Context, string, string) (*models.AffiliateLink, error) {
 	return nil, nil
 }
+func (*recordingSellerAffiliateService) CreateLinkWithPayoutDestination(context.Context, string, string, string) (*models.AffiliateLink, error) {
+	return nil, nil
+}
 func (*recordingSellerAffiliateService) GetLinkByToken(context.Context, string) (*models.AffiliateLink, error) {
 	return nil, nil
 }

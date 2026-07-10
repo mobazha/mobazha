@@ -133,6 +133,51 @@ func TestSellerAffiliateAppService_RejectsDeterministicSelfAttribution(t *testin
 	require.ErrorIs(t, err, coredatabase.ErrSellerAffiliateNotFound)
 }
 
+func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssue(t *testing.T) {
+	base, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	defer base.Close()
+	require.NoError(t, coredatabase.MigrateSellerAffiliateModels(base))
+
+	service := NewSellerAffiliateAppService(coredatabase.NewGormSellerAffiliateStore(base))
+	ctx := context.Background()
+	sellerPeerID := affiliateTestPeerID(t)
+	promoterPeerID := affiliateTestPeerID(t)
+	buyerPeerID := affiliateTestPeerID(t)
+	program, err := service.PutProgram(ctx, &models.AffiliateProgram{
+		SellerPeerID: sellerPeerID, Status: models.AffiliateProgramStatusActive,
+		CommissionRateBPS: 1250, AttributionWindowSeconds: 3600,
+	})
+	require.NoError(t, err)
+	payoutAddress := "0x1111111111111111111111111111111111111111"
+	link, err := service.CreateLinkWithPayoutDestination(ctx, promoterPeerID, "affiliate-token-frozen-payout", payoutAddress)
+	require.NoError(t, err)
+	assert.Equal(t, payoutAddress, link.PromoterPayoutAddress)
+
+	issuedAt := time.Now().UTC().Add(-time.Minute)
+	session, err := service.CreateReferralSession(ctx, link.PublicToken, issuedAt)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(1250), session.CommissionRateBPSSnapshot)
+	assert.Equal(t, payoutAddress, session.PromoterPayoutAddress)
+
+	program.CommissionRateBPS = 5000
+	_, err = service.PutProgram(ctx, program)
+	require.NoError(t, err)
+	result, err := service.AttributeOrder(ctx, models.AffiliateOrderFacts{
+		OrderID: "order-frozen-payout", SellerPeerID: sellerPeerID, BuyerPeerID: buyerPeerID,
+		ReferralSessionID: session.ID, AttributedAt: issuedAt.Add(time.Minute),
+		Lines: []models.AffiliateOrderLineFact{{OrderLineID: "order-frozen-payout:0", NetMerchandiseAtomic: "1000", Currency: "USDT"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, uint32(1250), result.Attribution.CommissionRateBPSSnapshot)
+	assert.Equal(t, payoutAddress, result.Attribution.PromoterPayoutAddress)
+	assert.Equal(t, "125", result.Lines[0].CommissionAtomic)
+
+	_, err = service.CreateLinkWithPayoutDestination(ctx, promoterPeerID, "ignored-token", "0x2222222222222222222222222222222222222222")
+	require.ErrorIs(t, err, models.ErrSellerAffiliateConflict)
+}
+
 func TestGormSellerAffiliateStore_IsTenantScoped(t *testing.T) {
 	base, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)

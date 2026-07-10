@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -60,6 +61,20 @@ func (s *SellerAffiliateAppService) GetProgram(ctx context.Context) (*models.Aff
 
 // CreateLink creates the tenant's direct link for one promoter.
 func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeerID, publicToken string) (*models.AffiliateLink, error) {
+	return s.createLink(ctx, promoterPeerID, publicToken, "")
+}
+
+// CreateLinkWithPayoutDestination creates a link with the promoter's immutable
+// EVM settlement destination. Existing legacy links can be backfilled once.
+func (s *SellerAffiliateAppService) CreateLinkWithPayoutDestination(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error) {
+	payoutAddress, err := normalizeAffiliateEVMPayoutAddress(payoutAddress)
+	if err != nil {
+		return nil, err
+	}
+	return s.createLink(ctx, promoterPeerID, publicToken, payoutAddress)
+}
+
+func (s *SellerAffiliateAppService) createLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error) {
 	if s == nil || s.store == nil {
 		return nil, errors.New("seller affiliate store not configured")
 	}
@@ -73,6 +88,16 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 	}
 	existing, err := s.store.GetAffiliateLinkByPromoter(ctx, program.ID, promoterPeerID)
 	if err == nil {
+		if payoutAddress == "" {
+			return existing, nil
+		}
+		if existing.PromoterPayoutAddress == "" {
+			return s.store.SetAffiliateLinkPayoutAddress(ctx, existing.ID, payoutAddress, time.Now().UTC())
+		}
+		existingAddress, normalizeErr := normalizeAffiliateEVMPayoutAddress(existing.PromoterPayoutAddress)
+		if normalizeErr != nil || existingAddress != payoutAddress {
+			return nil, models.ErrSellerAffiliateConflict
+		}
 		return existing, nil
 	}
 	if !errors.Is(err, models.ErrSellerAffiliateNotFound) {
@@ -80,13 +105,14 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 	}
 	now := time.Now().UTC()
 	link := &models.AffiliateLink{
-		ID:             uuid.NewString(),
-		ProgramID:      program.ID,
-		PromoterPeerID: promoterPeerID,
-		PublicToken:    strings.TrimSpace(publicToken),
-		Status:         models.AffiliateLinkStatusActive,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:                    uuid.NewString(),
+		ProgramID:             program.ID,
+		PromoterPeerID:        promoterPeerID,
+		PromoterPayoutAddress: payoutAddress,
+		PublicToken:           strings.TrimSpace(publicToken),
+		Status:                models.AffiliateLinkStatusActive,
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}
 	if err := link.Validate(); err != nil {
 		return nil, err
@@ -127,14 +153,16 @@ func (s *SellerAffiliateAppService) CreateReferralSession(ctx context.Context, p
 		return nil, models.ErrInvalidSellerAffiliate
 	}
 	session := &models.AffiliateReferralSession{
-		ID:              uuid.NewString(),
-		AffiliateLinkID: link.ID,
-		ProgramID:       program.ID,
-		SellerPeerID:    program.SellerPeerID,
-		PromoterPeerID:  link.PromoterPeerID,
-		IssuedAt:        issuedAt,
-		ExpiresAt:       issuedAt.Add(time.Duration(program.AttributionWindowSeconds) * time.Second),
-		CreatedAt:       issuedAt,
+		ID:                        uuid.NewString(),
+		AffiliateLinkID:           link.ID,
+		ProgramID:                 program.ID,
+		SellerPeerID:              program.SellerPeerID,
+		PromoterPeerID:            link.PromoterPeerID,
+		CommissionRateBPSSnapshot: program.CommissionRateBPS,
+		PromoterPayoutAddress:     link.PromoterPayoutAddress,
+		IssuedAt:                  issuedAt,
+		ExpiresAt:                 issuedAt.Add(time.Duration(program.AttributionWindowSeconds) * time.Second),
+		CreatedAt:                 issuedAt,
 	}
 	if err := session.Validate(); err != nil {
 		return nil, err
@@ -185,11 +213,12 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 			ID:                        attributionID,
 			OrderID:                   facts.OrderID,
 			ReferralSessionID:         session.ID,
-			ProgramID:                 program.ID,
+			ProgramID:                 session.ProgramID,
 			SellerPeerID:              facts.SellerPeerID,
 			BuyerPeerID:               facts.BuyerPeerID,
 			PromoterPeerID:            session.PromoterPeerID,
-			CommissionRateBPSSnapshot: program.CommissionRateBPS,
+			CommissionRateBPSSnapshot: session.CommissionRateBPSSnapshot,
+			PromoterPayoutAddress:     session.PromoterPayoutAddress,
 			AttributedAt:              facts.AttributedAt,
 		},
 		Lines: make([]models.AffiliateCommissionLine, 0, len(facts.Lines)),
@@ -204,7 +233,7 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 			return nil, models.ErrInvalidSellerAffiliate
 		}
 		seenLines[fact.OrderLineID] = struct{}{}
-		commissionAtomic, err := affiliateCommissionAtomic(fact.NetMerchandiseAtomic, program.CommissionRateBPS)
+		commissionAtomic, err := affiliateCommissionAtomic(fact.NetMerchandiseAtomic, session.CommissionRateBPSSnapshot)
 		if err != nil {
 			return nil, err
 		}
@@ -214,7 +243,7 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 			OrderLineID:               fact.OrderLineID,
 			NetMerchandiseAtomic:      fact.NetMerchandiseAtomic,
 			Currency:                  strings.TrimSpace(fact.Currency),
-			CommissionRateBPSSnapshot: program.CommissionRateBPS,
+			CommissionRateBPSSnapshot: session.CommissionRateBPSSnapshot,
 			CommissionAtomic:          commissionAtomic,
 			Status:                    models.AffiliateCommissionStatusPending,
 			CreatedAt:                 facts.AttributedAt,
@@ -226,6 +255,14 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 		result.Lines = append(result.Lines, line)
 	}
 	return s.store.RecordAffiliateOrder(ctx, result)
+}
+
+func normalizeAffiliateEVMPayoutAddress(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if !common.IsHexAddress(value) || common.HexToAddress(value) == (common.Address{}) {
+		return "", models.ErrInvalidSellerAffiliate
+	}
+	return common.HexToAddress(value).Hex(), nil
 }
 
 // TransitionCommission advances all order lines using an objective order fact.

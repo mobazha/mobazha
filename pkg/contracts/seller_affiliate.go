@@ -12,6 +12,7 @@ type SellerAffiliateStore interface {
 	PutAffiliateProgram(ctx context.Context, program *models.AffiliateProgram) error
 	GetAffiliateProgram(ctx context.Context) (*models.AffiliateProgram, error)
 	CreateAffiliateLink(ctx context.Context, link *models.AffiliateLink) error
+	SetAffiliateLinkPayoutAddress(ctx context.Context, linkID, payoutAddress string, updatedAt time.Time) (*models.AffiliateLink, error)
 	GetAffiliateLink(ctx context.Context, id string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByPromoter(ctx context.Context, programID, promoterPeerID string) (*models.AffiliateLink, error)
@@ -30,6 +31,7 @@ type SellerAffiliateService interface {
 	PutProgram(ctx context.Context, program *models.AffiliateProgram) (*models.AffiliateProgram, error)
 	GetProgram(ctx context.Context) (*models.AffiliateProgram, error)
 	CreateLink(ctx context.Context, promoterPeerID, publicToken string) (*models.AffiliateLink, error)
+	CreateLinkWithPayoutDestination(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error)
 	GetLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
 	CreateReferralSession(ctx context.Context, publicToken string, issuedAt time.Time) (*models.AffiliateReferralSession, error)
 	AttributeOrder(ctx context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error)

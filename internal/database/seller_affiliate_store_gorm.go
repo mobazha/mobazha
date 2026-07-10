@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -32,7 +33,7 @@ func NewGormSellerAffiliateStore(db pkgdb.Database) *GormSellerAffiliateStore {
 	return &GormSellerAffiliateStore{db: db}
 }
 
-// MigrateSellerAffiliateModels creates only the Phase 1 affiliate tables.
+// MigrateSellerAffiliateModels creates affiliate tables and payout snapshot columns.
 func MigrateSellerAffiliateModels(db pkgdb.Database) error {
 	return db.Update(func(tx pkgdb.Tx) error {
 		for _, model := range []interface{}{
@@ -89,6 +90,42 @@ func (s *GormSellerAffiliateStore) CreateAffiliateLink(_ context.Context, link *
 		return err
 	}
 	return s.db.Update(func(tx pkgdb.Tx) error { return tx.Create(link) })
+}
+
+// SetAffiliateLinkPayoutAddress sets a legacy link's EVM destination exactly once.
+func (s *GormSellerAffiliateStore) SetAffiliateLinkPayoutAddress(_ context.Context, linkID, payoutAddress string, updatedAt time.Time) (*models.AffiliateLink, error) {
+	if s == nil || s.db == nil || strings.TrimSpace(linkID) == "" || strings.TrimSpace(payoutAddress) == "" || updatedAt.IsZero() {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	var updated models.AffiliateLink
+	err := s.db.Update(func(tx pkgdb.Tx) error {
+		var existing models.AffiliateLink
+		if err := tx.Read().Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", linkID).First(&existing).Error; err != nil {
+			return err
+		}
+		if existing.PromoterPayoutAddress != "" && existing.PromoterPayoutAddress != payoutAddress {
+			return ErrSellerAffiliateConflict
+		}
+		if existing.PromoterPayoutAddress == "" {
+			existing.PromoterPayoutAddress = payoutAddress
+			existing.UpdatedAt = updatedAt.UTC()
+			if err := existing.Validate(); err != nil {
+				return err
+			}
+			if err := tx.Save(&existing); err != nil {
+				return err
+			}
+		}
+		updated = existing
+		return nil
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrSellerAffiliateNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }
 
 // GetAffiliateLink returns one tenant-local promoter link.
@@ -339,7 +376,8 @@ func sameAffiliateOrderSnapshot(existing models.AffiliateAttribution, storedLine
 	if existing.OrderID != requested.Attribution.OrderID || existing.ReferralSessionID != requested.Attribution.ReferralSessionID ||
 		existing.ProgramID != requested.Attribution.ProgramID || existing.SellerPeerID != requested.Attribution.SellerPeerID ||
 		existing.BuyerPeerID != requested.Attribution.BuyerPeerID || existing.PromoterPeerID != requested.Attribution.PromoterPeerID ||
-		existing.CommissionRateBPSSnapshot != requested.Attribution.CommissionRateBPSSnapshot || len(storedLines) != len(requested.Lines) {
+		existing.CommissionRateBPSSnapshot != requested.Attribution.CommissionRateBPSSnapshot ||
+		existing.PromoterPayoutAddress != requested.Attribution.PromoterPayoutAddress || len(storedLines) != len(requested.Lines) {
 		return false
 	}
 	requestedLines := append([]models.AffiliateCommissionLine(nil), requested.Lines...)

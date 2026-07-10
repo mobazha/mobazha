@@ -527,6 +527,20 @@ func (s *OrderAppService) executeUTXOSyncModeratedCompleteRelease(order *models.
 			Amount:  iwallet.NewAmount(releaseInfo.PlatformAmount),
 		})
 	}
+	if releaseInfo.AffiliateAddress != "" || releaseInfo.AffiliateAmount != "" {
+		affiliatePayout, err := affiliateUTXOPayoutFromEscrowRelease(releaseInfo)
+		if err != nil {
+			return nil, nil, fmt.Errorf("read seller-signed affiliate UTXO payout: %w", err)
+		}
+		if affiliatePayout != nil {
+			available := iwallet.NewAmount(releaseInfo.ToAmount).Add(iwallet.NewAmount(affiliatePayout.Amount))
+			spend, err := affiliateUTXOSpend(wallet, coinType, affiliatePayout, available)
+			if err != nil {
+				return nil, nil, err
+			}
+			txn.To = append(txn.To, spend)
+		}
+	}
 
 	for _, outpoint := range releaseInfo.Outpoints {
 		txn.From = append(txn.From, iwallet.SpendInfo{
@@ -561,12 +575,14 @@ func (s *OrderAppService) executeUTXOSyncModeratedCompleteRelease(order *models.
 	}
 
 	release := &pb.EscrowRelease{
-		ToAddress:       releaseInfo.ToAddress,
-		ToAmount:        releaseInfo.ToAmount,
-		PlatformAddress: releaseInfo.PlatformAddress,
-		PlatformAmount:  releaseInfo.PlatformAmount,
-		TransactionFee:  releaseInfo.TransactionFee,
-		Outpoints:       releaseInfo.Outpoints,
+		ToAddress:        releaseInfo.ToAddress,
+		ToAmount:         releaseInfo.ToAmount,
+		PlatformAddress:  releaseInfo.PlatformAddress,
+		PlatformAmount:   releaseInfo.PlatformAmount,
+		TransactionFee:   releaseInfo.TransactionFee,
+		Outpoints:        releaseInfo.Outpoints,
+		AffiliateAddress: releaseInfo.AffiliateAddress,
+		AffiliateAmount:  releaseInfo.AffiliateAmount,
 	}
 
 	for _, sig := range buyerSigs {

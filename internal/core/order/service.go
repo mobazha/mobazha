@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -1910,6 +1911,7 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 	}
 
 	var toAddress iwallet.Address
+	var affiliatePayout *models.AffiliateSettlementPayout
 	finishType := iwallet.ORDER_FINISH_CANCEL
 	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
@@ -1918,6 +1920,10 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 
 	if order.Role() == models.RoleVendor {
 		finishType = iwallet.ORDER_FINISH_COMPLETE
+		affiliatePayout, err = s.sellerAffiliateSettlementPayout(context.Background(), order.ID, coinType)
+		if err != nil {
+			return nil, fmt.Errorf("resolve affiliate settlement payout: %w", err)
+		}
 
 		if len(optionalPayoutAddress) > 0 && optionalPayoutAddress[0] != "" {
 			toAddress = iwallet.NewAddress(optionalPayoutAddress[0], coinType)
@@ -1958,12 +1964,13 @@ func (s *OrderAppService) ReleaseFromCancelableAddress(order *models.Order, opti
 	}
 
 	params := ReleaseFromCancelableParams{
-		CoinCode:       string(coinType),
-		PaymentAddress: paymentSent.ToAddress,
-		ScriptHex:      paymentSent.Script,
-		ChaincodeHex:   paymentSent.Chaincode,
-		ToAddress:      toAddress,
-		FinishType:     finishType,
+		CoinCode:        string(coinType),
+		PaymentAddress:  paymentSent.ToAddress,
+		ScriptHex:       paymentSent.Script,
+		ChaincodeHex:    paymentSent.Chaincode,
+		ToAddress:       toAddress,
+		AffiliatePayout: affiliatePayout,
+		FinishType:      finishType,
 	}
 
 	wTx, tx, err := s.escrow.ReleaseFromCancelableAddressWithParams(order, params)
@@ -1998,6 +2005,13 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		return nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 	usesBalanceEscrow := releaseUsesBalanceEscrow(order, paymentSent, strategyV2)
+	var affiliatePayout *models.AffiliateSettlementPayout
+	if includeAffiliate {
+		affiliatePayout, err = s.sellerAffiliateSettlementPayout(context.Background(), order.ID, coinType)
+		if err != nil {
+			return nil, fmt.Errorf("resolve affiliate settlement payout: %w", err)
+		}
+	}
 
 	if usesBalanceEscrow {
 		totalOut = iwallet.NewAmount(paymentSent.Amount).Sub(platformAmt)
@@ -2018,6 +2032,16 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		}
 	}
 
+	var affiliateSpend *iwallet.SpendInfo
+	if affiliatePayout != nil && !usesBalanceEscrow {
+		spend, err := affiliateUTXOSpend(wallet, coinType, affiliatePayout, totalOut)
+		if err != nil {
+			return nil, err
+		}
+		totalOut = totalOut.Sub(spend.Amount)
+		affiliateSpend = &spend
+	}
+
 	txn.To = append(txn.To, iwallet.SpendInfo{
 		Address: to,
 		Amount:  totalOut,
@@ -2027,6 +2051,9 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 			Address: platformAddr,
 			Amount:  platformAmt,
 		})
+	}
+	if affiliateSpend != nil {
+		txn.To = append(txn.To, *affiliateSpend)
 	}
 
 	release := &pb.EscrowRelease{
@@ -2044,16 +2071,9 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		})
 	}
 
-	var affiliatePayout *models.AffiliateSettlementPayout
-	if includeAffiliate {
-		affiliatePayout, err = s.sellerAffiliateSettlementPayout(context.Background(), order.ID, coinType)
-		if err != nil {
-			return nil, fmt.Errorf("resolve affiliate settlement payout: %w", err)
-		}
-		if affiliatePayout != nil {
-			release.AffiliateAddress = affiliatePayout.Address
-			release.AffiliateAmount = affiliatePayout.Amount
-		}
+	if affiliatePayout != nil {
+		release.AffiliateAddress = affiliatePayout.Address
+		release.AffiliateAmount = affiliatePayout.Amount
 	}
 	if settlementSigs, handled, err := s.signSettlementActionRelease(context.Background(), coinType, "complete", payment.ActionParams{
 		OrderID:         order.ID.String(),
@@ -2109,6 +2129,32 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	}
 
 	return release, nil
+}
+
+type affiliateUTXODustChecker interface {
+	IsDust(iwallet.Address, iwallet.Amount) bool
+}
+
+func affiliateUTXOSpend(wallet iwallet.Wallet, coinType iwallet.CoinType, payout *models.AffiliateSettlementPayout, available iwallet.Amount) (iwallet.SpendInfo, error) {
+	if wallet == nil || payout == nil {
+		return iwallet.SpendInfo{}, fmt.Errorf("affiliate UTXO payout requires wallet and payout")
+	}
+	amount, ok := new(big.Int).SetString(strings.TrimSpace(payout.Amount), 10)
+	if !ok || amount.Sign() <= 0 {
+		return iwallet.SpendInfo{}, fmt.Errorf("affiliate UTXO payout amount is invalid")
+	}
+	spend := iwallet.SpendInfo{Address: iwallet.NewAddress(strings.TrimSpace(payout.Address), coinType), Amount: iwallet.NewAmount(amount)}
+	if err := wallet.ValidateAddress(spend.Address); err != nil {
+		return iwallet.SpendInfo{}, fmt.Errorf("validate affiliate UTXO payout address: %w", err)
+	}
+	if spend.Amount.Cmp(available) >= 0 {
+		return iwallet.SpendInfo{}, fmt.Errorf("affiliate UTXO payout exceeds seller release")
+	}
+	dustChecker, ok := wallet.(affiliateUTXODustChecker)
+	if !ok || dustChecker.IsDust(spend.Address, spend.Amount) {
+		return iwallet.SpendInfo{}, fmt.Errorf("affiliate UTXO payout is dust")
+	}
+	return spend, nil
 }
 
 // releaseUsesBalanceEscrow reports strategies whose release projection is

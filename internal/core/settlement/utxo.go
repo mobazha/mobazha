@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -49,7 +51,11 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 		return nil, nil, fmt.Errorf("UTXO chain verification failed: %w", err)
 	}
 
-	escrowFee, err := escrowWallet.EstimateEscrowFee(len(txn.From), 1, 1, iwallet.FlNormal)
+	nOuts := 1
+	if params.AffiliatePayout != nil {
+		nOuts++
+	}
+	escrowFee, err := escrowWallet.EstimateEscrowFee(len(txn.From), 1, nOuts, iwallet.FlNormal)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -58,10 +64,23 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 		return nil, nil, fmt.Errorf("insufficient funds: total input %s is less than or equal to fee %s", totalOut.String(), escrowFee.String())
 	}
 
+	sellerAmount := totalOut.Sub(escrowFee)
+	var affiliateSpend *iwallet.SpendInfo
+	if params.AffiliatePayout != nil {
+		spend, err := cancelableAffiliateUTXOSpend(wallet, iwallet.CoinType(params.CoinCode), params.AffiliatePayout, sellerAmount)
+		if err != nil {
+			return nil, nil, err
+		}
+		sellerAmount = sellerAmount.Sub(spend.Amount)
+		affiliateSpend = &spend
+	}
 	txn.To = append(txn.To, iwallet.SpendInfo{
 		Address: params.ToAddress,
-		Amount:  totalOut.Sub(escrowFee),
+		Amount:  sellerAmount,
 	})
+	if affiliateSpend != nil {
+		txn.To = append(txn.To, *affiliateSpend)
+	}
 
 	script, err := hex.DecodeString(params.ScriptHex)
 	if err != nil {
@@ -102,9 +121,32 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 	txn.Timestamp = time.Now()
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Released escrow funds: txid=%s, to=%s, amount=%s",
-		txid, params.ToAddress, totalOut.Sub(escrowFee).String())
+		txid, params.ToAddress, sellerAmount.String())
 
 	return dbTx, &txn, nil
+}
+
+type cancelableAffiliateUTXODustChecker interface {
+	IsDust(iwallet.Address, iwallet.Amount) bool
+}
+
+func cancelableAffiliateUTXOSpend(wallet iwallet.Wallet, coinType iwallet.CoinType, payout *models.AffiliateSettlementPayout, available iwallet.Amount) (iwallet.SpendInfo, error) {
+	amount, ok := new(big.Int).SetString(strings.TrimSpace(payout.Amount), 10)
+	if wallet == nil || !ok || amount.Sign() <= 0 {
+		return iwallet.SpendInfo{}, fmt.Errorf("affiliate UTXO payout amount is invalid")
+	}
+	spend := iwallet.SpendInfo{Address: iwallet.NewAddress(strings.TrimSpace(payout.Address), coinType), Amount: iwallet.NewAmount(amount)}
+	if err := wallet.ValidateAddress(spend.Address); err != nil {
+		return iwallet.SpendInfo{}, fmt.Errorf("validate affiliate UTXO payout address: %w", err)
+	}
+	if spend.Amount.Cmp(available) >= 0 {
+		return iwallet.SpendInfo{}, fmt.Errorf("affiliate UTXO payout exceeds seller release")
+	}
+	dustChecker, ok := wallet.(cancelableAffiliateUTXODustChecker)
+	if !ok || dustChecker.IsDust(spend.Address, spend.Amount) {
+		return iwallet.SpendInfo{}, fmt.Errorf("affiliate UTXO payout is dust")
+	}
+	return spend, nil
 }
 
 func (s *SettlementService) transactionsForCancelableRelease(

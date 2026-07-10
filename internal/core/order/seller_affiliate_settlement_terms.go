@@ -43,6 +43,29 @@ func affiliatePayoutFromEscrowRelease(release *pb.EscrowRelease) (*models.Affili
 	}, nil
 }
 
+// affiliateUTXOPayoutFromEscrowRelease returns the seller-signed native UTXO
+// payout leg. Unlike Safe, a UTXO release stores ToAmount after the affiliate
+// amount has already been deducted, so only the chain wallet can validate the
+// address format and dust threshold during transaction reconstruction.
+func affiliateUTXOPayoutFromEscrowRelease(release *pb.EscrowRelease) (*models.AffiliateSettlementPayout, error) {
+	if release == nil {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	address := strings.TrimSpace(release.GetAffiliateAddress())
+	amount := strings.TrimSpace(release.GetAffiliateAmount())
+	if address == "" && amount == "" {
+		return nil, nil
+	}
+	if address == "" || amount == "" {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	affiliateAmount, ok := new(big.Int).SetString(amount, 10)
+	if !ok || affiliateAmount.Sign() <= 0 {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	return &models.AffiliateSettlementPayout{Address: address, Amount: affiliateAmount.String()}, nil
+}
+
 // affiliatePayoutFromDisputeRelease preserves the seller-signed commission
 // ratio when a dispute pays the seller only partially. The integer division is
 // deliberate: any rounding remainder remains with the seller, and every party

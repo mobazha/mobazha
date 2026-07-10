@@ -361,6 +361,11 @@ func (s *OrderAppService) ShipOrder(orderID models.OrderID, shipments []models.S
 		if iwallet.NewAmount(paymentSent.PlatformAmount).Cmp(iwallet.NewAmount(0)) > 0 {
 			nOuts = 2
 		}
+		if affiliatePayout, payoutErr := s.sellerAffiliateSettlementPayout(context.Background(), order.ID, coinType); payoutErr != nil {
+			return fmt.Errorf("resolve affiliate settlement payout: %w", payoutErr)
+		} else if affiliatePayout != nil && !releaseUsesBalanceEscrow(&order, paymentSent, strategy) {
+			nOuts++
+		}
 		fee := iwallet.NewAmount(0)
 		fee, err = strategy.EstimateEscrowFee(string(coinType), countEscrowReleaseInputs(&order, paymentSent), nOuts, iwallet.FlNormal)
 		if err != nil {

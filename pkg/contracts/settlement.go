@@ -20,12 +20,13 @@ type EscrowOperations interface {
 
 // ReleaseFromCancelableParams holds parameters for releasing from a CANCELABLE escrow address.
 type ReleaseFromCancelableParams struct {
-	CoinCode       string
-	PaymentAddress string
-	ScriptHex      string
-	ChaincodeHex   string
-	ToAddress      iwallet.Address
-	FinishType     iwallet.OrderFinishType
+	CoinCode        string
+	PaymentAddress  string
+	ScriptHex       string
+	ChaincodeHex    string
+	ToAddress       iwallet.Address
+	AffiliatePayout *models.AffiliateSettlementPayout
+	FinishType      iwallet.OrderFinishType
 }
 
 // ReleaseResult holds the result of a CANCELABLE address release operation.

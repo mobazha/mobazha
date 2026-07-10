@@ -6,6 +6,7 @@ import (
 	"time"
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
@@ -53,9 +54,10 @@ func (w fundingBuildWallet) Begin() (iwallet.Tx, error) { return noopWalletTx{},
 func (w fundingBuildWallet) BlockchainInfo() (iwallet.BlockInfo, error) {
 	return iwallet.BlockInfo{}, nil
 }
-func (w fundingBuildWallet) CoinCategory() iwallet.CoinCategory    { return iwallet.CoinCategoryBitcoin }
-func (w fundingBuildWallet) IsTestnet() bool                       { return true }
-func (w fundingBuildWallet) ValidateAddress(iwallet.Address) error { return nil }
+func (w fundingBuildWallet) CoinCategory() iwallet.CoinCategory          { return iwallet.CoinCategoryBitcoin }
+func (w fundingBuildWallet) IsTestnet() bool                             { return true }
+func (w fundingBuildWallet) ValidateAddress(iwallet.Address) error       { return nil }
+func (w fundingBuildWallet) IsDust(iwallet.Address, iwallet.Amount) bool { return false }
 func (w fundingBuildWallet) GetTransaction(id iwallet.TransactionID, _ iwallet.CoinType) (*iwallet.Transaction, error) {
 	tx, ok := w.txs[id]
 	if !ok {
@@ -325,6 +327,37 @@ func TestBuildEscrowRelease_EmbedsSellerSignedAffiliateTerms(t *testing.T) {
 	require.Equal(t, affiliate.payout.Address, release.GetAffiliateAddress())
 	require.Equal(t, affiliate.payout.Amount, release.GetAffiliateAmount())
 	require.Equal(t, affiliate.payout, strategy.lastParams.AffiliatePayout)
+}
+
+func TestBuildEscrowRelease_AtomicallyAddsUTXOAffiliateOutput(t *testing.T) {
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBitcoinCash)
+	require.NoError(t, err)
+	registry := payment.NewRegistry()
+	registry.RegisterV2(iwallet.ChainBitcoinCash, &fakeManagedStrategy{model: payment.PaymentModelMonitored})
+	affiliate := &recordingSellerAffiliateService{payout: &models.AffiliateSettlementPayout{
+		Address: "bitcoincash:qaffiliate", Amount: "20",
+	}}
+	svc := &OrderAppService{paymentRegistry: registry, sellerAffiliate: affiliate}
+	order := &models.Order{ID: models.OrderID("utxo-affiliate-release")}
+	paymentAddress := "bitcoincash:qescrow"
+	txID := "utxo-affiliate-funding"
+	paymentSent := &pb.PaymentSent{
+		Coin: coinType.String(), ToAddress: paymentAddress, Amount: "100",
+		SettlementSpec: payment.NewUTXOSpec(false).ToPaymentSent(),
+		FundingFacts:   []*pb.PaymentSent_FundingFact{{Id: "funding-1", TxHash: txID, TxHashSource: models.PaymentTxHashSourceChainTx, ToAddress: paymentAddress, Amount: "100", Status: models.PaymentObservationStatusConfirmed}},
+	}
+	require.NoError(t, order.SetPaymentSent(paymentSent))
+	wallet := fundingBuildWallet{txs: map[iwallet.TransactionID]iwallet.Transaction{
+		iwallet.TransactionID(txID): {ID: iwallet.TransactionID(txID), To: []iwallet.SpendInfo{{ID: []byte{0x01}, Address: iwallet.NewAddress(paymentAddress, coinType), Amount: iwallet.NewAmount(100)}}},
+	}}
+
+	release, err := svc.buildEscrowRelease(order, wallet,
+		iwallet.NewAddress("bitcoincash:qvendor", coinType), iwallet.NewAmount(5),
+		iwallet.NewAddress("bitcoincash:qplatform", coinType), iwallet.NewAmount(10), true)
+	require.NoError(t, err)
+	assert.Equal(t, "65", release.GetToAmount())
+	assert.Equal(t, "20", release.GetAffiliateAmount())
+	assert.Equal(t, "bitcoincash:qaffiliate", release.GetAffiliateAddress())
 }
 
 func TestBuildEscrowRelease_ManagedSolanaDoesNotRequireWallet(t *testing.T) {

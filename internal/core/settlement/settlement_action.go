@@ -155,6 +155,11 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 		if method != pb.PaymentSent_CANCELABLE {
 			return &payment.ActionResult{Mode: payment.ActionModeCompleted}, coinType, nil
 		}
+		affiliatePayout, payoutErr := s.sellerAffiliateSettlementPayout(ctx, order.ID, coinType)
+		if payoutErr != nil {
+			return nil, coinType, fmt.Errorf("resolve affiliate settlement payout: %w", payoutErr)
+		}
+		params.AffiliatePayout = affiliatePayout
 		strategy, err := s.settlementActionStrategy(coinType)
 		if err != nil {
 			return nil, coinType, err
@@ -248,6 +253,13 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 	default:
 		return nil, coinType, fmt.Errorf("%w: unsupported settlement action", coreiface.ErrBadRequest)
 	}
+}
+
+func (s *SettlementService) sellerAffiliateSettlementPayout(ctx context.Context, orderID models.OrderID, coinType iwallet.CoinType) (*models.AffiliateSettlementPayout, error) {
+	if s == nil || s.sellerAffiliate == nil {
+		return nil, nil
+	}
+	return s.sellerAffiliate.SettlementPayout(ctx, orderID.String(), coinType.String())
 }
 
 // existingSettlementActionResult makes backend settlement submission

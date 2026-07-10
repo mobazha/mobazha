@@ -807,6 +807,7 @@ func (n *MobazhaNode) initSettlementService() {
 		MonitorService:     n.monitorService,
 		EscrowMasterPubKey: n.escrowMasterKey.PubKey(),
 		UTXOKeyDeriver:     n.paymentService,
+		SellerAffiliate:    n.sellerAffiliateService,
 		EVMRelayService:    evmRelay,
 		RelayAPIURL:        n.relayAPIURL,
 		RelayAPIBearer:     n.relayAPIBearer,

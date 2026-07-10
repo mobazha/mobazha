@@ -59,22 +59,13 @@ func (s *SellerAffiliateAppService) GetProgram(ctx context.Context) (*models.Aff
 	return s.store.GetAffiliateProgram(ctx)
 }
 
-// CreateLink creates the tenant's direct link for one promoter.
-func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeerID, publicToken string) (*models.AffiliateLink, error) {
-	return s.createLink(ctx, promoterPeerID, publicToken, "")
-}
-
-// CreateLinkWithPayoutDestination creates a link with the promoter's immutable
-// EVM settlement destination. Existing legacy links can be backfilled once.
-func (s *SellerAffiliateAppService) CreateLinkWithPayoutDestination(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error) {
+// CreateLink creates a link with the promoter's immutable EVM settlement
+// destination. A payout destination is mandatory before a referral can exist.
+func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error) {
 	payoutAddress, err := normalizeAffiliateEVMPayoutAddress(payoutAddress)
 	if err != nil {
 		return nil, err
 	}
-	return s.createLink(ctx, promoterPeerID, publicToken, payoutAddress)
-}
-
-func (s *SellerAffiliateAppService) createLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error) {
 	if s == nil || s.store == nil {
 		return nil, errors.New("seller affiliate store not configured")
 	}
@@ -88,12 +79,6 @@ func (s *SellerAffiliateAppService) createLink(ctx context.Context, promoterPeer
 	}
 	existing, err := s.store.GetAffiliateLinkByPromoter(ctx, program.ID, promoterPeerID)
 	if err == nil {
-		if payoutAddress == "" {
-			return existing, nil
-		}
-		if existing.PromoterPayoutAddress == "" {
-			return s.store.SetAffiliateLinkPayoutAddress(ctx, existing.ID, payoutAddress, time.Now().UTC())
-		}
 		existingAddress, normalizeErr := normalizeAffiliateEVMPayoutAddress(existing.PromoterPayoutAddress)
 		if normalizeErr != nil || existingAddress != payoutAddress {
 			return nil, models.ErrSellerAffiliateConflict
@@ -320,6 +305,57 @@ func (s *SellerAffiliateAppService) ListPendingCommissionOrderIDs(ctx context.Co
 		return nil, errors.New("seller affiliate store not configured")
 	}
 	return s.store.ListPendingAffiliateCommissionOrderIDs(ctx)
+}
+
+// SettlementPayout returns the immutable commission split that an order
+// settlement adapter must execute. It never recomputes rate or destination
+// from mutable program/profile state.
+func (s *SellerAffiliateAppService) SettlementPayout(ctx context.Context, orderID, settlementCoin string) (*models.AffiliateSettlementPayout, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	orderID = strings.TrimSpace(orderID)
+	settlementCoin = strings.TrimSpace(settlementCoin)
+	if orderID == "" || settlementCoin == "" {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	attribution, err := s.store.GetAffiliateAttributionByOrder(ctx, orderID)
+	if errors.Is(err, models.ErrSellerAffiliateNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if attribution == nil {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	address, err := normalizeAffiliateEVMPayoutAddress(attribution.PromoterPayoutAddress)
+	if err != nil {
+		return nil, err
+	}
+	lines, err := s.store.ListAffiliateCommissionLinesByOrder(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	amount := new(big.Int)
+	for _, line := range lines {
+		if line.Status == models.AffiliateCommissionStatusReversed {
+			continue
+		}
+		if (line.Status != models.AffiliateCommissionStatusPending && line.Status != models.AffiliateCommissionStatusEarned) ||
+			!strings.EqualFold(strings.TrimSpace(line.Currency), settlementCoin) {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		lineAmount, ok := new(big.Int).SetString(line.CommissionAtomic, 10)
+		if !ok || lineAmount.Sign() < 0 {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		amount.Add(amount, lineAmount)
+	}
+	if amount.Sign() == 0 {
+		return nil, nil
+	}
+	return &models.AffiliateSettlementPayout{Address: address, Amount: amount.String()}, nil
 }
 
 func affiliateCommissionAtomic(baseAtomic string, rateBPS uint32) (string, error) {

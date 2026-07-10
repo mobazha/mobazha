@@ -18,7 +18,7 @@ import (
 
 type recordingSellerAffiliateService struct {
 	attribution *models.AffiliateAttribution
-	lines       []models.AffiliateCommissionLine
+	payout      *models.AffiliateSettlementPayout
 	facts       []models.AffiliateOrderFacts
 	status      models.AffiliateCommissionStatus
 	reason      models.AffiliateCommissionReversalReason
@@ -30,10 +30,7 @@ func (*recordingSellerAffiliateService) PutProgram(context.Context, *models.Affi
 func (*recordingSellerAffiliateService) GetProgram(context.Context) (*models.AffiliateProgram, error) {
 	return nil, nil
 }
-func (*recordingSellerAffiliateService) CreateLink(context.Context, string, string) (*models.AffiliateLink, error) {
-	return nil, nil
-}
-func (*recordingSellerAffiliateService) CreateLinkWithPayoutDestination(context.Context, string, string, string) (*models.AffiliateLink, error) {
+func (*recordingSellerAffiliateService) CreateLink(context.Context, string, string, string) (*models.AffiliateLink, error) {
 	return nil, nil
 }
 func (*recordingSellerAffiliateService) GetLinkByToken(context.Context, string) (*models.AffiliateLink, error) {
@@ -62,17 +59,13 @@ func (s *recordingSellerAffiliateService) GetAttributionByOrder(context.Context,
 	return s.attribution, nil
 }
 func (s *recordingSellerAffiliateService) ListCommissionLinesByOrder(context.Context, string) ([]models.AffiliateCommissionLine, error) {
-	return s.lines, nil
+	return nil, nil
 }
 
 func TestSellerAffiliateSettlementPayout_UsesFrozenSettlementAssetAndAddress(t *testing.T) {
-	affiliate := &recordingSellerAffiliateService{
-		attribution: &models.AffiliateAttribution{PromoterPayoutAddress: "0x1111111111111111111111111111111111111111"},
-		lines: []models.AffiliateCommissionLine{
-			{Currency: "USDT", CommissionAtomic: "125", Status: models.AffiliateCommissionStatusPending},
-			{Currency: "USDT", CommissionAtomic: "7", Status: models.AffiliateCommissionStatusEarned},
-		},
-	}
+	affiliate := &recordingSellerAffiliateService{payout: &models.AffiliateSettlementPayout{
+		Address: "0x1111111111111111111111111111111111111111", Amount: "132",
+	}}
 	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
 	payout, err := service.sellerAffiliateSettlementPayout(context.Background(), "affiliate-settlement-order", iwallet.CoinType("USDT"))
 	require.NoError(t, err)
@@ -81,15 +74,6 @@ func TestSellerAffiliateSettlementPayout_UsesFrozenSettlementAssetAndAddress(t *
 	assert.Equal(t, "132", payout.Amount)
 }
 
-func TestSellerAffiliateSettlementPayout_RejectsDifferentSettlementAsset(t *testing.T) {
-	affiliate := &recordingSellerAffiliateService{
-		attribution: &models.AffiliateAttribution{PromoterPayoutAddress: "0x1111111111111111111111111111111111111111"},
-		lines:       []models.AffiliateCommissionLine{{Currency: "USD", CommissionAtomic: "125", Status: models.AffiliateCommissionStatusPending}},
-	}
-	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
-	_, err := service.sellerAffiliateSettlementPayout(context.Background(), "affiliate-settlement-order", iwallet.CoinType("USDT"))
-	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
-}
 func (*recordingSellerAffiliateService) ListSellerStatement(context.Context) ([]models.AffiliateStatementLine, error) {
 	return nil, nil
 }
@@ -98,6 +82,9 @@ func (*recordingSellerAffiliateService) ListPromoterStatement(context.Context, s
 }
 func (*recordingSellerAffiliateService) ListPendingCommissionOrderIDs(context.Context) ([]string, error) {
 	return nil, nil
+}
+func (s *recordingSellerAffiliateService) SettlementPayout(context.Context, string, string) (*models.AffiliateSettlementPayout, error) {
+	return s.payout, nil
 }
 
 func TestReconcileSellerAffiliateOrder_DerivesPendingCommissionFromSignedOrder(t *testing.T) {

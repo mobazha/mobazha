@@ -78,7 +78,7 @@ type AffiliateLink struct {
 	ID                    string              `json:"id" gorm:"primaryKey;type:text"`
 	ProgramID             string              `json:"programID" gorm:"column:program_id;type:text;not null;index;uniqueIndex:idx_affiliate_link_promoter,priority:2"`
 	PromoterPeerID        string              `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index;uniqueIndex:idx_affiliate_link_promoter,priority:3"`
-	PromoterPayoutAddress string              `json:"promoterPayoutAddress,omitempty" gorm:"column:promoter_payout_address;type:text"`
+	PromoterPayoutAddress string              `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
 	PublicToken           string              `json:"publicToken" gorm:"column:public_token;type:text;not null;uniqueIndex:idx_affiliate_link_token,priority:2"`
 	Status                AffiliateLinkStatus `json:"status" gorm:"type:text;not null;index"`
 	CreatedAt             time.Time           `json:"createdAt" gorm:"column:created_at;not null;autoCreateTime:false"`
@@ -91,7 +91,7 @@ func (AffiliateLink) TableName() string { return "affiliate_links" }
 func (l *AffiliateLink) Validate() error {
 	if l == nil || !validAffiliateID(l.ID) || !validAffiliateID(l.ProgramID) ||
 		!validAffiliatePeerID(l.PromoterPeerID) || !validAffiliateID(l.PublicToken) ||
-		(l.PromoterPayoutAddress != "" && !validAffiliateEVMPayoutAddress(l.PromoterPayoutAddress)) ||
+		!validAffiliateEVMPayoutAddress(l.PromoterPayoutAddress) ||
 		(l.Status != AffiliateLinkStatusActive && l.Status != AffiliateLinkStatusRevoked) ||
 		l.CreatedAt.IsZero() || l.UpdatedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
@@ -108,7 +108,7 @@ type AffiliateReferralSession struct {
 	SellerPeerID              string     `json:"sellerPeerID" gorm:"column:seller_peer_id;type:text;not null;index"`
 	PromoterPeerID            string     `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index"`
 	CommissionRateBPSSnapshot uint32     `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
-	PromoterPayoutAddress     string     `json:"promoterPayoutAddress,omitempty" gorm:"column:promoter_payout_address;type:text"`
+	PromoterPayoutAddress     string     `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
 	IssuedAt                  time.Time  `json:"issuedAt" gorm:"column:issued_at;not null;index"`
 	ExpiresAt                 time.Time  `json:"expiresAt" gorm:"column:expires_at;not null;index"`
 	RevokedAt                 *time.Time `json:"revokedAt,omitempty" gorm:"column:revoked_at"`
@@ -123,7 +123,7 @@ func (s *AffiliateReferralSession) Validate() error {
 		!validAffiliateID(s.ProgramID) || !validAffiliatePeerID(s.SellerPeerID) ||
 		!validAffiliatePeerID(s.PromoterPeerID) || s.IssuedAt.IsZero() ||
 		s.CommissionRateBPSSnapshot == 0 || s.CommissionRateBPSSnapshot > 10000 ||
-		(s.PromoterPayoutAddress != "" && !validAffiliateEVMPayoutAddress(s.PromoterPayoutAddress)) ||
+		!validAffiliateEVMPayoutAddress(s.PromoterPayoutAddress) ||
 		s.ExpiresAt.IsZero() || !s.ExpiresAt.After(s.IssuedAt) || s.CreatedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
 	}
@@ -146,7 +146,7 @@ type AffiliateAttribution struct {
 	BuyerPeerID               string    `json:"buyerPeerID" gorm:"column:buyer_peer_id;type:text;not null;index"`
 	PromoterPeerID            string    `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index"`
 	CommissionRateBPSSnapshot uint32    `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
-	PromoterPayoutAddress     string    `json:"promoterPayoutAddress,omitempty" gorm:"column:promoter_payout_address;type:text"`
+	PromoterPayoutAddress     string    `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
 	AttributedAt              time.Time `json:"attributedAt" gorm:"column:attributed_at;not null;index"`
 }
 
@@ -159,7 +159,7 @@ func (a *AffiliateAttribution) Validate() error {
 		!validAffiliatePeerID(a.SellerPeerID) || !validAffiliatePeerID(a.BuyerPeerID) ||
 		!validAffiliatePeerID(a.PromoterPeerID) || a.CommissionRateBPSSnapshot == 0 ||
 		a.CommissionRateBPSSnapshot > 10000 ||
-		(a.PromoterPayoutAddress != "" && !validAffiliateEVMPayoutAddress(a.PromoterPayoutAddress)) ||
+		!validAffiliateEVMPayoutAddress(a.PromoterPayoutAddress) ||
 		a.AttributedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
 	}
@@ -240,6 +240,14 @@ type AffiliateOrderFacts struct {
 type AffiliateOrderResult struct {
 	Attribution AffiliateAttribution
 	Lines       []AffiliateCommissionLine
+}
+
+// AffiliateSettlementPayout is the Core-validated seller-funded commission
+// output for one order settlement. Amount uses the settlement asset's minimal
+// unit and is never a separate payout workflow.
+type AffiliateSettlementPayout struct {
+	Address string
+	Amount  string
 }
 
 // AffiliateStatementLine is a read-only projection of one immutable

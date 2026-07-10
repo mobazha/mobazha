@@ -39,7 +39,8 @@ type SettlementService struct {
 
 	// Cross-domain dependency: derives UTXO escrow keys from order chaincode.
 	// PaymentAppService satisfies this interface.
-	utxoKeyDeriver contracts.UTXOKeyDeriver
+	utxoKeyDeriver  contracts.UTXOKeyDeriver
+	sellerAffiliate contracts.SellerAffiliateSettlementPayoutProvider
 
 	// Relay infrastructure
 	evmRelayService relay.EVMRelayService
@@ -74,6 +75,7 @@ type SettlementServiceConfig struct {
 	MonitorService     utxo.UTXOMonitorService
 	EscrowMasterPubKey *btcec.PublicKey
 	UTXOKeyDeriver     contracts.UTXOKeyDeriver
+	SellerAffiliate    contracts.SellerAffiliateSettlementPayoutProvider
 
 	EVMRelayService relay.EVMRelayService
 	RelayAPIURL     string
@@ -93,6 +95,7 @@ func NewSettlementService(cfg SettlementServiceConfig) *SettlementService {
 		monitorService:     cfg.MonitorService,
 		escrowMasterPubKey: cfg.EscrowMasterPubKey,
 		utxoKeyDeriver:     cfg.UTXOKeyDeriver,
+		sellerAffiliate:    cfg.SellerAffiliate,
 		evmRelayService:    cfg.EVMRelayService,
 		relayAPIURL:        cfg.RelayAPIURL,
 		relayAPIBearer:     cfg.RelayAPIBearer,

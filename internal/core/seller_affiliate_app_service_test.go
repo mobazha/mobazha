@@ -31,10 +31,11 @@ func TestSellerAffiliateAppService_AutomatesMinimalCommissionLifecycle(t *testin
 	require.NoError(t, err)
 	assert.NotEmpty(t, program.ID)
 
-	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-promoter-a")
+	payoutAddress := "0x1111111111111111111111111111111111111111"
+	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-promoter-a", payoutAddress)
 	require.NoError(t, err)
 	assert.Equal(t, program.ID, link.ProgramID)
-	replayedLink, err := service.CreateLink(ctx, promoterPeerID, "ignored-token-on-retry")
+	replayedLink, err := service.CreateLink(ctx, promoterPeerID, "ignored-token-on-retry", payoutAddress)
 	require.NoError(t, err)
 	assert.Equal(t, link, replayedLink)
 
@@ -116,7 +117,7 @@ func TestSellerAffiliateAppService_RejectsDeterministicSelfAttribution(t *testin
 		CommissionRateBPS: 1000, AttributionWindowSeconds: 3600,
 	})
 	require.NoError(t, err)
-	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-self-check")
+	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-self-check", "0x1111111111111111111111111111111111111111")
 	require.NoError(t, err)
 	issuedAt := time.Now().UTC().Add(-time.Minute)
 	session, err := service.CreateReferralSession(ctx, link.PublicToken, issuedAt)
@@ -150,7 +151,7 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	})
 	require.NoError(t, err)
 	payoutAddress := "0x1111111111111111111111111111111111111111"
-	link, err := service.CreateLinkWithPayoutDestination(ctx, promoterPeerID, "affiliate-token-frozen-payout", payoutAddress)
+	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-frozen-payout", payoutAddress)
 	require.NoError(t, err)
 	assert.Equal(t, payoutAddress, link.PromoterPayoutAddress)
 
@@ -173,8 +174,15 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	assert.Equal(t, uint32(1250), result.Attribution.CommissionRateBPSSnapshot)
 	assert.Equal(t, payoutAddress, result.Attribution.PromoterPayoutAddress)
 	assert.Equal(t, "125", result.Lines[0].CommissionAtomic)
+	payout, err := service.SettlementPayout(ctx, "order-frozen-payout", "USDT")
+	require.NoError(t, err)
+	require.NotNil(t, payout)
+	assert.Equal(t, payoutAddress, payout.Address)
+	assert.Equal(t, "125", payout.Amount)
+	_, err = service.SettlementPayout(ctx, "order-frozen-payout", "ETH")
+	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
 
-	_, err = service.CreateLinkWithPayoutDestination(ctx, promoterPeerID, "ignored-token", "0x2222222222222222222222222222222222222222")
+	_, err = service.CreateLink(ctx, promoterPeerID, "ignored-token", "0x2222222222222222222222222222222222222222")
 	require.ErrorIs(t, err, models.ErrSellerAffiliateConflict)
 }
 

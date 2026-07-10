@@ -12,7 +12,6 @@ type SellerAffiliateStore interface {
 	PutAffiliateProgram(ctx context.Context, program *models.AffiliateProgram) error
 	GetAffiliateProgram(ctx context.Context) (*models.AffiliateProgram, error)
 	CreateAffiliateLink(ctx context.Context, link *models.AffiliateLink) error
-	SetAffiliateLinkPayoutAddress(ctx context.Context, linkID, payoutAddress string, updatedAt time.Time) (*models.AffiliateLink, error)
 	GetAffiliateLink(ctx context.Context, id string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByPromoter(ctx context.Context, programID, promoterPeerID string) (*models.AffiliateLink, error)
@@ -26,12 +25,18 @@ type SellerAffiliateStore interface {
 	TransitionAffiliateCommission(ctx context.Context, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 }
 
-// SellerAffiliateService defines the automation-first Phase 1 operations.
+// SellerAffiliateSettlementPayoutProvider exposes the Core-owned payout plan
+// needed by settlement execution without exposing affiliate write operations.
+type SellerAffiliateSettlementPayoutProvider interface {
+	SettlementPayout(ctx context.Context, orderID, settlementCoin string) (*models.AffiliateSettlementPayout, error)
+}
+
+// SellerAffiliateService defines the automation-first affiliate operations.
 type SellerAffiliateService interface {
+	SellerAffiliateSettlementPayoutProvider
 	PutProgram(ctx context.Context, program *models.AffiliateProgram) (*models.AffiliateProgram, error)
 	GetProgram(ctx context.Context) (*models.AffiliateProgram, error)
-	CreateLink(ctx context.Context, promoterPeerID, publicToken string) (*models.AffiliateLink, error)
-	CreateLinkWithPayoutDestination(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error)
+	CreateLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string) (*models.AffiliateLink, error)
 	GetLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
 	CreateReferralSession(ctx context.Context, publicToken string, issuedAt time.Time) (*models.AffiliateReferralSession, error)
 	AttributeOrder(ctx context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error)

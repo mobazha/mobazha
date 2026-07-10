@@ -2044,7 +2044,7 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		})
 	}
 
-	var affiliatePayout *payment.AffiliatePayout
+	var affiliatePayout *models.AffiliateSettlementPayout
 	if includeAffiliate {
 		affiliatePayout, err = s.sellerAffiliateSettlementPayout(context.Background(), order.ID, coinType)
 		if err != nil {

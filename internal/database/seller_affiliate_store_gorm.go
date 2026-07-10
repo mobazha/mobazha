@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -90,42 +89,6 @@ func (s *GormSellerAffiliateStore) CreateAffiliateLink(_ context.Context, link *
 		return err
 	}
 	return s.db.Update(func(tx pkgdb.Tx) error { return tx.Create(link) })
-}
-
-// SetAffiliateLinkPayoutAddress sets a legacy link's EVM destination exactly once.
-func (s *GormSellerAffiliateStore) SetAffiliateLinkPayoutAddress(_ context.Context, linkID, payoutAddress string, updatedAt time.Time) (*models.AffiliateLink, error) {
-	if s == nil || s.db == nil || strings.TrimSpace(linkID) == "" || strings.TrimSpace(payoutAddress) == "" || updatedAt.IsZero() {
-		return nil, models.ErrInvalidSellerAffiliate
-	}
-	var updated models.AffiliateLink
-	err := s.db.Update(func(tx pkgdb.Tx) error {
-		var existing models.AffiliateLink
-		if err := tx.Read().Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", linkID).First(&existing).Error; err != nil {
-			return err
-		}
-		if existing.PromoterPayoutAddress != "" && existing.PromoterPayoutAddress != payoutAddress {
-			return ErrSellerAffiliateConflict
-		}
-		if existing.PromoterPayoutAddress == "" {
-			existing.PromoterPayoutAddress = payoutAddress
-			existing.UpdatedAt = updatedAt.UTC()
-			if err := existing.Validate(); err != nil {
-				return err
-			}
-			if err := tx.Save(&existing); err != nil {
-				return err
-			}
-		}
-		updated = existing
-		return nil
-	})
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrSellerAffiliateNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &updated, nil
 }
 
 // GetAffiliateLink returns one tenant-local promoter link.

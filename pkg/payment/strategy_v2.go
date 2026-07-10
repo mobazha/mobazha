@@ -297,14 +297,7 @@ type ActionParams struct {
 	// this settlement action. Adapters execute it as an additional output and
 	// deduct the same amount from the seller output; they must not recalculate
 	// affiliate terms from order or profile data.
-	AffiliatePayout *AffiliatePayout
-}
-
-// AffiliatePayout is one immutable seller-funded commission output expressed
-// in the settlement asset's minimal unit.
-type AffiliatePayout struct {
-	Address string
-	Amount  string
+	AffiliatePayout *models.AffiliateSettlementPayout
 }
 
 // ActionStatus describes the lifecycle of a submitted action. The

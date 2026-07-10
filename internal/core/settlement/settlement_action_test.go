@@ -52,6 +52,35 @@ func TestExecuteSettlementAction_ConfirmModeratedReturnsNoop(t *testing.T) {
 	require.Equal(t, payment.ActionModeCompleted, result.Mode)
 }
 
+func TestExecuteSettlementAction_ConfirmCancelablePassesAffiliatePayoutPlan(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	strategy := &utxoActionStatusStub{model: payment.PaymentModelMonitored, confirmResult: &payment.ActionResult{Mode: payment.ActionModeSubmitted}}
+	registry := payment.NewRegistry()
+	registry.RegisterV2(iwallet.ChainEthereum, strategy)
+	payoutPlan := &models.AffiliateSettlementPayout{Address: "0x8888888888888888888888888888888888888888", Amount: "125"}
+	svc := NewSettlementService(SettlementServiceConfig{
+		DB: db, SellerAffiliate: staticAffiliatePayoutProvider{payout: payoutPlan},
+	})
+	svc.SetRegistry(registry)
+	order := seedModeratedSettlementActionOrder(t, db, "order-cancelable-affiliate", models.RoleVendor)
+	require.NoError(t, order.SetPaymentSent(&pb.PaymentSent{
+		SettlementSpec: payment.NewManagedEscrowSpec(false).ToPaymentSent(),
+		Amount:         "1000",
+		Coin:           "crypto:eip155:11155111:native",
+		PayerAddress:   "0x1111111111111111111111111111111111111111",
+		RefundAddress:  "0x1111111111111111111111111111111111111111",
+	}))
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(order) }))
+
+	_, _, err = svc.ExecuteSettlementAction(context.Background(), payment.SettlementActionConfirm, order.ID, "0x6666666666666666666666666666666666666666")
+	require.NoError(t, err)
+	require.NotNil(t, strategy.lastConfirm.AffiliatePayout)
+	require.Equal(t, payoutPlan, strategy.lastConfirm.AffiliatePayout)
+}
+
 func TestExecuteSettlementAction_CancelModeratedBeforeConfirmUsesStrategy(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
@@ -533,6 +562,15 @@ type utxoActionStatusStub struct {
 	lastConfirm         payment.ActionParams
 	lastCancel          payment.ActionParams
 	lastSellerDecline   payment.ActionParams
+}
+
+type staticAffiliatePayoutProvider struct {
+	payout *models.AffiliateSettlementPayout
+	err    error
+}
+
+func (s staticAffiliatePayoutProvider) SettlementPayout(context.Context, string, string) (*models.AffiliateSettlementPayout, error) {
+	return s.payout, s.err
 }
 
 // Embedding the base interface deliberately hides the optional

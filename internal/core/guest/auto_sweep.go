@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,17 +92,35 @@ func (s *AutoSweepService) CreateSweepTask(tx database.Tx, order *models.GuestOr
 		chainKey = string(coinInfo.Chain)
 	}
 	task := &models.SweepTask{
-		OrderToken:   order.OrderToken,
-		ChainKey:     chainKey,
-		FromAddress:  order.PaymentAddress,
-		ToAddress:    order.SweepToAddress,
-		Amount:       order.PaymentAmount,
-		AddressIndex: order.AddressIndex,
-		KeySource:    models.SweepKeySourceBIP44,
-		Status:       models.SweepStatusPending,
+		OrderToken:             order.OrderToken,
+		ChainKey:               chainKey,
+		FromAddress:            order.PaymentAddress,
+		ToAddress:              order.SweepToAddress,
+		Amount:                 order.PaymentAmount,
+		AffiliatePayoutAddress: order.AffiliatePayoutAddress,
+		AffiliatePayoutAmount:  order.AffiliatePayoutAmount,
+		AddressIndex:           order.AddressIndex,
+		KeySource:              models.SweepKeySourceBIP44,
+		Status:                 models.SweepStatusPending,
 	}
-	return tx.Save(task)
+	if err := tx.Save(task); err != nil {
+		return err
+	}
+	if task.AffiliatePayoutAddress == "" || task.AffiliatePayoutAmount == "" {
+		return nil
+	}
+	now := time.Now().UTC()
+	return tx.Save(&models.SettlementAction{
+		ActionID: guestSweepActionID(order.OrderToken), OrderID: order.OrderToken,
+		ActionKind: "guest_sweep", State: "submitting", SettlementCoin: chainKey, GrossAmount: order.PaymentAmount,
+		PlannedLines: models.EncodeSettlementPayoutLines([]models.SettlementPayoutLine{{
+			Type: "affiliate", Amount: task.AffiliatePayoutAmount, Address: task.AffiliatePayoutAddress, Coin: chainKey,
+		}}),
+		CreatedAt: now, UpdatedAt: now,
+	})
 }
+
+func guestSweepActionID(orderToken string) string { return "guest-sweep-" + orderToken }
 
 // ClaimSweepTask atomically transitions a task from pending to processing.
 // Returns true if the claim succeeded (this process owns the task).
@@ -159,6 +178,27 @@ func (s *AutoSweepService) RecoverStaleTasks() {
 			if err := tx.Save(&stale[i]); err != nil {
 				return err
 			}
+			if stale[i].AffiliatePayoutAddress != "" {
+				updates := map[string]interface{}{"updated_at": now}
+				switch stale[i].Status {
+				case models.SweepStatusSubmitted:
+					updates["state"] = "submitted"
+					updates["tx_hash"] = stale[i].TxHash
+					updates["attempt_tx_hashes"] = stale[i].TxHash
+				case models.SweepStatusFailed:
+					updates["state"] = "failed"
+					updates["last_error"] = stale[i].LastError
+				default:
+					continue
+				}
+				if _, err := tx.UpdateColumns(
+					updates,
+					map[string]interface{}{"action_id = ?": guestSweepActionID(stale[i].OrderToken)},
+					&models.SettlementAction{},
+				); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	})
@@ -213,7 +253,17 @@ func (s *AutoSweepService) processSingleSweep(ctx context.Context, task *models.
 			task.Status = models.SweepStatusSubmitted
 			task.TxHash = txHash
 			task.UpdatedAt = time.Now()
-			return tx.Save(task)
+			if err := tx.Save(task); err != nil {
+				return err
+			}
+			if task.AffiliatePayoutAddress != "" {
+				now := time.Now().UTC()
+				_, err := tx.UpdateColumns(map[string]interface{}{
+					"state": "submitted", "tx_hash": txHash, "attempt_tx_hashes": txHash, "updated_at": now,
+				}, map[string]interface{}{"action_id = ?": guestSweepActionID(task.OrderToken)}, &models.SettlementAction{})
+				return err
+			}
+			return nil
 		})
 		if saveErr == nil {
 			s.clearBroadcast(task.ID)
@@ -291,7 +341,22 @@ func (s *AutoSweepService) broadcastUTXOSweep(task *models.SweepTask) (string, e
 		return "", fmt.Errorf("no confirmed UTXOs available at %s", task.FromAddress)
 	}
 
-	rawTx, _, err := sweeper.BuildSweepTx(inputs, *privKey, task.ToAddress, defaultSweepFeePerByte)
+	var rawTx []byte
+	if task.AffiliatePayoutAddress != "" || task.AffiliatePayoutAmount != "" {
+		affiliateAmount, ok := new(big.Int).SetString(task.AffiliatePayoutAmount, 10)
+		if !ok || !affiliateAmount.IsInt64() || affiliateAmount.Sign() <= 0 {
+			return "", fmt.Errorf("invalid affiliate sweep amount %q", task.AffiliatePayoutAmount)
+		}
+		splitSweeper, ok := sweeper.(iwallet.UTXOSplitSweeper)
+		if !ok {
+			return "", fmt.Errorf("wallet for %s does not support affiliate split sweeps", coinInfo.Chain)
+		}
+		rawTx, _, err = splitSweeper.BuildSplitSweepTx(
+			inputs, *privKey, task.ToAddress, task.AffiliatePayoutAddress, affiliateAmount.Int64(), defaultSweepFeePerByte,
+		)
+	} else {
+		rawTx, _, err = sweeper.BuildSweepTx(inputs, *privKey, task.ToAddress, defaultSweepFeePerByte)
+	}
 	if err != nil {
 		return "", fmt.Errorf("build sweep tx: %w", err)
 	}
@@ -486,7 +551,7 @@ func (s *AutoSweepService) clearBroadcast(taskID int) {
 }
 
 func (s *AutoSweepService) failTask(task *models.SweepTask, errMsg string) {
-	_ = s.db.Update(func(tx database.Tx) error {
+	if err := s.db.Update(func(tx database.Tx) error {
 		task.RetryCount++
 		task.LastError = errMsg
 		if task.RetryCount >= models.MaxSweepRetries {
@@ -495,12 +560,23 @@ func (s *AutoSweepService) failTask(task *models.SweepTask, errMsg string) {
 			task.Status = models.SweepStatusPending
 		}
 		task.UpdatedAt = time.Now()
-		return tx.Save(task)
-	})
+		if err := tx.Save(task); err != nil {
+			return err
+		}
+		if task.Status == models.SweepStatusFailed && task.AffiliatePayoutAddress != "" {
+			_, err := tx.UpdateColumns(map[string]interface{}{
+				"state": "failed", "last_error": errMsg, "updated_at": time.Now().UTC(),
+			}, map[string]interface{}{"action_id = ?": guestSweepActionID(task.OrderToken)}, &models.SettlementAction{})
+			return err
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("persist failed sweep %d: %v", task.ID, err)
+	}
 }
 
 // ConfirmSweep marks a submitted sweep as confirmed after on-chain verification.
-func (s *AutoSweepService) ConfirmSweep(orderToken string, txHash string) error {
+func (s *AutoSweepService) ConfirmSweep(orderToken string, txHash string, observedLines ...[]models.SettlementPayoutLine) error {
 	return s.db.Update(func(tx database.Tx) error {
 		var task models.SweepTask
 		q := tx.Read().Where("order_token = ? AND status = ?",
@@ -513,7 +589,21 @@ func (s *AutoSweepService) ConfirmSweep(orderToken string, txHash string) error 
 		}
 		task.Status = models.SweepStatusConfirmed
 		task.UpdatedAt = time.Now()
-		return tx.Save(&task)
+		if err := tx.Save(&task); err != nil {
+			return err
+		}
+		if task.AffiliatePayoutAddress != "" {
+			if len(observedLines) != 1 || len(observedLines[0]) == 0 {
+				return errors.New("confirmed affiliate sweep requires observed output")
+			}
+			now := time.Now().UTC()
+			_, err := tx.UpdateColumns(map[string]interface{}{
+				"state": "confirmed", "tx_hash": txHash, "confirmations": sweepConfirmThreshold,
+				"observed_lines": models.EncodeSettlementPayoutLines(observedLines[0]), "confirmed_at": now, "updated_at": now,
+			}, map[string]interface{}{"action_id = ?": guestSweepActionID(task.OrderToken)}, &models.SettlementAction{})
+			return err
+		}
+		return nil
 	})
 }
 
@@ -525,10 +615,13 @@ func (s *AutoSweepService) checkSubmittedSweeps(ctx context.Context) {
 	}
 
 	var submitted []models.SweepTask
-	_ = s.db.View(func(tx database.Tx) error {
+	if err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("status = ? AND tx_hash != ''",
 			models.SweepStatusSubmitted).Find(&submitted).Error
-	})
+	}); err != nil {
+		log.Warningf("load submitted sweep tasks: %v", err)
+		return
+	}
 	if len(submitted) == 0 {
 		return
 	}
@@ -544,7 +637,19 @@ func (s *AutoSweepService) checkSubmittedSweeps(ctx context.Context) {
 			continue
 		}
 		if confs >= sweepConfirmThreshold {
-			if err := s.ConfirmSweep(task.OrderToken, task.TxHash); err != nil {
+			var observed []models.SettlementPayoutLine
+			if task.AffiliatePayoutAddress != "" {
+				tx, err := s.chainOps.GetTransaction(chain, task.TxHash)
+				if err != nil || tx == nil {
+					continue
+				}
+				observed, err = affiliateSweepObservedLines(task, *tx)
+				if err != nil {
+					log.Errorf("affiliate sweep %s output verification failed: %v", redact.Token(task.OrderToken), err)
+					continue
+				}
+			}
+			if err := s.ConfirmSweep(task.OrderToken, task.TxHash, observed); err != nil {
 				continue
 			}
 			if task.KeySource == models.SweepKeySourceAffiliateEscrow {
@@ -554,6 +659,18 @@ func (s *AutoSweepService) checkSubmittedSweeps(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func affiliateSweepObservedLines(task *models.SweepTask, tx iwallet.Transaction) ([]models.SettlementPayoutLine, error) {
+	for _, output := range tx.To {
+		if output.Address.String() == task.AffiliatePayoutAddress && output.Amount.String() == task.AffiliatePayoutAmount {
+			return []models.SettlementPayoutLine{{
+				Type: "affiliate", Amount: task.AffiliatePayoutAmount, Address: task.AffiliatePayoutAddress,
+				Coin: task.ChainKey, TxHash: task.TxHash,
+			}}, nil
+		}
+	}
+	return nil, errors.New("confirmed sweep transaction does not contain frozen affiliate output")
 }
 
 func chainFromTaskKey(chainKey string) iwallet.ChainType {

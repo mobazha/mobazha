@@ -520,6 +520,15 @@ func lockTimeFromRedeemScript(redeemScript []byte) (uint32, error) {
 // BuildSweepTx builds and signs a P2PKH sweep transaction using BCH's
 // SigHashForkID that spends all provided inputs to a single destination.
 func (w *BitcoinCashWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, destAddress string, feePerByte int64) ([]byte, string, error) {
+	return w.buildSweepTx(inputs, signingKey, destAddress, "", 0, feePerByte)
+}
+
+// BuildSplitSweepTx builds a seller remainder plus exact affiliate output.
+func (w *BitcoinCashWallet) BuildSplitSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, sellerAddress, affiliateAddress string, affiliateAmount, feePerByte int64) ([]byte, string, error) {
+	return w.buildSweepTx(inputs, signingKey, sellerAddress, affiliateAddress, affiliateAmount, feePerByte)
+}
+
+func (w *BitcoinCashWallet) buildSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, destAddress, affiliateAddress string, affiliateAmount, feePerByte int64) ([]byte, string, error) {
 	if len(inputs) == 0 {
 		return nil, "", errors.New("no inputs provided")
 	}
@@ -539,10 +548,18 @@ func (w *BitcoinCashWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey
 		return nil, "", errors.New("total input is zero")
 	}
 
-	// P2PKH: ~148 bytes per input, ~34 bytes for output + 10 overhead
-	estimatedSize := int64(10 + len(inputs)*148 + 34)
+	outputCount := 1
+	if affiliateAddress != "" || affiliateAmount != 0 {
+		if affiliateAddress == "" || affiliateAmount <= 0 {
+			return nil, "", errors.New("affiliate address and positive amount are required together")
+		}
+		outputCount++
+	}
+	// P2PKH: ~148 bytes per input, ~34 bytes per output + 10 overhead.
+	estimatedSize := int64(10 + len(inputs)*148 + outputCount*34)
 	fee := estimatedSize * feePerByte
-	if fee >= totalInput {
+	sellerAmount := totalInput - fee - affiliateAmount
+	if sellerAmount <= 0 {
 		return nil, "", fmt.Errorf("fee (%d) exceeds total input (%d)", fee, totalInput)
 	}
 
@@ -550,7 +567,20 @@ func (w *BitcoinCashWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey
 	if err != nil {
 		return nil, "", fmt.Errorf("decode dest address: %w", err)
 	}
-	tx.AddTxOut(wire.NewTxOut(totalInput-fee, destScript))
+	if w.IsDust(iwallet.NewAddress(destAddress, iwallet.CoinType(iwallet.ChainBitcoinCash)), iwallet.NewAmount(sellerAmount)) {
+		return nil, "", errors.New("seller sweep remainder is dust")
+	}
+	tx.AddTxOut(wire.NewTxOut(sellerAmount, destScript))
+	if outputCount == 2 {
+		affiliateScript, err := w.getPayToAddrScript(affiliateAddress)
+		if err != nil {
+			return nil, "", fmt.Errorf("decode affiliate address: %w", err)
+		}
+		if w.IsDust(iwallet.NewAddress(affiliateAddress, iwallet.CoinType(iwallet.ChainBitcoinCash)), iwallet.NewAmount(affiliateAmount)) {
+			return nil, "", errors.New("affiliate sweep output is dust")
+		}
+		tx.AddTxOut(wire.NewTxOut(affiliateAmount, affiliateScript))
+	}
 
 	pubKey := signingKey.PubKey()
 	pubKeyHash := bchutil.Hash160(pubKey.SerializeCompressed())

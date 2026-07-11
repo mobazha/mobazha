@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 )
 
@@ -18,11 +19,13 @@ type SellerAffiliateStore interface {
 	CreateAffiliateReferralSession(ctx context.Context, session *models.AffiliateReferralSession) error
 	GetAffiliateReferralSession(ctx context.Context, id string) (*models.AffiliateReferralSession, error)
 	RecordAffiliateOrder(ctx context.Context, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error)
+	RecordAffiliateOrderTx(tx database.Tx, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error)
 	GetAffiliateAttributionByOrder(ctx context.Context, orderID string) (*models.AffiliateAttribution, error)
 	ListAffiliateCommissionLinesByOrder(ctx context.Context, orderID string) ([]models.AffiliateCommissionLine, error)
 	ListAffiliateStatementLines(ctx context.Context, promoterPeerID string) ([]models.AffiliateStatementLine, error)
 	ListPendingAffiliateCommissionOrderIDs(ctx context.Context) ([]string, error)
 	TransitionAffiliateCommission(ctx context.Context, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
+	TransitionAffiliateCommissionTx(tx database.Tx, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 }
 
 // SellerAffiliateSettlementPayoutProvider exposes the Core-owned payout plan
@@ -52,6 +55,14 @@ type SellerAffiliateService interface {
 	ListSellerStatement(ctx context.Context) ([]models.AffiliateStatementLine, error)
 	ListPromoterStatement(ctx context.Context, promoterPeerID string) ([]models.AffiliateStatementLine, error)
 	ListPendingCommissionOrderIDs(ctx context.Context) ([]string, error)
+}
+
+// GuestSellerAffiliateService exposes only the affiliate operations that must
+// participate in the Guest order database transaction.
+type GuestSellerAffiliateService interface {
+	PrepareOrderAttribution(ctx context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error)
+	RecordPreparedOrderTx(tx database.Tx, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error)
+	TransitionCommissionTx(tx database.Tx, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 }
 
 // SellerAffiliateProvider exposes the tenant-local affiliate subsystem.

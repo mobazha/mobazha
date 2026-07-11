@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math/big"
 	"strconv"
 	"testing"
 	"time"
@@ -452,6 +453,86 @@ func newGuestQuoteConfigDB(t *testing.T) *testDatabase {
 		AcceptedCoins: "LTC",
 	}).Error)
 	return db
+}
+
+type recordingGuestAffiliateService struct {
+	facts    models.AffiliateOrderFacts
+	recorded bool
+}
+
+func (s *recordingGuestAffiliateService) PrepareOrderAttribution(_ context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error) {
+	s.facts = facts
+	return &models.AffiliateOrderResult{
+		Attribution: models.AffiliateAttribution{
+			OrderID: facts.OrderID, BuyerKind: facts.BuyerKind, GuestBuyerID: facts.GuestBuyerID,
+			PromoterUTXOPayoutAddresses: models.AffiliateUTXOPayoutAddresses{
+				models.AffiliatePayoutRailBitcoin: "btc-promoter", models.AffiliatePayoutRailBitcoinCash: "bch-promoter",
+				models.AffiliatePayoutRailLitecoin: "ltc-promoter",
+			},
+		},
+		Lines: []models.AffiliateCommissionLine{{CommissionAtomic: "1500"}},
+	}, nil
+}
+
+func (s *recordingGuestAffiliateService) RecordPreparedOrderTx(_ database.Tx, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error) {
+	s.recorded = true
+	return result, nil
+}
+
+func (*recordingGuestAffiliateService) TransitionCommissionTx(database.Tx, string, models.AffiliateCommissionStatus, models.AffiliateCommissionReversalReason, time.Time) ([]models.AffiliateCommissionLine, error) {
+	return nil, nil
+}
+
+func TestCreateGuestOrder_FreezesAffiliateTermsInPaymentCoin(t *testing.T) {
+	svc := newUTXOCapableService(t, true, true)
+	db := svc.db.(*testDatabase)
+	require.NoError(t, db.gormDB.AutoMigrate(
+		&models.DirectPaymentAddressCounter{},
+		&models.GuestCheckoutConfig{},
+	))
+	require.NoError(t, db.gormDB.Create(&models.DirectPaymentAddressCounter{
+		TenantID: testTenantID, ID: 1, ChainKey: "LTC",
+	}).Error)
+	recorder := &recordingSupplyAvailability{quoteResult: &contracts.SupplyQuoteResult{CanSell: true}}
+	affiliate := &recordingGuestAffiliateService{}
+	svc.resolver = alwaysEnabledResolver{}
+	svc.directPayment = NewDirectPaymentService(db, fixedBIP44KeyDeriver{})
+	svc.exchangeRates = wallet.NewFixedRateProvider("LTC", map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(8000),
+	})
+	svc.supplyAvailability = recorder
+	svc.sellerAffiliate = affiliate
+	svc.listings = &stubGuestListings{bySlug: map[string]*pb.SignedListing{
+		"ebook": guestListing("ebook", pb.Listing_Metadata_DIGITAL_GOOD),
+	}}
+	require.NoError(t, svc.SaveGuestCheckoutConfig(context.Background(), &models.GuestCheckoutConfig{
+		Enabled: true, AcceptedCoins: "LTC",
+	}))
+
+	resp, err := svc.CreateGuestOrder(context.Background(), contracts.CreateGuestOrderRequest{
+		PaymentCoin: "LTC", AffiliateReferralSessionID: "referral-session-1",
+		Items: []contracts.GuestOrderItemRequest{{ListingSlug: "ebook", Quantity: 1}},
+	})
+	require.NoError(t, err)
+	require.True(t, affiliate.recorded)
+	require.Equal(t, models.AffiliateBuyerKindGuest, affiliate.facts.BuyerKind)
+	require.Empty(t, affiliate.facts.BuyerPeerID)
+	require.NotEmpty(t, affiliate.facts.GuestBuyerID)
+	require.Len(t, affiliate.facts.Lines, 1)
+	require.Equal(t, resp.PaymentCoin, affiliate.facts.Lines[0].Currency)
+
+	order := loadGuestOrder(t, db, resp.OrderToken)
+	require.Equal(t, "referral-session-1", order.AffiliateReferralSessionID)
+	require.Equal(t, affiliate.facts.GuestBuyerID, order.AffiliateGuestBuyerID)
+	require.Equal(t, "ltc-promoter", order.AffiliatePayoutAddress)
+	require.Equal(t, "1500", order.AffiliatePayoutAmount)
+}
+
+func TestValidateGuestAffiliateUTXOPayout_RejectsDustBeforePayment(t *testing.T) {
+	svc := newUTXOCapableService(t, true, true)
+	err := svc.validateGuestAffiliateUTXOPayout(iwallet.ChainLitecoin, "ltc-promoter", big.NewInt(10))
+	require.ErrorIs(t, err, contracts.ErrInvalidGuestRequest)
+	require.Contains(t, err.Error(), "dust")
 }
 
 func TestCreateGuestOrder_ShadowQuotePreservesGuestInventoryReservation(t *testing.T) {

@@ -1035,6 +1035,7 @@ func (n *MobazhaNode) initGuestOrderService() {
 		ExchangeRates:           n.exchangeRates,
 		Resolver:                n.featureResolver,
 		SupplyAvailability:      n.supplyAvailabilityService,
+		SellerAffiliate:         n.sellerAffiliateService,
 		SupportedUTXOChains:     supportedUTXO,
 		EVMObservationAvailable: guestEvmAvailable,
 		SolanaMonitorAvailable:  guestSolanaAvailable,

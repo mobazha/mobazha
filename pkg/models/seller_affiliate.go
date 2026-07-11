@@ -213,7 +213,9 @@ type AffiliateAttribution struct {
 	ReferralSessionID           string                       `json:"referralSessionID" gorm:"column:referral_session_id;type:text;not null;index"`
 	ProgramID                   string                       `json:"programID" gorm:"column:program_id;type:text;not null;index"`
 	SellerPeerID                string                       `json:"sellerPeerID" gorm:"column:seller_peer_id;type:text;not null;index"`
-	BuyerPeerID                 string                       `json:"buyerPeerID" gorm:"column:buyer_peer_id;type:text;not null;index"`
+	BuyerKind                   AffiliateBuyerKind           `json:"buyerKind" gorm:"column:buyer_kind;type:text;not null;default:'peer';index"`
+	BuyerPeerID                 string                       `json:"buyerPeerID,omitempty" gorm:"column:buyer_peer_id;type:text;not null;default:'';index"`
+	GuestBuyerID                string                       `json:"-" gorm:"column:guest_buyer_id;type:text;not null;default:'';index"`
 	PromoterPeerID              string                       `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index"`
 	CommissionRateBPSSnapshot   uint32                       `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
 	PromoterPayoutAddress       string                       `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
@@ -227,7 +229,7 @@ func (AffiliateAttribution) TableName() string { return "affiliate_attributions"
 func (a *AffiliateAttribution) Validate() error {
 	if a == nil || !validAffiliateID(a.ID) || !validAffiliateID(a.OrderID) ||
 		!validAffiliateID(a.ReferralSessionID) || !validAffiliateID(a.ProgramID) ||
-		!validAffiliatePeerID(a.SellerPeerID) || !validAffiliatePeerID(a.BuyerPeerID) ||
+		!validAffiliatePeerID(a.SellerPeerID) || !a.validBuyerIdentity() ||
 		!validAffiliatePeerID(a.PromoterPeerID) || a.CommissionRateBPSSnapshot == 0 ||
 		a.CommissionRateBPSSnapshot > 10000 ||
 		!validAffiliateEVMPayoutAddress(a.PromoterPayoutAddress) || !a.PromoterUTXOPayoutAddresses.Valid() ||
@@ -235,6 +237,26 @@ func (a *AffiliateAttribution) Validate() error {
 		return ErrInvalidSellerAffiliate
 	}
 	return nil
+}
+
+// AffiliateBuyerKind identifies whether attribution belongs to a peer order or
+// to one anonymous Guest Checkout order.
+type AffiliateBuyerKind string
+
+const (
+	AffiliateBuyerKindPeer  AffiliateBuyerKind = "peer"
+	AffiliateBuyerKindGuest AffiliateBuyerKind = "guest"
+)
+
+func (a *AffiliateAttribution) validBuyerIdentity() bool {
+	switch a.BuyerKind {
+	case "", AffiliateBuyerKindPeer:
+		return validAffiliatePeerID(a.BuyerPeerID) && strings.TrimSpace(a.GuestBuyerID) == ""
+	case AffiliateBuyerKindGuest:
+		return strings.TrimSpace(a.BuyerPeerID) == "" && validAffiliateID(a.GuestBuyerID)
+	default:
+		return false
+	}
 }
 
 // AffiliateCommissionLine is one order line's complete Phase 1 commission record.
@@ -302,6 +324,8 @@ type AffiliateOrderFacts struct {
 	OrderID           string
 	SellerPeerID      string
 	BuyerPeerID       string
+	BuyerKind         AffiliateBuyerKind
+	GuestBuyerID      string
 	ReferralSessionID string
 	AttributedAt      time.Time
 	Lines             []AffiliateOrderLineFact

@@ -32,6 +32,14 @@ func (m *mockUTXOWallet) BuildSweepTx(_ []iwallet.SweepInput, _ btcec.PrivateKey
 	return []byte{0x01}, "mock-sweep", nil
 }
 
+func (m *mockUTXOWallet) BuildSplitSweepTx(_ []iwallet.SweepInput, _ btcec.PrivateKey, _, _ string, _ int64, _ int64) ([]byte, string, error) {
+	return []byte{0x01}, "mock-split-sweep", nil
+}
+
+func (m *mockUTXOWallet) IsDust(_ iwallet.Address, amount iwallet.Amount) bool {
+	return amount.Int64() < 1000
+}
+
 type mockWalletOperator struct {
 	wallet *mockUTXOWallet
 }

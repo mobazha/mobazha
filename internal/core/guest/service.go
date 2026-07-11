@@ -70,6 +70,7 @@ type GuestOrderAppServiceConfig struct {
 	EVMObservationAvailable bool
 	SolanaMonitorAvailable  bool
 	GuestPaymentPolicy      distribution.GuestPaymentPolicy
+	SellerAffiliate         contracts.GuestSellerAffiliateService
 	// BillingHoldActive reports L1 billing grace (checkout blocked).
 	BillingHoldActive func() bool
 }
@@ -119,6 +120,7 @@ type GuestOrderAppService struct {
 	evmManagedEscrowMonitorChains map[iwallet.ChainType]struct{}
 	evmHealthProvider             distribution.ManagedEscrowHealthProvider
 	guestPaymentPolicy            distribution.GuestPaymentPolicy
+	sellerAffiliate               contracts.GuestSellerAffiliateService
 	directObservedGraceMu         sync.RWMutex
 	directObservedGrace           PaymentGracePeriodProvider
 	billingHoldActive             func() bool
@@ -173,6 +175,7 @@ func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppServi
 		evmObservationAvailable: cfg.EVMObservationAvailable,
 		solanaMonitorAvailable:  cfg.SolanaMonitorAvailable,
 		guestPaymentPolicy:      cfg.GuestPaymentPolicy,
+		sellerAffiliate:         cfg.SellerAffiliate,
 		billingHoldActive:       cfg.BillingHoldActive,
 	}
 }
@@ -467,6 +470,60 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	if err != nil {
 		return nil, fmt.Errorf("convert to payment coin: %w", err)
 	}
+	referralSessionID := strings.TrimSpace(req.AffiliateReferralSessionID)
+	guestBuyerID := ""
+	affiliatePayoutAddress := ""
+	affiliatePayoutAmount := ""
+	var affiliateResult *models.AffiliateOrderResult
+	if referralSessionID != "" {
+		if s.sellerAffiliate == nil {
+			return nil, fmt.Errorf("%w: affiliate referral is unavailable", contracts.ErrInvalidGuestRequest)
+		}
+		guestBuyerID = guestAffiliateBuyerID(buyerPortalToken)
+		lineFacts := make([]models.AffiliateOrderLineFact, 0, len(items))
+		for index, item := range items {
+			lineAmount, err := s.convertToPaymentCoin(new(big.Int).SetUint64(item.ItemTotal), priceCurrencyCode, coinType)
+			if err != nil {
+				return nil, fmt.Errorf("convert affiliate line %d to payment coin: %w", index, err)
+			}
+			lineFacts = append(lineFacts, models.AffiliateOrderLineFact{
+				OrderLineID:          fmt.Sprintf("%s:%d", orderToken, index),
+				NetMerchandiseAtomic: lineAmount,
+				Currency:             paymentCoin,
+			})
+		}
+		affiliateResult, err = s.sellerAffiliate.PrepareOrderAttribution(ctx, models.AffiliateOrderFacts{
+			OrderID: orderToken, SellerPeerID: sellerPeerID, BuyerKind: models.AffiliateBuyerKindGuest,
+			GuestBuyerID: guestBuyerID, ReferralSessionID: referralSessionID, AttributedAt: time.Now().UTC(), Lines: lineFacts,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("prepare guest affiliate attribution: %w", err)
+		}
+		if affiliateResult != nil {
+			if coinInfo.Chain != iwallet.ChainBitcoin && coinInfo.Chain != iwallet.ChainBitcoinCash && coinInfo.Chain != iwallet.ChainLitecoin {
+				return nil, fmt.Errorf("%w: guest affiliate settlement is unsupported for %s", contracts.ErrCoinUnsupported, coinInfo.Chain)
+			}
+			var ok bool
+			affiliatePayoutAddress, ok = affiliateResult.Attribution.PromoterUTXOPayoutAddresses.AddressForRail(string(coinInfo.Chain))
+			if !ok {
+				return nil, fmt.Errorf("%w: affiliate payout address is unavailable for %s", contracts.ErrInvalidGuestRequest, coinInfo.Chain)
+			}
+			amount := new(big.Int)
+			for _, line := range affiliateResult.Lines {
+				lineAmount, ok := new(big.Int).SetString(line.CommissionAtomic, 10)
+				if !ok || lineAmount.Sign() < 0 {
+					return nil, fmt.Errorf("%w: invalid guest affiliate commission", contracts.ErrInvalidGuestRequest)
+				}
+				amount.Add(amount, lineAmount)
+			}
+			if amount.Sign() > 0 {
+				if err := s.validateGuestAffiliateUTXOPayout(coinInfo.Chain, affiliatePayoutAddress, amount); err != nil {
+					return nil, err
+				}
+				affiliatePayoutAmount = amount.String()
+			}
+		}
+	}
 
 	payResult, err := s.directPayment.GeneratePaymentAddress(ctx, PaymentAddressRequest{
 		CoinType:   coinType,
@@ -483,26 +540,30 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		requiredConfs = payResult.RequiredConfs
 	}
 	order := models.GuestOrder{
-		OrderToken:                orderToken,
-		State:                     models.GuestOrderAwaitingPayment,
-		PaymentCoin:               paymentCoin,
-		PaymentAddress:            payResult.Address,
-		PaymentAmount:             paymentAmount,
-		PriceCurrency:             priceCurrencyCode,
-		PriceDivisibility:         priceDivisibility,
-		Subtotal:                  subtotalSmallest.Uint64(),
-		ShippingCost:              shippingCostSmallest.Uint64(),
-		TotalPrice:                totalSmallest.Uint64(),
-		SweepToAddress:            payResult.SweepTo,
-		ReferenceKey:              payResult.ReferenceKey,
-		AddressIndex:              payResult.AddressIndex,
-		PaymentAttemptID:          payResult.AttemptID,
-		RequiredConfs:             requiredConfs,
-		ExpiresAt:                 expiresAt,
-		ContactEmail:              req.ContactEmail,
-		BuyerPortalTokenHash:      hashBuyerPortalToken(buyerPortalToken),
-		BuyerPortalTokenExpiresAt: &buyerPortalExpiresAt,
-		BuyerPortalTokenVersion:   1,
+		OrderToken:                 orderToken,
+		State:                      models.GuestOrderAwaitingPayment,
+		PaymentCoin:                paymentCoin,
+		PaymentAddress:             payResult.Address,
+		PaymentAmount:              paymentAmount,
+		PriceCurrency:              priceCurrencyCode,
+		PriceDivisibility:          priceDivisibility,
+		Subtotal:                   subtotalSmallest.Uint64(),
+		ShippingCost:               shippingCostSmallest.Uint64(),
+		TotalPrice:                 totalSmallest.Uint64(),
+		SweepToAddress:             payResult.SweepTo,
+		ReferenceKey:               payResult.ReferenceKey,
+		AddressIndex:               payResult.AddressIndex,
+		AffiliateReferralSessionID: referralSessionID,
+		AffiliateGuestBuyerID:      guestBuyerID,
+		AffiliatePayoutAddress:     affiliatePayoutAddress,
+		AffiliatePayoutAmount:      affiliatePayoutAmount,
+		PaymentAttemptID:           payResult.AttemptID,
+		RequiredConfs:              requiredConfs,
+		ExpiresAt:                  expiresAt,
+		ContactEmail:               req.ContactEmail,
+		BuyerPortalTokenHash:       hashBuyerPortalToken(buyerPortalToken),
+		BuyerPortalTokenExpiresAt:  &buyerPortalExpiresAt,
+		BuyerPortalTokenVersion:    1,
 	}
 	setGuestOrderPaymentRoute(&order, payResult.Route, payResult.GracePeriod)
 	if allDigitalGoods {
@@ -541,6 +602,11 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 	err = s.db.Update(func(tx database.Tx) error {
 		if err := tx.Save(&order); err != nil {
 			return fmt.Errorf("save guest order: %w", err)
+		}
+		if affiliateResult != nil {
+			if _, err := s.sellerAffiliate.RecordPreparedOrderTx(tx, affiliateResult); err != nil {
+				return fmt.Errorf("save guest affiliate attribution: %w", err)
+			}
 		}
 		for i := range items {
 			if err := tx.Save(&items[i]); err != nil {
@@ -1659,6 +1725,14 @@ func (s *GuestOrderAppService) releaseExpiredReservations(_ context.Context) {
 func (s *GuestOrderAppService) expireOrder(orderToken string, currentState models.GuestOrderState) error {
 	return s.transitionState(orderToken, currentState, models.GuestOrderExpired,
 		func(tx database.Tx, order *models.GuestOrder) error {
+			if s.sellerAffiliate != nil && order.AffiliateReferralSessionID != "" {
+				if _, err := s.sellerAffiliate.TransitionCommissionTx(
+					tx, orderToken, models.AffiliateCommissionStatusReversed,
+					models.AffiliateReversalOrderInvalid, time.Now().UTC(),
+				); err != nil && !errors.Is(err, models.ErrSellerAffiliateNotFound) {
+					return fmt.Errorf("reverse expired guest affiliate commission: %w", err)
+				}
+			}
 			return s.releaseGuestSupplyInTx(context.Background(), tx, orderToken, "expired")
 		})
 }
@@ -2068,6 +2142,39 @@ func generateBuyerPortalToken() (string, error) {
 		return "", err
 	}
 	return buyerPortalTokenPrefix + hex.EncodeToString(b), nil
+}
+
+func guestAffiliateBuyerID(buyerPortalToken string) string {
+	digest := sha256.Sum256([]byte("guest-affiliate:" + buyerPortalToken))
+	return hex.EncodeToString(digest[:])
+}
+
+func (s *GuestOrderAppService) validateGuestAffiliateUTXOPayout(chain iwallet.ChainType, address string, amount *big.Int) error {
+	if amount == nil || !amount.IsInt64() || amount.Sign() <= 0 {
+		return fmt.Errorf("%w: invalid guest affiliate commission", contracts.ErrInvalidGuestRequest)
+	}
+	utils, err := utxoAddressUtilsFor(s.multiwallet, chain)
+	if err != nil {
+		return fmt.Errorf("%w: affiliate %s address validation is unavailable: %v", contracts.ErrCoinUnavailable, chain, err)
+	}
+	if _, err := utils.AddressToScriptPubKey(address); err != nil {
+		return fmt.Errorf("%w: invalid affiliate payout address for %s", contracts.ErrInvalidGuestRequest, chain)
+	}
+	wallet, ok := s.multiwallet.WalletForChain(chain)
+	if !ok {
+		return fmt.Errorf("%w: affiliate wallet for %s is unavailable", contracts.ErrCoinUnavailable, chain)
+	}
+	if _, ok := wallet.(iwallet.UTXOSplitSweeper); !ok {
+		return fmt.Errorf("%w: affiliate split sweep is unavailable for %s", contracts.ErrCoinUnavailable, chain)
+	}
+	dustChecker, ok := wallet.(iwallet.UTXODustChecker)
+	if !ok {
+		return fmt.Errorf("%w: affiliate dust policy is unavailable for %s", contracts.ErrCoinUnavailable, chain)
+	}
+	if dustChecker.IsDust(iwallet.NewAddress(address, iwallet.CoinType(string(chain))), iwallet.NewAmount(amount)) {
+		return fmt.Errorf("%w: affiliate payout is dust for %s", contracts.ErrInvalidGuestRequest, chain)
+	}
+	return nil
 }
 
 func hashBuyerPortalToken(token string) string {

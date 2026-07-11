@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 	settlementpayment "github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
@@ -173,6 +174,16 @@ func (s *SellerAffiliateAppService) CreateReferralSession(ctx context.Context, p
 
 // AttributeOrder records one automatic order attribution and its line commissions.
 func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error) {
+	result, err := s.PrepareOrderAttribution(ctx, facts)
+	if err != nil || result == nil {
+		return result, err
+	}
+	return s.store.RecordAffiliateOrder(ctx, result)
+}
+
+// PrepareOrderAttribution validates mutable referral resources and returns the
+// immutable snapshot that must be committed with its order.
+func (s *SellerAffiliateAppService) PrepareOrderAttribution(ctx context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error) {
 	if s == nil || s.store == nil {
 		return nil, errors.New("seller affiliate store not configured")
 	}
@@ -182,6 +193,10 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 	facts.OrderID = strings.TrimSpace(facts.OrderID)
 	facts.SellerPeerID = strings.TrimSpace(facts.SellerPeerID)
 	facts.BuyerPeerID = strings.TrimSpace(facts.BuyerPeerID)
+	facts.GuestBuyerID = strings.TrimSpace(facts.GuestBuyerID)
+	if facts.BuyerKind == "" {
+		facts.BuyerKind = models.AffiliateBuyerKindPeer
+	}
 	facts.ReferralSessionID = strings.TrimSpace(facts.ReferralSessionID)
 	facts.AttributedAt = facts.AttributedAt.UTC()
 	session, err := s.store.GetAffiliateReferralSession(ctx, facts.ReferralSessionID)
@@ -202,7 +217,9 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 		session.PromoterPeerID != link.PromoterPeerID || !session.UsableAt(facts.AttributedAt) {
 		return nil, models.ErrInvalidSellerAffiliate
 	}
-	if facts.BuyerPeerID == facts.SellerPeerID || facts.BuyerPeerID == session.PromoterPeerID || facts.SellerPeerID == session.PromoterPeerID {
+	if facts.SellerPeerID == session.PromoterPeerID ||
+		(facts.BuyerKind == models.AffiliateBuyerKindPeer &&
+			(facts.BuyerPeerID == facts.SellerPeerID || facts.BuyerPeerID == session.PromoterPeerID)) {
 		return nil, nil
 	}
 	attributionID := uuid.NewString()
@@ -213,7 +230,9 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 			ReferralSessionID:           session.ID,
 			ProgramID:                   session.ProgramID,
 			SellerPeerID:                facts.SellerPeerID,
+			BuyerKind:                   facts.BuyerKind,
 			BuyerPeerID:                 facts.BuyerPeerID,
+			GuestBuyerID:                facts.GuestBuyerID,
 			PromoterPeerID:              session.PromoterPeerID,
 			CommissionRateBPSSnapshot:   session.CommissionRateBPSSnapshot,
 			PromoterPayoutAddress:       session.PromoterPayoutAddress,
@@ -253,7 +272,16 @@ func (s *SellerAffiliateAppService) AttributeOrder(ctx context.Context, facts mo
 		}
 		result.Lines = append(result.Lines, line)
 	}
-	return s.store.RecordAffiliateOrder(ctx, result)
+	return result, nil
+}
+
+// RecordPreparedOrderTx persists a prepared attribution in the caller's
+// tenant-scoped transaction.
+func (s *SellerAffiliateAppService) RecordPreparedOrderTx(tx database.Tx, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	return s.store.RecordAffiliateOrderTx(tx, result)
 }
 
 func normalizeAffiliateEVMPayoutAddress(value string) (string, error) {
@@ -273,6 +301,18 @@ func (s *SellerAffiliateAppService) TransitionCommission(ctx context.Context, or
 		return nil, models.ErrInvalidSellerAffiliate
 	}
 	return s.store.TransitionAffiliateCommission(ctx, strings.TrimSpace(orderID), status, reason, at.UTC())
+}
+
+// TransitionCommissionTx applies an objective lifecycle fact in the caller's
+// tenant-scoped order transaction.
+func (s *SellerAffiliateAppService) TransitionCommissionTx(tx database.Tx, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	if at.IsZero() || status != models.AffiliateCommissionStatusReversed || !reason.Valid() {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	return s.store.TransitionAffiliateCommissionTx(tx, strings.TrimSpace(orderID), status, reason, at.UTC())
 }
 
 // GetAttributionByOrder returns the immutable attribution for one seller order.

@@ -87,6 +87,12 @@ type GuestOrder struct {
 	Confirmations  int    `json:"confirmations"`
 	RequiredConfs  int    `json:"requiredConfs"`
 	AddressIndex   uint32 `json:"-"`
+	// Affiliate facts are frozen at checkout. GuestBuyerID is a per-order,
+	// server-generated opaque identifier and is never exposed by public APIs.
+	AffiliateReferralSessionID string `gorm:"column:affiliate_referral_session_id;type:text" json:"-"`
+	AffiliateGuestBuyerID      string `gorm:"column:affiliate_guest_buyer_id;type:text" json:"-"`
+	AffiliatePayoutAddress     string `gorm:"column:affiliate_payout_address;type:text" json:"-"`
+	AffiliatePayoutAmount      string `gorm:"column:affiliate_payout_amount;type:text" json:"-"`
 	// PaymentAttemptID links externally provisioned targets to the durable
 	// claim that was committed before the provider call.
 	PaymentAttemptID string `gorm:"column:payment_attempt_id;size:64;index;<-:create" json:"-"`

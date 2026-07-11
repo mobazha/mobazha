@@ -735,6 +735,34 @@ func TestLitecoinWallet_BuildSweepTx(t *testing.T) {
 	t.Logf("Transaction fee: %d litoshis (%.1f sat/vB)", fee, float64(fee)/float64(10+68+31))
 }
 
+func TestLitecoinWallet_BuildSplitSweepTx_PreservesAffiliateAmount(t *testing.T) {
+	w, err := newTestWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyBytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
+	addr, _ := ltcutil.NewAddressWitnessPubKeyHash(ltcutil.Hash160(pubKey.SerializeCompressed()), &chaincfg.TestNet4Params)
+	inputs := []iwallet.SweepInput{{TxHash: "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d", Value: 1_000_000}}
+	rawTx, _, err := w.BuildSplitSweepTx(inputs, *privKey, addr.String(), addr.String(), 100_000, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tx wire.MsgTx
+	if err := tx.Deserialize(bytes.NewReader(rawTx)); err != nil {
+		t.Fatal(err)
+	}
+	if len(tx.TxOut) != 2 {
+		t.Fatalf("expected 2 outputs, got %d", len(tx.TxOut))
+	}
+	if tx.TxOut[1].Value != 100_000 {
+		t.Fatalf("affiliate output = %d, want 100000", tx.TxOut[1].Value)
+	}
+	if _, _, err := w.BuildSplitSweepTx(inputs, *privKey, addr.String(), addr.String(), 1, 2); err == nil || !strings.Contains(err.Error(), "affiliate sweep output is dust") {
+		t.Fatalf("dust affiliate output error = %v", err)
+	}
+}
+
 func TestLitecoinWallet_BuildSweepTx_FeeExceedsInput(t *testing.T) {
 	w, err := newTestWallet()
 	if err != nil {

@@ -108,7 +108,7 @@ func newSweepTestDB(t *testing.T) *sweepTestDB {
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.SweepTask{}))
+	require.NoError(t, db.AutoMigrate(&models.SweepTask{}, &models.SettlementAction{}))
 	return &sweepTestDB{gormDB: db}
 }
 
@@ -187,6 +187,28 @@ func TestCreateSweepTask_UsesBIP44KeySource(t *testing.T) {
 	var task models.SweepTask
 	require.NoError(t, db.gormDB.Where("order_token = ?", "gst_key_source").First(&task).Error)
 	assert.Equal(t, models.SweepKeySourceBIP44, task.KeySource)
+}
+
+func TestCreateSweepTask_AffiliateFreezesSplitAction(t *testing.T) {
+	db := newSweepTestDB(t)
+	svc := newSweepSvc(db)
+	err := db.Update(func(tx database.Tx) error {
+		return svc.CreateSweepTask(tx, &models.GuestOrder{
+			OrderToken: "gst_affiliate", PaymentCoin: "BTC", PaymentAddress: "from", SweepToAddress: "seller",
+			PaymentAmount: "100000", AffiliatePayoutAddress: "promoter", AffiliatePayoutAmount: "5000",
+		})
+	})
+	require.NoError(t, err)
+	var task models.SweepTask
+	require.NoError(t, db.gormDB.Where("order_token = ?", "gst_affiliate").First(&task).Error)
+	assert.Equal(t, "promoter", task.AffiliatePayoutAddress)
+	assert.Equal(t, "5000", task.AffiliatePayoutAmount)
+	var action models.SettlementAction
+	require.NoError(t, db.gormDB.Where("action_id = ?", guestSweepActionID("gst_affiliate")).First(&action).Error)
+	assert.Equal(t, "submitting", action.State)
+	lines := models.DecodeSettlementPayoutLines(action.PlannedLines)
+	require.Len(t, lines, 1)
+	assert.Equal(t, "affiliate", lines[0].Type)
 }
 
 func TestCreateSweepTask_SolanaSkipsWhenNoSweepTo(t *testing.T) {
@@ -334,6 +356,31 @@ func TestConfirmSweep_TransitionsSubmittedToConfirmed(t *testing.T) {
 	assert.Equal(t, models.SweepStatusConfirmed, got.Status)
 }
 
+func TestConfirmSweep_AffiliateConfirmsObservedSettlementOutput(t *testing.T) {
+	db := newSweepTestDB(t)
+	svc := newSweepSvc(db)
+	task := &models.SweepTask{
+		ID: 1, OrderToken: "gst_affiliate_confirm", ChainKey: "BTC", Status: models.SweepStatusSubmitted,
+		TxHash: "tx-split", AffiliatePayoutAddress: "promoter", AffiliatePayoutAmount: "5000",
+	}
+	task.TenantID = testTenantID
+	require.NoError(t, db.gormDB.Create(task).Error)
+	action := models.SettlementAction{
+		ActionID: guestSweepActionID(task.OrderToken), OrderID: task.OrderToken, ActionKind: "guest_sweep",
+		State: "submitted", TxHash: task.TxHash, SettlementCoin: "BTC",
+		PlannedLines: models.EncodeSettlementPayoutLines([]models.SettlementPayoutLine{{Type: "affiliate", Amount: "5000", Address: "promoter", Coin: "BTC"}}),
+	}
+	action.TenantID = testTenantID
+	require.NoError(t, db.gormDB.Create(&action).Error)
+	observed := []models.SettlementPayoutLine{{Type: "affiliate", Amount: "5000", Address: "promoter", Coin: "BTC", TxHash: task.TxHash}}
+	require.NoError(t, svc.ConfirmSweep(task.OrderToken, task.TxHash, observed))
+	var got models.SettlementAction
+	require.NoError(t, db.gormDB.Where("action_id = ?", action.ActionID).First(&got).Error)
+	assert.Equal(t, "confirmed", got.State)
+	assert.NotNil(t, got.ConfirmedAt)
+	assert.Equal(t, observed, models.DecodeSettlementPayoutLines(got.ObservedLines))
+}
+
 func TestConfirmSweep_ErrorsWhenNoSubmittedTask(t *testing.T) {
 	db := newSweepTestDB(t)
 	svc := newSweepSvc(db)
@@ -439,6 +486,33 @@ func TestRecoverStaleTasks_IgnoresRecentProcessing(t *testing.T) {
 	require.NoError(t, db.gormDB.First(&got, "id = ?", 1).Error)
 	assert.Equal(t, models.SweepStatusProcessing, got.Status,
 		"recently-claimed task must not be recovered")
+}
+
+func TestRecoverStaleTasks_PromotesAffiliateActionAfterRecoveredBroadcast(t *testing.T) {
+	db := newSweepTestDB(t)
+	svc := newSweepSvc(db)
+	task := &models.SweepTask{
+		ID: 1, OrderToken: "gst_affiliate_stale", ChainKey: "LTC",
+		AffiliatePayoutAddress: "promoter", AffiliatePayoutAmount: "5000",
+		Status: models.SweepStatusProcessing,
+	}
+	task.TenantID = testTenantID
+	require.NoError(t, db.gormDB.Create(task).Error)
+	require.NoError(t, db.gormDB.Create(&models.SettlementAction{
+		ActionID: guestSweepActionID(task.OrderToken), OrderID: task.OrderToken,
+		ActionKind: "guest_sweep", State: "submitting", SettlementCoin: "LTC",
+	}).Error)
+	require.NoError(t, db.gormDB.Exec(
+		"UPDATE sweep_tasks SET updated_at = datetime('now', '-15 minutes') WHERE id = 1",
+	).Error)
+	svc.recordBroadcast(task.ID, "recovered_tx")
+
+	svc.RecoverStaleTasks()
+
+	var action models.SettlementAction
+	require.NoError(t, db.gormDB.First(&action, "action_id = ?", guestSweepActionID(task.OrderToken)).Error)
+	assert.Equal(t, "submitted", action.State)
+	assert.Equal(t, "recovered_tx", action.TxHash)
 }
 
 // ── ConfirmSweep with txHash mismatch ──────────────────────────────

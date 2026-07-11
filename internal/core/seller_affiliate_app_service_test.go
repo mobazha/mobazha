@@ -7,6 +7,7 @@ import (
 
 	coredatabase "github.com/mobazha/mobazha/internal/database"
 	"github.com/mobazha/mobazha/internal/database/dbstore"
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/identity"
 	"github.com/mobazha/mobazha/pkg/models"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
@@ -87,6 +88,40 @@ func TestSellerAffiliateAppService_AutomatesMinimalCommissionLifecycle(t *testin
 	assert.Equal(t, models.AffiliateCommissionStatusReversed, reversed[0].Status)
 	assert.Equal(t, models.AffiliateReversalRefund, reversed[0].ReversalReason)
 
+}
+
+func TestSellerAffiliateAppService_GuestIdentityPersistsInCallerTransaction(t *testing.T) {
+	base, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	defer base.Close()
+	require.NoError(t, coredatabase.MigrateSellerAffiliateModels(base))
+	service := NewSellerAffiliateAppService(coredatabase.NewGormSellerAffiliateStore(base))
+	ctx := context.Background()
+	sellerPeerID, promoterPeerID := affiliateTestPeerID(t), affiliateTestPeerID(t)
+	_, err = service.PutProgram(ctx, &models.AffiliateProgram{
+		SellerPeerID: sellerPeerID, Status: models.AffiliateProgramStatusActive,
+		CommissionRateBPS: 500, AttributionWindowSeconds: 3600,
+	})
+	require.NoError(t, err)
+	link, err := service.CreateLink(ctx, promoterPeerID, "guest-link", "0x1111111111111111111111111111111111111111", affiliateTestUTXOPayoutAddresses())
+	require.NoError(t, err)
+	session, err := service.CreateReferralSession(ctx, link.PublicToken, time.Now().UTC())
+	require.NoError(t, err)
+	prepared, err := service.PrepareOrderAttribution(ctx, models.AffiliateOrderFacts{
+		OrderID: "gst_order", SellerPeerID: sellerPeerID, BuyerKind: models.AffiliateBuyerKindGuest,
+		GuestBuyerID: "anonymous-order-buyer", ReferralSessionID: session.ID, AttributedAt: time.Now().UTC(),
+		Lines: []models.AffiliateOrderLineFact{{OrderLineID: "gst_order:0", NetMerchandiseAtomic: "10000", Currency: "BTC"}},
+	})
+	require.NoError(t, err)
+	require.NoError(t, base.Update(func(tx database.Tx) error {
+		_, err := service.RecordPreparedOrderTx(tx, prepared)
+		return err
+	}))
+	attribution, err := service.GetAttributionByOrder(ctx, "gst_order")
+	require.NoError(t, err)
+	assert.Equal(t, models.AffiliateBuyerKindGuest, attribution.BuyerKind)
+	assert.Empty(t, attribution.BuyerPeerID)
+	assert.Equal(t, "anonymous-order-buyer", attribution.GuestBuyerID)
 }
 
 func TestSellerAffiliateAppService_RejectsDeterministicSelfAttribution(t *testing.T) {

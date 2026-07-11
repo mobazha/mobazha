@@ -146,6 +146,18 @@ func (s *GormSellerAffiliateStore) GetAffiliateReferralSession(_ context.Context
 
 // RecordAffiliateOrder atomically inserts attribution and line commissions.
 func (s *GormSellerAffiliateStore) RecordAffiliateOrder(_ context.Context, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error) {
+	var stored *models.AffiliateOrderResult
+	err := s.db.Update(func(tx pkgdb.Tx) error {
+		var err error
+		stored, err = s.RecordAffiliateOrderTx(tx, result)
+		return err
+	})
+	return stored, err
+}
+
+// RecordAffiliateOrderTx inserts or verifies an immutable attribution using
+// the caller's tenant-scoped transaction.
+func (s *GormSellerAffiliateStore) RecordAffiliateOrderTx(tx pkgdb.Tx, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error) {
 	if result == nil || len(result.Lines) == 0 {
 		return nil, models.ErrInvalidSellerAffiliate
 	}
@@ -163,7 +175,7 @@ func (s *GormSellerAffiliateStore) RecordAffiliateOrder(_ context.Context, resul
 	}
 
 	stored := new(models.AffiliateOrderResult)
-	err := s.db.Update(func(tx pkgdb.Tx) error {
+	err := func() error {
 		var existing models.AffiliateAttribution
 		err := tx.Read().Where("order_id = ?", result.Attribution.OrderID).First(&existing).Error
 		if err == nil {
@@ -192,7 +204,7 @@ func (s *GormSellerAffiliateStore) RecordAffiliateOrder(_ context.Context, resul
 		stored.Attribution = result.Attribution
 		stored.Lines = append([]models.AffiliateCommissionLine(nil), result.Lines...)
 		return nil
-	})
+	}()
 	if err != nil {
 		return nil, err
 	}
@@ -278,6 +290,17 @@ func (s *GormSellerAffiliateStore) ListPendingAffiliateCommissionOrderIDs(_ cont
 func (s *GormSellerAffiliateStore) TransitionAffiliateCommission(_ context.Context, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error) {
 	var lines []models.AffiliateCommissionLine
 	err := s.db.Update(func(tx pkgdb.Tx) error {
+		var err error
+		lines, err = s.TransitionAffiliateCommissionTx(tx, orderID, status, reason, at)
+		return err
+	})
+	return lines, err
+}
+
+// TransitionAffiliateCommissionTx advances all order lines in the caller's transaction.
+func (s *GormSellerAffiliateStore) TransitionAffiliateCommissionTx(tx pkgdb.Tx, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error) {
+	var lines []models.AffiliateCommissionLine
+	err := func() error {
 		if err := tx.Read().Clauses(clause.Locking{Strength: "UPDATE"}).Where("order_id = ?", orderID).Order("order_line_id ASC").Find(&lines).Error; err != nil {
 			return err
 		}
@@ -313,11 +336,8 @@ func (s *GormSellerAffiliateStore) TransitionAffiliateCommission(_ context.Conte
 			}
 		}
 		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return lines, nil
+	}()
+	return lines, err
 }
 
 func affiliateResult[T any](value *T, err error) (*T, error) {
@@ -333,7 +353,8 @@ func affiliateResult[T any](value *T, err error) (*T, error) {
 func sameAffiliateOrderSnapshot(existing models.AffiliateAttribution, storedLines []models.AffiliateCommissionLine, requested *models.AffiliateOrderResult) bool {
 	if existing.OrderID != requested.Attribution.OrderID || existing.ReferralSessionID != requested.Attribution.ReferralSessionID ||
 		existing.ProgramID != requested.Attribution.ProgramID || existing.SellerPeerID != requested.Attribution.SellerPeerID ||
-		existing.BuyerPeerID != requested.Attribution.BuyerPeerID || existing.PromoterPeerID != requested.Attribution.PromoterPeerID ||
+		existing.BuyerKind != requested.Attribution.BuyerKind || existing.BuyerPeerID != requested.Attribution.BuyerPeerID ||
+		existing.GuestBuyerID != requested.Attribution.GuestBuyerID || existing.PromoterPeerID != requested.Attribution.PromoterPeerID ||
 		existing.CommissionRateBPSSnapshot != requested.Attribution.CommissionRateBPSSnapshot ||
 		existing.PromoterPayoutAddress != requested.Attribution.PromoterPayoutAddress ||
 		!existing.PromoterUTXOPayoutAddresses.Equal(requested.Attribution.PromoterUTXOPayoutAddresses) || len(storedLines) != len(requested.Lines) {

@@ -311,6 +311,7 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 		Resolver:           n.featureResolver,
 		SupplyAvailability: n.supplyAvailabilityService,
 		GuestPaymentPolicy: n.sovereignPolicy,
+		SellerAffiliate:    n.sellerAffiliateService,
 		BillingHoldActive: func() bool {
 			if n.preferencesService == nil {
 				return false

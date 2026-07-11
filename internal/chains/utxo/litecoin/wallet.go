@@ -458,6 +458,15 @@ func serializeOutpoint(op *wire.OutPoint) []byte {
 // BuildSweepTx builds and signs a P2WPKH sweep transaction that spends all
 // provided inputs to a single destination address minus fee.
 func (w *LitecoinWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, destAddress string, feePerByte int64) ([]byte, string, error) {
+	return w.buildSweepTx(inputs, signingKey, destAddress, "", 0, feePerByte)
+}
+
+// BuildSplitSweepTx builds a seller remainder plus exact affiliate output.
+func (w *LitecoinWallet) BuildSplitSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, sellerAddress, affiliateAddress string, affiliateAmount, feePerByte int64) ([]byte, string, error) {
+	return w.buildSweepTx(inputs, signingKey, sellerAddress, affiliateAddress, affiliateAmount, feePerByte)
+}
+
+func (w *LitecoinWallet) buildSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, destAddress, affiliateAddress string, affiliateAmount, feePerByte int64) ([]byte, string, error) {
 	if len(inputs) == 0 {
 		return nil, "", errors.New("no inputs provided")
 	}
@@ -477,9 +486,17 @@ func (w *LitecoinWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey bt
 		return nil, "", errors.New("total input is zero")
 	}
 
-	estimatedSize := int64(10 + len(inputs)*68 + 31)
+	outputCount := 1
+	if affiliateAddress != "" || affiliateAmount != 0 {
+		if affiliateAddress == "" || affiliateAmount <= 0 {
+			return nil, "", errors.New("affiliate address and positive amount are required together")
+		}
+		outputCount++
+	}
+	estimatedSize := int64(10 + len(inputs)*68 + outputCount*31)
 	fee := estimatedSize * feePerByte
-	if fee >= totalInput {
+	sellerAmount := totalInput - fee - affiliateAmount
+	if sellerAmount <= 0 {
 		return nil, "", fmt.Errorf("fee (%d) exceeds total input (%d)", fee, totalInput)
 	}
 
@@ -487,7 +504,20 @@ func (w *LitecoinWallet) BuildSweepTx(inputs []iwallet.SweepInput, signingKey bt
 	if err != nil {
 		return nil, "", fmt.Errorf("decode dest address: %w", err)
 	}
-	tx.AddTxOut(wire.NewTxOut(totalInput-fee, destScript))
+	if w.IsDust(iwallet.NewAddress(destAddress, iwallet.CoinType(iwallet.ChainLitecoin)), iwallet.NewAmount(sellerAmount)) {
+		return nil, "", errors.New("seller sweep remainder is dust")
+	}
+	tx.AddTxOut(wire.NewTxOut(sellerAmount, destScript))
+	if outputCount == 2 {
+		affiliateScript, err := w.getPayToAddrScript(affiliateAddress)
+		if err != nil {
+			return nil, "", fmt.Errorf("decode affiliate address: %w", err)
+		}
+		if w.IsDust(iwallet.NewAddress(affiliateAddress, iwallet.CoinType(iwallet.ChainLitecoin)), iwallet.NewAmount(affiliateAmount)) {
+			return nil, "", errors.New("affiliate sweep output is dust")
+		}
+		tx.AddTxOut(wire.NewTxOut(affiliateAmount, affiliateScript))
+	}
 
 	pubKey := signingKey.PubKey()
 	pubKeyHash := ltcutil.Hash160(pubKey.SerializeCompressed())

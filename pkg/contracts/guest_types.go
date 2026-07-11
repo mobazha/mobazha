@@ -53,6 +53,9 @@ type CreateGuestOrderRequest struct {
 	ShippingCountry string `json:"shippingCountry,omitempty"`
 	ContactEmail    string `json:"contactEmail,omitempty"`
 	PaymentCoin     string `json:"paymentCoin"`
+	// AffiliateReferralSessionID is an optional seller-issued referral session.
+	// Core validates and freezes it with the Guest Order before payment.
+	AffiliateReferralSessionID string `json:"affiliateReferralSessionID,omitempty"`
 }
 
 // QuoteGuestOrderSupplyRequest is the public preflight input for checking

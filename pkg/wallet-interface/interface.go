@@ -178,6 +178,18 @@ type UTXOSweeper interface {
 	BuildSweepTx(inputs []SweepInput, signingKey btcec.PrivateKey, destAddress string, feePerByte int64) (rawTx []byte, txHash string, err error)
 }
 
+// UTXOSplitSweeper builds an atomic seller remainder + affiliate payout sweep.
+// The fee is deducted only from the seller output; affiliateAmount is exact.
+type UTXOSplitSweeper interface {
+	BuildSplitSweepTx(inputs []SweepInput, signingKey btcec.PrivateKey, sellerAddress, affiliateAddress string, affiliateAmount, feePerByte int64) (rawTx []byte, txHash string, err error)
+}
+
+// UTXODustChecker exposes the chain wallet's current dust policy to callers
+// that must reject an unfundable output before showing a payment target.
+type UTXODustChecker interface {
+	IsDust(address Address, amount Amount) bool
+}
+
 // UTXOAddressUtilities provides chain-specific address derivation and parsing
 // utilities. Implemented by all UTXO wallets (BTC/LTC/BCH/ZEC). This interface
 // centralizes chain-specific logic (HRP, network params, encoding format) inside

@@ -9,20 +9,22 @@ import "time"
 // lifecycle, but are signed by the local escrow master key instead of BIP44.
 type SweepTask struct {
 	TenantMixin
-	ID           int            `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	OrderToken   string         `gorm:"index;size:64" json:"orderToken"`
-	ChainKey     string         `json:"chainKey"`
-	FromAddress  string         `json:"fromAddress"`
-	ToAddress    string         `json:"toAddress"`
-	Amount       string         `json:"amount"`
-	AddressIndex uint32         `json:"-"`
-	KeySource    SweepKeySource `gorm:"type:text;not null;default:'bip44'" json:"-"`
-	Status       string         `gorm:"index" json:"status"`
-	TxHash       string         `json:"txHash,omitempty"`
-	RetryCount   int            `json:"retryCount"`
-	LastError    string         `json:"lastError,omitempty"`
-	CreatedAt    time.Time      `gorm:"autoCreateTime" json:"createdAt"`
-	UpdatedAt    time.Time      `gorm:"autoUpdateTime" json:"updatedAt"`
+	ID                     int            `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	OrderToken             string         `gorm:"index;size:64" json:"orderToken"`
+	ChainKey               string         `json:"chainKey"`
+	FromAddress            string         `json:"fromAddress"`
+	ToAddress              string         `json:"toAddress"`
+	Amount                 string         `json:"amount"`
+	AffiliatePayoutAddress string         `gorm:"column:affiliate_payout_address;type:text" json:"-"`
+	AffiliatePayoutAmount  string         `gorm:"column:affiliate_payout_amount;type:text" json:"-"`
+	AddressIndex           uint32         `json:"-"`
+	KeySource              SweepKeySource `gorm:"type:text;not null;default:'bip44'" json:"-"`
+	Status                 string         `gorm:"index" json:"status"`
+	TxHash                 string         `json:"txHash,omitempty"`
+	RetryCount             int            `json:"retryCount"`
+	LastError              string         `json:"lastError,omitempty"`
+	CreatedAt              time.Time      `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt              time.Time      `gorm:"autoUpdateTime" json:"updatedAt"`
 }
 
 // SweepKeySource identifies the private-key domain that owns FromAddress.

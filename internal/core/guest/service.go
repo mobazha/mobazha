@@ -51,6 +51,14 @@ type PaymentWatcher interface {
 // GuestListingQuery is satisfied by *ListingAppService.
 type GuestListingQuery = checkoutsupply.CheckoutSupplyListingReader
 
+type frozenGuestExchangeRate struct {
+	rate iwallet.Amount
+}
+
+func (r frozenGuestExchangeRate) GetRate(models.CurrencyCode, models.CurrencyCode, bool) (iwallet.Amount, error) {
+	return r.rate, nil
+}
+
 // GuestOrderAppServiceConfig groups dependencies for GuestOrderAppService.
 type GuestOrderAppServiceConfig struct {
 	Context                 context.Context
@@ -466,7 +474,11 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 
 	s.quoteSupplyAvailabilityShadow(ctx, orderToken, items, itemBuckets, itemStockLimits)
 
-	paymentAmount, err := s.convertToPaymentCoin(totalSmallest, priceCurrencyCode, coinType)
+	convertPaymentAmount, err := s.paymentCoinConverter(priceCurrencyCode, coinType)
+	if err != nil {
+		return nil, fmt.Errorf("prepare payment coin conversion: %w", err)
+	}
+	paymentAmount, err := convertPaymentAmount(totalSmallest)
 	if err != nil {
 		return nil, fmt.Errorf("convert to payment coin: %w", err)
 	}
@@ -482,7 +494,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		guestBuyerID = guestAffiliateBuyerID(buyerPortalToken)
 		lineFacts := make([]models.AffiliateOrderLineFact, 0, len(items))
 		for index, item := range items {
-			lineAmount, err := s.convertToPaymentCoin(new(big.Int).SetUint64(item.ItemTotal), priceCurrencyCode, coinType)
+			lineAmount, err := convertPaymentAmount(new(big.Int).SetUint64(item.ItemTotal))
 			if err != nil {
 				return nil, fmt.Errorf("convert affiliate line %d to payment coin: %w", index, err)
 			}
@@ -1990,47 +2002,69 @@ func matchSku(listing *pb.Listing, options []map[string]string) *pb.Listing_Item
 	return nil
 }
 
-func (s *GuestOrderAppService) convertToPaymentCoin(totalSmallest *big.Int, priceCurCode string, coinType iwallet.CoinType) (string, error) {
+func (s *GuestOrderAppService) paymentCoinConverter(priceCurCode string, coinType iwallet.CoinType) (func(*big.Int) (string, error), error) {
 	priceCurDef, err := models.CurrencyDefinitions.Lookup(priceCurCode)
 	if err != nil {
-		return "", fmt.Errorf("lookup pricing currency %q: %w", priceCurCode, err)
+		return nil, fmt.Errorf("lookup pricing currency %q: %w", priceCurCode, err)
 	}
 
 	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
 	if err != nil {
-		return "", fmt.Errorf("unknown coin type %q: %w", coinType, err)
+		return nil, fmt.Errorf("unknown coin type %q: %w", coinType, err)
 	}
 
 	paymentCurDef, err := models.CurrencyDefinitions.Lookup(coinInfo.Symbol)
 	if err != nil {
-		return "", fmt.Errorf("lookup payment currency %q: %w", coinInfo.Symbol, err)
+		return nil, fmt.Errorf("lookup payment currency %q: %w", coinInfo.Symbol, err)
 	}
 
 	if priceCurDef.Equal(paymentCurDef) {
-		return totalSmallest.String(), nil
+		return func(amount *big.Int) (string, error) {
+			if amount == nil || amount.Sign() < 0 {
+				return "", errors.New("payment amount must be non-negative")
+			}
+			return amount.String(), nil
+		}, nil
 	}
 
 	// A standalone distribution without an exchange-rate authority can reject
 	// cross-currency checkout with a product-specific user-facing error.
 	if s.guestPaymentPolicy != nil {
 		if err := s.guestPaymentPolicy.ValidateCrossCurrencyCheckout(priceCurCode, coinInfo.Symbol); err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
 	if s.exchangeRates == nil {
-		return "", fmt.Errorf("exchange rate provider not configured")
+		return nil, fmt.Errorf("exchange rate provider not configured")
 	}
 
-	value := &models.CurrencyValue{
-		Amount:   iwallet.NewAmount(totalSmallest),
-		Currency: priceCurDef,
-	}
-	converted, err := wallet.ConvertCurrencyAmount(value, paymentCurDef, s.exchangeRates)
+	// Freeze one rate for the whole checkout. The payment total and every
+	// affiliate line must use identical economic facts even if the upstream
+	// provider changes between calls.
+	rate, err := s.exchangeRates.GetRate(paymentCurDef.Code, priceCurDef.Code, true)
 	if err != nil {
-		return "", fmt.Errorf("convert %s → %s: %w", priceCurCode, coinInfo.Symbol, err)
+		return nil, fmt.Errorf("load %s → %s rate: %w", priceCurCode, coinInfo.Symbol, err)
 	}
-	return converted.String(), nil
+	rateValue := big.Int(rate)
+	if rateValue.Sign() <= 0 {
+		return nil, errors.New("exchange rate must be positive")
+	}
+	rateSnapshot := frozenGuestExchangeRate{rate: rate}
+	return func(amount *big.Int) (string, error) {
+		if amount == nil || amount.Sign() < 0 {
+			return "", errors.New("payment amount must be non-negative")
+		}
+		value := &models.CurrencyValue{
+			Amount:   iwallet.NewAmount(amount),
+			Currency: priceCurDef,
+		}
+		converted, err := wallet.ConvertCurrencyAmount(value, paymentCurDef, rateSnapshot)
+		if err != nil {
+			return "", fmt.Errorf("convert %s → %s: %w", priceCurCode, coinInfo.Symbol, err)
+		}
+		return converted.String(), nil
+	}, nil
 }
 
 // --- Helpers ---

@@ -49,9 +49,21 @@ type PaymentAttemptSettlementFee struct {
 }
 
 type PaymentAttemptAffiliateTerm struct {
-	Address          string `json:"address"`
-	Amount           string `json:"amount"`
-	SellerGrossBasis string `json:"sellerGrossBasis"`
+	ReferralSessionID string                            `json:"referralSessionID"`
+	ProgramID         string                            `json:"programID"`
+	PromoterPeerID    string                            `json:"promoterPeerID"`
+	BuyerPeerID       string                            `json:"buyerPeerID"`
+	CommissionRateBPS uint32                            `json:"commissionRateBPS"`
+	Address           string                            `json:"address"`
+	Amount            string                            `json:"amount"`
+	SellerGrossBasis  string                            `json:"sellerGrossBasis"`
+	Lines             []PaymentAttemptAffiliateLineTerm `json:"lines"`
+}
+
+type PaymentAttemptAffiliateLineTerm struct {
+	OrderLineID          string `json:"orderLineID"`
+	NetMerchandiseAtomic string `json:"netMerchandiseAtomic"`
+	CommissionAtomic     string `json:"commissionAtomic"`
 }
 
 func (t PaymentAttemptSettlementTerms) CanonicalBytesAndHash() ([]byte, string, error) {
@@ -99,16 +111,9 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 	}
 	deductions := new(big.Int).Set(platform)
 	if t.Affiliate != nil {
-		if strings.TrimSpace(t.Affiliate.Address) == "" {
-			return fmt.Errorf("invalid affiliate address")
-		}
-		affiliate, err := settlementAtomicAmount(t.Affiliate.Amount, true)
+		affiliate, _, err := validatePaymentAttemptAffiliateTerm(t.Affiliate, sellerGross)
 		if err != nil {
-			return fmt.Errorf("invalid affiliate amount: %w", err)
-		}
-		affiliateBasis, err := settlementAtomicAmount(t.Affiliate.SellerGrossBasis, true)
-		if err != nil || affiliateBasis.Cmp(sellerGross) > 0 {
-			return fmt.Errorf("invalid affiliate seller gross basis")
+			return err
 		}
 		deductions.Add(deductions, affiliate)
 	}
@@ -116,6 +121,60 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 		return fmt.Errorf("seller-funded deductions must be less than seller gross basis")
 	}
 	return nil
+}
+
+func validatePaymentAttemptAffiliateTerm(term *PaymentAttemptAffiliateTerm, sellerGross *big.Int) (*big.Int, *big.Int, error) {
+	if term == nil || strings.TrimSpace(term.ReferralSessionID) == "" || strings.TrimSpace(term.ProgramID) == "" ||
+		strings.TrimSpace(term.Address) == "" || term.CommissionRateBPS == 0 || term.CommissionRateBPS > 10000 ||
+		len(term.Lines) == 0 {
+		return nil, nil, fmt.Errorf("invalid affiliate identity")
+	}
+	for _, rawPeerID := range []string{term.PromoterPeerID, term.BuyerPeerID} {
+		if _, err := peer.Decode(strings.TrimSpace(rawPeerID)); err != nil {
+			return nil, nil, fmt.Errorf("invalid affiliate peer ID")
+		}
+	}
+	affiliate, err := settlementAtomicAmount(term.Amount, true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid affiliate amount: %w", err)
+	}
+	affiliateBasis, err := settlementAtomicAmount(term.SellerGrossBasis, true)
+	if err != nil || affiliateBasis.Cmp(sellerGross) > 0 {
+		return nil, nil, fmt.Errorf("invalid affiliate seller gross basis")
+	}
+
+	seen := make(map[string]struct{}, len(term.Lines))
+	netTotal := new(big.Int)
+	commissionTotal := new(big.Int)
+	for _, line := range term.Lines {
+		lineID := strings.TrimSpace(line.OrderLineID)
+		if lineID == "" {
+			return nil, nil, fmt.Errorf("invalid affiliate order line ID")
+		}
+		if _, exists := seen[lineID]; exists {
+			return nil, nil, fmt.Errorf("duplicate affiliate order line ID")
+		}
+		seen[lineID] = struct{}{}
+		netAmount, err := settlementAtomicAmount(line.NetMerchandiseAtomic, true)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid affiliate line basis: %w", err)
+		}
+		commission, err := settlementAtomicAmount(line.CommissionAtomic, false)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid affiliate line commission: %w", err)
+		}
+		expected := new(big.Int).Mul(netAmount, new(big.Int).SetUint64(uint64(term.CommissionRateBPS)))
+		expected.Div(expected, big.NewInt(10000))
+		if commission.Cmp(expected) != 0 {
+			return nil, nil, fmt.Errorf("affiliate line commission does not match frozen rate")
+		}
+		netTotal.Add(netTotal, netAmount)
+		commissionTotal.Add(commissionTotal, commission)
+	}
+	if netTotal.Cmp(affiliateBasis) != 0 || commissionTotal.Cmp(affiliate) != 0 {
+		return nil, nil, fmt.Errorf("affiliate line totals do not match frozen terms")
+	}
+	return affiliate, affiliateBasis, nil
 }
 
 // SellerSigningPayload returns the domain-separated canonical bytes that the

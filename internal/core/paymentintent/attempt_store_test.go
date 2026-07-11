@@ -51,7 +51,14 @@ func cryptoAttemptFixture(t *testing.T) (
 		PlatformReleaseFee:   models.PaymentAttemptSettlementFee{Amount: "0"},
 		BuyerCancellationFee: models.PaymentAttemptSettlementFee{Amount: "0"},
 		Affiliate: &models.PaymentAttemptAffiliateTerm{
-			Address: "0x2222222222222222222222222222222222222222", Amount: "50", SellerGrossBasis: "1000",
+			ReferralSessionID: "referral-1", ProgramID: "program-1",
+			PromoterPeerID:    "12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
+			BuyerPeerID:       "12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
+			CommissionRateBPS: 500, Address: "0x2222222222222222222222222222222222222222",
+			Amount: "50", SellerGrossBasis: "1000",
+			Lines: []models.PaymentAttemptAffiliateLineTerm{{
+				OrderLineID: "order-1:0", NetMerchandiseAtomic: "1000", CommissionAtomic: "50",
+			}},
 		},
 		DisputePolicy: models.DisputeScalingSellerAwardProRataFloor,
 	}

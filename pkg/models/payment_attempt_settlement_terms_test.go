@@ -32,7 +32,14 @@ func validPaymentAttemptSettlementTerms() PaymentAttemptSettlementTerms {
 			Address: "0x2222222222222222222222222222222222222222", Amount: "10",
 		},
 		Affiliate: &PaymentAttemptAffiliateTerm{
-			Address: "0x3333333333333333333333333333333333333333", Amount: "100", SellerGrossBasis: "1000",
+			ReferralSessionID: "referral-1", ProgramID: "program-1",
+			PromoterPeerID:    "12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
+			BuyerPeerID:       "12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
+			CommissionRateBPS: 1000, Address: "0x3333333333333333333333333333333333333333",
+			Amount: "100", SellerGrossBasis: "1000",
+			Lines: []PaymentAttemptAffiliateLineTerm{{
+				OrderLineID: "order-1:0", NetMerchandiseAtomic: "1000", CommissionAtomic: "100",
+			}},
 		},
 		DisputePolicy: DisputeScalingSellerAwardProRataFloor,
 	}
@@ -56,9 +63,9 @@ func TestPaymentAttempt_SetSettlementTermsIsImmutable(t *testing.T) {
 	require.NoError(t, attempt.SetSettlementTerms(terms))
 
 	changed := terms
-	changed.Affiliate = &PaymentAttemptAffiliateTerm{
-		Address: terms.Affiliate.Address, Amount: "101", SellerGrossBasis: "1000",
-	}
+	changed.Affiliate = &PaymentAttemptAffiliateTerm{}
+	*changed.Affiliate = *terms.Affiliate
+	changed.Affiliate.Address = "0x4444444444444444444444444444444444444444"
 	require.ErrorIs(t, attempt.SetSettlementTerms(changed), ErrPaymentAttemptSettlementTermsConflict)
 }
 
@@ -116,6 +123,8 @@ func TestPaymentAttemptSettlementTerms_RejectsNonCanonicalOrUnsafeAmounts(t *tes
 		{name: "deductions consume seller gross", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.PlatformReleaseFee.Amount = "900" }},
 		{name: "positive fee without address", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.BuyerCancellationFee.Address = "" }},
 		{name: "cancel fee consumes funding", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.BuyerCancellationFee.Amount = "1000" }},
+		{name: "affiliate line rate mismatch", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.Affiliate.Lines[0].CommissionAtomic = "99" }},
+		{name: "affiliate line basis mismatch", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.Affiliate.Lines[0].NetMerchandiseAtomic = "999" }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

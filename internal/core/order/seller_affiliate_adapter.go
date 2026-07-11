@@ -116,48 +116,7 @@ func (s *OrderAppService) sellerAffiliateSettlementPayout(ctx context.Context, o
 }
 
 func (s *OrderAppService) sellerAffiliateOrderFacts(orderID models.OrderID, orderOpen *pb.OrderOpen, referralSessionID string) (models.AffiliateOrderFacts, error) {
-	if orderOpen == nil || len(orderOpen.GetItems()) == 0 || orderOpen.GetBuyerID() == nil {
-		return models.AffiliateOrderFacts{}, models.ErrInvalidSellerAffiliate
-	}
-	amounts, err := orders.CalculateOrderNetMerchandiseLines(orderOpen, s.exchangeRates)
-	if err != nil {
-		return models.AffiliateOrderFacts{}, fmt.Errorf("calculate affiliate merchandise lines: %w", err)
-	}
-	if len(amounts) != len(orderOpen.GetItems()) {
-		return models.AffiliateOrderFacts{}, models.ErrInvalidSellerAffiliate
-	}
-	sellerPeerID := ""
-	lines := make([]models.AffiliateOrderLineFact, 0, len(amounts))
-	for index, item := range orderOpen.GetItems() {
-		listing, err := extractOrderOpenListing(item.GetListingHash(), orderOpen.GetListings())
-		if err != nil || listing.GetVendorID() == nil {
-			return models.AffiliateOrderFacts{}, models.ErrInvalidSellerAffiliate
-		}
-		peerID := strings.TrimSpace(listing.GetVendorID().GetPeerID())
-		if peerID == "" || (sellerPeerID != "" && sellerPeerID != peerID) {
-			return models.AffiliateOrderFacts{}, models.ErrInvalidSellerAffiliate
-		}
-		sellerPeerID = peerID
-		if amounts[index].Cmp(iwallet.NewAmount(0)) <= 0 {
-			continue
-		}
-		lines = append(lines, models.AffiliateOrderLineFact{
-			OrderLineID:          fmt.Sprintf("%s:%d", orderID, index),
-			NetMerchandiseAtomic: amounts[index].String(),
-			Currency:             orderOpen.GetPricingCoin(),
-		})
-	}
-	if len(lines) == 0 {
-		return models.AffiliateOrderFacts{}, models.ErrInvalidSellerAffiliate
-	}
-	return models.AffiliateOrderFacts{
-		OrderID:           orderID.String(),
-		SellerPeerID:      sellerPeerID,
-		BuyerPeerID:       strings.TrimSpace(orderOpen.GetBuyerID().GetPeerID()),
-		ReferralSessionID: referralSessionID,
-		AttributedAt:      time.Now().UTC(),
-		Lines:             lines,
-	}, nil
+	return orders.BuildAffiliateOrderFacts(orderID.String(), orderOpen, referralSessionID, time.Now().UTC(), s.exchangeRates)
 }
 
 func (s *OrderAppService) reconcileSellerAffiliateCommissionStatus(ctx context.Context, order *models.Order) error {

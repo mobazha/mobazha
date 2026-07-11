@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/models"
+	settlementpayment "github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -507,7 +508,7 @@ func (s *SellerAffiliateAppService) SettlementPayout(ctx context.Context, orderI
 			continue
 		}
 		if line.Status != models.AffiliateCommissionStatusPending ||
-			!strings.EqualFold(strings.TrimSpace(line.Currency), settlementCoin) {
+			!sameAffiliateSettlementCoin(line.Currency, settlementCoin) {
 			return nil, models.ErrInvalidSellerAffiliate
 		}
 		lineAmount, ok := new(big.Int).SetString(line.CommissionAtomic, 10)
@@ -520,6 +521,17 @@ func (s *SellerAffiliateAppService) SettlementPayout(ctx context.Context, orderI
 		return nil, nil
 	}
 	return &models.AffiliateSettlementPayout{Address: address, Amount: amount.String()}, nil
+}
+
+func sameAffiliateSettlementCoin(lineCurrency, settlementCoin string) bool {
+	lineCurrency = strings.TrimSpace(lineCurrency)
+	settlementCoin = strings.TrimSpace(settlementCoin)
+	if strings.EqualFold(lineCurrency, settlementCoin) {
+		return true
+	}
+	lineCanonical, lineOK := settlementpayment.NormalizeSettlementPaymentCoin(lineCurrency)
+	settlementCanonical, settlementOK := settlementpayment.NormalizeSettlementPaymentCoin(settlementCoin)
+	return lineOK && settlementOK && lineCanonical == settlementCanonical
 }
 
 func affiliatePayoutAddressForSettlementCoin(attribution *models.AffiliateAttribution, settlementCoin string) (string, error) {

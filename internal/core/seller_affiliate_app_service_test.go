@@ -225,6 +225,14 @@ func TestAffiliatePayoutAddressForSettlementCoin_UsesFrozenNativeRail(t *testing
 	}
 }
 
+func TestSameAffiliateSettlementCoin_NormalizesLegacyNativeTicker(t *testing.T) {
+	btc, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBitcoin)
+	require.NoError(t, err)
+	assert.True(t, sameAffiliateSettlementCoin("ETH", "crypto:eip155:11155111:native"))
+	assert.True(t, sameAffiliateSettlementCoin("BTC", btc.String()))
+	assert.False(t, sameAffiliateSettlementCoin("ETH", "BTC"))
+}
+
 type staticAffiliateSettlementActionReader struct {
 	actions []models.SettlementActionSnapshot
 }

@@ -134,6 +134,21 @@ func affiliatePayoutForDisputeSettlement(coinType iwallet.CoinType, shipments []
 	return affiliatePayoutFromDisputeRelease(shipments, release)
 }
 
+// requiresInterimAffiliateDisputeTerms protects the current shipment-backed
+// payout terms until immutable PaymentAttempt settlement terms become the
+// authority. Ordinary orders and disputes that award the seller nothing do not
+// need a shipment merely to prove the absence of an affiliate output.
+func requiresInterimAffiliateDisputeTerms(orderOpen *pb.OrderOpen, release *pb.DisputeClose_ModeratedEscrowRelease) bool {
+	if orderOpen == nil || strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID()) == "" {
+		return false
+	}
+	if release == nil {
+		return true
+	}
+	vendorAmount, ok := new(big.Int).SetString(strings.TrimSpace(release.GetVendorAmount()), 10)
+	return !ok || vendorAmount.Sign() > 0
+}
+
 func affiliateUTXOPayoutFromDisputeRelease(shipments []*pb.OrderShipment, release *pb.DisputeClose_ModeratedEscrowRelease) (*models.AffiliateSettlementPayout, error) {
 	if release == nil {
 		return nil, models.ErrInvalidSellerAffiliate

@@ -957,7 +957,7 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 		return err
 	}
 
-	order, _, paymentSent, disputeClose, err := s.getOrderAndPaymentInfo(orderID)
+	order, orderOpen, paymentSent, disputeClose, err := s.getOrderAndPaymentInfo(orderID)
 	if err != nil {
 		return fmt.Errorf("get order payment info for %s: %w", orderID, err)
 	}
@@ -967,8 +967,14 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 	}
 
 	shipments, err := order.OrderShipmentMessages()
-	if err != nil {
+	if err != nil && !models.IsMessageNotExistError(err) {
 		return fmt.Errorf("load seller shipment payout terms: %w", err)
+	}
+	if models.IsMessageNotExistError(err) {
+		shipments = nil
+	}
+	if requiresInterimAffiliateDisputeTerms(orderOpen, disputeClose.ReleaseInfo) && len(shipments) == 0 {
+		return fmt.Errorf("read seller-signed dispute affiliate payout: %w", models.ErrInvalidSellerAffiliate)
 	}
 	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {

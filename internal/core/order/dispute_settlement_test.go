@@ -27,6 +27,7 @@ func seedManagedModeratedDecidedOrderForDisputeRelease(
 	svc *OrderAppService,
 	orderID string,
 	buyerPeerID, sellerPeerID peer.ID,
+	affiliateReferralSessionID ...string,
 ) {
 	t.Helper()
 
@@ -39,7 +40,7 @@ func seedManagedModeratedDecidedOrderForDisputeRelease(
 	}
 	order.SetFSMState(models.OrderState_DECIDED)
 
-	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
+	orderOpen := &pb.OrderOpen{
 		BuyerID:   &pb.ID{PeerID: buyerPeerID.String()},
 		Chaincode: "01020304",
 		Listings: []*pb.SignedListing{{
@@ -57,7 +58,11 @@ func seedManagedModeratedDecidedOrderForDisputeRelease(
 			},
 		}},
 		Items: []*pb.OrderOpen_Item{{ListingHash: "listing-1", Quantity: "1"}},
-	})))
+	}
+	if len(affiliateReferralSessionID) > 0 {
+		orderOpen.AffiliateReferralSessionID = affiliateReferralSessionID[0]
+	}
+	require.NoError(t, order.PutMessage(utils.MustWrapOrderMessage(orderOpen)))
 
 	paymentSent := &pb.PaymentSent{
 		Coin:           coinType.String(),
@@ -91,6 +96,24 @@ func seedManagedModeratedDecidedOrderForDisputeRelease(
 	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
 		return tx.Save(order)
 	}))
+}
+
+func TestReleaseFunds_AffiliateSellerAwardRequiresInterimSignedTerms(t *testing.T) {
+	t.Parallel()
+
+	buyerSigner, buyerPeerID := testSigner(t)
+	_, sellerPeerID := testSigner(t)
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
+	svc := newManagedDisputeReleaseTestService(t, strategy, buyerSigner, buyerPeerID)
+
+	const orderID = "managed-dispute-affiliate-missing-terms"
+	seedManagedModeratedDecidedOrderForDisputeRelease(
+		t, svc, orderID, buyerPeerID, sellerPeerID, "affiliate-referral-session",
+	)
+
+	err := svc.ReleaseFunds(models.OrderID(orderID), "", nil)
+	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
+	assert.Equal(t, 0, strategy.disputeCalls)
 }
 
 func seedSettlementDisputeReleaseAction(

@@ -83,3 +83,43 @@ func TestAffiliatePayoutForDisputeSettlement_UsesUTXOGrossSellerRatio(t *testing
 	require.Equal(t, "bitcoincash:qaffiliate", payout.Address)
 	require.Equal(t, "8", payout.Amount)
 }
+
+func TestRequiresInterimAffiliateDisputeTerms(t *testing.T) {
+	tests := []struct {
+		name       string
+		orderOpen  *pb.OrderOpen
+		release    *pb.DisputeClose_ModeratedEscrowRelease
+		requireNow bool
+	}{
+		{
+			name:       "ordinary order",
+			orderOpen:  &pb.OrderOpen{},
+			release:    &pb.DisputeClose_ModeratedEscrowRelease{VendorAmount: "100"},
+			requireNow: false,
+		},
+		{
+			name:       "affiliate seller award",
+			orderOpen:  &pb.OrderOpen{AffiliateReferralSessionID: "referral-session"},
+			release:    &pb.DisputeClose_ModeratedEscrowRelease{VendorAmount: "100"},
+			requireNow: true,
+		},
+		{
+			name:       "affiliate no seller award",
+			orderOpen:  &pb.OrderOpen{AffiliateReferralSessionID: "referral-session"},
+			release:    &pb.DisputeClose_ModeratedEscrowRelease{VendorAmount: "0"},
+			requireNow: false,
+		},
+		{
+			name:       "affiliate malformed award fails closed",
+			orderOpen:  &pb.OrderOpen{AffiliateReferralSessionID: "referral-session"},
+			release:    &pb.DisputeClose_ModeratedEscrowRelease{VendorAmount: "invalid"},
+			requireNow: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.requireNow, requiresInterimAffiliateDisputeTerms(test.orderOpen, test.release))
+		})
+	}
+}

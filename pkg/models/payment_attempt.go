@@ -13,6 +13,7 @@ import (
 const (
 	PaymentAttemptKindProviderSession       = "provider_session"
 	PaymentAttemptKindDirectObservedAddress = "direct_observed_address"
+	PaymentAttemptKindCryptoFundingTarget   = "crypto_funding_target"
 
 	PaymentAttemptPendingExternal     = "pending_external"
 	PaymentAttemptExternalDispatching = "external_dispatching"
@@ -22,6 +23,7 @@ const (
 	PaymentAttemptExpired             = "expired"
 	PaymentAttemptAbandoning          = "abandoning"
 	PaymentAttemptAbandoned           = "abandoned"
+	PaymentAttemptFundingTargetReady  = "funding_target_ready"
 )
 
 // PaymentAttempt is Core's durable claim for one concrete payment provisioning
@@ -37,19 +39,22 @@ type PaymentAttempt struct {
 	ProviderID        string `gorm:"column:provider_id;size:64;not null;default:''"`
 	Amount            int64  `gorm:"column:amount;not null;default:0"`
 	AmountValue       string `gorm:"column:amount_value;type:text;not null;default:''"`
-	Currency          string `gorm:"column:currency;size:16;not null;default:''"`
+	Currency          string `gorm:"column:currency;size:255;not null;default:''"`
 	RouteBindingID    string `gorm:"column:route_binding_id;size:64;not null"`
 	IdempotencyKey    string `gorm:"column:idempotency_key;size:128;not null;uniqueIndex:idx_payment_attempt_idempotency,priority:2"`
 	State             string `gorm:"column:state;size:32;not null;index:idx_payment_attempt_state;index:idx_payment_attempt_kind_state,priority:2"`
 	ExternalReference string `gorm:"column:external_reference;size:255"`
 	ExternalIndex     uint32 `gorm:"column:external_index;not null;default:0"`
 	RequiredConfs     int    `gorm:"column:required_confirmations;not null;default:0"`
+	FundingTarget     []byte `gorm:"column:funding_target;type:text"`
+	FundingTargetHash string `gorm:"column:funding_target_hash;size:64;not null;default:'';index"`
 	// SettlementTerms is the canonical, immutable economic allocation owned by
 	// this attempt. It must be committed before an actionable funding target is
 	// exposed. SettlementTermsHash binds settlement actions to these exact bytes.
 	SettlementTerms        []byte     `gorm:"column:settlement_terms;type:text"`
 	SettlementTermsHash    string     `gorm:"column:settlement_terms_hash;size:64;not null;default:'';index"`
 	SellerTermsSignature   []byte     `gorm:"column:seller_terms_signature"`
+	SellerTermsSigner      string     `gorm:"column:seller_terms_signer;size:255;not null;default:''"`
 	PlatformTermsSignature []byte     `gorm:"column:platform_terms_signature"`
 	ExpiresAt              *time.Time `gorm:"column:expires_at;index"`
 	LastError              string     `gorm:"column:last_error;size:2048"`
@@ -104,6 +109,88 @@ func (a *PaymentAttempt) GetSettlementTerms() (*PaymentAttemptSettlementTerms, e
 		return nil, ErrPaymentAttemptSettlementTermsConflict
 	}
 	return &terms, nil
+}
+
+// SetSellerTermsAuthorization freezes a verified seller identity signature for
+// the attempt's already-frozen canonical settlement terms.
+func (a *PaymentAttempt) SetSellerTermsAuthorization(signerPeerID string, signature []byte) error {
+	if a == nil {
+		return fmt.Errorf("payment attempt is nil")
+	}
+	terms, err := a.GetSettlementTerms()
+	if err != nil {
+		return err
+	}
+	if terms == nil {
+		return fmt.Errorf("payment attempt settlement terms are required before seller authorization")
+	}
+	if err := terms.VerifySellerAuthorization(signerPeerID, signature); err != nil {
+		return err
+	}
+	if a.SellerTermsSigner != "" || len(a.SellerTermsSignature) > 0 {
+		if a.SellerTermsSigner != strings.TrimSpace(signerPeerID) || string(a.SellerTermsSignature) != string(signature) {
+			return ErrPaymentAttemptSettlementTermsConflict
+		}
+		return nil
+	}
+	a.SellerTermsSigner = strings.TrimSpace(signerPeerID)
+	a.SellerTermsSignature = append([]byte(nil), signature...)
+	return nil
+}
+
+// SetFundingTarget freezes an actionable crypto target only after canonical
+// settlement terms and seller authorization have been verified.
+func (a *PaymentAttempt) SetFundingTarget(target PaymentAttemptFundingTarget) error {
+	if a == nil {
+		return fmt.Errorf("payment attempt is nil")
+	}
+	terms, err := a.GetSettlementTerms()
+	if err != nil {
+		return err
+	}
+	if terms == nil || strings.TrimSpace(a.SellerTermsSigner) == "" || len(a.SellerTermsSignature) == 0 {
+		return fmt.Errorf("verified settlement terms are required before funding target")
+	}
+	if err := terms.VerifySellerAuthorization(a.SellerTermsSigner, a.SellerTermsSignature); err != nil {
+		return err
+	}
+	if target.AttemptID != a.AttemptID || target.AssetID != terms.AssetID ||
+		target.AmountAtomic != terms.FundingAmount || target.Address != terms.FundingTargetAddress {
+		return fmt.Errorf("%w: funding target does not match settlement terms", ErrPaymentAttemptSettlementTermsConflict)
+	}
+	canonical, hash, err := target.CanonicalBytesAndHash()
+	if err != nil {
+		return err
+	}
+	if len(a.FundingTarget) > 0 || strings.TrimSpace(a.FundingTargetHash) != "" {
+		if string(a.FundingTarget) != string(canonical) || strings.TrimSpace(a.FundingTargetHash) != hash {
+			return ErrPaymentAttemptSettlementTermsConflict
+		}
+		return nil
+	}
+	a.FundingTarget = canonical
+	a.FundingTargetHash = hash
+	a.State = PaymentAttemptFundingTargetReady
+	return nil
+}
+
+// GetFundingTarget decodes and verifies the attempt's immutable target.
+func (a *PaymentAttempt) GetFundingTarget() (*PaymentAttemptFundingTarget, error) {
+	if a == nil || len(a.FundingTarget) == 0 {
+		return nil, nil
+	}
+	var target PaymentAttemptFundingTarget
+	if err := json.Unmarshal(a.FundingTarget, &target); err != nil {
+		return nil, fmt.Errorf("decode payment attempt funding target: %w", err)
+	}
+	canonical, hash, err := target.CanonicalBytesAndHash()
+	if err != nil {
+		return nil, err
+	}
+	if string(canonical) != string(a.FundingTarget) || hash != strings.TrimSpace(a.FundingTargetHash) {
+		return nil, ErrPaymentAttemptSettlementTermsConflict
+	}
+	return &target, nil
 }
 
 // PaymentRouteBinding is immutable routing identity for an accepted attempt.

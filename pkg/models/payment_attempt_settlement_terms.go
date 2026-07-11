@@ -11,11 +11,14 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+
+	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
 	PaymentAttemptSettlementTermsVersion  = 1
 	DisputeScalingSellerAwardProRataFloor = "seller_award_pro_rata_floor"
+	settlementTermsSigningDomain          = "mobazha/payment-attempt-settlement-terms/v1\x00"
 )
 
 var ErrPaymentAttemptSettlementTermsConflict = errors.New("payment attempt settlement terms conflict")
@@ -29,7 +32,9 @@ type PaymentAttemptSettlementTerms struct {
 	AttemptID            string                       `json:"attemptID"`
 	AssetID              string                       `json:"assetID"`
 	FundingAmount        string                       `json:"fundingAmount"`
+	FundingTargetAddress string                       `json:"fundingTargetAddress"`
 	RouteBindingID       string                       `json:"routeBindingID"`
+	SellerPeerID         string                       `json:"sellerPeerID"`
 	SellerAddress        string                       `json:"sellerAddress"`
 	SellerGrossBasis     string                       `json:"sellerGrossBasis"`
 	PlatformReleaseFee   PaymentAttemptSettlementFee  `json:"platformReleaseFee"`
@@ -64,10 +69,14 @@ func (t PaymentAttemptSettlementTerms) CanonicalBytesAndHash() ([]byte, string, 
 func (t PaymentAttemptSettlementTerms) Validate() error {
 	if t.Version != PaymentAttemptSettlementTermsVersion ||
 		strings.TrimSpace(t.OrderID) == "" || strings.TrimSpace(t.AttemptID) == "" ||
-		strings.TrimSpace(t.AssetID) == "" || strings.TrimSpace(t.RouteBindingID) == "" ||
+		strings.TrimSpace(t.AssetID) == "" || strings.TrimSpace(t.FundingTargetAddress) == "" ||
+		strings.TrimSpace(t.RouteBindingID) == "" ||
 		strings.TrimSpace(t.SellerAddress) == "" ||
 		strings.TrimSpace(t.DisputePolicy) != DisputeScalingSellerAwardProRataFloor {
 		return fmt.Errorf("invalid payment attempt settlement terms identity")
+	}
+	if _, err := peer.Decode(strings.TrimSpace(t.SellerPeerID)); err != nil {
+		return fmt.Errorf("invalid seller peer ID")
 	}
 	funding, err := settlementAtomicAmount(t.FundingAmount, true)
 	if err != nil {
@@ -105,6 +114,48 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 	}
 	if deductions.Cmp(sellerGross) >= 0 {
 		return fmt.Errorf("seller-funded deductions must be less than seller gross basis")
+	}
+	return nil
+}
+
+// SellerSigningPayload returns the domain-separated canonical bytes that the
+// seller identity key authorizes before a funding target can be exposed.
+func (t PaymentAttemptSettlementTerms) SellerSigningPayload() ([]byte, error) {
+	canonical, _, err := t.CanonicalBytesAndHash()
+	if err != nil {
+		return nil, err
+	}
+	payload := make([]byte, 0, len(settlementTermsSigningDomain)+len(canonical))
+	payload = append(payload, settlementTermsSigningDomain...)
+	payload = append(payload, canonical...)
+	return payload, nil
+}
+
+// VerifySellerAuthorization verifies that signature was produced by the
+// seller PeerID bound into these exact settlement terms.
+func (t PaymentAttemptSettlementTerms) VerifySellerAuthorization(signerPeerID string, signature []byte) error {
+	signerPeerID = strings.TrimSpace(signerPeerID)
+	if signerPeerID == "" || signerPeerID != strings.TrimSpace(t.SellerPeerID) || len(signature) == 0 {
+		return fmt.Errorf("invalid seller settlement terms authorization")
+	}
+	pid, err := peer.Decode(signerPeerID)
+	if err != nil {
+		return fmt.Errorf("decode seller settlement terms signer: %w", err)
+	}
+	pubKey, err := pid.ExtractPublicKey()
+	if err != nil {
+		return fmt.Errorf("extract seller settlement terms public key: %w", err)
+	}
+	payload, err := t.SellerSigningPayload()
+	if err != nil {
+		return err
+	}
+	valid, err := pubKey.Verify(payload, signature)
+	if err != nil {
+		return fmt.Errorf("verify seller settlement terms signature: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("invalid seller settlement terms signature")
 	}
 	return nil
 }

@@ -15,14 +15,16 @@ import (
 
 func validPaymentAttemptSettlementTerms() PaymentAttemptSettlementTerms {
 	return PaymentAttemptSettlementTerms{
-		Version:          PaymentAttemptSettlementTermsVersion,
-		OrderID:          "order-1",
-		AttemptID:        "attempt-1",
-		AssetID:          "crypto:eip155:1:native",
-		FundingAmount:    "1000",
-		RouteBindingID:   "route-1",
-		SellerAddress:    "0x1111111111111111111111111111111111111111",
-		SellerGrossBasis: "1000",
+		Version:              PaymentAttemptSettlementTermsVersion,
+		OrderID:              "order-1",
+		AttemptID:            "attempt-1",
+		AssetID:              "crypto:eip155:1:native",
+		FundingAmount:        "1000",
+		FundingTargetAddress: "0x4444444444444444444444444444444444444444",
+		RouteBindingID:       "route-1",
+		SellerPeerID:         "12D3KooWD1GpGf11qVtcDhat8q8rB2du9nohFEFu2DgciUYWY2BC",
+		SellerAddress:        "0x1111111111111111111111111111111111111111",
+		SellerGrossBasis:     "1000",
 		PlatformReleaseFee: PaymentAttemptSettlementFee{
 			Address: "0x2222222222222222222222222222222222222222", Amount: "10",
 		},

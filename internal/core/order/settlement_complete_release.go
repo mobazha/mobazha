@@ -133,6 +133,13 @@ func (s *OrderAppService) runMonitoredSettlementComplete(
 	if err != nil {
 		return nil, nil, nil, true, fmt.Errorf("read seller-signed affiliate settlement payout: %w", err)
 	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return nil, nil, nil, true, fmt.Errorf("read order affiliate terms: %w", err)
+	}
+	if err := requireInterimAffiliatePayout(orderOpen, affiliatePayout); err != nil {
+		return nil, nil, nil, true, fmt.Errorf("seller-signed affiliate settlement payout is required: %w", err)
+	}
 
 	result, err := strategy.Complete(ctx, payment.ActionParams{
 		OrderID:         order.ID.String(),

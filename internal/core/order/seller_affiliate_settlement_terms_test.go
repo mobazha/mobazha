@@ -123,3 +123,35 @@ func TestRequiresInterimAffiliateDisputeTerms(t *testing.T) {
 		})
 	}
 }
+
+func TestRequireInterimAffiliatePayout_FailsClosedForReferredOrder(t *testing.T) {
+	orderOpen := &pb.OrderOpen{AffiliateReferralSessionID: "referral-session"}
+
+	require.ErrorIs(t, requireInterimAffiliatePayout(orderOpen, nil), models.ErrInvalidSellerAffiliate)
+	require.NoError(t, requireInterimAffiliatePayout(orderOpen, &models.AffiliateSettlementPayout{
+		Address: affiliateSettlementPayoutAddress,
+		Amount:  "125",
+	}))
+	require.NoError(t, requireInterimAffiliatePayout(&pb.OrderOpen{}, nil))
+}
+
+func TestRequireInterimAffiliateDisputePayout_FailsClosedWhenSellerReceivesFunds(t *testing.T) {
+	orderOpen := &pb.OrderOpen{AffiliateReferralSessionID: "referral-session"}
+	release := &pb.DisputeClose_ModeratedEscrowRelease{VendorAmount: "100"}
+
+	require.ErrorIs(
+		t,
+		requireInterimAffiliateDisputePayout(orderOpen, release, nil),
+		models.ErrInvalidSellerAffiliate,
+	)
+	require.NoError(t, requireInterimAffiliateDisputePayout(
+		orderOpen,
+		release,
+		&models.AffiliateSettlementPayout{Address: affiliateSettlementPayoutAddress, Amount: "10"},
+	))
+	require.NoError(t, requireInterimAffiliateDisputePayout(
+		orderOpen,
+		&pb.DisputeClose_ModeratedEscrowRelease{VendorAmount: "0"},
+		nil,
+	))
+}

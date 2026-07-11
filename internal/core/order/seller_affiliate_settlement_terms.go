@@ -149,6 +149,27 @@ func requiresInterimAffiliateDisputeTerms(orderOpen *pb.OrderOpen, release *pb.D
 	return !ok || vendorAmount.Sign() > 0
 }
 
+func requireInterimAffiliatePayout(orderOpen *pb.OrderOpen, payout *models.AffiliateSettlementPayout) error {
+	if orderOpen == nil || strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID()) == "" {
+		return nil
+	}
+	if payout == nil {
+		return models.ErrInvalidSellerAffiliate
+	}
+	return nil
+}
+
+func requireInterimAffiliateDisputePayout(
+	orderOpen *pb.OrderOpen,
+	release *pb.DisputeClose_ModeratedEscrowRelease,
+	payout *models.AffiliateSettlementPayout,
+) error {
+	if requiresInterimAffiliateDisputeTerms(orderOpen, release) && payout == nil {
+		return models.ErrInvalidSellerAffiliate
+	}
+	return nil
+}
+
 func affiliateUTXOPayoutFromDisputeRelease(shipments []*pb.OrderShipment, release *pb.DisputeClose_ModeratedEscrowRelease) (*models.AffiliateSettlementPayout, error) {
 	if release == nil {
 		return nil, models.ErrInvalidSellerAffiliate

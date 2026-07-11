@@ -130,6 +130,13 @@ func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("read seller-signed dispute affiliate payout: %w", err)
 	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return nil, nil, true, fmt.Errorf("read order affiliate terms: %w", err)
+	}
+	if err := requireInterimAffiliateDisputePayout(orderOpen, release, affiliatePayout); err != nil {
+		return nil, nil, true, fmt.Errorf("seller-signed dispute affiliate payout is required: %w", err)
+	}
 
 	result, err := strategy.DisputeRelease(ctx, payment.ActionParams{
 		OrderID:         order.ID.String(),

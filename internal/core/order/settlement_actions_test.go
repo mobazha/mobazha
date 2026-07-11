@@ -155,6 +155,9 @@ func newManagedEscrowOrderForTests(t *testing.T, coinType iwallet.CoinType) (*mo
 		ID:             models.OrderID("managed-order-test"),
 		PaymentAddress: "0x9999999999999999999999999999999999999999",
 	}
+	if err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{})); err != nil {
+		t.Fatalf("PutMessage(OrderOpen): %v", err)
+	}
 	paymentSent := &pb.PaymentSent{
 		Coin:         coinType.String(),
 		Amount:       "1000000000000000000",

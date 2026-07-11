@@ -527,19 +527,24 @@ func (s *OrderAppService) executeUTXOSyncModeratedCompleteRelease(order *models.
 			Amount:  iwallet.NewAmount(releaseInfo.PlatformAmount),
 		})
 	}
-	if releaseInfo.AffiliateAddress != "" || releaseInfo.AffiliateAmount != "" {
-		affiliatePayout, err := affiliateUTXOPayoutFromEscrowRelease(releaseInfo)
+	affiliatePayout, err := affiliateUTXOPayoutFromEscrowRelease(releaseInfo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read seller-signed affiliate UTXO payout: %w", err)
+	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return nil, nil, fmt.Errorf("read order affiliate terms: %w", err)
+	}
+	if err := requireInterimAffiliatePayout(orderOpen, affiliatePayout); err != nil {
+		return nil, nil, fmt.Errorf("seller-signed affiliate UTXO payout is required: %w", err)
+	}
+	if affiliatePayout != nil {
+		available := iwallet.NewAmount(releaseInfo.ToAmount).Add(iwallet.NewAmount(affiliatePayout.Amount))
+		spend, err := affiliateUTXOSpend(wallet, coinType, affiliatePayout, available)
 		if err != nil {
-			return nil, nil, fmt.Errorf("read seller-signed affiliate UTXO payout: %w", err)
+			return nil, nil, err
 		}
-		if affiliatePayout != nil {
-			available := iwallet.NewAmount(releaseInfo.ToAmount).Add(iwallet.NewAmount(affiliatePayout.Amount))
-			spend, err := affiliateUTXOSpend(wallet, coinType, affiliatePayout, available)
-			if err != nil {
-				return nil, nil, err
-			}
-			txn.To = append(txn.To, spend)
-		}
+		txn.To = append(txn.To, spend)
 	}
 
 	for _, outpoint := range releaseInfo.Outpoints {

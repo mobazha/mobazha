@@ -1,0 +1,125 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 fengzie and the respective contributors.
+
+package models
+
+import (
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+func validPaymentAttemptSettlementTerms() PaymentAttemptSettlementTerms {
+	return PaymentAttemptSettlementTerms{
+		Version:          PaymentAttemptSettlementTermsVersion,
+		OrderID:          "order-1",
+		AttemptID:        "attempt-1",
+		AssetID:          "crypto:eip155:1:native",
+		FundingAmount:    "1000",
+		RouteBindingID:   "route-1",
+		SellerAddress:    "0x1111111111111111111111111111111111111111",
+		SellerGrossBasis: "1000",
+		PlatformReleaseFee: PaymentAttemptSettlementFee{
+			Address: "0x2222222222222222222222222222222222222222", Amount: "10",
+		},
+		BuyerCancellationFee: PaymentAttemptSettlementFee{
+			Address: "0x2222222222222222222222222222222222222222", Amount: "10",
+		},
+		Affiliate: &PaymentAttemptAffiliateTerm{
+			Address: "0x3333333333333333333333333333333333333333", Amount: "100", SellerGrossBasis: "1000",
+		},
+		DisputePolicy: DisputeScalingSellerAwardProRataFloor,
+	}
+}
+
+func TestPaymentAttemptSettlementTerms_CanonicalHashIsStable(t *testing.T) {
+	terms := validPaymentAttemptSettlementTerms()
+	first, firstHash, err := terms.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	second, secondHash, err := terms.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	require.Equal(t, first, second)
+	require.Equal(t, firstHash, secondHash)
+	require.Len(t, firstHash, 64)
+}
+
+func TestPaymentAttempt_SetSettlementTermsIsImmutable(t *testing.T) {
+	attempt := PaymentAttempt{AttemptID: "attempt-1", OrderID: "order-1"}
+	terms := validPaymentAttemptSettlementTerms()
+	require.NoError(t, attempt.SetSettlementTerms(terms))
+	require.NoError(t, attempt.SetSettlementTerms(terms))
+
+	changed := terms
+	changed.Affiliate = &PaymentAttemptAffiliateTerm{
+		Address: terms.Affiliate.Address, Amount: "101", SellerGrossBasis: "1000",
+	}
+	require.ErrorIs(t, attempt.SetSettlementTerms(changed), ErrPaymentAttemptSettlementTermsConflict)
+}
+
+func TestPaymentAttempt_SetSettlementTermsRejectsPartialStoredState(t *testing.T) {
+	terms := validPaymentAttemptSettlementTerms()
+	canonical, hash, err := terms.CanonicalBytesAndHash()
+	require.NoError(t, err)
+
+	missingHash := PaymentAttempt{AttemptID: "attempt-1", OrderID: "order-1", SettlementTerms: canonical}
+	require.ErrorIs(t, missingHash.SetSettlementTerms(terms), ErrPaymentAttemptSettlementTermsConflict)
+
+	missingTerms := PaymentAttempt{AttemptID: "attempt-1", OrderID: "order-1", SettlementTermsHash: hash}
+	require.ErrorIs(t, missingTerms.SetSettlementTerms(terms), ErrPaymentAttemptSettlementTermsConflict)
+}
+
+func TestPaymentAttempt_GetSettlementTermsRejectsTampering(t *testing.T) {
+	attempt := PaymentAttempt{AttemptID: "attempt-1", OrderID: "order-1"}
+	require.NoError(t, attempt.SetSettlementTerms(validPaymentAttemptSettlementTerms()))
+	attempt.SettlementTerms = append([]byte(nil), attempt.SettlementTerms...)
+	attempt.SettlementTerms[len(attempt.SettlementTerms)-2] = 'x'
+	_, err := attempt.GetSettlementTerms()
+	require.Error(t, err)
+}
+
+func TestPaymentAttemptSettlementTerms_PersistRoundTrip(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:payment-attempt-terms-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&PaymentAttempt{}))
+
+	attempt := PaymentAttempt{
+		TenantID: "tenant-1", AttemptID: "attempt-1", Kind: PaymentAttemptKindProviderSession,
+		PaymentSessionID: "ps_order-1", OrderID: "order-1", RouteBindingID: "route-1",
+		IdempotencyKey: "payment-attempt-terms-round-trip", State: PaymentAttemptPendingExternal,
+		SellerTermsSignature: []byte("seller-signature"), PlatformTermsSignature: []byte("platform-signature"),
+	}
+	require.NoError(t, attempt.SetSettlementTerms(validPaymentAttemptSettlementTerms()))
+	require.NoError(t, db.Create(&attempt).Error)
+
+	var stored PaymentAttempt
+	require.NoError(t, db.Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&stored).Error)
+	terms, err := stored.GetSettlementTerms()
+	require.NoError(t, err)
+	require.Equal(t, attempt.SettlementTermsHash, stored.SettlementTermsHash)
+	require.Equal(t, attempt.SellerTermsSignature, stored.SellerTermsSignature)
+	require.Equal(t, attempt.PlatformTermsSignature, stored.PlatformTermsSignature)
+	require.Equal(t, validPaymentAttemptSettlementTerms(), *terms)
+}
+
+func TestPaymentAttemptSettlementTerms_RejectsNonCanonicalOrUnsafeAmounts(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*PaymentAttemptSettlementTerms)
+	}{
+		{name: "leading zero", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.FundingAmount = "01000" }},
+		{name: "deductions consume seller gross", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.PlatformReleaseFee.Amount = "900" }},
+		{name: "positive fee without address", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.BuyerCancellationFee.Address = "" }},
+		{name: "cancel fee consumes funding", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.BuyerCancellationFee.Amount = "1000" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			terms := validPaymentAttemptSettlementTerms()
+			test.mutate(&terms)
+			require.Error(t, terms.Validate())
+		})
+	}
+}

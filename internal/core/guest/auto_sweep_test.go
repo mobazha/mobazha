@@ -206,9 +206,13 @@ func TestCreateSweepTask_AffiliateFreezesSplitAction(t *testing.T) {
 	var action models.SettlementAction
 	require.NoError(t, db.gormDB.Where("action_id = ?", guestSweepActionID("gst_affiliate")).First(&action).Error)
 	assert.Equal(t, "submitting", action.State)
+	wantCoin, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
+	require.True(t, ok)
+	assert.Equal(t, wantCoin.String(), action.SettlementCoin)
 	lines := models.DecodeSettlementPayoutLines(action.PlannedLines)
 	require.Len(t, lines, 1)
 	assert.Equal(t, "affiliate", lines[0].Type)
+	assert.Equal(t, wantCoin.String(), lines[0].Coin)
 }
 
 func TestCreateSweepTask_SolanaSkipsWhenNoSweepTo(t *testing.T) {

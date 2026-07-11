@@ -109,12 +109,13 @@ func (s *AutoSweepService) CreateSweepTask(tx database.Tx, order *models.GuestOr
 	if task.AffiliatePayoutAddress == "" || task.AffiliatePayoutAmount == "" {
 		return nil
 	}
+	settlementCoin := canonicalSweepSettlementCoin(task.ChainKey)
 	now := time.Now().UTC()
 	return tx.Save(&models.SettlementAction{
 		ActionID: guestSweepActionID(order.OrderToken), OrderID: order.OrderToken,
-		ActionKind: "guest_sweep", State: "submitting", SettlementCoin: chainKey, GrossAmount: order.PaymentAmount,
+		ActionKind: "guest_sweep", State: "submitting", SettlementCoin: settlementCoin, GrossAmount: order.PaymentAmount,
 		PlannedLines: models.EncodeSettlementPayoutLines([]models.SettlementPayoutLine{{
-			Type: "affiliate", Amount: task.AffiliatePayoutAmount, Address: task.AffiliatePayoutAddress, Coin: chainKey,
+			Type: "affiliate", Amount: task.AffiliatePayoutAmount, Address: task.AffiliatePayoutAddress, Coin: settlementCoin,
 		}}),
 		CreatedAt: now, UpdatedAt: now,
 	})
@@ -666,11 +667,19 @@ func affiliateSweepObservedLines(task *models.SweepTask, tx iwallet.Transaction)
 		if output.Address.String() == task.AffiliatePayoutAddress && output.Amount.String() == task.AffiliatePayoutAmount {
 			return []models.SettlementPayoutLine{{
 				Type: "affiliate", Amount: task.AffiliatePayoutAmount, Address: task.AffiliatePayoutAddress,
-				Coin: task.ChainKey, TxHash: task.TxHash,
+				Coin: canonicalSweepSettlementCoin(task.ChainKey), TxHash: task.TxHash,
 			}}, nil
 		}
 	}
 	return nil, errors.New("confirmed sweep transaction does not contain frozen affiliate output")
+}
+
+func canonicalSweepSettlementCoin(chainKey string) string {
+	chain := chainFromTaskKey(chainKey)
+	if coin, ok := iwallet.CanonicalNativeCoinType(chain); ok {
+		return coin.String()
+	}
+	return strings.TrimSpace(chainKey)
 }
 
 func chainFromTaskKey(chainKey string) iwallet.ChainType {

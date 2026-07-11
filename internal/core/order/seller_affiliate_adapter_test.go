@@ -117,10 +117,13 @@ func TestReconcileSellerAffiliateOrder_DerivesPendingCommissionFromSignedOrder(t
 	order := &models.Order{ID: orderID, MyRole: string(models.RoleVendor), Open: true}
 	order.SetFSMState(models.OrderState_AWAITING_SHIPMENT)
 	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(orderOpen)))
+	require.NoError(t, service.db.Update(func(tx database.Tx) error { return tx.Save(order) }))
+	require.ErrorIs(t, service.PrepareSellerAffiliateSettlement(context.Background(), orderID), ErrSellerAffiliateSettlementNotReady)
+	require.Empty(t, affiliate.facts)
+
 	order.MarkPaymentVerified()
 	require.NoError(t, service.db.Update(func(tx database.Tx) error { return tx.Save(order) }))
-
-	require.NoError(t, service.ReconcileSellerAffiliateOrder(context.Background(), orderID))
+	require.NoError(t, service.PrepareSellerAffiliateSettlement(context.Background(), orderID))
 	require.Len(t, affiliate.facts, 1)
 	require.Len(t, affiliate.facts[0].Lines, 1)
 	assert.Equal(t, "1000", affiliate.facts[0].Lines[0].NetMerchandiseAtomic)

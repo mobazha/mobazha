@@ -2,9 +2,12 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/mobazha/mobazha/internal/core/guest"
+	"github.com/mobazha/mobazha/internal/core/order"
 	corepayment "github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/internal/core/settlement"
 	dbgorm "github.com/mobazha/mobazha/internal/database"
@@ -397,10 +400,38 @@ func (n *MobazhaNode) dispatchCancelablePayment(event *events.CancelablePaymentR
 	}
 
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := n.prepareSellerAffiliateAutoConfirm(ctx, event.OrderID); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID,
+				"AutoConfirm denied until affiliate settlement facts are ready for order %s: %v", event.OrderID, err)
+			return
+		}
 		if err := strategyV2.AutoConfirm(context.Background(), event); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "AutoConfirm failed for order %s (coin=%s): %v", event.OrderID, event.Coin, err)
 		}
 	}()
+}
+
+func (n *MobazhaNode) prepareSellerAffiliateAutoConfirm(ctx context.Context, orderID string) error {
+	if n == nil || n.orderService == nil {
+		return nil
+	}
+	for {
+		err := n.orderService.PrepareSellerAffiliateSettlement(ctx, models.OrderID(orderID))
+		if !errors.Is(err, order.ErrSellerAffiliateSettlementNotReady) {
+			return err
+		}
+		timer := time.NewTimer(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return fmt.Errorf("%w: %v", order.ErrSellerAffiliateSettlementNotReady, ctx.Err())
+		case <-timer.C:
+		}
+	}
 }
 
 func (n *MobazhaNode) localTenantID() string {

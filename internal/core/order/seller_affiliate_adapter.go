@@ -16,6 +16,10 @@ import (
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
+// ErrSellerAffiliateSettlementNotReady means the signed Affiliate reference is
+// present but the verified-payment transaction has not committed yet.
+var ErrSellerAffiliateSettlementNotReady = errors.New("seller affiliate settlement facts are not ready")
+
 // ReconcileSellerAffiliateOrder projects verified seller-order facts into the
 // minimal affiliate ledger. It is safe to call after every order message.
 func (s *OrderAppService) ReconcileSellerAffiliateOrder(ctx context.Context, orderID models.OrderID) error {
@@ -58,6 +62,48 @@ func (s *OrderAppService) ReconcileSellerAffiliateOrder(ctx context.Context, ord
 		return models.ErrSellerAffiliateConflict
 	}
 	return s.reconcileSellerAffiliateCommissionStatus(ctx, &orderRecord)
+}
+
+// PrepareSellerAffiliateSettlement establishes the immutable attribution that
+// a seller-funded auto-confirm must consume. Payment events can be delivered
+// before the transaction that records verified payment has committed, so an
+// affiliate order explicitly reports not-ready instead of being mistaken for
+// an ordinary order with no payout.
+func (s *OrderAppService) PrepareSellerAffiliateSettlement(ctx context.Context, orderID models.OrderID) error {
+	if s == nil || s.sellerAffiliate == nil {
+		return nil
+	}
+	var orderRecord models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&orderRecord).Error
+	}); err != nil {
+		return fmt.Errorf("load seller affiliate settlement order: %w", err)
+	}
+	if orderRecord.Role() != models.RoleVendor {
+		return nil
+	}
+	orderOpen, err := orderRecord.OrderOpenMessage()
+	if err != nil {
+		return fmt.Errorf("read seller affiliate settlement OrderOpen: %w", err)
+	}
+	referralSessionID := strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID())
+	if referralSessionID == "" {
+		return nil
+	}
+	if !orderRecord.IsPaymentVerified() {
+		return ErrSellerAffiliateSettlementNotReady
+	}
+	if err := s.ReconcileSellerAffiliateOrder(ctx, orderID); err != nil {
+		return err
+	}
+	attribution, err := s.sellerAffiliate.GetAttributionByOrder(ctx, orderID.String())
+	if err != nil {
+		return err
+	}
+	if attribution == nil || attribution.ReferralSessionID != referralSessionID {
+		return models.ErrSellerAffiliateConflict
+	}
+	return nil
 }
 
 // sellerAffiliateSettlementPayout returns the one payout line that Core has

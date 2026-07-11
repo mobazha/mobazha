@@ -984,15 +984,18 @@ func (n *MobazhaNode) initNetDBSyncService() {
 	})
 }
 
-// initGuestOrderService creates the Guest Checkout subsystem:
-// DirectPaymentService → AutoSweepService → GuestOrderAppService.
-// Requires: db, eventBus, bip44MasterKey (from cryptoFields).
+// initGuestOrderService creates Guest Checkout services and the shared UTXO
+// sweep infrastructure. Affiliate sweeps require only the escrow key, so the
+// sweep service is deliberately available even when Guest BIP44 is absent.
 func (n *MobazhaNode) initGuestOrderService() {
 	if n.infrastructureOnly {
 		return
 	}
 	if n.db == nil || n.eventBus == nil {
 		return
+	}
+	if n.autoSweepService == nil {
+		n.autoSweepService = guest.NewAutoSweepService(n.db, nil, n.eventBus)
 	}
 	if n.bip44Key == nil {
 		return

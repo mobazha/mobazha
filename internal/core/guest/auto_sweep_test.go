@@ -2,15 +2,21 @@ package guest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
+	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha/pkg/models"
+	pkgutxo "github.com/mobazha/mobazha/pkg/utxo"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -161,6 +167,26 @@ func TestCreateSweepTask_NormalizesCanonicalCoinType(t *testing.T) {
 	require.Len(t, tasks, 1)
 	assert.Equal(t, "BTC", tasks[0].ChainKey,
 		"canonical CoinType must be normalised to chain identifier")
+}
+
+func TestCreateSweepTask_UsesBIP44KeySource(t *testing.T) {
+	db := newSweepTestDB(t)
+	svc := newSweepSvc(db)
+
+	err := db.Update(func(tx database.Tx) error {
+		return svc.CreateSweepTask(tx, &models.GuestOrder{
+			OrderToken:     "gst_key_source",
+			PaymentCoin:    "BTC",
+			PaymentAddress: "bc1q_from",
+			SweepToAddress: "bc1q_to",
+			PaymentAmount:  "100000",
+		})
+	})
+	require.NoError(t, err)
+
+	var task models.SweepTask
+	require.NoError(t, db.gormDB.Where("order_token = ?", "gst_key_source").First(&task).Error)
+	assert.Equal(t, models.SweepKeySourceBIP44, task.KeySource)
 }
 
 func TestCreateSweepTask_SolanaSkipsWhenNoSweepTo(t *testing.T) {
@@ -438,4 +464,160 @@ func TestConfirmSweep_ErrorsOnTxHashMismatch(t *testing.T) {
 	var got models.SweepTask
 	require.NoError(t, db.gormDB.First(&got, "id = ?", 1).Error)
 	assert.Equal(t, models.SweepStatusSubmitted, got.Status)
+}
+
+type affiliateSweepTestKeyProvider struct {
+	escrow *btcec.PrivateKey
+}
+
+var _ contracts.KeyProvider = (*affiliateSweepTestKeyProvider)(nil)
+
+func (p *affiliateSweepTestKeyProvider) EVMMasterKey() (*btcec.PrivateKey, error) {
+	return nil, errors.New("not used")
+}
+func (p *affiliateSweepTestKeyProvider) SolanaMasterKey() (*solana.PrivateKey, error) {
+	return nil, errors.New("not used")
+}
+func (p *affiliateSweepTestKeyProvider) EscrowMasterKey() (*btcec.PrivateKey, error) {
+	return p.escrow, nil
+}
+func (p *affiliateSweepTestKeyProvider) RatingMasterKey() (*btcec.PrivateKey, error) {
+	return nil, errors.New("not used")
+}
+func (p *affiliateSweepTestKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error) {
+	return nil, errors.New("not used")
+}
+func (p *affiliateSweepTestKeyProvider) DigitalContentMasterKey(int) ([]byte, error) {
+	return nil, errors.New("not used")
+}
+
+type affiliateSweepTestPayouts struct{}
+
+var _ contracts.EscrowOperations = (*affiliateSweepTestPayouts)(nil)
+
+func (p *affiliateSweepTestPayouts) GetPayoutAddress(coin string) (iwallet.Address, error) {
+	return iwallet.NewAddress("seller-"+coin, iwallet.CoinType(coin)), nil
+}
+func (p *affiliateSweepTestPayouts) ReleaseCancelableFunds(*models.Order, string) (iwallet.TransactionID, string, error) {
+	return "", "", errors.New("not used")
+}
+func (p *affiliateSweepTestPayouts) ReleaseFromCancelableAddressWithParams(*models.Order, contracts.ReleaseFromCancelableParams) (iwallet.Tx, *iwallet.Transaction, error) {
+	return nil, nil, errors.New("not used")
+}
+func (p *affiliateSweepTestPayouts) RelayInstructions(string, iwallet.CoinType, any) (string, error) {
+	return "", errors.New("not used")
+}
+func (p *affiliateSweepTestPayouts) CancelPartialPayment(string) (string, uint64, error) {
+	return "", 0, errors.New("not used")
+}
+
+type affiliateSweepTestWallet struct {
+	iwallet.Wallet
+	chain       iwallet.ChainType
+	signingKeys [][]byte
+}
+
+func (w *affiliateSweepTestWallet) DerivePaymentAddressFromPubKey(*btcec.PublicKey) (string, []byte, error) {
+	return "affiliate-" + string(w.chain), []byte{byte(len(w.chain))}, nil
+}
+func (w *affiliateSweepTestWallet) AddressToScriptPubKey(string) ([]byte, error) {
+	return []byte{byte(len(w.chain))}, nil
+}
+func (w *affiliateSweepTestWallet) BuildSweepTx(_ []iwallet.SweepInput, key btcec.PrivateKey, _ string, _ int64) ([]byte, string, error) {
+	w.signingKeys = append(w.signingKeys, key.Serialize())
+	return []byte{0x01, 0x02}, "built-" + string(w.chain), nil
+}
+
+type affiliateSweepTestWallets struct {
+	wallets map[iwallet.ChainType]*affiliateSweepTestWallet
+}
+
+var _ contracts.WalletOperator = (*affiliateSweepTestWallets)(nil)
+
+func (w *affiliateSweepTestWallets) WalletForCurrencyCode(string) (iwallet.Wallet, error) {
+	return nil, errors.New("not used")
+}
+func (w *affiliateSweepTestWallets) SupportedChains() []iwallet.ChainType {
+	return []iwallet.ChainType{iwallet.ChainBitcoin, iwallet.ChainBitcoinCash, iwallet.ChainLitecoin}
+}
+func (w *affiliateSweepTestWallets) WalletForChain(chain iwallet.ChainType) (iwallet.Wallet, bool) {
+	wallet, ok := w.wallets[chain]
+	return wallet, ok
+}
+func (w *affiliateSweepTestWallets) Start() error { return nil }
+func (w *affiliateSweepTestWallets) Close() error { return nil }
+
+type affiliateSweepTestChainOps struct {
+	unspent map[iwallet.ChainType][]pkgutxo.UnspentOutput
+}
+
+func (o *affiliateSweepTestChainOps) GetTransaction(iwallet.ChainType, string) (*iwallet.Transaction, error) {
+	return nil, errors.New("not used")
+}
+func (o *affiliateSweepTestChainOps) GetFeeEstimate(iwallet.ChainType, int) uint64 { return 2 }
+func (o *affiliateSweepTestChainOps) BroadcastTransaction(chain iwallet.ChainType, _ string) (string, error) {
+	return "affiliate-sweep-" + string(chain), nil
+}
+func (o *affiliateSweepTestChainOps) GetAddressTransactions(iwallet.ChainType, string, []byte) ([]iwallet.Transaction, error) {
+	return nil, nil
+}
+func (o *affiliateSweepTestChainOps) IsHealthy(iwallet.ChainType) bool { return true }
+func (o *affiliateSweepTestChainOps) ListUnspent(chain iwallet.ChainType, _ []byte) ([]pkgutxo.UnspentOutput, error) {
+	return o.unspent[chain], nil
+}
+func (o *affiliateSweepTestChainOps) GetTxConfirmations(iwallet.ChainType, string) (int, error) {
+	return 0, nil
+}
+
+func newAffiliateSweepTestWallets() *affiliateSweepTestWallets {
+	wallets := make(map[iwallet.ChainType]*affiliateSweepTestWallet)
+	for _, chain := range []iwallet.ChainType{iwallet.ChainBitcoin, iwallet.ChainBitcoinCash, iwallet.ChainLitecoin} {
+		wallets[chain] = &affiliateSweepTestWallet{chain: chain}
+	}
+	return &affiliateSweepTestWallets{wallets: wallets}
+}
+
+func TestStartAffiliateUTXOSweeps_ConfirmedDepositCreatesEscrowKeyTask(t *testing.T) {
+	db := newSweepTestDB(t)
+	escrowKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	wallets := newAffiliateSweepTestWallets()
+	ops := &affiliateSweepTestChainOps{unspent: map[iwallet.ChainType][]pkgutxo.UnspentOutput{}}
+	svc := NewAutoSweepService(db, nil, nil)
+	svc.SetChainOps(ops)
+	svc.SetMultiwallet(wallets)
+	svc.SetAffiliateSweepRuntime(&affiliateSweepTestKeyProvider{escrow: escrowKey}, &affiliateSweepTestPayouts{})
+	monitor := pkgutxo.NewMonitor(nil)
+
+	require.NoError(t, svc.StartAffiliateUTXOSweeps(context.Background(), "affiliate-node", monitor))
+	ltcAddress := "affiliate-" + string(iwallet.ChainLitecoin)
+	watch := monitor.GetWatchedAddress(ltcAddress)
+	require.NotNil(t, watch)
+
+	watch.OnPayment(&iwallet.Transaction{Height: 0}, pkgutxo.PaymentStatusNormal)
+	var count int64
+	require.NoError(t, db.gormDB.Model(&models.SweepTask{}).Count(&count).Error)
+	assert.Zero(t, count)
+
+	ops.unspent[iwallet.ChainLitecoin] = []pkgutxo.UnspentOutput{{
+		TxHash: "affiliate-deposit", OutputIndex: 0, Height: 1, Value: 100_000,
+	}}
+	watch.OnPayment(&iwallet.Transaction{Height: 1}, pkgutxo.PaymentStatusNormal)
+	require.NoError(t, db.gormDB.Model(&models.SweepTask{}).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+
+	var task models.SweepTask
+	require.NoError(t, db.gormDB.First(&task).Error)
+	assert.Equal(t, models.SweepKeySourceAffiliateEscrow, task.KeySource)
+	assert.Equal(t, "affiliate:LTC", task.OrderToken)
+	ltcPayoutCoin, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainLitecoin)
+	require.True(t, ok)
+	assert.Equal(t, "seller-"+ltcPayoutCoin.String(), task.ToAddress)
+	assert.Equal(t, "100000", task.Amount)
+
+	svc.ProcessPendingSweeps(context.Background())
+	require.Len(t, wallets.wallets[iwallet.ChainLitecoin].signingKeys, 1)
+	assert.Equal(t, escrowKey.Serialize(), wallets.wallets[iwallet.ChainLitecoin].signingKeys[0])
+	require.NoError(t, db.gormDB.First(&task).Error)
+	assert.Equal(t, models.SweepStatusSubmitted, task.Status)
 }

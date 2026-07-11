@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +34,8 @@ type AutoSweepService struct {
 	eventBus    events.Bus
 	chainOps    utxo.ChainOperations
 	multiwallet contracts.WalletOperator
+	keys        contracts.KeyProvider
+	payouts     contracts.EscrowOperations
 
 	// broadcastCache holds txHash for tasks that were successfully broadcast
 	// but whose DB save failed. RecoverStaleTasks consults this cache to
@@ -62,6 +66,14 @@ func (s *AutoSweepService) SetMultiwallet(mw contracts.WalletOperator) {
 	s.multiwallet = mw
 }
 
+// SetAffiliateSweepRuntime injects the local escrow-key provider and the
+// settlement payout resolver used by promoter UTXO sweeps. Guest sweeps do
+// not use either dependency.
+func (s *AutoSweepService) SetAffiliateSweepRuntime(keys contracts.KeyProvider, payouts contracts.EscrowOperations) {
+	s.keys = keys
+	s.payouts = payouts
+}
+
 // CreateSweepTask records a pending sweep task for a funded Guest Order.
 // Called within the FUNDED transition transaction.
 //
@@ -85,6 +97,7 @@ func (s *AutoSweepService) CreateSweepTask(tx database.Tx, order *models.GuestOr
 		ToAddress:    order.SweepToAddress,
 		Amount:       order.PaymentAmount,
 		AddressIndex: order.AddressIndex,
+		KeySource:    models.SweepKeySourceBIP44,
 		Status:       models.SweepStatusPending,
 	}
 	return tx.Save(task)
@@ -240,12 +253,11 @@ func (s *AutoSweepService) broadcastUTXOSweep(task *models.SweepTask) (string, e
 		return "", fmt.Errorf("sweeper for %s: %w", coinInfo.Chain, err)
 	}
 
-	privKeyBytes, err := s.keyDeriver.DerivePrivateKey(coinInfo.Chain, task.AddressIndex)
+	privKey, clearKey, err := s.sweepSigningKey(task, coinInfo.Chain)
 	if err != nil {
-		return "", fmt.Errorf("derive key: %w", err)
+		return "", err
 	}
-	privKey, _ := btcec.PrivKeyFromBytes(privKeyBytes)
-	defer encryption.ZeroBytes(privKeyBytes)
+	defer clearKey()
 
 	pkScript, err := addrUtils.AddressToScriptPubKey(task.FromAddress)
 	if err != nil {
@@ -262,11 +274,21 @@ func (s *AutoSweepService) broadcastUTXOSweep(task *models.SweepTask) (string, e
 
 	inputs := make([]iwallet.SweepInput, 0, len(utxos))
 	for _, u := range utxos {
+		// Affiliate payouts are a persistent receiving address rather than a
+		// one-time order address. Wait for a confirmed deposit before spending
+		// it; Guest sweep semantics remain unchanged.
+		if task.KeySource == models.SweepKeySourceAffiliateEscrow && u.Height <= 0 {
+			continue
+		}
 		inputs = append(inputs, iwallet.SweepInput{
 			TxHash:      u.TxHash,
 			OutputIndex: u.OutputIndex,
 			Value:       int64(u.Value),
 		})
+	}
+
+	if len(inputs) == 0 {
+		return "", fmt.Errorf("no confirmed UTXOs available at %s", task.FromAddress)
 	}
 
 	rawTx, _, err := sweeper.BuildSweepTx(inputs, *privKey, task.ToAddress, defaultSweepFeePerByte)
@@ -275,6 +297,171 @@ func (s *AutoSweepService) broadcastUTXOSweep(task *models.SweepTask) (string, e
 	}
 
 	return s.chainOps.BroadcastTransaction(coinInfo.Chain, hex.EncodeToString(rawTx))
+}
+
+func (s *AutoSweepService) sweepSigningKey(task *models.SweepTask, chain iwallet.ChainType) (*btcec.PrivateKey, func(), error) {
+	switch task.KeySource {
+	case models.SweepKeySourceBIP44:
+		if s.keyDeriver == nil {
+			return nil, func() {}, fmt.Errorf("guest BIP44 key deriver not initialised")
+		}
+		privKeyBytes, err := s.keyDeriver.DerivePrivateKey(chain, task.AddressIndex)
+		if err != nil {
+			return nil, func() {}, fmt.Errorf("derive guest sweep key: %w", err)
+		}
+		privKey, _ := btcec.PrivKeyFromBytes(privKeyBytes)
+		return privKey, func() { encryption.ZeroBytes(privKeyBytes) }, nil
+	case models.SweepKeySourceAffiliateEscrow:
+		if s.keys == nil {
+			return nil, func() {}, fmt.Errorf("affiliate escrow key provider not initialised")
+		}
+		privKey, err := s.keys.EscrowMasterKey()
+		if err != nil {
+			return nil, func() {}, fmt.Errorf("load affiliate escrow key: %w", err)
+		}
+		if privKey == nil {
+			return nil, func() {}, fmt.Errorf("affiliate escrow key unavailable")
+		}
+		return privKey, func() {}, nil
+	default:
+		return nil, func() {}, fmt.Errorf("unsupported sweep key source %q", task.KeySource)
+	}
+}
+
+// StartAffiliateUTXOSweeps restores the local promoter receive-and-sweep
+// closure. Affiliate addresses are deterministically derived from the local
+// EscrowMasterKey, watched indefinitely, and swept to the normal seller
+// receiving account after their deposits confirm.
+func (s *AutoSweepService) StartAffiliateUTXOSweeps(ctx context.Context, nodeID string, monitor utxo.UTXOMonitorService) error {
+	if s == nil || s.keys == nil || s.payouts == nil || s.multiwallet == nil || monitor == nil {
+		return nil
+	}
+	escrowKey, err := s.keys.EscrowMasterKey()
+	if err != nil {
+		return fmt.Errorf("load affiliate escrow key: %w", err)
+	}
+	if escrowKey == nil {
+		return fmt.Errorf("affiliate escrow key unavailable")
+	}
+
+	var startErrs []error
+	for _, chain := range []iwallet.ChainType{
+		iwallet.ChainBitcoin,
+		iwallet.ChainBitcoinCash,
+		iwallet.ChainLitecoin,
+	} {
+		utils, err := utxoAddressUtilsFor(s.multiwallet, chain)
+		if err != nil {
+			startErrs = append(startErrs, fmt.Errorf("affiliate %s address utilities: %w", chain, err))
+			continue
+		}
+		if _, err := utxoSweeperFor(s.multiwallet, chain); err != nil {
+			startErrs = append(startErrs, fmt.Errorf("affiliate %s sweeper: %w", chain, err))
+			continue
+		}
+
+		fromAddress, scriptPubKey, err := utils.DerivePaymentAddressFromPubKey(escrowKey.PubKey())
+		if err != nil {
+			startErrs = append(startErrs, fmt.Errorf("derive affiliate %s address: %w", chain, err))
+			continue
+		}
+		payoutCoin, ok := iwallet.CanonicalNativeCoinType(chain)
+		if !ok {
+			startErrs = append(startErrs, fmt.Errorf("affiliate %s canonical payout coin unavailable", chain))
+			continue
+		}
+		payout, err := s.payouts.GetPayoutAddress(payoutCoin.String())
+		if err != nil || strings.TrimSpace(payout.String()) == "" {
+			if err == nil {
+				err = errors.New("empty payout address")
+			}
+			startErrs = append(startErrs, fmt.Errorf("resolve affiliate %s payout address: %w", chain, err))
+			continue
+		}
+
+		watchChain := chain
+		watchAddress := fromAddress
+		toAddress := payout.String()
+		watch := &utxo.WatchedAddress{
+			Address:      watchAddress,
+			ScriptPubKey: scriptPubKey,
+			ChainType:    watchChain,
+			NodeID:       nodeID,
+			OrderID:      affiliateSweepToken(watchChain),
+			OnPayment: func(tx *iwallet.Transaction, _ utxo.PaymentStatus) {
+				if tx == nil || tx.Height <= 0 {
+					return
+				}
+				if err := s.ensureAffiliateSweepTask(watchChain, watchAddress, toAddress); err != nil {
+					log.Warningf("affiliate %s sweep task: %v", watchChain, err)
+				}
+			},
+		}
+		if err := monitor.WatchAddress(watch); err != nil {
+			startErrs = append(startErrs, fmt.Errorf("watch affiliate %s address: %w", chain, err))
+			continue
+		}
+		if err := s.ensureAffiliateSweepTask(watchChain, watchAddress, toAddress); err != nil {
+			startErrs = append(startErrs, fmt.Errorf("restore affiliate %s sweep: %w", watchChain, err))
+		}
+	}
+	return errors.Join(startErrs...)
+}
+
+func affiliateSweepToken(chain iwallet.ChainType) string {
+	return "affiliate:" + string(chain)
+}
+
+// ensureAffiliateSweepTask creates one task for an address only when it has
+// confirmed UTXOs and no unfinished task. A follow-up task is created after a
+// prior sweep confirms if another deposit arrived while it was in flight.
+func (s *AutoSweepService) ensureAffiliateSweepTask(chain iwallet.ChainType, fromAddress, toAddress string) error {
+	if s.chainOps == nil || !s.chainOps.IsHealthy(chain) {
+		return nil
+	}
+	utils, err := utxoAddressUtilsFor(s.multiwallet, chain)
+	if err != nil {
+		return err
+	}
+	scriptPubKey, err := utils.AddressToScriptPubKey(fromAddress)
+	if err != nil {
+		return err
+	}
+	utxos, err := s.chainOps.ListUnspent(chain, scriptPubKey)
+	if err != nil {
+		return err
+	}
+	var amount uint64
+	for _, output := range utxos {
+		if output.Height > 0 {
+			amount += output.Value
+		}
+	}
+	if amount == 0 {
+		return nil
+	}
+
+	return s.db.Update(func(tx database.Tx) error {
+		var existing int64
+		if err := tx.Read().Model(&models.SweepTask{}).
+			Where("from_address = ? AND key_source = ? AND status <> ?", fromAddress,
+				models.SweepKeySourceAffiliateEscrow, models.SweepStatusConfirmed).
+			Count(&existing).Error; err != nil {
+			return err
+		}
+		if existing > 0 {
+			return nil
+		}
+		return tx.Save(&models.SweepTask{
+			OrderToken:  affiliateSweepToken(chain),
+			ChainKey:    string(chain),
+			FromAddress: fromAddress,
+			ToAddress:   toAddress,
+			Amount:      strconv.FormatUint(amount, 10),
+			KeySource:   models.SweepKeySourceAffiliateEscrow,
+			Status:      models.SweepStatusPending,
+		})
+	})
 }
 
 func (s *AutoSweepService) recordBroadcast(taskID int, txHash string) {
@@ -357,7 +544,14 @@ func (s *AutoSweepService) checkSubmittedSweeps(ctx context.Context) {
 			continue
 		}
 		if confs >= sweepConfirmThreshold {
-			_ = s.ConfirmSweep(task.OrderToken, task.TxHash)
+			if err := s.ConfirmSweep(task.OrderToken, task.TxHash); err != nil {
+				continue
+			}
+			if task.KeySource == models.SweepKeySourceAffiliateEscrow {
+				if err := s.ensureAffiliateSweepTask(chain, task.FromAddress, task.ToAddress); err != nil {
+					log.Warningf("affiliate %s follow-up sweep task: %v", chain, err)
+				}
+			}
 		}
 	}
 }

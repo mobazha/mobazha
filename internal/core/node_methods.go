@@ -380,6 +380,12 @@ func (n *MobazhaNode) RunFiatCleanupOnce(_ context.Context) {
 func (n *MobazhaNode) RunGuestOrderCleanupOnce(_ context.Context) {
 	if n.guestOrderService != nil {
 		n.guestOrderService.RunGuestCleanupOnce()
+		return
+	}
+	// Affiliate UTXO sweeps intentionally reuse the bounded retry and
+	// confirmation loop without requiring Guest Checkout or its BIP44 keys.
+	if n.autoSweepService != nil {
+		n.autoSweepService.ProcessPendingSweeps(context.Background())
 	}
 }
 

@@ -72,6 +72,10 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	if n.autoSweepService != nil {
 		n.autoSweepService.SetChainOps(n.monitorService)
 		n.autoSweepService.SetMultiwallet(n.multiwallet)
+		n.autoSweepService.SetAffiliateSweepRuntime(n.keyProvider, n.settlementService)
+		if err := n.autoSweepService.StartAffiliateUTXOSweeps(context.Background(), n.nodeID, n.monitorService); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "start affiliate UTXO sweeps: %v", err)
+		}
 	}
 	if n.guestOrderService != nil && n.multiwallet != nil {
 		for _, chain := range n.multiwallet.SupportedChains() {

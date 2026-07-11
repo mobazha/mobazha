@@ -100,7 +100,7 @@ func initSellerAffiliateSubsystem(obNode *MobazhaNode) {
 		return
 	}
 	store := database.NewGormSellerAffiliateStore(obNode.db)
-	obNode.sellerAffiliateService = NewSellerAffiliateAppService(store)
+	obNode.sellerAffiliateService = NewSellerAffiliateAppService(store, NewSettlementActionStore(obNode.db))
 	logger.LogInfoWithID(log, obNode.nodeID, "SellerAffiliate subsystem initialized")
 }
 

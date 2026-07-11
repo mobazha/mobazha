@@ -225,6 +225,71 @@ func TestAffiliatePayoutAddressForSettlementCoin_UsesFrozenNativeRail(t *testing
 	}
 }
 
+type staticAffiliateSettlementActionReader struct {
+	actions []models.SettlementActionSnapshot
+}
+
+func (r staticAffiliateSettlementActionReader) ListSettlementActions(_ context.Context, _ []string) ([]models.SettlementActionSnapshot, error) {
+	return r.actions, nil
+}
+
+func TestSellerAffiliateStatement_ProjectsVerifiedSettlementOutputs(t *testing.T) {
+	baseLine := models.AffiliateStatementLine{
+		Attribution: models.AffiliateAttribution{
+			OrderID:               "affiliate-order",
+			PromoterPayoutAddress: "0x1111111111111111111111111111111111111111",
+		},
+		CommissionLine: models.AffiliateCommissionLine{CommissionAtomic: "125", Status: models.AffiliateCommissionStatusPending},
+	}
+	planned := models.SettlementPayoutLine{
+		Type: "affiliate", Amount: "125", Address: "0x1111111111111111111111111111111111111111", Coin: "ETH",
+	}
+	now := time.Now().UTC()
+	tests := []struct {
+		name   string
+		action models.SettlementActionSnapshot
+		want   string
+	}{
+		{
+			name: "planned", action: models.SettlementActionSnapshot{
+				OrderID: "affiliate-order", ActionID: "act-planned", Action: "confirm", State: "submitting", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned}, UpdatedAt: now,
+			}, want: "planned",
+		},
+		{
+			name: "submitted", action: models.SettlementActionSnapshot{
+				OrderID: "affiliate-order", ActionID: "act-submitted", Action: "confirm", State: "submitted", TxHash: "0xsubmitted", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned}, UpdatedAt: now,
+			}, want: "submitted",
+		},
+		{
+			name: "confirmed only after matching observed output", action: models.SettlementActionSnapshot{
+				OrderID: "affiliate-order", ActionID: "act-confirmed", Action: "complete", State: "confirmed", TxHash: "0xconfirmed", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned},
+				ObservedLines: []models.SettlementPayoutLine{{Type: "affiliate", Amount: "125", Address: "0x1111111111111111111111111111111111111111", TxHash: "0xconfirmed"}}, UpdatedAt: now,
+			}, want: "confirmed",
+		},
+		{
+			name: "confirmed without chain output is not paid", action: models.SettlementActionSnapshot{
+				OrderID: "affiliate-order", ActionID: "act-unverified", Action: "complete", State: "confirmed", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned}, UpdatedAt: now,
+			}, want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := NewSellerAffiliateAppService(nil, staticAffiliateSettlementActionReader{actions: []models.SettlementActionSnapshot{tt.action}})
+			statement, err := service.projectStatementSettlement(context.Background(), []models.AffiliateStatementLine{baseLine})
+			require.NoError(t, err)
+			require.Len(t, statement, 1)
+			if tt.want == "" {
+				assert.Nil(t, statement[0].Settlement)
+				return
+			}
+			require.NotNil(t, statement[0].Settlement)
+			assert.Equal(t, tt.want, statement[0].Settlement.State)
+			assert.Equal(t, "125", statement[0].Settlement.Amount)
+		})
+	}
+}
+
 func affiliateTestPeerID(t *testing.T) string {
 	t.Helper()
 	peerID, _, err := identity.GeneratePeerID()

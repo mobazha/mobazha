@@ -28,6 +28,32 @@ func NewSettlementActionStore(db pkgdb.Database) *SettlementActionStore {
 	return &SettlementActionStore{db: db}
 }
 
+// ListSettlementActions loads order-scoped action snapshots for read-model
+// projections such as affiliate statements. The tenant-scoped database handle
+// enforces the caller's tenant boundary.
+func (s *SettlementActionStore) ListSettlementActions(ctx context.Context, orderIDs []string) ([]models.SettlementActionSnapshot, error) {
+	if s == nil || s.db == nil || len(orderIDs) == 0 {
+		return nil, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	rows := make([]models.SettlementAction, 0)
+	if err := s.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().WithContext(ctx).
+			Where("order_id IN ?", orderIDs).
+			Order("updated_at DESC, action_id ASC").
+			Find(&rows).Error
+	}); err != nil {
+		return nil, err
+	}
+	out := make([]models.SettlementActionSnapshot, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.Snapshot())
+	}
+	return out, nil
+}
+
 // Lookup implements adapters.ActionStore.
 func (s *SettlementActionStore) Lookup(ctx context.Context, actionID string) (*adapters.ActionRecord, error) {
 	if err := ctx.Err(); err != nil {

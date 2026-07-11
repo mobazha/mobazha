@@ -324,8 +324,26 @@ type AffiliateSettlementPayout struct {
 // AffiliateStatementLine is a read-only projection of one immutable
 // attribution and one commission line. It is not persisted separately.
 type AffiliateStatementLine struct {
-	Attribution    AffiliateAttribution    `json:"attribution"`
-	CommissionLine AffiliateCommissionLine `json:"commissionLine"`
+	Attribution    AffiliateAttribution       `json:"attribution"`
+	CommissionLine AffiliateCommissionLine    `json:"commissionLine"`
+	Settlement     *AffiliateSettlementOutput `json:"settlement,omitempty"`
+}
+
+// AffiliateSettlementOutput is a read-only projection of the promoter output
+// in a backend settlement action. It never changes commission lifecycle state:
+// the UI derives settling/paid from State and uses CommissionLine.Status only
+// for pending/reversed business facts.
+type AffiliateSettlementOutput struct {
+	ActionID      string     `json:"actionId"`
+	Action        string     `json:"action"`
+	State         string     `json:"state"` // planned | submitted | confirmed
+	TxHash        string     `json:"txHash,omitempty"`
+	Coin          string     `json:"coin"`
+	Amount        string     `json:"amount"`
+	Address       string     `json:"address"`
+	Confirmations int        `json:"confirmations,omitempty"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+	ConfirmedAt   *time.Time `json:"confirmedAt,omitempty"`
 }
 
 var (

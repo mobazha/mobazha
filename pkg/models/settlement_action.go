@@ -19,6 +19,7 @@ type SettlementPayoutLine struct {
 // SettlementActionSnapshot is the read-model shape exposed on orders and list
 // views for backend-submitted settlement actions.
 type SettlementActionSnapshot struct {
+	OrderID          string                 `json:"orderId,omitempty"`
 	ActionID         string                 `json:"actionId"`
 	Action           string                 `json:"action"`
 	State            string                 `json:"state"`
@@ -85,6 +86,7 @@ func (SettlementAction) TableName() string { return "settlement_actions" }
 // model used by APIs.
 func (a SettlementAction) Snapshot() SettlementActionSnapshot {
 	return SettlementActionSnapshot{
+		OrderID:          a.OrderID,
 		ActionID:         a.ActionID,
 		Action:           a.ActionKind,
 		SettlementAction: a.ActionKind,

@@ -16,14 +16,19 @@ import (
 
 // SellerAffiliateAppService implements the automation-first Phase 1 domain.
 type SellerAffiliateAppService struct {
-	store contracts.SellerAffiliateStore
+	store   contracts.SellerAffiliateStore
+	actions contracts.AffiliateSettlementActionReader
 }
 
 var _ contracts.SellerAffiliateService = (*SellerAffiliateAppService)(nil)
 
 // NewSellerAffiliateAppService constructs the minimal affiliate application service.
-func NewSellerAffiliateAppService(store contracts.SellerAffiliateStore) *SellerAffiliateAppService {
-	return &SellerAffiliateAppService{store: store}
+func NewSellerAffiliateAppService(store contracts.SellerAffiliateStore, readers ...contracts.AffiliateSettlementActionReader) *SellerAffiliateAppService {
+	service := &SellerAffiliateAppService{store: store}
+	if len(readers) > 0 {
+		service.actions = readers[0]
+	}
+	return service
 }
 
 // PutProgram creates or updates the tenant's single storefront-wide program.
@@ -290,7 +295,11 @@ func (s *SellerAffiliateAppService) ListSellerStatement(ctx context.Context) ([]
 	if s == nil || s.store == nil {
 		return nil, errors.New("seller affiliate store not configured")
 	}
-	return s.store.ListAffiliateStatementLines(ctx, "")
+	statement, err := s.store.ListAffiliateStatementLines(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	return s.projectStatementSettlement(ctx, statement)
 }
 
 // ListPromoterStatement returns only lines attributed to one promoter PeerID.
@@ -302,7 +311,156 @@ func (s *SellerAffiliateAppService) ListPromoterStatement(ctx context.Context, p
 	if promoterPeerID == "" {
 		return nil, models.ErrInvalidSellerAffiliate
 	}
-	return s.store.ListAffiliateStatementLines(ctx, promoterPeerID)
+	statement, err := s.store.ListAffiliateStatementLines(ctx, promoterPeerID)
+	if err != nil {
+		return nil, err
+	}
+	return s.projectStatementSettlement(ctx, statement)
+}
+
+func (s *SellerAffiliateAppService) projectStatementSettlement(ctx context.Context, statement []models.AffiliateStatementLine) ([]models.AffiliateStatementLine, error) {
+	if len(statement) == 0 || s.actions == nil {
+		return statement, nil
+	}
+	orderIDs := make([]string, 0, len(statement))
+	seenOrders := make(map[string]struct{}, len(statement))
+	for _, line := range statement {
+		orderID := strings.TrimSpace(line.Attribution.OrderID)
+		if orderID == "" {
+			continue
+		}
+		if _, seen := seenOrders[orderID]; !seen {
+			seenOrders[orderID] = struct{}{}
+			orderIDs = append(orderIDs, orderID)
+		}
+	}
+	actions, err := s.actions.ListSettlementActions(ctx, orderIDs)
+	if err != nil {
+		return nil, err
+	}
+	actionsByOrder := make(map[string][]models.SettlementActionSnapshot, len(orderIDs))
+	for _, action := range actions {
+		if action.OrderID != "" {
+			actionsByOrder[action.OrderID] = append(actionsByOrder[action.OrderID], action)
+		}
+	}
+	for i := range statement {
+		if !affiliateCommissionPositive(statement[i].CommissionLine.CommissionAtomic) {
+			continue
+		}
+		statement[i].Settlement = affiliateStatementSettlement(&statement[i].Attribution, actionsByOrder[statement[i].Attribution.OrderID])
+	}
+	return statement, nil
+}
+
+func affiliateCommissionPositive(raw string) bool {
+	amount, ok := new(big.Int).SetString(strings.TrimSpace(raw), 10)
+	return ok && amount.Sign() > 0
+}
+
+func affiliateStatementSettlement(attribution *models.AffiliateAttribution, actions []models.SettlementActionSnapshot) *models.AffiliateSettlementOutput {
+	var best *models.AffiliateSettlementOutput
+	for _, action := range actions {
+		candidate := affiliateSettlementFromAction(attribution, action)
+		if candidate == nil || affiliateSettlementRank(candidate.State) < affiliateSettlementRank("planned") {
+			continue
+		}
+		if best == nil || affiliateSettlementRank(candidate.State) > affiliateSettlementRank(best.State) ||
+			(affiliateSettlementRank(candidate.State) == affiliateSettlementRank(best.State) && candidate.UpdatedAt.After(best.UpdatedAt)) {
+			best = candidate
+		}
+	}
+	return best
+}
+
+func affiliateSettlementFromAction(attribution *models.AffiliateAttribution, action models.SettlementActionSnapshot) *models.AffiliateSettlementOutput {
+	if attribution == nil || strings.TrimSpace(action.SettlementCoin) == "" {
+		return nil
+	}
+	expectedAddress, err := affiliatePayoutAddressForSettlementCoin(attribution, action.SettlementCoin)
+	if err != nil {
+		return nil
+	}
+	planned, ok := affiliatePayoutLine(action.PlannedLines, expectedAddress, "")
+	if !ok {
+		return nil
+	}
+	output := &models.AffiliateSettlementOutput{
+		ActionID:      action.ActionID,
+		Action:        action.Action,
+		State:         "planned",
+		TxHash:        action.TxHash,
+		Coin:          firstNonEmpty(planned.Coin, action.SettlementCoin),
+		Amount:        planned.Amount,
+		Address:       planned.Address,
+		Confirmations: action.Confirmations,
+		UpdatedAt:     action.UpdatedAt,
+		ConfirmedAt:   action.ConfirmedAt,
+	}
+	switch action.State {
+	case "submitting":
+		return output
+	case "submitted":
+		output.State = "submitted"
+		return output
+	case "confirmed":
+		observed, observedOK := affiliatePayoutLine(action.ObservedLines, expectedAddress, planned.Amount)
+		if !observedOK {
+			return nil
+		}
+		output.State = "confirmed"
+		output.Amount = observed.Amount
+		output.Address = observed.Address
+		output.Coin = firstNonEmpty(observed.Coin, output.Coin)
+		output.TxHash = firstNonEmpty(observed.TxHash, action.TxHash)
+		return output
+	default:
+		return nil
+	}
+}
+
+func affiliatePayoutLine(lines []models.SettlementPayoutLine, expectedAddress, expectedAmount string) (models.SettlementPayoutLine, bool) {
+	for _, line := range lines {
+		if strings.TrimSpace(line.Type) != "affiliate" || !sameAffiliatePayoutAddress(line.Address, expectedAddress) || strings.TrimSpace(line.Amount) == "" || strings.TrimSpace(line.Amount) == "0" {
+			continue
+		}
+		if expectedAmount != "" && strings.TrimSpace(line.Amount) != strings.TrimSpace(expectedAmount) {
+			continue
+		}
+		return line, true
+	}
+	return models.SettlementPayoutLine{}, false
+}
+
+func sameAffiliatePayoutAddress(actual, expected string) bool {
+	actual = strings.TrimSpace(actual)
+	expected = strings.TrimSpace(expected)
+	if common.IsHexAddress(actual) && common.IsHexAddress(expected) {
+		return common.HexToAddress(actual) == common.HexToAddress(expected)
+	}
+	return actual == expected
+}
+
+func affiliateSettlementRank(state string) int {
+	switch state {
+	case "confirmed":
+		return 3
+	case "submitted":
+		return 2
+	case "planned":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // ListPendingCommissionOrderIDs returns orders waiting on existing protection facts.

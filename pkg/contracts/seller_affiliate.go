@@ -31,6 +31,12 @@ type SellerAffiliateSettlementPayoutProvider interface {
 	SettlementPayout(ctx context.Context, orderID, settlementCoin string) (*models.AffiliateSettlementPayout, error)
 }
 
+// AffiliateSettlementActionReader provides the immutable settlement-action
+// facts needed to project promoter outputs into affiliate statements.
+type AffiliateSettlementActionReader interface {
+	ListSettlementActions(ctx context.Context, orderIDs []string) ([]models.SettlementActionSnapshot, error)
+}
+
 // SellerAffiliateService defines the automation-first affiliate operations.
 type SellerAffiliateService interface {
 	SellerAffiliateSettlementPayoutProvider

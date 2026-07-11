@@ -118,6 +118,10 @@ func (s *SettlementService) releaseMonitoredCancelableFunds(order *models.Order,
 		return "", "", err
 	}
 	coinCode := coinType.String()
+	affiliatePayout, err := s.sellerAffiliateSettlementPayout(context.Background(), order.ID, coinType)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve affiliate settlement payout: %w", err)
+	}
 	var toAddress iwallet.Address
 
 	if payoutAddress != "" {
@@ -137,21 +141,54 @@ func (s *SettlementService) releaseMonitoredCancelableFunds(order *models.Order,
 	}
 
 	params := contracts.ReleaseFromCancelableParams{
-		CoinCode:       coinCode,
-		PaymentAddress: paymentSent.ToAddress,
-		ScriptHex:      paymentSent.Script,
-		ChaincodeHex:   paymentSent.Chaincode,
-		ToAddress:      toAddress,
-		FinishType:     iwallet.ORDER_FINISH_COMPLETE,
+		CoinCode:        coinCode,
+		PaymentAddress:  paymentSent.ToAddress,
+		ScriptHex:       paymentSent.Script,
+		ChaincodeHex:    paymentSent.Chaincode,
+		ToAddress:       toAddress,
+		AffiliatePayout: affiliatePayout,
+		FinishType:      iwallet.ORDER_FINISH_COMPLETE,
+	}
+	actionID, existingTxHash, err := s.beginUTXOCancelableConfirmAction(order.ID.String(), coinCode, paymentSent.Amount)
+	if err != nil {
+		return "", "", err
+	}
+	if existingTxHash != "" {
+		return iwallet.TransactionID(existingTxHash), toAddress.String(), nil
 	}
 
 	wTx, tx, err := s.ReleaseFromCancelableAddressWithParams(order, params)
 	if err != nil {
+		s.failUTXOCancelableConfirmAction(actionID, err.Error())
 		return "", "", fmt.Errorf("failed to release CANCELABLE payment: %w", err)
+	}
+	if tx == nil || tx.ID == "" {
+		err := errors.New("CANCELABLE release completed without transaction")
+		s.failUTXOCancelableConfirmAction(actionID, err.Error())
+		return "", "", err
+	}
+	plannedLines, err := utxoCancelableConfirmPayoutLines(*tx, coinCode, affiliatePayout)
+	if err != nil {
+		if rollbackErr := wTx.Rollback(); rollbackErr != nil {
+			logger.LogWarningWithIDf(log, s.nodeID, "Rollback CANCELABLE release for order %s: %v", order.ID, rollbackErr)
+		}
+		s.failUTXOCancelableConfirmAction(actionID, err.Error())
+		return "", "", err
+	}
+	if err := s.recordUTXOCancelableConfirmSubmission(actionID, tx.ID.String(), plannedLines, "submitting"); err != nil {
+		if rollbackErr := wTx.Rollback(); rollbackErr != nil {
+			logger.LogWarningWithIDf(log, s.nodeID, "Rollback CANCELABLE release for order %s: %v", order.ID, rollbackErr)
+		}
+		s.failUTXOCancelableConfirmAction(actionID, err.Error())
+		return "", "", err
 	}
 
 	if err := commitCancelableReleaseWalletTx(wTx, order.ID); err != nil {
+		s.failUTXOCancelableConfirmAction(actionID, err.Error())
 		return "", "", err
+	}
+	if err := s.recordUTXOCancelableConfirmSubmission(actionID, tx.ID.String(), plannedLines, "submitted"); err != nil {
+		return "", "", fmt.Errorf("persist submitted CANCELABLE settlement action: %w", err)
 	}
 
 	actualAddr := toAddress.String()

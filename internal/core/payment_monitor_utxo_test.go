@@ -25,14 +25,15 @@ import (
 
 // mockUTXOPaymentSource is a mock implementation of pkgutxo.PaymentSource for testing
 type mockUTXOPaymentSource struct {
-	mu           sync.RWMutex
-	healthy      bool
-	chain        iwallet.ChainType
-	transactions map[string][]*iwallet.Transaction // address -> transactions
-	callbacks    map[string]func(tx *iwallet.Transaction)
-	feeRate      uint64
-	subscribeErr error
-	getTxErr     error
+	mu            sync.RWMutex
+	healthy       bool
+	chain         iwallet.ChainType
+	transactions  map[string][]*iwallet.Transaction // address -> transactions
+	callbacks     map[string]func(tx *iwallet.Transaction)
+	feeRate       uint64
+	subscribeErr  error
+	getTxErr      error
+	confirmations int
 }
 
 func newMockUTXOPaymentSource(chain iwallet.ChainType) *mockUTXOPaymentSource {
@@ -112,7 +113,7 @@ func (m *mockUTXOPaymentSource) ListUnspent(_ context.Context, _ []byte) ([]pkgu
 }
 
 func (m *mockUTXOPaymentSource) GetTxConfirmations(_ context.Context, _ string) (int, error) {
-	return 0, nil
+	return m.confirmations, nil
 }
 
 // SimulatePayment simulates a payment being detected

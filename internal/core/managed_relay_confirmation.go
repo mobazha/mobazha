@@ -51,6 +51,7 @@ func (n *MobazhaNode) runSettlementActionConfirmationsOnce(ctx context.Context) 
 	if n == nil || n.db == nil || n.multiwallet == nil {
 		return
 	}
+	n.runUTXOSettlementConfirmationsOnce(ctx)
 	n.runManagedSettlementReconciliationsOnce(ctx)
 	n.runManagedRelayConfirmationsOnce(ctx)
 }

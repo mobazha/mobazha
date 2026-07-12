@@ -16,7 +16,8 @@ import (
 )
 
 type distributionManagedEVMSigner struct {
-	keys contracts.KeyProvider
+	keys       contracts.KeyProvider
+	settlement contracts.SettlementSigner
 }
 
 func (s distributionManagedEVMSigner) SignManagedSettlementTransaction(
@@ -35,7 +36,7 @@ func (s distributionManagedEVMSigner) signManagedSettlement(
 	if err := ctx.Err(); err != nil {
 		return common.Address{}, nil, err
 	}
-	if s.keys == nil {
+	if s.keys == nil && s.settlement == nil {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: key provider unavailable")
 	}
 	if request.Chain == "" || request.ChainID == 0 || escrowAddress == (common.Address{}) ||
@@ -52,16 +53,6 @@ func (s distributionManagedEVMSigner) signManagedSettlement(
 	if request.Threshold == 0 || request.Threshold > uint64(len(request.Owners)) || len(request.Owners) == 0 {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: invalid owner threshold")
 	}
-	key, err := s.keys.EVMMasterKey()
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: load EVM key: %w", err)
-	}
-	ecdsaKey, err := crypto.ToECDSA(key.Serialize())
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: convert EVM key: %w", err)
-	}
-	address := crypto.PubkeyToAddress(ecdsaKey.PublicKey)
-	localOwner := false
 	seen := make(map[common.Address]struct{}, len(request.Owners))
 	for _, owner := range request.Owners {
 		if owner == (common.Address{}) {
@@ -71,16 +62,54 @@ func (s distributionManagedEVMSigner) signManagedSettlement(
 			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: duplicate owner %s", owner.Hex())
 		}
 		seen[owner] = struct{}{}
+	}
+	var address common.Address
+	var signature []byte
+	var err error
+	if request.AttemptScope != nil {
+		signer, ok := s.settlement.(contracts.EVMSettlementSigner)
+		if !ok {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: attempt-scoped EVM signer unavailable")
+		}
+		scope := request.AttemptScope
+		scopeCoin, scopeErr := iwallet.CoinInfoFromCoinType(iwallet.CoinType(scope.KeyRef.RailID))
+		if scopeErr != nil || scopeCoin.Chain != request.Chain {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: attempt rail does not match chain %s", request.Chain)
+		}
+		address, signature, err = signer.SignEVMDigest(ctx, contracts.EVMDigestSettlementSignRequest{
+			KeyRef: scope.KeyRef, OrderID: scope.OrderID, AttemptID: scope.AttemptID,
+			Action: scope.Action, Sequence: scope.Sequence, TermsHash: scope.TermsHash,
+			ChainID: request.ChainID, Digest: request.Digest,
+		})
+		if err != nil {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: %w", err)
+		}
+	} else {
+		if s.keys == nil {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: key provider unavailable")
+		}
+		key, keyErr := s.keys.EVMMasterKey()
+		if keyErr != nil {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: load EVM key: %w", keyErr)
+		}
+		ecdsaKey, keyErr := crypto.ToECDSA(key.Serialize())
+		if keyErr != nil {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: convert EVM key: %w", keyErr)
+		}
+		address = crypto.PubkeyToAddress(ecdsaKey.PublicKey)
+		signature, err = crypto.Sign(request.Digest[:], ecdsaKey)
+		if err != nil {
+			return common.Address{}, nil, fmt.Errorf("distribution EVM signer: sign digest: %w", err)
+		}
+		signature[64] += 27
+	}
+	localOwner := false
+	for _, owner := range request.Owners {
 		localOwner = localOwner || owner == address
 	}
 	if !localOwner {
 		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: local owner %s is outside the authorized owner set", address.Hex())
 	}
-	signature, err := crypto.Sign(request.Digest[:], ecdsaKey)
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("distribution EVM signer: sign digest: %w", err)
-	}
-	signature[64] += 27
 	return address, signature, nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -116,6 +117,38 @@ func (r UTXOMultisigSettlementSignRequest) Validate() error {
 // signatures only and never exposes the derived child key.
 type UTXOSettlementSigner interface {
 	SignUTXOMultisig(context.Context, UTXOMultisigSettlementSignRequest) ([]iwallet.EscrowSignature, error)
+}
+
+// EVMDigestSettlementSignRequest authorizes one raw EVM digest signature with
+// an attempt-scoped key. Digest is already the chain-native EIP-712 hash.
+type EVMDigestSettlementSignRequest struct {
+	KeyRef    SettlementKeyRef
+	OrderID   string
+	AttemptID string
+	Action    string
+	Sequence  uint64
+	TermsHash string
+	ChainID   uint64
+	Digest    [32]byte
+}
+
+// Validate rejects incomplete or replay-ambiguous EVM digest requests.
+func (r EVMDigestSettlementSignRequest) Validate() error {
+	if err := r.KeyRef.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(r.OrderID) == "" || strings.TrimSpace(r.AttemptID) == "" ||
+		strings.TrimSpace(r.Action) == "" || r.ChainID == 0 || r.Digest == ([32]byte{}) ||
+		!validSettlementTermsHash(r.TermsHash) {
+		return fmt.Errorf("EVM settlement signing requires attempt, action, chain, terms, and digest")
+	}
+	return nil
+}
+
+// EVMSettlementSigner produces a recoverable chain-native signature without
+// exposing the attempt-derived private key.
+type EVMSettlementSigner interface {
+	SignEVMDigest(context.Context, EVMDigestSettlementSignRequest) (common.Address, []byte, error)
 }
 
 // UTXOTimeoutSettlementSigner keeps the timeout private key inside the opaque

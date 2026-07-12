@@ -210,6 +210,36 @@ func TestLocalSettlementSigner_RejectsUTXOSigningWithoutWalletCapability(t *test
 	require.Error(t, err)
 }
 
+func TestLocalSettlementSigner_SignsRawEVMDigestWithAttemptKey(t *testing.T) {
+	signer := newLocalSettlementSigner(newFileKeyProvider(nil, settlementTestPrivateKey(t, 1), nil, nil, nil))
+	keyRef := contracts.SettlementKeyRef{
+		TenantID: "tenant-a", RailID: "crypto:eip155:1:native",
+		Purpose: "standard-order-participant:seller", ReferenceID: "authorization-context-1",
+	}
+	publicKey, err := signer.PublicKey(t.Context(), keyRef)
+	require.NoError(t, err)
+	parsedKey, err := btcec.ParsePubKey(publicKey)
+	require.NoError(t, err)
+	wantAddress := crypto.PubkeyToAddress(*parsedKey.ToECDSA())
+	digest := [32]byte{1, 2, 3, 4}
+
+	address, signature, err := signer.(contracts.EVMSettlementSigner).SignEVMDigest(
+		t.Context(),
+		contracts.EVMDigestSettlementSignRequest{
+			KeyRef: keyRef, OrderID: "order-1", AttemptID: "attempt-1", Action: "complete",
+			Sequence: 1, TermsHash: strings.Repeat("a", 64), ChainID: 1, Digest: digest,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, wantAddress, address)
+	require.Len(t, signature, 65)
+	recoverySignature := append([]byte(nil), signature...)
+	recoverySignature[64] -= 27
+	recovered, err := crypto.SigToPub(digest[:], recoverySignature)
+	require.NoError(t, err)
+	require.Equal(t, wantAddress, crypto.PubkeyToAddress(*recovered))
+}
+
 func TestGuestManagedEscrowOwner_UsesSettlementSignerNotEVMProfileKey(t *testing.T) {
 	profileKey := settlementTestPrivateKey(t, 1)
 	settlementRoot := settlementTestPrivateKey(t, 2)

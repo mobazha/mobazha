@@ -125,7 +125,7 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 	evmRelay := n.distributionEVMRelayService()
 	n.evmRelay = evmRelay
 	guestRuntimeBinder := &distributionManagedEscrowGuestRuntimeBinder{node: n, source: guestSettlementSource, watchSource: guestWatchSource}
-	evmSigner := distributionManagedEVMSigner{keys: n.keyProvider}
+	evmSigner := distributionManagedEVMSigner{keys: n.keyProvider, settlement: n.settlementSigner}
 	managedEVM := distribution.ManagedEVMRuntime{
 		SettlementSigner: evmSigner,
 		EVMReaders:       distributionEVMReaderProvider{wallets: n.multiwallet},

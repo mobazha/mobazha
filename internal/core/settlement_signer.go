@@ -13,6 +13,8 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/hkdf"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -21,6 +23,7 @@ import (
 
 var _ contracts.SettlementSigner = (*localSettlementSigner)(nil)
 var _ contracts.UTXOSettlementSigner = (*localSettlementSigner)(nil)
+var _ contracts.EVMSettlementSigner = (*localSettlementSigner)(nil)
 var _ contracts.UTXOTimeoutSettlementSigner = (*localSettlementSigner)(nil)
 
 // localSettlementSigner is the standalone opaque Settlement Domain adapter.
@@ -104,6 +107,32 @@ func (s *localSettlementSigner) SignUTXOMultisig(
 		return nil, fmt.Errorf("sign attempt-scoped UTXO multisig transaction: %w", err)
 	}
 	return signatures, nil
+}
+
+func (s *localSettlementSigner) SignEVMDigest(
+	ctx context.Context,
+	request contracts.EVMDigestSettlementSignRequest,
+) (common.Address, []byte, error) {
+	if err := ctx.Err(); err != nil {
+		return common.Address{}, nil, err
+	}
+	if err := request.Validate(); err != nil {
+		return common.Address{}, nil, err
+	}
+	key, err := s.deriveKey(request.KeyRef)
+	if err != nil {
+		return common.Address{}, nil, err
+	}
+	ecdsaKey, err := ethcrypto.ToECDSA(key.Serialize())
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("convert attempt-scoped EVM key: %w", err)
+	}
+	signature, err := ethcrypto.Sign(request.Digest[:], ecdsaKey)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("sign attempt-scoped EVM digest: %w", err)
+	}
+	signature[64] += 27
+	return ethcrypto.PubkeyToAddress(ecdsaKey.PublicKey), signature, nil
 }
 
 func (s *localSettlementSigner) ReleaseUTXOAfterTimeout(

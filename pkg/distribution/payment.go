@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
@@ -37,6 +38,18 @@ type ManagedEVMSignRequest struct {
 	Digest        [32]byte
 	Purpose       ManagedEVMSignPurpose
 	CorrelationID string
+	AttemptScope  *ManagedEVMAttemptSignScope
+}
+
+// ManagedEVMAttemptSignScope binds a managed Safe owner signature to the
+// participant key and immutable terms of one payment attempt.
+type ManagedEVMAttemptSignScope struct {
+	KeyRef    contracts.SettlementKeyRef
+	OrderID   string
+	AttemptID string
+	Action    string
+	Sequence  uint64
+	TermsHash string
 }
 
 // ManagedSettlementSigner is the provider-neutral typed EVM signing port for

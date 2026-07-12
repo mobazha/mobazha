@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strconv"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
@@ -92,6 +93,7 @@ func (s *localSettlementSigner) deriveKey(keyRef contracts.SettlementKeyRef) (*b
 func settlementSignatureDigest(request contracts.SettlementSignRequest) [32]byte {
 	encoded := canonicalSettlementFields(
 		"mobazha-settlement-signature-v1", request.Domain,
+		request.OrderID, request.AttemptID, request.Action, strconv.FormatUint(request.Sequence, 10), request.TermsHash,
 		request.KeyRef.RailID,
 		request.KeyRef.Purpose, request.KeyRef.ReferenceID,
 	)

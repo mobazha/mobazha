@@ -5,6 +5,7 @@ package contracts
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strings"
 )
@@ -35,9 +36,14 @@ func (r SettlementKeyRef) Validate() error {
 // explicit anti-replay domain. Adapters decide the chain-specific signature
 // encoding without returning key material to Core.
 type SettlementSignRequest struct {
-	KeyRef  SettlementKeyRef
-	Domain  string
-	Payload []byte
+	KeyRef    SettlementKeyRef
+	Domain    string
+	OrderID   string
+	AttemptID string
+	Action    string
+	Sequence  uint64
+	TermsHash string
+	Payload   []byte
 }
 
 // Validate rejects ambiguous or empty signing requests.
@@ -45,10 +51,21 @@ func (r SettlementSignRequest) Validate() error {
 	if err := r.KeyRef.Validate(); err != nil {
 		return err
 	}
-	if strings.TrimSpace(r.Domain) == "" || len(r.Payload) == 0 {
-		return fmt.Errorf("settlement signing requires domain and payload")
+	if strings.TrimSpace(r.Domain) == "" || strings.TrimSpace(r.OrderID) == "" ||
+		strings.TrimSpace(r.AttemptID) == "" || strings.TrimSpace(r.Action) == "" ||
+		len(r.Payload) == 0 || !validSettlementTermsHash(r.TermsHash) {
+		return fmt.Errorf("settlement signing requires domain, order, attempt, action, terms hash, and payload")
 	}
 	return nil
+}
+
+func validSettlementTermsHash(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) != 64 || strings.ToLower(value) != value {
+		return false
+	}
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == 32
 }
 
 // SettlementSigner exposes settlement-domain public keys and signing through

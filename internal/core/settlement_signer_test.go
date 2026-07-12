@@ -4,6 +4,7 @@
 package core
 
 import (
+	"strings"
 	"testing"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -57,7 +58,8 @@ func TestLocalSettlementSigner_TenantIDDoesNotAffectKeyOrSignatureDigest(t *test
 		KeyRef: contracts.SettlementKeyRef{
 			TenantID: "tenant-a", RailID: "ETH", Purpose: "safe-owner", ReferenceID: "order-1",
 		},
-		Domain: "safe-execute-v1", Payload: []byte("canonical transaction plan"),
+		Domain: "safe-execute-v1", OrderID: "order-1", AttemptID: "attempt-1", Action: "safe-execute",
+		TermsHash: strings.Repeat("a", 64), Payload: []byte("canonical transaction plan"),
 	}
 
 	firstPublicKey, err := signer.PublicKey(t.Context(), request.KeyRef)
@@ -96,7 +98,8 @@ func TestLocalSettlementSigner_SignatureBindsDomainPayloadAndReference(t *testin
 		KeyRef: contracts.SettlementKeyRef{
 			TenantID: "tenant-a", RailID: "ETH", Purpose: "safe-owner", ReferenceID: "order-1",
 		},
-		Domain: "safe-execute-v1", Payload: []byte("canonical transaction plan"),
+		Domain: "safe-execute-v1", OrderID: "order-1", AttemptID: "attempt-1", Action: "safe-execute",
+		TermsHash: strings.Repeat("a", 64), Payload: []byte("canonical transaction plan"),
 	}
 	publicKey, err := signer.PublicKey(t.Context(), request.KeyRef)
 	require.NoError(t, err)
@@ -112,6 +115,10 @@ func TestLocalSettlementSigner_SignatureBindsDomainPayloadAndReference(t *testin
 	tampered := request
 	tampered.Payload = []byte("different plan")
 	tamperedDigest := settlementSignatureDigest(tampered)
+	assert.False(t, parsedSignature.Verify(tamperedDigest[:], parsedKey))
+	tampered = request
+	tampered.AttemptID = "attempt-2"
+	tamperedDigest = settlementSignatureDigest(tampered)
 	assert.False(t, parsedSignature.Verify(tamperedDigest[:], parsedKey))
 }
 

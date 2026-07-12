@@ -298,3 +298,19 @@ func TestStandardOrderUTXOAuthorizationEligible_RequiresSameCurrencyNativeUTXO(t
 		t.Fatal("EVM order must remain disabled until its attempt owner projector is implemented")
 	}
 }
+
+func TestStandardOrderSettlementAuthorizationStartRequest_BindsModerator(t *testing.T) {
+	request := standardOrderSettlementAuthorizationStartRequest(
+		contracts.CreatePaymentSessionRequest{
+			OrderID: "order-moderated", PaymentSelectionQuoteID: "quote-moderated",
+			PaymentCoin: "crypto:bip122:000000000019d6689c085ae165831e93:native",
+		},
+		"1000",
+		"  "+testStorePolicyPeerA+"  ",
+	)
+
+	if request.OrderID != "order-moderated" || request.PaymentSelectionQuoteID != "quote-moderated" ||
+		request.AmountAtomic != "1000" || request.ModeratorPeerID != testStorePolicyPeerA {
+		t.Fatalf("start request does not preserve moderated authorization facts: %+v", request)
+	}
+}

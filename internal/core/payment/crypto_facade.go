@@ -34,6 +34,7 @@ type StandardOrderSettlementAuthorizationStartRequest struct {
 	PaymentSelectionQuoteID string
 	RailID                  string
 	AmountAtomic            string
+	ModeratorPeerID         string
 }
 
 type standardOrderSettlementAuthorizationStarter func(
@@ -132,9 +133,6 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, err
 	}
 	if c.settlementStarter != nil && standardOrderNativeUTXORail(coin) {
-		if moderator != "" {
-			return nil, fmt.Errorf("crypto facade: moderated UTXO settlement authorization is not implemented")
-		}
 		if !standardOrderUTXOAuthorizationEligible(coin, orderOpen) {
 			return nil, fmt.Errorf("crypto facade: cross-currency UTXO settlement authorization is not implemented")
 		}
@@ -148,10 +146,10 @@ func (c *CryptoPaymentFacade) CreateSession(
 		if err := c.saveCreateSessionRefundAddress(ctx, coin, req.OrderID, refundAddr); err != nil {
 			return nil, err
 		}
-		if err := c.settlementStarter(ctx, StandardOrderSettlementAuthorizationStartRequest{
-			OrderID: req.OrderID, PaymentSelectionQuoteID: req.PaymentSelectionQuoteID,
-			RailID: req.PaymentCoin, AmountAtomic: strconv.FormatUint(setupParams.Amount, 10),
-		}); err != nil {
+		startRequest := standardOrderSettlementAuthorizationStartRequest(
+			req, strconv.FormatUint(setupParams.Amount, 10), moderator,
+		)
+		if err := c.settlementStarter(ctx, startRequest); err != nil {
 			return nil, fmt.Errorf("crypto facade: start settlement authorization: %w", err)
 		}
 		updated, err := c.projector.fetchProjectInput(req.OrderID)
@@ -188,6 +186,18 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("crypto facade: re-load order %s: %w", req.OrderID, err)
 	}
 	return c.projector.Project(input2)
+}
+
+func standardOrderSettlementAuthorizationStartRequest(
+	req contracts.CreatePaymentSessionRequest,
+	amountAtomic string,
+	moderatorPeerID string,
+) StandardOrderSettlementAuthorizationStartRequest {
+	return StandardOrderSettlementAuthorizationStartRequest{
+		OrderID: req.OrderID, PaymentSelectionQuoteID: req.PaymentSelectionQuoteID,
+		RailID: req.PaymentCoin, AmountAtomic: strings.TrimSpace(amountAtomic),
+		ModeratorPeerID: strings.TrimSpace(moderatorPeerID),
+	}
 }
 
 func standardOrderUTXOAuthorizationEligible(coin iwallet.CoinType, orderOpen *porderpb.OrderOpen) bool {

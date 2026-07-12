@@ -26,7 +26,7 @@ type PaymentAttemptSettlementOffer struct {
 	Offer                  []byte                    `gorm:"column:offer;type:text;not null"`
 	OfferHash              string                    `gorm:"column:offer_hash;size:64;not null"`
 	PublicKeyHash          string                    `gorm:"column:public_key_hash;size:64;not null;uniqueIndex:idx_payment_attempt_offer_public_key,priority:3"`
-	CreatedAt              time.Time
+	CreatedAt              time.Time                 `gorm:"index:idx_payment_attempt_offer_created_at"`
 }
 
 func (PaymentAttemptSettlementOffer) TableName() string { return "payment_attempt_settlement_offers" }

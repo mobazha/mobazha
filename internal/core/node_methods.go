@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	aipkg "github.com/mobazha/mobazha/internal/ai"
 	"github.com/mobazha/mobazha/internal/config"
+	"github.com/mobazha/mobazha/internal/core/paymentintent"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/notifier"
 	"github.com/mobazha/mobazha/internal/wallet"
@@ -329,6 +331,16 @@ func (n *MobazhaNode) RunPaymentReconcileScanOnce(ctx context.Context) {
 	if n.directPaymentService != nil {
 		if _, err := n.directPaymentService.RecoverPendingExternalPaymentAddresses(ctx); err != nil {
 			logger.LogWarningWithIDf(log, n.nodeID, "direct observed address reconciliation: %v", err)
+		}
+	}
+	if n.db != nil {
+		if err := n.db.Update(func(tx database.Tx) error {
+			_, err := paymentintent.PruneStaleRetainedSettlementKeyOffersInTransaction(
+				tx.Read(), time.Now().UTC().Add(-paymentintent.RetainedSettlementKeyOfferMaxAge),
+			)
+			return err
+		}); err != nil {
+			logger.LogWarningWithIDf(log, n.nodeID, "settlement key offer inbox cleanup: %v", err)
 		}
 	}
 }

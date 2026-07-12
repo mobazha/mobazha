@@ -398,6 +398,80 @@ func TestCreateCryptoPaymentAttemptDraft_RejectsRetainedOfferContextMismatch(t *
 	require.Zero(t, attemptCount)
 }
 
+func TestPruneStaleRetainedSettlementKeyOffers(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-offer-prune-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentAttemptSettlementOffer{}))
+
+	cutoff := time.Now().UTC().Add(-RetainedSettlementKeyOfferMaxAge)
+	old := cutoff.Add(-time.Minute)
+	fresh := cutoff.Add(time.Minute)
+	createOffer := func(tenantID, attemptID string, createdAt time.Time) {
+		t.Helper()
+		require.NoError(t, db.Create(&models.PaymentAttemptSettlementOffer{
+			TenantID: tenantID, AttemptID: attemptID, ParticipantRole: models.SettlementParticipantBuyer,
+			OrderID: "order-" + attemptID, AuthorizationContextID: "context-" + attemptID,
+			RailID: "crypto:eip155:1/native", Offer: []byte("offer-" + attemptID),
+			OfferHash: "hash-" + attemptID, PublicKeyHash: "public-key-" + attemptID,
+			CreatedAt: createdAt,
+		}).Error)
+	}
+	createAttempt := func(tenantID, attemptID, state string) {
+		t.Helper()
+		require.NoError(t, db.Create(&models.PaymentAttempt{
+			TenantID: tenantID, AttemptID: attemptID, Kind: models.PaymentAttemptKindCryptoFundingTarget,
+			PaymentSessionID: "session-" + attemptID, OrderID: "order-" + attemptID,
+			RouteBindingID: "route-" + attemptID, IdempotencyKey: "idempotency-" + attemptID,
+			State: state,
+		}).Error)
+	}
+
+	createOffer("tenant-a", "orphan-old", old)
+	createOffer("tenant-a", "orphan-fresh", fresh)
+	createOffer("tenant-a", "draft-old", old)
+	createAttempt("tenant-a", "draft-old", models.PaymentAttemptAuthorizationDraft)
+	createOffer("tenant-a", "expired", fresh)
+	createAttempt("tenant-a", "expired", models.PaymentAttemptExpired)
+	createOffer("tenant-a", "abandoned", fresh)
+	createAttempt("tenant-a", "abandoned", models.PaymentAttemptAbandoned)
+	createOffer("tenant-a", "frozen", fresh)
+	createAttempt("tenant-a", "frozen", models.PaymentAttemptFundingTargetReady)
+	createOffer("tenant-b", "other-orphan-old", old)
+	// The same natural attempt ID in another tenant is an active draft and must
+	// not be mistaken for tenant-a's orphan.
+	createOffer("tenant-b", "orphan-old", old)
+	createAttempt("tenant-b", "orphan-old", models.PaymentAttemptAuthorizationDraft)
+
+	deleted, err := PruneStaleRetainedSettlementKeyOffers(db.Where("tenant_id = ?", "tenant-a"), cutoff)
+	require.NoError(t, err)
+	require.Equal(t, int64(4), deleted)
+
+	for _, scope := range []struct {
+		tenantID  string
+		attemptID string
+		retained  bool
+	}{
+		{tenantID: "tenant-a", attemptID: "orphan-old", retained: false},
+		{tenantID: "tenant-a", attemptID: "orphan-fresh", retained: true},
+		{tenantID: "tenant-a", attemptID: "draft-old", retained: true},
+		{tenantID: "tenant-a", attemptID: "expired", retained: false},
+		{tenantID: "tenant-a", attemptID: "abandoned", retained: false},
+		{tenantID: "tenant-a", attemptID: "frozen", retained: false},
+		{tenantID: "tenant-b", attemptID: "other-orphan-old", retained: true},
+		{tenantID: "tenant-b", attemptID: "orphan-old", retained: true},
+	} {
+		var count int64
+		require.NoError(t, db.Model(&models.PaymentAttemptSettlementOffer{}).
+			Where("tenant_id = ? AND attempt_id = ?", scope.tenantID, scope.attemptID).
+			Count(&count).Error)
+		if scope.retained {
+			require.Equal(t, int64(1), count, "%s/%s", scope.tenantID, scope.attemptID)
+		} else {
+			require.Zero(t, count, "%s/%s", scope.tenantID, scope.attemptID)
+		}
+	}
+}
+
 func TestNewSettlementSignRequest_UsesOnlyFrozenAttemptBindings(t *testing.T) {
 	attempt, _, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
 	attempt.TenantID = "tenant-a"

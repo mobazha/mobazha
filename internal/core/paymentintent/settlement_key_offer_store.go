@@ -9,11 +9,18 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/mobazha/mobazha/pkg/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// RetainedSettlementKeyOfferMaxAge is the local inbox retention period for a
+// verified offer that arrived before a matching local attempt exists. It is
+// storage hygiene only: it does not add a protocol TTL to SettlementKeyOffer
+// and does not invalidate an offer retained by an active authorization draft.
+const RetainedSettlementKeyOfferMaxAge = 7 * 24 * time.Hour
 
 // StoreCryptoPaymentAttemptSettlementKeyOffer retains a verified participant
 // offer for a persisted authorization draft. Retrying the exact signed offer
@@ -84,6 +91,76 @@ func RetainReceivedSettlementKeyOfferInTransaction(
 	default:
 		return retainSettlementKeyOfferRecord(tx, tenantID, offer, canonical, hash)
 	}
+}
+
+// PruneStaleRetainedSettlementKeyOffers removes local inbox records that can
+// no longer contribute to an authorization draft. It removes records older
+// than before only when no matching local attempt exists, and always removes
+// residual records for attempts that are terminal or already frozen. Active
+// authorization drafts are deliberately retained regardless of age because
+// SettlementKeyOffer has no protocol expiry in the first release.
+func PruneStaleRetainedSettlementKeyOffers(
+	db *gorm.DB,
+	before time.Time,
+) (int64, error) {
+	if db == nil {
+		return 0, fmt.Errorf("prune settlement key offers: database is required")
+	}
+	var deleted int64
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		deleted, err = PruneStaleRetainedSettlementKeyOffersInTransaction(tx, before)
+		return err
+	}); err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
+// PruneStaleRetainedSettlementKeyOffersInTransaction is the transactional
+// form of PruneStaleRetainedSettlementKeyOffers.
+func PruneStaleRetainedSettlementKeyOffersInTransaction(
+	tx *gorm.DB,
+	before time.Time,
+) (int64, error) {
+	if tx == nil {
+		return 0, fmt.Errorf("prune settlement key offers: transaction is required")
+	}
+	if before.IsZero() {
+		return 0, fmt.Errorf("prune settlement key offers: cutoff is required")
+	}
+
+	const attemptMissing = `
+NOT EXISTS (
+	SELECT 1 FROM payment_attempts
+	WHERE payment_attempts.tenant_id = payment_attempt_settlement_offers.tenant_id
+	  AND payment_attempts.attempt_id = payment_attempt_settlement_offers.attempt_id
+)`
+	const terminalOrFrozenAttempt = `
+EXISTS (
+	SELECT 1 FROM payment_attempts
+	WHERE payment_attempts.tenant_id = payment_attempt_settlement_offers.tenant_id
+	  AND payment_attempts.attempt_id = payment_attempt_settlement_offers.attempt_id
+	  AND payment_attempts.state IN ?
+)`
+
+	// Keep any tenant filter carried by the caller's transaction. Unlike the
+	// offer read/write paths this statement targets only one model, so a fresh
+	// NewDB session is neither needed nor safe: it would widen a tenant-scoped
+	// cleanup into a cross-tenant delete.
+	result := tx.Where(
+		`(payment_attempt_settlement_offers.created_at < ? AND `+attemptMissing+") OR "+terminalOrFrozenAttempt,
+		before,
+		[]string{
+			models.PaymentAttemptExpired,
+			models.PaymentAttemptAbandoned,
+			models.PaymentAttemptFundingTargetReady,
+		},
+	).Delete(&models.PaymentAttemptSettlementOffer{})
+	if result.Error != nil {
+		return 0, fmt.Errorf("prune stale settlement key offers: %w", result.Error)
+	}
+	return result.RowsAffected, nil
 }
 
 func retainSettlementKeyOfferRecord(

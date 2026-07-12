@@ -181,14 +181,14 @@ func (p standardOrderUTXOFundingTargetProjector) project(
 }
 
 // FinalizeStandardOrderSettlementAuthorization creates and freezes the
-// seller-authorized terms and UTXO funding target for the first unmoderated,
-// same-currency Standalone scope. It is idempotent and never exposes private
+// seller-authorized terms and rail-specific funding target for a same-currency
+// standard order. It is idempotent and never exposes private
 // settlement key material.
 func (n *MobazhaNode) FinalizeStandardOrderSettlementAuthorization(
 	ctx context.Context,
 	orderID, attemptID string,
 ) (StandardOrderSettlementAuthorizationFinalization, error) {
-	if n == nil || n.db == nil || n.orderService == nil || n.signer == nil || n.walletAccountService == nil || n.multiwallet == nil {
+	if n == nil || n.db == nil || n.orderService == nil || n.signer == nil || n.walletAccountService == nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("standard order settlement finalization is not configured")
 	}
 	orderID = strings.TrimSpace(orderID)
@@ -218,16 +218,24 @@ func (n *MobazhaNode) FinalizeStandardOrderSettlementAuthorization(
 	if !ok || rawProvider.RawDB() == nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("standard order settlement finalization raw database is unavailable")
 	}
+	var draft models.PaymentAttempt
+	if err := rawProvider.RawDB().Where(
+		"tenant_id = ? AND attempt_id = ?", strings.TrimSpace(order.TenantID), attemptID,
+	).Select("currency").First(&draft).Error; err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load settlement authorization rail: %w", err)
+	}
+	targetProjector, err := n.standardOrderFundingTargetProjectorForRail(draft.Currency)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
+	}
 	finalization, err := finalizeSellerSettlementAuthorization(
 		ctx, rawProvider.RawDB(), &order, n.signer, n.walletAccountService,
-		standardOrderUTXOFundingTargetProjector{wallets: n.multiwallet}, attemptID,
+		targetProjector, attemptID,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
-	if err := n.watchFrozenStandardOrderUTXOAttempt(
-		ctx, finalization.Attempt.TenantID, finalization.Attempt.AttemptID,
-	); err != nil {
+	if err := n.activateFrozenStandardOrderSettlementAttempt(ctx, finalization); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
 	buyer, err := peer.Decode(finalization.Terms.BuyerPeerID)
@@ -422,7 +430,7 @@ func (n *MobazhaNode) AdoptStandardOrderSettlementAuthorization(
 	orderID string,
 	authorization models.PaymentAttemptSettlementAuthorization,
 ) (StandardOrderSettlementAuthorizationFinalization, error) {
-	if n == nil || n.db == nil || n.signer == nil || n.multiwallet == nil {
+	if n == nil || n.db == nil || n.signer == nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("standard order settlement adoption is not configured")
 	}
 	orderID = strings.TrimSpace(orderID)
@@ -439,16 +447,18 @@ func (n *MobazhaNode) AdoptStandardOrderSettlementAuthorization(
 	if !ok || rawProvider.RawDB() == nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("standard order settlement adoption raw database is unavailable")
 	}
+	targetProjector, err := n.standardOrderFundingTargetProjectorForRail(authorization.Terms.AssetID)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
+	}
 	finalization, err := adoptBuyerSettlementAuthorization(
 		ctx, rawProvider.RawDB(), &order, n.signer,
-		standardOrderUTXOFundingTargetProjector{wallets: n.multiwallet}, authorization,
+		targetProjector, authorization,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
-	if err := n.watchFrozenStandardOrderUTXOAttempt(
-		ctx, finalization.Attempt.TenantID, finalization.Attempt.AttemptID,
-	); err != nil {
+	if err := n.activateFrozenStandardOrderSettlementAttempt(ctx, finalization); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
 	return finalization, nil

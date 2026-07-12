@@ -54,6 +54,17 @@ type CryptoPaymentFacade struct {
 	storePolicy          contracts.StorePolicyService
 	sellerPolicyResolver sellerStorePolicyResolver
 	settlementStarter    standardOrderSettlementAuthorizationStarter
+	settlementEligible   func(iwallet.CoinType) bool
+}
+
+// SetStandardOrderSettlementAuthorizationEligibility wires the runtime
+// capability check used before the facade cuts a rail over to authorization.
+func (c *CryptoPaymentFacade) SetStandardOrderSettlementAuthorizationEligibility(
+	eligible func(iwallet.CoinType) bool,
+) {
+	if c != nil {
+		c.settlementEligible = eligible
+	}
 }
 
 // SetStandardOrderSettlementAuthorizationStarter wires the fail-closed
@@ -132,9 +143,9 @@ func (c *CryptoPaymentFacade) CreateSession(
 	if err != nil {
 		return nil, err
 	}
-	if c.settlementStarter != nil && standardOrderNativeUTXORail(coin) {
-		if !standardOrderUTXOAuthorizationEligible(coin, orderOpen) {
-			return nil, fmt.Errorf("crypto facade: cross-currency UTXO settlement authorization is not implemented")
+	if c.settlementStarter != nil && c.settlementEligible != nil && c.settlementEligible(coin) {
+		if !standardOrderSettlementAuthorizationEligible(coin, orderOpen) {
+			return nil, fmt.Errorf("crypto facade: cross-currency settlement authorization is not implemented")
 		}
 		setupParams, err := buildPaymentSetupParamsFromOrder(
 			order, orderOpen, coin, req.PayerAddress, refundAddr, moderator,
@@ -201,10 +212,11 @@ func standardOrderSettlementAuthorizationStartRequest(
 }
 
 func standardOrderUTXOAuthorizationEligible(coin iwallet.CoinType, orderOpen *porderpb.OrderOpen) bool {
+	return standardOrderNativeUTXORail(coin) && standardOrderSettlementAuthorizationEligible(coin, orderOpen)
+}
+
+func standardOrderSettlementAuthorizationEligible(coin iwallet.CoinType, orderOpen *porderpb.OrderOpen) bool {
 	if orderOpen == nil {
-		return false
-	}
-	if !standardOrderNativeUTXORail(coin) {
 		return false
 	}
 	paymentCurrency, err := coin.PricingCurrencyCode()

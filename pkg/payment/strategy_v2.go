@@ -42,6 +42,54 @@ type ManagedEscrowReceiptValidator interface {
 	ValidateManagedEscrowReceipt(ctx context.Context, request ManagedEscrowReceiptValidationRequest) error
 }
 
+// AttemptSettlementFundingRequest contains the participant-authorized facts a
+// monitored rail needs to deterministically project one immutable funding
+// target. Implementations must not return provider secrets or private keys.
+type AttemptSettlementFundingRequest struct {
+	Attempt models.PaymentAttempt
+	Route   models.PaymentRouteBinding
+	Offers  []models.SettlementKeyOffer
+}
+
+// AttemptSettlementFundingProjector is an optional V2 capability for rails
+// that can rebuild the same funding target on every participant node.
+type AttemptSettlementFundingProjector interface {
+	ProjectAttemptSettlementFundingTarget(
+		context.Context,
+		AttemptSettlementFundingRequest,
+	) (models.PaymentAttemptFundingTarget, error)
+}
+
+// AttemptSettlementFundingActivator starts monitoring or materializes any
+// chain state required after an authorization snapshot has been frozen. It
+// must be idempotent because adoption and restart recovery can repeat it.
+type AttemptSettlementFundingActivator interface {
+	ActivateAttemptSettlementFunding(
+		context.Context,
+		AttemptSettlementFundingRequest,
+		models.PaymentAttemptFundingTarget,
+	) error
+}
+
+// AttemptSettlementActionSignRequest binds a chain action to the exact frozen
+// attempt snapshot before a participant owner signature is produced.
+type AttemptSettlementActionSignRequest struct {
+	Action        string
+	Sequence      uint64
+	Authorization models.PaymentAttemptSettlementAuthorization
+	Params        ActionParams
+}
+
+// AttemptSettlementActionAuthorizer is required before a monitored rail can
+// opt into attempt-scoped funding. It prevents a projector-only integration
+// from accepting funds that later fall back to order-global owner keys.
+type AttemptSettlementActionAuthorizer interface {
+	SignAttemptSettlementAction(
+		context.Context,
+		AttemptSettlementActionSignRequest,
+	) ([]ActionOwnerSignature, error)
+}
+
 // ChainEscrowV2 is the action-centric counterpart to ChainEscrow (V1).
 //
 // Background — Phase managed EVM v0.3.0 (D-Hybrid-17 A+ scheme):

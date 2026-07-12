@@ -1575,7 +1575,7 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 			obNode.ExchangeRate(),
 			obNode.StorePolicy(),
 		)
-		if _, ok := obNode.settlementSigner.(pkgcontracts.UTXOSettlementSigner); ok {
+		if obNode.settlementSigner != nil {
 			cryptoFacade.SetStandardOrderSettlementAuthorizationStarter(func(
 				ctx context.Context,
 				request corePmt.StandardOrderSettlementAuthorizationStartRequest,
@@ -1589,6 +1589,9 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 					},
 				)
 				return err
+			})
+			cryptoFacade.SetStandardOrderSettlementAuthorizationEligibility(func(coin iwallet.CoinType) bool {
+				return obNode.supportsStandardOrderSettlementAuthorization(coin)
 			})
 		}
 		svc.SetCryptoFacade(cryptoFacade)

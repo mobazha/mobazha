@@ -53,6 +53,9 @@ type FiatProviderCapabilities struct {
 	ModeratedMode    FiatModeratedMode `json:"moderatedMode"`
 	MaximumHold      time.Duration     `json:"maximumHold,omitempty"`
 	RequiresApproval bool              `json:"requiresApproval,omitempty"`
+	// DisputeResolution is true only when the adapter can execute the complete
+	// buyer/seller/moderator allocation required by a Mobazha dispute decision.
+	DisputeResolution bool `json:"disputeResolution"`
 }
 
 // SupportsModerated reports whether the active binding has an explicit

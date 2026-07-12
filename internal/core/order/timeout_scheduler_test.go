@@ -436,6 +436,10 @@ func (m *mockFiatOps) DisbursePayment(_ context.Context, _ string, _ contracts.D
 	return nil, nil
 }
 
+func (m *mockFiatOps) ProviderCapabilities(context.Context, string) (contracts.FiatProviderCapabilities, error) {
+	return contracts.FiatProviderCapabilities{}, nil
+}
+
 func (m *mockFiatOps) CancelPayment(_ context.Context, _ string, _ string) error {
 	m.cancelCalled = true
 	return m.cancelErr

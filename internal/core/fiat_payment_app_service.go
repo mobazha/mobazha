@@ -628,6 +628,18 @@ func (s *FiatPaymentAppService) GetPayment(ctx context.Context, providerID strin
 	return provider.GetPayment(ctx, paymentID)
 }
 
+func (s *FiatPaymentAppService) ProviderCapabilities(_ context.Context, providerID string) (contracts.FiatProviderCapabilities, error) {
+	provider, err := s.registry.ForProvider(strings.ToLower(strings.TrimSpace(providerID)))
+	if err != nil {
+		return contracts.FiatProviderCapabilities{}, err
+	}
+	reporter, ok := provider.(contracts.FiatProviderCapabilityReporter)
+	if !ok {
+		return contracts.FiatProviderCapabilities{}, nil
+	}
+	return reporter.Capabilities(), nil
+}
+
 func (s *FiatPaymentAppService) RefundPayment(
 	ctx context.Context,
 	providerID string,

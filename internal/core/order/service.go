@@ -1138,6 +1138,36 @@ func (s *OrderAppService) disburseFiatPayment(
 	}
 }
 
+func (s *OrderAppService) requireFiatDisputeResolution(
+	ctx context.Context,
+	order *models.Order,
+	paymentSent *pb.PaymentSent,
+	coinType iwallet.CoinType,
+) error {
+	method, ok := payment.ResolvedPaymentMethod(order, paymentSent)
+	if !ok || !payment.IsFiatPaymentRoute(method, coinType) {
+		return nil
+	}
+	if s.fiatOps == nil {
+		return fmt.Errorf("%w: fiat dispute resolution is not configured", coreiface.ErrBadRequest)
+	}
+	providerID := resolveFiatProvider(order, paymentSent)
+	if providerID == "" {
+		return fmt.Errorf("%w: fiat provider not resolved from disputed payment", coreiface.ErrBadRequest)
+	}
+	capabilities, err := s.fiatOps.ProviderCapabilities(ctx, providerID)
+	if err != nil {
+		return fmt.Errorf("resolve %s dispute capabilities: %w", providerID, err)
+	}
+	if !capabilities.DisputeResolution {
+		return fmt.Errorf(
+			"%w: %s moderated payments support hold, seller release, and buyer refund but not atomic buyer/seller/moderator dispute allocation",
+			coreiface.ErrBadRequest, providerID,
+		)
+	}
+	return fmt.Errorf("%w: %s dispute-resolution adapter is not implemented", coreiface.ErrBadRequest, providerID)
+}
+
 func (s *OrderAppService) buildFiatRefundMessage(order *models.Order, result *contracts.RefundResult) (*npb.OrderMessage, error) {
 	refundMsg := &pb.Refund{
 		RefundInfo: &pb.Refund_TransactionID{TransactionID: result.RefundID},

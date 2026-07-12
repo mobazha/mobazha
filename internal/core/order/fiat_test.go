@@ -47,6 +47,11 @@ type mockFiatOpsForOrderTest struct {
 	disburseResult *contracts.DisbursePaymentResult
 	disburseErr    error
 	disburseParams contracts.DisbursePaymentParams
+	capabilities   contracts.FiatProviderCapabilities
+}
+
+func (m *mockFiatOpsForOrderTest) ProviderCapabilities(context.Context, string) (contracts.FiatProviderCapabilities, error) {
+	return m.capabilities, nil
 }
 
 func (m *mockFiatOpsForOrderTest) DisbursePayment(_ context.Context, providerID string, params contracts.DisbursePaymentParams) (*contracts.DisbursePaymentResult, error) {
@@ -168,4 +173,20 @@ func TestDisburseFiatPayment_RejectsTerminalProviderStatus(t *testing.T) {
 
 	_, err := svc.disburseFiatPayment(context.Background(), order, paymentSent, "complete")
 	require.ErrorContains(t, err, "terminal status")
+}
+
+func TestRequireFiatDisputeResolution_FailsBeforeChainSettlement(t *testing.T) {
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+	svc.SetFiatOps(&mockFiatOpsForOrderTest{
+		capabilities: contracts.FiatProviderCapabilities{
+			ModeratedMode: contracts.FiatModeratedModeDelayedDisbursement,
+		},
+	})
+	err := svc.requireFiatDisputeResolution(context.Background(), nil, &pb.PaymentSent{
+		SettlementSpec: &pb.PaymentSent_SettlementSpec{
+			Method: pb.PaymentSent_MODERATED, PayMode: "provider", EscrowType: "fiat_provider",
+		},
+		Coin: "fiat:paypal:USD",
+	}, "fiat:paypal:USD")
+	require.ErrorContains(t, err, "not atomic buyer/seller/moderator dispute allocation")
 }

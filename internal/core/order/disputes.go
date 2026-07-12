@@ -568,6 +568,9 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	if !ok {
 		coinType = iwallet.CoinType(paymentSent.Coin)
 	}
+	if err := s.requireFiatDisputeResolution(context.Background(), nil, paymentSent, coinType); err != nil {
+		return err
+	}
 
 	var txs []*pb.Contract_Transaction
 	if !usesBalanceEscrow {
@@ -1013,6 +1016,9 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 	}
 	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
+		return err
+	}
+	if err := s.requireFiatDisputeResolution(context.Background(), order, paymentSent, coinType); err != nil {
 		return err
 	}
 	affiliatePayout, err := affiliatePayoutForDisputeSettlement(coinType, shipments, disputeClose.ReleaseInfo)

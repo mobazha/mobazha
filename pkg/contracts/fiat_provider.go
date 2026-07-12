@@ -255,6 +255,7 @@ type FiatPlatformConfigurer interface {
 type FiatPaymentOperations interface {
 	RefundPayment(ctx context.Context, providerID string, params RefundParams) (*RefundResult, error)
 	DisbursePayment(ctx context.Context, providerID string, params DisbursePaymentParams) (*DisbursePaymentResult, error)
+	ProviderCapabilities(ctx context.Context, providerID string) (FiatProviderCapabilities, error)
 	CancelPayment(ctx context.Context, providerID string, paymentID string) error
 	GetPaymentStatus(ctx context.Context, providerID string, paymentID string) (string, error)
 }

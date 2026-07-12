@@ -63,7 +63,7 @@ func cryptoAttemptFixture(t *testing.T) (
 	attempt := models.PaymentAttempt{
 		AttemptID: "attempt-crypto-1", Kind: models.PaymentAttemptKindCryptoFundingTarget,
 		PaymentSessionID: "ps_order-1", OrderID: "order-1", AmountValue: "1000",
-		Currency: "crypto:eip155:1/native", RouteBindingID: "route-crypto-1",
+		Currency: "crypto:eip155:1:native", RouteBindingID: "route-crypto-1",
 		IdempotencyKey: "order-1:crypto:eip155:1:native", State: models.PaymentAttemptPendingExternal,
 	}
 	authorizationContextID, err := models.NewSettlementAuthorizationContextID()
@@ -73,7 +73,7 @@ func cryptoAttemptFixture(t *testing.T) (
 		RouteBindingID: "route-crypto-1", AttemptID: "attempt-crypto-1",
 		ContributionID: "builtin-managed-evm", ModuleID: "managed-evm",
 		ImplementationGeneration: "safe-v1.4.1", RailKind: "crypto",
-		NetworkID: "eip155:1", AssetID: "crypto:eip155:1/native",
+		NetworkID: "eip155:1", AssetID: "crypto:eip155:1:native",
 		ProtocolVersion: "1", StateSchemaVersion: "1", CreatedAt: time.Now().UTC(),
 	}
 	terms := models.PaymentAttemptSettlementTerms{
@@ -448,7 +448,7 @@ func TestPruneStaleRetainedSettlementKeyOffers(t *testing.T) {
 		require.NoError(t, db.Create(&models.PaymentAttemptSettlementOffer{
 			TenantID: tenantID, AttemptID: attemptID, ParticipantRole: models.SettlementParticipantBuyer,
 			OrderID: "order-" + attemptID, AuthorizationContextID: "context-" + attemptID,
-			RailID: "crypto:eip155:1/native", Offer: []byte("offer-" + attemptID),
+			RailID: "crypto:eip155:1:native", Offer: []byte("offer-" + attemptID),
 			OfferHash: "hash-" + attemptID, PublicKeyHash: "public-key-" + attemptID,
 			CreatedAt: createdAt,
 		}).Error)

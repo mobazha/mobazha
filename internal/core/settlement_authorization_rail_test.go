@@ -6,12 +6,40 @@ import (
 
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/require"
 )
 
 type attemptFundingProjectorStub struct {
 	request payment.AttemptSettlementFundingRequest
 	target  models.PaymentAttemptFundingTarget
+}
+
+func TestStandardOrderSettlementPayoutRail_UsesNativeRailForTokenAsset(t *testing.T) {
+	tests := []struct {
+		name  string
+		asset string
+		want  iwallet.CoinType
+	}{
+		{
+			name: "native unchanged", asset: "crypto:eip155:1:native",
+			want: "crypto:eip155:1:native",
+		},
+		{
+			name: "erc20 uses chain native", asset: "crypto:eip155:1:erc20:0x1111111111111111111111111111111111111111",
+			want: "crypto:eip155:1:native",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := standardOrderSettlementPayoutRail(tt.asset)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+
+	_, err := standardOrderSettlementPayoutRail("crypto:eip155:999999:erc20:0x1111111111111111111111111111111111111111")
+	require.Error(t, err)
 }
 
 func (s *attemptFundingProjectorStub) ProjectAttemptSettlementFundingTarget(

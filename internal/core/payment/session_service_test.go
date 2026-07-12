@@ -77,7 +77,7 @@ func TestCanReprovisionForCoinSwitch_RejectsFundedFiatCheckout(t *testing.T) {
 
 func TestCanReprovisionForCoinSwitch_RejectsFrozenAttempt(t *testing.T) {
 	view := &pkpayment.PaymentSession{
-		PaymentCoin:    "crypto:eip155:1/native",
+		PaymentCoin:    "crypto:eip155:1:native",
 		SettlementMode: pkpayment.SettlementModeAddressMonitored,
 		PaymentProgress: pkpayment.PaymentProgressView{
 			ObservedAmount: "0",

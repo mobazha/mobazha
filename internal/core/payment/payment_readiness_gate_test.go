@@ -99,7 +99,7 @@ func TestPaymentSessionProjector_FrozenAttemptTargetIsAuthoritative(t *testing.T
 	}
 	target := &models.PaymentAttemptFundingTarget{
 		Version: models.PaymentAttemptFundingTargetVersion, AttemptID: "attempt-frozen",
-		Type: models.PaymentAttemptFundingTargetAddress, AssetID: "crypto:eip155:1/native",
+		Type: models.PaymentAttemptFundingTargetAddress, AssetID: "crypto:eip155:1:native",
 		AmountAtomic: "1000000000000000000", Address: "0x1111111111111111111111111111111111111111",
 		MemoOrTag: "attempt-memo",
 	}
@@ -142,7 +142,7 @@ func TestPaymentSessionProjector_RejectsMutableAddressConflictWithFrozenAttempt(
 	}
 	target := &models.PaymentAttemptFundingTarget{
 		Version: models.PaymentAttemptFundingTargetVersion, AttemptID: "attempt-frozen",
-		Type: models.PaymentAttemptFundingTargetAddress, AssetID: "crypto:eip155:1/native",
+		Type: models.PaymentAttemptFundingTargetAddress, AssetID: "crypto:eip155:1:native",
 		AmountAtomic: "1", Address: "0x1111111111111111111111111111111111111111",
 	}
 
@@ -227,7 +227,7 @@ func frozenPaymentAttemptForProjectionTest(t *testing.T, orderID string) models.
 	attempt := models.PaymentAttempt{
 		AttemptID: "attempt-verified", Kind: models.PaymentAttemptKindCryptoFundingTarget,
 		PaymentSessionID: "ps_" + orderID, OrderID: orderID, AmountValue: "1000",
-		Currency: "crypto:eip155:1/native", RouteBindingID: "route-verified",
+		Currency: "crypto:eip155:1:native", RouteBindingID: "route-verified",
 		IdempotencyKey: "attempt-verified", State: models.PaymentAttemptAuthorizationDraft,
 		AuthorizationContextID: contextID,
 	}

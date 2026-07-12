@@ -171,11 +171,11 @@ func TestBeginBuyerSettlementAuthorization_RejectsDifferentSignedSellers(t *test
 	require.ErrorContains(t, err, "requires one seller")
 }
 
-func TestBeginBuyerSettlementAuthorization_RejectsTokenRailBeforeDraft(t *testing.T) {
+func TestBeginBuyerSettlementAuthorization_AcceptsCanonicalTokenRail(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:buyer-authorization-token-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(
-		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{},
+		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}, &models.PaymentSelectionQuote{},
 	))
 	buyerKeys, err := identity.GenerateKeyPair()
 	require.NoError(t, err)
@@ -190,21 +190,41 @@ func TestBeginBuyerSettlementAuthorization_RejectsTokenRailBeforeDraft(t *testin
 		Listings: []*pb.SignedListing{{Listing: &pb.Listing{VendorID: &pb.ID{PeerID: sellerPeerID.String()}}}},
 	})
 	require.NoError(t, err)
-	order := &models.Order{TenantMixin: models.TenantMixin{TenantID: "tenant-a"}, ID: "order-token", MyRole: string(models.RoleBuyer), SerializedOrderOpen: openBytes}
+	order := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-a"}, ID: "order-token",
+		MyRole: string(models.RoleBuyer), SerializedOrderOpen: openBytes, PaymentSelectionQuoteID: "quote-token",
+	}
 	tokenRail := "crypto:eip155:1:erc20:0x1111111111111111111111111111111111111111"
-	_, err = beginBuyerSettlementAuthorization(
+	require.NoError(t, db.Create(&models.PaymentSelectionQuote{
+		TenantID: order.TenantID, QuoteID: order.PaymentSelectionQuoteID, OrderID: order.ID.String(),
+		FeeQuoteID: "fee-token", DealLinkID: "deal-token", TermsHash: "terms-token",
+		SchemaVersion: 1, PolicyVersion: models.PaymentSelectionQuotePilotZeroFeeV1,
+		PricingCurrency: "USD", PricingAmount: "1000", PricingDivisibility: 2,
+		PaymentCoin: tokenRail, PaymentCurrency: "USDT", PaymentDivisibility: 6,
+		ExchangeRate: "1", ExchangeRateBase: "USD", ExchangeRateQuote: "USDT",
+		ExchangeRateQuoteDivisibility: 6, PaymentSubtotal: "1000", ProviderOrNetworkCost: "0",
+		PlatformPaymentCost: "0", BuyerPaymentTotal: "1000", ExpiresAt: time.Now().Add(time.Hour), CreatedAt: time.Now(),
+	}).Error)
+	publisher := &retainingSettlementOfferPublisher{db: db, tenantID: order.TenantID}
+	started, err := beginBuyerSettlementAuthorization(
 		t.Context(), db, order, contracts.NewKeyPairSigner(buyerKeys, buyerPeerID),
-		new(buyerStartSettlementSigner), &retainingSettlementOfferPublisher{db: db, tenantID: order.TenantID},
+		new(buyerStartSettlementSigner), publisher,
 		payment.RouteIdentity{
 			ContributionID: "managed-evm.token", ModuleID: "managed-evm", ImplementationGeneration: "v1",
 			RailKind: "escrow", NetworkID: "eip155:1", AssetID: tokenRail, ProtocolVersion: "1", StateSchemaVersion: "1",
 		},
-		StandardOrderSettlementAuthorizationRequest{OrderID: order.ID.String(), RailID: tokenRail, AmountAtomic: "1000"},
+		StandardOrderSettlementAuthorizationRequest{
+			OrderID: order.ID.String(), PaymentSelectionQuoteID: order.PaymentSelectionQuoteID,
+			RailID: tokenRail, AmountAtomic: "1000",
+		},
 	)
-	require.ErrorContains(t, err, "canonical native rail")
+	require.NoError(t, err)
+	require.Equal(t, tokenRail, started.Attempt.Currency)
+	require.Equal(t, tokenRail, started.BuyerOffer.RailID)
+	require.Len(t, publisher.offers, 1)
 	var attempts int64
 	require.NoError(t, db.Model(&models.PaymentAttempt{}).Count(&attempts).Error)
-	require.Zero(t, attempts)
+	require.Equal(t, int64(1), attempts)
 }
 
 func TestRespondSellerSettlementAuthorization_AdoptsBuyerAttemptAndPublishesIdempotentOffer(t *testing.T) {

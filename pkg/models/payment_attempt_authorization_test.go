@@ -77,6 +77,39 @@ func TestSettlementKeyOffer_BindsEd25519AlgorithmToSolanaRail(t *testing.T) {
 	require.Error(t, wrongAlgorithm.Verify())
 }
 
+func TestSettlementKeyOffer_AcceptsOnlyCanonicalResolvableCryptoAssetRails(t *testing.T) {
+	contextID, err := NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	_, publicKey, err := libp2pcrypto.GenerateEd25519Key(rand.Reader)
+	require.NoError(t, err)
+	participant, err := peer.IDFromPublicKey(publicKey)
+	require.NoError(t, err)
+	offer := SettlementKeyOffer{
+		Version: SettlementAuthorizationVersion, AuthorizationContextID: contextID,
+		OrderID: "order-token", AttemptID: "attempt-token", ParticipantPeerID: participant.String(),
+		ParticipantRole: SettlementParticipantBuyer,
+		RailID:          "crypto:eip155:1:erc20:0x1111111111111111111111111111111111111111",
+		Purpose:         "standard-order-participant:buyer",
+		KeyAlgorithm:    SettlementKeyAlgorithmSecp256k1,
+		PublicKey:       append([]byte{2}, make([]byte, 32)...),
+	}
+	_, err = offer.SigningPayload()
+	require.NoError(t, err)
+
+	for name, railID := range map[string]string{
+		"non-canonical case": "CRYPTO:eip155:1:erc20:0x1111111111111111111111111111111111111111",
+		"invalid contract":   "crypto:eip155:1:erc20:not-an-address",
+		"unknown network":    "crypto:eip155:999999:erc20:0x1111111111111111111111111111111111111111",
+	} {
+		t.Run(name, func(t *testing.T) {
+			invalid := offer
+			invalid.RailID = railID
+			_, err := invalid.SigningPayload()
+			require.ErrorContains(t, err, "canonical crypto asset ID")
+		})
+	}
+}
+
 func TestPaymentAttemptAuthorizationBundle_CanonicalizesAndRequiresCompleteOffers(t *testing.T) {
 	contextID, err := NewSettlementAuthorizationContextID()
 	require.NoError(t, err)

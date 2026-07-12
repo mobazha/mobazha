@@ -347,14 +347,18 @@ func finalizeSellerSettlementAuthorization(
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
+	payoutRail, err := standardOrderSettlementPayoutRail(attempt.Currency)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
+	}
 	payout, err := walletAccounts.ReserveAddress(
-		ctx, attempt.Currency, contracts.AccountMain, standardOrderSellerPayoutReferencePrefix+attempt.AttemptID,
+		ctx, string(payoutRail), contracts.AccountMain, standardOrderSellerPayoutReferencePrefix+attempt.AttemptID,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("reserve seller settlement payout address: %w", err)
 	}
-	if payout.RailID != attempt.Currency || strings.TrimSpace(payout.Address) == "" {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("seller settlement payout does not match attempt rail")
+	if payout.RailID != string(payoutRail) || strings.TrimSpace(payout.Address) == "" {
+		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("seller settlement payout does not match attempt chain")
 	}
 	terms := models.PaymentAttemptSettlementTerms{
 		Version: models.PaymentAttemptSettlementTermsVersion, OrderID: attempt.OrderID,

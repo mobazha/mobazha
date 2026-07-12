@@ -15,6 +15,41 @@ type standardOrderStrategyFundingTargetProjector struct {
 	projector payment.AttemptSettlementFundingProjector
 }
 
+func canonicalStandardOrderSettlementCoinInfo(railID string) (iwallet.CoinInfo, error) {
+	coin := iwallet.CoinType(strings.TrimSpace(railID))
+	if !coin.IsCanonicalCryptoAssetID() {
+		return iwallet.CoinInfo{}, fmt.Errorf("settlement authorization rail must be a canonical crypto asset ID")
+	}
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coin)
+	if err != nil {
+		return iwallet.CoinInfo{}, fmt.Errorf("resolve settlement authorization rail: %w", err)
+	}
+	return coinInfo, nil
+}
+
+// standardOrderSettlementPayoutRail returns the native receiving rail whose
+// address format owns payouts for the settlement asset. Token value still
+// moves on the original asset rail; only address reservation is chain-native.
+func standardOrderSettlementPayoutRail(railID string) (iwallet.CoinType, error) {
+	coin := iwallet.CoinType(strings.TrimSpace(railID))
+	coinInfo, err := canonicalStandardOrderSettlementCoinInfo(string(coin))
+	if err != nil {
+		return "", err
+	}
+	if coinInfo.IsNative {
+		return coin, nil
+	}
+	native := coinInfo.NativeCoinType()
+	if native == "" || !native.IsCanonicalCryptoAssetID() {
+		return "", fmt.Errorf("settlement asset %s has no canonical native payout rail", railID)
+	}
+	nativeInfo, err := iwallet.CoinInfoFromCoinType(native)
+	if err != nil || !nativeInfo.IsNative || nativeInfo.Chain != coinInfo.Chain {
+		return "", fmt.Errorf("settlement asset %s has an invalid native payout rail", railID)
+	}
+	return native, nil
+}
+
 func (p standardOrderStrategyFundingTargetProjector) ProjectStandardOrderFundingTarget(
 	ctx context.Context,
 	attempt models.PaymentAttempt,
@@ -33,9 +68,9 @@ func (n *MobazhaNode) standardOrderFundingTargetProjectorForRail(
 	railID string,
 ) (standardOrderFundingTargetProjector, error) {
 	coin := iwallet.CoinType(strings.TrimSpace(railID))
-	coinInfo, err := iwallet.CoinInfoFromCoinType(coin)
+	coinInfo, err := canonicalStandardOrderSettlementCoinInfo(railID)
 	if err != nil {
-		return nil, fmt.Errorf("resolve settlement authorization rail: %w", err)
+		return nil, err
 	}
 	if coinInfo.IsNative && coinInfo.Chain.IsUTXOChain() {
 		if n == nil || n.multiwallet == nil {

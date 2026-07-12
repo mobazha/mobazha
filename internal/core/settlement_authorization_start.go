@@ -179,9 +179,9 @@ func beginBuyerSettlementAuthorization(
 	if order.ID.String() != request.OrderID || order.Role() != models.RoleBuyer {
 		return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("settlement authorization must start from the local buyer order")
 	}
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(request.RailID))
-	if err != nil || !coinInfo.IsNative {
-		return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("standard order settlement authorization requires a canonical native rail")
+	coinInfo, err := canonicalStandardOrderSettlementCoinInfo(request.RailID)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationStart{}, err
 	}
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
@@ -218,8 +218,7 @@ func beginBuyerSettlementAuthorization(
 	offerAmount := ""
 	escrowTimeoutHours := uint32(0)
 	escrowUnlockUnix := int64(0)
-	coinInfo, coinErr := iwallet.CoinInfoFromCoinType(iwallet.CoinType(request.RailID))
-	solanaRail := coinErr == nil && coinInfo.Chain == iwallet.ChainSolana
+	solanaRail := coinInfo.Chain == iwallet.ChainSolana
 	if request.ModeratorPeerID != "" || solanaRail {
 		offerAmount = request.AmountAtomic
 		escrowTimeoutHours = standardOrderEscrowTimeoutHours(orderOpen)
@@ -286,9 +285,9 @@ func respondSellerSettlementAuthorization(
 	if buyerOffer.Purpose != standardOrderSettlementKeyPurpose+":"+string(models.SettlementParticipantBuyer) {
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("buyer settlement key offer purpose does not match standard order protocol")
 	}
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(buyerOffer.RailID))
-	if err != nil || !coinInfo.IsNative {
-		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization requires a canonical native rail")
+	_, err := canonicalStandardOrderSettlementCoinInfo(buyerOffer.RailID)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
 	}
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {

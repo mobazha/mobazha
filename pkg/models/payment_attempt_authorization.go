@@ -198,8 +198,8 @@ func (o SettlementKeyOffer) validate(requireSignature bool) error {
 	if o.EscrowUnlockUnix < 0 || (solanaRail && o.EscrowUnlockUnix == 0) || (!solanaRail && o.EscrowUnlockUnix != 0) {
 		return fmt.Errorf("invalid settlement escrow unlock time")
 	}
-	if !validCanonicalNativeRail(o.RailID) {
-		return fmt.Errorf("settlement key offer rail must be a canonical native rail")
+	if !validCanonicalSettlementRail(o.RailID) {
+		return fmt.Errorf("settlement key offer rail must be a canonical crypto asset ID")
 	}
 	if _, err := peer.Decode(strings.TrimSpace(o.ParticipantPeerID)); err != nil {
 		return fmt.Errorf("invalid settlement key offer participant")
@@ -460,8 +460,11 @@ func validSHA256Hex(value string) bool {
 	return err == nil && len(decoded) == sha256.Size
 }
 
-func validCanonicalNativeRail(value string) bool {
-	value = strings.TrimSpace(value)
-	return strings.HasPrefix(value, "crypto:") && (strings.HasSuffix(value, ":native") || strings.HasSuffix(value, "/native")) &&
-		strings.ToLower(value) == value && !strings.ContainsAny(value, " \t\n\r")
+func validCanonicalSettlementRail(value string) bool {
+	coin := iwallet.CoinType(strings.TrimSpace(value))
+	if !coin.IsCanonicalCryptoAssetID() {
+		return false
+	}
+	_, err := iwallet.CoinInfoFromCoinType(coin)
+	return err == nil
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/pkg/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -39,6 +40,9 @@ func CreateCryptoPaymentAttemptDraft(
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := bindRetainedSettlementOfferScope(tx, &attempt); err != nil {
+				return err
+			}
 			if attempt.AuthorizationContextID == "" {
 				contextID, err := models.NewSettlementAuthorizationContextID()
 				if err != nil {
@@ -86,6 +90,32 @@ func CreateCryptoPaymentAttemptDraft(
 		return models.PaymentAttempt{}, err
 	}
 	return attempt, nil
+}
+
+func bindRetainedSettlementOfferScope(tx *gorm.DB, attempt *models.PaymentAttempt) error {
+	var records []models.PaymentAttemptSettlementOffer
+	if err := tx.Session(&gorm.Session{NewDB: true}).
+		Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).
+		Find(&records).Error; err != nil {
+		return fmt.Errorf("load retained settlement key offers: %w", err)
+	}
+	for _, record := range records {
+		offer, err := record.SettlementKeyOffer()
+		if err != nil {
+			return err
+		}
+		if offer.OrderID != attempt.OrderID || offer.AttemptID != attempt.AttemptID || offer.RailID != attempt.Currency {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		if attempt.AuthorizationContextID == "" {
+			if err := attempt.SetAuthorizationContextID(offer.AuthorizationContextID); err != nil {
+				return err
+			}
+		} else if attempt.AuthorizationContextID != offer.AuthorizationContextID {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	}
+	return nil
 }
 
 // FreezeCryptoPaymentAttempt atomically upgrades one persisted authorization
@@ -186,7 +216,8 @@ func sameCryptoPaymentAttemptIdentity(left, right models.PaymentAttempt) bool {
 		left.OrderID == right.OrderID && left.AmountValue == right.AmountValue &&
 		left.Currency == right.Currency && left.RouteBindingID == right.RouteBindingID &&
 		left.IdempotencyKey == right.IdempotencyKey &&
-		left.AuthorizationContextID == right.AuthorizationContextID
+		left.AuthorizationContextID == right.AuthorizationContextID &&
+		left.ExpectedModeratorPeerID == right.ExpectedModeratorPeerID
 }
 
 func sameCryptoPaymentAttemptDraftRequest(existing, requested models.PaymentAttempt) bool {
@@ -220,6 +251,11 @@ func validateCryptoAttemptIdentity(attempt models.PaymentAttempt, route models.P
 		strings.TrimSpace(route.NetworkID) == "" || strings.TrimSpace(route.ProtocolVersion) == "" ||
 		strings.TrimSpace(route.StateSchemaVersion) == "" {
 		return fmt.Errorf("invalid crypto payment attempt route identity")
+	}
+	if moderatorPeerID := strings.TrimSpace(attempt.ExpectedModeratorPeerID); moderatorPeerID != "" {
+		if _, err := peer.Decode(moderatorPeerID); err != nil {
+			return fmt.Errorf("invalid crypto payment attempt moderator identity")
+		}
 	}
 	return nil
 }

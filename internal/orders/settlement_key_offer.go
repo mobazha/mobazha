@@ -11,6 +11,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/models"
 	npb "github.com/mobazha/mobazha/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"gorm.io/gorm"
 )
 
 func (op *OrderProcessor) processSettlementKeyOfferMessage(
@@ -52,13 +53,21 @@ func (op *OrderProcessor) processSettlementKeyOfferMessage(
 			return nil, fmt.Errorf("settlement seller offer does not match order seller")
 		}
 	case models.SettlementParticipantModerator:
-		// The selected moderator is frozen later in settlement terms. At this
-		// stage the outer and inner Identity signatures already bind the sender.
+		var attempt models.PaymentAttempt
+		if err := dbtx.Read().Session(&gorm.Session{NewDB: true}).
+			Where("tenant_id = ? AND attempt_id = ?", order.TenantID, offer.AttemptID).
+			First(&attempt).Error; err != nil {
+			return nil, fmt.Errorf("settlement moderator offer requires a local authorization draft: %w", err)
+		}
+		if attempt.State != models.PaymentAttemptAuthorizationDraft ||
+			attempt.ExpectedModeratorPeerID == "" || attempt.ExpectedModeratorPeerID != offer.ParticipantPeerID {
+			return nil, fmt.Errorf("settlement moderator offer does not match selected moderator")
+		}
 	default:
 		return nil, fmt.Errorf("unsupported settlement key offer participant role %q", offer.ParticipantRole)
 	}
-	if err := paymentintent.StoreCryptoPaymentAttemptSettlementKeyOfferInTransaction(
-		dbtx.Read(), order.TenantID, offer.AttemptID, offer,
+	if err := paymentintent.RetainReceivedSettlementKeyOfferInTransaction(
+		dbtx.Read(), order.TenantID, offer,
 	); err != nil {
 		return nil, err
 	}

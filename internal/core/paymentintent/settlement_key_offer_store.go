@@ -55,16 +55,53 @@ func StoreCryptoPaymentAttemptSettlementKeyOfferInTransaction(
 		offer.AuthorizationContextID != attempt.AuthorizationContextID || offer.RailID != attempt.Currency {
 		return models.ErrPaymentAttemptSettlementTermsConflict
 	}
+	return retainSettlementKeyOfferRecord(tx, tenantID, offer, canonical, hash)
+}
 
-	var existing models.PaymentAttemptSettlementOffer
+// RetainReceivedSettlementKeyOfferInTransaction retains a verified inbound
+// offer even when the receiving node has not yet materialized its local draft.
+// If the draft already exists, the stricter draft-state checks are applied.
+func RetainReceivedSettlementKeyOfferInTransaction(
+	tx *gorm.DB,
+	tenantID string,
+	offer models.SettlementKeyOffer,
+) error {
+	if tx == nil {
+		return fmt.Errorf("retain received settlement key offer: transaction is required")
+	}
+	canonical, hash, err := offer.CanonicalBytesAndHash()
+	if err != nil {
+		return err
+	}
+	var attempt models.PaymentAttempt
 	err = tx.Session(&gorm.Session{NewDB: true}).
-		Where("tenant_id = ? AND attempt_id = ? AND participant_role = ?", tenantID, attemptID, offer.ParticipantRole).
+		Where("tenant_id = ? AND attempt_id = ?", tenantID, offer.AttemptID).First(&attempt).Error
+	switch {
+	case err == nil:
+		return StoreCryptoPaymentAttemptSettlementKeyOfferInTransaction(tx, tenantID, offer.AttemptID, offer)
+	case !errors.Is(err, gorm.ErrRecordNotFound):
+		return fmt.Errorf("load local draft for received settlement key offer: %w", err)
+	default:
+		return retainSettlementKeyOfferRecord(tx, tenantID, offer, canonical, hash)
+	}
+}
+
+func retainSettlementKeyOfferRecord(
+	tx *gorm.DB,
+	tenantID string,
+	offer models.SettlementKeyOffer,
+	canonical []byte,
+	hash string,
+) error {
+	var existing models.PaymentAttemptSettlementOffer
+	err := tx.Session(&gorm.Session{NewDB: true}).
+		Where("tenant_id = ? AND attempt_id = ? AND participant_role = ?", tenantID, offer.AttemptID, offer.ParticipantRole).
 		First(&existing).Error
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		var records []models.PaymentAttemptSettlementOffer
 		if err := tx.Session(&gorm.Session{NewDB: true}).
-			Where("tenant_id = ? AND attempt_id = ?", tenantID, attemptID).Find(&records).Error; err != nil {
+			Where("tenant_id = ? AND attempt_id = ?", tenantID, offer.AttemptID).Find(&records).Error; err != nil {
 			return fmt.Errorf("list existing settlement key offers: %w", err)
 		}
 		for _, record := range records {
@@ -78,7 +115,8 @@ func StoreCryptoPaymentAttemptSettlementKeyOfferInTransaction(
 		}
 		publicKeyDigest := sha256.Sum256(offer.PublicKey)
 		return tx.Session(&gorm.Session{NewDB: true}).Create(&models.PaymentAttemptSettlementOffer{
-			TenantID: tenantID, AttemptID: attemptID, ParticipantRole: offer.ParticipantRole,
+			TenantID: tenantID, AttemptID: offer.AttemptID, ParticipantRole: offer.ParticipantRole,
+			OrderID: offer.OrderID, AuthorizationContextID: offer.AuthorizationContextID, RailID: offer.RailID,
 			Offer: canonical, OfferHash: hash, PublicKeyHash: hex.EncodeToString(publicKeyDigest[:]),
 		}).Error
 	case err != nil:
@@ -152,7 +190,8 @@ func BuildCryptoPaymentAttemptAuthorizationBundle(
 	}
 	if attempt.Kind != models.PaymentAttemptKindCryptoFundingTarget || attempt.State != models.PaymentAttemptAuthorizationDraft ||
 		terms.OrderID != attempt.OrderID || terms.AttemptID != attempt.AttemptID ||
-		terms.AssetID != attempt.Currency || target.AttemptID != attempt.AttemptID ||
+		terms.AssetID != attempt.Currency || terms.ModeratorPeerID != attempt.ExpectedModeratorPeerID ||
+		target.AttemptID != attempt.AttemptID ||
 		target.AssetID != terms.AssetID || target.AmountAtomic != terms.FundingAmount || target.Address != terms.FundingTargetAddress {
 		return models.PaymentAttemptAuthorizationBundle{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}

@@ -82,6 +82,16 @@ func TestPaymentAttempt_SetSettlementTermsRejectsPartialStoredState(t *testing.T
 	require.ErrorIs(t, missingTerms.SetSettlementTerms(terms), ErrPaymentAttemptSettlementTermsConflict)
 }
 
+func TestPaymentAttempt_SetSettlementTermsRequiresSelectedModerator(t *testing.T) {
+	terms := validPaymentAttemptSettlementTerms()
+	terms.ModeratorPeerID = terms.Affiliate.PromoterPeerID
+	attempt := PaymentAttempt{AttemptID: terms.AttemptID, OrderID: terms.OrderID, Kind: PaymentAttemptKindCryptoFundingTarget}
+	require.ErrorIs(t, attempt.SetSettlementTerms(terms), ErrPaymentAttemptSettlementTermsConflict)
+
+	attempt.ExpectedModeratorPeerID = terms.ModeratorPeerID
+	require.NoError(t, attempt.SetSettlementTerms(terms))
+}
+
 func TestPaymentAttempt_GetSettlementTermsRejectsTampering(t *testing.T) {
 	attempt := PaymentAttempt{AttemptID: "attempt-1", OrderID: "order-1"}
 	require.NoError(t, attempt.SetSettlementTerms(validPaymentAttemptSettlementTerms()))

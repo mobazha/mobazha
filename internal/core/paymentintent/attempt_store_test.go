@@ -310,7 +310,9 @@ func TestStoreCryptoPaymentAttemptSettlementKeyOffer_RetainsVerifiedDraftOffers(
 	require.Error(t, db.Create(&models.PaymentAttemptSettlementOffer{
 		TenantID: attempt.TenantID, AttemptID: attempt.AttemptID,
 		ParticipantRole: models.SettlementParticipantBuyer,
-		Offer:           duplicateCanonical, OfferHash: duplicateHash, PublicKeyHash: sellerRecord.PublicKeyHash,
+		OrderID:         duplicateKeyOffer.OrderID, AuthorizationContextID: duplicateKeyOffer.AuthorizationContextID,
+		RailID: duplicateKeyOffer.RailID,
+		Offer:  duplicateCanonical, OfferHash: duplicateHash, PublicKeyHash: sellerRecord.PublicKeyHash,
 	}).Error)
 
 	require.NoError(t, StoreCryptoPaymentAttemptSettlementKeyOffer(db, attempt.TenantID, attempt.AttemptID, buyerOffer))
@@ -337,6 +339,63 @@ func TestStoreCryptoPaymentAttemptSettlementKeyOffer_RetainsVerifiedDraftOffers(
 	require.Zero(t, retainedCount)
 	_, err = ListCryptoPaymentAttemptSettlementKeyOffers(db, attempt.TenantID, attempt.AttemptID)
 	require.ErrorIs(t, err, models.ErrPaymentAttemptSettlementTermsConflict)
+}
+
+func TestCreateCryptoPaymentAttemptDraft_InheritsRetainedOfferContext(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-retained-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
+	attempt, route, _, _, _, bundle, _ := cryptoAttemptFixture(t)
+	attempt.TenantID = "tenant-a"
+	route.TenantID = attempt.TenantID
+	retainedContextID := attempt.AuthorizationContextID
+	attempt.AuthorizationContextID = ""
+	var buyerOffer models.SettlementKeyOffer
+	for _, offer := range bundle.Offers {
+		if offer.ParticipantRole == models.SettlementParticipantBuyer {
+			buyerOffer = offer
+			break
+		}
+	}
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, buyerOffer)
+	}))
+
+	created, err := CreateCryptoPaymentAttemptDraft(db, attempt, route)
+	require.NoError(t, err)
+	require.Equal(t, retainedContextID, created.AuthorizationContextID)
+	offers, err := ListCryptoPaymentAttemptSettlementKeyOffers(db, attempt.TenantID, attempt.AttemptID)
+	require.NoError(t, err)
+	require.Len(t, offers, 1)
+	require.Equal(t, buyerOffer, offers[0])
+}
+
+func TestCreateCryptoPaymentAttemptDraft_RejectsRetainedOfferContextMismatch(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-retained-conflict-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
+	attempt, route, _, _, _, bundle, _ := cryptoAttemptFixture(t)
+	attempt.TenantID = "tenant-a"
+	route.TenantID = attempt.TenantID
+	var buyerOffer models.SettlementKeyOffer
+	for _, offer := range bundle.Offers {
+		if offer.ParticipantRole == models.SettlementParticipantBuyer {
+			buyerOffer = offer
+			break
+		}
+	}
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, buyerOffer)
+	}))
+	differentContextID, err := models.NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	attempt.AuthorizationContextID = differentContextID
+
+	_, err = CreateCryptoPaymentAttemptDraft(db, attempt, route)
+	require.ErrorIs(t, err, models.ErrPaymentAttemptSettlementTermsConflict)
+	var attemptCount int64
+	require.NoError(t, db.Model(&models.PaymentAttempt{}).Count(&attemptCount).Error)
+	require.Zero(t, attemptCount)
 }
 
 func TestNewSettlementSignRequest_UsesOnlyFrozenAttemptBindings(t *testing.T) {

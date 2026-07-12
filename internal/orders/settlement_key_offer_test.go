@@ -62,6 +62,36 @@ func TestProcessSettlementKeyOfferMessage_PersistsSignedBuyerOfferIdempotently(t
 	}))
 }
 
+func TestProcessSettlementKeyOfferMessage_RetainsOfferBeforeLocalDraftExists(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	require.NoError(t, err)
+	defer teardown()
+
+	order, offer, message := settlementKeyOfferMessageFixture(t, op)
+	require.NoError(t, op.db.Update(func(tx database.Tx) error {
+		if err := tx.Save(&order); err != nil {
+			return err
+		}
+		_, err := op.ProcessMessage(tx, message)
+		return err
+	}))
+	require.NoError(t, op.db.View(func(tx database.Tx) error {
+		var record models.PaymentAttemptSettlementOffer
+		if err := tx.Read().Where(
+			"tenant_id = ? AND attempt_id = ? AND participant_role = ?",
+			order.TenantID, offer.AttemptID, offer.ParticipantRole,
+		).First(&record).Error; err != nil {
+			return err
+		}
+		stored, err := record.SettlementKeyOffer()
+		if err != nil {
+			return err
+		}
+		require.Equal(t, offer, *stored)
+		return nil
+	}))
+}
+
 func TestProcessSettlementKeyOfferMessage_RejectsOuterInnerSenderMismatch(t *testing.T) {
 	op, teardown, err := newMockOrderProcessor()
 	require.NoError(t, err)
@@ -80,6 +110,37 @@ func TestProcessSettlementKeyOfferMessage_RejectsOuterInnerSenderMismatch(t *tes
 		}
 		_, processErr := op.ProcessMessage(tx, message)
 		require.ErrorContains(t, processErr, "sender or order")
+		return nil
+	}))
+}
+
+func TestProcessSettlementKeyOfferMessage_RejectsUnselectedModerator(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	require.NoError(t, err)
+	defer teardown()
+
+	order, offer, _ := settlementKeyOfferMessageFixture(t, op)
+	offer.ParticipantRole = models.SettlementParticipantModerator
+	offer.Purpose = "standard-order-participant:moderator"
+	payload, err := offer.SigningPayload()
+	require.NoError(t, err)
+	offer.Signature, err = op.signer.Sign(payload)
+	require.NoError(t, err)
+	wire, err := paymentintent.SettlementKeyOfferToProto(offer)
+	require.NoError(t, err)
+	wireAny, err := anypb.New(wire)
+	require.NoError(t, err)
+	message := &npb.OrderMessage{
+		OrderID: offer.OrderID, MessageType: npb.OrderMessage_SETTLEMENT_KEY_OFFER, Message: wireAny,
+	}
+	require.NoError(t, utils.SignOrderMessage(message, op.signer))
+
+	require.NoError(t, op.db.Update(func(tx database.Tx) error {
+		if err := tx.Save(&order); err != nil {
+			return err
+		}
+		_, processErr := op.ProcessMessage(tx, message)
+		require.ErrorContains(t, processErr, "requires a local authorization draft")
 		return nil
 	}))
 }

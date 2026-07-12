@@ -54,6 +54,9 @@ type PaymentAttempt struct {
 	AuthorizationContextID  string `gorm:"column:authorization_context_id;size:64;not null;default:'';uniqueIndex:idx_payment_attempt_authorization_context,priority:2,where:authorization_context_id <> ''"`
 	AuthorizationBundle     []byte `gorm:"column:authorization_bundle;type:text"`
 	AuthorizationBundleHash string `gorm:"column:authorization_bundle_hash;size:64;not null;default:'';index"`
+	// ExpectedModeratorPeerID is routing/authorization metadata selected before
+	// a moderator offer is accepted. It is never part of key derivation.
+	ExpectedModeratorPeerID string `gorm:"column:expected_moderator_peer_id;size:255;not null;default:''"`
 	// SettlementTerms is the canonical, immutable economic allocation owned by
 	// this attempt. It must be committed before an actionable funding target is
 	// exposed. SettlementTermsHash binds settlement actions to these exact bytes.
@@ -175,6 +178,9 @@ func (a *PaymentAttempt) SetSettlementTerms(terms PaymentAttemptSettlementTerms)
 	}
 	if terms.AttemptID != a.AttemptID || terms.OrderID != a.OrderID {
 		return fmt.Errorf("settlement terms do not belong to payment attempt")
+	}
+	if strings.TrimSpace(terms.ModeratorPeerID) != strings.TrimSpace(a.ExpectedModeratorPeerID) {
+		return ErrPaymentAttemptSettlementTermsConflict
 	}
 	canonical, hash, err := terms.CanonicalBytesAndHash()
 	if err != nil {

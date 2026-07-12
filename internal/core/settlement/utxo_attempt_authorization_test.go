@@ -220,7 +220,7 @@ func TestCancelPartialPayment_UsesFrozenAttemptMonitorAndAbandonsTarget(t *testi
 		if err := tx.Read().AutoMigrate(&models.PaymentAttempt{}); err != nil {
 			return err
 		}
-		return tx.Read().AutoMigrate(&models.Order{})
+		return tx.Read().AutoMigrate(&models.Order{}, &models.PaymentObservation{})
 	}))
 	attempt, _ := frozenStandardOrderReleaseAttempt(t)
 	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(&attempt) }))
@@ -235,7 +235,11 @@ func TestCancelPartialPayment_UsesFrozenAttemptMonitorAndAbandonsTarget(t *testi
 			Amount: iwallet.NewAmount(partialAmount),
 		}},
 	}
-	wallet := &attemptReleaseWallet{fundingRecoveryWallet: fundingRecoveryWallet{}}
+	wallet := &attemptReleaseWallet{fundingRecoveryWallet: fundingRecoveryWallet{
+		txs: map[iwallet.TransactionID]iwallet.Transaction{
+			fundingTransaction.ID: fundingTransaction,
+		},
+	}}
 	monitor := &mockUTXOMonitor{
 		watchedAddresses: map[string]*utxo.WatchedAddress{
 			"bc1qattempttarget": {
@@ -243,9 +247,7 @@ func TestCancelPartialPayment_UsesFrozenAttemptMonitorAndAbandonsTarget(t *testi
 				ChainType: iwallet.ChainBitcoin, OrderID: attempt.OrderID,
 			},
 		},
-		addressTxs: map[string][]iwallet.Transaction{
-			"bc1qattempttarget": {fundingTransaction},
-		},
+		addressTxs: map[string][]iwallet.Transaction{},
 	}
 	signer := &attemptReleaseSigner{publicKey: []byte("buyer-attempt-key")}
 	svc := NewSettlementService(SettlementServiceConfig{
@@ -258,6 +260,17 @@ func TestCancelPartialPayment_UsesFrozenAttemptMonitorAndAbandonsTarget(t *testi
 		RefundAddress: "bc1qbuyerrefund",
 	}
 	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(order) }))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.PaymentObservation{
+			TenantID: attempt.TenantID, ID: "partial-observation", OrderID: attempt.OrderID,
+			ChainNamespace: "bip122", ChainReference: "bitcoin-regtest",
+			TxHash: fundingTransaction.ID.String(), TxHashSource: models.PaymentTxHashSourceChainTx,
+			EventType: models.PaymentEventUTXOFunding, ToAddress: "bc1qattempttarget", Amount: partialAmount,
+			BlockTime: time.Now().UTC(), Confirmations: 1,
+			Source: models.PaymentObservationSourceMonitor, Observer: "monitor:btc:test",
+			Status: models.PaymentObservationStatusConfirmed,
+		})
+	}))
 
 	txID, refunded, err := svc.CancelPartialPayment(attempt.OrderID)
 	require.NoError(t, err)

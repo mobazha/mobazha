@@ -143,9 +143,21 @@ func FreezeCryptoPaymentAttempt(
 			if !sameCryptoPaymentAttemptIdentity(existing, attempt) {
 				return models.ErrPaymentAttemptSettlementTermsConflict
 			}
-			return tx.Model(&models.PaymentAttempt{}).
-				Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).
-				Select("*").Updates(&attempt).Error
+			result := tx.Model(&models.PaymentAttempt{}).
+				Where("tenant_id = ? AND attempt_id = ? AND state = ?", attempt.TenantID, attempt.AttemptID, models.PaymentAttemptAuthorizationDraft).
+				Select("*").Updates(&attempt)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 1 {
+				return nil
+			}
+			// Another transaction froze this draft after our read. Never overwrite
+			// it: accept only an identical durable snapshot for an idempotent retry.
+			if err := tx.Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&existing).Error; err != nil {
+				return fmt.Errorf("reload concurrently frozen crypto payment attempt: %w", err)
+			}
+			return verifyFrozenCryptoAttempt(existing, attempt)
 		}
 		return verifyFrozenCryptoAttempt(existing, attempt)
 	})

@@ -179,6 +179,41 @@ func TestFreezeCryptoPaymentAttempt_RejectsFrozenMutation(t *testing.T) {
 	)
 }
 
+func TestFreezeCryptoPaymentAttempt_DoesNotOverwriteConcurrentWinner(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-cas-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}))
+	attempt, route, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
+	attempt, err = CreateCryptoPaymentAttemptDraft(db, attempt, route)
+	require.NoError(t, err)
+
+	fired := false
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register("test:freeze-concurrent-winner", func(tx *gorm.DB) {
+		if fired || tx.Statement.Table != (models.PaymentAttempt{}).TableName() {
+			return
+		}
+		fired = true
+		require.NoError(t, tx.Exec(
+			"UPDATE payment_attempts SET state = ?, last_error = ? WHERE tenant_id = ? AND attempt_id = ?",
+			models.PaymentAttemptFundingTargetReady, "concurrent winner", attempt.TenantID, attempt.AttemptID,
+		).Error)
+	}))
+	t.Cleanup(func() { db.Callback().Update().Remove("test:freeze-concurrent-winner") })
+
+	err = FreezeCryptoPaymentAttempt(db, attempt, route, terms, signer, signature, bundle, target)
+	require.ErrorIs(t, err, models.ErrPaymentAttemptSettlementTermsConflict)
+	require.True(t, fired)
+
+	var stored models.PaymentAttempt
+	require.NoError(t, db.Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&stored).Error)
+	// The test hook runs in the same transaction, so the intentional conflict
+	// rolls its simulated competing state claim back. The important property is
+	// that the conditional update did not write the frozen snapshot.
+	require.Equal(t, models.PaymentAttemptAuthorizationDraft, stored.State)
+	require.Empty(t, stored.LastError)
+	require.Empty(t, stored.FundingTarget)
+}
+
 func TestFreezeCryptoPaymentAttempt_RejectsTargetBeforeValidSellerAuthorization(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-auth-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)

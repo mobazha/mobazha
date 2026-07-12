@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/mobazha/mobazha/internal/core/paymentintent"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -84,7 +85,7 @@ func (s *OrderAppService) frozenSettlementAttemptActionContext(
 		Purpose:     contracts.StandardOrderSettlementKeyPurpose + ":" + string(localOffer.ParticipantRole),
 		ReferenceID: attempt.AuthorizationContextID,
 	}
-	publicKey, err := s.settlementSigner.PublicKey(ctx, keyRef)
+	publicKey, _, err := paymentintent.SettlementPublicKeyForRail(ctx, s.settlementSigner, keyRef)
 	if err != nil {
 		return nil, true, err
 	}

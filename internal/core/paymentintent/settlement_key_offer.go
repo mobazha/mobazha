@@ -70,20 +70,7 @@ func IssueSettlementKeyOfferWithScopeAndUnlock(
 	}
 	participantKeyRef := keyRef
 	participantKeyRef.Purpose = keyRef.Purpose + ":" + string(role)
-	keyAlgorithm := ""
-	var publicKey []byte
-	var err error
-	coinInfo, coinErr := iwallet.CoinInfoFromCoinType(iwallet.CoinType(participantKeyRef.RailID))
-	if coinErr == nil && coinInfo.Chain == iwallet.ChainSolana {
-		solanaSigner, ok := settlementSigner.(contracts.SolanaSettlementSigner)
-		if !ok {
-			return models.SettlementKeyOffer{}, fmt.Errorf("Solana attempt settlement signer is unavailable")
-		}
-		publicKey, err = solanaSigner.SolanaPublicKey(ctx, participantKeyRef)
-		keyAlgorithm = models.SettlementKeyAlgorithmEd25519
-	} else {
-		publicKey, err = settlementSigner.PublicKey(ctx, participantKeyRef)
-	}
+	publicKey, keyAlgorithm, err := SettlementPublicKeyForRail(ctx, settlementSigner, participantKeyRef)
 	if err != nil {
 		return models.SettlementKeyOffer{}, fmt.Errorf("derive settlement key offer public key: %w", err)
 	}
@@ -117,4 +104,28 @@ func IssueSettlementKeyOfferWithScopeAndUnlock(
 		return models.SettlementKeyOffer{}, err
 	}
 	return offer, nil
+}
+
+// SettlementPublicKeyForRail returns the same chain-native public key used in
+// a participant offer so later action authorization can verify the key ref
+// without accidentally comparing Solana Ed25519 keys to secp256k1 keys.
+func SettlementPublicKeyForRail(
+	ctx context.Context,
+	settlementSigner contracts.SettlementSigner,
+	keyRef contracts.SettlementKeyRef,
+) ([]byte, string, error) {
+	if settlementSigner == nil {
+		return nil, "", fmt.Errorf("settlement signer is required")
+	}
+	coinInfo, coinErr := iwallet.CoinInfoFromCoinType(iwallet.CoinType(keyRef.RailID))
+	if coinErr == nil && coinInfo.Chain == iwallet.ChainSolana {
+		solanaSigner, ok := settlementSigner.(contracts.SolanaSettlementSigner)
+		if !ok {
+			return nil, "", fmt.Errorf("Solana attempt settlement signer is unavailable")
+		}
+		publicKey, err := solanaSigner.SolanaPublicKey(ctx, keyRef)
+		return publicKey, models.SettlementKeyAlgorithmEd25519, err
+	}
+	publicKey, err := settlementSigner.PublicKey(ctx, keyRef)
+	return publicKey, "", err
 }

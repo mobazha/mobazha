@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	nodepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/internal/core/paymentintent"
 	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
@@ -343,7 +344,7 @@ func (s *SettlementService) applyFrozenSettlementAttemptActionParams(
 		Purpose:     contracts.StandardOrderSettlementKeyPurpose + ":" + string(localRole),
 		ReferenceID: attempt.AuthorizationContextID,
 	}
-	publicKey, err := s.settlementSigner.PublicKey(ctx, keyRef)
+	publicKey, _, err := paymentintent.SettlementPublicKeyForRail(ctx, s.settlementSigner, keyRef)
 	if err != nil {
 		return err
 	}

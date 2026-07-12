@@ -335,6 +335,7 @@ message SettlementKeyOffer {
     string moderatorPayoutAddress        = 13;
     string moderatorFeeAmount            = 14;
     uint32 escrowTimeoutHours             = 15;
+    string keyAlgorithm                   = 16;
 }
 
 // SettlementAuthorization carries the seller-frozen canonical public

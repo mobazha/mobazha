@@ -20,6 +20,11 @@ const (
 	settlementKeyOfferSigningDomain = "mobazha/settlement-key-offer/v1\x00"
 )
 
+const (
+	SettlementKeyAlgorithmSecp256k1 = "secp256k1"
+	SettlementKeyAlgorithmEd25519   = "ed25519"
+)
+
 // SettlementParticipantRole identifies one attempt-scoped settlement
 // participant. It is independent of a chain's threshold implementation.
 type SettlementParticipantRole string
@@ -64,6 +69,7 @@ type SettlementKeyOffer struct {
 	ParticipantRole         SettlementParticipantRole `json:"participantRole"`
 	RailID                  string                    `json:"railID"`
 	Purpose                 string                    `json:"purpose"`
+	KeyAlgorithm            string                    `json:"keyAlgorithm,omitempty"`
 	PublicKey               []byte                    `json:"publicKey"`
 	ExpectedModeratorPeerID string                    `json:"expectedModeratorPeerID,omitempty"`
 	AmountAtomic            string                    `json:"amountAtomic,omitempty"`
@@ -82,6 +88,7 @@ type settlementKeyOfferPayload struct {
 	ParticipantRole         SettlementParticipantRole `json:"participantRole"`
 	RailID                  string                    `json:"railID"`
 	Purpose                 string                    `json:"purpose"`
+	KeyAlgorithm            string                    `json:"keyAlgorithm,omitempty"`
 	PublicKey               []byte                    `json:"publicKey"`
 	ExpectedModeratorPeerID string                    `json:"expectedModeratorPeerID,omitempty"`
 	AmountAtomic            string                    `json:"amountAtomic,omitempty"`
@@ -100,7 +107,7 @@ func (o SettlementKeyOffer) SigningPayload() ([]byte, error) {
 		Version: o.Version, AuthorizationContextID: o.AuthorizationContextID,
 		OrderID: o.OrderID, AttemptID: o.AttemptID, ParticipantPeerID: o.ParticipantPeerID,
 		ParticipantRole: o.ParticipantRole, RailID: o.RailID, Purpose: o.Purpose,
-		PublicKey: o.PublicKey, ExpectedModeratorPeerID: o.ExpectedModeratorPeerID,
+		KeyAlgorithm: o.KeyAlgorithm, PublicKey: o.PublicKey, ExpectedModeratorPeerID: o.ExpectedModeratorPeerID,
 		AmountAtomic: o.AmountAtomic, ModeratorPayoutAddress: o.ModeratorPayoutAddress,
 		ModeratorFeeAmount: o.ModeratorFeeAmount,
 		EscrowTimeoutHours: o.EscrowTimeoutHours,
@@ -162,6 +169,25 @@ func (o SettlementKeyOffer) validate(requireSignature bool) error {
 	}
 	if !strings.HasSuffix(o.Purpose, ":"+string(o.ParticipantRole)) {
 		return fmt.Errorf("settlement key offer purpose must bind participant role")
+	}
+	switch strings.TrimSpace(o.KeyAlgorithm) {
+	case "":
+		// Version-1 offers omitted the algorithm. Preserve their canonical
+		// bytes; rail projectors still parse the concrete key encoding.
+	case SettlementKeyAlgorithmSecp256k1:
+		if len(o.PublicKey) != 33 {
+			return fmt.Errorf("settlement secp256k1 public key must be compressed")
+		}
+	case SettlementKeyAlgorithmEd25519:
+		if len(o.PublicKey) != 32 {
+			return fmt.Errorf("settlement Ed25519 public key must be 32 bytes")
+		}
+	default:
+		return fmt.Errorf("unsupported settlement key algorithm %q", o.KeyAlgorithm)
+	}
+	solanaRail := strings.HasPrefix(strings.TrimSpace(o.RailID), "crypto:solana:")
+	if solanaRail != (strings.TrimSpace(o.KeyAlgorithm) == SettlementKeyAlgorithmEd25519) {
+		return fmt.Errorf("settlement key algorithm does not match rail")
 	}
 	if !validCanonicalNativeRail(o.RailID) {
 		return fmt.Errorf("settlement key offer rail must be a canonical native rail")

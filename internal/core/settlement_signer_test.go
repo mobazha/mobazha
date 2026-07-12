@@ -5,17 +5,22 @@ package core
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"strings"
 	"testing"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/ethereum/go-ethereum/crypto"
+	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mobazha/mobazha/internal/core/guest"
+	"github.com/mobazha/mobazha/internal/core/paymentintent"
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/models"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -238,6 +243,54 @@ func TestLocalSettlementSigner_SignsRawEVMDigestWithAttemptKey(t *testing.T) {
 	recovered, err := crypto.SigToPub(digest[:], recoverySignature)
 	require.NoError(t, err)
 	require.Equal(t, wantAddress, crypto.PubkeyToAddress(*recovered))
+}
+
+func TestLocalSettlementSigner_SignsSolanaMessageWithAttemptKey(t *testing.T) {
+	signer := newLocalSettlementSigner(newFileKeyProvider(nil, settlementTestPrivateKey(t, 1), nil, nil, nil))
+	keyRef := contracts.SettlementKeyRef{
+		TenantID: "tenant-a", RailID: "crypto:solana:mainnet:native",
+		Purpose: "standard-order-participant:moderator", ReferenceID: "authorization-context-solana",
+	}
+	publicKey, err := signer.(contracts.SolanaSettlementSigner).SolanaPublicKey(t.Context(), keyRef)
+	require.NoError(t, err)
+	require.Len(t, publicKey, ed25519.PublicKeySize)
+	message := []byte("canonical anchor settlement message")
+	signedPublicKey, signature, err := signer.(contracts.SolanaSettlementSigner).SignSolanaMessage(
+		t.Context(), contracts.SolanaMessageSettlementSignRequest{
+			KeyRef: keyRef, OrderID: "order-solana", AttemptID: "attempt-solana", Action: "dispute_release",
+			Sequence: 1, TermsHash: strings.Repeat("a", 64),
+			ProgramAddress: "11111111111111111111111111111112",
+			EscrowAddress:  "11111111111111111111111111111113", Message: message,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, publicKey, signedPublicKey)
+	require.True(t, ed25519.Verify(ed25519.PublicKey(publicKey), message, signature))
+}
+
+func TestIssueSettlementKeyOffer_SelectsSolanaEd25519Key(t *testing.T) {
+	identityPrivateKey, _, err := libp2pcrypto.GenerateEd25519Key(rand.Reader)
+	require.NoError(t, err)
+	marshaled, err := libp2pcrypto.MarshalPrivateKey(identityPrivateKey)
+	require.NoError(t, err)
+	identitySigner, err := contracts.NewKeyPairSignerFromMarshaledKey(marshaled)
+	require.NoError(t, err)
+	settlementSigner := newLocalSettlementSigner(
+		newFileKeyProvider(nil, settlementTestPrivateKey(t, 1), nil, nil, nil),
+	)
+	contextID := strings.Repeat("a", 64)
+	offer, err := paymentintent.IssueSettlementKeyOffer(
+		t.Context(), identitySigner, settlementSigner,
+		contracts.SettlementKeyRef{
+			TenantID: "tenant-solana", RailID: "crypto:solana:mainnet:native",
+			Purpose: contracts.StandardOrderSettlementKeyPurpose, ReferenceID: contextID,
+		},
+		"order-solana", "attempt-solana", models.SettlementParticipantBuyer,
+	)
+	require.NoError(t, err)
+	require.Equal(t, models.SettlementKeyAlgorithmEd25519, offer.KeyAlgorithm)
+	require.Len(t, offer.PublicKey, ed25519.PublicKeySize)
+	require.NoError(t, offer.Verify())
 }
 
 func TestGuestManagedEscrowOwner_UsesSettlementSignerNotEVMProfileKey(t *testing.T) {

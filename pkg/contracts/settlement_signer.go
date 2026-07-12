@@ -151,6 +151,40 @@ type EVMSettlementSigner interface {
 	SignEVMDigest(context.Context, EVMDigestSettlementSignRequest) (common.Address, []byte, error)
 }
 
+// SolanaMessageSettlementSignRequest authorizes one deterministic Anchor
+// settlement message with an attempt-scoped Ed25519 key.
+type SolanaMessageSettlementSignRequest struct {
+	KeyRef         SettlementKeyRef
+	OrderID        string
+	AttemptID      string
+	Action         string
+	Sequence       uint64
+	TermsHash      string
+	ProgramAddress string
+	EscrowAddress  string
+	Message        []byte
+}
+
+// Validate rejects incomplete Solana signing requests.
+func (r SolanaMessageSettlementSignRequest) Validate() error {
+	if err := r.KeyRef.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(r.OrderID) == "" || strings.TrimSpace(r.AttemptID) == "" ||
+		strings.TrimSpace(r.Action) == "" || !validSettlementTermsHash(r.TermsHash) ||
+		strings.TrimSpace(r.ProgramAddress) == "" || strings.TrimSpace(r.EscrowAddress) == "" || len(r.Message) == 0 {
+		return fmt.Errorf("Solana settlement signing requires attempt, action, terms, program, escrow, and message")
+	}
+	return nil
+}
+
+// SolanaSettlementSigner owns attempt-derived Ed25519 keys used by Anchor
+// verification instructions.
+type SolanaSettlementSigner interface {
+	SolanaPublicKey(context.Context, SettlementKeyRef) ([]byte, error)
+	SignSolanaMessage(context.Context, SolanaMessageSettlementSignRequest) ([]byte, []byte, error)
+}
+
 // UTXOTimeoutSettlementSigner keeps the timeout private key inside the opaque
 // settlement signer while delegating native transaction construction to the
 // wallet implementation.

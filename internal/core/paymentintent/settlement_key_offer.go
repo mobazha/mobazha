@@ -10,6 +10,7 @@ import (
 
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 // IssueSettlementKeyOffer derives one attempt-scoped public key through the
@@ -49,7 +50,20 @@ func IssueSettlementKeyOfferWithScope(
 	}
 	participantKeyRef := keyRef
 	participantKeyRef.Purpose = keyRef.Purpose + ":" + string(role)
-	publicKey, err := settlementSigner.PublicKey(ctx, participantKeyRef)
+	keyAlgorithm := ""
+	var publicKey []byte
+	var err error
+	coinInfo, coinErr := iwallet.CoinInfoFromCoinType(iwallet.CoinType(participantKeyRef.RailID))
+	if coinErr == nil && coinInfo.Chain == iwallet.ChainSolana {
+		solanaSigner, ok := settlementSigner.(contracts.SolanaSettlementSigner)
+		if !ok {
+			return models.SettlementKeyOffer{}, fmt.Errorf("Solana attempt settlement signer is unavailable")
+		}
+		publicKey, err = solanaSigner.SolanaPublicKey(ctx, participantKeyRef)
+		keyAlgorithm = models.SettlementKeyAlgorithmEd25519
+	} else {
+		publicKey, err = settlementSigner.PublicKey(ctx, participantKeyRef)
+	}
 	if err != nil {
 		return models.SettlementKeyOffer{}, fmt.Errorf("derive settlement key offer public key: %w", err)
 	}
@@ -62,6 +76,7 @@ func IssueSettlementKeyOfferWithScope(
 		ParticipantRole:         role,
 		RailID:                  participantKeyRef.RailID,
 		Purpose:                 participantKeyRef.Purpose,
+		KeyAlgorithm:            keyAlgorithm,
 		PublicKey:               publicKey,
 		ExpectedModeratorPeerID: strings.TrimSpace(expectedModeratorPeerID),
 		AmountAtomic:            strings.TrimSpace(amountAtomic),

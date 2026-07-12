@@ -5,6 +5,7 @@ package core
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 var _ contracts.SettlementSigner = (*localSettlementSigner)(nil)
 var _ contracts.UTXOSettlementSigner = (*localSettlementSigner)(nil)
 var _ contracts.EVMSettlementSigner = (*localSettlementSigner)(nil)
+var _ contracts.SolanaSettlementSigner = (*localSettlementSigner)(nil)
 var _ contracts.UTXOTimeoutSettlementSigner = (*localSettlementSigner)(nil)
 
 // localSettlementSigner is the standalone opaque Settlement Domain adapter.
@@ -135,6 +137,40 @@ func (s *localSettlementSigner) SignEVMDigest(
 	return ethcrypto.PubkeyToAddress(ecdsaKey.PublicKey), signature, nil
 }
 
+func (s *localSettlementSigner) SolanaPublicKey(
+	ctx context.Context,
+	keyRef contracts.SettlementKeyRef,
+) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	key, err := s.deriveSolanaKey(keyRef)
+	if err != nil {
+		return nil, err
+	}
+	publicKey := key.Public().(ed25519.PublicKey)
+	return append([]byte(nil), publicKey...), nil
+}
+
+func (s *localSettlementSigner) SignSolanaMessage(
+	ctx context.Context,
+	request contracts.SolanaMessageSettlementSignRequest,
+) ([]byte, []byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	if err := request.Validate(); err != nil {
+		return nil, nil, err
+	}
+	key, err := s.deriveSolanaKey(request.KeyRef)
+	if err != nil {
+		return nil, nil, err
+	}
+	publicKey := key.Public().(ed25519.PublicKey)
+	signature := ed25519.Sign(key, request.Message)
+	return append([]byte(nil), publicKey...), append([]byte(nil), signature...), nil
+}
+
 func (s *localSettlementSigner) ReleaseUTXOAfterTimeout(
 	ctx context.Context,
 	keyRef contracts.SettlementKeyRef,
@@ -184,6 +220,31 @@ func (s *localSettlementSigner) deriveKey(keyRef contracts.SettlementKeyRef) (*b
 		return nil, fmt.Errorf("derived invalid settlement key")
 	}
 	return key, nil
+}
+
+func (s *localSettlementSigner) deriveSolanaKey(
+	keyRef contracts.SettlementKeyRef,
+) (ed25519.PrivateKey, error) {
+	if s == nil || s.keys == nil {
+		return nil, fmt.Errorf("settlement signer is not configured")
+	}
+	if err := keyRef.Validate(); err != nil {
+		return nil, err
+	}
+	root, err := s.keys.EscrowMasterKey()
+	if err != nil {
+		return nil, fmt.Errorf("settlement signer root: %w", err)
+	}
+	if root == nil {
+		return nil, fmt.Errorf("settlement signer root is unavailable")
+	}
+	info := canonicalSettlementFields(keyRef.RailID, keyRef.Purpose, keyRef.ReferenceID)
+	reader := hkdf.New(sha256.New, root.Serialize(), []byte("mobazha-settlement-ed25519-domain-v1"), info)
+	seed := make([]byte, ed25519.SeedSize)
+	if _, err := io.ReadFull(reader, seed); err != nil {
+		return nil, fmt.Errorf("derive Solana settlement key: %w", err)
+	}
+	return ed25519.NewKeyFromSeed(seed), nil
 }
 
 func settlementSignatureDigest(request contracts.SettlementSignRequest) [32]byte {

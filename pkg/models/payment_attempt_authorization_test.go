@@ -47,6 +47,35 @@ func TestSettlementKeyOffer_VerifiesIdentityBoundScope(t *testing.T) {
 	require.Error(t, tampered.Verify())
 }
 
+func TestSettlementKeyOffer_BindsEd25519AlgorithmToSolanaRail(t *testing.T) {
+	contextID, err := NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	privateKey, publicKey, err := libp2pcrypto.GenerateEd25519Key(rand.Reader)
+	require.NoError(t, err)
+	participant, err := peer.IDFromPublicKey(publicKey)
+	require.NoError(t, err)
+	offer := SettlementKeyOffer{
+		Version: SettlementAuthorizationVersion, AuthorizationContextID: contextID,
+		OrderID: "order-solana", AttemptID: "attempt-solana", ParticipantPeerID: participant.String(),
+		ParticipantRole: SettlementParticipantBuyer, RailID: "crypto:solana:mainnet:native",
+		Purpose: "standard-order-participant:buyer", KeyAlgorithm: SettlementKeyAlgorithmEd25519,
+		PublicKey: make([]byte, 32),
+	}
+	offer.PublicKey[0] = 1
+	payload, err := offer.SigningPayload()
+	require.NoError(t, err)
+	offer.Signature, err = privateKey.Sign(payload)
+	require.NoError(t, err)
+	require.NoError(t, offer.Verify())
+
+	wrongRail := offer
+	wrongRail.RailID = "crypto:eip155:1:native"
+	require.Error(t, wrongRail.Verify())
+	wrongAlgorithm := offer
+	wrongAlgorithm.KeyAlgorithm = SettlementKeyAlgorithmSecp256k1
+	require.Error(t, wrongAlgorithm.Verify())
+}
+
 func TestPaymentAttemptAuthorizationBundle_CanonicalizesAndRequiresCompleteOffers(t *testing.T) {
 	contextID, err := NewSettlementAuthorizationContextID()
 	require.NoError(t, err)

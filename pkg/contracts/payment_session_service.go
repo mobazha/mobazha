@@ -42,14 +42,15 @@ type CreatePaymentSessionRequest struct {
 	// BuyerPeerID is the peer ID of the buying node, used for ownership
 	// checks and address derivation in certain escrow schemes.
 	BuyerPeerID string
+	// Moderator is the dispute moderator Libp2p peer ID. Crypto rails bind it
+	// into settlement offers; provider rails require an approved moderated
+	// capability before accepting it.
+	Moderator string
 
 	// ── Crypto-only fields (canonical paymentCoin prefixed with "crypto:") ─────
 
 	// PayerAddress is the buyer pubkey or chain address forwarded into escrow setup.
 	PayerAddress string
-	// Moderator is the dispute moderator Libp2p peer ID (required when the order uses moderated escrow).
-	Moderator string
-
 	// PayFromCustodial marks exchange/custodial-wallet payments that must
 	// declare an explicit refundAddress at session creation time.
 	PayFromCustodial bool

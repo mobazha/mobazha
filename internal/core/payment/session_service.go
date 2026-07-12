@@ -289,6 +289,9 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		}
 		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(req.PaymentCoin)), "fiat:") {
 			policyInput.SettlementMethod = porderpb.PaymentSent_FIAT
+			if strings.TrimSpace(req.Moderator) != "" {
+				policyInput.SettlementMethod = porderpb.PaymentSent_MODERATED
+			}
 			policyInput.SettlementMethodKnown = true
 		}
 		for _, policy := range s.policies {

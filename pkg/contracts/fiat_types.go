@@ -28,6 +28,44 @@ type CreatePaymentParams struct {
 	// SellerAccountID is filled internally by FiatPaymentAppService;
 	// handlers must not set this directly.
 	SellerAccountID string
+	// ModeratorPeerID requests provider-backed moderated semantics. Providers
+	// must reject this unless their configured account mode can keep funds from
+	// becoming seller-available until a durable Mobazha decision.
+	ModeratorPeerID string
+}
+
+// FiatModeratedMode describes the provider primitive backing a moderated
+// payment. "none" must fail closed rather than silently creating a normal
+// seller payment.
+type FiatModeratedMode string
+
+const (
+	FiatModeratedModeNone                FiatModeratedMode = "none"
+	FiatModeratedModeAuthorizationHold   FiatModeratedMode = "authorization_hold"
+	FiatModeratedModeDelayedDisbursement FiatModeratedMode = "delayed_disbursement"
+)
+
+// FiatProviderCapabilities are immutable for one registered provider binding.
+// They describe money movement, not UI availability.
+type FiatProviderCapabilities struct {
+	FullRefund       bool              `json:"fullRefund"`
+	PartialRefund    bool              `json:"partialRefund"`
+	ModeratedMode    FiatModeratedMode `json:"moderatedMode"`
+	MaximumHold      time.Duration     `json:"maximumHold,omitempty"`
+	RequiresApproval bool              `json:"requiresApproval,omitempty"`
+}
+
+// SupportsModerated reports whether the active binding has an explicit
+// provider primitive that prevents immediate seller availability.
+func (c FiatProviderCapabilities) SupportsModerated() bool {
+	return c.ModeratedMode == FiatModeratedModeAuthorizationHold ||
+		c.ModeratedMode == FiatModeratedModeDelayedDisbursement
+}
+
+// FiatProviderCapabilityReporter is implemented by providers that can state
+// whether their current account/configuration safely supports moderated funds.
+type FiatProviderCapabilityReporter interface {
+	Capabilities() FiatProviderCapabilities
 }
 
 // FiatProviderSession is returned by CreatePayment with provider-specific client
@@ -181,9 +219,10 @@ type AccountStatus struct {
 
 // ProviderInfo describes a fiat provider's status for a specific seller.
 type ProviderInfo struct {
-	ProviderID string `json:"providerID"`
-	Status     string `json:"status"`    // "active", "not_connected", "pending", "restricted"
-	AccountID  string `json:"accountID"` // non-empty when connected
+	ProviderID   string                   `json:"providerID"`
+	Status       string                   `json:"status"`    // "active", "not_connected", "pending", "restricted"
+	AccountID    string                   `json:"accountID"` // non-empty when connected
+	Capabilities FiatProviderCapabilities `json:"capabilities"`
 }
 
 // ProviderConfigView is the API response for provider config (secrets masked).

@@ -21,6 +21,7 @@ func TestSettlementSpec_Validate(t *testing.T) {
 		NewLegacyEVMContractSpec(true),
 		NewLegacySolanaProgramSpec(false),
 		NewFiatSpec(),
+		NewFiatSpecForProduct(true),
 	}
 	for _, spec := range valid {
 		require.NoError(t, spec.Validate(), spec)
@@ -29,7 +30,7 @@ func TestSettlementSpec_Validate(t *testing.T) {
 	invalid := []SettlementSpec{
 		{Method: pb.PaymentSent_DIRECT, PayMode: PayModeClientSigned, EscrowType: EscrowTypeNone},
 		{Method: pb.PaymentSent_CANCELABLE, PayMode: PayModeAddressMonitored, EscrowType: EscrowTypeEVMContract},
-		{Method: pb.PaymentSent_MODERATED, PayMode: PayModeProvider, EscrowType: EscrowTypeFiatProvider},
+		{Method: pb.PaymentSent_MODERATED, PayMode: PayModeProvider, EscrowType: EscrowTypeManaged},
 		{Method: pb.PaymentSent_FIAT, PayMode: PayModeAddressMonitored, EscrowType: EscrowTypeFiatProvider},
 		{Method: pb.PaymentSent_RWA_ESCROW, PayMode: PayModeAddressMonitored, EscrowType: EscrowTypeNone},
 	}

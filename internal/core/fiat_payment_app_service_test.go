@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/extensions"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,6 +51,7 @@ type mockFiatProvider struct {
 	cancelParams  []contracts.CancelPaymentParams
 	createCalls   int
 	createParams  []contracts.CreatePaymentParams
+	capabilities  contracts.FiatProviderCapabilities
 }
 
 type mockWebhookProvider struct {
@@ -64,6 +67,10 @@ func (m *mockWebhookProvider) SetupWebhook(context.Context, string) (*contracts.
 func (*mockWebhookProvider) CleanupWebhook(context.Context, string) error { return nil }
 
 func (m *mockFiatProvider) ProviderID() string { return m.id }
+
+func (m *mockFiatProvider) Capabilities() contracts.FiatProviderCapabilities {
+	return m.capabilities
+}
 
 func (m *mockFiatProvider) CreatePayment(_ context.Context, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
 	m.createMu.Lock()
@@ -672,6 +679,53 @@ func TestFiatService_CreatePayment_NoAccount(t *testing.T) {
 		OrderID: "order_1", Amount: 1000, Currency: "USD",
 	})
 	assert.Error(t, err, "should fail when no receiving account")
+}
+
+func TestFiatService_CreatePayment_ModeratedFailsClosedWithoutProviderCapability(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{id: "stripe"})
+	svc, _ := newFiatTestService(t, reg)
+
+	_, err := svc.CreatePayment(context.Background(), "stripe", contracts.CreatePaymentParams{
+		OrderID: "order-moderated", Amount: 1000, Currency: "USD", ModeratorPeerID: "12D3KooWJK76bPoHH1Fw9N8uiXBcX3XSvuTDrBTxCx8oi4bsx3zD",
+	})
+	require.ErrorContains(t, err, "does not support moderated funds")
+}
+
+func TestFiatService_CreatePayment_ModeratedBindsAttemptAndSettlementSpec(t *testing.T) {
+	reg := newMockFiatRegistry()
+	provider := &mockFiatProvider{
+		id: "paypal",
+		capabilities: contracts.FiatProviderCapabilities{
+			FullRefund: true, PartialRefund: true,
+			ModeratedMode: contracts.FiatModeratedModeDelayedDisbursement,
+		},
+		createResult: &contracts.FiatProviderSession{SessionID: "order-provider-moderated"},
+	}
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.ReceivingAccount{ChainType: FiatChainType("paypal"), Address: "merchant-moderated", IsActive: true})
+	}))
+	orderRepo := newMockOrderRepo()
+	orderRepo.addOrder(&models.Order{ID: "order-moderated"})
+	svc.SetOrderRepo(orderRepo)
+
+	_, err := svc.CreatePayment(context.Background(), "paypal", contracts.CreatePaymentParams{
+		OrderID: "order-moderated", Amount: 1000, Currency: "USD", ModeratorPeerID: "12D3KooWJK76bPoHH1Fw9N8uiXBcX3XSvuTDrBTxCx8oi4bsx3zD",
+	})
+	require.NoError(t, err)
+	require.Len(t, provider.createParams, 1)
+	require.Equal(t, "12D3KooWJK76bPoHH1Fw9N8uiXBcX3XSvuTDrBTxCx8oi4bsx3zD", provider.createParams[0].ModeratorPeerID)
+
+	var attempt models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&attempt).Error }))
+	require.Equal(t, "12D3KooWJK76bPoHH1Fw9N8uiXBcX3XSvuTDrBTxCx8oi4bsx3zD", attempt.ExpectedModeratorPeerID)
+	var pending models.PendingSettlementSpec
+	require.NoError(t, json.Unmarshal([]byte(orderRepo.mergedMeta["order-moderated"]["settlement_spec"]), &pending))
+	spec, err := payment.SettlementSpecFromPending(&pending)
+	require.NoError(t, err)
+	require.Equal(t, payment.NewFiatSpecForProduct(true), spec)
 }
 
 func TestFiatService_CreatePayment_Success(t *testing.T) {

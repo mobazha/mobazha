@@ -75,6 +75,11 @@ func (s SettlementSpec) Validate() error {
 		return nil
 	case pb.PaymentSent_CANCELABLE, pb.PaymentSent_MODERATED:
 		switch s.PayMode {
+		case PayModeProvider:
+			if s.EscrowType == EscrowTypeFiatProvider {
+				return nil
+			}
+			return fmt.Errorf("%s with provider requires fiat_provider, got %s", s.Method, s.EscrowType)
 		case PayModeAddressMonitored:
 			switch s.EscrowType {
 			case EscrowTypeUTXOScript, EscrowTypeManaged, EscrowTypeSolanaEscrow:
@@ -252,6 +257,20 @@ func NewFiatSpec() SettlementSpec {
 	}
 }
 
+// NewFiatSpecForProduct separates provider checkout mechanics from product
+// trust semantics. Existing FIAT rows remain valid; new moderated sessions use
+// MODERATED/provider/fiat_provider.
+func NewFiatSpecForProduct(moderated bool) SettlementSpec {
+	if !moderated {
+		return NewFiatSpec()
+	}
+	return SettlementSpec{
+		Method:     pb.PaymentSent_MODERATED,
+		PayMode:    PayModeProvider,
+		EscrowType: EscrowTypeFiatProvider,
+	}
+}
+
 // ResolveSettlementSpecFromPendingUTXO reads an explicit spec or derives from legacy fields.
 func ResolveSettlementSpecFromPendingUTXO(info *models.PendingUTXOPaymentInfo) (SettlementSpec, bool) {
 	if info == nil {
@@ -374,7 +393,13 @@ func settlementSpecFromFiatMetadata(meta map[string]string) (SettlementSpec, boo
 
 // FiatMetadataSettlementSpecJSON returns JSON for storing NewFiatSpec() on an order.
 func FiatMetadataSettlementSpecJSON() (string, error) {
-	b, err := json.Marshal(NewFiatSpec().ToPending())
+	return FiatMetadataSettlementSpecJSONForProduct(false)
+}
+
+// FiatMetadataSettlementSpecJSONForProduct serializes provider checkout with
+// an explicit cancelable or moderated product contract.
+func FiatMetadataSettlementSpecJSONForProduct(moderated bool) (string, error) {
+	b, err := json.Marshal(NewFiatSpecForProduct(moderated).ToPending())
 	if err != nil {
 		return "", err
 	}

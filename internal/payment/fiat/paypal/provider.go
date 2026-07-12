@@ -67,6 +67,15 @@ func (p *Provider) OverrideBaseURL(url string) {
 
 func (p *Provider) ProviderID() string { return providerID }
 
+func (p *Provider) Capabilities() contracts.FiatProviderCapabilities {
+	return contracts.FiatProviderCapabilities{
+		FullRefund: true, PartialRefund: true,
+		// Partner mode alone is insufficient; delayed disbursement requires
+		// separate PayPal approval and seller feature onboarding.
+		ModeratedMode: contracts.FiatModeratedModeNone,
+	}
+}
+
 func (p *Provider) CreatePayment(ctx context.Context, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
 	amountStr := formatAmount(params.Amount, params.Currency)
 

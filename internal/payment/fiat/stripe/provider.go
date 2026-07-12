@@ -30,6 +30,15 @@ func NewProvider(cfg Config) *Provider {
 
 func (p *Provider) ProviderID() string { return providerID }
 
+func (p *Provider) Capabilities() contracts.FiatProviderCapabilities {
+	return contracts.FiatProviderCapabilities{
+		FullRefund: true, PartialRefund: true,
+		// Standard Connect direct charges do not provide platform escrow. A
+		// future manual-capture integration must opt in explicitly.
+		ModeratedMode: contracts.FiatModeratedModeNone,
+	}
+}
+
 func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
 	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 

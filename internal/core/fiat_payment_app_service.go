@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 	corepayment "github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/payment/fiat/paypal"
@@ -142,6 +143,11 @@ func (s *FiatPaymentAppService) EnabledProviders(ctx context.Context) ([]contrac
 			ProviderID: pid,
 			Status:     "not_connected",
 		}
+		if provider, err := s.registry.ForProvider(pid); err == nil {
+			if reporter, ok := provider.(contracts.FiatProviderCapabilityReporter); ok {
+				info.Capabilities = reporter.Capabilities()
+			}
+		}
 
 		ra, err := s.getActiveAccount(pid)
 		if err == nil && ra != nil {
@@ -175,6 +181,15 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 	provider, err := s.registry.ForProvider(providerID)
 	if err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(params.ModeratorPeerID) != "" {
+		if _, err := peer.Decode(strings.TrimSpace(params.ModeratorPeerID)); err != nil {
+			return nil, fmt.Errorf("invalid fiat moderator peer ID: %w", err)
+		}
+		reporter, ok := provider.(contracts.FiatProviderCapabilityReporter)
+		if !ok || !reporter.Capabilities().SupportsModerated() {
+			return nil, fmt.Errorf("provider %s does not support moderated funds for the active account binding", providerID)
+		}
 	}
 
 	ra, err := s.getActiveAccount(providerID)
@@ -242,7 +257,8 @@ func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, par
 		if !decision.Allowed {
 			return fmt.Errorf("payment route decision %s: %s", decision.Code, decision.Reason)
 		}
-		attemptSeed := fmt.Sprintf("%s|%s|%d|%s", strings.TrimSpace(params.OrderID), assetID, params.Amount, binding.BindingID)
+		moderatorPeerID := strings.TrimSpace(params.ModeratorPeerID)
+		attemptSeed := fmt.Sprintf("%s|%s|%d|%s|%s", strings.TrimSpace(params.OrderID), assetID, params.Amount, binding.BindingID, moderatorPeerID)
 		attemptID := stablePaymentIdentity("pa_", attemptSeed)
 		routeID := stablePaymentIdentity("prb_", attemptID)
 		attempt = models.PaymentAttempt{
@@ -250,6 +266,7 @@ func (s *FiatPaymentAppService) prepareFiatPaymentAttempt(providerID string, par
 			PaymentSessionID: "ps_" + strings.TrimSpace(params.OrderID), OrderID: strings.TrimSpace(params.OrderID),
 			ProviderID: strings.ToLower(strings.TrimSpace(providerID)), Amount: params.Amount, Currency: strings.ToUpper(strings.TrimSpace(params.Currency)),
 			RouteBindingID: routeID, IdempotencyKey: stablePaymentIdentity("mbz_", attemptSeed), State: models.PaymentAttemptPendingExternal,
+			ExpectedModeratorPeerID: moderatorPeerID,
 		}
 		route = models.PaymentRouteBinding{
 			RouteBindingID: routeID, AttemptID: attemptID,
@@ -493,7 +510,7 @@ func (s *FiatPaymentAppService) persistFiatPaymentMetadata(ctx context.Context, 
 		"payment_route_binding": route.RouteBindingID,
 		"fiat_currency":         attempt.Currency,
 	}
-	if specJSON, err := payment.FiatMetadataSettlementSpecJSON(); err == nil {
+	if specJSON, err := payment.FiatMetadataSettlementSpecJSONForProduct(attempt.ExpectedModeratorPeerID != ""); err == nil {
 		meta["settlement_spec"] = specJSON
 	}
 	return s.orderRepo.MergeFiatMetadata(ctx, attempt.OrderID, meta)
@@ -567,10 +584,14 @@ func (s *FiatPaymentAppService) authorizePaymentCreation(ctx context.Context, pr
 	if order.ExpiresAt != nil {
 		expiresAt = order.ExpiresAt.UTC()
 	}
+	method := pb.PaymentSent_FIAT
+	if strings.TrimSpace(params.ModeratorPeerID) != "" {
+		method = pb.PaymentSent_MODERATED
+	}
 	input := corepayment.SessionProvisioningPolicyInput{
 		OrderID:               strings.TrimSpace(params.OrderID),
 		PaymentCoin:           "fiat:" + strings.ToLower(strings.TrimSpace(providerID)) + ":" + strings.ToUpper(strings.TrimSpace(params.Currency)),
-		SettlementMethod:      pb.PaymentSent_FIAT,
+		SettlementMethod:      method,
 		SettlementMethodKnown: true,
 		ExpiresAt:             expiresAt,
 		OrderOpen:             orderOpen,
@@ -2282,6 +2303,7 @@ func (s *FiatPaymentAppService) reconcileFiatPaymentAttempts(ctx context.Context
 		params := contracts.CreatePaymentParams{
 			OrderID: attempt.OrderID, Amount: attempt.Amount, Currency: attempt.Currency,
 			SellerAccountID: binding.ExternalAccountReference, IdempotencyKey: attempt.IdempotencyKey,
+			ModeratorPeerID: attempt.ExpectedModeratorPeerID,
 			Metadata: map[string]string{
 				"mobazha_payment_attempt_id": attempt.AttemptID,
 				"mobazha_route_binding_id":   route.RouteBindingID,

@@ -89,12 +89,13 @@ func (f *FiatPaymentFacade) CreateSession(
 	}
 
 	params := contracts.CreatePaymentParams{
-		OrderID:     req.OrderID,
-		Amount:      req.FiatAmountCents,
-		Currency:    currency,
-		Description: req.FiatDescription,
-		ReturnURL:   req.FiatReturnURL,
-		CancelURL:   req.FiatCancelURL,
+		OrderID:         req.OrderID,
+		Amount:          req.FiatAmountCents,
+		Currency:        currency,
+		Description:     req.FiatDescription,
+		ReturnURL:       req.FiatReturnURL,
+		CancelURL:       req.FiatCancelURL,
+		ModeratorPeerID: strings.TrimSpace(req.Moderator),
 	}
 
 	provSession, err := f.fiatSvc.CreatePayment(ctx, providerID, params)

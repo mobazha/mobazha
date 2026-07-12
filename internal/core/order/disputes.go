@@ -624,7 +624,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	if err != nil {
 		return err
 	}
-	if frozenTerms != nil && frozenTerms.ModeratorPeerID == s.signer.PeerID().String() && frozenTerms.ModeratorFee != nil {
+	if frozenTerms != nil && frozenTerms.ModeratorFee != nil {
 		modAddr = iwallet.NewAddress(frozenTerms.ModeratorFee.Address, coinType)
 		modValue = iwallet.NewAmount(frozenTerms.ModeratorFee.Amount)
 		if modValue.Cmp(totalOut) >= 0 {

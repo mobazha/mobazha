@@ -1,0 +1,188 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 fengzie and the respective contributors.
+
+package core
+
+import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
+	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/mobazha/mobazha/internal/core/paymentintent"
+	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/identity"
+	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+type settlementFinalizationWalletAccounts struct {
+	destination contracts.ReservedDestination
+	requests    []struct {
+		railID      string
+		role        contracts.WalletAccountRole
+		referenceID string
+	}
+}
+
+func (*settlementFinalizationWalletAccounts) Capabilities(context.Context, string) (contracts.WalletCapabilities, error) {
+	return contracts.WalletCapabilities{Receive: true}, nil
+}
+
+func (s *settlementFinalizationWalletAccounts) ReserveAddress(
+	_ context.Context,
+	railID string,
+	role contracts.WalletAccountRole,
+	referenceID string,
+) (contracts.ReservedDestination, error) {
+	s.requests = append(s.requests, struct {
+		railID      string
+		role        contracts.WalletAccountRole
+		referenceID string
+	}{railID: railID, role: role, referenceID: referenceID})
+	return s.destination, nil
+}
+
+func (*settlementFinalizationWalletAccounts) Transfer(context.Context, contracts.WalletTransferRequest) (contracts.WalletTransfer, error) {
+	return contracts.WalletTransfer{}, fmt.Errorf("unexpected wallet transfer")
+}
+
+func (*settlementFinalizationWalletAccounts) ReconcileTransfers(context.Context) error { return nil }
+
+func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:seller-authorization-finalize-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(
+		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{},
+	))
+	rail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
+	require.True(t, ok)
+	routeIdentity := payment.RouteIdentity{
+		ContributionID: "utxo.btc", ModuleID: "utxo", ImplementationGeneration: "v1",
+		RailKind: "escrow", NetworkID: "bip122:000000000019d6689c085ae165831e93",
+		AssetID: string(rail), ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	attempt, _, err := paymentintent.PrepareCryptoPaymentAttemptDraft(
+		db,
+		paymentintent.CryptoPaymentAttemptDraftRequest{
+			TenantID: "tenant-seller", AttemptID: "attempt-finalize-utxo", OrderID: "order-finalize-utxo",
+			AmountAtomic: "100000", RailID: string(rail),
+		},
+		routeIdentity,
+	)
+	require.NoError(t, err)
+
+	buyerKeys, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	buyerPeerID, err := identity.PeerIDFromPublicKey(buyerKeys.PubKey)
+	require.NoError(t, err)
+	sellerKeys, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	sellerPeerID, err := identity.PeerIDFromPublicKey(sellerKeys.PubKey)
+	require.NoError(t, err)
+	buyerSettlementKey, _ := btcec.PrivKeyFromBytes([]byte("buyer-finalization-settlement-key"))
+	sellerSettlementKey, _ := btcec.PrivKeyFromBytes([]byte("seller-finalization-settlement-key"))
+	keyRef := contracts.SettlementKeyRef{
+		TenantID: attempt.TenantID, RailID: attempt.Currency,
+		Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
+	}
+	buyerOffer, err := paymentintent.IssueSettlementKeyOffer(
+		t.Context(), contracts.NewKeyPairSigner(buyerKeys, buyerPeerID),
+		&buyerStartSettlementSigner{publicKey: buyerSettlementKey.PubKey().SerializeCompressed()},
+		keyRef, attempt.OrderID, attempt.AttemptID, models.SettlementParticipantBuyer,
+	)
+	require.NoError(t, err)
+	sellerOffer, err := paymentintent.IssueSettlementKeyOffer(
+		t.Context(), contracts.NewKeyPairSigner(sellerKeys, sellerPeerID),
+		&buyerStartSettlementSigner{publicKey: sellerSettlementKey.PubKey().SerializeCompressed()},
+		keyRef, attempt.OrderID, attempt.AttemptID, models.SettlementParticipantSeller,
+	)
+	require.NoError(t, err)
+	require.NoError(t, paymentintent.StoreCryptoPaymentAttemptSettlementKeyOffer(
+		db, attempt.TenantID, attempt.AttemptID, buyerOffer,
+	))
+	require.NoError(t, paymentintent.StoreCryptoPaymentAttemptSettlementKeyOffer(
+		db, attempt.TenantID, attempt.AttemptID, sellerOffer,
+	))
+	openBytes, err := protojson.Marshal(&pb.OrderOpen{
+		Amount: attempt.AmountValue, PricingCoin: "BTC", BuyerID: &pb.ID{PeerID: buyerPeerID.String()},
+		Listings: []*pb.SignedListing{{Listing: &pb.Listing{VendorID: &pb.ID{PeerID: sellerPeerID.String()}}}},
+	})
+	require.NoError(t, err)
+	order := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: attempt.TenantID}, ID: models.OrderID(attempt.OrderID),
+		MyRole: string(models.RoleVendor), SerializedOrderOpen: openBytes,
+	}
+	payoutAddress := "bc1qsellerpayout000000000000000000000000000"
+	walletAccounts := &settlementFinalizationWalletAccounts{destination: contracts.ReservedDestination{
+		Destination: contracts.Destination{RailID: attempt.Currency, Address: payoutAddress, Version: 1},
+	}}
+	projector := standardOrderUTXOFundingTargetProjector{wallets: testMultiwallet(t, testMasterKey(t))}
+	identitySigner := contracts.NewKeyPairSigner(sellerKeys, sellerPeerID)
+
+	first, err := finalizeSellerSettlementAuthorization(
+		t.Context(), db, order, identitySigner, walletAccounts, projector, attempt.AttemptID,
+	)
+	require.NoError(t, err)
+	retry, err := finalizeSellerSettlementAuthorization(
+		t.Context(), db, order, identitySigner, walletAccounts, projector, attempt.AttemptID,
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, models.PaymentAttemptFundingTargetReady, first.Attempt.State)
+	require.NotEmpty(t, first.Target.Address)
+	require.Equal(t, attempt.AmountValue, first.Target.AmountAtomic)
+	require.Equal(t, payoutAddress, first.Terms.SellerAddress)
+	require.Equal(t, attempt.AmountValue, first.Terms.SellerGrossBasis)
+	require.Equal(t, "0", first.Terms.PlatformReleaseFee.Amount)
+	require.Equal(t, "0", first.Terms.BuyerCancellationFee.Amount)
+	require.Equal(t, []models.SettlementParticipantRole{
+		models.SettlementParticipantBuyer, models.SettlementParticipantSeller,
+	}, first.Authorization.RequiredRoles)
+	require.Equal(t, first.Attempt.AuthorizationBundleHash, retry.Attempt.AuthorizationBundleHash)
+	require.Equal(t, first.Target, retry.Target)
+	require.Equal(t, first.Terms, retry.Terms)
+	require.Len(t, walletAccounts.requests, 1, "frozen retry must not allocate another payout address")
+	require.Equal(t, contracts.AccountMain, walletAccounts.requests[0].role)
+	require.Equal(t, standardOrderSellerPayoutReferencePrefix+attempt.AttemptID, walletAccounts.requests[0].referenceID)
+
+	var retained int64
+	require.NoError(t, db.Model(&models.PaymentAttemptSettlementOffer{}).
+		Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).Count(&retained).Error)
+	require.Zero(t, retained)
+	storedTerms, err := first.Attempt.GetSettlementTerms()
+	require.NoError(t, err)
+	require.Equal(t, first.Terms, *storedTerms)
+	require.NoError(t, first.Terms.VerifySellerAuthorization(sellerPeerID.String(), first.SellerSignature))
+}
+
+func TestStandardOrderUTXOFundingTargetProjector_RejectsInvalidOffers(t *testing.T) {
+	rail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
+	require.True(t, ok)
+	attempt := models.PaymentAttempt{
+		AttemptID: "attempt-invalid-key", OrderID: "order-invalid-key",
+		Kind: models.PaymentAttemptKindCryptoFundingTarget, State: models.PaymentAttemptAuthorizationDraft,
+		AmountValue: "1000", Currency: string(rail), AuthorizationContextID: stringsOfHex('a', 64),
+	}
+	projector := standardOrderUTXOFundingTargetProjector{wallets: testMultiwallet(t, testMasterKey(t))}
+	_, err := projector.ProjectStandardOrderFundingTarget(
+		t.Context(), attempt, models.PaymentRouteBinding{AssetID: attempt.Currency},
+		[]models.SettlementKeyOffer{{}, {}},
+	)
+	require.Error(t, err)
+}
+
+func stringsOfHex(value byte, count int) string {
+	result := make([]byte, count)
+	for i := range result {
+		result[i] = value
+	}
+	return string(result)
+}

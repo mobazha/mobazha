@@ -225,6 +225,35 @@ func TestCreateCryptoPaymentAttemptDraft_ReusesDurableContextOnRetry(t *testing.
 	require.Equal(t, models.PaymentAttemptAuthorizationDraft, retry.State)
 }
 
+func TestNewSettlementSignRequest_UsesOnlyFrozenAttemptBindings(t *testing.T) {
+	attempt, _, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
+	attempt.TenantID = "tenant-a"
+	require.NoError(t, attempt.SetSettlementTerms(terms))
+	require.NoError(t, attempt.SetSellerTermsAuthorization(signer, signature))
+	require.NoError(t, attempt.SetAuthorizationBundle(bundle))
+	require.NoError(t, attempt.SetFundingTarget(target))
+
+	request, err := NewSettlementSignRequest(
+		attempt,
+		contracts.SettlementKeyRef{TenantID: attempt.TenantID, RailID: attempt.Currency, Purpose: "standard-order-participant:seller", ReferenceID: attempt.AuthorizationContextID},
+		models.SettlementParticipantSeller,
+		"mobazha:settlement:eip155:1:v1", "release", 7, []byte("canonical transaction plan"),
+	)
+	require.NoError(t, err)
+	require.NoError(t, request.Validate())
+	require.Equal(t, attempt.OrderID, request.OrderID)
+	require.Equal(t, attempt.AttemptID, request.AttemptID)
+	require.Equal(t, attempt.SettlementTermsHash, request.TermsHash)
+
+	_, err = NewSettlementSignRequest(
+		attempt,
+		contracts.SettlementKeyRef{TenantID: attempt.TenantID, RailID: attempt.Currency, Purpose: "standard-order-participant:buyer", ReferenceID: attempt.AuthorizationContextID},
+		models.SettlementParticipantSeller,
+		"mobazha:settlement:eip155:1:v1", "release", 7, []byte("canonical transaction plan"),
+	)
+	require.ErrorContains(t, err, "purpose")
+}
+
 func TestIssueSettlementKeyOffer_UsesOpaqueSettlementPublicKey(t *testing.T) {
 	keyPair, err := identity.GenerateKeyPair()
 	require.NoError(t, err)

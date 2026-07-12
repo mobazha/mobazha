@@ -598,9 +598,11 @@ func (s *SettlementService) cancelFrozenStandardOrderPartialPayment(
 	if len(scriptPubKey) == 0 {
 		return "", 0, fmt.Errorf("frozen partial payment scriptPubKey is empty")
 	}
-	txs, err := s.monitorService.GetAddressTransactions(coinInfo.Chain, target.Address, scriptPubKey)
+	txs, err := s.frozenPartialPaymentTransactions(
+		wallet, order, target, coinInfo.Chain, scriptPubKey,
+	)
 	if err != nil {
-		return "", 0, fmt.Errorf("query frozen partial payment transactions: %w", err)
+		return "", 0, err
 	}
 	releasePlan, totalPaid := collectCancelableReleaseInputs(txs, target.Address)
 	if len(releasePlan.From) == 0 || totalPaid.Cmp(iwallet.NewAmount(0)) <= 0 {
@@ -662,6 +664,62 @@ func (s *SettlementService) cancelFrozenStandardOrderPartialPayment(
 		return "", totalPaid.Uint64(), nil
 	}
 	return releaseTx.ID.String(), totalPaid.Uint64(), nil
+}
+
+func (s *SettlementService) frozenPartialPaymentTransactions(
+	wallet iwallet.Wallet,
+	order *models.Order,
+	target *models.PaymentAttemptFundingTarget,
+	chain iwallet.ChainType,
+	scriptPubKey []byte,
+) ([]iwallet.Transaction, error) {
+	if s == nil || s.db == nil || wallet == nil || order == nil || target == nil {
+		return nil, fmt.Errorf("frozen partial payment transaction recovery is not configured")
+	}
+	var observations []models.PaymentObservation
+	if err := s.db.View(func(tx database.Tx) error {
+		if !tx.Read().Migrator().HasTable(&models.PaymentObservation{}) {
+			return nil
+		}
+		return tx.Read().Where(
+			"tenant_id = ? AND order_id = ? AND status IN ?",
+			strings.TrimSpace(order.TenantID), order.ID.String(),
+			[]string{models.PaymentObservationStatusPending, models.PaymentObservationStatusConfirmed},
+		).Order("created_at ASC, id ASC").Find(&observations).Error
+	}); err != nil {
+		return nil, fmt.Errorf("load frozen partial payment observations: %w", err)
+	}
+	seen := make(map[string]struct{}, len(observations))
+	txs := make([]iwallet.Transaction, 0, len(observations))
+	for _, observation := range observations {
+		txHash := strings.TrimSpace(observation.TxHash)
+		if txHash == "" || models.NormalizePaymentTxHashSource(observation.TxHashSource) != models.PaymentTxHashSourceChainTx ||
+			!payment.SameUTXOAddress(observation.ToAddress, target.Address) {
+			continue
+		}
+		if _, exists := seen[txHash]; exists {
+			continue
+		}
+		seen[txHash] = struct{}{}
+		tx, err := wallet.GetTransaction(iwallet.TransactionID(txHash), iwallet.CoinType(target.AssetID))
+		if err != nil {
+			return nil, fmt.Errorf("resolve frozen partial payment transaction %s: %w", txHash, err)
+		}
+		if tx != nil {
+			txs = append(txs, *tx)
+		}
+	}
+	if len(txs) > 0 {
+		return txs, nil
+	}
+	if s.monitorService == nil {
+		return nil, fmt.Errorf("no frozen partial payment transactions found")
+	}
+	txs, err := s.monitorService.GetAddressTransactions(chain, target.Address, scriptPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("query frozen partial payment transactions: %w", err)
+	}
+	return txs, nil
 }
 
 // getRefundAddressFromTransactions extracts the buyer's refund address from transaction inputs.

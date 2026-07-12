@@ -331,7 +331,7 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 			break
 		}
 
-		frozenIntent, err := frozenStandardOrderUTXOAggregatedPaymentIntent(gdb, &order, deduped)
+		frozenIntent, err := frozenStandardOrderAggregatedPaymentIntent(gdb, &order, deduped)
 		if err != nil {
 			return fmt.Errorf("aggregating verifier: load frozen payment intent for %s: %w", orderID, err)
 		}
@@ -747,7 +747,7 @@ func buildAggregatedPaymentSent(
 	return ps, nil
 }
 
-func frozenStandardOrderUTXOAggregatedPaymentIntent(
+func frozenStandardOrderAggregatedPaymentIntent(
 	db *gorm.DB,
 	order *models.Order,
 	rows []models.PaymentObservation,
@@ -773,11 +773,6 @@ func frozenStandardOrderUTXOAggregatedPaymentIntent(
 	if address == "" {
 		return nil, nil
 	}
-	for i := 1; i < len(rows); i++ {
-		if !paymentmetrics.SameUTXOAddress(address, rows[i].ToAddress) {
-			return nil, fmt.Errorf("confirmed UTXO observations use multiple funding targets")
-		}
-	}
 	var matched *models.PaymentAttempt
 	var target *models.PaymentAttemptFundingTarget
 	for i := range attempts {
@@ -785,17 +780,22 @@ func frozenStandardOrderUTXOAggregatedPaymentIntent(
 		if err != nil {
 			return nil, err
 		}
-		if candidate == nil || !paymentmetrics.SameUTXOAddress(candidate.Address, address) {
+		if candidate == nil || !sameFrozenFundingTargetAddress(candidate.AssetID, candidate.Address, address) {
 			continue
 		}
 		if matched != nil {
-			return nil, fmt.Errorf("multiple frozen payment attempts match UTXO funding target")
+			return nil, fmt.Errorf("multiple frozen payment attempts match funding target")
 		}
 		matched = &attempts[i]
 		target = candidate
 	}
 	if matched == nil || target == nil {
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	for i := 1; i < len(rows); i++ {
+		if !sameFrozenFundingTargetAddress(target.AssetID, address, rows[i].ToAddress) {
+			return nil, fmt.Errorf("confirmed observations use multiple funding targets")
+		}
 	}
 	terms, err := matched.GetSettlementTerms()
 	if err != nil || terms == nil {
@@ -805,28 +805,61 @@ func frozenStandardOrderUTXOAggregatedPaymentIntent(
 	if err != nil || bundle == nil {
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	script, err := hex.DecodeString(target.RedeemScriptHex)
-	if err != nil || len(script) == 0 {
+	if terms.FundingTargetAddress != target.Address || terms.FundingAmount != target.AmountAtomic ||
+		terms.AssetID != target.AssetID || matched.Currency != target.AssetID {
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	amount, err := strconv.ParseUint(target.AmountAtomic, 10, 64)
 	if err != nil || amount == 0 {
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(target.AssetID))
-	if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
-		return nil, models.ErrPaymentAttemptSettlementTermsConflict
-	}
 	moderatorAddress := ""
 	if terms.ModeratorFee != nil {
 		moderatorAddress = terms.ModeratorFee.Address
 	}
-	return &aggregatedPaymentIntent{
-		coin:           target.AssetID,
-		settlementSpec: paymentmetrics.NewUTXOSpec(terms.ModeratorPeerID != ""), settlementSpecOK: true,
-		script: target.RedeemScriptHex, moderator: terms.ModeratorPeerID, moderatorAddress: moderatorAddress,
+	intent := &aggregatedPaymentIntent{
+		coin:             target.AssetID,
+		settlementSpecOK: true,
+		moderator:        terms.ModeratorPeerID, moderatorAddress: moderatorAddress,
+		platformAmount: terms.PlatformReleaseFee.Amount, platformAddr: terms.PlatformReleaseFee.Address,
+		cancelFeeAmount:    terms.BuyerCancellationFee.Amount,
 		escrowTimeoutHours: terms.EscrowTimeoutHours,
-	}, nil
+	}
+	switch {
+	case strings.HasPrefix(target.AssetID, "crypto:eip155:"):
+		intent.settlementSpec = paymentmetrics.NewManagedEscrowSpec(terms.ModeratorPeerID != "")
+		intent.contractAddress = target.Address
+	case strings.HasPrefix(target.AssetID, "crypto:solana:"):
+		intent.settlementSpec = paymentmetrics.NewSolanaEscrowSpec(terms.ModeratorPeerID != "")
+		intent.contractAddress = target.Address
+	default:
+		coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(target.AssetID))
+		if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		script, err := hex.DecodeString(target.RedeemScriptHex)
+		if err != nil || len(script) == 0 {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		intent.settlementSpec = paymentmetrics.NewUTXOSpec(terms.ModeratorPeerID != "")
+		intent.script = target.RedeemScriptHex
+	}
+	return intent, nil
+}
+
+func sameFrozenFundingTargetAddress(assetID, left, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
+		return false
+	}
+	if strings.HasPrefix(strings.TrimSpace(assetID), "crypto:eip155:") {
+		return strings.EqualFold(left, right)
+	}
+	if strings.HasPrefix(strings.TrimSpace(assetID), "crypto:solana:") {
+		return left == right
+	}
+	return paymentmetrics.SameUTXOAddress(left, right)
 }
 
 func paymentSentConfirmationPolicy(order *models.Order) string {

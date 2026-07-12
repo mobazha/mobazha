@@ -84,6 +84,35 @@ func (t *vTestTx) UpdateColumns(values map[string]interface{}, where map[string]
 	res := q.UpdateColumns(values)
 	return res.RowsAffected, res.Error
 }
+
+func TestFrozenStandardOrderAggregatedPaymentIntent_ProjectsManagedEVM(t *testing.T) {
+	db := newVerifierTestDB(t)
+	require.NoError(t, db.gormDB.AutoMigrate(&models.PaymentAttempt{}))
+
+	const (
+		tenantID = "tenant-safe"
+		orderID  = "order-safe"
+	)
+	attempt := frozenPaymentAttemptForProjectionTest(t, orderID)
+	attempt.TenantID = tenantID
+	attempt.State = models.PaymentAttemptFundingTargetReady
+	require.NoError(t, db.gormDB.Create(&attempt).Error)
+	target, err := attempt.GetFundingTarget()
+	require.NoError(t, err)
+
+	order := &models.Order{ID: models.OrderID(orderID)}
+	order.TenantID = tenantID
+	intent, err := frozenStandardOrderAggregatedPaymentIntent(db.gormDB, order, []models.PaymentObservation{{
+		ToAddress: strings.ToUpper(target.Address),
+		Amount:    target.AmountAtomic,
+	}})
+	require.NoError(t, err)
+	require.NotNil(t, intent)
+	require.Equal(t, target.AssetID, intent.coin)
+	require.Equal(t, target.Address, intent.contractAddress)
+	require.Equal(t, paymentmetrics.NewManagedEscrowSpec(false), intent.settlementSpec)
+	require.Empty(t, intent.script)
+}
 func (t *vTestTx) Commit() error   { panic("managed tx") }
 func (t *vTestTx) Rollback() error { panic("managed tx") }
 func (t *vTestTx) Delete(key string, value interface{}, where map[string]interface{}, model interface{}) error {

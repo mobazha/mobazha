@@ -214,19 +214,38 @@ func beginBuyerSettlementAuthorization(
 	if err != nil {
 		return StandardOrderSettlementAuthorizationStart{}, err
 	}
-	offer, err := paymentintent.IssueSettlementKeyOffer(
+	offerAmount := ""
+	escrowTimeoutHours := uint32(0)
+	if request.ModeratorPeerID != "" {
+		offerAmount = request.AmountAtomic
+		escrowTimeoutHours = standardOrderEscrowTimeoutHours(orderOpen)
+		if escrowTimeoutHours == 0 {
+			return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("moderated settlement authorization requires signed escrow timeout")
+		}
+	}
+	offer, err := paymentintent.IssueSettlementKeyOfferWithScope(
 		ctx, identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{
 			TenantID: tenantID, RailID: request.RailID,
 			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		request.OrderID, attempt.AttemptID, models.SettlementParticipantBuyer,
+		request.ModeratorPeerID, offerAmount, "", "", escrowTimeoutHours,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationStart{}, err
 	}
 	if err := publisher.PublishSettlementKeyOffer(ctx, seller, offer); err != nil {
 		return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("publish buyer settlement key offer: %w", err)
+	}
+	if request.ModeratorPeerID != "" {
+		moderator, err := peer.Decode(request.ModeratorPeerID)
+		if err != nil || moderator == seller || request.ModeratorPeerID == buyerPeerID {
+			return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("selected settlement moderator is invalid")
+		}
+		if err := publisher.PublishSettlementKeyOffer(ctx, moderator, offer); err != nil {
+			return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("publish buyer settlement key offer to moderator: %w", err)
+		}
 	}
 	return StandardOrderSettlementAuthorizationStart{
 		Attempt: attempt, Route: binding, BuyerOffer: offer, SellerPeerID: sellerPeerID,
@@ -277,6 +296,12 @@ func respondSellerSettlementAuthorization(
 		amountAtomic == "" {
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization requires same-currency signed order amount")
 	}
+	if buyerOffer.ExpectedModeratorPeerID != "" && buyerOffer.AmountAtomic != amountAtomic {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("buyer settlement key offer amount does not match signed order")
+	}
+	if buyerOffer.ExpectedModeratorPeerID != "" && buyerOffer.EscrowTimeoutHours != standardOrderEscrowTimeoutHours(orderOpen) {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("buyer settlement key offer timeout does not match signed order")
+	}
 	if route.AssetID != buyerOffer.RailID {
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller payment route does not match buyer offer rail")
 	}
@@ -301,6 +326,7 @@ func respondSellerSettlementAuthorization(
 	attempt, binding, err := paymentintent.PrepareCryptoPaymentAttemptDraft(db, paymentintent.CryptoPaymentAttemptDraftRequest{
 		TenantID: tenantID, AttemptID: buyerOffer.AttemptID, OrderID: order.ID.String(),
 		AmountAtomic: amountAtomic, RailID: buyerOffer.RailID,
+		ExpectedModeratorPeerID: buyerOffer.ExpectedModeratorPeerID,
 	}, route)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationResponse{}, err
@@ -308,13 +334,18 @@ func respondSellerSettlementAuthorization(
 	if attempt.AuthorizationContextID != buyerOffer.AuthorizationContextID {
 		return StandardOrderSettlementAuthorizationResponse{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	offer, err := paymentintent.IssueSettlementKeyOffer(
+	offerAmount := ""
+	if buyerOffer.ExpectedModeratorPeerID != "" {
+		offerAmount = amountAtomic
+	}
+	offer, err := paymentintent.IssueSettlementKeyOfferWithScope(
 		ctx, identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{
 			TenantID: tenantID, RailID: buyerOffer.RailID,
 			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		order.ID.String(), attempt.AttemptID, models.SettlementParticipantSeller,
+		buyerOffer.ExpectedModeratorPeerID, offerAmount, "", "", buyerOffer.EscrowTimeoutHours,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationResponse{}, err
@@ -325,6 +356,15 @@ func respondSellerSettlementAuthorization(
 	}
 	if err := publisher.PublishSettlementKeyOffer(ctx, buyer, offer); err != nil {
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("publish seller settlement key offer: %w", err)
+	}
+	if buyerOffer.ExpectedModeratorPeerID != "" {
+		moderator, err := peer.Decode(buyerOffer.ExpectedModeratorPeerID)
+		if err != nil {
+			return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("decode selected moderator: %w", err)
+		}
+		if err := publisher.PublishSettlementKeyOffer(ctx, moderator, offer); err != nil {
+			return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("publish seller settlement key offer to moderator: %w", err)
+		}
 	}
 	return StandardOrderSettlementAuthorizationResponse{
 		Attempt: attempt, Route: binding, SellerOffer: offer, BuyerPeerID: buyerPeerID,
@@ -391,4 +431,18 @@ func standardOrderSettlementParticipants(orderOpen *pb.OrderOpen) (string, strin
 		return "", "", fmt.Errorf("signed order seller is invalid")
 	}
 	return buyerPeerID, sellerPeerID, nil
+}
+
+func standardOrderEscrowTimeoutHours(orderOpen *pb.OrderOpen) uint32 {
+	var hours uint32
+	if orderOpen == nil {
+		return 0
+	}
+	for _, signedListing := range orderOpen.Listings {
+		if signedListing != nil && signedListing.Listing != nil && signedListing.Listing.Metadata != nil &&
+			signedListing.Listing.Metadata.EscrowTimeoutHours > hours {
+			hours = signedListing.Listing.Metadata.EscrowTimeoutHours
+		}
+	}
+	return hours
 }

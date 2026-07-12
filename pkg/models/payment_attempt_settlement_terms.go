@@ -37,6 +37,8 @@ type PaymentAttemptSettlementTerms struct {
 	BuyerPeerID          string                       `json:"buyerPeerID"`
 	SellerPeerID         string                       `json:"sellerPeerID"`
 	ModeratorPeerID      string                       `json:"moderatorPeerID,omitempty"`
+	ModeratorFee         *PaymentAttemptSettlementFee `json:"moderatorFee,omitempty"`
+	EscrowTimeoutHours   uint32                       `json:"escrowTimeoutHours,omitempty"`
 	SellerAddress        string                       `json:"sellerAddress"`
 	SellerGrossBasis     string                       `json:"sellerGrossBasis"`
 	PlatformReleaseFee   PaymentAttemptSettlementFee  `json:"platformReleaseFee"`
@@ -107,6 +109,11 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 		if moderatorPeerID == buyerPeerID || moderatorPeerID == sellerPeerID {
 			return fmt.Errorf("moderator settlement participant must differ from buyer and seller")
 		}
+		if t.ModeratorFee != nil && strings.TrimSpace(t.ModeratorFee.Address) == "" {
+			return fmt.Errorf("moderator payout address is required when moderator fee terms are present")
+		}
+	} else if t.ModeratorFee != nil {
+		return fmt.Errorf("unmoderated settlement terms cannot include moderator payout terms")
 	}
 	funding, err := settlementAtomicAmount(t.FundingAmount, true)
 	if err != nil {
@@ -126,6 +133,12 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 	}
 	if cancel.Cmp(funding) >= 0 {
 		return fmt.Errorf("buyer cancel fee must be less than funding amount")
+	}
+	if t.ModeratorFee != nil {
+		moderatorFee, err := validateSettlementFee(*t.ModeratorFee)
+		if err != nil || moderatorFee.Cmp(funding) >= 0 {
+			return fmt.Errorf("invalid moderator fee")
+		}
 	}
 	deductions := new(big.Int).Set(platform)
 	if t.Affiliate != nil {

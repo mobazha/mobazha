@@ -52,31 +52,42 @@ func NewSettlementAuthorizationContextID() (string, error) {
 }
 
 // SettlementKeyOffer is an Identity-signed binding of one participant's
-// attempt-scoped Settlement public key. It deliberately contains no economic
-// terms, expiration, lease, clock, or separately assigned offer identifier.
+// attempt-scoped Settlement public key. Moderated offers also bind the selected
+// moderator, funding amount, timeout, and moderator payout. Availability leases,
+// clocks, and separately assigned offer identifiers remain outside the protocol.
 type SettlementKeyOffer struct {
-	Version                uint32                    `json:"version"`
-	AuthorizationContextID string                    `json:"authorizationContextID"`
-	OrderID                string                    `json:"orderID"`
-	AttemptID              string                    `json:"attemptID"`
-	ParticipantPeerID      string                    `json:"participantPeerID"`
-	ParticipantRole        SettlementParticipantRole `json:"participantRole"`
-	RailID                 string                    `json:"railID"`
-	Purpose                string                    `json:"purpose"`
-	PublicKey              []byte                    `json:"publicKey"`
-	Signature              []byte                    `json:"signature"`
+	Version                 uint32                    `json:"version"`
+	AuthorizationContextID  string                    `json:"authorizationContextID"`
+	OrderID                 string                    `json:"orderID"`
+	AttemptID               string                    `json:"attemptID"`
+	ParticipantPeerID       string                    `json:"participantPeerID"`
+	ParticipantRole         SettlementParticipantRole `json:"participantRole"`
+	RailID                  string                    `json:"railID"`
+	Purpose                 string                    `json:"purpose"`
+	PublicKey               []byte                    `json:"publicKey"`
+	ExpectedModeratorPeerID string                    `json:"expectedModeratorPeerID,omitempty"`
+	AmountAtomic            string                    `json:"amountAtomic,omitempty"`
+	ModeratorPayoutAddress  string                    `json:"moderatorPayoutAddress,omitempty"`
+	ModeratorFeeAmount      string                    `json:"moderatorFeeAmount,omitempty"`
+	EscrowTimeoutHours      uint32                    `json:"escrowTimeoutHours,omitempty"`
+	Signature               []byte                    `json:"signature"`
 }
 
 type settlementKeyOfferPayload struct {
-	Version                uint32                    `json:"version"`
-	AuthorizationContextID string                    `json:"authorizationContextID"`
-	OrderID                string                    `json:"orderID"`
-	AttemptID              string                    `json:"attemptID"`
-	ParticipantPeerID      string                    `json:"participantPeerID"`
-	ParticipantRole        SettlementParticipantRole `json:"participantRole"`
-	RailID                 string                    `json:"railID"`
-	Purpose                string                    `json:"purpose"`
-	PublicKey              []byte                    `json:"publicKey"`
+	Version                 uint32                    `json:"version"`
+	AuthorizationContextID  string                    `json:"authorizationContextID"`
+	OrderID                 string                    `json:"orderID"`
+	AttemptID               string                    `json:"attemptID"`
+	ParticipantPeerID       string                    `json:"participantPeerID"`
+	ParticipantRole         SettlementParticipantRole `json:"participantRole"`
+	RailID                  string                    `json:"railID"`
+	Purpose                 string                    `json:"purpose"`
+	PublicKey               []byte                    `json:"publicKey"`
+	ExpectedModeratorPeerID string                    `json:"expectedModeratorPeerID,omitempty"`
+	AmountAtomic            string                    `json:"amountAtomic,omitempty"`
+	ModeratorPayoutAddress  string                    `json:"moderatorPayoutAddress,omitempty"`
+	ModeratorFeeAmount      string                    `json:"moderatorFeeAmount,omitempty"`
+	EscrowTimeoutHours      uint32                    `json:"escrowTimeoutHours,omitempty"`
 }
 
 // SigningPayload validates an unsigned offer and returns its domain-separated
@@ -89,7 +100,10 @@ func (o SettlementKeyOffer) SigningPayload() ([]byte, error) {
 		Version: o.Version, AuthorizationContextID: o.AuthorizationContextID,
 		OrderID: o.OrderID, AttemptID: o.AttemptID, ParticipantPeerID: o.ParticipantPeerID,
 		ParticipantRole: o.ParticipantRole, RailID: o.RailID, Purpose: o.Purpose,
-		PublicKey: o.PublicKey,
+		PublicKey: o.PublicKey, ExpectedModeratorPeerID: o.ExpectedModeratorPeerID,
+		AmountAtomic: o.AmountAtomic, ModeratorPayoutAddress: o.ModeratorPayoutAddress,
+		ModeratorFeeAmount: o.ModeratorFeeAmount,
+		EscrowTimeoutHours: o.EscrowTimeoutHours,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode settlement key offer: %w", err)
@@ -154,6 +168,40 @@ func (o SettlementKeyOffer) validate(requireSignature bool) error {
 	}
 	if _, err := peer.Decode(strings.TrimSpace(o.ParticipantPeerID)); err != nil {
 		return fmt.Errorf("invalid settlement key offer participant")
+	}
+	moderatorPeerID := strings.TrimSpace(o.ExpectedModeratorPeerID)
+	amountAtomic := strings.TrimSpace(o.AmountAtomic)
+	payoutAddress := strings.TrimSpace(o.ModeratorPayoutAddress)
+	feeAmount := strings.TrimSpace(o.ModeratorFeeAmount)
+	if moderatorPeerID == "" {
+		if amountAtomic != "" || payoutAddress != "" || feeAmount != "" {
+			return fmt.Errorf("settlement key offer moderator scope is incomplete")
+		}
+	} else {
+		if _, err := peer.Decode(moderatorPeerID); err != nil || amountAtomic == "" {
+			return fmt.Errorf("invalid settlement key offer moderator scope")
+		}
+		if o.EscrowTimeoutHours == 0 {
+			return fmt.Errorf("moderated settlement key offer requires escrow timeout")
+		}
+		if _, err := settlementAtomicAmount(amountAtomic, true); err != nil {
+			return fmt.Errorf("invalid settlement key offer amount")
+		}
+		if o.ParticipantRole == SettlementParticipantModerator {
+			if strings.TrimSpace(o.ParticipantPeerID) != moderatorPeerID || payoutAddress == "" || feeAmount == "" {
+				return fmt.Errorf("settlement moderator offer does not match selected moderator")
+			}
+			fee, err := settlementAtomicAmount(feeAmount, false)
+			if err != nil {
+				return fmt.Errorf("invalid settlement moderator fee")
+			}
+			amount, _ := settlementAtomicAmount(amountAtomic, true)
+			if fee.Cmp(amount) >= 0 {
+				return fmt.Errorf("settlement moderator fee must be less than funding amount")
+			}
+		} else if payoutAddress != "" || feeAmount != "" {
+			return fmt.Errorf("non-moderator settlement offer cannot bind moderator payout")
+		}
 	}
 	if requireSignature && len(o.Signature) == 0 {
 		return fmt.Errorf("settlement key offer signature is required")
@@ -232,6 +280,9 @@ func (b PaymentAttemptAuthorizationBundle) Validate() error {
 	seen := make(map[SettlementParticipantRole]struct{}, len(b.Offers))
 	publicKeys := make(map[string]SettlementParticipantRole, len(b.Offers))
 	sellerOfferPeerID := ""
+	expectedModeratorPeerID := ""
+	amountAtomic := ""
+	escrowTimeoutHours := uint32(0)
 	for _, offer := range b.Offers {
 		if err := offer.Verify(); err != nil {
 			return err
@@ -239,6 +290,14 @@ func (b PaymentAttemptAuthorizationBundle) Validate() error {
 		if offer.AuthorizationContextID != b.AuthorizationContextID || offer.OrderID != b.OrderID ||
 			offer.AttemptID != b.AttemptID || offer.RailID != b.RailID {
 			return fmt.Errorf("settlement key offer does not belong to authorization bundle")
+		}
+		if len(seen) == 0 {
+			expectedModeratorPeerID = strings.TrimSpace(offer.ExpectedModeratorPeerID)
+			amountAtomic = strings.TrimSpace(offer.AmountAtomic)
+			escrowTimeoutHours = offer.EscrowTimeoutHours
+		} else if strings.TrimSpace(offer.ExpectedModeratorPeerID) != expectedModeratorPeerID ||
+			strings.TrimSpace(offer.AmountAtomic) != amountAtomic || offer.EscrowTimeoutHours != escrowTimeoutHours {
+			return fmt.Errorf("settlement key offers disagree on moderator scope")
 		}
 		if _, requiredRole := required[offer.ParticipantRole]; !requiredRole {
 			return fmt.Errorf("unexpected settlement key offer role")
@@ -257,6 +316,10 @@ func (b PaymentAttemptAuthorizationBundle) Validate() error {
 	}
 	if len(seen) != len(required) {
 		return fmt.Errorf("incomplete settlement key offers")
+	}
+	_, requiresModerator := required[SettlementParticipantModerator]
+	if requiresModerator != (expectedModeratorPeerID != "") {
+		return fmt.Errorf("authorization bundle moderator scope does not match required roles")
 	}
 	if sellerOfferPeerID == "" || strings.TrimSpace(b.SellerTermsSigner) != sellerOfferPeerID {
 		return fmt.Errorf("authorization bundle seller signer does not match seller offer")

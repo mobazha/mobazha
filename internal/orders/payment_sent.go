@@ -156,11 +156,21 @@ func validateFrozenStandardOrderUTXOPaymentSent(
 		if err != nil || bundle == nil {
 			return false, models.ErrPaymentAttemptSettlementTermsConflict
 		}
+		spec, specOK := payment.ResolveSettlementSpec(order, paymentSent)
+		moderated := strings.TrimSpace(terms.ModeratorPeerID) != ""
+		moderatorAddress := ""
+		if terms.ModeratorFee != nil {
+			moderatorAddress = strings.TrimSpace(terms.ModeratorFee.Address)
+		}
 		if target.AssetID != strings.TrimSpace(paymentSent.Coin) ||
 			target.AmountAtomic != strings.TrimSpace(paymentSent.Amount) ||
 			!payment.SameUTXOAddress(target.Address, paymentSent.ToAddress) ||
 			!strings.EqualFold(target.RedeemScriptHex, strings.TrimSpace(paymentSent.Script)) ||
-			terms.AttemptID != target.AttemptID || bundle.AttemptID != target.AttemptID {
+			terms.AttemptID != target.AttemptID || bundle.AttemptID != target.AttemptID ||
+			!specOK || payment.MethodIsModerated(spec.Method) != moderated ||
+			strings.TrimSpace(paymentSent.Moderator) != strings.TrimSpace(terms.ModeratorPeerID) ||
+			strings.TrimSpace(paymentSent.ModeratorAddress) != moderatorAddress ||
+			paymentSent.EscrowTimeoutHours != terms.EscrowTimeoutHours {
 			continue
 		}
 		if matched {

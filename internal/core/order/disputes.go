@@ -1,6 +1,7 @@
 package order
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -8,10 +9,12 @@ import (
 	"strings"
 	"time"
 
+	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	nodepayment "github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/orders/utils"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
@@ -613,13 +616,29 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 
 	totalOut = totalOut.Sub(totalFee)
 
-	modAddr, err := s.escrow.GetPayoutAddress(string(coinType))
+	var modAddr iwallet.Address
+	var modValue iwallet.Amount
+	frozenTerms, err := s.frozenStandardOrderSettlementTerms(&models.Order{
+		TenantMixin: models.TenantMixin{TenantID: s.nodeID}, ID: orderID,
+	})
 	if err != nil {
 		return err
 	}
-	modValue, err := s.moderators.GetModeratorFee(totalOut, string(coinType))
-	if err != nil {
-		return fmt.Errorf("failed to get moderator fee: %w", err)
+	if frozenTerms != nil && frozenTerms.ModeratorPeerID == s.signer.PeerID().String() && frozenTerms.ModeratorFee != nil {
+		modAddr = iwallet.NewAddress(frozenTerms.ModeratorFee.Address, coinType)
+		modValue = iwallet.NewAmount(frozenTerms.ModeratorFee.Amount)
+		if modValue.Cmp(totalOut) >= 0 {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	} else {
+		modAddr, err = s.escrow.GetPayoutAddress(string(coinType))
+		if err != nil {
+			return err
+		}
+		modValue, err = s.moderators.GetModeratorFee(totalOut, string(coinType))
+		if err != nil {
+			return fmt.Errorf("failed to get moderator fee: %w", err)
+		}
 	}
 
 	effectiveVal := totalOut.Sub(modValue)
@@ -889,7 +908,7 @@ func (s *OrderAppService) BuildDisputeReleaseTransaction(releaseInfo *pb.Dispute
 	return txn, nil
 }
 
-func (s *OrderAppService) signAndSendReleaseTransaction(txn *iwallet.Transaction, paymentSent *pb.PaymentSent, disputeClose *pb.DisputeClose) error {
+func (s *OrderAppService) signAndSendReleaseTransaction(order *models.Order, txn *iwallet.Transaction, paymentSent *pb.PaymentSent, disputeClose *pb.DisputeClose) error {
 	script, err := hex.DecodeString(paymentSent.Script)
 	if err != nil {
 		return fmt.Errorf("failed to decode payment script: %w", err)
@@ -909,24 +928,36 @@ func (s *OrderAppService) signAndSendReleaseTransaction(txn *iwallet.Transaction
 		return fmt.Errorf("cannot validate order. coin not supported by moderator:%s, %w", coinType, err)
 	}
 
-	escrowMasterKey, err := s.keyProvider.EscrowMasterKey()
-	if err != nil {
-		return fmt.Errorf("failed to get escrow master key: %w", err)
-	}
-
-	signingKey, err := utils.GenerateEscrowPrivateKey(escrowMasterKey, chainCode)
-	if err != nil {
-		return fmt.Errorf("failed to generate moderator key: %w", err)
-	}
-
 	escrowWallet, ok := wallet.(iwallet.UTXOEscrow)
 	if !ok {
 		return errors.New("failed to get escrowWallet")
 	}
 
-	mySigs, err := escrowWallet.SignMultisigTransaction(*txn, *signingKey, script)
-	if err != nil {
-		return fmt.Errorf("failed to generate my signature: %w", err)
+	var mySigs []iwallet.EscrowSignature
+	settlementSigs, handled, signErr := s.signSettlementActionRelease(context.Background(), coinType, payment.SettlementActionDisputeRelease, payment.ActionParams{
+		OrderID: order.ID.String(), PaymentCoin: string(coinType), PaymentAmount: paymentSent.Amount,
+		Chaincode: paymentSent.Chaincode, Script: paymentSent.Script, OrderData: order, ReleaseInfo: disputeClose.ReleaseInfo,
+	})
+	if handled {
+		if signErr != nil {
+			return fmt.Errorf("failed to generate attempt-scoped dispute signature: %w", signErr)
+		}
+		for _, sig := range settlementSigs {
+			mySigs = append(mySigs, iwallet.EscrowSignature{Signature: append([]byte(nil), sig.Signature...), Index: int(sig.Index)})
+		}
+	} else {
+		escrowMasterKey, err := s.keyProvider.EscrowMasterKey()
+		if err != nil {
+			return fmt.Errorf("failed to get escrow master key: %w", err)
+		}
+		signingKey, err := utils.GenerateEscrowPrivateKey(escrowMasterKey, chainCode)
+		if err != nil {
+			return fmt.Errorf("failed to generate moderator key: %w", err)
+		}
+		mySigs, err = escrowWallet.SignMultisigTransaction(*txn, *signingKey, script)
+		if err != nil {
+			return fmt.Errorf("failed to generate my signature: %w", err)
+		}
 	}
 
 	var moderatorSigs []iwallet.EscrowSignature
@@ -1142,25 +1173,75 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 	if !walletSupportsEscrowTimeout {
 		return fmt.Errorf("wallet cannot support escrow timeout, coin: %s", coinType)
 	}
+	var frozenAttempt *models.PaymentAttempt
+	var frozenTerms *models.PaymentAttemptSettlementTerms
+	var frozenSellerOffer *models.SettlementKeyOffer
+	var frozenAttempts []models.PaymentAttempt
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+			strings.TrimSpace(order.TenantID), order.ID.String(),
+			models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady,
+		).Find(&frozenAttempts).Error
+	}); err != nil {
+		return err
+	}
+	for i := range frozenAttempts {
+		target, err := frozenAttempts[i].GetFundingTarget()
+		if err != nil {
+			return err
+		}
+		if target == nil || !payment.SameUTXOAddress(target.Address, paymentSent.ToAddress) {
+			continue
+		}
+		if frozenAttempt != nil {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		terms, err := frozenAttempts[i].GetSettlementTerms()
+		if err != nil || terms == nil || terms.ModeratorPeerID == "" || order.Role() != models.RoleVendor ||
+			!strings.EqualFold(target.RedeemScriptHex, paymentSent.Script) {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		bundle, err := frozenAttempts[i].GetAuthorizationBundle()
+		if err != nil || bundle == nil {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		for j := range bundle.Offers {
+			if bundle.Offers[j].ParticipantRole == models.SettlementParticipantSeller &&
+				bundle.Offers[j].ParticipantPeerID == s.signer.PeerID().String() {
+				frozenSellerOffer = &bundle.Offers[j]
+				break
+			}
+		}
+		if frozenSellerOffer == nil {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		frozenAttempt = &frozenAttempts[i]
+		frozenTerms = terms
+	}
+	if len(frozenAttempts) > 0 && frozenAttempt == nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
 
 	script, err := hex.DecodeString(paymentSent.Script)
 	if err != nil {
 		return fmt.Errorf("decode escrow script: %w", err)
 	}
 
-	chainCode, err := hex.DecodeString(paymentSent.Chaincode)
-	if err != nil {
-		return fmt.Errorf("decode chaincode: %w", err)
-	}
-
-	escrowMasterKey, err := s.keyProvider.EscrowMasterKey()
-	if err != nil {
-		return fmt.Errorf("escrow master key: %w", err)
-	}
-
-	vendorKey, err := utils.GenerateEscrowPrivateKey(escrowMasterKey, chainCode)
-	if err != nil {
-		return fmt.Errorf("generate escrow private key: %w", err)
+	var vendorKey *btcec.PrivateKey
+	if frozenAttempt == nil {
+		chainCode, err := hex.DecodeString(paymentSent.Chaincode)
+		if err != nil {
+			return fmt.Errorf("decode chaincode: %w", err)
+		}
+		escrowMasterKey, err := s.keyProvider.EscrowMasterKey()
+		if err != nil {
+			return fmt.Errorf("escrow master key: %w", err)
+		}
+		vendorKey, err = utils.GenerateEscrowPrivateKey(escrowMasterKey, chainCode)
+		if err != nil {
+			return fmt.Errorf("generate escrow private key: %w", err)
+		}
 	}
 
 	txs, err := order.GetTransactions()
@@ -1173,7 +1254,7 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 	totalOut := iwallet.NewAmount(0)
 	for _, tx := range txs {
 		for _, to := range tx.To {
-			if payment.SameUTXOAddress(to.Address.String(), order.PaymentAddress) {
+			if payment.SameUTXOAddress(to.Address.String(), paymentSent.ToAddress) {
 				txn.From = append(txn.From, to)
 				totalOut = totalOut.Add(to.Amount)
 			}
@@ -1192,9 +1273,14 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 
 	totalOut = totalOut.Sub(totalFee)
 
-	payoutAddress, err := s.escrow.GetPayoutAddress(string(coinType))
-	if err != nil {
-		return err
+	var payoutAddress iwallet.Address
+	if frozenTerms != nil {
+		payoutAddress = iwallet.NewAddress(frozenTerms.SellerAddress, coinType)
+	} else {
+		payoutAddress, err = s.escrow.GetPayoutAddress(string(coinType))
+		if err != nil {
+			return err
+		}
 	}
 
 	txn.To = append(txn.To, iwallet.SpendInfo{
@@ -1216,7 +1302,25 @@ func (s *OrderAppService) ReleaseFundsAfterTimeout(orderID models.OrderID, done 
 	case models.OrderState_DISPUTED:
 		finishType = iwallet.ORDER_FINISH_RESOLVED
 	}
-	txid, err := escrowTimeoutWallet.ReleaseFundsAfterTimeout(wtx, txn, *vendorKey, script, finishType)
+	var txid iwallet.TransactionID
+	if frozenAttempt != nil {
+		timeoutSigner, ok := s.settlementSigner.(contracts.UTXOTimeoutSettlementSigner)
+		if !ok {
+			return fmt.Errorf("attempt-scoped UTXO timeout settlement signer is not configured")
+		}
+		keyRef := contracts.SettlementKeyRef{
+			TenantID: frozenAttempt.TenantID, RailID: frozenAttempt.Currency,
+			Purpose:     contracts.StandardOrderSettlementKeyPurpose + ":" + string(models.SettlementParticipantSeller),
+			ReferenceID: frozenAttempt.AuthorizationContextID,
+		}
+		publicKey, err := s.settlementSigner.PublicKey(context.Background(), keyRef)
+		if err != nil || !bytes.Equal(publicKey, frozenSellerOffer.PublicKey) {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		txid, err = timeoutSigner.ReleaseUTXOAfterTimeout(context.Background(), keyRef, escrowTimeoutWallet, wtx, txn, script, finishType)
+	} else {
+		txid, err = escrowTimeoutWallet.ReleaseFundsAfterTimeout(wtx, txn, *vendorKey, script, finishType)
+	}
 	if err != nil {
 		return err
 	}

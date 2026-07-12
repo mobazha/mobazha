@@ -21,6 +21,7 @@ import (
 
 var _ contracts.SettlementSigner = (*localSettlementSigner)(nil)
 var _ contracts.UTXOSettlementSigner = (*localSettlementSigner)(nil)
+var _ contracts.UTXOTimeoutSettlementSigner = (*localSettlementSigner)(nil)
 
 // localSettlementSigner is the standalone opaque Settlement Domain adapter.
 // The legacy escrow root is used only as input key material inside this
@@ -103,6 +104,28 @@ func (s *localSettlementSigner) SignUTXOMultisig(
 		return nil, fmt.Errorf("sign attempt-scoped UTXO multisig transaction: %w", err)
 	}
 	return signatures, nil
+}
+
+func (s *localSettlementSigner) ReleaseUTXOAfterTimeout(
+	ctx context.Context,
+	keyRef contracts.SettlementKeyRef,
+	wallet iwallet.UTXOEscrowWithTimeout,
+	wtx iwallet.Tx,
+	txn iwallet.Transaction,
+	redeemScript []byte,
+	finishType iwallet.OrderFinishType,
+) (iwallet.TransactionID, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if wallet == nil || wtx == nil || len(txn.From) == 0 || len(txn.To) == 0 || len(redeemScript) == 0 {
+		return "", fmt.Errorf("attempt-scoped UTXO timeout release requires wallet, transaction, and redeem script")
+	}
+	key, err := s.deriveKey(keyRef)
+	if err != nil {
+		return "", err
+	}
+	return wallet.ReleaseFundsAfterTimeout(wtx, txn, *key, append([]byte(nil), redeemScript...), finishType)
 }
 
 func (s *localSettlementSigner) deriveKey(keyRef contracts.SettlementKeyRef) (*btcec.PrivateKey, error) {

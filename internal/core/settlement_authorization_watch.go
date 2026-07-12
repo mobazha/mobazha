@@ -56,8 +56,8 @@ func watchFrozenStandardOrderUTXOAttempt(
 	if err := db.Where("tenant_id = ? AND attempt_id = ?", tenantID, attemptID).First(&attempt).Error; err != nil {
 		return fmt.Errorf("load frozen standard order UTXO attempt: %w", err)
 	}
-	if attempt.State != models.PaymentAttemptFundingTargetReady || attempt.ExpectedModeratorPeerID != "" {
-		return fmt.Errorf("standard order UTXO watch requires an unmoderated frozen attempt")
+	if attempt.State != models.PaymentAttemptFundingTargetReady {
+		return fmt.Errorf("standard order UTXO watch requires a frozen attempt")
 	}
 	target, err := attempt.GetFundingTarget()
 	if err != nil || target == nil {
@@ -139,7 +139,7 @@ func (n *MobazhaNode) RecoverFrozenStandardOrderUTXOWatches(ctx context.Context)
 	var recoveryErrors []error
 	for _, attempt := range attempts {
 		coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(attempt.Currency))
-		if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() || attempt.ExpectedModeratorPeerID != "" {
+		if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
 			continue
 		}
 		if err := n.watchFrozenStandardOrderUTXOAttempt(ctx, attempt.TenantID, attempt.AttemptID); err != nil {

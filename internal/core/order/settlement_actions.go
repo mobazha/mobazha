@@ -1,7 +1,9 @@
 package order
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	ordersettlement "github.com/mobazha/mobazha/internal/core/order/settlement"
 	nodepayment "github.com/mobazha/mobazha/internal/core/payment"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -32,6 +35,9 @@ func (s *OrderAppService) v2StrategyForCoin(coinType iwallet.CoinType) (payment.
 }
 
 func (s *OrderAppService) signSettlementActionRelease(ctx context.Context, coinType iwallet.CoinType, action string, params payment.ActionParams) ([]*pb.Signature, bool, error) {
+	if sigs, handled, err := s.signFrozenStandardOrderUTXOAction(ctx, coinType, action, params); handled {
+		return sigs, true, err
+	}
 	strategy, err := s.v2StrategyForCoin(coinType)
 	if err != nil {
 		return nil, false, err
@@ -53,6 +59,153 @@ func (s *OrderAppService) signSettlementActionRelease(ctx context.Context, coinT
 		})
 	}
 	return out, true, nil
+}
+
+func (s *OrderAppService) signFrozenStandardOrderUTXOAction(
+	ctx context.Context,
+	coinType iwallet.CoinType,
+	action string,
+	params payment.ActionParams,
+) ([]*pb.Signature, bool, error) {
+	if s == nil || s.db == nil || s.signer == nil || s.settlementSigner == nil || params.OrderData == nil {
+		return nil, false, nil
+	}
+	utxoSigner, ok := s.settlementSigner.(contracts.UTXOSettlementSigner)
+	if !ok {
+		return nil, false, nil
+	}
+	if params.ReleaseInfo == nil {
+		return nil, false, nil
+	}
+	var attempts []models.PaymentAttempt
+	tenantID := strings.TrimSpace(params.OrderData.TenantID)
+	if tenantID == "" {
+		tenantID = strings.TrimSpace(s.nodeID)
+	}
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+			tenantID, params.OrderID,
+			models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady,
+		).Find(&attempts).Error
+	}); err != nil {
+		return nil, true, err
+	}
+	if len(attempts) == 0 {
+		return nil, false, nil
+	}
+	if len(attempts) != 1 {
+		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	attempt := attempts[0]
+	terms, err := attempt.GetSettlementTerms()
+	if err != nil || terms == nil || terms.ModeratorPeerID == "" || attempt.Currency != string(coinType) {
+		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	target, err := attempt.GetFundingTarget()
+	if err != nil || target == nil || !strings.EqualFold(target.RedeemScriptHex, strings.TrimSpace(params.Script)) {
+		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	bundle, err := attempt.GetAuthorizationBundle()
+	if err != nil || bundle == nil {
+		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	var localOffer *models.SettlementKeyOffer
+	for i := range bundle.Offers {
+		if bundle.Offers[i].ParticipantPeerID == s.signer.PeerID().String() {
+			localOffer = &bundle.Offers[i]
+			break
+		}
+	}
+	if localOffer == nil {
+		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	if action == payment.SettlementActionComplete && localOffer.ParticipantRole == models.SettlementParticipantModerator {
+		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	keyRef := contracts.SettlementKeyRef{
+		TenantID: attempt.TenantID, RailID: attempt.Currency,
+		Purpose:     contracts.StandardOrderSettlementKeyPurpose + ":" + string(localOffer.ParticipantRole),
+		ReferenceID: attempt.AuthorizationContextID,
+	}
+	publicKey, err := s.settlementSigner.PublicKey(ctx, keyRef)
+	if err != nil {
+		return nil, true, err
+	}
+	if !bytes.Equal(publicKey, localOffer.PublicKey) {
+		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	txn := iwallet.Transaction{}
+	appendOutput := func(address, amount string) {
+		if strings.TrimSpace(address) != "" && iwallet.NewAmount(amount).Cmp(iwallet.NewAmount(0)) > 0 {
+			txn.To = append(txn.To, iwallet.SpendInfo{Address: iwallet.NewAddress(address, coinType), Amount: iwallet.NewAmount(amount)})
+		}
+	}
+	switch release := params.ReleaseInfo.(type) {
+	case *pb.EscrowRelease:
+		for _, outpoint := range release.Outpoints {
+			txn.From = append(txn.From, iwallet.SpendInfo{ID: outpoint.FromID, Amount: iwallet.NewAmount(outpoint.Value)})
+		}
+		appendOutput(release.ToAddress, release.ToAmount)
+		appendOutput(release.PlatformAddress, release.PlatformAmount)
+		appendOutput(release.AffiliateAddress, release.AffiliateAmount)
+		if action == payment.SettlementActionComplete && !payment.SameUTXOAddress(release.ToAddress, terms.SellerAddress) {
+			return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	case *pb.DisputeClose_ModeratedEscrowRelease:
+		for _, outpoint := range release.Outpoints {
+			txn.From = append(txn.From, iwallet.SpendInfo{ID: outpoint.FromID, Amount: iwallet.NewAmount(outpoint.Value)})
+		}
+		appendOutput(release.BuyerAddress, release.BuyerAmount)
+		appendOutput(release.VendorAddress, release.VendorAmount)
+		appendOutput(release.ModeratorAddress, release.ModeratorAmount)
+	default:
+		return nil, false, nil
+	}
+	script, err := hex.DecodeString(target.RedeemScriptHex)
+	if err != nil || len(script) == 0 {
+		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	sigs, err := utxoSigner.SignUTXOMultisig(ctx, contracts.UTXOMultisigSettlementSignRequest{
+		KeyRef: keyRef, OrderID: attempt.OrderID, AttemptID: attempt.AttemptID,
+		Action: action, Sequence: 1, TermsHash: attempt.SettlementTermsHash,
+		CoinCode: attempt.Currency, Transaction: txn, RedeemScript: script,
+	})
+	if err != nil {
+		return nil, true, err
+	}
+	out := make([]*pb.Signature, 0, len(sigs))
+	for _, sig := range sigs {
+		out = append(out, &pb.Signature{Signature: append([]byte(nil), sig.Signature...), Index: uint32(sig.Index)})
+	}
+	return out, true, nil
+}
+
+func (s *OrderAppService) frozenStandardOrderSettlementTerms(order *models.Order) (*models.PaymentAttemptSettlementTerms, error) {
+	if s == nil || s.db == nil || order == nil {
+		return nil, nil
+	}
+	var attempts []models.PaymentAttempt
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+			strings.TrimSpace(order.TenantID), order.ID.String(),
+			models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady,
+		).Find(&attempts).Error
+	}); err != nil {
+		return nil, err
+	}
+	if len(attempts) == 0 {
+		return nil, nil
+	}
+	if len(attempts) != 1 {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	terms, err := attempts[0].GetSettlementTerms()
+	if err != nil {
+		return nil, err
+	}
+	return terms, nil
 }
 
 func orderDataWithPaymentSent(orderID models.OrderID, paymentSent *pb.PaymentSent) (*models.Order, error) {

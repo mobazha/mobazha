@@ -23,6 +23,21 @@ func IssueSettlementKeyOffer(
 	orderID, attemptID string,
 	role models.SettlementParticipantRole,
 ) (models.SettlementKeyOffer, error) {
+	return IssueSettlementKeyOfferWithScope(ctx, identitySigner, settlementSigner, keyRef, orderID, attemptID, role, "", "", "", "", 0)
+}
+
+// IssueSettlementKeyOfferWithScope additionally binds the selected moderator,
+// immutable funding amount, and (for the moderator offer) payout terms.
+func IssueSettlementKeyOfferWithScope(
+	ctx context.Context,
+	identitySigner contracts.Signer,
+	settlementSigner contracts.SettlementSigner,
+	keyRef contracts.SettlementKeyRef,
+	orderID, attemptID string,
+	role models.SettlementParticipantRole,
+	expectedModeratorPeerID, amountAtomic, moderatorPayoutAddress, moderatorFeeAmount string,
+	escrowTimeoutHours uint32,
+) (models.SettlementKeyOffer, error) {
 	if identitySigner == nil || settlementSigner == nil {
 		return models.SettlementKeyOffer{}, fmt.Errorf("identity and settlement signers are required for settlement key offer")
 	}
@@ -39,15 +54,20 @@ func IssueSettlementKeyOffer(
 		return models.SettlementKeyOffer{}, fmt.Errorf("derive settlement key offer public key: %w", err)
 	}
 	offer := models.SettlementKeyOffer{
-		Version:                models.SettlementAuthorizationVersion,
-		AuthorizationContextID: participantKeyRef.ReferenceID,
-		OrderID:                strings.TrimSpace(orderID),
-		AttemptID:              strings.TrimSpace(attemptID),
-		ParticipantPeerID:      identitySigner.PeerID().String(),
-		ParticipantRole:        role,
-		RailID:                 participantKeyRef.RailID,
-		Purpose:                participantKeyRef.Purpose,
-		PublicKey:              publicKey,
+		Version:                 models.SettlementAuthorizationVersion,
+		AuthorizationContextID:  participantKeyRef.ReferenceID,
+		OrderID:                 strings.TrimSpace(orderID),
+		AttemptID:               strings.TrimSpace(attemptID),
+		ParticipantPeerID:       identitySigner.PeerID().String(),
+		ParticipantRole:         role,
+		RailID:                  participantKeyRef.RailID,
+		Purpose:                 participantKeyRef.Purpose,
+		PublicKey:               publicKey,
+		ExpectedModeratorPeerID: strings.TrimSpace(expectedModeratorPeerID),
+		AmountAtomic:            strings.TrimSpace(amountAtomic),
+		ModeratorPayoutAddress:  strings.TrimSpace(moderatorPayoutAddress),
+		ModeratorFeeAmount:      strings.TrimSpace(moderatorFeeAmount),
+		EscrowTimeoutHours:      escrowTimeoutHours,
 	}
 	payload, err := offer.SigningPayload()
 	if err != nil {

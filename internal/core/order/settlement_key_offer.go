@@ -46,7 +46,7 @@ func (s *OrderAppService) PublishSettlementKeyOffer(
 	if err != nil {
 		return fmt.Errorf("publish settlement key offer: load order open: %w", err)
 	}
-	if err := validateSettlementKeyOfferTarget(orderOpen, offer.ParticipantRole, targetPeerID.String()); err != nil {
+	if err := validateSettlementKeyOfferTargetForOffer(orderOpen, offer, targetPeerID.String()); err != nil {
 		return err
 	}
 	message, err := buildSettlementKeyOfferOrderMessage(offer, s.signer)
@@ -68,6 +68,41 @@ func (s *OrderAppService) PublishSettlementKeyOffer(
 			return fmt.Errorf("publish settlement key offer: durable handoff: %w", err)
 		}
 		return nil
+	})
+}
+
+// PublishDetachedSettlementKeyOffer sends a locally-issued offer for an order
+// that is not present on this node. This is used only by the selected moderator;
+// the receiving buyer retains and relays the signed offer to the seller.
+func (s *OrderAppService) PublishDetachedSettlementKeyOffer(
+	ctx context.Context,
+	targetPeerID peer.ID,
+	offer models.SettlementKeyOffer,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if s == nil || s.messenger == nil || s.signer == nil || targetPeerID == "" {
+		return fmt.Errorf("publish detached settlement key offer: messenger, signer, and target are required")
+	}
+	if offer.ParticipantRole != models.SettlementParticipantModerator ||
+		offer.ParticipantPeerID != s.signer.PeerID().String() ||
+		offer.ExpectedModeratorPeerID != offer.ParticipantPeerID {
+		return fmt.Errorf("publish detached settlement key offer: local selected moderator offer is required")
+	}
+	message, err := buildSettlementKeyOfferOrderMessage(offer, s.signer)
+	if err != nil {
+		return err
+	}
+	payload, err := anypb.New(message)
+	if err != nil {
+		return fmt.Errorf("publish detached settlement key offer: marshal order message: %w", err)
+	}
+	netMessage := newMessageWithID()
+	netMessage.MessageType = npb.Message_ORDER
+	netMessage.Payload = payload
+	return s.db.Update(func(tx database.Tx) error {
+		return s.messenger.ReliablySendMessage(tx, targetPeerID, netMessage, nil)
 	})
 }
 
@@ -100,6 +135,14 @@ func validateSettlementKeyOfferTarget(
 	role models.SettlementParticipantRole,
 	targetPeerID string,
 ) error {
+	return validateSettlementKeyOfferTargetForOffer(orderOpen, models.SettlementKeyOffer{ParticipantRole: role}, targetPeerID)
+}
+
+func validateSettlementKeyOfferTargetForOffer(
+	orderOpen *pb.OrderOpen,
+	offer models.SettlementKeyOffer,
+	targetPeerID string,
+) error {
 	if orderOpen == nil || targetPeerID == "" {
 		return fmt.Errorf("publish settlement key offer: order participants are required")
 	}
@@ -112,13 +155,13 @@ func validateSettlementKeyOfferTarget(
 		orderOpen.Listings[0].Listing.VendorID != nil {
 		sellerPeerID = orderOpen.Listings[0].Listing.VendorID.PeerID
 	}
-	switch role {
+	switch offer.ParticipantRole {
 	case models.SettlementParticipantBuyer:
-		if sellerPeerID == "" || targetPeerID != sellerPeerID {
+		if sellerPeerID == "" || (targetPeerID != sellerPeerID && targetPeerID != offer.ExpectedModeratorPeerID) {
 			return fmt.Errorf("publish settlement buyer offer: target is not order seller")
 		}
 	case models.SettlementParticipantSeller:
-		if buyerPeerID == "" || targetPeerID != buyerPeerID {
+		if buyerPeerID == "" || (targetPeerID != buyerPeerID && targetPeerID != offer.ExpectedModeratorPeerID) {
 			return fmt.Errorf("publish settlement seller offer: target is not order buyer")
 		}
 	case models.SettlementParticipantModerator:
@@ -126,7 +169,7 @@ func validateSettlementKeyOfferTarget(
 			return fmt.Errorf("publish settlement moderator offer: target is not an order participant")
 		}
 	default:
-		return fmt.Errorf("publish settlement key offer: unsupported participant role %q", role)
+		return fmt.Errorf("publish settlement key offer: unsupported participant role %q", offer.ParticipantRole)
 	}
 	return nil
 }

@@ -573,14 +573,26 @@ func (s *OrderAppService) executeUTXOSyncModeratedCompleteRelease(order *models.
 		return nil, nil, fmt.Errorf("no chain escrow for coin %s: %w", coinType, err)
 	}
 
-	buyerSigs, err := strategy.SignEscrowRelease(context.Background(), payment.SignEscrowParams{
-		Transaction: txn,
-		Script:      script,
-		ChainCode:   chainCode,
-		CoinCode:    string(coinType),
+	var buyerSigs []iwallet.EscrowSignature
+	settlementSigs, handled, signErr := s.signSettlementActionRelease(context.Background(), coinType, payment.SettlementActionComplete, payment.ActionParams{
+		OrderID: order.ID.String(), PaymentCoin: string(coinType), PaymentAmount: paymentSent.Amount,
+		Chaincode: paymentSent.Chaincode, Script: paymentSent.Script, OrderData: order, ReleaseInfo: releaseInfo,
+		AffiliatePayout: executionPayout,
 	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to sign escrow release: %w", err)
+	if handled {
+		if signErr != nil {
+			return nil, nil, fmt.Errorf("failed to sign attempt-scoped escrow release: %w", signErr)
+		}
+		for _, sig := range settlementSigs {
+			buyerSigs = append(buyerSigs, iwallet.EscrowSignature{Index: int(sig.Index), Signature: append([]byte(nil), sig.Signature...)})
+		}
+	} else {
+		buyerSigs, err = strategy.SignEscrowRelease(context.Background(), payment.SignEscrowParams{
+			Transaction: txn, Script: script, ChainCode: chainCode, CoinCode: string(coinType),
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to sign escrow release: %w", err)
+		}
 	}
 
 	release := &pb.EscrowRelease{

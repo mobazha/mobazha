@@ -117,3 +117,18 @@ func (r UTXOMultisigSettlementSignRequest) Validate() error {
 type UTXOSettlementSigner interface {
 	SignUTXOMultisig(context.Context, UTXOMultisigSettlementSignRequest) ([]iwallet.EscrowSignature, error)
 }
+
+// UTXOTimeoutSettlementSigner keeps the timeout private key inside the opaque
+// settlement signer while delegating native transaction construction to the
+// wallet implementation.
+type UTXOTimeoutSettlementSigner interface {
+	ReleaseUTXOAfterTimeout(
+		context.Context,
+		SettlementKeyRef,
+		iwallet.UTXOEscrowWithTimeout,
+		iwallet.Tx,
+		iwallet.Transaction,
+		[]byte,
+		iwallet.OrderFinishType,
+	) (iwallet.TransactionID, error)
+}

@@ -802,7 +802,7 @@ func frozenStandardOrderUTXOAggregatedPaymentIntent(
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	bundle, err := matched.GetAuthorizationBundle()
-	if err != nil || bundle == nil || terms.ModeratorPeerID != "" {
+	if err != nil || bundle == nil {
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	script, err := hex.DecodeString(target.RedeemScriptHex)
@@ -817,10 +817,15 @@ func frozenStandardOrderUTXOAggregatedPaymentIntent(
 	if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
+	moderatorAddress := ""
+	if terms.ModeratorFee != nil {
+		moderatorAddress = terms.ModeratorFee.Address
+	}
 	return &aggregatedPaymentIntent{
 		coin:           target.AssetID,
-		settlementSpec: paymentmetrics.NewUTXOSpec(false), settlementSpecOK: true,
-		script: target.RedeemScriptHex,
+		settlementSpec: paymentmetrics.NewUTXOSpec(terms.ModeratorPeerID != ""), settlementSpecOK: true,
+		script: target.RedeemScriptHex, moderator: terms.ModeratorPeerID, moderatorAddress: moderatorAddress,
+		escrowTimeoutHours: terms.EscrowTimeoutHours,
 	}, nil
 }
 

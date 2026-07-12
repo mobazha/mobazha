@@ -32,7 +32,8 @@ func (s *OrderAppService) PublishSettlementAuthorization(
 		return fmt.Errorf("publish settlement authorization: messenger and signer are required")
 	}
 	if targetPeerID == "" || authorization.Terms.SellerPeerID != s.signer.PeerID().String() ||
-		authorization.Terms.BuyerPeerID != targetPeerID.String() {
+		(authorization.Terms.BuyerPeerID != targetPeerID.String() &&
+			authorization.Terms.ModeratorPeerID != targetPeerID.String()) {
 		return fmt.Errorf("publish settlement authorization: signed participants do not match sender and target")
 	}
 	if _, _, err := authorization.CanonicalBytesAndHash(); err != nil {

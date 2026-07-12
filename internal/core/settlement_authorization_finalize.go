@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -75,10 +76,15 @@ func (p standardOrderUTXOFundingTargetProjector) project(
 	if err := ctx.Err(); err != nil {
 		return standardOrderUTXOProjection{}, err
 	}
+	moderated := strings.TrimSpace(attempt.ExpectedModeratorPeerID) != ""
+	expectedOfferCount := 2
+	if moderated {
+		expectedOfferCount = 3
+	}
 	if p.wallets == nil || (attempt.State != models.PaymentAttemptAuthorizationDraft &&
 		attempt.State != models.PaymentAttemptFundingTargetReady) ||
-		attempt.ExpectedModeratorPeerID != "" || route.AssetID != attempt.Currency || len(offers) != 2 {
-		return standardOrderUTXOProjection{}, fmt.Errorf("standard order UTXO funding target requires an unmoderated authorization attempt")
+		route.AssetID != attempt.Currency || len(offers) != expectedOfferCount {
+		return standardOrderUTXOProjection{}, fmt.Errorf("standard order UTXO funding target requires a complete authorization attempt")
 	}
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(attempt.Currency))
 	if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
@@ -102,8 +108,15 @@ func (p standardOrderUTXOFundingTargetProjector) project(
 			offer.Purpose != standardOrderSettlementKeyPurpose+":"+string(offer.ParticipantRole) {
 			return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
 		}
-		if offer.ParticipantRole != models.SettlementParticipantBuyer &&
-			offer.ParticipantRole != models.SettlementParticipantSeller {
+		if offer.ExpectedModeratorPeerID != attempt.ExpectedModeratorPeerID ||
+			(moderated && (offer.AmountAtomic != attempt.AmountValue || offer.EscrowTimeoutHours == 0)) ||
+			(offer.ParticipantRole != models.SettlementParticipantBuyer &&
+				offer.ParticipantRole != models.SettlementParticipantSeller &&
+				offer.ParticipantRole != models.SettlementParticipantModerator) {
+			return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		if offer.ParticipantRole == models.SettlementParticipantModerator &&
+			(!moderated || offer.ParticipantPeerID != attempt.ExpectedModeratorPeerID) {
 			return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
 		}
 		if _, exists := roleKeys[offer.ParticipantRole]; exists {
@@ -120,9 +133,33 @@ func (p standardOrderUTXOFundingTargetProjector) project(
 	if buyerKey == nil || sellerKey == nil || buyerKey.IsEqual(sellerKey) {
 		return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	address, redeemScript, err := escrowWallet.CreateMultisigAddress(
-		[]btcec.PublicKey{*buyerKey, *sellerKey}, nil, 1,
-	)
+	keys := []btcec.PublicKey{*buyerKey, *sellerKey}
+	threshold := 1
+	if moderated {
+		moderatorKey := roleKeys[models.SettlementParticipantModerator]
+		if moderatorKey == nil || moderatorKey.IsEqual(buyerKey) || moderatorKey.IsEqual(sellerKey) {
+			return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		keys = append(keys, *moderatorKey)
+		threshold = 2
+	}
+	var address iwallet.Address
+	var redeemScript []byte
+	if moderated {
+		timeoutWallet, ok := wallet.(iwallet.UTXOEscrowWithTimeout)
+		if !ok {
+			return standardOrderUTXOProjection{}, fmt.Errorf("wallet for %s does not support moderated UTXO timeout", attempt.Currency)
+		}
+		timeoutHours := offers[0].EscrowTimeoutHours
+		for _, offer := range offers[1:] {
+			if offer.EscrowTimeoutHours != timeoutHours {
+				return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
+			}
+		}
+		address, redeemScript, err = timeoutWallet.CreateMultisigWithTimeout(keys, nil, threshold, time.Duration(timeoutHours)*time.Hour, *sellerKey)
+	} else {
+		address, redeemScript, err = escrowWallet.CreateMultisigAddress(keys, nil, threshold)
+	}
 	if err != nil {
 		return standardOrderUTXOProjection{}, fmt.Errorf("create standard order UTXO funding target: %w", err)
 	}
@@ -200,6 +237,15 @@ func (n *MobazhaNode) FinalizeStandardOrderSettlementAuthorization(
 	if err := n.orderService.PublishSettlementAuthorization(ctx, buyer, finalization.SettlementAuthorization); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("publish settlement authorization: %w", err)
 	}
+	if finalization.Terms.ModeratorPeerID != "" {
+		moderator, err := peer.Decode(finalization.Terms.ModeratorPeerID)
+		if err != nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("decode settlement authorization moderator: %w", err)
+		}
+		if err := n.orderService.PublishSettlementAuthorization(ctx, moderator, finalization.SettlementAuthorization); err != nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("publish settlement authorization to moderator: %w", err)
+		}
+	}
 	return finalization, nil
 }
 
@@ -236,8 +282,8 @@ func finalizeSellerSettlementAuthorization(
 	if attempt.State == models.PaymentAttemptFundingTargetReady {
 		return loadFrozenSellerSettlementFinalization(attempt, route, identitySigner)
 	}
-	if attempt.State != models.PaymentAttemptAuthorizationDraft || attempt.ExpectedModeratorPeerID != "" {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("seller settlement finalization requires an unmoderated authorization draft")
+	if attempt.State != models.PaymentAttemptAuthorizationDraft {
+		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("seller settlement finalization requires an authorization draft")
 	}
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
@@ -259,6 +305,20 @@ func finalizeSellerSettlementAuthorization(
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
+	var moderatorFee *models.PaymentAttemptSettlementFee
+	var escrowTimeoutHours uint32
+	if attempt.ExpectedModeratorPeerID != "" {
+		for _, offer := range offers {
+			if offer.ParticipantRole == models.SettlementParticipantModerator {
+				moderatorFee = &models.PaymentAttemptSettlementFee{Address: offer.ModeratorPayoutAddress, Amount: offer.ModeratorFeeAmount}
+				escrowTimeoutHours = offer.EscrowTimeoutHours
+				break
+			}
+		}
+		if moderatorFee == nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	}
 	target, err := targetProjector.ProjectStandardOrderFundingTarget(ctx, attempt, route, offers)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
@@ -276,7 +336,9 @@ func finalizeSellerSettlementAuthorization(
 		Version: models.PaymentAttemptSettlementTermsVersion, OrderID: attempt.OrderID,
 		AttemptID: attempt.AttemptID, AssetID: attempt.Currency, FundingAmount: attempt.AmountValue,
 		FundingTargetAddress: target.Address, RouteBindingID: route.RouteBindingID,
-		BuyerPeerID: buyerPeerID, SellerPeerID: sellerPeerID, SellerAddress: payout.Address,
+		BuyerPeerID: buyerPeerID, SellerPeerID: sellerPeerID, ModeratorPeerID: attempt.ExpectedModeratorPeerID,
+		ModeratorFee: moderatorFee, SellerAddress: payout.Address,
+		EscrowTimeoutHours:   escrowTimeoutHours,
 		SellerGrossBasis:     attempt.AmountValue,
 		PlatformReleaseFee:   models.PaymentAttemptSettlementFee{Amount: "0"},
 		BuyerCancellationFee: models.PaymentAttemptSettlementFee{Amount: "0"},

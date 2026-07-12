@@ -239,6 +239,76 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	require.NotEmpty(t, watch.scriptPubKey)
 }
 
+func TestStandardOrderUTXOFundingTargetProjector_ModeratedUsesTwoOfThreeWithTimeout(t *testing.T) {
+	rail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
+	require.True(t, ok)
+	contextID, err := models.NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	attempt := models.PaymentAttempt{
+		TenantID: "tenant-moderated", AttemptID: "attempt-moderated",
+		OrderID: "order-moderated", Currency: string(rail), AmountValue: "100000",
+		AuthorizationContextID: contextID, State: models.PaymentAttemptAuthorizationDraft,
+	}
+	route := models.PaymentRouteBinding{AssetID: string(rail)}
+	roles := []models.SettlementParticipantRole{
+		models.SettlementParticipantBuyer, models.SettlementParticipantSeller, models.SettlementParticipantModerator,
+	}
+	identities := make([]contracts.Signer, 0, len(roles))
+	settlementKeys := make([]*btcec.PrivateKey, 0, len(roles))
+	for _, role := range roles {
+		keys, err := identity.GenerateKeyPair()
+		require.NoError(t, err)
+		peerID, err := identity.PeerIDFromPublicKey(keys.PubKey)
+		require.NoError(t, err)
+		identities = append(identities, contracts.NewKeyPairSigner(keys, peerID))
+		key, _ := btcec.PrivKeyFromBytes([]byte("moderated-" + string(role) + "-settlement-key"))
+		settlementKeys = append(settlementKeys, key)
+	}
+	moderatorPeerID := identities[2].PeerID().String()
+	attempt.ExpectedModeratorPeerID = moderatorPeerID
+	keyRef := contracts.SettlementKeyRef{
+		TenantID: attempt.TenantID, RailID: attempt.Currency,
+		Purpose: standardOrderSettlementKeyPurpose, ReferenceID: contextID,
+	}
+	offers := make([]models.SettlementKeyOffer, 0, len(roles))
+	for i, role := range roles {
+		payout, fee := "", ""
+		if role == models.SettlementParticipantModerator {
+			payout, fee = "bc1qmoderatorpayout00000000000000000000000", "100"
+		}
+		offer, err := paymentintent.IssueSettlementKeyOfferWithScope(
+			t.Context(), identities[i],
+			&buyerStartSettlementSigner{publicKey: settlementKeys[i].PubKey().SerializeCompressed()},
+			keyRef, attempt.OrderID, attempt.AttemptID, role,
+			moderatorPeerID, attempt.AmountValue, payout, fee, 72,
+		)
+		require.NoError(t, err)
+		offers = append(offers, offer)
+	}
+	wallets := testMultiwallet(t, testMasterKey(t))
+	projector := standardOrderUTXOFundingTargetProjector{wallets: wallets}
+	projection, err := projector.project(t.Context(), attempt, route, offers)
+	require.NoError(t, err)
+	require.NotEmpty(t, projection.Target.Address)
+	require.NotEmpty(t, projection.RedeemScript)
+
+	wallet, err := wallets.WalletForCurrencyCode(string(rail))
+	require.NoError(t, err)
+	timeoutWallet, ok := wallet.(iwallet.UTXOEscrowWithTimeout)
+	require.True(t, ok)
+	expectedAddress, expectedScript, err := timeoutWallet.CreateMultisigWithTimeout(
+		[]btcec.PublicKey{*settlementKeys[0].PubKey(), *settlementKeys[1].PubKey(), *settlementKeys[2].PubKey()},
+		nil, 2, 72*time.Hour, *settlementKeys[1].PubKey(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, expectedAddress.String(), projection.Target.Address)
+	require.Equal(t, expectedScript, projection.RedeemScript)
+
+	mutated := append([]models.SettlementKeyOffer(nil), offers...)
+	mutated[2].EscrowTimeoutHours = 48
+	require.Error(t, mutated[2].Verify(), "timeout mutation must invalidate the moderator identity signature")
+}
+
 func TestStandardOrderUTXOFundingTargetProjector_RejectsInvalidOffers(t *testing.T) {
 	rail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
 	require.True(t, ok)

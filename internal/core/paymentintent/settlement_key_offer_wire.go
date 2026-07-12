@@ -21,6 +21,9 @@ func SettlementKeyOfferToProto(offer models.SettlementKeyOffer) (*pb.SettlementK
 		OrderID: offer.OrderID, AttemptID: offer.AttemptID, ParticipantPeerID: offer.ParticipantPeerID,
 		ParticipantRole: string(offer.ParticipantRole), RailID: offer.RailID, Purpose: offer.Purpose,
 		PublicKey: append([]byte(nil), offer.PublicKey...), Signature: append([]byte(nil), offer.Signature...),
+		ExpectedModeratorPeerID: offer.ExpectedModeratorPeerID, AmountAtomic: offer.AmountAtomic,
+		ModeratorPayoutAddress: offer.ModeratorPayoutAddress, ModeratorFeeAmount: offer.ModeratorFeeAmount,
+		EscrowTimeoutHours: offer.EscrowTimeoutHours,
 	}, nil
 }
 
@@ -36,6 +39,9 @@ func SettlementKeyOfferFromProto(wire *pb.SettlementKeyOffer) (models.Settlement
 		ParticipantRole: models.SettlementParticipantRole(wire.ParticipantRole),
 		RailID:          wire.RailID, Purpose: wire.Purpose,
 		PublicKey: append([]byte(nil), wire.PublicKey...), Signature: append([]byte(nil), wire.Signature...),
+		ExpectedModeratorPeerID: wire.ExpectedModeratorPeerID, AmountAtomic: wire.AmountAtomic,
+		ModeratorPayoutAddress: wire.ModeratorPayoutAddress, ModeratorFeeAmount: wire.ModeratorFeeAmount,
+		EscrowTimeoutHours: wire.EscrowTimeoutHours,
 	}
 	if err := offer.Verify(); err != nil {
 		return models.SettlementKeyOffer{}, err

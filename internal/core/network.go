@@ -340,6 +340,13 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 	if err := message.Payload.UnmarshalTo(orderMsg); err != nil {
 		return err
 	}
+	if handled, err := n.respondSelectedModeratorSettlementKeyOffer(n.nodeCtx, from, orderMsg); handled {
+		if err != nil {
+			return err
+		}
+		n.sendAckMessage(message.MessageID, from)
+		return nil
+	}
 
 	event, order, err := n.orderService.HandleIncomingOrderMessage(n.nodeCtx, orderMsg)
 	if err != nil {
@@ -385,10 +392,17 @@ func (n *MobazhaNode) progressStandardOrderSettlementAuthorization(
 			return err
 		}
 		if order.Role() != models.RoleVendor || offer.ParticipantRole != models.SettlementParticipantBuyer {
+			if order.Role() == models.RoleVendor && offer.ParticipantRole == models.SettlementParticipantModerator {
+				_, err := n.FinalizeStandardOrderSettlementAuthorization(ctx, orderMsg.OrderID, offer.AttemptID)
+				return err
+			}
 			return nil
 		}
 		if _, err := n.RespondStandardOrderSettlementAuthorization(ctx, orderMsg.OrderID, offer.AttemptID); err != nil {
 			return err
+		}
+		if offer.ExpectedModeratorPeerID != "" {
+			return nil
 		}
 		_, err = n.FinalizeStandardOrderSettlementAuthorization(ctx, orderMsg.OrderID, offer.AttemptID)
 		return err

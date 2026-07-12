@@ -192,7 +192,7 @@ func (s *OrderAppService) runUTXOSyncSettlementDisputeRelease(
 		return nil, nil, true, err
 	}
 	disputeClose := &pb.DisputeClose{ReleaseInfo: releaseInfo}
-	if err := s.signAndSendReleaseTransaction(&releaseTx, paymentSent, disputeClose); err != nil {
+	if err := s.signAndSendReleaseTransaction(order, &releaseTx, paymentSent, disputeClose); err != nil {
 		s.failSyncBackendSettlementAction(actionID, err.Error())
 		return nil, nil, true, err
 	}

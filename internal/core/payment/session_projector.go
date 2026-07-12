@@ -80,6 +80,9 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		}
 		paymentCoin = frozenCoin
 		productMode = payment.ProductModeCancelable
+		if input.cryptoAttempt != nil && strings.TrimSpace(input.cryptoAttempt.ExpectedModeratorPeerID) != "" {
+			productMode = payment.ProductModeModerated
+		}
 	}
 
 	// ── Expected amount ───────────────────────────────────────────────────

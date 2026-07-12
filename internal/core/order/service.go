@@ -76,21 +76,22 @@ type OrderExtensionDeclarer func(context.Context, extensions.DeclarationInput) (
 //
 // It depends only on explicit ports — never on *MobazhaNode.
 type OrderAppService struct {
-	db              database.Database
-	paymentRegistry *payment.Registry
-	multiwallet     contracts.WalletOperator
-	signer          contracts.Signer
-	orderProcessor  *orders.OrderProcessor
-	messenger       contracts.Messenger
-	networkService  contracts.NetworkService
-	eventBus        events.Bus
-	nodeID          string
-	shutdown        <-chan struct{}
-	keyProvider     contracts.KeyProvider
-	peerID          func() peer.ID
-	testnet         bool
-	exchangeRates   *wallet.ExchangeRateProvider
-	orderLockMgr    *OrderLockManager
+	db               database.Database
+	paymentRegistry  *payment.Registry
+	multiwallet      contracts.WalletOperator
+	signer           contracts.Signer
+	settlementSigner contracts.SettlementSigner
+	orderProcessor   *orders.OrderProcessor
+	messenger        contracts.Messenger
+	networkService   contracts.NetworkService
+	eventBus         events.Bus
+	nodeID           string
+	shutdown         <-chan struct{}
+	keyProvider      contracts.KeyProvider
+	peerID           func() peer.ID
+	testnet          bool
+	exchangeRates    *wallet.ExchangeRateProvider
+	orderLockMgr     *OrderLockManager
 
 	escrow     EscrowOperations
 	listings   ListingQuery
@@ -117,21 +118,22 @@ var _ contracts.PurchaseRecoveryService = (*OrderAppService)(nil)
 
 // OrderAppServiceConfig groups the dependencies for constructing OrderAppService.
 type OrderAppServiceConfig struct {
-	DB              database.Database
-	PaymentRegistry *payment.Registry
-	Multiwallet     contracts.WalletOperator
-	Signer          contracts.Signer
-	OrderProcessor  *orders.OrderProcessor
-	Messenger       contracts.Messenger
-	NetworkService  contracts.NetworkService
-	EventBus        events.Bus
-	NodeID          string
-	Shutdown        <-chan struct{}
-	KeyProvider     contracts.KeyProvider
-	PeerID          func() peer.ID
-	Testnet         bool
-	ExchangeRates   *wallet.ExchangeRateProvider
-	OrderLockMgr    *OrderLockManager
+	DB               database.Database
+	PaymentRegistry  *payment.Registry
+	Multiwallet      contracts.WalletOperator
+	Signer           contracts.Signer
+	SettlementSigner contracts.SettlementSigner
+	OrderProcessor   *orders.OrderProcessor
+	Messenger        contracts.Messenger
+	NetworkService   contracts.NetworkService
+	EventBus         events.Bus
+	NodeID           string
+	Shutdown         <-chan struct{}
+	KeyProvider      contracts.KeyProvider
+	PeerID           func() peer.ID
+	Testnet          bool
+	ExchangeRates    *wallet.ExchangeRateProvider
+	OrderLockMgr     *OrderLockManager
 
 	Escrow     EscrowOperations
 	Listings   ListingQuery
@@ -164,6 +166,7 @@ func NewOrderAppService(cfg OrderAppServiceConfig) *OrderAppService {
 		paymentRegistry:            cfg.PaymentRegistry,
 		multiwallet:                cfg.Multiwallet,
 		signer:                     cfg.Signer,
+		settlementSigner:           cfg.SettlementSigner,
 		orderProcessor:             cfg.OrderProcessor,
 		messenger:                  cfg.Messenger,
 		networkService:             cfg.NetworkService,
@@ -1110,7 +1113,6 @@ func (s *OrderAppService) buildFiatRefundMessage(order *models.Order, result *co
 	if err != nil {
 		return nil, err
 	}
-
 	return &npb.OrderMessage{
 		OrderID:     order.ID.String(),
 		MessageType: npb.OrderMessage_REFUND,
@@ -1999,6 +2001,11 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	coinType, err := payment.SettlementCoinFromPaymentSent(paymentSent)
 	if err != nil {
 		return nil, err
+	}
+	if terms, err := s.frozenStandardOrderSettlementTerms(order); err != nil {
+		return nil, err
+	} else if terms != nil && strings.TrimSpace(terms.ModeratorPeerID) != "" {
+		to = iwallet.NewAddress(terms.SellerAddress, coinType)
 	}
 	strategyV2, err := s.v2StrategyForCoin(coinType)
 	if err != nil {

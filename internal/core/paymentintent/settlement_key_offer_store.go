@@ -60,7 +60,9 @@ func StoreCryptoPaymentAttemptSettlementKeyOfferInTransaction(
 	}
 	if attempt.Kind != models.PaymentAttemptKindCryptoFundingTarget || attempt.State != models.PaymentAttemptAuthorizationDraft ||
 		offer.OrderID != attempt.OrderID || offer.AttemptID != attempt.AttemptID ||
-		offer.AuthorizationContextID != attempt.AuthorizationContextID || offer.RailID != attempt.Currency {
+		offer.AuthorizationContextID != attempt.AuthorizationContextID || offer.RailID != attempt.Currency ||
+		strings.TrimSpace(offer.ExpectedModeratorPeerID) != strings.TrimSpace(attempt.ExpectedModeratorPeerID) ||
+		(attempt.ExpectedModeratorPeerID != "" && strings.TrimSpace(offer.AmountAtomic) != strings.TrimSpace(attempt.AmountValue)) {
 		return models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	return retainSettlementKeyOfferRecord(tx, tenantID, offer, canonical, hash)

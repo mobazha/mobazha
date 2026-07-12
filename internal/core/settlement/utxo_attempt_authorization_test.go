@@ -17,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
+	"github.com/mobazha/mobazha/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -43,6 +44,14 @@ func (*attemptReleaseWallet) CreateMultisigAddress(
 	[]btcec.PublicKey, []byte, int,
 ) (iwallet.Address, []byte, error) {
 	return iwallet.Address{}, nil, nil
+}
+
+func (*attemptReleaseWallet) AddressToScriptPubKey(string) ([]byte, error) {
+	return []byte{0x00, 0x20, 0x01}, nil
+}
+
+func (*attemptReleaseWallet) DerivePaymentAddressFromPubKey(*btcec.PublicKey) (string, []byte, error) {
+	return "", nil, fmt.Errorf("not implemented")
 }
 
 func (*attemptReleaseWallet) SignMultisigTransaction(
@@ -126,6 +135,7 @@ func TestFrozenStandardOrderUTXOReleaseAuthorization_SelectsLocalRoleAndTerms(t 
 
 	buyerOrder := *vendorOrder
 	buyerOrder.MyRole = string(models.RoleBuyer)
+	buyerOrder.RefundAddress = "bc1qbuyerrefund"
 	params.ToAddress = iwallet.NewAddress("bc1qbuyerrefund", iwallet.CoinType(attempt.Currency))
 	params.FinishType = iwallet.ORDER_FINISH_CANCEL
 	authorization, err = svc.frozenStandardOrderUTXOReleaseAuthorization(&buyerOrder, params)
@@ -200,6 +210,71 @@ func TestReleaseFromCancelableAddress_UsesFrozenAttemptOpaqueSigner(t *testing.T
 		FinishType: iwallet.ORDER_FINISH_COMPLETE,
 	})
 	require.Error(t, err)
+}
+
+func TestCancelPartialPayment_UsesFrozenAttemptMonitorAndAbandonsTarget(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Read().AutoMigrate(&models.PaymentAttempt{}); err != nil {
+			return err
+		}
+		return tx.Read().AutoMigrate(&models.Order{})
+	}))
+	attempt, _ := frozenStandardOrderReleaseAttempt(t)
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(&attempt) }))
+	const partialAmount = "40000"
+	fundingTransaction := iwallet.Transaction{
+		ID: "partial-funding-tx",
+		From: []iwallet.SpendInfo{{
+			Address: iwallet.NewAddress("bc1qfundingsender", iwallet.CoinType(attempt.Currency)),
+		}},
+		To: []iwallet.SpendInfo{{
+			ID: []byte{1}, Address: iwallet.NewAddress("bc1qattempttarget", iwallet.CoinType(attempt.Currency)),
+			Amount: iwallet.NewAmount(partialAmount),
+		}},
+	}
+	wallet := &attemptReleaseWallet{fundingRecoveryWallet: fundingRecoveryWallet{}}
+	monitor := &mockUTXOMonitor{
+		watchedAddresses: map[string]*utxo.WatchedAddress{
+			"bc1qattempttarget": {
+				Address: "bc1qattempttarget", ScriptPubKey: []byte{0x00, 0x20, 0x01},
+				ChainType: iwallet.ChainBitcoin, OrderID: attempt.OrderID,
+			},
+		},
+		addressTxs: map[string][]iwallet.Transaction{
+			"bc1qattempttarget": {fundingTransaction},
+		},
+	}
+	signer := &attemptReleaseSigner{publicKey: []byte("buyer-attempt-key")}
+	svc := NewSettlementService(SettlementServiceConfig{
+		DB: db, Multiwallet: attemptReleaseWalletOperator{wallet: wallet},
+		SettlementSigner: signer, MonitorService: monitor,
+	})
+	order := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: attempt.TenantID},
+		ID:          models.OrderID(attempt.OrderID), MyRole: string(models.RoleBuyer),
+		RefundAddress: "bc1qbuyerrefund",
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(order) }))
+
+	txID, refunded, err := svc.CancelPartialPayment(attempt.OrderID)
+	require.NoError(t, err)
+	require.Equal(t, "attempt-release-tx", txID)
+	require.Equal(t, uint64(40000), refunded)
+	require.Equal(t, payment.SettlementActionCancel, signer.request.Action)
+	require.Equal(t, contracts.StandardOrderSettlementKeyPurpose+":buyer", signer.request.KeyRef.Purpose)
+	require.Equal(t, []string{"bc1qattempttarget"}, monitor.unwatched)
+
+	var stored models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID,
+		).First(&stored).Error
+	}))
+	require.Equal(t, models.PaymentAttemptAbandoned, stored.State)
+	require.Equal(t, "buyer cancelled partial funding", stored.LastError)
 }
 
 func attemptOrderID(value string) models.OrderID { return models.OrderID(value) }

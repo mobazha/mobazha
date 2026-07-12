@@ -21,12 +21,16 @@ type mockUTXOMonitor struct {
 	listUnspent           []utxo.UnspentOutput
 	listUnspentErr        error
 	listUnspentConfigured bool
+	unwatched             []string
 }
 
 func (m *mockUTXOMonitor) Start()                                     {}
 func (m *mockUTXOMonitor) Stop()                                      {}
 func (m *mockUTXOMonitor) WatchAddress(wa *utxo.WatchedAddress) error { return nil }
-func (m *mockUTXOMonitor) UnwatchAddress(address string) error        { return nil }
+func (m *mockUTXOMonitor) UnwatchAddress(address string) error {
+	m.unwatched = append(m.unwatched, address)
+	return nil
+}
 func (m *mockUTXOMonitor) RegisterNodeCallback(string, func(iwallet.Transaction, *utxo.WatchedAddress)) error {
 	return nil
 }

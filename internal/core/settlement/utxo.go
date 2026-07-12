@@ -95,8 +95,20 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 	if err != nil {
 		return nil, nil, err
 	}
-	if frozenAuthorization != nil && totalOut.String() != frozenAuthorization.target.AmountAtomic {
-		return nil, nil, models.ErrPaymentAttemptSettlementTermsConflict
+	if frozenAuthorization != nil {
+		switch frozenAuthorization.action {
+		case payment.SettlementActionComplete:
+			if totalOut.String() != frozenAuthorization.target.AmountAtomic {
+				return nil, nil, models.ErrPaymentAttemptSettlementTermsConflict
+			}
+		case payment.SettlementActionCancel:
+			expected := iwallet.NewAmount(frozenAuthorization.target.AmountAtomic)
+			if totalOut.Cmp(iwallet.NewAmount(0)) <= 0 || totalOut.Cmp(expected) > 0 {
+				return nil, nil, models.ErrPaymentAttemptSettlementTermsConflict
+			}
+		default:
+			return nil, nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
 	}
 	scriptHex := params.ScriptHex
 	if frozenAuthorization != nil {
@@ -238,8 +250,12 @@ func (s *SettlementService) frozenStandardOrderUTXOReleaseAuthorization(
 			!payment.SameUTXOAddress(params.ToAddress.String(), terms.SellerAddress) {
 			return nil, models.ErrPaymentAttemptSettlementTermsConflict
 		}
-	} else if order.Role() != models.RoleBuyer || params.FinishType != iwallet.ORDER_FINISH_CANCEL {
-		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	} else {
+		refundAddress := strings.TrimSpace(order.RefundAddress)
+		if order.Role() != models.RoleBuyer || params.FinishType != iwallet.ORDER_FINISH_CANCEL ||
+			refundAddress == "" || !payment.SameUTXOAddress(params.ToAddress.String(), refundAddress) {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
 	}
 	var offer *models.SettlementKeyOffer
 	for i := range bundle.Offers {
@@ -286,7 +302,14 @@ func (s *SettlementService) transactionsForCancelableRelease(
 ) ([]iwallet.Transaction, error) {
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
-		return nil, err
+		if !models.IsMessageNotExistError(err) {
+			return nil, err
+		}
+		txs, txErr := order.GetTransactions()
+		if txErr != nil {
+			return nil, fmt.Errorf("UTXO settlement requires PaymentSent funding facts or recovered transactions: %w", txErr)
+		}
+		return txs, nil
 	}
 	if len(paymentSent.GetFundingFacts()) == 0 {
 		return nil, fmt.Errorf("UTXO settlement requires PaymentSent funding facts")
@@ -480,7 +503,7 @@ func (s *SettlementService) CancelPartialPayment(orderID string) (txid string, r
 
 	pendingInfo, _ := order.GetPendingPaymentInfo()
 	if order.PaymentAddress == "" || pendingInfo == nil || pendingInfo.Coin == "" {
-		return "", 0, fmt.Errorf("no pending payment to cancel")
+		return s.cancelFrozenStandardOrderPartialPayment(order)
 	}
 
 	totalPaid, err := calculateTotalPaidToAddress(order, order.PaymentAddress)
@@ -527,6 +550,118 @@ func (s *SettlementService) CancelPartialPayment(orderID string) (txid string, r
 		txidStr = releaseTx.ID.String()
 	}
 	return txidStr, totalPaid.Uint64(), nil
+}
+
+func (s *SettlementService) cancelFrozenStandardOrderPartialPayment(
+	order *models.Order,
+) (txid string, refundedAmount uint64, err error) {
+	if s == nil || s.db == nil || s.multiwallet == nil || s.monitorService == nil || order == nil {
+		return "", 0, fmt.Errorf("frozen partial payment cancellation is not configured")
+	}
+	if order.Role() != models.RoleBuyer {
+		return "", 0, fmt.Errorf("frozen partial payment cancellation requires the buyer order")
+	}
+	var attempts []models.PaymentAttempt
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+			strings.TrimSpace(order.TenantID), order.ID.String(),
+			models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady,
+		).Find(&attempts).Error
+	}); err != nil {
+		return "", 0, fmt.Errorf("load frozen partial payment attempt: %w", err)
+	}
+	if len(attempts) != 1 {
+		return "", 0, fmt.Errorf("frozen partial payment cancellation requires exactly one active attempt")
+	}
+	attempt := attempts[0]
+	target, err := attempt.GetFundingTarget()
+	if err != nil || target == nil || strings.TrimSpace(target.RedeemScriptHex) == "" {
+		return "", 0, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(attempt.Currency))
+	if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
+		return "", 0, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	wallet, err := s.multiwallet.WalletForCurrencyCode(attempt.Currency)
+	if err != nil {
+		return "", 0, fmt.Errorf("load frozen partial payment wallet: %w", err)
+	}
+	addressUtilities, ok := wallet.(iwallet.UTXOAddressUtilities)
+	if !ok {
+		return "", 0, fmt.Errorf("wallet for %s cannot derive UTXO scriptPubKey", attempt.Currency)
+	}
+	scriptPubKey, err := addressUtilities.AddressToScriptPubKey(target.Address)
+	if err != nil {
+		return "", 0, fmt.Errorf("derive frozen partial payment scriptPubKey: %w", err)
+	}
+	if len(scriptPubKey) == 0 {
+		return "", 0, fmt.Errorf("frozen partial payment scriptPubKey is empty")
+	}
+	txs, err := s.monitorService.GetAddressTransactions(coinInfo.Chain, target.Address, scriptPubKey)
+	if err != nil {
+		return "", 0, fmt.Errorf("query frozen partial payment transactions: %w", err)
+	}
+	releasePlan, totalPaid := collectCancelableReleaseInputs(txs, target.Address)
+	if len(releasePlan.From) == 0 || totalPaid.Cmp(iwallet.NewAmount(0)) <= 0 {
+		return "", 0, fmt.Errorf("no payments found to cancel")
+	}
+	if totalPaid.Cmp(iwallet.NewAmount(target.AmountAtomic)) > 0 {
+		return "", 0, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	for _, tx := range txs {
+		if err := order.PutTransaction(tx); err != nil && !models.IsDuplicateTransactionError(err) {
+			return "", 0, fmt.Errorf("retain frozen partial payment transaction: %w", err)
+		}
+	}
+	refundAddress := strings.TrimSpace(order.RefundAddress)
+	if refundAddress == "" {
+		return "", 0, models.ErrRefundAddressRequired
+	}
+	refund := iwallet.NewAddress(refundAddress, iwallet.CoinType(attempt.Currency))
+	if err := wallet.ValidateAddress(refund); err != nil {
+		return "", 0, fmt.Errorf("validate frozen partial payment refund address: %w", err)
+	}
+	walletTx, releaseTx, err := s.ReleaseFromCancelableAddressWithParams(order, contracts.ReleaseFromCancelableParams{
+		CoinCode: attempt.Currency, PaymentAddress: target.Address,
+		ScriptHex: target.RedeemScriptHex, ToAddress: refund,
+		FinishType: iwallet.ORDER_FINISH_CANCEL,
+	})
+	if err != nil {
+		return "", 0, fmt.Errorf("release frozen partial payment: %w", err)
+	}
+	if err := walletTx.Commit(); err != nil {
+		return "", 0, fmt.Errorf("commit frozen partial payment cancellation: %w", err)
+	}
+	if err := s.db.Update(func(tx database.Tx) error {
+		if releaseTx != nil {
+			if err := order.PutTransaction(*releaseTx); err != nil && !models.IsDuplicateTransactionError(err) {
+				return fmt.Errorf("save frozen partial payment release: %w", err)
+			}
+		}
+		result := tx.Read().Model(&models.PaymentAttempt{}).Where(
+			"tenant_id = ? AND attempt_id = ? AND state = ?",
+			attempt.TenantID, attempt.AttemptID, models.PaymentAttemptFundingTargetReady,
+		).Updates(map[string]any{
+			"state": models.PaymentAttemptAbandoned, "last_error": "buyer cancelled partial funding",
+		})
+		if result.Error != nil {
+			return fmt.Errorf("abandon frozen partial payment attempt: %w", result.Error)
+		}
+		if result.RowsAffected != 1 {
+			return fmt.Errorf("abandon frozen partial payment attempt: state changed concurrently")
+		}
+		return tx.Save(order)
+	}); err != nil {
+		return "", 0, fmt.Errorf("persist frozen partial payment cancellation: %w", err)
+	}
+	if err := s.monitorService.UnwatchAddress(target.Address); err != nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "Failed to unwatch frozen partial payment address for order %s: %v", order.ID, err)
+	}
+	if releaseTx == nil {
+		return "", totalPaid.Uint64(), nil
+	}
+	return releaseTx.ID.String(), totalPaid.Uint64(), nil
 }
 
 // getRefundAddressFromTransactions extracts the buyer's refund address from transaction inputs.

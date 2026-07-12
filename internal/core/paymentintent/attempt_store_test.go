@@ -260,6 +260,68 @@ func TestCreateCryptoPaymentAttemptDraft_ReusesDurableContextOnRetry(t *testing.
 	require.Equal(t, models.PaymentAttemptAuthorizationDraft, retry.State)
 }
 
+func TestStoreCryptoPaymentAttemptSettlementKeyOffer_RetainsVerifiedDraftOffers(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-offers-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
+	attempt, route, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
+	attempt.TenantID = "tenant-a"
+	route.TenantID = attempt.TenantID
+	attempt, err = CreateCryptoPaymentAttemptDraft(db, attempt, route)
+	require.NoError(t, err)
+
+	var buyerOffer, sellerOffer models.SettlementKeyOffer
+	for _, offer := range bundle.Offers {
+		switch offer.ParticipantRole {
+		case models.SettlementParticipantBuyer:
+			buyerOffer = offer
+		case models.SettlementParticipantSeller:
+			sellerOffer = offer
+		}
+	}
+	require.NoError(t, StoreCryptoPaymentAttemptSettlementKeyOffer(db, attempt.TenantID, attempt.AttemptID, sellerOffer))
+	require.NoError(t, StoreCryptoPaymentAttemptSettlementKeyOffer(db, attempt.TenantID, attempt.AttemptID, sellerOffer))
+
+	keyPair, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	peerID, err := identity.PeerIDFromPublicKey(keyPair.PubKey)
+	require.NoError(t, err)
+	duplicateKeyOffer, err := IssueSettlementKeyOffer(
+		t.Context(), contracts.NewKeyPairSigner(keyPair, peerID),
+		&settlementKeyOfferSignerStub{publicKey: sellerOffer.PublicKey},
+		contracts.SettlementKeyRef{
+			TenantID: attempt.TenantID, RailID: attempt.Currency,
+			Purpose: "standard-order-participant", ReferenceID: attempt.AuthorizationContextID,
+		},
+		attempt.OrderID, attempt.AttemptID, models.SettlementParticipantBuyer,
+	)
+	require.NoError(t, err)
+	require.ErrorContains(t,
+		StoreCryptoPaymentAttemptSettlementKeyOffer(db, attempt.TenantID, attempt.AttemptID, duplicateKeyOffer),
+		"already retained",
+	)
+
+	require.NoError(t, StoreCryptoPaymentAttemptSettlementKeyOffer(db, attempt.TenantID, attempt.AttemptID, buyerOffer))
+	offers, err := ListCryptoPaymentAttemptSettlementKeyOffers(db, attempt.TenantID, attempt.AttemptID)
+	require.NoError(t, err)
+	require.Len(t, offers, 2)
+	require.Equal(t, []models.SettlementParticipantRole{
+		models.SettlementParticipantBuyer,
+		models.SettlementParticipantSeller,
+	}, []models.SettlementParticipantRole{offers[0].ParticipantRole, offers[1].ParticipantRole})
+
+	builtBundle, err := BuildCryptoPaymentAttemptAuthorizationBundle(db, attempt.TenantID, attempt.AttemptID, terms, signer, signature, target)
+	require.NoError(t, err)
+	_, expectedHash, err := bundle.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	_, actualHash, err := builtBundle.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, actualHash)
+	require.NoError(t, FreezeCryptoPaymentAttempt(db, attempt, route, terms, signer, signature, builtBundle, target))
+	_, err = ListCryptoPaymentAttemptSettlementKeyOffers(db, attempt.TenantID, attempt.AttemptID)
+	require.ErrorIs(t, err, models.ErrPaymentAttemptSettlementTermsConflict)
+}
+
 func TestNewSettlementSignRequest_UsesOnlyFrozenAttemptBindings(t *testing.T) {
 	attempt, _, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
 	attempt.TenantID = "tenant-a"

@@ -582,6 +582,7 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.SharedPaymentIntent{},
 		&models.PaymentRouteBinding{},
 		&models.PaymentAttempt{},
+		&models.PaymentAttemptSettlementOffer{},
 		&models.PaymentSelectionQuote{},
 		&models.PaymentProviderBinding{},
 		&models.PaymentProviderCredential{},

@@ -124,6 +124,20 @@ func (o SettlementKeyOffer) Verify() error {
 	return nil
 }
 
+// CanonicalBytesAndHash verifies and canonically encodes one signed offer for
+// durable idempotency checks before the complete authorization bundle exists.
+func (o SettlementKeyOffer) CanonicalBytesAndHash() ([]byte, string, error) {
+	if err := o.Verify(); err != nil {
+		return nil, "", err
+	}
+	canonical, err := json.Marshal(o)
+	if err != nil {
+		return nil, "", fmt.Errorf("encode settlement key offer: %w", err)
+	}
+	digest := sha256.Sum256(canonical)
+	return canonical, hex.EncodeToString(digest[:]), nil
+}
+
 func (o SettlementKeyOffer) validate(requireSignature bool) error {
 	if o.Version != SettlementAuthorizationVersion ||
 		!validSettlementAuthorizationContextID(o.AuthorizationContextID) ||

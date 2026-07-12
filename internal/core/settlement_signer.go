@@ -74,7 +74,9 @@ func (s *localSettlementSigner) deriveKey(keyRef contracts.SettlementKeyRef) (*b
 	if root == nil {
 		return nil, fmt.Errorf("settlement signer root is unavailable")
 	}
-	info := canonicalSettlementFields(keyRef.TenantID, keyRef.RailID, keyRef.Purpose, keyRef.ReferenceID)
+	// TenantID selects or audits the signer outside this standalone adapter; it
+	// is intentionally excluded from the stable settlement-key domain.
+	info := canonicalSettlementFields(keyRef.RailID, keyRef.Purpose, keyRef.ReferenceID)
 	reader := hkdf.New(sha256.New, root.Serialize(), []byte("mobazha-settlement-domain-v1"), info)
 	seed := make([]byte, 32)
 	if _, err := io.ReadFull(reader, seed); err != nil {
@@ -90,7 +92,7 @@ func (s *localSettlementSigner) deriveKey(keyRef contracts.SettlementKeyRef) (*b
 func settlementSignatureDigest(request contracts.SettlementSignRequest) [32]byte {
 	encoded := canonicalSettlementFields(
 		"mobazha-settlement-signature-v1", request.Domain,
-		request.KeyRef.TenantID, request.KeyRef.RailID,
+		request.KeyRef.RailID,
 		request.KeyRef.Purpose, request.KeyRef.ReferenceID,
 	)
 	encoded = appendCanonicalField(encoded, request.Payload)

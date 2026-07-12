@@ -564,7 +564,6 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.GuestOrder{},
 		&models.GuestOrderItem{},
 		&models.InventoryReservation{},
-		&models.DirectPaymentAddressCounter{},
 		&models.WalletAddressCursor{},
 		&models.WalletAddressReservation{},
 		&models.WalletTransfer{},
@@ -835,7 +834,6 @@ func autoMigrateDatabaseSafe(db database.Database) error {
 		&models.GuestOrder{},
 		&models.GuestOrderItem{},
 		&models.InventoryReservation{},
-		&models.DirectPaymentAddressCounter{},
 		&models.WalletAddressCursor{},
 		&models.WalletAddressReservation{},
 		&models.WalletTransfer{},
@@ -876,12 +874,6 @@ func assertNoLegacyWalletReceivingState(tx database.Tx) error {
 	}
 	if count > 0 {
 		return fmt.Errorf("legacy affiliate escrow sweep state exists (%d records); stop startup and migrate funds explicitly", count)
-	}
-	if err := tx.Read().Model(&models.DirectPaymentAddressCounter{}).Count(&count).Error; err != nil {
-		return fmt.Errorf("inspect legacy guest address state: %w", err)
-	}
-	if count > 0 {
-		return fmt.Errorf("legacy guest address allocation state exists (%d records); stop startup and migrate or reset it explicitly", count)
 	}
 	if err := tx.Read().Model(&models.SweepTask{}).Count(&count).Error; err != nil {
 		return fmt.Errorf("inspect legacy guest sweep state: %w", err)

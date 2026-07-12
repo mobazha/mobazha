@@ -19,6 +19,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/mobazha/mobazha/pkg/config"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -118,9 +119,13 @@ func (s *walletAccountService) ReserveAddress(
 	s.reservationMu.Lock()
 	defer s.reservationMu.Unlock()
 
+	tenantID, err := walletReservationTenantID(ctx, s.db)
+	if err != nil {
+		return contracts.ReservedDestination{}, err
+	}
 	var result contracts.ReservedDestination
 	for attempt := 0; attempt < 3; attempt++ {
-		err = s.reserveAddress(ctx, railID, role, referenceID, coinInfo.Chain, &result)
+		err = s.reserveAddress(ctx, tenantID, railID, role, referenceID, coinInfo.Chain, &result)
 		if !errors.Is(err, errWalletAddressCursorCreateRace) {
 			break
 		}
@@ -133,6 +138,7 @@ func (s *walletAccountService) ReserveAddress(
 
 func (s *walletAccountService) reserveAddress(
 	ctx context.Context,
+	tenantID string,
 	railID string,
 	role contracts.WalletAccountRole,
 	referenceID string,
@@ -140,14 +146,14 @@ func (s *walletAccountService) reserveAddress(
 	result *contracts.ReservedDestination,
 ) error {
 	return s.db.Update(func(tx database.Tx) error {
-		cursor, err := s.lockCursor(ctx, tx, railID, role)
+		cursor, err := s.lockCursor(ctx, tx, tenantID, railID, role)
 		if err != nil {
 			return err
 		}
 
 		var existing models.WalletAddressReservation
 		err = tx.Read().WithContext(ctx).
-			Where("rail_id = ? AND account_role = ? AND reference_id = ?", railID, string(role), referenceID).
+			Where("tenant_id = ? AND rail_id = ? AND account_role = ? AND reference_id = ?", tenantID, railID, string(role), referenceID).
 			First(&existing).Error
 		if err == nil {
 			*result = reservedDestinationFromModel(existing)
@@ -157,12 +163,24 @@ func (s *walletAccountService) reserveAddress(
 			return fmt.Errorf("load wallet address reservation: %w", err)
 		}
 
+		var conflicting models.WalletAddressReservation
+		err = tx.Read().WithContext(ctx).Where("tenant_id = ? AND reference_id = ?", tenantID, referenceID).First(&conflicting).Error
+		if err == nil {
+			return fmt.Errorf(
+				"wallet address reservation reference %q is already bound to rail %q and role %q",
+				referenceID, conflicting.RailID, conflicting.AccountRole,
+			)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("check wallet address reservation scope: %w", err)
+		}
+
 		address, err := s.deriveAddress(chain, role, cursor.NextIndex)
 		if err != nil {
 			return err
 		}
 		reservation := models.WalletAddressReservation{
-			RailID: railID, AccountRole: string(role), ReferenceID: referenceID,
+			TenantID: tenantID, RailID: railID, AccountRole: string(role), ReferenceID: referenceID,
 			AddressIndex: cursor.NextIndex, Address: address, Version: 1,
 		}
 		cursor.NextIndex++
@@ -180,14 +198,15 @@ func (s *walletAccountService) reserveAddress(
 func (s *walletAccountService) lockCursor(
 	ctx context.Context,
 	tx database.Tx,
+	tenantID string,
 	railID string,
 	role contracts.WalletAccountRole,
 ) (*models.WalletAddressCursor, error) {
-	cursor := models.WalletAddressCursor{RailID: railID, AccountRole: string(role)}
+	cursor := models.WalletAddressCursor{TenantID: tenantID, RailID: railID, AccountRole: string(role)}
 	err := tx.Read().WithContext(ctx).
-		Where("rail_id = ? AND account_role = ?", railID, string(role)).First(&cursor).Error
+		Where("tenant_id = ? AND rail_id = ? AND account_role = ?", tenantID, railID, string(role)).First(&cursor).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		cursor = models.WalletAddressCursor{RailID: railID, AccountRole: string(role)}
+		cursor = models.WalletAddressCursor{TenantID: tenantID, RailID: railID, AccountRole: string(role)}
 		if err := tx.Create(&cursor); err != nil {
 			return nil, fmt.Errorf("%w: %v", errWalletAddressCursorCreateRace, err)
 		}
@@ -195,10 +214,29 @@ func (s *walletAccountService) lockCursor(
 		return nil, fmt.Errorf("load wallet address cursor: %w", err)
 	}
 	if err := tx.Read().WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("rail_id = ? AND account_role = ?", railID, string(role)).First(&cursor).Error; err != nil {
+		Where("tenant_id = ? AND rail_id = ? AND account_role = ?", tenantID, railID, string(role)).First(&cursor).Error; err != nil {
 		return nil, fmt.Errorf("lock wallet address cursor: %w", err)
 	}
 	return &cursor, nil
+}
+
+type tenantScopedDatabase interface {
+	TenantID() string
+}
+
+func walletReservationTenantID(ctx context.Context, db database.Database) (string, error) {
+	contextTenantID := strings.TrimSpace(config.TenantIDFromContext(ctx))
+	databaseTenantID := ""
+	if scoped, ok := db.(tenantScopedDatabase); ok {
+		databaseTenantID = strings.TrimSpace(scoped.TenantID())
+	}
+	if contextTenantID != "" && databaseTenantID != "" && contextTenantID != databaseTenantID {
+		return "", fmt.Errorf("wallet reservation tenant context does not match database scope")
+	}
+	if databaseTenantID != "" {
+		return databaseTenantID, nil
+	}
+	return contextTenantID, nil
 }
 
 func (s *walletAccountService) deriveAddress(

@@ -16,9 +16,8 @@ import (
 	"github.com/mobazha/mobazha/pkg/contracts"
 )
 
-func TestLocalSettlementSigner_DeterministicAndDomainSeparated(t *testing.T) {
-	root, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
+func TestLocalSettlementSigner_DeterministicAndStableContextSeparated(t *testing.T) {
+	root := settlementTestPrivateKey(t, 1)
 	signer := newLocalSettlementSigner(newFileKeyProvider(nil, root, nil, nil, nil))
 	ref := contracts.SettlementKeyRef{
 		TenantID: "tenant-a", RailID: "ETH", Purpose: "guest-managed-escrow-owner", ReferenceID: "owner-v1",
@@ -34,17 +33,64 @@ func TestLocalSettlementSigner_DeterministicAndDomainSeparated(t *testing.T) {
 	otherTenant.TenantID = "tenant-b"
 	other, err := signer.PublicKey(t.Context(), otherTenant)
 	require.NoError(t, err)
-	assert.NotEqual(t, first, other)
+	assert.Equal(t, first, other)
 	otherRail := ref
 	otherRail.RailID = "BSC"
 	other, err = signer.PublicKey(t.Context(), otherRail)
 	require.NoError(t, err)
 	assert.NotEqual(t, first, other)
+
+	buyerRole := ref
+	buyerRole.Purpose = "standard-order-participant:buyer"
+	buyerKey, err := signer.PublicKey(t.Context(), buyerRole)
+	require.NoError(t, err)
+	sellerRole := ref
+	sellerRole.Purpose = "standard-order-participant:seller"
+	sellerKey, err := signer.PublicKey(t.Context(), sellerRole)
+	require.NoError(t, err)
+	assert.NotEqual(t, buyerKey, sellerKey)
+}
+
+func TestLocalSettlementSigner_TenantIDDoesNotAffectKeyOrSignatureDigest(t *testing.T) {
+	signer := newLocalSettlementSigner(newFileKeyProvider(nil, settlementTestPrivateKey(t, 1), nil, nil, nil))
+	request := contracts.SettlementSignRequest{
+		KeyRef: contracts.SettlementKeyRef{
+			TenantID: "tenant-a", RailID: "ETH", Purpose: "safe-owner", ReferenceID: "order-1",
+		},
+		Domain: "safe-execute-v1", Payload: []byte("canonical transaction plan"),
+	}
+
+	firstPublicKey, err := signer.PublicKey(t.Context(), request.KeyRef)
+	require.NoError(t, err)
+	firstDigest := settlementSignatureDigest(request)
+
+	otherTenant := request
+	otherTenant.KeyRef.TenantID = "tenant-b"
+	secondPublicKey, err := signer.PublicKey(t.Context(), otherTenant.KeyRef)
+	require.NoError(t, err)
+	secondDigest := settlementSignatureDigest(otherTenant)
+
+	assert.Equal(t, firstPublicKey, secondPublicKey)
+	assert.Equal(t, firstDigest, secondDigest)
+}
+
+func TestLocalSettlementSigner_DifferentRootsProduceDifferentPublicKeys(t *testing.T) {
+	ref := contracts.SettlementKeyRef{
+		TenantID: "tenant-a", RailID: "ETH", Purpose: "safe-owner", ReferenceID: "order-1",
+	}
+	firstSigner := newLocalSettlementSigner(newFileKeyProvider(nil, settlementTestPrivateKey(t, 1), nil, nil, nil))
+	secondSigner := newLocalSettlementSigner(newFileKeyProvider(nil, settlementTestPrivateKey(t, 2), nil, nil, nil))
+
+	firstPublicKey, err := firstSigner.PublicKey(t.Context(), ref)
+	require.NoError(t, err)
+	secondPublicKey, err := secondSigner.PublicKey(t.Context(), ref)
+	require.NoError(t, err)
+
+	assert.NotEqual(t, firstPublicKey, secondPublicKey)
 }
 
 func TestLocalSettlementSigner_SignatureBindsDomainPayloadAndReference(t *testing.T) {
-	root, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
+	root := settlementTestPrivateKey(t, 1)
 	signer := newLocalSettlementSigner(newFileKeyProvider(nil, root, nil, nil, nil))
 	request := contracts.SettlementSignRequest{
 		KeyRef: contracts.SettlementKeyRef{
@@ -70,10 +116,8 @@ func TestLocalSettlementSigner_SignatureBindsDomainPayloadAndReference(t *testin
 }
 
 func TestGuestManagedEscrowOwner_UsesSettlementSignerNotEVMProfileKey(t *testing.T) {
-	profileKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	settlementRoot, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
+	profileKey := settlementTestPrivateKey(t, 1)
+	settlementRoot := settlementTestPrivateKey(t, 2)
 	signer := newLocalSettlementSigner(newFileKeyProvider(profileKey, settlementRoot, nil, nil, nil))
 	resolver := &guest.NodeEVMSellerOwnerResolver{Signer: signer, TenantID: "tenant-a"}
 
@@ -88,4 +132,13 @@ func TestGuestManagedEscrowOwner_UsesSettlementSignerNotEVMProfileKey(t *testing
 	otherRailOwner, err := resolver.SellerEVMOwnerAddress(t.Context(), "BSC")
 	require.NoError(t, err)
 	assert.NotEqual(t, owner, otherRailOwner)
+}
+
+func settlementTestPrivateKey(t *testing.T, seed byte) *btcec.PrivateKey {
+	t.Helper()
+	keyBytes := make([]byte, 32)
+	keyBytes[len(keyBytes)-1] = seed
+	key, _ := btcec.PrivKeyFromBytes(keyBytes)
+	require.NotNil(t, key)
+	return key
 }

@@ -4,6 +4,7 @@
 package contracts
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,4 +26,15 @@ func TestSettlementSignRequest_ValidateRequiresOpaqueScopeAndDomain(t *testing.T
 	invalid = valid
 	invalid.KeyRef.ReferenceID = ""
 	require.Error(t, invalid.Validate())
+}
+
+func TestSettlementSigner_ExposesOnlyOpaqueOperations(t *testing.T) {
+	signerType := reflect.TypeOf((*SettlementSigner)(nil)).Elem()
+	require.Equal(t, 2, signerType.NumMethod())
+	_, hasPublicKey := signerType.MethodByName("PublicKey")
+	_, hasSign := signerType.MethodByName("Sign")
+	_, hasPrivateKey := signerType.MethodByName("PrivateKey")
+	require.True(t, hasPublicKey)
+	require.True(t, hasSign)
+	require.False(t, hasPrivateKey)
 }

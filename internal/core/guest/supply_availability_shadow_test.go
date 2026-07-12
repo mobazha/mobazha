@@ -486,13 +486,7 @@ func (*recordingGuestAffiliateService) TransitionCommissionTx(database.Tx, strin
 func TestCreateGuestOrder_FreezesAffiliateTermsInPaymentCoin(t *testing.T) {
 	svc := newUTXOCapableService(t, true, true)
 	db := svc.db.(*testDatabase)
-	require.NoError(t, db.gormDB.AutoMigrate(
-		&models.DirectPaymentAddressCounter{},
-		&models.GuestCheckoutConfig{},
-	))
-	require.NoError(t, db.gormDB.Create(&models.DirectPaymentAddressCounter{
-		TenantID: testTenantID, ID: 1, ChainKey: "LTC",
-	}).Error)
+	require.NoError(t, db.gormDB.AutoMigrate(&models.GuestCheckoutConfig{}))
 	recorder := &recordingSupplyAvailability{quoteResult: &contracts.SupplyQuoteResult{CanSell: true}}
 	affiliate := &recordingGuestAffiliateService{}
 	svc.resolver = alwaysEnabledResolver{}
@@ -538,15 +532,7 @@ func TestValidateGuestAffiliateUTXOPayout_RejectsDustBeforePayment(t *testing.T)
 func TestCreateGuestOrder_ShadowQuotePreservesGuestInventoryReservation(t *testing.T) {
 	svc := newUTXOCapableService(t, true, true)
 	db := svc.db.(*testDatabase)
-	require.NoError(t, db.gormDB.AutoMigrate(
-		&models.DirectPaymentAddressCounter{},
-		&models.GuestCheckoutConfig{},
-	))
-	require.NoError(t, db.gormDB.Create(&models.DirectPaymentAddressCounter{
-		TenantID: testTenantID,
-		ID:       1,
-		ChainKey: "LTC",
-	}).Error)
+	require.NoError(t, db.gormDB.AutoMigrate(&models.GuestCheckoutConfig{}))
 
 	recorder := &recordingSupplyAvailability{
 		quoteResult: &contracts.SupplyQuoteResult{CanSell: true},
@@ -613,15 +599,9 @@ func TestCreateGuestOrder_ShadowQuoteUsesExternalSupplyLineForSyncedListing(t *t
 	svc := newUTXOCapableService(t, true, true)
 	db := svc.db.(*testDatabase)
 	require.NoError(t, db.gormDB.AutoMigrate(
-		&models.DirectPaymentAddressCounter{},
 		&models.GuestCheckoutConfig{},
 		&models.SyncedProductMapping{},
 	))
-	require.NoError(t, db.gormDB.Create(&models.DirectPaymentAddressCounter{
-		TenantID: testTenantID,
-		ID:       1,
-		ChainKey: "LTC",
-	}).Error)
 	seedGuestExternalSupplyMapping(t, db, models.SyncedProductMapping{
 		ID:            "spm-1",
 		ProviderID:    "printful",
@@ -684,15 +664,7 @@ func TestCreateGuestOrder_ShadowQuoteUsesExternalSupplyLineForSyncedListing(t *t
 func TestCreateGuestOrder_AuthoritativeSupplyReserveUsesTransactionalService(t *testing.T) {
 	svc := newUTXOCapableService(t, true, true)
 	db := svc.db.(*testDatabase)
-	require.NoError(t, db.gormDB.AutoMigrate(
-		&models.DirectPaymentAddressCounter{},
-		&models.GuestCheckoutConfig{},
-	))
-	require.NoError(t, db.gormDB.Create(&models.DirectPaymentAddressCounter{
-		TenantID: testTenantID,
-		ID:       1,
-		ChainKey: "LTC",
-	}).Error)
+	require.NoError(t, db.gormDB.AutoMigrate(&models.GuestCheckoutConfig{}))
 
 	recorder := &transactionalRecordingSupplyAvailability{}
 	svc.resolver = alwaysEnabledResolver{}
@@ -745,15 +717,7 @@ func TestCreateGuestOrder_AuthoritativeSupplyReserveUsesTransactionalService(t *
 func TestCreateGuestOrder_PreparesDigitalSupplyBeforeWriteTransaction(t *testing.T) {
 	svc := newUTXOCapableService(t, true, true)
 	baseDB := svc.db.(*testDatabase)
-	require.NoError(t, baseDB.gormDB.AutoMigrate(
-		&models.DirectPaymentAddressCounter{},
-		&models.GuestCheckoutConfig{},
-	))
-	require.NoError(t, baseDB.gormDB.Create(&models.DirectPaymentAddressCounter{
-		TenantID: testTenantID,
-		ID:       1,
-		ChainKey: "LTC",
-	}).Error)
+	require.NoError(t, baseDB.gormDB.AutoMigrate(&models.GuestCheckoutConfig{}))
 
 	guardDB := &nestedViewGuardDatabase{Database: baseDB}
 	listing := guestListingWithSku("ebook", "License", "Standard", "3", "1200")
@@ -791,15 +755,9 @@ func TestCreateGuestOrder_AuthoritativeSupplyReserveSkipsExternalSyncedListing(t
 	svc := newUTXOCapableService(t, true, true)
 	db := svc.db.(*testDatabase)
 	require.NoError(t, db.gormDB.AutoMigrate(
-		&models.DirectPaymentAddressCounter{},
 		&models.GuestCheckoutConfig{},
 		&models.SyncedProductMapping{},
 	))
-	require.NoError(t, db.gormDB.Create(&models.DirectPaymentAddressCounter{
-		TenantID: testTenantID,
-		ID:       1,
-		ChainKey: "LTC",
-	}).Error)
 	seedGuestExternalSupplyMapping(t, db, models.SyncedProductMapping{
 		ID:            "spm-1",
 		ProviderID:    "printful",

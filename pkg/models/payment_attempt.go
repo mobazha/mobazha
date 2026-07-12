@@ -23,13 +23,14 @@ const (
 	PaymentAttemptExpired             = "expired"
 	PaymentAttemptAbandoning          = "abandoning"
 	PaymentAttemptAbandoned           = "abandoned"
+	PaymentAttemptAuthorizationDraft  = "authorization_draft"
 	PaymentAttemptFundingTargetReady  = "funding_target_ready"
 )
 
 // PaymentAttempt is Core's durable claim for one concrete payment provisioning
 // operation. It must exist before any external provider or chain create call.
 type PaymentAttempt struct {
-	TenantID  string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:idx_payment_attempt_idempotency,priority:1"`
+	TenantID  string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:idx_payment_attempt_idempotency,priority:1;uniqueIndex:idx_payment_attempt_authorization_context,priority:1"`
 	AttemptID string `gorm:"column:attempt_id;primaryKey;size:64"`
 	// Kind defaults to provider_session so databases created before attempt
 	// kinds were introduced upgrade without losing the meaning of existing rows.
@@ -48,6 +49,11 @@ type PaymentAttempt struct {
 	RequiredConfs     int    `gorm:"column:required_confirmations;not null;default:0"`
 	FundingTarget     []byte `gorm:"column:funding_target;type:text"`
 	FundingTargetHash string `gorm:"column:funding_target_hash;size:64;not null;default:'';index"`
+	// AuthorizationContextID is the non-secret, immutable key-locating input
+	// for attempt-scoped Settlement participant keys.
+	AuthorizationContextID  string `gorm:"column:authorization_context_id;size:64;not null;default:'';uniqueIndex:idx_payment_attempt_authorization_context,priority:2"`
+	AuthorizationBundle     []byte `gorm:"column:authorization_bundle;type:text"`
+	AuthorizationBundleHash string `gorm:"column:authorization_bundle_hash;size:64;not null;default:'';index"`
 	// SettlementTerms is the canonical, immutable economic allocation owned by
 	// this attempt. It must be committed before an actionable funding target is
 	// exposed. SettlementTermsHash binds settlement actions to these exact bytes.
@@ -60,6 +66,87 @@ type PaymentAttempt struct {
 	LastError              string     `gorm:"column:last_error;size:2048"`
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
+}
+
+// SetAuthorizationContextID freezes the random context that locates this
+// attempt's Settlement keys. Retried provisioning must reuse the same value.
+func (a *PaymentAttempt) SetAuthorizationContextID(contextID string) error {
+	if a == nil || !validSettlementAuthorizationContextID(contextID) {
+		return fmt.Errorf("invalid payment attempt authorization context")
+	}
+	if a.AuthorizationContextID != "" && a.AuthorizationContextID != contextID {
+		return ErrPaymentAttemptSettlementTermsConflict
+	}
+	a.AuthorizationContextID = contextID
+	return nil
+}
+
+// SetAuthorizationBundle freezes verified participant offers, seller terms
+// authorization, and the target commitment for this crypto attempt.
+func (a *PaymentAttempt) SetAuthorizationBundle(bundle PaymentAttemptAuthorizationBundle) error {
+	if a == nil || a.Kind != PaymentAttemptKindCryptoFundingTarget {
+		return fmt.Errorf("authorization bundles require a crypto payment attempt")
+	}
+	terms, err := a.GetSettlementTerms()
+	if err != nil {
+		return err
+	}
+	if terms == nil || a.AuthorizationContextID == "" || a.SellerTermsSigner == "" || len(a.SellerTermsSignature) == 0 {
+		return fmt.Errorf("authorization context, terms, and seller authorization are required before authorization bundle")
+	}
+	canonical, hash, err := bundle.CanonicalBytesAndHash()
+	if err != nil {
+		return err
+	}
+	if bundle.AuthorizationContextID != a.AuthorizationContextID || bundle.OrderID != a.OrderID ||
+		bundle.AttemptID != a.AttemptID || bundle.RailID != a.Currency ||
+		bundle.SettlementTermsHash != a.SettlementTermsHash || bundle.SellerTermsSigner != a.SellerTermsSigner ||
+		string(bundle.SellerTermsSignature) != string(a.SellerTermsSignature) {
+		return fmt.Errorf("authorization bundle does not match payment attempt")
+	}
+	expectedOfferPeers := map[SettlementParticipantRole]string{
+		SettlementParticipantBuyer:  terms.BuyerPeerID,
+		SettlementParticipantSeller: terms.SellerPeerID,
+	}
+	if terms.ModeratorPeerID != "" {
+		expectedOfferPeers[SettlementParticipantModerator] = terms.ModeratorPeerID
+	}
+	if len(bundle.RequiredRoles) != len(expectedOfferPeers) {
+		return fmt.Errorf("authorization bundle roles do not match settlement terms")
+	}
+	for _, offer := range bundle.Offers {
+		if expectedPeerID, ok := expectedOfferPeers[offer.ParticipantRole]; !ok || offer.ParticipantPeerID != expectedPeerID {
+			return fmt.Errorf("authorization bundle offer does not match settlement terms")
+		}
+	}
+	if len(a.AuthorizationBundle) > 0 || a.AuthorizationBundleHash != "" {
+		if string(a.AuthorizationBundle) != string(canonical) || a.AuthorizationBundleHash != hash {
+			return ErrPaymentAttemptSettlementTermsConflict
+		}
+		return nil
+	}
+	a.AuthorizationBundle = canonical
+	a.AuthorizationBundleHash = hash
+	return nil
+}
+
+// GetAuthorizationBundle decodes and verifies the immutable attempt bundle.
+func (a *PaymentAttempt) GetAuthorizationBundle() (*PaymentAttemptAuthorizationBundle, error) {
+	if a == nil || len(a.AuthorizationBundle) == 0 {
+		return nil, nil
+	}
+	var bundle PaymentAttemptAuthorizationBundle
+	if err := json.Unmarshal(a.AuthorizationBundle, &bundle); err != nil {
+		return nil, fmt.Errorf("decode payment attempt authorization bundle: %w", err)
+	}
+	canonical, hash, err := bundle.CanonicalBytesAndHash()
+	if err != nil {
+		return nil, err
+	}
+	if string(canonical) != string(a.AuthorizationBundle) || hash != strings.TrimSpace(a.AuthorizationBundleHash) {
+		return nil, ErrPaymentAttemptSettlementTermsConflict
+	}
+	return &bundle, nil
 }
 
 func (PaymentAttempt) TableName() string { return "payment_attempts" }
@@ -154,13 +241,22 @@ func (a *PaymentAttempt) SetFundingTarget(target PaymentAttemptFundingTarget) er
 	if err := terms.VerifySellerAuthorization(a.SellerTermsSigner, a.SellerTermsSignature); err != nil {
 		return err
 	}
-	if target.AttemptID != a.AttemptID || target.AssetID != terms.AssetID ||
-		target.AmountAtomic != terms.FundingAmount || target.Address != terms.FundingTargetAddress {
-		return fmt.Errorf("%w: funding target does not match settlement terms", ErrPaymentAttemptSettlementTermsConflict)
-	}
 	canonical, hash, err := target.CanonicalBytesAndHash()
 	if err != nil {
 		return err
+	}
+	if a.Kind == PaymentAttemptKindCryptoFundingTarget {
+		bundle, err := a.GetAuthorizationBundle()
+		if err != nil {
+			return err
+		}
+		if bundle == nil || bundle.AuthorizationContextID != a.AuthorizationContextID || bundle.FundingTargetHash != hash {
+			return fmt.Errorf("%w: verified authorization bundle is required before funding target", ErrPaymentAttemptSettlementTermsConflict)
+		}
+	}
+	if target.AttemptID != a.AttemptID || target.AssetID != terms.AssetID ||
+		target.AmountAtomic != terms.FundingAmount || target.Address != terms.FundingTargetAddress {
+		return fmt.Errorf("%w: funding target does not match settlement terms", ErrPaymentAttemptSettlementTermsConflict)
 	}
 	if len(a.FundingTarget) > 0 || strings.TrimSpace(a.FundingTargetHash) != "" {
 		if string(a.FundingTarget) != string(canonical) || strings.TrimSpace(a.FundingTargetHash) != hash {

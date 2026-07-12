@@ -22,6 +22,7 @@ func validPaymentAttemptSettlementTerms() PaymentAttemptSettlementTerms {
 		FundingAmount:        "1000",
 		FundingTargetAddress: "0x4444444444444444444444444444444444444444",
 		RouteBindingID:       "route-1",
+		BuyerPeerID:          "12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
 		SellerPeerID:         "12D3KooWD1GpGf11qVtcDhat8q8rB2du9nohFEFu2DgciUYWY2BC",
 		SellerAddress:        "0x1111111111111111111111111111111111111111",
 		SellerGrossBasis:     "1000",

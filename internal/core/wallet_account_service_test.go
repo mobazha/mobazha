@@ -13,6 +13,7 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/config"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -180,6 +181,68 @@ func TestWalletAccountService_ReserveAddress_RestoresFromPersistedState(t *testi
 	restored, err := restartedService.ReserveAddress(t.Context(), string(rail), contracts.AccountGuest, "guest-order-restore")
 	require.NoError(t, err)
 	assert.Equal(t, first, restored)
+}
+
+func TestWalletAccountService_ReserveAddress_RejectsReferenceScopeConflict(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	migrateWalletAccountModels(t, db)
+
+	service := newWalletAccountServiceForTest(t, db)
+	bitcoinRail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
+	require.True(t, ok)
+	bitcoinCashRail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoinCash)
+	require.True(t, ok)
+	const referenceID = "guest-order-1"
+
+	_, err = service.ReserveAddress(t.Context(), string(bitcoinRail), contracts.AccountGuest, referenceID)
+	require.NoError(t, err)
+
+	_, err = service.ReserveAddress(t.Context(), string(bitcoinCashRail), contracts.AccountGuest, referenceID)
+	require.ErrorContains(t, err, "already bound")
+	_, err = service.ReserveAddress(t.Context(), string(bitcoinRail), contracts.AccountMain, referenceID)
+	require.ErrorContains(t, err, "already bound")
+}
+
+func TestWalletAccountService_ReserveAddress_IsTenantScoped(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	migrateWalletAccountModels(t, db)
+	router, ok := db.(interface {
+		ForTenant(string) (database.Database, error)
+	})
+	require.True(t, ok)
+	tenantADB, err := router.ForTenant("tenant-a")
+	require.NoError(t, err)
+	tenantBDB, err := router.ForTenant("tenant-b")
+	require.NoError(t, err)
+	serviceA := newWalletAccountServiceForTest(t, tenantADB)
+	serviceB := newWalletAccountServiceForTest(t, tenantBDB)
+	rail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
+	require.True(t, ok)
+
+	_, err = serviceA.ReserveAddress(config.ContextWithTenantID(t.Context(), "tenant-a"), string(rail), contracts.AccountGuest, "order-42")
+	require.NoError(t, err)
+	second, err := serviceB.ReserveAddress(config.ContextWithTenantID(t.Context(), "tenant-b"), string(rail), contracts.AccountGuest, "order-42")
+	require.NoError(t, err)
+	retry, err := serviceB.ReserveAddress(config.ContextWithTenantID(t.Context(), "tenant-b"), string(rail), contracts.AccountGuest, "order-42")
+	require.NoError(t, err)
+	assert.Equal(t, second, retry)
+
+	var tenantAReservations []models.WalletAddressReservation
+	require.NoError(t, tenantADB.View(func(tx database.Tx) error {
+		return tx.Read().Where("reference_id = ?", "order-42").Find(&tenantAReservations).Error
+	}))
+	var tenantBReservations []models.WalletAddressReservation
+	require.NoError(t, tenantBDB.View(func(tx database.Tx) error {
+		return tx.Read().Where("reference_id = ?", "order-42").Find(&tenantBReservations).Error
+	}))
+	require.Len(t, tenantAReservations, 1)
+	require.Len(t, tenantBReservations, 1)
+	assert.Equal(t, "tenant-a", tenantAReservations[0].TenantID)
+	assert.Equal(t, "tenant-b", tenantBReservations[0].TenantID)
 }
 
 func TestWalletAccountService_ReserveAddress_ConcurrentReferencesDoNotReuseIndexes(t *testing.T) {

@@ -12,9 +12,84 @@ import (
 	"gorm.io/gorm"
 )
 
-// FreezeCryptoPaymentAttempt atomically persists one shared crypto route,
-// seller-authorized settlement terms, and its actionable funding target.
-// Identical retries are accepted; any mutation of the frozen attempt fails.
+// CreateCryptoPaymentAttemptDraft persists a non-actionable crypto attempt
+// before any seller or moderator key-offer request. Retried provisioning
+// returns the same immutable authorization context.
+func CreateCryptoPaymentAttemptDraft(
+	db *gorm.DB,
+	attempt models.PaymentAttempt,
+	route models.PaymentRouteBinding,
+) (models.PaymentAttempt, error) {
+	if db == nil {
+		return models.PaymentAttempt{}, fmt.Errorf("create crypto payment attempt draft: database is required")
+	}
+	if err := validateCryptoAttemptIdentity(attempt, route); err != nil {
+		return models.PaymentAttempt{}, err
+	}
+	if attempt.AuthorizationContextID != "" {
+		if err := attempt.SetAuthorizationContextID(attempt.AuthorizationContextID); err != nil {
+			return models.PaymentAttempt{}, err
+		}
+	}
+	requestedContextID := attempt.AuthorizationContextID
+	attempt.State = models.PaymentAttemptAuthorizationDraft
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var existing models.PaymentAttempt
+		err := tx.Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if attempt.AuthorizationContextID == "" {
+				contextID, err := models.NewSettlementAuthorizationContextID()
+				if err != nil {
+					return err
+				}
+				if err := attempt.SetAuthorizationContextID(contextID); err != nil {
+					return err
+				}
+			}
+			if err := tx.Create(&route).Error; err != nil {
+				return fmt.Errorf("persist crypto payment route binding: %w", err)
+			}
+			return tx.Create(&attempt).Error
+		}
+		if err != nil {
+			return fmt.Errorf("load crypto payment attempt draft: %w", err)
+		}
+		if !sameCryptoPaymentAttemptDraftRequest(existing, attempt) {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		var existingRoute models.PaymentRouteBinding
+		if err := tx.Where("tenant_id = ? AND route_binding_id = ?", route.TenantID, route.RouteBindingID).First(&existingRoute).Error; err != nil {
+			return fmt.Errorf("load crypto payment route binding: %w", err)
+		}
+		if !samePaymentRouteBinding(existingRoute, route) {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		attempt = existing
+		return nil
+	})
+	if err != nil {
+		// A concurrent creator may have committed the durable draft after this
+		// transaction's initial read. In that case return the winner instead of
+		// leaking a unique-constraint error to an idempotent caller.
+		attempt.AuthorizationContextID = requestedContextID
+		var existing models.PaymentAttempt
+		if loadErr := db.Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&existing).Error; loadErr == nil &&
+			sameCryptoPaymentAttemptDraftRequest(existing, attempt) {
+			var existingRoute models.PaymentRouteBinding
+			if routeErr := db.Where("tenant_id = ? AND route_binding_id = ?", route.TenantID, route.RouteBindingID).First(&existingRoute).Error; routeErr == nil &&
+				samePaymentRouteBinding(existingRoute, route) {
+				return existing, nil
+			}
+		}
+		return models.PaymentAttempt{}, err
+	}
+	return attempt, nil
+}
+
+// FreezeCryptoPaymentAttempt atomically upgrades one persisted authorization
+// draft with seller-authorized terms, its verified key offers, and an
+// actionable funding target. Identical retries are accepted; any mutation of
+// the frozen attempt fails.
 func FreezeCryptoPaymentAttempt(
 	db *gorm.DB,
 	attempt models.PaymentAttempt,
@@ -22,6 +97,7 @@ func FreezeCryptoPaymentAttempt(
 	terms models.PaymentAttemptSettlementTerms,
 	sellerSigner string,
 	sellerSignature []byte,
+	authorization models.PaymentAttemptAuthorizationBundle,
 	target models.PaymentAttemptFundingTarget,
 ) error {
 	if db == nil {
@@ -40,6 +116,9 @@ func FreezeCryptoPaymentAttempt(
 	if err := attempt.SetSellerTermsAuthorization(sellerSigner, sellerSignature); err != nil {
 		return fmt.Errorf("freeze crypto payment attempt seller authorization: %w", err)
 	}
+	if err := attempt.SetAuthorizationBundle(authorization); err != nil {
+		return fmt.Errorf("freeze crypto payment attempt authorization bundle: %w", err)
+	}
 	if err := attempt.SetFundingTarget(target); err != nil {
 		return fmt.Errorf("freeze crypto payment attempt target: %w", err)
 	}
@@ -49,19 +128,9 @@ func FreezeCryptoPaymentAttempt(
 		err := tx.Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&existing).Error
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
-			if err := tx.Create(&route).Error; err != nil {
-				return fmt.Errorf("persist crypto payment route binding: %w", err)
-			}
-			if err := tx.Create(&attempt).Error; err != nil {
-				return fmt.Errorf("persist crypto payment attempt: %w", err)
-			}
-			return nil
+			return fmt.Errorf("crypto payment authorization draft is required before freezing")
 		case err != nil:
 			return fmt.Errorf("load crypto payment attempt: %w", err)
-		}
-
-		if err := verifyFrozenCryptoAttempt(existing, attempt); err != nil {
-			return err
 		}
 		var existingRoute models.PaymentRouteBinding
 		if err := tx.Where("tenant_id = ? AND route_binding_id = ?", route.TenantID, route.RouteBindingID).First(&existingRoute).Error; err != nil {
@@ -70,8 +139,33 @@ func FreezeCryptoPaymentAttempt(
 		if !samePaymentRouteBinding(existingRoute, route) {
 			return models.ErrPaymentAttemptSettlementTermsConflict
 		}
-		return nil
+		if existing.State == models.PaymentAttemptAuthorizationDraft {
+			if !sameCryptoPaymentAttemptIdentity(existing, attempt) {
+				return models.ErrPaymentAttemptSettlementTermsConflict
+			}
+			return tx.Model(&models.PaymentAttempt{}).
+				Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).
+				Select("*").Updates(&attempt).Error
+		}
+		return verifyFrozenCryptoAttempt(existing, attempt)
 	})
+}
+
+func sameCryptoPaymentAttemptIdentity(left, right models.PaymentAttempt) bool {
+	return left.TenantID == right.TenantID && left.AttemptID == right.AttemptID &&
+		left.Kind == right.Kind && left.PaymentSessionID == right.PaymentSessionID &&
+		left.OrderID == right.OrderID && left.AmountValue == right.AmountValue &&
+		left.Currency == right.Currency && left.RouteBindingID == right.RouteBindingID &&
+		left.IdempotencyKey == right.IdempotencyKey &&
+		left.AuthorizationContextID == right.AuthorizationContextID
+}
+
+func sameCryptoPaymentAttemptDraftRequest(existing, requested models.PaymentAttempt) bool {
+	if requested.AuthorizationContextID != "" && existing.AuthorizationContextID != requested.AuthorizationContextID {
+		return false
+	}
+	requested.AuthorizationContextID = existing.AuthorizationContextID
+	return sameCryptoPaymentAttemptIdentity(existing, requested)
 }
 
 func samePaymentRouteBinding(left, right models.PaymentRouteBinding) bool {
@@ -110,6 +204,9 @@ func verifyFrozenCryptoAttempt(existing, expected models.PaymentAttempt) error {
 		string(existing.SettlementTerms) != string(expected.SettlementTerms) ||
 		existing.SellerTermsSigner != expected.SellerTermsSigner ||
 		string(existing.SellerTermsSignature) != string(expected.SellerTermsSignature) ||
+		existing.AuthorizationContextID != expected.AuthorizationContextID ||
+		existing.AuthorizationBundleHash != expected.AuthorizationBundleHash ||
+		string(existing.AuthorizationBundle) != string(expected.AuthorizationBundle) ||
 		existing.FundingTargetHash != expected.FundingTargetHash ||
 		string(existing.FundingTarget) != string(expected.FundingTarget) {
 		return models.ErrPaymentAttemptSettlementTermsConflict

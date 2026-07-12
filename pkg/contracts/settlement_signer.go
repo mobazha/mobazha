@@ -9,7 +9,9 @@ import (
 	"strings"
 )
 
-// SettlementKeyRef is an opaque reference to a settlement-domain key. It
+// SettlementKeyRef is an opaque reference to a settlement-domain key. TenantID
+// is retained for authorization, routing, tenant-specific root selection, and
+// audit; it is not part of the final KDF or signature digest. The reference
 // deliberately contains no derivation path, public parent key, or private key
 // material.
 type SettlementKeyRef struct {

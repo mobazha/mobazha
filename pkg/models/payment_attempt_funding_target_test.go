@@ -18,12 +18,17 @@ func signedSettlementAttempt(t *testing.T) (*PaymentAttempt, PaymentAttemptSettl
 	require.NoError(t, err)
 	sellerPeerID, err := peer.IDFromPublicKey(publicKey)
 	require.NoError(t, err)
+	buyerPrivateKey, buyerPublicKey, err := libp2pcrypto.GenerateEd25519Key(rand.Reader)
+	require.NoError(t, err)
+	buyerPeerID, err := peer.IDFromPublicKey(buyerPublicKey)
+	require.NoError(t, err)
 
 	attempt := &PaymentAttempt{
 		AttemptID: "attempt-1", OrderID: "order-1", Kind: PaymentAttemptKindCryptoFundingTarget,
-		PaymentSessionID: "ps_order-1", RouteBindingID: "route-1", State: PaymentAttemptPendingExternal,
+		PaymentSessionID: "ps_order-1", Currency: "crypto:eip155:1:native", RouteBindingID: "route-1", State: PaymentAttemptPendingExternal,
 	}
 	terms := validPaymentAttemptSettlementTerms()
+	terms.BuyerPeerID = buyerPeerID.String()
 	terms.SellerPeerID = sellerPeerID.String()
 	terms.FundingTargetAddress = "0xescrow"
 	require.NoError(t, attempt.SetSettlementTerms(terms))
@@ -32,6 +37,46 @@ func signedSettlementAttempt(t *testing.T) (*PaymentAttempt, PaymentAttemptSettl
 	signature, err := privateKey.Sign(payload)
 	require.NoError(t, err)
 	require.NoError(t, attempt.SetSellerTermsAuthorization(sellerPeerID.String(), signature))
+	target := PaymentAttemptFundingTarget{
+		Version: PaymentAttemptFundingTargetVersion, AttemptID: attempt.AttemptID,
+		Type: PaymentAttemptFundingTargetAddress, AssetID: terms.AssetID,
+		AmountAtomic: terms.FundingAmount, Address: "0xescrow",
+	}
+	_, targetHash, err := target.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	contextID, err := NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	require.NoError(t, attempt.SetAuthorizationContextID(contextID))
+	offer := SettlementKeyOffer{
+		Version: SettlementAuthorizationVersion, AuthorizationContextID: contextID,
+		OrderID: attempt.OrderID, AttemptID: attempt.AttemptID, ParticipantPeerID: sellerPeerID.String(),
+		ParticipantRole: SettlementParticipantSeller, RailID: terms.AssetID,
+		Purpose: "standard-order-participant:seller", PublicKey: []byte("seller-settlement-public-key"),
+	}
+	offerPayload, err := offer.SigningPayload()
+	require.NoError(t, err)
+	offer.Signature, err = privateKey.Sign(offerPayload)
+	require.NoError(t, err)
+	buyerOffer := SettlementKeyOffer{
+		Version: SettlementAuthorizationVersion, AuthorizationContextID: contextID,
+		OrderID: attempt.OrderID, AttemptID: attempt.AttemptID, ParticipantPeerID: buyerPeerID.String(),
+		ParticipantRole: SettlementParticipantBuyer, RailID: terms.AssetID,
+		Purpose: "standard-order-participant:buyer", PublicKey: []byte("buyer-settlement-public-key"),
+	}
+	buyerOfferPayload, err := buyerOffer.SigningPayload()
+	require.NoError(t, err)
+	buyerOffer.Signature, err = buyerPrivateKey.Sign(buyerOfferPayload)
+	require.NoError(t, err)
+	_, termsHash, err := terms.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	require.NoError(t, attempt.SetAuthorizationBundle(PaymentAttemptAuthorizationBundle{
+		Version: SettlementAuthorizationVersion, AuthorizationContextID: contextID,
+		OrderID: attempt.OrderID, AttemptID: attempt.AttemptID, RailID: terms.AssetID,
+		SettlementTermsHash: termsHash, FundingTargetHash: targetHash,
+		RequiredRoles: []SettlementParticipantRole{SettlementParticipantBuyer, SettlementParticipantSeller},
+		Offers:        []SettlementKeyOffer{buyerOffer, offer}, SellerTermsSigner: sellerPeerID.String(),
+		SellerTermsSignature: signature,
+	}))
 	return attempt, terms
 }
 

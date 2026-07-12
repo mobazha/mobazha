@@ -30,21 +30,6 @@ func TestAssertNoLegacyWalletReceivingState_FailsClosed(t *testing.T) {
 	require.ErrorContains(t, err, "legacy affiliate escrow sweep state exists")
 }
 
-func TestAssertNoLegacyWalletReceivingState_RejectsGuestCounter(t *testing.T) {
-	db, err := MockDB()
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	require.NoError(t, db.Update(func(tx database.Tx) error {
-		if err := tx.Migrate(&models.DirectPaymentAddressCounter{}); err != nil {
-			return err
-		}
-		return tx.Create(&models.DirectPaymentAddressCounter{ID: 1, ChainKey: "BTC", NextIndex: 1})
-	}))
-
-	err = db.Update(assertNoLegacyWalletReceivingState)
-	require.ErrorContains(t, err, "legacy guest address allocation state exists")
-}
-
 func TestAssertNoLegacyWalletReceivingState_RejectsGuestBIP44Sweep(t *testing.T) {
 	db, err := MockDB()
 	require.NoError(t, err)

@@ -22,10 +22,10 @@ func (WalletAddressCursor) TableName() string { return "wallet_address_cursors" 
 // its caller reference. The composite primary key makes ReserveAddress
 // idempotent; the index constraint prevents accidental address reuse.
 type WalletAddressReservation struct {
-	TenantID     string    `gorm:"column:tenant_id;type:varchar(255);primaryKey;default:'';uniqueIndex:uidx_wallet_address_reservation_index,priority:1" json:"-"`
+	TenantID     string    `gorm:"column:tenant_id;type:varchar(255);primaryKey;default:'';uniqueIndex:uidx_wallet_address_reservation_index,priority:1;uniqueIndex:uidx_wallet_address_reservation_reference,priority:1" json:"-"`
 	RailID       string    `gorm:"column:rail_id;type:varchar(255);primaryKey;uniqueIndex:uidx_wallet_address_reservation_index,priority:2"`
 	AccountRole  string    `gorm:"column:account_role;type:varchar(32);primaryKey;uniqueIndex:uidx_wallet_address_reservation_index,priority:3"`
-	ReferenceID  string    `gorm:"column:reference_id;type:varchar(255);primaryKey"`
+	ReferenceID  string    `gorm:"column:reference_id;type:varchar(255);primaryKey;uniqueIndex:uidx_wallet_address_reservation_reference,priority:2"`
 	AddressIndex uint32    `gorm:"column:address_index;not null;uniqueIndex:uidx_wallet_address_reservation_index,priority:4"`
 	Address      string    `gorm:"column:address;type:text;not null"`
 	Tag          string    `gorm:"column:tag;type:text"`

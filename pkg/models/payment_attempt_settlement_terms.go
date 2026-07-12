@@ -34,7 +34,9 @@ type PaymentAttemptSettlementTerms struct {
 	FundingAmount        string                       `json:"fundingAmount"`
 	FundingTargetAddress string                       `json:"fundingTargetAddress"`
 	RouteBindingID       string                       `json:"routeBindingID"`
+	BuyerPeerID          string                       `json:"buyerPeerID"`
 	SellerPeerID         string                       `json:"sellerPeerID"`
+	ModeratorPeerID      string                       `json:"moderatorPeerID,omitempty"`
 	SellerAddress        string                       `json:"sellerAddress"`
 	SellerGrossBasis     string                       `json:"sellerGrossBasis"`
 	PlatformReleaseFee   PaymentAttemptSettlementFee  `json:"platformReleaseFee"`
@@ -87,8 +89,15 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 		strings.TrimSpace(t.DisputePolicy) != DisputeScalingSellerAwardProRataFloor {
 		return fmt.Errorf("invalid payment attempt settlement terms identity")
 	}
-	if _, err := peer.Decode(strings.TrimSpace(t.SellerPeerID)); err != nil {
-		return fmt.Errorf("invalid seller peer ID")
+	for role, peerID := range map[string]string{"buyer": t.BuyerPeerID, "seller": t.SellerPeerID} {
+		if _, err := peer.Decode(strings.TrimSpace(peerID)); err != nil {
+			return fmt.Errorf("invalid %s peer ID", role)
+		}
+	}
+	if strings.TrimSpace(t.ModeratorPeerID) != "" {
+		if _, err := peer.Decode(strings.TrimSpace(t.ModeratorPeerID)); err != nil {
+			return fmt.Errorf("invalid moderator peer ID")
+		}
 	}
 	funding, err := settlementAtomicAmount(t.FundingAmount, true)
 	if err != nil {

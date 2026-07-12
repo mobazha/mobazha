@@ -477,8 +477,34 @@ func TestBuildEscrowRelease_ManagedSolanaDoesNotRequireWallet(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "900", release.GetToAmount())
 	require.Equal(t, "100", release.GetPlatformAmount())
+	require.Equal(t, "solana-platform", release.GetPlatformAddress())
 	require.Len(t, release.GetEscrowSignatures(), 1)
 	require.True(t, releaseUsesBalanceEscrow(order, paymentSent, strategy))
+}
+
+func TestBuildEscrowRelease_ManagedSolanaOmitsZeroPlatformAddress(t *testing.T) {
+	t.Parallel()
+
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainSolana)
+	require.NoError(t, err)
+	strategy := &fakeManagedStrategy{model: payment.PaymentModelMonitored}
+	registry := payment.NewRegistry()
+	registry.RegisterV2(iwallet.ChainSolana, strategy)
+	order := &models.Order{ID: models.OrderID("solana-zero-platform-release")}
+	require.NoError(t, order.SetPaymentSent(&pb.PaymentSent{
+		Coin: coinType.String(), Amount: "1000", ToAddress: "solana-escrow",
+		SettlementSpec: payment.NewSolanaEscrowSpec(false).ToPaymentSent(),
+	}))
+
+	release, err := (&OrderAppService{paymentRegistry: registry}).buildEscrowRelease(
+		order, nil,
+		iwallet.NewAddress("solana-seller", coinType), iwallet.NewAmount(0),
+		iwallet.NewAddress("solana-unused-platform", coinType), iwallet.NewAmount(0),
+		false,
+	)
+	require.NoError(t, err)
+	require.Equal(t, "0", release.GetPlatformAmount())
+	require.Empty(t, release.GetPlatformAddress())
 }
 
 func TestRunMonitoredSettlementComplete_UsesActionStatusTxHash(t *testing.T) {

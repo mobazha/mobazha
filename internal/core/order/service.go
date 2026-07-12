@@ -2070,10 +2070,14 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 		txn.To = append(txn.To, *affiliateSpend)
 	}
 
+	platformAddress := ""
+	if platformAmt.Cmp(iwallet.NewAmount(0)) > 0 {
+		platformAddress = platformAddr.String()
+	}
 	release := &pb.EscrowRelease{
 		ToAddress:       txn.To[0].Address.String(),
 		ToAmount:        txn.To[0].Amount.String(),
-		PlatformAddress: platformAddr.String(),
+		PlatformAddress: platformAddress,
 		PlatformAmount:  platformAmt.String(),
 		TransactionFee:  escrowReleaseFee.String(),
 	}

@@ -466,6 +466,74 @@ func TestMonitorWatchAddress(t *testing.T) {
 	})
 }
 
+func TestMonitorWatchAddress_SharedAddressNotifiesEveryRegisteredNode(t *testing.T) {
+	m := NewMonitor(nil)
+	source := newMockPaymentSource(true)
+	m.AddSource(iwallet.ChainBitcoin, source)
+	notified := map[string]int{}
+	for _, nodeID := range []string{"buyer-node", "seller-node"} {
+		nodeID := nodeID
+		if err := m.RegisterNodeCallback(nodeID, func(_ iwallet.Transaction, wa *WatchedAddress) {
+			notified[nodeID]++
+			if wa.OrderID != "order-shared" {
+				t.Errorf("%s order = %s, want order-shared", nodeID, wa.OrderID)
+			}
+		}); err != nil {
+			t.Fatalf("RegisterNodeCallback(%s): %v", nodeID, err)
+		}
+	}
+
+	first := &WatchedAddress{
+		Address: "shared-address", ScriptPubKey: []byte{0x00, 0x20, 0x01},
+		ChainType: iwallet.ChainBitcoin, OrderID: "order-shared", NodeID: "buyer-node",
+	}
+	second := &WatchedAddress{
+		Address: "shared-address", ScriptPubKey: []byte{0x00, 0x20, 0x01},
+		ChainType: iwallet.ChainBitcoin, OrderID: "order-shared", NodeID: "seller-node",
+	}
+	if err := m.WatchAddress(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WatchAddress(second); err != nil {
+		t.Fatal(err)
+	}
+	// The address is one chain subscription even though multiple hosted nodes
+	// independently register their order-scoped callbacks for it.
+	source.mu.RLock()
+	subscribeCalls := append([]string(nil), source.subscribeCalls...)
+	source.mu.RUnlock()
+	if len(subscribeCalls) != 1 || subscribeCalls[0] != "shared-address" {
+		t.Fatalf("subscribe calls = %v, want one shared subscription", subscribeCalls)
+	}
+
+	tx := &iwallet.Transaction{
+		ID: "shared-tx", Value: iwallet.NewAmount(1000), Height: 1,
+		To: []iwallet.SpendInfo{{
+			Address: iwallet.NewAddress("shared-address", iwallet.CoinType("BTC")), Amount: iwallet.NewAmount(1000),
+		}},
+	}
+	m.handleTransactionForAddress("shared-address", tx)
+
+	if got := m.GetWatchedAddressCount(); got != 1 {
+		t.Fatalf("watched addresses = %d, want 1", got)
+	}
+	if notified["buyer-node"] != 1 || notified["seller-node"] != 1 {
+		t.Fatalf("notifications = %v, want one per node", notified)
+	}
+
+	// Removing the node that created the underlying watch must promote a
+	// remaining registration instead of tearing down the shared subscription.
+	m.UnregisterNode("buyer-node")
+	if got := m.GetWatchedAddress("shared-address"); got == nil || got.NodeID != "seller-node" {
+		t.Fatalf("primary watch after unregister = %#v, want seller-node", got)
+	}
+	tx.ID = "shared-tx-after-unregister"
+	m.handleTransactionForAddress("shared-address", tx)
+	if notified["buyer-node"] != 1 || notified["seller-node"] != 2 {
+		t.Fatalf("notifications after unregister = %v, want only seller incremented", notified)
+	}
+}
+
 func TestMonitorUnwatchAddress(t *testing.T) {
 	t.Run("non-existent address", func(t *testing.T) {
 		m := NewMonitor(nil)

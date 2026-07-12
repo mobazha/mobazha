@@ -1,6 +1,7 @@
 package utxo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -98,6 +99,7 @@ type PaymentSource interface {
 type Monitor struct {
 	sources             map[iwallet.ChainType][]PaymentSource
 	watching            map[string]*WatchedAddress
+	watchRegistrations  map[string]map[string]*WatchedAddress
 	watchMu             sync.RWMutex
 	pollInterval        time.Duration
 	gracePeriod         time.Duration
@@ -142,6 +144,12 @@ type seenTxState struct {
 	confirmed     bool
 }
 
+type watchedAddressRemoval struct {
+	address string
+	chain   iwallet.ChainType
+	watch   *WatchedAddress
+}
+
 // MonitorConfig holds configuration for the transaction monitor
 type MonitorConfig struct {
 	PollInterval        time.Duration
@@ -172,6 +180,7 @@ func NewMonitor(config *MonitorConfig) *Monitor {
 	return &Monitor{
 		sources:             make(map[iwallet.ChainType][]PaymentSource),
 		watching:            make(map[string]*WatchedAddress),
+		watchRegistrations:  make(map[string]map[string]*WatchedAddress),
 		pollInterval:        config.PollInterval,
 		gracePeriod:         config.GracePeriod,
 		subscribeAllSources: config.SubscribeAllSources,
@@ -308,18 +317,45 @@ func (m *Monitor) UnregisterNode(nodeID string) {
 	delete(m.nodeCallbacks, nodeID)
 	m.nodeCallbacksMu.Unlock()
 
-	// Remove all watched addresses belonging to this node
+	// Remove this node's registrations without tearing down an address still
+	// needed by another tenant/node sharing the monitor.
 	m.watchMu.Lock()
-	addressesToRemove := make([]string, 0)
-	for addr, wa := range m.watching {
-		if wa.NodeID == nodeID {
-			addressesToRemove = append(addressesToRemove, addr)
+	addressesToRemove := make([]watchedAddressRemoval, 0)
+	for addr, registrations := range m.watchRegistrations {
+		primary := m.watching[addr]
+		for key, wa := range registrations {
+			if wa.NodeID == nodeID {
+				delete(registrations, key)
+			}
+		}
+		if len(registrations) == 0 {
+			if primary != nil {
+				addressesToRemove = append(addressesToRemove, watchedAddressRemoval{address: addr, chain: primary.ChainType, watch: primary})
+			}
+			continue
+		}
+		if primary != nil && primary.NodeID == nodeID {
+			for _, replacement := range registrations {
+				replacement.Subscribed = primary.Subscribed
+				replacement.LastPolled = primary.LastPolled
+				replacement.TotalPaid.Store(primary.TotalPaid.Load())
+				if primary.ExpiresAt.After(replacement.ExpiresAt) {
+					replacement.ExpiresAt = primary.ExpiresAt
+					replacement.GracePeriodEnd = primary.GracePeriodEnd
+				}
+				m.watching[addr] = replacement
+				break
+			}
 		}
 	}
-	for _, addr := range addressesToRemove {
-		delete(m.watching, addr)
+	for _, removal := range addressesToRemove {
+		delete(m.watching, removal.address)
+		delete(m.watchRegistrations, removal.address)
 	}
 	m.watchMu.Unlock()
+	for _, removal := range addressesToRemove {
+		m.unsubscribeAddress(removal.address, removal.chain)
+	}
 
 	log.Infof("Unregistered node %s, removed %d watched addresses", nodeID, len(addressesToRemove))
 }
@@ -361,7 +397,39 @@ func (m *Monitor) WatchAddress(wa *WatchedAddress) error {
 	}
 
 	m.watchMu.Lock()
+	if existing := m.watching[wa.Address]; existing != nil {
+		if existing.ChainType != wa.ChainType || !bytes.Equal(existing.ScriptPubKey, wa.ScriptPubKey) {
+			m.watchMu.Unlock()
+			return fmt.Errorf("address %s is already watched with different chain binding", wa.Address)
+		}
+		registrations := m.watchRegistrations[wa.Address]
+		if registrations == nil {
+			registrations = map[string]*WatchedAddress{
+				watchedAddressRegistrationKey(existing): existing,
+			}
+			m.watchRegistrations[wa.Address] = registrations
+		}
+		key := watchedAddressRegistrationKey(wa)
+		if registered := registrations[key]; registered != nil {
+			if wa.ExpiresAt.After(registered.ExpiresAt) {
+				registered.ExpiresAt = wa.ExpiresAt
+				registered.GracePeriodEnd = wa.GracePeriodEnd
+			}
+			m.watchMu.Unlock()
+			return nil
+		}
+		registrations[key] = wa
+		if wa.ExpiresAt.After(existing.ExpiresAt) {
+			existing.ExpiresAt = wa.ExpiresAt
+			existing.GracePeriodEnd = wa.GracePeriodEnd
+		}
+		m.watchMu.Unlock()
+		return nil
+	}
 	m.watching[wa.Address] = wa
+	m.watchRegistrations[wa.Address] = map[string]*WatchedAddress{
+		watchedAddressRegistrationKey(wa): wa,
+	}
 	m.watchMu.Unlock()
 
 	// Try to subscribe via available sources
@@ -380,7 +448,7 @@ func (m *Monitor) WatchAddress(wa *WatchedAddress) error {
 		}
 
 		err := source.Subscribe(ctx, wa.Address, wa.ScriptPubKey, func(tx *iwallet.Transaction) {
-			m.handleTransaction(wa, tx)
+			m.handleTransactionForAddress(wa.Address, tx)
 		})
 		if err != nil {
 			log.Warningf("Failed to subscribe via source for %s: %v", wa.Address, err)
@@ -412,6 +480,10 @@ func (m *Monitor) WatchAddress(wa *WatchedAddress) error {
 	return nil
 }
 
+func watchedAddressRegistrationKey(wa *WatchedAddress) string {
+	return wa.NodeID + "\x00" + wa.OrderID
+}
+
 // UnwatchAddress stops watching an address
 func (m *Monitor) UnwatchAddress(address string) error {
 	m.watchMu.Lock()
@@ -421,21 +493,22 @@ func (m *Monitor) UnwatchAddress(address string) error {
 		return nil
 	}
 	delete(m.watching, address)
+	delete(m.watchRegistrations, address)
 	m.watchMu.Unlock()
 
-	// Unsubscribe from all sources
-	ctx := context.Background()
-	sources := m.sources[wa.ChainType]
-	for _, source := range sources {
-		if source.IsHealthy() {
-			source.Unsubscribe(ctx, address)
-		}
-	}
-
-	// Clean up seen transactions for this address to prevent memory leak
-	m.cleanupSeenTxsForAddress(address)
+	m.unsubscribeAddress(address, wa.ChainType)
 
 	return nil
+}
+
+func (m *Monitor) unsubscribeAddress(address string, chain iwallet.ChainType) {
+	ctx := context.Background()
+	for _, source := range m.sources[chain] {
+		if err := source.Unsubscribe(ctx, address); err != nil {
+			log.Warningf("Failed to unsubscribe source for %s: %v", address, err)
+		}
+	}
+	m.cleanupSeenTxsForAddress(address)
 }
 
 // cleanupSeenTxsForAddress removes all seen transaction entries for a given address
@@ -473,13 +546,13 @@ func (m *Monitor) pollAllAddresses() {
 
 	m.watchMu.RLock()
 	addresses := make([]*WatchedAddress, 0, len(m.watching))
-	fullyExpiredAddresses := make([]string, 0)
+	fullyExpiredAddresses := make([]watchedAddressRemoval, 0)
 
 	for addr, wa := range m.watching {
 		// Only remove addresses after grace period ends (not just after ExpiresAt)
 		// This ensures we still catch late payments
 		if !wa.GracePeriodEnd.IsZero() && now.After(wa.GracePeriodEnd) {
-			fullyExpiredAddresses = append(fullyExpiredAddresses, addr)
+			fullyExpiredAddresses = append(fullyExpiredAddresses, watchedAddressRemoval{address: addr, chain: wa.ChainType, watch: wa})
 			continue
 		}
 
@@ -493,15 +566,21 @@ func (m *Monitor) pollAllAddresses() {
 	// Clean up fully expired addresses (past grace period)
 	if len(fullyExpiredAddresses) > 0 {
 		m.watchMu.Lock()
-		for _, addr := range fullyExpiredAddresses {
-			delete(m.watching, addr)
-			log.Infof("Removed watch address after grace period: %s", addr)
+		removed := fullyExpiredAddresses[:0]
+		for _, removal := range fullyExpiredAddresses {
+			current := m.watching[removal.address]
+			if current != removal.watch || current == nil || current.GracePeriodEnd.IsZero() || !now.After(current.GracePeriodEnd) {
+				continue
+			}
+			delete(m.watching, removal.address)
+			delete(m.watchRegistrations, removal.address)
+			removed = append(removed, removal)
+			log.Infof("Removed watch address after grace period: %s", removal.address)
 		}
 		m.watchMu.Unlock()
 
-		// Also clean up seenTxs cache for these addresses
-		for _, addr := range fullyExpiredAddresses {
-			m.cleanupSeenTxsForAddress(addr)
+		for _, removal := range removed {
+			m.unsubscribeAddress(removal.address, removal.chain)
 		}
 	}
 
@@ -587,9 +666,33 @@ func (m *Monitor) pollAddress(wa *WatchedAddress) {
 }
 
 func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction) {
+	m.handleTransactionForAddressWithFallback(wa.Address, wa, tx)
+}
+
+func (m *Monitor) handleTransactionForAddress(address string, tx *iwallet.Transaction) {
+	m.handleTransactionForAddressWithFallback(address, nil, tx)
+}
+
+func (m *Monitor) handleTransactionForAddressWithFallback(address string, fallback *WatchedAddress, tx *iwallet.Transaction) {
+	m.watchMu.RLock()
+	primary := m.watching[address]
+	registrationsByKey := m.watchRegistrations[address]
+	registrations := make([]*WatchedAddress, 0, len(registrationsByKey))
+	for _, wa := range registrationsByKey {
+		registrations = append(registrations, wa)
+	}
+	m.watchMu.RUnlock()
+	if len(registrations) == 0 && fallback != nil {
+		primary = fallback
+		registrations = append(registrations, fallback)
+	}
+	if primary == nil || len(registrations) == 0 {
+		return
+	}
+
 	// Deduplication: check if we've already processed this transaction for this address
 	// This prevents duplicate notifications when multiple sources detect the same transaction
-	dedupeKey := wa.Address + ":" + string(tx.ID)
+	dedupeKey := address + ":" + string(tx.ID)
 
 	m.seenTxsMu.Lock()
 	state, seen := m.seenTxs[dedupeKey]
@@ -598,7 +701,7 @@ func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction)
 	if seen {
 		if tx.Height == 0 || (state.confirmed && now.Sub(state.lastDelivered) < m.confirmedRedeliveryInterval()) {
 			m.seenTxsMu.Unlock()
-			log.Debugf("Skipping duplicate transaction %s for address %s", tx.ID, wa.Address)
+			log.Debugf("Skipping duplicate transaction %s for address %s", tx.ID, address)
 			return
 		}
 		state.height = tx.Height
@@ -616,29 +719,22 @@ func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction)
 	}
 	m.seenTxsMu.Unlock()
 
-	txPaid := AmountPaidTo(tx, wa.Address)
-	if !alreadyCounted {
-		wa.TotalPaid.Add(txPaid)
-	}
-
-	status := m.determinePaymentStatus(wa, tx)
-
-	// Call the OnPayment callback if set
-	if wa.OnPayment != nil {
-		wa.OnPayment(tx, status)
-	}
-
-	// Broadcast to all subscribers (channel-based)
+	txPaid := AmountPaidTo(tx, address)
 	m.broadcast(*tx)
-
-	// Notify the specific node via its registered callback (shared monitor mode)
-	// Pass WatchedAddress so node can directly access OrderID without DB query
-	if wa.NodeID != "" {
-		m.notifyNode(wa.NodeID, *tx, wa)
+	for _, wa := range registrations {
+		if !alreadyCounted {
+			wa.TotalPaid.Add(txPaid)
+		}
+		status := m.determinePaymentStatus(wa, tx)
+		if wa.OnPayment != nil {
+			wa.OnPayment(tx, status)
+		}
+		if wa.NodeID != "" {
+			m.notifyNode(wa.NodeID, *tx, wa)
+		}
+		log.Infof("Transaction detected for %s (node=%s): txid=%s, amount=%s, status=%s",
+			wa.OrderID, wa.NodeID, tx.ID, tx.Value.String(), status.String())
 	}
-
-	log.Infof("Transaction detected for %s (node=%s): txid=%s, amount=%s, status=%s",
-		wa.OrderID, wa.NodeID, tx.ID, tx.Value.String(), status.String())
 }
 
 func (m *Monitor) confirmedRedeliveryInterval() time.Duration {
@@ -1024,7 +1120,7 @@ func (m *Monitor) resubscribeChain(chain iwallet.ChainType, source PaymentSource
 	succeeded := make([]*WatchedAddress, 0, len(toResubscribe))
 	for _, wa := range toResubscribe {
 		err := source.Subscribe(ctx, wa.Address, wa.ScriptPubKey, func(tx *iwallet.Transaction) {
-			m.handleTransaction(wa, tx)
+			m.handleTransactionForAddress(wa.Address, tx)
 		})
 		if err != nil {
 			log.Warningf("Failed to re-subscribe address %s after source recovery: %v", wa.Address, err)

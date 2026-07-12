@@ -8,24 +8,26 @@ import (
 )
 
 type EscrowInfo struct {
-	ContractAddress      string
-	PayerAddress         string
-	PlatformAuthority    string
-	BuyerAddress         string
-	RefundAddress        string
-	SellerAddress        string
-	ModeratorAddress     string
-	PlatformFeeCollector string
-	RentCollector        string
-	UniqueId             [20]byte
-	RequiredSignatures   uint8
-	UnlockHours          uint64
-	UnlockTime           int64
-	FundingDeadline      int64
-	EscrowServiceFee     uint64
-	CoinType             CoinType
-	Amount               uint64
-	Testnet              bool // 是否使用测试网
+	ContractAddress        string
+	PayerAddress           string
+	PlatformAuthority      string
+	BuyerAddress           string
+	RefundAddress          string
+	SellerAddress          string
+	SellerPayoutAddress    string
+	ModeratorAddress       string
+	ModeratorPayoutAddress string
+	PlatformFeeCollector   string
+	RentCollector          string
+	UniqueId               [20]byte
+	RequiredSignatures     uint8
+	UnlockHours            uint64
+	UnlockTime             int64
+	FundingDeadline        int64
+	EscrowServiceFee       uint64
+	CoinType               CoinType
+	Amount                 uint64
+	Testnet                bool // 是否使用测试网
 }
 
 func (e *EscrowInfo) GetSolanaUsersInfo() (payer solana.PublicKey, buyer solana.PublicKey, seller solana.PublicKey, moderator solana.PublicKey, err error) {

@@ -328,6 +328,9 @@ func (n *MobazhaNode) RunOutboxCleanupOnce(_ context.Context) {
 // First-party modules still own observation loops; Core owns durable attempt
 // recovery because it owns the idempotency claim and historical route.
 func (n *MobazhaNode) RunPaymentReconcileScanOnce(ctx context.Context) {
+	if err := n.RecoverFrozenStandardOrderUTXOWatches(ctx); err != nil {
+		logger.LogWarningWithIDf(log, n.nodeID, "frozen standard order UTXO watch reconciliation: %v", err)
+	}
 	if n.directPaymentService != nil {
 		if _, err := n.directPaymentService.RecoverPendingExternalPaymentAddresses(ctx); err != nil {
 			logger.LogWarningWithIDf(log, n.nodeID, "direct observed address reconciliation: %v", err)

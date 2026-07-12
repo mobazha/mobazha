@@ -47,64 +47,86 @@ type standardOrderUTXOFundingTargetProjector struct {
 	wallets contracts.WalletOperator
 }
 
+type standardOrderUTXOProjection struct {
+	Target       models.PaymentAttemptFundingTarget
+	RedeemScript []byte
+}
+
 func (p standardOrderUTXOFundingTargetProjector) ProjectStandardOrderFundingTarget(
 	ctx context.Context,
 	attempt models.PaymentAttempt,
 	route models.PaymentRouteBinding,
 	offers []models.SettlementKeyOffer,
 ) (models.PaymentAttemptFundingTarget, error) {
-	if err := ctx.Err(); err != nil {
+	projection, err := p.project(ctx, attempt, route, offers)
+	if err != nil {
 		return models.PaymentAttemptFundingTarget{}, err
 	}
-	if p.wallets == nil || attempt.State != models.PaymentAttemptAuthorizationDraft ||
+	return projection.Target, nil
+}
+
+func (p standardOrderUTXOFundingTargetProjector) project(
+	ctx context.Context,
+	attempt models.PaymentAttempt,
+	route models.PaymentRouteBinding,
+	offers []models.SettlementKeyOffer,
+) (standardOrderUTXOProjection, error) {
+	if err := ctx.Err(); err != nil {
+		return standardOrderUTXOProjection{}, err
+	}
+	if p.wallets == nil || (attempt.State != models.PaymentAttemptAuthorizationDraft &&
+		attempt.State != models.PaymentAttemptFundingTargetReady) ||
 		attempt.ExpectedModeratorPeerID != "" || route.AssetID != attempt.Currency || len(offers) != 2 {
-		return models.PaymentAttemptFundingTarget{}, fmt.Errorf("standard order UTXO funding target requires an unmoderated authorization draft")
+		return standardOrderUTXOProjection{}, fmt.Errorf("standard order UTXO funding target requires an unmoderated authorization attempt")
 	}
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(attempt.Currency))
 	if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
-		return models.PaymentAttemptFundingTarget{}, fmt.Errorf("standard order funding target requires a native UTXO rail")
+		return standardOrderUTXOProjection{}, fmt.Errorf("standard order funding target requires a native UTXO rail")
 	}
 	wallet, err := p.wallets.WalletForCurrencyCode(attempt.Currency)
 	if err != nil {
-		return models.PaymentAttemptFundingTarget{}, fmt.Errorf("load standard order UTXO wallet: %w", err)
+		return standardOrderUTXOProjection{}, fmt.Errorf("load standard order UTXO wallet: %w", err)
 	}
 	escrowWallet, ok := wallet.(iwallet.UTXOEscrow)
 	if !ok {
-		return models.PaymentAttemptFundingTarget{}, fmt.Errorf("wallet for %s does not support UTXO escrow", attempt.Currency)
+		return standardOrderUTXOProjection{}, fmt.Errorf("wallet for %s does not support UTXO escrow", attempt.Currency)
 	}
 	roleKeys := make(map[models.SettlementParticipantRole]*btcec.PublicKey, len(offers))
 	for _, offer := range offers {
 		if err := offer.Verify(); err != nil {
-			return models.PaymentAttemptFundingTarget{}, err
+			return standardOrderUTXOProjection{}, err
 		}
 		if offer.OrderID != attempt.OrderID || offer.AttemptID != attempt.AttemptID ||
 			offer.AuthorizationContextID != attempt.AuthorizationContextID || offer.RailID != attempt.Currency ||
 			offer.Purpose != standardOrderSettlementKeyPurpose+":"+string(offer.ParticipantRole) {
-			return models.PaymentAttemptFundingTarget{}, models.ErrPaymentAttemptSettlementTermsConflict
+			return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
 		}
 		if offer.ParticipantRole != models.SettlementParticipantBuyer &&
 			offer.ParticipantRole != models.SettlementParticipantSeller {
-			return models.PaymentAttemptFundingTarget{}, models.ErrPaymentAttemptSettlementTermsConflict
+			return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
 		}
 		if _, exists := roleKeys[offer.ParticipantRole]; exists {
-			return models.PaymentAttemptFundingTarget{}, models.ErrPaymentAttemptSettlementTermsConflict
+			return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
 		}
 		key, err := btcec.ParsePubKey(offer.PublicKey)
 		if err != nil {
-			return models.PaymentAttemptFundingTarget{}, fmt.Errorf("parse %s settlement public key: %w", offer.ParticipantRole, err)
+			return standardOrderUTXOProjection{}, fmt.Errorf("parse %s settlement public key: %w", offer.ParticipantRole, err)
 		}
 		roleKeys[offer.ParticipantRole] = key
 	}
 	buyerKey := roleKeys[models.SettlementParticipantBuyer]
 	sellerKey := roleKeys[models.SettlementParticipantSeller]
 	if buyerKey == nil || sellerKey == nil || buyerKey.IsEqual(sellerKey) {
-		return models.PaymentAttemptFundingTarget{}, models.ErrPaymentAttemptSettlementTermsConflict
+		return standardOrderUTXOProjection{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	address, _, err := escrowWallet.CreateMultisigAddress(
+	address, redeemScript, err := escrowWallet.CreateMultisigAddress(
 		[]btcec.PublicKey{*buyerKey, *sellerKey}, nil, 1,
 	)
 	if err != nil {
-		return models.PaymentAttemptFundingTarget{}, fmt.Errorf("create standard order UTXO funding target: %w", err)
+		return standardOrderUTXOProjection{}, fmt.Errorf("create standard order UTXO funding target: %w", err)
+	}
+	if len(redeemScript) == 0 {
+		return standardOrderUTXOProjection{}, fmt.Errorf("standard order UTXO funding target has no redeem script")
 	}
 	target := models.PaymentAttemptFundingTarget{
 		Version: models.PaymentAttemptFundingTargetVersion, AttemptID: attempt.AttemptID,
@@ -112,9 +134,11 @@ func (p standardOrderUTXOFundingTargetProjector) ProjectStandardOrderFundingTarg
 		AmountAtomic: attempt.AmountValue, Address: strings.TrimSpace(address.String()),
 	}
 	if _, _, err := target.CanonicalBytesAndHash(); err != nil {
-		return models.PaymentAttemptFundingTarget{}, err
+		return standardOrderUTXOProjection{}, err
 	}
-	return target, nil
+	return standardOrderUTXOProjection{
+		Target: target, RedeemScript: append([]byte(nil), redeemScript...),
+	}, nil
 }
 
 // FinalizeStandardOrderSettlementAuthorization creates and freezes the
@@ -160,6 +184,11 @@ func (n *MobazhaNode) FinalizeStandardOrderSettlementAuthorization(
 		standardOrderUTXOFundingTargetProjector{wallets: n.multiwallet}, attemptID,
 	)
 	if err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
+	}
+	if err := n.watchFrozenStandardOrderUTXOAttempt(
+		ctx, finalization.Attempt.TenantID, finalization.Attempt.AttemptID,
+	); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
 	buyer, err := peer.Decode(finalization.Terms.BuyerPeerID)
@@ -346,10 +375,19 @@ func (n *MobazhaNode) AdoptStandardOrderSettlementAuthorization(
 	if !ok || rawProvider.RawDB() == nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("standard order settlement adoption raw database is unavailable")
 	}
-	return adoptBuyerSettlementAuthorization(
+	finalization, err := adoptBuyerSettlementAuthorization(
 		ctx, rawProvider.RawDB(), &order, n.signer,
 		standardOrderUTXOFundingTargetProjector{wallets: n.multiwallet}, authorization,
 	)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
+	}
+	if err := n.watchFrozenStandardOrderUTXOAttempt(
+		ctx, finalization.Attempt.TenantID, finalization.Attempt.AttemptID,
+	); err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
+	}
+	return finalization, nil
 }
 
 // AdoptRetainedStandardOrderSettlementAuthorization loads the canonical

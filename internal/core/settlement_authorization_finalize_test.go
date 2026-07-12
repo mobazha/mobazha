@@ -32,6 +32,27 @@ type settlementFinalizationWalletAccounts struct {
 	}
 }
 
+type settlementAuthorizationPaymentWatch struct {
+	orderID      string
+	address      string
+	chain        iwallet.ChainType
+	scriptPubKey []byte
+	calls        int
+}
+
+func (w *settlementAuthorizationPaymentWatch) WatchPaymentAddress(
+	orderID, address string,
+	chain iwallet.ChainType,
+	scriptPubKey []byte,
+) error {
+	w.orderID = orderID
+	w.address = address
+	w.chain = chain
+	w.scriptPubKey = append([]byte(nil), scriptPubKey...)
+	w.calls++
+	return nil
+}
+
 func (*settlementFinalizationWalletAccounts) Capabilities(context.Context, string) (contracts.WalletCapabilities, error) {
 	return contracts.WalletCapabilities{Receive: true}, nil
 }
@@ -149,6 +170,10 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	require.Equal(t, first.Attempt.AuthorizationBundleHash, retry.Attempt.AuthorizationBundleHash)
 	require.Equal(t, first.Target, retry.Target)
 	require.Equal(t, first.Terms, retry.Terms)
+	projection, err := projector.project(t.Context(), first.Attempt, first.Route, first.Authorization.Offers)
+	require.NoError(t, err)
+	require.Equal(t, first.Target, projection.Target)
+	require.NotEmpty(t, projection.RedeemScript)
 	require.Len(t, walletAccounts.requests, 1, "frozen retry must not allocate another payout address")
 	require.Equal(t, contracts.AccountMain, walletAccounts.requests[0].role)
 	require.Equal(t, standardOrderSellerPayoutReferencePrefix+attempt.AttemptID, walletAccounts.requests[0].referenceID)
@@ -201,6 +226,16 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	require.Equal(t, first.Attempt.AuthorizationBundleHash, adopted.Attempt.AuthorizationBundleHash)
 	require.Equal(t, adopted.Attempt.AuthorizationBundleHash, adoptedRetry.Attempt.AuthorizationBundleHash)
 	require.Equal(t, first.Target, adopted.Target)
+
+	watch := &settlementAuthorizationPaymentWatch{}
+	require.NoError(t, watchFrozenStandardOrderUTXOAttempt(
+		t.Context(), buyerDB, projector.wallets, watch, attempt.TenantID, attempt.AttemptID,
+	))
+	require.Equal(t, 1, watch.calls)
+	require.Equal(t, attempt.OrderID, watch.orderID)
+	require.Equal(t, first.Target.Address, watch.address)
+	require.Equal(t, iwallet.ChainBitcoin, watch.chain)
+	require.NotEmpty(t, watch.scriptPubKey)
 }
 
 func TestStandardOrderUTXOFundingTargetProjector_RejectsInvalidOffers(t *testing.T) {

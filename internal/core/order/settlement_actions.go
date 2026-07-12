@@ -759,6 +759,15 @@ func (s *OrderAppService) submitSettlementAction(ctx context.Context, action str
 	if len(releaseInfo) > 0 {
 		params.ReleaseInfo = releaseInfo[0]
 	}
+	if _, ok := strategy.(payment.AttemptSettlementActionAuthorizer); ok {
+		attemptContext, handled, loadErr := s.frozenSettlementAttemptActionContext(ctx, order, coinType)
+		if loadErr != nil {
+			return "", nil, handled, loadErr
+		}
+		if handled {
+			applyFrozenSettlementAttemptActionParams(&params, attemptContext)
+		}
+	}
 	var result *payment.ActionResult
 	switch action {
 	case payment.SettlementActionCancel:

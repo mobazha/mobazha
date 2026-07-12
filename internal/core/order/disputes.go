@@ -619,7 +619,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	var modAddr iwallet.Address
 	var modValue iwallet.Amount
 	frozenTerms, err := s.frozenStandardOrderSettlementTerms(&models.Order{
-		TenantMixin: models.TenantMixin{TenantID: s.nodeID}, ID: orderID,
+		TenantMixin: models.TenantMixin{TenantID: disputeCase.TenantID}, ID: orderID,
 	})
 	if err != nil {
 		return err
